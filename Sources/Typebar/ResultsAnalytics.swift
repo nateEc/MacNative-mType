@@ -96,6 +96,51 @@ enum WordBurstHeatmapPolicy {
   }
 }
 
+/// A local-only, deliberately conservative follow-up exercise generated from
+/// words the user actually attempted in the just-finished result. It leaves
+/// unmeasured words out instead of assigning them an invented speed.
+struct SlowWordPracticePlan: Equatable {
+  let selectedWords: [String]
+  let exerciseWords: [String]
+
+  static let minimumMeasuredWords = 5
+
+  static func make(reviews: [TypedWordReview], bursts: [Int?]) -> Self? {
+    struct Candidate {
+      let index: Int
+      let target: String
+      let burst: Int
+    }
+
+    let candidates = reviews.enumerated().compactMap { index, review -> Candidate? in
+      guard bursts.indices.contains(index), let burst = bursts[index], burst > 0,
+        !review.target.isEmpty
+      else { return nil }
+      return .init(index: index, target: review.target, burst: burst)
+    }
+    guard candidates.count >= minimumMeasuredWords else { return nil }
+
+    let selectedCount = min(12, max(1, Int((Double(candidates.count) * 0.25).rounded(.up))))
+    let ranked = candidates.sorted {
+      $0.burst == $1.burst ? $0.index < $1.index : $0.burst < $1.burst
+    }
+    var selected: [Candidate] = []
+    var seen = Set<String>()
+    for candidate in ranked where seen.insert(candidate.target).inserted {
+      selected.append(candidate)
+      if selected.count == selectedCount { break }
+    }
+    guard !selected.isEmpty else { return nil }
+
+    let denominator = max(1, selected.count - 1)
+    let exerciseWords = selected.enumerated().flatMap { index, candidate in
+      let repetitions = max(1, 3 - Int((Double(index) / Double(denominator) * 2).rounded(.down)))
+      return Array(repeating: candidate.target, count: repetitions)
+    }
+    return .init(selectedWords: selected.map(\.target), exerciseWords: exerciseWords)
+  }
+}
+
 struct ResultPerformancePoint: Equatable, Identifiable {
   let elapsed: TimeInterval
   let wpm: Int

@@ -495,6 +495,8 @@ private struct ContentView: View {
         lastCompletedWpm = result.wpm
         repeatedPaceArmed = settings.repeatedPace
         let savesResult = settings.saveCompletedResults
+        let wordReviews = session.wordReviews
+        let wordBursts = session.wordBurstHistory
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
           modelContext.insert(TestResultRecord(result: result))
         }
@@ -502,8 +504,9 @@ private struct ContentView: View {
           result: result,
           savesResult: savesResult,
           missedWords: session.missedWords,
-          wordReviews: session.wordReviews,
-          wordBursts: session.wordBurstHistory,
+          wordReviews: wordReviews,
+          wordBursts: wordBursts,
+          slowWordPractice: SlowWordPracticePlan.make(reviews: wordReviews, bursts: wordBursts),
           challengeEvaluation: TypebarChallengeLibrary.challenge(
             id: result.configuration.challengeID
           ).map { ChallengeEvaluator.evaluate(result, challenge: $0) }
@@ -596,14 +599,11 @@ private struct ContentView: View {
         missedWords: result.missedWords,
         wordReviews: result.wordReviews,
         wordBursts: result.wordBursts,
+        slowWordPractice: result.slowWordPractice,
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
-        onPracticeMissedWords: {
-          customText = result.missedWords.joined(separator: " ")
-          mode = .custom
-          completedResult = nil
-          reset()
-        }
+        onPracticeMissedWords: { startWordPractice(result.missedWords) },
+        onPracticeSlowWords: { startWordPractice($0) }
       )
     }
     .alert(item: $terminalNotice) { notice in
@@ -1798,6 +1798,16 @@ private struct ContentView: View {
       )?.id ?? selectedQuoteID
   }
 
+  private func startWordPractice(_ words: [String]) {
+    guard !words.isEmpty else { return }
+    customText = words.joined(separator: " ")
+    customTextCompletion = .finish
+    customTextOrdering = .inOrder
+    mode = .custom
+    completedResult = nil
+    reset()
+  }
+
   private func publishIfEnabled(_ result: CompletedTestResult) {
     publicationMessage = nil
     guard settings.publishCompletedResults, account.currentUser != nil else { return }
@@ -1855,6 +1865,7 @@ private struct CompletedResultPresentation: Identifiable {
   let missedWords: [String]
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
+  let slowWordPractice: SlowWordPracticePlan?
   let challengeEvaluation: ChallengeEvaluation?
   var id: UUID { result.id }
 }
@@ -1878,9 +1889,11 @@ private struct CompletedResultView: View {
   let missedWords: [String]
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
+  let slowWordPractice: SlowWordPracticePlan?
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onPracticeMissedWords: () -> Void
+  let onPracticeSlowWords: ([String]) -> Void
   @State private var exportStatus: String?
 
   var body: some View {
@@ -1965,6 +1978,11 @@ private struct CompletedResultView: View {
         Spacer()
         if !missedWords.isEmpty {
           Button("练习错词（\(missedWords.count)）", action: onPracticeMissedWords)
+        }
+        if let slowWordPractice {
+          Button("练习慢词（\(slowWordPractice.selectedWords.count)）") {
+            onPracticeSlowWords(slowWordPractice.exerciseWords)
+          }
         }
         Button("再来一次", action: onRestart)
           .buttonStyle(.borderedProminent)
