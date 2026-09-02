@@ -516,7 +516,7 @@ private struct ContentView: View {
       Button("通知", systemImage: "bell") { showingNotifications = true }
     }
     .sheet(isPresented: $showingHistory) {
-      ResultsHistoryView()
+      ResultsHistoryView(settings: settings)
     }
     .sheet(isPresented: $showingPresets) {
       PresetLibraryView(currentPreset: presetDefinition, onApply: apply)
@@ -2003,6 +2003,7 @@ private struct WordReviewHistoryView: View {
 }
 
 private struct ResultsHistoryView: View {
+  let settings: AppSettings
   fileprivate enum ActivityChartMeasure: String, CaseIterable, Identifiable {
     case completedTests
     case typingMinutes
@@ -2113,7 +2114,7 @@ private struct ResultsHistoryView: View {
               PointMark(x: .value("日期", metric.finishedAt), y: .value("WPM", metric.wpm))
                 .foregroundStyle(.tint)
             }
-            .chartYScale(domain: .automatic(includesZero: true))
+            .chartYScale(domain: .automatic(includesZero: settings.startGraphsAtZero))
             .frame(height: 120)
             .padding(.horizontal)
 

@@ -312,6 +312,10 @@ struct PreferencesView: View {
           Text("只影响完成结果页的速度和准确率显示；本机成绩、统计和同步仍以 WPM 保存。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Toggle("历史速度图从零开始", isOn: $settings.startGraphsAtZero)
+          Text("关闭后，历史速度趋势图会按实际数据范围缩放，细小变化可能显得更大；完成次数和练习分钟图仍从零开始。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Picker("已输入字符效果", selection: $settings.typedCharacterEffect) {
             ForEach(TypedCharacterEffect.allCases) { effect in
               Text(effect.displayName).tag(effect)

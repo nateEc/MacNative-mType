@@ -308,6 +308,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var compositionDisplayStyle: CompositionDisplayStyle = .replace
   var typingSpeedUnit: TypingSpeedUnit = .wpm
   var alwaysShowDecimalPlaces = false
+  var startGraphsAtZero = true
   var typedCharacterEffect: TypedCharacterEffect = .keep
   var liveSpeedStyle: LiveMetricStyle = .text
   var liveAccuracyStyle: LiveMetricStyle = .text
@@ -370,6 +371,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     compositionDisplayStyle: CompositionDisplayStyle = .replace,
     typingSpeedUnit: TypingSpeedUnit = .wpm,
     alwaysShowDecimalPlaces: Bool = false,
+    startGraphsAtZero: Bool = true,
     typedCharacterEffect: TypedCharacterEffect = .keep,
     liveSpeedStyle: LiveMetricStyle = .text,
     liveAccuracyStyle: LiveMetricStyle = .text,
@@ -433,6 +435,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.compositionDisplayStyle = compositionDisplayStyle
     self.typingSpeedUnit = typingSpeedUnit
     self.alwaysShowDecimalPlaces = alwaysShowDecimalPlaces
+    self.startGraphsAtZero = startGraphsAtZero
     self.typedCharacterEffect = typedCharacterEffect
     self.liveSpeedStyle = liveSpeedStyle
     self.liveAccuracyStyle = liveAccuracyStyle
@@ -463,7 +466,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       minimumAccuracy, minimumWpm, minimumWordBurstWpm,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
       smoothPracticeLineScroll, showAllPracticeLines, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
-      alwaysShowDecimalPlaces,
+      alwaysShowDecimalPlaces, startGraphsAtZero,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
       testModifiers, showFocusWarning,
       showCapsLockWarning, playErrorBeep, playKeyclickSound, timeWarningOffset, soundVolume,
@@ -541,6 +544,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     typingSpeedUnit = try values.decodeIfPresent(TypingSpeedUnit.self, forKey: .typingSpeedUnit) ?? .wpm
     alwaysShowDecimalPlaces =
       try values.decodeIfPresent(Bool.self, forKey: .alwaysShowDecimalPlaces) ?? false
+    startGraphsAtZero =
+      try values.decodeIfPresent(Bool.self, forKey: .startGraphsAtZero) ?? true
     typedCharacterEffect = try values.decodeIfPresent(TypedCharacterEffect.self, forKey: .typedCharacterEffect) ?? .keep
     liveSpeedStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveSpeedStyle) ?? .text
     liveAccuracyStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveAccuracyStyle) ?? .text
@@ -634,6 +639,7 @@ final class AppSettings {
   var compositionDisplayStyle: CompositionDisplayStyle = .replace { didSet { persist() } }
   var typingSpeedUnit: TypingSpeedUnit = .wpm { didSet { persist() } }
   var alwaysShowDecimalPlaces = false { didSet { persist() } }
+  var startGraphsAtZero = true { didSet { persist() } }
   var typedCharacterEffect: TypedCharacterEffect = .keep { didSet { persist() } }
   var liveSpeedStyle: LiveMetricStyle = .text { didSet { persist() } }
   var liveAccuracyStyle: LiveMetricStyle = .text { didSet { persist() } }
@@ -706,6 +712,7 @@ final class AppSettings {
     compositionDisplayStyle = snapshot.compositionDisplayStyle
     typingSpeedUnit = snapshot.typingSpeedUnit
     alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
+    startGraphsAtZero = snapshot.startGraphsAtZero
     typedCharacterEffect = snapshot.typedCharacterEffect
     liveSpeedStyle = snapshot.liveSpeedStyle
     liveAccuracyStyle = snapshot.liveAccuracyStyle
@@ -767,6 +774,7 @@ final class AppSettings {
       caretStyle: caretStyle, typoIndicatorStyle: typoIndicatorStyle,
       compositionDisplayStyle: compositionDisplayStyle, typingSpeedUnit: typingSpeedUnit,
       alwaysShowDecimalPlaces: alwaysShowDecimalPlaces,
+      startGraphsAtZero: startGraphsAtZero,
       typedCharacterEffect: typedCharacterEffect, liveSpeedStyle: liveSpeedStyle,
       liveAccuracyStyle: liveAccuracyStyle, liveBurstStyle: liveBurstStyle,
       liveProgressStyle: liveProgressStyle, testModifiers: testModifiers, showFocusWarning: showFocusWarning,
@@ -823,6 +831,7 @@ final class AppSettings {
     compositionDisplayStyle = .replace
     typingSpeedUnit = .wpm
     alwaysShowDecimalPlaces = false
+    startGraphsAtZero = true
     typedCharacterEffect = .keep
     liveSpeedStyle = .text
     liveAccuracyStyle = .text
@@ -921,6 +930,7 @@ final class AppSettings {
     compositionDisplayStyle = snapshot.compositionDisplayStyle
     typingSpeedUnit = snapshot.typingSpeedUnit
     alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
+    startGraphsAtZero = snapshot.startGraphsAtZero
     typedCharacterEffect = snapshot.typedCharacterEffect
     liveSpeedStyle = snapshot.liveSpeedStyle
     liveAccuracyStyle = snapshot.liveAccuracyStyle
@@ -1060,6 +1070,7 @@ final class AppSettings {
       compositionDisplayStyle: compositionDisplayStyle,
       typingSpeedUnit: typingSpeedUnit,
       alwaysShowDecimalPlaces: alwaysShowDecimalPlaces,
+      startGraphsAtZero: startGraphsAtZero,
       typedCharacterEffect: typedCharacterEffect,
       liveSpeedStyle: liveSpeedStyle,
       liveAccuracyStyle: liveAccuracyStyle,
