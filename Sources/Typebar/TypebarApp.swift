@@ -1995,8 +1995,9 @@ private struct CompletedResultView: View {
             Button("查看历史", action: onHistory)
           }
           Menu("导出") {
-            Button("复制结果文字", action: copyResultText)
-            Button("复制结果图片", action: copyResultImage)
+          Button("复制结果文字", action: copyResultText)
+          Button("复制实际输入", action: copyResultInput)
+          Button("复制结果图片", action: copyResultImage)
             Divider()
             Button("保存结果图片…", action: saveResultImage)
           }
@@ -2042,6 +2043,16 @@ private struct CompletedResultView: View {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(ResultShareText.make(for: result), forType: .string)
     exportStatus = "结果文字已复制"
+  }
+
+  private func copyResultInput() {
+    guard let input = ResultInputText.make(for: result) else {
+      exportStatus = "没有可复制的输入回放"
+      return
+    }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(input, forType: .string)
+    exportStatus = "实际输入已复制"
   }
 
   private func copyResultImage() {

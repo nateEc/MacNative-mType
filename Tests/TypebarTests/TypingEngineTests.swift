@@ -723,6 +723,26 @@ final class TypingEngineTests: XCTestCase {
       ResultShareText.make(for: result), "Typebar\n72 WPM · 91% 准确率 · 1 错误\ntime · english · 30 秒")
   }
 
+  func testResultInputTextRebuildsActualInputOnlyWhenReplayExists() {
+    let configuration = TestConfiguration.timed(seconds: 30, language: .english)
+    let result = CompletedTestResult(
+      id: UUID(), configuration: configuration, outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(3), typedCharacterCount: 5, correctCharacterCount: 4,
+      errorCount: 1, wpm: 20, rawWpm: 25, accuracy: 80, prompt: "amber",
+      replayEvents: [
+        .init(offset: 0, kind: .insert, text: "amx"),
+        .init(offset: 1, kind: .delete, text: ""),
+        .init(offset: 2, kind: .insert, text: "ber"),
+      ])
+    XCTAssertEqual(ResultInputText.make(for: result), "amber")
+    XCTAssertNil(
+      ResultInputText.make(
+        for: CompletedTestResult(
+          id: UUID(), configuration: configuration, outcome: .completed, startedAt: start,
+          finishedAt: start.addingTimeInterval(3), typedCharacterCount: 5, correctCharacterCount: 5,
+          errorCount: 0, wpm: 20, rawWpm: 20, accuracy: 100, prompt: "amber")))
+  }
+
   func testResultImageExportUsesPortableUtcFilename() {
     XCTAssertEqual(
       ResultImageExport.filename(for: Date(timeIntervalSince1970: 0)),

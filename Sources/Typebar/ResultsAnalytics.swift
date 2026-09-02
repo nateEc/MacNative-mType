@@ -167,6 +167,15 @@ enum ResultImageExport {
   }
 }
 
+enum ResultInputText {
+  static func make(for result: CompletedTestResult) -> String? {
+    guard !result.replayEvents.isEmpty else { return nil }
+    let elapsed = max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+    let typed = TypingReplay.typedText(events: result.replayEvents, through: elapsed)
+    return typed.isEmpty ? nil : typed
+  }
+}
+
 /// Rebuilds a compact, local-only result trace from the input replay that is
 /// already saved with a completed test. It uses Typebar's own incremental
 /// character accounting and deliberately has a conservative duration cap so
