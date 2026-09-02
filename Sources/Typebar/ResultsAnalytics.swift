@@ -39,6 +39,11 @@ struct RecentTestAverage: Equatable {
   let accuracy: Int
 }
 
+struct CurrentPersonalBest: Equatable {
+  let wpm: Int
+  let accuracy: Int
+}
+
 /// Mirrors the official current-settings average with Typebar's locally stored
 /// result model. Tags are deliberately absent because the native practice screen
 /// has no active tag-filter state.
@@ -50,12 +55,8 @@ enum RecentTestAveragePolicy {
     limit: Int = 10
   ) -> RecentTestAverage? {
     guard limit > 0 else { return nil }
-    let matching = samples
-      .filter {
-        matches(
-          sample: $0, currentConfiguration: currentConfiguration, currentPrompt: currentPrompt)
-      }
-      .sorted { $0.finishedAt > $1.finishedAt }
+    let matching = matchingSamples(
+      currentConfiguration: currentConfiguration, currentPrompt: currentPrompt, samples: samples)
       .prefix(limit)
 
     guard !matching.isEmpty else { return nil }
@@ -65,6 +66,22 @@ enum RecentTestAveragePolicy {
     let averageAccuracy = Int(
       (Double(matching.map(\.accuracy).reduce(0, +)) / Double(count)).rounded())
     return .init(count: count, wpm: averageWpm, accuracy: averageAccuracy)
+  }
+
+  /// Uses the setting fields the reference project uses for local average and
+  /// PB lookup. Modifiers other than simplified input intentionally do not
+  /// split this collection; PB eligibility is applied by its own policy.
+  static func matchingSamples(
+    currentConfiguration: TestConfiguration,
+    currentPrompt: String,
+    samples: [RecentAverageSample]
+  ) -> [RecentAverageSample] {
+    samples
+      .filter {
+        matches(
+          sample: $0, currentConfiguration: currentConfiguration, currentPrompt: currentPrompt)
+      }
+      .sorted { $0.finishedAt > $1.finishedAt }
   }
 
   private static func matches(
@@ -94,6 +111,57 @@ enum RecentTestAveragePolicy {
     case .quote:
       true
     case .zen, .custom:
+      true
+    }
+  }
+}
+
+/// Determines whether a locally completed Typebar result may contribute to a
+/// current-setting personal best. It mirrors the reference funbox eligibility
+/// while also excluding Typebar-only corrective modifiers that alter scoring.
+enum CurrentPersonalBestPolicy {
+  static func personalBest(
+    currentConfiguration: TestConfiguration,
+    currentPrompt: String,
+    samples: [RecentAverageSample]
+  ) -> CurrentPersonalBest? {
+    guard isConfigurationEligible(currentConfiguration) else { return nil }
+    let matching = RecentTestAveragePolicy.matchingSamples(
+      currentConfiguration: currentConfiguration, currentPrompt: currentPrompt, samples: samples)
+      .filter { isResultEligible(configuration: $0.configuration, accuracy: $0.accuracy) }
+    guard let highestWpm = matching.map(\.wpm).max(),
+      let best = matching.filter({ $0.wpm == highestWpm }).min(by: { $0.finishedAt < $1.finishedAt })
+    else {
+      return nil
+    }
+    return .init(wpm: best.wpm, accuracy: best.accuracy)
+  }
+
+  static func isConfigurationEligible(_ configuration: TestConfiguration) -> Bool {
+    configuration.mode != .quote
+      && configuration.language != .mixedEnglishChinese
+      && configuration.language != .mixedLanguages
+      && configuration.modifiers.allSatisfy(modifierAllowsPersonalBest)
+  }
+
+  static func isResultEligible(configuration: TestConfiguration, accuracy: Int) -> Bool {
+    isConfigurationEligible(configuration)
+      && (!configuration.rules.stopOnError || accuracy == 100)
+  }
+
+  private static func modifierAllowsPersonalBest(_ modifier: TestModifier) -> Bool {
+    switch modifier {
+    case .noSpaces, .underscoreSeparators, .uppercase, .titleCase, .alternatingCase, .randomCase,
+      .messagingStyle, .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream,
+      .asciiStream, .specialCharacterStream, .gibberishStream, .poetryStream, .referenceStream,
+      .arrowStream, .ipv4Stream, .ipv6Stream, .pseudolangStream, .morseStream, .zipf,
+      .correctBeforeAdvance, .clearCurrentWordOnError:
+      false
+    case .mirrorVisual, .upsideDownVisual, .crtVisual, .earthquakeVisual, .spaceVisual,
+      .nauseaVisual, .roundVisual, .chooVisual, .layoutFluid, .aslVisual, .rot13, .backwards,
+      .doubleCharacters, .listening, .simonSays, .memory, .readAheadEasy, .readAhead,
+      .readAheadHard, .noQuit, .mirrorKeyboard, .focusCurrentWord, .focusNextWord,
+      .focusTwoWords, .focusThreeWords, .lazyLatin:
       true
     }
   }

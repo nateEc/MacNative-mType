@@ -1668,6 +1668,51 @@ final class TypingEngineTests: XCTestCase {
         limit: 0))
   }
 
+  func testCurrentPersonalBestExcludesIneligibleResultsAndUsesMatchingSettings() {
+    let current = TestConfiguration.words(
+      25, difficulty: .expert, language: .english,
+      contentOptions: .init(includePunctuation: true, includeNumbers: false))
+    let eligible = RecentAverageSample(
+      configuration: current, prompt: "first", finishedAt: start, wpm: 72, accuracy: 98)
+    let best = RecentAverageSample(
+      configuration: current, prompt: "second", finishedAt: start.addingTimeInterval(1),
+      wpm: 84, accuracy: 93)
+    let ineligibleStream = RecentAverageSample(
+      configuration: current.with(modifiers: [.zipf]), prompt: "zipf",
+      finishedAt: start.addingTimeInterval(2), wpm: 999, accuracy: 100)
+    let stoppedWithError = RecentAverageSample(
+      configuration: TestConfiguration(
+        mode: .words, duration: nil, wordLimit: 25, difficulty: .expert,
+        rules: .init(stopOnError: true), language: .english,
+        contentOptions: .init(includePunctuation: true, includeNumbers: false)),
+      prompt: "stopped", finishedAt: start.addingTimeInterval(3), wpm: 500, accuracy: 99)
+    let differentWordLimit = RecentAverageSample(
+      configuration: .words(
+        50, difficulty: .expert, language: .english,
+        contentOptions: .init(includePunctuation: true, includeNumbers: false)),
+      prompt: "longer", finishedAt: start.addingTimeInterval(4), wpm: 600, accuracy: 100)
+
+    XCTAssertEqual(
+      CurrentPersonalBestPolicy.personalBest(
+        currentConfiguration: current, currentPrompt: "ignored", samples: [
+          eligible, best, ineligibleStream, stoppedWithError, differentWordLimit,
+        ]),
+      .init(wpm: 84, accuracy: 93))
+    XCTAssertFalse(CurrentPersonalBestPolicy.isConfigurationEligible(current.with(modifiers: [.zipf])))
+    XCTAssertFalse(
+      CurrentPersonalBestPolicy.isConfigurationEligible(
+        .words(25, difficulty: .expert, language: .mixedLanguages)))
+    XCTAssertNil(
+      CurrentPersonalBestPolicy.personalBest(
+        currentConfiguration: current.with(modifiers: [.zipf]), currentPrompt: "ignored",
+        samples: [eligible, best]))
+    XCTAssertNil(
+      CurrentPersonalBestPolicy.personalBest(
+        currentConfiguration: TestConfiguration(
+          mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+          language: .english), currentPrompt: "quote", samples: [eligible, best]))
+  }
+
   func testOfflineAchievementsAreDerivedFromCompletedLocalMetrics() {
     let metrics = [
       ResultMetric(finishedAt: start, wpm: 84, accuracy: 99, typingSeconds: 16),
@@ -1980,6 +2025,7 @@ final class TypingEngineTests: XCTestCase {
     settings.alwaysShowWordsHistory = true
     settings.startGraphsAtZero = false
     settings.showAverage = .both
+    settings.showPersonalBest = true
     settings.typedCharacterEffect = .dots
     settings.liveSpeedStyle = .mini
     settings.liveAccuracyStyle = .off
@@ -2043,6 +2089,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.alwaysShowWordsHistory)
     XCTAssertFalse(restored.startGraphsAtZero)
     XCTAssertEqual(restored.showAverage, .both)
+    XCTAssertTrue(restored.showPersonalBest)
     XCTAssertEqual(restored.typedCharacterEffect, .dots)
     XCTAssertEqual(restored.liveSpeedStyle, .mini)
     XCTAssertEqual(restored.liveAccuracyStyle, .off)
@@ -2130,6 +2177,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.typingSpeedUnit, .wpm)
     XCTAssertFalse(snapshot.alwaysShowWordsHistory)
     XCTAssertEqual(snapshot.showAverage, .off)
+    XCTAssertFalse(snapshot.showPersonalBest)
     XCTAssertEqual(snapshot.typedCharacterEffect, .keep)
     XCTAssertEqual(snapshot.liveSpeedStyle, .text)
     XCTAssertEqual(snapshot.liveAccuracyStyle, .text)

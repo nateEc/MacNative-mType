@@ -442,6 +442,14 @@ private struct ContentView: View {
           .background(.thinMaterial, in: Capsule())
           .accessibilityLabel(averageNotice)
       }
+      if let personalBestNotice {
+        Label(personalBestNotice, systemImage: "crown")
+          .font(.caption.weight(.medium))
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .background(.thinMaterial, in: Capsule())
+          .accessibilityLabel(personalBestNotice)
+      }
       typingPanel
       stats
       if settings.showKeyboardGuide || session.configuration.modifiers.contains(.simonSays) {
@@ -1379,6 +1387,25 @@ private struct ContentView: View {
       metrics.append("\(average.accuracy)% 准确率")
     }
     return "近 \(average.count) 次平均：\(metrics.joined(separator: " · "))"
+  }
+
+  private var personalBestNotice: String? {
+    guard settings.showPersonalBest else { return nil }
+    guard CurrentPersonalBestPolicy.isConfigurationEligible(configuration) else {
+      return "本机个人最佳：当前测试不计入 PB"
+    }
+    let samples = savedResults.compactMap { record -> RecentAverageSample? in
+      guard let result = record.portableResult else { return nil }
+      return .init(
+        configuration: result.configuration, prompt: result.prompt, finishedAt: result.finishedAt,
+        wpm: result.wpm, accuracy: result.accuracy)
+    }
+    guard let personalBest = CurrentPersonalBestPolicy.personalBest(
+      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples)
+    else {
+      return "本机个人最佳：暂无符合资格的同类成绩"
+    }
+    return "本机个人最佳：\(settings.typingSpeedUnit.formatted(wpm: personalBest.wpm)) \(settings.typingSpeedUnit.displayName) · \(personalBest.accuracy)% 准确率"
   }
 
   private func startWeakSpotPractice() {

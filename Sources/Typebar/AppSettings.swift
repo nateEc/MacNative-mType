@@ -334,6 +334,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var alwaysShowWordsHistory = false
   var startGraphsAtZero = true
   var showAverage: AverageNoticeDisplay = .off
+  var showPersonalBest = false
   var typedCharacterEffect: TypedCharacterEffect = .keep
   var liveSpeedStyle: LiveMetricStyle = .text
   var liveAccuracyStyle: LiveMetricStyle = .text
@@ -399,6 +400,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     alwaysShowWordsHistory: Bool = false,
     startGraphsAtZero: Bool = true,
     showAverage: AverageNoticeDisplay = .off,
+    showPersonalBest: Bool = false,
     typedCharacterEffect: TypedCharacterEffect = .keep,
     liveSpeedStyle: LiveMetricStyle = .text,
     liveAccuracyStyle: LiveMetricStyle = .text,
@@ -465,6 +467,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.alwaysShowWordsHistory = alwaysShowWordsHistory
     self.startGraphsAtZero = startGraphsAtZero
     self.showAverage = showAverage
+    self.showPersonalBest = showPersonalBest
     self.typedCharacterEffect = typedCharacterEffect
     self.liveSpeedStyle = liveSpeedStyle
     self.liveAccuracyStyle = liveAccuracyStyle
@@ -495,7 +498,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       minimumAccuracy, minimumWpm, minimumWordBurstWpm,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
       smoothPracticeLineScroll, showAllPracticeLines, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
-      alwaysShowDecimalPlaces, alwaysShowWordsHistory, startGraphsAtZero, showAverage,
+      alwaysShowDecimalPlaces, alwaysShowWordsHistory, startGraphsAtZero, showAverage, showPersonalBest,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
       testModifiers, showFocusWarning,
       showCapsLockWarning, playErrorBeep, playKeyclickSound, timeWarningOffset, soundVolume,
@@ -579,6 +582,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(Bool.self, forKey: .startGraphsAtZero) ?? true
     showAverage =
       try values.decodeIfPresent(AverageNoticeDisplay.self, forKey: .showAverage) ?? .off
+    showPersonalBest = try values.decodeIfPresent(Bool.self, forKey: .showPersonalBest) ?? false
     typedCharacterEffect = try values.decodeIfPresent(TypedCharacterEffect.self, forKey: .typedCharacterEffect) ?? .keep
     liveSpeedStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveSpeedStyle) ?? .text
     liveAccuracyStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveAccuracyStyle) ?? .text
@@ -675,6 +679,7 @@ final class AppSettings {
   var alwaysShowWordsHistory = false { didSet { persist() } }
   var startGraphsAtZero = true { didSet { persist() } }
   var showAverage: AverageNoticeDisplay = .off { didSet { persist() } }
+  var showPersonalBest = false { didSet { persist() } }
   var typedCharacterEffect: TypedCharacterEffect = .keep { didSet { persist() } }
   var liveSpeedStyle: LiveMetricStyle = .text { didSet { persist() } }
   var liveAccuracyStyle: LiveMetricStyle = .text { didSet { persist() } }
@@ -750,6 +755,7 @@ final class AppSettings {
     alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
     startGraphsAtZero = snapshot.startGraphsAtZero
     showAverage = snapshot.showAverage
+    showPersonalBest = snapshot.showPersonalBest
     typedCharacterEffect = snapshot.typedCharacterEffect
     liveSpeedStyle = snapshot.liveSpeedStyle
     liveAccuracyStyle = snapshot.liveAccuracyStyle
@@ -814,6 +820,7 @@ final class AppSettings {
       alwaysShowWordsHistory: alwaysShowWordsHistory,
       startGraphsAtZero: startGraphsAtZero,
       showAverage: showAverage,
+      showPersonalBest: showPersonalBest,
       typedCharacterEffect: typedCharacterEffect, liveSpeedStyle: liveSpeedStyle,
       liveAccuracyStyle: liveAccuracyStyle, liveBurstStyle: liveBurstStyle,
       liveProgressStyle: liveProgressStyle, testModifiers: testModifiers, showFocusWarning: showFocusWarning,
@@ -873,6 +880,7 @@ final class AppSettings {
     alwaysShowWordsHistory = false
     startGraphsAtZero = true
     showAverage = .off
+    showPersonalBest = false
     typedCharacterEffect = .keep
     liveSpeedStyle = .text
     liveAccuracyStyle = .text
@@ -974,6 +982,7 @@ final class AppSettings {
     alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
     startGraphsAtZero = snapshot.startGraphsAtZero
     showAverage = snapshot.showAverage
+    showPersonalBest = snapshot.showPersonalBest
     typedCharacterEffect = snapshot.typedCharacterEffect
     liveSpeedStyle = snapshot.liveSpeedStyle
     liveAccuracyStyle = snapshot.liveAccuracyStyle
@@ -1116,6 +1125,7 @@ final class AppSettings {
       alwaysShowWordsHistory: alwaysShowWordsHistory,
       startGraphsAtZero: startGraphsAtZero,
       showAverage: showAverage,
+      showPersonalBest: showPersonalBest,
       typedCharacterEffect: typedCharacterEffect,
       liveSpeedStyle: liveSpeedStyle,
       liveAccuracyStyle: liveAccuracyStyle,
