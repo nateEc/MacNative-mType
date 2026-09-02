@@ -779,6 +779,22 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(deduplicated.selectedWords, ["cabin", "planet"])
   }
 
+  func testContextualMissedWordPracticeKeepsOnlyAttemptedTargetContext() throws {
+    let plan = try XCTUnwrap(
+      ContextualMissedWordPracticePlan.make(
+        reviews: [
+          TypedWordReview(index: 0, target: "ember", typed: "ember"),
+          TypedWordReview(index: 1, target: "cabin", typed: "cab"),
+          TypedWordReview(index: 2, target: "planet", typed: "planet"),
+          TypedWordReview(index: 3, target: "willow", typed: "willox"),
+        ]))
+    XCTAssertEqual(plan.missedWordCount, 2)
+    XCTAssertEqual(plan.phrases, ["ember cabin", "planet willow"])
+    XCTAssertNil(
+      ContextualMissedWordPracticePlan.make(
+        reviews: [TypedWordReview(index: 0, target: "ember", typed: "ember")]))
+  }
+
   @MainActor
   func testResultSnapshotImageRendersThemedHighResolutionPng() throws {
     let result = CompletedTestResult(

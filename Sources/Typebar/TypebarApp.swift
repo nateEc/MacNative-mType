@@ -508,6 +508,7 @@ private struct ContentView: View {
           wordReviews: wordReviews,
           wordBursts: wordBursts,
           slowWordPractice: SlowWordPracticePlan.make(reviews: wordReviews, bursts: wordBursts),
+          contextualMissedPractice: ContextualMissedWordPracticePlan.make(reviews: wordReviews),
           repeatedSession: repeatedSession,
           challengeEvaluation: TypebarChallengeLibrary.challenge(
             id: result.configuration.challengeID
@@ -602,6 +603,7 @@ private struct ContentView: View {
         wordReviews: result.wordReviews,
         wordBursts: result.wordBursts,
         slowWordPractice: result.slowWordPractice,
+        contextualMissedPractice: result.contextualMissedPractice,
         onRepeat: {
           completedResult = nil
           startRepeatedAttempt(result.repeatedSession)
@@ -609,6 +611,7 @@ private struct ContentView: View {
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
         onPracticeMissedWords: { startWordPractice(result.missedWords) },
+        onPracticeContextualMissedWords: { startWordPractice($0) },
         onPracticeSlowWords: { startWordPractice($0) }
       )
     }
@@ -1888,6 +1891,7 @@ private struct CompletedResultPresentation: Identifiable {
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
+  let contextualMissedPractice: ContextualMissedWordPracticePlan?
   let repeatedSession: TypingSession
   let challengeEvaluation: ChallengeEvaluation?
   var id: UUID { result.id }
@@ -1913,10 +1917,12 @@ private struct CompletedResultView: View {
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
+  let contextualMissedPractice: ContextualMissedWordPracticePlan?
   let onRepeat: () -> Void
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onPracticeMissedWords: () -> Void
+  let onPracticeContextualMissedWords: ([String]) -> Void
   let onPracticeSlowWords: ([String]) -> Void
   @State private var exportStatus: String?
 
@@ -2009,7 +2015,14 @@ private struct CompletedResultView: View {
         if !missedWords.isEmpty || slowWordPractice != nil {
           HStack {
             if !missedWords.isEmpty {
-              Button("练习错词（\(missedWords.count)）", action: onPracticeMissedWords)
+              Menu("错词练习") {
+                Button("只练错词（\(missedWords.count)）", action: onPracticeMissedWords)
+                if let contextualMissedPractice {
+                  Button("带前词上下文（\(contextualMissedPractice.missedWordCount)）") {
+                    onPracticeContextualMissedWords(contextualMissedPractice.phrases)
+                  }
+                }
+              }
             }
             if let slowWordPractice {
               Button("练习慢词（\(slowWordPractice.selectedWords.count)）") {

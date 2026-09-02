@@ -141,6 +141,26 @@ struct SlowWordPracticePlan: Equatable {
   }
 }
 
+/// Builds a finite, local follow-up that keeps the previous target word next
+/// to each missed word. The context is derived only from the attempt being
+/// reviewed, never from a remote corpus or an unattempted tail of the prompt.
+struct ContextualMissedWordPracticePlan: Equatable {
+  let phrases: [String]
+  let missedWordCount: Int
+
+  static func make(reviews: [TypedWordReview]) -> Self? {
+    let phrases = reviews.indices.compactMap { index -> String? in
+      guard !reviews[index].isCorrect else { return nil }
+      let target = reviews[index].target
+      guard !target.isEmpty else { return nil }
+      guard index > 0, !reviews[index - 1].target.isEmpty else { return target }
+      return "\(reviews[index - 1].target) \(target)"
+    }
+    guard !phrases.isEmpty else { return nil }
+    return .init(phrases: phrases, missedWordCount: phrases.count)
+  }
+}
+
 struct ResultPerformancePoint: Equatable, Identifiable {
   let elapsed: TimeInterval
   let wpm: Int
