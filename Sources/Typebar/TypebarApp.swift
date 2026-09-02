@@ -434,6 +434,14 @@ private struct ContentView: View {
     VStack(spacing: 30) {
       header
       configurationPanel
+      if let averageNotice {
+        Label(averageNotice, systemImage: "chart.bar")
+          .font(.caption.weight(.medium))
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .background(.thinMaterial, in: Capsule())
+          .accessibilityLabel(averageNotice)
+      }
       typingPanel
       stats
       if settings.showKeyboardGuide || session.configuration.modifiers.contains(.simonSays) {
@@ -1346,6 +1354,31 @@ private struct ContentView: View {
       language: language,
       englishVariant: settings.englishVariant
     )
+  }
+
+  private var averageNotice: String? {
+    guard settings.showAverage != .off else { return nil }
+    let samples = savedResults.compactMap { record -> RecentAverageSample? in
+      guard let result = record.portableResult else { return nil }
+      return .init(
+        configuration: result.configuration, prompt: result.prompt, finishedAt: result.finishedAt,
+        wpm: result.wpm, accuracy: result.accuracy)
+    }
+    guard let average = RecentTestAveragePolicy.average(
+      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples)
+    else {
+      return "近 10 次平均：暂无同类本机成绩"
+    }
+
+    var metrics = [String]()
+    if settings.showAverage.showsSpeed {
+      metrics.append(
+        "\(settings.typingSpeedUnit.formatted(wpm: average.wpm)) \(settings.typingSpeedUnit.displayName)")
+    }
+    if settings.showAverage.showsAccuracy {
+      metrics.append("\(average.accuracy)% 准确率")
+    }
+    return "近 \(average.count) 次平均：\(metrics.joined(separator: " · "))"
   }
 
   private func startWeakSpotPractice() {

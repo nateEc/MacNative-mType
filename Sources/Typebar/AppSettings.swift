@@ -144,6 +144,29 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 }
 
+/// Chooses which local, current-setting average appears above the practice area.
+/// It intentionally starts off so the main practice screen remains quiet by default.
+enum AverageNoticeDisplay: String, CaseIterable, Codable, Equatable, Identifiable {
+  case off
+  case speed
+  case accuracy
+  case both
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .off: "关闭"
+    case .speed: "速度"
+    case .accuracy: "准确率"
+    case .both: "速度和准确率"
+    }
+  }
+
+  var showsSpeed: Bool { self == .speed || self == .both }
+  var showsAccuracy: Bool { self == .accuracy || self == .both }
+}
+
 enum TypedCharacterEffect: String, CaseIterable, Codable, Equatable, Identifiable {
   case keep
   case hide
@@ -310,6 +333,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var alwaysShowDecimalPlaces = false
   var alwaysShowWordsHistory = false
   var startGraphsAtZero = true
+  var showAverage: AverageNoticeDisplay = .off
   var typedCharacterEffect: TypedCharacterEffect = .keep
   var liveSpeedStyle: LiveMetricStyle = .text
   var liveAccuracyStyle: LiveMetricStyle = .text
@@ -374,6 +398,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     alwaysShowDecimalPlaces: Bool = false,
     alwaysShowWordsHistory: Bool = false,
     startGraphsAtZero: Bool = true,
+    showAverage: AverageNoticeDisplay = .off,
     typedCharacterEffect: TypedCharacterEffect = .keep,
     liveSpeedStyle: LiveMetricStyle = .text,
     liveAccuracyStyle: LiveMetricStyle = .text,
@@ -439,6 +464,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.alwaysShowDecimalPlaces = alwaysShowDecimalPlaces
     self.alwaysShowWordsHistory = alwaysShowWordsHistory
     self.startGraphsAtZero = startGraphsAtZero
+    self.showAverage = showAverage
     self.typedCharacterEffect = typedCharacterEffect
     self.liveSpeedStyle = liveSpeedStyle
     self.liveAccuracyStyle = liveAccuracyStyle
@@ -469,7 +495,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       minimumAccuracy, minimumWpm, minimumWordBurstWpm,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
       smoothPracticeLineScroll, showAllPracticeLines, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
-      alwaysShowDecimalPlaces, alwaysShowWordsHistory, startGraphsAtZero,
+      alwaysShowDecimalPlaces, alwaysShowWordsHistory, startGraphsAtZero, showAverage,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
       testModifiers, showFocusWarning,
       showCapsLockWarning, playErrorBeep, playKeyclickSound, timeWarningOffset, soundVolume,
@@ -551,6 +577,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(Bool.self, forKey: .alwaysShowWordsHistory) ?? false
     startGraphsAtZero =
       try values.decodeIfPresent(Bool.self, forKey: .startGraphsAtZero) ?? true
+    showAverage =
+      try values.decodeIfPresent(AverageNoticeDisplay.self, forKey: .showAverage) ?? .off
     typedCharacterEffect = try values.decodeIfPresent(TypedCharacterEffect.self, forKey: .typedCharacterEffect) ?? .keep
     liveSpeedStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveSpeedStyle) ?? .text
     liveAccuracyStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveAccuracyStyle) ?? .text
@@ -646,6 +674,7 @@ final class AppSettings {
   var alwaysShowDecimalPlaces = false { didSet { persist() } }
   var alwaysShowWordsHistory = false { didSet { persist() } }
   var startGraphsAtZero = true { didSet { persist() } }
+  var showAverage: AverageNoticeDisplay = .off { didSet { persist() } }
   var typedCharacterEffect: TypedCharacterEffect = .keep { didSet { persist() } }
   var liveSpeedStyle: LiveMetricStyle = .text { didSet { persist() } }
   var liveAccuracyStyle: LiveMetricStyle = .text { didSet { persist() } }
@@ -720,6 +749,7 @@ final class AppSettings {
     alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
     alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
     startGraphsAtZero = snapshot.startGraphsAtZero
+    showAverage = snapshot.showAverage
     typedCharacterEffect = snapshot.typedCharacterEffect
     liveSpeedStyle = snapshot.liveSpeedStyle
     liveAccuracyStyle = snapshot.liveAccuracyStyle
@@ -783,6 +813,7 @@ final class AppSettings {
       alwaysShowDecimalPlaces: alwaysShowDecimalPlaces,
       alwaysShowWordsHistory: alwaysShowWordsHistory,
       startGraphsAtZero: startGraphsAtZero,
+      showAverage: showAverage,
       typedCharacterEffect: typedCharacterEffect, liveSpeedStyle: liveSpeedStyle,
       liveAccuracyStyle: liveAccuracyStyle, liveBurstStyle: liveBurstStyle,
       liveProgressStyle: liveProgressStyle, testModifiers: testModifiers, showFocusWarning: showFocusWarning,
@@ -841,6 +872,7 @@ final class AppSettings {
     alwaysShowDecimalPlaces = false
     alwaysShowWordsHistory = false
     startGraphsAtZero = true
+    showAverage = .off
     typedCharacterEffect = .keep
     liveSpeedStyle = .text
     liveAccuracyStyle = .text
@@ -941,6 +973,7 @@ final class AppSettings {
     alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
     alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
     startGraphsAtZero = snapshot.startGraphsAtZero
+    showAverage = snapshot.showAverage
     typedCharacterEffect = snapshot.typedCharacterEffect
     liveSpeedStyle = snapshot.liveSpeedStyle
     liveAccuracyStyle = snapshot.liveAccuracyStyle
@@ -1082,6 +1115,7 @@ final class AppSettings {
       alwaysShowDecimalPlaces: alwaysShowDecimalPlaces,
       alwaysShowWordsHistory: alwaysShowWordsHistory,
       startGraphsAtZero: startGraphsAtZero,
+      showAverage: showAverage,
       typedCharacterEffect: typedCharacterEffect,
       liveSpeedStyle: liveSpeedStyle,
       liveAccuracyStyle: liveAccuracyStyle,

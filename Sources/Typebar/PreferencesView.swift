@@ -312,6 +312,14 @@ struct PreferencesView: View {
               Text(unit.displayName).tag(unit)
             }
           }
+          Picker("显示近 10 次平均", selection: $settings.showAverage) {
+            ForEach(AverageNoticeDisplay.allCases) { display in
+              Text(display.displayName).tag(display)
+            }
+          }
+          Text("按当前模式、时长或词数（引语按当前内容）、标点、数字、语言、难度和简化输入，显示最近 10 条本机完成成绩的均值。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Toggle("结果页固定显示两位小数", isOn: $settings.alwaysShowDecimalPlaces)
           Text("只影响完成结果页的速度和准确率显示；本机成绩、统计和同步仍以 WPM 保存。")
             .font(.caption)

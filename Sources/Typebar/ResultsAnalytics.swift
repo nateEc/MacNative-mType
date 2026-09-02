@@ -23,6 +23,82 @@ struct ResultHistoryEntry: Equatable, Identifiable {
     let tags: [String]
 }
 
+/// The minimum immutable data needed to calculate the practice-screen average
+/// without making the display depend on a network account or a SwiftData query.
+struct RecentAverageSample: Equatable {
+  let configuration: TestConfiguration
+  let prompt: String
+  let finishedAt: Date
+  let wpm: Int
+  let accuracy: Int
+}
+
+struct RecentTestAverage: Equatable {
+  let count: Int
+  let wpm: Int
+  let accuracy: Int
+}
+
+/// Mirrors the official current-settings average with Typebar's locally stored
+/// result model. Tags are deliberately absent because the native practice screen
+/// has no active tag-filter state.
+enum RecentTestAveragePolicy {
+  static func average(
+    currentConfiguration: TestConfiguration,
+    currentPrompt: String,
+    samples: [RecentAverageSample],
+    limit: Int = 10
+  ) -> RecentTestAverage? {
+    guard limit > 0 else { return nil }
+    let matching = samples
+      .filter {
+        matches(
+          sample: $0, currentConfiguration: currentConfiguration, currentPrompt: currentPrompt)
+      }
+      .sorted { $0.finishedAt > $1.finishedAt }
+      .prefix(limit)
+
+    guard !matching.isEmpty else { return nil }
+    let count = matching.count
+    let averageWpm = Int(
+      (Double(matching.map(\.wpm).reduce(0, +)) / Double(count)).rounded())
+    let averageAccuracy = Int(
+      (Double(matching.map(\.accuracy).reduce(0, +)) / Double(count)).rounded())
+    return .init(count: count, wpm: averageWpm, accuracy: averageAccuracy)
+  }
+
+  private static func matches(
+    sample: RecentAverageSample,
+    currentConfiguration: TestConfiguration,
+    currentPrompt: String
+  ) -> Bool {
+    let sampleConfiguration = sample.configuration
+    return sampleConfiguration.mode == currentConfiguration.mode
+      && sameModeParameter(sampleConfiguration, currentConfiguration)
+      && (currentConfiguration.mode != .quote || sample.prompt == currentPrompt)
+      && sampleConfiguration.contentOptions == currentConfiguration.contentOptions
+      && sampleConfiguration.language == currentConfiguration.language
+      && sampleConfiguration.difficulty == currentConfiguration.difficulty
+      && sampleConfiguration.modifiers.contains(.lazyLatin)
+        == currentConfiguration.modifiers.contains(.lazyLatin)
+  }
+
+  private static func sameModeParameter(
+    _ sample: TestConfiguration, _ current: TestConfiguration
+  ) -> Bool {
+    switch current.mode {
+    case .time:
+      sample.duration == current.duration
+    case .words:
+      sample.wordLimit == current.wordLimit
+    case .quote:
+      true
+    case .zen, .custom:
+      true
+    }
+  }
+}
+
 struct ResultHistoryFilter: Codable, Equatable {
     var mode: TestMode?
     var language: TypingLanguage?

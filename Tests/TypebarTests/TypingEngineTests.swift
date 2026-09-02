@@ -1631,6 +1631,43 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(statistics.totalTypingSeconds, 90)
   }
 
+  func testRecentTestAverageUsesTheLatestTenMatchingCurrentSettings() {
+    let current = TestConfiguration.words(
+      25, difficulty: .expert, language: .english,
+      contentOptions: .init(includePunctuation: true, includeNumbers: false)
+    )
+    let matching = (0..<11).map { offset in
+      RecentAverageSample(
+        configuration: current, prompt: "generated \(offset)",
+        finishedAt: start.addingTimeInterval(TimeInterval(offset)), wpm: 50 + offset,
+        accuracy: 80 + offset)
+    }
+    let differentWordLimit = RecentAverageSample(
+      configuration: .words(
+        50, difficulty: .expert, language: .english,
+        contentOptions: .init(includePunctuation: true, includeNumbers: false)),
+      prompt: "other", finishedAt: start.addingTimeInterval(99), wpm: 999, accuracy: 1)
+    let quote = TestConfiguration(
+      mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      language: .english)
+    let differentQuote = RecentAverageSample(
+      configuration: quote, prompt: "another quote", finishedAt: start.addingTimeInterval(100),
+      wpm: 999, accuracy: 1)
+
+    let average = RecentTestAveragePolicy.average(
+      currentConfiguration: current, currentPrompt: "irrelevant for words",
+      samples: matching + [differentWordLimit, differentQuote])
+    XCTAssertEqual(average, .init(count: 10, wpm: 56, accuracy: 86))
+
+    XCTAssertNil(
+      RecentTestAveragePolicy.average(
+        currentConfiguration: quote, currentPrompt: "current quote", samples: [differentQuote]))
+    XCTAssertNil(
+      RecentTestAveragePolicy.average(
+        currentConfiguration: current, currentPrompt: "irrelevant for words", samples: matching,
+        limit: 0))
+  }
+
   func testOfflineAchievementsAreDerivedFromCompletedLocalMetrics() {
     let metrics = [
       ResultMetric(finishedAt: start, wpm: 84, accuracy: 99, typingSeconds: 16),
@@ -1942,6 +1979,7 @@ final class TypingEngineTests: XCTestCase {
     settings.alwaysShowDecimalPlaces = true
     settings.alwaysShowWordsHistory = true
     settings.startGraphsAtZero = false
+    settings.showAverage = .both
     settings.typedCharacterEffect = .dots
     settings.liveSpeedStyle = .mini
     settings.liveAccuracyStyle = .off
@@ -2004,6 +2042,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.alwaysShowDecimalPlaces)
     XCTAssertTrue(restored.alwaysShowWordsHistory)
     XCTAssertFalse(restored.startGraphsAtZero)
+    XCTAssertEqual(restored.showAverage, .both)
     XCTAssertEqual(restored.typedCharacterEffect, .dots)
     XCTAssertEqual(restored.liveSpeedStyle, .mini)
     XCTAssertEqual(restored.liveAccuracyStyle, .off)
@@ -2090,6 +2129,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.typoIndicatorStyle, .off)
     XCTAssertEqual(snapshot.typingSpeedUnit, .wpm)
     XCTAssertFalse(snapshot.alwaysShowWordsHistory)
+    XCTAssertEqual(snapshot.showAverage, .off)
     XCTAssertEqual(snapshot.typedCharacterEffect, .keep)
     XCTAssertEqual(snapshot.liveSpeedStyle, .text)
     XCTAssertEqual(snapshot.liveAccuracyStyle, .text)
