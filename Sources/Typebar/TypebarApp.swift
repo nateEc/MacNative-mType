@@ -558,6 +558,7 @@ private struct ContentView: View {
         savesResult: result.savesResult,
         typingSpeedUnit: settings.typingSpeedUnit,
         alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
+        alwaysShowWordsHistory: settings.alwaysShowWordsHistory,
         publicationMessage: publicationMessage,
         onRestart: {
           completedResult = nil
@@ -1791,6 +1792,7 @@ private struct CompletedResultView: View {
   let savesResult: Bool
   let typingSpeedUnit: TypingSpeedUnit
   let alwaysShowDecimalPlaces: Bool
+  let alwaysShowWordsHistory: Bool
   let publicationMessage: String?
   let onRestart: () -> Void
   let onHistory: () -> Void
@@ -1840,7 +1842,8 @@ private struct CompletedResultView: View {
       }
 
       if !wordReviews.isEmpty {
-        WordReviewHistoryView(reviews: wordReviews)
+        WordReviewHistoryView(
+          reviews: wordReviews, initiallyExpanded: alwaysShowWordsHistory)
       }
 
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
@@ -1968,16 +1971,15 @@ private struct ReplayTimelineView: View {
 
 private struct WordReviewHistoryView: View {
   let reviews: [TypedWordReview]
+  @State private var isExpanded: Bool
+
+  init(reviews: [TypedWordReview], initiallyExpanded: Bool) {
+    self.reviews = reviews
+    _isExpanded = State(initialValue: initiallyExpanded)
+  }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack {
-        Text("本次单词历史").font(.caption.weight(.medium))
-        Spacer()
-        Text("\(reviews.filter(\.isCorrect).count)/\(reviews.count) 正确")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
+    DisclosureGroup(isExpanded: $isExpanded) {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 5) {
           ForEach(reviews) { review in
@@ -1996,6 +1998,14 @@ private struct WordReviewHistoryView: View {
         }
       }
       .frame(maxHeight: 112)
+    } label: {
+      HStack {
+        Text("本次单词历史").font(.caption.weight(.medium))
+        Spacer()
+        Text("\(reviews.filter(\.isCorrect).count)/\(reviews.count) 正确")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
     }
     .padding(10)
     .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))

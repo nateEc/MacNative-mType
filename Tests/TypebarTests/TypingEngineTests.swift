@@ -1940,6 +1940,7 @@ final class TypingEngineTests: XCTestCase {
     settings.compositionDisplayStyle = .below
     settings.typingSpeedUnit = .cps
     settings.alwaysShowDecimalPlaces = true
+    settings.alwaysShowWordsHistory = true
     settings.startGraphsAtZero = false
     settings.typedCharacterEffect = .dots
     settings.liveSpeedStyle = .mini
@@ -2001,6 +2002,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.compositionDisplayStyle, .below)
     XCTAssertEqual(restored.typingSpeedUnit, .cps)
     XCTAssertTrue(restored.alwaysShowDecimalPlaces)
+    XCTAssertTrue(restored.alwaysShowWordsHistory)
     XCTAssertFalse(restored.startGraphsAtZero)
     XCTAssertEqual(restored.typedCharacterEffect, .dots)
     XCTAssertEqual(restored.liveSpeedStyle, .mini)
@@ -2087,6 +2089,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.caretStyle, .block)
     XCTAssertEqual(snapshot.typoIndicatorStyle, .off)
     XCTAssertEqual(snapshot.typingSpeedUnit, .wpm)
+    XCTAssertFalse(snapshot.alwaysShowWordsHistory)
     XCTAssertEqual(snapshot.typedCharacterEffect, .keep)
     XCTAssertEqual(snapshot.liveSpeedStyle, .text)
     XCTAssertEqual(snapshot.liveAccuracyStyle, .text)
