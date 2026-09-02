@@ -1739,6 +1739,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(WordBurstHeatmapPolicy.make(bursts: [nil, 0]))
   }
 
+  func testResultPerformanceTraceRebuildsSpeedBurstAndCorrectedErrorsFromReplay() {
+    let points = ResultPerformanceTrace.points(
+      prompt: "amber",
+      events: [
+        .init(offset: 0, kind: .insert, text: "a"),
+        .init(offset: 1, kind: .insert, text: "m"),
+        .init(offset: 2, kind: .insert, text: "x"),
+        .init(offset: 3, kind: .delete, text: ""),
+        .init(offset: 4, kind: .insert, text: "b"),
+      ],
+      duration: 4)
+
+    XCTAssertEqual(points.map(\.elapsed), [1, 2, 3, 4])
+    XCTAssertEqual(points.map(\.wpm), [24, 12, 8, 9])
+    XCTAssertEqual(points.map(\.rawWpm), [24, 18, 8, 9])
+    XCTAssertEqual(points.map(\.burstWpm), [36, 24, 36, 12])
+    XCTAssertEqual(points.map(\.errorCount), [0, 1, 0, 0])
+    XCTAssertEqual(
+      ResultPerformanceTrace.points(
+        prompt: "amber", events: [.init(offset: 0, kind: .insert, text: "a")], duration: 121),
+      [])
+  }
+
   func testOfflineAchievementsAreDerivedFromCompletedLocalMetrics() {
     let metrics = [
       ResultMetric(finishedAt: start, wpm: 84, accuracy: 99, typingSeconds: 16),
@@ -2050,6 +2073,7 @@ final class TypingEngineTests: XCTestCase {
     settings.alwaysShowDecimalPlaces = true
     settings.alwaysShowWordsHistory = true
     settings.showWordBurstHeatmap = true
+    settings.resultPerformanceVisibility = .init(raw: false, burst: false, errors: true)
     settings.startGraphsAtZero = false
     settings.showAverage = .both
     settings.showPersonalBest = true
@@ -2115,6 +2139,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.alwaysShowDecimalPlaces)
     XCTAssertTrue(restored.alwaysShowWordsHistory)
     XCTAssertTrue(restored.showWordBurstHeatmap)
+    XCTAssertEqual(restored.resultPerformanceVisibility, .init(raw: false, burst: false, errors: true))
     XCTAssertFalse(restored.startGraphsAtZero)
     XCTAssertEqual(restored.showAverage, .both)
     XCTAssertTrue(restored.showPersonalBest)
@@ -2205,6 +2230,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.typingSpeedUnit, .wpm)
     XCTAssertFalse(snapshot.alwaysShowWordsHistory)
     XCTAssertFalse(snapshot.showWordBurstHeatmap)
+    XCTAssertEqual(snapshot.resultPerformanceVisibility, .init())
     XCTAssertEqual(snapshot.showAverage, .off)
     XCTAssertFalse(snapshot.showPersonalBest)
     XCTAssertEqual(snapshot.typedCharacterEffect, .keep)
@@ -2243,6 +2269,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingSpeedUnit.wph.formatted(wpm: 72), "4320")
     XCTAssertEqual(TypingSpeedUnit.cps.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "6.00")
     XCTAssertEqual(TypingSpeedUnit.wph.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "4320.00")
+    XCTAssertEqual(TypingSpeedUnit.wps.converted(wpm: 72), 1.2, accuracy: 0.001)
+    XCTAssertEqual(TypingSpeedUnit.cps.converted(wpm: 72), 6, accuracy: 0.001)
   }
 
   func testPaceGuideUsesOnlyComparableCompletedResultsAndClampsProgress() {

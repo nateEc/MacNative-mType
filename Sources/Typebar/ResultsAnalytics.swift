@@ -96,6 +96,131 @@ enum WordBurstHeatmapPolicy {
   }
 }
 
+struct ResultPerformancePoint: Equatable, Identifiable {
+  let elapsed: TimeInterval
+  let wpm: Int
+  let rawWpm: Int
+  let burstWpm: Int
+  let errorCount: Int
+
+  var id: Int { Int((elapsed * 1_000).rounded()) }
+}
+
+struct ResultPerformanceVisibility: Codable, Equatable {
+  var raw = true
+  var burst = true
+  var errors = true
+}
+
+/// Rebuilds a compact, local-only result trace from the input replay that is
+/// already saved with a completed test. It uses Typebar's own incremental
+/// character accounting and deliberately has a conservative duration cap so
+/// a long practice session cannot create an impractically dense result chart.
+enum ResultPerformanceTrace {
+  static let maximumChartDuration: TimeInterval = 120
+
+  static func points(
+    prompt: String,
+    events: [TypingReplayEvent],
+    duration: TimeInterval
+  ) -> [ResultPerformancePoint] {
+    guard !prompt.isEmpty, !events.isEmpty,
+      duration > 0, duration <= maximumChartDuration
+    else { return [] }
+
+    let sampleTimes = samplingTimes(for: duration)
+    let orderedEvents = events.enumerated().sorted { lhs, rhs in
+      lhs.element.offset == rhs.element.offset ? lhs.offset < rhs.offset : lhs.element.offset < rhs.element.offset
+    }.map(\.element)
+    var eventIndex = 0
+    var typed: [Character] = []
+    var forcedErrors: [Bool] = []
+    var characterTimes: [TimeInterval] = []
+
+    return sampleTimes.map { elapsed in
+      while eventIndex < orderedEvents.count, orderedEvents[eventIndex].offset <= elapsed {
+        apply(
+          orderedEvents[eventIndex],
+          typed: &typed,
+          forcedErrors: &forcedErrors,
+          characterTimes: &characterTimes)
+        eventIndex += 1
+      }
+      let errors = errorCount(typed: typed, prompt: Array(prompt), forcedErrors: forcedErrors)
+      let correct = max(0, typed.count - errors)
+      return .init(
+        elapsed: elapsed,
+        wpm: wpm(characters: correct, elapsed: elapsed),
+        rawWpm: wpm(characters: typed.count, elapsed: elapsed),
+        burstWpm: burst(typed: typed, dates: characterTimes),
+        errorCount: errors)
+    }
+  }
+
+  private static func samplingTimes(for duration: TimeInterval) -> [TimeInterval] {
+    guard duration >= 1 else { return [duration] }
+    let completedSeconds = Int(duration.rounded(.down))
+    var samples = (1...completedSeconds).map(TimeInterval.init)
+    if abs((samples.last ?? 0) - duration) > 0.001 {
+      samples.append(duration)
+    }
+    return samples
+  }
+
+  private static func apply(
+    _ event: TypingReplayEvent,
+    typed: inout [Character],
+    forcedErrors: inout [Bool],
+    characterTimes: inout [TimeInterval]
+  ) {
+    switch event.kind {
+    case .insert:
+      for character in event.text {
+        typed.append(character)
+        forcedErrors.append(event.forceError)
+        characterTimes.append(event.offset)
+      }
+    case .delete:
+      guard !typed.isEmpty else { return }
+      typed.removeLast()
+      forcedErrors.removeLast()
+      characterTimes.removeLast()
+    }
+  }
+
+  private static func errorCount(
+    typed: [Character], prompt: [Character], forcedErrors: [Bool]
+  ) -> Int {
+    typed.indices.reduce(into: 0) { count, index in
+      if index >= prompt.count || typed[index] != prompt[index] || forcedErrors[index] {
+        count += 1
+      }
+    }
+  }
+
+  private static func wpm(characters: Int, elapsed: TimeInterval) -> Int {
+    Int((Double(characters) / 5 / max(elapsed, 1) * 60).rounded())
+  }
+
+  private static func burst(typed: [Character], dates: [TimeInterval]) -> Int {
+    guard typed.count == dates.count, !typed.isEmpty else { return 0 }
+    let lastCharacter = typed.count - 1
+    let wordEnd: Int
+    let wordStart: Int
+    if typed[lastCharacter] == " " {
+      wordEnd = lastCharacter
+      wordStart = typed[..<wordEnd].lastIndex(of: " ").map { $0 + 1 } ?? 0
+    } else {
+      wordEnd = lastCharacter
+      wordStart = typed[..<typed.count].lastIndex(of: " ").map { $0 + 1 } ?? 0
+    }
+    let elapsed = dates[wordEnd] - dates[wordStart]
+    guard elapsed > 0 else { return 0 }
+    let characters = wordEnd - wordStart + 1 + (typed[wordEnd] == " " ? 0 : 1)
+    return wpm(characters: characters, elapsed: elapsed)
+  }
+}
+
 /// Mirrors the official current-settings average with Typebar's locally stored
 /// result model. Tags are deliberately absent because the native practice screen
 /// has no active tag-filter state.

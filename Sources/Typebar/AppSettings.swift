@@ -124,6 +124,16 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
   var id: Self { self }
   var displayName: String { rawValue.uppercased() }
 
+  func converted(wpm: Int) -> Double {
+    switch self {
+    case .wpm: Double(wpm)
+    case .cpm: Double(wpm * 5)
+    case .wps: Double(wpm) / 60
+    case .cps: Double(wpm * 5) / 60
+    case .wph: Double(wpm * 60)
+    }
+  }
+
   func formatted(wpm: Int, alwaysShowDecimalPlaces: Bool = false) -> String {
     switch self {
     case .wpm:
@@ -333,6 +343,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var alwaysShowDecimalPlaces = false
   var alwaysShowWordsHistory = false
   var showWordBurstHeatmap = false
+  var resultPerformanceVisibility = ResultPerformanceVisibility()
   var startGraphsAtZero = true
   var showAverage: AverageNoticeDisplay = .off
   var showPersonalBest = false
@@ -400,6 +411,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     alwaysShowDecimalPlaces: Bool = false,
     alwaysShowWordsHistory: Bool = false,
     showWordBurstHeatmap: Bool = false,
+    resultPerformanceVisibility: ResultPerformanceVisibility = .init(),
     startGraphsAtZero: Bool = true,
     showAverage: AverageNoticeDisplay = .off,
     showPersonalBest: Bool = false,
@@ -468,6 +480,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.alwaysShowDecimalPlaces = alwaysShowDecimalPlaces
     self.alwaysShowWordsHistory = alwaysShowWordsHistory
     self.showWordBurstHeatmap = showWordBurstHeatmap
+    self.resultPerformanceVisibility = resultPerformanceVisibility
     self.startGraphsAtZero = startGraphsAtZero
     self.showAverage = showAverage
     self.showPersonalBest = showPersonalBest
@@ -501,7 +514,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       minimumAccuracy, minimumWpm, minimumWordBurstWpm,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
       smoothPracticeLineScroll, showAllPracticeLines, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
-      alwaysShowDecimalPlaces, alwaysShowWordsHistory, showWordBurstHeatmap, startGraphsAtZero, showAverage, showPersonalBest,
+      alwaysShowDecimalPlaces, alwaysShowWordsHistory, showWordBurstHeatmap, resultPerformanceVisibility,
+      startGraphsAtZero, showAverage, showPersonalBest,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
       testModifiers, showFocusWarning,
       showCapsLockWarning, playErrorBeep, playKeyclickSound, timeWarningOffset, soundVolume,
@@ -583,6 +597,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(Bool.self, forKey: .alwaysShowWordsHistory) ?? false
     showWordBurstHeatmap =
       try values.decodeIfPresent(Bool.self, forKey: .showWordBurstHeatmap) ?? false
+    resultPerformanceVisibility =
+      try values.decodeIfPresent(ResultPerformanceVisibility.self, forKey: .resultPerformanceVisibility) ?? .init()
     startGraphsAtZero =
       try values.decodeIfPresent(Bool.self, forKey: .startGraphsAtZero) ?? true
     showAverage =
@@ -683,6 +699,7 @@ final class AppSettings {
   var alwaysShowDecimalPlaces = false { didSet { persist() } }
   var alwaysShowWordsHistory = false { didSet { persist() } }
   var showWordBurstHeatmap = false { didSet { persist() } }
+  var resultPerformanceVisibility = ResultPerformanceVisibility() { didSet { persist() } }
   var startGraphsAtZero = true { didSet { persist() } }
   var showAverage: AverageNoticeDisplay = .off { didSet { persist() } }
   var showPersonalBest = false { didSet { persist() } }
@@ -760,6 +777,7 @@ final class AppSettings {
     alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
     alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
     showWordBurstHeatmap = snapshot.showWordBurstHeatmap
+    resultPerformanceVisibility = snapshot.resultPerformanceVisibility
     startGraphsAtZero = snapshot.startGraphsAtZero
     showAverage = snapshot.showAverage
     showPersonalBest = snapshot.showPersonalBest
@@ -826,6 +844,7 @@ final class AppSettings {
       alwaysShowDecimalPlaces: alwaysShowDecimalPlaces,
       alwaysShowWordsHistory: alwaysShowWordsHistory,
       showWordBurstHeatmap: showWordBurstHeatmap,
+      resultPerformanceVisibility: resultPerformanceVisibility,
       startGraphsAtZero: startGraphsAtZero,
       showAverage: showAverage,
       showPersonalBest: showPersonalBest,
@@ -887,6 +906,7 @@ final class AppSettings {
     alwaysShowDecimalPlaces = false
     alwaysShowWordsHistory = false
     showWordBurstHeatmap = false
+    resultPerformanceVisibility = .init()
     startGraphsAtZero = true
     showAverage = .off
     showPersonalBest = false
@@ -990,6 +1010,7 @@ final class AppSettings {
     alwaysShowDecimalPlaces = snapshot.alwaysShowDecimalPlaces
     alwaysShowWordsHistory = snapshot.alwaysShowWordsHistory
     showWordBurstHeatmap = snapshot.showWordBurstHeatmap
+    resultPerformanceVisibility = snapshot.resultPerformanceVisibility
     startGraphsAtZero = snapshot.startGraphsAtZero
     showAverage = snapshot.showAverage
     showPersonalBest = snapshot.showPersonalBest
@@ -1134,6 +1155,7 @@ final class AppSettings {
       alwaysShowDecimalPlaces: alwaysShowDecimalPlaces,
       alwaysShowWordsHistory: alwaysShowWordsHistory,
       showWordBurstHeatmap: showWordBurstHeatmap,
+      resultPerformanceVisibility: resultPerformanceVisibility,
       startGraphsAtZero: startGraphsAtZero,
       showAverage: showAverage,
       showPersonalBest: showPersonalBest,

@@ -577,6 +577,8 @@ private struct ContentView: View {
         alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
         alwaysShowWordsHistory: settings.alwaysShowWordsHistory,
         showWordBurstHeatmap: settings.showWordBurstHeatmap,
+        startGraphsAtZero: settings.startGraphsAtZero,
+        resultPerformanceVisibility: settings.resultPerformanceVisibility,
         accent: activeTheme.accent,
         publicationMessage: publicationMessage,
         onRestart: {
@@ -591,6 +593,7 @@ private struct ContentView: View {
         wordReviews: result.wordReviews,
         wordBursts: result.wordBursts,
         challengeEvaluation: result.challengeEvaluation,
+        onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
         onPracticeMissedWords: {
           customText = result.missedWords.joined(separator: " ")
           mode = .custom
@@ -1859,6 +1862,8 @@ private struct CompletedResultView: View {
   let alwaysShowDecimalPlaces: Bool
   let alwaysShowWordsHistory: Bool
   let showWordBurstHeatmap: Bool
+  let startGraphsAtZero: Bool
+  let resultPerformanceVisibility: ResultPerformanceVisibility
   let accent: Color
   let publicationMessage: String?
   let onRestart: () -> Void
@@ -1867,6 +1872,7 @@ private struct CompletedResultView: View {
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let challengeEvaluation: ChallengeEvaluation?
+  let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onPracticeMissedWords: () -> Void
   @State private var shareStatus: String?
 
@@ -1897,6 +1903,16 @@ private struct CompletedResultView: View {
           metric("用时", "\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
         }
       }
+
+      ResultPerformanceChart(
+        prompt: result.prompt,
+        events: result.replayEvents,
+        duration: result.finishedAt.timeIntervalSince(result.startedAt),
+        typingSpeedUnit: typingSpeedUnit,
+        startsAtZero: startGraphsAtZero,
+        visibility: resultPerformanceVisibility,
+        onVisibilityChange: onResultPerformanceVisibilityChange,
+        accent: accent)
 
       if let challengeEvaluation {
         ChallengeResultView(evaluation: challengeEvaluation)
@@ -2175,6 +2191,123 @@ private extension WordBurstHeatmapTone {
     case .swift: "最快"
     case .unmeasured: "无计时"
     }
+  }
+}
+
+private struct ResultPerformanceChart: View {
+  let points: [ResultPerformancePoint]
+  let typingSpeedUnit: TypingSpeedUnit
+  let startsAtZero: Bool
+  let accent: Color
+  let onVisibilityChange: (ResultPerformanceVisibility) -> Void
+  @State private var visibility: ResultPerformanceVisibility
+
+  init(
+    prompt: String,
+    events: [TypingReplayEvent],
+    duration: TimeInterval,
+    typingSpeedUnit: TypingSpeedUnit,
+    startsAtZero: Bool,
+    visibility: ResultPerformanceVisibility,
+    onVisibilityChange: @escaping (ResultPerformanceVisibility) -> Void,
+    accent: Color
+  ) {
+    points = ResultPerformanceTrace.points(prompt: prompt, events: events, duration: duration)
+    self.typingSpeedUnit = typingSpeedUnit
+    self.startsAtZero = startsAtZero
+    self.onVisibilityChange = onVisibilityChange
+    _visibility = State(initialValue: visibility)
+    self.accent = accent
+  }
+
+  var body: some View {
+    if points.count >= 2 {
+      VStack(alignment: .leading, spacing: 7) {
+        HStack {
+          Label("本次速度轨迹", systemImage: "chart.xyaxis.line")
+            .font(.caption.weight(.medium))
+          Spacer()
+          traceToggle("Raw", isOn: visibilityBinding(\.raw), color: .secondary)
+          traceToggle("Burst", isOn: visibilityBinding(\.burst), color: .orange)
+          traceToggle("错误", isOn: visibilityBinding(\.errors), color: .red)
+        }
+        Chart(points) { point in
+          LineMark(
+            x: .value("秒", point.elapsed),
+            y: .value(typingSpeedUnit.displayName, typingSpeedUnit.converted(wpm: point.wpm))
+          )
+          .foregroundStyle(accent)
+          .interpolationMethod(.catmullRom)
+          if visibility.raw {
+            LineMark(
+              x: .value("秒", point.elapsed),
+              y: .value(typingSpeedUnit.displayName, typingSpeedUnit.converted(wpm: point.rawWpm))
+            )
+            .foregroundStyle(.secondary)
+            .lineStyle(.init(lineWidth: 1, dash: [3, 3]))
+          }
+          if visibility.burst {
+            LineMark(
+              x: .value("秒", point.elapsed),
+              y: .value(typingSpeedUnit.displayName, typingSpeedUnit.converted(wpm: point.burstWpm))
+            )
+            .foregroundStyle(.orange)
+            .lineStyle(.init(lineWidth: 1))
+          }
+        }
+        .chartYScale(domain: .automatic(includesZero: startsAtZero))
+        .chartXAxis {
+          AxisMarks(values: .automatic(desiredCount: 4)) { value in
+            AxisGridLine().foregroundStyle(.secondary.opacity(0.2))
+            AxisTick()
+            AxisValueLabel {
+              if let elapsed = value.as(TimeInterval.self) {
+                Text("\(Int(elapsed.rounded())) 秒")
+              }
+            }
+          }
+        }
+        .frame(height: 118)
+        if visibility.errors {
+          Chart(points) { point in
+            BarMark(
+              x: .value("秒", point.elapsed),
+              y: .value("错误", point.errorCount)
+            )
+            .foregroundStyle(.red.opacity(0.68))
+          }
+          .chartYScale(domain: .automatic(includesZero: true))
+          .chartXAxis(.hidden)
+          .frame(height: 30)
+          .accessibilityLabel("按秒重建的错误轨迹")
+        }
+        Text("强调色为 WPM，灰虚线为 Raw，橙色为 Burst；数据仅由本机输入回放重建。")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      .padding(10)
+      .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+  }
+
+  private func traceToggle(_ title: String, isOn: Binding<Bool>, color: Color) -> some View {
+    Button(title) { isOn.wrappedValue.toggle() }
+      .buttonStyle(.bordered)
+      .controlSize(.mini)
+      .tint(isOn.wrappedValue ? color : .secondary)
+      .accessibilityLabel("\(title)轨迹")
+      .accessibilityValue(isOn.wrappedValue ? "显示" : "隐藏")
+  }
+
+  private func visibilityBinding(
+    _ keyPath: WritableKeyPath<ResultPerformanceVisibility, Bool>
+  ) -> Binding<Bool> {
+    Binding(
+      get: { visibility[keyPath: keyPath] },
+      set: { value in
+        visibility[keyPath: keyPath] = value
+        onVisibilityChange(visibility)
+      })
   }
 }
 
