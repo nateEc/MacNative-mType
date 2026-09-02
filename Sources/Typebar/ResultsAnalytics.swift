@@ -112,6 +112,16 @@ struct ResultPerformanceVisibility: Codable, Equatable {
   var errors = true
 }
 
+enum ResultImageExport {
+  static func filename(for date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyyMMdd-HHmmss"
+    return "typebar-result-\(formatter.string(from: date)).png"
+  }
+}
+
 /// Rebuilds a compact, local-only result trace from the input replay that is
 /// already saved with a completed test. It uses Typebar's own incremental
 /// character accounting and deliberately has a conservative duration cap so

@@ -723,6 +723,33 @@ final class TypingEngineTests: XCTestCase {
       ResultShareText.make(for: result), "Typebar\n72 WPM · 91% 准确率 · 1 错误\ntime · english · 30 秒")
   }
 
+  func testResultImageExportUsesPortableUtcFilename() {
+    XCTAssertEqual(
+      ResultImageExport.filename(for: Date(timeIntervalSince1970: 0)),
+      "typebar-result-19700101-000000.png")
+  }
+
+  @MainActor
+  func testResultSnapshotImageRendersThemedHighResolutionPng() throws {
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .words(2), outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(12), typedCharacterCount: 12, correctCharacterCount: 11,
+      errorCount: 1, wpm: 66, rawWpm: 72, accuracy: 92, prompt: "amber harbor")
+    let image = try XCTUnwrap(
+      ResultSnapshotImage.make(
+        result: result,
+        typingSpeedUnit: .wpm,
+        background: AppTheme.paper.background,
+        panel: AppTheme.paper.panel,
+        accent: AppTheme.paper.accent,
+        colorScheme: .light))
+    let tiff = try XCTUnwrap(image.tiffRepresentation)
+    let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff))
+
+    XCTAssertEqual(bitmap.pixelsWide, 1_520)
+    XCTAssertGreaterThan(bitmap.pixelsHigh, 500)
+  }
+
   func testReplayRebuildsAcceptedInsertsAndDeletesAtRecordedTimes() {
     var session = TypingSession(
       configuration: .init(

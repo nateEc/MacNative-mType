@@ -2,6 +2,7 @@ import AppKit
 import Charts
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct TypebarApp: App {
@@ -579,7 +580,10 @@ private struct ContentView: View {
         showWordBurstHeatmap: settings.showWordBurstHeatmap,
         startGraphsAtZero: settings.startGraphsAtZero,
         resultPerformanceVisibility: settings.resultPerformanceVisibility,
+        background: activeTheme.background,
+        panel: activeTheme.panel,
         accent: activeTheme.accent,
+        colorScheme: activeTheme.colorScheme,
         publicationMessage: publicationMessage,
         onRestart: {
           completedResult = nil
@@ -1864,7 +1868,10 @@ private struct CompletedResultView: View {
   let showWordBurstHeatmap: Bool
   let startGraphsAtZero: Bool
   let resultPerformanceVisibility: ResultPerformanceVisibility
+  let background: Color
+  let panel: Color
   let accent: Color
+  let colorScheme: ColorScheme
   let publicationMessage: String?
   let onRestart: () -> Void
   let onHistory: () -> Void
@@ -1874,7 +1881,7 @@ private struct CompletedResultView: View {
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onPracticeMissedWords: () -> Void
-  @State private var shareStatus: String?
+  @State private var exportStatus: String?
 
   var body: some View {
     VStack(spacing: 28) {
@@ -1925,6 +1932,12 @@ private struct CompletedResultView: View {
           .multilineTextAlignment(.center)
       }
 
+      if let exportStatus {
+        Text(exportStatus)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
       if !wordReviews.isEmpty {
         WordReviewHistoryView(
           reviews: wordReviews,
@@ -1943,7 +1956,12 @@ private struct CompletedResultView: View {
         if savesResult {
           Button("查看历史", action: onHistory)
         }
-        Button(shareStatus ?? "复制结果") { copyResult() }
+        Menu("导出") {
+          Button("复制结果文字", action: copyResultText)
+          Button("复制结果图片", action: copyResultImage)
+          Divider()
+          Button("保存结果图片…", action: saveResultImage)
+        }
         Spacer()
         if !missedWords.isEmpty {
           Button("练习错词（\(missedWords.count)）", action: onPracticeMissedWords)
@@ -1970,10 +1988,157 @@ private struct CompletedResultView: View {
       : "\(result.accuracy)%"
   }
 
-  private func copyResult() {
+  private func copyResultText() {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(ResultShareText.make(for: result), forType: .string)
-    shareStatus = "已复制"
+    exportStatus = "结果文字已复制"
+  }
+
+  private func copyResultImage() {
+    guard let image = resultImage else {
+      exportStatus = "无法生成结果图片"
+      return
+    }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.writeObjects([image])
+    exportStatus = "结果图片已复制"
+  }
+
+  private func saveResultImage() {
+    guard let image = resultImage,
+      let tiff = image.tiffRepresentation,
+      let bitmap = NSBitmapImageRep(data: tiff),
+      let data = bitmap.representation(using: .png, properties: [:])
+    else {
+      exportStatus = "无法生成 PNG 图片"
+      return
+    }
+    let panel = NSSavePanel()
+    panel.allowedContentTypes = [.png]
+    panel.nameFieldStringValue = ResultImageExport.filename(for: result.finishedAt)
+    panel.canCreateDirectories = true
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    do {
+      try data.write(to: url, options: .atomic)
+      exportStatus = "结果图片已保存"
+    } catch {
+      exportStatus = "无法保存结果图片"
+    }
+  }
+
+  private var resultImage: NSImage? {
+    ResultSnapshotImage.make(
+      result: result,
+      typingSpeedUnit: typingSpeedUnit,
+      background: background,
+      panel: panel,
+      accent: accent,
+      colorScheme: colorScheme)
+  }
+}
+
+@MainActor
+enum ResultSnapshotImage {
+  static func make(
+    result: CompletedTestResult,
+    typingSpeedUnit: TypingSpeedUnit,
+    background: Color,
+    panel: Color,
+    accent: Color,
+    colorScheme: ColorScheme
+  ) -> NSImage? {
+    let renderer = ImageRenderer(
+      content: ResultSnapshotCard(
+        result: result,
+        typingSpeedUnit: typingSpeedUnit,
+        background: background,
+        panel: panel,
+        accent: accent)
+      .preferredColorScheme(colorScheme))
+    renderer.scale = 2
+    return renderer.nsImage
+  }
+
+}
+
+private struct ResultSnapshotCard: View {
+  let result: CompletedTestResult
+  let typingSpeedUnit: TypingSpeedUnit
+  let background: Color
+  let panel: Color
+  let accent: Color
+
+  private var accuracyBlocks: Int { min(10, max(0, Int((Double(result.accuracy) / 10).rounded()))) }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 20) {
+      HStack(alignment: .firstTextBaseline) {
+        Text("TYPEBAR / LOCAL RESULT")
+          .font(.system(size: 12, weight: .bold, design: .monospaced))
+          .tracking(1.4)
+        Spacer()
+        Text(result.finishedAt, format: .dateTime.year().month().day().hour().minute())
+          .font(.system(size: 12, design: .monospaced))
+          .foregroundStyle(.secondary)
+      }
+      Divider().overlay(accent.opacity(0.55))
+      HStack(alignment: .bottom) {
+        VStack(alignment: .leading, spacing: 4) {
+          Text(typingSpeedUnit.formatted(wpm: result.wpm))
+            .font(.system(size: 88, weight: .bold, design: .rounded))
+          Text(typingSpeedUnit.displayName)
+            .font(.system(size: 15, weight: .semibold, design: .monospaced))
+            .foregroundStyle(accent)
+        }
+        Spacer()
+        VStack(alignment: .trailing, spacing: 8) {
+          snapshotMetric("准确率", "\(result.accuracy)%")
+          snapshotMetric("Raw \(typingSpeedUnit.displayName)", typingSpeedUnit.formatted(wpm: result.rawWpm))
+          snapshotMetric("错误", "\(result.errorCount)")
+        }
+      }
+      VStack(alignment: .leading, spacing: 7) {
+        HStack {
+          Text("准确度刻度")
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+          Spacer()
+          Text("\(result.accuracy)%")
+            .font(.system(size: 11, design: .monospaced))
+        }
+        HStack(spacing: 5) {
+          ForEach(0..<10, id: \.self) { index in
+            RoundedRectangle(cornerRadius: 2)
+              .fill(index < accuracyBlocks ? accent : panel.opacity(0.7))
+              .frame(height: 7)
+          }
+        }
+      }
+      HStack {
+        Text(result.configuration.mode.rawValue.uppercased())
+        Text("•")
+        Text(result.configuration.language.displayName)
+        Text("•")
+        Text("\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
+        Spacer()
+        Text("OFFLINE")
+      }
+      .font(.system(size: 11, weight: .medium, design: .monospaced))
+      .foregroundStyle(.secondary)
+    }
+    .padding(36)
+    .frame(width: 760)
+    .background(background)
+    .foregroundStyle(.primary)
+  }
+
+  private func snapshotMetric(_ title: String, _ value: String) -> some View {
+    HStack(spacing: 12) {
+      Text(title)
+        .font(.system(size: 12, design: .monospaced))
+        .foregroundStyle(.secondary)
+      Text(value)
+        .font(.system(size: 17, weight: .semibold, design: .monospaced))
+    }
   }
 }
 
