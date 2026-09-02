@@ -345,6 +345,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(session.recentWordBursts.allSatisfy { $0 > 0 })
   }
 
+  func testWordBurstHistoryTracksAttemptedWordsAndLeavesSingleEventWordsNeutral() {
+    var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber bay")
+    session.insert("a", at: start)
+    session.insert("mber ", at: start.addingTimeInterval(0.5))
+    session.insert("b", at: start.addingTimeInterval(1))
+    session.insert("ay", at: start.addingTimeInterval(1.4))
+
+    XCTAssertEqual(session.wordReviews.count, 2)
+    XCTAssertEqual(session.wordBurstHistory, [144, 120])
+
+    var singleEvent = TypingSession(configuration: .timed(seconds: 30), prompt: "amber bay")
+    singleEvent.insert("amber ", at: start)
+    XCTAssertEqual(singleEvent.wordBurstHistory, [nil])
+  }
+
   func testMissedWordsIncludesOnlyAttemptedIncorrectSpaceDelimitedTargetsWithoutDuplicates() {
     var session = TypingSession(
       configuration: .timed(seconds: 30), prompt: "amber harbor amber quiet")
@@ -1713,6 +1728,17 @@ final class TypingEngineTests: XCTestCase {
           language: .english), currentPrompt: "quote", samples: [eligible, best]))
   }
 
+  func testWordBurstHeatmapUsesCurrentResultQuintilesAndLeavesMissingBurstsNeutral() throws {
+    let heatmap = try XCTUnwrap(
+      WordBurstHeatmapPolicy.make(bursts: [20, 40, 60, 80, 100, nil, 0]))
+
+    XCTAssertEqual(heatmap.lowerBounds, [20, 40, 60, 80, 100])
+    XCTAssertEqual(
+      heatmap.tones,
+      [.slow, .measured, .steady, .fast, .swift, .unmeasured, .unmeasured])
+    XCTAssertNil(WordBurstHeatmapPolicy.make(bursts: [nil, 0]))
+  }
+
   func testOfflineAchievementsAreDerivedFromCompletedLocalMetrics() {
     let metrics = [
       ResultMetric(finishedAt: start, wpm: 84, accuracy: 99, typingSeconds: 16),
@@ -2023,6 +2049,7 @@ final class TypingEngineTests: XCTestCase {
     settings.typingSpeedUnit = .cps
     settings.alwaysShowDecimalPlaces = true
     settings.alwaysShowWordsHistory = true
+    settings.showWordBurstHeatmap = true
     settings.startGraphsAtZero = false
     settings.showAverage = .both
     settings.showPersonalBest = true
@@ -2087,6 +2114,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.typingSpeedUnit, .cps)
     XCTAssertTrue(restored.alwaysShowDecimalPlaces)
     XCTAssertTrue(restored.alwaysShowWordsHistory)
+    XCTAssertTrue(restored.showWordBurstHeatmap)
     XCTAssertFalse(restored.startGraphsAtZero)
     XCTAssertEqual(restored.showAverage, .both)
     XCTAssertTrue(restored.showPersonalBest)
@@ -2176,6 +2204,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.typoIndicatorStyle, .off)
     XCTAssertEqual(snapshot.typingSpeedUnit, .wpm)
     XCTAssertFalse(snapshot.alwaysShowWordsHistory)
+    XCTAssertFalse(snapshot.showWordBurstHeatmap)
     XCTAssertEqual(snapshot.showAverage, .off)
     XCTAssertFalse(snapshot.showPersonalBest)
     XCTAssertEqual(snapshot.typedCharacterEffect, .keep)

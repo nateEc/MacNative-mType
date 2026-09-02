@@ -502,6 +502,7 @@ private struct ContentView: View {
           savesResult: savesResult,
           missedWords: session.missedWords,
           wordReviews: session.wordReviews,
+          wordBursts: session.wordBurstHistory,
           challengeEvaluation: TypebarChallengeLibrary.challenge(
             id: result.configuration.challengeID
           ).map { ChallengeEvaluator.evaluate(result, challenge: $0) }
@@ -575,6 +576,8 @@ private struct ContentView: View {
         typingSpeedUnit: settings.typingSpeedUnit,
         alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
         alwaysShowWordsHistory: settings.alwaysShowWordsHistory,
+        showWordBurstHeatmap: settings.showWordBurstHeatmap,
+        accent: activeTheme.accent,
         publicationMessage: publicationMessage,
         onRestart: {
           completedResult = nil
@@ -586,6 +589,7 @@ private struct ContentView: View {
         },
         missedWords: result.missedWords,
         wordReviews: result.wordReviews,
+        wordBursts: result.wordBursts,
         challengeEvaluation: result.challengeEvaluation,
         onPracticeMissedWords: {
           customText = result.missedWords.joined(separator: " ")
@@ -1843,6 +1847,7 @@ private struct CompletedResultPresentation: Identifiable {
   let savesResult: Bool
   let missedWords: [String]
   let wordReviews: [TypedWordReview]
+  let wordBursts: [Int?]
   let challengeEvaluation: ChallengeEvaluation?
   var id: UUID { result.id }
 }
@@ -1853,11 +1858,14 @@ private struct CompletedResultView: View {
   let typingSpeedUnit: TypingSpeedUnit
   let alwaysShowDecimalPlaces: Bool
   let alwaysShowWordsHistory: Bool
+  let showWordBurstHeatmap: Bool
+  let accent: Color
   let publicationMessage: String?
   let onRestart: () -> Void
   let onHistory: () -> Void
   let missedWords: [String]
   let wordReviews: [TypedWordReview]
+  let wordBursts: [Int?]
   let challengeEvaluation: ChallengeEvaluation?
   let onPracticeMissedWords: () -> Void
   @State private var shareStatus: String?
@@ -1903,7 +1911,12 @@ private struct CompletedResultView: View {
 
       if !wordReviews.isEmpty {
         WordReviewHistoryView(
-          reviews: wordReviews, initiallyExpanded: alwaysShowWordsHistory)
+          reviews: wordReviews,
+          bursts: wordBursts,
+          showsBurstHeatmap: showWordBurstHeatmap,
+          typingSpeedUnit: typingSpeedUnit,
+          accent: accent,
+          initiallyExpanded: alwaysShowWordsHistory)
       }
 
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
@@ -2031,33 +2044,63 @@ private struct ReplayTimelineView: View {
 
 private struct WordReviewHistoryView: View {
   let reviews: [TypedWordReview]
+  let bursts: [Int?]
+  let showsBurstHeatmap: Bool
+  let typingSpeedUnit: TypingSpeedUnit
+  let accent: Color
   @State private var isExpanded: Bool
 
-  init(reviews: [TypedWordReview], initiallyExpanded: Bool) {
+  private var heatmap: WordBurstHeatmap? {
+    guard showsBurstHeatmap else { return nil }
+    return WordBurstHeatmapPolicy.make(bursts: Array(bursts.prefix(reviews.count)))
+  }
+
+  init(
+    reviews: [TypedWordReview],
+    bursts: [Int?],
+    showsBurstHeatmap: Bool,
+    typingSpeedUnit: TypingSpeedUnit,
+    accent: Color,
+    initiallyExpanded: Bool
+  ) {
     self.reviews = reviews
+    self.bursts = bursts
+    self.showsBurstHeatmap = showsBurstHeatmap
+    self.typingSpeedUnit = typingSpeedUnit
+    self.accent = accent
     _isExpanded = State(initialValue: initiallyExpanded)
   }
 
   var body: some View {
     DisclosureGroup(isExpanded: $isExpanded) {
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 5) {
-          ForEach(reviews) { review in
-            HStack(spacing: 8) {
-              Image(systemName: review.isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundStyle(review.isCorrect ? .green : .red)
-              Text(review.target).font(.system(.body, design: .monospaced))
-              if !review.isCorrect {
-                Text("→ \(review.typed.isEmpty ? "∅" : review.typed)")
-                  .font(.system(.caption, design: .monospaced))
-                  .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 10) {
+        if let heatmap {
+          WordBurstHeatmapLegend(
+            heatmap: heatmap,
+            typingSpeedUnit: typingSpeedUnit,
+            accent: accent)
+        }
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 5) {
+            ForEach(reviews) { review in
+              HStack(spacing: 8) {
+                Image(systemName: review.isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
+                  .foregroundStyle(review.isCorrect ? .green : .red)
+                Text(review.target)
+                  .font(.system(.body, design: .monospaced))
+                  .foregroundStyle(wordBurstHeatmapColor(heatmap?.tone(at: review.index), accent: accent))
+                if !review.isCorrect {
+                  Text("→ \(review.typed.isEmpty ? "∅" : review.typed)")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                }
+                Spacer()
               }
-              Spacer()
             }
           }
         }
+        .frame(maxHeight: 112)
       }
-      .frame(maxHeight: 112)
     } label: {
       HStack {
         Text("本次单词历史").font(.caption.weight(.medium))
@@ -2069,6 +2112,69 @@ private struct WordReviewHistoryView: View {
     }
     .padding(10)
     .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+  }
+}
+
+private struct WordBurstHeatmapLegend: View {
+  let heatmap: WordBurstHeatmap
+  let typingSpeedUnit: TypingSpeedUnit
+  let accent: Color
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label("单词 Burst 热力图", systemImage: "flame")
+        .font(.caption.weight(.medium))
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 9) {
+          ForEach(WordBurstHeatmapTone.scoredTones) { tone in
+            HStack(spacing: 4) {
+              Circle()
+                .fill(wordBurstHeatmapColor(tone, accent: accent))
+                .frame(width: 7, height: 7)
+              Text("\(tone.title) \(formattedLowerBound(for: tone))+")
+                .font(.caption2.monospacedDigit())
+            }
+          }
+          HStack(spacing: 4) {
+            Circle().fill(wordBurstHeatmapColor(.unmeasured, accent: accent)).frame(width: 7, height: 7)
+            Text("无计时")
+              .font(.caption2)
+          }
+        }
+      }
+      Text("颜色表示本次完成中的相对单词速度；灰色表示没有可测输入间隔。")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private func formattedLowerBound(for tone: WordBurstHeatmapTone) -> String {
+    guard let wpm = heatmap.lowerBound(for: tone) else { return "—" }
+    return typingSpeedUnit.formatted(wpm: wpm)
+  }
+}
+
+private func wordBurstHeatmapColor(_ tone: WordBurstHeatmapTone?, accent: Color) -> Color {
+  switch tone {
+  case .slow: .red
+  case .measured: .orange
+  case .steady: .primary
+  case .fast: accent.opacity(0.72)
+  case .swift: accent
+  case .unmeasured, .none: .secondary
+  }
+}
+
+private extension WordBurstHeatmapTone {
+  var title: String {
+    switch self {
+    case .slow: "慢"
+    case .measured: "偏慢"
+    case .steady: "均衡"
+    case .fast: "快"
+    case .swift: "最快"
+    case .unmeasured: "无计时"
+    }
   }
 }
 

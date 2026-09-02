@@ -44,6 +44,58 @@ struct CurrentPersonalBest: Equatable {
   let accuracy: Int
 }
 
+enum WordBurstHeatmapTone: Int, CaseIterable, Equatable, Identifiable {
+  case slow
+  case measured
+  case steady
+  case fast
+  case swift
+  case unmeasured
+
+  var id: Self { self }
+
+  static var scoredTones: [Self] { [.slow, .measured, .steady, .fast, .swift] }
+}
+
+struct WordBurstHeatmap: Equatable {
+  let tones: [WordBurstHeatmapTone]
+  let lowerBounds: [Int]
+
+  func tone(at wordIndex: Int) -> WordBurstHeatmapTone? {
+    guard tones.indices.contains(wordIndex) else { return nil }
+    return tones[wordIndex]
+  }
+
+  func lowerBound(for tone: WordBurstHeatmapTone) -> Int? {
+    guard let index = WordBurstHeatmapTone.scoredTones.firstIndex(of: tone),
+      lowerBounds.indices.contains(index)
+    else { return nil }
+    return lowerBounds[index]
+  }
+}
+
+/// Classifies result-page word bursts with independently authored quintiles.
+/// Each band is relative to the current completed test, making the display
+/// useful at both beginner and advanced typing speeds without any network data.
+enum WordBurstHeatmapPolicy {
+  static func make(bursts: [Int?]) -> WordBurstHeatmap? {
+    let measured = bursts.compactMap { $0 }.filter { $0 > 0 }.sorted()
+    guard !measured.isEmpty else { return nil }
+    let lowerBounds = [0.0, 0.25, 0.5, 0.75, 1.0].map { percentile in
+      measured[Int((Double(measured.count - 1) * percentile).rounded(.down))]
+    }
+    return .init(
+      tones: bursts.map { burst in tone(for: burst, lowerBounds: lowerBounds) },
+      lowerBounds: lowerBounds)
+  }
+
+  private static func tone(for burst: Int?, lowerBounds: [Int]) -> WordBurstHeatmapTone {
+    guard let burst, burst > 0 else { return .unmeasured }
+    let index = lowerBounds.lastIndex(where: { burst >= $0 }) ?? 0
+    return WordBurstHeatmapTone.scoredTones[index]
+  }
+}
+
 /// Mirrors the official current-settings average with Typebar's locally stored
 /// result model. Tags are deliberately absent because the native practice screen
 /// has no active tag-filter state.

@@ -1349,6 +1349,28 @@ struct TypingSession {
   /// so a user can see pace changes alongside their error count.
   var recentWordBursts: [Int] { Array(committedWordBursts.suffix(8)) }
 
+  /// Per-attempt burst speeds for the result-page word history. A missing
+  /// value means the attempt has no measurable interval (for example, text was
+  /// inserted in a single event), so presentation can keep it neutral instead
+  /// of inventing an extreme speed.
+  var wordBurstHistory: [Int?] {
+    guard configuration.language.usesSpaceDelimitedWords,
+      !configuration.modifiers.contains(.noSpaces), !typed.isEmpty
+    else { return [] }
+    let characters = Array(typed)
+    guard characters.count == typedCharacterDates.count else { return [] }
+    var bursts: [Int?] = []
+    var wordStart = 0
+    for index in characters.indices where characters[index] == " " {
+      bursts.append(wordBurst(from: wordStart, through: index, includesTrailingSpace: true))
+      wordStart = index + 1
+    }
+    if wordStart < characters.count {
+      bursts.append(wordBurst(from: wordStart, through: characters.count - 1, includesTrailingSpace: false))
+    }
+    return bursts
+  }
+
   /// Target words from a space-delimited language that the user actually
   /// attempted but did not enter exactly.
   /// Unreached prompt words are intentionally excluded so a timed test does
@@ -1616,6 +1638,14 @@ struct TypingSession {
     let elapsed = typedCharacterDates.last!.timeIntervalSince(typedCharacterDates[start])
     guard elapsed > 0 else { return nil }
     return wpm(characters: length + 1, seconds: elapsed)
+  }
+
+  private func wordBurst(from start: Int, through end: Int, includesTrailingSpace: Bool) -> Int? {
+    guard start >= 0, end >= start, end < typedCharacterDates.count else { return nil }
+    let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
+    guard elapsed > 0 else { return nil }
+    let characters = end - start + 1 + (includesTrailingSpace ? 0 : 1)
+    return wpm(characters: characters, seconds: elapsed)
   }
 
   private mutating func recordWordBurstIfCommitted() {
