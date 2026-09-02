@@ -795,6 +795,28 @@ final class TypingEngineTests: XCTestCase {
         reviews: [TypedWordReview(index: 0, target: "ember", typed: "ember")]))
   }
 
+  func testTodayPracticeSummaryMergesSavedAndCurrentProcessWithoutDoubleCounting() {
+    let calendar = Calendar(identifier: .gregorian)
+    let today = Date(timeIntervalSince1970: 1_728_000_000)
+    let yesterday = today.addingTimeInterval(-86_400)
+    let currentID = UUID()
+    let summary = TodayPracticeAggregation.summary(
+      persisted: [
+        ResultMetric(id: currentID, finishedAt: today, wpm: 50, accuracy: 98, typingSeconds: 12),
+        ResultMetric(finishedAt: today, wpm: 60, accuracy: 99, typingSeconds: 75),
+        ResultMetric(finishedAt: yesterday, wpm: 70, accuracy: 100, typingSeconds: 90),
+      ],
+      currentProcess: [
+        CurrentProcessPractice(id: currentID, finishedAt: today, typingSeconds: 18),
+        CurrentProcessPractice(id: UUID(), finishedAt: today, typingSeconds: 7),
+      ],
+      now: today,
+      calendar: calendar)
+    XCTAssertEqual(summary.typingSeconds, 100)
+    XCTAssertEqual(summary.completedTests, 3)
+    XCTAssertEqual(summary.formattedDuration, "1 分 40 秒")
+  }
+
   @MainActor
   func testResultSnapshotImageRendersThemedHighResolutionPng() throws {
     let result = CompletedTestResult(

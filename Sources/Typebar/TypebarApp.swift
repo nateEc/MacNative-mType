@@ -426,6 +426,7 @@ private struct ContentView: View {
   @State private var lastTimeWarningSecond: Int?
   @State private var restartLockMessage: String?
   @State private var lastCompletedWpm: Int?
+  @State private var currentProcessPractice: [CurrentProcessPractice] = []
   @State private var repeatedPaceArmed = false
   @State private var activePaceTargetWpm: Int?
   @State private var compositionText = ""
@@ -498,6 +499,7 @@ private struct ContentView: View {
         let wordReviews = session.wordReviews
         let wordBursts = session.wordBurstHistory
         let repeatedSession = session.repeatedAttempt()
+        currentProcessPractice.append(.init(result: result))
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
           modelContext.insert(TestResultRecord(result: result))
         }
@@ -509,6 +511,7 @@ private struct ContentView: View {
           wordBursts: wordBursts,
           slowWordPractice: SlowWordPracticePlan.make(reviews: wordReviews, bursts: wordBursts),
           contextualMissedPractice: ContextualMissedWordPracticePlan.make(reviews: wordReviews),
+          todayPractice: todayPracticeSummary,
           repeatedSession: repeatedSession,
           challengeEvaluation: TypebarChallengeLibrary.challenge(
             id: result.configuration.challengeID
@@ -604,6 +607,7 @@ private struct ContentView: View {
         wordBursts: result.wordBursts,
         slowWordPractice: result.slowWordPractice,
         contextualMissedPractice: result.contextualMissedPractice,
+        todayPractice: result.todayPractice,
         onRepeat: {
           completedResult = nil
           startRepeatedAttempt(result.repeatedSession)
@@ -1425,6 +1429,16 @@ private struct ContentView: View {
     return "近 \(average.count) 次平均：\(metrics.joined(separator: " · "))"
   }
 
+  private var todayPracticeSummary: TodayPracticeSummary {
+    TodayPracticeAggregation.summary(
+      persisted: savedResults.map {
+        ResultMetric(
+          id: $0.id, finishedAt: $0.finishedAt, wpm: $0.wpm, accuracy: $0.accuracy,
+          typingSeconds: $0.finishedAt.timeIntervalSince($0.startedAt))
+      },
+      currentProcess: currentProcessPractice)
+  }
+
   private var personalBestNotice: String? {
     guard settings.showPersonalBest else { return nil }
     guard CurrentPersonalBestPolicy.isConfigurationEligible(configuration) else {
@@ -1892,6 +1906,7 @@ private struct CompletedResultPresentation: Identifiable {
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
   let contextualMissedPractice: ContextualMissedWordPracticePlan?
+  let todayPractice: TodayPracticeSummary
   let repeatedSession: TypingSession
   let challengeEvaluation: ChallengeEvaluation?
   var id: UUID { result.id }
@@ -1918,6 +1933,7 @@ private struct CompletedResultView: View {
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
   let contextualMissedPractice: ContextualMissedWordPracticePlan?
+  let todayPractice: TodayPracticeSummary
   let onRepeat: () -> Void
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
@@ -1953,6 +1969,12 @@ private struct CompletedResultView: View {
           metric("用时", "\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
         }
       }
+
+      Label(
+        "今日练习 \(todayPractice.formattedDuration) · \(todayPractice.completedTests) 次",
+        systemImage: "clock.badge.checkmark")
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
 
       ResultPerformanceChart(
         prompt: result.prompt,

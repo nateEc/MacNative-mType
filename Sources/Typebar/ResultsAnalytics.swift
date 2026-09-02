@@ -16,6 +16,59 @@ struct ResultMetric: Equatable, Identifiable {
     }
 }
 
+/// Completed practice that belongs to the current running app process. It
+/// keeps the daily result summary truthful even when the user opted out of
+/// persisting a completed test to SwiftData.
+struct CurrentProcessPractice: Equatable, Identifiable {
+  let id: UUID
+  let finishedAt: Date
+  let typingSeconds: TimeInterval
+
+  init(id: UUID = UUID(), finishedAt: Date, typingSeconds: TimeInterval) {
+    self.id = id
+    self.finishedAt = finishedAt
+    self.typingSeconds = max(0, typingSeconds)
+  }
+
+  init(result: CompletedTestResult) {
+    self.init(
+      id: result.id, finishedAt: result.finishedAt,
+      typingSeconds: result.finishedAt.timeIntervalSince(result.startedAt))
+  }
+}
+
+struct TodayPracticeSummary: Equatable {
+  let typingSeconds: TimeInterval
+  let completedTests: Int
+
+  var formattedDuration: String {
+    let totalSeconds = max(0, Int(typingSeconds.rounded()))
+    let hours = totalSeconds / 3_600
+    let minutes = totalSeconds % 3_600 / 60
+    let seconds = totalSeconds % 60
+    if hours > 0 { return "\(hours) 小时 \(minutes) 分" }
+    if minutes > 0 { return "\(minutes) 分 \(seconds) 秒" }
+    return "\(seconds) 秒"
+  }
+}
+
+enum TodayPracticeAggregation {
+  static func summary(
+    persisted: [ResultMetric], currentProcess: [CurrentProcessPractice], now: Date = .now,
+    calendar: Calendar = .current
+  ) -> TodayPracticeSummary {
+    let local = currentProcess.filter { calendar.isDate($0.finishedAt, inSameDayAs: now) }
+    let localIDs = Set(local.map(\.id))
+    let saved = persisted.filter {
+      calendar.isDate($0.finishedAt, inSameDayAs: now) && !localIDs.contains($0.id)
+    }
+    return .init(
+      typingSeconds: saved.map(\.typingSeconds).reduce(0, +)
+        + local.map(\.typingSeconds).reduce(0, +),
+      completedTests: saved.count + local.count)
+  }
+}
+
 struct ResultHistoryEntry: Equatable, Identifiable {
     let id: UUID
     let mode: TestMode?
