@@ -1,0 +1,2648 @@
+import AppKit
+import Charts
+import SwiftData
+import SwiftUI
+
+@main
+struct TypebarApp: App {
+  @State private var settings = AppSettings()
+  @State private var account = AccountSession()
+  @State private var hotkey = GlobalHotkeyMonitor()
+
+  var body: some Scene {
+    WindowGroup("Typebar") {
+      ContentView(settings: settings, account: account, hotkey: hotkey)
+        .frame(minWidth: 760, minHeight: 480)
+        .task {
+          await account.restoreSession()
+          hotkey.setEnabled(settings.globalHotkeyEnabled)
+        }
+    }
+    .windowResizability(.contentMinSize)
+    .modelContainer(for: [
+      TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
+      ResultFilterPresetRecord.self,
+    ])
+
+    Settings {
+      PreferencesView(settings: settings, account: account, hotkey: hotkey)
+    }
+
+    MenuBarExtra("Typebar", systemImage: "keyboard") {
+      Button("打开 Typebar") {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first(where: { $0.isVisible })?.makeKeyAndOrderFront(nil)
+      }
+      Divider()
+      Button("退出") { NSApp.terminate(nil) }
+    }
+  }
+}
+
+private enum QuoteSource: String, CaseIterable, Identifiable {
+  case builtIn
+  case community
+
+  var id: Self { self }
+  var title: String { self == .builtIn ? "Typebar 自有" : "社区审核" }
+}
+
+private struct CRTPracticeOverlay: View {
+  var body: some View {
+    Canvas { context, size in
+      var line = Path()
+      var y = 0.0
+      while y < size.height {
+        line.move(to: .init(x: 0, y: y))
+        line.addLine(to: .init(x: size.width, y: y))
+        y += 3
+      }
+      context.stroke(line, with: .color(.black.opacity(0.13)), lineWidth: 1)
+    }
+    .background(.green.opacity(0.045))
+    .overlay(
+      RoundedRectangle(cornerRadius: 20)
+        .stroke(.green.opacity(0.22), lineWidth: 2)
+        .shadow(color: .green.opacity(0.25), radius: 12)
+    )
+    .clipShape(RoundedRectangle(cornerRadius: 20))
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
+  }
+}
+
+private struct EarthquakePracticeContent<Content: View>: View {
+  let isEnabled: Bool
+  let reducesMotion: Bool
+  @ViewBuilder let content: Content
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  var body: some View {
+    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+      let offset = EarthquakeOffsetPolicy.offset(
+        at: timeline.date, isEnabled: isEnabled,
+        reducesMotion: reducesMotion || systemReduceMotion)
+      content.offset(x: offset.x, y: offset.y)
+    }
+  }
+}
+
+private struct NauseaPracticeContent<Content: View>: View {
+  let isEnabled: Bool
+  let reducesMotion: Bool
+  @ViewBuilder let content: Content
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  var body: some View {
+    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+      let transform = NauseaVisualPolicy.transform(
+        at: timeline.date, isEnabled: isEnabled,
+        reducesMotion: reducesMotion || systemReduceMotion)
+      content
+        .scaleEffect(x: transform.horizontalScale, y: transform.verticalScale, anchor: .center)
+        .rotation3DEffect(.degrees(transform.rotationDegrees), axis: (x: 0.45, y: 0.9, z: 0.12))
+    }
+  }
+}
+
+private struct RoundPracticeContent<Content: View>: View {
+  let isEnabled: Bool
+  let reducesMotion: Bool
+  @ViewBuilder let content: Content
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  var body: some View {
+    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+      content.rotationEffect(.degrees(RoundVisualPolicy.rotationDegrees(
+        at: timeline.date, isEnabled: isEnabled,
+        reducesMotion: reducesMotion || systemReduceMotion)))
+    }
+  }
+}
+
+private struct PromptLineBreakKey: LayoutValueKey {
+  static let defaultValue = false
+}
+
+private struct PromptFlowLayout: Layout {
+  var rowSpacing: CGFloat = 12
+
+  func sizeThatFits(
+    proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+  ) -> CGSize {
+    let availableWidth = proposal.width ?? .greatestFiniteMagnitude
+    var width = 0.0
+    var height = 0.0
+    var rowWidth = 0.0
+    var rowHeight = 0.0
+    for subview in subviews {
+      if subview[PromptLineBreakKey.self] {
+        width = max(width, rowWidth)
+        height += rowHeight + rowSpacing
+        rowWidth = 0
+        rowHeight = 0
+        continue
+      }
+      let size = subview.sizeThatFits(.unspecified)
+      if rowWidth > 0 && rowWidth + size.width > availableWidth {
+        width = max(width, rowWidth)
+        height += rowHeight + rowSpacing
+        rowWidth = 0
+        rowHeight = 0
+      }
+      rowWidth += size.width
+      rowHeight = max(rowHeight, size.height)
+    }
+    return .init(width: proposal.width ?? max(width, rowWidth), height: height + rowHeight)
+  }
+
+  func placeSubviews(
+    in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+  ) {
+    var x = bounds.minX
+    var y = bounds.minY
+    var rowHeight = 0.0
+    for subview in subviews {
+      if subview[PromptLineBreakKey.self] {
+        x = bounds.minX
+        y += rowHeight + rowSpacing
+        rowHeight = 0
+        continue
+      }
+      let size = subview.sizeThatFits(.unspecified)
+      if x > bounds.minX && x + size.width > bounds.maxX {
+        x = bounds.minX
+        y += rowHeight + rowSpacing
+        rowHeight = 0
+      }
+      subview.place(at: .init(x: x, y: y), anchor: .topLeading, proposal: .unspecified)
+      x += size.width
+      rowHeight = max(rowHeight, size.height)
+    }
+  }
+}
+
+private struct TapePracticePrompt: View {
+  let prompt: AttributedString
+  let typed: String
+  let mode: PracticeTapeMode
+  let margin: Double
+  let font: Font
+  let fontSize: Double
+  let animatesScroll: Bool
+
+  var body: some View {
+    GeometryReader { proxy in
+      let offset = PracticeTapePolicy.horizontalOffset(
+        typed: typed, mode: mode, margin: margin, glyphWidth: fontSize * 0.62,
+        containerWidth: proxy.size.width)
+      Text(prompt)
+        .font(font)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .offset(x: -offset)
+        .animation(animatesScroll ? .easeOut(duration: 0.16) : nil, value: offset)
+    }
+    .frame(height: fontSize * 1.7)
+    .clipped()
+    .accessibilityLabel("卷带练习提示")
+  }
+}
+
+private struct ChooPracticePrompt: View {
+  let glyphs: [TypingPromptGlyph]
+  let font: Font
+  let fontSize: Double
+  let accent: Color
+  let isEnabled: Bool
+  let reducesMotion: Bool
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  var body: some View {
+    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+      PromptFlowLayout {
+        ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
+          if glyph.character == "\n" {
+            Color.clear.frame(width: 0, height: 0)
+              .layoutValue(key: PromptLineBreakKey.self, value: true)
+          } else {
+            Text(String(glyph.typedCharacter ?? glyph.character))
+              .font(font)
+              .foregroundStyle(color(for: glyph))
+              .background(background(for: glyph))
+              .rotation3DEffect(
+                .degrees(ChooVisualPolicy.rotationDegrees(
+                  at: timeline.date, glyphIndex: index, isEnabled: isEnabled,
+                  reducesMotion: reducesMotion || systemReduceMotion)),
+                axis: (x: 0, y: 1, z: 0))
+          }
+        }
+      }
+    }
+  }
+
+  private func color(for glyph: TypingPromptGlyph) -> Color {
+    switch glyph.state {
+    case .correct: .primary
+    case .incorrect, .extra: .red
+    case .current: accent
+    case .pending: .secondary.opacity(0.55)
+    case .hidden: .clear
+    }
+  }
+
+  @ViewBuilder private func background(for glyph: TypingPromptGlyph) -> some View {
+    switch glyph.state {
+    case .incorrect: Color.red.opacity(0.16)
+    case .extra: Color.red.opacity(0.12)
+    case .current: accent.opacity(0.18)
+    default: Color.clear
+    }
+  }
+}
+
+private struct ASLHandshapeGlyph: View {
+  let character: Character
+  let color: Color
+  let background: Color
+  let size: CGFloat
+
+  var body: some View {
+    Canvas { context, canvasSize in
+      let mask = ASLHandshapePolicy.fingerMask(for: character) ?? 0
+      let palm = CGRect(
+        x: canvasSize.width * 0.24, y: canvasSize.height * 0.42,
+        width: canvasSize.width * 0.52, height: canvasSize.height * 0.39)
+      context.fill(Path(roundedRect: palm, cornerRadius: size * 0.15), with: .color(color.opacity(0.78)))
+      for finger in 0..<5 {
+        let x = canvasSize.width * (0.30 + Double(finger) * 0.10)
+        let raised = mask & (1 << UInt8(finger)) != 0
+        if raised {
+          let height = finger == 0 ? canvasSize.height * 0.30 : canvasSize.height * 0.39
+          let rect = CGRect(x: x, y: palm.minY - height + size * 0.04, width: size * 0.08, height: height)
+          context.fill(Path(roundedRect: rect, cornerRadius: size * 0.04), with: .color(color))
+        } else {
+          context.fill(
+            Path(ellipseIn: CGRect(x: x, y: palm.minY - size * 0.05, width: size * 0.075, height: size * 0.075)),
+            with: .color(color.opacity(0.48)))
+        }
+      }
+      if ASLHandshapePolicy.usesMotionCue(for: character) {
+        var arrow = Path()
+        arrow.move(to: .init(x: canvasSize.width * 0.12, y: canvasSize.height * 0.25))
+        arrow.addLine(to: .init(x: canvasSize.width * 0.23, y: canvasSize.height * 0.16))
+        arrow.addLine(to: .init(x: canvasSize.width * 0.19, y: canvasSize.height * 0.29))
+        context.stroke(arrow, with: .color(color), lineWidth: max(1.5, size * 0.045))
+      }
+    }
+    .frame(width: size * 1.02, height: size * 1.10)
+    .background(background, in: RoundedRectangle(cornerRadius: size * 0.12))
+    .accessibilityLabel("ASL 指语字形")
+  }
+}
+
+private struct ASLPracticePrompt: View {
+  let glyphs: [TypingPromptGlyph]
+  let fontSize: Double
+  let accent: Color
+
+  var body: some View {
+    PromptFlowLayout {
+      ForEach(Array(glyphs.enumerated()), id: \.offset) { _, glyph in
+        if glyph.character == "\n" {
+          Color.clear.frame(width: 0, height: 0)
+            .layoutValue(key: PromptLineBreakKey.self, value: true)
+        } else if ASLHandshapePolicy.fingerMask(for: glyph.character) != nil {
+          ASLHandshapeGlyph(
+            character: glyph.typedCharacter ?? glyph.character,
+            color: color(for: glyph), background: background(for: glyph), size: fontSize)
+        } else {
+          Text(String(glyph.character))
+            .font(.system(size: fontSize, design: .monospaced))
+            .foregroundStyle(color(for: glyph))
+        }
+      }
+    }
+  }
+
+  private func color(for glyph: TypingPromptGlyph) -> Color {
+    switch glyph.state {
+    case .correct: .primary
+    case .incorrect, .extra: .red
+    case .current: accent
+    case .pending: .secondary.opacity(0.55)
+    case .hidden: .clear
+    }
+  }
+
+  private func background(for glyph: TypingPromptGlyph) -> Color {
+    switch glyph.state {
+    case .incorrect: .red.opacity(0.16)
+    case .extra: .red.opacity(0.12)
+    case .current: accent.opacity(0.18)
+    default: .clear
+    }
+  }
+}
+
+private struct SpacePracticeOverlay: View {
+  let accent: Color
+
+  var body: some View {
+    Canvas { context, size in
+      for index in 0..<54 {
+        let point = StarfieldPolicy.point(index: index, in: size)
+        let radius = index.isMultiple(of: 7) ? 1.4 : 0.7
+        let opacity = index.isMultiple(of: 7) ? 0.72 : 0.35
+        context.fill(
+          Path(ellipseIn: CGRect(
+            x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)),
+          with: .color(.white.opacity(opacity)))
+      }
+    }
+    .background(
+      RadialGradient(
+        colors: [.clear, accent.opacity(0.15)], center: .bottomTrailing, startRadius: 6, endRadius: 280)
+    )
+    .clipShape(RoundedRectangle(cornerRadius: 20))
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
+  }
+}
+
+private struct ContentView: View {
+  let settings: AppSettings
+  let account: AccountSession
+  let hotkey: GlobalHotkeyMonitor
+  @Environment(\.modelContext) private var modelContext
+  @Environment(\.openSettings) private var openSettings
+  @Environment(\.colorScheme) private var systemColorScheme
+  @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var savedResults:
+    [TestResultRecord]
+  @State private var session = TestSessionFactory.make(configuration: .timed(seconds: 30))
+  @State private var mode: TestMode = .time
+  @State private var language: TypingLanguage = .english
+  @State private var mixedLanguageComponents = TypingLanguage.defaultMixedComponents
+  @State private var contentOptions = ContentOptions()
+  @State private var duration = 30
+  @State private var wordLimit = 25
+  @State private var selectedQuoteID = OfflineContent.quotes(for: .english)[0].id
+  @State private var quoteLength: QuoteLength = .all
+  @State private var quoteSource: QuoteSource = .builtIn
+  @State private var communityQuotes: [OfflineQuote] = []
+  @State private var communityQuoteRatings: [UUID: RemoteQuoteRatingResponse] = [:]
+  @State private var communityQuoteMessage: String?
+  @State private var isLoadingCommunityQuotes = false
+  @State private var quoteReportReason: RemoteQuoteReportReason = .other
+  @State private var quoteReportNote = ""
+  @State private var favoriteQuotesOnly = false
+  @State private var quoteSearchQuery = ""
+  @State private var quoteRatings = QuoteRatingStore()
+  @State private var customText = "A calm practice makes the next difficult sentence feel possible."
+  @State private var customTextCompletion: CustomTextCompletion = .finish
+  @State private var customTextDuration = 30
+  @State private var customTextWordLimit = 25
+  @State private var customTextSectionLimit = 1
+  @State private var customTextOrdering: CustomTextOrdering = .inOrder
+  @State private var showingHistory = false
+  @State private var showingPresets = false
+  @State private var showingDataMigration = false
+  @State private var showingSavedTexts = false
+  @State private var showingSaveCustomText = false
+  @State private var completedResult: CompletedResultPresentation?
+  @State private var publicationMessage: String?
+  @State private var terminalNotice: TestTerminalNotice?
+  @State private var showingSync = false
+  @State private var showingConnections = false
+  @State private var showingNotifications = false
+  @State private var showingCommandPalette = false
+  @State private var showingTestShare = false
+  @State private var showingChallenges = false
+  @State private var activeChallengeID: String?
+  @State private var focusRequest = 0
+  @State private var inputHasFocus = false
+  @State private var capsLockEnabled = false
+  @State private var lastTimeWarningSecond: Int?
+  @State private var restartLockMessage: String?
+  @State private var lastCompletedWpm: Int?
+  @State private var repeatedPaceArmed = false
+  @State private var activePaceTargetWpm: Int?
+  @State private var compositionText = ""
+  private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
+
+  var body: some View {
+    VStack(spacing: 30) {
+      header
+      configurationPanel
+      typingPanel
+      stats
+      if settings.showKeyboardGuide || session.configuration.modifiers.contains(.simonSays) {
+        KeyboardGuide(
+          nextCharacter: session.nextExpectedCharacter, accent: activeTheme.accent,
+          panel: activeTheme.panel, layout: effectiveKeyboardLayout,
+          mirrored: settings.testModifiers.contains(.mirrorKeyboard))
+      }
+      controls
+    }
+    .padding(42)
+    .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
+    .background(
+      PracticeBackdrop(
+        style: settings.practiceBackdrop, theme: activeTheme,
+        reduceMotion: settings.reducePracticeMotion)
+    )
+    .tint(activeTheme.accent)
+    .preferredColorScheme(settings.followSystemTheme ? nil : activeTheme.colorScheme)
+    .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
+    .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
+    .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
+    .onReceive(timer) { now in
+      capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
+      session.tick(at: now)
+      let remaining = session.remainingSeconds(at: now)
+      if TimeWarningPolicy.shouldPlay(
+        remainingSeconds: remaining, previousSecond: lastTimeWarningSecond,
+        offset: settings.timeWarningOffset)
+      {
+        TypingFeedbackSound.shared.playError(volume: settings.soundVolume)
+      }
+      lastTimeWarningSecond = remaining
+    }
+    .onAppear {
+      reset()
+    }
+    .onChange(of: session.outcome) { _, outcome in
+      switch outcome {
+      case .completed:
+        guard let result = session.result() else { return }
+        lastCompletedWpm = result.wpm
+        repeatedPaceArmed = settings.repeatedPace
+        let savesResult = settings.saveCompletedResults
+        if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
+          modelContext.insert(TestResultRecord(result: result))
+        }
+        completedResult = .init(
+          result: result,
+          savesResult: savesResult,
+          missedWords: session.missedWords,
+          wordReviews: session.wordReviews,
+          challengeEvaluation: TypebarChallengeLibrary.challenge(
+            id: result.configuration.challengeID
+          ).map { ChallengeEvaluator.evaluate(result, challenge: $0) }
+        )
+        if savesResult {
+          publishIfEnabled(result)
+        } else {
+          publicationMessage = "练习模式：本次成绩不会保存、本机统计、同步或发布。"
+        }
+      case .failed:
+        terminalNotice = .failed
+      case .abandoned:
+        terminalNotice = .abandoned
+      case .active:
+        break
+      }
+    }
+    .toolbar {
+      Button("命令", systemImage: "command") { showingCommandPalette = true }
+        .keyboardShortcut("k", modifiers: [.command, .shift])
+      Button("分享", systemImage: "square.and.arrow.up") { showingTestShare = true }
+      Button("预设", systemImage: "slider.horizontal.3") { showingPresets = true }
+      Button("挑战", systemImage: "flag.checkered") { showingChallenges = true }
+      Button("历史", systemImage: "clock.arrow.circlepath") { showingHistory = true }
+      Button("数据", systemImage: "externaldrive") { showingDataMigration = true }
+      Button("同步", systemImage: "arrow.triangle.2.circlepath") { showingSync = true }
+      Button("好友", systemImage: "person.2") { showingConnections = true }
+      Button("通知", systemImage: "bell") { showingNotifications = true }
+    }
+    .sheet(isPresented: $showingHistory) {
+      ResultsHistoryView()
+    }
+    .sheet(isPresented: $showingPresets) {
+      PresetLibraryView(currentPreset: presetDefinition, onApply: apply)
+    }
+    .sheet(isPresented: $showingChallenges) {
+      ChallengeLibraryView(onSelect: loadChallenge)
+    }
+    .sheet(isPresented: $showingDataMigration) {
+      ArchiveManagementView(settings: settings)
+    }
+    .sheet(isPresented: $showingSync) {
+      CloudSyncView(settings: settings, account: account)
+    }
+    .sheet(isPresented: $showingConnections) {
+      ConnectionsView(account: account)
+    }
+    .sheet(isPresented: $showingNotifications) {
+      NotificationsView(account: account)
+    }
+    .sheet(isPresented: $showingCommandPalette) {
+      CommandPaletteView(items: commandPaletteItems, onSelect: runCommand)
+    }
+    .sheet(isPresented: $showingTestShare) {
+      TestConfigurationShareView(currentPreset: presetDefinition, onApply: apply)
+    }
+    .sheet(isPresented: $showingSavedTexts) {
+      SavedTextsView { text in
+        customText = text
+        mode = .custom
+        reset()
+      }
+    }
+    .sheet(isPresented: $showingSaveCustomText) {
+      SaveCustomTextView(text: customText)
+    }
+    .sheet(item: $completedResult) { result in
+      CompletedResultView(
+        result: result.result,
+        savesResult: result.savesResult,
+        typingSpeedUnit: settings.typingSpeedUnit,
+        alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
+        publicationMessage: publicationMessage,
+        onRestart: {
+          completedResult = nil
+          attemptRestart()
+        },
+        onHistory: {
+          completedResult = nil
+          showingHistory = true
+        },
+        missedWords: result.missedWords,
+        wordReviews: result.wordReviews,
+        challengeEvaluation: result.challengeEvaluation,
+        onPracticeMissedWords: {
+          customText = result.missedWords.joined(separator: " ")
+          mode = .custom
+          completedResult = nil
+          reset()
+        }
+      )
+    }
+    .alert(item: $terminalNotice) { notice in
+      Alert(
+        title: Text(notice.title),
+        message: Text(notice.message),
+        dismissButton: .default(Text("重新开始"), action: { reset() })
+      )
+    }
+  }
+
+  private var header: some View {
+    HStack {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("typebar").font(.system(size: 28, weight: .bold, design: .rounded))
+        Text("离线、专注的 Mac 打字练习").foregroundStyle(.secondary)
+      }
+      Spacer()
+      Picker("模式", selection: $mode) {
+        ForEach(TestMode.allCases, id: \.self) { mode in
+          Text(mode.displayName).tag(mode)
+        }
+      }
+      .pickerStyle(.segmented)
+      .frame(width: 420)
+      .disabled(activeChallenge != nil)
+      .onChange(of: mode) { _, _ in reset() }
+    }
+  }
+
+  @ViewBuilder
+  private var configurationPanel: some View {
+    @Bindable var settings = settings
+    VStack(alignment: .leading, spacing: 14) {
+      if let activeChallenge {
+        VStack(alignment: .leading, spacing: 5) {
+          Label(activeChallenge.title, systemImage: "flag.checkered")
+            .font(.headline)
+          Text(activeChallenge.requirements.summary)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          Button("退出挑战") {
+            activeChallengeID = nil
+            reset()
+          }
+        }
+        .padding(12)
+        .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+      } else {
+        if mode != .custom {
+          Picker("语言", selection: $language) {
+            ForEach(availableLanguages, id: \.self) { language in
+              Text(language.displayName).tag(language)
+            }
+          }
+          .onChange(of: language) { _, language in languageChanged(to: language) }
+          if language == .english {
+            Picker("英文拼写", selection: $settings.englishVariant) {
+              ForEach(EnglishVariant.allCases) { variant in
+                Text(variant.displayName).tag(variant)
+              }
+            }
+            .onChange(of: settings.englishVariant) { _, _ in
+              reset()
+            }
+          }
+          if language == .mixedLanguages {
+            VStack(alignment: .leading, spacing: 6) {
+              Text("多语组合（至少选择两种）").font(.caption).foregroundStyle(.secondary)
+              HStack(spacing: 10) {
+                ForEach(TypingLanguage.mixableLanguages, id: \.self) { component in
+                  Toggle(component.displayName, isOn: mixedLanguageBinding(for: component))
+                    .toggleStyle(.checkbox)
+                }
+              }
+            }
+          }
+        }
+
+        if mode == .time || mode == .words || mode == .zen {
+          HStack {
+            Toggle("标点", isOn: $contentOptions.includePunctuation)
+            Toggle("数字", isOn: $contentOptions.includeNumbers)
+          }
+          .onChange(of: contentOptions) { _, _ in reset() }
+        }
+
+        if !settings.testModifiers.isEmpty {
+          Label(
+            "修饰器：\(settings.testModifiers.map(\.displayName).joined(separator: "、"))",
+            systemImage: "wand.and.stars"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
+
+        switch mode {
+        case .time:
+          Stepper(value: $duration, in: 5...3600, step: 5) {
+            LabeledContent("时长", value: "\(duration) 秒")
+          }
+          .onChange(of: duration) { _, _ in reset() }
+        case .words:
+          Stepper(value: $wordLimit, in: 1...1000) {
+            LabeledContent("字数", value: "\(wordLimit) 词")
+          }
+          .onChange(of: wordLimit) { _, _ in reset() }
+        case .quote:
+          Picker("内容来源", selection: $quoteSource) {
+            ForEach(QuoteSource.allCases) { source in Text(source.title).tag(source) }
+          }
+          .pickerStyle(.segmented)
+          .onChange(of: quoteSource) { _, source in
+            if source == .community { refreshCommunityQuotes() }
+            ensureSelectedQuote()
+            reset()
+          }
+          Picker("引语长度", selection: $quoteLength) {
+            ForEach(QuoteLength.allCases) { length in
+              Text(length.displayName).tag(length)
+            }
+          }
+          .onChange(of: quoteLength) { _, _ in
+            ensureSelectedQuote()
+            reset()
+          }
+          Toggle("只显示收藏", isOn: $favoriteQuotesOnly)
+            .onChange(of: favoriteQuotesOnly) { _, _ in
+              ensureSelectedQuote()
+              reset()
+            }
+          TextField("搜索当前引语（仅本机）", text: $quoteSearchQuery)
+            .onChange(of: quoteSearchQuery) { _, _ in
+              ensureSelectedQuote()
+              reset()
+            }
+          if quoteSource == .community {
+            HStack {
+              Button("刷新社区引语") { refreshCommunityQuotes() }
+                .disabled(isLoadingCommunityQuotes)
+              Picker("举报原因", selection: $quoteReportReason) {
+                ForEach(RemoteQuoteReportReason.allCases, id: \.self) { reason in
+                  Text(reason.displayName).tag(reason)
+                }
+              }
+              .labelsHidden()
+              .frame(maxWidth: 150)
+              TextField("可选说明（最多 400 字）", text: $quoteReportNote, axis: .vertical)
+                .lineLimit(1...3)
+                .frame(maxWidth: 260)
+                .onChange(of: quoteReportNote) { _, value in
+                  if value.count > 400 { quoteReportNote = String(value.prefix(400)) }
+                }
+              Button("举报此引语", role: .destructive) { reportSelectedCommunityQuote() }
+                .disabled(
+                  isLoadingCommunityQuotes || account.currentUser == nil
+                    || selectedCommunityQuoteID == nil)
+              if isLoadingCommunityQuotes { ProgressView().controlSize(.small) }
+              Text(communityQuoteMessage ?? "仅显示通过服务端审核的投稿。")
+                .font(.caption).foregroundStyle(.secondary)
+            }
+          }
+          if availableQuotes.isEmpty {
+            ContentUnavailableView(
+              quoteSource == .community ? "没有可用的社区引语" : "没有匹配的收藏引语",
+              systemImage: quoteSource == .community ? "quote.bubble" : "star.slash",
+              description: Text(
+                quoteSource == .community ? "刷新后仍为空，说明该语言尚无已审核内容。" : "关闭“只显示收藏”，或先收藏一条引语。"))
+          } else {
+            Picker("引语", selection: $selectedQuoteID) {
+              ForEach(availableQuotes) { quote in
+                Text(quote.title).tag(quote.id)
+              }
+            }
+            .onChange(of: selectedQuoteID) { _, _ in reset() }
+            HStack {
+              Button(settings.isFavoriteQuote(selectedQuoteID) ? "取消收藏" : "收藏引语") {
+                settings.toggleFavoriteQuote(selectedQuoteID)
+                ensureSelectedQuote()
+              }
+              Button("随机一条") {
+                chooseNextQuote()
+                reset()
+              }
+              Toggle("重开时重复当前引语", isOn: $settings.repeatQuotes)
+            }
+            if quoteSource == .builtIn {
+              HStack(spacing: 8) {
+                Text("这条引语如何？").font(.caption).foregroundStyle(.secondary)
+                Button("不适合") { quoteRatings.set(.down, for: selectedQuoteID) }
+                  .buttonStyle(.bordered)
+                  .tint(quoteRatings.rating(for: selectedQuoteID) == .down ? .red : .secondary)
+                Button("不错") { quoteRatings.set(.up, for: selectedQuoteID) }
+                  .buttonStyle(.bordered)
+                  .tint(quoteRatings.rating(for: selectedQuoteID) == .up ? .green : .secondary)
+                if quoteRatings.rating(for: selectedQuoteID) != .neutral {
+                  Button("清除评分") { quoteRatings.set(.neutral, for: selectedQuoteID) }
+                    .buttonStyle(.borderless)
+                }
+              }
+            } else {
+              communityRatingControls
+            }
+          }
+        case .custom:
+          VStack(alignment: .leading, spacing: 10) {
+            TextField("输入你自己的练习文本", text: $customText, axis: .vertical)
+              .lineLimit(2...4)
+              .onChange(of: customText) { _, value in
+                let clamped = CustomTextPolicy.clamped(value)
+                if clamped != value { customText = clamped }
+                customTextSectionLimit = min(
+                  customTextSectionLimit, max(1, CustomTextPolicy.sections(in: clamped).count))
+              }
+            Text("\(customText.count) / \(CustomTextPolicy.maximumLength) 个字符")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Picker("完成方式", selection: $customTextCompletion) {
+              ForEach(CustomTextCompletion.allCases) { completion in
+                Text(completion.displayName).tag(completion)
+              }
+            }
+            .onChange(of: customTextCompletion) { _, _ in reset() }
+            if customTextCompletion == .time {
+              Stepper(value: $customTextDuration, in: 5...3600, step: 5) {
+                LabeledContent("循环时长", value: "\(customTextDuration) 秒")
+              }
+              .onChange(of: customTextDuration) { _, _ in reset() }
+            }
+            if customTextCompletion == .words {
+              Stepper(value: $customTextWordLimit, in: 1...1000) {
+                LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
+              }
+              .onChange(of: customTextWordLimit) { _, _ in reset() }
+            }
+            if customTextCompletion == .sections {
+              Stepper(value: $customTextSectionLimit, in: 1...max(1, customTextSections.count)) {
+                LabeledContent(
+                  "完成段数", value: "\(customTextSectionLimit) / \(customTextSections.count) 段")
+              }
+              .onChange(of: customTextSectionLimit) { _, _ in reset() }
+              Text("使用竖线 | 分隔段落；练习会按顺序取前面的段落。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+              Picker("文本顺序", selection: $customTextOrdering) {
+                ForEach(CustomTextOrdering.allCases) { ordering in
+                  Text(ordering.displayName).tag(ordering)
+                }
+              }
+              .onChange(of: customTextOrdering) { _, _ in reset() }
+            }
+            HStack {
+              Button("使用这段文本开始") { reset() }
+                .disabled(!CustomTextPolicy.isValid(customText))
+              Button("保存文本…") { showingSaveCustomText = true }
+                .disabled(!CustomTextPolicy.isValid(customText))
+              Button("已保存文本…") { showingSavedTexts = true }
+            }
+          }
+        case .zen:
+          Text("禅模式没有计时器或完成条件；随时按 ⌘R 开始新一轮。")
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+  }
+
+  private var typingPanel: some View {
+    ZStack(alignment: .topLeading) {
+      RoundPracticeContent(
+        isEnabled: practiceVisualEffect.usesRound,
+        reducesMotion: settings.reducePracticeMotion
+      ) {
+        NauseaPracticeContent(
+          isEnabled: practiceVisualEffect.usesNausea,
+          reducesMotion: settings.reducePracticeMotion
+        ) {
+          EarthquakePracticeContent(
+            isEnabled: practiceVisualEffect.usesEarthquake,
+            reducesMotion: settings.reducePracticeMotion
+          ) {
+            Group {
+              if showsAllPracticeLines {
+                practicePrompt
+              } else {
+                ScrollView {
+                  practicePrompt
+                }
+              }
+            }
+            .scaleEffect(x: practiceVisualTransform.horizontalScale, y: 1, anchor: .center)
+            .rotationEffect(.degrees(practiceVisualTransform.rotationDegrees))
+          }
+        }
+      }
+
+      NativeTypingInput(
+        focusRequest: focusRequest, quickRestartKey: settings.quickRestartKey,
+        keyboardLayout: settings.keyboardLayout,
+        oppositeShiftMode: settings.oppositeShiftMode,
+        mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
+        acceptsNewlineInput: session.prompt.contains("\n"),
+        acceptsTabInput: session.prompt.contains("\t"),
+        onInsert: { text, forceError in
+          let errorsBefore = session.errors
+          let typedCountBefore = session.typed.count
+          session.insert(
+            settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
+            forceError: forceError)
+          if settings.playKeyclickSound, session.typed.count > typedCountBefore {
+            TypingFeedbackSound.shared.playClick(volume: settings.soundVolume)
+          }
+          if settings.playErrorBeep, session.errors > errorsBefore {
+            TypingFeedbackSound.shared.playError(volume: settings.soundVolume)
+          }
+        },
+        onDelete: { session.deleteBackward() },
+        onRestart: attemptRestart,
+        onFocusChanged: { inputHasFocus = $0 },
+        onCompositionChanged: { compositionText = $0 }
+      )
+      .opacity(0.01)
+      .frame(width: 1, height: 1)
+    }
+    .padding(28)
+    .frame(
+      maxWidth: .infinity, minHeight: 240,
+      maxHeight: showsAllPracticeLines ? nil : 240, alignment: .topLeading)
+    .background(activeTheme.panel, in: RoundedRectangle(cornerRadius: 20))
+    .overlay {
+      if practiceVisualEffect.usesCRT { CRTPracticeOverlay() }
+    }
+    .overlay {
+      if practiceVisualEffect.usesSpace { SpacePracticeOverlay(accent: activeTheme.accent) }
+    }
+    .contentShape(Rectangle())
+    .overlay(alignment: .top) {
+      if session.configuration.modifiers.contains(.listening) {
+        Label("听写模式：请听系统语音", systemImage: "ear")
+          .font(.caption.weight(.medium))
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .background(.thinMaterial, in: Capsule())
+          .padding(.top, 10)
+      }
+      if session.configuration.modifiers.contains(.simonSays) {
+        Label("Simon 指令：跟随下一键提示", systemImage: "hand.point.right")
+          .font(.caption.weight(.medium))
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .background(.thinMaterial, in: Capsule())
+          .padding(.top, 10)
+      }
+      if session.configuration.modifiers.contains(.memory) {
+        Label(
+          session.hasStarted ? "记忆模式：提示已隐藏" : "记忆模式：开始输入后提示会隐藏", systemImage: "brain.head.profile"
+        )
+        .font(.caption.weight(.medium))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.thinMaterial, in: Capsule())
+          .padding(.top, 10)
+      }
+      if let layoutFluidNotice {
+        Label(layoutFluidNotice, systemImage: "keyboard.badge.ellipsis")
+          .font(.caption.weight(.medium))
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .background(.thinMaterial, in: Capsule())
+          .padding(.top, 10)
+      }
+      if !attentionWarnings.isEmpty {
+        VStack(spacing: 6) {
+          ForEach(attentionWarnings, id: \.self) { warning in
+            Label(warning.message, systemImage: warning.systemImage)
+          }
+        }
+        .font(.caption.weight(.medium))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.thinMaterial, in: Capsule())
+        .padding(.top, 10)
+      }
+    }
+    .overlay(alignment: .bottomLeading) {
+      VStack(alignment: .leading, spacing: 6) {
+        if let activePaceTargetWpm, let paceGuideIndex {
+          Label(
+            "节奏 \(activePaceTargetWpm) WPM · \(paceGuideProgressDescription)", systemImage: "metronome"
+          )
+          .font(.caption.weight(.medium))
+          .padding(.horizontal, 12)
+          .padding(.vertical, 7)
+          .background(.thinMaterial, in: Capsule())
+          .accessibilityLabel(
+            "节奏引导：目标 \(activePaceTargetWpm) WPM，\(paceGuideProgressDescription)，目标位置 \(paceGuideIndex + 1)"
+          )
+        }
+        if settings.compositionDisplayStyle == .below, !compositionText.isEmpty {
+          Text(compositionText)
+            .font(settings.practiceFont.font(size: max(14, settings.fontSize * 0.58)))
+            .foregroundStyle(activeTheme.accent)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(activeTheme.panel.opacity(0.9), in: RoundedRectangle(cornerRadius: 6))
+            .accessibilityLabel("正在组合：\(compositionText)")
+        }
+      }
+      .padding(12)
+    }
+    .onTapGesture { requestTypingFocus() }
+  }
+
+  private var practicePrompt: some View {
+    Group {
+      if practiceVisualEffect.usesASL {
+        ASLPracticePrompt(
+          glyphs: session.promptGlyphs, fontSize: settings.fontSize, accent: activeTheme.accent)
+      } else if practiceVisualEffect.usesChoo {
+        ChooPracticePrompt(
+          glyphs: session.promptGlyphs,
+          font: settings.practiceFont.font(size: settings.fontSize),
+          fontSize: settings.fontSize, accent: activeTheme.accent,
+          isEnabled: true, reducesMotion: settings.reducePracticeMotion)
+      } else if usesTapePractice {
+        TapePracticePrompt(
+          prompt: renderedPrompt, typed: session.typed, mode: settings.practiceTapeMode,
+          margin: settings.practiceTapeMargin,
+          font: settings.practiceFont.font(size: settings.fontSize),
+          fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll)
+      } else {
+        Text(renderedPrompt)
+          .lineSpacing(12)
+          .textSelection(.disabled)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .font(settings.practiceFont.font(size: settings.fontSize))
+    .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
+    .frame(
+      maxWidth: settings.practiceLineWidth.maximumWidth(
+        fontSize: settings.fontSize, customColumns: settings.customPracticeLineColumns),
+      alignment: .leading
+    )
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.trailing, 4)
+  }
+
+  private var practiceVisualTransform: PracticeVisualTransform {
+    PracticeVisualTransform.make(modifiers: session.configuration.modifiers)
+  }
+
+  private var practiceVisualEffect: PracticeVisualEffect {
+    PracticeVisualEffect.make(modifiers: session.configuration.modifiers)
+  }
+
+  private var effectiveKeyboardLayout: KeyboardLayout {
+    guard session.configuration.modifiers.contains(.layoutFluid) else { return settings.keyboardLayout }
+    return LayoutFluidPolicy.activeLayout(
+      completedWords: session.completedWordCount, wordLimit: session.configuration.wordLimit,
+      layouts: settings.layoutFluidLayouts)
+  }
+
+  private var layoutFluidNotice: String? {
+    guard session.configuration.modifiers.contains(.layoutFluid) else { return nil }
+    if let upcoming = LayoutFluidPolicy.upcomingLayout(
+      completedWords: session.completedWordCount, wordLimit: session.configuration.wordLimit,
+      layouts: settings.layoutFluidLayouts)
+    {
+      return "\(upcoming.wordsRemaining) 个词后切换至 \(upcoming.layout.displayName)"
+    }
+    return "当前布局：\(effectiveKeyboardLayout.displayName)"
+  }
+
+  private var renderedPrompt: AttributedString {
+    var output = AttributedString()
+    let completedCharacterIndices = TypedCharacterEffectPolicy.completedCharacterIndices(
+      target: session.prompt, typed: session.typed, isFinished: session.isFinished)
+    for (index, glyph) in session.promptGlyphs.enumerated() {
+      let replacesTypo = glyph.state == .incorrect && settings.typoIndicatorStyle.replacesTarget
+      let turnsIntoDot = completedCharacterIndices.contains(index)
+        && settings.typedCharacterEffect == .dots
+        && !glyph.character.isWhitespace
+      let replacesCurrentWithComposition = glyph.state == .current
+        && settings.compositionDisplayStyle == .replace
+        && !compositionText.isEmpty
+      let displayedText: String
+      if turnsIntoDot {
+        displayedText = "•"
+      } else if replacesCurrentWithComposition {
+        displayedText = compositionText
+      } else if replacesTypo {
+        displayedText = String(glyph.typedCharacter ?? glyph.character)
+      } else {
+        displayedText = String(glyph.character)
+      }
+      var character = AttributedString(displayedText)
+      if session.configuration.modifiers.contains(.listening) {
+        character.foregroundColor = .clear
+        output += character
+        continue
+      }
+      if index == paceGuideIndex, glyph.state != .current {
+        applyPaceCaret(to: &character)
+      }
+      switch glyph.state {
+      case .correct:
+        switch settings.typedCharacterEffect {
+        case .keep:
+          character.foregroundColor = .primary
+        case .hide where completedCharacterIndices.contains(index):
+          character.foregroundColor = .clear
+        case .fade where completedCharacterIndices.contains(index):
+          character.foregroundColor = .secondary.opacity(0.24)
+        case .dots where turnsIntoDot:
+          character.foregroundColor = activeTheme.accent.opacity(0.74)
+        default:
+          character.foregroundColor = .primary
+        }
+      case .incorrect:
+        character.foregroundColor = .red
+        character.backgroundColor = .red.opacity(0.16)
+      case .current:
+        applyCaret(to: &character)
+      case .pending:
+        character.foregroundColor = .secondary.opacity(0.55)
+      case .hidden:
+        character.foregroundColor = .clear
+      case .extra:
+        character.foregroundColor = .red
+        character.backgroundColor = .red.opacity(0.12)
+        character.strikethroughStyle = .single
+      }
+      output += character
+      if glyph.state == .incorrect,
+        settings.typoIndicatorStyle.showsHint,
+        let enteredCharacter = glyph.typedCharacter
+      {
+        let hintCharacter = replacesTypo ? glyph.character : enteredCharacter
+        var hint = AttributedString(String(hintCharacter))
+        hint.font = .system(
+          size: max(9, settings.fontSize * 0.48), weight: .semibold, design: .monospaced)
+        hint.foregroundColor = .red.opacity(0.72)
+        hint.baselineOffset = -settings.fontSize * 0.42
+        // Reserve no additional horizontal advance: the hint sits under the
+        // erroneous glyph instead of reflowing every following character.
+        hint.kern = -settings.fontSize * 0.62
+        output += hint
+      }
+    }
+    return output
+  }
+
+  private var usesTapePractice: Bool {
+    settings.practiceTapeMode != .off && !session.prompt.contains("\n")
+  }
+
+  private var showsAllPracticeLines: Bool {
+    PracticeLineDisplayPolicy.shouldShowAllLines(
+      settingEnabled: settings.showAllPracticeLines,
+      tapeMode: settings.practiceTapeMode,
+      testMode: session.configuration.mode,
+      hasTimeLimit: session.configuration.duration != nil)
+  }
+
+  private func applyCaret(to character: inout AttributedString) {
+    switch settings.caretStyle {
+    case .bar:
+      character.foregroundColor = activeTheme.accent
+      character.underlineStyle = .single
+    case .underline:
+      character.underlineStyle = .single
+      character.backgroundColor = activeTheme.accent.opacity(0.12)
+    case .block:
+      character.backgroundColor = activeTheme.accent.opacity(0.55)
+    }
+  }
+
+  private func applyPaceCaret(to character: inout AttributedString) {
+    switch settings.paceCaretStyle {
+    case .bar:
+      character.backgroundColor = activeTheme.accent.opacity(0.16)
+      character.underlineStyle = .single
+    case .underline:
+      character.underlineStyle = .single
+    case .block:
+      character.backgroundColor = activeTheme.accent.opacity(0.34)
+    }
+  }
+
+  private var stats: some View {
+    HStack(spacing: 0) {
+      metric(
+        settings.typingSpeedUnit.displayName,
+        value: settings.typingSpeedUnit.formatted(
+          wpm: session.wpm(at: .now)),
+        style: settings.liveSpeedStyle)
+      metric(
+        "Raw \(settings.typingSpeedUnit.displayName)",
+        value: settings.typingSpeedUnit.formatted(
+          wpm: session.rawWpm(at: .now)),
+        style: settings.liveSpeedStyle)
+      metric(
+        "Burst \(settings.typingSpeedUnit.displayName)",
+        value: settings.typingSpeedUnit.formatted(
+          wpm: session.burstWpm),
+        style: settings.liveBurstStyle)
+      metric("准确率", value: "\(session.accuracy)%", style: settings.liveAccuracyStyle)
+      if settings.liveProgressStyle == .bar {
+        progressMetricBar
+      } else {
+        metric(
+          session.progressLabel, value: session.progressText(at: .now) ?? "—",
+          style: settings.liveProgressStyle.metricStyle)
+      }
+      if let sections = session.sectionProgress {
+        metric("段落", value: "\(sections.completed)/\(sections.total)")
+      }
+      metric("错误", value: "\(session.errors)")
+    }
+    .background(activeTheme.panel, in: RoundedRectangle(cornerRadius: 16))
+    .overlay(alignment: .bottomLeading) {
+      if !session.recentWordBursts.isEmpty {
+        WordBurstHistoryView(bursts: session.recentWordBursts, accent: activeTheme.accent)
+          .padding(.horizontal, 14)
+          .padding(.bottom, 8)
+      }
+    }
+  }
+
+  private var attentionWarnings: [TypingAttentionWarning] {
+    TypingAttentionPolicy.warnings(
+      isInputFocused: inputHasFocus,
+      capsLockEnabled: capsLockEnabled,
+      language: language,
+      isFinished: session.isFinished,
+      showFocusWarning: settings.showFocusWarning,
+      showCapsLockWarning: settings.showCapsLockWarning
+    )
+  }
+
+  @ViewBuilder
+  private func metric(_ title: String, value: String, style: LiveMetricStyle = .text) -> some View {
+    if style != .off {
+      let isMini = style == .mini
+      VStack(spacing: isMini ? 2 : 5) {
+        Text(value).font(
+          .system(size: isMini ? 17 : 28, weight: .semibold, design: .rounded))
+        Text(title).font(isMini ? .caption2 : .caption).foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, isMini ? 8 : 14)
+    }
+  }
+
+  private var progressMetricBar: some View {
+    VStack(spacing: 6) {
+      HStack {
+        Text(session.progressLabel).font(.caption).foregroundStyle(.secondary)
+        Spacer()
+        Text(session.progressText(at: .now) ?? "—")
+          .font(.caption.weight(.semibold))
+      }
+      ProgressView(value: session.progressFraction(at: .now) ?? 0)
+        .tint(activeTheme.accent)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 16)
+  }
+
+  private var controls: some View {
+    HStack {
+      Text(
+        session.isFinished
+          ? session.outcome.statusText(savesResult: settings.saveCompletedResults)
+          : restartInstruction
+      )
+        .foregroundStyle(.secondary)
+      Spacer()
+      if session.hasStarted && !session.isFinished {
+        Button("放弃本次测试", role: .destructive) { session.abandon() }
+      }
+      Button {
+        attemptRestart()
+      } label: {
+        Label("重新开始", systemImage: "arrow.counterclockwise")
+      }
+      .keyboardShortcut("r", modifiers: .command)
+      .buttonStyle(.borderedProminent)
+      if weakSpotPrompt != nil {
+        Button("弱项训练") { startWeakSpotPractice() }
+          .help("依据本机完成测试中的错误字符生成 Typebar 自有词库练习")
+      }
+      Button("朗读提示") {
+        NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
+      }
+      .help("使用 macOS 本机语音朗读当前提示，不发送文本到网络")
+    }
+    .overlay(alignment: .bottomLeading) {
+      if let restartLockMessage {
+        Label(restartLockMessage, systemImage: "lock.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
+      }
+    }
+  }
+
+  private func attemptRestart() {
+    guard !TypingRestartPolicy.isLocked(session) else {
+      restartLockMessage = "锁定重开已开启：请完成或放弃本次测试。"
+      return
+    }
+    reset(restarting: true)
+  }
+
+  private var restartInstruction: String {
+    switch settings.quickRestartKey {
+    case .off: "按任意键开始，可使用 ⌘R 重新开始"
+    case .escape: "按任意键开始，Esc 可重新开始"
+    case .tab: "按任意键开始，Tab 可重新开始"
+    case .enter: "按任意键开始，Enter 可重新开始"
+    }
+  }
+
+  private func reset(restarting: Bool = false) {
+    restartLockMessage = nil
+    compositionText = ""
+    lastTimeWarningSecond = nil
+    NativeSpeech.shared.stop()
+    if settings.randomThemeOnRestart { settings.randomizeBuiltInTheme() }
+    if restarting, mode == .quote,
+      !QuoteRestartPolicy.shouldKeepCurrent(
+        repeatWhileTyping: settings.repeatQuotes, hasStarted: session.hasStarted,
+        isFinished: session.isFinished)
+    {
+      chooseNextQuote()
+    }
+    session = TestSessionFactory.make(
+      configuration: configuration,
+      customText: customText,
+      quote: availableQuotes.first { $0.id == selectedQuoteID }
+    )
+    let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
+    activePaceTargetWpm = paceGuideTarget(
+      usingRepeatedPace: shouldUseRepeatedPace ? lastCompletedWpm : nil)
+    repeatedPaceArmed = false
+    if session.configuration.modifiers.contains(.listening) {
+      NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
+    }
+    requestTypingFocus()
+  }
+
+  private func refreshPaceTarget() {
+    activePaceTargetWpm = paceGuideTarget()
+  }
+
+  private func requestTypingFocus() {
+    focusRequest &+= 1
+  }
+
+  private var weakSpotPrompt: String? {
+    WeakSpotPractice.prompt(
+      results: savedResults.compactMap(\.portableResult),
+      language: language,
+      englishVariant: settings.englishVariant
+    )
+  }
+
+  private func startWeakSpotPractice() {
+    guard let weakSpotPrompt else { return }
+    activeChallengeID = nil
+    customText = weakSpotPrompt
+    customTextCompletion = .words
+    customTextWordLimit = weakSpotPrompt.split(separator: " ").count
+    customTextOrdering = .inOrder
+    mode = .custom
+    reset()
+  }
+
+  private func paceGuideTarget(usingRepeatedPace repeatedWpm: Int? = nil) -> Int? {
+    if settings.paceGuideMode == .off, let repeatedWpm {
+      return repeatedWpm.clamped(to: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm)
+    }
+    let samples = savedResults.compactMap { record -> PaceGuideSample? in
+      guard let result = record.portableResult else { return nil }
+      return .init(
+        configuration: result.configuration, outcome: result.outcome, finishedAt: result.finishedAt,
+        wpm: result.wpm)
+    }
+    return PaceGuidePolicy.targetWpm(
+      mode: settings.paceGuideMode,
+      customWpm: settings.paceGuideCustomWpm,
+      configuration: configuration,
+      samples: samples,
+      lastTestWpm: repeatedWpm ?? lastCompletedWpm
+    )
+  }
+
+  private var paceGuideIndex: Int? {
+    guard
+      let targetWpm = activePaceTargetWpm,
+      let startedAt = session.startedAt,
+      !session.isFinished
+    else { return nil }
+    return PaceGuidePolicy.expectedCharacterIndex(
+      elapsed: Date.now.timeIntervalSince(startedAt),
+      targetWpm: targetWpm,
+      promptLength: session.prompt.count
+    )
+  }
+
+  private var paceGuideProgressDescription: String {
+    guard let paceGuideIndex else { return "等待开始" }
+    let delta = session.typedCharacterCount - paceGuideIndex
+    if delta == 0 { return "同步" }
+    return delta > 0 ? "领先 \(delta) 字符" : "落后 \(-delta) 字符"
+  }
+
+  private var activeTheme: ResolvedTheme {
+    settings.resolvedTheme(for: systemColorScheme)
+  }
+
+  private var commandPaletteItems: [CommandPaletteItem] {
+    [
+      .init(
+        id: "restart", title: "重新开始测试", subtitle: "使用当前配置生成新的练习",
+        systemImage: "arrow.counterclockwise", keywords: ["restart", "reset", "重开"]),
+      .init(
+        id: "mode.time", title: "切换到时间模式", subtitle: "按设定时长完成练习", systemImage: "timer",
+        keywords: ["time", "时间", "模式"]),
+      .init(
+        id: "mode.words", title: "切换到字数模式", subtitle: "按设定词数完成练习", systemImage: "text.word.spacing",
+        keywords: ["words", "字数", "模式"]),
+      .init(
+        id: "mode.quote", title: "切换到引语模式", subtitle: "使用原创离线引语练习", systemImage: "quote.opening",
+        keywords: ["quote", "引语", "模式"]),
+      .init(
+        id: "mode.zen", title: "切换到禅模式", subtitle: "不计时的自由练习", systemImage: "leaf",
+        keywords: ["zen", "禅", "模式"]),
+      .init(
+        id: "mode.custom", title: "切换到自定义文本", subtitle: "输入或选择自己的练习文本", systemImage: "text.cursor",
+        keywords: ["custom", "文本", "模式"]),
+      .init(
+        id: "history", title: "打开练习历史", subtitle: "查看成绩、趋势与活动",
+        systemImage: "clock.arrow.circlepath", keywords: ["history", "历史", "统计"]),
+      .init(
+        id: "presets", title: "打开测试预设", subtitle: "保存或应用完整测试配置", systemImage: "slider.horizontal.3",
+        keywords: ["preset", "预设"]),
+      .init(
+        id: "challenges", title: "打开离线挑战", subtitle: "加载固定配置并验收速度、准确率和错误",
+        systemImage: "flag.checkered", keywords: ["challenge", "挑战", "目标"]),
+      .init(
+        id: "savedTexts", title: "打开已保存文本", subtitle: "选择本地自定义练习文本", systemImage: "doc.text",
+        keywords: ["saved", "文本", "自定义"]),
+      .init(
+        id: "data", title: "打开数据管理", subtitle: "导入或导出本地 Typebar 归档", systemImage: "externaldrive",
+        keywords: ["data", "数据", "备份"]),
+      .init(
+        id: "sync", title: "打开同步", subtitle: "连接自建服务并同步归档",
+        systemImage: "arrow.triangle.2.circlepath", keywords: ["sync", "同步", "账户"]),
+      .init(
+        id: "friends", title: "打开好友", subtitle: "搜索用户和管理好友关系", systemImage: "person.2",
+        keywords: ["friend", "好友", "社交"]),
+      .init(
+        id: "notifications", title: "打开通知", subtitle: "查看好友请求和接受事件", systemImage: "bell",
+        keywords: ["notification", "通知", "好友请求"]),
+      .init(
+        id: "settings", title: "打开设置", subtitle: "修改输入规则、显示和账户选项", systemImage: "gearshape",
+        keywords: ["settings", "设置", "主题", "键盘"]),
+      .init(
+        id: "share", title: "分享当前测试", subtitle: "复制或导入 Typebar 测试配置链接",
+        systemImage: "square.and.arrow.up", keywords: ["share", "分享", "链接", "配置"]),
+    ]
+  }
+
+  private func runCommand(_ item: CommandPaletteItem) {
+    switch item.id {
+    case "restart": attemptRestart()
+    case "mode.time":
+      mode = .time
+      reset()
+    case "mode.words":
+      mode = .words
+      reset()
+    case "mode.quote":
+      mode = .quote
+      reset()
+    case "mode.zen":
+      mode = .zen
+      reset()
+    case "mode.custom":
+      mode = .custom
+      reset()
+    case "history": showingHistory = true
+    case "presets": showingPresets = true
+    case "challenges": showingChallenges = true
+    case "savedTexts": showingSavedTexts = true
+    case "data": showingDataMigration = true
+    case "sync": showingSync = true
+    case "friends": showingConnections = true
+    case "notifications": showingNotifications = true
+    case "settings": openSettings()
+    case "share": showingTestShare = true
+    default: break
+    }
+  }
+
+  private var configuration: TestConfiguration {
+    if let activeChallenge {
+      return activeChallenge.preset.configuration.with(challengeID: activeChallenge.id)
+    }
+    switch mode {
+    case .time:
+      return .timed(
+        seconds: TimeInterval(duration), difficulty: settings.difficulty,
+        rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
+        mixedLanguageComponents: mixedLanguageComponents, contentOptions: contentOptions
+      ).with(modifiers: settings.testModifiers)
+    case .words:
+      return .words(
+        wordLimit, difficulty: settings.difficulty, rules: settings.inputRules, language: language,
+        englishVariant: settings.englishVariant, mixedLanguageComponents: mixedLanguageComponents,
+        contentOptions: contentOptions
+      ).with(modifiers: settings.testModifiers)
+    case .quote, .zen:
+      return .init(
+        mode: mode, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
+        rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
+        quoteLength: quoteLength, mixedLanguageComponents: mixedLanguageComponents,
+        modifiers: settings.testModifiers, contentOptions: contentOptions)
+    case .custom:
+      let duration = customTextCompletion == .time ? TimeInterval(customTextDuration) : nil
+      let wordLimit = customTextCompletion == .words ? customTextWordLimit : nil
+      let sectionLimit =
+        customTextCompletion == .sections
+        ? min(customTextSectionLimit, customTextSections.count) : nil
+      return .init(
+        mode: .custom, duration: duration, wordLimit: wordLimit, difficulty: settings.difficulty,
+        rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
+        quoteLength: quoteLength, customTextCompletion: customTextCompletion,
+        customTextSectionLimit: sectionLimit,
+        customTextOrdering: customTextCompletion == .sections ? .inOrder : customTextOrdering,
+        mixedLanguageComponents: mixedLanguageComponents, modifiers: settings.testModifiers,
+        contentOptions: contentOptions)
+    }
+  }
+
+  private var availableLanguages: [TypingLanguage] {
+    mode == .quote ? TypingLanguage.allCases.filter(\.supportsQuotes) : TypingLanguage.allCases
+  }
+
+  private var presetDefinition: SavedTestPreset {
+    .init(
+      configuration: configuration,
+      quoteID: mode == .quote ? selectedQuoteID : nil,
+      customText: mode == .custom ? customText : nil
+    )
+  }
+
+  private func apply(_ preset: SavedTestPreset) {
+    let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID)
+    activeChallengeID = challenge?.id
+    let configuration = challenge?.preset.configuration ?? preset.configuration
+    mode = configuration.mode
+    if let duration = configuration.duration { self.duration = Int(duration) }
+    if let wordLimit = configuration.wordLimit { self.wordLimit = wordLimit }
+    if let quoteID = preset.quoteID { selectedQuoteID = quoteID }
+    if let customText = preset.customText { self.customText = customText }
+    customTextCompletion = configuration.customTextCompletion
+    if configuration.customTextCompletion == .time, let duration = configuration.duration {
+      customTextDuration = Int(duration)
+    }
+    if configuration.customTextCompletion == .words, let wordLimit = configuration.wordLimit {
+      customTextWordLimit = wordLimit
+    }
+    if configuration.customTextCompletion == .sections,
+      let sectionLimit = configuration.customTextSectionLimit
+    {
+      customTextSectionLimit = sectionLimit
+    }
+    customTextOrdering = configuration.customTextOrdering
+    language = configuration.language
+    mixedLanguageComponents = configuration.mixedLanguageComponents
+    quoteLength = configuration.quoteLength
+    contentOptions = configuration.contentOptions
+    settings.apply(configuration)
+    reset()
+  }
+
+  private var activeChallenge: TypebarChallenge? {
+    TypebarChallengeLibrary.challenge(id: activeChallengeID)
+  }
+
+  private func loadChallenge(_ challenge: TypebarChallenge) {
+    var preset = challenge.preset
+    preset.configuration = preset.configuration.with(challengeID: challenge.id)
+    apply(preset)
+  }
+
+  private func languageChanged(to language: TypingLanguage) {
+    if mode == .quote { ensureSelectedQuote() }
+    reset()
+  }
+
+  private func mixedLanguageBinding(for component: TypingLanguage) -> Binding<Bool> {
+    Binding(
+      get: { mixedLanguageComponents.contains(component) },
+      set: { enabled in
+        if enabled {
+          mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
+            mixedLanguageComponents + [component])
+        } else if mixedLanguageComponents.count > 2 {
+          mixedLanguageComponents.removeAll { $0 == component }
+          mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
+            mixedLanguageComponents)
+        }
+        reset()
+      }
+    )
+  }
+
+  private var availableQuotes: [OfflineQuote] {
+    let sourceQuotes =
+      quoteSource == .builtIn
+      ? OfflineContent.quotes(for: language, length: quoteLength)
+      : communityQuotes.filter {
+        $0.language == language && (quoteLength == .all || $0.length == quoteLength)
+      }
+    let quotes = favoriteQuotesOnly
+      ? sourceQuotes.filter { settings.isFavoriteQuote($0.id) }
+      : sourceQuotes
+    return QuoteSearch.filtered(quotes, query: quoteSearchQuery)
+  }
+
+  private func refreshCommunityQuotes() {
+    isLoadingCommunityQuotes = true
+    communityQuoteMessage = nil
+    Task {
+      do {
+        let remoteQuotes = try await account.publicQuotes(language: language)
+        communityQuoteRatings = Dictionary(
+          uniqueKeysWithValues: remoteQuotes.map {
+            (
+              $0.id,
+              .init(
+                quoteID: $0.id, upvotes: $0.upvotes, downvotes: $0.downvotes,
+                viewerRating: $0.viewerRating)
+            )
+          })
+        communityQuotes = remoteQuotes.map { quote in
+          .init(
+            id: "community-\(quote.id.uuidString.lowercased())", title: quote.attribution ?? "社区投稿",
+            text: quote.text, language: language, length: communityQuoteLength(for: quote.text))
+        }
+        communityQuoteMessage =
+          remoteQuotes.isEmpty ? "该语言还没有已审核内容。" : "已载入 \(remoteQuotes.count) 条已审核内容。"
+        ensureSelectedQuote()
+        reset()
+      } catch {
+        communityQuoteMessage = "无法载入社区引语：\(error.localizedDescription)"
+      }
+      isLoadingCommunityQuotes = false
+    }
+  }
+
+  private func communityQuoteLength(for text: String) -> QuoteLength {
+    switch text.count {
+    case ...120: .short
+    case ...240: .medium
+    case ...480: .long
+    default: .extended
+    }
+  }
+
+  private var selectedCommunityQuoteID: UUID? {
+    guard selectedQuoteID.hasPrefix("community-") else { return nil }
+    return UUID(uuidString: String(selectedQuoteID.dropFirst("community-".count)))
+  }
+
+  private func reportSelectedCommunityQuote() {
+    guard let quoteID = selectedCommunityQuoteID else { return }
+    Task {
+      do {
+        try await account.reportQuote(quoteID, reason: quoteReportReason, note: quoteReportNote)
+        quoteReportNote = ""
+        communityQuoteMessage = "已私下提交举报；引语作者不会收到通知。"
+      } catch {
+        communityQuoteMessage = "无法提交举报：\(error.localizedDescription)"
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var communityRatingControls: some View {
+    HStack(spacing: 8) {
+      let rating = selectedCommunityQuoteID.flatMap { communityQuoteRatings[$0] }
+      Text("社区评价：支持 \(rating?.upvotes ?? 0) · 不适合 \(rating?.downvotes ?? 0)")
+        .font(.caption).foregroundStyle(.secondary)
+      if account.currentUser != nil, let quoteID = selectedCommunityQuoteID {
+        Button("不适合") { rateCommunityQuote(quoteID, value: .down) }
+          .buttonStyle(.bordered)
+          .tint(rating?.viewerRating == RemoteQuoteRatingValue.down.rawValue ? .red : .secondary)
+        Button("不错") { rateCommunityQuote(quoteID, value: .up) }
+          .buttonStyle(.bordered)
+          .tint(rating?.viewerRating == RemoteQuoteRatingValue.up.rawValue ? .green : .secondary)
+        if rating?.viewerRating != nil {
+          Button("撤销评价") { rateCommunityQuote(quoteID, value: .neutral) }
+            .buttonStyle(.borderless)
+        }
+      } else {
+        Text("登录后可评价").font(.caption).foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private func rateCommunityQuote(_ quoteID: UUID, value: RemoteQuoteRatingValue) {
+    Task {
+      do {
+        let rating = try await account.rateQuote(quoteID, value: value)
+        communityQuoteRatings[quoteID] = rating
+        communityQuoteMessage = value == .neutral ? "已撤销你的社区评价。" : "已更新你的社区评价。"
+      } catch {
+        communityQuoteMessage = "无法更新社区评价：\(error.localizedDescription)"
+      }
+    }
+  }
+
+  private var customTextSections: [String] {
+    CustomTextPolicy.sections(in: customText)
+  }
+
+  private func ensureSelectedQuote() {
+    guard let first = availableQuotes.first else { return }
+    if !availableQuotes.contains(where: { $0.id == selectedQuoteID }) {
+      selectedQuoteID = first.id
+    }
+  }
+
+  private func chooseNextQuote() {
+    selectedQuoteID =
+      OfflineContent.nextQuote(
+        from: availableQuotes,
+        currentID: selectedQuoteID,
+        allowsRepeat: false
+      )?.id ?? selectedQuoteID
+  }
+
+  private func publishIfEnabled(_ result: CompletedTestResult) {
+    publicationMessage = nil
+    guard settings.publishCompletedResults, account.currentUser != nil else { return }
+    Task {
+      do {
+        let response = try await account.submitCompletedResult(result)
+        let rank = response.weeklyExperienceRank.map { " · 本周 XP #\($0)" } ?? ""
+        publicationMessage =
+          response.leaderboardEligible
+          ? "已发送至自建服务 · +\(response.experienceGained) XP · 总计 \(response.totalExperience) XP\(rank)"
+          : "已发送至自建服务 · +\(response.experienceGained) XP"
+      } catch {
+        publicationMessage = "本机成绩已保存；未能发送至服务：\(error.localizedDescription)"
+      }
+    }
+  }
+}
+
+private enum TestTerminalNotice: Identifiable {
+  case failed
+  case abandoned
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .failed: "本次测试失败"
+    case .abandoned: "已放弃本次测试"
+    }
+  }
+
+  var message: String {
+    switch self {
+    case .failed: "本次没有保存为完成成绩。"
+    case .abandoned: "本次没有保存为完成成绩。"
+    }
+  }
+}
+
+extension TestOutcome {
+  func statusText(savesResult: Bool) -> String {
+    switch self {
+    case .active: "按任意键开始，Esc 可重新开始"
+    case .completed:
+      savesResult ? "本次完成 · 已保存到本机" : "本次完成 · 未保存为完成成绩"
+    case .failed: "本次失败 · 未保存为完成成绩"
+    case .abandoned: "本次已放弃 · 未保存为完成成绩"
+    }
+  }
+}
+
+private struct CompletedResultPresentation: Identifiable {
+  let result: CompletedTestResult
+  let savesResult: Bool
+  let missedWords: [String]
+  let wordReviews: [TypedWordReview]
+  let challengeEvaluation: ChallengeEvaluation?
+  var id: UUID { result.id }
+}
+
+private struct CompletedResultView: View {
+  let result: CompletedTestResult
+  let savesResult: Bool
+  let typingSpeedUnit: TypingSpeedUnit
+  let alwaysShowDecimalPlaces: Bool
+  let publicationMessage: String?
+  let onRestart: () -> Void
+  let onHistory: () -> Void
+  let missedWords: [String]
+  let wordReviews: [TypedWordReview]
+  let challengeEvaluation: ChallengeEvaluation?
+  let onPracticeMissedWords: () -> Void
+  @State private var shareStatus: String?
+
+  var body: some View {
+    VStack(spacing: 28) {
+      VStack(spacing: 6) {
+        Text("完成").font(.title2.weight(.semibold))
+        Text(savesResult ? "已保存到这台 Mac" : "练习模式：不保存成绩")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Text(typingSpeedUnit.formatted(
+          wpm: result.wpm, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
+          .font(.system(size: 72, weight: .bold, design: .rounded))
+        Text(typingSpeedUnit.displayName).foregroundStyle(.secondary)
+      }
+
+      Grid(horizontalSpacing: 36, verticalSpacing: 14) {
+        GridRow {
+          metric("准确率", formattedAccuracy)
+          metric("Raw \(typingSpeedUnit.displayName)", typingSpeedUnit.formatted(
+            wpm: result.rawWpm, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
+        }
+        GridRow {
+          metric("错误", "\(result.errorCount)")
+          metric("用时", "\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
+        }
+      }
+
+      if let challengeEvaluation {
+        ChallengeResultView(evaluation: challengeEvaluation)
+      }
+
+      if let publicationMessage {
+        Text(publicationMessage)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+      }
+
+      if !wordReviews.isEmpty {
+        WordReviewHistoryView(reviews: wordReviews)
+      }
+
+      if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
+        ReplayTimelineView(prompt: result.prompt, events: result.replayEvents)
+      }
+
+      HStack {
+        if savesResult {
+          Button("查看历史", action: onHistory)
+        }
+        Button(shareStatus ?? "复制结果") { copyResult() }
+        Spacer()
+        if !missedWords.isEmpty {
+          Button("练习错词（\(missedWords.count)）", action: onPracticeMissedWords)
+        }
+        Button("再来一次", action: onRestart)
+          .buttonStyle(.borderedProminent)
+      }
+    }
+    .padding(32)
+    .frame(width: 390)
+  }
+
+  private func metric(_ title: String, _ value: String) -> some View {
+    VStack(spacing: 3) {
+      Text(value).font(.headline)
+      Text(title).font(.caption).foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity)
+  }
+
+  private var formattedAccuracy: String {
+    alwaysShowDecimalPlaces
+      ? String(format: "%.2f%%", Double(result.accuracy))
+      : "\(result.accuracy)%"
+  }
+
+  private func copyResult() {
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(ResultShareText.make(for: result), forType: .string)
+    shareStatus = "已复制"
+  }
+}
+
+private struct ChallengeResultView: View {
+  let evaluation: ChallengeEvaluation
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label(
+        evaluation.passed
+          ? "挑战通过：\(evaluation.challenge.title)" : "挑战未通过：\(evaluation.challenge.title)",
+        systemImage: evaluation.passed ? "checkmark.seal.fill" : "xmark.seal.fill"
+      )
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(evaluation.passed ? .green : .orange)
+      if !evaluation.passed {
+        ForEach(evaluation.failedRequirements, id: \.self) { requirement in
+          Text(requirement).font(.caption).foregroundStyle(.secondary)
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(10)
+    .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+  }
+}
+
+private struct ReplayTimelineView: View {
+  let prompt: String
+  let events: [TypingReplayEvent]
+  @State private var elapsed: TimeInterval = 0
+  @State private var isPlaying = false
+  private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+
+  private var duration: TimeInterval { events.last?.offset ?? 0 }
+  private var replayedText: String { TypingReplay.typedText(events: events, through: elapsed) }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label("输入回放", systemImage: "play.rectangle")
+          .font(.caption.weight(.medium))
+        Spacer()
+        Text("\(String(format: "%.1f", elapsed)) / \(String(format: "%.1f", duration)) 秒")
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.secondary)
+      }
+      Text(replayedText.isEmpty ? "等待播放" : replayedText)
+        .font(.system(.caption, design: .monospaced))
+        .lineLimit(3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+      Slider(
+        value: $elapsed, in: 0...max(duration, 0.01),
+        onEditingChanged: { editing in
+          if editing { isPlaying = false }
+        })
+      HStack {
+        Button(isPlaying ? "暂停" : "播放") {
+          if elapsed >= duration { elapsed = 0 }
+          isPlaying.toggle()
+        }
+        .disabled(duration == 0)
+        Button("重置") {
+          elapsed = 0
+          isPlaying = false
+        }
+        .disabled(elapsed == 0 && !isPlaying)
+        Spacer()
+        Text("目标：\(prompt.prefix(42))")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+    }
+    .onReceive(timer) { _ in
+      guard isPlaying else { return }
+      elapsed = min(duration, elapsed + 0.05)
+      if elapsed >= duration { isPlaying = false }
+    }
+  }
+}
+
+private struct WordReviewHistoryView: View {
+  let reviews: [TypedWordReview]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Text("本次单词历史").font(.caption.weight(.medium))
+        Spacer()
+        Text("\(reviews.filter(\.isCorrect).count)/\(reviews.count) 正确")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: 5) {
+          ForEach(reviews) { review in
+            HStack(spacing: 8) {
+              Image(systemName: review.isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundStyle(review.isCorrect ? .green : .red)
+              Text(review.target).font(.system(.body, design: .monospaced))
+              if !review.isCorrect {
+                Text("→ \(review.typed.isEmpty ? "∅" : review.typed)")
+                  .font(.system(.caption, design: .monospaced))
+                  .foregroundStyle(.secondary)
+              }
+              Spacer()
+            }
+          }
+        }
+      }
+      .frame(maxHeight: 112)
+    }
+    .padding(10)
+    .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+  }
+}
+
+private struct ResultsHistoryView: View {
+  fileprivate enum ActivityChartMeasure: String, CaseIterable, Identifiable {
+    case completedTests
+    case typingMinutes
+
+    var id: Self { self }
+
+    var title: String {
+      switch self {
+      case .completedTests: "完成次数"
+      case .typingMinutes: "练习分钟"
+      }
+    }
+  }
+
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
+  @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var results:
+    [TestResultRecord]
+  @Query(sort: \ResultFilterPresetRecord.createdAt, order: .reverse) private var filterPresets:
+    [ResultFilterPresetRecord]
+  @State private var selectedResult: TestResultRecord?
+  @State private var modeFilter: TestMode?
+  @State private var languageFilter: TypingLanguage?
+  @State private var tagFilter: String?
+  @State private var personalBestOnly = false
+  @State private var filterPresetName = ""
+  @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
+
+  private var filteredResults: [TestResultRecord] {
+    let filter = ResultHistoryFilter(
+      mode: modeFilter,
+      language: languageFilter,
+      tag: tagFilter,
+      personalBestOnly: personalBestOnly
+    )
+    let entries = results.map {
+      ResultHistoryEntry(
+        id: $0.id, mode: $0.configuration?.mode, language: $0.configuration?.language, tags: $0.tags
+      )
+    }
+    let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs)
+    return results.filter { ids.contains($0.id) }
+  }
+
+  private var availableTags: [String] {
+    Array(Set(results.flatMap(\.tags))).sorted {
+      $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+    }
+  }
+
+  private var metrics: [ResultMetric] {
+    filteredResults.map {
+      ResultMetric(
+        id: $0.id,
+        finishedAt: $0.finishedAt,
+        wpm: $0.wpm,
+        accuracy: $0.accuracy,
+        typingSeconds: $0.finishedAt.timeIntervalSince($0.startedAt)
+      )
+    }
+  }
+
+  private var allMetrics: [ResultMetric] {
+    results.map {
+      ResultMetric(
+        id: $0.id,
+        finishedAt: $0.finishedAt,
+        wpm: $0.wpm,
+        accuracy: $0.accuracy,
+        typingSeconds: $0.finishedAt.timeIntervalSince($0.startedAt)
+      )
+    }
+  }
+
+  private var activity: [DailyActivity] {
+    ActivityAggregation.daily(metrics: metrics)
+  }
+
+  private var recentActivity: [ActivityBarPoint] {
+    ActivityAggregation.recentDays(activity: activity)
+  }
+
+  private var wpmHistogram: [WPMHistogramBucket] {
+    WPMHistogram.buckets(metrics: metrics)
+  }
+
+  private var personalBestIDs: Set<UUID> {
+    ResultStatistics.personalBestIDs(metrics: allMetrics)
+  }
+
+  var body: some View {
+    NavigationStack {
+      Group {
+        if results.isEmpty {
+          ContentUnavailableView(
+            "还没有完成的测试", systemImage: "keyboard", description: Text("完成一次练习后，结果会保存在这台 Mac 上。"))
+        } else {
+          VStack(spacing: 0) {
+            statistics
+            AchievementStrip(
+              achievements: TypebarAchievementPolicy.achievements(metrics: allMetrics)
+            )
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            Chart(metrics) { metric in
+              LineMark(x: .value("日期", metric.finishedAt), y: .value("WPM", metric.wpm))
+                .foregroundStyle(.tint)
+              PointMark(x: .value("日期", metric.finishedAt), y: .value("WPM", metric.wpm))
+                .foregroundStyle(.tint)
+            }
+            .chartYScale(domain: .automatic(includesZero: true))
+            .frame(height: 120)
+            .padding(.horizontal)
+
+            WPMHistogramView(buckets: wpmHistogram)
+              .padding(.horizontal)
+              .padding(.top, 8)
+
+            ActivityBarChartView(points: recentActivity, measure: $activityChartMeasure)
+              .padding(.horizontal)
+              .padding(.top, 8)
+
+            ActivityHeatmapView(activity: activity)
+              .padding(.horizontal)
+              .padding(.bottom, 10)
+
+            List {
+              Section("筛选") {
+                HStack {
+                  TextField("筛选预设名称", text: $filterPresetName)
+                  Button("保存筛选", action: saveFilterPreset)
+                    .disabled(ResultFilterPresetPolicy.normalizedName(filterPresetName) == nil)
+                }
+                if !filterPresets.isEmpty {
+                  ForEach(filterPresets) { preset in
+                    HStack {
+                      Button(preset.name) { applyFilterPreset(preset) }
+                        .buttonStyle(.borderless)
+                      Spacer()
+                      Button(role: .destructive) {
+                        modelContext.delete(preset)
+                      } label: {
+                        Image(systemName: "trash")
+                      }
+                      .buttonStyle(.borderless)
+                      .accessibilityLabel("删除筛选预设 \(preset.name)")
+                    }
+                  }
+                }
+                Picker("模式", selection: $modeFilter) {
+                  Text("全部模式").tag(TestMode?.none)
+                  ForEach(TestMode.allCases, id: \.self) { mode in
+                    Text(modeName(mode)).tag(Optional(mode))
+                  }
+                }
+                Picker("语言", selection: $languageFilter) {
+                  Text("全部语言").tag(TypingLanguage?.none)
+                  ForEach(TypingLanguage.allCases, id: \.self) { language in
+                    Text(language.displayName).tag(Optional(language))
+                  }
+                }
+                if !availableTags.isEmpty {
+                  Picker("标签", selection: $tagFilter) {
+                    Text("全部标签").tag(String?.none)
+                    ForEach(availableTags, id: \.self) { tag in
+                      Text(tag).tag(Optional(tag))
+                    }
+                  }
+                }
+                Toggle("仅个人最佳", isOn: $personalBestOnly)
+              }
+              if filteredResults.isEmpty {
+                ContentUnavailableView(
+                  "没有匹配的成绩", systemImage: "line.3.horizontal.decrease.circle",
+                  description: Text("调整筛选条件以查看其他本地练习记录。"))
+              }
+              ForEach(filteredResults) { result in
+                Button {
+                  selectedResult = result
+                } label: {
+                  HStack(spacing: 16) {
+                    Text("\(result.wpm)")
+                      .font(.system(size: 30, weight: .bold, design: .rounded))
+                      .frame(width: 56, alignment: .trailing)
+                    VStack(alignment: .leading, spacing: 3) {
+                      Text("\(modeName(result.configuration?.mode)) · \(result.accuracy)% 准确率")
+                      Text(
+                        result.finishedAt, format: .dateTime.year().month().day().hour().minute()
+                      )
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                    }
+                    if personalBestIDs.contains(result.id) {
+                      Label("个人最佳", systemImage: "trophy.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    }
+                    Spacer()
+                    Text("raw \(result.rawWpm)")
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
+                }
+                .buttonStyle(.plain)
+              }
+              .onDelete(perform: delete)
+            }
+          }
+        }
+      }
+      .navigationTitle("练习历史")
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("完成") { dismiss() }
+        }
+      }
+    }
+    .frame(minWidth: 520, minHeight: 360)
+    .sheet(item: $selectedResult) { result in
+      ResultDetailView(
+        result: result, modeName: modeName(result.configuration?.mode),
+        isPersonalBest: personalBestIDs.contains(result.id))
+    }
+  }
+
+  private var statistics: some View {
+    let summary = ResultStatistics(metrics: metrics)
+    let streak = ActivityAggregation.currentStreak(activity: activity)
+    return HStack {
+      statistic("完成", "\(summary.completedTests)")
+      statistic("均速", "\(summary.averageWPM)")
+      statistic("最佳", "\(summary.bestWPM)")
+      statistic("准确率", "\(summary.averageAccuracy)%")
+      statistic("连续", "\(streak) 天")
+    }
+    .padding()
+  }
+
+  private func statistic(_ title: String, _ value: String) -> some View {
+    VStack(spacing: 2) {
+      Text(value).font(.headline)
+      Text(title).font(.caption).foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity)
+  }
+
+  private func delete(at offsets: IndexSet) {
+    for index in offsets { modelContext.delete(filteredResults[index]) }
+  }
+
+  private var activeFilter: ResultHistoryFilter {
+    .init(
+      mode: modeFilter, language: languageFilter, tag: tagFilter, personalBestOnly: personalBestOnly
+    )
+  }
+
+  private func saveFilterPreset() {
+    guard let preset = ResultFilterPresetRecord(name: filterPresetName, filter: activeFilter) else {
+      return
+    }
+    modelContext.insert(preset)
+    filterPresetName = ""
+  }
+
+  private func applyFilterPreset(_ preset: ResultFilterPresetRecord) {
+    guard let filter = preset.filter else { return }
+    modeFilter = filter.mode
+    languageFilter = filter.language
+    tagFilter = filter.tag
+    personalBestOnly = filter.personalBestOnly
+  }
+
+  private func modeName(_ mode: TestMode?) -> String {
+    switch mode {
+    case .time: "时间"
+    case .words: "字数"
+    case .quote: "引语"
+    case .zen: "禅"
+    case .custom: "自定义"
+    case nil: "未知"
+    }
+  }
+}
+
+private struct AchievementStrip: View {
+  let achievements: [TypebarAchievement]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 7) {
+      HStack {
+        Label("本机成就", systemImage: "medal")
+          .font(.caption.weight(.semibold))
+        Spacer()
+        Text("\(achievements.filter(\.isUnlocked).count)/\(achievements.count)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          ForEach(achievements) { achievement in
+            VStack(alignment: .leading, spacing: 3) {
+              Label(achievement.title, systemImage: achievement.systemImage)
+                .font(.caption.weight(.medium))
+              Text(achievement.detail)
+                .font(.caption2)
+                .lineLimit(1)
+              Text(achievement.progress)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+            }
+            .frame(width: 142, alignment: .leading)
+            .padding(9)
+            .foregroundStyle(achievement.isUnlocked ? Color.primary : Color.secondary)
+            .background(
+              achievement.isUnlocked
+                ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.08),
+              in: RoundedRectangle(cornerRadius: 10)
+            )
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+              "\(achievement.title)，\(achievement.detail)，进度 \(achievement.progress)，\(achievement.isUnlocked ? "已获得" : "未获得")"
+            )
+          }
+        }
+      }
+      Text("成就只由这台 Mac 已完成的练习导出，不上传或替代服务器 XP。")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
+private struct WPMHistogramView: View {
+  let buckets: [WPMHistogramBucket]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      HStack {
+        Text("速度分布").font(.caption.weight(.medium))
+        Spacer()
+        Text("每档 10 WPM").font(.caption2).foregroundStyle(.secondary)
+      }
+      Chart(buckets) { bucket in
+        BarMark(
+          x: .value("速度区间", bucket.label),
+          y: .value("完成次数", bucket.count)
+        )
+        .foregroundStyle(Color.accentColor.gradient)
+        .accessibilityLabel("\(bucket.label) WPM")
+        .accessibilityValue("\(bucket.count) 次完成")
+      }
+      .chartXAxis {
+        AxisMarks(values: .automatic(desiredCount: 6)) { _ in
+          AxisGridLine().foregroundStyle(.secondary.opacity(0.2))
+          AxisValueLabel()
+        }
+      }
+      .chartYScale(domain: .automatic(includesZero: true))
+      .frame(height: 110)
+    }
+  }
+}
+
+private struct ActivityBarChartView: View {
+  let points: [ActivityBarPoint]
+  @Binding var measure: ResultsHistoryView.ActivityChartMeasure
+
+  private var yTitle: String { measure.title }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      HStack {
+        Text("近 28 日练习").font(.caption.weight(.medium))
+        Spacer()
+        Picker("柱状图指标", selection: $measure) {
+          ForEach(ResultsHistoryView.ActivityChartMeasure.allCases) { measure in
+            Text(measure.title).tag(measure)
+          }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 190)
+      }
+      Chart(points) { point in
+        BarMark(
+          x: .value("日期", point.day, unit: .day),
+          y: .value(yTitle, value(for: point))
+        )
+        .foregroundStyle(Color.accentColor.gradient)
+        .accessibilityLabel(point.day.formatted(date: .abbreviated, time: .omitted))
+        .accessibilityValue(accessibilityValue(for: point))
+      }
+      .chartXAxis {
+        AxisMarks(values: .stride(by: .weekOfYear)) { _ in
+          AxisGridLine().foregroundStyle(.secondary.opacity(0.2))
+          AxisValueLabel(format: .dateTime.month().day())
+        }
+      }
+      .chartYScale(domain: .automatic(includesZero: true))
+      .frame(height: 110)
+    }
+  }
+
+  private func value(for point: ActivityBarPoint) -> Double {
+    switch measure {
+    case .completedTests: Double(point.completedTests)
+    case .typingMinutes: point.typingSeconds / 60
+    }
+  }
+
+  private func accessibilityValue(for point: ActivityBarPoint) -> String {
+    switch measure {
+    case .completedTests: "\(point.completedTests) 次完成"
+    case .typingMinutes: "\(Int((point.typingSeconds / 60).rounded())) 分钟练习"
+    }
+  }
+}
+
+private struct ActivityHeatmapView: View {
+  let activity: [DailyActivity]
+
+  private var cells: [ActivityHeatmapCell] {
+    ActivityHeatmap.cells(activity: activity)
+  }
+
+  private let rows = Array(repeating: GridItem(.fixed(11), spacing: 3), count: 7)
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Text("近 12 周活动").font(.caption.weight(.medium))
+        Spacer()
+        Text("深色代表更多完成次数").font(.caption2).foregroundStyle(.secondary)
+      }
+      ScrollView(.horizontal, showsIndicators: false) {
+        LazyHGrid(rows: rows, spacing: 3) {
+          ForEach(cells) { cell in
+            RoundedRectangle(cornerRadius: 2)
+              .fill(Color.accentColor.opacity(opacity(for: cell.intensity)))
+              .frame(width: 11, height: 11)
+              .accessibilityLabel(cell.day.formatted(date: .abbreviated, time: .omitted))
+              .accessibilityValue("\(cell.completedTests) 次完成")
+          }
+        }
+        .frame(height: 95)
+      }
+    }
+  }
+
+  private func opacity(for intensity: Int) -> Double {
+    switch intensity {
+    case 0: 0.12
+    case 1: 0.35
+    case 2: 0.55
+    case 3: 0.75
+    default: 1
+    }
+  }
+}
+
+private struct ResultDetailView: View {
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
+  let result: TestResultRecord
+  let modeName: String
+  let isPersonalBest: Bool
+  @State private var newTag = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 24) {
+      HStack(alignment: .firstTextBaseline) {
+        Text("\(result.wpm)")
+          .font(.system(size: 64, weight: .bold, design: .rounded))
+        Text("WPM").foregroundStyle(.secondary)
+        if isPersonalBest {
+          Label("个人最佳", systemImage: "trophy.fill")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.orange)
+        }
+      }
+      Text(result.finishedAt, format: .dateTime.year().month().day().hour().minute())
+        .foregroundStyle(.secondary)
+      Grid(alignment: .leading, horizontalSpacing: 40, verticalSpacing: 14) {
+        GridRow {
+          Text("模式")
+          Text(modeName)
+        }
+        if let configuration = result.configuration {
+          GridRow {
+            Text("语言")
+            Text(configuration.language.displayName)
+          }
+          GridRow {
+            Text("难度")
+            Text(configuration.difficulty.displayName)
+          }
+          if let duration = configuration.duration {
+            GridRow {
+              Text("设定时长")
+              Text("\(Int(duration)) 秒")
+            }
+          }
+          if let wordLimit = configuration.wordLimit {
+            GridRow {
+              Text("设定字数")
+              Text("\(wordLimit) 词")
+            }
+          }
+          if !configuration.modifiers.isEmpty {
+            GridRow {
+              Text("修饰器")
+              Text(configuration.modifiers.map(\.displayName).joined(separator: "、"))
+            }
+          }
+        }
+        GridRow {
+          Text("准确率")
+          Text("\(result.accuracy)%")
+        }
+        GridRow {
+          Text("Raw WPM")
+          Text("\(result.rawWpm)")
+        }
+        GridRow {
+          Text("错误")
+          Text("\(result.errorCount)")
+        }
+        GridRow {
+          Text("正确字符")
+          Text("\(result.correctCharacterCount)")
+        }
+        GridRow {
+          Text("用时")
+          Text("\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
+        }
+      }
+      if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
+        ReplayTimelineView(prompt: result.prompt, events: result.replayEvents)
+      }
+      VStack(alignment: .leading, spacing: 9) {
+        Text("标签").font(.headline)
+        if !result.tags.isEmpty {
+          FlowLayout(spacing: 8) {
+            ForEach(result.tags, id: \.self) { tag in
+              Button {
+                result.removeTag(tag)
+                saveTags()
+              } label: {
+                Label(tag, systemImage: "xmark")
+                  .font(.caption)
+              }
+              .buttonStyle(.bordered)
+            }
+          }
+        }
+        HStack {
+          TextField("添加标签", text: $newTag)
+            .onSubmit(addTag)
+          Button("添加", action: addTag)
+            .disabled(
+              newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || result.tags.count >= ResultTagPolicy.maximumCount)
+        }
+        Text(
+          "最多 \(ResultTagPolicy.maximumCount) 个标签，每个不超过 \(ResultTagPolicy.maximumLength) 个字符。点按标签可移除。"
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+      Spacer()
+      HStack {
+        Spacer()
+        Button("完成") { dismiss() }
+      }
+    }
+    .padding(32)
+    .frame(width: 460, height: 620)
+  }
+
+  private func addTag() {
+    result.addTag(newTag)
+    newTag = ""
+    saveTags()
+  }
+
+  private func saveTags() {
+    try? modelContext.save()
+  }
+}
+
+private struct FlowLayout: Layout {
+  let spacing: CGFloat
+
+  init(spacing: CGFloat) {
+    self.spacing = spacing
+  }
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    let width = proposal.width ?? 0
+    let rows = makeRows(subviews: subviews, width: width)
+    let height =
+      rows.reduce(CGFloat.zero) { $0 + $1.height } + max(0, CGFloat(rows.count - 1) * spacing)
+    return CGSize(width: width, height: height)
+  }
+
+  func placeSubviews(
+    in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+  ) {
+    var y = bounds.minY
+    for row in makeRows(subviews: subviews, width: bounds.width) {
+      var x = bounds.minX
+      for index in row.indices {
+        let size = subviews[index].sizeThatFits(.unspecified)
+        subviews[index].place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+        x += size.width + spacing
+      }
+      y += row.height + spacing
+    }
+  }
+
+  private func makeRows(subviews: Subviews, width: CGFloat) -> [(indices: [Int], height: CGFloat)] {
+    guard width > 0 else { return [] }
+    var rows: [(indices: [Int], height: CGFloat)] = []
+    var indices: [Int] = []
+    var rowWidth: CGFloat = 0
+    var rowHeight: CGFloat = 0
+
+    for index in subviews.indices {
+      let size = subviews[index].sizeThatFits(.unspecified)
+      let nextWidth = indices.isEmpty ? size.width : rowWidth + spacing + size.width
+      if !indices.isEmpty, nextWidth > width {
+        rows.append((indices, rowHeight))
+        indices = []
+        rowWidth = 0
+        rowHeight = 0
+      }
+      indices.append(index)
+      rowWidth = indices.count == 1 ? size.width : rowWidth + spacing + size.width
+      rowHeight = max(rowHeight, size.height)
+    }
+    if !indices.isEmpty { rows.append((indices, rowHeight)) }
+    return rows
+  }
+}

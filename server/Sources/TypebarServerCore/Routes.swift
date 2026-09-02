@@ -1,0 +1,444 @@
+import Vapor
+
+public func configure(
+    _ app: Application,
+    authStore: AuthStore? = nil,
+    moderationKey: String? = Environment.get("TYPEBAR_MODERATION_TOKEN"),
+    maintenanceMode: Bool = TypebarMaintenanceMode.environmentEnabled
+) throws {
+    let authStore = try authStore ?? AuthStore(fileURL: TypebarServerStorage.defaultUserStoreURL(for: app))
+    app.middleware.use(TypebarMaintenanceMiddleware(isEnabled: maintenanceMode))
+    app.middleware.use(TypebarRateLimitMiddleware(limiter: RequestRateLimiter()))
+
+    app.get("health") { _ in
+        HealthResponse(status: "ok", service: "typebar", maintenanceMode: maintenanceMode)
+    }
+
+    app.get("v1", "capabilities") { _ in
+        ServiceCapabilitiesResponse(
+            apiVersion: "v1",
+            service: "typebar",
+            capabilities: [
+                "health": .available,
+                "rateLimiting": .partial,
+                "authentication": .available,
+                "synchronization": .partial,
+                "resultSubmission": .partial,
+                "leaderboards": .partial,
+                "profiles": .partial,
+                "connections": .partial,
+                "notifications": .partial,
+                "profileReports": .partial,
+                "directMessages": .partial,
+                "experience": .partial,
+                "quotes": .partial
+            ]
+        )
+    }
+
+    app.post("v1", "auth", "register") { request async throws -> AuthSessionResponse in
+        do {
+            return try await authStore.register(request.content.decode(RegisterRequest.self))
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "login") { request async throws -> AuthSessionResponse in
+        do {
+            return try await authStore.login(request.content.decode(LoginRequest.self))
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "password") { request async throws -> AuthSessionResponse in
+        do {
+            let accessToken = try request.accessToken()
+            let change = try request.content.decode(ChangePasswordRequest.self)
+            return try await authStore.changePassword(change, accessToken: accessToken)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "email") { request async throws -> AuthSessionResponse in
+        do {
+            let accessToken = try request.accessToken()
+            let change = try request.content.decode(ChangeEmailRequest.self)
+            return try await authStore.changeEmail(change, accessToken: accessToken)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.delete("v1", "auth", "account") { request async throws -> AccountDeletionResponse in
+        do {
+            let accessToken = try request.accessToken()
+            let deletion = try request.content.decode(DeleteAccountRequest.self)
+            try await authStore.deleteAccount(
+                deletion,
+                accessToken: accessToken
+            )
+            return .init(deleted: true)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.get("v1", "profiles", "me") { request async throws -> AuthUserResponse in
+        do {
+            return try await authStore.authenticatedUser(for: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.patch("v1", "profiles", "me") { request async throws -> AuthUserResponse in
+        do {
+            return try await authStore.updateProfile(
+                request.content.decode(UpdateProfileRequest.self),
+                accessToken: try request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.get("v1", "profiles") { request async throws -> PublicProfileSearchResponse in
+        do {
+            let query = try request.query.decode(ProfileSearchQuery.self)
+            return try await authStore.searchPublicProfiles(query: query.query, limit: query.limit)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.get("v1", "profiles", ":id") { request async throws -> PublicProfileResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The profile identifier was invalid.")
+        }
+        do {
+            return try await authStore.publicProfile(id: id)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.get("v1", "connections") { request async throws -> ConnectionsResponse in
+        do {
+            return try await authStore.connections(accessToken: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "connections") { request async throws -> ConnectionResponse in
+        do {
+            let accessToken = try request.accessToken()
+            return try await authStore.sendConnection(request.content.decode(ConnectionRequest.self), accessToken: accessToken)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "connections", ":id", "accept") { request async throws -> ConnectionResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The connection identifier was invalid.")
+        }
+        do {
+            return try await authStore.acceptConnection(requesterID: id, accessToken: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.delete("v1", "connections", ":id") { request async throws -> ConnectionRemovalResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The connection identifier was invalid.")
+        }
+        do {
+            try await authStore.removeConnection(otherUserID: id, accessToken: try request.accessToken())
+            return .init(removed: true)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "blocks", ":id") { request async throws -> ConnectionRemovalResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The profile identifier was invalid.") }
+        do {
+            try await authStore.blockUser(id, accessToken: try request.accessToken())
+            return .init(removed: true)
+        } catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.get("v1", "blocks") { request async throws -> BlockedUsersResponse in
+        do { return try await authStore.blockedUsers(accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.delete("v1", "blocks", ":id") { request async throws -> ConnectionRemovalResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The profile identifier was invalid.") }
+        do {
+            try await authStore.unblockUser(id, accessToken: try request.accessToken())
+            return .init(removed: true)
+        } catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.get("v1", "notifications") { request async throws -> TypebarNotificationsResponse in
+        do { return try await authStore.notifications(accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.post("v1", "notifications", ":id", "read") { request async throws -> TypebarNotificationResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The notification identifier was invalid.")
+        }
+        do { return try await authStore.markNotificationRead(id, accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.post("v1", "reports", "profiles") { request async throws -> ProfileReportResponse in
+        do {
+            return try await authStore.submitProfileReport(
+                request.content.decode(ProfileReportRequest.self), accessToken: try request.accessToken()
+            )
+        } catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.post("v1", "reports", "quotes") { request async throws -> QuoteReportResponse in
+        do { return try await authStore.submitQuoteReport(try request.content.decode(QuoteReportRequest.self), accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.get("v1", "moderation", "profile-reports") { request async throws -> ModerationProfileReportListResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        let query = try request.query.decode(ModerationProfileReportListQuery.self)
+        return await authStore.moderationProfileReports(status: query.status, limit: query.limit)
+    }
+
+    app.patch("v1", "moderation", "profile-reports", ":id") { request async throws -> ModerationProfileReportResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The profile report identifier was invalid.") }
+        do { return try await authStore.moderateProfileReport(id, status: try request.content.decode(ProfileReportModerationRequest.self).status) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.get("v1", "messages", ":id") { request async throws -> DirectConversationResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The profile identifier was invalid.") }
+        do { return try await authStore.directConversation(with: id, accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.post("v1", "messages") { request async throws -> DirectMessageResponse in
+        do { return try await authStore.sendDirectMessage(request.content.decode(DirectMessageRequest.self), accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.post("v1", "messages", ":id", "read") { request async throws -> ConnectionRemovalResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The profile identifier was invalid.") }
+        do { try await authStore.markDirectConversationRead(with: id, accessToken: try request.accessToken()); return .init(removed: true) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.post("v1", "quotes") { request async throws -> QuoteSubmissionResponse in
+        do {
+            let token = try request.accessToken()
+            return try await authStore.submitQuote(try request.content.decode(QuoteSubmissionRequest.self), accessToken: token)
+        } catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.get("v1", "quotes", "mine") { request async throws -> QuoteSubmissionListResponse in
+        do { return try await authStore.quoteSubmissions(accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.get("v1", "quotes") { request async throws -> PublicQuoteListResponse in
+        do {
+            let query = try request.query.decode(QuoteListQuery.self)
+            return try await authStore.publicQuotes(language: query.language, limit: query.limit, accessToken: request.headers.bearerAuthorization?.token)
+        } catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.put("v1", "quotes", ":id", "rating") { request async throws -> QuoteRatingResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The quote identifier was invalid.") }
+        do { return try await authStore.rateQuote(id, request: try request.content.decode(QuoteRatingRequest.self), accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.get("v1", "moderation", "quotes") { request async throws -> ModerationQuoteListResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        do {
+            let query = try request.query.decode(ModerationQuoteListQuery.self)
+            return try await authStore.moderationQuotes(status: query.status, limit: query.limit)
+        } catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.patch("v1", "moderation", "quotes", ":id") { request async throws -> QuoteSubmissionResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The quote identifier was invalid.") }
+        do { return try await authStore.moderateQuote(id, status: try request.content.decode(QuoteModerationRequest.self).status) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.delete("v1", "quotes", ":id") { request async throws -> ConnectionRemovalResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The quote identifier was invalid.") }
+        do {
+            try await authStore.withdrawQuoteSubmission(id, accessToken: try request.accessToken())
+            return .init(removed: true)
+        } catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.post("v1", "sync") { request async throws -> SyncPushResponse in
+        do {
+            return try await authStore.pushSync(
+                request.content.decode(SyncPushRequest.self),
+                accessToken: try request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.get("v1", "sync") { request async throws -> SyncPullResponse in
+        do {
+            let query = try request.query.decode(SyncCursorQuery.self)
+            return try await authStore.pullSync(after: max(0, query.cursor ?? 0), accessToken: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "results") { request async throws -> ResultSubmissionResponse in
+        do {
+            let accessToken = try request.accessToken()
+            let submission = try request.content.decode(ResultSubmissionRequest.self)
+            return try await authStore.submitResult(
+                submission,
+                accessToken: accessToken
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        } catch is ResultStoreError {
+            throw Abort(.badRequest, reason: "The submitted result was outside Typebar's accepted bounds.")
+        }
+    }
+
+    app.get("v1", "leaderboards", "friends") { request async throws -> LeaderboardResponse in
+        do {
+            return try await authStore.friendLeaderboard(
+                request.query.decode(LeaderboardQuery.self),
+                accessToken: try request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        } catch is ResultStoreError {
+            throw Abort(.badRequest, reason: "The leaderboard filters were invalid.")
+        }
+    }
+
+    app.get("v1", "leaderboards") { request async throws -> LeaderboardResponse in
+        do {
+            return try await authStore.leaderboard(request.query.decode(LeaderboardQuery.self))
+        } catch is ResultStoreError {
+            throw Abort(.badRequest, reason: "The leaderboard filters were invalid.")
+        }
+    }
+
+    app.get("v1", "leaderboards", "experience") { _ async throws -> ExperienceLeaderboardResponse in
+        await authStore.experienceLeaderboard()
+    }
+
+    app.get("v1", "leaderboards", "experience", "friends") { request async throws -> ExperienceLeaderboardResponse in
+        do { return try await authStore.friendExperienceLeaderboard(accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+}
+
+public enum TypebarServerStorage {
+    public static func defaultUserStoreURL(for app: Application) -> URL {
+        let path = ProcessInfo.processInfo.environment["TYPEBAR_DATA_DIRECTORY"] ?? app.directory.workingDirectory + "typebar-server-data"
+        return URL(fileURLWithPath: path, isDirectory: true).appendingPathComponent("users.json")
+    }
+}
+
+public struct HealthResponse: Content, Equatable {
+    public let status: String
+    public let service: String
+    public let maintenanceMode: Bool
+
+    public init(status: String, service: String, maintenanceMode: Bool) {
+        self.status = status
+        self.service = service
+        self.maintenanceMode = maintenanceMode
+    }
+}
+
+public struct ServiceCapabilitiesResponse: Content, Equatable {
+    public let apiVersion: String
+    public let service: String
+    public let capabilities: [String: ServiceCapabilityStatus]
+
+    public init(apiVersion: String, service: String, capabilities: [String: ServiceCapabilityStatus]) {
+        self.apiVersion = apiVersion
+        self.service = service
+        self.capabilities = capabilities
+    }
+}
+
+public enum ServiceCapabilityStatus: String, Content, Equatable {
+    case available
+    case partial
+    case planned
+}
+
+private extension AuthStoreError {
+    var abort: Abort {
+        switch self {
+        case .invalidEmail, .invalidDisplayName, .weakPassword, .invalidQuoteSubmission, .cannotReportSelf, .invalidProfileReport, .invalidDirectMessage:
+            Abort(.badRequest, reason: "The request did not meet Typebar account requirements.")
+        case .emailAlreadyRegistered:
+            Abort(.conflict, reason: "An account already exists for this email address.")
+        case .invalidCredentials, .invalidAccessToken:
+            Abort(.unauthorized, reason: "Invalid email or password.")
+        case .profileNotFound:
+            Abort(.notFound, reason: "The requested Typebar profile does not exist.")
+        case .cannotConnectToSelf, .connectionNotPending:
+            Abort(.badRequest, reason: "The requested connection change was invalid.")
+        case .connectionAlreadyExists:
+            Abort(.conflict, reason: "A Typebar connection already exists for these users.")
+        case .connectionNotFound:
+            Abort(.notFound, reason: "The requested Typebar connection does not exist.")
+        case .notificationNotFound:
+            Abort(.notFound, reason: "The requested Typebar notification does not exist.")
+        case .reportAlreadySubmitted:
+            Abort(.conflict, reason: "A matching report has already been submitted by this account.")
+        case .invalidProfileSearch:
+            Abort(.badRequest, reason: "A public profile search requires 2 to 40 display-name characters.")
+        case .directMessageNotAllowed:
+            Abort(.forbidden, reason: "Direct messages are only available between accepted Typebar friends.")
+        }
+    }
+}
+
+private extension Request {
+    func accessToken() throws -> String {
+        guard let token = headers.bearerAuthorization?.token, !token.isEmpty else {
+            throw Abort(.unauthorized, reason: "A Typebar access token is required.")
+        }
+        return token
+    }
+}

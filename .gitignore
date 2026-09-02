@@ -1,0 +1,16 @@
+# SwiftPM build products and editor state
+.build/
+server/.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+
+# Locally packaged candidates and Finder metadata
+*.app/
+.DS_Store
+
+# Deployment-only secrets
+.env
+.env.*
+!.env.example

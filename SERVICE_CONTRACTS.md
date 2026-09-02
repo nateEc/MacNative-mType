@@ -1,0 +1,34 @@
+# 服务端契约 v1（草案）
+
+所有响应使用 JSON，认证使用 Typebar 发行的短期访问令牌；客户端不会发送原始密码以外的敏感本地数据。
+
+服务运行时会以 Typebar 自有固定窗口策略限制请求：注册/登录为每来源 10 次/分钟，成绩提交为每令牌 30 次/分钟，其余写操作为每令牌 60 次/分钟，读取接口为每键 180 次/分钟。拒绝响应为 `429`，含 `Retry-After` 和 `X-RateLimit-Remaining: 0`；计数只在进程内保存，重启后清空。部署者可设置 `TYPEBAR_MAINTENANCE_MODE=true`：健康检查和只读请求仍可访问，所有写请求统一得到 `503`、`Retry-After: 300`、`X-Typebar-Maintenance: true` 与提示本机离线练习可继续的 JSON reason。
+
+| 操作 | 方法与路径 | 核心请求 / 响应 |
+| --- | --- | --- |
+| 注册 | `POST /v1/auth/register` | 邮箱、密码、显示名 → 用户与会话（已实现服务端基础） |
+| 登录 | `POST /v1/auth/login` | 邮箱、密码 → 用户与会话（已实现服务端基础） |
+| 更新密码 | `POST /v1/auth/password` | Bearer 令牌、当前密码、新密码 → 新会话；验证当前密码、bcrypt 重哈希，并撤销该账户既有会话（已实现） |
+| 更新邮箱 | `POST /v1/auth/email` | Bearer 令牌、当前密码、新邮箱 → 新会话；验证当前密码、邮箱格式与唯一性，并撤销该账户既有会话（已实现） |
+| 删除账户 | `DELETE /v1/auth/account` | Bearer 令牌、当前密码 → `deleted: true`；永久清除该账户的会话、成绩、同步、好友关系、屏蔽、通知、投稿、社区评分及其私有引语举报，不影响客户端本地记录（已实现） |
+| 同步拉取 | `GET /v1/sync?cursor=` | → 变更列表、下一游标（已实现服务端基础） |
+| 同步推送 | `POST /v1/sync` | 带 UUID、版本和删除标记的变更 → 接受/冲突结果（已实现服务端基础） |
+| 提交结果 | `POST /v1/results` | 受 Bearer 令牌保护；保存具 UUID 的结果，基本范围/时间校验与重复提交幂等；响应包含服务端重算的本次 XP、总 XP 与可选本周 XP 名次（部分实现） |
+| 排行榜 | `GET /v1/leaderboards`、`GET /v1/leaderboards/friends` | 前者为公开全局结果榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者都可按模式、语言与 `all`/`day`/`week` 周期筛选；每位用户仅保留该筛选下的最佳一条成绩，按此成绩排名，最多返回 100 位用户（部分实现） |
+| XP 排行榜 | `GET /v1/leaderboards/experience`、`GET /v1/leaderboards/experience/friends` | 前者为公开全局 ISO 本周 XP 榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者最多返回 100 位用户，返回展示名、本周服务端计算 XP 与名次（部分实现） |
+| 资料 | `GET /v1/profiles?query=&limit=`、`GET /v1/profiles/{id}`、`GET/PATCH /v1/profiles/me` | 公开资料仅返回展示名、加入时间与聚合成绩；可按展示名搜索（2–40 字符，最多 50 项）；本人可读取/更新显示名及 `leaderboardOptedOut`。设为 `true` 会立即从全局和好友 WPM/XP 榜移除该账户，但不删除其服务端成绩、XP 或同步数据（部分实现） |
+| 好友 | `GET/POST /v1/connections`、`POST /v1/connections/{requesterID}/accept`、`DELETE /v1/connections/{userID}` | 受令牌保护的好友请求、接受、列表与解除关系（部分实现） |
+| 通知 | `GET /v1/notifications`、`POST /v1/notifications/{id}/read` | Bearer 令牌保护；仅返回当前账户的好友请求、接受与新私信事件及触发者公开资料，不携带私信正文，可单条标记已读（部分实现） |
+| 资料举报与审核 | `POST /v1/reports/profiles`、`GET /v1/moderation/profile-reports`、`PATCH /v1/moderation/profile-reports/{id}` | 投稿者提交受 Bearer 令牌保护；审核读写要求部署者显式配置的 `TYPEBAR_MODERATION_TOKEN` 与 `X-Typebar-Moderation-Key`。队列可按 `open`、`resolved` 或 `dismissed` 筛选，最多 100 条，只返回目标的公开资料、分类、说明、状态和时间，绝不返回举报者身份或邮箱；审核修改只更新举报状态，不通知或自动改变目标账户（部分实现） |
+| 引语举报 | `POST /v1/reports/quotes` | Bearer 令牌保护；仅可举报已批准且非本人投稿的社区引语，原因相同不可重复提交，说明最多 400 字。报告只进入私有待审核队列，不通知作者或自动下架（部分实现） |
+| 社区引语评分 | `PUT /v1/quotes/{id}/rating` | Bearer 令牌保护；仅可对已批准且非本人投稿设为 `-1`、`0` 或 `1`。`0` 撤销评分；公共引语列表仅返回聚合支持/不适合计数，带本人令牌时才附带本人的评分（部分实现） |
+| 私信 | `GET /v1/messages/{friendID}`、`POST /v1/messages`、`POST /v1/messages/{friendID}/read` | Bearer 令牌保护；仅双方已接受好友且未屏蔽时可读取、发送（1–1,000 字）和标记已读。屏蔽或账户删除会清除相关会话（部分实现） |
+| 引语投稿与审核 | `POST /v1/quotes`、`GET /v1/quotes/mine`、`GET /v1/quotes`、`GET /v1/moderation/quotes`、`PATCH /v1/moderation/quotes/{id}` | 投稿读取受 Bearer 令牌保护并以 `pending` 保存；公共查询可按语言、最多 100 条且只返回 `approved` 内容及聚合社区评分。两个审核端点都要求部署者显式配置的 `TYPEBAR_MODERATION_TOKEN` 与 `X-Typebar-Moderation-Key`；队列可按 `pending`、`approved` 或 `rejected` 筛选，最多 100 条，并返回引语及举报原因/说明但不返回举报者身份；审核修改可设为 `approved` 或 `rejected`（部分实现） |
+
+冲突规则：同一 UUID 使用单调版本和服务器时间；当前实现会拒绝未前进版本。不可自动合并的文本、主题和预设保留双方副本并标记冲突尚未实现。成绩接口会校验枚举、数值范围、完成时间窗口、输入量与错误数、准确率、raw/WPM 和起止耗时的相互一致性，并限制提交速率；尚未实现不可伪造的签名或完整事件回放，因此排行榜仍不应被视作可信竞赛成绩。
+
+当前认证限制：资料、同步、成绩提交、好友 WPM/XP 榜、通知、资料举报、引语投稿与账户删除均由各自路由校验 Bearer 令牌；密码或邮箱更新均要求当前密码并轮换会话令牌、撤销其他既有会话，邮箱更新还校验格式与唯一性；账户删除会永久删除服务端所有用户作用域数据。资料与引语审核队列仅供持有部署密钥的运维者读取，且不包含举报者身份；资料举报的审核只改变其私有处理状态，不会自动处置账户。原生客户端提供两类队列工作台，并且审核密钥只留在当前内存会话。通用认证中间件、密码重置、邮箱验证与细粒度审核员权限模型尚未实现。原生客户端仅在用户明确启用后提交完成成绩，并可浏览全局或好友 WPM/XP 榜。
+
+好友关系当前限制：只实现单向请求与双向接受后的好友关系；公开搜索仅按展示名匹配且不返回邮箱。已提供屏蔽与解除屏蔽（会移除双方关系、相关站内信并拒绝双方后续请求），以及仅展示本人和已接受好友成绩的好友榜。好友请求与接受会生成仅接收者可读取、可标记已读的站内通知；已接受好友可交换并标记已读私有站内信，但没有隐私设置或推送。原生客户端已提供搜索、请求/接受/取消/解除、屏蔽/解除屏蔽、好友榜、通知中心、好友会话、资料举报表单、社区引语举报表单及不落盘密钥的引语审核工作台。
+
+周期语义：`day` 按服务端当前日历日计算；`week` 与 XP 榜均按 ISO 周（周一开始）计算。Typebar XP 是独立设计：服务端根据验证后的成绩时长、准确率与模式计算，禅模式不产生 XP；它不是用户本地时区、每日重置时间或赛季系统的替代品。
