@@ -1904,6 +1904,24 @@ final class TypingEngineTests: XCTestCase {
       try JSONDecoder().decode(TestConfiguration.self, from: Data(legacy.utf8)).challengeID)
   }
 
+  func testRepeatedAttemptRestoresTheInitialPromptAndRepeatSource() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: 30, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .time)
+    var session = TypingSession(
+      configuration: configuration, prompt: "ember pilot ember pilot", repeatingPrompt: "ember pilot")
+    session.insert("ember pilot ember pilot", at: start)
+
+    var repeated = session.repeatedAttempt()
+    XCTAssertEqual(repeated.configuration, configuration)
+    XCTAssertEqual(repeated.prompt, "ember pilot ember pilot")
+    XCTAssertFalse(repeated.hasStarted)
+    XCTAssertEqual(repeated.outcome, .active)
+    repeated.insert("ember pilot ember pilot", at: start)
+    repeated.insert(" ", at: start.addingTimeInterval(1))
+    XCTAssertGreaterThan(repeated.prompt.count, "ember pilot ember pilot".count)
+  }
+
   func testWPMHistogramKeepsEmptyIntervalsBetweenSelectedResults() {
     let metrics = [
       ResultMetric(finishedAt: start, wpm: 11, accuracy: 95, typingSeconds: 30),

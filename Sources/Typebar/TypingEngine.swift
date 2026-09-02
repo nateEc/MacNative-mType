@@ -1255,6 +1255,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
 struct TypingSession {
   let configuration: TestConfiguration
   private(set) var prompt: String
+  private let initialPrompt: String
   private let repeatingPrompt: String?
   private let sectionEndIndices: [Int]
   private(set) var typed = ""
@@ -1272,8 +1273,18 @@ struct TypingSession {
   ) {
     self.configuration = configuration
     self.prompt = prompt
+    self.initialPrompt = prompt
     self.repeatingPrompt = repeatingPrompt
     self.sectionEndIndices = sectionEndIndices
+  }
+
+  /// Starts an equivalent fresh attempt without regenerating content. This is
+  /// intentionally based on the initial session prompt so timed custom text
+  /// retains its original repeat source instead of reusing a grown prompt.
+  func repeatedAttempt() -> TypingSession {
+    TypingSession(
+      configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
+      sectionEndIndices: sectionEndIndices)
   }
 
   var isFinished: Bool { outcome != .active }

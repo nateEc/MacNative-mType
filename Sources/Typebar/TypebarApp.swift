@@ -497,6 +497,7 @@ private struct ContentView: View {
         let savesResult = settings.saveCompletedResults
         let wordReviews = session.wordReviews
         let wordBursts = session.wordBurstHistory
+        let repeatedSession = session.repeatedAttempt()
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
           modelContext.insert(TestResultRecord(result: result))
         }
@@ -507,6 +508,7 @@ private struct ContentView: View {
           wordReviews: wordReviews,
           wordBursts: wordBursts,
           slowWordPractice: SlowWordPracticePlan.make(reviews: wordReviews, bursts: wordBursts),
+          repeatedSession: repeatedSession,
           challengeEvaluation: TypebarChallengeLibrary.challenge(
             id: result.configuration.challengeID
           ).map { ChallengeEvaluator.evaluate(result, challenge: $0) }
@@ -600,6 +602,10 @@ private struct ContentView: View {
         wordReviews: result.wordReviews,
         wordBursts: result.wordBursts,
         slowWordPractice: result.slowWordPractice,
+        onRepeat: {
+          completedResult = nil
+          startRepeatedAttempt(result.repeatedSession)
+        },
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
         onPracticeMissedWords: { startWordPractice(result.missedWords) },
@@ -1359,6 +1365,22 @@ private struct ContentView: View {
     requestTypingFocus()
   }
 
+  private func startRepeatedAttempt(_ repeatedSession: TypingSession) {
+    restartLockMessage = nil
+    compositionText = ""
+    lastTimeWarningSecond = nil
+    NativeSpeech.shared.stop()
+    session = repeatedSession
+    let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
+    activePaceTargetWpm = paceGuideTarget(
+      usingRepeatedPace: shouldUseRepeatedPace ? lastCompletedWpm : nil)
+    repeatedPaceArmed = false
+    if session.configuration.modifiers.contains(.listening) {
+      NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
+    }
+    requestTypingFocus()
+  }
+
   private func refreshPaceTarget() {
     activePaceTargetWpm = paceGuideTarget()
   }
@@ -1866,6 +1888,7 @@ private struct CompletedResultPresentation: Identifiable {
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
+  let repeatedSession: TypingSession
   let challengeEvaluation: ChallengeEvaluation?
   var id: UUID { result.id }
 }
@@ -1890,6 +1913,7 @@ private struct CompletedResultView: View {
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
+  let onRepeat: () -> Void
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onPracticeMissedWords: () -> Void
@@ -1965,27 +1989,35 @@ private struct CompletedResultView: View {
         ReplayTimelineView(prompt: result.prompt, events: result.replayEvents)
       }
 
-      HStack {
-        if savesResult {
-          Button("查看历史", action: onHistory)
+      VStack(alignment: .leading, spacing: 10) {
+        HStack {
+          if savesResult {
+            Button("查看历史", action: onHistory)
+          }
+          Menu("导出") {
+            Button("复制结果文字", action: copyResultText)
+            Button("复制结果图片", action: copyResultImage)
+            Divider()
+            Button("保存结果图片…", action: saveResultImage)
+          }
+          Spacer()
+          Button("重复本轮", action: onRepeat)
+          Button("再来一次", action: onRestart)
+            .buttonStyle(.borderedProminent)
         }
-        Menu("导出") {
-          Button("复制结果文字", action: copyResultText)
-          Button("复制结果图片", action: copyResultImage)
-          Divider()
-          Button("保存结果图片…", action: saveResultImage)
-        }
-        Spacer()
-        if !missedWords.isEmpty {
-          Button("练习错词（\(missedWords.count)）", action: onPracticeMissedWords)
-        }
-        if let slowWordPractice {
-          Button("练习慢词（\(slowWordPractice.selectedWords.count)）") {
-            onPracticeSlowWords(slowWordPractice.exerciseWords)
+        if !missedWords.isEmpty || slowWordPractice != nil {
+          HStack {
+            if !missedWords.isEmpty {
+              Button("练习错词（\(missedWords.count)）", action: onPracticeMissedWords)
+            }
+            if let slowWordPractice {
+              Button("练习慢词（\(slowWordPractice.selectedWords.count)）") {
+                onPracticeSlowWords(slowWordPractice.exerciseWords)
+              }
+            }
+            Spacer()
           }
         }
-        Button("再来一次", action: onRestart)
-          .buttonStyle(.borderedProminent)
       }
     }
     .padding(32)
