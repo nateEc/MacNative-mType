@@ -1664,6 +1664,25 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice"))
   }
 
+  @MainActor
+  func testRestoreDefaultsResetsPersistedSettings() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.difficulty = .master
+    settings.installedPracticeFontName = NativePracticeFont.fallbackPostScriptName
+    settings.theme = .midnight
+    settings.customBackgroundURL = "https://images.example.test/harbour.jpeg"
+    settings.showTypingCompanion = true
+    settings.commandPaletteListMode = .grouped
+    settings.restoreDefaults()
+
+    XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
+    XCTAssertEqual(AppSettings(defaults: defaults).snapshot, AppSettingsSnapshot())
+  }
+
   func testSettingsSearchMatchesEveryWhitespaceSeparatedTokenAcrossLocalizedTerms() {
     XCTAssertTrue(
       SettingsSearch.matches(query: "KEYBOARD layout", terms: ["键盘布局", "Keyboard Layout", "下一键"]))

@@ -1410,6 +1410,10 @@ final class AppSettings {
   }
 
   func restoreDefaults() {
+    if TypebarLocalBackgroundStore.hasImage {
+      try? TypebarLocalBackgroundStore.remove()
+      localBackgroundRevision &+= 1
+    }
     difficulty = .normal
     strictSpace = false
     stopOnError = false

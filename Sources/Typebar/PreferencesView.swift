@@ -17,6 +17,7 @@ struct PreferencesView: View {
   @State private var confirmedNewPassword = ""
   @State private var accountDeletionPassword = ""
   @State private var showingAccountDeletionConfirmation = false
+  @State private var showingRestoreDefaultsConfirmation = false
   @State private var submittedQuoteText = ""
   @State private var submittedQuoteAttribution = ""
   @State private var submittedQuoteLanguage: TypingLanguage = .english
@@ -1024,7 +1025,9 @@ struct PreferencesView: View {
 
       if defaultsSectionVisible {
         Section {
-          Button("恢复默认设置", role: .destructive) { settings.restoreDefaults() }
+          Button("恢复默认设置", role: .destructive) {
+            showingRestoreDefaultsConfirmation = true
+          }
         }
       }
 
@@ -1036,6 +1039,13 @@ struct PreferencesView: View {
       }
     }
     .formStyle(.grouped)
+    .confirmationDialog(
+      "恢复默认设置？", isPresented: $showingRestoreDefaultsConfirmation, titleVisibility: .visible
+    ) {
+      Button("恢复默认", role: .destructive) { settings.restoreDefaults() }
+    } message: {
+      Text("练习与外观设置将恢复默认，本地背景图片会移除；本地字体文件和练习历史会保留。")
+    }
     .confirmationDialog(
       "删除此自建账户？", isPresented: $showingAccountDeletionConfirmation, titleVisibility: .visible
     ) {
