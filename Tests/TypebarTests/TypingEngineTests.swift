@@ -1936,6 +1936,13 @@ final class TypingEngineTests: XCTestCase {
     )
     XCTAssertEqual(
       TypingAttentionPolicy.warnings(
+        isInputFocused: false, focusWarningDelayElapsed: false,
+        capsLockEnabled: true, language: .english, isFinished: false,
+        showFocusWarning: true, showCapsLockWarning: true),
+      [.capsLockEnabled]
+    )
+    XCTAssertEqual(
+      TypingAttentionPolicy.warnings(
         isInputFocused: true, capsLockEnabled: true, language: .simplifiedChinese,
         isFinished: false, showFocusWarning: true, showCapsLockWarning: true),
       []

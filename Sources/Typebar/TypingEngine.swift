@@ -1306,6 +1306,7 @@ enum TypingAttentionWarning: Equatable {
 enum TypingAttentionPolicy {
   static func warnings(
     isInputFocused: Bool,
+    focusWarningDelayElapsed: Bool = true,
     capsLockEnabled: Bool,
     language: TypingLanguage,
     isFinished: Bool,
@@ -1314,7 +1315,9 @@ enum TypingAttentionPolicy {
   ) -> [TypingAttentionWarning] {
     guard !isFinished else { return [] }
     var warnings: [TypingAttentionWarning] = []
-    if showFocusWarning, !isInputFocused { warnings.append(.inputUnfocused) }
+    if showFocusWarning, !isInputFocused, focusWarningDelayElapsed {
+      warnings.append(.inputUnfocused)
+    }
     if showCapsLockWarning, capsLockEnabled, language != .simplifiedChinese {
       warnings.append(.capsLockEnabled)
     }

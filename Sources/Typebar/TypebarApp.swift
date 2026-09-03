@@ -478,6 +478,8 @@ private struct ContentView: View {
   @State private var activeChallengeID: String?
   @State private var focusRequest = 0
   @State private var inputHasFocus = false
+  @State private var focusWarningDelayElapsed = false
+  @State private var focusWarningSequence = 0
   @State private var capsLockEnabled = false
   @State private var lastTimeWarningSecond: Int?
   @State private var restartLockMessage: String?
@@ -1118,7 +1120,7 @@ private struct ContentView: View {
           session.bailOut()
         },
         onFinishZen: { session.finishZen() },
-        onFocusChanged: { inputHasFocus = $0 },
+        onFocusChanged: handleTypingFocusChange,
         onCompositionChanged: { compositionText = $0 },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 }
       )
@@ -1509,6 +1511,7 @@ private struct ContentView: View {
   private var attentionWarnings: [TypingAttentionWarning] {
     TypingAttentionPolicy.warnings(
       isInputFocused: inputHasFocus,
+      focusWarningDelayElapsed: focusWarningDelayElapsed,
       capsLockEnabled: capsLockEnabled,
       language: language,
       isFinished: session.isFinished,
@@ -1660,6 +1663,23 @@ private struct ContentView: View {
     case .escape: return "Esc / ⌘R"
     case .tab: return "Tab / ⌘R"
     case .enter: return "Enter / ⌘R"
+    }
+  }
+
+  private func handleTypingFocusChange(_ hasFocus: Bool) {
+    inputHasFocus = hasFocus
+    focusWarningSequence &+= 1
+    guard !hasFocus else {
+      focusWarningDelayElapsed = false
+      return
+    }
+
+    focusWarningDelayElapsed = false
+    let sequence = focusWarningSequence
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 1_000_000_000)
+      guard !inputHasFocus, focusWarningSequence == sequence else { return }
+      focusWarningDelayElapsed = true
     }
   }
 
