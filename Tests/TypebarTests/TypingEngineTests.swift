@@ -587,13 +587,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.accuracy, 50)
   }
 
-  func testStrictSpaceRejectsPrematureSpace() {
-    var rules = InputRules()
-    rules.strictSpace = true
-    var session = TypingSession(
-      configuration: .timed(seconds: 30, rules: rules), prompt: "amber harbor")
-    session.insert("am ", at: start)
-    XCTAssertEqual(session.typed, "am")
+  func testReferenceSpaceNormalizationAndLeadingSeparatorRules() {
+    var normal = TypingSession(
+      configuration: .timed(seconds: 30), prompt: "amber harbor")
+    normal.insert("\u{3000}", at: start)
+    XCTAssertEqual(normal.typed, "")
+    XCTAssertEqual(normal.errors, 0)
+    normal.insert("amber\u{3000}harbor", at: start)
+    XCTAssertEqual(normal.typed, "amber harbor")
+    XCTAssertEqual(normal.errors, 0)
+
+    let strictRules = InputRules(strictSpace: true)
+    var strict = TypingSession(
+      configuration: .timed(seconds: 30, rules: strictRules), prompt: "amber harbor")
+    strict.insert("\u{3000}", at: start)
+    XCTAssertEqual(strict.typed, " ")
+    XCTAssertEqual(strict.errors, 1)
+
+    var expert = TypingSession(
+      configuration: .timed(seconds: 30, difficulty: .expert), prompt: "amber harbor")
+    expert.insert(" ", at: start)
+    XCTAssertEqual(expert.typed, " ")
+    XCTAssertEqual(expert.outcome, .active)
   }
 
   func testStatsUseCorrectCharactersAndFixedClock() {

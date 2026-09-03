@@ -1833,10 +1833,17 @@ struct TypingSession {
     if configuration.mode == .zen {
       return insertZenCharacter(character, at: date)
     }
+    // The reference input accepts several platform space characters as the
+    // regular word separator, but no-space rejects every one of them before
+    // it can reach validation or result statistics.
+    if configuration.modifiers.contains(.noSpaces), isReferenceInputSpace(character) {
+      return false
+    }
+    let inputCharacter = normalizedInputCharacter(character)
     extendPromptIfNeeded()
     if typed.count >= prompt.count {
       if !configuration.rules.hideExtraLetters {
-        typed.append(character)
+        typed.append(inputCharacter)
         typedCharacterDates.append(date)
         recordWordBurstIfCommitted()
         recordNoSpaceWordBurstIfCommitted()
@@ -1844,26 +1851,28 @@ struct TypingSession {
       }
       return false
     }
-    // Monkeytype rejects direct space input while no-space is active, even
-    // when the selected input rules would otherwise accept an incorrect key.
-    // Keep Return distinct: custom prompts can intentionally contain it.
-    if isNoSpaceInputWhitespace(character) { return false }
+    // In normal difficulty, a leading separator is ignored unless the user
+    // explicitly enables strict space or a hard delete rule needs the key to
+    // reach its own recovery path. Other difficulties keep the key as a
+    // correctable input error instead of silently skipping it.
+    if inputCharacter == " " && typed.isEmpty && shouldRejectLeadingSeparator {
+      return false
+    }
     let expected = Array(prompt)[typed.count]
-    let isCorrect = character == expected && !forceError
+    let isCorrect = inputCharacter == expected && !forceError
     if !isCorrect { attemptedErrorCounts[typed.count, default: 0] += 1 }
     let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
-      with: character, forceError: forceError)
+      with: inputCharacter, forceError: forceError)
     if configuration.modifiers.contains(.correctBeforeAdvance),
       configuration.language.usesSpaceDelimitedWords,
-      ((character == " " && !configuration.modifiers.contains(.noSpaces) && !currentWordIsCorrect)
+      ((inputCharacter == " " && !configuration.modifiers.contains(.noSpaces) && !currentWordIsCorrect)
         || blocksNoSpaceWordAdvance)
     {
       return false
     }
-    if character == " " && configuration.rules.strictSpace && expected != " " { return false }
     if configuration.rules.stopOnErrorMode == .word,
       configuration.language.usesSpaceDelimitedWords,
-      ((character == " " && !configuration.modifiers.contains(.noSpaces) && !currentWordIsCorrect)
+      ((inputCharacter == " " && !configuration.modifiers.contains(.noSpaces) && !currentWordIsCorrect)
         || blocksNoSpaceWordAdvance)
     {
       return false
@@ -1879,7 +1888,7 @@ struct TypingSession {
       clearCurrentWord(at: date)
       return false
     }
-    typed.append(character)
+    typed.append(inputCharacter)
     typedCharacterDates.append(date)
     if forceError { forcedErrorIndices.insert(typed.count - 1) }
     recordWordBurstIfCommitted()
@@ -1888,10 +1897,10 @@ struct TypingSession {
     if configuration.difficulty == .master && !isCorrect {
       fail(at: date)
     } else if configuration.difficulty == .expert
-      && ((character == " " && errorsInCurrentWord() > 0) || committedNoSpaceWordHasError)
+      && ((inputCharacter == " " && errorsInCurrentWord() > 0) || committedNoSpaceWordHasError)
     {
       fail(at: date)
-    } else if shouldFailMinimumWordBurst(after: character) {
+    } else if shouldFailMinimumWordBurst(after: inputCharacter) {
       fail(at: date)
     }
     return true
@@ -2123,12 +2132,23 @@ struct TypingSession {
     return noSpaceWordEndIndices.firstIndex(of: typed.count + 1)
   }
 
-  private func isNoSpaceInputWhitespace(_ character: Character) -> Bool {
-    guard configuration.modifiers.contains(.noSpaces) else { return false }
+  /// Mirrors the reference product's explicit space set. Keep Return outside
+  /// this group because custom prompts and Zen use it as a real newline.
+  private func isReferenceInputSpace(_ character: Character) -> Bool {
     return [
       " ", "\u{2002}", "\u{2003}", "\u{2009}", "\u{3000}", "\u{00A0}", "\u{1680}", "\u{202F}",
       "\u{FEFF}", "\u{2007}", "\u{2008}", "\u{2004}", "\u{200A}", "\u{200B}",
     ].contains(character)
+  }
+
+  private func normalizedInputCharacter(_ character: Character) -> Character {
+    isReferenceInputSpace(character) ? " " : character
+  }
+
+  private var shouldRejectLeadingSeparator: Bool {
+    configuration.difficulty == .normal
+      && !configuration.rules.strictSpace
+      && !configuration.rules.deleteOnErrorMode.returnsToPreviousWordAtStart
   }
 
   private func shouldBlockNoSpaceWordAdvance(with character: Character, forceError: Bool) -> Bool {
