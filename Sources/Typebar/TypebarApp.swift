@@ -453,6 +453,7 @@ private struct ContentView: View {
   @State private var completedResult: CompletedResultPresentation?
   @State private var publicationMessage: String?
   @State private var terminalNotice: TestTerminalNotice?
+  @State private var bailoutConfirmationMessage: String?
   @State private var showingSync = false
   @State private var showingConnections = false
   @State private var showingNotifications = false
@@ -519,11 +520,11 @@ private struct ContentView: View {
     }
     .onChange(of: session.outcome) { _, outcome in
       switch outcome {
-      case .completed:
+      case .completed, .bailedOut:
         guard let result = session.result() else { return }
         lastCompletedWpm = result.wpm
         repeatedPaceArmed = settings.repeatedPace
-        let savesResult = settings.saveCompletedResults
+        let savesResult = result.outcome == .completed && settings.saveCompletedResults
         let wordReviews = session.wordReviews
         let wordBursts = session.wordBurstHistory
         let missedWordPractice = MissedWordPracticePlan.make(errorCounts: session.missedWordErrorCounts)
@@ -531,7 +532,9 @@ private struct ContentView: View {
         let contextualMissedPractice = ContextualMissedWordPracticePlan.make(
           reviews: wordReviews, errorCounts: session.missedWordErrorCountsByWord)
         let repeatedSession = session.repeatedAttempt()
-        currentProcessPractice.append(.init(result: result))
+        if result.outcome == .completed {
+          currentProcessPractice.append(.init(result: result))
+        }
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
           modelContext.insert(TestResultRecord(result: result))
         }
@@ -550,12 +553,16 @@ private struct ContentView: View {
           contextualMissedPractice: contextualMissedPractice,
           todayPractice: todayPracticeSummary,
           repeatedSession: repeatedSession,
-          challengeEvaluation: TypebarChallengeLibrary.challenge(
-            id: result.configuration.challengeID
-          ).map { ChallengeEvaluator.evaluate(result, challenge: $0) }
+          challengeEvaluation: result.outcome == .completed
+            ? TypebarChallengeLibrary.challenge(
+              id: result.configuration.challengeID
+            ).map { ChallengeEvaluator.evaluate(result, challenge: $0) }
+            : nil
         )
         if savesResult {
           publishIfEnabled(result)
+        } else if result.outcome == .bailedOut {
+          publicationMessage = "本次已中止：结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
         } else {
           publicationMessage = "练习模式：本次成绩不会保存、本机统计、同步或发布。"
         }
@@ -1009,6 +1016,8 @@ private struct ContentView: View {
           for: session.configuration) && settings.quickRestartKey != .enter,
         disablesQuickRestart: QuickRestartSafetyPolicy.requiresShift(
           for: session.configuration) && settings.quickRestartKey == .enter,
+        enablesLongTestBailout: QuickRestartSafetyPolicy.requiresShift(
+          for: session.configuration),
         finishesOnShiftEnter: session.configuration.mode == .zen,
         onInsert: { text, forceError in
           let errorsBefore = session.errors
@@ -1026,6 +1035,11 @@ private struct ContentView: View {
         onDelete: { session.deleteBackward() },
         onDeleteWord: { session.deleteWordBackward() },
         onRestart: attemptRestart,
+        onBailoutArmed: armLongTestBailout,
+        onBailout: {
+          bailoutConfirmationMessage = nil
+          session.bailOut()
+        },
         onFinishZen: { session.finishZen() },
         onFocusChanged: { inputHasFocus = $0 },
         onCompositionChanged: { compositionText = $0 }
@@ -1408,7 +1422,12 @@ private struct ContentView: View {
       .help("使用 macOS 本机语音朗读当前提示，不发送文本到网络")
     }
     .overlay(alignment: .bottomLeading) {
-      if let restartLockMessage {
+      if let bailoutConfirmationMessage {
+        Label(bailoutConfirmationMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
+      } else if let restartLockMessage {
         Label(restartLockMessage, systemImage: "lock.fill")
           .font(.caption)
           .foregroundStyle(.orange)
@@ -1426,16 +1445,26 @@ private struct ContentView: View {
   }
 
   private var restartInstruction: String {
+    if QuickRestartSafetyPolicy.requiresShift(for: session.configuration) {
+      let bailout = "双击 Shift+Enter 中止并显示结果"
+      switch settings.quickRestartKey {
+      case .escape: return "按任意键开始，Shift+Esc 可重新开始；\(bailout)"
+      case .tab: return "按任意键开始，Shift+Tab 可重新开始；\(bailout)"
+      case .enter: return "按任意键开始，⌘R 可重开；\(bailout)"
+      case .off: return "按任意键开始，可用 ⌘R 重开；\(bailout)"
+      }
+    }
     switch settings.quickRestartKey {
-    case .off: "按任意键开始，可使用 ⌘R 重新开始"
-    case .escape: "按任意键开始，Esc 可重新开始"
-    case .tab: "按任意键开始，Tab 可重新开始"
-    case .enter: "按任意键开始，Enter 可重新开始"
+    case .off: return "按任意键开始，可使用 ⌘R 重新开始"
+    case .escape: return "按任意键开始，Esc 可重新开始"
+    case .tab: return "按任意键开始，Tab 可重新开始"
+    case .enter: return "按任意键开始，Enter 可重新开始"
     }
   }
 
   private func reset(restarting: Bool = false) {
     restartLockMessage = nil
+    bailoutConfirmationMessage = nil
     compositionText = ""
     lastTimeWarningSecond = nil
     NativeSpeech.shared.stop()
@@ -1460,6 +1489,16 @@ private struct ContentView: View {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
     requestTypingFocus()
+  }
+
+  private func armLongTestBailout() {
+    let message = "再次在 0.2 秒内按 Shift+Enter，可中止并显示未保存结果。"
+    bailoutConfirmationMessage = message
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 5_000_000_000)
+      guard bailoutConfirmationMessage == message else { return }
+      bailoutConfirmationMessage = nil
+    }
   }
 
   private func startRepeatedAttempt(_ repeatedSession: TypingSession) {
@@ -1999,6 +2038,7 @@ extension TestOutcome {
       savesResult ? "本次完成 · 已保存到本机" : "本次完成 · 未保存为完成成绩"
     case .failed: "本次失败 · 未保存为完成成绩"
     case .abandoned: "本次已放弃 · 未保存为完成成绩"
+    case .bailedOut: "本次已中止 · 未保存为完成成绩"
     }
   }
 }
@@ -2058,8 +2098,12 @@ private struct CompletedResultView: View {
   var body: some View {
     VStack(spacing: 28) {
       VStack(spacing: 6) {
-        Text("完成").font(.title2.weight(.semibold))
-        Text(savesResult ? "已保存到这台 Mac" : "练习模式：不保存成绩")
+        Text(result.outcome == .bailedOut ? "已中止" : "完成")
+          .font(.title2.weight(.semibold))
+        Text(
+          result.outcome == .bailedOut
+            ? "中止结果只在当前窗口显示，不保存成绩"
+            : savesResult ? "已保存到这台 Mac" : "练习模式：不保存成绩")
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }

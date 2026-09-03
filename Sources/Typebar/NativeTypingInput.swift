@@ -11,11 +11,14 @@ struct NativeTypingInput: NSViewRepresentable {
     var acceptsTabInput: Bool
     var requiresShiftQuickRestart: Bool
     var disablesQuickRestart: Bool
+    var enablesLongTestBailout: Bool
     var finishesOnShiftEnter: Bool
     let onInsert: (String, Bool) -> Void
     let onDelete: () -> Void
     let onDeleteWord: () -> Void
     let onRestart: () -> Void
+    let onBailoutArmed: () -> Void
+    let onBailout: () -> Void
     let onFinishZen: () -> Void
     let onFocusChanged: (Bool) -> Void
     let onCompositionChanged: (String) -> Void
@@ -43,12 +46,16 @@ struct NativeTypingInput: NSViewRepresentable {
         view.acceptsTabInput = acceptsTabInput
         view.requiresShiftQuickRestart = requiresShiftQuickRestart
         view.disablesQuickRestart = disablesQuickRestart
+        view.enablesLongTestBailout = enablesLongTestBailout
         view.finishesOnShiftEnter = finishesOnShiftEnter
+        view.onBailoutArmed = onBailoutArmed
+        view.onBailout = onBailout
         view.onFinishZen = onFinishZen
         view.onFocusChanged = onFocusChanged
         view.onCompositionChanged = onCompositionChanged
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
         context.coordinator.appliedFocusRequest = focusRequest
+        view.resetBailoutAttempt()
         DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
     }
 }
@@ -58,6 +65,8 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onDelete: () -> Void = {}
     var onDeleteWord: () -> Void = {}
     var onRestart: () -> Void = {}
+    var onBailoutArmed: () -> Void = {}
+    var onBailout: () -> Void = {}
     var quickRestartKey: QuickRestartKey = .escape
     var keyboardLayout: KeyboardLayout = .ansiQwerty
     var oppositeShiftMode: OppositeShiftMode = .off
@@ -66,6 +75,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var acceptsTabInput = false
     var requiresShiftQuickRestart = false
     var disablesQuickRestart = false
+    var enablesLongTestBailout = false
     var finishesOnShiftEnter = false
     var onFinishZen: () -> Void = {}
     var onFocusChanged: (Bool) -> Void = { _ in }
@@ -75,6 +85,8 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     private var leftShiftPressed = false
     private var rightShiftPressed = false
     private var pendingForcedError = false
+    private var lastBailoutAttempt: Date?
+    var bailoutClock: () -> Date = { .now }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -114,6 +126,12 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     override func keyDown(with event: NSEvent) {
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {
             onRestart()
+            return
+        }
+        if enablesLongTestBailout,
+           event.modifierFlags.contains(.shift),
+           event.charactersIgnoringModifiers == "\r" || event.charactersIgnoringModifiers == "\n" {
+            handleLongTestBailout()
             return
         }
         if acceptsNewlineInput,
@@ -171,6 +189,23 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         }
         pendingForcedError = forcesError
         interpretKeyEvents([event])
+    }
+
+    func resetBailoutAttempt() {
+        lastBailoutAttempt = nil
+    }
+
+    private func handleLongTestBailout() {
+        let now = bailoutClock()
+        guard let previous = lastBailoutAttempt,
+              now.timeIntervalSince(previous) <= 0.2
+        else {
+            lastBailoutAttempt = now
+            onBailoutArmed()
+            return
+        }
+        lastBailoutAttempt = nil
+        onBailout()
     }
 
     override func doCommand(by selector: Selector) {

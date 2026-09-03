@@ -1119,6 +1119,7 @@ enum TestOutcome: String, Codable, Equatable {
   case completed
   case failed
   case abandoned
+  case bailedOut
 }
 
 enum TypingPromptCharacterState: Equatable {
@@ -1989,6 +1990,16 @@ struct TypingSession {
   mutating func abandon(at date: Date = .now) {
     guard !isFinished, startedAt != nil else { return }
     outcome = .abandoned
+    finishedAt = date
+  }
+
+  /// Ends a long test through the same result path as the reference's
+  /// double Shift+Enter bailout. It is deliberately distinct from a manual
+  /// abandonment: callers can present its local result, while persistence
+  /// and publication policies continue to reject it.
+  mutating func bailOut(at date: Date = .now) {
+    guard !isFinished, startedAt != nil else { return }
+    outcome = .bailedOut
     finishedAt = date
   }
 

@@ -156,6 +156,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.result(at: start.addingTimeInterval(4))?.outcome, .abandoned)
   }
 
+  func testBailoutProducesAnUnsavedResultAfterTypingStarts() throws {
+    var session = TypingSession(configuration: .timed(seconds: 900), prompt: "amber harbor")
+    session.insert("amber", at: start)
+    session.bailOut(at: start.addingTimeInterval(4))
+
+    let result = try XCTUnwrap(session.result(at: start.addingTimeInterval(4)))
+    XCTAssertEqual(session.outcome, .bailedOut)
+    XCTAssertEqual(result.outcome, .bailedOut)
+    XCTAssertEqual(result.typedCharacterCount, 5)
+    XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: true))
+  }
+
   func testMasterFailsOnFirstMistake() {
     var session = TypingSession(
       configuration: .timed(seconds: 30, difficulty: .master), prompt: "amber")
@@ -1336,11 +1348,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .completed, enabled: false))
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .failed, enabled: true))
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .abandoned, enabled: true))
+    XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .bailedOut, enabled: true))
   }
 
   func testCompletedStatusTextReflectsWhetherResultWasSaved() {
     XCTAssertEqual(TestOutcome.completed.statusText(savesResult: true), "本次完成 · 已保存到本机")
     XCTAssertEqual(TestOutcome.completed.statusText(savesResult: false), "本次完成 · 未保存为完成成绩")
+    XCTAssertEqual(TestOutcome.bailedOut.statusText(savesResult: true), "本次已中止 · 未保存为完成成绩")
   }
 
   func testCompletedSessionCreatesPortableResult() throws {
@@ -1956,12 +1970,19 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testNativeInputBridgeDisablesEnterQuickRestartForLongTests() throws {
+  func testNativeInputBridgeUsesDoubleShiftEnterToBailOutOfLongTests() throws {
     var restarts = 0
+    var armedBailouts = 0
+    var bailouts = 0
+    var now = start
     let view = TypingInputView()
     view.quickRestartKey = .enter
     view.disablesQuickRestart = true
+    view.enablesLongTestBailout = true
+    view.bailoutClock = { now }
     view.onRestart = { restarts += 1 }
+    view.onBailoutArmed = { armedBailouts += 1 }
+    view.onBailout = { bailouts += 1 }
     let enter = try XCTUnwrap(
       NSEvent.keyEvent(
         with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
@@ -1975,7 +1996,16 @@ final class TypingEngineTests: XCTestCase {
 
     view.keyDown(with: enter)
     view.keyDown(with: shiftEnter)
+    now = start.addingTimeInterval(0.1)
+    view.keyDown(with: shiftEnter)
     XCTAssertEqual(restarts, 0)
+    XCTAssertEqual(armedBailouts, 1)
+    XCTAssertEqual(bailouts, 1)
+
+    now = start.addingTimeInterval(0.4)
+    view.keyDown(with: shiftEnter)
+    XCTAssertEqual(armedBailouts, 2)
+    XCTAssertEqual(bailouts, 1)
   }
 
   func testZipfFrequencyModifierUsesRankWeightedTypebarLexicon() {
