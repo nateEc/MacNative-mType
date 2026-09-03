@@ -207,6 +207,33 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.typed, "amber ")
   }
 
+  func testNoSpaceRejectsDirectWhitespaceWithoutRecordingAnError() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      modifiers: [.noSpaces])
+    var session = TestSessionFactory.make(configuration: configuration, customText: "amber harbor")
+
+    session.insert("am \u{3000}", at: start)
+
+    XCTAssertEqual(session.typed, "am")
+    XCTAssertEqual(session.errors, 0)
+  }
+
+  func testNoSpaceStopOnErrorWordBlocksIncorrectWordBoundaryUntilCorrected() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(stopOnErrorMode: .word), modifiers: [.noSpaces])
+    var session = TestSessionFactory.make(configuration: configuration, customText: "amber harbor")
+
+    session.insert("amxer", at: start)
+    XCTAssertEqual(session.typed, "amxe")
+
+    session.deleteBackward(at: start.addingTimeInterval(1))
+    session.deleteBackward(at: start.addingTimeInterval(1))
+    session.insert("ber", at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.typed, "amber")
+  }
+
   func testDeleteOnErrorLetterCostsOneAcceptedCharacter() {
     let rules = InputRules(deleteOnErrorMode: .letter)
     var session = TypingSession(
@@ -1702,6 +1729,18 @@ final class TypingEngineTests: XCTestCase {
     lazySession.deleteBackward(at: start)
     lazySession.insert("ber ", at: start)
     XCTAssertEqual(lazySession.typed, "amber ")
+
+    let noSpaceLazyConfiguration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      modifiers: [.noSpaces, .correctBeforeAdvance])
+    var noSpaceLazySession = TestSessionFactory.make(
+      configuration: noSpaceLazyConfiguration, customText: "amber bay")
+    noSpaceLazySession.insert("amxer", at: start)
+    XCTAssertEqual(noSpaceLazySession.typed, "amxe")
+    noSpaceLazySession.deleteBackward(at: start)
+    noSpaceLazySession.deleteBackward(at: start)
+    noSpaceLazySession.insert("ber", at: start)
+    XCTAssertEqual(noSpaceLazySession.typed, "amber")
   }
 
   func testRandomCaseModifierChangesOnlyAsciiLetterCaseAndConflictsWithOtherCaseModes() {

@@ -1844,19 +1844,27 @@ struct TypingSession {
       }
       return false
     }
+    // Monkeytype rejects direct space input while no-space is active, even
+    // when the selected input rules would otherwise accept an incorrect key.
+    // Keep Return distinct: custom prompts can intentionally contain it.
+    if isNoSpaceInputWhitespace(character) { return false }
     let expected = Array(prompt)[typed.count]
     let isCorrect = character == expected && !forceError
     if !isCorrect { attemptedErrorCounts[typed.count, default: 0] += 1 }
-    if character == " ", configuration.modifiers.contains(.correctBeforeAdvance),
-      configuration.language.usesSpaceDelimitedWords, !configuration.modifiers.contains(.noSpaces),
-      !currentWordIsCorrect
+    let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
+      with: character, forceError: forceError)
+    if configuration.modifiers.contains(.correctBeforeAdvance),
+      configuration.language.usesSpaceDelimitedWords,
+      ((character == " " && !configuration.modifiers.contains(.noSpaces) && !currentWordIsCorrect)
+        || blocksNoSpaceWordAdvance)
     {
       return false
     }
     if character == " " && configuration.rules.strictSpace && expected != " " { return false }
-    if character == " ", configuration.rules.stopOnErrorMode == .word,
-      configuration.language.usesSpaceDelimitedWords, !configuration.modifiers.contains(.noSpaces),
-      !currentWordIsCorrect
+    if configuration.rules.stopOnErrorMode == .word,
+      configuration.language.usesSpaceDelimitedWords,
+      ((character == " " && !configuration.modifiers.contains(.noSpaces) && !currentWordIsCorrect)
+        || blocksNoSpaceWordAdvance)
     {
       return false
     }
@@ -2108,13 +2116,52 @@ struct TypingSession {
     return noSpaceWordEndIndices.firstIndex(of: typed.count)
   }
 
+  /// No-space keeps a hidden word boundary after every source word. The final
+  /// visible character is therefore the equivalent of an entered separator.
+  private var nextNoSpaceCommittedWordIndex: Int? {
+    guard tracksNoSpaceWordBursts else { return nil }
+    return noSpaceWordEndIndices.firstIndex(of: typed.count + 1)
+  }
+
+  private func isNoSpaceInputWhitespace(_ character: Character) -> Bool {
+    guard configuration.modifiers.contains(.noSpaces) else { return false }
+    return [
+      " ", "\u{2002}", "\u{2003}", "\u{2009}", "\u{3000}", "\u{00A0}", "\u{1680}", "\u{202F}",
+      "\u{FEFF}", "\u{2007}", "\u{2008}", "\u{2004}", "\u{200A}", "\u{200B}",
+    ].contains(character)
+  }
+
+  private func shouldBlockNoSpaceWordAdvance(with character: Character, forceError: Bool) -> Bool {
+    guard configuration.modifiers.contains(.noSpaces),
+      let wordIndex = nextNoSpaceCommittedWordIndex,
+      let range = noSpaceWordRange(for: wordIndex)
+    else { return false }
+
+    let promptCharacters = Array(prompt)
+    guard typed.count == range.upperBound - 1, range.upperBound <= promptCharacters.count else { return false }
+    return range.contains { index in
+      if index == typed.count {
+        return character != promptCharacters[index] || forceError
+      }
+      return !isTypedCharacterCorrect(at: index)
+    }
+  }
+
+  private func noSpaceWordRange(for wordIndex: Int) -> Range<Int>? {
+    guard noSpaceWordEndIndices.indices.contains(wordIndex) else { return nil }
+    let start = wordIndex == 0 ? 0 : noSpaceWordEndIndices[wordIndex - 1]
+    let end = noSpaceWordEndIndices[wordIndex]
+    guard start < end else { return nil }
+    return start..<end
+  }
+
   /// Expert difficulty evaluates a no-space word on its final visible
   /// character, the same logical point at which the reference product moves
   /// to its next retained word. Use the accepted text and forced physical
   /// input errors rather than historical attempts: a corrected word is valid.
   private var committedNoSpaceWordHasError: Bool {
     guard let wordIndex = noSpaceCommittedWordIndex,
-      let range = targetRange(forWord: wordIndex)
+      let range = noSpaceWordRange(for: wordIndex)
     else { return false }
     return range.contains { !isTypedCharacterCorrect(at: $0) }
   }
