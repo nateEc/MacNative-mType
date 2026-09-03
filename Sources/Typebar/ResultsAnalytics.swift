@@ -1094,6 +1094,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     var tag: String?
     var tagFilter: ResultHistoryTagFilter?
     var difficulty: Difficulty?
+    var difficulties: Set<Difficulty>?
     var personalBestOnly: Bool
     var personalBestFilter: ResultHistoryPersonalBestFilter?
     var dateRange: ResultHistoryDateRange
@@ -1112,6 +1113,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         personalBestOnly: Bool = false,
         personalBestFilter: ResultHistoryPersonalBestFilter? = nil,
         difficulty: Difficulty? = nil,
+        difficulties: Set<Difficulty>? = nil,
         dateRange: ResultHistoryDateRange = .all,
         punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all,
         quoteLength: QuoteLength? = nil,
@@ -1126,6 +1128,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.tag = tag
         self.tagFilter = tagFilter
         self.difficulty = difficulty
+        self.difficulties = difficulties
         self.personalBestOnly = personalBestOnly
         self.personalBestFilter = personalBestFilter
         self.dateRange = dateRange
@@ -1153,7 +1156,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         return .init(
             modes: [configuration.mode],
             languages: [configuration.language],
-            difficulty: configuration.difficulty,
+            difficulties: [configuration.difficulty],
             punctuation: configuration.contentOptions.includePunctuation ? .included : .excluded,
             numbers: configuration.contentOptions.includeNumbers ? .included : .excluded,
             quoteLength: configuration.mode == .quote && configuration.quoteLength != .all
@@ -1176,6 +1179,12 @@ struct ResultHistoryFilter: Codable, Equatable {
     /// that representation as the decoding fallback.
     var modeSelections: Set<TestMode> {
         modes ?? mode.map { [$0] } ?? Set(TestMode.allCases)
+    }
+
+    /// New presets can preserve several difficulty toggles. The original
+    /// optional field remains the fallback for already-saved local presets.
+    var difficultySelections: Set<Difficulty> {
+        difficulties ?? difficulty.map { [$0] } ?? Set(Difficulty.allCases)
     }
 
     var effectiveTagFilter: ResultHistoryTagFilter {
@@ -1202,8 +1211,15 @@ struct ResultHistoryFilter: Codable, Equatable {
         return names.count <= 3 ? names.joined(separator: "、") : "已选 \(names.count) 种"
     }
 
+    static func difficultySelectionSummary(_ selection: Set<Difficulty>) -> String {
+        guard !selection.isEmpty else { return "无匹配难度" }
+        guard selection != Set(Difficulty.allCases) else { return "全部" }
+        let names = Difficulty.allCases.filter(selection.contains).map(\.displayName)
+        return names.joined(separator: "、")
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case mode, modes, language, languages, tag, tagFilter, difficulty, personalBestOnly, personalBestFilter, dateRange, punctuation, numbers, quoteLength,
+        case mode, modes, language, languages, tag, tagFilter, difficulty, difficulties, personalBestOnly, personalBestFilter, dateRange, punctuation, numbers, quoteLength,
           timeLimits, wordLimits, modifierFilter
     }
 
@@ -1216,6 +1232,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         tag = try values.decodeIfPresent(String.self, forKey: .tag)
         tagFilter = try values.decodeIfPresent(ResultHistoryTagFilter.self, forKey: .tagFilter)
         difficulty = try values.decodeIfPresent(Difficulty.self, forKey: .difficulty)
+        difficulties = try values.decodeIfPresent(Set<Difficulty>.self, forKey: .difficulties)
         personalBestOnly = try values.decodeIfPresent(Bool.self, forKey: .personalBestOnly) ?? false
         personalBestFilter = try values.decodeIfPresent(
             ResultHistoryPersonalBestFilter.self, forKey: .personalBestFilter)
@@ -1239,7 +1256,7 @@ struct ResultHistoryFilter: Codable, Equatable {
             matchesMode(entry.mode)
                 && matchesLanguage(entry.language)
                 && effectiveTagFilter.matches(entry.tags)
-                && (difficulty == nil || entry.difficulty == difficulty)
+                && matchesDifficulty(entry.difficulty)
                 && effectivePersonalBestFilter.matches(id: entry.id, personalBestIDs: personalBestIDs)
                 && (cutoff.map { entry.finishedAt >= $0 } ?? true)
                 && punctuation.matches(entry.includesPunctuation)
@@ -1259,6 +1276,12 @@ struct ResultHistoryFilter: Codable, Equatable {
         let selection = modeSelections
         guard selection != Set(TestMode.allCases) else { return true }
         return entryMode.map(selection.contains) ?? false
+    }
+
+    private func matchesDifficulty(_ entryDifficulty: Difficulty?) -> Bool {
+        let selection = difficultySelections
+        guard selection != Set(Difficulty.allCases) else { return true }
+        return entryDifficulty.map(selection.contains) ?? false
     }
 
     private func matchesLanguage(_ entryLanguage: TypingLanguage?) -> Bool {

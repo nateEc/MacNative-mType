@@ -3348,7 +3348,7 @@ private struct ResultsHistoryView: View {
   @State private var modeFilter = Set(TestMode.allCases)
   @State private var languageFilter = Set(TypingLanguage.allCases)
   @State private var selectedTagFilter = ResultHistoryTagFilter()
-  @State private var difficultyFilter: Difficulty?
+  @State private var difficultyFilter = Set(Difficulty.allCases)
   @State private var personalBestFilter: ResultHistoryPersonalBestFilter = .all
   @State private var dateRangeFilter: ResultHistoryDateRange = .all
   @State private var punctuationFilter: ResultHistoryBinaryFilter = .all
@@ -3367,7 +3367,7 @@ private struct ResultsHistoryView: View {
       languages: languageFilter,
       tagFilter: selectedTagFilter,
       personalBestFilter: personalBestFilter,
-      difficulty: difficultyFilter,
+      difficulties: difficultyFilter,
       dateRange: dateRangeFilter,
       punctuation: punctuationFilter,
       numbers: numbersFilter,
@@ -3486,10 +3486,12 @@ private struct ResultsHistoryView: View {
                     Text(range.displayName).tag(range)
                   }
                 }
-                Picker("难度", selection: $difficultyFilter) {
-                  Text("全部难度").tag(Difficulty?.none)
+                DisclosureGroup(
+                  "难度：\(ResultHistoryFilter.difficultySelectionSummary(difficultyFilter))"
+                ) {
                   ForEach(Difficulty.allCases, id: \.self) { difficulty in
-                    Text(difficulty.displayName).tag(Optional(difficulty))
+                    Toggle(difficulty.displayName, isOn: difficultyBinding(for: difficulty))
+                      .toggleStyle(.checkbox)
                   }
                 }
                 Picker("标点", selection: $punctuationFilter) {
@@ -3797,7 +3799,7 @@ private struct ResultsHistoryView: View {
   private var activeFilter: ResultHistoryFilter {
     .init(
       modes: modeFilter, languages: languageFilter, tagFilter: selectedTagFilter,
-      personalBestFilter: personalBestFilter, difficulty: difficultyFilter, dateRange: dateRangeFilter,
+      personalBestFilter: personalBestFilter, difficulties: difficultyFilter, dateRange: dateRangeFilter,
       punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter,
       timeLimits: timeLimitFilter, wordLimits: wordLimitFilter, modifierFilter: activeModifierFilter
     )
@@ -3832,7 +3834,7 @@ private struct ResultsHistoryView: View {
     modeFilter = filter.modeSelections
     languageFilter = filter.languageSelections
     selectedTagFilter = filter.effectiveTagFilter
-    difficultyFilter = filter.difficulty
+    difficultyFilter = filter.difficultySelections
     personalBestFilter = filter.effectivePersonalBestFilter
     dateRangeFilter = filter.dateRange
     punctuationFilter = filter.punctuation
@@ -3857,6 +3859,14 @@ private struct ResultsHistoryView: View {
       get: { modeFilter.contains(mode) },
       set: { selected in
         if selected { modeFilter.insert(mode) } else { modeFilter.remove(mode) }
+      })
+  }
+
+  private func difficultyBinding(for difficulty: Difficulty) -> Binding<Bool> {
+    Binding(
+      get: { difficultyFilter.contains(difficulty) },
+      set: { selected in
+        if selected { difficultyFilter.insert(difficulty) } else { difficultyFilter.remove(difficulty) }
       })
   }
 

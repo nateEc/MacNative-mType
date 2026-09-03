@@ -3794,6 +3794,38 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(legacy.modeSelections, [.quote])
   }
 
+  func testResultHistoryDifficultyFilterSupportsMultiSelectAndLegacySingleDifficultyPresets() throws {
+    let normal = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], difficulty: .normal)
+    let expert = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], difficulty: .expert)
+    let master = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], difficulty: .master)
+    let legacyUnknown = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], difficulty: nil)
+    let entries = [normal, expert, master, legacyUnknown]
+
+    let multiDifficulty = ResultHistoryFilter(difficulties: [.normal, .expert])
+    XCTAssertEqual(
+      multiDifficulty.matchingIDs(entries: entries, personalBestIDs: []),
+      [normal.id, expert.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter.difficultySelectionSummary([.normal, .expert]), "普通、专家")
+    XCTAssertEqual(
+      ResultHistoryFilter(difficulties: Set(Difficulty.allCases)).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      Set(entries.map(\.id))
+    )
+    XCTAssertTrue(
+      ResultHistoryFilter(difficulties: []).matchingIDs(entries: entries, personalBestIDs: []).isEmpty)
+
+    let legacy = try JSONDecoder().decode(
+      ResultHistoryFilter.self, from: Data(#"{"difficulty":"master"}"#.utf8))
+    XCTAssertNil(legacy.difficulties)
+    XCTAssertEqual(legacy.difficultySelections, [.master])
+  }
+
   func testResultHistoryTagFilterSupportsNoTagAnyTagAndLegacySingleTagPresets() throws {
     let noTags = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: [])
     let focus = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: ["focus"])
@@ -4675,7 +4707,7 @@ final class TypingEngineTests: XCTestCase {
       language: .english, modes: [.quote, .zen],
       tagFilter: .init(isUnrestricted: false, includesNoTags: true, tags: ["focus", "review"]),
       personalBestFilter: .excluded,
-      difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
+      difficulties: [.normal, .expert], dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
       quoteLength: .medium, timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom],
       modifierFilter: .init(includesNoModifiers: false, modifiers: [.crtVisual, .binaryStream]))
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
