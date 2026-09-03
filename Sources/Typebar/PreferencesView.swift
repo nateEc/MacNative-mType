@@ -163,7 +163,7 @@ struct PreferencesView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("最后一词快速结束", isOn: $settings.quickEnd)
-          Text("仅在字数模式的最后一词达到目标长度时生效；“遇错停下”或“遇错删除”会自动禁用该行为。")
+          Text("仅在字数、引语或有限自定义测试的最后一词达到目标长度时生效；“遇错停下”或“遇错删除”会自动禁用该行为。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("英文拼写", selection: $settings.englishVariant) {
