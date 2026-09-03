@@ -6,6 +6,22 @@ struct SavedTestPreset: Codable, Equatable {
     var configuration: TestConfiguration
     var quoteID: String?
     var customText: String?
+
+    var summaryDescription: String {
+        switch configuration.mode {
+        case .time: "时间 · \(Int(configuration.duration ?? 0)) 秒"
+        case .words: "字数 · \(configuration.wordLimit ?? 0) 词"
+        case .quote: "引语"
+        case .zen: "禅"
+        case .custom:
+            switch configuration.customTextCompletion {
+            case .finish: "自定义文本 · 输入完成"
+            case .time: "自定义文本 · 循环 \(Int(configuration.duration ?? 0)) 秒"
+            case .words: "自定义文本 · 循环 \(configuration.wordLimit ?? 0) 词"
+            case .sections: "自定义文本 · \(configuration.customTextSectionLimit ?? 0) 段"
+            }
+        }
+    }
 }
 
 @Model
@@ -59,7 +75,7 @@ struct PresetLibraryView: View {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(preset.name)
-                                        Text(summary(for: preset.definition))
+                                        Text(preset.definition?.summaryDescription ?? "无法读取的预设")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
@@ -91,22 +107,5 @@ struct PresetLibraryView: View {
 
     private func delete(at offsets: IndexSet) {
         for index in offsets { modelContext.delete(presets[index]) }
-    }
-
-    private func summary(for preset: SavedTestPreset?) -> String {
-        guard let preset else { return "无法读取的预设" }
-        return switch preset.configuration.mode {
-        case .time: "时间 · \(Int(preset.configuration.duration ?? 0)) 秒"
-        case .words: "字数 · \(preset.configuration.wordLimit ?? 0) 词"
-        case .quote: "引语"
-        case .zen: "禅"
-        case .custom:
-            switch preset.configuration.customTextCompletion {
-            case .finish: "自定义文本 · 输入完成"
-            case .time: "自定义文本 · 循环 \(Int(preset.configuration.duration ?? 0)) 秒"
-            case .words: "自定义文本 · 循环 \(preset.configuration.wordLimit ?? 0) 词"
-            case .sections: "自定义文本 · \(preset.configuration.customTextSectionLimit ?? 0) 段"
-            }
-        }
     }
 }

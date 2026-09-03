@@ -430,6 +430,8 @@ private struct ContentView: View {
   @Environment(\.colorScheme) private var systemColorScheme
   @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var savedResults:
     [TestResultRecord]
+  @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
+    [TestPresetRecord]
   @State private var session = TestSessionFactory.make(configuration: .timed(seconds: 30))
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
@@ -1818,6 +1820,11 @@ private struct ContentView: View {
     }
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
+    items.append(contentsOf: PresetCommandCatalog.items(
+      presets: savedPresets.compactMap { preset in
+        guard let definition = preset.definition else { return nil }
+        return .init(id: preset.id, name: preset.name, definition: definition)
+      }))
     return items
   }
 
@@ -1828,6 +1835,12 @@ private struct ContentView: View {
       case .builtIn(let theme): settings.selectBuiltInTheme(theme)
       case .custom(let id): settings.selectCustomTheme(id)
       }
+      return
+    }
+    if let presetID = PresetCommandCatalog.presetID(for: item.id),
+      let preset = savedPresets.first(where: { $0.id == presetID })?.definition
+    {
+      apply(preset)
       return
     }
     switch item.id {

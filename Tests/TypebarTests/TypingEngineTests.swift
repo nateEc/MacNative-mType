@@ -610,6 +610,20 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(ThemeCommandCatalog.target(for: "theme.custom.not-a-uuid"))
   }
 
+  func testPresetCommandCatalogDescribesAndRoutesLocalPresets() {
+    let id = UUID(uuidString: "E5D0D867-373F-4B15-B2ED-4F05919AE94B")!
+    let preset = SavedTestPreset(configuration: .timed(seconds: 60), quoteID: nil, customText: nil)
+
+    let items = PresetCommandCatalog.items(
+      presets: [.init(id: id, name: "冲刺一分钟", definition: preset)])
+
+    XCTAssertEqual(items.first?.title, "应用预设：冲刺一分钟")
+    XCTAssertEqual(items.first?.subtitle, "时间 · 60 秒")
+    XCTAssertEqual(items.first?.id, "preset.e5d0d867-373f-4b15-b2ed-4f05919ae94b")
+    XCTAssertEqual(PresetCommandCatalog.presetID(for: items[0].id), id)
+    XCTAssertNil(PresetCommandCatalog.presetID(for: "preset.invalid"))
+  }
+
   func testClearCurrentWordOnErrorModifierKeepsCompletedWordsAndReplayInSync() {
     var session = TypingSession(
       configuration: .words(2).with(modifiers: [.clearCurrentWordOnError]),

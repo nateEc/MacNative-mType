@@ -84,6 +84,34 @@ enum ThemeCommandCatalog {
     }
 }
 
+struct PresetCommandEntry: Equatable {
+    let id: UUID
+    let name: String
+    let definition: SavedTestPreset
+}
+
+enum PresetCommandCatalog {
+    static func identifier(for presetID: UUID) -> String {
+        "preset.\(presetID.uuidString.lowercased())"
+    }
+
+    static func presetID(for identifier: String) -> UUID? {
+        guard identifier.hasPrefix("preset."),
+            let rawValue = identifier.split(separator: ".").last
+        else { return nil }
+        return UUID(uuidString: String(rawValue))
+    }
+
+    static func items(presets: [PresetCommandEntry]) -> [CommandPaletteItem] {
+        presets.map { preset in
+            CommandPaletteItem(
+                id: identifier(for: preset.id), title: "应用预设：\(preset.name)",
+                subtitle: preset.definition.summaryDescription, systemImage: "slider.horizontal.3",
+                keywords: ["preset", "预设", "apply", "应用", preset.name])
+        }
+    }
+}
+
 enum CommandPaletteSearch {
     static func results(items: [CommandPaletteItem], query: String) -> [CommandPaletteItem] {
         let query = normalized(query)
