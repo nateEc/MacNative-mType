@@ -3345,7 +3345,7 @@ private struct ResultsHistoryView: View {
   @Query(sort: \ResultFilterPresetRecord.createdAt, order: .reverse) private var filterPresets:
     [ResultFilterPresetRecord]
   @State private var selectedResult: TestResultRecord?
-  @State private var modeFilter: TestMode?
+  @State private var modeFilter = Set(TestMode.allCases)
   @State private var languageFilter = Set(TypingLanguage.allCases)
   @State private var selectedTagFilter = ResultHistoryTagFilter()
   @State private var difficultyFilter: Difficulty?
@@ -3363,7 +3363,7 @@ private struct ResultsHistoryView: View {
 
   private var filteredResults: [TestResultRecord] {
     let filter = ResultHistoryFilter(
-      mode: modeFilter,
+      modes: modeFilter,
       languages: languageFilter,
       tagFilter: selectedTagFilter,
       personalBestFilter: personalBestFilter,
@@ -3502,10 +3502,12 @@ private struct ResultsHistoryView: View {
                     Text(filter.displayName).tag(filter)
                   }
                 }
-                Picker("模式", selection: $modeFilter) {
-                  Text("全部模式").tag(TestMode?.none)
+                DisclosureGroup(
+                  "模式：\(ResultHistoryFilter.modeSelectionSummary(modeFilter))"
+                ) {
                   ForEach(TestMode.allCases, id: \.self) { mode in
-                    Text(modeName(mode)).tag(Optional(mode))
+                    Toggle(modeName(mode), isOn: modeBinding(for: mode))
+                      .toggleStyle(.checkbox)
                   }
                 }
                 Picker("引语长度", selection: $quoteLengthFilter) {
@@ -3794,7 +3796,7 @@ private struct ResultsHistoryView: View {
 
   private var activeFilter: ResultHistoryFilter {
     .init(
-      mode: modeFilter, languages: languageFilter, tagFilter: selectedTagFilter,
+      modes: modeFilter, languages: languageFilter, tagFilter: selectedTagFilter,
       personalBestFilter: personalBestFilter, difficulty: difficultyFilter, dateRange: dateRangeFilter,
       punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter,
       timeLimits: timeLimitFilter, wordLimits: wordLimitFilter, modifierFilter: activeModifierFilter
@@ -3827,7 +3829,7 @@ private struct ResultsHistoryView: View {
   }
 
   private func apply(_ filter: ResultHistoryFilter) {
-    modeFilter = filter.mode
+    modeFilter = filter.modeSelections
     languageFilter = filter.languageSelections
     selectedTagFilter = filter.effectiveTagFilter
     difficultyFilter = filter.difficulty
@@ -3847,6 +3849,14 @@ private struct ResultsHistoryView: View {
       get: { timeLimitFilter.contains(limit) },
       set: { selected in
         if selected { timeLimitFilter.insert(limit) } else { timeLimitFilter.remove(limit) }
+      })
+  }
+
+  private func modeBinding(for mode: TestMode) -> Binding<Bool> {
+    Binding(
+      get: { modeFilter.contains(mode) },
+      set: { selected in
+        if selected { modeFilter.insert(mode) } else { modeFilter.remove(mode) }
       })
   }
 

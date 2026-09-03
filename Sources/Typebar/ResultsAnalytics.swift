@@ -1088,6 +1088,7 @@ struct ResultHistoryTagFilter: Codable, Equatable {
 
 struct ResultHistoryFilter: Codable, Equatable {
     var mode: TestMode?
+    var modes: Set<TestMode>?
     var language: TypingLanguage?
     var languages: Set<TypingLanguage>?
     var tag: String?
@@ -1105,6 +1106,7 @@ struct ResultHistoryFilter: Codable, Equatable {
 
     init(
         mode: TestMode? = nil, language: TypingLanguage? = nil,
+        modes: Set<TestMode>? = nil,
         languages: Set<TypingLanguage>? = nil, tag: String? = nil,
         tagFilter: ResultHistoryTagFilter? = nil,
         personalBestOnly: Bool = false,
@@ -1118,6 +1120,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         modifierFilter: ResultHistoryModifierFilter = .init()
     ) {
         self.mode = mode
+        self.modes = modes
         self.language = language
         self.languages = languages
         self.tag = tag
@@ -1148,7 +1151,7 @@ struct ResultHistoryFilter: Codable, Equatable {
             : Set(ResultHistoryWordLimit.allCases)
 
         return .init(
-            mode: configuration.mode,
+            modes: [configuration.mode],
             languages: [configuration.language],
             difficulty: configuration.difficulty,
             punctuation: configuration.contentOptions.includePunctuation ? .included : .excluded,
@@ -1168,6 +1171,13 @@ struct ResultHistoryFilter: Codable, Equatable {
         languages ?? language.map { [$0] } ?? Set(TypingLanguage.allCases)
     }
 
+    /// New presets can mirror the reference product's independently toggled
+    /// mode records. Older Typebar presets stored one optional mode, so retain
+    /// that representation as the decoding fallback.
+    var modeSelections: Set<TestMode> {
+        modes ?? mode.map { [$0] } ?? Set(TestMode.allCases)
+    }
+
     var effectiveTagFilter: ResultHistoryTagFilter {
         if let tagFilter { return tagFilter }
         guard let tag else { return .init() }
@@ -1185,14 +1195,22 @@ struct ResultHistoryFilter: Codable, Equatable {
         return names.count <= 3 ? names.joined(separator: "、") : "已选 \(names.count) 种"
     }
 
+    static func modeSelectionSummary(_ selection: Set<TestMode>) -> String {
+        guard !selection.isEmpty else { return "无匹配模式" }
+        guard selection != Set(TestMode.allCases) else { return "全部" }
+        let names = TestMode.allCases.filter(selection.contains).map(\.displayName)
+        return names.count <= 3 ? names.joined(separator: "、") : "已选 \(names.count) 种"
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case mode, language, languages, tag, tagFilter, difficulty, personalBestOnly, personalBestFilter, dateRange, punctuation, numbers, quoteLength,
+        case mode, modes, language, languages, tag, tagFilter, difficulty, personalBestOnly, personalBestFilter, dateRange, punctuation, numbers, quoteLength,
           timeLimits, wordLimits, modifierFilter
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         mode = try values.decodeIfPresent(TestMode.self, forKey: .mode)
+        modes = try values.decodeIfPresent(Set<TestMode>.self, forKey: .modes)
         language = try values.decodeIfPresent(TypingLanguage.self, forKey: .language)
         languages = try values.decodeIfPresent(Set<TypingLanguage>.self, forKey: .languages)
         tag = try values.decodeIfPresent(String.self, forKey: .tag)
@@ -1218,7 +1236,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     ) -> Set<UUID> {
         let cutoff = dateRange.cutoff(relativeTo: now)
         return Set(entries.filter { entry in
-            (mode == nil || entry.mode == mode)
+            matchesMode(entry.mode)
                 && matchesLanguage(entry.language)
                 && effectiveTagFilter.matches(entry.tags)
                 && (difficulty == nil || entry.difficulty == difficulty)
@@ -1235,6 +1253,12 @@ struct ResultHistoryFilter: Codable, Equatable {
 
     private func matchesTimeLimit(_ entry: ResultHistoryEntry) -> Bool {
         entry.mode != .time || timeLimits.contains { $0.matches(entry.duration) }
+    }
+
+    private func matchesMode(_ entryMode: TestMode?) -> Bool {
+        let selection = modeSelections
+        guard selection != Set(TestMode.allCases) else { return true }
+        return entryMode.map(selection.contains) ?? false
     }
 
     private func matchesLanguage(_ entryLanguage: TypingLanguage?) -> Bool {

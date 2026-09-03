@@ -3766,6 +3766,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(legacy.languageSelections, [.german])
   }
 
+  func testResultHistoryModeFilterSupportsMultiSelectAndLegacySingleModePresets() throws {
+    let timed = ResultHistoryEntry(id: UUID(), mode: .time, language: .english, tags: [])
+    let words = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: [])
+    let quote = ResultHistoryEntry(id: UUID(), mode: .quote, language: .english, tags: [])
+    let legacyUnknown = ResultHistoryEntry(id: UUID(), mode: nil, language: .english, tags: [])
+    let entries = [timed, words, quote, legacyUnknown]
+
+    let multiMode = ResultHistoryFilter(modes: [.time, .words])
+    XCTAssertEqual(
+      multiMode.matchingIDs(entries: entries, personalBestIDs: []),
+      [timed.id, words.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter.modeSelectionSummary([.time, .words]), "时间、字数")
+    XCTAssertEqual(
+      ResultHistoryFilter(modes: Set(TestMode.allCases)).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      Set(entries.map(\.id))
+    )
+    XCTAssertTrue(
+      ResultHistoryFilter(modes: []).matchingIDs(entries: entries, personalBestIDs: []).isEmpty)
+
+    let legacy = try JSONDecoder().decode(
+      ResultHistoryFilter.self, from: Data(#"{"mode":"quote"}"#.utf8))
+    XCTAssertNil(legacy.modes)
+    XCTAssertEqual(legacy.modeSelections, [.quote])
+  }
+
   func testResultHistoryTagFilterSupportsNoTagAnyTagAndLegacySingleTagPresets() throws {
     let noTags = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: [])
     let focus = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: ["focus"])
@@ -4644,7 +4672,7 @@ final class TypingEngineTests: XCTestCase {
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     let filter = ResultHistoryFilter(
-      mode: .quote, language: .english,
+      language: .english, modes: [.quote, .zen],
       tagFilter: .init(isUnrestricted: false, includesNoTags: true, tags: ["focus", "review"]),
       personalBestFilter: .excluded,
       difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
