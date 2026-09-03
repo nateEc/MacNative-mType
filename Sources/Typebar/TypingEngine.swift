@@ -1118,6 +1118,18 @@ struct TypingPromptGlyph: Equatable {
 }
 
 enum TypingPromptPresentation {
+  /// Zen mode does not compare input with a generated target. Render the
+  /// locally entered text itself as correct and retain a trailing caret.
+  static func zenGlyphs(typed: String, isFinished: Bool, blindMode: Bool) -> [TypingPromptGlyph] {
+    var output = typed.map {
+      TypingPromptGlyph(character: $0, state: blindMode ? .hidden : .correct)
+    }
+    if !isFinished {
+      output.append(.init(character: " ", state: .current))
+    }
+    return output
+  }
+
   static func glyphs(
     target: String, typed: String, isFinished: Bool, blindMode: Bool,
     forcedErrorIndices: Set<Int> = [],
@@ -1458,7 +1470,11 @@ struct TypingSession {
   }
 
   var promptGlyphs: [TypingPromptGlyph] {
-    TypingPromptPresentation.glyphs(
+    if configuration.mode == .zen {
+      return TypingPromptPresentation.zenGlyphs(
+        typed: typed, isFinished: isFinished, blindMode: configuration.rules.blindMode)
+    }
+    return TypingPromptPresentation.glyphs(
       target: prompt,
       typed: typed,
       isFinished: isFinished,
@@ -1759,6 +1775,13 @@ struct TypingSession {
     finishedAt = date
   }
 
+  /// Zen has no automatic terminal condition. It completes only through its
+  /// explicit Shift+Enter command after the user has begun entering text.
+  mutating func finishZen(at date: Date = .now) {
+    guard configuration.mode == .zen, !isFinished, startedAt != nil else { return }
+    complete(at: date)
+  }
+
   private mutating func beginIfNeeded(at date: Date) {
     if startedAt == nil { startedAt = date }
   }
@@ -1767,6 +1790,9 @@ struct TypingSession {
   private mutating func insertCharacter(
     _ character: Character, forceError: Bool, at date: Date
   ) -> Bool {
+    if configuration.mode == .zen {
+      return insertZenCharacter(character, at: date)
+    }
     extendPromptIfNeeded()
     if typed.count >= prompt.count {
       if !configuration.rules.hideExtraLetters {
@@ -1816,6 +1842,22 @@ struct TypingSession {
     } else if shouldFailMinimumWordBurst(after: character) {
       fail(at: date)
     }
+    return true
+  }
+
+  /// Zen accepts the user's own text rather than comparing it to a generated
+  /// word list. Space and Return end an entered word; Tab remains text.
+  @discardableResult
+  private mutating func insertZenCharacter(_ character: Character, at date: Date) -> Bool {
+    let commitsWord = isZenWordCommit(character)
+    let activeLength = zenActiveWordLength
+    if activeLength >= 30 && !commitsWord { return false }
+    if character == " " && activeLength == 0 { return false }
+
+    typed.append(character)
+    typedCharacterDates.append(date)
+    recordZenWordBurstIfCommitted(after: character)
+    if shouldFailMinimumWordBurst(after: character) { fail(at: date) }
     return true
   }
 
@@ -1936,27 +1978,55 @@ struct TypingSession {
     committedWordBursts.append(wpm(characters: end - start + 1, seconds: elapsed))
   }
 
+  private mutating func recordZenWordBurstIfCommitted(after character: Character) {
+    guard isZenWordCommit(character) else { return }
+    let characters = Array(typed)
+    guard typedCharacterDates.count == characters.count else { return }
+    let end = characters.count - 1
+    let start = characters[..<end].lastIndex(where: { isZenWordCommit($0) }).map { $0 + 1 } ?? 0
+    guard start < end else { return }
+    let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
+    guard elapsed > 0 else { return }
+    committedWordBursts.append(wpm(characters: end - start + 1, seconds: elapsed))
+  }
+
   private func shouldFailMinimumWordBurst(after character: Character) -> Bool {
     let minimum = configuration.rules.minimumWordBurstWpm
     let mode = configuration.rules.minimumWordBurstMode
-    guard mode != .off, minimum > 0,
-      character == " ",
-      configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces),
+    let commitsWord = configuration.mode == .zen
+      ? isZenWordCommit(character)
+      : character == " " && configuration.language.usesSpaceDelimitedWords
+        && !configuration.modifiers.contains(.noSpaces)
+    guard mode != .off, minimum > 0, commitsWord,
       let burst = committedWordBursts.last,
-      let targetLength = lastCommittedTargetWordLength
+      let targetLength = lastCommittedBurstWordLength
     else { return false }
     let threshold = MinimumWordBurstPolicy.threshold(
       baseWpm: minimum, mode: mode, wordLength: targetLength)
     return burst < threshold
   }
 
-  private var lastCommittedTargetWordLength: Int? {
+  private var lastCommittedBurstWordLength: Int? {
+    if configuration.mode == .zen {
+      let characters = Array(typed)
+      guard let last = characters.last, isZenWordCommit(last) else { return nil }
+      let end = characters.count - 1
+      let start = characters[..<end].lastIndex(where: { isZenWordCommit($0) }).map { $0 + 1 } ?? 0
+      return end - start + 1
+    }
     guard typed.last == " " else { return nil }
     let committedWords = typed.dropLast().split(separator: " ", omittingEmptySubsequences: true)
     let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true)
     guard committedWords.count > 0, committedWords.count <= targetWords.count else { return nil }
     return targetWords[committedWords.count - 1].count
+  }
+
+  private var zenActiveWordLength: Int {
+    Array(typed).reversed().prefix { !isZenWordCommit($0) }.count
+  }
+
+  private func isZenWordCommit(_ character: Character) -> Bool {
+    character == " " || character == "\n"
   }
 
   private var lastCommittedWordIsCorrect: Bool {

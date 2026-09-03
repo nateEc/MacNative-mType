@@ -89,13 +89,37 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testZenNeverAutoCompletes() {
+  func testZenAcceptsFreeformTextAndFinishesOnlyWhenExplicitlyRequested() {
     var session = TypingSession(
       configuration: .init(
         mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
-      prompt: "violet")
-    session.insert("violet", at: start)
+      prompt: "")
+    session.insert("free form\nwith\ttab", forceError: true, at: start)
+    XCTAssertEqual(session.typed, "free form\nwith\ttab")
+    XCTAssertEqual(session.errors, 0)
     XCTAssertEqual(session.outcome, .active)
+    XCTAssertEqual(session.promptGlyphs.dropLast().map(\.character), Array(session.typed))
+    XCTAssertTrue(session.promptGlyphs.dropLast().allSatisfy { $0.state == .correct })
+
+    session.finishZen(at: start.addingTimeInterval(3))
+    XCTAssertEqual(session.outcome, .completed)
+  }
+
+  func testZenMinimumBurstChecksSpaceAndNewlineCommittedUserWords() {
+    let rules = InputRules(minimumWordBurstWpm: 100, minimumWordBurstMode: .fixed)
+    var spaceCommitted = TypingSession(
+      configuration: .init(
+        mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: rules), prompt: "")
+    spaceCommitted.insert("f", at: start)
+    spaceCommitted.insert("ree ", at: start.addingTimeInterval(4))
+    XCTAssertEqual(spaceCommitted.outcome, .failed)
+
+    var newlineCommitted = TypingSession(
+      configuration: .init(
+        mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: rules), prompt: "")
+    newlineCommitted.insert("f", at: start)
+    newlineCommitted.insert("ree\n", at: start.addingTimeInterval(4))
+    XCTAssertEqual(newlineCommitted.outcome, .failed)
   }
 
   func testAbandonOnlyAppliesAfterTypingStartsAndDoesNotProduceCompletedOutcome() {
@@ -1165,7 +1189,7 @@ final class TypingEngineTests: XCTestCase {
     )
   }
 
-  func testSessionFactoryUsesACompletePromptForEveryMode() {
+  func testSessionFactoryLeavesZenPromptFreeformAndBuildsOtherModePrompts() {
     let timed = TestSessionFactory.make(configuration: .timed(seconds: 120))
     let words = TestSessionFactory.make(configuration: .words(25))
     let quote = TestSessionFactory.make(
@@ -1183,7 +1207,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(timed.prompt.split(separator: " ").count, 480)
     XCTAssertEqual(words.prompt.split(separator: " ").count, 25)
     XCTAssertEqual(quote.prompt, OfflineContent.quotes[1].text)
-    XCTAssertGreaterThanOrEqual(zen.prompt.split(separator: " ").count, 10_000)
+    XCTAssertTrue(zen.prompt.isEmpty)
     XCTAssertEqual(custom.prompt, "own text")
   }
 

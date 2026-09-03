@@ -472,12 +472,9 @@ struct TestSessionFactory {
           quote?.text ?? OfflineContent.quotes(for: configuration.language).first?.text
           ?? OfflineContent.quotes(for: .english)[0].text
       case .zen:
-        prompt = OfflineContent.generatedPrompt(
-          wordCount: 10_000, language: configuration.language,
-          englishVariant: configuration.englishVariant,
-          mixedLanguageComponents: configuration.mixedLanguageComponents,
-          contentOptions: configuration.contentOptions,
-          usesZipfFrequency: configuration.modifiers.contains(.zipf))
+        // Zen renders and scores only text entered locally by the user. It
+        // intentionally has no generated target prompt or imported content.
+        prompt = ""
       case .custom:
         let source =
           !CustomTextPolicy.isValid(customText)

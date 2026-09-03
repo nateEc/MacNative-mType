@@ -962,7 +962,7 @@ private struct ContentView: View {
             }
           }
         case .zen:
-          Text("禅模式没有计时器或完成条件；随时按 ⌘R 开始新一轮。")
+          Text("禅模式接受自由输入、没有计时器；按 Shift+Enter 完成本次练习，⌘R 可开始新一轮。")
             .foregroundStyle(.secondary)
         }
       }
@@ -1003,8 +1003,9 @@ private struct ContentView: View {
         keyboardLayout: settings.keyboardLayout,
         oppositeShiftMode: settings.oppositeShiftMode,
         mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
-        acceptsNewlineInput: session.prompt.contains("\n"),
-        acceptsTabInput: session.prompt.contains("\t"),
+        acceptsNewlineInput: session.configuration.mode == .zen || session.prompt.contains("\n"),
+        acceptsTabInput: session.configuration.mode == .zen || session.prompt.contains("\t"),
+        finishesOnShiftEnter: session.configuration.mode == .zen,
         onInsert: { text, forceError in
           let errorsBefore = session.errors
           let typedCountBefore = session.typed.count
@@ -1020,6 +1021,7 @@ private struct ContentView: View {
         },
         onDelete: { session.deleteBackward() },
         onRestart: attemptRestart,
+        onFinishZen: { session.finishZen() },
         onFocusChanged: { inputHasFocus = $0 },
         onCompositionChanged: { compositionText = $0 }
       )

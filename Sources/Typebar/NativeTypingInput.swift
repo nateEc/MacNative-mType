@@ -9,9 +9,11 @@ struct NativeTypingInput: NSViewRepresentable {
     var mapsArrowKeysToInput: Bool
     var acceptsNewlineInput: Bool
     var acceptsTabInput: Bool
+    var finishesOnShiftEnter: Bool
     let onInsert: (String, Bool) -> Void
     let onDelete: () -> Void
     let onRestart: () -> Void
+    let onFinishZen: () -> Void
     let onFocusChanged: (Bool) -> Void
     let onCompositionChanged: (String) -> Void
 
@@ -35,6 +37,8 @@ struct NativeTypingInput: NSViewRepresentable {
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
         view.acceptsNewlineInput = acceptsNewlineInput
         view.acceptsTabInput = acceptsTabInput
+        view.finishesOnShiftEnter = finishesOnShiftEnter
+        view.onFinishZen = onFinishZen
         view.onFocusChanged = onFocusChanged
         view.onCompositionChanged = onCompositionChanged
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
@@ -53,6 +57,8 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var mapsArrowKeysToInput = false
     var acceptsNewlineInput = false
     var acceptsTabInput = false
+    var finishesOnShiftEnter = false
+    var onFinishZen: () -> Void = {}
     var onFocusChanged: (Bool) -> Void = { _ in }
     var onCompositionChanged: (String) -> Void = { _ in }
 
@@ -103,6 +109,10 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         }
         if acceptsNewlineInput,
            event.charactersIgnoringModifiers == "\r" || event.charactersIgnoringModifiers == "\n" {
+            if finishesOnShiftEnter, event.modifierFlags.contains(.shift) {
+                onFinishZen()
+                return
+            }
             onInsert("\n", false)
             return
         }
