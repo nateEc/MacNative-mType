@@ -387,9 +387,9 @@ enum ResultInputText {
 
 /// Builds the local equivalent of the completed-result "copy words" action.
 /// Normal space-delimited tests copy the reached target words, whereas Zen
-/// mode intentionally copies the user's open-ended input. Unspaced prompts
-/// have no word-review boundaries, so their reached target range is bounded by
-/// the final local input length.
+/// mode intentionally copies the user's open-ended input. Chinese prompts use
+/// Typebar's own generated-word boundaries so a partial current word still
+/// copies its complete target token.
 enum ResultPromptText {
   static func make(for result: CompletedTestResult, reviews: [TypedWordReview]) -> String? {
     if result.configuration.mode == .zen {
@@ -406,7 +406,37 @@ enum ResultPromptText {
     guard let typed = ResultInputText.make(for: result) else { return nil }
     let reachedCount = min(typed.count, result.prompt.count)
     guard reachedCount > 0 else { return nil }
+    if result.configuration.language == .simplifiedChinese {
+      return chineseTargetText(prompt: result.prompt, reachedCharacterCount: reachedCount)
+    }
     return String(result.prompt.prefix(reachedCount))
+  }
+
+  private static func chineseTargetText(prompt: String, reachedCharacterCount: Int) -> String {
+    let characters = Array(prompt)
+    let tokens = StarterLexicon.simplifiedChineseWords
+      .map { Array($0) }
+      .sorted { $0.count > $1.count }
+    var index = 0
+
+    while index < characters.count {
+      guard let token = tokens.first(where: { token in
+        let end = index + token.count
+        return end <= characters.count && characters[index..<end].elementsEqual(token)
+      })
+      else {
+        if index >= reachedCharacterCount { break }
+        index += 1
+        continue
+      }
+
+      let end = index + token.count
+      if reachedCharacterCount > index && reachedCharacterCount <= end {
+        return String(characters.prefix(end))
+      }
+      index = end
+    }
+    return String(characters.prefix(reachedCharacterCount))
   }
 }
 
