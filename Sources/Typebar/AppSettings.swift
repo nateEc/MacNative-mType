@@ -473,6 +473,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var keyboardLayout: KeyboardLayout = .ansiQwerty
   var quickEnd = false
   var quickRestartKey: QuickRestartKey = .escape
+  var showKeyTips = true
   var followSystemTheme = false
   var systemLightTheme: AppTheme = .paper
   var systemDarkTheme: AppTheme = .midnight
@@ -563,6 +564,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     keyboardLayout: KeyboardLayout = .ansiQwerty,
     quickEnd: Bool = false,
     quickRestartKey: QuickRestartKey = .escape,
+    showKeyTips: Bool = true,
     followSystemTheme: Bool = false,
     systemLightTheme: AppTheme = .paper,
     systemDarkTheme: AppTheme = .midnight,
@@ -656,6 +658,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.keyboardLayout = keyboardLayout
     self.quickEnd = quickEnd
     self.quickRestartKey = quickRestartKey
+    self.showKeyTips = showKeyTips
     self.followSystemTheme = followSystemTheme
     self.systemLightTheme = systemLightTheme
     self.systemDarkTheme = systemDarkTheme
@@ -730,7 +733,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       hideExtraLetters, blindMode, fontSize,
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
-      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme, systemLightTheme, systemDarkTheme,
+      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, showKeyTips, followSystemTheme, systemLightTheme, systemDarkTheme,
       randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
@@ -793,6 +796,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(KeyboardLayout.self, forKey: .keyboardLayout) ?? .ansiQwerty
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
     quickRestartKey = try values.decodeIfPresent(QuickRestartKey.self, forKey: .quickRestartKey) ?? .escape
+    showKeyTips = try values.decodeIfPresent(Bool.self, forKey: .showKeyTips) ?? true
     followSystemTheme = try values.decodeIfPresent(Bool.self, forKey: .followSystemTheme) ?? false
     systemLightTheme = try values.decodeIfPresent(AppTheme.self, forKey: .systemLightTheme) ?? .paper
     systemDarkTheme = try values.decodeIfPresent(AppTheme.self, forKey: .systemDarkTheme) ?? .midnight
@@ -1013,6 +1017,7 @@ final class AppSettings {
   }
   var quickEnd = false { didSet { persist() } }
   var quickRestartKey: QuickRestartKey = .escape { didSet { persist() } }
+  var showKeyTips = true { didSet { persist() } }
   var followSystemTheme = false {
     didSet {
       if followSystemTheme && randomThemeMode.isEnabled {
@@ -1201,6 +1206,7 @@ final class AppSettings {
     keyboardLayout = snapshot.keyboardLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
+    showKeyTips = snapshot.showKeyTips
     followSystemTheme = snapshot.followSystemTheme
     systemLightTheme = snapshot.systemLightTheme
     systemDarkTheme = snapshot.systemDarkTheme
@@ -1306,6 +1312,7 @@ final class AppSettings {
       keyboardGuideStyle: keyboardGuideStyle,
       keyboardLayout: keyboardLayout, quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
+      showKeyTips: showKeyTips,
       followSystemTheme: followSystemTheme,
       systemLightTheme: systemLightTheme, systemDarkTheme: systemDarkTheme,
       randomThemeOnRestart: randomThemeOnRestart,
@@ -1376,6 +1383,7 @@ final class AppSettings {
     layoutFluidLayouts = LayoutFluidPolicy.defaultLayouts
     quickEnd = false
     quickRestartKey = .escape
+    showKeyTips = true
     followSystemTheme = false
     systemLightTheme = .paper
     systemDarkTheme = .midnight
@@ -1507,6 +1515,7 @@ final class AppSettings {
     keyboardLayout = snapshot.keyboardLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
+    showKeyTips = snapshot.showKeyTips
     followSystemTheme = snapshot.followSystemTheme
     systemLightTheme = snapshot.systemLightTheme
     systemDarkTheme = snapshot.systemDarkTheme
@@ -1733,6 +1742,7 @@ final class AppSettings {
       keyboardLayout: keyboardLayout,
       quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
+      showKeyTips: showKeyTips,
       followSystemTheme: followSystemTheme,
       systemLightTheme: systemLightTheme,
       systemDarkTheme: systemDarkTheme,

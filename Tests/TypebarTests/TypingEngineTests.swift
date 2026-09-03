@@ -3398,6 +3398,7 @@ final class TypingEngineTests: XCTestCase {
     settings.layoutFluidLayouts = [.ansiWorkman, .frenchAzerty, .ansiQwerty]
     settings.quickEnd = true
     settings.quickRestartKey = .enter
+    settings.showKeyTips = false
     settings.systemLightTheme = .paper
     settings.systemDarkTheme = .grove
     settings.practiceBackdrop = .halos
@@ -3479,6 +3480,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
     XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
     XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
+    XCTAssertFalse(exportedSnapshot.showKeyTips)
     XCTAssertEqual(exportedSnapshot.systemLightTheme, .paper)
     XCTAssertEqual(exportedSnapshot.systemDarkTheme, .grove)
     XCTAssertTrue(exportedSnapshot.flipTestColors)
@@ -3508,6 +3510,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.ansiWorkman, .frenchAzerty, .ansiQwerty])
     XCTAssertTrue(restored.quickEnd)
     XCTAssertEqual(restored.quickRestartKey, .enter)
+    XCTAssertFalse(restored.showKeyTips)
     XCTAssertFalse(restored.followSystemTheme)
     XCTAssertEqual(restored.systemLightTheme, .paper)
     XCTAssertEqual(restored.systemDarkTheme, .grove)
@@ -3661,6 +3664,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.keyboardGuideStyle, .staggered)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
+    XCTAssertTrue(snapshot.showKeyTips)
     XCTAssertFalse(snapshot.followSystemTheme)
     XCTAssertEqual(snapshot.systemLightTheme, .paper)
     XCTAssertEqual(snapshot.systemDarkTheme, .midnight)

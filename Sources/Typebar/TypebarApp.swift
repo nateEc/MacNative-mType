@@ -527,6 +527,7 @@ private struct ContentView: View {
           modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
       }
       controls
+      practiceKeyTips
     }
     .padding(42)
     .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
@@ -1635,6 +1636,30 @@ private struct ContentView: View {
     case .escape: return "按任意键开始，Esc 可重新开始"
     case .tab: return "按任意键开始，Tab 可重新开始"
     case .enter: return "按任意键开始，Enter 可重新开始"
+    }
+  }
+
+  @ViewBuilder private var practiceKeyTips: some View {
+    if settings.showKeyTips {
+      VStack(spacing: 6) {
+        Label("\(keyTipRestartShortcut) · 重新开始测试", systemImage: "arrow.counterclockwise")
+        Label("⇧⌘K · 打开命令面板", systemImage: "command")
+      }
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .opacity(inputHasFocus ? 0 : 1)
+      .accessibilityHidden(inputHasFocus)
+      .animation(.easeInOut(duration: 0.2), value: inputHasFocus)
+    }
+  }
+
+  private var keyTipRestartShortcut: String {
+    guard !quickRestartRequiresProtection else { return "⌘R" }
+    switch settings.quickRestartKey {
+    case .off: return "⌘R"
+    case .escape: return "Esc / ⌘R"
+    case .tab: return "Tab / ⌘R"
+    case .enter: return "Enter / ⌘R"
     }
   }
 
