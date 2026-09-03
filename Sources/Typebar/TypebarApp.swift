@@ -501,8 +501,8 @@ private struct ContentView: View {
         let savesResult = settings.saveCompletedResults
         let wordReviews = session.wordReviews
         let wordBursts = session.wordBurstHistory
-        let missedWordPractice = MissedWordPracticePlan.make(
-          errorCounts: session.missedWordErrorCounts)
+        let missedWordPractice = MissedWordPracticePlan.make(errorCounts: session.missedWordErrorCounts)
+        let slowWordPractice = SlowWordPracticePlan.make(reviews: wordReviews, bursts: wordBursts)
         let repeatedSession = session.repeatedAttempt()
         currentProcessPractice.append(.init(result: result))
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
@@ -515,7 +515,9 @@ private struct ContentView: View {
           missedWordPracticeWords: missedWordPractice?.exerciseWords ?? [],
           wordReviews: wordReviews,
           wordBursts: wordBursts,
-          slowWordPractice: SlowWordPracticePlan.make(reviews: wordReviews, bursts: wordBursts),
+          slowWordPractice: slowWordPractice,
+          missedAndSlowPractice: MissedAndSlowWordPracticePlan.make(
+            missed: missedWordPractice, slow: slowWordPractice),
           contextualMissedPractice: ContextualMissedWordPracticePlan.make(
             reviews: wordReviews, errorCounts: session.missedWordErrorCountsByWord),
           todayPractice: todayPracticeSummary,
@@ -587,6 +589,18 @@ private struct ContentView: View {
       SaveCustomTextView(text: customText)
     }
     .sheet(item: $completedResult) { result in
+      completedResultSheet(result)
+    }
+    .alert(item: $terminalNotice) { notice in
+      Alert(
+        title: Text(notice.title),
+        message: Text(notice.message),
+        dismissButton: .default(Text("重新开始"), action: { reset() })
+      )
+    }
+  }
+
+  private func completedResultSheet(_ result: CompletedResultPresentation) -> some View {
       CompletedResultView(
         result: result.result,
         savesResult: result.savesResult,
@@ -615,6 +629,7 @@ private struct ContentView: View {
         wordReviews: result.wordReviews,
         wordBursts: result.wordBursts,
         slowWordPractice: result.slowWordPractice,
+        missedAndSlowPractice: result.missedAndSlowPractice,
         contextualMissedPractice: result.contextualMissedPractice,
         todayPractice: result.todayPractice,
         onRepeat: {
@@ -632,16 +647,11 @@ private struct ContentView: View {
         },
         onPracticeSlowWords: { words, selectedTargetCount in
           startWordPractice(words, selectedTargetCount: selectedTargetCount)
+        },
+        onPracticeMissedAndSlowWords: { words, selectedTargetCount in
+          startWordPractice(words, selectedTargetCount: selectedTargetCount)
         }
       )
-    }
-    .alert(item: $terminalNotice) { notice in
-      Alert(
-        title: Text(notice.title),
-        message: Text(notice.message),
-        dismissButton: .default(Text("重新开始"), action: { reset() })
-      )
-    }
   }
 
   private func runClock() async {
@@ -1963,6 +1973,7 @@ private struct CompletedResultPresentation: Identifiable {
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
+  let missedAndSlowPractice: MissedAndSlowWordPracticePlan?
   let contextualMissedPractice: ContextualMissedWordPracticePlan?
   let todayPractice: TodayPracticeSummary
   let repeatedSession: TypingSession
@@ -1991,6 +2002,7 @@ private struct CompletedResultView: View {
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
+  let missedAndSlowPractice: MissedAndSlowWordPracticePlan?
   let contextualMissedPractice: ContextualMissedWordPracticePlan?
   let todayPractice: TodayPracticeSummary
   let onRepeat: () -> Void
@@ -1999,6 +2011,7 @@ private struct CompletedResultView: View {
   let onPracticeMissedWords: () -> Void
   let onPracticeContextualMissedWords: ([String], Int) -> Void
   let onPracticeSlowWords: ([String], Int) -> Void
+  let onPracticeMissedAndSlowWords: ([String], Int) -> Void
   @State private var exportStatus: String?
 
   var body: some View {
@@ -2103,6 +2116,14 @@ private struct CompletedResultView: View {
                     onPracticeContextualMissedWords(
                       contextualMissedPractice.phrases,
                       contextualMissedPractice.selectedTargetCount)
+                  }
+                }
+                if let missedAndSlowPractice {
+                  Divider()
+                  Button("错词 + 慢词（\(missedAndSlowPractice.selectedTargetCount)）") {
+                    onPracticeMissedAndSlowWords(
+                      missedAndSlowPractice.exerciseWords,
+                      missedAndSlowPractice.selectedTargetCount)
                   }
                 }
                 Divider()

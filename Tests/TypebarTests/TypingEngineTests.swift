@@ -886,6 +886,20 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(capped.missedWordCount, ContextualMissedWordPracticePlan.maximumSelectedWords)
   }
 
+  func testMissedAndSlowPracticeBoundsMissedTargetsAndWeightsSlowWords() throws {
+    let missed = try XCTUnwrap(MissedWordPracticePlan.make(errorCounts: [
+      .init(word: "amber", count: 2), .init(word: "cabin", count: 1),
+    ]))
+    let slow = SlowWordPracticePlan(
+      selectedWords: ["planet", "willow"], exerciseWords: ["ignored"])
+    let plan = try XCTUnwrap(MissedAndSlowWordPracticePlan.make(missed: missed, slow: slow))
+    XCTAssertEqual(plan.selectedTargetCount, 4)
+    XCTAssertEqual(plan.exerciseWords, ["amber", "amber", "cabin", "planet", "planet", "willow"])
+
+    let noSlow = MissedAndSlowWordPracticePlan.make(missed: missed, slow: nil)
+    XCTAssertNil(noSlow)
+  }
+
   func testTodayPracticeSummaryMergesSavedAndCurrentProcessWithoutDoubleCounting() {
     let calendar = Calendar(identifier: .gregorian)
     let today = Date(timeIntervalSince1970: 1_728_000_000)

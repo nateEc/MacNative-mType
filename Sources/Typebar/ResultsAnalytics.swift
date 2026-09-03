@@ -241,18 +241,49 @@ struct MissedWordPracticePlan: Equatable {
 
   static let maximumSelectedWords = 20
 
-  static func make(errorCounts: [MissedWordErrorCount]) -> Self? {
+  static func make(
+    errorCounts: [MissedWordErrorCount], maximumSelectedWords: Int = maximumSelectedWords
+  ) -> Self? {
     let selected = errorCounts.enumerated()
       .filter { $0.element.count > 0 && !$0.element.word.isEmpty }
       .sorted { lhs, rhs in
         lhs.element.count == rhs.element.count ? lhs.offset < rhs.offset : lhs.element.count > rhs.element.count
       }
-      .prefix(maximumSelectedWords)
+      .prefix(max(1, maximumSelectedWords))
       .map(\.element)
     guard !selected.isEmpty else { return nil }
     return .init(
       selectedWords: selected.map(\.word),
       exerciseWords: selected.flatMap { Array(repeating: $0.word, count: $0.count) })
+  }
+}
+
+/// Combines independently observed missed and slow words into one bounded
+/// local exercise. The smaller missed-word limit mirrors the reference
+/// practice mode when slow words are included, while slow-word repetition is
+/// ranked from slowest to fastest.
+struct MissedAndSlowWordPracticePlan: Equatable {
+  let exerciseWords: [String]
+  let selectedTargetCount: Int
+
+  static let maximumMissedWords = 10
+  static let maximumSlowWords = 10
+
+  static func make(
+    missed: MissedWordPracticePlan?, slow: SlowWordPracticePlan?
+  ) -> Self? {
+    guard let missed, let slow else { return nil }
+    let selectedMissed = Array(missed.selectedWords.prefix(maximumMissedWords))
+    let selectedSlow = Array(slow.selectedWords.prefix(maximumSlowWords))
+    guard !selectedMissed.isEmpty, !selectedSlow.isEmpty else { return nil }
+    let missedSet = Set(selectedMissed)
+    let missedWords = missed.exerciseWords.filter { missedSet.contains($0) }
+    let slowWords = selectedSlow.enumerated().flatMap { index, word in
+      Array(repeating: word, count: selectedSlow.count - index)
+    }
+    return .init(
+      exerciseWords: missedWords + slowWords,
+      selectedTargetCount: selectedMissed.count + selectedSlow.count)
   }
 }
 
