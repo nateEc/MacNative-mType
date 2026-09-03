@@ -1212,6 +1212,41 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(otherChanges.changes.isEmpty)
   }
 
+  func testSyncPullPagesUserChangesWithoutSkippingTheFinalCursor() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let owner = try await store.register(
+      .init(email: "paged-owner@example.com", password: "a secure password", displayName: "Owner"))
+    let other = try await store.register(
+      .init(email: "paged-other@example.com", password: "a secure password", displayName: "Other"))
+    let ownerIDs = [UUID(), UUID(), UUID()]
+
+    for id in ownerIDs {
+      _ = try await store.pushSync(
+        .init(changes: [.init(id: id, type: "preset", version: 1, payload: "{}", isDeleted: false)]),
+        accessToken: owner.accessToken)
+    }
+    _ = try await store.pushSync(
+      .init(changes: [.init(id: UUID(), type: "preset", version: 1, payload: "{}", isDeleted: false)]),
+      accessToken: other.accessToken)
+
+    let firstPage = try await store.pullSync(after: 0, accessToken: owner.accessToken, limit: 2)
+    XCTAssertEqual(firstPage.changes.map(\.id), Array(ownerIDs.prefix(2)))
+    XCTAssertEqual(firstPage.nextCursor, 2)
+    XCTAssertTrue(firstPage.hasMore)
+
+    let finalPage = try await store.pullSync(
+      after: firstPage.nextCursor, accessToken: owner.accessToken, limit: 2)
+    XCTAssertEqual(finalPage.changes.map(\.id), [ownerIDs[2]])
+    XCTAssertEqual(finalPage.nextCursor, 4)
+    XCTAssertFalse(finalPage.hasMore)
+
+    let caughtUp = try await store.pullSync(
+      after: finalPage.nextCursor, accessToken: owner.accessToken, limit: 2)
+    XCTAssertTrue(caughtUp.changes.isEmpty)
+    XCTAssertEqual(caughtUp.nextCursor, 4)
+    XCTAssertFalse(caughtUp.hasMore)
+  }
+
   func testResultsAreIdempotentAndLeaderboardOrdersEligibleScores() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let slower = try await store.register(

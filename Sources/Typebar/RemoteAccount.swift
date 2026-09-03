@@ -179,7 +179,7 @@ private struct RemoteSyncPushResponse: Codable, Sendable {
     let nextCursor: Int
 }
 
-private struct RemoteSyncPullChange: Codable, Sendable {
+struct RemoteSyncPullChange: Codable, Sendable {
     let id: UUID
     let type: String
     let version: Int
@@ -188,9 +188,27 @@ private struct RemoteSyncPullChange: Codable, Sendable {
     let cursor: Int
 }
 
-private struct RemoteSyncPullResponse: Codable, Sendable {
+struct RemoteSyncPullResponse: Codable, Sendable {
     let changes: [RemoteSyncPullChange]
     let nextCursor: Int
+    let hasMore: Bool
+
+    private enum CodingKeys: String, CodingKey { case changes, nextCursor, hasMore }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        changes = try values.decode([RemoteSyncPullChange].self, forKey: .changes)
+        nextCursor = try values.decode(Int.self, forKey: .nextCursor)
+        // Self-hosted servers from before paged pulls omit this key and return the
+        // entire change set, so treating it as the final page is backward-compatible.
+        hasMore = try values.decodeIfPresent(Bool.self, forKey: .hasMore) ?? false
+    }
+}
+
+struct RemoteArchivePull {
+    let archive: TypebarArchive?
+    let nextCursor: Int
+    let archiveVersion: Int?
 }
 
 private struct RemoteResultSubmission: Codable, Sendable {
@@ -787,23 +805,52 @@ final class AccountSession {
         return response.nextCursor
     }
 
-    func pullArchive() async throws -> TypebarArchive? {
+    func pullArchive() async throws -> RemoteArchivePull {
         isWorking = true
         defer { isWorking = false }
         guard let token = tokenStore.load() else { throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。") }
-        let cursor = defaults.integer(forKey: syncCursorKey)
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
-            path: "v1/sync",
-            method: "GET",
-            token: token,
-            body: Optional<String>.none,
-            queryItems: [URLQueryItem(name: "cursor", value: "\(cursor)")],
-            response: RemoteSyncPullResponse.self
-        )
-        defaults.set(response.nextCursor, forKey: syncCursorKey)
-        guard let change = response.changes.last(where: { $0.type == "typebar-archive" && !$0.isDeleted && $0.payload != nil }), let payload = change.payload else { return nil }
-        defaults.set(max(defaults.integer(forKey: syncVersionKey), change.version), forKey: syncVersionKey)
-        return try TypebarDataTransfer.importArchive(from: Data(payload.utf8))
+        var cursor = defaults.integer(forKey: syncCursorKey)
+        var latestArchiveChange: RemoteSyncPullChange?
+
+        while true {
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/sync",
+                method: "GET",
+                token: token,
+                body: Optional<String>.none,
+                queryItems: [
+                    URLQueryItem(name: "cursor", value: "\(cursor)"),
+                    URLQueryItem(name: "limit", value: "100")
+                ],
+                response: RemoteSyncPullResponse.self
+            )
+            guard response.nextCursor >= cursor else { throw RemoteAccountError.unexpectedResponse }
+            if let newest = response.changes
+                .filter({ $0.type == "typebar-archive" })
+                .max(by: { $0.cursor < $1.cursor })
+              , (latestArchiveChange?.cursor ?? -1) < newest.cursor
+            {
+                latestArchiveChange = newest
+            }
+            guard response.hasMore else {
+                let archive = try latestArchiveChange.flatMap { change -> TypebarArchive? in
+                    guard !change.isDeleted, let payload = change.payload else { return nil }
+                    return try TypebarDataTransfer.importArchive(from: Data(payload.utf8))
+                }
+                return .init(
+                    archive: archive, nextCursor: response.nextCursor,
+                    archiveVersion: latestArchiveChange?.version)
+            }
+            guard response.nextCursor > cursor else { throw RemoteAccountError.unexpectedResponse }
+            cursor = response.nextCursor
+        }
+    }
+
+    func confirmPulledArchive(_ pull: RemoteArchivePull) {
+        defaults.set(pull.nextCursor, forKey: syncCursorKey)
+        if let version = pull.archiveVersion {
+            defaults.set(max(defaults.integer(forKey: syncVersionKey), version), forKey: syncVersionKey)
+        }
     }
 
     func submitCompletedResult(_ result: CompletedTestResult) async throws -> RemoteResultSubmissionResponse {

@@ -42,8 +42,10 @@ public struct SyncPushResponse: Content, Equatable {
 public struct SyncPullResponse: Content, Equatable {
     public let changes: [SyncChangeResponse]
     public let nextCursor: Int
+    public let hasMore: Bool
 }
 
 public struct SyncCursorQuery: Content {
     public let cursor: Int?
+    public let limit: Int?
 }

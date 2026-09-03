@@ -316,7 +316,10 @@ public func configure(
     app.get("v1", "sync") { request async throws -> SyncPullResponse in
         do {
             let query = try request.query.decode(SyncCursorQuery.self)
-            return try await authStore.pullSync(after: max(0, query.cursor ?? 0), accessToken: try request.accessToken())
+            return try await authStore.pullSync(
+                after: max(0, query.cursor ?? 0), accessToken: try request.accessToken(),
+                limit: query.limit
+            )
         } catch let error as AuthStoreError {
             throw error.abort
         }

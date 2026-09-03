@@ -1206,15 +1206,34 @@ public actor AuthStore {
     return .init(results: results, nextCursor: state.nextSyncCursor)
   }
 
-  public func pullSync(after cursor: Int, accessToken: String, now: Date = .now) throws
+  public func pullSync(
+    after cursor: Int, accessToken: String, limit: Int? = nil, now: Date = .now
+  ) throws
     -> SyncPullResponse
   {
     let user = try authenticatedUser(for: accessToken, now: now)
-    let changes = state.syncRecords
+    let records = state.syncRecords
       .filter { $0.userID == user.id && $0.cursor > cursor }
       .sorted { $0.cursor < $1.cursor }
-      .map { $0.response() }
-    return .init(changes: changes, nextCursor: state.nextSyncCursor)
+    guard let limit else {
+      return .init(
+        changes: records.map { $0.response() }, nextCursor: state.nextSyncCursor, hasMore: false)
+    }
+
+    let pageSize = min(max(limit, 1), 250)
+    let page = Array(records.prefix(pageSize))
+    let hasMore = records.count > page.count
+    // An unfinished page must resume at the last record actually delivered. Once the
+    // user-scoped stream is exhausted, advancing to the current global cursor is safe:
+    // any future record for this user receives a strictly higher cursor.
+    let nextCursor: Int
+    if hasMore, let last = page.last {
+      nextCursor = last.cursor
+    } else {
+      nextCursor = state.nextSyncCursor
+    }
+    return .init(
+      changes: page.map { $0.response() }, nextCursor: nextCursor, hasMore: hasMore)
   }
 
   public func submitResult(

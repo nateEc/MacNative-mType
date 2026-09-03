@@ -168,11 +168,14 @@ struct CloudSyncView: View {
     private func pull() {
         Task {
             do {
-                guard let archive = try await account.pullArchive() else {
+                let pulled = try await account.pullArchive()
+                guard let archive = pulled.archive else {
+                    account.confirmPulledArchive(pulled)
                     message = "没有新的远端归档。"
                     return
                 }
                 let summary = try LocalArchiveImport.apply(archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts, modelContext: modelContext)
+                account.confirmPulledArchive(pulled)
                 message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本。"
             } catch {
                 message = error.localizedDescription

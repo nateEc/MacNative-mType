@@ -8,6 +8,19 @@ import XCTest
 final class TypingEngineTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 10_000)
 
+  func testLegacySyncPullResponseDefaultsMissingPaginationFlagToFinalPage() throws {
+    let legacy = try JSONDecoder().decode(
+      RemoteSyncPullResponse.self,
+      from: Data(#"{"changes":[],"nextCursor":17}"#.utf8))
+    XCTAssertEqual(legacy.nextCursor, 17)
+    XCTAssertFalse(legacy.hasMore)
+
+    let paged = try JSONDecoder().decode(
+      RemoteSyncPullResponse.self,
+      from: Data(#"{"changes":[],"nextCursor":23,"hasMore":true}"#.utf8))
+    XCTAssertTrue(paged.hasMore)
+  }
+
   func testTimedTestCompletesAtDeadline() {
     var session = TypingSession(configuration: .timed(seconds: 15), prompt: "amber harbor")
     session.insert("a", at: start)
