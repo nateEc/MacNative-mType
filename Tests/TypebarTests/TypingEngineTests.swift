@@ -1683,6 +1683,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(AppSettings(defaults: defaults).snapshot, AppSettingsSnapshot())
   }
 
+  @MainActor
+  func testFreshAndRestoredSettingsUseReferenceCompatiblePresentationDefaults() {
+    let suiteName = "TypebarTests.reference-defaults-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    XCTAssertFalse(settings.showKeyboardGuide)
+    XCTAssertEqual(settings.keyboardGuideMode, .off)
+    XCTAssertEqual(settings.quickRestartKey, .off)
+    XCTAssertFalse(settings.smoothPracticeLineScroll)
+    XCTAssertEqual(settings.caretStyle, .bar)
+    XCTAssertEqual(settings.liveSpeedStyle, .off)
+    XCTAssertEqual(settings.liveAccuracyStyle, .off)
+    XCTAssertEqual(settings.liveBurstStyle, .off)
+    XCTAssertEqual(settings.liveProgressStyle, .mini)
+    XCTAssertEqual(settings.soundVolume, 0.5)
+    XCTAssertEqual(settings.paceGuideCustomWpm, 100)
+    XCTAssertTrue(settings.repeatedPace)
+
+    settings.keyboardGuideMode = .next
+    settings.quickRestartKey = .escape
+    settings.liveSpeedStyle = .text
+    settings.restoreDefaults()
+
+    XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
+  }
+
   func testSettingsSearchMatchesEveryWhitespaceSeparatedTokenAcrossLocalizedTerms() {
     XCTAssertTrue(
       SettingsSearch.matches(query: "KEYBOARD layout", terms: ["键盘布局", "Keyboard Layout", "下一键"]))
@@ -3844,14 +3872,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(snapshot.customThemes.isEmpty)
     XCTAssertNil(snapshot.activeCustomThemeID)
     XCTAssertTrue(snapshot.favoriteThemeIDs.isEmpty)
-    XCTAssertTrue(snapshot.showKeyboardGuide)
-    XCTAssertEqual(snapshot.keyboardGuideMode, .next)
+    XCTAssertFalse(snapshot.showKeyboardGuide)
+    XCTAssertEqual(snapshot.keyboardGuideMode, .off)
     XCTAssertEqual(snapshot.keyboardGuideScale, 1)
     XCTAssertEqual(snapshot.keyboardGuideLegendStyle, .lowercase)
     XCTAssertEqual(snapshot.keyboardGuideKeysMode, .minimal)
     XCTAssertEqual(snapshot.keyboardGuideStyle, .staggered)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
+    XCTAssertEqual(snapshot.quickRestartKey, .off)
     XCTAssertTrue(snapshot.showKeyTips)
     XCTAssertEqual(snapshot.commandPaletteListMode, .singleList)
     XCTAssertFalse(snapshot.followSystemTheme)
@@ -3877,8 +3906,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.minimumWordBurstWpm, 0)
     XCTAssertEqual(snapshot.practiceLineWidth, .standard)
     XCTAssertEqual(snapshot.customPracticeLineColumns, 60)
+    XCTAssertFalse(snapshot.smoothPracticeLineScroll)
     XCTAssertEqual(snapshot.smoothCaretMotion, .medium)
-    XCTAssertEqual(snapshot.caretStyle, .block)
+    XCTAssertEqual(snapshot.caretStyle, .bar)
     XCTAssertEqual(snapshot.installedPracticeFontName, "")
     XCTAssertEqual(snapshot.typoIndicatorStyle, .off)
     XCTAssertEqual(snapshot.typingSpeedUnit, .wpm)
@@ -3888,10 +3918,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.showAverage, .off)
     XCTAssertFalse(snapshot.showPersonalBest)
     XCTAssertEqual(snapshot.typedCharacterEffect, .keep)
-    XCTAssertEqual(snapshot.liveSpeedStyle, .text)
-    XCTAssertEqual(snapshot.liveAccuracyStyle, .text)
-    XCTAssertEqual(snapshot.liveBurstStyle, .text)
-    XCTAssertEqual(snapshot.liveProgressStyle, .text)
+    XCTAssertEqual(snapshot.liveSpeedStyle, .off)
+    XCTAssertEqual(snapshot.liveAccuracyStyle, .off)
+    XCTAssertEqual(snapshot.liveBurstStyle, .off)
+    XCTAssertEqual(snapshot.liveProgressStyle, .mini)
     XCTAssertEqual(snapshot.liveStatsColor, .accent)
     XCTAssertEqual(snapshot.liveStatsOpacity, .full)
     XCTAssertEqual(snapshot.promptHighlightMode, .letter)
@@ -3903,10 +3933,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.errorSoundStyle, .basso)
     XCTAssertEqual(snapshot.timeWarningOffset, .off)
     XCTAssertEqual(snapshot.timeWarningSoundStyle, .glass)
+    XCTAssertEqual(snapshot.soundVolume, 0.5)
     XCTAssertEqual(snapshot.paceGuideMode, .off)
-    XCTAssertEqual(snapshot.paceGuideCustomWpm, 60)
+    XCTAssertEqual(snapshot.paceGuideCustomWpm, 100)
     XCTAssertEqual(snapshot.paceCaretStyle, .bar)
-    XCTAssertFalse(snapshot.repeatedPace)
+    XCTAssertTrue(snapshot.repeatedPace)
     let legacyRandom = try JSONDecoder().decode(
       AppSettingsSnapshot.self, from: Data("{\"randomThemeOnRestart\":true}".utf8))
     XCTAssertEqual(legacyRandom.randomThemeMode, .on)

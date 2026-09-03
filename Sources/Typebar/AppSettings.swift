@@ -476,15 +476,15 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var customThemes: [CustomThemeDefinition] = []
   var activeCustomThemeID: UUID?
   var favoriteThemeIDs: [String] = []
-  var showKeyboardGuide = true
-  var keyboardGuideMode: KeyboardGuideMode = .next
+  var showKeyboardGuide = false
+  var keyboardGuideMode: KeyboardGuideMode = .off
   var keyboardGuideScale = 1.0
   var keyboardGuideLegendStyle: KeyboardGuideLegendStyle = .lowercase
   var keyboardGuideKeysMode: KeyboardGuideKeysMode = .minimal
   var keyboardGuideStyle: KeyboardGuideStyle = .staggered
   var keyboardLayout: KeyboardLayout = .ansiQwerty
   var quickEnd = false
-  var quickRestartKey: QuickRestartKey = .escape
+  var quickRestartKey: QuickRestartKey = .off
   var showKeyTips = true
   var commandPaletteListMode: CommandPaletteListMode = .singleList
   var followSystemTheme = false
@@ -515,10 +515,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var customPracticeLineColumns = 60
   var practiceTapeMode: PracticeTapeMode = .off
   var practiceTapeMargin: Double = 0.5
-  var smoothPracticeLineScroll = true
+  var smoothPracticeLineScroll = false
   var showAllPracticeLines = false
   var smoothCaretMotion: SmoothCaretMotion = .medium
-  var caretStyle: TypingCaretStyle = .block
+  var caretStyle: TypingCaretStyle = .bar
   var typoIndicatorStyle: TypoIndicatorStyle = .off
   var compositionDisplayStyle: CompositionDisplayStyle = .replace
   var typingSpeedUnit: TypingSpeedUnit = .wpm
@@ -530,10 +530,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var showAverage: AverageNoticeDisplay = .off
   var showPersonalBest = false
   var typedCharacterEffect: TypedCharacterEffect = .keep
-  var liveSpeedStyle: LiveMetricStyle = .text
-  var liveAccuracyStyle: LiveMetricStyle = .text
-  var liveBurstStyle: LiveMetricStyle = .text
-  var liveProgressStyle: LiveProgressStyle = .text
+  var liveSpeedStyle: LiveMetricStyle = .off
+  var liveAccuracyStyle: LiveMetricStyle = .off
+  var liveBurstStyle: LiveMetricStyle = .off
+  var liveProgressStyle: LiveProgressStyle = .mini
   var liveStatsColor: LiveStatsColor = .accent
   var liveStatsOpacity: LiveStatsOpacity = .full
   var promptHighlightMode: PromptHighlightMode = .letter
@@ -546,12 +546,12 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var errorSoundStyle: TypingErrorSoundStyle = .basso
   var timeWarningOffset: TimeWarningOffset = .off
   var timeWarningSoundStyle: TimeWarningSoundStyle = .glass
-  var soundVolume: Double = 0.7
+  var soundVolume: Double = 0.5
   var globalHotkeyEnabled = false
   var paceGuideMode: PaceGuideMode = .off
-  var paceGuideCustomWpm = 60
+  var paceGuideCustomWpm = 100
   var paceCaretStyle: TypingCaretStyle = .bar
-  var repeatedPace = false
+  var repeatedPace = true
 
   init(
     difficulty: Difficulty = .normal,
@@ -571,15 +571,15 @@ struct AppSettingsSnapshot: Codable, Equatable {
     customThemes: [CustomThemeDefinition] = [],
     activeCustomThemeID: UUID? = nil,
     favoriteThemeIDs: [String] = [],
-    showKeyboardGuide: Bool = true,
-    keyboardGuideMode: KeyboardGuideMode = .next,
+    showKeyboardGuide: Bool = false,
+    keyboardGuideMode: KeyboardGuideMode = .off,
     keyboardGuideScale: Double = 1,
     keyboardGuideLegendStyle: KeyboardGuideLegendStyle = .lowercase,
     keyboardGuideKeysMode: KeyboardGuideKeysMode = .minimal,
     keyboardGuideStyle: KeyboardGuideStyle = .staggered,
     keyboardLayout: KeyboardLayout = .ansiQwerty,
     quickEnd: Bool = false,
-    quickRestartKey: QuickRestartKey = .escape,
+    quickRestartKey: QuickRestartKey = .off,
     showKeyTips: Bool = true,
     commandPaletteListMode: CommandPaletteListMode = .singleList,
     followSystemTheme: Bool = false,
@@ -610,10 +610,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
     customPracticeLineColumns: Int = 60,
     practiceTapeMode: PracticeTapeMode = .off,
     practiceTapeMargin: Double = 0.5,
-    smoothPracticeLineScroll: Bool = true,
+    smoothPracticeLineScroll: Bool = false,
     showAllPracticeLines: Bool = false,
     smoothCaretMotion: SmoothCaretMotion = .medium,
-    caretStyle: TypingCaretStyle = .block,
+    caretStyle: TypingCaretStyle = .bar,
     typoIndicatorStyle: TypoIndicatorStyle = .off,
     compositionDisplayStyle: CompositionDisplayStyle = .replace,
     typingSpeedUnit: TypingSpeedUnit = .wpm,
@@ -625,10 +625,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
     showAverage: AverageNoticeDisplay = .off,
     showPersonalBest: Bool = false,
     typedCharacterEffect: TypedCharacterEffect = .keep,
-    liveSpeedStyle: LiveMetricStyle = .text,
-    liveAccuracyStyle: LiveMetricStyle = .text,
-    liveBurstStyle: LiveMetricStyle = .text,
-    liveProgressStyle: LiveProgressStyle = .text,
+    liveSpeedStyle: LiveMetricStyle = .off,
+    liveAccuracyStyle: LiveMetricStyle = .off,
+    liveBurstStyle: LiveMetricStyle = .off,
+    liveProgressStyle: LiveProgressStyle = .mini,
     liveStatsColor: LiveStatsColor = .accent,
     liveStatsOpacity: LiveStatsOpacity = .full,
     promptHighlightMode: PromptHighlightMode = .letter,
@@ -641,12 +641,12 @@ struct AppSettingsSnapshot: Codable, Equatable {
     errorSoundStyle: TypingErrorSoundStyle = .basso,
     timeWarningOffset: TimeWarningOffset = .off,
     timeWarningSoundStyle: TimeWarningSoundStyle = .glass,
-    soundVolume: Double = 0.7,
+    soundVolume: Double = 0.5,
     globalHotkeyEnabled: Bool = false,
     paceGuideMode: PaceGuideMode = .off,
-    paceGuideCustomWpm: Int = 60,
+    paceGuideCustomWpm: Int = 100,
     paceCaretStyle: TypingCaretStyle = .bar,
-    repeatedPace: Bool = false
+    repeatedPace: Bool = true
   ) {
     self.difficulty = difficulty
     self.strictSpace = strictSpace
@@ -806,7 +806,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     favoriteThemeIDs = ThemeFavoritePolicy.normalized(
       try values.decodeIfPresent([String].self, forKey: .favoriteThemeIDs) ?? [],
       customThemes: customThemes)
-    showKeyboardGuide = try values.decodeIfPresent(Bool.self, forKey: .showKeyboardGuide) ?? true
+    showKeyboardGuide = try values.decodeIfPresent(Bool.self, forKey: .showKeyboardGuide) ?? false
     keyboardGuideMode = try values.decodeIfPresent(KeyboardGuideMode.self, forKey: .keyboardGuideMode)
       ?? (showKeyboardGuide ? .next : .off)
     keyboardGuideScale = KeyboardGuideScalePolicy.normalized(
@@ -820,7 +820,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     keyboardLayout =
       try values.decodeIfPresent(KeyboardLayout.self, forKey: .keyboardLayout) ?? .ansiQwerty
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
-    quickRestartKey = try values.decodeIfPresent(QuickRestartKey.self, forKey: .quickRestartKey) ?? .escape
+    quickRestartKey = try values.decodeIfPresent(QuickRestartKey.self, forKey: .quickRestartKey) ?? .off
     showKeyTips = try values.decodeIfPresent(Bool.self, forKey: .showKeyTips) ?? true
     commandPaletteListMode =
       try values.decodeIfPresent(CommandPaletteListMode.self, forKey: .commandPaletteListMode) ?? .singleList
@@ -877,12 +877,12 @@ struct AppSettingsSnapshot: Codable, Equatable {
     practiceTapeMargin =
       (try values.decodeIfPresent(Double.self, forKey: .practiceTapeMargin) ?? 0.5).clamped(to: 0...1)
     smoothPracticeLineScroll =
-      try values.decodeIfPresent(Bool.self, forKey: .smoothPracticeLineScroll) ?? true
+      try values.decodeIfPresent(Bool.self, forKey: .smoothPracticeLineScroll) ?? false
     showAllPracticeLines =
       try values.decodeIfPresent(Bool.self, forKey: .showAllPracticeLines) ?? false
     smoothCaretMotion =
       try values.decodeIfPresent(SmoothCaretMotion.self, forKey: .smoothCaretMotion) ?? .medium
-    caretStyle = try values.decodeIfPresent(TypingCaretStyle.self, forKey: .caretStyle) ?? .block
+    caretStyle = try values.decodeIfPresent(TypingCaretStyle.self, forKey: .caretStyle) ?? .bar
     typoIndicatorStyle = try values.decodeIfPresent(TypoIndicatorStyle.self, forKey: .typoIndicatorStyle) ?? .off
     compositionDisplayStyle =
       try values.decodeIfPresent(CompositionDisplayStyle.self, forKey: .compositionDisplayStyle) ?? .replace
@@ -901,10 +901,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(AverageNoticeDisplay.self, forKey: .showAverage) ?? .off
     showPersonalBest = try values.decodeIfPresent(Bool.self, forKey: .showPersonalBest) ?? false
     typedCharacterEffect = try values.decodeIfPresent(TypedCharacterEffect.self, forKey: .typedCharacterEffect) ?? .keep
-    liveSpeedStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveSpeedStyle) ?? .text
-    liveAccuracyStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveAccuracyStyle) ?? .text
-    liveBurstStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveBurstStyle) ?? .text
-    liveProgressStyle = try values.decodeIfPresent(LiveProgressStyle.self, forKey: .liveProgressStyle) ?? .text
+    liveSpeedStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveSpeedStyle) ?? .off
+    liveAccuracyStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveAccuracyStyle) ?? .off
+    liveBurstStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveBurstStyle) ?? .off
+    liveProgressStyle = try values.decodeIfPresent(LiveProgressStyle.self, forKey: .liveProgressStyle) ?? .mini
     liveStatsColor = try values.decodeIfPresent(LiveStatsColor.self, forKey: .liveStatsColor) ?? .accent
     liveStatsOpacity = try values.decodeIfPresent(LiveStatsOpacity.self, forKey: .liveStatsOpacity) ?? .full
     promptHighlightMode =
@@ -924,15 +924,15 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(TimeWarningOffset.self, forKey: .timeWarningOffset) ?? .off
     timeWarningSoundStyle =
       try values.decodeIfPresent(TimeWarningSoundStyle.self, forKey: .timeWarningSoundStyle) ?? .glass
-    soundVolume = (try values.decodeIfPresent(Double.self, forKey: .soundVolume) ?? 0.7).clamped(
+    soundVolume = (try values.decodeIfPresent(Double.self, forKey: .soundVolume) ?? 0.5).clamped(
       to: 0...1)
     globalHotkeyEnabled =
       try values.decodeIfPresent(Bool.self, forKey: .globalHotkeyEnabled) ?? false
     paceGuideMode = try values.decodeIfPresent(PaceGuideMode.self, forKey: .paceGuideMode) ?? .off
-    paceGuideCustomWpm = (try values.decodeIfPresent(Int.self, forKey: .paceGuideCustomWpm) ?? 60)
+    paceGuideCustomWpm = (try values.decodeIfPresent(Int.self, forKey: .paceGuideCustomWpm) ?? 100)
       .clamped(to: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm)
     paceCaretStyle = try values.decodeIfPresent(TypingCaretStyle.self, forKey: .paceCaretStyle) ?? .bar
-    repeatedPace = try values.decodeIfPresent(Bool.self, forKey: .repeatedPace) ?? false
+    repeatedPace = try values.decodeIfPresent(Bool.self, forKey: .repeatedPace) ?? true
   }
 }
 
@@ -1031,8 +1031,8 @@ final class AppSettings {
   var customThemes: [CustomThemeDefinition] = [] { didSet { persist() } }
   var activeCustomThemeID: UUID? { didSet { persist() } }
   var favoriteThemeIDs: [String] = [] { didSet { persist() } }
-  var showKeyboardGuide = true { didSet { persist() } }
-  var keyboardGuideMode: KeyboardGuideMode = .next {
+  var showKeyboardGuide = false { didSet { persist() } }
+  var keyboardGuideMode: KeyboardGuideMode = .off {
     didSet {
       let shouldShowGuide = keyboardGuideMode != .off
       if showKeyboardGuide != shouldShowGuide { showKeyboardGuide = shouldShowGuide }
@@ -1057,7 +1057,7 @@ final class AppSettings {
     didSet { defaults.set(layoutFluidLayouts.map(\.rawValue), forKey: layoutFluidStorageKey) }
   }
   var quickEnd = false { didSet { persist() } }
-  var quickRestartKey: QuickRestartKey = .escape { didSet { persist() } }
+  var quickRestartKey: QuickRestartKey = .off { didSet { persist() } }
   var showKeyTips = true { didSet { persist() } }
   var commandPaletteListMode: CommandPaletteListMode = .singleList { didSet { persist() } }
   var followSystemTheme = false {
@@ -1177,10 +1177,10 @@ final class AppSettings {
   var customPracticeLineColumns = 60 { didSet { persist() } }
   var practiceTapeMode: PracticeTapeMode = .off { didSet { persist() } }
   var practiceTapeMargin: Double = 0.5 { didSet { persist() } }
-  var smoothPracticeLineScroll = true { didSet { persist() } }
+  var smoothPracticeLineScroll = false { didSet { persist() } }
   var showAllPracticeLines = false { didSet { persist() } }
   var smoothCaretMotion: SmoothCaretMotion = .medium { didSet { persist() } }
-  var caretStyle: TypingCaretStyle = .block { didSet { persist() } }
+  var caretStyle: TypingCaretStyle = .bar { didSet { persist() } }
   var typoIndicatorStyle: TypoIndicatorStyle = .off { didSet { persist() } }
   var compositionDisplayStyle: CompositionDisplayStyle = .replace { didSet { persist() } }
   var typingSpeedUnit: TypingSpeedUnit = .wpm { didSet { persist() } }
@@ -1192,10 +1192,10 @@ final class AppSettings {
   var showAverage: AverageNoticeDisplay = .off { didSet { persist() } }
   var showPersonalBest = false { didSet { persist() } }
   var typedCharacterEffect: TypedCharacterEffect = .keep { didSet { persist() } }
-  var liveSpeedStyle: LiveMetricStyle = .text { didSet { persist() } }
-  var liveAccuracyStyle: LiveMetricStyle = .text { didSet { persist() } }
-  var liveBurstStyle: LiveMetricStyle = .text { didSet { persist() } }
-  var liveProgressStyle: LiveProgressStyle = .text { didSet { persist() } }
+  var liveSpeedStyle: LiveMetricStyle = .off { didSet { persist() } }
+  var liveAccuracyStyle: LiveMetricStyle = .off { didSet { persist() } }
+  var liveBurstStyle: LiveMetricStyle = .off { didSet { persist() } }
+  var liveProgressStyle: LiveProgressStyle = .mini { didSet { persist() } }
   var liveStatsColor: LiveStatsColor = .accent { didSet { persist() } }
   var liveStatsOpacity: LiveStatsOpacity = .full { didSet { persist() } }
   var promptHighlightMode: PromptHighlightMode = .letter { didSet { persist() } }
@@ -1208,12 +1208,12 @@ final class AppSettings {
   var errorSoundStyle: TypingErrorSoundStyle = .basso { didSet { persist() } }
   var timeWarningOffset: TimeWarningOffset = .off { didSet { persist() } }
   var timeWarningSoundStyle: TimeWarningSoundStyle = .glass { didSet { persist() } }
-  var soundVolume: Double = 0.7 { didSet { persist() } }
+  var soundVolume: Double = 0.5 { didSet { persist() } }
   var globalHotkeyEnabled = false { didSet { persist() } }
   var paceGuideMode: PaceGuideMode = .off { didSet { persist() } }
-  var paceGuideCustomWpm = 60 { didSet { persist() } }
+  var paceGuideCustomWpm = 100 { didSet { persist() } }
   var paceCaretStyle: TypingCaretStyle = .bar { didSet { persist() } }
-  var repeatedPace = false { didSet { persist() } }
+  var repeatedPace = true { didSet { persist() } }
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
@@ -1431,8 +1431,8 @@ final class AppSettings {
     customThemes = []
     activeCustomThemeID = nil
     favoriteThemeIDs = []
-    showKeyboardGuide = true
-    keyboardGuideMode = .next
+    showKeyboardGuide = false
+    keyboardGuideMode = .off
     keyboardGuideScale = 1
     keyboardGuideLegendStyle = .lowercase
     keyboardGuideKeysMode = .minimal
@@ -1440,7 +1440,7 @@ final class AppSettings {
     keyboardLayout = .ansiQwerty
     layoutFluidLayouts = LayoutFluidPolicy.defaultLayouts
     quickEnd = false
-    quickRestartKey = .escape
+    quickRestartKey = .off
     showKeyTips = true
     commandPaletteListMode = .singleList
     followSystemTheme = false
@@ -1470,10 +1470,10 @@ final class AppSettings {
     customPracticeLineColumns = 60
     practiceTapeMode = .off
     practiceTapeMargin = 0.5
-    smoothPracticeLineScroll = true
+    smoothPracticeLineScroll = false
     showAllPracticeLines = false
     smoothCaretMotion = .medium
-    caretStyle = .block
+    caretStyle = .bar
     typoIndicatorStyle = .off
     compositionDisplayStyle = .replace
     typingSpeedUnit = .wpm
@@ -1485,10 +1485,10 @@ final class AppSettings {
     showAverage = .off
     showPersonalBest = false
     typedCharacterEffect = .keep
-    liveSpeedStyle = .text
-    liveAccuracyStyle = .text
-    liveBurstStyle = .text
-    liveProgressStyle = .text
+    liveSpeedStyle = .off
+    liveAccuracyStyle = .off
+    liveBurstStyle = .off
+    liveProgressStyle = .mini
     liveStatsColor = .accent
     liveStatsOpacity = .full
     promptHighlightMode = .letter
@@ -1501,12 +1501,12 @@ final class AppSettings {
     errorSoundStyle = .basso
     timeWarningOffset = .off
     timeWarningSoundStyle = .glass
-    soundVolume = 0.7
+    soundVolume = 0.5
     globalHotkeyEnabled = false
     paceGuideMode = .off
-    paceGuideCustomWpm = 60
+    paceGuideCustomWpm = 100
     paceCaretStyle = .bar
-    repeatedPace = false
+    repeatedPace = true
   }
 
   func apply(_ configuration: TestConfiguration) {

@@ -71,7 +71,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onRestart: () -> Void = {}
     var onBailoutArmed: () -> Void = {}
     var onBailout: () -> Void = {}
-    var quickRestartKey: QuickRestartKey = .escape
+    var quickRestartKey: QuickRestartKey = .off
     var keyboardLayout: KeyboardLayout = .ansiQwerty
     var oppositeShiftMode: OppositeShiftMode = .off
     var mapsArrowKeysToInput = false
