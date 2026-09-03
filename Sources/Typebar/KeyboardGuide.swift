@@ -113,6 +113,51 @@ enum KeyboardGuideKeysMode: String, Codable, CaseIterable, Identifiable {
   }
 }
 
+/// Native geometry choices corresponding to Monkeytype's `keymapStyle` values.
+/// They change only the visual guide, never keyboard interpretation or scoring.
+enum KeyboardGuideStyle: String, Codable, CaseIterable, Identifiable {
+  case staggered
+  case alice
+  case matrix
+  case split
+  case splitMatrix = "split_matrix"
+  case steno
+  case stenoMatrix = "steno_matrix"
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .staggered: "错列"
+    case .alice: "人体工学"
+    case .matrix: "矩阵"
+    case .split: "分体错列"
+    case .splitMatrix: "分体矩阵"
+    case .steno: "速录"
+    case .stenoMatrix: "速录矩阵"
+    }
+  }
+
+  var isSteno: Bool {
+    self == .steno || self == .stenoMatrix
+  }
+
+  var usesSplit: Bool {
+    self == .split || self == .splitMatrix || self == .alice || isSteno
+  }
+
+  func rowLeadingInset(for rowIndex: Int) -> CGFloat {
+    switch self {
+    case .staggered, .split:
+      CGFloat(min(rowIndex, 3)) * 4
+    case .steno:
+      rowIndex == 0 ? 0 : 8
+    case .alice, .matrix, .splitMatrix, .stenoMatrix:
+      0
+    }
+  }
+}
+
 struct KeyboardGuideKey: Identifiable, Equatable {
   let id: String
   let label: String
@@ -213,13 +258,17 @@ enum KeyboardGuideModel {
     }
   }
 
-  static func highlightedKey(for character: Character?, layout: KeyboardLayout = .ansiQwerty)
+  static func highlightedKey(
+    for character: Character?,
+    layout: KeyboardLayout = .ansiQwerty,
+    style: KeyboardGuideStyle = .staggered
+  )
     -> String?
   {
     guard let character else { return nil }
-    if character == " " { return "space" }
-    return rows(for: layout)
-      .flatMap { $0 }
+    if character == " " { return style.isSteno ? "steno-space" : "space" }
+    let keys = style.isSteno ? stenoRows().flatMap { $0 } : rows(for: layout).flatMap { $0 }
+    return keys
       .first(where: { $0.characters.contains(Character(String(character).lowercased())) })?
       .id
   }
@@ -228,8 +277,10 @@ enum KeyboardGuideModel {
     for layout: KeyboardLayout,
     keysMode: KeyboardGuideKeysMode,
     mode: KeyboardGuideMode,
-    nextCharacter: Character?
+    nextCharacter: Character?,
+    style: KeyboardGuideStyle = .staggered
   ) -> [[KeyboardGuideKey]] {
+    if style.isSteno { return stenoRows() }
     let baseRows = rows(for: layout)
     let contentRows = keysMode.showsNumberRow(
       for: layout, mode: mode, nextCharacter: nextCharacter)
@@ -247,7 +298,11 @@ enum KeyboardGuideModel {
     ]
   }
 
-  static func bottomRow(for keysMode: KeyboardGuideKeysMode) -> [KeyboardGuideKey] {
+  static func bottomRow(
+    for keysMode: KeyboardGuideKeysMode,
+    style: KeyboardGuideStyle = .staggered
+  ) -> [KeyboardGuideKey] {
+    if style.isSteno { return [] }
     if keysMode == .full {
       return [
         nonTypingKey("left-control", label: "⌃", width: 34),
@@ -260,6 +315,14 @@ enum KeyboardGuideModel {
       ]
     }
     return [KeyboardGuideKey("space", label: "空格", characters: " ", width: 170)]
+  }
+
+  static func stenoRows() -> [[KeyboardGuideKey]] {
+    [
+      stenoRow("steno-left-top", "STPH", "steno-right-top", "FPLTR"),
+      stenoRow("steno-left-bottom", "SKWR", "steno-right-bottom", "RBGSZ"),
+      [KeyboardGuideKey("steno-space", label: "—", characters: " ", width: 150)],
+    ]
   }
 
   private static func row(_ prefix: String, _ labels: String, characters: [String]? = nil)
@@ -276,6 +339,16 @@ enum KeyboardGuideModel {
 
   private static func nonTypingKey(_ id: String, label: String, width: CGFloat) -> KeyboardGuideKey {
     KeyboardGuideKey(id, label: label, characters: "", width: width)
+  }
+
+  private static func stenoRow(
+    _ leftID: String,
+    _ left: String,
+    _ rightID: String,
+    _ right: String
+  ) -> [KeyboardGuideKey] {
+    row(leftID, left) + [KeyboardGuideKey("\(leftID)-star", label: "*", width: 34)]
+      + row(rightID, right)
   }
 }
 
@@ -302,6 +375,7 @@ struct KeyboardGuide: View {
   let scale: Double
   let legendStyle: KeyboardGuideLegendStyle
   let keysMode: KeyboardGuideKeysMode
+  let style: KeyboardGuideStyle
   let modifierFlags: NSEvent.ModifierFlags
   let capsLockEnabled: Bool
 
@@ -312,19 +386,23 @@ struct KeyboardGuide: View {
     if mode == .react { return flashedKey }
     let expected = nextCharacter.map { mirrored ? KeyboardMirror.transform($0) : $0 }
     return KeyboardGuideModel.highlightedKey(
-      for: mode.highlightedCharacter(nextCharacter: expected, recentCharacter: nil), layout: layout)
+      for: mode.highlightedCharacter(nextCharacter: expected, recentCharacter: nil), layout: layout,
+      style: style)
   }
   private var guideRows: [[KeyboardGuideKey]] {
     KeyboardGuideModel.displayRows(
-      for: layout, keysMode: keysMode, mode: mode, nextCharacter: nextCharacter)
+      for: layout, keysMode: keysMode, mode: mode, nextCharacter: nextCharacter, style: style)
   }
 
   var body: some View {
     VStack(spacing: 4 * scale) {
       ForEach(guideRows.indices, id: \.self) { index in
-        keyRow(guideRows[index])
+        keyRow(guideRows[index], rowIndex: index)
       }
-      keyRow(KeyboardGuideModel.bottomRow(for: keysMode))
+      if !style.isSteno {
+        keyRow(
+          KeyboardGuideModel.bottomRow(for: keysMode, style: style), rowIndex: guideRows.count)
+      }
     }
     .padding(10 * scale)
     .background(panel.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
@@ -336,7 +414,8 @@ struct KeyboardGuide: View {
         flashedKey = nil
         return
       }
-      flashedKey = KeyboardGuideModel.highlightedKey(for: feedback.character, layout: layout)
+      flashedKey = KeyboardGuideModel.highlightedKey(
+        for: feedback.character, layout: layout, style: style)
       flashedKeyIsCorrect = feedback.isCorrect
       try? await Task.sleep(nanoseconds: 180_000_000)
       guard !Task.isCancelled else { return }
@@ -360,12 +439,60 @@ struct KeyboardGuide: View {
     })?.label
   }
 
-  private func keyRow(_ keys: [KeyboardGuideKey]) -> some View {
+  @ViewBuilder
+  private func keyRow(_ keys: [KeyboardGuideKey], rowIndex: Int) -> some View {
+    switch style {
+    case .split, .splitMatrix, .steno, .stenoMatrix:
+      splitKeyRow(keys, rowIndex: rowIndex)
+    case .alice:
+      aliceKeyRow(keys, rowIndex: rowIndex)
+    case .staggered, .matrix:
+      regularKeyRow(keys, rowIndex: rowIndex)
+    }
+  }
+
+  private func regularKeyRow(_ keys: [KeyboardGuideKey], rowIndex: Int) -> some View {
     HStack(spacing: 4 * scale) {
+      if style.rowLeadingInset(for: rowIndex) > 0 {
+        Color.clear.frame(width: style.rowLeadingInset(for: rowIndex) * scale)
+      }
       ForEach(keys) { key in
         keyView(key)
       }
     }
+  }
+
+  private func splitKeyRow(_ keys: [KeyboardGuideKey], rowIndex: Int) -> some View {
+    let splitIndex = (keys.count + 1) / 2
+    return HStack(spacing: 4 * scale) {
+      if style.rowLeadingInset(for: rowIndex) > 0 {
+        Color.clear.frame(width: style.rowLeadingInset(for: rowIndex) * scale)
+      }
+      ForEach(keys.indices, id: \.self) { index in
+        if index == splitIndex {
+          Color.clear.frame(width: 24 * scale)
+        }
+        keyView(keys[index])
+      }
+    }
+  }
+
+  private func aliceKeyRow(_ keys: [KeyboardGuideKey], rowIndex: Int) -> some View {
+    let splitIndex = (keys.count + 1) / 2
+    return HStack(spacing: 4 * scale) {
+      ForEach(keys.indices, id: \.self) { index in
+        if index == splitIndex {
+          Color.clear.frame(width: 14 * scale)
+        }
+        let side = index < splitIndex ? -1.0 : 1.0
+        let distance = abs(Double(index) - (Double(keys.count - 1) / 2))
+        let verticalOffset = CGFloat(min(distance, 4) * 1.4) * scale
+        keyView(keys[index])
+          .rotationEffect(.degrees(side * min(distance, 4) * 2.2))
+          .offset(y: verticalOffset)
+      }
+    }
+    .padding(.vertical, 4 * scale)
   }
 
   private func keyView(_ key: KeyboardGuideKey) -> some View {

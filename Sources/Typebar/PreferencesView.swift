@@ -493,6 +493,14 @@ struct PreferencesView: View {
             Text("精简档只在所选布局要求或下一键为数字时显示数字行；完整档增加不可输入的功能键图示。")
               .font(.caption)
               .foregroundStyle(.secondary)
+            Picker("键盘样式", selection: $settings.keyboardGuideStyle) {
+              ForEach(KeyboardGuideStyle.allCases) { style in
+                Text(style.displayName).tag(style)
+              }
+            }
+            Text("样式只调整键盘提示的原生几何布局；速录样式不改变普通 macOS 键盘输入。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
           Picker("键盘布局", selection: $settings.keyboardLayout) {
             ForEach(KeyboardLayout.allCases) { layout in

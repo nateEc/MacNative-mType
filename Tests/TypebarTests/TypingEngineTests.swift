@@ -1201,6 +1201,31 @@ final class TypingEngineTests: XCTestCase {
     ])
   }
 
+  func testKeyboardGuideStylesCoverReferenceChoicesWithNativeGeometries() {
+    XCTAssertEqual(KeyboardGuideStyle.allCases.map(\.rawValue), [
+      "staggered", "alice", "matrix", "split", "split_matrix", "steno", "steno_matrix",
+    ])
+    XCTAssertEqual(KeyboardGuideStyle.staggered.rowLeadingInset(for: 3), 12)
+    XCTAssertEqual(KeyboardGuideStyle.matrix.rowLeadingInset(for: 3), 0)
+    XCTAssertTrue(KeyboardGuideStyle.split.usesSplit)
+    XCTAssertTrue(KeyboardGuideStyle.alice.usesSplit)
+    XCTAssertTrue(KeyboardGuideStyle.steno.isSteno)
+    XCTAssertTrue(KeyboardGuideStyle.stenoMatrix.isSteno)
+
+    let stenoRows = KeyboardGuideModel.displayRows(
+      for: .ansiQwerty, keysMode: .minimal, mode: .next, nextCharacter: "s", style: .steno)
+    XCTAssertEqual(stenoRows.count, 3)
+    XCTAssertEqual(stenoRows[0].first?.id, "steno-left-top-0")
+    XCTAssertEqual(stenoRows[2].first?.id, "steno-space")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "s", layout: .ansiQwerty, style: .steno),
+      "steno-left-top-0")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: " ", layout: .ansiQwerty, style: .steno),
+      "steno-space")
+    XCTAssertTrue(KeyboardGuideModel.bottomRow(for: .full, style: .steno).isEmpty)
+  }
+
   func testKeyboardGuideUsesTheSelectedLayoutAndSupportsAsciiPunctuation() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiQwerty), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiDvorak), "bottom-1")
@@ -3362,6 +3387,7 @@ final class TypingEngineTests: XCTestCase {
     settings.keyboardGuideScale = 2.7
     settings.keyboardGuideLegendStyle = .dynamic
     settings.keyboardGuideKeysMode = .full
+    settings.keyboardGuideStyle = .alice
     settings.showFocusWarning = false
     settings.showCapsLockWarning = false
     settings.playErrorBeep = true
@@ -3383,6 +3409,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideScale, 2.7)
     XCTAssertEqual(exportedSnapshot.keyboardGuideLegendStyle, .dynamic)
     XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
+    XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
     XCTAssertEqual(exportedSnapshot.promptHighlightMode, .nextTwoWords)
@@ -3454,6 +3481,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardGuideScale, 2.7)
     XCTAssertEqual(restored.keyboardGuideLegendStyle, .dynamic)
     XCTAssertEqual(restored.keyboardGuideKeysMode, .full)
+    XCTAssertEqual(restored.keyboardGuideStyle, .alice)
     XCTAssertEqual(restored.effectiveKeyboardGuideMode, .react)
     restored.keyboardGuideMode = .off
     XCTAssertFalse(restored.showKeyboardGuide)
@@ -3545,6 +3573,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.keyboardGuideScale, 1)
     XCTAssertEqual(snapshot.keyboardGuideLegendStyle, .lowercase)
     XCTAssertEqual(snapshot.keyboardGuideKeysMode, .minimal)
+    XCTAssertEqual(snapshot.keyboardGuideStyle, .staggered)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertFalse(snapshot.followSystemTheme)

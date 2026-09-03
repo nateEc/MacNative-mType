@@ -523,6 +523,7 @@ private struct ContentView: View {
           mirrored: settings.testModifiers.contains(.mirrorKeyboard),
           scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
           keysMode: settings.keyboardGuideKeysMode,
+          style: settings.keyboardGuideStyle,
           modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
       }
       controls

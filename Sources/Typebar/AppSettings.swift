@@ -393,6 +393,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var keyboardGuideScale = 1.0
   var keyboardGuideLegendStyle: KeyboardGuideLegendStyle = .lowercase
   var keyboardGuideKeysMode: KeyboardGuideKeysMode = .minimal
+  var keyboardGuideStyle: KeyboardGuideStyle = .staggered
   var keyboardLayout: KeyboardLayout = .ansiQwerty
   var quickEnd = false
   var quickRestartKey: QuickRestartKey = .escape
@@ -474,6 +475,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     keyboardGuideScale: Double = 1,
     keyboardGuideLegendStyle: KeyboardGuideLegendStyle = .lowercase,
     keyboardGuideKeysMode: KeyboardGuideKeysMode = .minimal,
+    keyboardGuideStyle: KeyboardGuideStyle = .staggered,
     keyboardLayout: KeyboardLayout = .ansiQwerty,
     quickEnd: Bool = false,
     quickRestartKey: QuickRestartKey = .escape,
@@ -558,6 +560,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.keyboardGuideScale = KeyboardGuideScalePolicy.normalized(keyboardGuideScale)
     self.keyboardGuideLegendStyle = keyboardGuideLegendStyle
     self.keyboardGuideKeysMode = keyboardGuideKeysMode
+    self.keyboardGuideStyle = keyboardGuideStyle
     self.keyboardLayout = keyboardLayout
     self.quickEnd = quickEnd
     self.quickRestartKey = quickRestartKey
@@ -626,7 +629,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       hideExtraLetters, blindMode, fontSize,
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
-      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
+      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
       randomThemeOnRestart, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
@@ -683,6 +686,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       KeyboardGuideLegendStyle.self, forKey: .keyboardGuideLegendStyle) ?? .lowercase
     keyboardGuideKeysMode = try values.decodeIfPresent(
       KeyboardGuideKeysMode.self, forKey: .keyboardGuideKeysMode) ?? .minimal
+    keyboardGuideStyle = try values.decodeIfPresent(
+      KeyboardGuideStyle.self, forKey: .keyboardGuideStyle) ?? .staggered
     keyboardLayout =
       try values.decodeIfPresent(KeyboardLayout.self, forKey: .keyboardLayout) ?? .ansiQwerty
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
@@ -876,6 +881,7 @@ final class AppSettings {
   }
   var keyboardGuideLegendStyle: KeyboardGuideLegendStyle = .lowercase { didSet { persist() } }
   var keyboardGuideKeysMode: KeyboardGuideKeysMode = .minimal { didSet { persist() } }
+  var keyboardGuideStyle: KeyboardGuideStyle = .staggered { didSet { persist() } }
   var keyboardLayout: KeyboardLayout = .ansiQwerty { didSet { persist() } }
   var layoutFluidLayouts: [KeyboardLayout] = LayoutFluidPolicy.defaultLayouts {
     didSet { defaults.set(layoutFluidLayouts.map(\.rawValue), forKey: layoutFluidStorageKey) }
@@ -1003,6 +1009,7 @@ final class AppSettings {
     keyboardGuideScale = snapshot.keyboardGuideScale
     keyboardGuideLegendStyle = snapshot.keyboardGuideLegendStyle
     keyboardGuideKeysMode = snapshot.keyboardGuideKeysMode
+    keyboardGuideStyle = snapshot.keyboardGuideStyle
     keyboardLayout = snapshot.keyboardLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
@@ -1101,6 +1108,7 @@ final class AppSettings {
       keyboardGuideScale: keyboardGuideScale,
       keyboardGuideLegendStyle: keyboardGuideLegendStyle,
       keyboardGuideKeysMode: keyboardGuideKeysMode,
+      keyboardGuideStyle: keyboardGuideStyle,
       keyboardLayout: keyboardLayout, quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       followSystemTheme: followSystemTheme, randomThemeOnRestart: randomThemeOnRestart,
@@ -1162,6 +1170,7 @@ final class AppSettings {
     keyboardGuideScale = 1
     keyboardGuideLegendStyle = .lowercase
     keyboardGuideKeysMode = .minimal
+    keyboardGuideStyle = .staggered
     keyboardLayout = .ansiQwerty
     layoutFluidLayouts = LayoutFluidPolicy.defaultLayouts
     quickEnd = false
@@ -1286,6 +1295,7 @@ final class AppSettings {
     keyboardGuideScale = snapshot.keyboardGuideScale
     keyboardGuideLegendStyle = snapshot.keyboardGuideLegendStyle
     keyboardGuideKeysMode = snapshot.keyboardGuideKeysMode
+    keyboardGuideStyle = snapshot.keyboardGuideStyle
     keyboardLayout = snapshot.keyboardLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
@@ -1439,6 +1449,7 @@ final class AppSettings {
       keyboardGuideScale: keyboardGuideScale,
       keyboardGuideLegendStyle: keyboardGuideLegendStyle,
       keyboardGuideKeysMode: keyboardGuideKeysMode,
+      keyboardGuideStyle: keyboardGuideStyle,
       keyboardLayout: keyboardLayout,
       quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
