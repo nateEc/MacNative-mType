@@ -1010,6 +1010,7 @@ struct ResultHistoryModifierFilter: Codable, Equatable {
 struct ResultHistoryFilter: Codable, Equatable {
     var mode: TestMode?
     var language: TypingLanguage?
+    var languages: Set<TypingLanguage>?
     var tag: String?
     var difficulty: Difficulty?
     var personalBestOnly: Bool
@@ -1022,7 +1023,8 @@ struct ResultHistoryFilter: Codable, Equatable {
     var modifierFilter: ResultHistoryModifierFilter
 
     init(
-        mode: TestMode? = nil, language: TypingLanguage? = nil, tag: String? = nil,
+        mode: TestMode? = nil, language: TypingLanguage? = nil,
+        languages: Set<TypingLanguage>? = nil, tag: String? = nil,
         personalBestOnly: Bool = false, difficulty: Difficulty? = nil,
         dateRange: ResultHistoryDateRange = .all,
         punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all,
@@ -1033,6 +1035,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     ) {
         self.mode = mode
         self.language = language
+        self.languages = languages
         self.tag = tag
         self.difficulty = difficulty
         self.personalBestOnly = personalBestOnly
@@ -1060,7 +1063,7 @@ struct ResultHistoryFilter: Codable, Equatable {
 
         return .init(
             mode: configuration.mode,
-            language: configuration.language,
+            languages: [configuration.language],
             difficulty: configuration.difficulty,
             punctuation: configuration.contentOptions.includePunctuation ? .included : .excluded,
             numbers: configuration.contentOptions.includeNumbers ? .included : .excluded,
@@ -1075,8 +1078,19 @@ struct ResultHistoryFilter: Codable, Equatable {
         )
     }
 
+    var languageSelections: Set<TypingLanguage> {
+        languages ?? language.map { [$0] } ?? Set(TypingLanguage.allCases)
+    }
+
+    static func languageSelectionSummary(_ selection: Set<TypingLanguage>) -> String {
+        guard !selection.isEmpty else { return "无匹配语言" }
+        guard selection != Set(TypingLanguage.allCases) else { return "全部" }
+        let names = TypingLanguage.allCases.filter(selection.contains).map(\.displayName)
+        return names.count <= 3 ? names.joined(separator: "、") : "已选 \(names.count) 种"
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case mode, language, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength,
+        case mode, language, languages, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength,
           timeLimits, wordLimits, modifierFilter
     }
 
@@ -1084,6 +1098,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         mode = try values.decodeIfPresent(TestMode.self, forKey: .mode)
         language = try values.decodeIfPresent(TypingLanguage.self, forKey: .language)
+        languages = try values.decodeIfPresent(Set<TypingLanguage>.self, forKey: .languages)
         tag = try values.decodeIfPresent(String.self, forKey: .tag)
         difficulty = try values.decodeIfPresent(Difficulty.self, forKey: .difficulty)
         personalBestOnly = try values.decodeIfPresent(Bool.self, forKey: .personalBestOnly) ?? false
@@ -1105,7 +1120,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         let cutoff = dateRange.cutoff(relativeTo: now)
         return Set(entries.filter { entry in
             (mode == nil || entry.mode == mode)
-                && (language == nil || entry.language == language)
+                && matchesLanguage(entry.language)
                 && (tag == nil || entry.tags.contains(tag!))
                 && (difficulty == nil || entry.difficulty == difficulty)
                 && (!personalBestOnly || personalBestIDs.contains(entry.id))
@@ -1121,6 +1136,12 @@ struct ResultHistoryFilter: Codable, Equatable {
 
     private func matchesTimeLimit(_ entry: ResultHistoryEntry) -> Bool {
         entry.mode != .time || timeLimits.contains { $0.matches(entry.duration) }
+    }
+
+    private func matchesLanguage(_ entryLanguage: TypingLanguage?) -> Bool {
+        let selection = languageSelections
+        guard selection != Set(TypingLanguage.allCases) else { return true }
+        return entryLanguage.map(selection.contains) ?? false
     }
 
     private func matchesWordLimit(_ entry: ResultHistoryEntry) -> Bool {

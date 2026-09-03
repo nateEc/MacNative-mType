@@ -195,7 +195,7 @@ extension Difficulty {
   }
 }
 
-enum TypingLanguage: String, CaseIterable, Codable, Equatable {
+enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
   case spanish
   case german

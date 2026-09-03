@@ -3727,6 +3727,7 @@ final class TypingEngineTests: XCTestCase {
       [matching.id]
     )
     XCTAssertEqual(filter.quoteLength, nil)
+    XCTAssertEqual(filter.languageSelections, [.spanish])
     XCTAssertEqual(filter.timeLimits, [.seconds60])
     XCTAssertEqual(filter.wordLimits, Set(ResultHistoryWordLimit.allCases))
 
@@ -3737,6 +3738,32 @@ final class TypingEngineTests: XCTestCase {
       )
     )
     XCTAssertEqual(quoteFilter.quoteLength, .long)
+  }
+
+  func testResultHistoryLanguageFilterSupportsMultiSelectAndLegacySingleLanguagePresets() throws {
+    let english = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: [])
+    let spanish = ResultHistoryEntry(id: UUID(), mode: .words, language: .spanish, tags: [])
+    let german = ResultHistoryEntry(id: UUID(), mode: .words, language: .german, tags: [])
+    let legacyUnknown = ResultHistoryEntry(id: UUID(), mode: .words, language: nil, tags: [])
+    let entries = [english, spanish, german, legacyUnknown]
+
+    let multiLanguage = ResultHistoryFilter(languages: [.english, .spanish])
+    XCTAssertEqual(
+      multiLanguage.matchingIDs(entries: entries, personalBestIDs: []),
+      [english.id, spanish.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter.languageSelectionSummary([.english, .spanish]), "English、Español")
+    XCTAssertEqual(
+      ResultHistoryFilter(languages: Set(TypingLanguage.allCases)).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      Set(entries.map(\.id))
+    )
+
+    let legacy = try JSONDecoder().decode(
+      ResultHistoryFilter.self, from: Data(#"{"language":"german"}"#.utf8))
+    XCTAssertNil(legacy.languages)
+    XCTAssertEqual(legacy.languageSelections, [.german])
   }
 
   func testResultHistoryDateRangesUseReferenceRollingWindowsAndPreserveLegacyPresets() throws {
