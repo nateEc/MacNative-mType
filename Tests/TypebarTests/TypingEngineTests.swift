@@ -2544,6 +2544,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(tags, ["flow", "review", "one", "two", "three"])
   }
 
+  func testQAStoreModeOnlyUsesExplicitBooleanBundleFlag() {
+    XCTAssertFalse(QAStoreMode.usesInMemoryStore(info: [:]))
+    XCTAssertTrue(QAStoreMode.usesInMemoryStore(info: [
+      QAStoreMode.inMemoryInfoKey: true,
+    ]))
+    XCTAssertFalse(QAStoreMode.usesInMemoryStore(info: [
+      QAStoreMode.inMemoryInfoKey: "YES",
+    ]))
+  }
+
   @MainActor
   func testResultFilterPresetPersistsACompleteFilter() throws {
     let container = try ModelContainer(

@@ -12,18 +12,10 @@ struct TypebarApp: App {
 
   var body: some Scene {
     WindowGroup("Typebar") {
-      ContentView(settings: settings, account: account, hotkey: hotkey)
-        .frame(minWidth: 760, minHeight: 480)
-        .task {
-          await account.restoreSession()
-          hotkey.setEnabled(settings.globalHotkeyEnabled)
-        }
+      rootContent
     }
     .windowResizability(.contentMinSize)
-    .modelContainer(for: [
-      TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
-      ResultFilterPresetRecord.self,
-    ])
+    .modelContainer(Self.modelContainer)
 
     Settings {
       PreferencesView(settings: settings, account: account, hotkey: hotkey)
@@ -38,6 +30,28 @@ struct TypebarApp: App {
       Button("退出") { NSApp.terminate(nil) }
     }
   }
+
+  private var rootContent: some View {
+    ContentView(settings: settings, account: account, hotkey: hotkey)
+      .frame(minWidth: 760, minHeight: 480)
+      .task {
+        await account.restoreSession()
+        hotkey.setEnabled(settings.globalHotkeyEnabled)
+      }
+  }
+
+  private static let modelContainer: ModelContainer = {
+    do {
+      return try ModelContainer(
+        for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
+        ResultFilterPresetRecord.self,
+        configurations: ModelConfiguration(
+          isStoredInMemoryOnly: QAStoreMode.usesInMemoryStore(
+            info: Bundle.main.infoDictionary ?? [:])))
+    } catch {
+      fatalError("Unable to create the Typebar data store: \(error)")
+    }
+  }()
 }
 
 private enum QuoteSource: String, CaseIterable, Identifiable {
