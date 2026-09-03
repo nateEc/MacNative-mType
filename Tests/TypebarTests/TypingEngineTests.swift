@@ -1139,6 +1139,17 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(KeyboardGuideModel.highlightedKey(for: session.nextExpectedCharacter))
   }
 
+  func testKeyboardGuideModesChooseStaticReactiveAndNextHighlights() {
+    XCTAssertNil(KeyboardGuideMode.off.highlightedCharacter(
+      nextCharacter: "n", recentCharacter: "r"))
+    XCTAssertNil(KeyboardGuideMode.staticGuide.highlightedCharacter(
+      nextCharacter: "n", recentCharacter: "r"))
+    XCTAssertEqual(KeyboardGuideMode.react.highlightedCharacter(
+      nextCharacter: "n", recentCharacter: "r"), "r")
+    XCTAssertEqual(KeyboardGuideMode.next.highlightedCharacter(
+      nextCharacter: "n", recentCharacter: "r"), "n")
+  }
+
   func testKeyboardGuideUsesTheSelectedLayoutAndSupportsAsciiPunctuation() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiQwerty), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiDvorak), "bottom-1")
@@ -3295,7 +3306,8 @@ final class TypingEngineTests: XCTestCase {
     settings.testModifiers = [.noSpaces, .uppercase]
     settings.favoriteQuoteIDs = ["craft"]
     settings.repeatQuotes = true
-    settings.showKeyboardGuide = false
+    settings.showKeyboardGuide = true
+    settings.keyboardGuideMode = .react
     settings.showFocusWarning = false
     settings.showCapsLockWarning = false
     settings.playErrorBeep = true
@@ -3310,6 +3322,16 @@ final class TypingEngineTests: XCTestCase {
     settings.paceGuideCustomWpm = 95
     settings.paceCaretStyle = .block
     settings.repeatedPace = true
+
+    let exportedSnapshot = settings.snapshot
+    XCTAssertTrue(exportedSnapshot.codeUnindentOnBackspace)
+    XCTAssertEqual(exportedSnapshot.keyboardGuideMode, .react)
+    XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
+    XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
+    XCTAssertEqual(exportedSnapshot.promptHighlightMode, .nextTwoWords)
+    XCTAssertEqual(exportedSnapshot.clickSoundStyle, .morse)
+    XCTAssertEqual(exportedSnapshot.errorSoundStyle, .submarine)
+    XCTAssertEqual(exportedSnapshot.timeWarningSoundStyle, .frog)
 
     let restored = AppSettings(defaults: defaults)
     XCTAssertEqual(restored.difficulty, .master)
@@ -3370,7 +3392,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.repeatQuotes)
     XCTAssertEqual(restored.resolvedTheme(for: .dark).colorScheme, .dark)
     XCTAssertEqual(restored.resolvedTheme(for: .light).colorScheme, .light)
+    XCTAssertTrue(restored.showKeyboardGuide)
+    XCTAssertEqual(restored.keyboardGuideMode, .react)
+    XCTAssertEqual(restored.effectiveKeyboardGuideMode, .react)
+    restored.keyboardGuideMode = .off
     XCTAssertFalse(restored.showKeyboardGuide)
+    XCTAssertEqual(restored.effectiveKeyboardGuideMode, .off)
+    restored.keyboardGuideMode = .next
+    XCTAssertTrue(restored.showKeyboardGuide)
+    XCTAssertEqual(restored.effectiveKeyboardGuideMode, .next)
     XCTAssertFalse(restored.showFocusWarning)
     XCTAssertFalse(restored.showCapsLockWarning)
     XCTAssertTrue(restored.playErrorBeep)
@@ -3451,6 +3481,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(snapshot.activeCustomThemeID)
     XCTAssertTrue(snapshot.favoriteThemeIDs.isEmpty)
     XCTAssertTrue(snapshot.showKeyboardGuide)
+    XCTAssertEqual(snapshot.keyboardGuideMode, .next)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertFalse(snapshot.followSystemTheme)
@@ -3495,6 +3526,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.paceGuideCustomWpm, 60)
     XCTAssertEqual(snapshot.paceCaretStyle, .bar)
     XCTAssertFalse(snapshot.repeatedPace)
+    let hiddenGuideLegacy = try JSONDecoder().decode(
+      AppSettingsSnapshot.self, from: Data("{\"showKeyboardGuide\":false}".utf8))
+    XCTAssertEqual(hiddenGuideLegacy.keyboardGuideMode, .off)
     XCTAssertEqual(
       try XCTUnwrap(PracticeLineWidth.compact.maximumWidth(fontSize: 20)), 520.8, accuracy: 0.001)
     XCTAssertEqual(

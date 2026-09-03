@@ -389,6 +389,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var activeCustomThemeID: UUID?
   var favoriteThemeIDs: [String] = []
   var showKeyboardGuide = true
+  var keyboardGuideMode: KeyboardGuideMode = .next
   var keyboardLayout: KeyboardLayout = .ansiQwerty
   var quickEnd = false
   var quickRestartKey: QuickRestartKey = .escape
@@ -466,6 +467,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     activeCustomThemeID: UUID? = nil,
     favoriteThemeIDs: [String] = [],
     showKeyboardGuide: Bool = true,
+    keyboardGuideMode: KeyboardGuideMode = .next,
     keyboardLayout: KeyboardLayout = .ansiQwerty,
     quickEnd: Bool = false,
     quickRestartKey: QuickRestartKey = .escape,
@@ -546,6 +548,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.favoriteThemeIDs = ThemeFavoritePolicy.normalized(
       favoriteThemeIDs, customThemes: customThemes)
     self.showKeyboardGuide = showKeyboardGuide
+    self.keyboardGuideMode = keyboardGuideMode
     self.keyboardLayout = keyboardLayout
     self.quickEnd = quickEnd
     self.quickRestartKey = quickRestartKey
@@ -614,7 +617,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       hideExtraLetters, blindMode, fontSize,
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
-      favoriteThemeIDs, showKeyboardGuide, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
+      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
       randomThemeOnRestart, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
@@ -663,6 +666,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent([String].self, forKey: .favoriteThemeIDs) ?? [],
       customThemes: customThemes)
     showKeyboardGuide = try values.decodeIfPresent(Bool.self, forKey: .showKeyboardGuide) ?? true
+    keyboardGuideMode = try values.decodeIfPresent(KeyboardGuideMode.self, forKey: .keyboardGuideMode)
+      ?? (showKeyboardGuide ? .next : .off)
     keyboardLayout =
       try values.decodeIfPresent(KeyboardLayout.self, forKey: .keyboardLayout) ?? .ansiQwerty
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
@@ -837,6 +842,13 @@ final class AppSettings {
   var activeCustomThemeID: UUID? { didSet { persist() } }
   var favoriteThemeIDs: [String] = [] { didSet { persist() } }
   var showKeyboardGuide = true { didSet { persist() } }
+  var keyboardGuideMode: KeyboardGuideMode = .next {
+    didSet {
+      let shouldShowGuide = keyboardGuideMode != .off
+      if showKeyboardGuide != shouldShowGuide { showKeyboardGuide = shouldShowGuide }
+      persist()
+    }
+  }
   var keyboardLayout: KeyboardLayout = .ansiQwerty { didSet { persist() } }
   var layoutFluidLayouts: [KeyboardLayout] = LayoutFluidPolicy.defaultLayouts {
     didSet { defaults.set(layoutFluidLayouts.map(\.rawValue), forKey: layoutFluidStorageKey) }
@@ -960,6 +972,7 @@ final class AppSettings {
     favoriteThemeIDs = ThemeFavoritePolicy.normalized(
       snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
     showKeyboardGuide = snapshot.showKeyboardGuide
+    keyboardGuideMode = snapshot.keyboardGuideMode
     keyboardLayout = snapshot.keyboardLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
@@ -1041,6 +1054,10 @@ final class AppSettings {
     )
   }
 
+  var effectiveKeyboardGuideMode: KeyboardGuideMode {
+    showKeyboardGuide ? keyboardGuideMode : .off
+  }
+
   var snapshot: AppSettingsSnapshot {
     .init(
       difficulty: difficulty, strictSpace: strictSpace, stopOnError: stopOnError,
@@ -1050,13 +1067,15 @@ final class AppSettings {
       publishCompletedResults: publishCompletedResults, saveCompletedResults: saveCompletedResults,
       customThemes: customThemes,
       activeCustomThemeID: activeCustomThemeID, favoriteThemeIDs: favoriteThemeIDs,
-      showKeyboardGuide: showKeyboardGuide, keyboardLayout: keyboardLayout, quickEnd: quickEnd,
+      showKeyboardGuide: showKeyboardGuide, keyboardGuideMode: effectiveKeyboardGuideMode,
+      keyboardLayout: keyboardLayout, quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       followSystemTheme: followSystemTheme, randomThemeOnRestart: randomThemeOnRestart,
       practiceBackdrop: practiceBackdrop, reducePracticeMotion: reducePracticeMotion,
       englishVariant: englishVariant, favoriteQuoteIDs: favoriteQuoteIDs,
       repeatQuotes: repeatQuotes, freedomMode: freedomMode, confidenceMode: confidenceMode,
       oppositeShiftMode: oppositeShiftMode,
+      codeUnindentOnBackspace: codeUnindentOnBackspace,
       minimumAccuracy: minimumAccuracy,
       minimumWpm: minimumWpm, minimumWordBurstWpm: minimumWordBurstWpm,
       minimumWordBurstMode: minimumWordBurstMode,
@@ -1075,9 +1094,13 @@ final class AppSettings {
       showPersonalBest: showPersonalBest,
       typedCharacterEffect: typedCharacterEffect, liveSpeedStyle: liveSpeedStyle,
       liveAccuracyStyle: liveAccuracyStyle, liveBurstStyle: liveBurstStyle,
-      liveProgressStyle: liveProgressStyle, testModifiers: testModifiers, showFocusWarning: showFocusWarning,
+      liveProgressStyle: liveProgressStyle, liveStatsColor: liveStatsColor,
+      liveStatsOpacity: liveStatsOpacity, promptHighlightMode: promptHighlightMode,
+      testModifiers: testModifiers, showFocusWarning: showFocusWarning,
       showCapsLockWarning: showCapsLockWarning, playErrorBeep: playErrorBeep,
-      playKeyclickSound: playKeyclickSound, timeWarningOffset: timeWarningOffset,
+      playKeyclickSound: playKeyclickSound, clickSoundStyle: clickSoundStyle,
+      errorSoundStyle: errorSoundStyle, timeWarningOffset: timeWarningOffset,
+      timeWarningSoundStyle: timeWarningSoundStyle,
       soundVolume: soundVolume,
       globalHotkeyEnabled: globalHotkeyEnabled, paceGuideMode: paceGuideMode,
       paceGuideCustomWpm: paceGuideCustomWpm, paceCaretStyle: paceCaretStyle,
@@ -1102,6 +1125,7 @@ final class AppSettings {
     activeCustomThemeID = nil
     favoriteThemeIDs = []
     showKeyboardGuide = true
+    keyboardGuideMode = .next
     keyboardLayout = .ansiQwerty
     layoutFluidLayouts = LayoutFluidPolicy.defaultLayouts
     quickEnd = false
@@ -1222,6 +1246,7 @@ final class AppSettings {
     favoriteThemeIDs = ThemeFavoritePolicy.normalized(
       snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
     showKeyboardGuide = snapshot.showKeyboardGuide
+    keyboardGuideMode = snapshot.keyboardGuideMode
     keyboardLayout = snapshot.keyboardLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
@@ -1371,6 +1396,7 @@ final class AppSettings {
       activeCustomThemeID: activeCustomThemeID,
       favoriteThemeIDs: favoriteThemeIDs,
       showKeyboardGuide: showKeyboardGuide,
+      keyboardGuideMode: effectiveKeyboardGuideMode,
       keyboardLayout: keyboardLayout,
       quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,

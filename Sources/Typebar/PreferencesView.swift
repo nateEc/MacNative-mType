@@ -454,7 +454,14 @@ struct PreferencesView: View {
           Text("在练习文本中显示第二个目标标记；个人最佳和平均只比较同一模式与语言的已完成本地成绩。“上一轮速度”与自动沿用只保留在本次应用运行中。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Toggle("显示下一键键盘提示", isOn: $settings.showKeyboardGuide)
+          Picker("键盘提示模式", selection: $settings.keyboardGuideMode) {
+            ForEach(KeyboardGuideMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          Text("静态只显示布局；按键反馈会短暂标记刚按下的键（错误为红色）；下一键标记目标键。Simon 指令始终使用下一键。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Picker("键盘布局", selection: $settings.keyboardLayout) {
             ForEach(KeyboardLayout.allCases) { layout in
               Text(layout.displayName).tag(layout)

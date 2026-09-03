@@ -486,6 +486,8 @@ private struct ContentView: View {
   @State private var repeatedPaceArmed = false
   @State private var activePaceTargetWpm: Int?
   @State private var compositionText = ""
+  @State private var keyboardGuideFeedback: KeyboardGuideFeedback?
+  @State private var keyboardGuideFeedbackSequence = 0
   @State private var liveContentRequestID = UUID()
   @State private var isLoadingLiveContent = false
   @State private var liveContentMessage: String?
@@ -512,9 +514,10 @@ private struct ContentView: View {
       }
       typingPanel
       stats
-      if settings.showKeyboardGuide || session.configuration.modifiers.contains(.simonSays) {
+      if effectiveKeyboardGuideMode != .off {
         KeyboardGuide(
-          nextCharacter: session.nextExpectedCharacter, accent: activeTheme.accent,
+          nextCharacter: session.nextExpectedCharacter, mode: effectiveKeyboardGuideMode,
+          feedback: keyboardGuideFeedback, accent: activeTheme.accent,
           panel: activeTheme.panel, layout: effectiveKeyboardLayout,
           mirrored: settings.testModifiers.contains(.mirrorKeyboard))
       }
@@ -1080,6 +1083,13 @@ private struct ContentView: View {
           session.insertBatch(
             settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
             forceError: forceError)
+          if effectiveKeyboardGuideMode == .react, let pressedCharacter = text.last {
+            keyboardGuideFeedbackSequence &+= 1
+            keyboardGuideFeedback = .init(
+              sequence: keyboardGuideFeedbackSequence,
+              character: pressedCharacter,
+              isCorrect: session.errors == errorsBefore)
+          }
           if settings.playKeyclickSound, session.typed.count > typedCountBefore {
             TypingFeedbackSound.shared.playClick(
               style: settings.clickSoundStyle, volume: settings.soundVolume)
@@ -1226,6 +1236,12 @@ private struct ContentView: View {
     )
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.trailing, 4)
+  }
+
+  private var effectiveKeyboardGuideMode: KeyboardGuideMode {
+    if session.configuration.modifiers.contains(.listening) { return .off }
+    if session.configuration.modifiers.contains(.simonSays) { return .next }
+    return settings.effectiveKeyboardGuideMode
   }
 
   private var practiceVisualTransform: PracticeVisualTransform {
@@ -1582,6 +1598,7 @@ private struct ContentView: View {
     restartLockMessage = nil
     bailoutConfirmationMessage = nil
     compositionText = ""
+    keyboardGuideFeedback = nil
     lastTimeWarningSecond = nil
     liveContentRequestID = UUID()
     let requestID = liveContentRequestID
@@ -1724,6 +1741,7 @@ private struct ContentView: View {
   private func startRepeatedAttempt(_ repeatedSession: TypingSession) {
     restartLockMessage = nil
     compositionText = ""
+    keyboardGuideFeedback = nil
     lastTimeWarningSecond = nil
     NativeSpeech.shared.stop()
     session = repeatedSession

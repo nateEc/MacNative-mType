@@ -20,6 +20,40 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   }
 }
 
+/// Determines whether the native keyboard guide is hidden, static, reacts to
+/// the last physical key, or directs the next expected key.
+enum KeyboardGuideMode: String, Codable, CaseIterable, Identifiable {
+  case off
+  case staticGuide = "static"
+  case react
+  case next
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .off: "关闭"
+    case .staticGuide: "静态"
+    case .react: "按键反馈"
+    case .next: "下一键"
+    }
+  }
+
+  func highlightedCharacter(nextCharacter: Character?, recentCharacter: Character?) -> Character? {
+    switch self {
+    case .off, .staticGuide: nil
+    case .react: recentCharacter
+    case .next: nextCharacter
+    }
+  }
+}
+
+struct KeyboardGuideFeedback: Equatable {
+  let sequence: Int
+  let character: Character
+  let isCorrect: Bool
+}
+
 struct KeyboardGuideKey: Identifiable, Equatable {
   let id: String
   let label: String
@@ -125,14 +159,21 @@ extension Collection {
 
 struct KeyboardGuide: View {
   let nextCharacter: Character?
+  let mode: KeyboardGuideMode
+  let feedback: KeyboardGuideFeedback?
   let accent: Color
   let panel: Color
   let layout: KeyboardLayout
   let mirrored: Bool
 
+  @State private var flashedKey: String?
+  @State private var flashedKeyIsCorrect = true
+
   private var highlightedKey: String? {
-    KeyboardGuideModel.highlightedKey(
-      for: nextCharacter.map { mirrored ? KeyboardMirror.transform($0) : $0 }, layout: layout)
+    if mode == .react { return flashedKey }
+    let expected = nextCharacter.map { mirrored ? KeyboardMirror.transform($0) : $0 }
+    return KeyboardGuideModel.highlightedKey(
+      for: mode.highlightedCharacter(nextCharacter: expected, recentCharacter: nil), layout: layout)
   }
   private var guideRows: [[KeyboardGuideKey]] { KeyboardGuideModel.rows(for: layout) }
 
@@ -147,7 +188,27 @@ struct KeyboardGuide: View {
     .background(panel.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("键盘提示")
-    .accessibilityValue(highlightedLabel.map { "下一键：\($0)" } ?? "没有可提示的下一键")
+    .accessibilityValue(accessibilityValue)
+    .task(id: feedback?.sequence) {
+      guard mode == .react, let feedback else {
+        flashedKey = nil
+        return
+      }
+      flashedKey = KeyboardGuideModel.highlightedKey(for: feedback.character, layout: layout)
+      flashedKeyIsCorrect = feedback.isCorrect
+      try? await Task.sleep(nanoseconds: 180_000_000)
+      guard !Task.isCancelled else { return }
+      flashedKey = nil
+    }
+  }
+
+  private var accessibilityValue: String {
+    switch mode {
+    case .off: "键盘提示已关闭"
+    case .staticGuide: "当前键盘布局"
+    case .react: highlightedLabel.map { "最近按键：\($0)" } ?? "等待按键"
+    case .next: highlightedLabel.map { "下一键：\($0)" } ?? "没有可提示的下一键"
+    }
   }
 
   private var highlightedLabel: String? {
@@ -171,7 +232,11 @@ struct KeyboardGuide: View {
       .foregroundStyle(key.id == highlightedKey ? .white : .secondary)
       .frame(width: key.width, height: 22)
       .background(
-        key.id == highlightedKey ? accent : Color.primary.opacity(0.08),
+        key.id == highlightedKey ? highlightedColor : Color.primary.opacity(0.08),
         in: RoundedRectangle(cornerRadius: 5))
+  }
+
+  private var highlightedColor: Color {
+    mode == .react && !flashedKeyIsCorrect ? .red : accent
   }
 }
