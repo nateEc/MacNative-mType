@@ -1387,6 +1387,9 @@ struct TypingSession {
   /// Unreached prompt words are intentionally excluded so a timed test does
   /// not turn its remaining text into an error list.
   var missedWords: [String] {
+    if configuration.language == .simplifiedChinese {
+      return missedChineseWords
+    }
     guard configuration.language.usesSpaceDelimitedWords,
       !configuration.modifiers.contains(.noSpaces)
     else { return [] }
@@ -1399,6 +1402,40 @@ struct TypingSession {
     for index in 0..<min(attemptedCount, targetWords.count)
     where typedWords[index] != targetWords[index] || hasForcedError(inWord: index) {
       if !unique.contains(targetWords[index]) { unique.append(targetWords[index]) }
+    }
+    return unique
+  }
+
+  private var missedChineseWords: [String] {
+    let targetCharacters = Array(prompt)
+    let typedCharacters = Array(typed)
+    guard !typedCharacters.isEmpty else { return [] }
+
+    let tokens = StarterLexicon.simplifiedChineseWords.map {
+      (text: $0, characters: Array($0))
+    }.sorted { $0.characters.count > $1.characters.count }
+    var unique: [String] = []
+    var index = 0
+
+    while index < targetCharacters.count {
+      guard let token = tokens.first(where: { token in
+        let end = index + token.characters.count
+        guard end <= targetCharacters.count else { return false }
+        return targetCharacters[index..<end].elementsEqual(token.characters)
+      }) else {
+        index += 1
+        continue
+      }
+
+      guard typedCharacters.count > index else { break }
+      let end = index + token.characters.count
+      let typedEnd = min(end, typedCharacters.count)
+      if !typedCharacters[index..<typedEnd].elementsEqual(token.characters),
+        !unique.contains(token.text)
+      {
+        unique.append(token.text)
+      }
+      index = end
     }
     return unique
   }

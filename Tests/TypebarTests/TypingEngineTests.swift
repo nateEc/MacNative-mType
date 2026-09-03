@@ -373,7 +373,15 @@ final class TypingEngineTests: XCTestCase {
     var chinese = TypingSession(
       configuration: .timed(seconds: 30, language: .simplifiedChinese), prompt: "晨光窗边")
     chinese.insert("晨x", at: start)
-    XCTAssertTrue(chinese.missedWords.isEmpty)
+    XCTAssertEqual(chinese.missedWords, ["晨光"])
+
+    var chineseWithPunctuation = TypingSession(
+      configuration: .timed(seconds: 30, language: .simplifiedChinese), prompt: "晨光，窗边纸张")
+    chineseWithPunctuation.insert("晨光，窗x", at: start)
+    XCTAssertEqual(chineseWithPunctuation.missedWords, ["窗边"])
+    XCTAssertEqual(
+      WordPracticeText.make(words: chineseWithPunctuation.missedWords, language: .simplifiedChinese),
+      "窗边")
 
     var spanish = TypingSession(
       configuration: .timed(seconds: 30, language: .spanish), prompt: "árbol puerto calma")

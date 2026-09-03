@@ -214,6 +214,12 @@ struct ContextualMissedWordPracticePlan: Equatable {
   }
 }
 
+enum WordPracticeText {
+  static func make(words: [String], language: TypingLanguage) -> String {
+    words.joined(separator: language.usesSpaceDelimitedWords ? " " : "")
+  }
+}
+
 struct ResultPerformancePoint: Equatable, Identifiable {
   let elapsed: TimeInterval
   let wpm: Int

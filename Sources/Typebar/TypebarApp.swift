@@ -1862,7 +1862,7 @@ private struct ContentView: View {
 
   private func startWordPractice(_ words: [String]) {
     guard !words.isEmpty else { return }
-    customText = words.joined(separator: " ")
+    customText = WordPracticeText.make(words: words, language: language)
     customTextCompletion = .finish
     customTextOrdering = .inOrder
     mode = .custom
