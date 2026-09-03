@@ -1238,6 +1238,7 @@ private struct ContentView: View {
   }
 
   private var practicePrompt: some View {
+    let _ = settings.localPracticeFontRevision
     let rendering = renderedPrompt
     return Group {
       if practiceVisualEffect.usesASL {

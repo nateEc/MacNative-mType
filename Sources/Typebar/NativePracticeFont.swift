@@ -31,16 +31,20 @@ enum NativePracticeFont {
   }
 
   static func font(named requestedName: String, size: Double) -> Font? {
-    guard let postScriptName = postScriptName(for: requestedName) else { return nil }
+    guard let postScriptName = preferredPostScriptName(for: requestedName) else { return nil }
     return .custom(postScriptName, size: size)
   }
 
   static func nsFont(named requestedName: String, size: CGFloat) -> NSFont? {
-    guard let postScriptName = postScriptName(for: requestedName) else { return nil }
+    guard let postScriptName = preferredPostScriptName(for: requestedName) else { return nil }
     return NSFont(name: postScriptName, size: size)
   }
 
   static func isAvailable(_ requestedName: String) -> Bool {
     postScriptName(for: requestedName) != nil
+  }
+
+  private static func preferredPostScriptName(for requestedName: String) -> String? {
+    TypebarLocalPracticeFontStore.activeInfo?.postScriptName ?? postScriptName(for: requestedName)
   }
 }

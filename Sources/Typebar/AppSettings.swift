@@ -1125,6 +1125,7 @@ final class AppSettings {
     }
   }
   private(set) var localBackgroundRevision = 0
+  private(set) var localPracticeFontRevision = 0
   var practiceBackdrop: PracticeBackdropStyle = .solid { didSet { persist() } }
   var reducePracticeMotion = false { didSet { persist() } }
   var showTypingCompanion = false { didSet { persist() } }
@@ -1649,6 +1650,13 @@ final class AppSettings {
 
   var hasLocalBackground: Bool { TypebarLocalBackgroundStore.hasImage }
 
+  var localPracticeFontInfo: LocalPracticeFontInfo? {
+    _ = localPracticeFontRevision
+    return TypebarLocalPracticeFontStore.activeInfo
+  }
+
+  var hasLocalPracticeFont: Bool { localPracticeFontInfo != nil }
+
   func importLocalBackground(data: Data) throws {
     try TypebarLocalBackgroundStore.save(data)
     localBackgroundRevision &+= 1
@@ -1657,6 +1665,16 @@ final class AppSettings {
   func removeLocalBackground() throws {
     try TypebarLocalBackgroundStore.remove()
     localBackgroundRevision &+= 1
+  }
+
+  func importLocalPracticeFont(data: Data, originalFilename: String) throws {
+    _ = try TypebarLocalPracticeFontStore.save(data, originalFilename: originalFilename)
+    localPracticeFontRevision &+= 1
+  }
+
+  func removeLocalPracticeFont() throws {
+    try TypebarLocalPracticeFontStore.remove()
+    localPracticeFontRevision &+= 1
   }
 
   func resolvedTheme(for systemColorScheme: ColorScheme) -> ResolvedTheme {

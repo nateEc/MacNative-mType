@@ -1655,6 +1655,15 @@ final class TypingEngineTests: XCTestCase {
       installedName)
   }
 
+  func testLocalPracticeFontFilePolicyAcceptsNativeFormatsOnly() {
+    XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "practice.ttf"))
+    XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "PRACTICE.OTF"))
+    XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice.woff"))
+    XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice.woff2"))
+    XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice.ttc"))
+    XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice"))
+  }
+
   func testSettingsSearchMatchesEveryWhitespaceSeparatedTokenAcrossLocalizedTerms() {
     XCTAssertTrue(
       SettingsSearch.matches(query: "KEYBOARD layout", terms: ["键盘布局", "Keyboard Layout", "下一键"]))

@@ -37,6 +37,8 @@ struct PreferencesView: View {
   @State private var customBackgroundURLDraft = ""
   @State private var customBackgroundMessage: String?
   @State private var showingCustomBackgroundImporter = false
+  @State private var localPracticeFontMessage: String?
+  @State private var showingLocalPracticeFontImporter = false
 
   var body: some View {
     @Bindable var settings = settings
@@ -381,7 +383,19 @@ struct PreferencesView: View {
           }
           TextField("本机字体名称（可选）", text: $settings.installedPracticeFontName)
             .textFieldStyle(.roundedBorder)
-          if settings.installedPracticeFontName.isEmpty {
+          HStack {
+            Button(settings.hasLocalPracticeFont ? "替换本地字体…" : "选择本地字体文件…") {
+              showingLocalPracticeFontImporter = true
+            }
+            if settings.hasLocalPracticeFont {
+              Button("移除本地字体", role: .destructive) { removeLocalPracticeFont() }
+            }
+          }
+          if let localFont = settings.localPracticeFontInfo {
+            Text("本地字体正在覆盖上方名称：\(localFont.displayName)")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          } else if settings.installedPracticeFontName.isEmpty {
             Text("可输入已安装字体的家族名或 PostScript 名；留空使用上方系统设计。")
               .font(.caption)
               .foregroundStyle(.secondary)
@@ -397,6 +411,14 @@ struct PreferencesView: View {
           Text("Typebar 不会安装、上传或打包第三方字体文件。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Text("本地文件仅保存在当前 Mac 的应用支持目录，不随账户或设置归档迁移；支持 TTF、OTF。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          if let localPracticeFontMessage {
+            Text(localPracticeFontMessage)
+              .font(.caption)
+              .foregroundStyle(.red)
+          }
           Picker("练习行宽", selection: $settings.practiceLineWidth) {
             ForEach(PracticeLineWidth.allCases) { width in
               Text(width.displayName).tag(width)
@@ -1032,6 +1054,15 @@ struct PreferencesView: View {
       case .failure(let error): customBackgroundMessage = error.localizedDescription
       }
     }
+    .fileImporter(
+      isPresented: $showingLocalPracticeFontImporter,
+      allowedContentTypes: LocalPracticeFontFilePolicy.supportedContentTypes
+    ) { result in
+      switch result {
+      case .success(let url): importLocalPracticeFont(from: url)
+      case .failure(let error): localPracticeFontMessage = error.localizedDescription
+      }
+    }
     .onAppear { customBackgroundURLDraft = settings.customBackgroundURL }
     .frame(width: 440)
     .padding()
@@ -1066,6 +1097,33 @@ struct PreferencesView: View {
       customBackgroundMessage = nil
     } catch {
       customBackgroundMessage = error.localizedDescription
+    }
+  }
+
+  private func importLocalPracticeFont(from url: URL) {
+    guard LocalPracticeFontFilePolicy.supports(filename: url.lastPathComponent) else {
+      localPracticeFontMessage = "请选择 TTF 或 OTF 字体文件。"
+      return
+    }
+    let canAccess = url.startAccessingSecurityScopedResource()
+    defer {
+      if canAccess { url.stopAccessingSecurityScopedResource() }
+    }
+    do {
+      try settings.importLocalPracticeFont(
+        data: Data(contentsOf: url), originalFilename: url.lastPathComponent)
+      localPracticeFontMessage = nil
+    } catch {
+      localPracticeFontMessage = error.localizedDescription
+    }
+  }
+
+  private func removeLocalPracticeFont() {
+    do {
+      try settings.removeLocalPracticeFont()
+      localPracticeFontMessage = nil
+    } catch {
+      localPracticeFontMessage = error.localizedDescription
     }
   }
 
