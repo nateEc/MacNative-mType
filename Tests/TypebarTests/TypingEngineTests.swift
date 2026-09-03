@@ -60,6 +60,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(words.progressFraction(at: start), 1)
   }
 
+  func testFlashProgressStylesMatchReferenceTimerVisibility() {
+    XCTAssertEqual(LiveProgressStyle.flashText.metricStyle, .text)
+    XCTAssertEqual(LiveProgressStyle.flashMini.metricStyle, .mini)
+
+    XCTAssertTrue(
+      LiveProgressStyle.flashText.showsProgressValue(isTimed: true, remainingSeconds: 30))
+    XCTAssertFalse(
+      LiveProgressStyle.flashText.showsProgressValue(isTimed: true, remainingSeconds: 29))
+    XCTAssertTrue(
+      LiveProgressStyle.flashMini.showsProgressValue(isTimed: true, remainingSeconds: 15))
+    XCTAssertFalse(
+      LiveProgressStyle.flashMini.showsProgressValue(isTimed: true, remainingSeconds: 1))
+    XCTAssertTrue(
+      LiveProgressStyle.flashText.showsProgressValue(isTimed: true, remainingSeconds: 0))
+
+    XCTAssertTrue(
+      LiveProgressStyle.flashText.showsProgressValue(isTimed: false, remainingSeconds: 29))
+    XCTAssertTrue(LiveProgressStyle.flashMini.showsProgressValue(isTimed: false, remainingSeconds: nil))
+    XCTAssertTrue(LiveProgressStyle.text.showsProgressValue(isTimed: true, remainingSeconds: 29))
+  }
+
   func testNoSpaceWordTestsKeepTheirCommittedWordProgress() {
     let configuration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
     var session = TypingSession(
@@ -3375,7 +3396,7 @@ final class TypingEngineTests: XCTestCase {
     settings.liveSpeedStyle = .mini
     settings.liveAccuracyStyle = .off
     settings.liveBurstStyle = .mini
-    settings.liveProgressStyle = .bar
+    settings.liveProgressStyle = .flashMini
     settings.liveStatsColor = .black
     settings.liveStatsOpacity = .half
     settings.promptHighlightMode = .nextTwoWords
@@ -3410,6 +3431,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideLegendStyle, .dynamic)
     XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
     XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
+    XCTAssertEqual(exportedSnapshot.liveProgressStyle, .flashMini)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
     XCTAssertEqual(exportedSnapshot.promptHighlightMode, .nextTwoWords)
@@ -3467,7 +3489,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.liveSpeedStyle, .mini)
     XCTAssertEqual(restored.liveAccuracyStyle, .off)
     XCTAssertEqual(restored.liveBurstStyle, .mini)
-    XCTAssertEqual(restored.liveProgressStyle, .bar)
+    XCTAssertEqual(restored.liveProgressStyle, .flashMini)
     XCTAssertEqual(restored.liveStatsColor, .black)
     XCTAssertEqual(restored.liveStatsOpacity, .half)
     XCTAssertEqual(restored.promptHighlightMode, .nextTwoWords)

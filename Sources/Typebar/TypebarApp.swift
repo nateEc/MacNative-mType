@@ -1430,7 +1430,13 @@ private struct ContentView: View {
   }
 
   private var stats: some View {
-    HStack(spacing: 0) {
+    let now = Date.now
+    let progressStyle = settings.liveProgressStyle
+    let isProgressFlashHidden = !progressStyle.showsProgressValue(
+      isTimed: session.configuration.duration != nil,
+      remainingSeconds: session.remainingSeconds(at: now))
+
+    return HStack(spacing: 0) {
       metric(
         settings.typingSpeedUnit.displayName,
         value: settings.typingSpeedUnit.formatted(
@@ -1446,12 +1452,16 @@ private struct ContentView: View {
       metric(
         "准确率", value: "\(session.accuracy)%", style: settings.liveAccuracyStyle,
         usesLiveAppearance: true)
-      if settings.liveProgressStyle == .bar {
+      if progressStyle == .bar {
         progressMetricBar
       } else {
         metric(
-          session.progressLabel, value: session.progressText(at: .now) ?? "—",
-          style: settings.liveProgressStyle.metricStyle, usesLiveAppearance: true)
+          session.progressLabel,
+          value: isProgressFlashHidden && progressStyle == .flashText
+            ? "" : session.progressText(at: now) ?? "—",
+          style: progressStyle.metricStyle,
+          usesLiveAppearance: true,
+          isHidden: isProgressFlashHidden && progressStyle == .flashMini)
       }
       if let sections = session.sectionProgress {
         metric("段落", value: "\(sections.completed)/\(sections.total)")
@@ -1484,7 +1494,8 @@ private struct ContentView: View {
     _ title: String,
     value: String,
     style: LiveMetricStyle = .text,
-    usesLiveAppearance: Bool = false
+    usesLiveAppearance: Bool = false,
+    isHidden: Bool = false
   ) -> some View {
     if style != .off {
       let isMini = style == .mini
@@ -1497,7 +1508,7 @@ private struct ContentView: View {
         Text(title).font(isMini ? .caption2 : .caption).foregroundStyle(labelForeground)
       }
       .foregroundStyle(foreground)
-      .opacity(usesLiveAppearance ? settings.liveStatsOpacity.rawValue : 1)
+      .opacity((usesLiveAppearance ? settings.liveStatsOpacity.rawValue : 1) * (isHidden ? 0 : 1))
       .frame(maxWidth: .infinity)
       .padding(.vertical, isMini ? 8 : 14)
     }

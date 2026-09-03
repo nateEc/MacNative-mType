@@ -216,6 +216,8 @@ enum LiveProgressStyle: String, CaseIterable, Codable, Equatable, Identifiable {
   case text
   case mini
   case bar
+  case flashText = "flash_text"
+  case flashMini = "flash_mini"
 
   var id: Self { self }
 
@@ -225,6 +227,8 @@ enum LiveProgressStyle: String, CaseIterable, Codable, Equatable, Identifiable {
     case .text: "文字"
     case .mini: "迷你"
     case .bar: "进度条"
+    case .flashText: "闪现文字"
+    case .flashMini: "闪现迷你"
     }
   }
 
@@ -234,7 +238,17 @@ enum LiveProgressStyle: String, CaseIterable, Codable, Equatable, Identifiable {
     case .text: .text
     case .mini: .mini
     case .bar: .off
+    case .flashText: .text
+    case .flashMini: .mini
     }
+  }
+
+  /// Matches the reference timer's flash cadence while keeping progress visible
+  /// in every non-timed test where there is no countdown to flash.
+  func showsProgressValue(isTimed: Bool, remainingSeconds: Int?) -> Bool {
+    guard self == .flashText || self == .flashMini else { return true }
+    guard isTimed, let remainingSeconds else { return true }
+    return remainingSeconds.isMultiple(of: 15)
   }
 }
 
