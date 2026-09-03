@@ -36,7 +36,7 @@ struct ConnectionsView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(profile.displayName)
-                                    Text("最佳 \(profile.bestWPM) WPM · \(profile.completedResultCount) 次完成")
+                                    Text(profileSummary(profile))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -98,7 +98,7 @@ struct ConnectionsView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(connection.profile.displayName)
-                        Text("最佳 \(connection.profile.bestWPM) WPM · \(connection.profile.completedResultCount) 次完成")
+                        Text(profileSummary(connection.profile))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -114,6 +114,12 @@ struct ConnectionsView: View {
     }
 
     private func load() { Task { await loadAsync() } }
+
+    private func profileSummary(_ profile: RemotePublicProfile) -> String {
+        let consistency = profile.highestConsistency.formatted(
+            .number.precision(.fractionLength(0...2)))
+        return "最佳 \(profile.bestWPM) WPM · \(consistency)% 稳定 · \(profile.completedResultCount) 次完成"
+    }
 
     private func loadAsync() async {
         isLoading = true

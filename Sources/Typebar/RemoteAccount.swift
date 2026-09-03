@@ -301,9 +301,12 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let joinedAt: Date
     let completedResultCount: Int
     let bestWPM: Int
+    let highestConsistency: Double
     let totalExperience: Int
 
-    private enum CodingKeys: String, CodingKey { case id, displayName, joinedAt, completedResultCount, bestWPM, totalExperience }
+    private enum CodingKeys: String, CodingKey {
+        case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, totalExperience
+    }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -312,6 +315,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         joinedAt = try values.decode(Date.self, forKey: .joinedAt)
         completedResultCount = try values.decode(Int.self, forKey: .completedResultCount)
         bestWPM = try values.decode(Int.self, forKey: .bestWPM)
+        highestConsistency = try values.decodeIfPresent(Double.self, forKey: .highestConsistency) ?? 0
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
     }
 }

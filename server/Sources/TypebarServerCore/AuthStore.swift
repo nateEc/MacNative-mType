@@ -61,6 +61,7 @@ public struct PublicProfileResponse: Content, Equatable {
   public let joinedAt: Date
   public let completedResultCount: Int
   public let bestWPM: Int
+  public let highestConsistency: Double
   public let totalExperience: Int
 }
 
@@ -1032,6 +1033,7 @@ public actor AuthStore {
       joinedAt: user.createdAt,
       completedResultCount: results.count,
       bestWPM: results.map(\.wpm).max() ?? 0,
+      highestConsistency: results.map(\.consistency).max() ?? 0,
       totalExperience: experience(for: user.id)
     )
   }

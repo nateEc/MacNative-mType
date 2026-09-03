@@ -866,10 +866,10 @@ final class HealthRouteTests: XCTestCase {
         email: "private@example.com", password: "a secure password", displayName: "Profile User"))
     let now = Date.now
     _ = try await store.submitResult(
-      result(id: UUID(), wpm: 88, accuracy: 99, finishedAt: now), accessToken: session.accessToken,
+      result(id: UUID(), wpm: 88, accuracy: 99, consistency: 84, finishedAt: now), accessToken: session.accessToken,
       now: now)
     _ = try await store.submitResult(
-      result(id: UUID(), wpm: 76, accuracy: 98, finishedAt: now), accessToken: session.accessToken,
+      result(id: UUID(), wpm: 76, accuracy: 98, consistency: 92, finishedAt: now), accessToken: session.accessToken,
       now: now)
 
     do {
@@ -880,6 +880,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(profile?.displayName, "Profile User")
         XCTAssertEqual(profile?.completedResultCount, 2)
         XCTAssertEqual(profile?.bestWPM, 88)
+        XCTAssertEqual(profile?.highestConsistency, 92)
         XCTAssertFalse(response.body.string.contains("private@example.com"))
       }
       try await app.test(.GET, "v1/profiles/not-a-uuid") { response async in

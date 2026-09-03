@@ -126,6 +126,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(entry.consistency, 0)
   }
 
+  func testLegacyPublicProfileResponseDefaultsMissingHighestConsistencyToZero() throws {
+    let id = UUID()
+    let joinedAt = Date(timeIntervalSinceReferenceDate: 1_000)
+    let payload = """
+      {"id":"\(id.uuidString)","displayName":"Local","joinedAt":\(joinedAt.timeIntervalSinceReferenceDate),"completedResultCount":3,"bestWPM":80,"totalExperience":42}
+      """
+
+    let profile = try JSONDecoder().decode(RemotePublicProfile.self, from: Data(payload.utf8))
+
+    XCTAssertEqual(profile.highestConsistency, 0)
+  }
+
   func testWordsTestCompletesAtWordLimit() {
     var session = TypingSession(configuration: .words(2), prompt: "amber harbor quiet")
     session.insert("amber harbor", at: start)

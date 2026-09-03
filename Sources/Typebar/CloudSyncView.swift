@@ -247,8 +247,14 @@ private struct PublicProfileView: View {
             Text(profile.displayName).font(.title2.weight(.semibold))
             Grid(horizontalSpacing: 28, verticalSpacing: 12) {
                 GridRow { metric("完成成绩", "\(profile.completedResultCount)"); metric("最佳 WPM", "\(profile.bestWPM)") }
-                GridRow { metric("总 XP", "\(profile.totalExperience)"); metric("加入", profile.joinedAt.formatted(date: .abbreviated, time: .omitted)) }
+                GridRow {
+                    metric("最高稳定度", "\(profile.highestConsistency.formatted(.number.precision(.fractionLength(0...2))))%")
+                    metric("总 XP", "\(profile.totalExperience)")
+                }
             }
+            Text("加入 \(profile.joinedAt.formatted(date: .abbreviated, time: .omitted))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Text("公开资料不会包含邮箱、令牌或本地练习内容。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
