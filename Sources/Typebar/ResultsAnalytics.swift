@@ -1104,6 +1104,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     var punctuation: ResultHistoryBinaryFilter
     var numbers: ResultHistoryBinaryFilter
     var quoteLength: QuoteLength?
+    var quoteLengths: Set<QuoteLength>?
     var timeLimits: Set<ResultHistoryTimeLimit>
     var wordLimits: Set<ResultHistoryWordLimit>
     var modifierFilter: ResultHistoryModifierFilter
@@ -1120,6 +1121,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         dateRange: ResultHistoryDateRange = .all,
         punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all,
         quoteLength: QuoteLength? = nil,
+        quoteLengths: Set<QuoteLength>? = nil,
         timeLimits: Set<ResultHistoryTimeLimit> = Set(ResultHistoryTimeLimit.allCases),
         wordLimits: Set<ResultHistoryWordLimit> = Set(ResultHistoryWordLimit.allCases),
         modifierFilter: ResultHistoryModifierFilter = .init()
@@ -1138,6 +1140,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.punctuation = punctuation
         self.numbers = numbers
         self.quoteLength = quoteLength
+        self.quoteLengths = quoteLengths
         self.timeLimits = timeLimits
         self.wordLimits = wordLimits
         self.modifierFilter = modifierFilter
@@ -1162,8 +1165,8 @@ struct ResultHistoryFilter: Codable, Equatable {
             difficulties: [configuration.difficulty],
             punctuation: configuration.contentOptions.includePunctuation ? .included : .excluded,
             numbers: configuration.contentOptions.includeNumbers ? .included : .excluded,
-            quoteLength: configuration.mode == .quote && configuration.quoteLength != .all
-                ? configuration.quoteLength : nil,
+            quoteLengths: configuration.mode == .quote && configuration.quoteLength != .all
+                ? [configuration.quoteLength] : Self.filterableQuoteLengths,
             timeLimits: timeLimits,
             wordLimits: wordLimits,
             modifierFilter: .init(
@@ -1188,6 +1191,16 @@ struct ResultHistoryFilter: Codable, Equatable {
     /// optional field remains the fallback for already-saved local presets.
     var difficultySelections: Set<Difficulty> {
         difficulties ?? difficulty.map { [$0] } ?? Set(Difficulty.allCases)
+    }
+
+    static let filterableQuoteLengths = Set(QuoteLength.allCases.filter { $0 != .all })
+
+    /// Result records outside quote mode use the reference product's fallback
+    /// bucket. A newly-created partial selection therefore filters quote rows
+    /// only and retains other modes. Legacy one-length presets retain their
+    /// prior Typebar-only exact-match behavior.
+    var quoteLengthSelections: Set<QuoteLength> {
+        quoteLengths ?? quoteLength.map { [$0] } ?? Self.filterableQuoteLengths
     }
 
     var effectiveTagFilter: ResultHistoryTagFilter {
@@ -1221,9 +1234,16 @@ struct ResultHistoryFilter: Codable, Equatable {
         return names.joined(separator: "、")
     }
 
+    static func quoteLengthSelectionSummary(_ selection: Set<QuoteLength>) -> String {
+        guard !selection.isEmpty else { return "仅非引语" }
+        guard selection != filterableQuoteLengths else { return "全部" }
+        let names = QuoteLength.allCases.filter(selection.contains).map(\.displayName)
+        return names.count <= 3 ? names.joined(separator: "、") : "已选 \(names.count) 项"
+    }
+
     private enum CodingKeys: String, CodingKey {
         case mode, modes, language, languages, tag, tagFilter, difficulty, difficulties, personalBestOnly, personalBestFilter, dateRange, punctuation, numbers, quoteLength,
-          timeLimits, wordLimits, modifierFilter
+          quoteLengths, timeLimits, wordLimits, modifierFilter
     }
 
     init(from decoder: Decoder) throws {
@@ -1243,6 +1263,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         punctuation = try values.decodeIfPresent(ResultHistoryBinaryFilter.self, forKey: .punctuation) ?? .all
         numbers = try values.decodeIfPresent(ResultHistoryBinaryFilter.self, forKey: .numbers) ?? .all
         quoteLength = try values.decodeIfPresent(QuoteLength.self, forKey: .quoteLength)
+        quoteLengths = try values.decodeIfPresent(Set<QuoteLength>.self, forKey: .quoteLengths)
         timeLimits = try values.decodeIfPresent(Set<ResultHistoryTimeLimit>.self, forKey: .timeLimits)
           ?? Set(ResultHistoryTimeLimit.allCases)
         wordLimits = try values.decodeIfPresent(Set<ResultHistoryWordLimit>.self, forKey: .wordLimits)
@@ -1264,7 +1285,7 @@ struct ResultHistoryFilter: Codable, Equatable {
                 && (cutoff.map { entry.finishedAt >= $0 } ?? true)
                 && punctuation.matches(entry.includesPunctuation)
                 && numbers.matches(entry.includesNumbers)
-                && (quoteLength == nil || entry.quoteLength == quoteLength)
+                && matchesQuoteLength(entry.quoteLength)
                 && matchesTimeLimit(entry)
                 && matchesWordLimit(entry)
                 && modifierFilter.matches(entry.modifiers)
@@ -1285,6 +1306,14 @@ struct ResultHistoryFilter: Codable, Equatable {
         let selection = difficultySelections
         guard selection != Set(Difficulty.allCases) else { return true }
         return entryDifficulty.map(selection.contains) ?? false
+    }
+
+    private func matchesQuoteLength(_ entryQuoteLength: QuoteLength?) -> Bool {
+        if let quoteLengths {
+            guard quoteLengths != Self.filterableQuoteLengths else { return true }
+            return entryQuoteLength.map(quoteLengths.contains) ?? true
+        }
+        return quoteLength == nil || entryQuoteLength == quoteLength
     }
 
     private func matchesLanguage(_ entryLanguage: TypingLanguage?) -> Bool {

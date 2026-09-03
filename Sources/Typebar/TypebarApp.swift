@@ -3353,7 +3353,7 @@ private struct ResultsHistoryView: View {
   @State private var dateRangeFilter: ResultHistoryDateRange = .all
   @State private var punctuationFilter: ResultHistoryBinaryFilter = .all
   @State private var numbersFilter: ResultHistoryBinaryFilter = .all
-  @State private var quoteLengthFilter: QuoteLength?
+  @State private var quoteLengthFilter = ResultHistoryFilter.filterableQuoteLengths
   @State private var timeLimitFilter = Set(ResultHistoryTimeLimit.allCases)
   @State private var wordLimitFilter = Set(ResultHistoryWordLimit.allCases)
   @State private var includesNoModifierFilter = true
@@ -3371,7 +3371,7 @@ private struct ResultsHistoryView: View {
       dateRange: dateRangeFilter,
       punctuation: punctuationFilter,
       numbers: numbersFilter,
-      quoteLength: quoteLengthFilter,
+      quoteLengths: quoteLengthFilter,
       timeLimits: timeLimitFilter,
       wordLimits: wordLimitFilter,
       modifierFilter: activeModifierFilter
@@ -3512,10 +3512,12 @@ private struct ResultsHistoryView: View {
                       .toggleStyle(.checkbox)
                   }
                 }
-                Picker("引语长度", selection: $quoteLengthFilter) {
-                  Text("全部长度").tag(QuoteLength?.none)
+                DisclosureGroup(
+                  "引语长度：\(ResultHistoryFilter.quoteLengthSelectionSummary(quoteLengthFilter))"
+                ) {
                   ForEach(QuoteLength.allCases.filter { $0 != .all }, id: \.self) { length in
-                    Text(length.displayName).tag(Optional(length))
+                    Toggle(length.displayName, isOn: quoteLengthBinding(for: length))
+                      .toggleStyle(.checkbox)
                   }
                 }
                 DisclosureGroup(
@@ -3800,7 +3802,7 @@ private struct ResultsHistoryView: View {
     .init(
       modes: modeFilter, languages: languageFilter, tagFilter: selectedTagFilter,
       personalBestFilter: personalBestFilter, difficulties: difficultyFilter, dateRange: dateRangeFilter,
-      punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter,
+      punctuation: punctuationFilter, numbers: numbersFilter, quoteLengths: quoteLengthFilter,
       timeLimits: timeLimitFilter, wordLimits: wordLimitFilter, modifierFilter: activeModifierFilter
     )
   }
@@ -3839,7 +3841,7 @@ private struct ResultsHistoryView: View {
     dateRangeFilter = filter.dateRange
     punctuationFilter = filter.punctuation
     numbersFilter = filter.numbers
-    quoteLengthFilter = filter.quoteLength
+    quoteLengthFilter = filter.quoteLengthSelections
     timeLimitFilter = filter.timeLimits
     wordLimitFilter = filter.wordLimits
     includesNoModifierFilter = filter.modifierFilter.includesNoModifiers
@@ -3867,6 +3869,14 @@ private struct ResultsHistoryView: View {
       get: { difficultyFilter.contains(difficulty) },
       set: { selected in
         if selected { difficultyFilter.insert(difficulty) } else { difficultyFilter.remove(difficulty) }
+      })
+  }
+
+  private func quoteLengthBinding(for length: QuoteLength) -> Binding<Bool> {
+    Binding(
+      get: { quoteLengthFilter.contains(length) },
+      set: { selected in
+        if selected { quoteLengthFilter.insert(length) } else { quoteLengthFilter.remove(length) }
       })
   }
 

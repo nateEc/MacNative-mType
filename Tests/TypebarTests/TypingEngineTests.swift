@@ -3680,6 +3680,40 @@ final class TypingEngineTests: XCTestCase {
       QuoteLengthPolicy.actualLength(for: String(repeating: "x", count: 481), language: .english), .extended)
   }
 
+  func testResultHistoryQuoteLengthFilterSupportsMultiSelectAndReferenceFallbackBucket() throws {
+    let short = ResultHistoryEntry(
+      id: UUID(), mode: .quote, language: .english, tags: [], quoteLength: .short)
+    let medium = ResultHistoryEntry(
+      id: UUID(), mode: .quote, language: .english, tags: [], quoteLength: .medium)
+    let long = ResultHistoryEntry(
+      id: UUID(), mode: .quote, language: .english, tags: [], quoteLength: .long)
+    let standard = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], quoteLength: nil)
+    let entries = [short, medium, long, standard]
+
+    XCTAssertEqual(
+      ResultHistoryFilter(quoteLengths: [.short, .long]).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      [short.id, long.id, standard.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter(quoteLengths: ResultHistoryFilter.filterableQuoteLengths).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      Set(entries.map(\.id))
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter(quoteLengths: []).matchingIDs(entries: entries, personalBestIDs: []),
+      [standard.id]
+    )
+    XCTAssertEqual(ResultHistoryFilter.quoteLengthSelectionSummary([]), "仅非引语")
+
+    let legacy = try JSONDecoder().decode(
+      ResultHistoryFilter.self, from: Data(#"{"quoteLength":"long"}"#.utf8))
+    XCTAssertNil(legacy.quoteLengths)
+    XCTAssertEqual(
+      legacy.matchingIDs(entries: entries, personalBestIDs: []), [long.id])
+  }
+
   func testResultHistoryTimeAndWordLimitsSupportMultiSelectAndCustomValues() {
     let fifteenSeconds = ResultHistoryEntry(
       id: UUID(), mode: .time, language: .english, tags: [], duration: 15)
@@ -3772,7 +3806,7 @@ final class TypingEngineTests: XCTestCase {
         quoteLength: .long
       )
     )
-    XCTAssertEqual(quoteFilter.quoteLength, .long)
+    XCTAssertEqual(quoteFilter.quoteLengthSelections, [.long])
   }
 
   func testResultHistoryLanguageFilterSupportsMultiSelectAndLegacySingleLanguagePresets() throws {
@@ -4743,7 +4777,7 @@ final class TypingEngineTests: XCTestCase {
       tagFilter: .init(isUnrestricted: false, includesNoTags: true, tags: ["focus", "review"]),
       personalBestFilter: .excluded,
       difficulties: [.normal, .expert], dateRange: .lastMonth, punctuation: .included, numbers: .noMatches,
-      quoteLength: .medium, timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom],
+      quoteLengths: [.medium, .long], timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom],
       modifierFilter: .init(includesNoModifiers: false, modifiers: [.crtVisual, .binaryStream]))
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
     container.mainContext.insert(preset)
