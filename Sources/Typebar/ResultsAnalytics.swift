@@ -156,11 +156,13 @@ struct ResultHistoryEntry: Equatable, Identifiable {
     let difficulty: Difficulty?
     let includesPunctuation: Bool?
     let includesNumbers: Bool?
+    let quoteLength: QuoteLength?
 
     init(
         id: UUID, mode: TestMode?, language: TypingLanguage?, tags: [String],
         finishedAt: Date = .distantPast, difficulty: Difficulty? = nil,
-        includesPunctuation: Bool? = nil, includesNumbers: Bool? = nil
+        includesPunctuation: Bool? = nil, includesNumbers: Bool? = nil,
+        quoteLength: QuoteLength? = nil
     ) {
         self.id = id
         self.mode = mode
@@ -170,6 +172,7 @@ struct ResultHistoryEntry: Equatable, Identifiable {
         self.difficulty = difficulty
         self.includesPunctuation = includesPunctuation
         self.includesNumbers = includesNumbers
+        self.quoteLength = quoteLength
     }
 }
 
@@ -903,12 +906,14 @@ struct ResultHistoryFilter: Codable, Equatable {
     var dateRange: ResultHistoryDateRange
     var punctuation: ResultHistoryBinaryFilter
     var numbers: ResultHistoryBinaryFilter
+    var quoteLength: QuoteLength?
 
     init(
         mode: TestMode? = nil, language: TypingLanguage? = nil, tag: String? = nil,
         personalBestOnly: Bool = false, difficulty: Difficulty? = nil,
         dateRange: ResultHistoryDateRange = .all,
-        punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all
+        punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all,
+        quoteLength: QuoteLength? = nil
     ) {
         self.mode = mode
         self.language = language
@@ -918,10 +923,11 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.dateRange = dateRange
         self.punctuation = punctuation
         self.numbers = numbers
+        self.quoteLength = quoteLength
     }
 
     private enum CodingKeys: String, CodingKey {
-        case mode, language, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers
+        case mode, language, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength
     }
 
     init(from decoder: Decoder) throws {
@@ -934,6 +940,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         dateRange = try values.decodeIfPresent(ResultHistoryDateRange.self, forKey: .dateRange) ?? .all
         punctuation = try values.decodeIfPresent(ResultHistoryBinaryFilter.self, forKey: .punctuation) ?? .all
         numbers = try values.decodeIfPresent(ResultHistoryBinaryFilter.self, forKey: .numbers) ?? .all
+        quoteLength = try values.decodeIfPresent(QuoteLength.self, forKey: .quoteLength)
     }
 
     func matchingIDs(
@@ -949,6 +956,7 @@ struct ResultHistoryFilter: Codable, Equatable {
                 && (cutoff.map { entry.finishedAt >= $0 } ?? true)
                 && punctuation.matches(entry.includesPunctuation)
                 && numbers.matches(entry.includesNumbers)
+                && (quoteLength == nil || entry.quoteLength == quoteLength)
         }.map(\.id))
     }
 }

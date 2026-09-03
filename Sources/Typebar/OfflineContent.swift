@@ -8,6 +8,22 @@ struct OfflineQuote: Identifiable, Hashable {
   let length: QuoteLength
 }
 
+enum QuoteLengthPolicy {
+  static func actualLength(for prompt: String, language: TypingLanguage) -> QuoteLength {
+    if let authoredQuote = OfflineContent.quotes.first(where: {
+      $0.language == language && $0.text == prompt
+    }) {
+      return authoredQuote.length
+    }
+    switch prompt.count {
+    case ...120: return .short
+    case ...240: return .medium
+    case ...480: return .long
+    default: return .extended
+    }
+  }
+}
+
 enum QuoteRestartPolicy {
   /// Opting in repeats the current quote only when the user restarts an
   /// in-progress attempt, never after it is finished.

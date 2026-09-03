@@ -2382,7 +2382,8 @@ private struct ContentView: View {
         communityQuotes = remoteQuotes.map { quote in
           .init(
             id: "community-\(quote.id.uuidString.lowercased())", title: quote.attribution ?? "社区投稿",
-            text: quote.text, language: language, length: communityQuoteLength(for: quote.text))
+            text: quote.text, language: language,
+            length: QuoteLengthPolicy.actualLength(for: quote.text, language: language))
         }
         communityQuoteMessage =
           remoteQuotes.isEmpty ? "该语言还没有已审核内容。" : "已载入 \(remoteQuotes.count) 条已审核内容。"
@@ -2392,15 +2393,6 @@ private struct ContentView: View {
         communityQuoteMessage = "无法载入社区引语：\(error.localizedDescription)"
       }
       isLoadingCommunityQuotes = false
-    }
-  }
-
-  private func communityQuoteLength(for text: String) -> QuoteLength {
-    switch text.count {
-    case ...120: .short
-    case ...240: .medium
-    case ...480: .long
-    default: .extended
     }
   }
 
@@ -3360,6 +3352,7 @@ private struct ResultsHistoryView: View {
   @State private var dateRangeFilter: ResultHistoryDateRange = .all
   @State private var punctuationFilter: ResultHistoryBinaryFilter = .all
   @State private var numbersFilter: ResultHistoryBinaryFilter = .all
+  @State private var quoteLengthFilter: QuoteLength?
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
 
@@ -3372,14 +3365,20 @@ private struct ResultsHistoryView: View {
       difficulty: difficultyFilter,
       dateRange: dateRangeFilter,
       punctuation: punctuationFilter,
-      numbers: numbersFilter
+      numbers: numbersFilter,
+      quoteLength: quoteLengthFilter
     )
-    let entries = results.map {
-      ResultHistoryEntry(
-        id: $0.id, mode: $0.configuration?.mode, language: $0.configuration?.language, tags: $0.tags,
-        finishedAt: $0.finishedAt, difficulty: $0.configuration?.difficulty,
-        includesPunctuation: $0.configuration?.contentOptions.includePunctuation,
-        includesNumbers: $0.configuration?.contentOptions.includeNumbers
+    let entries = results.map { result in
+      let configuration = result.configuration
+      return ResultHistoryEntry(
+        id: result.id, mode: configuration?.mode, language: configuration?.language, tags: result.tags,
+        finishedAt: result.finishedAt, difficulty: configuration?.difficulty,
+        includesPunctuation: configuration?.contentOptions.includePunctuation,
+        includesNumbers: configuration?.contentOptions.includeNumbers,
+        quoteLength: configuration.flatMap { configuration -> QuoteLength? in
+          guard configuration.mode == .quote else { return nil }
+          return QuoteLengthPolicy.actualLength(for: result.prompt, language: configuration.language)
+        }
       )
     }
     let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs)
@@ -3492,6 +3491,12 @@ private struct ResultsHistoryView: View {
                   Text("全部模式").tag(TestMode?.none)
                   ForEach(TestMode.allCases, id: \.self) { mode in
                     Text(modeName(mode)).tag(Optional(mode))
+                  }
+                }
+                Picker("引语长度", selection: $quoteLengthFilter) {
+                  Text("全部长度").tag(QuoteLength?.none)
+                  ForEach(QuoteLength.allCases.filter { $0 != .all }, id: \.self) { length in
+                    Text(length.displayName).tag(Optional(length))
                   }
                 }
                 Picker("语言", selection: $languageFilter) {
@@ -3744,7 +3749,7 @@ private struct ResultsHistoryView: View {
     .init(
       mode: modeFilter, language: languageFilter, tag: tagFilter,
       personalBestOnly: personalBestOnly, difficulty: difficultyFilter, dateRange: dateRangeFilter,
-      punctuation: punctuationFilter, numbers: numbersFilter
+      punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter
     )
   }
 
@@ -3766,6 +3771,7 @@ private struct ResultsHistoryView: View {
     dateRangeFilter = filter.dateRange
     punctuationFilter = filter.punctuation
     numbersFilter = filter.numbers
+    quoteLengthFilter = filter.quoteLength
   }
 
   private func modeName(_ mode: TestMode?) -> String {

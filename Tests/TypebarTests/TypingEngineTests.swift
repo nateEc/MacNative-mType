@@ -3619,6 +3619,32 @@ final class TypingEngineTests: XCTestCase {
       Set([timeEnglish, wordsEnglish, wordsChinese]))
   }
 
+  func testResultHistoryQuoteLengthUsesTheCompletedPrompt() {
+    let completedQuote = OfflineContent.quotes.first { $0.length == .medium }!
+    let quote = ResultHistoryEntry(
+      id: UUID(), mode: .quote, language: completedQuote.language, tags: [],
+      quoteLength: QuoteLengthPolicy.actualLength(
+        for: completedQuote.text, language: completedQuote.language))
+    let standard = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], quoteLength: nil)
+
+    XCTAssertEqual(quote.quoteLength, .medium)
+    XCTAssertEqual(
+      ResultHistoryFilter(quoteLength: .medium).matchingIDs(
+        entries: [quote, standard], personalBestIDs: []), [quote.id])
+    XCTAssertEqual(
+      ResultHistoryFilter(quoteLength: .extended).matchingIDs(
+        entries: [quote, standard], personalBestIDs: []), [])
+    XCTAssertEqual(
+      QuoteLengthPolicy.actualLength(for: String(repeating: "x", count: 120), language: .english), .short)
+    XCTAssertEqual(
+      QuoteLengthPolicy.actualLength(for: String(repeating: "x", count: 121), language: .english), .medium)
+    XCTAssertEqual(
+      QuoteLengthPolicy.actualLength(for: String(repeating: "x", count: 241), language: .english), .long)
+    XCTAssertEqual(
+      QuoteLengthPolicy.actualLength(for: String(repeating: "x", count: 481), language: .english), .extended)
+  }
+
   func testResultHistoryDateRangesUseReferenceRollingWindowsAndPreserveLegacyPresets() throws {
     let now = Date(timeIntervalSinceReferenceDate: 1_000_000)
     let onBoundary = UUID()
@@ -3650,6 +3676,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(legacy.dateRange, .all)
     XCTAssertEqual(legacy.punctuation, .all)
     XCTAssertEqual(legacy.numbers, .all)
+    XCTAssertNil(legacy.quoteLength)
   }
 
   func testPersonalBestMarksEveryTiedHighestResult() {
@@ -4424,8 +4451,9 @@ final class TypingEngineTests: XCTestCase {
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     let filter = ResultHistoryFilter(
-      mode: .words, language: .english, tag: "focus", personalBestOnly: true,
-      difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded)
+      mode: .quote, language: .english, tag: "focus", personalBestOnly: true,
+      difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
+      quoteLength: .medium)
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
     container.mainContext.insert(preset)
     try container.mainContext.save()
