@@ -500,6 +500,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var practiceBackdrop: PracticeBackdropStyle = .solid
   var reducePracticeMotion = false
   var showTypingCompanion = false
+  var typingPowerMode: TypingPowerMode = .off
   var englishVariant: EnglishVariant = .american
   var favoriteQuoteIDs: [String] = []
   var repeatQuotes = false
@@ -595,6 +596,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     practiceBackdrop: PracticeBackdropStyle = .solid,
     reducePracticeMotion: Bool = false,
     showTypingCompanion: Bool = false,
+    typingPowerMode: TypingPowerMode = .off,
     englishVariant: EnglishVariant = .american,
     favoriteQuoteIDs: [String] = [],
     repeatQuotes: Bool = false,
@@ -694,6 +696,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.practiceBackdrop = practiceBackdrop
     self.reducePracticeMotion = reducePracticeMotion
     self.showTypingCompanion = showTypingCompanion
+    self.typingPowerMode = typingPowerMode
     self.englishVariant = englishVariant
     self.favoriteQuoteIDs = favoriteQuoteIDs
     self.repeatQuotes = repeatQuotes
@@ -757,7 +760,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       practiceFont, installedPracticeFontName, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
-      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, englishVariant,
+      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, typingPowerMode, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
@@ -848,6 +851,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(Bool.self, forKey: .reducePracticeMotion) ?? false
     showTypingCompanion =
       try values.decodeIfPresent(Bool.self, forKey: .showTypingCompanion) ?? false
+    typingPowerMode =
+      try values.decodeIfPresent(TypingPowerMode.self, forKey: .typingPowerMode) ?? .off
     englishVariant =
       try values.decodeIfPresent(EnglishVariant.self, forKey: .englishVariant) ?? .american
     favoriteQuoteIDs = try values.decodeIfPresent([String].self, forKey: .favoriteQuoteIDs) ?? []
@@ -1129,6 +1134,7 @@ final class AppSettings {
   var practiceBackdrop: PracticeBackdropStyle = .solid { didSet { persist() } }
   var reducePracticeMotion = false { didSet { persist() } }
   var showTypingCompanion = false { didSet { persist() } }
+  var typingPowerMode: TypingPowerMode = .off { didSet { persist() } }
   var englishVariant: EnglishVariant = .american { didSet { persist() } }
   var favoriteQuoteIDs: [String] = [] { didSet { persist() } }
   var repeatQuotes = false { didSet { persist() } }
@@ -1266,6 +1272,7 @@ final class AppSettings {
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
     showTypingCompanion = snapshot.showTypingCompanion
+    typingPowerMode = snapshot.typingPowerMode
     englishVariant = snapshot.englishVariant
     favoriteQuoteIDs = snapshot.favoriteQuoteIDs
     repeatQuotes = snapshot.repeatQuotes
@@ -1372,7 +1379,7 @@ final class AppSettings {
       customBackgroundURL: customBackgroundURL, customBackgroundFit: customBackgroundFit,
       customBackgroundFilter: customBackgroundFilter,
       practiceBackdrop: practiceBackdrop, reducePracticeMotion: reducePracticeMotion,
-      showTypingCompanion: showTypingCompanion,
+      showTypingCompanion: showTypingCompanion, typingPowerMode: typingPowerMode,
       englishVariant: englishVariant, favoriteQuoteIDs: favoriteQuoteIDs,
       repeatQuotes: repeatQuotes, freedomMode: freedomMode, confidenceMode: confidenceMode,
       oppositeShiftMode: oppositeShiftMode,
@@ -1455,6 +1462,7 @@ final class AppSettings {
     practiceBackdrop = .solid
     reducePracticeMotion = false
     showTypingCompanion = false
+    typingPowerMode = .off
     englishVariant = .american
     favoriteQuoteIDs = []
     repeatQuotes = false
@@ -1591,6 +1599,7 @@ final class AppSettings {
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
     showTypingCompanion = snapshot.showTypingCompanion
+    typingPowerMode = snapshot.typingPowerMode
     englishVariant = snapshot.englishVariant
     favoriteQuoteIDs = snapshot.favoriteQuoteIDs
     repeatQuotes = snapshot.repeatQuotes
@@ -1840,6 +1849,7 @@ final class AppSettings {
       practiceBackdrop: practiceBackdrop,
       reducePracticeMotion: reducePracticeMotion,
       showTypingCompanion: showTypingCompanion,
+      typingPowerMode: typingPowerMode,
       englishVariant: englishVariant,
       favoriteQuoteIDs: favoriteQuoteIDs,
       repeatQuotes: repeatQuotes,

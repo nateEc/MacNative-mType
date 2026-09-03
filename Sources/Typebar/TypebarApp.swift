@@ -428,6 +428,7 @@ private struct ContentView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.colorScheme) private var systemColorScheme
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var savedResults:
     [TestResultRecord]
   @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
@@ -492,6 +493,9 @@ private struct ContentView: View {
   @State private var keyboardGuideFeedbackSequence = 0
   @State private var keyboardModifierFlags: NSEvent.ModifierFlags = []
   @State private var typingCompanionHands = TypingCompanionHands()
+  @State private var typingPowerParticles: [TypingPowerParticle] = []
+  @State private var typingPowerGeneration = 0
+  @State private var typingPowerShakeOffset = CGSize.zero
   @State private var liveContentRequestID = UUID()
   @State private var isLoadingLiveContent = false
   @State private var liveContentMessage: String?
@@ -547,6 +551,9 @@ private struct ContentView: View {
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
+    .onChange(of: settings.typingPowerMode) { _, mode in
+      if !mode.isEnabled { clearTypingPowerEffect() }
+    }
     .task { await runClock() }
     .onAppear {
       reset()
@@ -1097,6 +1104,9 @@ private struct ContentView: View {
           session.insertBatch(
             settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
             forceError: forceError)
+          emitTypingPowerEffect(
+            isCorrect: session.errors == errorsBefore,
+            acceptedCharacters: session.typed.count - typedCountBefore)
           if effectiveKeyboardGuideMode == .react, let pressedCharacter = text.last {
             keyboardGuideFeedbackSequence &+= 1
             keyboardGuideFeedback = .init(
@@ -1152,11 +1162,19 @@ private struct ContentView: View {
       maxHeight: showsAllPracticeLines ? nil : 240, alignment: .topLeading)
     .background(activeTheme.panel, in: RoundedRectangle(cornerRadius: 20))
     .overlay {
+      if settings.typingPowerMode.isEnabled, !typingPowerParticles.isEmpty {
+        TypingPowerOverlay(
+          particles: typingPowerParticles, accent: activeTheme.accent, error: .red,
+          reducesMotion: settings.reducePracticeMotion)
+      }
+    }
+    .overlay {
       if practiceVisualEffect.usesCRT { CRTPracticeOverlay() }
     }
     .overlay {
       if practiceVisualEffect.usesSpace { SpacePracticeOverlay(accent: activeTheme.accent) }
     }
+    .offset(typingPowerShakeOffset)
     .contentShape(Rectangle())
     .overlay(alignment: .top) {
       if session.configuration.modifiers.contains(.listening) {
@@ -1745,6 +1763,7 @@ private struct ContentView: View {
       return
     }
 
+    clearTypingPowerEffect()
     focusWarningDelayElapsed = false
     let sequence = focusWarningSequence
     Task { @MainActor in
@@ -1754,12 +1773,57 @@ private struct ContentView: View {
     }
   }
 
+  private func emitTypingPowerEffect(isCorrect: Bool, acceptedCharacters: Int) {
+    let mode = settings.typingPowerMode
+    guard mode.isEnabled, acceptedCharacters > 0, !systemReduceMotion, !settings.reducePracticeMotion
+    else { return }
+
+    let now = Date.now
+    let origin = TypingPowerPolicy.origin(
+      typedCharacters: session.typed.count, promptLength: session.prompt.count)
+    let tone = TypingPowerPolicy.tone(for: mode, isCorrect: isCorrect, isBlind: settings.blindMode)
+    let particleCount = TypingPowerPolicy.particleCount(randomUnit: Double.random(in: 0...1))
+    let newParticles = (0..<particleCount).map { _ in
+      TypingPowerParticle(
+        id: UUID(), origin: origin,
+        velocity: .init(
+          width: Double.random(in: -260...260),
+          height: Double.random(in: -310 ... -80)),
+        createdAt: now, tone: tone, hue: Double.random(in: 0...1))
+    }
+    typingPowerParticles = Array(
+      (typingPowerParticles + newParticles).suffix(TypingPowerPolicy.maximumParticles))
+    typingPowerGeneration &+= 1
+    let generation = typingPowerGeneration
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 1_000_000_000)
+      guard generation == typingPowerGeneration else { return }
+      typingPowerParticles = []
+    }
+
+    guard mode.usesShake else { return }
+    typingPowerShakeOffset = TypingPowerPolicy.shakeOffset(
+      xRandomUnit: Double.random(in: 0...1), yRandomUnit: Double.random(in: 0...1))
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 70_000_000)
+      guard generation == typingPowerGeneration else { return }
+      withAnimation(.easeOut(duration: 0.16)) { typingPowerShakeOffset = .zero }
+    }
+  }
+
+  private func clearTypingPowerEffect() {
+    typingPowerGeneration &+= 1
+    typingPowerParticles = []
+    typingPowerShakeOffset = .zero
+  }
+
   private func reset(restarting: Bool = false) {
     restartLockMessage = nil
     bailoutConfirmationMessage = nil
     compositionText = ""
     keyboardGuideFeedback = nil
     typingCompanionHands.reset()
+    clearTypingPowerEffect()
     lastTimeWarningSecond = nil
     liveContentRequestID = UUID()
     let requestID = liveContentRequestID

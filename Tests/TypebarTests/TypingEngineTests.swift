@@ -1598,6 +1598,26 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 250), 1)
   }
 
+  func testTypingPowerModesKeepReferenceLevelSemanticsWithNativeParticles() {
+    XCTAssertFalse(TypingPowerMode.off.isEnabled)
+    XCTAssertFalse(TypingPowerMode.mellow.usesSpectrum)
+    XCTAssertFalse(TypingPowerMode.high.usesShake)
+    XCTAssertTrue(TypingPowerMode.high.usesSpectrum)
+    XCTAssertTrue(TypingPowerMode.ultra.usesShake)
+    XCTAssertTrue(TypingPowerMode.over9000.usesSpectrum)
+    XCTAssertTrue(TypingPowerMode.over9000.usesShake)
+    XCTAssertEqual(TypingPowerPolicy.particleCount(randomUnit: -1), 6)
+    XCTAssertEqual(TypingPowerPolicy.particleCount(randomUnit: 0.5), 8)
+    XCTAssertEqual(TypingPowerPolicy.particleCount(randomUnit: 2), 9)
+    XCTAssertEqual(TypingPowerPolicy.tone(for: .mellow, isCorrect: true, isBlind: false), .accent)
+    XCTAssertEqual(TypingPowerPolicy.tone(for: .mellow, isCorrect: false, isBlind: false), .error)
+    XCTAssertEqual(TypingPowerPolicy.tone(for: .mellow, isCorrect: false, isBlind: true), .accent)
+    XCTAssertEqual(TypingPowerPolicy.tone(for: .high, isCorrect: false, isBlind: false), .spectrum)
+    XCTAssertEqual(TypingPowerPolicy.origin(typedCharacters: 0, promptLength: 10), .init(x: 0.22, y: 0.48))
+    XCTAssertEqual(TypingPowerPolicy.origin(typedCharacters: 10, promptLength: 10), .init(x: 0.78, y: 0.48))
+    XCTAssertEqual(TypingPowerPolicy.shakeOffset(xRandomUnit: 1, yRandomUnit: 0), .init(width: 5, height: -5))
+  }
+
   func testIndependentCaretLayoutTracksGlyphsWrapsAndMotionSettings() throws {
     let text = AttributedString("amber harbor willow")
     let font = PracticeFont.monospaced.nsFont(size: 28)
@@ -3610,6 +3630,7 @@ final class TypingEngineTests: XCTestCase {
     settings.practiceBackdrop = .halos
     settings.reducePracticeMotion = true
     settings.showTypingCompanion = true
+    settings.typingPowerMode = .over9000
     settings.toggleFavoriteTheme(.grove)
     settings.addCustomTheme(
       name: "Harbour", background: .black, panel: .gray, accent: .orange, prefersDark: true)
@@ -3698,6 +3719,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.customBackgroundFit, .contain)
     XCTAssertEqual(exportedSnapshot.customBackgroundFilter, .init(blur: 4, brightness: 0.85, saturation: 1.4, opacity: 0.7))
     XCTAssertTrue(exportedSnapshot.showTypingCompanion)
+    XCTAssertEqual(exportedSnapshot.typingPowerMode, .over9000)
     XCTAssertEqual(exportedSnapshot.liveProgressStyle, .flashMini)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
@@ -3738,6 +3760,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.practiceBackdrop, .halos)
     XCTAssertTrue(restored.reducePracticeMotion)
     XCTAssertTrue(restored.showTypingCompanion)
+    XCTAssertEqual(restored.typingPowerMode, .over9000)
     XCTAssertTrue(restored.isFavoriteTheme(.grove))
     XCTAssertTrue(restored.isFavoriteCustomTheme(customThemeID))
     XCTAssertEqual(restored.englishVariant, .british)
@@ -3896,6 +3919,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.practiceBackdrop, .solid)
     XCTAssertFalse(snapshot.reducePracticeMotion)
     XCTAssertFalse(snapshot.showTypingCompanion)
+    XCTAssertEqual(snapshot.typingPowerMode, .off)
     XCTAssertTrue(snapshot.startGraphsAtZero)
     XCTAssertEqual(snapshot.englishVariant, .american)
     XCTAssertTrue(snapshot.favoriteQuoteIDs.isEmpty)

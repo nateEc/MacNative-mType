@@ -368,6 +368,14 @@ struct PreferencesView: View {
           Text("练习开始后以原创矢量显示左右手按键状态；速度越高，视觉反馈越明显。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Picker("键入能量效果", selection: $settings.typingPowerMode) {
+            ForEach(TypingPowerMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          Text("每次接受输入时显示原创粒子轨迹；高档位会短暂抖动练习面板，并遵从 macOS“减少动态效果”。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Slider(value: $settings.fontSize, in: 18...42, step: 1) {
             Text("练习字体大小")
           } minimumValueLabel: {
