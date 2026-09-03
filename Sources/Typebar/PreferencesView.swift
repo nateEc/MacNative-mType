@@ -50,8 +50,22 @@ struct PreferencesView: View {
             }
           }
           Toggle("严格空格", isOn: $settings.strictSpace)
-          Toggle("遇错停下", isOn: $settings.stopOnError)
-          Toggle("遇错删除", isOn: $settings.deleteOnError)
+          Picker("遇错停下", selection: $settings.stopOnErrorMode) {
+            ForEach(StopOnErrorMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          Text("字符会拒绝错误按键；单词允许继续输入，但在当前词完全修正前拒绝空格提交。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          Picker("遇错删除", selection: $settings.deleteOnErrorMode) {
+            ForEach(DeleteOnErrorMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          Text("字符会回退一格，单词会清空当前词；硬模式在新词首个错误时返回上一词。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Toggle("隐藏额外字符", isOn: $settings.hideExtraLetters)
           Toggle("盲打", isOn: $settings.blindMode)
           Picker("快速重开按键", selection: $settings.quickRestartKey) {

@@ -30,6 +30,58 @@ enum ConfidenceMode: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 }
 
+/// Mirrors the two selectable stop-on-error behaviors from the reference
+/// product without retaining its implementation or presentation code.
+enum StopOnErrorMode: String, CaseIterable, Codable, Equatable, Identifiable {
+  case off
+  case letter
+  case word
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .off: "关闭"
+    case .letter: "字符"
+    case .word: "单词"
+    }
+  }
+
+  var isEnabled: Bool { self != .off }
+}
+
+/// The four delete-on-error variants. "Hard" returns to the previous word
+/// when the mistake happens before entering any character of the new word.
+enum DeleteOnErrorMode: String, CaseIterable, Codable, Equatable, Identifiable {
+  case off
+  case letter
+  case letterHard
+  case word
+  case wordHard
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .off: "关闭"
+    case .letter: "字符（退一格）"
+    case .letterHard: "字符（硬）"
+    case .word: "单词"
+    case .wordHard: "单词（硬）"
+    }
+  }
+
+  var isEnabled: Bool { self != .off }
+
+  var clearsWholeWord: Bool {
+    self == .word || self == .wordHard
+  }
+
+  var returnsToPreviousWordAtStart: Bool {
+    self == .letterHard || self == .wordHard
+  }
+}
+
 enum OppositeShiftMode: String, CaseIterable, Codable, Equatable, Identifiable {
   case off
   case on
@@ -731,8 +783,14 @@ enum TypingTextNormalizer {
 
 struct InputRules: Codable, Equatable {
   var strictSpace = false
+  /// Legacy Boolean retained in saved configurations for backward decoding.
+  /// New callers should select `stopOnErrorMode`.
   var stopOnError = false
+  var stopOnErrorMode: StopOnErrorMode = .off
+  /// Legacy Boolean retained in saved configurations for backward decoding.
+  /// New callers should select `deleteOnErrorMode`.
   var deleteOnError = false
+  var deleteOnErrorMode: DeleteOnErrorMode = .off
   var hideExtraLetters = false
   var blindMode = false
   var quickEnd = false
@@ -752,7 +810,9 @@ struct InputRules: Codable, Equatable {
   init(
     strictSpace: Bool = false,
     stopOnError: Bool = false,
+    stopOnErrorMode: StopOnErrorMode = .off,
     deleteOnError: Bool = false,
+    deleteOnErrorMode: DeleteOnErrorMode = .off,
     hideExtraLetters: Bool = false,
     blindMode: Bool = false,
     quickEnd: Bool = false,
@@ -765,8 +825,12 @@ struct InputRules: Codable, Equatable {
     minimumWordBurstWpm: Int = 0
   ) {
     self.strictSpace = strictSpace
-    self.stopOnError = stopOnError
-    self.deleteOnError = deleteOnError
+    self.stopOnErrorMode = stopOnErrorMode.isEnabled
+      ? stopOnErrorMode : (stopOnError ? .letter : .off)
+    self.deleteOnErrorMode = deleteOnErrorMode.isEnabled
+      ? deleteOnErrorMode : (deleteOnError ? .letter : .off)
+    self.stopOnError = self.stopOnErrorMode.isEnabled
+    self.deleteOnError = self.deleteOnErrorMode.isEnabled
     self.hideExtraLetters = hideExtraLetters
     self.blindMode = blindMode
     self.quickEnd = quickEnd
@@ -777,10 +841,12 @@ struct InputRules: Codable, Equatable {
     self.minimumAccuracy = minimumAccuracy.clamped(to: 0...100)
     self.minimumWpm = minimumWpm.clamped(to: 0...300)
     self.minimumWordBurstWpm = minimumWordBurstWpm.clamped(to: 0...300)
+    normalizeErrorHandlingModes()
   }
 
   private enum CodingKeys: String, CodingKey {
-    case strictSpace, stopOnError, deleteOnError, hideExtraLetters, blindMode, quickEnd,
+    case strictSpace, stopOnError, stopOnErrorMode, deleteOnError, deleteOnErrorMode,
+      hideExtraLetters, blindMode, quickEnd,
       freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace, minimumAccuracy, minimumWpm,
       minimumWordBurstWpm
   }
@@ -788,8 +854,15 @@ struct InputRules: Codable, Equatable {
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
     strictSpace = try values.decodeIfPresent(Bool.self, forKey: .strictSpace) ?? false
-    stopOnError = try values.decodeIfPresent(Bool.self, forKey: .stopOnError) ?? false
-    deleteOnError = try values.decodeIfPresent(Bool.self, forKey: .deleteOnError) ?? false
+    let legacyStopOnError = try values.decodeIfPresent(Bool.self, forKey: .stopOnError) ?? false
+    stopOnErrorMode = try values.decodeIfPresent(StopOnErrorMode.self, forKey: .stopOnErrorMode)
+      ?? (legacyStopOnError ? .letter : .off)
+    stopOnError = stopOnErrorMode.isEnabled
+    let legacyDeleteOnError = try values.decodeIfPresent(Bool.self, forKey: .deleteOnError) ?? false
+    deleteOnErrorMode =
+      try values.decodeIfPresent(DeleteOnErrorMode.self, forKey: .deleteOnErrorMode)
+      ?? (legacyDeleteOnError ? .letter : .off)
+    deleteOnError = deleteOnErrorMode.isEnabled
     hideExtraLetters = try values.decodeIfPresent(Bool.self, forKey: .hideExtraLetters) ?? false
     blindMode = try values.decodeIfPresent(Bool.self, forKey: .blindMode) ?? false
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
@@ -805,6 +878,24 @@ struct InputRules: Codable, Equatable {
       to: 0...300)
     minimumWordBurstWpm = (try values.decodeIfPresent(Int.self, forKey: .minimumWordBurstWpm) ?? 0)
       .clamped(to: 0...300)
+    normalizeErrorHandlingModes()
+  }
+
+  mutating func normalizeErrorHandlingModes() {
+    // Configurations saved before variants used Booleans. Also honor callers
+    // that still set those public compatibility fields after initialization.
+    if stopOnError && stopOnErrorMode == .off { stopOnErrorMode = .letter }
+    if deleteOnError && deleteOnErrorMode == .off { deleteOnErrorMode = .letter }
+    if confidenceMode != .off {
+      stopOnErrorMode = .off
+      deleteOnErrorMode = .off
+    } else if stopOnErrorMode.isEnabled {
+      deleteOnErrorMode = .off
+    } else if deleteOnErrorMode.isEnabled {
+      stopOnErrorMode = .off
+    }
+    stopOnError = stopOnErrorMode.isEnabled
+    deleteOnError = deleteOnErrorMode.isEnabled
   }
 }
 
@@ -845,11 +936,8 @@ struct TestConfiguration: Codable, Equatable {
     self.wordLimit = wordLimit
     self.difficulty = difficulty
     var normalizedRules = rules
-    if normalizedRules.confidenceMode != .off {
-      normalizedRules.freedomMode = false
-      normalizedRules.stopOnError = false
-      normalizedRules.deleteOnError = false
-    }
+    normalizedRules.normalizeErrorHandlingModes()
+    if normalizedRules.confidenceMode != .off { normalizedRules.freedomMode = false }
     self.rules = normalizedRules
     self.language = language
     self.englishVariant = englishVariant
@@ -1654,8 +1742,17 @@ struct TypingSession {
       return false
     }
     if character == " " && configuration.rules.strictSpace && expected != " " { return false }
-    if !isCorrect && configuration.rules.stopOnError { return false }
-    if !isCorrect && configuration.rules.deleteOnError { return false }
+    if character == " ", configuration.rules.stopOnErrorMode == .word,
+      configuration.language.usesSpaceDelimitedWords, !configuration.modifiers.contains(.noSpaces),
+      !currentWordIsCorrect
+    {
+      return false
+    }
+    if !isCorrect && configuration.rules.stopOnErrorMode == .letter { return false }
+    if !isCorrect && configuration.rules.deleteOnErrorMode.isEnabled {
+      deleteForError(configuration.rules.deleteOnErrorMode, at: date)
+      return false
+    }
     if !isCorrect && configuration.modifiers.contains(.clearCurrentWordOnError),
       configuration.language.usesSpaceDelimitedWords, !configuration.modifiers.contains(.noSpaces)
     {
@@ -1696,6 +1793,44 @@ struct TypingSession {
       typedCharacterDates.removeLast()
       forcedErrorIndices.remove(typed.count)
       recordReplayEvent(kind: .delete, text: "", at: date)
+    }
+  }
+
+  /// Applies an original native equivalent of the selectable delete-on-error
+  /// modes. The failed key remains in `attemptedErrorCounts`; only accepted
+  /// text is removed, so metrics and replay stay internally consistent.
+  private mutating func deleteForError(_ mode: DeleteOnErrorMode, at date: Date) {
+    let activeWordIsEmpty = typed.isEmpty || typed.last?.isWhitespace == true
+    if mode.returnsToPreviousWordAtStart && activeWordIsEmpty,
+      configuration.language.usesSpaceDelimitedWords,
+      !configuration.modifiers.contains(.noSpaces), !typed.isEmpty
+    {
+      removePreviousWordForHardDelete(clearingWord: mode.clearsWholeWord, at: date)
+      return
+    }
+    if mode.clearsWholeWord {
+      clearCurrentWord(at: date)
+    } else {
+      removeLastCharacterFromCurrentWord(at: date)
+    }
+  }
+
+  private mutating func removeLastCharacterFromCurrentWord(at date: Date) {
+    guard let last = typed.last, !last.isWhitespace else { return }
+    typed.removeLast()
+    typedCharacterDates.removeLast()
+    forcedErrorIndices.remove(typed.count)
+    recordReplayEvent(kind: .delete, text: "", at: date)
+  }
+
+  private mutating func removePreviousWordForHardDelete(clearingWord: Bool, at date: Date) {
+    guard typed.last?.isWhitespace == true else { return }
+    typed.removeLast()
+    typedCharacterDates.removeLast()
+    forcedErrorIndices.remove(typed.count)
+    recordReplayEvent(kind: .delete, text: "", at: date)
+    if clearingWord {
+      clearCurrentWord(at: date)
     }
   }
 

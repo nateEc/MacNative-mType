@@ -301,7 +301,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var difficulty: Difficulty = .normal
   var strictSpace = false
   var stopOnError = false
+  var stopOnErrorMode: StopOnErrorMode = .off
   var deleteOnError = false
+  var deleteOnErrorMode: DeleteOnErrorMode = .off
   var hideExtraLetters = false
   var blindMode = false
   var fontSize: Double = 28
@@ -369,7 +371,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     difficulty: Difficulty = .normal,
     strictSpace: Bool = false,
     stopOnError: Bool = false,
+    stopOnErrorMode: StopOnErrorMode = .off,
     deleteOnError: Bool = false,
+    deleteOnErrorMode: DeleteOnErrorMode = .off,
     hideExtraLetters: Bool = false,
     blindMode: Bool = false,
     fontSize: Double = 28,
@@ -435,8 +439,13 @@ struct AppSettingsSnapshot: Codable, Equatable {
   ) {
     self.difficulty = difficulty
     self.strictSpace = strictSpace
-    self.stopOnError = stopOnError
-    self.deleteOnError = deleteOnError
+    self.stopOnErrorMode = stopOnErrorMode.isEnabled
+      ? stopOnErrorMode : (stopOnError ? .letter : .off)
+    self.deleteOnErrorMode = deleteOnErrorMode.isEnabled
+      ? deleteOnErrorMode : (deleteOnError ? .letter : .off)
+    if self.stopOnErrorMode.isEnabled { self.deleteOnErrorMode = .off }
+    self.stopOnError = self.stopOnErrorMode.isEnabled
+    self.deleteOnError = self.deleteOnErrorMode.isEnabled
     self.hideExtraLetters = hideExtraLetters
     self.blindMode = blindMode
     self.fontSize = fontSize
@@ -505,7 +514,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case difficulty, strictSpace, stopOnError, deleteOnError, hideExtraLetters, blindMode, fontSize,
+    case difficulty, strictSpace, stopOnError, stopOnErrorMode, deleteOnError, deleteOnErrorMode,
+      hideExtraLetters, blindMode, fontSize,
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
@@ -527,8 +537,16 @@ struct AppSettingsSnapshot: Codable, Equatable {
     let values = try decoder.container(keyedBy: CodingKeys.self)
     difficulty = try values.decodeIfPresent(Difficulty.self, forKey: .difficulty) ?? .normal
     strictSpace = try values.decodeIfPresent(Bool.self, forKey: .strictSpace) ?? false
-    stopOnError = try values.decodeIfPresent(Bool.self, forKey: .stopOnError) ?? false
-    deleteOnError = try values.decodeIfPresent(Bool.self, forKey: .deleteOnError) ?? false
+    let legacyStopOnError = try values.decodeIfPresent(Bool.self, forKey: .stopOnError) ?? false
+    stopOnErrorMode = try values.decodeIfPresent(StopOnErrorMode.self, forKey: .stopOnErrorMode)
+      ?? (legacyStopOnError ? .letter : .off)
+    let legacyDeleteOnError = try values.decodeIfPresent(Bool.self, forKey: .deleteOnError) ?? false
+    deleteOnErrorMode =
+      try values.decodeIfPresent(DeleteOnErrorMode.self, forKey: .deleteOnErrorMode)
+      ?? (legacyDeleteOnError ? .letter : .off)
+    if stopOnErrorMode.isEnabled { deleteOnErrorMode = .off }
+    stopOnError = stopOnErrorMode.isEnabled
+    deleteOnError = deleteOnErrorMode.isEnabled
     hideExtraLetters = try values.decodeIfPresent(Bool.self, forKey: .hideExtraLetters) ?? false
     blindMode = try values.decodeIfPresent(Bool.self, forKey: .blindMode) ?? false
     fontSize = try values.decodeIfPresent(Double.self, forKey: .fontSize) ?? 28
@@ -639,8 +657,58 @@ final class AppSettings {
 
   var difficulty: Difficulty = .normal { didSet { persist() } }
   var strictSpace = false { didSet { persist() } }
-  var stopOnError = false { didSet { if stopOnError { confidenceMode = .off }; persist() } }
-  var deleteOnError = false { didSet { if deleteOnError { confidenceMode = .off }; persist() } }
+  /// Backward-compatible Boolean bridge for archives and callers written
+  /// before selectable error-handling variants existed.
+  var stopOnError = false {
+    didSet {
+      if stopOnError && stopOnErrorMode == .off { stopOnErrorMode = .letter; return }
+      if !stopOnError && stopOnErrorMode != .off { stopOnErrorMode = .off; return }
+      if stopOnError {
+        confidenceMode = .off
+        deleteOnErrorMode = .off
+      }
+      persist()
+    }
+  }
+  var stopOnErrorMode: StopOnErrorMode = .off {
+    didSet {
+      if stopOnErrorMode.isEnabled {
+        confidenceMode = .off
+        deleteOnErrorMode = .off
+      }
+      if stopOnError != stopOnErrorMode.isEnabled {
+        stopOnError = stopOnErrorMode.isEnabled
+        return
+      }
+      persist()
+    }
+  }
+  /// Backward-compatible Boolean bridge for archives and callers written
+  /// before selectable error-handling variants existed.
+  var deleteOnError = false {
+    didSet {
+      if deleteOnError && deleteOnErrorMode == .off { deleteOnErrorMode = .letter; return }
+      if !deleteOnError && deleteOnErrorMode != .off { deleteOnErrorMode = .off; return }
+      if deleteOnError {
+        confidenceMode = .off
+        stopOnErrorMode = .off
+      }
+      persist()
+    }
+  }
+  var deleteOnErrorMode: DeleteOnErrorMode = .off {
+    didSet {
+      if deleteOnErrorMode.isEnabled {
+        confidenceMode = .off
+        stopOnErrorMode = .off
+      }
+      if deleteOnError != deleteOnErrorMode.isEnabled {
+        deleteOnError = deleteOnErrorMode.isEnabled
+        return
+      }
+      persist()
+    }
+  }
   var hideExtraLetters = false { didSet { persist() } }
   var blindMode = false { didSet { persist() } }
   var fontSize: Double = 28 { didSet { persist() } }
@@ -734,7 +802,9 @@ final class AppSettings {
     difficulty = snapshot.difficulty
     strictSpace = snapshot.strictSpace
     stopOnError = snapshot.stopOnError
+    stopOnErrorMode = snapshot.stopOnErrorMode
     deleteOnError = snapshot.deleteOnError
+    deleteOnErrorMode = snapshot.deleteOnErrorMode
     hideExtraLetters = snapshot.hideExtraLetters
     blindMode = snapshot.blindMode
     fontSize = snapshot.fontSize
@@ -804,7 +874,9 @@ final class AppSettings {
     .init(
       strictSpace: strictSpace,
       stopOnError: stopOnError,
+      stopOnErrorMode: stopOnErrorMode,
       deleteOnError: deleteOnError,
+      deleteOnErrorMode: deleteOnErrorMode,
       hideExtraLetters: hideExtraLetters,
       blindMode: blindMode,
       quickEnd: quickEnd,
@@ -821,7 +893,8 @@ final class AppSettings {
   var snapshot: AppSettingsSnapshot {
     .init(
       difficulty: difficulty, strictSpace: strictSpace, stopOnError: stopOnError,
-      deleteOnError: deleteOnError, hideExtraLetters: hideExtraLetters, blindMode: blindMode,
+      stopOnErrorMode: stopOnErrorMode, deleteOnError: deleteOnError,
+      deleteOnErrorMode: deleteOnErrorMode, hideExtraLetters: hideExtraLetters, blindMode: blindMode,
       fontSize: fontSize, practiceFont: practiceFont, theme: theme,
       publishCompletedResults: publishCompletedResults, saveCompletedResults: saveCompletedResults,
       customThemes: customThemes,
@@ -863,7 +936,9 @@ final class AppSettings {
     difficulty = .normal
     strictSpace = false
     stopOnError = false
+    stopOnErrorMode = .off
     deleteOnError = false
+    deleteOnErrorMode = .off
     hideExtraLetters = false
     blindMode = false
     fontSize = 28
@@ -933,7 +1008,9 @@ final class AppSettings {
     difficulty = configuration.difficulty
     strictSpace = configuration.rules.strictSpace
     stopOnError = configuration.rules.stopOnError
+    stopOnErrorMode = configuration.rules.stopOnErrorMode
     deleteOnError = configuration.rules.deleteOnError
+    deleteOnErrorMode = configuration.rules.deleteOnErrorMode
     hideExtraLetters = configuration.rules.hideExtraLetters
     blindMode = configuration.rules.blindMode
     quickEnd = configuration.rules.quickEnd
@@ -1113,7 +1190,9 @@ final class AppSettings {
       difficulty: difficulty,
       strictSpace: strictSpace,
       stopOnError: stopOnError,
+      stopOnErrorMode: stopOnErrorMode,
       deleteOnError: deleteOnError,
+      deleteOnErrorMode: deleteOnErrorMode,
       hideExtraLetters: hideExtraLetters,
       blindMode: blindMode,
       fontSize: fontSize,

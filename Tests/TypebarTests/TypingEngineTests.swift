@@ -132,17 +132,70 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.typed, "")
   }
 
-  func testDeleteOnErrorDiscardsTheWrongCharacterWithoutChangingAcceptedInput() {
-    var rules = InputRules()
-    rules.deleteOnError = true
+  func testStopOnErrorWordBlocksOnlyTheIncorrectWordCommit() {
+    let rules = InputRules(stopOnErrorMode: .word)
+    var session = TypingSession(
+      configuration: .timed(seconds: 30, rules: rules), prompt: "amber bay")
+    session.insert("amxer ", at: start)
+    XCTAssertEqual(session.typed, "amxer")
+
+    session.deleteBackward(at: start.addingTimeInterval(1))
+    session.deleteBackward(at: start.addingTimeInterval(1))
+    session.deleteBackward(at: start.addingTimeInterval(1))
+    session.insert("ber ", at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.typed, "amber ")
+  }
+
+  func testDeleteOnErrorLetterCostsOneAcceptedCharacter() {
+    let rules = InputRules(deleteOnErrorMode: .letter)
     var session = TypingSession(
       configuration: .timed(seconds: 30, rules: rules), prompt: "amber")
     session.insert("am", at: start)
     session.insert("x", at: start.addingTimeInterval(1))
-    XCTAssertEqual(session.typed, "am")
+    XCTAssertEqual(session.typed, "a")
     XCTAssertEqual(session.errors, 0)
-    session.insert("ber", at: start.addingTimeInterval(2))
+    session.insert("mber", at: start.addingTimeInterval(2))
     XCTAssertEqual(session.typed, "amber")
+  }
+
+  func testDeleteOnErrorWordClearsTheActiveWord() {
+    let rules = InputRules(deleteOnErrorMode: .word)
+    var session = TypingSession(
+      configuration: .timed(seconds: 30, rules: rules), prompt: "amber")
+    session.insert("am", at: start)
+    session.insert("x", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.typed, "")
+    session.insert("amber", at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.typed, "amber")
+  }
+
+  func testHardDeleteOnErrorReturnsToPreviousWordAtWordStart() {
+    var letterHard = TypingSession(
+      configuration: .timed(
+        seconds: 30, rules: .init(deleteOnErrorMode: .letterHard)), prompt: "amber bay")
+    letterHard.insert("amber ", at: start)
+    letterHard.insert("x", at: start.addingTimeInterval(1))
+    XCTAssertEqual(letterHard.typed, "amber")
+
+    var wordHard = TypingSession(
+      configuration: .timed(
+        seconds: 30, rules: .init(deleteOnErrorMode: .wordHard)), prompt: "amber bay")
+    wordHard.insert("amber ", at: start)
+    wordHard.insert("x", at: start.addingTimeInterval(1))
+    XCTAssertEqual(wordHard.typed, "")
+  }
+
+  func testErrorHandlingModesDecodeLegacyBooleanAndRemainMutuallyExclusive() throws {
+    let legacy = """
+      {"strictSpace":false,"stopOnError":true,"deleteOnError":false}
+      """
+    let decoded = try JSONDecoder().decode(InputRules.self, from: Data(legacy.utf8))
+    XCTAssertEqual(decoded.stopOnErrorMode, .letter)
+    XCTAssertTrue(decoded.stopOnError)
+
+    let conflicting = InputRules(stopOnErrorMode: .word, deleteOnErrorMode: .wordHard)
+    XCTAssertEqual(conflicting.stopOnErrorMode, .word)
+    XCTAssertEqual(conflicting.deleteOnErrorMode, .off)
   }
 
   func testConfidenceModePreventsReturningToAnIncorrectPreviousWord() {
@@ -2475,6 +2528,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.paceGuideCustomWpm, 95)
     XCTAssertEqual(restored.paceCaretStyle, .block)
     XCTAssertTrue(restored.repeatedPace)
+  }
+
+  @MainActor
+  func testErrorHandlingModesPersistAndNormalizeInSettings() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.stopOnErrorMode = .word
+    XCTAssertTrue(settings.stopOnError)
+    XCTAssertEqual(settings.inputRules.stopOnErrorMode, .word)
+
+    settings.deleteOnErrorMode = .wordHard
+    XCTAssertFalse(settings.stopOnError)
+    XCTAssertEqual(settings.stopOnErrorMode, .off)
+    XCTAssertTrue(settings.deleteOnError)
+    XCTAssertEqual(settings.inputRules.deleteOnErrorMode, .wordHard)
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.deleteOnErrorMode, .wordHard)
+    XCTAssertEqual(restored.inputRules.deleteOnErrorMode, .wordHard)
   }
 
   @MainActor
