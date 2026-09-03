@@ -88,6 +88,32 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(instant.afkPercentage, 0)
   }
 
+  func testResultConsistencyRebuildsCadenceOnlyFromLocalReplay() {
+    let steadyEvents: [TypingReplayEvent] = [
+      .init(offset: 0.2, kind: .insert, text: "a"),
+      .init(offset: 1.2, kind: .insert, text: "b"),
+      .init(offset: 2.2, kind: .insert, text: "c"),
+    ]
+    let steady = ResultConsistencyPolicy.metrics(events: steadyEvents, duration: 3)
+    XCTAssertEqual(steady.typing, 100)
+    XCTAssertEqual(steady.key, 100)
+
+    let uneven = ResultConsistencyPolicy.metrics(
+      events: [
+        .init(offset: 0.2, kind: .insert, text: "a"),
+        .init(offset: 1.2, kind: .insert, text: "b"),
+        .init(offset: 1.4, kind: .insert, text: "c"),
+        .init(offset: 3.8, kind: .insert, text: "d"),
+      ],
+      duration: 4
+    )
+    XCTAssertLessThan(uneven.typing, steady.typing)
+    XCTAssertLessThan(uneven.key, steady.key)
+
+    let unavailable = ResultConsistencyPolicy.metrics(events: [], duration: 3)
+    XCTAssertEqual(unavailable, .init(typing: 0, key: 0))
+  }
+
   func testWordsTestCompletesAtWordLimit() {
     var session = TypingSession(configuration: .words(2), prompt: "amber harbor quiet")
     session.insert("amber harbor", at: start)

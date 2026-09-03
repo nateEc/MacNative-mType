@@ -2636,6 +2636,10 @@ private struct CompletedResultView: View {
           metric("错误", "\(result.errorCount)")
           metric("总用时", "\(Int(result.elapsedDuration)) 秒")
         }
+        GridRow {
+          metric("稳定度", "\(consistencyText(consistency.typing))%")
+          metric("按键稳定度", "\(consistencyText(consistency.key))%")
+        }
         if result.afkDuration > 0 {
           GridRow {
             metric("闲置", "\(Int(result.afkDuration)) 秒 · \(afkPercentageText)%")
@@ -2774,6 +2778,14 @@ private struct CompletedResultView: View {
 
   private var afkPercentageText: String {
     result.afkPercentage.formatted(.number.precision(.fractionLength(0...2)))
+  }
+
+  private var consistency: ResultConsistency {
+    ResultConsistencyPolicy.metrics(events: result.replayEvents, duration: result.elapsedDuration)
+  }
+
+  private func consistencyText(_ value: Double) -> String {
+    value.formatted(.number.precision(.fractionLength(0...2)))
   }
 
   private func metric(_ title: String, _ value: String) -> some View {
@@ -3981,6 +3993,10 @@ private struct ResultDetailView: View {
           Text("总用时")
           Text("\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
         }
+        GridRow {
+          Text("稳定度 / 按键稳定度")
+          Text("\(consistencyText(consistency.typing))% / \(consistencyText(consistency.key))%")
+        }
         if result.afkDuration > 0 {
           GridRow {
             Text("闲置 / 有效键入")
@@ -4031,6 +4047,17 @@ private struct ResultDetailView: View {
     }
     .padding(32)
     .frame(width: 460, height: 620)
+  }
+
+  private var consistency: ResultConsistency {
+    ResultConsistencyPolicy.metrics(
+      events: result.replayEvents,
+      duration: result.finishedAt.timeIntervalSince(result.startedAt)
+    )
+  }
+
+  private func consistencyText(_ value: Double) -> String {
+    value.formatted(.number.precision(.fractionLength(0...2)))
   }
 
   private func addTag() {

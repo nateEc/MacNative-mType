@@ -503,6 +503,75 @@ enum ResultPromptText {
   }
 }
 
+/// Local result consistency values reconstructed from Typebar's own replay.
+/// They intentionally remain derived data: existing archives with no replay
+/// safely show zero instead of inventing a cadence statistic.
+struct ResultConsistency: Equatable {
+  let typing: Double
+  let key: Double
+}
+
+enum ResultConsistencyPolicy {
+  static func metrics(events: [TypingReplayEvent], duration: TimeInterval) -> ResultConsistency {
+    let ordered = events.enumerated().sorted { lhs, rhs in
+      lhs.element.offset == rhs.element.offset ? lhs.offset < rhs.offset : lhs.element.offset < rhs.element.offset
+    }.map(\.element)
+    let typingSamples = typingSpeeds(events: ordered, duration: duration)
+    let keySpacing = keySpacings(events: ordered)
+    return .init(
+      typing: consistency(for: typingSamples),
+      key: consistency(for: Array(keySpacing.dropLast())))
+  }
+
+  private static func typingSpeeds(
+    events: [TypingReplayEvent], duration: TimeInterval
+  ) -> [Double] {
+    guard duration > 0 else { return [] }
+    let wholeSeconds = Int(duration.rounded(.down))
+    var boundaries = wholeSeconds > 0 ? (1...wholeSeconds).map(TimeInterval.init) : []
+    let fractionalTail = duration - Double(wholeSeconds)
+    if fractionalTail >= 0.5 { boundaries.append(duration) }
+
+    var previousBoundary: TimeInterval = 0
+    return boundaries.map { boundary in
+      let characters = events.reduce(into: 0) { count, event in
+        guard event.kind == .insert, event.offset > previousBoundary, event.offset <= boundary else { return }
+        count += event.text.count
+      }
+      defer { previousBoundary = boundary }
+      let interval = boundary - previousBoundary
+      guard interval > 0 else { return 0 }
+      return Double(Int((Double(characters) / 5 / interval * 60).rounded()))
+    }
+  }
+
+  private static func keySpacings(events: [TypingReplayEvent]) -> [TimeInterval] {
+    let keyEvents = events.filter { $0.kind == .insert || $0.kind == .delete }
+    return zip(keyEvents, keyEvents.dropFirst()).map { earlier, later in
+      max(0, later.offset - earlier.offset)
+    }
+  }
+
+  private static func consistency(for samples: [Double]) -> Double {
+    guard !samples.isEmpty else { return 0 }
+    let average = samples.reduce(0, +) / Double(samples.count)
+    guard average > 0 else { return 0 }
+    let variance = samples.reduce(0) { partial, sample in
+      partial + pow(sample - average, 2)
+    } / Double(samples.count)
+    let coefficientOfVariation = sqrt(variance) / average
+    let mapped = 100 * (
+      1 - tanh(
+        coefficientOfVariation
+          + pow(coefficientOfVariation, 3) / 3
+          + pow(coefficientOfVariation, 5) / 5
+      )
+    )
+    guard mapped.isFinite else { return 0 }
+    return (mapped * 100).rounded() / 100
+  }
+}
+
 /// Rebuilds a compact, local-only result trace from the input replay that is
 /// already saved with a completed test. It uses Typebar's own incremental
 /// character accounting and deliberately has a conservative duration cap so
