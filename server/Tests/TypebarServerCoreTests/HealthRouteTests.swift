@@ -1620,6 +1620,150 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(passwordOnlyUser.authenticationMethods, [.password])
   }
 
+  func testOAuthTransactionsAreOneTimeAndCompleteRegistrationOrLinking() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let start = Date(timeIntervalSince1970: 12_000)
+    let signIn = try await store.beginOAuth(provider: .google, purpose: .signIn, now: start)
+    XCTAssertEqual(signIn.state.count, 43)
+    XCTAssertEqual(signIn.codeChallenge.count, 43)
+
+    let callback = try await store.beginOAuthCallback(
+      provider: .google, stateToken: signIn.state, now: start)
+    XCTAssertEqual(callback.provider, .google)
+    XCTAssertEqual(callback.codeVerifier.count, 43)
+    do {
+      _ = try await store.beginOAuthCallback(provider: .google, stateToken: signIn.state, now: start)
+      XCTFail("OAuth callback state must not be replayed")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidOAuthTransaction)
+    }
+
+    try await store.completeOAuthCallback(
+      stateToken: signIn.state,
+      identity: .init(
+        provider: .google, subject: "google-subject-1", email: "google-flow@example.com",
+        suggestedDisplayName: "Google Flow"),
+      now: start)
+    let registration = try await store.oauthCompletion(stateToken: signIn.state, now: start)
+    XCTAssertEqual(registration.status, .registrationRequired)
+    XCTAssertEqual(registration.email, "google-flow@example.com")
+    XCTAssertEqual(registration.suggestedDisplayName, "Google Flow")
+
+    let oauthSession = try await store.completeOAuthRegistration(
+      stateToken: signIn.state, displayName: "Native Google", now: start)
+    XCTAssertEqual(oauthSession.user.authenticationMethods, [.google])
+    do {
+      _ = try await store.oauthCompletion(stateToken: signIn.state, now: start)
+      XCTFail("Completed OAuth transactions must be consumed")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidOAuthTransaction)
+    }
+
+    let link = try await store.beginOAuth(
+      provider: .github, purpose: .link, accessToken: oauthSession.accessToken, now: start)
+    _ = try await store.beginOAuthCallback(provider: .github, stateToken: link.state, now: start)
+    try await store.completeOAuthCallback(
+      stateToken: link.state,
+      identity: .init(provider: .github, subject: "github-subject-2", email: "github-flow@example.com"),
+      now: start)
+    let linked = try await store.oauthCompletion(stateToken: link.state, now: start)
+    XCTAssertEqual(linked.status, .linked)
+    XCTAssertEqual(linked.user?.authenticationMethods, [.github, .google])
+  }
+
+  func testOAuthProviderAuthorizationURLsUseMinimalScopesAndPKCE() throws {
+    let githubRedirect = try XCTUnwrap(
+      URL(string: "https://typebar.example.com/v1/auth/oauth/github/callback"))
+    let googleRedirect = try XCTUnwrap(
+      URL(string: "https://typebar.example.com/v1/auth/oauth/google/callback"))
+    let client = OAuthProviderClient(configurations: [
+      .github: try .init(clientID: "github-client", clientSecret: "github-secret", redirectURL: githubRedirect),
+      .google: try .init(clientID: "google-client", clientSecret: "google-secret", redirectURL: googleRedirect),
+    ])
+    let request = OAuthAuthorizationRequest(
+      provider: .github, state: "state-token", codeChallenge: "challenge-token")
+    let githubURL = try client.authorizationURL(for: request)
+    let githubQuery = Dictionary(
+      uniqueKeysWithValues: (URLComponents(url: githubURL, resolvingAgainstBaseURL: false)?.queryItems ?? [])
+        .compactMap { item in item.value.map { (item.name, $0) } })
+    XCTAssertEqual(githubURL.host, "github.com")
+    XCTAssertEqual(githubQuery["scope"], "read:user user:email")
+    XCTAssertEqual(githubQuery["state"], "state-token")
+    XCTAssertEqual(githubQuery["code_challenge"], "challenge-token")
+    XCTAssertEqual(githubQuery["code_challenge_method"], "S256")
+
+    let googleURL = try client.authorizationURL(for: .init(
+      provider: .google, state: "google-state", codeChallenge: "google-challenge"))
+    let googleQuery = Dictionary(
+      uniqueKeysWithValues: (URLComponents(url: googleURL, resolvingAgainstBaseURL: false)?.queryItems ?? [])
+        .compactMap { item in item.value.map { (item.name, $0) } })
+    XCTAssertEqual(googleURL.host, "accounts.google.com")
+    XCTAssertEqual(googleQuery["scope"], "openid profile email")
+    XCTAssertEqual(googleQuery["prompt"], "select_account")
+    XCTAssertEqual(googleQuery["redirect_uri"], googleRedirect.absoluteString)
+  }
+
+  func testOAuthRoutesUseInjectedIdentityAndReturnToTheNativeCallback() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let redirectURL = try XCTUnwrap(
+      URL(string: "https://typebar.example.com/v1/auth/oauth/google/callback"))
+    let oauthClient = OAuthProviderClient(
+      configurations: [
+        .google: try .init(clientID: "google-client", clientSecret: "google-secret", redirectURL: redirectURL)
+      ],
+      identityResolver: { provider, _, _ in
+        guard provider == .google else { throw OAuthProviderClientError.providerRejected }
+        return .init(
+          provider: .google, subject: "route-google-subject", email: "route-google@example.com",
+          suggestedDisplayName: "Route Google")
+      })
+    do {
+      try configure(app, authStore: store, oauthProviderClient: oauthClient)
+      try await app.test(.GET, "v1/capabilities") { response async in
+        let capabilities = try? response.content.decode(ServiceCapabilitiesResponse.self)
+        XCTAssertEqual(capabilities?.capabilities["googleOAuth"], .available)
+        XCTAssertEqual(capabilities?.capabilities["githubOAuth"], .planned)
+      }
+      try await app.test(.POST, "v1/auth/oauth/google/start", beforeRequest: { request in
+        try request.content.encode(OAuthStartRequest(purpose: .signIn))
+      }) { response async in
+        XCTAssertEqual(response.status, .ok)
+        let started = try? response.content.decode(OAuthStartResponse.self)
+        XCTAssertEqual(URL(string: started?.authorizationURL ?? "")?.host, "accounts.google.com")
+      }
+
+      let transaction = try await store.beginOAuth(provider: .google, purpose: .signIn)
+      try await app.test(
+        .GET, "v1/auth/oauth/google/callback?code=test-code&state=\(transaction.state)"
+      ) { response async in
+        XCTAssertEqual(response.status, .found)
+        let callbackURL = response.headers.first(name: "Location")
+        XCTAssertEqual(URL(string: callbackURL ?? "")?.scheme, "typebar")
+        XCTAssertEqual(URLComponents(string: callbackURL ?? "")?.queryItems?.first(where: { $0.name == "state" })?.value, transaction.state)
+      }
+      try await app.test(.GET, "v1/auth/oauth/completion?state=\(transaction.state)") { response async in
+        XCTAssertEqual(response.status, .ok)
+        let completion = try? response.content.decode(OAuthCompletionResponse.self)
+        XCTAssertEqual(completion?.status, .registrationRequired)
+        XCTAssertEqual(completion?.email, "route-google@example.com")
+      }
+      try await app.test(.POST, "v1/auth/oauth/registration", beforeRequest: { request in
+        try request.content.encode(
+          OAuthRegistrationRequest(state: transaction.state, displayName: "Native Route"))
+      }) { response async in
+        XCTAssertEqual(response.status, .ok)
+        let session = try? response.content.decode(AuthSessionResponse.self)
+        XCTAssertEqual(session?.user.authenticationMethods, [.google])
+        XCTAssertTrue(session?.user.emailVerified ?? false)
+      }
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testExperienceIsServerCalculatedIdempotentAndRankedForTheCurrentISOWeek() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let alice = try await store.register(
@@ -1801,12 +1945,14 @@ final class HealthRouteTests: XCTestCase {
   private func configureTestApp(
     _ app: Application,
     moderationKey: String? = nil,
+    oauthProviderClient: OAuthProviderClient? = nil,
     maintenanceMode: Bool = false
   ) throws {
     try configure(
       app,
       authStore: AuthStore(fileURL: nil, bcryptCost: 4),
       moderationKey: moderationKey,
+      oauthProviderClient: oauthProviderClient,
       maintenanceMode: maintenanceMode)
   }
 }

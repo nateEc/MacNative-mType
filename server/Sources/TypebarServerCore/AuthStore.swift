@@ -124,6 +124,64 @@ public enum AuthenticationMethod: String, Content, CaseIterable, Equatable, Send
   case google
 }
 
+public enum OAuthAuthorizationPurpose: String, Content, Equatable, Sendable {
+  case signIn
+  case link
+}
+
+public struct OAuthAuthorizationRequest: Sendable, Equatable {
+  public let provider: OAuthProvider
+  public let state: String
+  public let codeChallenge: String
+
+  public init(provider: OAuthProvider, state: String, codeChallenge: String) {
+    self.provider = provider
+    self.state = state
+    self.codeChallenge = codeChallenge
+  }
+}
+
+public struct OAuthCallbackExchange: Sendable, Equatable {
+  public let provider: OAuthProvider
+  public let codeVerifier: String
+
+  public init(provider: OAuthProvider, codeVerifier: String) {
+    self.provider = provider
+    self.codeVerifier = codeVerifier
+  }
+}
+
+public enum OAuthCompletionStatus: String, Content, Equatable, Sendable {
+  case pending
+  case exchanging
+  case registrationRequired
+  case signedIn
+  case linked
+  case failed
+}
+
+public struct OAuthCompletionResponse: Content, Equatable {
+  public let status: OAuthCompletionStatus
+  public let email: String?
+  public let suggestedDisplayName: String?
+  public let session: AuthSessionResponse?
+  public let user: AuthUserResponse?
+  public let message: String?
+}
+
+public struct OAuthStartRequest: Content, Equatable {
+  public let purpose: OAuthAuthorizationPurpose
+}
+
+public struct OAuthStartResponse: Content, Equatable {
+  public let authorizationURL: String
+}
+
+public struct OAuthRegistrationRequest: Content, Equatable {
+  public let state: String
+  public let displayName: String
+}
+
 /// A verified identity returned by a configured OAuth provider. It deliberately
 /// contains no provider access or refresh token; Typebar only keeps the stable
 /// provider subject needed for future sign-in.
@@ -131,11 +189,15 @@ public struct OAuthProviderIdentity: Sendable, Equatable {
   public let provider: OAuthProvider
   public let subject: String
   public let email: String
+  public let suggestedDisplayName: String?
 
-  public init(provider: OAuthProvider, subject: String, email: String) {
+  public init(
+    provider: OAuthProvider, subject: String, email: String, suggestedDisplayName: String? = nil
+  ) {
     self.provider = provider
     self.subject = subject
     self.email = email
+    self.suggestedDisplayName = suggestedDisplayName
   }
 }
 
@@ -199,6 +261,8 @@ public enum AuthStoreError: Error, Equatable {
   case oauthIdentityAlreadyLinked
   case oauthIdentityNotLinked
   case cannotRemoveLastAuthentication
+  case invalidOAuthTransaction
+  case oauthRegistrationNotRequired
   case profileNotFound
   case cannotConnectToSelf
   case connectionAlreadyExists
@@ -221,6 +285,7 @@ public actor AuthStore {
     var passwordResetTokens: [StoredPasswordResetToken] = []
     var emailVerificationTokens: [StoredEmailVerificationToken] = []
     var oauthIdentities: [StoredOAuthIdentity] = []
+    var oauthTransactions: [StoredOAuthTransaction] = []
     var syncRecords: [StoredSyncRecord] = []
     var results: [StoredResult] = []
     var connections: [StoredConnection] = []
@@ -234,7 +299,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, passwordResetTokens, emailVerificationTokens, oauthIdentities, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
+      case users, sessions, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, nextSyncCursor
     }
 
@@ -250,6 +315,8 @@ public actor AuthStore {
         try values.decodeIfPresent([StoredEmailVerificationToken].self, forKey: .emailVerificationTokens) ?? []
       oauthIdentities =
         try values.decodeIfPresent([StoredOAuthIdentity].self, forKey: .oauthIdentities) ?? []
+      oauthTransactions =
+        try values.decodeIfPresent([StoredOAuthTransaction].self, forKey: .oauthTransactions) ?? []
       syncRecords = try values.decodeIfPresent([StoredSyncRecord].self, forKey: .syncRecords) ?? []
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
@@ -333,6 +400,21 @@ public actor AuthStore {
     let subject: String
     let userID: UUID
     let linkedAt: Date
+  }
+
+  private struct StoredOAuthTransaction: Codable {
+    let provider: OAuthProvider
+    let stateHash: String
+    let codeVerifier: String
+    let purpose: OAuthAuthorizationPurpose
+    let userID: UUID?
+    let expiresAt: Date
+    var status: OAuthCompletionStatus
+    var subject: String?
+    var email: String?
+    var suggestedDisplayName: String?
+    var authenticatedUserID: UUID?
+    var failureMessage: String?
   }
 
   private struct StoredSyncRecord: Codable {
@@ -638,6 +720,187 @@ public actor AuthStore {
     return try userResponse(for: currentUser.id)
   }
 
+  /// Starts a short-lived OAuth transaction. The raw state is returned only to
+  /// the caller and its SHA-256 hash is all that reaches persisted state.
+  public func beginOAuth(
+    provider: OAuthProvider, purpose: OAuthAuthorizationPurpose, accessToken: String? = nil,
+    now: Date = .now
+  ) throws -> OAuthAuthorizationRequest {
+    let userID: UUID?
+    switch purpose {
+    case .signIn:
+      userID = nil
+    case .link:
+      guard let accessToken else { throw AuthStoreError.invalidAccessToken }
+      userID = try authenticatedUser(for: accessToken, now: now).id
+    }
+    state.oauthTransactions.removeAll { $0.expiresAt <= now }
+    let stateToken = Self.makeAccessToken()
+    let codeVerifier = Self.makeAccessToken()
+    state.oauthTransactions.append(
+      .init(
+        provider: provider, stateHash: Self.tokenHash(stateToken), codeVerifier: codeVerifier,
+        purpose: purpose, userID: userID, expiresAt: now.addingTimeInterval(10 * 60), status: .pending,
+        subject: nil, email: nil, suggestedDisplayName: nil, authenticatedUserID: nil,
+        failureMessage: nil))
+    try persist()
+    return .init(
+      provider: provider, state: stateToken, codeChallenge: Self.codeChallenge(for: codeVerifier))
+  }
+
+  /// Consumes the pending state before an external exchange begins, preventing
+  /// callback replay from exchanging the same code more than once.
+  public func beginOAuthCallback(
+    provider: OAuthProvider, stateToken: String, now: Date = .now
+  ) throws -> OAuthCallbackExchange {
+    let stateHash = Self.tokenHash(stateToken)
+    guard let index = state.oauthTransactions.firstIndex(where: {
+      $0.provider == provider && $0.stateHash == stateHash && $0.expiresAt > now && $0.status == .pending
+    }) else { throw AuthStoreError.invalidOAuthTransaction }
+    state.oauthTransactions[index].status = .exchanging
+    let verifier = state.oauthTransactions[index].codeVerifier
+    try persist()
+    return .init(provider: provider, codeVerifier: verifier)
+  }
+
+  /// Records a provider-validated identity without storing its credentials.
+  /// The native app later consumes this state to sign in, link, or select a
+  /// display name for a new account.
+  public func completeOAuthCallback(
+    stateToken: String, identity: OAuthProviderIdentity, now: Date = .now
+  ) throws {
+    let stateHash = Self.tokenHash(stateToken)
+    guard let index = state.oauthTransactions.firstIndex(where: {
+      $0.provider == identity.provider && $0.stateHash == stateHash && $0.expiresAt > now && $0.status == .exchanging
+    }) else { throw AuthStoreError.invalidOAuthTransaction }
+    let (subject, email) = try validatedOAuthIdentity(identity)
+    switch state.oauthTransactions[index].purpose {
+    case .signIn:
+      if let existing = state.oauthIdentities.first(where: {
+        $0.provider == identity.provider && $0.subject == subject
+      }) {
+        state.oauthTransactions[index].status = .signedIn
+        state.oauthTransactions[index].subject = nil
+        state.oauthTransactions[index].email = nil
+        state.oauthTransactions[index].suggestedDisplayName = nil
+        state.oauthTransactions[index].authenticatedUserID = existing.userID
+      } else if state.users.contains(where: { $0.email == email }) {
+        state.oauthTransactions[index].status = .failed
+        state.oauthTransactions[index].failureMessage =
+          "This email already has a Typebar account. Sign in with an existing method before linking this provider."
+      } else {
+        state.oauthTransactions[index].status = .registrationRequired
+        state.oauthTransactions[index].subject = subject
+        state.oauthTransactions[index].email = email
+        state.oauthTransactions[index].suggestedDisplayName = identity.suggestedDisplayName
+      }
+    case .link:
+      guard let userID = state.oauthTransactions[index].userID,
+        state.users.contains(where: { $0.id == userID })
+      else { throw AuthStoreError.invalidOAuthTransaction }
+      if let existing = state.oauthIdentities.first(where: {
+        $0.provider == identity.provider && $0.subject == subject
+      }), existing.userID != userID {
+        state.oauthTransactions[index].status = .failed
+        state.oauthTransactions[index].failureMessage = "This provider identity is already linked to another Typebar account."
+      } else {
+        if !state.oauthIdentities.contains(where: {
+          $0.provider == identity.provider && $0.subject == subject && $0.userID == userID
+        }) {
+          state.oauthIdentities.append(
+            .init(provider: identity.provider, subject: subject, userID: userID, linkedAt: now))
+        }
+        state.oauthTransactions[index].status = .linked
+      }
+    }
+    try persist()
+  }
+
+  /// Lets a failed callback return a user-safe error through the same native
+  /// callback path without logging provider responses or authorization codes.
+  public func failOAuthCallback(stateToken: String, now: Date = .now) throws {
+    let stateHash = Self.tokenHash(stateToken)
+    guard let index = state.oauthTransactions.firstIndex(where: {
+      $0.stateHash == stateHash && $0.expiresAt > now && $0.status == .exchanging
+    }) else { throw AuthStoreError.invalidOAuthTransaction }
+    state.oauthTransactions[index].status = .failed
+    state.oauthTransactions[index].failureMessage = "The provider authentication was not completed."
+    try persist()
+  }
+
+  public func oauthCompletion(stateToken: String, now: Date = .now) throws -> OAuthCompletionResponse {
+    let stateHash = Self.tokenHash(stateToken)
+    let originalCount = state.oauthTransactions.count
+    state.oauthTransactions.removeAll { $0.expiresAt <= now }
+    guard let index = state.oauthTransactions.firstIndex(where: { $0.stateHash == stateHash }) else {
+      if state.oauthTransactions.count != originalCount { try persist() }
+      throw AuthStoreError.invalidOAuthTransaction
+    }
+    let transaction = state.oauthTransactions[index]
+    switch transaction.status {
+    case .pending, .exchanging:
+      return .init(
+        status: .pending, email: nil, suggestedDisplayName: nil, session: nil, user: nil,
+        message: nil)
+    case .registrationRequired:
+      return .init(
+        status: .registrationRequired, email: transaction.email,
+        suggestedDisplayName: transaction.suggestedDisplayName, session: nil, user: nil, message: nil)
+    case .signedIn:
+      guard let userID = transaction.authenticatedUserID,
+        let user = state.users.first(where: { $0.id == userID })
+      else { throw AuthStoreError.invalidOAuthTransaction }
+      state.oauthTransactions.remove(at: index)
+      let session = makeSession(for: user, now: now)
+      try persist()
+      return .init(
+        status: .signedIn, email: nil, suggestedDisplayName: nil, session: session, user: nil,
+        message: nil)
+    case .linked:
+      guard let userID = transaction.userID else { throw AuthStoreError.invalidOAuthTransaction }
+      let user = try userResponse(for: userID)
+      state.oauthTransactions.remove(at: index)
+      try persist()
+      return .init(
+        status: .linked, email: nil, suggestedDisplayName: nil, session: nil, user: user, message: nil)
+    case .failed:
+      state.oauthTransactions.remove(at: index)
+      try persist()
+      return .init(
+        status: .failed, email: nil, suggestedDisplayName: nil, session: nil, user: nil,
+        message: transaction.failureMessage ?? "The provider authentication was not completed.")
+    }
+  }
+
+  public func completeOAuthRegistration(
+    stateToken: String, displayName: String, now: Date = .now
+  ) throws -> AuthSessionResponse {
+    let stateHash = Self.tokenHash(stateToken)
+    guard let index = state.oauthTransactions.firstIndex(where: {
+      $0.stateHash == stateHash && $0.expiresAt > now && $0.status == .registrationRequired
+    }), let subject = state.oauthTransactions[index].subject,
+      let email = state.oauthTransactions[index].email
+    else { throw AuthStoreError.oauthRegistrationNotRequired }
+    let transaction = state.oauthTransactions[index]
+    let name = try validatedDisplayName(displayName)
+    guard !state.oauthIdentities.contains(where: {
+      $0.provider == transaction.provider && $0.subject == subject
+    }) else { throw AuthStoreError.oauthIdentityAlreadyLinked }
+    guard !state.users.contains(where: { $0.email == email }) else {
+      throw AuthStoreError.emailAlreadyRegistered
+    }
+    let user = StoredUser(
+      id: UUID(), email: email, displayName: name, passwordHash: nil, createdAt: now,
+      emailVerified: true)
+    state.users.append(user)
+    state.oauthIdentities.append(
+      .init(provider: transaction.provider, subject: subject, userID: user.id, linkedAt: now))
+    state.oauthTransactions.remove(at: index)
+    let session = makeSession(for: user, now: now)
+    try persist()
+    return session
+  }
+
   /// Creates a 20-minute, one-time reset token for a known account. Invalid
   /// and unknown addresses intentionally return `nil` instead of an error so
   /// the route can provide the same response to every caller.
@@ -855,6 +1118,7 @@ public actor AuthStore {
     state.passwordResetTokens.removeAll { $0.userID == userID }
     state.emailVerificationTokens.removeAll { $0.userID == userID }
     state.oauthIdentities.removeAll { $0.userID == userID }
+    state.oauthTransactions.removeAll { $0.userID == userID }
     state.syncRecords.removeAll { $0.userID == userID }
     state.results.removeAll { $0.userID == userID }
     state.connections.removeAll { $0.requesterID == userID || $0.recipientID == userID }
@@ -1838,6 +2102,12 @@ public actor AuthStore {
 
   private static func tokenHash(_ token: String) -> String {
     SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
+  }
+
+  private static func codeChallenge(for verifier: String) -> String {
+    Data(SHA256.hash(data: Data(verifier.utf8))).base64EncodedString()
+      .replacingOccurrences(of: "+", with: "-")
+      .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
   }
 }
 

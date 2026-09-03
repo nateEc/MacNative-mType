@@ -9,7 +9,8 @@ enum TypebarServer {
         try configure(
             app,
             passwordResetDelivery: try PasswordResetWebhookDelivery.fromEnvironment(),
-            emailVerificationDelivery: try EmailVerificationWebhookDelivery.fromEnvironment()
+            emailVerificationDelivery: try EmailVerificationWebhookDelivery.fromEnvironment(),
+            oauthProviderClient: try OAuthProviderClient.fromEnvironment()
         )
 
         do {

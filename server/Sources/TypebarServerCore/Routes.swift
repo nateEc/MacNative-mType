@@ -1,4 +1,27 @@
+import Foundation
 import Vapor
+
+private struct OAuthCallbackQuery: Content {
+    let code: String?
+    let state: String?
+    let error: String?
+}
+
+private struct OAuthCompletionQuery: Content {
+    let state: String
+}
+
+private func nativeOAuthCallbackRedirect(state: String) -> Response {
+    var components = URLComponents()
+    components.scheme = "typebar"
+    components.host = "oauth"
+    components.path = "/callback"
+    components.queryItems = [.init(name: "state", value: state)]
+    guard let callbackURL = components.url else { return Response(status: .internalServerError) }
+    var headers = HTTPHeaders()
+    headers.replaceOrAdd(name: "Location", value: callbackURL.absoluteString)
+    return Response(status: .found, headers: headers)
+}
 
 public func configure(
     _ app: Application,
@@ -6,6 +29,7 @@ public func configure(
     moderationKey: String? = Environment.get("TYPEBAR_MODERATION_TOKEN"),
     passwordResetDelivery: PasswordResetDeliveryHandler? = nil,
     emailVerificationDelivery: EmailVerificationDeliveryHandler? = nil,
+    oauthProviderClient: OAuthProviderClient? = nil,
     maintenanceMode: Bool = TypebarMaintenanceMode.environmentEnabled
 ) throws {
     let authStore = try authStore ?? AuthStore(fileURL: TypebarServerStorage.defaultUserStoreURL(for: app))
@@ -26,6 +50,8 @@ public func configure(
                 "authentication": .available,
                 "passwordReset": passwordResetDelivery == nil ? .planned : .available,
                 "emailVerification": emailVerificationDelivery == nil ? .planned : .available,
+                "githubOAuth": oauthProviderClient?.isConfigured(for: .github) == true ? .available : .planned,
+                "googleOAuth": oauthProviderClient?.isConfigured(for: .google) == true ? .available : .planned,
                 "synchronization": .partial,
                 "resultSubmission": .partial,
                 "leaderboards": .partial,
@@ -134,6 +160,88 @@ public func configure(
             try await authStore.completeEmailVerification(
                 request.content.decode(CompleteEmailVerificationRequest.self))
             return .init(verified: true)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "oauth", ":provider", "start") { request async throws -> OAuthStartResponse in
+        guard let rawProvider = request.parameters.get("provider"),
+              let provider = OAuthProvider(rawValue: rawProvider),
+              let oauthProviderClient,
+              oauthProviderClient.isConfigured(for: provider) else {
+            throw Abort(.serviceUnavailable, reason: "That OAuth provider is not configured for this Typebar service.")
+        }
+        do {
+            let start = try request.content.decode(OAuthStartRequest.self)
+            let transaction = try await authStore.beginOAuth(
+                provider: provider, purpose: start.purpose,
+                accessToken: request.headers.bearerAuthorization?.token)
+            return try .init(authorizationURL: oauthProviderClient.authorizationURL(for: transaction).absoluteString)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        } catch {
+            throw Abort(.badRequest, reason: "The OAuth authorization could not be started.")
+        }
+    }
+
+    app.get("v1", "auth", "oauth", ":provider", "callback") { request async throws -> Response in
+        guard let rawProvider = request.parameters.get("provider"),
+              let provider = OAuthProvider(rawValue: rawProvider),
+              let oauthProviderClient,
+              oauthProviderClient.isConfigured(for: provider) else {
+            throw Abort(.serviceUnavailable, reason: "That OAuth provider is not configured for this Typebar service.")
+        }
+        let callback = try request.query.decode(OAuthCallbackQuery.self)
+        guard let state = callback.state, !state.isEmpty else {
+            throw Abort(.badRequest, reason: "The OAuth callback did not include state.")
+        }
+        do {
+            let exchange = try await authStore.beginOAuthCallback(provider: provider, stateToken: state)
+            if callback.error != nil || callback.code == nil {
+                try await authStore.failOAuthCallback(stateToken: state)
+            } else if let code = callback.code {
+                do {
+                    let identity = try await oauthProviderClient.resolveIdentity(
+                        provider: provider, authorizationCode: code, codeVerifier: exchange.codeVerifier)
+                    try await authStore.completeOAuthCallback(stateToken: state, identity: identity)
+                } catch {
+                    try? await authStore.failOAuthCallback(stateToken: state)
+                }
+            }
+            return nativeOAuthCallbackRedirect(state: state)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.get("v1", "auth", "oauth", "completion") { request async throws -> OAuthCompletionResponse in
+        let query = try request.query.decode(OAuthCompletionQuery.self)
+        do {
+            return try await authStore.oauthCompletion(stateToken: query.state)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "oauth", "registration") { request async throws -> AuthSessionResponse in
+        do {
+            let registration = try request.content.decode(OAuthRegistrationRequest.self)
+            return try await authStore.completeOAuthRegistration(
+                stateToken: registration.state, displayName: registration.displayName)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.delete("v1", "auth", "oauth", ":provider") { request async throws -> AuthUserResponse in
+        guard let rawProvider = request.parameters.get("provider"),
+              let provider = OAuthProvider(rawValue: rawProvider) else {
+            throw Abort(.badRequest, reason: "The OAuth provider is invalid.")
+        }
+        do {
+            return try await authStore.unlinkOAuth(
+                provider, accessToken: try request.accessToken())
         } catch let error as AuthStoreError {
             throw error.abort
         }
@@ -517,8 +625,12 @@ private extension AuthStoreError {
             Abort(.conflict, reason: "That OAuth identity is already linked to a Typebar account.")
         case .cannotRemoveLastAuthentication:
             Abort(.conflict, reason: "A Typebar account must retain at least one authentication method.")
+        case .oauthRegistrationNotRequired:
+            Abort(.conflict, reason: "This OAuth authorization does not require account registration.")
         case .invalidCredentials, .invalidAccessToken:
             Abort(.unauthorized, reason: "Invalid email or password.")
+        case .invalidOAuthTransaction:
+            Abort(.unauthorized, reason: "This OAuth authorization is invalid or has expired.")
         case .invalidPasswordResetToken:
             Abort(.unauthorized, reason: "This password reset code is invalid or has expired.")
         case .invalidEmailVerificationToken:

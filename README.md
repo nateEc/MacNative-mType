@@ -32,6 +32,10 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 
 密码重置与邮箱验证由部署者显式配置的 HTTPS webhook 投递，不绑定特定邮件服务。设置 `TYPEBAR_PASSWORD_RESET_WEBHOOK_URL` 后，密码重置会继续向该地址 `POST` JSON 的 `email`、`token` 和 ISO 8601 `expiresAt`；邮箱验证在相同字段外额外带 `kind: "emailVerification"`，以兼容既有的重置收件端。可选的 `TYPEBAR_PASSWORD_RESET_WEBHOOK_TOKEN` 会以 Bearer 令牌放入请求头。webhook 必须为带 `kind` 的事件生成验证邮件，且切勿记录或转发一次性码。未配置 webhook 时，能力端点会标为计划中，重置或验证请求会返回明确的 `503`，不会伪称邮件已发出。
 
+### 配置第三方登录
+
+自建服务可按标准授权码流程接入 GitHub 和 Google。每个提供商都必须同时设置客户端 ID、客户端密钥和精确的回调地址：`TYPEBAR_GITHUB_OAUTH_CLIENT_ID`、`TYPEBAR_GITHUB_OAUTH_CLIENT_SECRET`、`TYPEBAR_GITHUB_OAUTH_REDIRECT_URL`，或相应的 `TYPEBAR_GOOGLE_OAUTH_*` 三项。回调地址必须是 HTTPS（本机 `localhost`、`127.0.0.1` 或 `::1` 可使用 HTTP），不能带查询参数、片段或用户信息。服务端会使用 PKCE、一次性且仅保存哈希的短期 state，并只接受已验证的提供商邮箱；提供商访问令牌不会保存或写入日志。尚未配置的提供商会在能力端点显示为“计划中”。原生登录界面将在后续阶段连接这套已验证的服务端流程。
+
 ## 已验证的基础能力
 
 - 原生 macOS 窗口及菜单栏入口；可选择开启 `⌃⇧Space` 全局唤起（需要用户主动授予辅助功能权限）
@@ -86,7 +90,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 原生历史列表，显示、标记、添加标签并可删除本地成绩
 - 本地历史汇总、WPM 趋势图、近 28 日完成/练习分钟柱状图、近 12 周活动热力图与个人最佳标记
 - 223 个引擎、内容、存储、偏好设置、预设、统计和归档单元测试
-- 47 个自建服务自动化测试，覆盖账号、密码重置与邮箱验证、第三方身份关联保护、公开资料隐私与搜索、排行榜隐身、好友关系、同步、成绩、WPM/XP 排行榜、审核引语/资料举报、社区评分、请求限速与维护模式
+- 50 个自建服务自动化测试，覆盖账号、密码重置与邮箱验证、OAuth 授权码/PKCE/一次性状态及第三方身份关联保护、公开资料隐私与搜索、排行榜隐身、好友关系、同步、成绩、WPM/XP 排行榜、审核引语/资料举报、社区评分、请求限速与维护模式
 
 ## 后续范围（尚未完成）
 
