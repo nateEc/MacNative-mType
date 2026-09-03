@@ -9,6 +9,8 @@ struct NativeTypingInput: NSViewRepresentable {
     var mapsArrowKeysToInput: Bool
     var acceptsNewlineInput: Bool
     var acceptsTabInput: Bool
+    var requiresShiftQuickRestart: Bool
+    var disablesQuickRestart: Bool
     var finishesOnShiftEnter: Bool
     let onInsert: (String, Bool) -> Void
     let onDelete: () -> Void
@@ -39,6 +41,8 @@ struct NativeTypingInput: NSViewRepresentable {
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
         view.acceptsNewlineInput = acceptsNewlineInput
         view.acceptsTabInput = acceptsTabInput
+        view.requiresShiftQuickRestart = requiresShiftQuickRestart
+        view.disablesQuickRestart = disablesQuickRestart
         view.finishesOnShiftEnter = finishesOnShiftEnter
         view.onFinishZen = onFinishZen
         view.onFocusChanged = onFocusChanged
@@ -60,6 +64,8 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var mapsArrowKeysToInput = false
     var acceptsNewlineInput = false
     var acceptsTabInput = false
+    var requiresShiftQuickRestart = false
+    var disablesQuickRestart = false
     var finishesOnShiftEnter = false
     var onFinishZen: () -> Void = {}
     var onFocusChanged: (Bool) -> Void = { _ in }
@@ -116,7 +122,9 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
                 onFinishZen()
                 return
             }
-            if quickRestartKey == .enter, event.modifierFlags.contains(.shift) {
+            if quickRestartKey == .enter,
+               !disablesQuickRestart,
+               event.modifierFlags.contains(.shift) {
                 onRestart()
                 return
             }
@@ -132,6 +140,8 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             return
         }
         if quickRestartKey.matches(charactersIgnoringModifiers: event.charactersIgnoringModifiers) {
+            if disablesQuickRestart { return }
+            if requiresShiftQuickRestart, !event.modifierFlags.contains(.shift) { return }
             onRestart()
             return
         }

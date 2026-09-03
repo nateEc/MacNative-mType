@@ -73,7 +73,7 @@ struct PreferencesView: View {
               Text(key.displayName).tag(key)
             }
           }
-          Text("⌘R 始终可用；选定 Esc、Tab 或 Enter 后，按该键可立即重新开始当前练习。提示需要 Tab 或换行时，改按 Shift+该键重开。")
+          Text("⌘R 始终可用；选定 Esc、Tab 或 Enter 后，按该键可立即重新开始当前练习。提示需要 Tab/换行时，改按 Shift+该键重开；字数达 1000 词或时长达 15 分钟时，Esc/Tab 需配合 Shift，Enter 快速重开停用。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("保存完成成绩", isOn: $settings.saveCompletedResults)

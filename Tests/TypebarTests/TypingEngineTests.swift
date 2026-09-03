@@ -543,6 +543,22 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(QuickRestartKey.tab.matches(charactersIgnoringModifiers: "\r"))
   }
 
+  func testQuickRestartSafetyRequiresShiftAtReferenceLongTestThresholds() {
+    XCTAssertFalse(QuickRestartSafetyPolicy.requiresShift(for: .words(999)))
+    XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: .words(1_000)))
+    XCTAssertFalse(QuickRestartSafetyPolicy.requiresShift(for: .timed(seconds: 895)))
+    XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: .timed(seconds: 900)))
+
+    let customTime = TestConfiguration(
+      mode: .custom, duration: 900, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .time)
+    let customSections = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .sections, customTextSectionLimit: 1_000)
+    XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: customTime))
+    XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: customSections))
+  }
+
   func testClearCurrentWordOnErrorModifierKeepsCompletedWordsAndReplayInSync() {
     var session = TypingSession(
       configuration: .words(2).with(modifiers: [.clearCurrentWordOnError]),
@@ -1913,6 +1929,53 @@ final class TypingEngineTests: XCTestCase {
     view.keyDown(with: shiftTab)
     XCTAssertEqual(restarts, 1)
     XCTAssertEqual(accepted, ["\t"])
+  }
+
+  @MainActor
+  func testNativeInputBridgeRequiresShiftToRestartLongTests() throws {
+    var restarts = 0
+    let view = TypingInputView()
+    view.quickRestartKey = .escape
+    view.requiresShiftQuickRestart = true
+    view.onRestart = { restarts += 1 }
+    let escape = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}", isARepeat: false,
+        keyCode: 53))
+    let shiftEscape = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}", isARepeat: false,
+        keyCode: 53))
+
+    view.keyDown(with: escape)
+    XCTAssertEqual(restarts, 0)
+    view.keyDown(with: shiftEscape)
+    XCTAssertEqual(restarts, 1)
+  }
+
+  @MainActor
+  func testNativeInputBridgeDisablesEnterQuickRestartForLongTests() throws {
+    var restarts = 0
+    let view = TypingInputView()
+    view.quickRestartKey = .enter
+    view.disablesQuickRestart = true
+    view.onRestart = { restarts += 1 }
+    let enter = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false,
+        keyCode: 36))
+    let shiftEnter = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false,
+        keyCode: 36))
+
+    view.keyDown(with: enter)
+    view.keyDown(with: shiftEnter)
+    XCTAssertEqual(restarts, 0)
   }
 
   func testZipfFrequencyModifierUsesRankWeightedTypebarLexicon() {

@@ -1005,6 +1005,10 @@ private struct ContentView: View {
         mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
         acceptsNewlineInput: session.configuration.mode == .zen || session.prompt.contains("\n"),
         acceptsTabInput: session.configuration.mode == .zen || session.prompt.contains("\t"),
+        requiresShiftQuickRestart: QuickRestartSafetyPolicy.requiresShift(
+          for: session.configuration) && settings.quickRestartKey != .enter,
+        disablesQuickRestart: QuickRestartSafetyPolicy.requiresShift(
+          for: session.configuration) && settings.quickRestartKey == .enter,
         finishesOnShiftEnter: session.configuration.mode == .zen,
         onInsert: { text, forceError in
           let errorsBefore = session.errors

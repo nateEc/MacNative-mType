@@ -1327,6 +1327,37 @@ enum TypingRestartPolicy {
   }
 }
 
+/// Mirrors the reference thresholds that protect lengthy configured tests
+/// from an accidental quick-restart keypress. Saved-text long-form metadata
+/// is intentionally outside this policy until Typebar exposes that separate
+/// user-selected field.
+enum QuickRestartSafetyPolicy {
+  static let longWordLimit = 1_000
+  static let longDuration: TimeInterval = 900
+
+  static func requiresShift(for configuration: TestConfiguration) -> Bool {
+    switch configuration.mode {
+    case .words:
+      return (configuration.wordLimit ?? 0) >= longWordLimit
+    case .time:
+      return (configuration.duration ?? 0) >= longDuration
+    case .custom:
+      switch configuration.customTextCompletion {
+      case .time:
+        return (configuration.duration ?? 0) >= longDuration
+      case .words:
+        return (configuration.wordLimit ?? 0) >= longWordLimit
+      case .sections:
+        return (configuration.customTextSectionLimit ?? 0) >= longWordLimit
+      case .finish:
+        return false
+      }
+    case .quote, .zen:
+      return false
+    }
+  }
+}
+
 struct TypedWordReview: Equatable, Identifiable {
   let index: Int
   let target: String
