@@ -1007,11 +1007,66 @@ struct ResultHistoryModifierFilter: Codable, Equatable {
     }
 }
 
+struct ResultHistoryTagFilter: Codable, Equatable {
+    var isUnrestricted: Bool
+    var includesNoTags: Bool
+    var tags: Set<String>
+
+    init(
+        isUnrestricted: Bool = true,
+        includesNoTags: Bool = true,
+        tags: Set<String> = []
+    ) {
+        self.isUnrestricted = isUnrestricted
+        self.includesNoTags = includesNoTags
+        self.tags = tags
+    }
+
+    func matches(_ entryTags: [String]) -> Bool {
+        guard !isUnrestricted else { return true }
+        return (includesNoTags && entryTags.isEmpty)
+            || entryTags.contains(where: tags.contains)
+    }
+
+    func isTagSelected(_ tag: String) -> Bool {
+        isUnrestricted || tags.contains(tag)
+    }
+
+    var isNoTagsSelected: Bool {
+        isUnrestricted || includesNoTags
+    }
+
+    var selectionSummary: String {
+        guard !isUnrestricted else { return "全部" }
+        guard includesNoTags || !tags.isEmpty else { return "无匹配标签" }
+        let labels = (includesNoTags ? ["无标签"] : []) + tags.sorted()
+        return labels.count <= 3 ? labels.joined(separator: "、") : "已选 \(labels.count) 项"
+    }
+
+    mutating func setNoTagsSelected(_ selected: Bool, availableTags: Set<String>) {
+        prepareForExplicitSelection(availableTags: availableTags)
+        includesNoTags = selected
+    }
+
+    mutating func setTag(_ tag: String, selected: Bool, availableTags: Set<String>) {
+        prepareForExplicitSelection(availableTags: availableTags)
+        if selected { tags.insert(tag) } else { tags.remove(tag) }
+    }
+
+    private mutating func prepareForExplicitSelection(availableTags: Set<String>) {
+        guard isUnrestricted else { return }
+        isUnrestricted = false
+        includesNoTags = true
+        tags = availableTags
+    }
+}
+
 struct ResultHistoryFilter: Codable, Equatable {
     var mode: TestMode?
     var language: TypingLanguage?
     var languages: Set<TypingLanguage>?
     var tag: String?
+    var tagFilter: ResultHistoryTagFilter?
     var difficulty: Difficulty?
     var personalBestOnly: Bool
     var dateRange: ResultHistoryDateRange
@@ -1025,6 +1080,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     init(
         mode: TestMode? = nil, language: TypingLanguage? = nil,
         languages: Set<TypingLanguage>? = nil, tag: String? = nil,
+        tagFilter: ResultHistoryTagFilter? = nil,
         personalBestOnly: Bool = false, difficulty: Difficulty? = nil,
         dateRange: ResultHistoryDateRange = .all,
         punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all,
@@ -1037,6 +1093,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.language = language
         self.languages = languages
         self.tag = tag
+        self.tagFilter = tagFilter
         self.difficulty = difficulty
         self.personalBestOnly = personalBestOnly
         self.dateRange = dateRange
@@ -1082,6 +1139,12 @@ struct ResultHistoryFilter: Codable, Equatable {
         languages ?? language.map { [$0] } ?? Set(TypingLanguage.allCases)
     }
 
+    var effectiveTagFilter: ResultHistoryTagFilter {
+        if let tagFilter { return tagFilter }
+        guard let tag else { return .init() }
+        return .init(isUnrestricted: false, includesNoTags: false, tags: [tag])
+    }
+
     static func languageSelectionSummary(_ selection: Set<TypingLanguage>) -> String {
         guard !selection.isEmpty else { return "无匹配语言" }
         guard selection != Set(TypingLanguage.allCases) else { return "全部" }
@@ -1090,7 +1153,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case mode, language, languages, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength,
+        case mode, language, languages, tag, tagFilter, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength,
           timeLimits, wordLimits, modifierFilter
     }
 
@@ -1100,6 +1163,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         language = try values.decodeIfPresent(TypingLanguage.self, forKey: .language)
         languages = try values.decodeIfPresent(Set<TypingLanguage>.self, forKey: .languages)
         tag = try values.decodeIfPresent(String.self, forKey: .tag)
+        tagFilter = try values.decodeIfPresent(ResultHistoryTagFilter.self, forKey: .tagFilter)
         difficulty = try values.decodeIfPresent(Difficulty.self, forKey: .difficulty)
         personalBestOnly = try values.decodeIfPresent(Bool.self, forKey: .personalBestOnly) ?? false
         dateRange = try values.decodeIfPresent(ResultHistoryDateRange.self, forKey: .dateRange) ?? .all
@@ -1121,7 +1185,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         return Set(entries.filter { entry in
             (mode == nil || entry.mode == mode)
                 && matchesLanguage(entry.language)
-                && (tag == nil || entry.tags.contains(tag!))
+                && effectiveTagFilter.matches(entry.tags)
                 && (difficulty == nil || entry.difficulty == difficulty)
                 && (!personalBestOnly || personalBestIDs.contains(entry.id))
                 && (cutoff.map { entry.finishedAt >= $0 } ?? true)

@@ -3347,7 +3347,7 @@ private struct ResultsHistoryView: View {
   @State private var selectedResult: TestResultRecord?
   @State private var modeFilter: TestMode?
   @State private var languageFilter = Set(TypingLanguage.allCases)
-  @State private var tagFilter: String?
+  @State private var selectedTagFilter = ResultHistoryTagFilter()
   @State private var difficultyFilter: Difficulty?
   @State private var personalBestOnly = false
   @State private var dateRangeFilter: ResultHistoryDateRange = .all
@@ -3365,7 +3365,7 @@ private struct ResultsHistoryView: View {
     let filter = ResultHistoryFilter(
       mode: modeFilter,
       languages: languageFilter,
-      tag: tagFilter,
+      tagFilter: selectedTagFilter,
       personalBestOnly: personalBestOnly,
       difficulty: difficultyFilter,
       dateRange: dateRangeFilter,
@@ -3547,10 +3547,12 @@ private struct ResultsHistoryView: View {
                   }
                 }
                 if !availableTags.isEmpty {
-                  Picker("标签", selection: $tagFilter) {
-                    Text("全部标签").tag(String?.none)
+                  DisclosureGroup("标签：\(selectedTagFilter.selectionSummary)") {
+                    Toggle("无标签", isOn: noTagBinding)
+                      .toggleStyle(.checkbox)
                     ForEach(availableTags, id: \.self) { tag in
-                      Text(tag).tag(Optional(tag))
+                      Toggle(tag, isOn: tagBinding(for: tag))
+                        .toggleStyle(.checkbox)
                     }
                   }
                 }
@@ -3788,7 +3790,7 @@ private struct ResultsHistoryView: View {
 
   private var activeFilter: ResultHistoryFilter {
     .init(
-      mode: modeFilter, languages: languageFilter, tag: tagFilter,
+      mode: modeFilter, languages: languageFilter, tagFilter: selectedTagFilter,
       personalBestOnly: personalBestOnly, difficulty: difficultyFilter, dateRange: dateRangeFilter,
       punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter,
       timeLimits: timeLimitFilter, wordLimits: wordLimitFilter, modifierFilter: activeModifierFilter
@@ -3823,7 +3825,7 @@ private struct ResultsHistoryView: View {
   private func apply(_ filter: ResultHistoryFilter) {
     modeFilter = filter.mode
     languageFilter = filter.languageSelections
-    tagFilter = filter.tag
+    selectedTagFilter = filter.effectiveTagFilter
     difficultyFilter = filter.difficulty
     personalBestOnly = filter.personalBestOnly
     dateRangeFilter = filter.dateRange
@@ -3865,6 +3867,22 @@ private struct ResultsHistoryView: View {
       get: { languageFilter.contains(language) },
       set: { selected in
         if selected { languageFilter.insert(language) } else { languageFilter.remove(language) }
+      })
+  }
+
+  private var noTagBinding: Binding<Bool> {
+    Binding(
+      get: { selectedTagFilter.isNoTagsSelected },
+      set: { selected in
+        selectedTagFilter.setNoTagsSelected(selected, availableTags: Set(availableTags))
+      })
+  }
+
+  private func tagBinding(for tag: String) -> Binding<Bool> {
+    Binding(
+      get: { selectedTagFilter.isTagSelected(tag) },
+      set: { selected in
+        selectedTagFilter.setTag(tag, selected: selected, availableTags: Set(availableTags))
       })
   }
 

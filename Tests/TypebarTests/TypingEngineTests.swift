@@ -3766,6 +3766,44 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(legacy.languageSelections, [.german])
   }
 
+  func testResultHistoryTagFilterSupportsNoTagAnyTagAndLegacySingleTagPresets() throws {
+    let noTags = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: [])
+    let focus = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: ["focus"])
+    let review = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: ["review"])
+    let both = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: ["focus", "review"])
+    let entries = [noTags, focus, review, both]
+
+    let noTagOrFocus = ResultHistoryFilter(
+      tagFilter: .init(isUnrestricted: false, includesNoTags: true, tags: ["focus"]))
+    XCTAssertEqual(
+      noTagOrFocus.matchingIDs(entries: entries, personalBestIDs: []),
+      [noTags.id, focus.id, both.id]
+    )
+    XCTAssertEqual(noTagOrFocus.effectiveTagFilter.selectionSummary, "无标签、focus")
+    XCTAssertEqual(
+      ResultHistoryFilter(tagFilter: .init(isUnrestricted: true)).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      Set(entries.map(\.id))
+    )
+    XCTAssertTrue(
+      ResultHistoryFilter(
+        tagFilter: .init(isUnrestricted: false, includesNoTags: false, tags: [])
+      ).matchingIDs(entries: entries, personalBestIDs: []).isEmpty)
+
+    var allTags = ResultHistoryTagFilter()
+    allTags.setTag("focus", selected: false, availableTags: ["focus", "review"])
+    XCTAssertFalse(allTags.isUnrestricted)
+    XCTAssertTrue(allTags.includesNoTags)
+    XCTAssertEqual(allTags.tags, ["review"])
+
+    let legacy = try JSONDecoder().decode(
+      ResultHistoryFilter.self, from: Data(#"{"tag":"review"}"#.utf8))
+    XCTAssertNil(legacy.tagFilter)
+    XCTAssertEqual(
+      legacy.matchingIDs(entries: entries, personalBestIDs: []), [review.id, both.id])
+  }
+
   func testResultHistoryDateRangesUseReferenceRollingWindowsAndPreserveLegacyPresets() throws {
     let now = Date(timeIntervalSinceReferenceDate: 1_000_000)
     let onBoundary = UUID()
@@ -4575,7 +4613,9 @@ final class TypingEngineTests: XCTestCase {
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     let filter = ResultHistoryFilter(
-      mode: .quote, language: .english, tag: "focus", personalBestOnly: true,
+      mode: .quote, language: .english,
+      tagFilter: .init(isUnrestricted: false, includesNoTags: true, tags: ["focus", "review"]),
+      personalBestOnly: true,
       difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
       quoteLength: .medium, timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom],
       modifierFilter: .init(includesNoModifiers: false, modifiers: [.crtVisual, .binaryStream]))
