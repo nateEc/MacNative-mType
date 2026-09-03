@@ -149,13 +149,17 @@ struct PreferencesView: View {
           Text("有限测试结束时按最终 WPM 检查；未达门槛会标记失败，不保存完成成绩或发布到榜单。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Toggle("最低单词速度", isOn: minimumBurstEnabledBinding(settings: settings))
-          if settings.minimumWordBurstWpm > 0 {
+          Picker("最低单词速度", selection: $settings.minimumWordBurstMode) {
+            ForEach(MinimumWordBurstMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          if settings.minimumWordBurstMode != .off {
             Stepper(value: $settings.minimumWordBurstWpm, in: 20...300, step: 5) {
               LabeledContent("最低速度", value: "\(settings.minimumWordBurstWpm) WPM")
             }
           }
-          Text("只在空格提交且拼写正确的词后检查；低于阈值会结束本次测试且不保存完成成绩。")
+          Text("固定档使用该阈值；弹性档会随目标词变长按参考公式降低阈值。每个可计时的空格提交词都会检查，未达标会结束本次测试且不保存完成成绩。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("最后一词快速结束", isOn: $settings.quickEnd)
@@ -873,13 +877,6 @@ struct PreferencesView: View {
         guard enabled != settings.testModifiers.contains(modifier) else { return }
         settings.toggleTestModifier(modifier)
       }
-    )
-  }
-
-  private func minimumBurstEnabledBinding(settings: AppSettings) -> Binding<Bool> {
-    Binding(
-      get: { settings.minimumWordBurstWpm > 0 },
-      set: { settings.minimumWordBurstWpm = $0 ? max(60, settings.minimumWordBurstWpm) : 0 }
     )
   }
 

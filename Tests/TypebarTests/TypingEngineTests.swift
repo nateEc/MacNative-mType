@@ -273,7 +273,7 @@ final class TypingEngineTests: XCTestCase {
       TimeWarningPolicy.shouldPlay(remainingSeconds: 5, previousSecond: 6, offset: .off))
   }
 
-  func testMinimumWordBurstFailsOnlyForSlowCorrectCommittedWords() {
+  func testMinimumWordBurstFailsForEverySlowCommittedWordAndCanBeDisabled() {
     var rules = InputRules(minimumWordBurstWpm: 60)
     var slow = TypingSession(configuration: .words(2, rules: rules), prompt: "amber harbor")
     slow.insert("a", at: start)
@@ -285,7 +285,7 @@ final class TypingEngineTests: XCTestCase {
     var incorrect = TypingSession(configuration: .words(2, rules: rules), prompt: "amber harbor")
     incorrect.insert("axber", at: start)
     incorrect.insert(" ", at: start.addingTimeInterval(9))
-    XCTAssertEqual(incorrect.outcome, .active)
+    XCTAssertEqual(incorrect.outcome, .failed)
 
     rules.minimumWordBurstWpm = 0
     var disabled = TypingSession(configuration: .words(2, rules: rules), prompt: "amber harbor")
@@ -293,6 +293,31 @@ final class TypingEngineTests: XCTestCase {
     disabled.insert("mber", at: start.addingTimeInterval(8))
     disabled.insert(" ", at: start.addingTimeInterval(9))
     XCTAssertEqual(disabled.outcome, .active)
+  }
+
+  func testFlexibleMinimumWordBurstRelaxesForLongerTargetWords() {
+    XCTAssertEqual(
+      MinimumWordBurstPolicy.threshold(baseWpm: 100, mode: .fixed, wordLength: 9), 100)
+    XCTAssertEqual(
+      MinimumWordBurstPolicy.threshold(baseWpm: 100, mode: .flex, wordLength: 3), 100)
+    XCTAssertEqual(
+      MinimumWordBurstPolicy.threshold(baseWpm: 100, mode: .flex, wordLength: 9), 70)
+
+    var fixed = TypingSession(
+      configuration: .words(
+        2, rules: .init(minimumWordBurstWpm: 100, minimumWordBurstMode: .fixed)),
+      prompt: "wonderful harbor")
+    fixed.insert("w", at: start)
+    fixed.insert("onderful ", at: start.addingTimeInterval(1.5))
+    XCTAssertEqual(fixed.outcome, .failed)
+
+    var flexible = TypingSession(
+      configuration: .words(
+        2, rules: .init(minimumWordBurstWpm: 100, minimumWordBurstMode: .flex)),
+      prompt: "wonderful harbor")
+    flexible.insert("w", at: start)
+    flexible.insert("onderful ", at: start.addingTimeInterval(1.5))
+    XCTAssertEqual(flexible.outcome, .active)
   }
 
   func testMinimumAccuracyFailsFiniteTestsOnlyWhenCompletionWouldOtherwiseSucceed() {
@@ -2423,6 +2448,7 @@ final class TypingEngineTests: XCTestCase {
     settings.minimumAccuracy = 97
     settings.minimumWpm = 85
     settings.minimumWordBurstWpm = 85
+    settings.minimumWordBurstMode = .flex
     settings.practiceLineWidth = .wide
     settings.customPracticeLineColumns = 112
     settings.practiceTapeMode = .letter
@@ -2489,6 +2515,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.minimumAccuracy, 97)
     XCTAssertEqual(restored.minimumWpm, 85)
     XCTAssertEqual(restored.minimumWordBurstWpm, 85)
+    XCTAssertEqual(restored.minimumWordBurstMode, .flex)
     XCTAssertEqual(restored.practiceLineWidth, .wide)
     XCTAssertEqual(restored.customPracticeLineColumns, 112)
     XCTAssertEqual(restored.practiceTapeMode, .letter)

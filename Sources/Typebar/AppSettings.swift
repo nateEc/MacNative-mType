@@ -332,6 +332,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var minimumAccuracy = 0
   var minimumWpm = 0
   var minimumWordBurstWpm = 0
+  var minimumWordBurstMode: MinimumWordBurstMode = .off
   var practiceLineWidth: PracticeLineWidth = .standard
   var customPracticeLineColumns = 60
   var practiceTapeMode: PracticeTapeMode = .off
@@ -402,6 +403,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     minimumAccuracy: Int = 0,
     minimumWpm: Int = 0,
     minimumWordBurstWpm: Int = 0,
+    minimumWordBurstMode: MinimumWordBurstMode = .off,
     practiceLineWidth: PracticeLineWidth = .standard,
     customPracticeLineColumns: Int = 60,
     practiceTapeMode: PracticeTapeMode = .off,
@@ -475,6 +477,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.minimumAccuracy = minimumAccuracy.clamped(to: 0...100)
     self.minimumWpm = minimumWpm.clamped(to: 0...300)
     self.minimumWordBurstWpm = minimumWordBurstWpm.clamped(to: 0...300)
+    self.minimumWordBurstMode = minimumWordBurstMode == .off && self.minimumWordBurstWpm > 0
+      ? .fixed : minimumWordBurstMode
     self.practiceLineWidth = practiceLineWidth
     self.customPracticeLineColumns = customPracticeLineColumns.clamped(
       to: PracticeLineWidth.customColumnRange)
@@ -521,7 +525,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       favoriteThemeIDs, showKeyboardGuide, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
       randomThemeOnRestart, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
-      minimumAccuracy, minimumWpm, minimumWordBurstWpm,
+      minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
       smoothPracticeLineScroll, showAllPracticeLines, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
       alwaysShowDecimalPlaces, alwaysShowWordsHistory, showWordBurstHeatmap, resultPerformanceVisibility,
@@ -591,6 +595,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
       to: 0...300)
     minimumWordBurstWpm = (try values.decodeIfPresent(Int.self, forKey: .minimumWordBurstWpm) ?? 0)
       .clamped(to: 0...300)
+    minimumWordBurstMode =
+      try values.decodeIfPresent(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
+      ?? (minimumWordBurstWpm > 0 ? .fixed : .off)
     practiceLineWidth =
       try values.decodeIfPresent(PracticeLineWidth.self, forKey: .practiceLineWidth) ?? .standard
     customPracticeLineColumns =
@@ -753,7 +760,32 @@ final class AppSettings {
   var codeUnindentOnBackspace = false { didSet { persist() } }
   var minimumAccuracy = 0 { didSet { persist() } }
   var minimumWpm = 0 { didSet { persist() } }
-  var minimumWordBurstWpm = 0 { didSet { persist() } }
+  var minimumWordBurstWpm = 0 {
+    didSet {
+      if minimumWordBurstWpm > 0 && minimumWordBurstMode == .off {
+        minimumWordBurstMode = .fixed
+        return
+      }
+      if minimumWordBurstWpm <= 0 && minimumWordBurstMode != .off {
+        minimumWordBurstMode = .off
+        return
+      }
+      persist()
+    }
+  }
+  var minimumWordBurstMode: MinimumWordBurstMode = .off {
+    didSet {
+      if minimumWordBurstMode == .off && minimumWordBurstWpm != 0 {
+        minimumWordBurstWpm = 0
+        return
+      }
+      if minimumWordBurstMode != .off && minimumWordBurstWpm == 0 {
+        minimumWordBurstWpm = 60
+        return
+      }
+      persist()
+    }
+  }
   var practiceLineWidth: PracticeLineWidth = .standard { didSet { persist() } }
   var customPracticeLineColumns = 60 { didSet { persist() } }
   var practiceTapeMode: PracticeTapeMode = .off { didSet { persist() } }
@@ -834,6 +866,7 @@ final class AppSettings {
     minimumAccuracy = snapshot.minimumAccuracy
     minimumWpm = snapshot.minimumWpm
     minimumWordBurstWpm = snapshot.minimumWordBurstWpm
+    minimumWordBurstMode = snapshot.minimumWordBurstMode
     practiceLineWidth = snapshot.practiceLineWidth
     customPracticeLineColumns = snapshot.customPracticeLineColumns
     practiceTapeMode = snapshot.practiceTapeMode
@@ -886,7 +919,8 @@ final class AppSettings {
       codeUnindentOnBackspace: codeUnindentOnBackspace,
       minimumAccuracy: minimumAccuracy,
       minimumWpm: minimumWpm,
-      minimumWordBurstWpm: minimumWordBurstWpm
+      minimumWordBurstWpm: minimumWordBurstWpm,
+      minimumWordBurstMode: minimumWordBurstMode
     )
   }
 
@@ -908,6 +942,7 @@ final class AppSettings {
       oppositeShiftMode: oppositeShiftMode,
       minimumAccuracy: minimumAccuracy,
       minimumWpm: minimumWpm, minimumWordBurstWpm: minimumWordBurstWpm,
+      minimumWordBurstMode: minimumWordBurstMode,
       practiceLineWidth: practiceLineWidth, customPracticeLineColumns: customPracticeLineColumns,
       practiceTapeMode: practiceTapeMode, practiceTapeMargin: practiceTapeMargin,
       smoothPracticeLineScroll: smoothPracticeLineScroll,
@@ -968,6 +1003,7 @@ final class AppSettings {
     minimumAccuracy = 0
     minimumWpm = 0
     minimumWordBurstWpm = 0
+    minimumWordBurstMode = .off
     practiceLineWidth = .standard
     customPracticeLineColumns = 60
     practiceTapeMode = .off
@@ -1022,6 +1058,7 @@ final class AppSettings {
     minimumAccuracy = configuration.rules.minimumAccuracy
     minimumWpm = configuration.rules.minimumWpm
     minimumWordBurstWpm = configuration.rules.minimumWordBurstWpm
+    minimumWordBurstMode = configuration.rules.minimumWordBurstMode
     testModifiers = configuration.modifiers
   }
 
@@ -1078,6 +1115,7 @@ final class AppSettings {
     minimumAccuracy = snapshot.minimumAccuracy
     minimumWpm = snapshot.minimumWpm
     minimumWordBurstWpm = snapshot.minimumWordBurstWpm
+    minimumWordBurstMode = snapshot.minimumWordBurstMode
     practiceLineWidth = snapshot.practiceLineWidth
     customPracticeLineColumns = snapshot.customPracticeLineColumns
     caretStyle = snapshot.caretStyle
@@ -1221,6 +1259,7 @@ final class AppSettings {
       minimumAccuracy: minimumAccuracy,
       minimumWpm: minimumWpm,
       minimumWordBurstWpm: minimumWordBurstWpm,
+      minimumWordBurstMode: minimumWordBurstMode,
       practiceLineWidth: practiceLineWidth,
       customPracticeLineColumns: customPracticeLineColumns,
       practiceTapeMode: practiceTapeMode,

@@ -82,6 +82,39 @@ enum DeleteOnErrorMode: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 }
 
+/// A minimum per-word burst can be a fixed threshold, or a threshold that
+/// relaxes for longer target words using the reference product's published
+/// formula.
+enum MinimumWordBurstMode: String, CaseIterable, Codable, Equatable, Identifiable {
+  case off
+  case fixed
+  case flex
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .off: "关闭"
+    case .fixed: "固定"
+    case .flex: "弹性"
+    }
+  }
+}
+
+enum MinimumWordBurstPolicy {
+  static func threshold(baseWpm: Int, mode: MinimumWordBurstMode, wordLength: Int) -> Int {
+    switch mode {
+    case .off: return 0
+    case .fixed: return baseWpm
+    case .flex:
+      let adjusted = Int(
+        floor(Double(baseWpm) * pow(1.03, -2 * Double(max(0, wordLength - 3))))
+      )
+      return min(baseWpm, adjusted)
+    }
+  }
+}
+
 enum OppositeShiftMode: String, CaseIterable, Codable, Equatable, Identifiable {
   case off
   case on
@@ -804,8 +837,9 @@ struct InputRules: Codable, Equatable {
   /// Zero disables the final whole-test WPM threshold.
   var minimumWpm = 0
   /// Zero disables Typebar's minimum per-word speed rule. A positive value
-  /// is evaluated only after a correctly committed, space-delimited word.
+  /// is evaluated after a measurable, space-delimited word commit.
   var minimumWordBurstWpm = 0
+  var minimumWordBurstMode: MinimumWordBurstMode = .off
 
   init(
     strictSpace: Bool = false,
@@ -822,7 +856,8 @@ struct InputRules: Codable, Equatable {
     codeUnindentOnBackspace: Bool = false,
     minimumAccuracy: Int = 0,
     minimumWpm: Int = 0,
-    minimumWordBurstWpm: Int = 0
+    minimumWordBurstWpm: Int = 0,
+    minimumWordBurstMode: MinimumWordBurstMode = .off
   ) {
     self.strictSpace = strictSpace
     self.stopOnErrorMode = stopOnErrorMode.isEnabled
@@ -841,6 +876,8 @@ struct InputRules: Codable, Equatable {
     self.minimumAccuracy = minimumAccuracy.clamped(to: 0...100)
     self.minimumWpm = minimumWpm.clamped(to: 0...300)
     self.minimumWordBurstWpm = minimumWordBurstWpm.clamped(to: 0...300)
+    self.minimumWordBurstMode = minimumWordBurstMode == .off && self.minimumWordBurstWpm > 0
+      ? .fixed : minimumWordBurstMode
     normalizeErrorHandlingModes()
   }
 
@@ -848,7 +885,7 @@ struct InputRules: Codable, Equatable {
     case strictSpace, stopOnError, stopOnErrorMode, deleteOnError, deleteOnErrorMode,
       hideExtraLetters, blindMode, quickEnd,
       freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace, minimumAccuracy, minimumWpm,
-      minimumWordBurstWpm
+      minimumWordBurstWpm, minimumWordBurstMode
   }
 
   init(from decoder: Decoder) throws {
@@ -878,6 +915,9 @@ struct InputRules: Codable, Equatable {
       to: 0...300)
     minimumWordBurstWpm = (try values.decodeIfPresent(Int.self, forKey: .minimumWordBurstWpm) ?? 0)
       .clamped(to: 0...300)
+    minimumWordBurstMode =
+      try values.decodeIfPresent(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
+      ?? (minimumWordBurstWpm > 0 ? .fixed : .off)
     normalizeErrorHandlingModes()
   }
 
@@ -886,6 +926,11 @@ struct InputRules: Codable, Equatable {
     // that still set those public compatibility fields after initialization.
     if stopOnError && stopOnErrorMode == .off { stopOnErrorMode = .letter }
     if deleteOnError && deleteOnErrorMode == .off { deleteOnErrorMode = .letter }
+    if minimumWordBurstWpm <= 0 {
+      minimumWordBurstMode = .off
+    } else if minimumWordBurstMode == .off {
+      minimumWordBurstMode = .fixed
+    }
     if confidenceMode != .off {
       stopOnErrorMode = .off
       deleteOnErrorMode = .off
@@ -1893,14 +1938,25 @@ struct TypingSession {
 
   private func shouldFailMinimumWordBurst(after character: Character) -> Bool {
     let minimum = configuration.rules.minimumWordBurstWpm
-    guard minimum > 0,
+    let mode = configuration.rules.minimumWordBurstMode
+    guard mode != .off, minimum > 0,
       character == " ",
       configuration.language.usesSpaceDelimitedWords,
       !configuration.modifiers.contains(.noSpaces),
-      lastCommittedWordIsCorrect,
-      let burst = committedWordBursts.last
+      let burst = committedWordBursts.last,
+      let targetLength = lastCommittedTargetWordLength
     else { return false }
-    return burst < minimum
+    let threshold = MinimumWordBurstPolicy.threshold(
+      baseWpm: minimum, mode: mode, wordLength: targetLength)
+    return burst < threshold
+  }
+
+  private var lastCommittedTargetWordLength: Int? {
+    guard typed.last == " " else { return nil }
+    let committedWords = typed.dropLast().split(separator: " ", omittingEmptySubsequences: true)
+    let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true)
+    guard committedWords.count > 0, committedWords.count <= targetWords.count else { return nil }
+    return targetWords[committedWords.count - 1].count
   }
 
   private var lastCommittedWordIsCorrect: Bool {
