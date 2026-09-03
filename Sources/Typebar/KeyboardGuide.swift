@@ -54,6 +54,14 @@ struct KeyboardGuideFeedback: Equatable {
   let isCorrect: Bool
 }
 
+enum KeyboardGuideScalePolicy {
+  static let range: ClosedRange<Double> = 0.5...3.5
+
+  static func normalized(_ value: Double) -> Double {
+    (value * 10).rounded().clamped(to: 5.0...35.0) / 10
+  }
+}
+
 struct KeyboardGuideKey: Identifiable, Equatable {
   let id: String
   let label: String
@@ -165,6 +173,7 @@ struct KeyboardGuide: View {
   let panel: Color
   let layout: KeyboardLayout
   let mirrored: Bool
+  let scale: Double
 
   @State private var flashedKey: String?
   @State private var flashedKeyIsCorrect = true
@@ -178,13 +187,13 @@ struct KeyboardGuide: View {
   private var guideRows: [[KeyboardGuideKey]] { KeyboardGuideModel.rows(for: layout) }
 
   var body: some View {
-    VStack(spacing: 4) {
+    VStack(spacing: 4 * scale) {
       ForEach(guideRows.indices, id: \.self) { index in
         keyRow(guideRows[index])
       }
       keyView(KeyboardGuideKey("space", label: "空格", characters: " ", width: 170))
     }
-    .padding(10)
+    .padding(10 * scale)
     .background(panel.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("键盘提示")
@@ -219,7 +228,7 @@ struct KeyboardGuide: View {
   }
 
   private func keyRow(_ keys: [KeyboardGuideKey]) -> some View {
-    HStack(spacing: 4) {
+    HStack(spacing: 4 * scale) {
       ForEach(keys) { key in
         keyView(key)
       }
@@ -228,9 +237,9 @@ struct KeyboardGuide: View {
 
   private func keyView(_ key: KeyboardGuideKey) -> some View {
     Text(key.label)
-      .font(.system(size: 10, weight: .semibold, design: .monospaced))
+      .font(.system(size: 10 * scale, weight: .semibold, design: .monospaced))
       .foregroundStyle(key.id == highlightedKey ? .white : .secondary)
-      .frame(width: key.width, height: 22)
+      .frame(width: key.width * scale, height: 22 * scale)
       .background(
         key.id == highlightedKey ? highlightedColor : Color.primary.opacity(0.08),
         in: RoundedRectangle(cornerRadius: 5))

@@ -519,7 +519,8 @@ private struct ContentView: View {
           nextCharacter: session.nextExpectedCharacter, mode: effectiveKeyboardGuideMode,
           feedback: keyboardGuideFeedback, accent: activeTheme.accent,
           panel: activeTheme.panel, layout: effectiveKeyboardLayout,
-          mirrored: settings.testModifiers.contains(.mirrorKeyboard))
+          mirrored: settings.testModifiers.contains(.mirrorKeyboard),
+          scale: settings.keyboardGuideScale)
       }
       controls
     }

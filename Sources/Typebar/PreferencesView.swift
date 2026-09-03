@@ -462,6 +462,22 @@ struct PreferencesView: View {
           Text("静态只显示布局；按键反馈会短暂标记刚按下的键（错误为红色）；下一键标记目标键。Simon 指令始终使用下一键。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          if settings.keyboardGuideMode != .off {
+            Slider(
+              value: $settings.keyboardGuideScale,
+              in: KeyboardGuideScalePolicy.range,
+              step: 0.1
+            ) {
+              Text("键盘提示大小")
+            } minimumValueLabel: {
+              Text("0.5").font(.caption)
+            } maximumValueLabel: {
+              Text("3.5").font(.caption)
+            }
+            Text("\(settings.keyboardGuideScale, format: .number.precision(.fractionLength(1)))×")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
           Picker("键盘布局", selection: $settings.keyboardLayout) {
             ForEach(KeyboardLayout.allCases) { layout in
               Text(layout.displayName).tag(layout)

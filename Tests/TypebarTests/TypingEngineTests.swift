@@ -1150,6 +1150,13 @@ final class TypingEngineTests: XCTestCase {
       nextCharacter: "n", recentCharacter: "r"), "n")
   }
 
+  func testKeyboardGuideScaleMatchesReferenceRangeAndStep() {
+    XCTAssertEqual(KeyboardGuideScalePolicy.normalized(1), 1)
+    XCTAssertEqual(KeyboardGuideScalePolicy.normalized(1.234), 1.2)
+    XCTAssertEqual(KeyboardGuideScalePolicy.normalized(0.4), 0.5)
+    XCTAssertEqual(KeyboardGuideScalePolicy.normalized(3.6), 3.5)
+  }
+
   func testKeyboardGuideUsesTheSelectedLayoutAndSupportsAsciiPunctuation() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiQwerty), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiDvorak), "bottom-1")
@@ -3308,6 +3315,7 @@ final class TypingEngineTests: XCTestCase {
     settings.repeatQuotes = true
     settings.showKeyboardGuide = true
     settings.keyboardGuideMode = .react
+    settings.keyboardGuideScale = 2.7
     settings.showFocusWarning = false
     settings.showCapsLockWarning = false
     settings.playErrorBeep = true
@@ -3326,6 +3334,7 @@ final class TypingEngineTests: XCTestCase {
     let exportedSnapshot = settings.snapshot
     XCTAssertTrue(exportedSnapshot.codeUnindentOnBackspace)
     XCTAssertEqual(exportedSnapshot.keyboardGuideMode, .react)
+    XCTAssertEqual(exportedSnapshot.keyboardGuideScale, 2.7)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
     XCTAssertEqual(exportedSnapshot.promptHighlightMode, .nextTwoWords)
@@ -3394,6 +3403,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.resolvedTheme(for: .light).colorScheme, .light)
     XCTAssertTrue(restored.showKeyboardGuide)
     XCTAssertEqual(restored.keyboardGuideMode, .react)
+    XCTAssertEqual(restored.keyboardGuideScale, 2.7)
     XCTAssertEqual(restored.effectiveKeyboardGuideMode, .react)
     restored.keyboardGuideMode = .off
     XCTAssertFalse(restored.showKeyboardGuide)
@@ -3482,6 +3492,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(snapshot.favoriteThemeIDs.isEmpty)
     XCTAssertTrue(snapshot.showKeyboardGuide)
     XCTAssertEqual(snapshot.keyboardGuideMode, .next)
+    XCTAssertEqual(snapshot.keyboardGuideScale, 1)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertFalse(snapshot.followSystemTheme)

@@ -390,6 +390,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var favoriteThemeIDs: [String] = []
   var showKeyboardGuide = true
   var keyboardGuideMode: KeyboardGuideMode = .next
+  var keyboardGuideScale = 1.0
   var keyboardLayout: KeyboardLayout = .ansiQwerty
   var quickEnd = false
   var quickRestartKey: QuickRestartKey = .escape
@@ -468,6 +469,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     favoriteThemeIDs: [String] = [],
     showKeyboardGuide: Bool = true,
     keyboardGuideMode: KeyboardGuideMode = .next,
+    keyboardGuideScale: Double = 1,
     keyboardLayout: KeyboardLayout = .ansiQwerty,
     quickEnd: Bool = false,
     quickRestartKey: QuickRestartKey = .escape,
@@ -549,6 +551,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       favoriteThemeIDs, customThemes: customThemes)
     self.showKeyboardGuide = showKeyboardGuide
     self.keyboardGuideMode = keyboardGuideMode
+    self.keyboardGuideScale = KeyboardGuideScalePolicy.normalized(keyboardGuideScale)
     self.keyboardLayout = keyboardLayout
     self.quickEnd = quickEnd
     self.quickRestartKey = quickRestartKey
@@ -617,7 +620,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       hideExtraLetters, blindMode, fontSize,
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
-      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
+      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
       randomThemeOnRestart, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
@@ -668,6 +671,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     showKeyboardGuide = try values.decodeIfPresent(Bool.self, forKey: .showKeyboardGuide) ?? true
     keyboardGuideMode = try values.decodeIfPresent(KeyboardGuideMode.self, forKey: .keyboardGuideMode)
       ?? (showKeyboardGuide ? .next : .off)
+    keyboardGuideScale = KeyboardGuideScalePolicy.normalized(
+      try values.decodeIfPresent(Double.self, forKey: .keyboardGuideScale) ?? 1)
     keyboardLayout =
       try values.decodeIfPresent(KeyboardLayout.self, forKey: .keyboardLayout) ?? .ansiQwerty
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
@@ -849,6 +854,16 @@ final class AppSettings {
       persist()
     }
   }
+  var keyboardGuideScale = 1.0 {
+    didSet {
+      let normalized = KeyboardGuideScalePolicy.normalized(keyboardGuideScale)
+      if keyboardGuideScale != normalized {
+        keyboardGuideScale = normalized
+        return
+      }
+      persist()
+    }
+  }
   var keyboardLayout: KeyboardLayout = .ansiQwerty { didSet { persist() } }
   var layoutFluidLayouts: [KeyboardLayout] = LayoutFluidPolicy.defaultLayouts {
     didSet { defaults.set(layoutFluidLayouts.map(\.rawValue), forKey: layoutFluidStorageKey) }
@@ -973,6 +988,7 @@ final class AppSettings {
       snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
     showKeyboardGuide = snapshot.showKeyboardGuide
     keyboardGuideMode = snapshot.keyboardGuideMode
+    keyboardGuideScale = snapshot.keyboardGuideScale
     keyboardLayout = snapshot.keyboardLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
@@ -1068,6 +1084,7 @@ final class AppSettings {
       customThemes: customThemes,
       activeCustomThemeID: activeCustomThemeID, favoriteThemeIDs: favoriteThemeIDs,
       showKeyboardGuide: showKeyboardGuide, keyboardGuideMode: effectiveKeyboardGuideMode,
+      keyboardGuideScale: keyboardGuideScale,
       keyboardLayout: keyboardLayout, quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       followSystemTheme: followSystemTheme, randomThemeOnRestart: randomThemeOnRestart,
@@ -1126,6 +1143,7 @@ final class AppSettings {
     favoriteThemeIDs = []
     showKeyboardGuide = true
     keyboardGuideMode = .next
+    keyboardGuideScale = 1
     keyboardLayout = .ansiQwerty
     layoutFluidLayouts = LayoutFluidPolicy.defaultLayouts
     quickEnd = false
@@ -1247,6 +1265,7 @@ final class AppSettings {
       snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
     showKeyboardGuide = snapshot.showKeyboardGuide
     keyboardGuideMode = snapshot.keyboardGuideMode
+    keyboardGuideScale = snapshot.keyboardGuideScale
     keyboardLayout = snapshot.keyboardLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
@@ -1397,6 +1416,7 @@ final class AppSettings {
       favoriteThemeIDs: favoriteThemeIDs,
       showKeyboardGuide: showKeyboardGuide,
       keyboardGuideMode: effectiveKeyboardGuideMode,
+      keyboardGuideScale: keyboardGuideScale,
       keyboardLayout: keyboardLayout,
       quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
