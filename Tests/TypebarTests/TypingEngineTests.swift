@@ -402,9 +402,68 @@ final class TypingEngineTests: XCTestCase {
     let modifiers: [TestModifier] = [.noSpaces, .backwards]
     let prompt = TestModifierPolicy.transformed("amber bay", modifiers: modifiers)
     XCTAssertEqual(prompt, "yabrebma")
-    XCTAssertEqual(
+    let lengths =
       NoSpaceWordBoundaryPolicy.wordLengths(
-        source: "amber bay", modifiers: modifiers, transformedPrompt: prompt), [3, 5])
+        source: "amber bay", modifiers: modifiers, transformedPrompt: prompt)
+    XCTAssertEqual(lengths, [3, 5])
+    XCTAssertEqual(
+      NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: prompt), ["yab", "rebma"])
+  }
+
+  func testNoSpaceResultHistoryAndPracticeKeepOriginalWordBoundaries() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      modifiers: [.noSpaces])
+    var session = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor")
+
+    session.insert("a", at: start)
+    session.insert("xber", at: start.addingTimeInterval(0.5))
+    session.insert("h", at: start.addingTimeInterval(1))
+    session.insert("arbor", at: start.addingTimeInterval(1.4))
+
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(
+      session.wordReviews,
+      [
+        .init(index: 0, target: "amber", typed: "axber"),
+        .init(index: 1, target: "harbor", typed: "harbor"),
+      ])
+    XCTAssertEqual(session.wordBurstHistory, [144, 210])
+    XCTAssertEqual(session.missedWordErrorCounts, [.init(word: "amber", count: 1)])
+    XCTAssertEqual(session.missedWordErrorCountsByWord, [1, 0])
+    XCTAssertEqual(session.missedWords, ["amber"])
+  }
+
+  func testNoSpaceRepeatingCustomTextExtendsItsResultWordSegments() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: 30, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .time, modifiers: [.noSpaces])
+    var session = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor")
+
+    session.insert(session.prompt, at: start)
+    session.insert("a", at: start.addingTimeInterval(1))
+
+    XCTAssertEqual(session.wordReviews.map(\.target), ["amber", "harbor", "amber", "harbor", "amber"])
+    XCTAssertEqual(session.wordReviews.last?.typed, "a")
+  }
+
+  func testNoSpaceBackwardsResultHistoryUsesRenderedWordSlices() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      modifiers: [.noSpaces, .backwards])
+    var session = TestSessionFactory.make(
+      configuration: configuration, customText: "amber bay")
+
+    XCTAssertEqual(session.prompt, "yabrebma")
+    session.insert("y", at: start)
+    session.insert("ab", at: start.addingTimeInterval(0.5))
+    session.insert("r", at: start.addingTimeInterval(1))
+    session.insert("ebma", at: start.addingTimeInterval(1.5))
+
+    XCTAssertEqual(session.wordReviews.map(\.target), ["yab", "rebma"])
+    XCTAssertEqual(session.wordReviews.map(\.typed), ["yab", "rebma"])
   }
 
   func testMinimumAccuracyFailsFiniteTestsOnlyWhenCompletionWouldOtherwiseSucceed() {
@@ -1500,7 +1559,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(noSpaceSession.prompt.contains(" "))
     noSpaceSession.insert(noSpaceSession.prompt, at: start)
     XCTAssertEqual(noSpaceSession.outcome, .completed)
-    XCTAssertTrue(noSpaceSession.wordReviews.isEmpty)
+    XCTAssertEqual(noSpaceSession.wordReviews.count, 2)
+    XCTAssertEqual(noSpaceSession.wordReviews.map(\.target).joined(), noSpaceSession.prompt)
+    XCTAssertTrue(noSpaceSession.wordReviews.allSatisfy(\.isCorrect))
 
     let underscoreConfiguration = TestConfiguration(
       mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),

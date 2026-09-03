@@ -465,6 +465,24 @@ enum NoSpaceWordBoundaryPolicy {
       return end
     }
   }
+
+  /// Reconstructs the visible target for each original word after a safe
+  /// no-space transformation. These are deliberately slices of the rendered
+  /// prompt, rather than the source strings, so result reviews compare against
+  /// exactly what the user was asked to type.
+  static func targetWords(for wordLengths: [Int], in transformedPrompt: String) -> [String] {
+    guard !wordLengths.isEmpty, wordLengths.allSatisfy({ $0 > 0 }) else { return [] }
+    let characters = Array(transformedPrompt)
+    var start = 0
+    var words: [String] = []
+    for length in wordLengths {
+      let end = start + length
+      guard end <= characters.count else { return [] }
+      words.append(String(characters[start..<end]))
+      start = end
+    }
+    return start == characters.count ? words : []
+  }
 }
 
 struct TestSessionFactory {
@@ -540,24 +558,31 @@ struct TestSessionFactory {
     let noSpaceWordLengths = NoSpaceWordBoundaryPolicy.wordLengths(
       source: noSpaceBoundarySource ?? prompt, modifiers: configuration.modifiers,
       transformedPrompt: transformedPrompt)
+    let noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
+      for: noSpaceWordLengths, in: transformedPrompt)
     let repeats =
       configuration.mode == .custom && [.time, .words].contains(configuration.customTextCompletion)
     let initialPrompt: String
     let initialNoSpaceWordEndIndices: [Int]
+    let initialNoSpaceTargetWords: [String]
     if repeats {
       let separator = configuration.modifiers.contains(.noSpaces) ? "" : " "
       initialPrompt = transformedPrompt + separator + transformedPrompt
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
         for: noSpaceWordLengths + noSpaceWordLengths)
+      initialNoSpaceTargetWords = noSpaceTargetWords + noSpaceTargetWords
     } else {
       initialPrompt = transformedPrompt
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(for: noSpaceWordLengths)
+      initialNoSpaceTargetWords = noSpaceTargetWords
     }
     return TypingSession(
       configuration: configuration, prompt: initialPrompt,
       repeatingPrompt: repeats ? transformedPrompt : nil, sectionEndIndices: sectionEndIndices,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
-      repeatingNoSpaceWordLengths: repeats ? noSpaceWordLengths : [])
+      noSpaceTargetWords: initialNoSpaceTargetWords,
+      repeatingNoSpaceWordLengths: repeats ? noSpaceWordLengths : [],
+      repeatingNoSpaceTargetWords: repeats ? noSpaceTargetWords : [])
   }
 }
 

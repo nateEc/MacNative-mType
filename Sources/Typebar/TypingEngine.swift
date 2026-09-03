@@ -1428,7 +1428,13 @@ struct TypingSession {
   /// after the prompt has been flattened, spaces can no longer recover them.
   private var noSpaceWordEndIndices: [Int]
   private let initialNoSpaceWordEndIndices: [Int]
+  /// Rendered word slices paired with the separate no-space boundaries. They
+  /// let result history and local practice retain word-level behavior even
+  /// though the prompt itself has no visible separator.
+  private var noSpaceTargetWords: [String]
+  private let initialNoSpaceTargetWords: [String]
   private let repeatingNoSpaceWordLengths: [Int]
+  private let repeatingNoSpaceTargetWords: [String]
   private(set) var typed = ""
   private var typedCharacterDates: [Date] = []
   private var forcedErrorIndices = Set<Int>()
@@ -1445,7 +1451,8 @@ struct TypingSession {
   init(
     configuration: TestConfiguration, prompt: String, repeatingPrompt: String? = nil,
     sectionEndIndices: [Int] = [], noSpaceWordEndIndices: [Int] = [],
-    repeatingNoSpaceWordLengths: [Int] = []
+    noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
+    repeatingNoSpaceTargetWords: [String] = []
   ) {
     self.configuration = configuration
     self.prompt = prompt
@@ -1454,7 +1461,10 @@ struct TypingSession {
     self.sectionEndIndices = sectionEndIndices
     self.noSpaceWordEndIndices = noSpaceWordEndIndices
     self.initialNoSpaceWordEndIndices = noSpaceWordEndIndices
+    self.noSpaceTargetWords = noSpaceTargetWords
+    self.initialNoSpaceTargetWords = noSpaceTargetWords
     self.repeatingNoSpaceWordLengths = repeatingNoSpaceWordLengths
+    self.repeatingNoSpaceTargetWords = repeatingNoSpaceTargetWords
   }
 
   /// Starts an equivalent fresh attempt without regenerating content. This is
@@ -1464,7 +1474,9 @@ struct TypingSession {
     TypingSession(
       configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
       sectionEndIndices: sectionEndIndices, noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
-      repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths)
+      noSpaceTargetWords: initialNoSpaceTargetWords,
+      repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
+      repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords)
   }
 
   var isFinished: Bool { outcome != .active }
@@ -1554,11 +1566,19 @@ struct TypingSession {
   /// inserted in a single event), so presentation can keep it neutral instead
   /// of inventing an extreme speed.
   var wordBurstHistory: [Int?] {
+    let characters = Array(typed)
+    guard characters.count == typedCharacterDates.count else { return [] }
+    if hasNoSpaceWordSegmentation {
+      var bursts: [Int?] = []
+      for range in noSpaceWordRanges where range.lowerBound < characters.count {
+        let end = min(range.upperBound, characters.count) - 1
+        bursts.append(wordBurst(from: range.lowerBound, through: end, includesTrailingSpace: false))
+      }
+      return bursts
+    }
     guard configuration.language.usesSpaceDelimitedWords,
       !configuration.modifiers.contains(.noSpaces), !typed.isEmpty
     else { return [] }
-    let characters = Array(typed)
-    guard characters.count == typedCharacterDates.count else { return [] }
     var bursts: [Int?] = []
     var wordStart = 0
     for index in characters.indices where characters[index] == " " {
@@ -1587,10 +1607,8 @@ struct TypingSession {
     if configuration.language == .simplifiedChinese {
       return missedChineseWordErrorCounts
     }
-    guard configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces)
-    else { return [] }
-    let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+    let targetWords = resultTargetWords
+    guard !targetWords.isEmpty else { return [] }
     let errorCounts = missedWordErrorCountsByWord
     var result: [MissedWordErrorCount] = []
     for index in targetWords.indices where errorCounts.indices.contains(index) && errorCounts[index] > 0 {
@@ -1603,13 +1621,12 @@ struct TypingSession {
     return result
   }
 
-  /// Per-target-word event counts for the space-delimited path. It includes
-  /// zeros for unattempted words so result review indices remain aligned.
+  /// Per-target-word event counts. It includes zeros for unattempted words so
+  /// result review indices remain aligned, including when no-space metadata
+  /// restores safe source-word boundaries.
   var missedWordErrorCountsByWord: [Int] {
-    guard configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces)
-    else { return [] }
-    let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true)
+    let targetWords = resultTargetWords
+    guard !targetWords.isEmpty else { return [] }
     return targetWords.indices.map { attemptedInputErrorCount(inWord: $0) }
   }
 
@@ -1645,12 +1662,17 @@ struct TypingSession {
     return result
   }
 
-  /// Per-word comparison for words actually attempted during a space-delimited test.
+  /// Per-word comparison for words actually attempted during a test with
+  /// space delimiters, or with safely reconstructed no-space boundaries.
   var wordReviews: [TypedWordReview] {
-    guard (!typed.isEmpty || !attemptedErrorCounts.isEmpty), configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces)
+    guard (!typed.isEmpty || !attemptedErrorCounts.isEmpty),
+      configuration.language.usesSpaceDelimitedWords
     else { return [] }
-    let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+    let targetWords = resultTargetWords
+    guard !targetWords.isEmpty else { return [] }
+    if hasNoSpaceWordSegmentation {
+      return noSpaceWordReviews(targetWords: targetWords)
+    }
     let typedWords = typed.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
     let finalAttemptedCount = typed.last == " " ? max(0, typedWords.count - 1) : typedWords.count
     let historicalAttemptedCount = targetWords.indices.last(where: hasAttemptedInputError)
@@ -2140,6 +2162,53 @@ struct TypingSession {
     attemptedInputErrorCount(inWord: word) > 0
   }
 
+  /// Word targets for result history and local follow-up practice. A flattened
+  /// prompt is eligible only when its saved word slices still exactly match
+  /// the current boundary list; otherwise there is no trustworthy word-level
+  /// representation to expose.
+  private var resultTargetWords: [String] {
+    if hasNoSpaceWordSegmentation { return noSpaceTargetWords }
+    guard configuration.language.usesSpaceDelimitedWords,
+      !configuration.modifiers.contains(.noSpaces)
+    else { return [] }
+    return prompt.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+  }
+
+  private var noSpaceWordRanges: [Range<Int>] {
+    guard hasNoSpaceWordSegmentation else { return [] }
+    var start = 0
+    return noSpaceWordEndIndices.map { end in
+      defer { start = end }
+      return start..<end
+    }
+  }
+
+  private var hasNoSpaceWordSegmentation: Bool {
+    tracksNoSpaceWordBursts
+      && noSpaceTargetWords.count == noSpaceWordEndIndices.count
+      && noSpaceTargetWords.allSatisfy { !$0.isEmpty }
+  }
+
+  private func noSpaceWordReviews(targetWords: [String]) -> [TypedWordReview] {
+    let typedCharacters = Array(typed)
+    let directlyAttemptedCount = noSpaceWordRanges.lastIndex {
+      typedCharacters.count > $0.lowerBound
+    }.map { $0 + 1 } ?? 0
+    let historicalAttemptedCount = targetWords.indices.last(where: hasAttemptedInputError)
+      .map { $0 + 1 } ?? 0
+    let attemptedCount = max(directlyAttemptedCount, historicalAttemptedCount)
+    return (0..<min(attemptedCount, targetWords.count)).map { index in
+      let range = noSpaceWordRanges[index]
+      let typedEnd = min(range.upperBound, typedCharacters.count)
+      let typedWord = typedEnd > range.lowerBound
+        ? String(typedCharacters[range.lowerBound..<typedEnd]) : ""
+      return .init(
+        index: index, target: targetWords[index], typed: typedWord,
+        hasInputError: typedWord == targetWords[index]
+          && hasAttemptedInputError(inWord: index))
+    }
+  }
+
   private func hasError(inWord word: Int, indices: Set<Int>) -> Bool {
     guard let range = targetRange(forWord: word) else { return false }
     return indices.contains(where: range.contains)
@@ -2158,6 +2227,10 @@ struct TypingSession {
 
   private func targetRange(forWord word: Int) -> Range<Int>? {
     guard word >= 0 else { return nil }
+    if hasNoSpaceWordSegmentation {
+      guard noSpaceWordRanges.indices.contains(word) else { return nil }
+      return noSpaceWordRanges[word]
+    }
     let targetCharacters = Array(prompt)
     var currentWord = 0
     var start = 0
@@ -2220,6 +2293,8 @@ struct TypingSession {
       end += length
       noSpaceWordEndIndices.append(end)
     }
+    guard repeatingNoSpaceTargetWords.count == repeatingNoSpaceWordLengths.count else { return }
+    noSpaceTargetWords += repeatingNoSpaceTargetWords
   }
 
   private var shouldFinishEnglishWordsTest: Bool {
