@@ -339,7 +339,7 @@ struct PreferencesView: View {
               Text(style.displayName).tag(style)
             }
           }
-          Text("条形和下划线保留当前目标字符，块状会高亮当前目标字符。")
+          Text("关闭不绘制标记；条形和下划线保留当前目标字符，块状会高亮当前目标字符。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("错误字符显示", selection: $settings.typoIndicatorStyle) {
@@ -929,7 +929,7 @@ struct PreferencesView: View {
   private var displaySectionVisible: Bool {
     matches(
       "显示", "主题", "theme", "随机", "random", "系统", "system", "字体", "font", "等宽", "圆角", "衬线", "行宽",
-      "width", "光标", "caret", "条形", "下划线", "块状", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
+      "width", "光标", "caret", "关闭", "条形", "下划线", "块状", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
       "keyboard", "布局", "layout", "下一键")
   }
 

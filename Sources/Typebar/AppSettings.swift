@@ -55,6 +55,7 @@ enum PracticeTapeMode: String, CaseIterable, Codable, Equatable, Identifiable {
 /// A small set of native caret treatments for the active prompt character.
 /// They use SwiftUI text attributes only and do not depend on copied CSS.
 enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
+  case off
   case bar
   case underline
   case block
@@ -63,11 +64,14 @@ enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
 
   var displayName: String {
     switch self {
+    case .off: "关闭"
     case .bar: "条形"
     case .underline: "下划线"
     case .block: "块状"
     }
   }
+
+  var drawsMarker: Bool { self != .off }
 }
 
 /// Controls how an already-entered wrong character is shown without changing

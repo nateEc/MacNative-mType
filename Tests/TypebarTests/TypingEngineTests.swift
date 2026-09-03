@@ -81,6 +81,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(LiveProgressStyle.text.showsProgressValue(isTimed: true, remainingSeconds: 29))
   }
 
+  func testCaretOffStyleDoesNotDrawEitherPromptOrPaceMarker() {
+    XCTAssertFalse(TypingCaretStyle.off.drawsMarker)
+    XCTAssertTrue(TypingCaretStyle.bar.drawsMarker)
+    XCTAssertTrue(TypingCaretStyle.underline.drawsMarker)
+    XCTAssertTrue(TypingCaretStyle.block.drawsMarker)
+  }
+
   func testNoSpaceWordTestsKeepTheirCommittedWordProgress() {
     let configuration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
     var session = TypingSession(
@@ -3381,7 +3388,7 @@ final class TypingEngineTests: XCTestCase {
     settings.practiceTapeMargin = 0.35
     settings.smoothPracticeLineScroll = false
     settings.showAllPracticeLines = true
-    settings.caretStyle = .underline
+    settings.caretStyle = .off
     settings.typoIndicatorStyle = .both
     settings.compositionDisplayStyle = .below
     settings.typingSpeedUnit = .cps
@@ -3421,7 +3428,7 @@ final class TypingEngineTests: XCTestCase {
     settings.globalHotkeyEnabled = true
     settings.paceGuideMode = .custom
     settings.paceGuideCustomWpm = 95
-    settings.paceCaretStyle = .block
+    settings.paceCaretStyle = .off
     settings.repeatedPace = true
 
     let exportedSnapshot = settings.snapshot
@@ -3474,7 +3481,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.practiceTapeMargin, 0.35)
     XCTAssertFalse(restored.smoothPracticeLineScroll)
     XCTAssertTrue(restored.showAllPracticeLines)
-    XCTAssertEqual(restored.caretStyle, .underline)
+    XCTAssertEqual(restored.caretStyle, .off)
     XCTAssertEqual(restored.typoIndicatorStyle, .both)
     XCTAssertEqual(restored.compositionDisplayStyle, .below)
     XCTAssertEqual(restored.typingSpeedUnit, .cps)
@@ -3523,7 +3530,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.globalHotkeyEnabled)
     XCTAssertEqual(restored.paceGuideMode, .custom)
     XCTAssertEqual(restored.paceGuideCustomWpm, 95)
-    XCTAssertEqual(restored.paceCaretStyle, .block)
+    XCTAssertEqual(restored.paceCaretStyle, .off)
     XCTAssertTrue(restored.repeatedPace)
   }
 

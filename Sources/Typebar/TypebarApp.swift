@@ -1354,7 +1354,7 @@ private struct ContentView: View {
         character.foregroundColor = .red
         character.backgroundColor = .red.opacity(0.16)
       case .current:
-        if promptHighlightMode == .off {
+        if promptHighlightMode == .off || !settings.caretStyle.drawsMarker {
           character.foregroundColor = .secondary.opacity(0.55)
         } else {
           applyCaret(to: &character)
@@ -1402,6 +1402,8 @@ private struct ContentView: View {
 
   private func applyCaret(to character: inout AttributedString) {
     switch settings.caretStyle {
+    case .off:
+      break
     case .bar:
       character.foregroundColor = activeTheme.accent
       character.underlineStyle = .single
@@ -1419,6 +1421,8 @@ private struct ContentView: View {
 
   private func applyPaceCaret(to character: inout AttributedString) {
     switch settings.paceCaretStyle {
+    case .off:
+      break
     case .bar:
       character.backgroundColor = activeTheme.accent.opacity(0.16)
       character.underlineStyle = .single
