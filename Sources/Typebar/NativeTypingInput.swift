@@ -156,8 +156,13 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         switch selector {
         case #selector(NSResponder.deleteWordBackward(_:)):
             onDeleteWord()
-        case #selector(deleteBackward(_:)), #selector(deleteForward(_:)):
+        case #selector(deleteBackward(_:)):
             onDelete()
+        case #selector(deleteForward(_:)):
+            // The practice cursor is fixed at the input end. The reference
+            // only processes backward deletion events, so Forward Delete
+            // must not erase the preceding typed character.
+            break
         case #selector(insertNewline(_:)), #selector(insertLineBreak(_:)):
             if acceptsNewlineInput { onInsert("\n", false) }
         case #selector(insertTab(_:)):
