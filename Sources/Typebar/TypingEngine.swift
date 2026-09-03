@@ -1261,6 +1261,10 @@ struct TypingSession {
   private(set) var typed = ""
   private var typedCharacterDates: [Date] = []
   private var forcedErrorIndices = Set<Int>()
+  /// Target positions at which the user made an input error during this
+  /// attempt. Unlike `forcedErrorIndices`, these remain after a backspace so
+  /// local error practice can include words the user later corrected.
+  private var attemptedErrorIndices = Set<Int>()
   private var committedWordBursts: [Int] = []
   private var replayEvents: [TypingReplayEvent] = []
   private(set) var startedAt: Date?
@@ -1383,7 +1387,8 @@ struct TypingSession {
   }
 
   /// Target words from a space-delimited language that the user actually
-  /// attempted but did not enter exactly.
+  /// attempted but did not enter exactly, or where an input error was later
+  /// corrected or deleted.
   /// Unreached prompt words are intentionally excluded so a timed test does
   /// not turn its remaining text into an error list.
   var missedWords: [String] {
@@ -1395,12 +1400,15 @@ struct TypingSession {
     else { return [] }
     let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
     let typedWords = typed.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
-    let attemptedCount = typed.last == " " ? max(0, typedWords.count - 1) : typedWords.count
+    let finalAttemptedCount = typed.last == " " ? max(0, typedWords.count - 1) : typedWords.count
+    let historicalAttemptedCount = targetWords.indices.last(where: hasAttemptedInputError)
+      .map { $0 + 1 } ?? 0
+    let attemptedCount = max(finalAttemptedCount, historicalAttemptedCount)
     guard attemptedCount > 0 else { return [] }
 
     var unique: [String] = []
     for index in 0..<min(attemptedCount, targetWords.count)
-    where typedWords[index] != targetWords[index] || hasForcedError(inWord: index) {
+    where typedWords[index] != targetWords[index] || hasAttemptedInputError(inWord: index) {
       if !unique.contains(targetWords[index]) { unique.append(targetWords[index]) }
     }
     return unique
@@ -1409,8 +1417,6 @@ struct TypingSession {
   private var missedChineseWords: [String] {
     let targetCharacters = Array(prompt)
     let typedCharacters = Array(typed)
-    guard !typedCharacters.isEmpty else { return [] }
-
     let tokens = StarterLexicon.simplifiedChineseWords.map {
       (text: $0, characters: Array($0))
     }.sorted { $0.characters.count > $1.characters.count }
@@ -1427,10 +1433,11 @@ struct TypingSession {
         continue
       }
 
-      guard typedCharacters.count > index else { break }
       let end = index + token.characters.count
       let typedEnd = min(end, typedCharacters.count)
-      if !typedCharacters[index..<typedEnd].elementsEqual(token.characters),
+      let hasFinalAttempt = typedCharacters.count > index
+      if hasFinalAttempt && !typedCharacters[index..<typedEnd].elementsEqual(token.characters)
+        || attemptedErrorIndices.contains(where: { index..<end ~= $0 }),
         !unique.contains(token.text)
       {
         unique.append(token.text)
@@ -1442,16 +1449,21 @@ struct TypingSession {
 
   /// Per-word comparison for words actually attempted during a space-delimited test.
   var wordReviews: [TypedWordReview] {
-    guard !typed.isEmpty, configuration.language.usesSpaceDelimitedWords,
+    guard (!typed.isEmpty || !attemptedErrorIndices.isEmpty), configuration.language.usesSpaceDelimitedWords,
       !configuration.modifiers.contains(.noSpaces)
     else { return [] }
     let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
     let typedWords = typed.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
-    let attemptedCount = typed.last == " " ? max(0, typedWords.count - 1) : typedWords.count
+    let finalAttemptedCount = typed.last == " " ? max(0, typedWords.count - 1) : typedWords.count
+    let historicalAttemptedCount = targetWords.indices.last(where: hasAttemptedInputError)
+      .map { $0 + 1 } ?? 0
+    let attemptedCount = max(finalAttemptedCount, historicalAttemptedCount)
     return (0..<min(attemptedCount, targetWords.count)).map {
-      TypedWordReview(
-        index: $0, target: targetWords[$0], typed: typedWords[$0],
-        hasInputError: hasForcedError(inWord: $0))
+      let typedWord = $0 < typedWords.count ? typedWords[$0] : ""
+      return TypedWordReview(
+        index: $0, target: targetWords[$0], typed: typedWord,
+        hasInputError: typedWord == targetWords[$0]
+          && hasAttemptedInputError(inWord: $0))
     }
   }
 
@@ -1601,6 +1613,7 @@ struct TypingSession {
     }
     let expected = Array(prompt)[typed.count]
     let isCorrect = character == expected && !forceError
+    if !isCorrect { attemptedErrorIndices.insert(typed.count) }
     if character == " ", configuration.modifiers.contains(.correctBeforeAdvance),
       configuration.language.usesSpaceDelimitedWords, !configuration.modifiers.contains(.noSpaces),
       !currentWordIsCorrect
@@ -1773,6 +1786,14 @@ struct TypingSession {
   }
 
   private func hasForcedError(inWord word: Int) -> Bool {
+    hasError(inWord: word, indices: forcedErrorIndices)
+  }
+
+  private func hasAttemptedInputError(inWord word: Int) -> Bool {
+    hasError(inWord: word, indices: attemptedErrorIndices)
+  }
+
+  private func hasError(inWord word: Int, indices: Set<Int>) -> Bool {
     guard word >= 0 else { return false }
     let targetCharacters = Array(prompt)
     var currentWord = 0
@@ -1780,13 +1801,13 @@ struct TypingSession {
     for index in targetCharacters.indices {
       if targetCharacters[index] == " " {
         if currentWord == word {
-          return forcedErrorIndices.contains { start...index ~= $0 }
+          return indices.contains { start...index ~= $0 }
         }
         currentWord += 1
         start = index + 1
       }
     }
-    return currentWord == word && forcedErrorIndices.contains { start..<targetCharacters.count ~= $0 }
+    return currentWord == word && indices.contains { start..<targetCharacters.count ~= $0 }
   }
 
   private func wpm(characters: Int, seconds: TimeInterval) -> Int {

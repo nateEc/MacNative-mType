@@ -389,6 +389,42 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(spanish.missedWords, ["puerto"])
   }
 
+  func testMissedWordsRetainCorrectedInputErrorsForWordAndChinesePractice() {
+    var words = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor")
+    words.insert("amx", at: start)
+    words.deleteBackward(at: start.addingTimeInterval(0.1))
+    words.insert("ber harbor", at: start.addingTimeInterval(0.2))
+
+    XCTAssertEqual(words.typed, "amber harbor")
+    XCTAssertEqual(words.missedWords, ["amber"])
+    XCTAssertTrue(words.wordReviews.first?.hasInputError ?? false)
+
+    var chinese = TypingSession(
+      configuration: .timed(seconds: 30, language: .simplifiedChinese), prompt: "晨光窗边")
+    chinese.insert("晨x", at: start)
+    chinese.deleteBackward(at: start.addingTimeInterval(0.1))
+    chinese.insert("光窗边", at: start.addingTimeInterval(0.2))
+
+    XCTAssertEqual(chinese.typed, "晨光窗边")
+    XCTAssertEqual(chinese.missedWords, ["晨光"])
+
+    var deleted = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor")
+    deleted.insert("x", at: start)
+    deleted.deleteBackward(at: start.addingTimeInterval(0.1))
+
+    XCTAssertTrue(deleted.typed.isEmpty)
+    XCTAssertEqual(deleted.missedWords, ["amber"])
+    XCTAssertEqual(deleted.wordReviews.first, .init(index: 0, target: "amber", typed: ""))
+
+    var deletedChinese = TypingSession(
+      configuration: .timed(seconds: 30, language: .simplifiedChinese), prompt: "晨光窗边")
+    deletedChinese.insert("x", at: start)
+    deletedChinese.deleteBackward(at: start.addingTimeInterval(0.1))
+
+    XCTAssertTrue(deletedChinese.typed.isEmpty)
+    XCTAssertEqual(deletedChinese.missedWords, ["晨光"])
+  }
+
   func testWordReviewsPairOnlyAttemptedWordsWithTheirTargetAndTypedValue() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor quiet")
     session.insert("amber habxxx ", at: start)
