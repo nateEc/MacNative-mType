@@ -3676,6 +3676,30 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(ResultHistoryWordLimit.selectionSummary(Set(ResultHistoryWordLimit.allCases)), "全部")
   }
 
+  func testResultHistoryModifierFilterMatchesNoModifierAndAnySelectedModifier() {
+    let plain = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: [], modifiers: [])
+    let crt = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], modifiers: [.crtVisual])
+    let binary = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], modifiers: [.binaryStream])
+    let combined = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [],
+      modifiers: [.uppercase, .crtVisual])
+    let entries = [plain, crt, binary, combined]
+
+    let noModifierOrBinary = ResultHistoryFilter(
+      modifierFilter: .init(includesNoModifiers: true, modifiers: [.binaryStream]))
+    XCTAssertEqual(
+      noModifierOrBinary.matchingIDs(entries: entries, personalBestIDs: []), [plain.id, binary.id])
+
+    let crtOnly = ResultHistoryFilter(
+      modifierFilter: .init(includesNoModifiers: false, modifiers: [.crtVisual]))
+    XCTAssertEqual(crtOnly.matchingIDs(entries: entries, personalBestIDs: []), [crt.id, combined.id])
+    XCTAssertEqual(
+      ResultHistoryFilter(modifierFilter: .init(includesNoModifiers: false, modifiers: [])).matchingIDs(
+        entries: entries, personalBestIDs: []), [])
+  }
+
   func testResultHistoryDateRangesUseReferenceRollingWindowsAndPreserveLegacyPresets() throws {
     let now = Date(timeIntervalSinceReferenceDate: 1_000_000)
     let onBoundary = UUID()
@@ -3710,6 +3734,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(legacy.quoteLength)
     XCTAssertEqual(legacy.timeLimits, Set(ResultHistoryTimeLimit.allCases))
     XCTAssertEqual(legacy.wordLimits, Set(ResultHistoryWordLimit.allCases))
+    XCTAssertTrue(legacy.modifierFilter.isUnfiltered)
   }
 
   func testPersonalBestMarksEveryTiedHighestResult() {
@@ -4486,7 +4511,8 @@ final class TypingEngineTests: XCTestCase {
     let filter = ResultHistoryFilter(
       mode: .quote, language: .english, tag: "focus", personalBestOnly: true,
       difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
-      quoteLength: .medium, timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom])
+      quoteLength: .medium, timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom],
+      modifierFilter: .init(includesNoModifiers: false, modifiers: [.crtVisual, .binaryStream]))
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
     container.mainContext.insert(preset)
     try container.mainContext.save()

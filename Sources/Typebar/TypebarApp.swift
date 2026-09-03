@@ -3355,6 +3355,8 @@ private struct ResultsHistoryView: View {
   @State private var quoteLengthFilter: QuoteLength?
   @State private var timeLimitFilter = Set(ResultHistoryTimeLimit.allCases)
   @State private var wordLimitFilter = Set(ResultHistoryWordLimit.allCases)
+  @State private var includesNoModifierFilter = true
+  @State private var modifierFilter = Set(TestModifier.allCases)
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
 
@@ -3370,7 +3372,8 @@ private struct ResultsHistoryView: View {
       numbers: numbersFilter,
       quoteLength: quoteLengthFilter,
       timeLimits: timeLimitFilter,
-      wordLimits: wordLimitFilter
+      wordLimits: wordLimitFilter,
+      modifierFilter: activeModifierFilter
     )
     let entries = results.map { result in
       let configuration = result.configuration
@@ -3384,7 +3387,8 @@ private struct ResultsHistoryView: View {
           return QuoteLengthPolicy.actualLength(for: result.prompt, language: configuration.language)
         },
         duration: configuration?.duration,
-        wordLimit: configuration?.wordLimit
+        wordLimit: configuration?.wordLimit,
+        modifiers: configuration?.modifiers
       )
     }
     let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs)
@@ -3518,6 +3522,14 @@ private struct ResultsHistoryView: View {
                 ) {
                   ForEach(ResultHistoryWordLimit.allCases, id: \.self) { limit in
                     Toggle(limit.displayName, isOn: wordLimitBinding(for: limit))
+                      .toggleStyle(.checkbox)
+                  }
+                }
+                DisclosureGroup("修饰器：\(activeModifierFilter.selectionSummary)") {
+                  Toggle("无修饰器", isOn: $includesNoModifierFilter)
+                    .toggleStyle(.checkbox)
+                  ForEach(TestModifier.allCases, id: \.self) { modifier in
+                    Toggle(modifier.displayName, isOn: modifierBinding(for: modifier))
                       .toggleStyle(.checkbox)
                   }
                 }
@@ -3772,8 +3784,12 @@ private struct ResultsHistoryView: View {
       mode: modeFilter, language: languageFilter, tag: tagFilter,
       personalBestOnly: personalBestOnly, difficulty: difficultyFilter, dateRange: dateRangeFilter,
       punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter,
-      timeLimits: timeLimitFilter, wordLimits: wordLimitFilter
+      timeLimits: timeLimitFilter, wordLimits: wordLimitFilter, modifierFilter: activeModifierFilter
     )
+  }
+
+  private var activeModifierFilter: ResultHistoryModifierFilter {
+    .init(includesNoModifiers: includesNoModifierFilter, modifiers: modifierFilter)
   }
 
   private func saveFilterPreset() {
@@ -3797,6 +3813,8 @@ private struct ResultsHistoryView: View {
     quoteLengthFilter = filter.quoteLength
     timeLimitFilter = filter.timeLimits
     wordLimitFilter = filter.wordLimits
+    includesNoModifierFilter = filter.modifierFilter.includesNoModifiers
+    modifierFilter = filter.modifierFilter.modifiers
   }
 
   private func timeLimitBinding(for limit: ResultHistoryTimeLimit) -> Binding<Bool> {
@@ -3812,6 +3830,14 @@ private struct ResultsHistoryView: View {
       get: { wordLimitFilter.contains(limit) },
       set: { selected in
         if selected { wordLimitFilter.insert(limit) } else { wordLimitFilter.remove(limit) }
+      })
+  }
+
+  private func modifierBinding(for modifier: TestModifier) -> Binding<Bool> {
+    Binding(
+      get: { modifierFilter.contains(modifier) },
+      set: { selected in
+        if selected { modifierFilter.insert(modifier) } else { modifierFilter.remove(modifier) }
       })
   }
 

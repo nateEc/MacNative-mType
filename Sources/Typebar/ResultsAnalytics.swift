@@ -159,12 +159,14 @@ struct ResultHistoryEntry: Equatable, Identifiable {
     let quoteLength: QuoteLength?
     let duration: TimeInterval?
     let wordLimit: Int?
+    let modifiers: [TestModifier]?
 
     init(
         id: UUID, mode: TestMode?, language: TypingLanguage?, tags: [String],
         finishedAt: Date = .distantPast, difficulty: Difficulty? = nil,
         includesPunctuation: Bool? = nil, includesNumbers: Bool? = nil,
-        quoteLength: QuoteLength? = nil, duration: TimeInterval? = nil, wordLimit: Int? = nil
+        quoteLength: QuoteLength? = nil, duration: TimeInterval? = nil, wordLimit: Int? = nil,
+        modifiers: [TestModifier]? = nil
     ) {
         self.id = id
         self.mode = mode
@@ -177,6 +179,7 @@ struct ResultHistoryEntry: Equatable, Identifiable {
         self.quoteLength = quoteLength
         self.duration = duration
         self.wordLimit = wordLimit
+        self.modifiers = modifiers
     }
 }
 
@@ -972,6 +975,38 @@ enum ResultHistoryWordLimit: String, CaseIterable, Codable, Hashable {
     }
 }
 
+struct ResultHistoryModifierFilter: Codable, Equatable {
+    var includesNoModifiers: Bool
+    var modifiers: Set<TestModifier>
+
+    init(
+        includesNoModifiers: Bool = true,
+        modifiers: Set<TestModifier> = Set(TestModifier.allCases)
+    ) {
+        self.includesNoModifiers = includesNoModifiers
+        self.modifiers = modifiers
+    }
+
+    var isUnfiltered: Bool {
+        includesNoModifiers && modifiers == Set(TestModifier.allCases)
+    }
+
+    func matches(_ entryModifiers: [TestModifier]?) -> Bool {
+        guard !isUnfiltered else { return true }
+        guard let entryModifiers else { return false }
+        return (includesNoModifiers && entryModifiers.isEmpty)
+            || !modifiers.isDisjoint(with: entryModifiers)
+    }
+
+    var selectionSummary: String {
+        guard !includesNoModifiers || !modifiers.isEmpty else { return "无匹配修饰器" }
+        guard !isUnfiltered else { return "全部" }
+        let selected = TestModifier.allCases.filter(modifiers.contains).map(\.displayName)
+        let labels = (includesNoModifiers ? ["无修饰器"] : []) + selected
+        return labels.count <= 3 ? labels.joined(separator: "、") : "已选 \(labels.count) 项"
+    }
+}
+
 struct ResultHistoryFilter: Codable, Equatable {
     var mode: TestMode?
     var language: TypingLanguage?
@@ -984,6 +1019,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     var quoteLength: QuoteLength?
     var timeLimits: Set<ResultHistoryTimeLimit>
     var wordLimits: Set<ResultHistoryWordLimit>
+    var modifierFilter: ResultHistoryModifierFilter
 
     init(
         mode: TestMode? = nil, language: TypingLanguage? = nil, tag: String? = nil,
@@ -992,7 +1028,8 @@ struct ResultHistoryFilter: Codable, Equatable {
         punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all,
         quoteLength: QuoteLength? = nil,
         timeLimits: Set<ResultHistoryTimeLimit> = Set(ResultHistoryTimeLimit.allCases),
-        wordLimits: Set<ResultHistoryWordLimit> = Set(ResultHistoryWordLimit.allCases)
+        wordLimits: Set<ResultHistoryWordLimit> = Set(ResultHistoryWordLimit.allCases),
+        modifierFilter: ResultHistoryModifierFilter = .init()
     ) {
         self.mode = mode
         self.language = language
@@ -1005,11 +1042,12 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.quoteLength = quoteLength
         self.timeLimits = timeLimits
         self.wordLimits = wordLimits
+        self.modifierFilter = modifierFilter
     }
 
     private enum CodingKeys: String, CodingKey {
         case mode, language, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength,
-          timeLimits, wordLimits
+          timeLimits, wordLimits, modifierFilter
     }
 
     init(from decoder: Decoder) throws {
@@ -1027,6 +1065,8 @@ struct ResultHistoryFilter: Codable, Equatable {
           ?? Set(ResultHistoryTimeLimit.allCases)
         wordLimits = try values.decodeIfPresent(Set<ResultHistoryWordLimit>.self, forKey: .wordLimits)
           ?? Set(ResultHistoryWordLimit.allCases)
+        modifierFilter = try values.decodeIfPresent(ResultHistoryModifierFilter.self, forKey: .modifierFilter)
+          ?? .init()
     }
 
     func matchingIDs(
@@ -1045,6 +1085,7 @@ struct ResultHistoryFilter: Codable, Equatable {
                 && (quoteLength == nil || entry.quoteLength == quoteLength)
                 && matchesTimeLimit(entry)
                 && matchesWordLimit(entry)
+                && modifierFilter.matches(entry.modifiers)
         }.map(\.id))
     }
 
