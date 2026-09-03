@@ -593,7 +593,7 @@ final class TypingEngineTests: XCTestCase {
     normal.insert("\u{3000}", at: start)
     XCTAssertEqual(normal.typed, "")
     XCTAssertEqual(normal.errors, 0)
-    normal.insert("amber\u{3000}harbor", at: start)
+    normal.insert("amber\u{3000}\u{3000}harbor", at: start)
     XCTAssertEqual(normal.typed, "amber harbor")
     XCTAssertEqual(normal.errors, 0)
 

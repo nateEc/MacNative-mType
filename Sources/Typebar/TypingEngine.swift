@@ -1855,7 +1855,7 @@ struct TypingSession {
     // explicitly enables strict space or a hard delete rule needs the key to
     // reach its own recovery path. Other difficulties keep the key as a
     // correctable input error instead of silently skipping it.
-    if inputCharacter == " " && typed.isEmpty && shouldRejectLeadingSeparator {
+    if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator {
       return false
     }
     let expected = Array(prompt)[typed.count]
@@ -2149,6 +2149,12 @@ struct TypingSession {
     configuration.difficulty == .normal
       && !configuration.rules.strictSpace
       && !configuration.rules.deleteOnErrorMode.returnsToPreviousWordAtStart
+  }
+
+  /// `typed` contains every accepted word in this native engine, so either
+  /// edge is an empty input buffer for the current source word.
+  private var inputWordIsEmpty: Bool {
+    typed.isEmpty || typed.last == " "
   }
 
   private func shouldBlockNoSpaceWordAdvance(with character: Character, forceError: Bool) -> Bool {
