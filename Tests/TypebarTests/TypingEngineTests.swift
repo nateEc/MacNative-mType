@@ -1921,6 +1921,43 @@ final class TypingEngineTests: XCTestCase {
       TestModifierPolicy.toggling(.morseStream, in: [.pseudolangStream]), [.morseStream])
   }
 
+  func testLivePracticeContentParsesSanitizesAndExpandsPublicSources() throws {
+    let poetryData = Data("""
+    [{"title":"Night Walk","author":"A. Writer","lines":["Dawn, arrives.","Hands learn slowly."]}]
+    """.utf8)
+    let poetry = try XCTUnwrap(LivePracticeContentService.poetry(from: poetryData))
+    XCTAssertEqual(poetry.text, "Dawn arrives Hands learn slowly")
+    XCTAssertEqual(poetry.attribution, "诗歌内容：Night Walk · A. Writer")
+    XCTAssertEqual(poetry.prompt(for: .words(7)).split(separator: " ").count, 7)
+    let poetryConfiguration = TestConfiguration.words(4).with(modifiers: [.poetryStream])
+    XCTAssertEqual(LivePracticeContentSource.selected(for: poetryConfiguration), .poetry)
+    XCTAssertNil(LivePracticeContentSource.selected(for: .init(
+      mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())))
+    XCTAssertNil(LivePracticeContentSource.selected(for: .words(4, language: .simplifiedChinese)))
+    XCTAssertEqual(
+      TestSessionFactory.make(
+        configuration: poetryConfiguration, streamPrompt: poetry.prompt(for: poetryConfiguration)
+      ).prompt,
+      "Dawn arrives Hands learn")
+    XCTAssertTrue(LivePracticeContentReplacementPolicy.shouldApply(
+      hasStarted: false, currentConfiguration: poetryConfiguration,
+      requestedConfiguration: poetryConfiguration))
+    XCTAssertFalse(LivePracticeContentReplacementPolicy.shouldApply(
+      hasStarted: true, currentConfiguration: poetryConfiguration,
+      requestedConfiguration: poetryConfiguration))
+    XCTAssertFalse(LivePracticeContentReplacementPolicy.shouldApply(
+      hasStarted: false, currentConfiguration: .words(5),
+      requestedConfiguration: poetryConfiguration))
+
+    let encyclopediaData = Data("""
+    {"title":"Harbor","extract":"A harbor holds boats safely near shore."}
+    """.utf8)
+    let encyclopedia = try XCTUnwrap(LivePracticeContentService.encyclopedia(from: encyclopediaData))
+    XCTAssertEqual(encyclopedia.text, "A harbor holds boats safely near shore")
+    XCTAssertEqual(encyclopedia.prompt(for: .words(3)), "A harbor holds")
+    XCTAssertNil(LivePracticeContentService.encyclopedia(from: Data("{}".utf8)))
+  }
+
   @MainActor
   func testNativeInputBridgeSendsArrowKeysToTheTypingEngineOnlyInArrowMode() throws {
     var accepted = [String]()

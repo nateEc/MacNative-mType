@@ -486,6 +486,9 @@ private struct ContentView: View {
   @State private var repeatedPaceArmed = false
   @State private var activePaceTargetWpm: Int?
   @State private var compositionText = ""
+  @State private var liveContentRequestID = UUID()
+  @State private var isLoadingLiveContent = false
+  @State private var liveContentMessage: String?
 
   var body: some View {
     VStack(spacing: 30) {
@@ -824,6 +827,15 @@ private struct ContentView: View {
           )
           .font(.caption)
           .foregroundStyle(.secondary)
+        }
+
+        if let liveContentMessage {
+          HStack(spacing: 7) {
+            if isLoadingLiveContent { ProgressView().controlSize(.small) }
+            Label(liveContentMessage, systemImage: "network")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
         }
 
         switch mode {
@@ -1518,6 +1530,10 @@ private struct ContentView: View {
     bailoutConfirmationMessage = nil
     compositionText = ""
     lastTimeWarningSecond = nil
+    liveContentRequestID = UUID()
+    let requestID = liveContentRequestID
+    isLoadingLiveContent = false
+    liveContentMessage = nil
     if mode != .custom { activeLongSavedText = nil }
     NativeSpeech.shared.stop()
     if settings.randomThemeOnRestart { settings.randomizeBuiltInTheme() }
@@ -1540,7 +1556,37 @@ private struct ContentView: View {
     if session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
+    refreshLiveContentIfNeeded(configuration: session.configuration, requestID: requestID)
     requestTypingFocus()
+  }
+
+  private func refreshLiveContentIfNeeded(configuration: TestConfiguration, requestID: UUID) {
+    guard let source = LivePracticeContentSource.selected(for: configuration) else { return }
+    isLoadingLiveContent = true
+    liveContentMessage = "正在获取随机\(source.displayName)；失败时继续使用离线内容。"
+    Task {
+      let content = await LivePracticeContentService.fetch(source: source, language: configuration.language)
+      guard requestID == liveContentRequestID else { return }
+      isLoadingLiveContent = false
+      guard let content else {
+        liveContentMessage = "无法获取随机\(source.displayName)，正在使用原创离线内容。"
+        return
+      }
+      guard LivePracticeContentReplacementPolicy.shouldApply(
+        hasStarted: session.hasStarted, currentConfiguration: session.configuration,
+        requestedConfiguration: configuration)
+      else {
+        liveContentMessage = "已获取\(content.attribution)，为避免打断输入，本轮仍使用现有提示。"
+        return
+      }
+      session = TestSessionFactory.make(
+        configuration: configuration, streamPrompt: content.prompt(for: configuration))
+      liveContentMessage = "已载入\(content.attribution)。"
+      if configuration.modifiers.contains(.listening) {
+        NativeSpeech.shared.speak(session.prompt, language: configuration.language)
+      }
+      requestTypingFocus()
+    }
   }
 
   private var quickRestartRequiresProtection: Bool {

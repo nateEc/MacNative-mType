@@ -489,12 +489,15 @@ struct TestSessionFactory {
   static func make(
     configuration: TestConfiguration,
     customText: String = "",
-    quote: OfflineQuote? = nil
+    quote: OfflineQuote? = nil,
+    streamPrompt: String? = nil
   ) -> TypingSession {
     let prompt: String
     var sectionEndIndices: [Int] = []
     var noSpaceBoundarySource: String?
-    if configuration.mode != .custom,
+    if configuration.mode != .custom, let streamPrompt {
+      prompt = streamPrompt
+    } else if configuration.mode != .custom,
       let streamPrompt = TypebarStreamContent.prompt(configuration: configuration)
     {
       prompt = streamPrompt
