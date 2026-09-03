@@ -3610,6 +3610,36 @@ final class TypingEngineTests: XCTestCase {
       Set([timeEnglish, wordsEnglish, wordsChinese]))
   }
 
+  func testResultHistoryDateRangesUseReferenceRollingWindowsAndPreserveLegacyPresets() throws {
+    let now = Date(timeIntervalSinceReferenceDate: 1_000_000)
+    let onBoundary = UUID()
+    let recent = UUID()
+    let stale = UUID()
+    let entries = [
+      ResultHistoryEntry(
+        id: onBoundary, mode: .time, language: .english, tags: [],
+        finishedAt: now.addingTimeInterval(-24 * 60 * 60)),
+      ResultHistoryEntry(
+        id: recent, mode: .time, language: .english, tags: [],
+        finishedAt: now.addingTimeInterval(-24 * 60 * 60 + 1)),
+      ResultHistoryEntry(
+        id: stale, mode: .time, language: .english, tags: [],
+        finishedAt: now.addingTimeInterval(-24 * 60 * 60 - 1)),
+    ]
+    let lastDay = ResultHistoryFilter(dateRange: .lastDay)
+    XCTAssertEqual(
+      lastDay.matchingIDs(entries: entries, personalBestIDs: [], now: now), [onBoundary, recent])
+    XCTAssertNil(ResultHistoryDateRange.all.cutoff(relativeTo: now))
+    XCTAssertEqual(
+      ResultHistoryDateRange.lastThreeMonths.cutoff(relativeTo: now),
+      now.addingTimeInterval(-90 * 24 * 60 * 60))
+
+    let legacy = try JSONDecoder().decode(
+      ResultHistoryFilter.self, from: Data(#"{"personalBestOnly":true}"#.utf8))
+    XCTAssertTrue(legacy.personalBestOnly)
+    XCTAssertEqual(legacy.dateRange, .all)
+  }
+
   func testPersonalBestMarksEveryTiedHighestResult() {
     let first = UUID()
     let second = UUID()
@@ -4382,7 +4412,8 @@ final class TypingEngineTests: XCTestCase {
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     let filter = ResultHistoryFilter(
-      mode: .words, language: .english, tag: "focus", personalBestOnly: true)
+      mode: .words, language: .english, tag: "focus", personalBestOnly: true,
+      dateRange: .lastMonth)
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
     container.mainContext.insert(preset)
     try container.mainContext.save()

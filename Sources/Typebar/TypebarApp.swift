@@ -3356,6 +3356,7 @@ private struct ResultsHistoryView: View {
   @State private var languageFilter: TypingLanguage?
   @State private var tagFilter: String?
   @State private var personalBestOnly = false
+  @State private var dateRangeFilter: ResultHistoryDateRange = .all
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
 
@@ -3364,11 +3365,13 @@ private struct ResultsHistoryView: View {
       mode: modeFilter,
       language: languageFilter,
       tag: tagFilter,
-      personalBestOnly: personalBestOnly
+      personalBestOnly: personalBestOnly,
+      dateRange: dateRangeFilter
     )
     let entries = results.map {
       ResultHistoryEntry(
-        id: $0.id, mode: $0.configuration?.mode, language: $0.configuration?.language, tags: $0.tags
+        id: $0.id, mode: $0.configuration?.mode, language: $0.configuration?.language, tags: $0.tags,
+        finishedAt: $0.finishedAt
       )
     }
     let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs)
@@ -3454,6 +3457,11 @@ private struct ResultsHistoryView: View {
                       .buttonStyle(.borderless)
                       .accessibilityLabel("删除筛选预设 \(preset.name)")
                     }
+                  }
+                }
+                Picker("时间范围", selection: $dateRangeFilter) {
+                  ForEach(ResultHistoryDateRange.allCases, id: \.self) { range in
+                    Text(range.displayName).tag(range)
                   }
                 }
                 Picker("模式", selection: $modeFilter) {
@@ -3710,7 +3718,8 @@ private struct ResultsHistoryView: View {
 
   private var activeFilter: ResultHistoryFilter {
     .init(
-      mode: modeFilter, language: languageFilter, tag: tagFilter, personalBestOnly: personalBestOnly
+      mode: modeFilter, language: languageFilter, tag: tagFilter,
+      personalBestOnly: personalBestOnly, dateRange: dateRangeFilter
     )
   }
 
@@ -3728,6 +3737,7 @@ private struct ResultsHistoryView: View {
     languageFilter = filter.language
     tagFilter = filter.tag
     personalBestOnly = filter.personalBestOnly
+    dateRangeFilter = filter.dateRange
   }
 
   private func modeName(_ mode: TestMode?) -> String {

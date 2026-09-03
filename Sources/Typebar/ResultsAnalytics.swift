@@ -152,6 +152,18 @@ struct ResultHistoryEntry: Equatable, Identifiable {
     let mode: TestMode?
     let language: TypingLanguage?
     let tags: [String]
+    let finishedAt: Date
+
+    init(
+        id: UUID, mode: TestMode?, language: TypingLanguage?, tags: [String],
+        finishedAt: Date = .distantPast
+    ) {
+        self.id = id
+        self.mode = mode
+        self.language = language
+        self.tags = tags
+        self.finishedAt = finishedAt
+    }
 }
 
 /// The minimum immutable data needed to calculate the practice-screen average
@@ -823,25 +835,77 @@ enum CurrentPersonalBestPolicy {
   }
 }
 
+enum ResultHistoryDateRange: String, CaseIterable, Codable, Equatable {
+    case all
+    case lastDay
+    case lastWeek
+    case lastMonth
+    case lastThreeMonths
+
+    var displayName: String {
+        switch self {
+        case .all: "全部时间"
+        case .lastDay: "最近 24 小时"
+        case .lastWeek: "最近 7 天"
+        case .lastMonth: "最近 30 天"
+        case .lastThreeMonths: "最近 90 天"
+        }
+    }
+
+    func cutoff(relativeTo now: Date) -> Date? {
+        let seconds: TimeInterval?
+        switch self {
+        case .all: seconds = nil
+        case .lastDay: seconds = 24 * 60 * 60
+        case .lastWeek: seconds = 7 * 24 * 60 * 60
+        case .lastMonth: seconds = 30 * 24 * 60 * 60
+        case .lastThreeMonths: seconds = 90 * 24 * 60 * 60
+        }
+        return seconds.map { now.addingTimeInterval(-$0) }
+    }
+}
+
 struct ResultHistoryFilter: Codable, Equatable {
     var mode: TestMode?
     var language: TypingLanguage?
     var tag: String?
     var personalBestOnly: Bool
+    var dateRange: ResultHistoryDateRange
 
-    init(mode: TestMode? = nil, language: TypingLanguage? = nil, tag: String? = nil, personalBestOnly: Bool = false) {
+    init(
+        mode: TestMode? = nil, language: TypingLanguage? = nil, tag: String? = nil,
+        personalBestOnly: Bool = false, dateRange: ResultHistoryDateRange = .all
+    ) {
         self.mode = mode
         self.language = language
         self.tag = tag
         self.personalBestOnly = personalBestOnly
+        self.dateRange = dateRange
     }
 
-    func matchingIDs(entries: [ResultHistoryEntry], personalBestIDs: Set<UUID>) -> Set<UUID> {
-        Set(entries.filter { entry in
+    private enum CodingKeys: String, CodingKey {
+        case mode, language, tag, personalBestOnly, dateRange
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        mode = try values.decodeIfPresent(TestMode.self, forKey: .mode)
+        language = try values.decodeIfPresent(TypingLanguage.self, forKey: .language)
+        tag = try values.decodeIfPresent(String.self, forKey: .tag)
+        personalBestOnly = try values.decodeIfPresent(Bool.self, forKey: .personalBestOnly) ?? false
+        dateRange = try values.decodeIfPresent(ResultHistoryDateRange.self, forKey: .dateRange) ?? .all
+    }
+
+    func matchingIDs(
+        entries: [ResultHistoryEntry], personalBestIDs: Set<UUID>, now: Date = .now
+    ) -> Set<UUID> {
+        let cutoff = dateRange.cutoff(relativeTo: now)
+        return Set(entries.filter { entry in
             (mode == nil || entry.mode == mode)
                 && (language == nil || entry.language == language)
                 && (tag == nil || entry.tags.contains(tag!))
                 && (!personalBestOnly || personalBestIDs.contains(entry.id))
+                && (cutoff.map { entry.finishedAt >= $0 } ?? true)
         }.map(\.id))
     }
 }
