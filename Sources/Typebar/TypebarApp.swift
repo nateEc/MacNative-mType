@@ -750,7 +750,7 @@ private struct ContentView: View {
         .padding(12)
         .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
       } else {
-        if mode != .custom {
+        if mode != .custom && mode != .zen {
           Picker("语言", selection: $language) {
             ForEach(availableLanguages, id: \.self) { language in
               Text(language.displayName).tag(language)
@@ -780,7 +780,7 @@ private struct ContentView: View {
           }
         }
 
-        if mode == .time || mode == .words || mode == .zen {
+        if mode == .time || mode == .words {
           HStack {
             Toggle("标点", isOn: $contentOptions.includePunctuation)
             Toggle("数字", isOn: $contentOptions.includeNumbers)
