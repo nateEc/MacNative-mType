@@ -886,12 +886,14 @@ enum ResultHistoryBinaryFilter: String, CaseIterable, Codable, Equatable {
     case all
     case included
     case excluded
+    case noMatches
 
     var displayName: String {
         switch self {
         case .all: "全部"
         case .included: "包含"
         case .excluded: "不包含"
+        case .noMatches: "无匹配项"
         }
     }
 
@@ -900,6 +902,7 @@ enum ResultHistoryBinaryFilter: String, CaseIterable, Codable, Equatable {
         case .all: true
         case .included: value == true
         case .excluded: value == false
+        case .noMatches: false
         }
     }
 }

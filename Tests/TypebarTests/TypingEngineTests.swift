@@ -3619,6 +3619,41 @@ final class TypingEngineTests: XCTestCase {
       Set([timeEnglish, wordsEnglish, wordsChinese]))
   }
 
+  func testResultHistoryBinaryFiltersSupportEveryReferenceToggleCombination() {
+    let withBoth = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [],
+      includesPunctuation: true, includesNumbers: true)
+    let withoutBoth = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [],
+      includesPunctuation: false, includesNumbers: false)
+    let legacyUnknown = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [],
+      includesPunctuation: nil, includesNumbers: nil)
+    let entries = [withBoth, withoutBoth, legacyUnknown]
+
+    XCTAssertEqual(
+      ResultHistoryFilter(punctuation: .included, numbers: .included).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      [withBoth.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter(punctuation: .excluded, numbers: .excluded).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      [withoutBoth.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter(punctuation: .all, numbers: .all).matchingIDs(
+        entries: entries, personalBestIDs: []),
+      Set(entries.map(\.id))
+    )
+    XCTAssertTrue(
+      ResultHistoryFilter(punctuation: .noMatches).matchingIDs(
+        entries: entries, personalBestIDs: []).isEmpty)
+    XCTAssertTrue(
+      ResultHistoryFilter(numbers: .noMatches).matchingIDs(
+        entries: entries, personalBestIDs: []).isEmpty)
+  }
+
   func testResultHistoryQuoteLengthUsesTheCompletedPrompt() {
     let completedQuote = OfflineContent.quotes.first { $0.length == .medium }!
     let quote = ResultHistoryEntry(
@@ -4707,7 +4742,7 @@ final class TypingEngineTests: XCTestCase {
       language: .english, modes: [.quote, .zen],
       tagFilter: .init(isUnrestricted: false, includesNoTags: true, tags: ["focus", "review"]),
       personalBestFilter: .excluded,
-      difficulties: [.normal, .expert], dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
+      difficulties: [.normal, .expert], dateRange: .lastMonth, punctuation: .included, numbers: .noMatches,
       quoteLength: .medium, timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom],
       modifierFilter: .init(includesNoModifiers: false, modifiers: [.crtVisual, .binaryStream]))
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
