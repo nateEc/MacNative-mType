@@ -324,6 +324,26 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.outcome, .completed)
   }
 
+  func testEllipsisExpandsToPeriodsOnlyWhenThePromptDoesNotUseAnEllipsis() {
+    var periodPrompt = TypingSession(
+      configuration: .init(
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      prompt: "wait...")
+    periodPrompt.insertBatch("wait…", at: start)
+    XCTAssertEqual(periodPrompt.typed, "wait...")
+    XCTAssertEqual(periodPrompt.errors, 0)
+    XCTAssertEqual(periodPrompt.outcome, .completed)
+
+    var ellipsisPrompt = TypingSession(
+      configuration: .init(
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      prompt: "wait…")
+    ellipsisPrompt.insertBatch("wait…", at: start)
+    XCTAssertEqual(ellipsisPrompt.typed, "wait…")
+    XCTAssertEqual(ellipsisPrompt.errors, 0)
+    XCTAssertEqual(ellipsisPrompt.outcome, .completed)
+  }
+
   func testNormalSpaceCompletesAnIncompleteFiniteFinalWord() {
     var session = TypingSession(
       configuration: .init(

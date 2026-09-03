@@ -1862,6 +1862,16 @@ struct TypingSession {
     let characters = Array(text)
     for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
+      if shouldExpandReferenceEllipsis(character) {
+        // The web reference replaces a single ellipsis with three periods
+        // only when the prompt expects periods. Treat that replacement as
+        // its own multi-character insertion event so replay and terminal
+        // rules match the transformed user input.
+        insertText(
+          "...", forceError: forceError, at: date,
+          evaluatesTerminalRulesOnLastCharacterOnly: true)
+        continue
+      }
       let evaluatesTerminalRules = !evaluatesTerminalRulesOnLastCharacterOnly
         || index == characters.indices.last
       if insertCharacter(
@@ -1932,6 +1942,16 @@ struct TypingSession {
 
   private mutating func beginIfNeeded(at date: Date) {
     if startedAt == nil { startedAt = date }
+  }
+
+  /// The reference expands the typographic ellipsis only when it is not the
+  /// character the prompt itself requests. This preserves literal ellipses
+  /// in custom text while accepting the common macOS replacement for `...`.
+  private mutating func shouldExpandReferenceEllipsis(_ character: Character) -> Bool {
+    guard character == "…" else { return false }
+    extendPromptIfNeeded()
+    guard nextTargetIndex < prompt.count else { return true }
+    return Array(prompt)[nextTargetIndex] != character
   }
 
   @discardableResult
