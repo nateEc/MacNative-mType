@@ -8,6 +8,82 @@ struct CommandPaletteItem: Equatable, Identifiable {
     let keywords: [String]
 }
 
+enum ThemeCommandTarget: Equatable {
+    case builtIn(AppTheme)
+    case custom(UUID)
+}
+
+/// Flattens the reference theme subgroup for the native searchable palette.
+/// Theme colors and names are Typebar-owned; this only preserves the quick
+/// selection behavior and favorite-first ordering.
+enum ThemeCommandCatalog {
+    private struct Option {
+        let target: ThemeCommandTarget
+        let title: String
+        let subtitle: String
+        let keywords: [String]
+        let isFavorite: Bool
+    }
+
+    static func identifier(for target: ThemeCommandTarget) -> String {
+        switch target {
+        case .builtIn(let theme): "theme.builtin.\(theme.rawValue)"
+        case .custom(let id): "theme.custom.\(id.uuidString.lowercased())"
+        }
+    }
+
+    static func target(for identifier: String) -> ThemeCommandTarget? {
+        if let rawValue = identifier.split(separator: ".").last,
+            identifier.hasPrefix("theme.builtin."),
+            let theme = AppTheme(rawValue: String(rawValue))
+        {
+            return .builtIn(theme)
+        }
+        if let rawValue = identifier.split(separator: ".").last,
+            identifier.hasPrefix("theme.custom."),
+            let id = UUID(uuidString: String(rawValue))
+        {
+            return .custom(id)
+        }
+        return nil
+    }
+
+    static func items(
+        builtInThemes: [AppTheme] = AppTheme.allCases,
+        customThemes: [CustomThemeDefinition],
+        favoriteThemeIDs: [String]
+    ) -> [CommandPaletteItem] {
+        let favorites = Set(favoriteThemeIDs)
+        let builtIns = builtInThemes.map { theme in
+            Option(
+                target: .builtIn(theme), title: "切换主题：\(theme.displayName)",
+                subtitle: favorites.contains(ThemeFavoritePolicy.builtInID(for: theme))
+                    ? "内置主题 · 已收藏" : "内置主题",
+                keywords: ["theme", "主题", theme.displayName, theme.rawValue],
+                isFavorite: favorites.contains(ThemeFavoritePolicy.builtInID(for: theme)))
+        }
+        let customs = customThemes.map { theme in
+            Option(
+                target: .custom(theme.id), title: "切换主题：\(theme.name)",
+                subtitle: favorites.contains(ThemeFavoritePolicy.customID(for: theme.id))
+                    ? "自定义主题 · 已收藏" : "自定义主题",
+                keywords: ["theme", "主题", "custom", "自定义", theme.name],
+                isFavorite: favorites.contains(ThemeFavoritePolicy.customID(for: theme.id)))
+        }
+
+        return (builtIns + customs)
+            .sorted {
+                if $0.isFavorite != $1.isFavorite { return $0.isFavorite }
+                return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+            }
+            .map { option in
+                CommandPaletteItem(
+                    id: identifier(for: option.target), title: option.title, subtitle: option.subtitle,
+                    systemImage: "paintpalette", keywords: option.keywords)
+            }
+    }
+}
+
 enum CommandPaletteSearch {
     static func results(items: [CommandPaletteItem], query: String) -> [CommandPaletteItem] {
         let query = normalized(query)

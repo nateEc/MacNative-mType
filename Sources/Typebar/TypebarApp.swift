@@ -1816,10 +1816,20 @@ private struct ContentView: View {
         id: "bailout", title: "中止长测试…", subtitle: "确认后显示未保存结果",
         systemImage: "figure.run", keywords: ["bail", "bailout", "中止", "退出"]))
     }
+    items.append(contentsOf: ThemeCommandCatalog.items(
+      customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     return items
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let target = ThemeCommandCatalog.target(for: item.id) {
+      settings.followSystemTheme = false
+      switch target {
+      case .builtIn(let theme): settings.selectBuiltInTheme(theme)
+      case .custom(let id): settings.selectCustomTheme(id)
+      }
+      return
+    }
     switch item.id {
     case "restart": attemptRestart()
     case "mode.time":
