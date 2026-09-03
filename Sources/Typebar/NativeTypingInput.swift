@@ -22,6 +22,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onFinishZen: () -> Void
     let onFocusChanged: (Bool) -> Void
     let onCompositionChanged: (String) -> Void
+    let onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void
 
     final class Coordinator {
         var appliedFocusRequest = -1
@@ -53,6 +54,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onFinishZen = onFinishZen
         view.onFocusChanged = onFocusChanged
         view.onCompositionChanged = onCompositionChanged
+        view.onModifierFlagsChanged = onModifierFlagsChanged
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
         context.coordinator.appliedFocusRequest = focusRequest
         view.resetBailoutAttempt()
@@ -80,6 +82,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onFinishZen: () -> Void = {}
     var onFocusChanged: (Bool) -> Void = { _ in }
     var onCompositionChanged: (String) -> Void = { _ in }
+    var onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void = { _ in }
 
     private var composition = NSAttributedString()
     private var leftShiftPressed = false
@@ -110,6 +113,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       leftShiftPressed = false
       rightShiftPressed = false
       pendingForcedError = false
+      onModifierFlagsChanged([])
       onFocusChanged(false)
       return true
     }
@@ -120,10 +124,12 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       case 60: rightShiftPressed.toggle()
       default: break
       }
+      onModifierFlagsChanged(event.modifierFlags)
       super.flagsChanged(with: event)
     }
 
     override func keyDown(with event: NSEvent) {
+        onModifierFlagsChanged(event.modifierFlags)
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {
             onRestart()
             return

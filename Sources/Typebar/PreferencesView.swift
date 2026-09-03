@@ -477,6 +477,14 @@ struct PreferencesView: View {
             Text("\(settings.keyboardGuideScale, format: .number.precision(.fractionLength(1)))×")
               .font(.caption)
               .foregroundStyle(.secondary)
+            Picker("键盘图例", selection: $settings.keyboardGuideLegendStyle) {
+              ForEach(KeyboardGuideLegendStyle.allCases) { style in
+                Text(style.displayName).tag(style)
+              }
+            }
+            Text("动态图例跟随 Shift 与 Caps Lock；Option 图层继续交给 macOS 原生输入处理。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
           Picker("键盘布局", selection: $settings.keyboardLayout) {
             ForEach(KeyboardLayout.allCases) { layout in

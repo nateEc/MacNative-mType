@@ -1157,6 +1157,19 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideScalePolicy.normalized(3.6), 3.5)
   }
 
+  func testKeyboardGuideLegendsSupportStaticAndDynamicShiftLayers() {
+    let key = KeyboardGuideKey("number-0", label: "1")
+    XCTAssertEqual(key.legend(style: .lowercase, modifierFlags: [], capsLockEnabled: false), "1")
+    XCTAssertEqual(key.legend(style: .uppercase, modifierFlags: [], capsLockEnabled: false), "1")
+    XCTAssertEqual(key.legend(style: .blank, modifierFlags: [], capsLockEnabled: false), "")
+    XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: false), "1")
+    XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: [.shift], capsLockEnabled: false), "!")
+    XCTAssertEqual(key.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: true), "1")
+    let letter = KeyboardGuideKey("top-0", label: "Q")
+    XCTAssertEqual(letter.legend(style: .dynamic, modifierFlags: [], capsLockEnabled: false), "q")
+    XCTAssertEqual(letter.legend(style: .dynamic, modifierFlags: [.shift], capsLockEnabled: false), "Q")
+  }
+
   func testKeyboardGuideUsesTheSelectedLayoutAndSupportsAsciiPunctuation() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiQwerty), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiDvorak), "bottom-1")
@@ -3316,6 +3329,7 @@ final class TypingEngineTests: XCTestCase {
     settings.showKeyboardGuide = true
     settings.keyboardGuideMode = .react
     settings.keyboardGuideScale = 2.7
+    settings.keyboardGuideLegendStyle = .dynamic
     settings.showFocusWarning = false
     settings.showCapsLockWarning = false
     settings.playErrorBeep = true
@@ -3335,6 +3349,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(exportedSnapshot.codeUnindentOnBackspace)
     XCTAssertEqual(exportedSnapshot.keyboardGuideMode, .react)
     XCTAssertEqual(exportedSnapshot.keyboardGuideScale, 2.7)
+    XCTAssertEqual(exportedSnapshot.keyboardGuideLegendStyle, .dynamic)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
     XCTAssertEqual(exportedSnapshot.promptHighlightMode, .nextTwoWords)
@@ -3404,6 +3419,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.showKeyboardGuide)
     XCTAssertEqual(restored.keyboardGuideMode, .react)
     XCTAssertEqual(restored.keyboardGuideScale, 2.7)
+    XCTAssertEqual(restored.keyboardGuideLegendStyle, .dynamic)
     XCTAssertEqual(restored.effectiveKeyboardGuideMode, .react)
     restored.keyboardGuideMode = .off
     XCTAssertFalse(restored.showKeyboardGuide)
@@ -3493,6 +3509,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(snapshot.showKeyboardGuide)
     XCTAssertEqual(snapshot.keyboardGuideMode, .next)
     XCTAssertEqual(snapshot.keyboardGuideScale, 1)
+    XCTAssertEqual(snapshot.keyboardGuideLegendStyle, .lowercase)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertFalse(snapshot.followSystemTheme)

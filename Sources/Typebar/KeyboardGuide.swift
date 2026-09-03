@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
@@ -62,6 +63,24 @@ enum KeyboardGuideScalePolicy {
   }
 }
 
+enum KeyboardGuideLegendStyle: String, Codable, CaseIterable, Identifiable {
+  case lowercase
+  case uppercase
+  case blank
+  case dynamic
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .lowercase: "小写"
+    case .uppercase: "大写"
+    case .blank: "空白"
+    case .dynamic: "动态"
+    }
+  }
+}
+
 struct KeyboardGuideKey: Identifiable, Equatable {
   let id: String
   let label: String
@@ -85,6 +104,32 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     let normalized = Character(String(character).lowercased())
     if let shifted = shiftedPairs[normalized] { return [normalized, shifted] }
     return [normalized]
+  }
+
+  func legend(
+    style: KeyboardGuideLegendStyle,
+    modifierFlags: NSEvent.ModifierFlags,
+    capsLockEnabled: Bool
+  ) -> String {
+    switch style {
+    case .blank: return ""
+    case .lowercase: return label.lowercased()
+    case .uppercase: return label.uppercased()
+    case .dynamic:
+      if modifierFlags.contains(.shift), let shiftedSymbol = Self.shiftedSymbol(for: label) {
+        return shiftedSymbol
+      }
+      return (modifierFlags.contains(.shift) || capsLockEnabled) ? label.uppercased() : label.lowercased()
+    }
+  }
+
+  private static func shiftedSymbol(for label: String) -> String? {
+    let shiftedSymbols: [String: String] = [
+      "1": "!", "2": "@", "3": "#", "4": "$", "5": "%", "6": "^", "7": "&",
+      "8": "*", "9": "(", "0": ")", "-": "_", "=": "+", "[": "{", "]": "}",
+      ";": ":", "'": "\"", ",": "<", ".": ">", "/": "?", "\\": "|", "`": "~",
+    ]
+    return shiftedSymbols[label]
   }
 }
 
@@ -174,6 +219,9 @@ struct KeyboardGuide: View {
   let layout: KeyboardLayout
   let mirrored: Bool
   let scale: Double
+  let legendStyle: KeyboardGuideLegendStyle
+  let modifierFlags: NSEvent.ModifierFlags
+  let capsLockEnabled: Bool
 
   @State private var flashedKey: String?
   @State private var flashedKeyIsCorrect = true
@@ -236,7 +284,8 @@ struct KeyboardGuide: View {
   }
 
   private func keyView(_ key: KeyboardGuideKey) -> some View {
-    Text(key.label)
+    Text(key.legend(
+      style: legendStyle, modifierFlags: modifierFlags, capsLockEnabled: capsLockEnabled))
       .font(.system(size: 10 * scale, weight: .semibold, design: .monospaced))
       .foregroundStyle(key.id == highlightedKey ? .white : .secondary)
       .frame(width: key.width * scale, height: 22 * scale)

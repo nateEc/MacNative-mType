@@ -488,6 +488,7 @@ private struct ContentView: View {
   @State private var compositionText = ""
   @State private var keyboardGuideFeedback: KeyboardGuideFeedback?
   @State private var keyboardGuideFeedbackSequence = 0
+  @State private var keyboardModifierFlags: NSEvent.ModifierFlags = []
   @State private var liveContentRequestID = UUID()
   @State private var isLoadingLiveContent = false
   @State private var liveContentMessage: String?
@@ -520,7 +521,8 @@ private struct ContentView: View {
           feedback: keyboardGuideFeedback, accent: activeTheme.accent,
           panel: activeTheme.panel, layout: effectiveKeyboardLayout,
           mirrored: settings.testModifiers.contains(.mirrorKeyboard),
-          scale: settings.keyboardGuideScale)
+          scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
+          modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
       }
       controls
     }
@@ -1110,7 +1112,8 @@ private struct ContentView: View {
         },
         onFinishZen: { session.finishZen() },
         onFocusChanged: { inputHasFocus = $0 },
-        onCompositionChanged: { compositionText = $0 }
+        onCompositionChanged: { compositionText = $0 },
+        onModifierFlagsChanged: { keyboardModifierFlags = $0 }
       )
       .opacity(0.01)
       .frame(width: 1, height: 1)
