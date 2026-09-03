@@ -1529,6 +1529,39 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   }
 }
 
+/// Determines the prompt positions that receive a presentation-only emphasis.
+/// It is deliberately independent from the accepted text, error accounting,
+/// and word-completion rules.
+enum PromptHighlightPolicy {
+  static func highlightedIndices(
+    in target: String,
+    currentTargetIndex: Int?,
+    mode: PromptHighlightMode,
+    allowsWordRanges: Bool
+  ) -> Set<Int> {
+    let characters = Array(target)
+    guard mode != .off,
+      let currentTargetIndex,
+      characters.indices.contains(currentTargetIndex)
+    else { return [] }
+    guard let futureWordCount = mode.futureWordCount, allowsWordRanges else {
+      return [currentTargetIndex]
+    }
+
+    let currentWord = characters[..<currentTargetIndex].filter(isPromptWordSeparator).count
+    let highlightedWords = currentWord...(currentWord + futureWordCount)
+    var word = 0
+    var indices = Set<Int>()
+    for index in characters.indices {
+      if !isPromptWordSeparator(characters[index]), highlightedWords.contains(word) {
+        indices.insert(index)
+      }
+      if isPromptWordSeparator(characters[index]) { word += 1 }
+    }
+    return indices
+  }
+}
+
 struct TypingSession {
   let configuration: TestConfiguration
   private(set) var prompt: String

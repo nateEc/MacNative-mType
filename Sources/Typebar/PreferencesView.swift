@@ -421,6 +421,14 @@ struct PreferencesView: View {
               Text(opacity.displayName).tag(opacity)
             }
           }
+          Picker("提示高亮范围", selection: $settings.promptHighlightMode) {
+            ForEach(PromptHighlightMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          Text("当前词范围只在常规空格分词提示中生效；卷带、无空格、听写、记忆与预读遮挡会安全降级为当前字符。高亮只改变呈现，不改变输入或计分。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Text("颜色与透明度只作用于进度、速度、准确率和 Burst；错误、段落进度、最终结果、历史和回放不受影响。")
             .font(.caption)
             .foregroundStyle(.secondary)

@@ -277,6 +277,41 @@ enum LiveStatsOpacity: Double, CaseIterable, Codable, Equatable, Identifiable {
   var displayName: String { "\(Int((rawValue * 100).rounded()))%" }
 }
 
+/// Controls the scope of the native prompt emphasis without affecting its
+/// input state. Word scopes are safely reduced to the active character when
+/// the prompt does not expose ordinary word separators.
+enum PromptHighlightMode: String, CaseIterable, Codable, Equatable, Identifiable {
+  case off
+  case letter
+  case word
+  case nextWord
+  case nextTwoWords
+  case nextThreeWords
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .off: "关闭"
+    case .letter: "当前字符"
+    case .word: "当前词"
+    case .nextWord: "当前词和下一词"
+    case .nextTwoWords: "当前词及后两词"
+    case .nextThreeWords: "当前词及后三词"
+    }
+  }
+
+  var futureWordCount: Int? {
+    switch self {
+    case .off, .letter: nil
+    case .word: 0
+    case .nextWord: 1
+    case .nextTwoWords: 2
+    case .nextThreeWords: 3
+    }
+  }
+}
+
 /// Native type treatments available in the practice surface. They map only to
 /// macOS system designs, so no third-party font file is bundled or copied.
 enum PracticeFont: String, CaseIterable, Codable, Equatable, Identifiable {
@@ -396,6 +431,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var liveProgressStyle: LiveProgressStyle = .text
   var liveStatsColor: LiveStatsColor = .accent
   var liveStatsOpacity: LiveStatsOpacity = .full
+  var promptHighlightMode: PromptHighlightMode = .letter
   var testModifiers: [TestModifier] = []
   var showFocusWarning = true
   var showCapsLockWarning = true
@@ -472,6 +508,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     liveProgressStyle: LiveProgressStyle = .text,
     liveStatsColor: LiveStatsColor = .accent,
     liveStatsOpacity: LiveStatsOpacity = .full,
+    promptHighlightMode: PromptHighlightMode = .letter,
     testModifiers: [TestModifier] = [],
     showFocusWarning: Bool = true,
     showCapsLockWarning: Bool = true,
@@ -553,6 +590,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.liveProgressStyle = liveProgressStyle
     self.liveStatsColor = liveStatsColor
     self.liveStatsOpacity = liveStatsOpacity
+    self.promptHighlightMode = promptHighlightMode
     self.testModifiers = TestModifierPolicy.normalized(testModifiers)
     self.showFocusWarning = showFocusWarning
     self.showCapsLockWarning = showCapsLockWarning
@@ -586,6 +624,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       startGraphsAtZero, showAverage, showPersonalBest,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
       liveStatsColor, liveStatsOpacity,
+      promptHighlightMode,
       testModifiers, showFocusWarning,
       showCapsLockWarning, playErrorBeep, playKeyclickSound, clickSoundStyle, errorSoundStyle,
       timeWarningOffset, timeWarningSoundStyle, soundVolume,
@@ -692,6 +731,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     liveProgressStyle = try values.decodeIfPresent(LiveProgressStyle.self, forKey: .liveProgressStyle) ?? .text
     liveStatsColor = try values.decodeIfPresent(LiveStatsColor.self, forKey: .liveStatsColor) ?? .accent
     liveStatsOpacity = try values.decodeIfPresent(LiveStatsOpacity.self, forKey: .liveStatsOpacity) ?? .full
+    promptHighlightMode =
+      try values.decodeIfPresent(PromptHighlightMode.self, forKey: .promptHighlightMode) ?? .letter
     testModifiers = TestModifierPolicy.normalized(
       try values.decodeIfPresent([TestModifier].self, forKey: .testModifiers) ?? [])
     showFocusWarning = try values.decodeIfPresent(Bool.self, forKey: .showFocusWarning) ?? true
@@ -874,6 +915,7 @@ final class AppSettings {
   var liveProgressStyle: LiveProgressStyle = .text { didSet { persist() } }
   var liveStatsColor: LiveStatsColor = .accent { didSet { persist() } }
   var liveStatsOpacity: LiveStatsOpacity = .full { didSet { persist() } }
+  var promptHighlightMode: PromptHighlightMode = .letter { didSet { persist() } }
   var testModifiers: [TestModifier] = [] { didSet { persist() } }
   var showFocusWarning = true { didSet { persist() } }
   var showCapsLockWarning = true { didSet { persist() } }
@@ -960,6 +1002,7 @@ final class AppSettings {
     liveProgressStyle = snapshot.liveProgressStyle
     liveStatsColor = snapshot.liveStatsColor
     liveStatsOpacity = snapshot.liveStatsOpacity
+    promptHighlightMode = snapshot.promptHighlightMode
     testModifiers = snapshot.testModifiers
     showFocusWarning = snapshot.showFocusWarning
     showCapsLockWarning = snapshot.showCapsLockWarning
@@ -1102,6 +1145,7 @@ final class AppSettings {
     liveProgressStyle = .text
     liveStatsColor = .accent
     liveStatsOpacity = .full
+    promptHighlightMode = .letter
     testModifiers = []
     showFocusWarning = true
     showCapsLockWarning = true
@@ -1215,6 +1259,7 @@ final class AppSettings {
     liveProgressStyle = snapshot.liveProgressStyle
     liveStatsColor = snapshot.liveStatsColor
     liveStatsOpacity = snapshot.liveStatsOpacity
+    promptHighlightMode = snapshot.promptHighlightMode
     testModifiers = snapshot.testModifiers
     showFocusWarning = snapshot.showFocusWarning
     showCapsLockWarning = snapshot.showCapsLockWarning
@@ -1368,6 +1413,7 @@ final class AppSettings {
       liveProgressStyle: liveProgressStyle,
       liveStatsColor: liveStatsColor,
       liveStatsOpacity: liveStatsOpacity,
+      promptHighlightMode: promptHighlightMode,
       testModifiers: testModifiers,
       showFocusWarning: showFocusWarning,
       showCapsLockWarning: showCapsLockWarning,

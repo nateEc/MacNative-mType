@@ -1254,9 +1254,33 @@ private struct ContentView: View {
     return "当前布局：\(effectiveKeyboardLayout.displayName)"
   }
 
+  private var promptHighlightAllowsWordRanges: Bool {
+    guard session.configuration.language.usesSpaceDelimitedWords,
+      !usesTapePractice else { return false }
+    let restrictedModifiers: [TestModifier] = [
+      .noSpaces, .underscoreSeparators, .listening, .simonSays, .memory,
+      .readAheadEasy, .readAhead, .readAheadHard,
+    ]
+    return !restrictedModifiers.contains { session.configuration.modifiers.contains($0) }
+  }
+
+  private var effectivePromptHighlightMode: PromptHighlightMode {
+    guard settings.promptHighlightMode != .off else { return .off }
+    return promptHighlightAllowsWordRanges ? settings.promptHighlightMode : .letter
+  }
+
+  private var highlightedPromptIndices: Set<Int> {
+    let currentIndex = session.promptGlyphs.firstIndex { $0.state == .current }
+    return PromptHighlightPolicy.highlightedIndices(
+      in: session.prompt, currentTargetIndex: currentIndex, mode: effectivePromptHighlightMode,
+      allowsWordRanges: promptHighlightAllowsWordRanges)
+  }
+
   private var renderedPrompt: AttributedString {
     var output = AttributedString()
     let completedCharacterIndices = session.completedPromptCharacterIndices
+    let promptHighlightMode = effectivePromptHighlightMode
+    let highlightedIndices = highlightedPromptIndices
     for (index, glyph) in session.promptGlyphs.enumerated() {
       let replacesTypo = glyph.state == .incorrect && settings.typoIndicatorStyle.replacesTarget
       let turnsIntoDot = completedCharacterIndices.contains(index)
@@ -1281,6 +1305,12 @@ private struct ContentView: View {
         output += character
         continue
       }
+      if promptHighlightMode.futureWordCount != nil,
+        highlightedIndices.contains(index),
+        glyph.state != .hidden
+      {
+        applyWordHighlight(to: &character)
+      }
       if index == paceGuideIndex, glyph.state != .current {
         applyPaceCaret(to: &character)
       }
@@ -1302,7 +1332,11 @@ private struct ContentView: View {
         character.foregroundColor = .red
         character.backgroundColor = .red.opacity(0.16)
       case .current:
-        applyCaret(to: &character)
+        if promptHighlightMode == .off {
+          character.foregroundColor = .secondary.opacity(0.55)
+        } else {
+          applyCaret(to: &character)
+        }
       case .pending:
         character.foregroundColor = .secondary.opacity(0.55)
       case .hidden:
@@ -1355,6 +1389,10 @@ private struct ContentView: View {
     case .block:
       character.backgroundColor = activeTheme.accent.opacity(0.55)
     }
+  }
+
+  private func applyWordHighlight(to character: inout AttributedString) {
+    character.backgroundColor = activeTheme.accent.opacity(0.14)
   }
 
   private func applyPaceCaret(to character: inout AttributedString) {

@@ -1708,6 +1708,62 @@ final class TypingEngineTests: XCTestCase {
       ])
   }
 
+  func testPromptHighlightPolicyScopesWordsAndSafelyFallsBackToCharacter() {
+    let target = "amber bay cove"
+    let firstWord = Set(0..<5)
+    let secondWord = Set(6..<9)
+    let thirdWord = Set(10..<14)
+
+    XCTAssertTrue(PromptHighlightPolicy.highlightedIndices(
+      in: target,
+      currentTargetIndex: 2,
+      mode: .off,
+      allowsWordRanges: true
+    ).isEmpty)
+    XCTAssertEqual(PromptHighlightPolicy.highlightedIndices(
+      in: target,
+      currentTargetIndex: 2,
+      mode: .letter,
+      allowsWordRanges: true
+    ), [2])
+    XCTAssertEqual(PromptHighlightPolicy.highlightedIndices(
+      in: target,
+      currentTargetIndex: 2,
+      mode: .word,
+      allowsWordRanges: true
+    ), firstWord)
+    XCTAssertEqual(PromptHighlightPolicy.highlightedIndices(
+      in: target,
+      currentTargetIndex: 2,
+      mode: .nextWord,
+      allowsWordRanges: true
+    ), firstWord.union(secondWord))
+    XCTAssertEqual(PromptHighlightPolicy.highlightedIndices(
+      in: target,
+      currentTargetIndex: 2,
+      mode: .nextTwoWords,
+      allowsWordRanges: true
+    ), firstWord.union(secondWord).union(thirdWord))
+    XCTAssertEqual(PromptHighlightPolicy.highlightedIndices(
+      in: target,
+      currentTargetIndex: 5,
+      mode: .word,
+      allowsWordRanges: true
+    ), firstWord)
+    XCTAssertEqual(PromptHighlightPolicy.highlightedIndices(
+      in: target,
+      currentTargetIndex: 2,
+      mode: .nextThreeWords,
+      allowsWordRanges: false
+    ), [2])
+    XCTAssertTrue(PromptHighlightPolicy.highlightedIndices(
+      in: target,
+      currentTargetIndex: 99,
+      mode: .nextWord,
+      allowsWordRanges: true
+    ).isEmpty)
+  }
+
   func testTypedCharacterEffectsOnlySelectCompletedPromptWords() {
     XCTAssertEqual(
       TypedCharacterEffectPolicy.completedCharacterIndices(
@@ -3235,6 +3291,7 @@ final class TypingEngineTests: XCTestCase {
     settings.liveProgressStyle = .bar
     settings.liveStatsColor = .black
     settings.liveStatsOpacity = .half
+    settings.promptHighlightMode = .nextTwoWords
     settings.testModifiers = [.noSpaces, .uppercase]
     settings.favoriteQuoteIDs = ["craft"]
     settings.repeatQuotes = true
@@ -3307,6 +3364,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.liveProgressStyle, .bar)
     XCTAssertEqual(restored.liveStatsColor, .black)
     XCTAssertEqual(restored.liveStatsOpacity, .half)
+    XCTAssertEqual(restored.promptHighlightMode, .nextTwoWords)
     XCTAssertEqual(restored.testModifiers, [.noSpaces, .uppercase])
     XCTAssertTrue(restored.isFavoriteQuote("craft"))
     XCTAssertTrue(restored.repeatQuotes)
@@ -3424,6 +3482,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.liveProgressStyle, .text)
     XCTAssertEqual(snapshot.liveStatsColor, .accent)
     XCTAssertEqual(snapshot.liveStatsOpacity, .full)
+    XCTAssertEqual(snapshot.promptHighlightMode, .letter)
     XCTAssertTrue(snapshot.testModifiers.isEmpty)
     XCTAssertTrue(snapshot.showFocusWarning)
     XCTAssertTrue(snapshot.showCapsLockWarning)
