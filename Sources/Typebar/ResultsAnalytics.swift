@@ -417,12 +417,14 @@ enum ResultPromptText {
     let tokens = StarterLexicon.simplifiedChineseWords
       .map { Array($0) }
       .sorted { $0.count > $1.count }
+    let trailingPunctuation: Set<Character> = ["，", "。", "！", "？", "：", "；"]
     var index = 0
 
     while index < characters.count {
+      let coreStart = characters[index] == "（" ? index + 1 : index
       guard let token = tokens.first(where: { token in
-        let end = index + token.count
-        return end <= characters.count && characters[index..<end].elementsEqual(token)
+        let end = coreStart + token.count
+        return end <= characters.count && characters[coreStart..<end].elementsEqual(token)
       })
       else {
         if index >= reachedCharacterCount { break }
@@ -430,7 +432,9 @@ enum ResultPromptText {
         continue
       }
 
-      let end = index + token.count
+      var end = coreStart + token.count
+      if end < characters.count, characters[end] == "）" { end += 1 }
+      if end < characters.count, trailingPunctuation.contains(characters[end]) { end += 1 }
       if reachedCharacterCount > index && reachedCharacterCount <= end {
         return String(characters.prefix(end))
       }

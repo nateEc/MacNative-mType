@@ -835,6 +835,13 @@ final class TypingEngineTests: XCTestCase {
       accuracy: 100, prompt: "晨光窗边", replayEvents: [.init(offset: 0, kind: .insert, text: "晨")])
     XCTAssertEqual(ResultPromptText.make(for: chinese, reviews: []), "晨光")
 
+    let punctuatedChinese = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30, language: .simplifiedChinese),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(3),
+      typedCharacterCount: 1, correctCharacterCount: 1, errorCount: 0, wpm: 20, rawWpm: 24,
+      accuracy: 100, prompt: "（晨光）窗边", replayEvents: [.init(offset: 0, kind: .insert, text: "（")])
+    XCTAssertEqual(ResultPromptText.make(for: punctuatedChinese, reviews: []), "（晨光）")
+
     let zen = CompletedTestResult(
       id: UUID(),
       configuration: .init(mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
