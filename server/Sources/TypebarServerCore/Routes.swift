@@ -509,16 +509,22 @@ public enum ServiceCapabilityStatus: String, Content, Equatable {
 private extension AuthStoreError {
     var abort: Abort {
         switch self {
-        case .invalidEmail, .invalidDisplayName, .weakPassword, .invalidQuoteSubmission, .cannotReportSelf, .invalidProfileReport, .invalidDirectMessage:
+        case .invalidEmail, .invalidDisplayName, .weakPassword, .invalidOAuthIdentity, .invalidQuoteSubmission, .cannotReportSelf, .invalidProfileReport, .invalidDirectMessage:
             Abort(.badRequest, reason: "The request did not meet Typebar account requirements.")
         case .emailAlreadyRegistered:
             Abort(.conflict, reason: "An account already exists for this email address.")
+        case .oauthIdentityAlreadyLinked:
+            Abort(.conflict, reason: "That OAuth identity is already linked to a Typebar account.")
+        case .cannotRemoveLastAuthentication:
+            Abort(.conflict, reason: "A Typebar account must retain at least one authentication method.")
         case .invalidCredentials, .invalidAccessToken:
             Abort(.unauthorized, reason: "Invalid email or password.")
         case .invalidPasswordResetToken:
             Abort(.unauthorized, reason: "This password reset code is invalid or has expired.")
         case .invalidEmailVerificationToken:
             Abort(.unauthorized, reason: "This email verification code is invalid or has expired.")
+        case .oauthIdentityNotLinked:
+            Abort(.notFound, reason: "The requested OAuth identity is not linked to this Typebar account.")
         case .profileNotFound:
             Abort(.notFound, reason: "The requested Typebar profile does not exist.")
         case .cannotConnectToSelf, .connectionNotPending:

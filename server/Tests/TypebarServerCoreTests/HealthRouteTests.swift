@@ -1564,6 +1564,62 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(request.consistency, 0)
   }
 
+  func testOAuthIdentitiesSupportPasswordlessLoginLinkingAndSafeUnlinking() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let github = OAuthProviderIdentity(
+      provider: .github, subject: "github-user-42", email: "github@example.com")
+    let oauthSession = try await store.registerWithOAuth(
+      github, displayName: "GitHub User")
+
+    XCTAssertTrue(oauthSession.user.emailVerified)
+    XCTAssertEqual(oauthSession.user.authenticationMethods, [.github])
+    do {
+      _ = try await store.login(
+        .init(email: "github@example.com", password: "a secure password"))
+      XCTFail("Passwordless accounts must reject password sign-in")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidCredentials)
+    }
+
+    let secondOAuthSession = try await store.loginWithOAuth(github)
+    XCTAssertEqual(secondOAuthSession.user.id, oauthSession.user.id)
+    XCTAssertNotEqual(secondOAuthSession.accessToken, oauthSession.accessToken)
+
+    do {
+      _ = try await store.unlinkOAuth(.github, accessToken: oauthSession.accessToken)
+      XCTFail("The final authentication method must remain linked")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .cannotRemoveLastAuthentication)
+    }
+
+    let google = OAuthProviderIdentity(
+      provider: .google, subject: "google-user-21", email: "google@example.com")
+    let linkedUser = try await store.linkOAuth(google, accessToken: oauthSession.accessToken)
+    XCTAssertEqual(linkedUser.authenticationMethods, [.github, .google])
+
+    let remainingGoogleUser = try await store.unlinkOAuth(.github, accessToken: oauthSession.accessToken)
+    XCTAssertEqual(remainingGoogleUser.authenticationMethods, [.google])
+    let googleLogin = try await store.loginWithOAuth(google)
+    XCTAssertEqual(googleLogin.user.id, oauthSession.user.id)
+
+    let passwordSession = try await store.register(
+      .init(email: "password@example.com", password: "a secure password", displayName: "Password User"))
+    do {
+      _ = try await store.linkOAuth(google, accessToken: passwordSession.accessToken)
+      XCTFail("A provider identity must not move to another account")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .oauthIdentityAlreadyLinked)
+    }
+
+    let passwordGitHub = OAuthProviderIdentity(
+      provider: .github, subject: "github-user-84", email: "second-github@example.com")
+    let linkedPasswordUser = try await store.linkOAuth(
+      passwordGitHub, accessToken: passwordSession.accessToken)
+    XCTAssertEqual(linkedPasswordUser.authenticationMethods, [.password, .github])
+    let passwordOnlyUser = try await store.unlinkOAuth(.github, accessToken: passwordSession.accessToken)
+    XCTAssertEqual(passwordOnlyUser.authenticationMethods, [.password])
+  }
+
   func testExperienceIsServerCalculatedIdempotentAndRankedForTheCurrentISOWeek() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let alice = try await store.register(

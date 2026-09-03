@@ -110,6 +110,35 @@ public struct AuthSessionResponse: Content, Equatable {
   public let expiresAt: Date
 }
 
+/// The self-hosted providers intentionally mirror the two third-party methods
+/// exposed by the reference product. Their opaque subject identifiers are only
+/// accepted after a configured OAuth exchange has validated them.
+public enum OAuthProvider: String, Content, CaseIterable, Equatable, Sendable {
+  case github
+  case google
+}
+
+public enum AuthenticationMethod: String, Content, CaseIterable, Equatable, Sendable {
+  case password
+  case github
+  case google
+}
+
+/// A verified identity returned by a configured OAuth provider. It deliberately
+/// contains no provider access or refresh token; Typebar only keeps the stable
+/// provider subject needed for future sign-in.
+public struct OAuthProviderIdentity: Sendable, Equatable {
+  public let provider: OAuthProvider
+  public let subject: String
+  public let email: String
+
+  public init(provider: OAuthProvider, subject: String, email: String) {
+    self.provider = provider
+    self.subject = subject
+    self.email = email
+  }
+}
+
 public struct AuthUserResponse: Content, Equatable {
   public let id: UUID
   public let email: String
@@ -117,6 +146,7 @@ public struct AuthUserResponse: Content, Equatable {
   public let displayName: String
   public let totalExperience: Int
   public let leaderboardOptedOut: Bool
+  public let authenticationMethods: [AuthenticationMethod]
 }
 
 public struct PublicProfileResponse: Content, Equatable {
@@ -165,6 +195,10 @@ public enum AuthStoreError: Error, Equatable {
   case invalidAccessToken
   case invalidPasswordResetToken
   case invalidEmailVerificationToken
+  case invalidOAuthIdentity
+  case oauthIdentityAlreadyLinked
+  case oauthIdentityNotLinked
+  case cannotRemoveLastAuthentication
   case profileNotFound
   case cannotConnectToSelf
   case connectionAlreadyExists
@@ -186,6 +220,7 @@ public actor AuthStore {
     var sessions: [StoredSession] = []
     var passwordResetTokens: [StoredPasswordResetToken] = []
     var emailVerificationTokens: [StoredEmailVerificationToken] = []
+    var oauthIdentities: [StoredOAuthIdentity] = []
     var syncRecords: [StoredSyncRecord] = []
     var results: [StoredResult] = []
     var connections: [StoredConnection] = []
@@ -199,7 +234,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, passwordResetTokens, emailVerificationTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
+      case users, sessions, passwordResetTokens, emailVerificationTokens, oauthIdentities, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, nextSyncCursor
     }
 
@@ -213,6 +248,8 @@ public actor AuthStore {
         try values.decodeIfPresent([StoredPasswordResetToken].self, forKey: .passwordResetTokens) ?? []
       emailVerificationTokens =
         try values.decodeIfPresent([StoredEmailVerificationToken].self, forKey: .emailVerificationTokens) ?? []
+      oauthIdentities =
+        try values.decodeIfPresent([StoredOAuthIdentity].self, forKey: .oauthIdentities) ?? []
       syncRecords = try values.decodeIfPresent([StoredSyncRecord].self, forKey: .syncRecords) ?? []
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
@@ -238,7 +275,7 @@ public actor AuthStore {
     let id: UUID
     let email: String
     let displayName: String
-    let passwordHash: String
+    let passwordHash: String?
     let createdAt: Date
     let emailVerified: Bool
     let leaderboardOptedOut: Bool
@@ -248,7 +285,7 @@ public actor AuthStore {
     }
 
     init(
-      id: UUID, email: String, displayName: String, passwordHash: String, createdAt: Date,
+      id: UUID, email: String, displayName: String, passwordHash: String?, createdAt: Date,
       emailVerified: Bool = false,
       leaderboardOptedOut: Bool = false
     ) {
@@ -266,7 +303,7 @@ public actor AuthStore {
       id = try values.decode(UUID.self, forKey: .id)
       email = try values.decode(String.self, forKey: .email)
       displayName = try values.decode(String.self, forKey: .displayName)
-      passwordHash = try values.decode(String.self, forKey: .passwordHash)
+      passwordHash = try values.decodeIfPresent(String.self, forKey: .passwordHash)
       createdAt = try values.decode(Date.self, forKey: .createdAt)
       emailVerified = try values.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
       leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
@@ -289,6 +326,13 @@ public actor AuthStore {
     let tokenHash: String
     let userID: UUID
     let expiresAt: Date
+  }
+
+  private struct StoredOAuthIdentity: Codable {
+    let provider: OAuthProvider
+    let subject: String
+    let userID: UUID
+    let linkedAt: Date
   }
 
   private struct StoredSyncRecord: Codable {
@@ -501,10 +545,12 @@ public actor AuthStore {
 
   public func login(_ request: LoginRequest, now: Date = .now) throws -> AuthSessionResponse {
     let email = try validatedEmail(request.email)
-    guard let user = state.users.first(where: { $0.email == email }) else {
+    guard let user = state.users.first(where: { $0.email == email }),
+      let passwordHash = user.passwordHash
+    else {
       throw AuthStoreError.invalidCredentials
     }
-    guard try Bcrypt.verify(request.password, created: user.passwordHash) else {
+    guard try Bcrypt.verify(request.password, created: passwordHash) else {
       throw AuthStoreError.invalidCredentials
     }
 
@@ -512,6 +558,84 @@ public actor AuthStore {
     let response = makeSession(for: user, now: now)
     try persist()
     return response
+  }
+
+  /// Creates a passwordless account after an OAuth provider has validated a
+  /// stable provider subject and verified email address. Provider tokens are
+  /// intentionally never accepted or persisted by the store.
+  public func registerWithOAuth(
+    _ identity: OAuthProviderIdentity, displayName: String, now: Date = .now
+  ) throws -> AuthSessionResponse {
+    let (subject, email) = try validatedOAuthIdentity(identity)
+    let name = try validatedDisplayName(displayName)
+    guard !state.oauthIdentities.contains(where: {
+      $0.provider == identity.provider && $0.subject == subject
+    }) else { throw AuthStoreError.oauthIdentityAlreadyLinked }
+    guard !state.users.contains(where: { $0.email == email }) else {
+      throw AuthStoreError.emailAlreadyRegistered
+    }
+
+    let user = StoredUser(
+      id: UUID(), email: email, displayName: name, passwordHash: nil, createdAt: now,
+      emailVerified: true)
+    state.users.append(user)
+    state.oauthIdentities.append(
+      .init(provider: identity.provider, subject: subject, userID: user.id, linkedAt: now))
+    let response = makeSession(for: user, now: now)
+    try persist()
+    return response
+  }
+
+  /// Signs in only when the exact provider subject is already linked. A
+  /// matching email alone never grants access to an existing Typebar account.
+  public func loginWithOAuth(
+    _ identity: OAuthProviderIdentity, now: Date = .now
+  ) throws -> AuthSessionResponse {
+    let (subject, _) = try validatedOAuthIdentity(identity)
+    guard let linkedIdentity = state.oauthIdentities.first(where: {
+      $0.provider == identity.provider && $0.subject == subject
+    }), let user = state.users.first(where: { $0.id == linkedIdentity.userID })
+    else { throw AuthStoreError.oauthIdentityNotLinked }
+    state.sessions.removeAll { $0.expiresAt <= now }
+    let response = makeSession(for: user, now: now)
+    try persist()
+    return response
+  }
+
+  /// Attaches a provider identity to the authenticated account. The same
+  /// provider subject cannot be moved between accounts through this endpoint.
+  public func linkOAuth(
+    _ identity: OAuthProviderIdentity, accessToken: String, now: Date = .now
+  ) throws -> AuthUserResponse {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    let (subject, _) = try validatedOAuthIdentity(identity)
+    if let existing = state.oauthIdentities.first(where: {
+      $0.provider == identity.provider && $0.subject == subject
+    }) {
+      guard existing.userID == currentUser.id else { throw AuthStoreError.oauthIdentityAlreadyLinked }
+      return try userResponse(for: currentUser.id)
+    }
+    state.oauthIdentities.append(
+      .init(provider: identity.provider, subject: subject, userID: currentUser.id, linkedAt: now))
+    try persist()
+    return try userResponse(for: currentUser.id)
+  }
+
+  /// Removes a linked provider only if a password or another provider remains.
+  /// This prevents making the account permanently inaccessible.
+  public func unlinkOAuth(
+    _ provider: OAuthProvider, accessToken: String, now: Date = .now
+  ) throws -> AuthUserResponse {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard state.oauthIdentities.contains(where: {
+      $0.userID == currentUser.id && $0.provider == provider
+    }) else { throw AuthStoreError.oauthIdentityNotLinked }
+    guard authenticationMethods(for: currentUser.id).count > 1 else {
+      throw AuthStoreError.cannotRemoveLastAuthentication
+    }
+    state.oauthIdentities.removeAll { $0.userID == currentUser.id && $0.provider == provider }
+    try persist()
+    return try userResponse(for: currentUser.id)
   }
 
   /// Creates a 20-minute, one-time reset token for a known account. Invalid
@@ -523,7 +647,7 @@ public actor AuthStore {
     let tokenCount = state.passwordResetTokens.count
     state.passwordResetTokens.removeAll { $0.expiresAt <= now }
     guard let email = normalizedEmail(rawEmail),
-      let user = state.users.first(where: { $0.email == email })
+      let user = state.users.first(where: { $0.email == email }), user.passwordHash != nil
     else {
       if state.passwordResetTokens.count != tokenCount { try persist() }
       return nil
@@ -638,9 +762,7 @@ public actor AuthStore {
     guard let session = state.sessions.first(where: { $0.tokenHash == hash && $0.expiresAt > now }),
       let user = state.users.first(where: { $0.id == session.userID })
     else { throw AuthStoreError.invalidAccessToken }
-    return .init(
-      id: user.id, email: user.email, emailVerified: user.emailVerified, displayName: user.displayName,
-      totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut)
+    return userResponse(for: user)
   }
 
   /// Replaces the password only after checking the existing password, then
@@ -653,7 +775,9 @@ public actor AuthStore {
       throw AuthStoreError.invalidAccessToken
     }
     let user = state.users[index]
-    guard try Bcrypt.verify(request.currentPassword, created: user.passwordHash) else {
+    guard let passwordHash = user.passwordHash,
+      try Bcrypt.verify(request.currentPassword, created: passwordHash)
+    else {
       throw AuthStoreError.invalidCredentials
     }
     try validatedPassword(request.newPassword)
@@ -685,7 +809,9 @@ public actor AuthStore {
       throw AuthStoreError.invalidAccessToken
     }
     let user = state.users[index]
-    guard try Bcrypt.verify(request.currentPassword, created: user.passwordHash) else {
+    guard let passwordHash = user.passwordHash,
+      try Bcrypt.verify(request.currentPassword, created: passwordHash)
+    else {
       throw AuthStoreError.invalidCredentials
     }
     let email = try validatedEmail(request.newEmail)
@@ -718,7 +844,8 @@ public actor AuthStore {
     guard let index = state.users.firstIndex(where: { $0.id == currentUser.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
-    guard try Bcrypt.verify(request.currentPassword, created: state.users[index].passwordHash)
+    guard let passwordHash = state.users[index].passwordHash,
+      try Bcrypt.verify(request.currentPassword, created: passwordHash)
     else { throw AuthStoreError.invalidCredentials }
     let userID = currentUser.id
     let removedQuoteIDs = Set(state.quoteSubmissions.filter { $0.userID == userID }.map(\.id))
@@ -727,6 +854,7 @@ public actor AuthStore {
     state.sessions.removeAll { $0.userID == userID }
     state.passwordResetTokens.removeAll { $0.userID == userID }
     state.emailVerificationTokens.removeAll { $0.userID == userID }
+    state.oauthIdentities.removeAll { $0.userID == userID }
     state.syncRecords.removeAll { $0.userID == userID }
     state.results.removeAll { $0.userID == userID }
     state.connections.removeAll { $0.requesterID == userID || $0.recipientID == userID }
@@ -758,11 +886,7 @@ public actor AuthStore {
       leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut)
     state.users[index] = updatedUser
     try persist()
-    return .init(
-      id: updatedUser.id, email: updatedUser.email, emailVerified: updatedUser.emailVerified,
-      displayName: updatedUser.displayName,
-      totalExperience: experience(for: updatedUser.id),
-      leaderboardOptedOut: updatedUser.leaderboardOptedOut)
+    return userResponse(for: updatedUser)
   }
 
   public func publicProfile(id: UUID, now: Date = .now) throws -> PublicProfileResponse {
@@ -1577,12 +1701,37 @@ public actor AuthStore {
     state.sessions.append(
       .init(tokenHash: Self.tokenHash(token), userID: user.id, expiresAt: expiry))
     return .init(
-      user: .init(
-        id: user.id, email: user.email, emailVerified: user.emailVerified, displayName: user.displayName,
-        totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut),
+      user: userResponse(for: user),
       accessToken: token,
       expiresAt: expiry
     )
+  }
+
+  private func userResponse(for userID: UUID) throws -> AuthUserResponse {
+    guard let user = state.users.first(where: { $0.id == userID }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    return userResponse(for: user)
+  }
+
+  private func userResponse(for user: StoredUser) -> AuthUserResponse {
+    .init(
+      id: user.id, email: user.email, emailVerified: user.emailVerified, displayName: user.displayName,
+      totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut,
+      authenticationMethods: authenticationMethods(for: user.id))
+  }
+
+  private func authenticationMethods(for userID: UUID) -> [AuthenticationMethod] {
+    guard let user = state.users.first(where: { $0.id == userID }) else { return [] }
+    var available = Set<AuthenticationMethod>()
+    if user.passwordHash != nil { available.insert(.password) }
+    for identity in state.oauthIdentities where identity.userID == userID {
+      switch identity.provider {
+      case .github: available.insert(.github)
+      case .google: available.insert(.google)
+      }
+    }
+    return AuthenticationMethod.allCases.filter { available.contains($0) }
   }
 
   private func makeSyncRecord(userID: UUID, change: SyncChangeRequest, now: Date)
@@ -1612,6 +1761,12 @@ public actor AuthStore {
   private func validatedEmail(_ value: String) throws -> String {
     guard let email = normalizedEmail(value) else { throw AuthStoreError.invalidEmail }
     return email
+  }
+
+  private func validatedOAuthIdentity(_ identity: OAuthProviderIdentity) throws -> (String, String) {
+    let subject = identity.subject.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !subject.isEmpty, subject.count <= 255 else { throw AuthStoreError.invalidOAuthIdentity }
+    return (subject, try validatedEmail(identity.email))
   }
 
   private func normalizedEmail(_ value: String) -> String? {
