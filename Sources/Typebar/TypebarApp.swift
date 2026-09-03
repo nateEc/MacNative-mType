@@ -470,6 +470,7 @@ private struct ContentView: View {
   @State private var showingConnections = false
   @State private var showingNotifications = false
   @State private var showingCommandPalette = false
+  @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
   @State private var showingChallenges = false
   @State private var activeChallengeID: String?
@@ -624,6 +625,14 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingCommandPalette) {
       CommandPaletteView(items: commandPaletteItems, onSelect: runCommand)
+    }
+    .confirmationDialog(
+      "中止当前长测试？", isPresented: $showingCommandBailoutConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("中止并显示未保存结果", role: .destructive) { session.bailOut() }
+    } message: {
+      Text("结果不会保存、本机统计、同步或发布。")
     }
     .sheet(isPresented: $showingTestShare) {
       TestConfigurationShareView(currentPreset: presetDefinition, onApply: apply)
@@ -1537,6 +1546,11 @@ private struct ContentView: View {
       for: session.configuration, savedLongText: activeLongSavedText != nil)
   }
 
+  private var commandBailoutAvailable: Bool {
+    CommandBailoutPolicy.isAvailable(
+      for: session.configuration, savedLongText: activeLongSavedText != nil)
+  }
+
   private func loadSavedCustomText(_ selection: SavedCustomTextSelection) {
     mode = .custom
     guard selection.isLong else {
@@ -1747,7 +1761,7 @@ private struct ContentView: View {
   }
 
   private var commandPaletteItems: [CommandPaletteItem] {
-    [
+    var items: [CommandPaletteItem] = [
       .init(
         id: "restart", title: "重新开始测试", subtitle: "使用当前配置生成新的练习",
         systemImage: "arrow.counterclockwise", keywords: ["restart", "reset", "重开"]),
@@ -1797,6 +1811,12 @@ private struct ContentView: View {
         id: "share", title: "分享当前测试", subtitle: "复制或导入 Typebar 测试配置链接",
         systemImage: "square.and.arrow.up", keywords: ["share", "分享", "链接", "配置"]),
     ]
+    if session.hasStarted, !session.isFinished, commandBailoutAvailable {
+      items.append(.init(
+        id: "bailout", title: "中止长测试…", subtitle: "确认后显示未保存结果",
+        systemImage: "figure.run", keywords: ["bail", "bailout", "中止", "退出"]))
+    }
+    return items
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
@@ -1827,6 +1847,7 @@ private struct ContentView: View {
     case "notifications": showingNotifications = true
     case "settings": openSettings()
     case "share": showingTestShare = true
+    case "bailout": showingCommandBailoutConfirmation = true
     default: break
     }
   }

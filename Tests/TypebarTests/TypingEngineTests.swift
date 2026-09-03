@@ -576,6 +576,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: savedLongText, savedLongText: true))
   }
 
+  func testCommandBailoutPolicyMatchesReferenceAvailability() {
+    XCTAssertTrue(CommandBailoutPolicy.isAvailable(for: .timed(seconds: 3_600)))
+    XCTAssertFalse(CommandBailoutPolicy.isAvailable(for: .timed(seconds: 900)))
+    XCTAssertTrue(CommandBailoutPolicy.isAvailable(for: .words(5_000)))
+    XCTAssertFalse(CommandBailoutPolicy.isAvailable(for: .words(1_000)))
+    XCTAssertTrue(CommandBailoutPolicy.isAvailable(for: .init(
+      mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())))
+    XCTAssertTrue(CommandBailoutPolicy.isAvailable(for: .init(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      savedLongText: true))
+  }
+
   func testClearCurrentWordOnErrorModifierKeepsCompletedWordsAndReplayInSync() {
     var session = TypingSession(
       configuration: .words(2).with(modifiers: [.clearCurrentWordOnError]),

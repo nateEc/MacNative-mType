@@ -1360,6 +1360,31 @@ enum QuickRestartSafetyPolicy {
   }
 }
 
+/// Matches the reference command palette's more conservative bailout entry.
+/// It intentionally has higher thresholds than quick-restart protection.
+enum CommandBailoutPolicy {
+  static func isAvailable(for configuration: TestConfiguration, savedLongText: Bool = false) -> Bool {
+    if savedLongText { return true }
+    switch configuration.mode {
+    case .zen:
+      return true
+    case .time:
+      return (configuration.duration ?? 0) >= 3_600
+    case .words:
+      return (configuration.wordLimit ?? 0) >= 5_000
+    case .custom:
+      switch configuration.customTextCompletion {
+      case .time: return (configuration.duration ?? 0) >= 3_600
+      case .words: return (configuration.wordLimit ?? 0) >= 5_000
+      case .sections: return (configuration.customTextSectionLimit ?? 0) >= 5_000
+      case .finish: return false
+      }
+    case .quote:
+      return false
+    }
+  }
+}
+
 struct TypedWordReview: Equatable, Identifiable {
   let index: Int
   let target: String
