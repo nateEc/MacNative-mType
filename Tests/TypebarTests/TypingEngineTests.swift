@@ -344,6 +344,69 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(flexible.outcome, .active)
   }
 
+  func testNoSpaceMinimumWordBurstCommitsAtEveryOriginalWordBoundary() {
+    let rules = InputRules(minimumWordBurstWpm: 60, minimumWordBurstMode: .fixed)
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: rules,
+      modifiers: [.noSpaces])
+    var session = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor")
+
+    XCTAssertEqual(session.prompt, "amberharbor")
+    session.insert("a", at: start)
+    session.insert("mber", at: start.addingTimeInterval(0.5))
+    XCTAssertEqual(session.outcome, .active, "the first original word should commit without a space")
+
+    session.insert("h", at: start.addingTimeInterval(1))
+    session.insert("arbor", at: start.addingTimeInterval(9))
+    XCTAssertEqual(session.outcome, .failed, "the second original word should independently check min burst")
+  }
+
+  func testNoSpaceFlexibleMinimumWordBurstUsesTheOriginalWordLength() {
+    let fixedConfiguration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(minimumWordBurstWpm: 100, minimumWordBurstMode: .fixed),
+      modifiers: [.noSpaces])
+    var fixed = TestSessionFactory.make(
+      configuration: fixedConfiguration, customText: "wonderful harbor")
+    fixed.insert("w", at: start)
+    fixed.insert("onderful", at: start.addingTimeInterval(1.5))
+    XCTAssertEqual(fixed.outcome, .failed)
+
+    let flexibleConfiguration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(minimumWordBurstWpm: 100, minimumWordBurstMode: .flex),
+      modifiers: [.noSpaces])
+    var flexible = TestSessionFactory.make(
+      configuration: flexibleConfiguration, customText: "wonderful harbor")
+    flexible.insert("w", at: start)
+    flexible.insert("onderful", at: start.addingTimeInterval(1.5))
+    XCTAssertEqual(flexible.outcome, .active)
+  }
+
+  func testNoSpaceRepeatingCustomTextKeepsWordBoundariesWithoutReintroducingSpaces() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: 30, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .time, modifiers: [.noSpaces])
+    var session = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor")
+
+    XCTAssertEqual(session.prompt, "amberharboramberharbor")
+    session.insert(session.prompt, at: start)
+    session.insert("a", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.prompt, "amberharboramberharboramberharbor")
+    XCTAssertFalse(session.prompt.contains(" "))
+  }
+
+  func testNoSpaceBoundaryPolicyTracksFlattenedWordsAfterBackwardsTransform() {
+    let modifiers: [TestModifier] = [.noSpaces, .backwards]
+    let prompt = TestModifierPolicy.transformed("amber bay", modifiers: modifiers)
+    XCTAssertEqual(prompt, "yabrebma")
+    XCTAssertEqual(
+      NoSpaceWordBoundaryPolicy.wordLengths(
+        source: "amber bay", modifiers: modifiers, transformedPrompt: prompt), [3, 5])
+  }
+
   func testMinimumAccuracyFailsFiniteTestsOnlyWhenCompletionWouldOtherwiseSucceed() {
     let rules = InputRules(minimumAccuracy: 90)
     var failed = TypingSession(configuration: .words(2, rules: rules), prompt: "amber bay")

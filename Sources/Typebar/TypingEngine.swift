@@ -1423,6 +1423,12 @@ struct TypingSession {
   private let initialPrompt: String
   private let repeatingPrompt: String?
   private let sectionEndIndices: [Int]
+  /// In no-space tests, the reference product still commits each source word
+  /// when its final character is entered. Keep those boundaries separately:
+  /// after the prompt has been flattened, spaces can no longer recover them.
+  private var noSpaceWordEndIndices: [Int]
+  private let initialNoSpaceWordEndIndices: [Int]
+  private let repeatingNoSpaceWordLengths: [Int]
   private(set) var typed = ""
   private var typedCharacterDates: [Date] = []
   private var forcedErrorIndices = Set<Int>()
@@ -1438,13 +1444,17 @@ struct TypingSession {
 
   init(
     configuration: TestConfiguration, prompt: String, repeatingPrompt: String? = nil,
-    sectionEndIndices: [Int] = []
+    sectionEndIndices: [Int] = [], noSpaceWordEndIndices: [Int] = [],
+    repeatingNoSpaceWordLengths: [Int] = []
   ) {
     self.configuration = configuration
     self.prompt = prompt
     self.initialPrompt = prompt
     self.repeatingPrompt = repeatingPrompt
     self.sectionEndIndices = sectionEndIndices
+    self.noSpaceWordEndIndices = noSpaceWordEndIndices
+    self.initialNoSpaceWordEndIndices = noSpaceWordEndIndices
+    self.repeatingNoSpaceWordLengths = repeatingNoSpaceWordLengths
   }
 
   /// Starts an equivalent fresh attempt without regenerating content. This is
@@ -1453,7 +1463,8 @@ struct TypingSession {
   func repeatedAttempt() -> TypingSession {
     TypingSession(
       configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
-      sectionEndIndices: sectionEndIndices)
+      sectionEndIndices: sectionEndIndices, noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
+      repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths)
   }
 
   var isFinished: Bool { outcome != .active }
@@ -1520,6 +1531,11 @@ struct TypingSession {
   /// space counts as one input character, matching the app's word metric.
   var burstWpm: Int {
     let characters = Array(typed)
+    if tracksNoSpaceWordBursts {
+      if noSpaceCommittedWordIndex != nil { return committedWordBursts.last ?? 0 }
+      let start = noSpaceWordEndIndices.last(where: { $0 < characters.count }) ?? 0
+      return activeWordBurst(start: start) ?? committedWordBursts.last ?? 0
+    }
     guard let lastSpace = characters.lastIndex(of: " ") else {
       return activeWordBurst(start: 0) ?? committedWordBursts.last ?? 0
     }
@@ -1799,6 +1815,7 @@ struct TypingSession {
         typed.append(character)
         typedCharacterDates.append(date)
         recordWordBurstIfCommitted()
+        recordNoSpaceWordBurstIfCommitted()
         return true
       }
       return false
@@ -1834,6 +1851,7 @@ struct TypingSession {
     typedCharacterDates.append(date)
     if forceError { forcedErrorIndices.insert(typed.count - 1) }
     recordWordBurstIfCommitted()
+    recordNoSpaceWordBurstIfCommitted()
 
     if configuration.difficulty == .master && !isCorrect {
       fail(at: date)
@@ -1978,6 +1996,21 @@ struct TypingSession {
     committedWordBursts.append(wpm(characters: end - start + 1, seconds: elapsed))
   }
 
+  private mutating func recordNoSpaceWordBurstIfCommitted() {
+    guard let wordIndex = noSpaceCommittedWordIndex,
+      typedCharacterDates.count == typed.count
+    else { return }
+    let start = wordIndex == 0 ? 0 : noSpaceWordEndIndices[wordIndex - 1]
+    let end = noSpaceWordEndIndices[wordIndex] - 1
+    guard start < end else { return }
+    let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
+    guard elapsed > 0 else { return }
+    // A no-space commit is the word's last letter rather than an entered
+    // separator, so count the same virtual trailing character used by the
+    // regular word-burst path.
+    committedWordBursts.append(wpm(characters: end - start + 2, seconds: elapsed))
+  }
+
   private mutating func recordZenWordBurstIfCommitted(after character: Character) {
     guard isZenWordCommit(character) else { return }
     let characters = Array(typed)
@@ -1993,10 +2026,15 @@ struct TypingSession {
   private func shouldFailMinimumWordBurst(after character: Character) -> Bool {
     let minimum = configuration.rules.minimumWordBurstWpm
     let mode = configuration.rules.minimumWordBurstMode
-    let commitsWord = configuration.mode == .zen
-      ? isZenWordCommit(character)
-      : character == " " && configuration.language.usesSpaceDelimitedWords
+    let commitsWord: Bool
+    if configuration.mode == .zen {
+      commitsWord = isZenWordCommit(character)
+    } else if tracksNoSpaceWordBursts {
+      commitsWord = noSpaceCommittedWordIndex != nil
+    } else {
+      commitsWord = character == " " && configuration.language.usesSpaceDelimitedWords
         && !configuration.modifiers.contains(.noSpaces)
+    }
     guard mode != .off, minimum > 0, commitsWord,
       let burst = committedWordBursts.last,
       let targetLength = lastCommittedBurstWordLength
@@ -2014,6 +2052,10 @@ struct TypingSession {
       let start = characters[..<end].lastIndex(where: { isZenWordCommit($0) }).map { $0 + 1 } ?? 0
       return end - start + 1
     }
+    if let wordIndex = noSpaceCommittedWordIndex {
+      let start = wordIndex == 0 ? 0 : noSpaceWordEndIndices[wordIndex - 1]
+      return noSpaceWordEndIndices[wordIndex] - start
+    }
     guard typed.last == " " else { return nil }
     let committedWords = typed.dropLast().split(separator: " ", omittingEmptySubsequences: true)
     let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true)
@@ -2027,6 +2069,17 @@ struct TypingSession {
 
   private func isZenWordCommit(_ character: Character) -> Bool {
     character == " " || character == "\n"
+  }
+
+  private var tracksNoSpaceWordBursts: Bool {
+    configuration.language.usesSpaceDelimitedWords
+      && configuration.modifiers.contains(.noSpaces)
+      && !noSpaceWordEndIndices.isEmpty
+  }
+
+  private var noSpaceCommittedWordIndex: Int? {
+    guard tracksNoSpaceWordBursts else { return nil }
+    return noSpaceWordEndIndices.firstIndex(of: typed.count)
   }
 
   private var lastCommittedWordIsCorrect: Bool {
@@ -2157,7 +2210,16 @@ struct TypingSession {
 
   private mutating func extendPromptIfNeeded() {
     guard typed.count >= prompt.count, let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
-    prompt += prompt.last?.isWhitespace == true ? repeatingPrompt : " \(repeatingPrompt)"
+    let usesNoSpaceSeparator = configuration.modifiers.contains(.noSpaces)
+    let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
+    let previousEnd = prompt.count + separator.count
+    prompt += separator + repeatingPrompt
+    guard usesNoSpaceSeparator, !repeatingNoSpaceWordLengths.isEmpty else { return }
+    var end = previousEnd
+    for length in repeatingNoSpaceWordLengths {
+      end += length
+      noSpaceWordEndIndices.append(end)
+    }
   }
 
   private var shouldFinishEnglishWordsTest: Bool {

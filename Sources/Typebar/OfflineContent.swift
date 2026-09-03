@@ -439,6 +439,34 @@ enum CodePracticeContent {
   }
 }
 
+enum NoSpaceWordBoundaryPolicy {
+  /// Returns the end position of each original space-delimited word after it
+  /// has been transformed and concatenated. The session needs this explicit
+  /// metadata because no-space prompts intentionally contain no separators.
+  static func wordLengths(
+    source: String, modifiers: [TestModifier], transformedPrompt: String
+  ) -> [Int] {
+    guard modifiers.contains(.noSpaces) else { return [] }
+    var words = source.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+    // `backwards` runs after space removal in the native transform, so the
+    // flattened output contains source words in reverse order.
+    if modifiers.contains(.backwards) { words.reverse() }
+    let lengths = words.map {
+      TestModifierPolicy.transformed($0, modifiers: modifiers).count
+    }
+    guard lengths.reduce(0, +) == transformedPrompt.count else { return [] }
+    return lengths
+  }
+
+  static func endIndices(for wordLengths: [Int]) -> [Int] {
+    var end = 0
+    return wordLengths.map { length in
+      end += length
+      return end
+    }
+  }
+}
+
 struct TestSessionFactory {
   static func make(
     configuration: TestConfiguration,
@@ -447,6 +475,7 @@ struct TestSessionFactory {
   ) -> TypingSession {
     let prompt: String
     var sectionEndIndices: [Int] = []
+    var noSpaceBoundarySource: String?
     if configuration.mode != .custom,
       let streamPrompt = TypebarStreamContent.prompt(configuration: configuration)
     {
@@ -487,6 +516,7 @@ struct TestSessionFactory {
           let transformedSections = sections.prefix(limit).map {
             TestModifierPolicy.transformed($0, modifiers: configuration.modifiers)
           }
+          noSpaceBoundarySource = sections.prefix(limit).joined(separator: " ")
           let separator =
             !configuration.language.usesSpaceDelimitedWords || configuration.modifiers.contains(.noSpaces)
             ? "" : configuration.modifiers.contains(.underscoreSeparators) ? "_" : " "
@@ -507,12 +537,27 @@ struct TestSessionFactory {
       configuration.mode == .custom && configuration.customTextCompletion == .sections
       ? prompt
       : TestModifierPolicy.transformed(prompt, modifiers: configuration.modifiers)
+    let noSpaceWordLengths = NoSpaceWordBoundaryPolicy.wordLengths(
+      source: noSpaceBoundarySource ?? prompt, modifiers: configuration.modifiers,
+      transformedPrompt: transformedPrompt)
     let repeats =
       configuration.mode == .custom && [.time, .words].contains(configuration.customTextCompletion)
-    let initialPrompt = repeats ? "\(transformedPrompt) \(transformedPrompt)" : transformedPrompt
+    let initialPrompt: String
+    let initialNoSpaceWordEndIndices: [Int]
+    if repeats {
+      let separator = configuration.modifiers.contains(.noSpaces) ? "" : " "
+      initialPrompt = transformedPrompt + separator + transformedPrompt
+      initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
+        for: noSpaceWordLengths + noSpaceWordLengths)
+    } else {
+      initialPrompt = transformedPrompt
+      initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(for: noSpaceWordLengths)
+    }
     return TypingSession(
       configuration: configuration, prompt: initialPrompt,
-      repeatingPrompt: repeats ? transformedPrompt : nil, sectionEndIndices: sectionEndIndices)
+      repeatingPrompt: repeats ? transformedPrompt : nil, sectionEndIndices: sectionEndIndices,
+      noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
+      repeatingNoSpaceWordLengths: repeats ? noSpaceWordLengths : [])
   }
 }
 

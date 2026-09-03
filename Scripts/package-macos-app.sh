@@ -17,7 +17,9 @@ if [[ -e "$app_path" ]]; then
   exit 1
 fi
 
-binary_dir="$(cd "$project_root" && swift build --show-bin-path)"
+cd "$project_root"
+swift build
+binary_dir="$(swift build --show-bin-path)"
 mkdir -p "$app_path/Contents/MacOS"
 cp "$binary_dir/Typebar" "$app_path/Contents/MacOS/Typebar"
 cp "$project_root/Resources/Info.plist" "$app_path/Contents/Info.plist"
