@@ -1695,13 +1695,13 @@ struct TypingSession {
   }
 
   /// Live counter text for limited tests. Timed tests retain a countdown;
-  /// space-delimited word tests show committed words out of their configured
-  /// target without deriving any scoring state from this display.
+  /// word tests show committed source words out of their configured target,
+  /// including no-space prompts whose commits happen on a word's final
+  /// character. This presentation does not derive any scoring state.
   func progressText(at date: Date = .now) -> String? {
     if let remaining = remainingSeconds(at: date) { return "\(remaining)s" }
     guard let wordLimit = configuration.wordLimit,
-      configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces)
+      configuration.language.usesSpaceDelimitedWords
     else { return nil }
     return "\(min(wordLimit, completedWordCount))/\(wordLimit)"
   }
@@ -1716,13 +1716,15 @@ struct TypingSession {
       return (date.timeIntervalSince(startedAt) / duration).clamped(to: 0...1)
     }
     guard let wordLimit = configuration.wordLimit,
-      configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces)
+      configuration.language.usesSpaceDelimitedWords
     else { return nil }
     return Double(min(wordLimit, completedWordCount)) / Double(wordLimit)
   }
 
   var completedWordCount: Int {
+    if tracksNoSpaceWordBursts {
+      return noSpaceWordEndIndices.filter { typed.count >= $0 }.count
+    }
     let targetCharacters = Array(prompt)
     let typedCharacters = Array(typed)
     let committed = targetCharacters.indices.filter {

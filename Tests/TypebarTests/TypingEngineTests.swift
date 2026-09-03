@@ -60,6 +60,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(words.progressFraction(at: start), 1)
   }
 
+  func testNoSpaceWordTestsKeepTheirCommittedWordProgress() {
+    let configuration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
+    var session = TypingSession(
+      configuration: configuration, prompt: "amberharbor", noSpaceWordEndIndices: [5, 11])
+
+    XCTAssertEqual(session.progressLabel, "进度")
+    XCTAssertEqual(session.progressText(at: start), "0/2")
+    XCTAssertEqual(session.progressFraction(at: start), 0)
+
+    session.insert("amber", at: start)
+    XCTAssertEqual(session.outcome, .active)
+    XCTAssertEqual(session.completedWordCount, 1)
+    XCTAssertEqual(session.progressText(at: start), "1/2")
+    XCTAssertEqual(session.progressFraction(at: start), 0.5)
+
+    session.insert("harbor", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 2)
+    XCTAssertEqual(session.progressText(at: start), "2/2")
+    XCTAssertEqual(session.progressFraction(at: start), 1)
+  }
+
   func testQuickEndOnlyFinishesAFullLengthIncorrectLastWordWithoutErrorRules() {
     var ordinary = TypingSession(configuration: .words(2), prompt: "amber harbor")
     ordinary.insert("amber haxxxx", at: start)
