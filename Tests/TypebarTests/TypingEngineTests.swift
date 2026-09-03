@@ -163,6 +163,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.outcome, .failed)
   }
 
+  func testMultiCharacterInsertionDefersDifficultyUntilTheFinalCharacter() {
+    var master = TypingSession(
+      configuration: .timed(seconds: 30, difficulty: .master), prompt: "amber")
+    master.insertBatch("xmber", at: start)
+    XCTAssertEqual(master.typed, "xmber")
+    XCTAssertEqual(master.errors, 1)
+    XCTAssertEqual(master.outcome, .active)
+
+    var expert = TypingSession(
+      configuration: .timed(seconds: 30, difficulty: .expert), prompt: "amber bay")
+    expert.insertBatch("am x", at: start)
+    XCTAssertEqual(expert.typed, "am x")
+    XCTAssertEqual(expert.outcome, .active)
+  }
+
   func testExpertFailsWhenIncorrectWordIsCommitted() {
     var session = TypingSession(
       configuration: .timed(seconds: 30, difficulty: .expert), prompt: "amber harbor")
@@ -560,6 +575,17 @@ final class TypingEngineTests: XCTestCase {
     disabled.insert("mber", at: start.addingTimeInterval(8))
     disabled.insert(" ", at: start.addingTimeInterval(9))
     XCTAssertEqual(disabled.outcome, .active)
+  }
+
+  func testMultiCharacterInsertionDefersMinimumBurstUntilTheFinalCharacter() {
+    let rules = InputRules(minimumWordBurstWpm: 60)
+    var session = TypingSession(
+      configuration: .words(2, rules: rules), prompt: "amber bay")
+    session.insert("a", at: start)
+    session.insertBatch(" b", at: start.addingTimeInterval(9))
+
+    XCTAssertEqual(session.typed, "a b")
+    XCTAssertEqual(session.outcome, .active)
   }
 
   func testFlexibleMinimumWordBurstRelaxesForLongerTargetWords() {

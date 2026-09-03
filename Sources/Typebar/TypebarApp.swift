@@ -1009,7 +1009,7 @@ private struct ContentView: View {
         onInsert: { text, forceError in
           let errorsBefore = session.errors
           let typedCountBefore = session.typed.count
-          session.insert(
+          session.insertBatch(
             settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
             forceError: forceError)
           if settings.playKeyclickSound, session.typed.count > typedCountBefore {

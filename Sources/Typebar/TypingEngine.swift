@@ -1840,11 +1840,34 @@ struct TypingSession {
   }
 
   mutating func insert(_ text: String, forceError: Bool = false, at date: Date = .now) {
+    insertText(
+      text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: false)
+  }
+
+  /// Handles a single platform text-insertion event such as a paste or a
+  /// confirmed IME composition. The reference processes every character but
+  /// delays difficulty and burst terminal checks until the event's final
+  /// character.
+  mutating func insertBatch(_ text: String, forceError: Bool = false, at date: Date = .now) {
+    insertText(
+      text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true)
+  }
+
+  private mutating func insertText(
+    _ text: String, forceError: Bool, at date: Date,
+    evaluatesTerminalRulesOnLastCharacterOnly: Bool
+  ) {
     guard !isFinished, !text.isEmpty else { return }
     beginIfNeeded(at: date)
-    for character in text {
+    let characters = Array(text)
+    for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
-      if insertCharacter(character, forceError: forceError, at: date) {
+      let evaluatesTerminalRules = !evaluatesTerminalRulesOnLastCharacterOnly
+        || index == characters.indices.last
+      if insertCharacter(
+        character, forceError: forceError, at: date,
+        evaluatesTerminalRules: evaluatesTerminalRules)
+      {
         recordReplayEvent(kind: .insert, text: String(character), forceError: forceError, at: date)
         insertCodeIndentationIfNeeded(after: character, at: date)
       }
@@ -1913,10 +1936,10 @@ struct TypingSession {
 
   @discardableResult
   private mutating func insertCharacter(
-    _ character: Character, forceError: Bool, at date: Date
+    _ character: Character, forceError: Bool, at date: Date, evaluatesTerminalRules: Bool
   ) -> Bool {
     if configuration.mode == .zen {
-      return insertZenCharacter(character, at: date)
+      return insertZenCharacter(character, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
     }
     // The reference input accepts several platform space characters as the
     // regular word separator, but no-space rejects every one of them before
@@ -1998,13 +2021,13 @@ struct TypingSession {
     recordWordBurstIfCommitted()
     recordNoSpaceWordBurstIfCommitted()
 
-    if configuration.difficulty == .master && !isCorrect {
+    if evaluatesTerminalRules, configuration.difficulty == .master && !isCorrect {
       fail(at: date)
-    } else if configuration.difficulty == .expert
+    } else if evaluatesTerminalRules, configuration.difficulty == .expert
       && ((commitsCurrentWord && (!isCorrect || errorsInCurrentWord() > 0)) || committedNoSpaceWordHasError)
     {
       fail(at: date)
-    } else if shouldFailMinimumWordBurst(after: inputCharacter) {
+    } else if evaluatesTerminalRules, shouldFailMinimumWordBurst(after: inputCharacter) {
       fail(at: date)
     }
     return true
@@ -2013,7 +2036,9 @@ struct TypingSession {
   /// Zen accepts the user's own text rather than comparing it to a generated
   /// word list. Space and Return end an entered word; Tab remains text.
   @discardableResult
-  private mutating func insertZenCharacter(_ character: Character, at date: Date) -> Bool {
+  private mutating func insertZenCharacter(
+    _ character: Character, at date: Date, evaluatesTerminalRules: Bool
+  ) -> Bool {
     let commitsWord = isZenWordCommit(character)
     let activeLength = zenActiveWordLength
     if activeLength >= 30 && !commitsWord { return false }
@@ -2021,7 +2046,7 @@ struct TypingSession {
 
     appendTypedCharacter(character, targetIndex: nil, at: date)
     recordZenWordBurstIfCommitted(after: character)
-    if shouldFailMinimumWordBurst(after: character) { fail(at: date) }
+    if evaluatesTerminalRules, shouldFailMinimumWordBurst(after: character) { fail(at: date) }
     return true
   }
 
