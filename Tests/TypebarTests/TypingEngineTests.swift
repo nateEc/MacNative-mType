@@ -1639,6 +1639,22 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingCaretStyle.allCases.contains(.monkey))
   }
 
+  @MainActor
+  func testInstalledPracticeFontResolvesLocalNamesAndSafelyFallsBack() {
+    let installedName = NativePracticeFont.fallbackPostScriptName
+
+    XCTAssertEqual(NativePracticeFont.normalizedName(" \n\(installedName)\t "), installedName)
+    XCTAssertEqual(NativePracticeFont.postScriptName(for: installedName), installedName)
+    XCTAssertTrue(NativePracticeFont.isAvailable(installedName))
+    XCTAssertNil(NativePracticeFont.postScriptName(for: "Typebar-Missing-Font"))
+    XCTAssertEqual(
+      NativePracticeFont.normalizedName(String(repeating: "a", count: 55)).count,
+      NativePracticeFont.maximumNameLength)
+    XCTAssertEqual(
+      PracticeFont.serif.nsFont(size: 24, installedFontName: installedName).fontName,
+      installedName)
+  }
+
   func testSettingsSearchMatchesEveryWhitespaceSeparatedTokenAcrossLocalizedTerms() {
     XCTAssertTrue(
       SettingsSearch.matches(query: "KEYBOARD layout", terms: ["键盘布局", "Keyboard Layout", "下一键"]))
@@ -3523,6 +3539,7 @@ final class TypingEngineTests: XCTestCase {
     settings.blindMode = true
     settings.fontSize = 34
     settings.practiceFont = .serif
+    settings.installedPracticeFontName = NativePracticeFont.fallbackPostScriptName
     settings.theme = .midnight
     settings.publishCompletedResults = true
     settings.saveCompletedResults = false
@@ -3633,6 +3650,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.errorSoundStyle, .submarine)
     XCTAssertEqual(exportedSnapshot.timeWarningSoundStyle, .frog)
     XCTAssertEqual(exportedSnapshot.smoothCaretMotion, .fast)
+    XCTAssertEqual(exportedSnapshot.installedPracticeFontName, NativePracticeFont.fallbackPostScriptName)
 
     let restored = AppSettings(defaults: defaults)
     XCTAssertEqual(restored.difficulty, .master)
@@ -3641,6 +3659,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.inputRules.blindMode)
     XCTAssertEqual(restored.fontSize, 34)
     XCTAssertEqual(restored.practiceFont, .serif)
+    XCTAssertEqual(restored.installedPracticeFontName, NativePracticeFont.fallbackPostScriptName)
     XCTAssertEqual(restored.theme, .midnight)
     XCTAssertTrue(restored.publishCompletedResults)
     XCTAssertFalse(restored.saveCompletedResults)
@@ -3832,6 +3851,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.customPracticeLineColumns, 60)
     XCTAssertEqual(snapshot.smoothCaretMotion, .medium)
     XCTAssertEqual(snapshot.caretStyle, .block)
+    XCTAssertEqual(snapshot.installedPracticeFontName, "")
     XCTAssertEqual(snapshot.typoIndicatorStyle, .off)
     XCTAssertEqual(snapshot.typingSpeedUnit, .wpm)
     XCTAssertFalse(snapshot.alwaysShowWordsHistory)

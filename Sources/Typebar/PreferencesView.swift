@@ -379,7 +379,22 @@ struct PreferencesView: View {
               Text(font.displayName).tag(font)
             }
           }
-          Text("使用 macOS 内置字体设计，不会向本机安装或打包第三方字体。")
+          TextField("本机字体名称（可选）", text: $settings.installedPracticeFontName)
+            .textFieldStyle(.roundedBorder)
+          if settings.installedPracticeFontName.isEmpty {
+            Text("可输入已安装字体的家族名或 PostScript 名；留空使用上方系统设计。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          } else if NativePracticeFont.isAvailable(settings.installedPracticeFontName) {
+            Text("正在使用本机字体：\(settings.installedPracticeFontName)")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          } else {
+            Text("此 Mac 未找到该字体，练习会回退到上方系统设计；名称将保留以便在安装该字体后恢复。")
+              .font(.caption)
+              .foregroundStyle(.orange)
+          }
+          Text("Typebar 不会安装、上传或打包第三方字体文件。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("练习行宽", selection: $settings.practiceLineWidth) {

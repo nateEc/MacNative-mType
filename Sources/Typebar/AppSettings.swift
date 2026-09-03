@@ -396,8 +396,8 @@ enum PromptHighlightMode: String, CaseIterable, Codable, Equatable, Identifiable
   }
 }
 
-/// Native type treatments available in the practice surface. They map only to
-/// macOS system designs, so no third-party font file is bundled or copied.
+/// Native type treatments available in the practice surface. They fall back to
+/// macOS system designs when no locally installed font name has been selected.
 enum PracticeFont: String, CaseIterable, Codable, Equatable, Identifiable {
   case monospaced
   case rounded
@@ -415,7 +415,10 @@ enum PracticeFont: String, CaseIterable, Codable, Equatable, Identifiable {
     }
   }
 
-  func font(size: Double) -> Font {
+  func font(size: Double, installedFontName: String = "") -> Font {
+    if let font = NativePracticeFont.font(named: installedFontName, size: size) {
+      return font
+    }
     let design: Font.Design
     switch self {
     case .monospaced: design = .monospaced
@@ -466,6 +469,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var blindMode = false
   var fontSize: Double = 28
   var practiceFont: PracticeFont = .monospaced
+  var installedPracticeFontName = ""
   var theme: AppTheme = .paper
   var publishCompletedResults = false
   var saveCompletedResults = true
@@ -560,6 +564,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     blindMode: Bool = false,
     fontSize: Double = 28,
     practiceFont: PracticeFont = .monospaced,
+    installedPracticeFontName: String = "",
     theme: AppTheme = .paper,
     publishCompletedResults: Bool = false,
     saveCompletedResults: Bool = true,
@@ -656,6 +661,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.blindMode = blindMode
     self.fontSize = fontSize
     self.practiceFont = practiceFont
+    self.installedPracticeFontName = NativePracticeFont.normalizedName(installedPracticeFontName)
     self.theme = theme
     self.publishCompletedResults = publishCompletedResults
     self.saveCompletedResults = saveCompletedResults
@@ -748,7 +754,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   private enum CodingKeys: String, CodingKey {
     case difficulty, strictSpace, stopOnError, stopOnErrorMode, deleteOnError, deleteOnErrorMode,
       hideExtraLetters, blindMode, fontSize,
-      practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
+      practiceFont, installedPracticeFontName, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
       randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, englishVariant,
@@ -787,6 +793,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     fontSize = try values.decodeIfPresent(Double.self, forKey: .fontSize) ?? 28
     practiceFont =
       try values.decodeIfPresent(PracticeFont.self, forKey: .practiceFont) ?? .monospaced
+    installedPracticeFontName = NativePracticeFont.normalizedName(
+      try values.decodeIfPresent(String.self, forKey: .installedPracticeFontName) ?? "")
     theme = try values.decodeIfPresent(AppTheme.self, forKey: .theme) ?? .paper
     publishCompletedResults =
       try values.decodeIfPresent(Bool.self, forKey: .publishCompletedResults) ?? false
@@ -1001,6 +1009,16 @@ final class AppSettings {
   var blindMode = false { didSet { persist() } }
   var fontSize: Double = 28 { didSet { persist() } }
   var practiceFont: PracticeFont = .monospaced { didSet { persist() } }
+  var installedPracticeFontName = "" {
+    didSet {
+      let normalized = NativePracticeFont.normalizedName(installedPracticeFontName)
+      if installedPracticeFontName != normalized {
+        installedPracticeFontName = normalized
+      } else {
+        persist()
+      }
+    }
+  }
   var theme: AppTheme = .paper {
     didSet {
       activeCustomThemeID = nil
@@ -1216,6 +1234,7 @@ final class AppSettings {
     blindMode = snapshot.blindMode
     fontSize = snapshot.fontSize
     practiceFont = snapshot.practiceFont
+    installedPracticeFontName = snapshot.installedPracticeFontName
     theme = snapshot.theme
     publishCompletedResults = snapshot.publishCompletedResults
     saveCompletedResults = snapshot.saveCompletedResults
@@ -1330,7 +1349,8 @@ final class AppSettings {
       difficulty: difficulty, strictSpace: strictSpace, stopOnError: stopOnError,
       stopOnErrorMode: stopOnErrorMode, deleteOnError: deleteOnError,
       deleteOnErrorMode: deleteOnErrorMode, hideExtraLetters: hideExtraLetters, blindMode: blindMode,
-      fontSize: fontSize, practiceFont: practiceFont, theme: theme,
+      fontSize: fontSize, practiceFont: practiceFont,
+      installedPracticeFontName: installedPracticeFontName, theme: theme,
       publishCompletedResults: publishCompletedResults, saveCompletedResults: saveCompletedResults,
       customThemes: customThemes,
       activeCustomThemeID: activeCustomThemeID, favoriteThemeIDs: favoriteThemeIDs,
@@ -1399,6 +1419,7 @@ final class AppSettings {
     blindMode = false
     fontSize = 28
     practiceFont = .monospaced
+    installedPracticeFontName = ""
     theme = .paper
     publishCompletedResults = false
     saveCompletedResults = true
@@ -1534,6 +1555,7 @@ final class AppSettings {
     blindMode = snapshot.blindMode
     fontSize = snapshot.fontSize
     practiceFont = snapshot.practiceFont
+    installedPracticeFontName = snapshot.installedPracticeFontName
     theme = snapshot.theme
     publishCompletedResults = snapshot.publishCompletedResults
     saveCompletedResults = snapshot.saveCompletedResults
@@ -1765,6 +1787,7 @@ final class AppSettings {
       blindMode: blindMode,
       fontSize: fontSize,
       practiceFont: practiceFont,
+      installedPracticeFontName: installedPracticeFontName,
       theme: theme,
       publishCompletedResults: publishCompletedResults,
       saveCompletedResults: saveCompletedResults,
