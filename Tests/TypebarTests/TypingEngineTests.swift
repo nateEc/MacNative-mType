@@ -1563,6 +1563,26 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CustomTextPolicy.sections(in: "one|| two | "), ["one", "two"])
   }
 
+  func testSectionedPracticeCyclesWeightedCandidatesAndPreservesChineseSpacing() throws {
+    let practice = try XCTUnwrap(
+      WordPracticeText.sectionedPractice(
+        segments: ["amber", "amber", "cabin"], selectedTargetCount: 2, random: { 0 }))
+    let sections = CustomTextPolicy.sections(in: practice.text)
+    XCTAssertEqual(practice.sectionCount, 10)
+    XCTAssertEqual(sections.count, 10)
+    XCTAssertEqual(Set(sections), ["amber", "cabin"])
+    XCTAssertEqual(sections.prefix(3).sorted(), ["amber", "amber", "cabin"])
+    XCTAssertEqual(sections.dropFirst(3).prefix(3).sorted(), ["amber", "amber", "cabin"])
+    XCTAssertEqual(sections.dropFirst(6).prefix(3).sorted(), ["amber", "amber", "cabin"])
+
+    let chineseConfiguration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      language: .simplifiedChinese, customTextCompletion: .sections, customTextSectionLimit: 2)
+    let chineseSession = TestSessionFactory.make(
+      configuration: chineseConfiguration, customText: "晨光 | 窗边 | 纸张")
+    XCTAssertEqual(chineseSession.prompt, "晨光窗边")
+  }
+
   func testCustomTextOrderingUsesOnlyUserSuppliedTokens() {
     let text = "amber harbor quiet"
     let shuffled = CustomTextOrderPolicy.prompt(from: text, ordering: .shuffled, random: { 1 })

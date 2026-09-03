@@ -491,7 +491,7 @@ struct TestSessionFactory {
             TestModifierPolicy.transformed($0, modifiers: configuration.modifiers)
           }
           let separator =
-            configuration.modifiers.contains(.noSpaces)
+            !configuration.language.usesSpaceDelimitedWords || configuration.modifiers.contains(.noSpaces)
             ? "" : configuration.modifiers.contains(.underscoreSeparators) ? "_" : " "
           prompt = transformedSections.joined(separator: separator)
           var length = 0

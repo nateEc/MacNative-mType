@@ -200,6 +200,7 @@ struct SlowWordPracticePlan: Equatable {
 struct ContextualMissedWordPracticePlan: Equatable {
   let phrases: [String]
   let missedWordCount: Int
+  let selectedTargetCount: Int
 
   static let maximumSelectedWords = 10
 
@@ -226,7 +227,8 @@ struct ContextualMissedWordPracticePlan: Equatable {
     .prefix(maximumSelectedWords)
     let phrases = selected.flatMap { Array(repeating: $0.phrase, count: $0.count) }
     guard !phrases.isEmpty else { return nil }
-    return .init(phrases: phrases, missedWordCount: phrases.count)
+    return .init(
+      phrases: phrases, missedWordCount: phrases.count, selectedTargetCount: selected.count)
   }
 }
 
@@ -257,6 +259,38 @@ struct MissedWordPracticePlan: Equatable {
 enum WordPracticeText {
   static func make(words: [String], language: TypingLanguage) -> String {
     words.joined(separator: language.usesSpaceDelimitedWords ? " " : "")
+  }
+
+  /// A practice run is a shuffled sequence of complete candidate sections.
+  /// Rebuilding the small shuffled bag keeps error-frequency duplicates as
+  /// weights while ensuring every candidate is revisited locally.
+  static func sectionedPractice(
+    segments: [String], selectedTargetCount: Int,
+    random: () -> Int = { Int.random(in: Int.min...Int.max) }
+  ) -> SectionedPractice? {
+    let candidates = segments.filter { !$0.isEmpty }
+    let sectionCount = selectedTargetCount * 5
+    guard !candidates.isEmpty, sectionCount > 0 else { return nil }
+
+    var practiceSections: [String] = []
+    while practiceSections.count < sectionCount {
+      var shuffled = candidates
+      guard shuffled.count > 1 else {
+        practiceSections.append(contentsOf: repeatElement(shuffled[0], count: sectionCount - practiceSections.count))
+        break
+      }
+      for index in stride(from: shuffled.count - 1, through: 1, by: -1) {
+        let swapIndex = Int(random().magnitude % UInt(index + 1))
+        shuffled.swapAt(index, swapIndex)
+      }
+      practiceSections.append(contentsOf: shuffled.prefix(sectionCount - practiceSections.count))
+    }
+    return .init(text: practiceSections.joined(separator: " | "), sectionCount: sectionCount)
+  }
+
+  struct SectionedPractice: Equatable {
+    let text: String
+    let sectionCount: Int
   }
 }
 

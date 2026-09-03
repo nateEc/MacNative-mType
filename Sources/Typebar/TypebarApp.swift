@@ -623,9 +623,16 @@ private struct ContentView: View {
         },
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
-        onPracticeMissedWords: { startWordPractice(result.missedWordPracticeWords) },
-        onPracticeContextualMissedWords: { startWordPractice($0) },
-        onPracticeSlowWords: { startWordPractice($0) }
+        onPracticeMissedWords: {
+          startWordPractice(
+            result.missedWordPracticeWords, selectedTargetCount: result.missedWords.count)
+        },
+        onPracticeContextualMissedWords: { words, selectedTargetCount in
+          startWordPractice(words, selectedTargetCount: selectedTargetCount)
+        },
+        onPracticeSlowWords: { words, selectedTargetCount in
+          startWordPractice(words, selectedTargetCount: selectedTargetCount)
+        }
       )
     }
     .alert(item: $terminalNotice) { notice in
@@ -1867,11 +1874,14 @@ private struct ContentView: View {
       )?.id ?? selectedQuoteID
   }
 
-  private func startWordPractice(_ words: [String]) {
-    guard !words.isEmpty else { return }
+  private func startWordPractice(_ words: [String], selectedTargetCount: Int) {
+    guard let practice = WordPracticeText.sectionedPractice(
+      segments: words, selectedTargetCount: selectedTargetCount)
+    else { return }
     if practiceReturnPreset == nil { practiceReturnPreset = presetDefinition }
-    customText = WordPracticeText.make(words: words, language: language)
-    customTextCompletion = .finish
+    customText = practice.text
+    customTextCompletion = .sections
+    customTextSectionLimit = practice.sectionCount
     customTextOrdering = .inOrder
     mode = .custom
     completedResult = nil
@@ -1981,8 +1991,8 @@ private struct CompletedResultView: View {
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onPracticeMissedWords: () -> Void
-  let onPracticeContextualMissedWords: ([String]) -> Void
-  let onPracticeSlowWords: ([String]) -> Void
+  let onPracticeContextualMissedWords: ([String], Int) -> Void
+  let onPracticeSlowWords: ([String], Int) -> Void
   @State private var exportStatus: String?
 
   var body: some View {
@@ -2083,8 +2093,10 @@ private struct CompletedResultView: View {
               Menu("错词练习") {
                 Button("只练错词（\(missedWords.count)）", action: onPracticeMissedWords)
                 if let contextualMissedPractice {
-                  Button("带前词上下文（\(contextualMissedPractice.missedWordCount)）") {
-                    onPracticeContextualMissedWords(contextualMissedPractice.phrases)
+                Button("带前词上下文（\(contextualMissedPractice.missedWordCount)）") {
+                    onPracticeContextualMissedWords(
+                      contextualMissedPractice.phrases,
+                      contextualMissedPractice.selectedTargetCount)
                   }
                 }
                 Divider()
@@ -2092,8 +2104,9 @@ private struct CompletedResultView: View {
               }
             }
             if let slowWordPractice {
-              Button("练习慢词（\(slowWordPractice.selectedWords.count)）") {
-                onPracticeSlowWords(slowWordPractice.exerciseWords)
+            Button("练习慢词（\(slowWordPractice.selectedWords.count)）") {
+              onPracticeSlowWords(
+                slowWordPractice.exerciseWords, slowWordPractice.selectedWords.count)
               }
             }
             Spacer()
