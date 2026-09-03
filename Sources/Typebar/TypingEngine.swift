@@ -2563,17 +2563,17 @@ struct TypingSession {
         complete(at: date)
       }
     case .quote:
-      if nextTargetIndex >= prompt.count { complete(at: date) }
+      if shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
     case .custom:
       switch configuration.customTextCompletion {
       case .finish:
-        if nextTargetIndex >= prompt.count { complete(at: date) }
+        if shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
       case .time:
         break
       case .words:
         if shouldFinishEnglishWordsTest { complete(at: date) }
       case .sections:
-        if nextTargetIndex >= prompt.count { complete(at: date) }
+        if shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
       }
     case .time, .zen:
       break
@@ -2616,6 +2616,25 @@ struct TypingSession {
       && !configuration.rules.stopOnError
       && !configuration.rules.deleteOnError
     return allowsQuickEnd && typedWords[wordLimit - 1].count == targetWords[wordLimit - 1].count
+  }
+
+  /// Finite quotes and custom text use the same final-word rule as regular
+  /// word tests: an incorrect word remains editable until its separator is
+  /// entered, unless the optional quick-end rule explicitly applies.
+  private var shouldFinishFiniteSpaceDelimitedTest: Bool {
+    guard nextTargetIndex >= prompt.count else { return false }
+    guard configuration.language.usesSpaceDelimitedWords,
+      !configuration.modifiers.contains(.noSpaces)
+    else { return true }
+    if currentWordIsCorrect || typed.last.map(isPromptWordSeparator) == true { return true }
+    guard configuration.rules.quickEnd,
+      !configuration.rules.stopOnError,
+      !configuration.rules.deleteOnError
+    else { return false }
+    guard let typedWord = splitPromptWords(typed, omittingEmptySubsequences: false).last,
+      let targetWord = splitPromptWords(prompt, omittingEmptySubsequences: true).last
+    else { return false }
+    return typedWord.count == targetWord.count
   }
 
   /// The correct final word needs to retain its original preceding commit

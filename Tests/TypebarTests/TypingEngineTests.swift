@@ -323,6 +323,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.wordReviews, [.init(index: 0, target: "amber", typed: "am")])
   }
 
+  func testFiniteCustomTextWaitsForAnIncorrectFinalWordToBeCommitted() {
+    var session = TypingSession(
+      configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      prompt: "amber")
+
+    session.insert("axxxx", at: start)
+
+    XCTAssertEqual(session.outcome, .active)
+    XCTAssertEqual(session.errors, 4)
+
+    session.insert(" ", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.outcome, .completed)
+  }
+
   func testExtraLettersRemainInTheCurrentWordUntilSpaceSubmitsIt() {
     var session = TypingSession(
       configuration: .words(2), prompt: "amber bay")
