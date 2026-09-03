@@ -6,6 +6,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiDvorak
   case ansiColemak
   case ansiWorkman
+  case germanQwertz
   case frenchAzerty
 
   var id: Self { self }
@@ -16,6 +17,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ansiDvorak: "ANSI Dvorak"
     case .ansiColemak: "ANSI Colemak"
     case .ansiWorkman: "ANSI Workman"
+    case .germanQwertz: "German QWERTZ"
     case .frenchAzerty: "French AZERTY"
     }
   }
@@ -163,13 +165,21 @@ struct KeyboardGuideKey: Identifiable, Equatable {
   let label: String
   let characters: Set<Character>
   let width: CGFloat
+  let shiftedLabel: String?
 
-  init(_ id: String, label: String, characters: String? = nil, width: CGFloat = 28) {
+  init(
+    _ id: String,
+    label: String,
+    characters: String? = nil,
+    width: CGFloat = 28,
+    shiftedLabel: String? = nil
+  ) {
     self.id = id
     self.label = label
     self.characters = characters.map { Set($0.lowercased()) }
       ?? Set(label.flatMap { KeyboardGuideKey.typedCharacters(for: $0) })
     self.width = width
+    self.shiftedLabel = shiftedLabel
   }
 
   private static func typedCharacters(for character: Character) -> [Character] {
@@ -194,6 +204,7 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     case .lowercase: return label.lowercased()
     case .uppercase: return label.uppercased()
     case .dynamic:
+      if modifierFlags.contains(.shift), let shiftedLabel { return shiftedLabel }
       if modifierFlags.contains(.shift), let shiftedSymbol = Self.shiftedSymbol(for: label) {
         return shiftedSymbol
       }
@@ -241,6 +252,25 @@ enum KeyboardGuideModel {
         row("top", "QDRWBJFUP;[]"),
         row("home", "ASHTGYNEOI'"),
         row("bottom", "ZXMCVKL,./"),
+      ]
+    case .germanQwertz:
+      [
+        row(
+          "number", "1234567890ß´",
+          characters: ["1!", "2\"", "3§", "4$", "5%", "6&", "7/", "8(", "9)", "0=", "ß?", "´`"],
+          shiftedLabels: ["!", "\"", "§", "$", "%", "&", "/", "(", ")", "=", "?", "`"]
+        ),
+        row(
+          "top", "QWERTZUIOPÜ+",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "zZ", "uU", "iI", "oO", "pP", "üÜ", "+*"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Z", "U", "I", "O", "P", "Ü", "*"]
+        ),
+        row("home", "ASDFGHJKLÖÄ"),
+        row(
+          "bottom", "<YXCVBNM,.-",
+          characters: ["<>", "yY", "xX", "cC", "vV", "bB", "nN", "mM", ",<", ".>", "-_"],
+          shiftedLabels: [">", "Y", "X", "C", "V", "B", "N", "M", "<", ">", "_"]
+        ),
       ]
     case .frenchAzerty:
       [
@@ -325,14 +355,20 @@ enum KeyboardGuideModel {
     ]
   }
 
-  private static func row(_ prefix: String, _ labels: String, characters: [String]? = nil)
+  private static func row(
+    _ prefix: String,
+    _ labels: String,
+    characters: [String]? = nil,
+    shiftedLabels: [String]? = nil
+  )
     -> [KeyboardGuideKey]
   {
     Array(labels).enumerated().map { offset, label in
       KeyboardGuideKey(
         "\(prefix)-\(offset)",
         label: String(label),
-        characters: characters?[safe: offset]
+        characters: characters?[safe: offset],
+        shiftedLabel: shiftedLabels?[safe: offset]
       )
     }
   }

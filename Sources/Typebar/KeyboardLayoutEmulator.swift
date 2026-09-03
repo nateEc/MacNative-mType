@@ -51,6 +51,12 @@ enum KeyboardLayoutEmulator {
         "12:qQ 13:dD 14:rR 15:wW 17:bB 16:jJ 32:fF 34:uU 31:pP 35:;: 33:[{ 30:]} "
           + "0:aA 1:sS 2:hH 3:tT 5:gG 4:yY 38:nN 40:eE 37:oO 41:iI 39:'\" "
           + "6:zZ 7:xX 8:mM 9:cC 11:vV 45:kK 46:lL 43:,< 47:.> 44:/?")
+    case .germanQwertz:
+      map(
+        "50:^° 18:1! 19:2\" 20:3§ 21:4$ 23:5% 22:6& 26:7/ 28:8( 25:9) 29:0= 27:ß? 24:´` "
+          + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:zZ 32:uU 34:iI 31:oO 35:pP 33:üÜ 30:+* "
+          + "0:aA 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:öÖ 39:äÄ "
+          + "10:<> 6:yY 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,< 47:.> 44:-_")
     case .frenchAzerty:
       map(
         "18:&1 19:é2 20:\"3 21:'4 23:(5 22:-6 26:è7 28:_8 25:ç9 29:à0 27:)° 24:=+ "
