@@ -1134,6 +1134,7 @@ enum TypingPromptPresentation {
     target: String, typed: String, isFinished: Bool, blindMode: Bool,
     forcedErrorIndices: Set<Int> = [],
     typedTargetIndices: [Int?]? = nil, currentTargetIndex: Int? = nil,
+    hideExtraLetters: Bool = false,
     visibleFutureWords: Int? = nil, concealAll: Bool = false,
     concealedCurrentAndFutureWords: Int? = nil, concealPendingCharacters: Bool = false
   ) -> [TypingPromptGlyph] {
@@ -1221,7 +1222,7 @@ enum TypingPromptPresentation {
     guard !extraCharacters.isEmpty else { return output }
     output += extraCharacters.map {
       TypingPromptGlyph(
-        character: $0, state: blindMode || concealAll ? .hidden : .extra)
+        character: $0, state: blindMode || concealAll || hideExtraLetters ? .hidden : .extra)
     }
     return output
   }
@@ -1538,6 +1539,7 @@ struct TypingSession {
       forcedErrorIndices: forcedErrorIndices,
       typedTargetIndices: typedTargetIndices,
       currentTargetIndex: nextTargetIndex,
+      hideExtraLetters: configuration.rules.hideExtraLetters,
       visibleFutureWords: configuration.language.usesSpaceDelimitedWords
         ? configuration.visibleFutureWordCount : nil,
       concealAll: configuration.modifiers.contains(.memory) && hasStarted && !isFinished,
@@ -1900,15 +1902,12 @@ struct TypingSession {
       return false
     }
     if currentTargetIndex >= prompt.count {
-      if !configuration.rules.hideExtraLetters {
-        appendTypedCharacter(
-          inputCharacter, targetIndex: nil,
-          countsAsExtraError: inputCharacter != " " && hasUncommittedSpaceDelimitedInput, at: date)
-        recordWordBurstIfCommitted()
-        recordNoSpaceWordBurstIfCommitted()
-        return true
-      }
-      return false
+      appendTypedCharacter(
+        inputCharacter, targetIndex: nil,
+        countsAsExtraError: inputCharacter != " " && hasUncommittedSpaceDelimitedInput, at: date)
+      recordWordBurstIfCommitted()
+      recordNoSpaceWordBurstIfCommitted()
+      return true
     }
     // In normal difficulty, a leading separator is ignored unless the user
     // explicitly enables strict space or a hard delete rule needs the key to

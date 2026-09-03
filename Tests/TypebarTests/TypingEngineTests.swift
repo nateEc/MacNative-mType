@@ -299,6 +299,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.nextExpectedCharacter, "b")
   }
 
+  func testHideExtraLettersOnlyHidesTheGlyphWithoutRejectingOrUnscoringInput() {
+    let rules = InputRules(hideExtraLetters: true)
+    var session = TypingSession(
+      configuration: .timed(seconds: 30, rules: rules), prompt: "a")
+
+    session.insert("ax", at: start)
+
+    XCTAssertEqual(session.typed, "ax")
+    XCTAssertEqual(session.errors, 1)
+    XCTAssertEqual(session.promptGlyphs.last, .init(character: "x", state: .hidden))
+  }
+
   func testNoSpaceRejectsDirectWhitespaceWithoutRecordingAnError() {
     let configuration = TestConfiguration(
       mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
