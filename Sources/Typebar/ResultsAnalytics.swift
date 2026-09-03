@@ -385,6 +385,31 @@ enum ResultInputText {
   }
 }
 
+/// Builds the local equivalent of the completed-result "copy words" action.
+/// Normal space-delimited tests copy the reached target words, whereas Zen
+/// mode intentionally copies the user's open-ended input. Unspaced prompts
+/// have no word-review boundaries, so their reached target range is bounded by
+/// the final local input length.
+enum ResultPromptText {
+  static func make(for result: CompletedTestResult, reviews: [TypedWordReview]) -> String? {
+    if result.configuration.mode == .zen {
+      return ResultInputText.make(for: result)
+    }
+
+    if result.configuration.language.usesSpaceDelimitedWords,
+      !result.configuration.modifiers.contains(.noSpaces)
+    {
+      let targets = reviews.map(\.target)
+      return targets.isEmpty ? nil : targets.joined(separator: " ")
+    }
+
+    guard let typed = ResultInputText.make(for: result) else { return nil }
+    let reachedCount = min(typed.count, result.prompt.count)
+    guard reachedCount > 0 else { return nil }
+    return String(result.prompt.prefix(reachedCount))
+  }
+}
+
 /// Rebuilds a compact, local-only result trace from the input replay that is
 /// already saved with a completed test. It uses Typebar's own incremental
 /// character accounting and deliberately has a conservative duration cap so

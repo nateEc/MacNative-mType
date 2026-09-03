@@ -815,6 +815,35 @@ final class TypingEngineTests: XCTestCase {
           errorCount: 0, wpm: 20, rawWpm: 20, accuracy: 100, prompt: "amber")))
   }
 
+  func testResultPromptTextCopiesReachedTargetsInsteadOfActualInputOrFuturePrompt() {
+    let configuration = TestConfiguration.timed(seconds: 30, language: .english)
+    let result = CompletedTestResult(
+      id: UUID(), configuration: configuration, outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(3), typedCharacterCount: 6, correctCharacterCount: 5,
+      errorCount: 1, wpm: 20, rawWpm: 24, accuracy: 83, prompt: "amber harbor summer",
+      replayEvents: [.init(offset: 0, kind: .insert, text: "amxer ")])
+    XCTAssertEqual(
+      ResultPromptText.make(
+        for: result,
+        reviews: [.init(index: 0, target: "amber", typed: "amxer", hasInputError: true)]),
+      "amber")
+
+    let chinese = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30, language: .simplifiedChinese),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(3),
+      typedCharacterCount: 2, correctCharacterCount: 1, errorCount: 1, wpm: 20, rawWpm: 24,
+      accuracy: 50, prompt: "晨光窗边", replayEvents: [.init(offset: 0, kind: .insert, text: "晨x")])
+    XCTAssertEqual(ResultPromptText.make(for: chinese, reviews: []), "晨光")
+
+    let zen = CompletedTestResult(
+      id: UUID(),
+      configuration: .init(mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(3),
+      typedCharacterCount: 5, correctCharacterCount: 4, errorCount: 1, wpm: 20, rawWpm: 24,
+      accuracy: 80, prompt: "unused prompt", replayEvents: [.init(offset: 0, kind: .insert, text: "hello")])
+    XCTAssertEqual(ResultPromptText.make(for: zen, reviews: []), "hello")
+  }
+
   func testResultImageExportUsesPortableUtcFilename() {
     XCTAssertEqual(
       ResultImageExport.filename(for: Date(timeIntervalSince1970: 0)),
