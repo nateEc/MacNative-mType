@@ -170,6 +170,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.outcome, .failed)
   }
 
+  func testNoSpaceExpertFailsAtTheOriginalWordBoundary() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .expert, rules: .init(),
+      modifiers: [.noSpaces])
+    var incorrect = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor")
+    incorrect.insert("amxer", at: start)
+    XCTAssertEqual(incorrect.outcome, .failed)
+
+    var correct = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor")
+    correct.insert("amber", at: start)
+    XCTAssertEqual(correct.outcome, .active)
+  }
+
   func testStopOnErrorRejectsIncorrectCharacter() {
     var rules = InputRules()
     rules.stopOnError = true

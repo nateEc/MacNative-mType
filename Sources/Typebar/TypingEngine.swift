@@ -1879,7 +1879,9 @@ struct TypingSession {
 
     if configuration.difficulty == .master && !isCorrect {
       fail(at: date)
-    } else if configuration.difficulty == .expert && character == " " && errorsInCurrentWord() > 0 {
+    } else if configuration.difficulty == .expert
+      && ((character == " " && errorsInCurrentWord() > 0) || committedNoSpaceWordHasError)
+    {
       fail(at: date)
     } else if shouldFailMinimumWordBurst(after: character) {
       fail(at: date)
@@ -2104,6 +2106,17 @@ struct TypingSession {
   private var noSpaceCommittedWordIndex: Int? {
     guard tracksNoSpaceWordBursts else { return nil }
     return noSpaceWordEndIndices.firstIndex(of: typed.count)
+  }
+
+  /// Expert difficulty evaluates a no-space word on its final visible
+  /// character, the same logical point at which the reference product moves
+  /// to its next retained word. Use the accepted text and forced physical
+  /// input errors rather than historical attempts: a corrected word is valid.
+  private var committedNoSpaceWordHasError: Bool {
+    guard let wordIndex = noSpaceCommittedWordIndex,
+      let range = targetRange(forWord: wordIndex)
+    else { return false }
+    return range.contains { !isTypedCharacterCorrect(at: $0) }
   }
 
   private var lastCommittedWordIsCorrect: Bool {
