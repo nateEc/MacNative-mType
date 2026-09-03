@@ -865,6 +865,24 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(
       ContextualMissedWordPracticePlan.make(
         reviews: [TypedWordReview(index: 0, target: "ember", typed: "ember")], errorCounts: [0]))
+
+    let sharedTarget = try XCTUnwrap(
+      ContextualMissedWordPracticePlan.make(
+        reviews: [
+          TypedWordReview(index: 0, target: "cabin", typed: "cab"),
+          TypedWordReview(index: 1, target: "harbor", typed: "harbor"),
+          TypedWordReview(index: 2, target: "cabin", typed: "cabin"),
+        ],
+        errorCounts: [2, 0, 0]))
+    XCTAssertEqual(sharedTarget.phrases, ["cabin", "cabin", "harbor cabin", "harbor cabin"])
+
+    let capped = try XCTUnwrap(
+      ContextualMissedWordPracticePlan.make(
+        reviews: (0...10).map {
+          TypedWordReview(index: $0, target: "word\($0)", typed: "wrong")
+        },
+        errorCounts: Array(repeating: 1, count: 11)))
+    XCTAssertEqual(capped.missedWordCount, ContextualMissedWordPracticePlan.maximumSelectedWords)
   }
 
   func testTodayPracticeSummaryMergesSavedAndCurrentProcessWithoutDoubleCounting() {

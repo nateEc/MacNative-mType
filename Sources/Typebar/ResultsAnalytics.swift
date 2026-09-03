@@ -201,16 +201,30 @@ struct ContextualMissedWordPracticePlan: Equatable {
   let phrases: [String]
   let missedWordCount: Int
 
+  static let maximumSelectedWords = 10
+
   static func make(reviews: [TypedWordReview], errorCounts: [Int]) -> Self? {
-    let phrases = reviews.indices.flatMap { index -> [String] in
+    let countsByTarget = reviews.indices.reduce(into: [String: Int]()) { totals, index in
       let count = errorCounts.indices.contains(index) ? errorCounts[index] : 0
-      guard count > 0 else { return [] }
       let target = reviews[index].target
-      guard !target.isEmpty else { return [] }
+      guard count > 0, !target.isEmpty else { return }
+      totals[target, default: 0] += count
+    }
+    struct Candidate {
+      let index: Int
+      let phrase: String
+      let count: Int
+    }
+    let selected = reviews.indices.compactMap { index -> Candidate? in
+      let target = reviews[index].target
+      guard let count = countsByTarget[target], count > 0 else { return nil }
       let phrase = index > 0 && !reviews[index - 1].target.isEmpty
         ? "\(reviews[index - 1].target) \(target)" : target
-      return Array(repeating: phrase, count: count)
+      return .init(index: index, phrase: phrase, count: count)
     }
+    .sorted { lhs, rhs in lhs.count == rhs.count ? lhs.index < rhs.index : lhs.count > rhs.count }
+    .prefix(maximumSelectedWords)
+    let phrases = selected.flatMap { Array(repeating: $0.phrase, count: $0.count) }
     guard !phrases.isEmpty else { return nil }
     return .init(phrases: phrases, missedWordCount: phrases.count)
   }
