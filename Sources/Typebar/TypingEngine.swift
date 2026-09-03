@@ -1131,6 +1131,13 @@ struct TypedWordReview: Equatable, Identifiable {
   }
 }
 
+/// The number of incorrect input events attributed to one original target
+/// word. This is session-only data used to weight a local follow-up exercise.
+struct MissedWordErrorCount: Equatable {
+  let word: String
+  let count: Int
+}
+
 enum TypingReplayEventKind: String, Codable, Equatable {
   case insert
   case delete
@@ -1264,7 +1271,7 @@ struct TypingSession {
   /// Target positions at which the user made an input error during this
   /// attempt. Unlike `forcedErrorIndices`, these remain after a backspace so
   /// local error practice can include words the user later corrected.
-  private var attemptedErrorIndices = Set<Int>()
+  private var attemptedErrorCounts = [Int: Int]()
   private var committedWordBursts: [Int] = []
   private var replayEvents: [TypingReplayEvent] = []
   private(set) var startedAt: Date?
@@ -1386,41 +1393,54 @@ struct TypingSession {
     return bursts
   }
 
-  /// Target words from a space-delimited language that the user actually
-  /// attempted but did not enter exactly, or where an input error was later
-  /// corrected or deleted.
+  /// Distinct target words that received at least one incorrect input event.
+  /// A correct but unfinished word is deliberately excluded: it was not an
+  /// error, even if a timed test ended before its final characters were typed.
   /// Unreached prompt words are intentionally excluded so a timed test does
   /// not turn its remaining text into an error list.
   var missedWords: [String] {
+    missedWordErrorCounts.map(\.word)
+  }
+
+  /// Error frequency for each distinct attempted target word, in first-target
+  /// order. The count survives backspaces and repeated mistakes at the same
+  /// position so local practice can use it as a weight.
+  var missedWordErrorCounts: [MissedWordErrorCount] {
     if configuration.language == .simplifiedChinese {
-      return missedChineseWords
+      return missedChineseWordErrorCounts
     }
     guard configuration.language.usesSpaceDelimitedWords,
       !configuration.modifiers.contains(.noSpaces)
     else { return [] }
     let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-    let typedWords = typed.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
-    let finalAttemptedCount = typed.last == " " ? max(0, typedWords.count - 1) : typedWords.count
-    let historicalAttemptedCount = targetWords.indices.last(where: hasAttemptedInputError)
-      .map { $0 + 1 } ?? 0
-    let attemptedCount = max(finalAttemptedCount, historicalAttemptedCount)
-    guard attemptedCount > 0 else { return [] }
-
-    var unique: [String] = []
-    for index in 0..<min(attemptedCount, targetWords.count)
-    where typedWords[index] != targetWords[index] || hasAttemptedInputError(inWord: index) {
-      if !unique.contains(targetWords[index]) { unique.append(targetWords[index]) }
+    let errorCounts = missedWordErrorCountsByWord
+    var result: [MissedWordErrorCount] = []
+    for index in targetWords.indices where errorCounts.indices.contains(index) && errorCounts[index] > 0 {
+      if let existing = result.firstIndex(where: { $0.word == targetWords[index] }) {
+        result[existing] = .init(word: targetWords[index], count: result[existing].count + errorCounts[index])
+      } else {
+        result.append(.init(word: targetWords[index], count: errorCounts[index]))
+      }
     }
-    return unique
+    return result
   }
 
-  private var missedChineseWords: [String] {
+  /// Per-target-word event counts for the space-delimited path. It includes
+  /// zeros for unattempted words so result review indices remain aligned.
+  var missedWordErrorCountsByWord: [Int] {
+    guard configuration.language.usesSpaceDelimitedWords,
+      !configuration.modifiers.contains(.noSpaces)
+    else { return [] }
+    let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true)
+    return targetWords.indices.map { attemptedInputErrorCount(inWord: $0) }
+  }
+
+  private var missedChineseWordErrorCounts: [MissedWordErrorCount] {
     let targetCharacters = Array(prompt)
-    let typedCharacters = Array(typed)
     let tokens = StarterLexicon.simplifiedChineseWords.map {
       (text: $0, characters: Array($0))
     }.sorted { $0.characters.count > $1.characters.count }
-    var unique: [String] = []
+    var result: [MissedWordErrorCount] = []
     var index = 0
 
     while index < targetCharacters.count {
@@ -1434,22 +1454,22 @@ struct TypingSession {
       }
 
       let end = index + token.characters.count
-      let typedEnd = min(end, typedCharacters.count)
-      let hasFinalAttempt = typedCharacters.count > index
-      if hasFinalAttempt && !typedCharacters[index..<typedEnd].elementsEqual(token.characters)
-        || attemptedErrorIndices.contains(where: { index..<end ~= $0 }),
-        !unique.contains(token.text)
-      {
-        unique.append(token.text)
+      let count = attemptedInputErrorCount(in: index..<end)
+      if count > 0 {
+        if let existing = result.firstIndex(where: { $0.word == token.text }) {
+          result[existing] = .init(word: token.text, count: result[existing].count + count)
+        } else {
+          result.append(.init(word: token.text, count: count))
+        }
       }
       index = end
     }
-    return unique
+    return result
   }
 
   /// Per-word comparison for words actually attempted during a space-delimited test.
   var wordReviews: [TypedWordReview] {
-    guard (!typed.isEmpty || !attemptedErrorIndices.isEmpty), configuration.language.usesSpaceDelimitedWords,
+    guard (!typed.isEmpty || !attemptedErrorCounts.isEmpty), configuration.language.usesSpaceDelimitedWords,
       !configuration.modifiers.contains(.noSpaces)
     else { return [] }
     let targetWords = prompt.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
@@ -1613,7 +1633,7 @@ struct TypingSession {
     }
     let expected = Array(prompt)[typed.count]
     let isCorrect = character == expected && !forceError
-    if !isCorrect { attemptedErrorIndices.insert(typed.count) }
+    if !isCorrect { attemptedErrorCounts[typed.count, default: 0] += 1 }
     if character == " ", configuration.modifiers.contains(.correctBeforeAdvance),
       configuration.language.usesSpaceDelimitedWords, !configuration.modifiers.contains(.noSpaces),
       !currentWordIsCorrect
@@ -1790,24 +1810,40 @@ struct TypingSession {
   }
 
   private func hasAttemptedInputError(inWord word: Int) -> Bool {
-    hasError(inWord: word, indices: attemptedErrorIndices)
+    attemptedInputErrorCount(inWord: word) > 0
   }
 
   private func hasError(inWord word: Int, indices: Set<Int>) -> Bool {
-    guard word >= 0 else { return false }
+    guard let range = targetRange(forWord: word) else { return false }
+    return indices.contains(where: range.contains)
+  }
+
+  private func attemptedInputErrorCount(inWord word: Int) -> Int {
+    guard let range = targetRange(forWord: word) else { return 0 }
+    return attemptedInputErrorCount(in: range)
+  }
+
+  private func attemptedInputErrorCount(in range: Range<Int>) -> Int {
+    attemptedErrorCounts.reduce(into: 0) { total, error in
+      if range.contains(error.key) { total += error.value }
+    }
+  }
+
+  private func targetRange(forWord word: Int) -> Range<Int>? {
+    guard word >= 0 else { return nil }
     let targetCharacters = Array(prompt)
     var currentWord = 0
     var start = 0
     for index in targetCharacters.indices {
       if targetCharacters[index] == " " {
         if currentWord == word {
-          return indices.contains { start...index ~= $0 }
+          return start..<(index + 1)
         }
         currentWord += 1
         start = index + 1
       }
     }
-    return currentWord == word && indices.contains { start..<targetCharacters.count ~= $0 }
+    return currentWord == word ? start..<targetCharacters.count : nil
   }
 
   private func wpm(characters: Int, seconds: TimeInterval) -> Int {

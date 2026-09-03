@@ -500,6 +500,8 @@ private struct ContentView: View {
         let savesResult = settings.saveCompletedResults
         let wordReviews = session.wordReviews
         let wordBursts = session.wordBurstHistory
+        let missedWordPractice = MissedWordPracticePlan.make(
+          errorCounts: session.missedWordErrorCounts)
         let repeatedSession = session.repeatedAttempt()
         currentProcessPractice.append(.init(result: result))
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
@@ -508,11 +510,13 @@ private struct ContentView: View {
         completedResult = .init(
           result: result,
           savesResult: savesResult,
-          missedWords: session.missedWords,
+          missedWords: missedWordPractice?.selectedWords ?? [],
+          missedWordPracticeWords: missedWordPractice?.exerciseWords ?? [],
           wordReviews: wordReviews,
           wordBursts: wordBursts,
           slowWordPractice: SlowWordPracticePlan.make(reviews: wordReviews, bursts: wordBursts),
-          contextualMissedPractice: ContextualMissedWordPracticePlan.make(reviews: wordReviews),
+          contextualMissedPractice: ContextualMissedWordPracticePlan.make(
+            reviews: wordReviews, errorCounts: session.missedWordErrorCountsByWord),
           todayPractice: todayPracticeSummary,
           repeatedSession: repeatedSession,
           challengeEvaluation: TypebarChallengeLibrary.challenge(
@@ -605,6 +609,7 @@ private struct ContentView: View {
           showingHistory = true
         },
         missedWords: result.missedWords,
+        missedWordPracticeWords: result.missedWordPracticeWords,
         wordReviews: result.wordReviews,
         wordBursts: result.wordBursts,
         slowWordPractice: result.slowWordPractice,
@@ -616,7 +621,7 @@ private struct ContentView: View {
         },
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
-        onPracticeMissedWords: { startWordPractice(result.missedWords) },
+        onPracticeMissedWords: { startWordPractice(result.missedWordPracticeWords) },
         onPracticeContextualMissedWords: { startWordPractice($0) },
         onPracticeSlowWords: { startWordPractice($0) }
       )
@@ -1925,6 +1930,7 @@ private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
   let savesResult: Bool
   let missedWords: [String]
+  let missedWordPracticeWords: [String]
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
@@ -1952,6 +1958,7 @@ private struct CompletedResultView: View {
   let onRestart: () -> Void
   let onHistory: () -> Void
   let missedWords: [String]
+  let missedWordPracticeWords: [String]
   let wordReviews: [TypedWordReview]
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?

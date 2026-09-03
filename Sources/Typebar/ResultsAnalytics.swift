@@ -201,16 +201,42 @@ struct ContextualMissedWordPracticePlan: Equatable {
   let phrases: [String]
   let missedWordCount: Int
 
-  static func make(reviews: [TypedWordReview]) -> Self? {
-    let phrases = reviews.indices.compactMap { index -> String? in
-      guard !reviews[index].isCorrect else { return nil }
+  static func make(reviews: [TypedWordReview], errorCounts: [Int]) -> Self? {
+    let phrases = reviews.indices.flatMap { index -> [String] in
+      let count = errorCounts.indices.contains(index) ? errorCounts[index] : 0
+      guard count > 0 else { return [] }
       let target = reviews[index].target
-      guard !target.isEmpty else { return nil }
-      guard index > 0, !reviews[index - 1].target.isEmpty else { return target }
-      return "\(reviews[index - 1].target) \(target)"
+      guard !target.isEmpty else { return [] }
+      let phrase = index > 0 && !reviews[index - 1].target.isEmpty
+        ? "\(reviews[index - 1].target) \(target)" : target
+      return Array(repeating: phrase, count: count)
     }
     guard !phrases.isEmpty else { return nil }
     return .init(phrases: phrases, missedWordCount: phrases.count)
+  }
+}
+
+/// Selects a bounded set of locally observed error targets, then repeats each
+/// target by its actual error-event count. It intentionally accepts counts
+/// supplied by the input engine rather than deriving guesses from final text.
+struct MissedWordPracticePlan: Equatable {
+  let selectedWords: [String]
+  let exerciseWords: [String]
+
+  static let maximumSelectedWords = 20
+
+  static func make(errorCounts: [MissedWordErrorCount]) -> Self? {
+    let selected = errorCounts.enumerated()
+      .filter { $0.element.count > 0 && !$0.element.word.isEmpty }
+      .sorted { lhs, rhs in
+        lhs.element.count == rhs.element.count ? lhs.offset < rhs.offset : lhs.element.count > rhs.element.count
+      }
+      .prefix(maximumSelectedWords)
+      .map(\.element)
+    guard !selected.isEmpty else { return nil }
+    return .init(
+      selectedWords: selected.map(\.word),
+      exerciseWords: selected.flatMap { Array(repeating: $0.word, count: $0.count) })
   }
 }
 

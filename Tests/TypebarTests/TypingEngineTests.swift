@@ -370,6 +370,10 @@ final class TypingEngineTests: XCTestCase {
     partial.insert("amx", at: start)
     XCTAssertEqual(partial.missedWords, ["amber"])
 
+    var correctPartial = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor")
+    correctPartial.insert("am", at: start)
+    XCTAssertTrue(correctPartial.missedWords.isEmpty)
+
     var chinese = TypingSession(
       configuration: .timed(seconds: 30, language: .simplifiedChinese), prompt: "晨光窗边")
     chinese.insert("晨x", at: start)
@@ -423,6 +427,29 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertTrue(deletedChinese.typed.isEmpty)
     XCTAssertEqual(deletedChinese.missedWords, ["晨光"])
+
+    var repeated = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor")
+    repeated.insert("ax", at: start)
+    repeated.deleteBackward(at: start.addingTimeInterval(0.1))
+    repeated.insert("x", at: start.addingTimeInterval(0.2))
+
+    XCTAssertEqual(repeated.missedWordErrorCounts, [.init(word: "amber", count: 2)])
+    let weighted = MissedWordPracticePlan.make(errorCounts: repeated.missedWordErrorCounts)
+    XCTAssertEqual(weighted?.selectedWords, ["amber"])
+    XCTAssertEqual(weighted?.exerciseWords, ["amber", "amber"])
+
+    let ranked = MissedWordPracticePlan.make(errorCounts: [
+      .init(word: "harbor", count: 1),
+      .init(word: "amber", count: 3),
+      .init(word: "cabin", count: 2),
+    ])
+    XCTAssertEqual(ranked?.selectedWords, ["amber", "cabin", "harbor"])
+    XCTAssertEqual(ranked?.exerciseWords, ["amber", "amber", "amber", "cabin", "cabin", "harbor"])
+
+    let capped = MissedWordPracticePlan.make(errorCounts: (0...20).map {
+      .init(word: "word\($0)", count: 1)
+    })
+    XCTAssertEqual(capped?.selectedWords.count, MissedWordPracticePlan.maximumSelectedWords)
   }
 
   func testWordReviewsPairOnlyAttemptedWordsWithTheirTargetAndTypedValue() {
@@ -831,12 +858,13 @@ final class TypingEngineTests: XCTestCase {
           TypedWordReview(index: 1, target: "cabin", typed: "cab"),
           TypedWordReview(index: 2, target: "planet", typed: "planet"),
           TypedWordReview(index: 3, target: "willow", typed: "willox"),
-        ]))
-    XCTAssertEqual(plan.missedWordCount, 2)
-    XCTAssertEqual(plan.phrases, ["ember cabin", "planet willow"])
+        ],
+        errorCounts: [0, 2, 0, 1]))
+    XCTAssertEqual(plan.missedWordCount, 3)
+    XCTAssertEqual(plan.phrases, ["ember cabin", "ember cabin", "planet willow"])
     XCTAssertNil(
       ContextualMissedWordPracticePlan.make(
-        reviews: [TypedWordReview(index: 0, target: "ember", typed: "ember")]))
+        reviews: [TypedWordReview(index: 0, target: "ember", typed: "ember")], errorCounts: [0]))
   }
 
   func testTodayPracticeSummaryMergesSavedAndCurrentProcessWithoutDoubleCounting() {
