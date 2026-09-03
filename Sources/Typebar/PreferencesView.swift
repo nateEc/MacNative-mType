@@ -423,12 +423,20 @@ struct PreferencesView: View {
           Text("仅在无计时的词、引语和自定义测试中生效：关闭时长提示保留在可滚动练习区；开启后可展开完整高度。卷带模式不支持此选项。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Picker("平滑光标", selection: $settings.smoothCaretMotion) {
+            ForEach(SmoothCaretMotion.allCases) { motion in
+              Text(motion.displayName).tag(motion)
+            }
+          }
+          Text("以独立原生测量层在字符间移动光标；关闭时位置立即更新。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Picker("光标样式", selection: $settings.caretStyle) {
             ForEach(TypingCaretStyle.allCases) { style in
               Text(style.displayName).tag(style)
             }
           }
-          Text("关闭不绘制标记；条形和下划线保留当前目标字符，块状会高亮当前目标字符。")
+          Text("支持条形、轮廓、下划线、块状和三种原创图形标记；关闭不绘制标记。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("错误字符显示", selection: $settings.typoIndicatorStyle) {
@@ -1057,7 +1065,7 @@ struct PreferencesView: View {
   private var displaySectionVisible: Bool {
     matches(
       "显示", "主题", "theme", "随机", "random", "系统", "system", "翻转", "flip", "彩色", "colorful", "颜色", "背景", "图片", "image", "url", "模糊", "blur", "亮度", "brightness", "饱和度", "saturation", "不透明度", "opacity", "伙伴", "companion", "手部", "hand", "字体", "font", "等宽", "圆角", "衬线", "行宽",
-      "width", "光标", "caret", "关闭", "条形", "下划线", "块状", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
+      "width", "光标", "caret", "平滑", "smooth", "关闭", "条形", "轮廓", "outline", "下划线", "块状", "胡萝卜", "香蕉", "小猴", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
       "keyboard", "布局", "layout", "下一键")
   }
 

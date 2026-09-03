@@ -1236,7 +1236,8 @@ private struct ContentView: View {
   }
 
   private var practicePrompt: some View {
-    Group {
+    let rendering = renderedPrompt
+    return Group {
       if practiceVisualEffect.usesASL {
         ASLPracticePrompt(
           glyphs: session.promptGlyphs, fontSize: settings.fontSize, accent: activeTheme.accent)
@@ -1248,15 +1249,30 @@ private struct ContentView: View {
           isEnabled: true, reducesMotion: settings.reducePracticeMotion)
       } else if usesTapePractice {
         TapePracticePrompt(
-          prompt: renderedPrompt, typed: session.typed, mode: settings.practiceTapeMode,
+          prompt: rendering.text, typed: session.typed, mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
           font: settings.practiceFont.font(size: settings.fontSize),
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll)
       } else {
-        Text(renderedPrompt)
+        Text(rendering.text)
           .lineSpacing(12)
           .textSelection(.disabled)
           .foregroundStyle(.secondary)
+          .overlay(alignment: .topLeading) {
+            if usesNativeCaretOverlay {
+              PromptCaretOverlay(
+                text: rendering.text,
+                mainCharacterOffset: settings.caretStyle.drawsMarker
+                  ? rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex) : nil,
+                mainStyle: settings.caretStyle,
+                paceCharacterOffset: paceCaretCharacterOffset(in: rendering),
+                paceStyle: settings.paceCaretStyle,
+                font: settings.practiceFont.nsFont(size: settings.fontSize),
+                lineSpacing: 12,
+                accent: activeTheme.accent,
+                motion: settings.smoothCaretMotion)
+            }
+          }
       }
     }
     .font(settings.practiceFont.font(size: settings.fontSize))
@@ -1317,6 +1333,25 @@ private struct ContentView: View {
     return promptHighlightAllowsWordRanges ? settings.promptHighlightMode : .letter
   }
 
+  private var currentPromptGlyphIndex: Int? {
+    session.promptGlyphs.firstIndex { $0.state == .current }
+  }
+
+  private var usesNativeCaretOverlay: Bool {
+    guard settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker else { return false }
+    guard !usesTapePractice, !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo else {
+      return false
+    }
+    return !session.configuration.modifiers.contains(.listening)
+  }
+
+  private func paceCaretCharacterOffset(in rendering: PromptRendering) -> Int? {
+    guard settings.paceCaretStyle.drawsMarker, paceGuideIndex != currentPromptGlyphIndex else {
+      return nil
+    }
+    return rendering.characterOffset(forGlyphAt: paceGuideIndex)
+  }
+
   private var highlightedPromptIndices: Set<Int> {
     let currentIndex = session.promptGlyphs.firstIndex { $0.state == .current }
     return PromptHighlightPolicy.highlightedIndices(
@@ -1324,12 +1359,14 @@ private struct ContentView: View {
       allowsWordRanges: promptHighlightAllowsWordRanges)
   }
 
-  private var renderedPrompt: AttributedString {
+  private var renderedPrompt: PromptRendering {
     var output = AttributedString()
+    var glyphCharacterOffsets: [Int: Int] = [:]
     let completedCharacterIndices = session.completedPromptCharacterIndices
     let promptHighlightMode = effectivePromptHighlightMode
     let highlightedIndices = highlightedPromptIndices
     for (index, glyph) in session.promptGlyphs.enumerated() {
+      glyphCharacterOffsets[index] = output.characters.count
       let replacesTypo = glyph.state == .incorrect && settings.typoIndicatorStyle.replacesTarget
       let turnsIntoDot = completedCharacterIndices.contains(index)
         && settings.typedCharacterEffect == .dots
@@ -1359,7 +1396,7 @@ private struct ContentView: View {
       {
         applyWordHighlight(to: &character)
       }
-      if index == paceGuideIndex, glyph.state != .current {
+      if !usesNativeCaretOverlay, index == paceGuideIndex, glyph.state != .current {
         applyPaceCaret(to: &character)
       }
       switch glyph.state {
@@ -1380,7 +1417,7 @@ private struct ContentView: View {
         character.foregroundColor = .red
         character.backgroundColor = .red.opacity(0.16)
       case .current:
-        if promptHighlightMode == .off || !settings.caretStyle.drawsMarker {
+        if promptHighlightMode == .off || !settings.caretStyle.drawsMarker || usesNativeCaretOverlay {
           character.foregroundColor = futurePromptColor
         } else {
           applyCaret(to: &character)
@@ -1411,7 +1448,7 @@ private struct ContentView: View {
         output += hint
       }
     }
-    return output
+    return PromptRendering(text: output, glyphCharacterOffsets: glyphCharacterOffsets)
   }
 
   private var completedPromptColor: Color {
@@ -1452,11 +1489,15 @@ private struct ContentView: View {
     case .bar:
       character.foregroundColor = activeTheme.accent
       character.underlineStyle = .single
+    case .outline:
+      character.backgroundColor = activeTheme.accent.opacity(0.14)
     case .underline:
       character.underlineStyle = .single
       character.backgroundColor = activeTheme.accent.opacity(0.12)
     case .block:
       character.backgroundColor = activeTheme.accent.opacity(0.55)
+    case .carrot, .banana, .monkey:
+      character.foregroundColor = activeTheme.accent
     }
   }
 
@@ -1471,10 +1512,14 @@ private struct ContentView: View {
     case .bar:
       character.backgroundColor = activeTheme.accent.opacity(0.16)
       character.underlineStyle = .single
+    case .outline:
+      character.backgroundColor = activeTheme.accent.opacity(0.12)
     case .underline:
       character.underlineStyle = .single
     case .block:
       character.backgroundColor = activeTheme.accent.opacity(0.34)
+    case .carrot, .banana, .monkey:
+      character.foregroundColor = activeTheme.accent.opacity(0.72)
     }
   }
 

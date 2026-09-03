@@ -57,8 +57,12 @@ enum PracticeTapeMode: String, CaseIterable, Codable, Equatable, Identifiable {
 enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
   case off
   case bar
+  case outline
   case underline
   case block
+  case carrot
+  case banana
+  case monkey
 
   var id: Self { self }
 
@@ -66,8 +70,12 @@ enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
     switch self {
     case .off: "关闭"
     case .bar: "条形"
+    case .outline: "轮廓"
     case .underline: "下划线"
     case .block: "块状"
+    case .carrot: "胡萝卜"
+    case .banana: "香蕉"
+    case .monkey: "小猴"
     }
   }
 
@@ -505,6 +513,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var practiceTapeMargin: Double = 0.5
   var smoothPracticeLineScroll = true
   var showAllPracticeLines = false
+  var smoothCaretMotion: SmoothCaretMotion = .medium
   var caretStyle: TypingCaretStyle = .block
   var typoIndicatorStyle: TypoIndicatorStyle = .off
   var compositionDisplayStyle: CompositionDisplayStyle = .replace
@@ -598,6 +607,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     practiceTapeMargin: Double = 0.5,
     smoothPracticeLineScroll: Bool = true,
     showAllPracticeLines: Bool = false,
+    smoothCaretMotion: SmoothCaretMotion = .medium,
     caretStyle: TypingCaretStyle = .block,
     typoIndicatorStyle: TypoIndicatorStyle = .off,
     compositionDisplayStyle: CompositionDisplayStyle = .replace,
@@ -697,6 +707,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.practiceTapeMargin = practiceTapeMargin.clamped(to: 0...1)
     self.smoothPracticeLineScroll = smoothPracticeLineScroll
     self.showAllPracticeLines = showAllPracticeLines
+    self.smoothCaretMotion = smoothCaretMotion
     self.caretStyle = caretStyle
     self.typoIndicatorStyle = typoIndicatorStyle
     self.compositionDisplayStyle = compositionDisplayStyle
@@ -744,7 +755,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
-      smoothPracticeLineScroll, showAllPracticeLines, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
+      smoothPracticeLineScroll, showAllPracticeLines, smoothCaretMotion, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
       alwaysShowDecimalPlaces, alwaysShowWordsHistory, showWordBurstHeatmap, resultPerformanceVisibility,
       startGraphsAtZero, showAverage, showPersonalBest,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
@@ -861,6 +872,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(Bool.self, forKey: .smoothPracticeLineScroll) ?? true
     showAllPracticeLines =
       try values.decodeIfPresent(Bool.self, forKey: .showAllPracticeLines) ?? false
+    smoothCaretMotion =
+      try values.decodeIfPresent(SmoothCaretMotion.self, forKey: .smoothCaretMotion) ?? .medium
     caretStyle = try values.decodeIfPresent(TypingCaretStyle.self, forKey: .caretStyle) ?? .block
     typoIndicatorStyle = try values.decodeIfPresent(TypoIndicatorStyle.self, forKey: .typoIndicatorStyle) ?? .off
     compositionDisplayStyle =
@@ -1147,6 +1160,7 @@ final class AppSettings {
   var practiceTapeMargin: Double = 0.5 { didSet { persist() } }
   var smoothPracticeLineScroll = true { didSet { persist() } }
   var showAllPracticeLines = false { didSet { persist() } }
+  var smoothCaretMotion: SmoothCaretMotion = .medium { didSet { persist() } }
   var caretStyle: TypingCaretStyle = .block { didSet { persist() } }
   var typoIndicatorStyle: TypoIndicatorStyle = .off { didSet { persist() } }
   var compositionDisplayStyle: CompositionDisplayStyle = .replace { didSet { persist() } }
@@ -1249,6 +1263,7 @@ final class AppSettings {
     practiceTapeMargin = snapshot.practiceTapeMargin
     smoothPracticeLineScroll = snapshot.smoothPracticeLineScroll
     showAllPracticeLines = snapshot.showAllPracticeLines
+    smoothCaretMotion = snapshot.smoothCaretMotion
     caretStyle = snapshot.caretStyle
     typoIndicatorStyle = snapshot.typoIndicatorStyle
     compositionDisplayStyle = snapshot.compositionDisplayStyle
@@ -1348,6 +1363,7 @@ final class AppSettings {
       practiceTapeMode: practiceTapeMode, practiceTapeMargin: practiceTapeMargin,
       smoothPracticeLineScroll: smoothPracticeLineScroll,
       showAllPracticeLines: showAllPracticeLines,
+      smoothCaretMotion: smoothCaretMotion,
       caretStyle: caretStyle, typoIndicatorStyle: typoIndicatorStyle,
       compositionDisplayStyle: compositionDisplayStyle, typingSpeedUnit: typingSpeedUnit,
       alwaysShowDecimalPlaces: alwaysShowDecimalPlaces,
@@ -1430,6 +1446,7 @@ final class AppSettings {
     practiceTapeMargin = 0.5
     smoothPracticeLineScroll = true
     showAllPracticeLines = false
+    smoothCaretMotion = .medium
     caretStyle = .block
     typoIndicatorStyle = .off
     compositionDisplayStyle = .replace
@@ -1559,6 +1576,7 @@ final class AppSettings {
     minimumWordBurstMode = snapshot.minimumWordBurstMode
     practiceLineWidth = snapshot.practiceLineWidth
     customPracticeLineColumns = snapshot.customPracticeLineColumns
+    smoothCaretMotion = snapshot.smoothCaretMotion
     caretStyle = snapshot.caretStyle
     typoIndicatorStyle = snapshot.typoIndicatorStyle
     compositionDisplayStyle = snapshot.compositionDisplayStyle
@@ -1794,6 +1812,7 @@ final class AppSettings {
       practiceTapeMargin: practiceTapeMargin,
       smoothPracticeLineScroll: smoothPracticeLineScroll,
       showAllPracticeLines: showAllPracticeLines,
+      smoothCaretMotion: smoothCaretMotion,
       caretStyle: caretStyle,
       typoIndicatorStyle: typoIndicatorStyle,
       compositionDisplayStyle: compositionDisplayStyle,

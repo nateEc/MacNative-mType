@@ -1598,6 +1598,47 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 250), 1)
   }
 
+  func testIndependentCaretLayoutTracksGlyphsWrapsAndMotionSettings() throws {
+    let text = AttributedString("amber harbor willow")
+    let font = PracticeFont.monospaced.nsFont(size: 28)
+    let first = try XCTUnwrap(
+      PromptCaretLayout.rect(
+        in: text, characterOffset: 0, containerSize: .init(width: 360, height: 200),
+        font: font, lineSpacing: 12))
+    let secondWord = try XCTUnwrap(
+      PromptCaretLayout.rect(
+        in: text, characterOffset: 6, containerSize: .init(width: 360, height: 200),
+        font: font, lineSpacing: 12))
+    let wrapped = try XCTUnwrap(
+      PromptCaretLayout.rect(
+        in: text, characterOffset: 13, containerSize: .init(width: 90, height: 200),
+        font: font, lineSpacing: 12))
+    let wrappedBoundary = try XCTUnwrap(
+      PromptCaretLayout.rect(
+        in: text, characterOffset: 12, containerSize: .init(width: 90, height: 200),
+        font: font, lineSpacing: 12))
+
+    XCTAssertGreaterThan(secondWord.minX, first.minX)
+    XCTAssertGreaterThan(wrapped.minY, first.minY)
+    XCTAssertEqual(wrappedBoundary.minY, wrapped.minY)
+    XCTAssertNil(
+      PromptCaretLayout.rect(
+        in: text, characterOffset: 100, containerSize: .init(width: 360, height: 200),
+        font: font, lineSpacing: 12))
+    XCTAssertEqual(SmoothCaretMotion.off.duration, nil)
+    XCTAssertEqual(try XCTUnwrap(SmoothCaretMotion.slow.duration), 0.15, accuracy: 0.0001)
+    XCTAssertEqual(try XCTUnwrap(SmoothCaretMotion.medium.duration), 0.10, accuracy: 0.0001)
+    XCTAssertEqual(try XCTUnwrap(SmoothCaretMotion.fast.duration), 0.085, accuracy: 0.0001)
+    XCTAssertFalse(TypingCaretStyle.bar.usesFullGlyphWidth)
+    XCTAssertTrue(TypingCaretStyle.outline.usesFullGlyphWidth)
+    XCTAssertTrue(TypingCaretStyle.underline.usesFullGlyphWidth)
+    XCTAssertTrue(TypingCaretStyle.block.usesFullGlyphWidth)
+    XCTAssertTrue(TypingCaretStyle.allCases.contains(.outline))
+    XCTAssertTrue(TypingCaretStyle.allCases.contains(.carrot))
+    XCTAssertTrue(TypingCaretStyle.allCases.contains(.banana))
+    XCTAssertTrue(TypingCaretStyle.allCases.contains(.monkey))
+  }
+
   func testSettingsSearchMatchesEveryWhitespaceSeparatedTokenAcrossLocalizedTerms() {
     XCTAssertTrue(
       SettingsSearch.matches(query: "KEYBOARD layout", terms: ["键盘布局", "Keyboard Layout", "下一键"]))
@@ -3522,7 +3563,8 @@ final class TypingEngineTests: XCTestCase {
     settings.practiceTapeMargin = 0.35
     settings.smoothPracticeLineScroll = false
     settings.showAllPracticeLines = true
-    settings.caretStyle = .off
+    settings.smoothCaretMotion = .fast
+    settings.caretStyle = .monkey
     settings.typoIndicatorStyle = .both
     settings.compositionDisplayStyle = .below
     settings.typingSpeedUnit = .cps
@@ -3590,6 +3632,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.clickSoundStyle, .morse)
     XCTAssertEqual(exportedSnapshot.errorSoundStyle, .submarine)
     XCTAssertEqual(exportedSnapshot.timeWarningSoundStyle, .frog)
+    XCTAssertEqual(exportedSnapshot.smoothCaretMotion, .fast)
 
     let restored = AppSettings(defaults: defaults)
     XCTAssertEqual(restored.difficulty, .master)
@@ -3637,7 +3680,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.practiceTapeMargin, 0.35)
     XCTAssertFalse(restored.smoothPracticeLineScroll)
     XCTAssertTrue(restored.showAllPracticeLines)
-    XCTAssertEqual(restored.caretStyle, .off)
+    XCTAssertEqual(restored.smoothCaretMotion, .fast)
+    XCTAssertEqual(restored.caretStyle, .monkey)
     XCTAssertEqual(restored.typoIndicatorStyle, .both)
     XCTAssertEqual(restored.compositionDisplayStyle, .below)
     XCTAssertEqual(restored.typingSpeedUnit, .cps)
@@ -3786,6 +3830,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.minimumWordBurstWpm, 0)
     XCTAssertEqual(snapshot.practiceLineWidth, .standard)
     XCTAssertEqual(snapshot.customPracticeLineColumns, 60)
+    XCTAssertEqual(snapshot.smoothCaretMotion, .medium)
     XCTAssertEqual(snapshot.caretStyle, .block)
     XCTAssertEqual(snapshot.typoIndicatorStyle, .off)
     XCTAssertEqual(snapshot.typingSpeedUnit, .wpm)
