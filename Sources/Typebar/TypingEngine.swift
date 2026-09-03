@@ -14,6 +14,19 @@ private func splitPromptWords(
     whereSeparator: isPromptWordSeparator)
 }
 
+private enum InputCharacterEquivalence {
+  static let sets: [Set<Character>] = [
+    ["’", "‘", "'", "ʼ", "׳", "ʻ", "᾽"],
+    ["\"", "”", "“", "„"],
+    ["–", "—", "-", "‐", "‑"],
+    [",", "‚"],
+  ]
+
+  static func matches(_ first: Character, _ second: Character) -> Bool {
+    first == second || sets.contains { $0.contains(first) && $0.contains(second) }
+  }
+}
+
 enum TestMode: String, CaseIterable, Codable {
   case time
   case words
@@ -1914,9 +1927,11 @@ struct TypingSession {
     if character == "\n", !configuration.language.isCodeLanguage, !prompt.contains("\n") {
       return false
     }
-    let inputCharacter = normalizedInputCharacter(character)
     extendPromptIfNeeded()
     let currentTargetIndex = nextTargetIndex
+    let inputCharacter = normalizedInputCharacter(
+      character,
+      expected: currentTargetIndex < prompt.count ? Array(prompt)[currentTargetIndex] : nil)
     let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !inputWordIsEmpty
     if let inputLimit = currentSpaceDelimitedWordInputLimit,
       activeInputWordLength >= inputLimit, !commitsCurrentWord
@@ -2226,8 +2241,19 @@ struct TypingSession {
     ].contains(character)
   }
 
-  private func normalizedInputCharacter(_ character: Character) -> Character {
-    isReferenceInputSpace(character) ? " " : character
+  private func normalizedInputCharacter(_ character: Character, expected: Character?) -> Character {
+    guard let expected else {
+      return isReferenceInputSpace(character) ? " " : character
+    }
+    if (character == " " || expected == " ")
+      && isReferenceInputSpace(character) && isReferenceInputSpace(expected)
+    {
+      return expected
+    }
+    if InputCharacterEquivalence.matches(character, expected) {
+      return expected
+    }
+    return isReferenceInputSpace(character) ? " " : character
   }
 
   private var shouldRejectLeadingSeparator: Bool {

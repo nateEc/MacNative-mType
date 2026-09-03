@@ -280,6 +280,20 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.completedWordCount, 2)
   }
 
+  func testVisuallyEquivalentPunctuationNormalizesToThePromptCharacter() {
+    let target = "“don’t”—go, now"
+    var session = TypingSession(
+      configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      prompt: target)
+
+    session.insert("\"don't\"-go‚ now", at: start)
+
+    XCTAssertEqual(session.typed, target)
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertEqual(session.outcome, .completed)
+  }
+
   func testNormalSpaceCompletesAnIncompleteFiniteFinalWord() {
     var session = TypingSession(
       configuration: .init(
