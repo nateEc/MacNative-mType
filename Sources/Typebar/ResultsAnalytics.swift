@@ -287,6 +287,29 @@ struct MissedAndSlowWordPracticePlan: Equatable {
   }
 }
 
+/// The contextual counterpart keeps the immediately preceding attempted word
+/// attached to every missed target before it is combined with slow words.
+struct ContextualMissedAndSlowWordPracticePlan: Equatable {
+  let exerciseSegments: [String]
+  let selectedTargetCount: Int
+
+  static let maximumSlowWords = 10
+
+  static func make(
+    contextual: ContextualMissedWordPracticePlan?, slow: SlowWordPracticePlan?
+  ) -> Self? {
+    guard let contextual, let slow else { return nil }
+    let selectedSlow = Array(slow.selectedWords.prefix(maximumSlowWords))
+    guard contextual.selectedTargetCount > 0, !selectedSlow.isEmpty else { return nil }
+    let slowSegments = selectedSlow.enumerated().flatMap { index, word in
+      Array(repeating: word, count: selectedSlow.count - index)
+    }
+    return .init(
+      exerciseSegments: contextual.phrases + slowSegments,
+      selectedTargetCount: contextual.selectedTargetCount + selectedSlow.count)
+  }
+}
+
 enum WordPracticeText {
   static func make(words: [String], language: TypingLanguage) -> String {
     words.joined(separator: language.usesSpaceDelimitedWords ? " " : "")

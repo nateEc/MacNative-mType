@@ -503,6 +503,8 @@ private struct ContentView: View {
         let wordBursts = session.wordBurstHistory
         let missedWordPractice = MissedWordPracticePlan.make(errorCounts: session.missedWordErrorCounts)
         let slowWordPractice = SlowWordPracticePlan.make(reviews: wordReviews, bursts: wordBursts)
+        let contextualMissedPractice = ContextualMissedWordPracticePlan.make(
+          reviews: wordReviews, errorCounts: session.missedWordErrorCountsByWord)
         let repeatedSession = session.repeatedAttempt()
         currentProcessPractice.append(.init(result: result))
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
@@ -518,8 +520,9 @@ private struct ContentView: View {
           slowWordPractice: slowWordPractice,
           missedAndSlowPractice: MissedAndSlowWordPracticePlan.make(
             missed: missedWordPractice, slow: slowWordPractice),
-          contextualMissedPractice: ContextualMissedWordPracticePlan.make(
-            reviews: wordReviews, errorCounts: session.missedWordErrorCountsByWord),
+          contextualMissedAndSlowPractice: ContextualMissedAndSlowWordPracticePlan.make(
+            contextual: contextualMissedPractice, slow: slowWordPractice),
+          contextualMissedPractice: contextualMissedPractice,
           todayPractice: todayPracticeSummary,
           repeatedSession: repeatedSession,
           challengeEvaluation: TypebarChallengeLibrary.challenge(
@@ -630,6 +633,7 @@ private struct ContentView: View {
         wordBursts: result.wordBursts,
         slowWordPractice: result.slowWordPractice,
         missedAndSlowPractice: result.missedAndSlowPractice,
+        contextualMissedAndSlowPractice: result.contextualMissedAndSlowPractice,
         contextualMissedPractice: result.contextualMissedPractice,
         todayPractice: result.todayPractice,
         onRepeat: {
@@ -649,6 +653,9 @@ private struct ContentView: View {
           startWordPractice(words, selectedTargetCount: selectedTargetCount)
         },
         onPracticeMissedAndSlowWords: { words, selectedTargetCount in
+          startWordPractice(words, selectedTargetCount: selectedTargetCount)
+        },
+        onPracticeContextualMissedAndSlowWords: { words, selectedTargetCount in
           startWordPractice(words, selectedTargetCount: selectedTargetCount)
         }
       )
@@ -1974,6 +1981,7 @@ private struct CompletedResultPresentation: Identifiable {
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
   let missedAndSlowPractice: MissedAndSlowWordPracticePlan?
+  let contextualMissedAndSlowPractice: ContextualMissedAndSlowWordPracticePlan?
   let contextualMissedPractice: ContextualMissedWordPracticePlan?
   let todayPractice: TodayPracticeSummary
   let repeatedSession: TypingSession
@@ -2003,6 +2011,7 @@ private struct CompletedResultView: View {
   let wordBursts: [Int?]
   let slowWordPractice: SlowWordPracticePlan?
   let missedAndSlowPractice: MissedAndSlowWordPracticePlan?
+  let contextualMissedAndSlowPractice: ContextualMissedAndSlowWordPracticePlan?
   let contextualMissedPractice: ContextualMissedWordPracticePlan?
   let todayPractice: TodayPracticeSummary
   let onRepeat: () -> Void
@@ -2012,6 +2021,7 @@ private struct CompletedResultView: View {
   let onPracticeContextualMissedWords: ([String], Int) -> Void
   let onPracticeSlowWords: ([String], Int) -> Void
   let onPracticeMissedAndSlowWords: ([String], Int) -> Void
+  let onPracticeContextualMissedAndSlowWords: ([String], Int) -> Void
   @State private var exportStatus: String?
 
   var body: some View {
@@ -2124,6 +2134,13 @@ private struct CompletedResultView: View {
                     onPracticeMissedAndSlowWords(
                       missedAndSlowPractice.exerciseWords,
                       missedAndSlowPractice.selectedTargetCount)
+                  }
+                }
+                if let contextualMissedAndSlowPractice {
+                  Button("上下文错词 + 慢词（\(contextualMissedAndSlowPractice.selectedTargetCount)）") {
+                    onPracticeContextualMissedAndSlowWords(
+                      contextualMissedAndSlowPractice.exerciseSegments,
+                      contextualMissedAndSlowPractice.selectedTargetCount)
                   }
                 }
                 Divider()

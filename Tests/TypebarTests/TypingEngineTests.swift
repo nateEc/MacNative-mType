@@ -900,6 +900,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(noSlow)
   }
 
+  func testContextualMissedAndSlowPracticePreservesPhrasesAndWeightsSlowWords() throws {
+    let contextual = ContextualMissedWordPracticePlan(
+      phrases: ["amber cabin", "amber cabin"], missedWordCount: 2, selectedTargetCount: 1)
+    let slow = SlowWordPracticePlan(selectedWords: ["planet", "willow"], exerciseWords: [])
+    let plan = try XCTUnwrap(
+      ContextualMissedAndSlowWordPracticePlan.make(contextual: contextual, slow: slow))
+    XCTAssertEqual(plan.selectedTargetCount, 3)
+    XCTAssertEqual(
+      plan.exerciseSegments,
+      ["amber cabin", "amber cabin", "planet", "planet", "willow"])
+  }
+
   func testTodayPracticeSummaryMergesSavedAndCurrentProcessWithoutDoubleCounting() {
     let calendar = Calendar(identifier: .gregorian)
     let today = Date(timeIntervalSince1970: 1_728_000_000)
