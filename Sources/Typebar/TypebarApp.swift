@@ -444,7 +444,6 @@ private struct ContentView: View {
   @State private var repeatedPaceArmed = false
   @State private var activePaceTargetWpm: Int?
   @State private var compositionText = ""
-  private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
   var body: some View {
     VStack(spacing: 30) {
@@ -488,18 +487,7 @@ private struct ContentView: View {
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
-    .onReceive(timer) { now in
-      capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
-      session.tick(at: now)
-      let remaining = session.remainingSeconds(at: now)
-      if TimeWarningPolicy.shouldPlay(
-        remainingSeconds: remaining, previousSecond: lastTimeWarningSecond,
-        offset: settings.timeWarningOffset)
-      {
-        TypingFeedbackSound.shared.playError(volume: settings.soundVolume)
-      }
-      lastTimeWarningSecond = remaining
-    }
+    .task { await runClock() }
     .onAppear {
       reset()
     }
@@ -640,6 +628,27 @@ private struct ContentView: View {
         dismissButton: .default(Text("重新开始"), action: { reset() })
       )
     }
+  }
+
+  private func runClock() async {
+    while !Task.isCancelled {
+      try? await Task.sleep(nanoseconds: 100_000_000)
+      guard !Task.isCancelled else { return }
+      advanceClock(at: .now)
+    }
+  }
+
+  private func advanceClock(at now: Date) {
+    capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
+    session.tick(at: now)
+    let remaining = session.remainingSeconds(at: now)
+    if TimeWarningPolicy.shouldPlay(
+      remainingSeconds: remaining, previousSecond: lastTimeWarningSecond,
+      offset: settings.timeWarningOffset)
+    {
+      TypingFeedbackSound.shared.playError(volume: settings.soundVolume)
+    }
+    lastTimeWarningSecond = remaining
   }
 
   private var header: some View {
