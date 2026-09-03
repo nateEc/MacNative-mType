@@ -1841,8 +1841,10 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testNativeInputBridgeOnlySendsReturnWhenThePromptAcceptsNewlines() throws {
     var accepted = [String]()
+    var restarts = 0
     let view = TypingInputView()
     view.onInsert = { text, _ in accepted.append(text) }
+    view.onRestart = { restarts += 1 }
     let enter = try XCTUnwrap(
       NSEvent.keyEvent(
         with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
@@ -1858,6 +1860,17 @@ final class TypingEngineTests: XCTestCase {
     view.acceptsNewlineInput = false
     view.keyDown(with: enter)
     XCTAssertTrue(accepted.isEmpty)
+    XCTAssertEqual(restarts, 1)
+
+    let shiftEnterRestart = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false,
+        keyCode: 36))
+    view.acceptsNewlineInput = true
+    view.keyDown(with: shiftEnterRestart)
+    XCTAssertEqual(restarts, 2)
+    XCTAssertTrue(accepted.isEmpty)
 
     let shiftEnter = try XCTUnwrap(
       NSEvent.keyEvent(
@@ -1871,6 +1884,35 @@ final class TypingEngineTests: XCTestCase {
     view.keyDown(with: shiftEnter)
     XCTAssertEqual(zenFinishes, 1)
     XCTAssertTrue(accepted.isEmpty)
+  }
+
+  @MainActor
+  func testNativeInputBridgeReservesShiftTabForRestartWhenThePromptNeedsTabs() throws {
+    var accepted = [String]()
+    var restarts = 0
+    let view = TypingInputView()
+    view.quickRestartKey = .tab
+    view.acceptsTabInput = true
+    view.onInsert = { text, _ in accepted.append(text) }
+    view.onRestart = { restarts += 1 }
+    let tab = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false,
+        keyCode: 48))
+    let shiftTab = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false,
+        keyCode: 48))
+
+    view.keyDown(with: tab)
+    XCTAssertEqual(accepted, ["\t"])
+    XCTAssertEqual(restarts, 0)
+
+    view.keyDown(with: shiftTab)
+    XCTAssertEqual(restarts, 1)
+    XCTAssertEqual(accepted, ["\t"])
   }
 
   func testZipfFrequencyModifierUsesRankWeightedTypebarLexicon() {

@@ -116,7 +116,19 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
                 onFinishZen()
                 return
             }
+            if quickRestartKey == .enter, event.modifierFlags.contains(.shift) {
+                onRestart()
+                return
+            }
             onInsert("\n", false)
+            return
+        }
+        if acceptsTabInput, event.charactersIgnoringModifiers == "\t" {
+            if quickRestartKey == .tab, event.modifierFlags.contains(.shift) {
+                onRestart()
+                return
+            }
+            onInsert("\t", false)
             return
         }
         if quickRestartKey.matches(charactersIgnoringModifiers: event.charactersIgnoringModifiers) {
