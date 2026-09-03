@@ -3804,6 +3804,37 @@ final class TypingEngineTests: XCTestCase {
       legacy.matchingIDs(entries: entries, personalBestIDs: []), [review.id, both.id])
   }
 
+  func testResultHistoryPersonalBestFilterSupportsAllStatesAndLegacyBooleanPresets() throws {
+    let personalBest = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: [])
+    let ordinary = ResultHistoryEntry(id: UUID(), mode: .words, language: .english, tags: [])
+    let entries = [personalBest, ordinary]
+    let personalBestIDs: Set<UUID> = [personalBest.id]
+
+    XCTAssertEqual(
+      ResultHistoryFilter(personalBestFilter: .only).matchingIDs(
+        entries: entries, personalBestIDs: personalBestIDs),
+      [personalBest.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter(personalBestFilter: .excluded).matchingIDs(
+        entries: entries, personalBestIDs: personalBestIDs),
+      [ordinary.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter(personalBestFilter: .all).matchingIDs(
+        entries: entries, personalBestIDs: personalBestIDs),
+      Set(entries.map(\.id))
+    )
+    XCTAssertTrue(
+      ResultHistoryFilter(personalBestFilter: .noMatches).matchingIDs(
+        entries: entries, personalBestIDs: personalBestIDs).isEmpty)
+
+    let legacy = try JSONDecoder().decode(
+      ResultHistoryFilter.self, from: Data(#"{"personalBestOnly":true}"#.utf8))
+    XCTAssertNil(legacy.personalBestFilter)
+    XCTAssertEqual(legacy.effectivePersonalBestFilter, .only)
+  }
+
   func testResultHistoryDateRangesUseReferenceRollingWindowsAndPreserveLegacyPresets() throws {
     let now = Date(timeIntervalSinceReferenceDate: 1_000_000)
     let onBoundary = UUID()
@@ -4615,7 +4646,7 @@ final class TypingEngineTests: XCTestCase {
     let filter = ResultHistoryFilter(
       mode: .quote, language: .english,
       tagFilter: .init(isUnrestricted: false, includesNoTags: true, tags: ["focus", "review"]),
-      personalBestOnly: true,
+      personalBestFilter: .excluded,
       difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
       quoteLength: .medium, timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom],
       modifierFilter: .init(includesNoModifiers: false, modifiers: [.crtVisual, .binaryStream]))

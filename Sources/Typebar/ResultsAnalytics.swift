@@ -904,6 +904,31 @@ enum ResultHistoryBinaryFilter: String, CaseIterable, Codable, Equatable {
     }
 }
 
+enum ResultHistoryPersonalBestFilter: String, CaseIterable, Codable, Equatable {
+    case all
+    case only
+    case excluded
+    case noMatches
+
+    var displayName: String {
+        switch self {
+        case .all: "全部"
+        case .only: "仅个人最佳"
+        case .excluded: "排除个人最佳"
+        case .noMatches: "无匹配项"
+        }
+    }
+
+    func matches(id: UUID, personalBestIDs: Set<UUID>) -> Bool {
+        switch self {
+        case .all: true
+        case .only: personalBestIDs.contains(id)
+        case .excluded: !personalBestIDs.contains(id)
+        case .noMatches: false
+        }
+    }
+}
+
 enum ResultHistoryTimeLimit: String, CaseIterable, Codable, Hashable {
     case seconds15 = "15"
     case seconds30 = "30"
@@ -1069,6 +1094,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     var tagFilter: ResultHistoryTagFilter?
     var difficulty: Difficulty?
     var personalBestOnly: Bool
+    var personalBestFilter: ResultHistoryPersonalBestFilter?
     var dateRange: ResultHistoryDateRange
     var punctuation: ResultHistoryBinaryFilter
     var numbers: ResultHistoryBinaryFilter
@@ -1081,7 +1107,9 @@ struct ResultHistoryFilter: Codable, Equatable {
         mode: TestMode? = nil, language: TypingLanguage? = nil,
         languages: Set<TypingLanguage>? = nil, tag: String? = nil,
         tagFilter: ResultHistoryTagFilter? = nil,
-        personalBestOnly: Bool = false, difficulty: Difficulty? = nil,
+        personalBestOnly: Bool = false,
+        personalBestFilter: ResultHistoryPersonalBestFilter? = nil,
+        difficulty: Difficulty? = nil,
         dateRange: ResultHistoryDateRange = .all,
         punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all,
         quoteLength: QuoteLength? = nil,
@@ -1096,6 +1124,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.tagFilter = tagFilter
         self.difficulty = difficulty
         self.personalBestOnly = personalBestOnly
+        self.personalBestFilter = personalBestFilter
         self.dateRange = dateRange
         self.punctuation = punctuation
         self.numbers = numbers
@@ -1145,6 +1174,10 @@ struct ResultHistoryFilter: Codable, Equatable {
         return .init(isUnrestricted: false, includesNoTags: false, tags: [tag])
     }
 
+    var effectivePersonalBestFilter: ResultHistoryPersonalBestFilter {
+        personalBestFilter ?? (personalBestOnly ? .only : .all)
+    }
+
     static func languageSelectionSummary(_ selection: Set<TypingLanguage>) -> String {
         guard !selection.isEmpty else { return "无匹配语言" }
         guard selection != Set(TypingLanguage.allCases) else { return "全部" }
@@ -1153,7 +1186,7 @@ struct ResultHistoryFilter: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case mode, language, languages, tag, tagFilter, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength,
+        case mode, language, languages, tag, tagFilter, difficulty, personalBestOnly, personalBestFilter, dateRange, punctuation, numbers, quoteLength,
           timeLimits, wordLimits, modifierFilter
     }
 
@@ -1166,6 +1199,8 @@ struct ResultHistoryFilter: Codable, Equatable {
         tagFilter = try values.decodeIfPresent(ResultHistoryTagFilter.self, forKey: .tagFilter)
         difficulty = try values.decodeIfPresent(Difficulty.self, forKey: .difficulty)
         personalBestOnly = try values.decodeIfPresent(Bool.self, forKey: .personalBestOnly) ?? false
+        personalBestFilter = try values.decodeIfPresent(
+            ResultHistoryPersonalBestFilter.self, forKey: .personalBestFilter)
         dateRange = try values.decodeIfPresent(ResultHistoryDateRange.self, forKey: .dateRange) ?? .all
         punctuation = try values.decodeIfPresent(ResultHistoryBinaryFilter.self, forKey: .punctuation) ?? .all
         numbers = try values.decodeIfPresent(ResultHistoryBinaryFilter.self, forKey: .numbers) ?? .all
@@ -1187,7 +1222,7 @@ struct ResultHistoryFilter: Codable, Equatable {
                 && matchesLanguage(entry.language)
                 && effectiveTagFilter.matches(entry.tags)
                 && (difficulty == nil || entry.difficulty == difficulty)
-                && (!personalBestOnly || personalBestIDs.contains(entry.id))
+                && effectivePersonalBestFilter.matches(id: entry.id, personalBestIDs: personalBestIDs)
                 && (cutoff.map { entry.finishedAt >= $0 } ?? true)
                 && punctuation.matches(entry.includesPunctuation)
                 && numbers.matches(entry.includesNumbers)

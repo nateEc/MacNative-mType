@@ -3349,7 +3349,7 @@ private struct ResultsHistoryView: View {
   @State private var languageFilter = Set(TypingLanguage.allCases)
   @State private var selectedTagFilter = ResultHistoryTagFilter()
   @State private var difficultyFilter: Difficulty?
-  @State private var personalBestOnly = false
+  @State private var personalBestFilter: ResultHistoryPersonalBestFilter = .all
   @State private var dateRangeFilter: ResultHistoryDateRange = .all
   @State private var punctuationFilter: ResultHistoryBinaryFilter = .all
   @State private var numbersFilter: ResultHistoryBinaryFilter = .all
@@ -3366,7 +3366,7 @@ private struct ResultsHistoryView: View {
       mode: modeFilter,
       languages: languageFilter,
       tagFilter: selectedTagFilter,
-      personalBestOnly: personalBestOnly,
+      personalBestFilter: personalBestFilter,
       difficulty: difficultyFilter,
       dateRange: dateRangeFilter,
       punctuation: punctuationFilter,
@@ -3556,7 +3556,11 @@ private struct ResultsHistoryView: View {
                     }
                   }
                 }
-                Toggle("仅个人最佳", isOn: $personalBestOnly)
+                Picker("个人最佳", selection: $personalBestFilter) {
+                  ForEach(ResultHistoryPersonalBestFilter.allCases, id: \.self) { filter in
+                    Text(filter.displayName).tag(filter)
+                  }
+                }
               }
               if filteredResults.isEmpty {
                 ContentUnavailableView(
@@ -3791,7 +3795,7 @@ private struct ResultsHistoryView: View {
   private var activeFilter: ResultHistoryFilter {
     .init(
       mode: modeFilter, languages: languageFilter, tagFilter: selectedTagFilter,
-      personalBestOnly: personalBestOnly, difficulty: difficultyFilter, dateRange: dateRangeFilter,
+      personalBestFilter: personalBestFilter, difficulty: difficultyFilter, dateRange: dateRangeFilter,
       punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter,
       timeLimits: timeLimitFilter, wordLimits: wordLimitFilter, modifierFilter: activeModifierFilter
     )
@@ -3827,7 +3831,7 @@ private struct ResultsHistoryView: View {
     languageFilter = filter.languageSelections
     selectedTagFilter = filter.effectiveTagFilter
     difficultyFilter = filter.difficulty
-    personalBestOnly = filter.personalBestOnly
+    personalBestFilter = filter.effectivePersonalBestFilter
     dateRangeFilter = filter.dateRange
     punctuationFilter = filter.punctuation
     numbersFilter = filter.numbers
