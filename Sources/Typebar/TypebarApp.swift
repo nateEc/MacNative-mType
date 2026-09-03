@@ -680,7 +680,12 @@ private struct ContentView: View {
       .pickerStyle(.segmented)
       .frame(width: 420)
       .disabled(activeChallenge != nil)
-      .onChange(of: mode) { _, _ in reset() }
+      .onChange(of: mode) { _, nextMode in
+        // A deliberate departure from temporary word practice becomes the
+        // user's new source configuration, matching the reference reset rule.
+        if nextMode != .custom { practiceReturnPreset = nil }
+        reset()
+      }
     }
   }
 
@@ -1687,6 +1692,7 @@ private struct ContentView: View {
   }
 
   private func apply(_ preset: SavedTestPreset) {
+    practiceReturnPreset = nil
     let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID)
     activeChallengeID = challenge?.id
     let configuration = challenge?.preset.configuration ?? preset.configuration
