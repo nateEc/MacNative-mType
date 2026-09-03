@@ -1374,25 +1374,24 @@ private struct ContentView: View {
       metric(
         settings.typingSpeedUnit.displayName,
         value: settings.typingSpeedUnit.formatted(
-          wpm: session.wpm(at: .now)),
-        style: settings.liveSpeedStyle)
+          wpm: session.wpm(at: .now)), style: settings.liveSpeedStyle, usesLiveAppearance: true)
       metric(
         "Raw \(settings.typingSpeedUnit.displayName)",
         value: settings.typingSpeedUnit.formatted(
-          wpm: session.rawWpm(at: .now)),
-        style: settings.liveSpeedStyle)
+          wpm: session.rawWpm(at: .now)), style: settings.liveSpeedStyle, usesLiveAppearance: true)
       metric(
         "Burst \(settings.typingSpeedUnit.displayName)",
         value: settings.typingSpeedUnit.formatted(
-          wpm: session.burstWpm),
-        style: settings.liveBurstStyle)
-      metric("准确率", value: "\(session.accuracy)%", style: settings.liveAccuracyStyle)
+          wpm: session.burstWpm), style: settings.liveBurstStyle, usesLiveAppearance: true)
+      metric(
+        "准确率", value: "\(session.accuracy)%", style: settings.liveAccuracyStyle,
+        usesLiveAppearance: true)
       if settings.liveProgressStyle == .bar {
         progressMetricBar
       } else {
         metric(
           session.progressLabel, value: session.progressText(at: .now) ?? "—",
-          style: settings.liveProgressStyle.metricStyle)
+          style: settings.liveProgressStyle.metricStyle, usesLiveAppearance: true)
       }
       if let sections = session.sectionProgress {
         metric("段落", value: "\(sections.completed)/\(sections.total)")
@@ -1421,30 +1420,43 @@ private struct ContentView: View {
   }
 
   @ViewBuilder
-  private func metric(_ title: String, value: String, style: LiveMetricStyle = .text) -> some View {
+  private func metric(
+    _ title: String,
+    value: String,
+    style: LiveMetricStyle = .text,
+    usesLiveAppearance: Bool = false
+  ) -> some View {
     if style != .off {
       let isMini = style == .mini
+      let foreground = usesLiveAppearance
+        ? settings.liveStatsColor.resolved(accent: activeTheme.accent) : Color.primary
+      let labelForeground = usesLiveAppearance ? foreground.opacity(0.76) : Color.secondary
       VStack(spacing: isMini ? 2 : 5) {
         Text(value).font(
           .system(size: isMini ? 17 : 28, weight: .semibold, design: .rounded))
-        Text(title).font(isMini ? .caption2 : .caption).foregroundStyle(.secondary)
+        Text(title).font(isMini ? .caption2 : .caption).foregroundStyle(labelForeground)
       }
+      .foregroundStyle(foreground)
+      .opacity(usesLiveAppearance ? settings.liveStatsOpacity.rawValue : 1)
       .frame(maxWidth: .infinity)
       .padding(.vertical, isMini ? 8 : 14)
     }
   }
 
   private var progressMetricBar: some View {
-    VStack(spacing: 6) {
+    let foreground = settings.liveStatsColor.resolved(accent: activeTheme.accent)
+    return VStack(spacing: 6) {
       HStack {
-        Text(session.progressLabel).font(.caption).foregroundStyle(.secondary)
+        Text(session.progressLabel).font(.caption).foregroundStyle(foreground.opacity(0.76))
         Spacer()
         Text(session.progressText(at: .now) ?? "—")
           .font(.caption.weight(.semibold))
       }
       ProgressView(value: session.progressFraction(at: .now) ?? 0)
-        .tint(activeTheme.accent)
+        .tint(foreground)
     }
+    .foregroundStyle(foreground)
+    .opacity(settings.liveStatsOpacity.rawValue)
     .frame(maxWidth: .infinity)
     .padding(.horizontal, 14)
     .padding(.vertical, 16)

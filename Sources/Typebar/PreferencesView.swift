@@ -411,7 +411,17 @@ struct PreferencesView: View {
               Text(style.displayName).tag(style)
             }
           }
-          Text("关闭只收起相应实时仪表，不影响最终结果、历史或回放。")
+          Picker("实时指标颜色", selection: $settings.liveStatsColor) {
+            ForEach(LiveStatsColor.allCases) { color in
+              Text(color.displayName).tag(color)
+            }
+          }
+          Picker("实时指标透明度", selection: $settings.liveStatsOpacity) {
+            ForEach(LiveStatsOpacity.allCases) { opacity in
+              Text(opacity.displayName).tag(opacity)
+            }
+          }
+          Text("颜色与透明度只作用于进度、速度、准确率和 Burst；错误、段落进度、最终结果、历史和回放不受影响。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("节奏引导", selection: $settings.paceGuideMode) {

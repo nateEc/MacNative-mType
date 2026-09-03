@@ -238,6 +238,45 @@ enum LiveProgressStyle: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 }
 
+/// Presentation-only coloring for the live progress, speed, burst, and
+/// accuracy metrics. It deliberately leaves errors and section counts alone.
+enum LiveStatsColor: String, CaseIterable, Codable, Equatable, Identifiable {
+  case accent
+  case secondary
+  case primary
+  case black
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .accent: "主题强调色"
+    case .secondary: "辅助文字"
+    case .primary: "主文字"
+    case .black: "黑色"
+    }
+  }
+
+  func resolved(accent: Color) -> Color {
+    switch self {
+    case .accent: accent
+    case .secondary: .secondary
+    case .primary: .primary
+    case .black: .black
+    }
+  }
+}
+
+enum LiveStatsOpacity: Double, CaseIterable, Codable, Equatable, Identifiable {
+  case quarter = 0.25
+  case half = 0.5
+  case threeQuarters = 0.75
+  case full = 1
+
+  var id: Self { self }
+  var displayName: String { "\(Int((rawValue * 100).rounded()))%" }
+}
+
 /// Native type treatments available in the practice surface. They map only to
 /// macOS system designs, so no third-party font file is bundled or copied.
 enum PracticeFont: String, CaseIterable, Codable, Equatable, Identifiable {
@@ -355,6 +394,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var liveAccuracyStyle: LiveMetricStyle = .text
   var liveBurstStyle: LiveMetricStyle = .text
   var liveProgressStyle: LiveProgressStyle = .text
+  var liveStatsColor: LiveStatsColor = .accent
+  var liveStatsOpacity: LiveStatsOpacity = .full
   var testModifiers: [TestModifier] = []
   var showFocusWarning = true
   var showCapsLockWarning = true
@@ -429,6 +470,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     liveAccuracyStyle: LiveMetricStyle = .text,
     liveBurstStyle: LiveMetricStyle = .text,
     liveProgressStyle: LiveProgressStyle = .text,
+    liveStatsColor: LiveStatsColor = .accent,
+    liveStatsOpacity: LiveStatsOpacity = .full,
     testModifiers: [TestModifier] = [],
     showFocusWarning: Bool = true,
     showCapsLockWarning: Bool = true,
@@ -508,6 +551,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.liveAccuracyStyle = liveAccuracyStyle
     self.liveBurstStyle = liveBurstStyle
     self.liveProgressStyle = liveProgressStyle
+    self.liveStatsColor = liveStatsColor
+    self.liveStatsOpacity = liveStatsOpacity
     self.testModifiers = TestModifierPolicy.normalized(testModifiers)
     self.showFocusWarning = showFocusWarning
     self.showCapsLockWarning = showCapsLockWarning
@@ -540,6 +585,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       alwaysShowDecimalPlaces, alwaysShowWordsHistory, showWordBurstHeatmap, resultPerformanceVisibility,
       startGraphsAtZero, showAverage, showPersonalBest,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
+      liveStatsColor, liveStatsOpacity,
       testModifiers, showFocusWarning,
       showCapsLockWarning, playErrorBeep, playKeyclickSound, clickSoundStyle, errorSoundStyle,
       timeWarningOffset, timeWarningSoundStyle, soundVolume,
@@ -644,6 +690,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     liveAccuracyStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveAccuracyStyle) ?? .text
     liveBurstStyle = try values.decodeIfPresent(LiveMetricStyle.self, forKey: .liveBurstStyle) ?? .text
     liveProgressStyle = try values.decodeIfPresent(LiveProgressStyle.self, forKey: .liveProgressStyle) ?? .text
+    liveStatsColor = try values.decodeIfPresent(LiveStatsColor.self, forKey: .liveStatsColor) ?? .accent
+    liveStatsOpacity = try values.decodeIfPresent(LiveStatsOpacity.self, forKey: .liveStatsOpacity) ?? .full
     testModifiers = TestModifierPolicy.normalized(
       try values.decodeIfPresent([TestModifier].self, forKey: .testModifiers) ?? [])
     showFocusWarning = try values.decodeIfPresent(Bool.self, forKey: .showFocusWarning) ?? true
@@ -824,6 +872,8 @@ final class AppSettings {
   var liveAccuracyStyle: LiveMetricStyle = .text { didSet { persist() } }
   var liveBurstStyle: LiveMetricStyle = .text { didSet { persist() } }
   var liveProgressStyle: LiveProgressStyle = .text { didSet { persist() } }
+  var liveStatsColor: LiveStatsColor = .accent { didSet { persist() } }
+  var liveStatsOpacity: LiveStatsOpacity = .full { didSet { persist() } }
   var testModifiers: [TestModifier] = [] { didSet { persist() } }
   var showFocusWarning = true { didSet { persist() } }
   var showCapsLockWarning = true { didSet { persist() } }
@@ -908,6 +958,8 @@ final class AppSettings {
     liveAccuracyStyle = snapshot.liveAccuracyStyle
     liveBurstStyle = snapshot.liveBurstStyle
     liveProgressStyle = snapshot.liveProgressStyle
+    liveStatsColor = snapshot.liveStatsColor
+    liveStatsOpacity = snapshot.liveStatsOpacity
     testModifiers = snapshot.testModifiers
     showFocusWarning = snapshot.showFocusWarning
     showCapsLockWarning = snapshot.showCapsLockWarning
@@ -1048,6 +1100,8 @@ final class AppSettings {
     liveAccuracyStyle = .text
     liveBurstStyle = .text
     liveProgressStyle = .text
+    liveStatsColor = .accent
+    liveStatsOpacity = .full
     testModifiers = []
     showFocusWarning = true
     showCapsLockWarning = true
@@ -1159,6 +1213,8 @@ final class AppSettings {
     liveAccuracyStyle = snapshot.liveAccuracyStyle
     liveBurstStyle = snapshot.liveBurstStyle
     liveProgressStyle = snapshot.liveProgressStyle
+    liveStatsColor = snapshot.liveStatsColor
+    liveStatsOpacity = snapshot.liveStatsOpacity
     testModifiers = snapshot.testModifiers
     showFocusWarning = snapshot.showFocusWarning
     showCapsLockWarning = snapshot.showCapsLockWarning
@@ -1310,6 +1366,8 @@ final class AppSettings {
       liveAccuracyStyle: liveAccuracyStyle,
       liveBurstStyle: liveBurstStyle,
       liveProgressStyle: liveProgressStyle,
+      liveStatsColor: liveStatsColor,
+      liveStatsOpacity: liveStatsOpacity,
       testModifiers: testModifiers,
       showFocusWarning: showFocusWarning,
       showCapsLockWarning: showCapsLockWarning,

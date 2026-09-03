@@ -3233,6 +3233,8 @@ final class TypingEngineTests: XCTestCase {
     settings.liveAccuracyStyle = .off
     settings.liveBurstStyle = .mini
     settings.liveProgressStyle = .bar
+    settings.liveStatsColor = .black
+    settings.liveStatsOpacity = .half
     settings.testModifiers = [.noSpaces, .uppercase]
     settings.favoriteQuoteIDs = ["craft"]
     settings.repeatQuotes = true
@@ -3303,6 +3305,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.liveAccuracyStyle, .off)
     XCTAssertEqual(restored.liveBurstStyle, .mini)
     XCTAssertEqual(restored.liveProgressStyle, .bar)
+    XCTAssertEqual(restored.liveStatsColor, .black)
+    XCTAssertEqual(restored.liveStatsOpacity, .half)
     XCTAssertEqual(restored.testModifiers, [.noSpaces, .uppercase])
     XCTAssertTrue(restored.isFavoriteQuote("craft"))
     XCTAssertTrue(restored.repeatQuotes)
@@ -3418,6 +3422,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.liveAccuracyStyle, .text)
     XCTAssertEqual(snapshot.liveBurstStyle, .text)
     XCTAssertEqual(snapshot.liveProgressStyle, .text)
+    XCTAssertEqual(snapshot.liveStatsColor, .accent)
+    XCTAssertEqual(snapshot.liveStatsOpacity, .full)
     XCTAssertTrue(snapshot.testModifiers.isEmpty)
     XCTAssertTrue(snapshot.showFocusWarning)
     XCTAssertTrue(snapshot.showCapsLockWarning)
