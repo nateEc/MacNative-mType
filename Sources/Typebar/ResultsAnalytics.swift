@@ -6,13 +6,32 @@ struct ResultMetric: Equatable, Identifiable {
     let wpm: Int
     let accuracy: Int
     let typingSeconds: TimeInterval
+    let consistency: Double
 
-    init(id: UUID = UUID(), finishedAt: Date, wpm: Int, accuracy: Int, typingSeconds: TimeInterval) {
+    init(
+        id: UUID = UUID(), finishedAt: Date, wpm: Int, accuracy: Int, typingSeconds: TimeInterval,
+        consistency: Double = 0
+    ) {
         self.id = id
         self.finishedAt = finishedAt
         self.wpm = wpm
         self.accuracy = accuracy
         self.typingSeconds = typingSeconds
+        self.consistency = consistency.isFinite ? min(100, max(0, consistency)) : 0
+    }
+
+    init(record: TestResultRecord) {
+        self.init(
+            id: record.id,
+            finishedAt: record.finishedAt,
+            wpm: record.wpm,
+            accuracy: record.accuracy,
+            typingSeconds: record.engagedDuration,
+            consistency: ResultConsistencyPolicy.metrics(
+                events: record.replayEvents,
+                duration: record.finishedAt.timeIntervalSince(record.startedAt)
+            ).typing
+        )
     }
 }
 
@@ -833,6 +852,9 @@ struct ResultStatistics: Equatable {
     let bestWPM: Int
     let averageAccuracy: Int
     let totalTypingSeconds: TimeInterval
+    let highestConsistency: Double
+    let averageConsistency: Double
+    let averageConsistencyLast10: Double
 
     init(metrics: [ResultMetric]) {
         completedTests = metrics.count
@@ -840,6 +862,14 @@ struct ResultStatistics: Equatable {
         bestWPM = metrics.map(\.wpm).max() ?? 0
         averageAccuracy = metrics.isEmpty ? 0 : Int((Double(metrics.map(\.accuracy).reduce(0, +)) / Double(metrics.count)).rounded())
         totalTypingSeconds = metrics.map(\.typingSeconds).reduce(0, +)
+        highestConsistency = metrics.map(\.consistency).max() ?? 0
+        averageConsistency = Self.averageConsistency(metrics)
+        averageConsistencyLast10 = Self.averageConsistency(Array(metrics.prefix(10)))
+    }
+
+    private static func averageConsistency(_ metrics: [ResultMetric]) -> Double {
+        guard !metrics.isEmpty else { return 0 }
+        return metrics.map(\.consistency).reduce(0, +) / Double(metrics.count)
     }
 
     static func personalBestIDs(metrics: [ResultMetric]) -> Set<UUID> {
@@ -887,6 +917,17 @@ struct DailyActivity: Equatable, Identifiable {
     let day: Date
     let completedTests: Int
     let typingSeconds: TimeInterval
+    let averageConsistency: Double
+
+    init(
+        day: Date, completedTests: Int, typingSeconds: TimeInterval, averageConsistency: Double = 0
+    ) {
+        self.day = day
+        self.completedTests = completedTests
+        self.typingSeconds = typingSeconds
+        self.averageConsistency = averageConsistency.isFinite ? min(100, max(0, averageConsistency)) : 0
+    }
+
     var id: Date { day }
 }
 
@@ -896,6 +937,17 @@ struct ActivityBarPoint: Equatable, Identifiable {
     let day: Date
     let completedTests: Int
     let typingSeconds: TimeInterval
+    let averageConsistency: Double
+
+    init(
+        day: Date, completedTests: Int, typingSeconds: TimeInterval, averageConsistency: Double = 0
+    ) {
+        self.day = day
+        self.completedTests = completedTests
+        self.typingSeconds = typingSeconds
+        self.averageConsistency = averageConsistency.isFinite ? min(100, max(0, averageConsistency)) : 0
+    }
+
     var id: Date { day }
 }
 
@@ -919,7 +971,12 @@ enum ActivityAggregation {
     static func daily(metrics: [ResultMetric], calendar: Calendar = .current) -> [DailyActivity] {
         let grouped = Dictionary(grouping: metrics) { calendar.startOfDay(for: $0.finishedAt) }
         return grouped.map { day, values in
-            DailyActivity(day: day, completedTests: values.count, typingSeconds: values.map(\.typingSeconds).reduce(0, +))
+            DailyActivity(
+                day: day,
+                completedTests: values.count,
+                typingSeconds: values.map(\.typingSeconds).reduce(0, +),
+                averageConsistency: values.map(\.consistency).reduce(0, +) / Double(values.count)
+            )
         }
         .sorted { $0.day < $1.day }
     }
@@ -952,7 +1009,8 @@ enum ActivityAggregation {
             return ActivityBarPoint(
                 day: day,
                 completedTests: value?.completedTests ?? 0,
-                typingSeconds: value?.typingSeconds ?? 0
+                typingSeconds: value?.typingSeconds ?? 0,
+                averageConsistency: value?.averageConsistency ?? 0
             )
         }
     }

@@ -3321,6 +3321,7 @@ private struct ResultsHistoryView: View {
   fileprivate enum ActivityChartMeasure: String, CaseIterable, Identifiable {
     case completedTests
     case typingMinutes
+    case averageConsistency
 
     var id: Self { self }
 
@@ -3328,6 +3329,7 @@ private struct ResultsHistoryView: View {
       switch self {
       case .completedTests: "完成次数"
       case .typingMinutes: "练习分钟"
+      case .averageConsistency: "平均稳定度"
       }
     }
   }
@@ -3380,27 +3382,11 @@ private struct ResultsHistoryView: View {
   }
 
   private var metrics: [ResultMetric] {
-    filteredResults.map {
-      ResultMetric(
-        id: $0.id,
-        finishedAt: $0.finishedAt,
-        wpm: $0.wpm,
-        accuracy: $0.accuracy,
-        typingSeconds: $0.engagedDuration
-      )
-    }
+    filteredResults.map { ResultMetric(record: $0) }
   }
 
   private var allMetrics: [ResultMetric] {
-    results.map {
-      ResultMetric(
-        id: $0.id,
-        finishedAt: $0.finishedAt,
-        wpm: $0.wpm,
-        accuracy: $0.accuracy,
-        typingSeconds: $0.engagedDuration
-      )
-    }
+    results.map { ResultMetric(record: $0) }
   }
 
   private var activity: [DailyActivity] {
@@ -3519,7 +3505,7 @@ private struct ResultsHistoryView: View {
                         .foregroundStyle(.orange)
                     }
                     Spacer()
-                    Text("raw \(result.rawWpm)")
+                    Text("raw \(result.rawWpm) · \(consistencyText(for: result))% 稳定")
                       .font(.caption)
                       .foregroundStyle(.secondary)
                   }
@@ -3687,14 +3673,27 @@ private struct ResultsHistoryView: View {
   private var statistics: some View {
     let summary = ResultStatistics(metrics: metrics)
     let streak = ActivityAggregation.currentStreak(activity: activity)
-    return HStack {
+    return LazyVGrid(
+      columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 10
+    ) {
       statistic("完成", "\(summary.completedTests)")
       statistic("均速", "\(summary.averageWPM)")
       statistic("最佳", "\(summary.bestWPM)")
       statistic("准确率", "\(summary.averageAccuracy)%")
       statistic("连续", "\(streak) 天")
+      statistic("最高稳定度", "\(formattedConsistency(summary.highestConsistency))%")
+      statistic("平均稳定度", "\(formattedConsistency(summary.averageConsistency))%")
+      statistic("近 10 稳定度", "\(formattedConsistency(summary.averageConsistencyLast10))%")
     }
     .padding()
+  }
+
+  private func consistencyText(for result: TestResultRecord) -> String {
+    formattedConsistency(ResultMetric(record: result).consistency)
+  }
+
+  private func formattedConsistency(_ value: Double) -> String {
+    value.formatted(.number.precision(.fractionLength(0...2)))
   }
 
   private func statistic(_ title: String, _ value: String) -> some View {
@@ -3839,7 +3838,7 @@ private struct ActivityBarChartView: View {
           }
         }
         .pickerStyle(.segmented)
-        .frame(width: 190)
+        .frame(width: 270)
       }
       Chart(points) { point in
         BarMark(
@@ -3865,6 +3864,7 @@ private struct ActivityBarChartView: View {
     switch measure {
     case .completedTests: Double(point.completedTests)
     case .typingMinutes: point.typingSeconds / 60
+    case .averageConsistency: point.averageConsistency
     }
   }
 
@@ -3872,6 +3872,8 @@ private struct ActivityBarChartView: View {
     switch measure {
     case .completedTests: "\(point.completedTests) 次完成"
     case .typingMinutes: "\(Int((point.typingSeconds / 60).rounded())) 分钟练习"
+    case .averageConsistency:
+      "\(point.averageConsistency.formatted(.number.precision(.fractionLength(0...2))))% 平均稳定度"
     }
   }
 }

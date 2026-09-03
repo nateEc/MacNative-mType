@@ -3291,14 +3291,28 @@ final class TypingEngineTests: XCTestCase {
   func testResultStatisticsAggregateCompletedTests() {
     let day = Date(timeIntervalSinceReferenceDate: 1_000)
     let statistics = ResultStatistics(metrics: [
-      .init(finishedAt: day, wpm: 60, accuracy: 95, typingSeconds: 30),
-      .init(finishedAt: day.addingTimeInterval(60), wpm: 90, accuracy: 85, typingSeconds: 60),
+      .init(finishedAt: day, wpm: 60, accuracy: 95, typingSeconds: 30, consistency: 80),
+      .init(
+        finishedAt: day.addingTimeInterval(60), wpm: 90, accuracy: 85, typingSeconds: 60,
+        consistency: 92),
     ])
     XCTAssertEqual(statistics.completedTests, 2)
     XCTAssertEqual(statistics.averageWPM, 75)
     XCTAssertEqual(statistics.bestWPM, 90)
     XCTAssertEqual(statistics.averageAccuracy, 90)
     XCTAssertEqual(statistics.totalTypingSeconds, 90)
+    XCTAssertEqual(statistics.highestConsistency, 92)
+    XCTAssertEqual(statistics.averageConsistency, 86)
+    XCTAssertEqual(statistics.averageConsistencyLast10, 86)
+
+    let newestFirst = (0...10).map { offset in
+      ResultMetric(
+        finishedAt: day.addingTimeInterval(Double(-offset)), wpm: 60, accuracy: 95,
+        typingSeconds: 30, consistency: Double(100 - offset * 10))
+    }
+    let recentStatistics = ResultStatistics(metrics: newestFirst)
+    XCTAssertEqual(recentStatistics.averageConsistency, 50)
+    XCTAssertEqual(recentStatistics.averageConsistencyLast10, 55)
   }
 
   func testRecentTestAverageUsesTheLatestTenMatchingCurrentSettings() {
@@ -3656,17 +3670,18 @@ final class TypingEngineTests: XCTestCase {
     let metrics = [
       ResultMetric(
         finishedAt: Date(timeIntervalSince1970: 86_400 + 60), wpm: 40, accuracy: 90,
-        typingSeconds: 30),
+        typingSeconds: 30, consistency: 70),
       ResultMetric(
         finishedAt: Date(timeIntervalSince1970: 86_400 + 3_600), wpm: 50, accuracy: 90,
-        typingSeconds: 45),
+        typingSeconds: 45, consistency: 90),
       ResultMetric(
         finishedAt: Date(timeIntervalSince1970: 172_800 + 60), wpm: 60, accuracy: 90,
-        typingSeconds: 15),
+        typingSeconds: 15, consistency: 50),
     ]
     let activity = ActivityAggregation.daily(metrics: metrics, calendar: calendar)
     XCTAssertEqual(activity.map(\.completedTests), [2, 1])
     XCTAssertEqual(activity.map(\.typingSeconds), [75, 15])
+    XCTAssertEqual(activity.map(\.averageConsistency), [80, 50])
   }
 
   func testRecentActivityBarsFillEveryRequestedDayWithoutCollapsingGaps() {
@@ -3674,8 +3689,10 @@ final class TypingEngineTests: XCTestCase {
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     let end = Date(timeIntervalSince1970: 345_600)
     let activity = [
-      DailyActivity(day: end.addingTimeInterval(-172_800), completedTests: 2, typingSeconds: 75),
-      DailyActivity(day: end, completedTests: 1, typingSeconds: 30),
+      DailyActivity(
+        day: end.addingTimeInterval(-172_800), completedTests: 2, typingSeconds: 75,
+        averageConsistency: 80),
+      DailyActivity(day: end, completedTests: 1, typingSeconds: 30, averageConsistency: 50),
     ]
 
     let points = ActivityAggregation.recentDays(
@@ -3683,6 +3700,7 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(points.map(\.completedTests), [0, 2, 0, 1])
     XCTAssertEqual(points.map(\.typingSeconds), [0, 75, 0, 30])
+    XCTAssertEqual(points.map(\.averageConsistency), [0, 80, 0, 50])
     XCTAssertEqual(
       points.map(\.day),
       [
