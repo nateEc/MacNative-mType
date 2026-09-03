@@ -3364,8 +3364,6 @@ final class TypingEngineTests: XCTestCase {
     settings.layoutFluidLayouts = [.ansiWorkman, .frenchAzerty, .ansiQwerty]
     settings.quickEnd = true
     settings.quickRestartKey = .enter
-    settings.followSystemTheme = true
-    settings.randomThemeOnRestart = true
     settings.practiceBackdrop = .halos
     settings.reducePracticeMotion = true
     settings.toggleFavoriteTheme(.grove)
@@ -3373,6 +3371,7 @@ final class TypingEngineTests: XCTestCase {
       name: "Harbour", background: .black, panel: .gray, accent: .orange, prefersDark: true)
     let customThemeID = try XCTUnwrap(settings.customThemes.first?.id)
     settings.toggleFavoriteCustomTheme(customThemeID)
+    settings.randomThemeMode = .custom
     settings.englishVariant = .british
     settings.freedomMode = true
     settings.confidenceMode = .maximum
@@ -3438,6 +3437,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideLegendStyle, .dynamic)
     XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
     XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
+    XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
     XCTAssertEqual(exportedSnapshot.liveProgressStyle, .flashMini)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
@@ -3460,8 +3460,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.ansiWorkman, .frenchAzerty, .ansiQwerty])
     XCTAssertTrue(restored.quickEnd)
     XCTAssertEqual(restored.quickRestartKey, .enter)
-    XCTAssertTrue(restored.followSystemTheme)
+    XCTAssertFalse(restored.followSystemTheme)
     XCTAssertTrue(restored.randomThemeOnRestart)
+    XCTAssertEqual(restored.randomThemeMode, .custom)
     XCTAssertEqual(restored.practiceBackdrop, .halos)
     XCTAssertTrue(restored.reducePracticeMotion)
     XCTAssertTrue(restored.isFavoriteTheme(.grove))
@@ -3504,7 +3505,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.isFavoriteQuote("craft"))
     XCTAssertTrue(restored.repeatQuotes)
     XCTAssertEqual(restored.resolvedTheme(for: .dark).colorScheme, .dark)
-    XCTAssertEqual(restored.resolvedTheme(for: .light).colorScheme, .light)
+    XCTAssertEqual(restored.resolvedTheme(for: .light).colorScheme, .dark)
     XCTAssertTrue(restored.showKeyboardGuide)
     XCTAssertEqual(restored.keyboardGuideMode, .react)
     XCTAssertEqual(restored.keyboardGuideScale, 2.7)
@@ -3607,6 +3608,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertFalse(snapshot.followSystemTheme)
     XCTAssertFalse(snapshot.randomThemeOnRestart)
+    XCTAssertEqual(snapshot.randomThemeMode, .off)
     XCTAssertEqual(snapshot.practiceBackdrop, .solid)
     XCTAssertFalse(snapshot.reducePracticeMotion)
     XCTAssertTrue(snapshot.startGraphsAtZero)
@@ -3647,6 +3649,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.paceGuideCustomWpm, 60)
     XCTAssertEqual(snapshot.paceCaretStyle, .bar)
     XCTAssertFalse(snapshot.repeatedPace)
+    let legacyRandom = try JSONDecoder().decode(
+      AppSettingsSnapshot.self, from: Data("{\"randomThemeOnRestart\":true}".utf8))
+    XCTAssertEqual(legacyRandom.randomThemeMode, .on)
+    XCTAssertTrue(legacyRandom.randomThemeOnRestart)
     let hiddenGuideLegacy = try JSONDecoder().decode(
       AppSettingsSnapshot.self, from: Data("{\"showKeyboardGuide\":false}".utf8))
     XCTAssertEqual(hiddenGuideLegacy.keyboardGuideMode, .off)
@@ -3728,17 +3734,52 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
-  func testRandomBuiltInThemeUsesOnlyOriginalBuiltInsAndRespectsSystemMode() {
+  func testRandomThemeModesUseEphemeralCompatibleNativePools() throws {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     defer { defaults.removePersistentDomain(forName: suiteName) }
     let settings = AppSettings(defaults: defaults)
 
-    settings.randomizeBuiltInTheme(using: 1)
+    settings.selectBuiltInTheme(.grove)
+    settings.randomThemeMode = .light
+    settings.randomizeTheme(for: .dark, using: 0)
+    XCTAssertEqual(settings.activeTheme.colorScheme, .light)
+    XCTAssertEqual(settings.theme, .grove)
+
+    settings.selectBuiltInTheme(.midnight)
+    settings.randomThemeMode = .dark
+    settings.randomizeTheme(for: .light, using: 0)
+    XCTAssertEqual(settings.activeTheme.colorScheme, .dark)
+
+    settings.toggleFavoriteTheme(.paper)
+    settings.randomThemeMode = .favorites
+    settings.randomizeTheme(for: .dark, using: 0)
+    XCTAssertEqual(settings.activeTheme.colorScheme, .light)
+
+    settings.addCustomTheme(
+      name: "Dawn", background: .white, panel: .gray, accent: .orange, prefersDark: false)
+    settings.selectBuiltInTheme(.midnight)
+    settings.randomThemeMode = .custom
+    settings.randomizeTheme(for: .dark, using: 0)
+    XCTAssertEqual(settings.activeTheme.colorScheme, .light)
     XCTAssertEqual(settings.theme, .midnight)
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.randomThemeMode, .custom)
+    XCTAssertEqual(restored.theme, .midnight)
+    XCTAssertEqual(restored.activeTheme.colorScheme, .dark)
+
+    settings.randomThemeMode = .auto
+    settings.randomizeTheme(for: .dark, using: 0)
+    XCTAssertEqual(settings.activeTheme.colorScheme, .dark)
     settings.followSystemTheme = true
-    settings.randomizeBuiltInTheme(using: 2)
-    XCTAssertEqual(settings.theme, .midnight)
+    XCTAssertEqual(settings.randomThemeMode, .off)
+    settings.randomThemeMode = .on
+    XCTAssertFalse(settings.followSystemTheme)
+    XCTAssertTrue(settings.randomThemeOnRestart)
+    settings.randomThemeMode = .off
+    settings.randomizeTheme(for: .light, using: 0)
+    XCTAssertEqual(settings.activeTheme.colorScheme, .dark)
   }
 
   @MainActor

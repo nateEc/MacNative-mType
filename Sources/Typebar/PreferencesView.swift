@@ -261,9 +261,13 @@ struct PreferencesView: View {
           Text("开启后会使用原创纸白或午夜主题；手动主题和自定义主题会保留，关闭自动切换后恢复。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Toggle("每次新测试随机内置主题", isOn: $settings.randomThemeOnRestart)
-            .disabled(settings.followSystemTheme)
-          Text("开启后，重新开始或切换测试会在纸白、午夜和林地之间随机选择；跟随系统时不会随机切换。")
+          Picker("完成后随机主题", selection: $settings.randomThemeMode) {
+            ForEach(RandomThemeMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          .disabled(settings.followSystemTheme)
+          Text("完成测试后从所选范围轮换主题；随机结果只留在当前运行，不会改写手动主题。收藏范围含内置和自定义收藏；“跟随当前系统深浅色”只用对应色调的内置主题。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("练习背景", selection: $settings.practiceBackdrop) {

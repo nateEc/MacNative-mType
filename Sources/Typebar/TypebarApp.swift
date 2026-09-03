@@ -561,6 +561,7 @@ private struct ContentView: View {
         let repeatedSession = session.repeatedAttempt()
         if result.outcome == .completed {
           currentProcessPractice.append(.init(result: result))
+          settings.randomizeTheme(for: systemColorScheme)
         }
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
           modelContext.insert(TestResultRecord(result: result))
@@ -1627,7 +1628,6 @@ private struct ContentView: View {
     liveContentMessage = nil
     if mode != .custom { activeLongSavedText = nil }
     NativeSpeech.shared.stop()
-    if settings.randomThemeOnRestart { settings.randomizeBuiltInTheme() }
     if restarting, mode == .quote,
       !QuoteRestartPolicy.shouldKeepCurrent(
         repeatWhileTyping: settings.repeatQuotes, hasStarted: session.hasStarted,

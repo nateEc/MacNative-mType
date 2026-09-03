@@ -74,6 +74,34 @@ enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
   var drawsMarker: Bool { self != .off }
 }
 
+/// Chooses the native theme pool that is rotated after a completed test.
+/// The temporary selection itself is intentionally never persisted.
+enum RandomThemeMode: String, CaseIterable, Codable, Equatable, Identifiable {
+  case off
+  case on
+  case favorites = "fav"
+  case light
+  case dark
+  case custom
+  case auto
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .off: "关闭"
+    case .on: "全部主题"
+    case .favorites: "收藏主题"
+    case .light: "浅色主题"
+    case .dark: "深色主题"
+    case .custom: "自定义主题"
+    case .auto: "跟随当前系统深浅色"
+    }
+  }
+
+  var isEnabled: Bool { self != .off }
+}
+
 /// Controls how an already-entered wrong character is shown without changing
 /// the session's target text, accepted input, or metrics.
 enum TypoIndicatorStyle: String, CaseIterable, Codable, Equatable, Identifiable {
@@ -417,6 +445,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var quickRestartKey: QuickRestartKey = .escape
   var followSystemTheme = false
   var randomThemeOnRestart = false
+  var randomThemeMode: RandomThemeMode = .off
   var practiceBackdrop: PracticeBackdropStyle = .solid
   var reducePracticeMotion = false
   var englishVariant: EnglishVariant = .american
@@ -499,6 +528,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     quickRestartKey: QuickRestartKey = .escape,
     followSystemTheme: Bool = false,
     randomThemeOnRestart: Bool = false,
+    randomThemeMode: RandomThemeMode = .off,
     practiceBackdrop: PracticeBackdropStyle = .solid,
     reducePracticeMotion: Bool = false,
     englishVariant: EnglishVariant = .american,
@@ -583,7 +613,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.quickEnd = quickEnd
     self.quickRestartKey = quickRestartKey
     self.followSystemTheme = followSystemTheme
-    self.randomThemeOnRestart = randomThemeOnRestart
+    self.randomThemeMode = followSystemTheme ? .off : (
+      randomThemeMode.isEnabled ? randomThemeMode : (randomThemeOnRestart ? .on : .off))
+    self.randomThemeOnRestart = self.randomThemeMode.isEnabled
     self.practiceBackdrop = practiceBackdrop
     self.reducePracticeMotion = reducePracticeMotion
     self.englishVariant = englishVariant
@@ -648,7 +680,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
-      randomThemeOnRestart, practiceBackdrop, reducePracticeMotion, englishVariant,
+      randomThemeOnRestart, randomThemeMode, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
@@ -711,8 +743,12 @@ struct AppSettingsSnapshot: Codable, Equatable {
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
     quickRestartKey = try values.decodeIfPresent(QuickRestartKey.self, forKey: .quickRestartKey) ?? .escape
     followSystemTheme = try values.decodeIfPresent(Bool.self, forKey: .followSystemTheme) ?? false
-    randomThemeOnRestart =
+    let legacyRandomThemeOnRestart =
       try values.decodeIfPresent(Bool.self, forKey: .randomThemeOnRestart) ?? false
+    randomThemeMode = followSystemTheme ? .off : (
+      try values.decodeIfPresent(RandomThemeMode.self, forKey: .randomThemeMode)
+        ?? (legacyRandomThemeOnRestart ? .on : .off))
+    randomThemeOnRestart = randomThemeMode.isEnabled
     practiceBackdrop =
       try values.decodeIfPresent(PracticeBackdropStyle.self, forKey: .practiceBackdrop) ?? .solid
     reducePracticeMotion =
@@ -803,12 +839,20 @@ struct AppSettingsSnapshot: Codable, Equatable {
   }
 }
 
+private enum RandomThemeTarget: Equatable {
+  case builtIn(AppTheme)
+  case custom(UUID)
+}
+
 @MainActor
 @Observable
 final class AppSettings {
   @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private let storageKey = "appSettings.v1"
   @ObservationIgnored private let layoutFluidStorageKey = "layoutFluidLayouts.v1"
+  @ObservationIgnored private var randomThemeBag: [RandomThemeTarget] = []
+  @ObservationIgnored private var randomThemeBagSignature: [RandomThemeTarget] = []
+  private var randomThemeTarget: RandomThemeTarget?
 
   var difficulty: Difficulty = .normal { didSet { persist() } }
   var strictSpace = false { didSet { persist() } }
@@ -871,6 +915,7 @@ final class AppSettings {
   var theme: AppTheme = .paper {
     didSet {
       activeCustomThemeID = nil
+      clearRandomThemeSelection()
       persist()
     }
   }
@@ -906,8 +951,45 @@ final class AppSettings {
   }
   var quickEnd = false { didSet { persist() } }
   var quickRestartKey: QuickRestartKey = .escape { didSet { persist() } }
-  var followSystemTheme = false { didSet { persist() } }
-  var randomThemeOnRestart = false { didSet { persist() } }
+  var followSystemTheme = false {
+    didSet {
+      if followSystemTheme && randomThemeMode.isEnabled {
+        randomThemeMode = .off
+        return
+      }
+      if followSystemTheme { clearRandomThemeSelection() }
+      persist()
+    }
+  }
+  /// Compatibility bridge for earlier Typebar archives. New UI uses
+  /// `randomThemeMode`, and randomization occurs after completion instead of
+  /// at reset time.
+  var randomThemeOnRestart = false {
+    didSet {
+      if randomThemeOnRestart && !randomThemeMode.isEnabled {
+        randomThemeMode = .on
+        return
+      }
+      if !randomThemeOnRestart && randomThemeMode.isEnabled {
+        randomThemeMode = .off
+        return
+      }
+      persist()
+    }
+  }
+  var randomThemeMode: RandomThemeMode = .off {
+    didSet {
+      clearRandomThemeSelection()
+      if randomThemeMode.isEnabled && followSystemTheme {
+        followSystemTheme = false
+      }
+      if randomThemeOnRestart != randomThemeMode.isEnabled {
+        randomThemeOnRestart = randomThemeMode.isEnabled
+        return
+      }
+      persist()
+    }
+  }
   var practiceBackdrop: PracticeBackdropStyle = .solid { didSet { persist() } }
   var reducePracticeMotion = false { didSet { persist() } }
   var englishVariant: EnglishVariant = .american { didSet { persist() } }
@@ -1032,7 +1114,7 @@ final class AppSettings {
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
     followSystemTheme = snapshot.followSystemTheme
-    randomThemeOnRestart = snapshot.randomThemeOnRestart
+    randomThemeMode = snapshot.randomThemeMode
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
     englishVariant = snapshot.englishVariant
@@ -1130,6 +1212,7 @@ final class AppSettings {
       keyboardLayout: keyboardLayout, quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       followSystemTheme: followSystemTheme, randomThemeOnRestart: randomThemeOnRestart,
+      randomThemeMode: randomThemeMode,
       practiceBackdrop: practiceBackdrop, reducePracticeMotion: reducePracticeMotion,
       englishVariant: englishVariant, favoriteQuoteIDs: favoriteQuoteIDs,
       repeatQuotes: repeatQuotes, freedomMode: freedomMode, confidenceMode: confidenceMode,
@@ -1194,7 +1277,7 @@ final class AppSettings {
     quickEnd = false
     quickRestartKey = .escape
     followSystemTheme = false
-    randomThemeOnRestart = false
+    randomThemeMode = .off
     practiceBackdrop = .solid
     reducePracticeMotion = false
     englishVariant = .american
@@ -1318,7 +1401,7 @@ final class AppSettings {
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
     followSystemTheme = snapshot.followSystemTheme
-    randomThemeOnRestart = snapshot.randomThemeOnRestart
+    randomThemeMode = snapshot.randomThemeMode
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
     englishVariant = snapshot.englishVariant
@@ -1370,6 +1453,9 @@ final class AppSettings {
   }
 
   var activeTheme: ResolvedTheme {
+    if let randomThemeTarget, let randomTheme = resolvedTheme(for: randomThemeTarget) {
+      return randomTheme
+    }
     guard let activeCustomThemeID,
       let custom = customThemes.first(where: { $0.id == activeCustomThemeID })
     else {
@@ -1383,12 +1469,23 @@ final class AppSettings {
     return (systemColorScheme == .dark ? AppTheme.midnight : AppTheme.paper).resolvedTheme
   }
 
-  func randomizeBuiltInTheme(using index: Int? = nil) {
-    guard !followSystemTheme else { return }
-    let selection =
-      index.map { AppTheme.allCases[abs($0) % AppTheme.allCases.count] } ?? AppTheme.allCases
-      .randomElement()!
-    theme = selection
+  /// Picks an ephemeral native theme after completion. The user's chosen
+  /// theme is untouched, so closing the app restores their saved selection.
+  func randomizeTheme(for systemColorScheme: ColorScheme, using index: Int? = nil) {
+    guard !followSystemTheme, randomThemeMode.isEnabled else { return }
+    let candidates = randomThemeCandidates(for: systemColorScheme)
+    guard !candidates.isEmpty else { return }
+
+    if let index {
+      randomThemeTarget = candidates[Int(index.magnitude % UInt(candidates.count))]
+      return
+    }
+
+    if randomThemeBagSignature != candidates || randomThemeBag.isEmpty {
+      randomThemeBagSignature = candidates
+      randomThemeBag = candidates.shuffled()
+    }
+    randomThemeTarget = randomThemeBag.removeFirst()
   }
 
   func addCustomTheme(
@@ -1405,6 +1502,7 @@ final class AppSettings {
 
   func selectCustomTheme(_ id: UUID) {
     guard customThemes.contains(where: { $0.id == id }) else { return }
+    clearRandomThemeSelection()
     activeCustomThemeID = id
   }
 
@@ -1434,6 +1532,44 @@ final class AppSettings {
     customThemes.removeAll { $0.id == id }
     favoriteThemeIDs.removeAll { $0 == ThemeFavoritePolicy.customID(for: id) }
     if activeCustomThemeID == id { activeCustomThemeID = nil }
+    if randomThemeTarget == .custom(id) { clearRandomThemeSelection() }
+  }
+
+  private func randomThemeCandidates(for systemColorScheme: ColorScheme) -> [RandomThemeTarget] {
+    switch randomThemeMode {
+    case .off:
+      return []
+    case .on:
+      return AppTheme.allCases.map(RandomThemeTarget.builtIn)
+    case .favorites:
+      let builtIns = AppTheme.allCases.filter(isFavoriteTheme).map(RandomThemeTarget.builtIn)
+      let custom = customThemes.filter { isFavoriteCustomTheme($0.id) }.map {
+        RandomThemeTarget.custom($0.id)
+      }
+      return builtIns + custom
+    case .light:
+      return AppTheme.allCases.filter { $0.colorScheme == .light }.map(RandomThemeTarget.builtIn)
+    case .dark:
+      return AppTheme.allCases.filter { $0.colorScheme == .dark }.map(RandomThemeTarget.builtIn)
+    case .custom:
+      return customThemes.map { RandomThemeTarget.custom($0.id) }
+    case .auto:
+      return AppTheme.allCases.filter { $0.colorScheme == systemColorScheme }.map(
+        RandomThemeTarget.builtIn)
+    }
+  }
+
+  private func resolvedTheme(for target: RandomThemeTarget) -> ResolvedTheme? {
+    switch target {
+    case .builtIn(let theme): return theme.resolvedTheme
+    case .custom(let id): return customThemes.first(where: { $0.id == id })?.resolvedTheme
+    }
+  }
+
+  private func clearRandomThemeSelection() {
+    randomThemeTarget = nil
+    randomThemeBag = []
+    randomThemeBagSignature = []
   }
 
   private func toggleFavoriteThemeID(_ id: String) {
@@ -1473,6 +1609,7 @@ final class AppSettings {
       quickRestartKey: quickRestartKey,
       followSystemTheme: followSystemTheme,
       randomThemeOnRestart: randomThemeOnRestart,
+      randomThemeMode: randomThemeMode,
       practiceBackdrop: practiceBackdrop,
       reducePracticeMotion: reducePracticeMotion,
       englishVariant: englishVariant,
