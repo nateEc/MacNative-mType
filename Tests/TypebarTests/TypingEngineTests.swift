@@ -3593,13 +3593,16 @@ final class TypingEngineTests: XCTestCase {
     let wordsEnglish = UUID()
     let wordsChinese = UUID()
     let entries = [
-      ResultHistoryEntry(id: timeEnglish, mode: .time, language: .english, tags: ["morning"]),
-      ResultHistoryEntry(id: wordsEnglish, mode: .words, language: .english, tags: ["focus"]),
       ResultHistoryEntry(
-        id: wordsChinese, mode: .words, language: .simplifiedChinese, tags: ["focus", "evening"]),
+        id: timeEnglish, mode: .time, language: .english, tags: ["morning"], difficulty: .normal),
+      ResultHistoryEntry(
+        id: wordsEnglish, mode: .words, language: .english, tags: ["focus"], difficulty: .expert),
+      ResultHistoryEntry(
+        id: wordsChinese, mode: .words, language: .simplifiedChinese, tags: ["focus", "evening"],
+        difficulty: .normal),
     ]
     let filter = ResultHistoryFilter(
-      mode: .words, language: .english, tag: "focus", personalBestOnly: true)
+      mode: .words, language: .english, tag: "focus", personalBestOnly: true, difficulty: .expert)
     XCTAssertEqual(
       filter.matchingIDs(entries: entries, personalBestIDs: [wordsEnglish, wordsChinese]),
       [wordsEnglish])
@@ -3637,6 +3640,7 @@ final class TypingEngineTests: XCTestCase {
     let legacy = try JSONDecoder().decode(
       ResultHistoryFilter.self, from: Data(#"{"personalBestOnly":true}"#.utf8))
     XCTAssertTrue(legacy.personalBestOnly)
+    XCTAssertNil(legacy.difficulty)
     XCTAssertEqual(legacy.dateRange, .all)
   }
 
@@ -4413,7 +4417,7 @@ final class TypingEngineTests: XCTestCase {
     )
     let filter = ResultHistoryFilter(
       mode: .words, language: .english, tag: "focus", personalBestOnly: true,
-      dateRange: .lastMonth)
+      difficulty: .expert, dateRange: .lastMonth)
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
     container.mainContext.insert(preset)
     try container.mainContext.save()

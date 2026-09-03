@@ -3355,6 +3355,7 @@ private struct ResultsHistoryView: View {
   @State private var modeFilter: TestMode?
   @State private var languageFilter: TypingLanguage?
   @State private var tagFilter: String?
+  @State private var difficultyFilter: Difficulty?
   @State private var personalBestOnly = false
   @State private var dateRangeFilter: ResultHistoryDateRange = .all
   @State private var filterPresetName = ""
@@ -3366,12 +3367,13 @@ private struct ResultsHistoryView: View {
       language: languageFilter,
       tag: tagFilter,
       personalBestOnly: personalBestOnly,
+      difficulty: difficultyFilter,
       dateRange: dateRangeFilter
     )
     let entries = results.map {
       ResultHistoryEntry(
         id: $0.id, mode: $0.configuration?.mode, language: $0.configuration?.language, tags: $0.tags,
-        finishedAt: $0.finishedAt
+        finishedAt: $0.finishedAt, difficulty: $0.configuration?.difficulty
       )
     }
     let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs)
@@ -3462,6 +3464,12 @@ private struct ResultsHistoryView: View {
                 Picker("时间范围", selection: $dateRangeFilter) {
                   ForEach(ResultHistoryDateRange.allCases, id: \.self) { range in
                     Text(range.displayName).tag(range)
+                  }
+                }
+                Picker("难度", selection: $difficultyFilter) {
+                  Text("全部难度").tag(Difficulty?.none)
+                  ForEach(Difficulty.allCases, id: \.self) { difficulty in
+                    Text(difficulty.displayName).tag(Optional(difficulty))
                   }
                 }
                 Picker("模式", selection: $modeFilter) {
@@ -3719,7 +3727,7 @@ private struct ResultsHistoryView: View {
   private var activeFilter: ResultHistoryFilter {
     .init(
       mode: modeFilter, language: languageFilter, tag: tagFilter,
-      personalBestOnly: personalBestOnly, dateRange: dateRangeFilter
+      personalBestOnly: personalBestOnly, difficulty: difficultyFilter, dateRange: dateRangeFilter
     )
   }
 
@@ -3736,6 +3744,7 @@ private struct ResultsHistoryView: View {
     modeFilter = filter.mode
     languageFilter = filter.language
     tagFilter = filter.tag
+    difficultyFilter = filter.difficulty
     personalBestOnly = filter.personalBestOnly
     dateRangeFilter = filter.dateRange
   }

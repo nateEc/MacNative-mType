@@ -153,16 +153,18 @@ struct ResultHistoryEntry: Equatable, Identifiable {
     let language: TypingLanguage?
     let tags: [String]
     let finishedAt: Date
+    let difficulty: Difficulty?
 
     init(
         id: UUID, mode: TestMode?, language: TypingLanguage?, tags: [String],
-        finishedAt: Date = .distantPast
+        finishedAt: Date = .distantPast, difficulty: Difficulty? = nil
     ) {
         self.id = id
         self.mode = mode
         self.language = language
         self.tags = tags
         self.finishedAt = finishedAt
+        self.difficulty = difficulty
     }
 }
 
@@ -869,22 +871,25 @@ struct ResultHistoryFilter: Codable, Equatable {
     var mode: TestMode?
     var language: TypingLanguage?
     var tag: String?
+    var difficulty: Difficulty?
     var personalBestOnly: Bool
     var dateRange: ResultHistoryDateRange
 
     init(
         mode: TestMode? = nil, language: TypingLanguage? = nil, tag: String? = nil,
-        personalBestOnly: Bool = false, dateRange: ResultHistoryDateRange = .all
+        personalBestOnly: Bool = false, difficulty: Difficulty? = nil,
+        dateRange: ResultHistoryDateRange = .all
     ) {
         self.mode = mode
         self.language = language
         self.tag = tag
+        self.difficulty = difficulty
         self.personalBestOnly = personalBestOnly
         self.dateRange = dateRange
     }
 
     private enum CodingKeys: String, CodingKey {
-        case mode, language, tag, personalBestOnly, dateRange
+        case mode, language, tag, difficulty, personalBestOnly, dateRange
     }
 
     init(from decoder: Decoder) throws {
@@ -892,6 +897,7 @@ struct ResultHistoryFilter: Codable, Equatable {
         mode = try values.decodeIfPresent(TestMode.self, forKey: .mode)
         language = try values.decodeIfPresent(TypingLanguage.self, forKey: .language)
         tag = try values.decodeIfPresent(String.self, forKey: .tag)
+        difficulty = try values.decodeIfPresent(Difficulty.self, forKey: .difficulty)
         personalBestOnly = try values.decodeIfPresent(Bool.self, forKey: .personalBestOnly) ?? false
         dateRange = try values.decodeIfPresent(ResultHistoryDateRange.self, forKey: .dateRange) ?? .all
     }
@@ -904,6 +910,7 @@ struct ResultHistoryFilter: Codable, Equatable {
             (mode == nil || entry.mode == mode)
                 && (language == nil || entry.language == language)
                 && (tag == nil || entry.tags.contains(tag!))
+                && (difficulty == nil || entry.difficulty == difficulty)
                 && (!personalBestOnly || personalBestIDs.contains(entry.id))
                 && (cutoff.map { entry.finishedAt >= $0 } ?? true)
         }.map(\.id))
