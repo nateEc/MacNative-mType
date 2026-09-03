@@ -3358,6 +3358,8 @@ private struct ResultsHistoryView: View {
   @State private var difficultyFilter: Difficulty?
   @State private var personalBestOnly = false
   @State private var dateRangeFilter: ResultHistoryDateRange = .all
+  @State private var punctuationFilter: ResultHistoryBinaryFilter = .all
+  @State private var numbersFilter: ResultHistoryBinaryFilter = .all
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
 
@@ -3368,12 +3370,16 @@ private struct ResultsHistoryView: View {
       tag: tagFilter,
       personalBestOnly: personalBestOnly,
       difficulty: difficultyFilter,
-      dateRange: dateRangeFilter
+      dateRange: dateRangeFilter,
+      punctuation: punctuationFilter,
+      numbers: numbersFilter
     )
     let entries = results.map {
       ResultHistoryEntry(
         id: $0.id, mode: $0.configuration?.mode, language: $0.configuration?.language, tags: $0.tags,
-        finishedAt: $0.finishedAt, difficulty: $0.configuration?.difficulty
+        finishedAt: $0.finishedAt, difficulty: $0.configuration?.difficulty,
+        includesPunctuation: $0.configuration?.contentOptions.includePunctuation,
+        includesNumbers: $0.configuration?.contentOptions.includeNumbers
       )
     }
     let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs)
@@ -3470,6 +3476,16 @@ private struct ResultsHistoryView: View {
                   Text("全部难度").tag(Difficulty?.none)
                   ForEach(Difficulty.allCases, id: \.self) { difficulty in
                     Text(difficulty.displayName).tag(Optional(difficulty))
+                  }
+                }
+                Picker("标点", selection: $punctuationFilter) {
+                  ForEach(ResultHistoryBinaryFilter.allCases, id: \.self) { filter in
+                    Text(filter.displayName).tag(filter)
+                  }
+                }
+                Picker("数字", selection: $numbersFilter) {
+                  ForEach(ResultHistoryBinaryFilter.allCases, id: \.self) { filter in
+                    Text(filter.displayName).tag(filter)
                   }
                 }
                 Picker("模式", selection: $modeFilter) {
@@ -3727,7 +3743,8 @@ private struct ResultsHistoryView: View {
   private var activeFilter: ResultHistoryFilter {
     .init(
       mode: modeFilter, language: languageFilter, tag: tagFilter,
-      personalBestOnly: personalBestOnly, difficulty: difficultyFilter, dateRange: dateRangeFilter
+      personalBestOnly: personalBestOnly, difficulty: difficultyFilter, dateRange: dateRangeFilter,
+      punctuation: punctuationFilter, numbers: numbersFilter
     )
   }
 
@@ -3747,6 +3764,8 @@ private struct ResultsHistoryView: View {
     difficultyFilter = filter.difficulty
     personalBestOnly = filter.personalBestOnly
     dateRangeFilter = filter.dateRange
+    punctuationFilter = filter.punctuation
+    numbersFilter = filter.numbers
   }
 
   private func modeName(_ mode: TestMode?) -> String {

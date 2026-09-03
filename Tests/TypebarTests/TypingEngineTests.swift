@@ -3588,24 +3588,30 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(buckets.map(\.count), [2, 2, 0, 1])
   }
 
-  func testResultHistoryFilterCombinesModeLanguageTagAndPersonalBest() {
+  func testResultHistoryFilterCombinesModeLanguageTagContentOptionsAndPersonalBest() {
     let timeEnglish = UUID()
     let wordsEnglish = UUID()
     let wordsChinese = UUID()
     let entries = [
       ResultHistoryEntry(
-        id: timeEnglish, mode: .time, language: .english, tags: ["morning"], difficulty: .normal),
+        id: timeEnglish, mode: .time, language: .english, tags: ["morning"], difficulty: .normal,
+        includesPunctuation: false, includesNumbers: false),
       ResultHistoryEntry(
-        id: wordsEnglish, mode: .words, language: .english, tags: ["focus"], difficulty: .expert),
+        id: wordsEnglish, mode: .words, language: .english, tags: ["focus"], difficulty: .expert,
+        includesPunctuation: true, includesNumbers: false),
       ResultHistoryEntry(
         id: wordsChinese, mode: .words, language: .simplifiedChinese, tags: ["focus", "evening"],
-        difficulty: .normal),
+        difficulty: .normal, includesPunctuation: true, includesNumbers: true),
     ]
     let filter = ResultHistoryFilter(
-      mode: .words, language: .english, tag: "focus", personalBestOnly: true, difficulty: .expert)
+      mode: .words, language: .english, tag: "focus", personalBestOnly: true, difficulty: .expert,
+      punctuation: .included, numbers: .excluded)
     XCTAssertEqual(
       filter.matchingIDs(entries: entries, personalBestIDs: [wordsEnglish, wordsChinese]),
       [wordsEnglish])
+
+    let plainContent = ResultHistoryFilter(punctuation: .excluded, numbers: .excluded)
+    XCTAssertEqual(plainContent.matchingIDs(entries: entries, personalBestIDs: []), [timeEnglish])
 
     let all = ResultHistoryFilter()
     XCTAssertEqual(
@@ -3642,6 +3648,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(legacy.personalBestOnly)
     XCTAssertNil(legacy.difficulty)
     XCTAssertEqual(legacy.dateRange, .all)
+    XCTAssertEqual(legacy.punctuation, .all)
+    XCTAssertEqual(legacy.numbers, .all)
   }
 
   func testPersonalBestMarksEveryTiedHighestResult() {
@@ -4417,7 +4425,7 @@ final class TypingEngineTests: XCTestCase {
     )
     let filter = ResultHistoryFilter(
       mode: .words, language: .english, tag: "focus", personalBestOnly: true,
-      difficulty: .expert, dateRange: .lastMonth)
+      difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded)
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
     container.mainContext.insert(preset)
     try container.mainContext.save()
