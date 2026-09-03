@@ -11,6 +11,14 @@ private actor PasswordResetDeliveryRecorder {
   func count() -> Int { deliveries.count }
 }
 
+private actor EmailVerificationDeliveryRecorder {
+  private var deliveries: [EmailVerificationDelivery] = []
+
+  func record(_ delivery: EmailVerificationDelivery) { deliveries.append(delivery) }
+  func latest() -> EmailVerificationDelivery? { deliveries.last }
+  func count() -> Int { deliveries.count }
+}
+
 final class HealthRouteTests: XCTestCase {
   func testHealthRouteReturnsServiceIdentity() async throws {
     let app = try await Application.make(.testing)
@@ -46,6 +54,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["rateLimiting"], .partial)
         XCTAssertEqual(capabilities.capabilities["authentication"], .available)
         XCTAssertEqual(capabilities.capabilities["passwordReset"], .planned)
+        XCTAssertEqual(capabilities.capabilities["emailVerification"], .planned)
         XCTAssertEqual(capabilities.capabilities["synchronization"], .partial)
         XCTAssertEqual(capabilities.capabilities["resultSubmission"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboards"], .partial)
@@ -755,6 +764,126 @@ final class HealthRouteTests: XCTestCase {
       try await unavailableApp.asyncShutdown()
     } catch {
       try? await unavailableApp.asyncShutdown()
+      throw error
+    }
+  }
+
+  func testEmailVerificationIsOneTimeExpiresAndResetsAfterAnEmailChange() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let start = Date(timeIntervalSince1970: 2_000)
+    let registration = try await store.register(
+      .init(email: "verify@example.com", password: "a secure password", displayName: "Verify User"),
+      now: start)
+    XCTAssertFalse(registration.user.emailVerified)
+
+    let first = try await store.requestEmailVerification(
+      accessToken: registration.accessToken, now: start)
+    let second = try await store.requestEmailVerification(
+      accessToken: registration.accessToken, now: start.addingTimeInterval(1))
+    guard let first, let second else {
+      return XCTFail("Unverified accounts must receive verification deliveries")
+    }
+    XCTAssertNotEqual(first.token, second.token)
+    do {
+      try await store.completeEmailVerification(.init(token: first.token), now: start.addingTimeInterval(2))
+      XCTFail("A newer verification request must revoke the previous token")
+    } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidEmailVerificationToken) }
+    try await store.completeEmailVerification(.init(token: second.token), now: start.addingTimeInterval(2))
+    let verified = try await store.authenticatedUser(for: registration.accessToken, now: start.addingTimeInterval(2))
+    XCTAssertTrue(verified.emailVerified)
+    let verifiedAccountDelivery = try await store.requestEmailVerification(
+      accessToken: registration.accessToken, now: start.addingTimeInterval(3))
+    XCTAssertNil(verifiedAccountDelivery)
+
+    let emailChange = try await store.changeEmail(
+      .init(currentPassword: "a secure password", newEmail: "verified-new@example.com"),
+      accessToken: registration.accessToken,
+      now: start.addingTimeInterval(4))
+    XCTAssertFalse(emailChange.user.emailVerified)
+    let afterChange = try await store.requestEmailVerification(
+      accessToken: emailChange.accessToken, now: start.addingTimeInterval(4))
+    guard let afterChange else { return XCTFail("Changing an email must require new verification") }
+    do {
+      try await store.completeEmailVerification(
+        .init(token: afterChange.token), now: start.addingTimeInterval(60 * 60 * 24 + 5))
+      XCTFail("Expired verification codes must be rejected")
+    } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidEmailVerificationToken) }
+  }
+
+  func testEmailVerificationRoutesDeliverOnRegistrationAndExposeVerifiedProfileState() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let recorder = EmailVerificationDeliveryRecorder()
+
+    do {
+      try configure(
+        app,
+        authStore: store,
+        emailVerificationDelivery: { delivery in await recorder.record(delivery) })
+      try await app.test(.GET, "v1/capabilities") { response async in
+        let capabilities = try? response.content.decode(ServiceCapabilitiesResponse.self)
+        XCTAssertEqual(capabilities?.capabilities["emailVerification"], .available)
+      }
+      var session: AuthSessionResponse?
+      try await app.test(
+        .POST,
+        "v1/auth/register",
+        beforeRequest: { request async throws in
+          try request.content.encode(
+            RegisterRequest(
+              email: "verify-route@example.com", password: "a secure password",
+              displayName: "Verify Route"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          session = try? response.content.decode(AuthSessionResponse.self)
+          XCTAssertFalse(session?.user.emailVerified ?? true)
+        }
+      )
+      let registrationDeliveryCount = await recorder.count()
+      XCTAssertEqual(registrationDeliveryCount, 1)
+      guard let session else { return XCTFail("Registration must return a session") }
+
+      try await app.test(
+        .POST,
+        "v1/auth/email-verification/request",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(try? response.content.decode(EmailVerificationRequestResponse.self), .init(accepted: true))
+        }
+      )
+      let deliveryCount = await recorder.count()
+      XCTAssertEqual(deliveryCount, 2)
+      guard let delivery = await recorder.latest() else {
+        return XCTFail("The delivery handler should receive the newest verification token")
+      }
+      try await app.test(
+        .POST,
+        "v1/auth/email-verification/complete",
+        beforeRequest: { request async throws in
+          try request.content.encode(CompleteEmailVerificationRequest(token: delivery.token))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(try? response.content.decode(EmailVerificationCompletionResponse.self), .init(verified: true))
+        }
+      )
+      try await app.test(
+        .GET,
+        "v1/profiles/me",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+        },
+        afterResponse: { response async in
+          XCTAssertTrue(try response.content.decode(AuthUserResponse.self).emailVerified)
+        }
+      )
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
       throw error
     }
   }

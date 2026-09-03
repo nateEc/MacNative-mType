@@ -5,15 +5,17 @@ import Security
 struct RemoteAccountUser: Codable, Equatable, Sendable {
     let id: UUID
     let email: String
+    let emailVerified: Bool
     let displayName: String
     let totalExperience: Int
     let leaderboardOptedOut: Bool
 
-    private enum CodingKeys: String, CodingKey { case id, email, displayName, totalExperience, leaderboardOptedOut }
+    private enum CodingKeys: String, CodingKey { case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut }
 
-    init(id: UUID, email: String, displayName: String, totalExperience: Int, leaderboardOptedOut: Bool = false) {
+    init(id: UUID, email: String, emailVerified: Bool = false, displayName: String, totalExperience: Int, leaderboardOptedOut: Bool = false) {
         self.id = id
         self.email = email
+        self.emailVerified = emailVerified
         self.displayName = displayName
         self.totalExperience = totalExperience
         self.leaderboardOptedOut = leaderboardOptedOut
@@ -23,6 +25,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
         email = try values.decode(String.self, forKey: .email)
+        emailVerified = try values.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
         displayName = try values.decode(String.self, forKey: .displayName)
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
@@ -58,6 +61,9 @@ private struct RemoteCompletePasswordResetRequest: Codable, Sendable {
     let newPassword: String
 }
 private struct RemotePasswordResetCompletionResponse: Codable, Sendable { let reset: Bool }
+private struct RemoteEmailVerificationRequestResponse: Codable, Sendable { let accepted: Bool }
+private struct RemoteCompleteEmailVerificationRequest: Codable, Sendable { let token: String }
+private struct RemoteEmailVerificationCompletionResponse: Codable, Sendable { let verified: Bool }
 
 private struct RemoteChangeEmailRequest: Codable, Sendable {
     let currentPassword: String
@@ -609,6 +615,59 @@ final class AccountSession {
         }
     }
 
+    func requestEmailVerification() async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/email-verification/request",
+                method: "POST",
+                token: token,
+                body: Optional<String>.none,
+                response: RemoteEmailVerificationRequestResponse.self
+            )
+            guard response.accepted else { throw RemoteAccountError.unexpectedResponse }
+            statusMessage = "验证邮件已发送；请粘贴邮件中的验证码。"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func completeEmailVerification(token: String) async -> Bool {
+        guard let accessToken = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/email-verification/complete",
+                method: "POST",
+                token: nil,
+                body: RemoteCompleteEmailVerificationRequest(token: token),
+                response: RemoteEmailVerificationCompletionResponse.self
+            )
+            guard response.verified else { throw RemoteAccountError.unexpectedResponse }
+            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/profiles/me",
+                method: "GET",
+                token: accessToken,
+                body: Optional<String>.none,
+                response: RemoteAccountUser.self
+            )
+            statusMessage = "邮箱已验证。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func changePassword(currentPassword: String, newPassword: String) async {
         guard let token = tokenStore.load(), currentUser != nil else {
             statusMessage = "请先登录自建 Typebar 服务。"
@@ -914,7 +973,14 @@ final class AccountSession {
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }
         if let user = currentUser {
-            currentUser = .init(id: user.id, email: user.email, displayName: user.displayName, totalExperience: response.totalExperience)
+            currentUser = .init(
+                id: user.id,
+                email: user.email,
+                emailVerified: user.emailVerified,
+                displayName: user.displayName,
+                totalExperience: response.totalExperience,
+                leaderboardOptedOut: user.leaderboardOptedOut
+            )
         }
         return response
     }

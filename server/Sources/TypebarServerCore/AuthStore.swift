@@ -35,6 +35,34 @@ public struct PasswordResetCompletionResponse: Content, Equatable {
   public let reset: Bool
 }
 
+public struct EmailVerificationRequestResponse: Content, Equatable {
+  public let accepted: Bool
+}
+
+public struct CompleteEmailVerificationRequest: Content, Equatable {
+  public let token: String
+}
+
+public struct EmailVerificationCompletionResponse: Content, Equatable {
+  public let verified: Bool
+}
+
+/// An opaque, one-time code that a trusted mail webhook can embed in a
+/// verification email. The account store persists only its SHA-256 hash.
+public struct EmailVerificationDelivery: Sendable {
+  public let email: String
+  public let token: String
+  public let expiresAt: Date
+
+  public init(email: String, token: String, expiresAt: Date) {
+    self.email = email
+    self.token = token
+    self.expiresAt = expiresAt
+  }
+}
+
+public typealias EmailVerificationDeliveryHandler = @Sendable (EmailVerificationDelivery) async throws -> Void
+
 /// The only point at which a raw reset token leaves the account store. A
 /// deployment supplies a trusted delivery handler; persisted state only keeps
 /// the SHA-256 hash of `token`.
@@ -85,6 +113,7 @@ public struct AuthSessionResponse: Content, Equatable {
 public struct AuthUserResponse: Content, Equatable {
   public let id: UUID
   public let email: String
+  public let emailVerified: Bool
   public let displayName: String
   public let totalExperience: Int
   public let leaderboardOptedOut: Bool
@@ -135,6 +164,7 @@ public enum AuthStoreError: Error, Equatable {
   case invalidCredentials
   case invalidAccessToken
   case invalidPasswordResetToken
+  case invalidEmailVerificationToken
   case profileNotFound
   case cannotConnectToSelf
   case connectionAlreadyExists
@@ -155,6 +185,7 @@ public actor AuthStore {
     var users: [StoredUser] = []
     var sessions: [StoredSession] = []
     var passwordResetTokens: [StoredPasswordResetToken] = []
+    var emailVerificationTokens: [StoredEmailVerificationToken] = []
     var syncRecords: [StoredSyncRecord] = []
     var results: [StoredResult] = []
     var connections: [StoredConnection] = []
@@ -168,7 +199,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, passwordResetTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
+      case users, sessions, passwordResetTokens, emailVerificationTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, nextSyncCursor
     }
 
@@ -180,6 +211,8 @@ public actor AuthStore {
       sessions = try values.decodeIfPresent([StoredSession].self, forKey: .sessions) ?? []
       passwordResetTokens =
         try values.decodeIfPresent([StoredPasswordResetToken].self, forKey: .passwordResetTokens) ?? []
+      emailVerificationTokens =
+        try values.decodeIfPresent([StoredEmailVerificationToken].self, forKey: .emailVerificationTokens) ?? []
       syncRecords = try values.decodeIfPresent([StoredSyncRecord].self, forKey: .syncRecords) ?? []
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
@@ -207,14 +240,16 @@ public actor AuthStore {
     let displayName: String
     let passwordHash: String
     let createdAt: Date
+    let emailVerified: Bool
     let leaderboardOptedOut: Bool
 
     private enum CodingKeys: String, CodingKey {
-      case id, email, displayName, passwordHash, createdAt, leaderboardOptedOut
+      case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut
     }
 
     init(
       id: UUID, email: String, displayName: String, passwordHash: String, createdAt: Date,
+      emailVerified: Bool = false,
       leaderboardOptedOut: Bool = false
     ) {
       self.id = id
@@ -222,6 +257,7 @@ public actor AuthStore {
       self.displayName = displayName
       self.passwordHash = passwordHash
       self.createdAt = createdAt
+      self.emailVerified = emailVerified
       self.leaderboardOptedOut = leaderboardOptedOut
     }
 
@@ -232,6 +268,7 @@ public actor AuthStore {
       displayName = try values.decode(String.self, forKey: .displayName)
       passwordHash = try values.decode(String.self, forKey: .passwordHash)
       createdAt = try values.decode(Date.self, forKey: .createdAt)
+      emailVerified = try values.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
       leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
     }
   }
@@ -243,6 +280,12 @@ public actor AuthStore {
   }
 
   private struct StoredPasswordResetToken: Codable {
+    let tokenHash: String
+    let userID: UUID
+    let expiresAt: Date
+  }
+
+  private struct StoredEmailVerificationToken: Codable {
     let tokenHash: String
     let userID: UUID
     let expiresAt: Date
@@ -525,9 +568,66 @@ public actor AuthStore {
     state.users[userIndex] = StoredUser(
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
-      createdAt: user.createdAt, leaderboardOptedOut: user.leaderboardOptedOut)
+      createdAt: user.createdAt, emailVerified: user.emailVerified,
+      leaderboardOptedOut: user.leaderboardOptedOut)
     state.sessions.removeAll { $0.userID == user.id }
     state.passwordResetTokens.removeAll { $0.userID == user.id }
+    try persist()
+  }
+
+  /// Creates a 24-hour, one-time email verification token for the current
+  /// account. Already verified accounts do not receive another token.
+  public func requestEmailVerification(accessToken: String, now: Date = .now) throws
+    -> EmailVerificationDelivery?
+  {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard let user = state.users.first(where: { $0.id == currentUser.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    let tokenCount = state.emailVerificationTokens.count
+    state.emailVerificationTokens.removeAll { $0.expiresAt <= now }
+    guard !user.emailVerified else {
+      if state.emailVerificationTokens.count != tokenCount { try persist() }
+      return nil
+    }
+
+    state.emailVerificationTokens.removeAll { $0.userID == user.id }
+    let token = Self.makeAccessToken()
+    let expiresAt = now.addingTimeInterval(60 * 60 * 24)
+    state.emailVerificationTokens.append(
+      .init(tokenHash: Self.tokenHash(token), userID: user.id, expiresAt: expiresAt))
+    try persist()
+    return .init(email: user.email, token: token, expiresAt: expiresAt)
+  }
+
+  /// Cancels an undelivered verification token without persisting the raw
+  /// value or disclosing whether the account has since been verified.
+  public func cancelEmailVerification(token: String) throws {
+    let tokenHash = Self.tokenHash(token)
+    let count = state.emailVerificationTokens.count
+    state.emailVerificationTokens.removeAll { $0.tokenHash == tokenHash }
+    if state.emailVerificationTokens.count != count { try persist() }
+  }
+
+  public func completeEmailVerification(
+    _ request: CompleteEmailVerificationRequest, now: Date = .now
+  ) throws {
+    let tokenCount = state.emailVerificationTokens.count
+    state.emailVerificationTokens.removeAll { $0.expiresAt <= now }
+    let tokenHash = Self.tokenHash(request.token)
+    guard let verification = state.emailVerificationTokens.first(where: { $0.tokenHash == tokenHash }),
+      let userIndex = state.users.firstIndex(where: { $0.id == verification.userID })
+    else {
+      if state.emailVerificationTokens.count != tokenCount { try persist() }
+      throw AuthStoreError.invalidEmailVerificationToken
+    }
+
+    let user = state.users[userIndex]
+    state.users[userIndex] = StoredUser(
+      id: user.id, email: user.email, displayName: user.displayName,
+      passwordHash: user.passwordHash, createdAt: user.createdAt, emailVerified: true,
+      leaderboardOptedOut: user.leaderboardOptedOut)
+    state.emailVerificationTokens.removeAll { $0.userID == user.id }
     try persist()
   }
 
@@ -539,7 +639,7 @@ public actor AuthStore {
       let user = state.users.first(where: { $0.id == session.userID })
     else { throw AuthStoreError.invalidAccessToken }
     return .init(
-      id: user.id, email: user.email, displayName: user.displayName,
+      id: user.id, email: user.email, emailVerified: user.emailVerified, displayName: user.displayName,
       totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut)
   }
 
@@ -564,6 +664,7 @@ public actor AuthStore {
       displayName: user.displayName,
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt,
+      emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut
     )
     state.users[index] = updatedUser
@@ -596,11 +697,13 @@ public actor AuthStore {
     let updatedUser = StoredUser(
       id: user.id, email: email, displayName: user.displayName,
       passwordHash: user.passwordHash, createdAt: user.createdAt,
+      emailVerified: false,
       leaderboardOptedOut: user.leaderboardOptedOut
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
     state.passwordResetTokens.removeAll { $0.userID == updatedUser.id }
+    state.emailVerificationTokens.removeAll { $0.userID == updatedUser.id }
     let response = makeSession(for: updatedUser, now: now)
     try persist()
     return response
@@ -623,6 +726,7 @@ public actor AuthStore {
     state.users.remove(at: index)
     state.sessions.removeAll { $0.userID == userID }
     state.passwordResetTokens.removeAll { $0.userID == userID }
+    state.emailVerificationTokens.removeAll { $0.userID == userID }
     state.syncRecords.removeAll { $0.userID == userID }
     state.results.removeAll { $0.userID == userID }
     state.connections.removeAll { $0.requesterID == userID || $0.recipientID == userID }
@@ -650,12 +754,13 @@ public actor AuthStore {
     let user = state.users[index]
     let updatedUser = StoredUser(
       id: user.id, email: user.email, displayName: displayName, passwordHash: user.passwordHash,
-      createdAt: user.createdAt,
+      createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut)
     state.users[index] = updatedUser
     try persist()
     return .init(
-      id: updatedUser.id, email: updatedUser.email, displayName: updatedUser.displayName,
+      id: updatedUser.id, email: updatedUser.email, emailVerified: updatedUser.emailVerified,
+      displayName: updatedUser.displayName,
       totalExperience: experience(for: updatedUser.id),
       leaderboardOptedOut: updatedUser.leaderboardOptedOut)
   }
@@ -1473,7 +1578,7 @@ public actor AuthStore {
       .init(tokenHash: Self.tokenHash(token), userID: user.id, expiresAt: expiry))
     return .init(
       user: .init(
-        id: user.id, email: user.email, displayName: user.displayName,
+        id: user.id, email: user.email, emailVerified: user.emailVerified, displayName: user.displayName,
         totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut),
       accessToken: token,
       expiresAt: expiry

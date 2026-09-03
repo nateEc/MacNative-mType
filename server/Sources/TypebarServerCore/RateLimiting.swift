@@ -83,6 +83,9 @@ public struct TypebarRateLimitMiddleware: AsyncMiddleware {
         if path == "/v1/auth/password-reset/request" {
             return .init(id: "password-reset", maximumRequests: 3, window: 15 * 60)
         }
+        if path == "/v1/auth/email-verification/request" {
+            return .init(id: "email-verification", maximumRequests: 3, window: 15 * 60)
+        }
         if path == "/v1/results" && request.method == .POST {
             return .init(id: "result-write", maximumRequests: 30, window: 60)
         }

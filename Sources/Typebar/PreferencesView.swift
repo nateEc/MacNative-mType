@@ -12,6 +12,7 @@ struct PreferencesView: View {
   @State private var passwordResetToken = ""
   @State private var passwordResetPassword = ""
   @State private var confirmedPasswordResetPassword = ""
+  @State private var emailVerificationToken = ""
   @State private var updatedDisplayName = ""
   @State private var updatedEmail = ""
   @State private var emailChangePassword = ""
@@ -759,6 +760,29 @@ struct PreferencesView: View {
           if let user = account.currentUser {
             LabeledContent("已登录", value: user.displayName)
             Text(user.email).font(.caption).foregroundStyle(.secondary)
+            if user.emailVerified {
+              Label("邮箱已验证", systemImage: "checkmark.seal.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
+            } else {
+              Text("邮箱尚未验证；验证能确认该登录邮箱归属，不会公开邮箱。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Button("发送验证邮件") {
+                Task { await account.requestEmailVerification() }
+              }
+              .disabled(account.isWorking)
+              SecureField("邮件中的验证码", text: $emailVerificationToken)
+                .textContentType(.oneTimeCode)
+              Button("确认邮箱") {
+                Task {
+                  if await account.completeEmailVerification(token: emailVerificationToken) {
+                    emailVerificationToken = ""
+                  }
+                }
+              }
+              .disabled(account.isWorking || emailVerificationToken.isEmpty)
+            }
             TextField("公开显示名", text: $updatedDisplayName)
               .onAppear { updatedDisplayName = user.displayName }
               .onChange(of: user.displayName) { _, value in updatedDisplayName = value }

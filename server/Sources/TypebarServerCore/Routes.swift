@@ -5,6 +5,7 @@ public func configure(
     authStore: AuthStore? = nil,
     moderationKey: String? = Environment.get("TYPEBAR_MODERATION_TOKEN"),
     passwordResetDelivery: PasswordResetDeliveryHandler? = nil,
+    emailVerificationDelivery: EmailVerificationDeliveryHandler? = nil,
     maintenanceMode: Bool = TypebarMaintenanceMode.environmentEnabled
 ) throws {
     let authStore = try authStore ?? AuthStore(fileURL: TypebarServerStorage.defaultUserStoreURL(for: app))
@@ -24,6 +25,7 @@ public func configure(
                 "rateLimiting": .partial,
                 "authentication": .available,
                 "passwordReset": passwordResetDelivery == nil ? .planned : .available,
+                "emailVerification": emailVerificationDelivery == nil ? .planned : .available,
                 "synchronization": .partial,
                 "resultSubmission": .partial,
                 "leaderboards": .partial,
@@ -40,7 +42,18 @@ public func configure(
 
     app.post("v1", "auth", "register") { request async throws -> AuthSessionResponse in
         do {
-            return try await authStore.register(request.content.decode(RegisterRequest.self))
+            let session = try await authStore.register(request.content.decode(RegisterRequest.self))
+            if let emailVerificationDelivery,
+                let delivery = try await authStore.requestEmailVerification(accessToken: session.accessToken)
+            {
+                do {
+                    try await emailVerificationDelivery(delivery)
+                } catch {
+                    try? await authStore.cancelEmailVerification(token: delivery.token)
+                    request.logger.warning("Typebar could not deliver a registration verification email.")
+                }
+            }
+            return session
         } catch let error as AuthStoreError {
             throw error.abort
         }
@@ -90,6 +103,42 @@ public func configure(
         }
     }
 
+    app.post("v1", "auth", "email-verification", "request") { request async throws -> EmailVerificationRequestResponse in
+        guard let emailVerificationDelivery else {
+            throw Abort(
+                .serviceUnavailable,
+                reason: "Email verification delivery is not configured for this Typebar service."
+            )
+        }
+        do {
+            let accessToken = try request.accessToken()
+            if let delivery = try await authStore.requestEmailVerification(accessToken: accessToken) {
+                do {
+                    try await emailVerificationDelivery(delivery)
+                } catch {
+                    try? await authStore.cancelEmailVerification(token: delivery.token)
+                    throw Abort(
+                        .serviceUnavailable,
+                        reason: "Typebar could not deliver the verification email. Please try again later."
+                    )
+                }
+            }
+            return .init(accepted: true)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "email-verification", "complete") { request async throws -> EmailVerificationCompletionResponse in
+        do {
+            try await authStore.completeEmailVerification(
+                request.content.decode(CompleteEmailVerificationRequest.self))
+            return .init(verified: true)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.post("v1", "auth", "password") { request async throws -> AuthSessionResponse in
         do {
             let accessToken = try request.accessToken()
@@ -104,7 +153,18 @@ public func configure(
         do {
             let accessToken = try request.accessToken()
             let change = try request.content.decode(ChangeEmailRequest.self)
-            return try await authStore.changeEmail(change, accessToken: accessToken)
+            let session = try await authStore.changeEmail(change, accessToken: accessToken)
+            if let emailVerificationDelivery,
+                let delivery = try await authStore.requestEmailVerification(accessToken: session.accessToken)
+            {
+                do {
+                    try await emailVerificationDelivery(delivery)
+                } catch {
+                    try? await authStore.cancelEmailVerification(token: delivery.token)
+                    request.logger.warning("Typebar could not deliver an email-change verification email.")
+                }
+            }
+            return session
         } catch let error as AuthStoreError {
             throw error.abort
         }
@@ -457,6 +517,8 @@ private extension AuthStoreError {
             Abort(.unauthorized, reason: "Invalid email or password.")
         case .invalidPasswordResetToken:
             Abort(.unauthorized, reason: "This password reset code is invalid or has expired.")
+        case .invalidEmailVerificationToken:
+            Abort(.unauthorized, reason: "This email verification code is invalid or has expired.")
         case .profileNotFound:
             Abort(.notFound, reason: "The requested Typebar profile does not exist.")
         case .cannotConnectToSelf, .connectionNotPending:
