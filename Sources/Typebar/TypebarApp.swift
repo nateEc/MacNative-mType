@@ -2638,7 +2638,7 @@ private struct CompletedResultView: View {
         }
         if result.afkDuration > 0 {
           GridRow {
-            metric("闲置", "\(Int(result.afkDuration)) 秒")
+            metric("闲置", "\(Int(result.afkDuration)) 秒 · \(afkPercentageText)%")
             metric("有效键入", "\(Int(result.engagedDuration)) 秒")
           }
         }
@@ -2770,6 +2770,10 @@ private struct CompletedResultView: View {
     case .active, .completed, .failed, .abandoned:
       savesResult ? "已保存到这台 Mac" : "练习模式：不保存成绩"
     }
+  }
+
+  private var afkPercentageText: String {
+    result.afkPercentage.formatted(.number.precision(.fractionLength(0...2)))
   }
 
   private func metric(_ title: String, _ value: String) -> some View {
@@ -3980,7 +3984,9 @@ private struct ResultDetailView: View {
         if result.afkDuration > 0 {
           GridRow {
             Text("闲置 / 有效键入")
-            Text("\(Int(result.afkDuration)) 秒 / \(Int(result.engagedDuration)) 秒")
+            Text(
+              "\(Int(result.afkDuration)) 秒（\(result.afkPercentage.formatted(.number.precision(.fractionLength(0...2))))%） / \(Int(result.engagedDuration)) 秒"
+            )
           }
         }
       }

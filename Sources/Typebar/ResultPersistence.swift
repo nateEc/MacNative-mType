@@ -61,6 +61,12 @@ final class TestResultRecord {
     max(0, finishedAt.timeIntervalSince(startedAt) - afkDuration)
   }
 
+  var afkPercentage: Double {
+    let elapsedDuration = max(0, finishedAt.timeIntervalSince(startedAt))
+    guard elapsedDuration > 0 else { return 0 }
+    return afkDuration / elapsedDuration * 100
+  }
+
   func addTag(_ rawTag: String) {
     tags = ResultTagPolicy.appending(rawTag, to: tags)
   }

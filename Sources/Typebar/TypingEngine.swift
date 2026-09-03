@@ -1564,6 +1564,11 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     max(0, elapsedDuration - afkDuration)
   }
 
+  var afkPercentage: Double {
+    guard elapsedDuration > 0 else { return 0 }
+    return afkDuration / elapsedDuration * 100
+  }
+
   private enum CodingKeys: String, CodingKey {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, tags, prompt, replayEvents

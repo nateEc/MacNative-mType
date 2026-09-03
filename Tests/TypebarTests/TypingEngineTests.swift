@@ -52,6 +52,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(idle.outcome, .invalidAFK)
     XCTAssertEqual(invalidResult.afkDuration, 9)
     XCTAssertEqual(invalidResult.engagedDuration, 1)
+    XCTAssertEqual(invalidResult.afkPercentage, 90, accuracy: 0.000_001)
     XCTAssertEqual(idle.remainingSeconds(at: start.addingTimeInterval(10)), 0)
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: invalidResult.outcome, enabled: true))
     XCTAssertEqual(
@@ -71,6 +72,20 @@ final class TypingEngineTests: XCTestCase {
     keyboardOnly.tick(at: start.addingTimeInterval(10))
     let keyboardOnlyResult = try XCTUnwrap(keyboardOnly.result())
     XCTAssertEqual(keyboardOnlyResult.afkDuration, 6)
+  }
+
+  func testAfkPercentageUsesTheCompletedWallClockDuration() {
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30), outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(30), afkDuration: 7, typedCharacterCount: 50,
+      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96)
+    XCTAssertEqual(result.afkPercentage, 23.333_333_333_3, accuracy: 0.000_001)
+
+    let instant = CompletedTestResult(
+      id: UUID(), configuration: .words(10), outcome: .completed, startedAt: start,
+      finishedAt: start, afkDuration: 1, typedCharacterCount: 0, correctCharacterCount: 0,
+      errorCount: 0, wpm: 0, rawWpm: 0, accuracy: 100)
+    XCTAssertEqual(instant.afkPercentage, 0)
   }
 
   func testWordsTestCompletesAtWordLimit() {
@@ -3562,6 +3577,7 @@ final class TypingEngineTests: XCTestCase {
     let restored = try JSONDecoder().decode(CompletedTestResult.self, from: legacyData)
     XCTAssertEqual(restored.afkDuration, 0)
     XCTAssertEqual(restored.engagedDuration, 30)
+    XCTAssertEqual(restored.afkPercentage, 0)
   }
 
   func testArchiveMergeSkipsExistingResultsAndPresets() {
@@ -4247,6 +4263,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(stored.wpm, result.wpm)
     XCTAssertEqual(stored.accuracy, 100)
     XCTAssertEqual(stored.afkDuration, 4)
+    XCTAssertEqual(stored.afkPercentage, 66.666_666_666_7, accuracy: 0.000_001)
     XCTAssertEqual(stored.portableResult, result)
 
     stored.addTag("morning")
