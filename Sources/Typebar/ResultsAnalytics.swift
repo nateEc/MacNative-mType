@@ -149,14 +149,14 @@ enum WordBurstHeatmapPolicy {
   }
 }
 
-/// A local-only, deliberately conservative follow-up exercise generated from
-/// words the user actually attempted in the just-finished result. It leaves
-/// unmeasured words out instead of assigning them an invented speed.
+/// A local-only slow-word follow-up matching the reference selection rule:
+/// rank attempted targets by word burst, retain the slowest rounded 20%, and
+/// weight the slowest selected target most heavily.
 struct SlowWordPracticePlan: Equatable {
   let selectedWords: [String]
   let exerciseWords: [String]
 
-  static let minimumMeasuredWords = 5
+  static let maximumSelectedWords = 20
 
   static func make(reviews: [TypedWordReview], bursts: [Int?]) -> Self? {
     struct Candidate {
@@ -165,30 +165,24 @@ struct SlowWordPracticePlan: Equatable {
       let burst: Int
     }
 
-    let candidates = reviews.enumerated().compactMap { index, review -> Candidate? in
-      guard bursts.indices.contains(index), let burst = bursts[index], burst > 0,
-        !review.target.isEmpty
-      else { return nil }
-      return .init(index: index, target: review.target, burst: burst)
+    // The reference event history ends with the active trailing entry, which
+    // is not eligible for slow-word classification.
+    let candidates = reviews.dropLast().enumerated().compactMap { index, review -> Candidate? in
+      guard !review.target.isEmpty else { return nil }
+      return .init(index: index, target: review.target, burst: bursts.indices.contains(index) ? bursts[index] ?? 0 : 0)
     }
-    guard candidates.count >= minimumMeasuredWords else { return nil }
-
-    let selectedCount = min(12, max(1, Int((Double(candidates.count) * 0.25).rounded(.up))))
+    let selectedCount = min(
+      maximumSelectedWords,
+      Int((Double(candidates.count) * 0.2).rounded(.toNearestOrAwayFromZero)))
+    guard selectedCount > 0 else { return nil }
     let ranked = candidates.sorted {
       $0.burst == $1.burst ? $0.index < $1.index : $0.burst < $1.burst
     }
-    var selected: [Candidate] = []
-    var seen = Set<String>()
-    for candidate in ranked where seen.insert(candidate.target).inserted {
-      selected.append(candidate)
-      if selected.count == selectedCount { break }
-    }
+    let selected = Array(ranked.prefix(selectedCount))
     guard !selected.isEmpty else { return nil }
 
-    let denominator = max(1, selected.count - 1)
     let exerciseWords = selected.enumerated().flatMap { index, candidate in
-      let repetitions = max(1, 3 - Int((Double(index) / Double(denominator) * 2).rounded(.down)))
-      return Array(repeating: candidate.target, count: repetitions)
+      Array(repeating: candidate.target, count: selected.count - index)
     }
     return .init(selectedWords: selected.map(\.target), exerciseWords: exerciseWords)
   }

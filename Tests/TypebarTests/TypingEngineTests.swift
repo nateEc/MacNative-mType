@@ -821,7 +821,7 @@ final class TypingEngineTests: XCTestCase {
       "typebar-result-19700101-000000.png")
   }
 
-  func testSlowWordPracticeUsesMeasuredTargetWordsAndWeightsTheSlowest() throws {
+  func testSlowWordPracticeUsesReferenceTwentyPercentSelectionAndWeightsTheSlowest() throws {
     let reviews = [
       TypedWordReview(index: 0, target: "ember", typed: "ember"),
       TypedWordReview(index: 1, target: "cabin", typed: "cabin"),
@@ -830,14 +830,16 @@ final class TypingEngineTests: XCTestCase {
       TypedWordReview(index: 4, target: "stream", typed: "stream"),
       TypedWordReview(index: 5, target: "ignored", typed: "ignored"),
     ]
-    XCTAssertNil(SlowWordPracticePlan.make(reviews: Array(reviews.prefix(4)), bursts: [80, 70, 60, 50]))
+    let shortPlan = try XCTUnwrap(
+      SlowWordPracticePlan.make(reviews: Array(reviews.prefix(4)), bursts: [80, 70, 60, 50]))
+    XCTAssertEqual(shortPlan.selectedWords, ["planet"])
 
     let plan = try XCTUnwrap(
       SlowWordPracticePlan.make(reviews: reviews, bursts: [90, 40, 25, 55, 70, nil]))
-    XCTAssertEqual(plan.selectedWords, ["planet", "cabin"])
-    XCTAssertEqual(plan.exerciseWords, ["planet", "planet", "planet", "cabin"])
+    XCTAssertEqual(plan.selectedWords, ["planet"])
+    XCTAssertEqual(plan.exerciseWords, ["planet"])
 
-    let deduplicated = try XCTUnwrap(
+    let repeatedTarget = try XCTUnwrap(
       SlowWordPracticePlan.make(
         reviews: [
           TypedWordReview(index: 0, target: "cabin", typed: "cabin"),
@@ -848,7 +850,7 @@ final class TypingEngineTests: XCTestCase {
           TypedWordReview(index: 5, target: "ember", typed: "ember"),
         ],
         bursts: [10, 20, 30, 40, 50, 60]))
-    XCTAssertEqual(deduplicated.selectedWords, ["cabin", "planet"])
+    XCTAssertEqual(repeatedTarget.selectedWords, ["cabin"])
   }
 
   func testContextualMissedWordPracticeKeepsOnlyAttemptedTargetContext() throws {
