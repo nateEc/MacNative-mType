@@ -109,6 +109,19 @@ final class TypingEngineTests: XCTestCase {
         for: .future, flipsCompletionAndFuture: true, usesAccentForCompleted: true), .accent)
   }
 
+  func testCustomBackgroundPolicyAcceptsOnlySupportedRemoteImagesAndNormalizesFilters() {
+    XCTAssertEqual(
+      CustomBackgroundURLPolicy.normalizedRemoteURL(" https://images.example.test/sky.webp?theme=night "),
+      "https://images.example.test/sky.webp?theme=night")
+    XCTAssertEqual(CustomBackgroundURLPolicy.normalizedRemoteURL(""), "")
+    XCTAssertNil(CustomBackgroundURLPolicy.normalizedRemoteURL("ftp://images.example.test/sky.jpg"))
+    XCTAssertNil(CustomBackgroundURLPolicy.normalizedRemoteURL("https://images.example.test/sky.svg"))
+    XCTAssertNil(CustomBackgroundURLPolicy.normalizedRemoteURL("https://images.example.test/sky.jpg'"))
+
+    let filter = CustomBackgroundFilter(blur: -1, brightness: 9, saturation: -2, opacity: 4)
+    XCTAssertEqual(filter, .init(blur: 0, brightness: 2, saturation: 0, opacity: 1))
+  }
+
   func testNoSpaceWordTestsKeepTheirCommittedWordProgress() {
     let configuration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
     var session = TypingSession(
@@ -3395,6 +3408,9 @@ final class TypingEngineTests: XCTestCase {
     settings.randomThemeMode = .custom
     settings.flipTestColors = true
     settings.colorfulMode = true
+    settings.customBackgroundURL = "https://images.example.test/harbour.jpeg"
+    settings.customBackgroundFit = .contain
+    settings.customBackgroundFilter = .init(blur: 4, brightness: 0.85, saturation: 1.4, opacity: 0.7)
     settings.englishVariant = .british
     settings.freedomMode = true
     settings.confidenceMode = .maximum
@@ -3463,6 +3479,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
     XCTAssertTrue(exportedSnapshot.flipTestColors)
     XCTAssertTrue(exportedSnapshot.colorfulMode)
+    XCTAssertEqual(exportedSnapshot.customBackgroundURL, "https://images.example.test/harbour.jpeg")
+    XCTAssertEqual(exportedSnapshot.customBackgroundFit, .contain)
+    XCTAssertEqual(exportedSnapshot.customBackgroundFilter, .init(blur: 4, brightness: 0.85, saturation: 1.4, opacity: 0.7))
     XCTAssertEqual(exportedSnapshot.liveProgressStyle, .flashMini)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
@@ -3490,6 +3509,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.randomThemeMode, .custom)
     XCTAssertTrue(restored.flipTestColors)
     XCTAssertTrue(restored.colorfulMode)
+    XCTAssertEqual(restored.customBackgroundURL, "https://images.example.test/harbour.jpeg")
+    XCTAssertEqual(restored.customBackgroundFit, .contain)
+    XCTAssertEqual(restored.customBackgroundFilter, .init(blur: 4, brightness: 0.85, saturation: 1.4, opacity: 0.7))
     XCTAssertEqual(restored.practiceBackdrop, .halos)
     XCTAssertTrue(restored.reducePracticeMotion)
     XCTAssertTrue(restored.isFavoriteTheme(.grove))
@@ -3638,6 +3660,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.randomThemeMode, .off)
     XCTAssertFalse(snapshot.flipTestColors)
     XCTAssertFalse(snapshot.colorfulMode)
+    XCTAssertEqual(snapshot.customBackgroundURL, "")
+    XCTAssertEqual(snapshot.customBackgroundFit, .cover)
+    XCTAssertEqual(snapshot.customBackgroundFilter, .init())
     XCTAssertEqual(snapshot.practiceBackdrop, .solid)
     XCTAssertFalse(snapshot.reducePracticeMotion)
     XCTAssertTrue(snapshot.startGraphsAtZero)

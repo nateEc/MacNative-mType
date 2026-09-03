@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct PreferencesView: View {
   let settings: AppSettings
@@ -33,6 +34,9 @@ struct PreferencesView: View {
   @State private var customThemeAccent = Color(red: 0.95, green: 0.57, blue: 0.20)
   @State private var customThemePrefersDark = true
   @State private var searchQuery = ""
+  @State private var customBackgroundURLDraft = ""
+  @State private var customBackgroundMessage: String?
+  @State private var showingCustomBackgroundImporter = false
 
   var body: some View {
     @Bindable var settings = settings
@@ -278,6 +282,51 @@ struct PreferencesView: View {
           Text("开启后，已输入文本使用当前主题强调色；与翻转颜色组合时，后续提示使用强调色。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          TextField("背景图片 URL", text: $customBackgroundURLDraft)
+            .textFieldStyle(.roundedBorder)
+          HStack {
+            Button("应用 URL") { applyCustomBackgroundURL() }
+            if !settings.customBackgroundURL.isEmpty {
+              Button("移除 URL") {
+                settings.customBackgroundURL = ""
+                customBackgroundURLDraft = ""
+              }
+            }
+            Spacer()
+            Button(settings.hasLocalBackground ? "替换本地图片…" : "选择本地图片…") {
+              showingCustomBackgroundImporter = true
+            }
+            if settings.hasLocalBackground {
+              Button("移除本地图片", role: .destructive) { removeLocalBackground() }
+            }
+          }
+          Picker("背景图片适配", selection: $settings.customBackgroundFit) {
+            ForEach(CustomBackgroundFit.allCases) { fit in
+              Text(fit.displayName).tag(fit)
+            }
+          }
+          if settings.hasLocalBackground || !settings.customBackgroundURL.isEmpty {
+            Slider(value: $settings.customBackgroundFilter.blur, in: 0...20, step: 0.5) {
+              Text("背景模糊")
+            }
+            Slider(value: $settings.customBackgroundFilter.brightness, in: 0...2, step: 0.05) {
+              Text("背景亮度")
+            }
+            Slider(value: $settings.customBackgroundFilter.saturation, in: 0...3, step: 0.05) {
+              Text("背景饱和度")
+            }
+            Slider(value: $settings.customBackgroundFilter.opacity, in: 0...1, step: 0.05) {
+              Text("背景不透明度")
+            }
+          }
+          if let customBackgroundMessage {
+            Text(customBackgroundMessage)
+              .font(.caption)
+              .foregroundStyle(.red)
+          }
+          Text("可使用 HTTP(S) 的 PNG、JPG、GIF 或 WebP 图片 URL，或导入本地图片。本地图片只保存在这台 Mac 且优先于 URL；只有在你填写 URL 时才会访问网络。URL、适配和滤镜会随设置归档，本地图片不会导出。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Picker("练习背景", selection: $settings.practiceBackdrop) {
             ForEach(PracticeBackdropStyle.allCases) { style in
               Text(style.displayName).tag(style)
@@ -285,7 +334,7 @@ struct PreferencesView: View {
           }
           Toggle("减少练习背景动态效果", isOn: $settings.reducePracticeMotion)
             .disabled(settings.practiceBackdrop != .halos)
-          Text("背景由 Typebar 的原生矢量绘制，不使用或下载图片。光晕会遵从 macOS“减少动态效果”辅助功能设置。")
+          Text("未设置自定义图片时，背景由 Typebar 的原生矢量绘制；光晕会遵从 macOS“减少动态效果”辅助功能设置。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Slider(value: $settings.fontSize, in: 18...42, step: 1) {
@@ -926,8 +975,47 @@ struct PreferencesView: View {
     } message: {
       Text("服务端数据将永久移除。本机练习历史仍保留在这台 Mac 上。")
     }
+    .fileImporter(isPresented: $showingCustomBackgroundImporter, allowedContentTypes: [.image]) { result in
+      switch result {
+      case .success(let url): importLocalBackground(from: url)
+      case .failure(let error): customBackgroundMessage = error.localizedDescription
+      }
+    }
+    .onAppear { customBackgroundURLDraft = settings.customBackgroundURL }
     .frame(width: 440)
     .padding()
+  }
+
+  private func applyCustomBackgroundURL() {
+    guard let normalized = CustomBackgroundURLPolicy.normalizedRemoteURL(customBackgroundURLDraft) else {
+      customBackgroundMessage = "请输入 HTTP(S) 的 PNG、JPG、GIF 或 WebP 图片 URL。"
+      return
+    }
+    settings.customBackgroundURL = normalized
+    customBackgroundURLDraft = normalized
+    customBackgroundMessage = nil
+  }
+
+  private func importLocalBackground(from url: URL) {
+    let canAccess = url.startAccessingSecurityScopedResource()
+    defer {
+      if canAccess { url.stopAccessingSecurityScopedResource() }
+    }
+    do {
+      try settings.importLocalBackground(data: Data(contentsOf: url))
+      customBackgroundMessage = nil
+    } catch {
+      customBackgroundMessage = error.localizedDescription
+    }
+  }
+
+  private func removeLocalBackground() {
+    do {
+      try settings.removeLocalBackground()
+      customBackgroundMessage = nil
+    } catch {
+      customBackgroundMessage = error.localizedDescription
+    }
   }
 
   private var testSectionVisible: Bool {
@@ -940,7 +1028,7 @@ struct PreferencesView: View {
 
   private var displaySectionVisible: Bool {
     matches(
-      "显示", "主题", "theme", "随机", "random", "系统", "system", "翻转", "flip", "彩色", "colorful", "颜色", "字体", "font", "等宽", "圆角", "衬线", "行宽",
+      "显示", "主题", "theme", "随机", "random", "系统", "system", "翻转", "flip", "彩色", "colorful", "颜色", "背景", "图片", "image", "url", "模糊", "blur", "亮度", "brightness", "饱和度", "saturation", "不透明度", "opacity", "字体", "font", "等宽", "圆角", "衬线", "行宽",
       "width", "光标", "caret", "关闭", "条形", "下划线", "块状", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
       "keyboard", "布局", "layout", "下一键")
   }

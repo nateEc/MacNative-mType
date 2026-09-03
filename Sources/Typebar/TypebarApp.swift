@@ -531,9 +531,12 @@ private struct ContentView: View {
     .padding(42)
     .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
     .background(
-      PracticeBackdrop(
-        style: settings.practiceBackdrop, theme: activeTheme,
-        reduceMotion: settings.reducePracticeMotion)
+      CustomPracticeBackground(
+        fallbackStyle: settings.practiceBackdrop, theme: activeTheme,
+        reduceMotion: settings.reducePracticeMotion,
+        remoteURL: settings.customBackgroundURL, fit: settings.customBackgroundFit,
+        filter: settings.customBackgroundFilter,
+        localImageRevision: settings.localBackgroundRevision)
     )
     .tint(activeTheme.accent)
     .preferredColorScheme(settings.followSystemTheme ? nil : activeTheme.colorScheme)

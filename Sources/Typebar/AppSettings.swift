@@ -478,6 +478,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var randomThemeMode: RandomThemeMode = .off
   var flipTestColors = false
   var colorfulMode = false
+  var customBackgroundURL = ""
+  var customBackgroundFit: CustomBackgroundFit = .cover
+  var customBackgroundFilter = CustomBackgroundFilter()
   var practiceBackdrop: PracticeBackdropStyle = .solid
   var reducePracticeMotion = false
   var englishVariant: EnglishVariant = .american
@@ -563,6 +566,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     randomThemeMode: RandomThemeMode = .off,
     flipTestColors: Bool = false,
     colorfulMode: Bool = false,
+    customBackgroundURL: String = "",
+    customBackgroundFit: CustomBackgroundFit = .cover,
+    customBackgroundFilter: CustomBackgroundFilter = .init(),
     practiceBackdrop: PracticeBackdropStyle = .solid,
     reducePracticeMotion: Bool = false,
     englishVariant: EnglishVariant = .american,
@@ -652,6 +658,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.randomThemeOnRestart = self.randomThemeMode.isEnabled
     self.flipTestColors = flipTestColors
     self.colorfulMode = colorfulMode
+    self.customBackgroundURL = CustomBackgroundURLPolicy.normalizedRemoteURL(customBackgroundURL) ?? ""
+    self.customBackgroundFit = customBackgroundFit
+    self.customBackgroundFilter = customBackgroundFilter.normalized
     self.practiceBackdrop = practiceBackdrop
     self.reducePracticeMotion = reducePracticeMotion
     self.englishVariant = englishVariant
@@ -716,7 +725,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
-      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, practiceBackdrop, reducePracticeMotion, englishVariant,
+      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
@@ -787,6 +796,13 @@ struct AppSettingsSnapshot: Codable, Equatable {
     randomThemeOnRestart = randomThemeMode.isEnabled
     flipTestColors = try values.decodeIfPresent(Bool.self, forKey: .flipTestColors) ?? false
     colorfulMode = try values.decodeIfPresent(Bool.self, forKey: .colorfulMode) ?? false
+    customBackgroundURL = CustomBackgroundURLPolicy.normalizedRemoteURL(
+      try values.decodeIfPresent(String.self, forKey: .customBackgroundURL) ?? "") ?? ""
+    customBackgroundFit =
+      try values.decodeIfPresent(CustomBackgroundFit.self, forKey: .customBackgroundFit) ?? .cover
+    customBackgroundFilter =
+      (try values.decodeIfPresent(CustomBackgroundFilter.self, forKey: .customBackgroundFilter) ?? .init())
+      .normalized
     practiceBackdrop =
       try values.decodeIfPresent(PracticeBackdropStyle.self, forKey: .practiceBackdrop) ?? .solid
     reducePracticeMotion =
@@ -1030,6 +1046,28 @@ final class AppSettings {
   }
   var flipTestColors = false { didSet { persist() } }
   var colorfulMode = false { didSet { persist() } }
+  var customBackgroundURL = "" {
+    didSet {
+      let normalized = CustomBackgroundURLPolicy.normalizedRemoteURL(customBackgroundURL) ?? ""
+      if customBackgroundURL != normalized {
+        customBackgroundURL = normalized
+        return
+      }
+      persist()
+    }
+  }
+  var customBackgroundFit: CustomBackgroundFit = .cover { didSet { persist() } }
+  var customBackgroundFilter = CustomBackgroundFilter() {
+    didSet {
+      let normalized = customBackgroundFilter.normalized
+      if customBackgroundFilter != normalized {
+        customBackgroundFilter = normalized
+        return
+      }
+      persist()
+    }
+  }
+  private(set) var localBackgroundRevision = 0
   var practiceBackdrop: PracticeBackdropStyle = .solid { didSet { persist() } }
   var reducePracticeMotion = false { didSet { persist() } }
   var englishVariant: EnglishVariant = .american { didSet { persist() } }
@@ -1157,6 +1195,9 @@ final class AppSettings {
     randomThemeMode = snapshot.randomThemeMode
     flipTestColors = snapshot.flipTestColors
     colorfulMode = snapshot.colorfulMode
+    customBackgroundURL = snapshot.customBackgroundURL
+    customBackgroundFit = snapshot.customBackgroundFit
+    customBackgroundFilter = snapshot.customBackgroundFilter
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
     englishVariant = snapshot.englishVariant
@@ -1256,6 +1297,8 @@ final class AppSettings {
       followSystemTheme: followSystemTheme, randomThemeOnRestart: randomThemeOnRestart,
       randomThemeMode: randomThemeMode,
       flipTestColors: flipTestColors, colorfulMode: colorfulMode,
+      customBackgroundURL: customBackgroundURL, customBackgroundFit: customBackgroundFit,
+      customBackgroundFilter: customBackgroundFilter,
       practiceBackdrop: practiceBackdrop, reducePracticeMotion: reducePracticeMotion,
       englishVariant: englishVariant, favoriteQuoteIDs: favoriteQuoteIDs,
       repeatQuotes: repeatQuotes, freedomMode: freedomMode, confidenceMode: confidenceMode,
@@ -1323,6 +1366,9 @@ final class AppSettings {
     randomThemeMode = .off
     flipTestColors = false
     colorfulMode = false
+    customBackgroundURL = ""
+    customBackgroundFit = .cover
+    customBackgroundFilter = .init()
     practiceBackdrop = .solid
     reducePracticeMotion = false
     englishVariant = .american
@@ -1449,6 +1495,9 @@ final class AppSettings {
     randomThemeMode = snapshot.randomThemeMode
     flipTestColors = snapshot.flipTestColors
     colorfulMode = snapshot.colorfulMode
+    customBackgroundURL = snapshot.customBackgroundURL
+    customBackgroundFit = snapshot.customBackgroundFit
+    customBackgroundFilter = snapshot.customBackgroundFilter
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
     englishVariant = snapshot.englishVariant
@@ -1509,6 +1558,18 @@ final class AppSettings {
       return theme.resolvedTheme
     }
     return custom.resolvedTheme
+  }
+
+  var hasLocalBackground: Bool { TypebarLocalBackgroundStore.hasImage }
+
+  func importLocalBackground(data: Data) throws {
+    try TypebarLocalBackgroundStore.save(data)
+    localBackgroundRevision &+= 1
+  }
+
+  func removeLocalBackground() throws {
+    try TypebarLocalBackgroundStore.remove()
+    localBackgroundRevision &+= 1
   }
 
   func resolvedTheme(for systemColorScheme: ColorScheme) -> ResolvedTheme {
@@ -1659,6 +1720,9 @@ final class AppSettings {
       randomThemeMode: randomThemeMode,
       flipTestColors: flipTestColors,
       colorfulMode: colorfulMode,
+      customBackgroundURL: customBackgroundURL,
+      customBackgroundFit: customBackgroundFit,
+      customBackgroundFilter: customBackgroundFilter,
       practiceBackdrop: practiceBackdrop,
       reducePracticeMotion: reducePracticeMotion,
       englishVariant: englishVariant,
