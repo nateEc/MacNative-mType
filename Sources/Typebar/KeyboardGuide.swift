@@ -14,6 +14,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case italianQwerty
   case portugueseQwertyISO
   case portugueseQwertyANSI
+  case latinAmericanQwerty
   case frenchAzerty
 
   var id: Self { self }
@@ -32,6 +33,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .italianQwerty: "Italian QWERTY"
     case .portugueseQwertyISO: "Portuguese QWERTY (ISO)"
     case .portugueseQwertyANSI: "Portuguese QWERTY (ANSI)"
+    case .latinAmericanQwerty: "Latin American QWERTY"
     case .frenchAzerty: "French AZERTY"
     }
   }
@@ -410,6 +412,25 @@ enum KeyboardGuideModel {
           characters: ["zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",;", ".:", "-_"],
           shiftedLabels: ["Z", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
         ),
+      ]
+    case .latinAmericanQwerty:
+      [
+        row(
+          "number", "|1234567890'¿",
+          characters: ["|°", "1!", "2\"", "3#", "4$", "5%", "6&", "7/", "8(", "9)", "0=", "'?", "¿¡"],
+          shiftedLabels: ["°", "!", "\"", "#", "$", "%", "&", "/", "(", ")", "=", "?", "¡"]
+        ),
+        row(
+          "top", "QWERTYUIOP´+",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "´¨", "+*"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "¨", "*"]
+        ),
+        row(
+          "home", "ASDFGHJKLÑ{",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "ñÑ", "{["],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ", "["]
+        ),
+        isoBottomRow()
       ]
     case .frenchAzerty:
       [

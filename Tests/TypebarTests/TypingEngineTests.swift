@@ -1538,6 +1538,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ª", layout: .portugueseQwertyANSI), 39)
   }
 
+  func testLatinAmericanQwertyLeavesItsDeadKeyToMacOSAndMapsTypedSymbols() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ñ", layout: .latinAmericanQwerty), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "¡", layout: .latinAmericanQwerty), "number-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "[", layout: .latinAmericanQwerty), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .latinAmericanQwerty), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .latinAmericanQwerty), "°")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 24, modifierFlags: [.shift], layout: .latinAmericanQwerty), "¡")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [.shift], layout: .latinAmericanQwerty), "[")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [], layout: .latinAmericanQwerty))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ñ", layout: .latinAmericanQwerty), 41)
+  }
+
   func testNonDefaultKeyboardLayoutsEmulatePhysicalAnsiKeyPositions() {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
