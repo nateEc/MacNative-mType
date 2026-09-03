@@ -361,6 +361,10 @@ struct PreferencesView: View {
           Text("未设置自定义图片时，背景由 Typebar 的原生矢量绘制；光晕会遵从 macOS“减少动态效果”辅助功能设置。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Toggle("显示节奏伙伴", isOn: $settings.showTypingCompanion)
+          Text("练习开始后以原创矢量显示左右手按键状态；速度越高，视觉反馈越明显。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Slider(value: $settings.fontSize, in: 18...42, step: 1) {
             Text("练习字体大小")
           } minimumValueLabel: {
@@ -1052,7 +1056,7 @@ struct PreferencesView: View {
 
   private var displaySectionVisible: Bool {
     matches(
-      "显示", "主题", "theme", "随机", "random", "系统", "system", "翻转", "flip", "彩色", "colorful", "颜色", "背景", "图片", "image", "url", "模糊", "blur", "亮度", "brightness", "饱和度", "saturation", "不透明度", "opacity", "字体", "font", "等宽", "圆角", "衬线", "行宽",
+      "显示", "主题", "theme", "随机", "random", "系统", "system", "翻转", "flip", "彩色", "colorful", "颜色", "背景", "图片", "image", "url", "模糊", "blur", "亮度", "brightness", "饱和度", "saturation", "不透明度", "opacity", "伙伴", "companion", "手部", "hand", "字体", "font", "等宽", "圆角", "衬线", "行宽",
       "width", "光标", "caret", "关闭", "条形", "下划线", "块状", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
       "keyboard", "布局", "layout", "下一键")
   }

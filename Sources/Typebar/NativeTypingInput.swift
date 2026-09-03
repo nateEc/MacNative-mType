@@ -23,6 +23,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onFocusChanged: (Bool) -> Void
     let onCompositionChanged: (String) -> Void
     let onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void
+    let onPhysicalKey: (UInt16, Bool, Bool) -> Void
 
     final class Coordinator {
         var appliedFocusRequest = -1
@@ -55,6 +56,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onFocusChanged = onFocusChanged
         view.onCompositionChanged = onCompositionChanged
         view.onModifierFlagsChanged = onModifierFlagsChanged
+        view.onPhysicalKey = onPhysicalKey
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
         context.coordinator.appliedFocusRequest = focusRequest
         view.resetBailoutAttempt()
@@ -83,6 +85,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onFocusChanged: (Bool) -> Void = { _ in }
     var onCompositionChanged: (String) -> Void = { _ in }
     var onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void = { _ in }
+    var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
 
     private var composition = NSAttributedString()
     private var leftShiftPressed = false
@@ -120,8 +123,12 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 
     override func flagsChanged(with event: NSEvent) {
       switch event.keyCode {
-      case 56: leftShiftPressed.toggle()
-      case 60: rightShiftPressed.toggle()
+      case 56:
+        leftShiftPressed.toggle()
+        onPhysicalKey(event.keyCode, leftShiftPressed, false)
+      case 60:
+        rightShiftPressed.toggle()
+        onPhysicalKey(event.keyCode, rightShiftPressed, false)
       default: break
       }
       onModifierFlagsChanged(event.modifierFlags)
@@ -129,6 +136,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
+        onPhysicalKey(event.keyCode, true, event.isARepeat)
         onModifierFlagsChanged(event.modifierFlags)
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {
             onRestart()
@@ -195,6 +203,11 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         }
         pendingForcedError = forcesError
         interpretKeyEvents([event])
+    }
+
+    override func keyUp(with event: NSEvent) {
+        onPhysicalKey(event.keyCode, false, false)
+        super.keyUp(with: event)
     }
 
     func resetBailoutAttempt() {

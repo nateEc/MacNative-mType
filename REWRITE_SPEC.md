@@ -88,7 +88,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 | 数据迁移 | `Tests/TypebarTests/TypingEngineTests.swift`、打包应用的“数据迁移”界面 | 版本化设置、成绩、预设和自定义文本归档往返；导入去重合并；v1 归档兼容；导入/导出文件选择器已人工验收（已取消，未写入真实文件） |
 | 本地统计 | `Tests/TypebarTests/TypingEngineTests.swift` | 完成次数、均速、最佳、准确率、累计时长，以及 WPM 固定区间分布（包括空档区间）聚合 |
 | 挑战验收 | `Tests/TypebarTests/TypingEngineTests.swift` | 原创离线挑战的通过与全部未满足条件都可被独立验证；挑战标记可随测试配置编码，并与历史配置兼容 |
-| 构建 | `swift test`、`swift build` | macOS Swift 包能编译且 191 项客户端测试通过；独立 Vapor 服务的 40 项自动化测试通过 |
+| 构建 | `swift test`、`swift build` | macOS Swift 包能编译且 192 项客户端测试通过；独立 Vapor 服务的 40 项自动化测试通过 |
 | 运行时 UI | 打包的 `Typebar.app` 辅助功能树与截图 | 焦点输入、时间/字数模式、实时指标、可滚动长文本区，以及正确输入/错误/退格/Esc 重开；2026-09-02 已人工切换“光晕”背景，确认减少动态效果开关状态和练习页主题色光晕绘制，检查后恢复为纯色 |
 
 ## 2026-09-03 审计更正

@@ -491,6 +491,7 @@ private struct ContentView: View {
   @State private var keyboardGuideFeedback: KeyboardGuideFeedback?
   @State private var keyboardGuideFeedbackSequence = 0
   @State private var keyboardModifierFlags: NSEvent.ModifierFlags = []
+  @State private var typingCompanionHands = TypingCompanionHands()
   @State private var liveContentRequestID = UUID()
   @State private var isLoadingLiveContent = false
   @State private var liveContentMessage: String?
@@ -1121,12 +1122,29 @@ private struct ContentView: View {
           session.bailOut()
         },
         onFinishZen: { session.finishZen() },
-        onFocusChanged: handleTypingFocusChange,
+        onFocusChanged: { isFocused in
+          if !isFocused { typingCompanionHands.reset() }
+          handleTypingFocusChange(isFocused)
+        },
         onCompositionChanged: { compositionText = $0 },
-        onModifierFlagsChanged: { keyboardModifierFlags = $0 }
+        onModifierFlagsChanged: { keyboardModifierFlags = $0 },
+        onPhysicalKey: { keyCode, isKeyDown, isRepeat in
+          guard settings.showTypingCompanion else { return }
+          typingCompanionHands.handle(keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
+        }
       )
       .opacity(0.01)
       .frame(width: 1, height: 1)
+    }
+    .overlay(alignment: .bottomTrailing) {
+      if settings.showTypingCompanion, session.hasStarted, !session.isFinished {
+        TypingCompanion(
+          hands: typingCompanionHands,
+          wpm: Double(settings.blindMode ? session.rawWpm(at: .now) : session.wpm(at: .now)),
+          accent: activeTheme.accent, panel: activeTheme.panel,
+          reduceMotion: settings.reducePracticeMotion)
+        .padding(18)
+      }
     }
     .padding(28)
     .frame(
@@ -1689,6 +1707,7 @@ private struct ContentView: View {
     bailoutConfirmationMessage = nil
     compositionText = ""
     keyboardGuideFeedback = nil
+    typingCompanionHands.reset()
     lastTimeWarningSecond = nil
     liveContentRequestID = UUID()
     let requestID = liveContentRequestID

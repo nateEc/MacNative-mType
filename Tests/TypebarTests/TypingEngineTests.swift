@@ -1554,6 +1554,50 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CommandPaletteBrowsePolicy.globalSearchQuery("> theme"), " theme")
   }
 
+  func testTypingCompanionTracksPhysicalHandsAndClampsSpeedFeedback() {
+    var hands = TypingCompanionHands()
+    XCTAssertFalse(hands.leftIsActive)
+    XCTAssertFalse(hands.rightIsActive)
+
+    hands.handle(keyCode: 0, isKeyDown: true)  // A: left hand
+    XCTAssertTrue(hands.leftIsActive)
+    XCTAssertFalse(hands.rightIsActive)
+    hands.handle(keyCode: 4, isKeyDown: true)  // H: right hand
+    XCTAssertTrue(hands.leftIsActive)
+    XCTAssertTrue(hands.rightIsActive)
+    hands.handle(keyCode: 0, isKeyDown: false)
+    XCTAssertFalse(hands.leftIsActive)
+    XCTAssertTrue(hands.rightIsActive)
+    hands.handle(keyCode: 4, isKeyDown: false)
+
+    hands.handle(keyCode: 16, isKeyDown: true)  // Y: shared centre key
+    XCTAssertTrue(hands.leftIsActive)
+    XCTAssertFalse(hands.rightIsActive)
+    hands.handle(keyCode: 16, isKeyDown: false)
+    hands.handle(keyCode: 16, isKeyDown: true)
+    XCTAssertFalse(hands.leftIsActive)
+    XCTAssertTrue(hands.rightIsActive)
+    hands.reset()
+    XCTAssertFalse(hands.leftIsActive)
+    XCTAssertFalse(hands.rightIsActive)
+
+    hands.handle(keyCode: 56, isKeyDown: true)  // Left Shift
+    XCTAssertTrue(hands.leftIsActive)
+    hands.handle(keyCode: 56, isKeyDown: false)
+    XCTAssertFalse(hands.leftIsActive)
+
+    hands.handle(keyCode: 10, isKeyDown: true)  // ISO section: left hand
+    XCTAssertTrue(hands.leftIsActive)
+    hands.handle(keyCode: 10, isKeyDown: false)
+    XCTAssertFalse(hands.leftIsActive)
+
+    XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 0), 0)
+    XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 130), 0)
+    XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 155), 0.5, accuracy: 0.001)
+    XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 180), 1)
+    XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 250), 1)
+  }
+
   func testSettingsSearchMatchesEveryWhitespaceSeparatedTokenAcrossLocalizedTerms() {
     XCTAssertTrue(
       SettingsSearch.matches(query: "KEYBOARD layout", terms: ["键盘布局", "Keyboard Layout", "下一键"]))
@@ -3451,6 +3495,7 @@ final class TypingEngineTests: XCTestCase {
     settings.systemDarkTheme = .grove
     settings.practiceBackdrop = .halos
     settings.reducePracticeMotion = true
+    settings.showTypingCompanion = true
     settings.toggleFavoriteTheme(.grove)
     settings.addCustomTheme(
       name: "Harbour", background: .black, panel: .gray, accent: .orange, prefersDark: true)
@@ -3537,6 +3582,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.customBackgroundURL, "https://images.example.test/harbour.jpeg")
     XCTAssertEqual(exportedSnapshot.customBackgroundFit, .contain)
     XCTAssertEqual(exportedSnapshot.customBackgroundFilter, .init(blur: 4, brightness: 0.85, saturation: 1.4, opacity: 0.7))
+    XCTAssertTrue(exportedSnapshot.showTypingCompanion)
     XCTAssertEqual(exportedSnapshot.liveProgressStyle, .flashMini)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
@@ -3573,6 +3619,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.customBackgroundFilter, .init(blur: 4, brightness: 0.85, saturation: 1.4, opacity: 0.7))
     XCTAssertEqual(restored.practiceBackdrop, .halos)
     XCTAssertTrue(restored.reducePracticeMotion)
+    XCTAssertTrue(restored.showTypingCompanion)
     XCTAssertTrue(restored.isFavoriteTheme(.grove))
     XCTAssertTrue(restored.isFavoriteCustomTheme(customThemeID))
     XCTAssertEqual(restored.englishVariant, .british)
@@ -3728,6 +3775,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.customBackgroundFilter, .init())
     XCTAssertEqual(snapshot.practiceBackdrop, .solid)
     XCTAssertFalse(snapshot.reducePracticeMotion)
+    XCTAssertFalse(snapshot.showTypingCompanion)
     XCTAssertTrue(snapshot.startGraphsAtZero)
     XCTAssertEqual(snapshot.englishVariant, .american)
     XCTAssertTrue(snapshot.favoriteQuoteIDs.isEmpty)
