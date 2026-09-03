@@ -260,6 +260,14 @@ enum WordPracticeText {
   }
 }
 
+enum MissedWordCopyText {
+  /// A copied list remains space separated even for unspaced languages, so
+  /// individual locally identified targets can be read and reused elsewhere.
+  static func make(words: [String]) -> String {
+    words.joined(separator: " ")
+  }
+}
+
 struct ResultPerformancePoint: Equatable, Identifiable {
   let elapsed: TimeInterval
   let wpm: Int

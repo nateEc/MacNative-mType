@@ -2074,6 +2074,8 @@ private struct CompletedResultView: View {
                     onPracticeContextualMissedWords(contextualMissedPractice.phrases)
                   }
                 }
+                Divider()
+                Button("复制错词列表", action: copyMissedWords)
               }
             }
             if let slowWordPractice {
@@ -2118,6 +2120,12 @@ private struct CompletedResultView: View {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(input, forType: .string)
     exportStatus = "实际输入已复制"
+  }
+
+  private func copyMissedWords() {
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(MissedWordCopyText.make(words: missedWords), forType: .string)
+    exportStatus = "错词列表已复制"
   }
 
   private func copyResultImage() {

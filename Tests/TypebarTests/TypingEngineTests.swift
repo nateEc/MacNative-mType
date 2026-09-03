@@ -386,6 +386,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       WordPracticeText.make(words: chineseWithPunctuation.missedWords, language: .simplifiedChinese),
       "窗边")
+    XCTAssertEqual(MissedWordCopyText.make(words: ["晨光", "窗边"]), "晨光 窗边")
 
     var spanish = TypingSession(
       configuration: .timed(seconds: 30, language: .spanish), prompt: "árbol puerto calma")
