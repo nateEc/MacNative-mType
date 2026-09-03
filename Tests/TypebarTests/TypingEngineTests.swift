@@ -263,6 +263,25 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.wordReviews, [.init(index: 0, target: "amber", typed: "am")])
   }
 
+  func testExtraLettersRemainInTheCurrentWordUntilSpaceSubmitsIt() {
+    var session = TypingSession(
+      configuration: .words(2), prompt: "amber bay")
+
+    session.insert("amberx", at: start)
+
+    XCTAssertEqual(session.typed, "amberx")
+    XCTAssertEqual(session.errors, 1)
+    XCTAssertEqual(session.nextExpectedCharacter, " ")
+    XCTAssertEqual(session.promptGlyphs[5].state, .current)
+    XCTAssertEqual(session.promptGlyphs.last, .init(character: "x", state: .extra))
+
+    session.insert(" ", at: start.addingTimeInterval(1))
+
+    XCTAssertEqual(session.nextExpectedCharacter, "b")
+    XCTAssertEqual(session.completedWordCount, 1)
+    XCTAssertEqual(session.wordReviews, [.init(index: 0, target: "amber", typed: "amberx")])
+  }
+
   func testNoSpaceRejectsDirectWhitespaceWithoutRecordingAnError() {
     let configuration = TestConfiguration(
       mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),

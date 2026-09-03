@@ -1551,9 +1551,12 @@ struct TypingSession {
     let typedCharacters = Array(typed)
     let targetCharacters = Array(prompt)
     return typedCharacters.indices.reduce(into: 0) { total, typedIndex in
-      guard typedTargetIndices.indices.contains(typedIndex),
-        let targetIndex = typedTargetIndices[typedIndex], targetCharacters.indices.contains(targetIndex)
-      else { return }
+      guard typedTargetIndices.indices.contains(typedIndex) else { return }
+      guard let targetIndex = typedTargetIndices[typedIndex], targetCharacters.indices.contains(targetIndex)
+      else {
+        if configuration.mode != .zen && hasUncommittedSpaceDelimitedInput { total += 1 }
+        return
+      }
       if typedCharacters[typedIndex] != targetCharacters[targetIndex]
         || forcedErrorIndices.contains(targetIndex)
       {
@@ -1904,10 +1907,13 @@ struct TypingSession {
     }
     let commitsCurrentWord = inputCharacter == " " && !inputWordIsEmpty
     let expected = Array(prompt)[currentTargetIndex]
+    let retainsCurrentWordAsExtra = shouldRetainInCurrentWord(
+      inputCharacter, expected: expected)
     let earlyWordCommitTargetIndex = incompleteWordCommitTargetIndex(
       for: inputCharacter, currentTargetIndex: currentTargetIndex)
-    let targetIndex = earlyWordCommitTargetIndex ?? currentTargetIndex
-    let isCorrect = inputCharacter == expected && !forceError
+    let targetIndex = retainsCurrentWordAsExtra
+      ? nil : earlyWordCommitTargetIndex ?? currentTargetIndex
+    let isCorrect = !retainsCurrentWordAsExtra && inputCharacter == expected && !forceError
     if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
     let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
       with: inputCharacter, forceError: forceError)
@@ -2196,6 +2202,21 @@ struct TypingSession {
   /// edge is an empty input buffer for the current source word.
   private var inputWordIsEmpty: Bool {
     typed.isEmpty || typed.last == " "
+  }
+
+  private var hasUncommittedSpaceDelimitedInput: Bool {
+    configuration.mode != .zen
+      && configuration.language.usesSpaceDelimitedWords
+      && !configuration.language.isCodeLanguage
+      && !configuration.modifiers.contains(.noSpaces)
+      && !inputWordIsEmpty
+  }
+
+  /// The reference keeps letters beyond a word's target length in that same
+  /// word buffer. They are visible errors but do not advance toward the next
+  /// word until the user enters its separator.
+  private func shouldRetainInCurrentWord(_ character: Character, expected: Character) -> Bool {
+    character != " " && expected == " " && hasUncommittedSpaceDelimitedInput
   }
 
   /// The target cursor is independent from raw input length when normal
