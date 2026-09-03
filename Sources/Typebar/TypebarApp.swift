@@ -302,17 +302,42 @@ private struct ASLHandshapeGlyph: View {
             with: .color(color.opacity(0.48)))
         }
       }
-      if ASLHandshapePolicy.usesMotionCue(for: character) {
-        var arrow = Path()
-        arrow.move(to: .init(x: canvasSize.width * 0.12, y: canvasSize.height * 0.25))
-        arrow.addLine(to: .init(x: canvasSize.width * 0.23, y: canvasSize.height * 0.16))
-        arrow.addLine(to: .init(x: canvasSize.width * 0.19, y: canvasSize.height * 0.29))
-        context.stroke(arrow, with: .color(color), lineWidth: max(1.5, size * 0.045))
+      if let motionCue = ASLHandshapePolicy.motionCue(for: character) {
+        let lineWidth = max(1.8, size * 0.06)
+        var cue = Path()
+        switch motionCue {
+        case .jCurve:
+          cue.move(to: .init(x: canvasSize.width * 0.16, y: canvasSize.height * 0.14))
+          cue.addCurve(
+            to: .init(x: canvasSize.width * 0.57, y: canvasSize.height * 0.28),
+            control1: .init(x: canvasSize.width * 0.47, y: canvasSize.height * 0.04),
+            control2: .init(x: canvasSize.width * 0.73, y: canvasSize.height * 0.19))
+          cue.addLine(to: .init(x: canvasSize.width * 0.49, y: canvasSize.height * 0.13))
+          cue.move(to: .init(x: canvasSize.width * 0.57, y: canvasSize.height * 0.28))
+          cue.addLine(to: .init(x: canvasSize.width * 0.43, y: canvasSize.height * 0.30))
+        case .zZigzag:
+          cue.move(to: .init(x: canvasSize.width * 0.13, y: canvasSize.height * 0.12))
+          cue.addLine(to: .init(x: canvasSize.width * 0.70, y: canvasSize.height * 0.12))
+          cue.addLine(to: .init(x: canvasSize.width * 0.23, y: canvasSize.height * 0.31))
+          cue.addLine(to: .init(x: canvasSize.width * 0.79, y: canvasSize.height * 0.31))
+          cue.addLine(to: .init(x: canvasSize.width * 0.65, y: canvasSize.height * 0.21))
+          cue.move(to: .init(x: canvasSize.width * 0.79, y: canvasSize.height * 0.31))
+          cue.addLine(to: .init(x: canvasSize.width * 0.64, y: canvasSize.height * 0.39))
+        }
+        context.stroke(cue, with: .color(color), lineWidth: lineWidth)
       }
     }
     .frame(width: size * 1.02, height: size * 1.10)
     .background(background, in: RoundedRectangle(cornerRadius: size * 0.12))
-    .accessibilityLabel("ASL 指语字形")
+    .accessibilityLabel(aslAccessibilityLabel)
+  }
+
+  private var aslAccessibilityLabel: String {
+    switch ASLHandshapePolicy.motionCue(for: character) {
+    case .jCurve: "ASL 指语字形，J 弧线运动轨迹"
+    case .zZigzag: "ASL 指语字形，Z 折线运动轨迹"
+    case nil: "ASL 指语字形"
+    }
   }
 }
 

@@ -589,6 +589,11 @@ enum ChooVisualPolicy {
   }
 }
 
+enum ASLMotionCue: Equatable {
+  case jCurve
+  case zZigzag
+}
+
 enum ASLHandshapePolicy {
   /// Original handshape categories used solely to draw Typebar's own vector
   /// prompts. They intentionally do not embed or depend on a third-party font.
@@ -605,8 +610,16 @@ enum ASLHandshapePolicy {
     return masks[Int(scalar.value - 65)]
   }
 
+  static func motionCue(for character: Character) -> ASLMotionCue? {
+    switch character.uppercased() {
+    case "J": .jCurve
+    case "Z": .zZigzag
+    default: nil
+    }
+  }
+
   static func usesMotionCue(for character: Character) -> Bool {
-    character.uppercased() == "J" || character.uppercased() == "Z"
+    motionCue(for: character) != nil
   }
 }
 

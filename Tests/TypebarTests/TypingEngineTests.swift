@@ -1515,6 +1515,8 @@ final class TypingEngineTests: XCTestCase {
       .ansiColemak)
     XCTAssertNotNil(ASLHandshapePolicy.fingerMask(for: "A"))
     XCTAssertNil(ASLHandshapePolicy.fingerMask(for: "7"))
+    XCTAssertEqual(ASLHandshapePolicy.motionCue(for: "J"), .jCurve)
+    XCTAssertEqual(ASLHandshapePolicy.motionCue(for: "z"), .zZigzag)
     XCTAssertTrue(ASLHandshapePolicy.usesMotionCue(for: "J"))
     XCTAssertTrue(ASLHandshapePolicy.usesMotionCue(for: "z"))
     XCTAssertFalse(ASLHandshapePolicy.usesMotionCue(for: "A"))
