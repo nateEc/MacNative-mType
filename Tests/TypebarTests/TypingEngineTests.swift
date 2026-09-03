@@ -624,6 +624,17 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(PresetCommandCatalog.presetID(for: "preset.invalid"))
   }
 
+  func testChallengeCommandCatalogDescribesAndRoutesLibraryChallenges() throws {
+    let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "calm-thirty"))
+
+    let items = ChallengeCommandCatalog.items(challenges: [challenge])
+
+    XCTAssertEqual(items.first?.title, "加载挑战：沉稳三十")
+    XCTAssertEqual(items.first?.id, "challenge.calm-thirty")
+    XCTAssertEqual(ChallengeCommandCatalog.challengeID(for: items[0].id), "calm-thirty")
+    XCTAssertNil(ChallengeCommandCatalog.challengeID(for: "challenge."))
+  }
+
   func testClearCurrentWordOnErrorModifierKeepsCompletedWordsAndReplayInSync() {
     var session = TypingSession(
       configuration: .words(2).with(modifiers: [.clearCurrentWordOnError]),

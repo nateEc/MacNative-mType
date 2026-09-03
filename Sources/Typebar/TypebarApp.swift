@@ -1825,6 +1825,7 @@ private struct ContentView: View {
         guard let definition = preset.definition else { return nil }
         return .init(id: preset.id, name: preset.name, definition: definition)
       }))
+    items.append(contentsOf: ChallengeCommandCatalog.items(challenges: TypebarChallengeLibrary.all))
     return items
   }
 
@@ -1841,6 +1842,12 @@ private struct ContentView: View {
       let preset = savedPresets.first(where: { $0.id == presetID })?.definition
     {
       apply(preset)
+      return
+    }
+    if let challengeID = ChallengeCommandCatalog.challengeID(for: item.id),
+      let challenge = TypebarChallengeLibrary.challenge(id: challengeID)
+    {
+      loadChallenge(challenge)
       return
     }
     switch item.id {

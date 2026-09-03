@@ -112,6 +112,29 @@ enum PresetCommandCatalog {
     }
 }
 
+enum ChallengeCommandCatalog {
+    static func identifier(for challengeID: String) -> String {
+        "challenge.\(challengeID)"
+    }
+
+    static func challengeID(for identifier: String) -> String? {
+        let prefix = "challenge."
+        guard identifier.hasPrefix(prefix) else { return nil }
+        let id = String(identifier.dropFirst(prefix.count))
+        return id.isEmpty ? nil : id
+    }
+
+    static func items(challenges: [TypebarChallenge]) -> [CommandPaletteItem] {
+        challenges.map { challenge in
+            CommandPaletteItem(
+                id: identifier(for: challenge.id), title: "加载挑战：\(challenge.title)",
+                subtitle: "\(challenge.description) · \(challenge.requirements.summary)",
+                systemImage: "flag.checkered",
+                keywords: ["challenge", "挑战", "load", "加载", challenge.title])
+        }
+    }
+}
+
 enum CommandPaletteSearch {
     static func results(items: [CommandPaletteItem], query: String) -> [CommandPaletteItem] {
         let query = normalized(query)
