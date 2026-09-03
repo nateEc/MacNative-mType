@@ -267,6 +267,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.outcome, .completed)
   }
 
+  func testLeadingNewlineInNormalModeCommitsAnEmptyCustomTextWord() {
+    var session = TypingSession(
+      configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      prompt: "amber\nbay")
+
+    session.insert("\n", at: start)
+
+    XCTAssertEqual(session.typed, "\n")
+    XCTAssertEqual(session.errors, 1)
+    XCTAssertEqual(session.nextExpectedCharacter, "b")
+    XCTAssertEqual(session.completedWordCount, 1)
+    XCTAssertEqual(session.wordReviews, [.init(index: 0, target: "amber", typed: "")])
+  }
+
   func testCustomWordLimitFinishesOnTheFinalNewlineDelimitedWord() {
     var session = TypingSession(
       configuration: .init(

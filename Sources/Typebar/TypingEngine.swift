@@ -2262,6 +2262,18 @@ struct TypingSession {
       && !configuration.rules.deleteOnErrorMode.returnsToPreviousWordAtStart
   }
 
+  /// Return is a commit character, unlike the space-only leading-key guard in
+  /// the reference input handler. A normal, unrestricted multiline test can
+  /// therefore submit an empty line; stricter error rules retain the word.
+  private var shouldCommitLeadingNewline: Bool {
+    configuration.difficulty == .normal
+      && !configuration.rules.strictSpace
+      && configuration.rules.stopOnErrorMode == .off
+      && !configuration.rules.deleteOnErrorMode.isEnabled
+      && !configuration.modifiers.contains(.correctBeforeAdvance)
+      && !configuration.modifiers.contains(.clearCurrentWordOnError)
+  }
+
   /// `typed` contains every accepted word in this native engine, so either
   /// edge is an empty input buffer for the current source word.
   private var inputWordIsEmpty: Bool {
@@ -2319,7 +2331,8 @@ struct TypingSession {
   private func incompleteWordCommitTargetIndex(
     for character: Character, currentTargetIndex: Int
   ) -> Int? {
-    guard isPromptWordSeparator(character), !inputWordIsEmpty,
+    guard isPromptWordSeparator(character),
+      (!inputWordIsEmpty || (character == "\n" && shouldCommitLeadingNewline)),
       configuration.language.usesSpaceDelimitedWords,
       !configuration.language.isCodeLanguage,
       !configuration.modifiers.contains(.noSpaces)
