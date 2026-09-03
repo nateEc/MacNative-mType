@@ -1020,6 +1020,7 @@ private struct ContentView: View {
           }
         },
         onDelete: { session.deleteBackward() },
+        onDeleteWord: { session.deleteWordBackward() },
         onRestart: attemptRestart,
         onFinishZen: { session.finishZen() },
         onFocusChanged: { inputHasFocus = $0 },

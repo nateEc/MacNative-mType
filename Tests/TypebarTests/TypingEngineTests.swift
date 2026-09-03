@@ -511,6 +511,12 @@ final class TypingEngineTests: XCTestCase {
     session.insert("b", at: start.addingTimeInterval(2))
     session.deleteBackward(at: start.addingTimeInterval(3))
     XCTAssertEqual(session.typed, "amber x ")
+
+    var correctPreviousWord = TypingSession(
+      configuration: .words(2, rules: rules), prompt: "amber bay")
+    correctPreviousWord.insert("amber ", at: start)
+    correctPreviousWord.deleteBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(correctPreviousWord.typed, "amber ")
   }
 
   func testMaximumConfidenceModeDisablesBackspaceAndNormalizesConflicts() {
@@ -801,6 +807,30 @@ final class TypingEngineTests: XCTestCase {
     freeSession.insert("amber ", at: start)
     freeSession.deleteBackward()
     XCTAssertEqual(freeSession.typed, "amber")
+  }
+
+  func testWordBackwardDeletionClearsTheCurrentWordAndRespectsWordProtection() {
+    let prompt = "amber harbor"
+    var currentWord = TypingSession(configuration: .words(2), prompt: prompt)
+    currentWord.insert("amber har", at: start)
+    currentWord.deleteWordBackward()
+    XCTAssertEqual(currentWord.typed, "amber ")
+
+    var protected = TypingSession(configuration: .words(2), prompt: prompt)
+    protected.insert("amber ", at: start)
+    protected.deleteWordBackward()
+    XCTAssertEqual(protected.typed, "amber ")
+
+    var incorrect = TypingSession(configuration: .words(2), prompt: prompt)
+    incorrect.insert("amberx ", at: start)
+    incorrect.deleteWordBackward()
+    XCTAssertTrue(incorrect.typed.isEmpty)
+
+    var free = TypingSession(
+      configuration: .words(2, rules: .init(freedomMode: true)), prompt: prompt)
+    free.insert("amber ", at: start)
+    free.deleteWordBackward()
+    XCTAssertTrue(free.typed.isEmpty)
   }
 
   func testBlindModeKeepsInputForMetricsWithoutChangingValidation() {

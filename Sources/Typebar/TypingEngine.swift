@@ -1897,12 +1897,40 @@ struct TypingSession {
     recordReplayEvent(kind: .delete, text: "", at: date)
   }
 
+  /// Handles the platform's word-backward command (for example Option-Delete)
+  /// without bypassing the same confidence and committed-word protections as
+  /// ordinary backspace. Each removed character stays visible to replay.
+  mutating func deleteWordBackward(at date: Date = .now) {
+    guard !isFinished, !typed.isEmpty else { return }
+    guard canDeleteBackward else { return }
+    if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
+      removeCodeIndentationBeforeLine(at: date)
+    {
+      return
+    }
+
+    var removedCurrentWord = false
+    while let last = typed.last, !isPromptWordSeparator(last) {
+      removeLastTypedCharacter()
+      recordReplayEvent(kind: .delete, text: "", at: date)
+      removedCurrentWord = true
+    }
+    guard !removedCurrentWord, typed.last.map(isPromptWordSeparator) == true else { return }
+
+    removeLastTypedCharacter()
+    recordReplayEvent(kind: .delete, text: "", at: date)
+    while let last = typed.last, !isPromptWordSeparator(last) {
+      removeLastTypedCharacter()
+      recordReplayEvent(kind: .delete, text: "", at: date)
+    }
+  }
+
   private var canDeleteBackward: Bool {
     if configuration.rules.confidenceMode == .maximum { return false }
     guard !configuration.rules.freedomMode, typed.last.map(isPromptWordSeparator) == true else {
       return true
     }
-    if configuration.rules.confidenceMode == .on { return lastCommittedWordIsCorrect }
+    if configuration.rules.confidenceMode == .on { return false }
     let completedWords = splitPromptWords(
       String(typed.dropLast()), omittingEmptySubsequences: true)
     guard let typedWord = completedWords.last else { return true }

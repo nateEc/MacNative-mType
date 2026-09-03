@@ -12,6 +12,7 @@ struct NativeTypingInput: NSViewRepresentable {
     var finishesOnShiftEnter: Bool
     let onInsert: (String, Bool) -> Void
     let onDelete: () -> Void
+    let onDeleteWord: () -> Void
     let onRestart: () -> Void
     let onFinishZen: () -> Void
     let onFocusChanged: (Bool) -> Void
@@ -30,6 +31,7 @@ struct NativeTypingInput: NSViewRepresentable {
     func updateNSView(_ view: TypingInputView, context: Context) {
         view.onInsert = onInsert
         view.onDelete = onDelete
+        view.onDeleteWord = onDeleteWord
         view.onRestart = onRestart
         view.quickRestartKey = quickRestartKey
         view.keyboardLayout = keyboardLayout
@@ -50,6 +52,7 @@ struct NativeTypingInput: NSViewRepresentable {
 final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onInsert: (String, Bool) -> Void = { _, _ in }
     var onDelete: () -> Void = {}
+    var onDeleteWord: () -> Void = {}
     var onRestart: () -> Void = {}
     var quickRestartKey: QuickRestartKey = .escape
     var keyboardLayout: KeyboardLayout = .ansiQwerty
@@ -151,6 +154,8 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     override func doCommand(by selector: Selector) {
         pendingForcedError = false
         switch selector {
+        case #selector(NSResponder.deleteWordBackward(_:)):
+            onDeleteWord()
         case #selector(deleteBackward(_:)), #selector(deleteForward(_:)):
             onDelete()
         case #selector(insertNewline(_:)), #selector(insertLineBreak(_:)):
