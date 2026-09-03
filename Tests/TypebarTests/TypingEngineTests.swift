@@ -1463,6 +1463,35 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "#", layout: .germanQwertz), 42)
   }
 
+  func testSwissQwertzLayoutsMapTheirDistinctAccentKeys() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "è", layout: .swissGerman), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "é", layout: .swissGerman), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "è", layout: .swissFrench), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "é", layout: .swissFrench), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ü", layout: .swissFrench), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .swissFrench), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "<", layout: .swissGerman), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [], layout: .swissGerman), "z")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 18, modifierFlags: [.shift], layout: .swissGerman), "+")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [.shift], layout: .swissGerman), "è")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [.shift], layout: .swissGerman), "é")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [], layout: .swissFrench), "è")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [.shift], layout: .swissFrench), "ü")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [], layout: .swissFrench), "é")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [.shift], layout: .swissFrench), "ö")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ç", layout: .swissGerman), 21)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "£", layout: .swissFrench), 42)
+  }
+
   func testNonDefaultKeyboardLayoutsEmulatePhysicalAnsiKeyPositions() {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(

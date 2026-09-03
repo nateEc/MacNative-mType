@@ -7,6 +7,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiColemak
   case ansiWorkman
   case germanQwertz
+  case swissGerman
+  case swissFrench
   case frenchAzerty
 
   var id: Self { self }
@@ -18,6 +20,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ansiColemak: "ANSI Colemak"
     case .ansiWorkman: "ANSI Workman"
     case .germanQwertz: "German QWERTZ"
+    case .swissGerman: "Swiss German"
+    case .swissFrench: "Swiss French"
     case .frenchAzerty: "French AZERTY"
     }
   }
@@ -276,6 +280,24 @@ enum KeyboardGuideModel {
           shiftedLabels: [">", "Y", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
         ),
       ]
+    case .swissGerman:
+      swissQwertzRows(
+        topLabels: "QWERTZUIOPÜ‥",
+        topCharacters: ["qQ", "wW", "eE", "rR", "tT", "zZ", "uU", "iI", "oO", "pP", "üè", "‥!"],
+        topShiftedLabels: ["Q", "W", "E", "R", "T", "Z", "U", "I", "O", "P", "è", "!"],
+        homeLabels: "ASDFGHJKLÖÄ$",
+        homeCharacters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "öé", "äà", "$£"],
+        homeShiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "é", "à", "£"]
+      )
+    case .swissFrench:
+      swissQwertzRows(
+        topLabels: "QWERTZUIOPÈ‥",
+        topCharacters: ["qQ", "wW", "eE", "rR", "tT", "zZ", "uU", "iI", "oO", "pP", "èü", "‥!"],
+        topShiftedLabels: ["Q", "W", "E", "R", "T", "Z", "U", "I", "O", "P", "ü", "!"],
+        homeLabels: "ASDFGHJKLÉÀ$",
+        homeCharacters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "éö", "àä", "$£"],
+        homeShiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "ö", "ä", "£"]
+      )
     case .frenchAzerty:
       [
         row(
@@ -375,6 +397,30 @@ enum KeyboardGuideModel {
         shiftedLabel: shiftedLabels?[safe: offset]
       )
     }
+  }
+
+  private static func swissQwertzRows(
+    topLabels: String,
+    topCharacters: [String],
+    topShiftedLabels: [String],
+    homeLabels: String,
+    homeCharacters: [String],
+    homeShiftedLabels: [String]
+  ) -> [[KeyboardGuideKey]] {
+    [
+      row(
+        "number", "§1234567890'^",
+        characters: ["§°", "1+", "2\"", "3*", "4ç", "5%", "6&", "7/", "8(", "9)", "0=", "'?", "^`"],
+        shiftedLabels: ["°", "+", "\"", "*", "ç", "%", "&", "/", "(", ")", "=", "?", "`"]
+      ),
+      row("top", topLabels, characters: topCharacters, shiftedLabels: topShiftedLabels),
+      row("home", homeLabels, characters: homeCharacters, shiftedLabels: homeShiftedLabels),
+      row(
+        "bottom", "<YXCVBNM,.-",
+        characters: ["<>", "yY", "xX", "cC", "vV", "bB", "nN", "mM", ",;", ".:", "-_"],
+        shiftedLabels: [">", "Y", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
+      ),
+    ]
   }
 
   private static func nonTypingKey(_ id: String, label: String, width: CGFloat) -> KeyboardGuideKey {
