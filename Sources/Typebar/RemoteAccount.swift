@@ -303,10 +303,11 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let bestWPM: Int
     let highestConsistency: Double
     let personalBests: [RemotePublicProfileBest]
+    let activity: RemotePublicProfileActivity?
     let totalExperience: Int
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests, totalExperience
+        case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests, activity, totalExperience
     }
 
     init(from decoder: Decoder) throws {
@@ -318,6 +319,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         bestWPM = try values.decode(Int.self, forKey: .bestWPM)
         highestConsistency = try values.decodeIfPresent(Double.self, forKey: .highestConsistency) ?? 0
         personalBests = try values.decodeIfPresent([RemotePublicProfileBest].self, forKey: .personalBests) ?? []
+        activity = try values.decodeIfPresent(RemotePublicProfileActivity.self, forKey: .activity)
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
     }
 }
@@ -342,6 +344,11 @@ struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
     var languageLabel: String {
         TypingLanguage(rawValue: language)?.displayName ?? language
     }
+}
+
+struct RemotePublicProfileActivity: Codable, Sendable {
+    let lastDay: Date
+    let testsByDays: [Int]
 }
 
 private struct RemotePublicProfileSearchResponse: Codable, Sendable {

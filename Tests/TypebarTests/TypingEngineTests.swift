@@ -137,6 +137,7 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(profile.highestConsistency, 0)
     XCTAssertTrue(profile.personalBests.isEmpty)
+    XCTAssertNil(profile.activity)
   }
 
   func testWordsTestCompletesAtWordLimit() {

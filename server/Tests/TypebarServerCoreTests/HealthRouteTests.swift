@@ -880,6 +880,15 @@ final class HealthRouteTests: XCTestCase {
         id: UUID(), wpm: 66, accuracy: 96, consistency: 75, mode: "words",
         durationSeconds: nil, wordLimit: 10, finishedAt: now), accessToken: session.accessToken,
       now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 55, accuracy: 95, consistency: 70,
+        finishedAt: now.addingTimeInterval(-366 * 24 * 60 * 60)), accessToken: session.accessToken,
+      now: now)
+    let detailedProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(detailedProfile.activity?.testsByDays.count, 365)
+    XCTAssertEqual(detailedProfile.activity?.testsByDays.reduce(0, +), 4)
+    XCTAssertEqual(detailedProfile.activity?.testsByDays.last, 4)
 
     do {
       try configure(app, authStore: store)
@@ -887,13 +896,15 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(response.status, .ok)
         let profile = try? response.content.decode(PublicProfileResponse.self)
         XCTAssertEqual(profile?.displayName, "Profile User")
-        XCTAssertEqual(profile?.completedResultCount, 4)
+        XCTAssertEqual(profile?.completedResultCount, 5)
         XCTAssertEqual(profile?.bestWPM, 88)
         XCTAssertEqual(profile?.highestConsistency, 92)
         XCTAssertEqual(profile?.personalBests.map(\.durationSeconds), [15, 30, nil])
         XCTAssertEqual(profile?.personalBests.map(\.wordLimit), [nil, nil, 10])
         XCTAssertEqual(profile?.personalBests.map(\.wpm), [72, 88, 66])
         XCTAssertEqual(profile?.personalBests.map(\.consistency), [88, 84, 75])
+        XCTAssertEqual(profile?.activity?.testsByDays.count, 365)
+        XCTAssertEqual(profile?.activity?.testsByDays.reduce(0, +), 4)
         XCTAssertFalse(response.body.string.contains("private@example.com"))
       }
       try await app.test(.GET, "v1/profiles/not-a-uuid") { response async in
@@ -1149,6 +1160,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(response.status, .ok)
         let results = try? response.content.decode(PublicProfileSearchResponse.self)
         XCTAssertEqual(results?.profiles.map(\.displayName), ["Ada Typist"])
+        XCTAssertNil(results?.profiles.first?.activity)
         XCTAssertFalse(response.body.string.contains("ada.private@example.com"))
       }
       try await app.test(.GET, "v1/profiles?query=x") { response async in

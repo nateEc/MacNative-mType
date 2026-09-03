@@ -63,6 +63,7 @@ public struct PublicProfileResponse: Content, Equatable {
   public let bestWPM: Int
   public let highestConsistency: Double
   public let personalBests: [PublicProfileBestResponse]
+  public let activity: PublicProfileActivityResponse?
   public let totalExperience: Int
 }
 
@@ -78,6 +79,13 @@ public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
   public let accuracy: Int
   public let consistency: Double
   public let finishedAt: Date
+}
+
+/// A UTC 12-month activity timeline. The detail endpoint returns this compact
+/// aggregate only; nested profiles in lists intentionally omit it.
+public struct PublicProfileActivityResponse: Content, Equatable {
+  public let lastDay: Date
+  public let testsByDays: [Int]
 }
 
 public struct PublicProfileSearchResponse: Content, Equatable {
@@ -544,11 +552,11 @@ public actor AuthStore {
       leaderboardOptedOut: updatedUser.leaderboardOptedOut)
   }
 
-  public func publicProfile(id: UUID) throws -> PublicProfileResponse {
+  public func publicProfile(id: UUID, now: Date = .now) throws -> PublicProfileResponse {
     guard let user = state.users.first(where: { $0.id == id }) else {
       throw AuthStoreError.profileNotFound
     }
-    return publicProfile(for: user)
+    return detailedPublicProfile(for: user, now: now)
   }
 
   public func searchPublicProfiles(query: String?, limit: Int?) throws
@@ -1042,6 +1050,18 @@ public actor AuthStore {
 
   private func publicProfile(for user: StoredUser) -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
+    return publicProfile(for: user, results: results, activity: nil)
+  }
+
+  private func detailedPublicProfile(for user: StoredUser, now: Date) -> PublicProfileResponse {
+    let results = state.results.filter { $0.userID == user.id }
+    return publicProfile(
+      for: user, results: results, activity: publicActivity(from: results, endingAt: now))
+  }
+
+  private func publicProfile(
+    for user: StoredUser, results: [StoredResult], activity: PublicProfileActivityResponse?
+  ) -> PublicProfileResponse {
     return .init(
       id: user.id,
       displayName: user.displayName,
@@ -1050,8 +1070,30 @@ public actor AuthStore {
       bestWPM: results.map(\.wpm).max() ?? 0,
       highestConsistency: results.map(\.consistency).max() ?? 0,
       personalBests: publicPersonalBests(from: results),
+      activity: activity,
       totalExperience: experience(for: user.id)
     )
+  }
+
+  private func publicActivity(from results: [StoredResult], endingAt now: Date)
+    -> PublicProfileActivityResponse?
+  {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let lastDay = calendar.startOfDay(for: now)
+    guard let firstDay = calendar.date(byAdding: .day, value: -364, to: lastDay) else { return nil }
+    var testsByDays = Array(repeating: 0, count: 365)
+
+    for result in results {
+      let resultDay = calendar.startOfDay(for: result.finishedAt)
+      guard resultDay >= firstDay, resultDay <= lastDay else { continue }
+      let offset = calendar.dateComponents([.day], from: firstDay, to: resultDay).day ?? -1
+      guard testsByDays.indices.contains(offset) else { continue }
+      testsByDays[offset] += 1
+    }
+
+    guard testsByDays.contains(where: { $0 > 0 }) else { return nil }
+    return .init(lastDay: lastDay, testsByDays: testsByDays)
   }
 
   private func publicPersonalBests(from results: [StoredResult]) -> [PublicProfileBestResponse] {

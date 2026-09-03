@@ -240,7 +240,8 @@ private struct PublicProfileView: View {
     @State private var showingReport = false
 
     var body: some View {
-        VStack(spacing: 20) {
+        ScrollView {
+          VStack(spacing: 20) {
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 54))
                 .foregroundStyle(.secondary)
@@ -283,6 +284,9 @@ private struct PublicProfileView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            if let activity = profile.activity {
+                PublicProfileActivityCalendar(activity: activity)
+            }
             Text("公开资料不会包含邮箱、令牌或本地练习内容。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -299,9 +303,10 @@ private struct PublicProfileView: View {
             }
             Button("完成") { dismiss() }
                 .buttonStyle(.borderedProminent)
+          }
+          .padding(32)
         }
-        .padding(32)
-        .frame(width: 420)
+        .frame(width: 420, height: 620)
         .sheet(isPresented: $showingReport) {
             ProfileReportView(profile: profile, account: account)
         }
@@ -326,5 +331,58 @@ private struct PublicProfileView: View {
                 connectionMessage = error.localizedDescription
             }
         }
+    }
+}
+
+private struct PublicProfileActivityCalendar: View {
+    let activity: RemotePublicProfileActivity
+
+    private var calendar: Calendar {
+        var value = Calendar(identifier: .gregorian)
+        value.timeZone = TimeZone(secondsFromGMT: 0)!
+        return value
+    }
+
+    private var maximum: Int { max(1, activity.testsByDays.max() ?? 0) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("近 12 个月公开活动")
+                    .font(.headline)
+                Spacer()
+                Text("按 UTC 日聚合")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHGrid(
+                    rows: Array(repeating: GridItem(.fixed(10), spacing: 3), count: 7), spacing: 3
+                ) {
+                    ForEach(Array(activity.testsByDays.enumerated()), id: \.offset) { offset, count in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.accentColor.opacity(opacity(for: count)))
+                            .frame(width: 10, height: 10)
+                            .accessibilityLabel("\(dayLabel(offset: offset))：完成 \(count) 次")
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            Text("颜色越深表示完成次数越多；只显示完成次数，不显示文本或输入回放。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func opacity(for count: Int) -> Double {
+        guard count > 0 else { return 0.1 }
+        return 0.25 + 0.75 * min(1, Double(count) / Double(maximum))
+    }
+
+    private func dayLabel(offset: Int) -> String {
+        let startOffset = offset - activity.testsByDays.count + 1
+        let day = calendar.date(byAdding: .day, value: startOffset, to: activity.lastDay) ?? activity.lastDay
+        return day.formatted(date: .abbreviated, time: .omitted)
     }
 }
