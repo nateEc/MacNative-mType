@@ -474,6 +474,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var quickEnd = false
   var quickRestartKey: QuickRestartKey = .escape
   var followSystemTheme = false
+  var systemLightTheme: AppTheme = .paper
+  var systemDarkTheme: AppTheme = .midnight
   var randomThemeOnRestart = false
   var randomThemeMode: RandomThemeMode = .off
   var flipTestColors = false
@@ -562,6 +564,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     quickEnd: Bool = false,
     quickRestartKey: QuickRestartKey = .escape,
     followSystemTheme: Bool = false,
+    systemLightTheme: AppTheme = .paper,
+    systemDarkTheme: AppTheme = .midnight,
     randomThemeOnRestart: Bool = false,
     randomThemeMode: RandomThemeMode = .off,
     flipTestColors: Bool = false,
@@ -653,6 +657,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.quickEnd = quickEnd
     self.quickRestartKey = quickRestartKey
     self.followSystemTheme = followSystemTheme
+    self.systemLightTheme = systemLightTheme
+    self.systemDarkTheme = systemDarkTheme
     self.randomThemeMode = followSystemTheme ? .off : (
       randomThemeMode.isEnabled ? randomThemeMode : (randomThemeOnRestart ? .on : .off))
     self.randomThemeOnRestart = self.randomThemeMode.isEnabled
@@ -724,7 +730,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       hideExtraLetters, blindMode, fontSize,
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
-      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
+      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme, systemLightTheme, systemDarkTheme,
       randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
@@ -788,6 +794,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
     quickRestartKey = try values.decodeIfPresent(QuickRestartKey.self, forKey: .quickRestartKey) ?? .escape
     followSystemTheme = try values.decodeIfPresent(Bool.self, forKey: .followSystemTheme) ?? false
+    systemLightTheme = try values.decodeIfPresent(AppTheme.self, forKey: .systemLightTheme) ?? .paper
+    systemDarkTheme = try values.decodeIfPresent(AppTheme.self, forKey: .systemDarkTheme) ?? .midnight
     let legacyRandomThemeOnRestart =
       try values.decodeIfPresent(Bool.self, forKey: .randomThemeOnRestart) ?? false
     randomThemeMode = followSystemTheme ? .off : (
@@ -1015,6 +1023,8 @@ final class AppSettings {
       persist()
     }
   }
+  var systemLightTheme: AppTheme = .paper { didSet { persist() } }
+  var systemDarkTheme: AppTheme = .midnight { didSet { persist() } }
   /// Compatibility bridge for earlier Typebar archives. New UI uses
   /// `randomThemeMode`, and randomization occurs after completion instead of
   /// at reset time.
@@ -1192,6 +1202,8 @@ final class AppSettings {
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
     followSystemTheme = snapshot.followSystemTheme
+    systemLightTheme = snapshot.systemLightTheme
+    systemDarkTheme = snapshot.systemDarkTheme
     randomThemeMode = snapshot.randomThemeMode
     flipTestColors = snapshot.flipTestColors
     colorfulMode = snapshot.colorfulMode
@@ -1294,7 +1306,9 @@ final class AppSettings {
       keyboardGuideStyle: keyboardGuideStyle,
       keyboardLayout: keyboardLayout, quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
-      followSystemTheme: followSystemTheme, randomThemeOnRestart: randomThemeOnRestart,
+      followSystemTheme: followSystemTheme,
+      systemLightTheme: systemLightTheme, systemDarkTheme: systemDarkTheme,
+      randomThemeOnRestart: randomThemeOnRestart,
       randomThemeMode: randomThemeMode,
       flipTestColors: flipTestColors, colorfulMode: colorfulMode,
       customBackgroundURL: customBackgroundURL, customBackgroundFit: customBackgroundFit,
@@ -1363,6 +1377,8 @@ final class AppSettings {
     quickEnd = false
     quickRestartKey = .escape
     followSystemTheme = false
+    systemLightTheme = .paper
+    systemDarkTheme = .midnight
     randomThemeMode = .off
     flipTestColors = false
     colorfulMode = false
@@ -1492,6 +1508,8 @@ final class AppSettings {
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
     followSystemTheme = snapshot.followSystemTheme
+    systemLightTheme = snapshot.systemLightTheme
+    systemDarkTheme = snapshot.systemDarkTheme
     randomThemeMode = snapshot.randomThemeMode
     flipTestColors = snapshot.flipTestColors
     colorfulMode = snapshot.colorfulMode
@@ -1574,7 +1592,7 @@ final class AppSettings {
 
   func resolvedTheme(for systemColorScheme: ColorScheme) -> ResolvedTheme {
     guard followSystemTheme else { return activeTheme }
-    return (systemColorScheme == .dark ? AppTheme.midnight : AppTheme.paper).resolvedTheme
+    return (systemColorScheme == .dark ? systemDarkTheme : systemLightTheme).resolvedTheme
   }
 
   /// Picks an ephemeral native theme after completion. The user's chosen
@@ -1716,6 +1734,8 @@ final class AppSettings {
       quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       followSystemTheme: followSystemTheme,
+      systemLightTheme: systemLightTheme,
+      systemDarkTheme: systemDarkTheme,
       randomThemeOnRestart: randomThemeOnRestart,
       randomThemeMode: randomThemeMode,
       flipTestColors: flipTestColors,

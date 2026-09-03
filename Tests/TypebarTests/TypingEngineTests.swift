@@ -3398,6 +3398,8 @@ final class TypingEngineTests: XCTestCase {
     settings.layoutFluidLayouts = [.ansiWorkman, .frenchAzerty, .ansiQwerty]
     settings.quickEnd = true
     settings.quickRestartKey = .enter
+    settings.systemLightTheme = .paper
+    settings.systemDarkTheme = .grove
     settings.practiceBackdrop = .halos
     settings.reducePracticeMotion = true
     settings.toggleFavoriteTheme(.grove)
@@ -3477,6 +3479,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
     XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
     XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
+    XCTAssertEqual(exportedSnapshot.systemLightTheme, .paper)
+    XCTAssertEqual(exportedSnapshot.systemDarkTheme, .grove)
     XCTAssertTrue(exportedSnapshot.flipTestColors)
     XCTAssertTrue(exportedSnapshot.colorfulMode)
     XCTAssertEqual(exportedSnapshot.customBackgroundURL, "https://images.example.test/harbour.jpeg")
@@ -3505,6 +3509,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.quickEnd)
     XCTAssertEqual(restored.quickRestartKey, .enter)
     XCTAssertFalse(restored.followSystemTheme)
+    XCTAssertEqual(restored.systemLightTheme, .paper)
+    XCTAssertEqual(restored.systemDarkTheme, .grove)
     XCTAssertTrue(restored.randomThemeOnRestart)
     XCTAssertEqual(restored.randomThemeMode, .custom)
     XCTAssertTrue(restored.flipTestColors)
@@ -3656,6 +3662,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertFalse(snapshot.followSystemTheme)
+    XCTAssertEqual(snapshot.systemLightTheme, .paper)
+    XCTAssertEqual(snapshot.systemDarkTheme, .midnight)
     XCTAssertFalse(snapshot.randomThemeOnRestart)
     XCTAssertEqual(snapshot.randomThemeMode, .off)
     XCTAssertFalse(snapshot.flipTestColors)
@@ -3826,8 +3834,12 @@ final class TypingEngineTests: XCTestCase {
     settings.randomThemeMode = .auto
     settings.randomizeTheme(for: .dark, using: 0)
     XCTAssertEqual(settings.activeTheme.colorScheme, .dark)
+    settings.systemLightTheme = .paper
+    settings.systemDarkTheme = .grove
     settings.followSystemTheme = true
     XCTAssertEqual(settings.randomThemeMode, .off)
+    XCTAssertEqual(settings.resolvedTheme(for: .light).accent, AppTheme.paper.accent)
+    XCTAssertEqual(settings.resolvedTheme(for: .dark).accent, AppTheme.grove.accent)
     settings.randomThemeMode = .on
     XCTAssertFalse(settings.followSystemTheme)
     XCTAssertTrue(settings.randomThemeOnRestart)

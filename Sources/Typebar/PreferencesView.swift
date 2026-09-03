@@ -262,7 +262,19 @@ struct PreferencesView: View {
             }
           }
           Toggle("跟随 macOS 深浅色自动切换", isOn: $settings.followSystemTheme)
-          Text("开启后会使用原创纸白或午夜主题；手动主题和自定义主题会保留，关闭自动切换后恢复。")
+          if settings.followSystemTheme {
+            Picker("浅色外观主题", selection: $settings.systemLightTheme) {
+              ForEach(AppTheme.allCases, id: \.self) { theme in
+                Text(theme.displayName).tag(theme)
+              }
+            }
+            Picker("深色外观主题", selection: $settings.systemDarkTheme) {
+              ForEach(AppTheme.allCases, id: \.self) { theme in
+                Text(theme.displayName).tag(theme)
+              }
+            }
+          }
+          Text("开启后会按 macOS 深浅色使用这里选择的内置主题；手动主题和自定义主题会保留，关闭自动切换后恢复。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("完成后随机主题", selection: $settings.randomThemeMode) {
