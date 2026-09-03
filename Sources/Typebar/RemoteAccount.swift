@@ -2,6 +2,51 @@ import Foundation
 import Observation
 import Security
 
+enum RemoteAuthenticationMethod: String, Codable, CaseIterable, Identifiable, Sendable {
+    case password
+    case github
+    case google
+
+    var id: Self { self }
+
+    var displayName: String {
+        switch self {
+        case .password: "密码"
+        case .github: "GitHub"
+        case .google: "Google"
+        }
+    }
+
+    var oauthProvider: RemoteOAuthProvider? {
+        switch self {
+        case .password: nil
+        case .github: .github
+        case .google: .google
+        }
+    }
+}
+
+enum RemoteOAuthProvider: String, Codable, CaseIterable, Identifiable, Sendable {
+    case github
+    case google
+
+    var id: Self { self }
+
+    var displayName: String {
+        switch self {
+        case .github: "GitHub"
+        case .google: "Google"
+        }
+    }
+
+    var authenticationMethod: RemoteAuthenticationMethod {
+        switch self {
+        case .github: .github
+        case .google: .google
+        }
+    }
+}
+
 struct RemoteAccountUser: Codable, Equatable, Sendable {
     let id: UUID
     let email: String
@@ -9,16 +54,28 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     let displayName: String
     let totalExperience: Int
     let leaderboardOptedOut: Bool
+    let authenticationMethods: [RemoteAuthenticationMethod]
 
-    private enum CodingKeys: String, CodingKey { case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut }
+    private enum CodingKeys: String, CodingKey {
+        case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut, authenticationMethods
+    }
 
-    init(id: UUID, email: String, emailVerified: Bool = false, displayName: String, totalExperience: Int, leaderboardOptedOut: Bool = false) {
+    init(
+        id: UUID,
+        email: String,
+        emailVerified: Bool = false,
+        displayName: String,
+        totalExperience: Int,
+        leaderboardOptedOut: Bool = false,
+        authenticationMethods: [RemoteAuthenticationMethod] = [.password]
+    ) {
         self.id = id
         self.email = email
         self.emailVerified = emailVerified
         self.displayName = displayName
         self.totalExperience = totalExperience
         self.leaderboardOptedOut = leaderboardOptedOut
+        self.authenticationMethods = authenticationMethods
     }
 
     init(from decoder: Decoder) throws {
@@ -29,6 +86,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         displayName = try values.decode(String.self, forKey: .displayName)
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
+        authenticationMethods = try values.decodeIfPresent([RemoteAuthenticationMethod].self, forKey: .authenticationMethods) ?? [.password]
     }
 }
 
@@ -49,9 +107,60 @@ private struct RemoteLoginRequest: Codable, Sendable {
     let password: String
 }
 
+private enum RemoteOAuthPurpose: String, Codable, Sendable {
+    case signIn
+    case link
+}
+
+private struct RemoteOAuthStartRequest: Codable, Sendable {
+    let purpose: RemoteOAuthPurpose
+}
+
+private struct RemoteOAuthStartResponse: Codable, Sendable {
+    let authorizationURL: String
+}
+
+private enum RemoteOAuthCompletionStatus: String, Codable, Sendable {
+    case pending
+    case exchanging
+    case registrationRequired
+    case signedIn
+    case linked
+    case failed
+}
+
+private struct RemoteOAuthCompletionResponse: Codable, Sendable {
+    let status: RemoteOAuthCompletionStatus
+    let email: String?
+    let suggestedDisplayName: String?
+    let session: RemoteAuthSession?
+    let user: RemoteAccountUser?
+    let message: String?
+}
+
+private struct RemoteOAuthRegistrationRequest: Codable, Sendable {
+    let state: String
+    let displayName: String
+}
+
+struct PendingRemoteOAuthRegistration: Equatable, Sendable {
+    let provider: RemoteOAuthProvider
+    let state: String
+    let email: String
+    let suggestedDisplayName: String?
+}
+
 private struct RemoteChangePasswordRequest: Codable, Sendable {
     let currentPassword: String
     let newPassword: String
+}
+
+private struct RemoteAddPasswordAuthenticationRequest: Codable, Sendable {
+    let newPassword: String
+}
+
+private struct RemoteRemovePasswordAuthenticationRequest: Codable, Sendable {
+    let currentPassword: String
 }
 
 private struct RemotePasswordResetRequest: Codable, Sendable { let email: String }
@@ -530,12 +639,18 @@ enum RemoteLeaderboardScope: String, CaseIterable {
 
 enum RemoteAccountError: LocalizedError {
     case invalidServerURL
+    case invalidOAuthCallback
+    case oauthAuthorizationCancelled
+    case oauthAuthorizationInProgress
     case serverMessage(String)
     case unexpectedResponse
 
     var errorDescription: String? {
         switch self {
         case .invalidServerURL: "请输入有效的 Typebar 服务地址。"
+        case .invalidOAuthCallback: "第三方登录返回了无法识别的回调。"
+        case .oauthAuthorizationCancelled: "第三方登录已取消。"
+        case .oauthAuthorizationInProgress: "已有一个第三方登录正在进行。"
         case .serverMessage(let message): message
         case .unexpectedResponse: "服务返回了无法识别的响应。"
         }
@@ -551,9 +666,11 @@ final class AccountSession {
     @ObservationIgnored private let syncVersionKey = "remoteAccount.archiveSyncVersion.v1"
     @ObservationIgnored private let syncCursorKey = "remoteAccount.syncCursor.v1"
     @ObservationIgnored private let tokenStore = AccountTokenStore()
+    @ObservationIgnored private let oauthBrowser = OAuthWebAuthenticationSession()
 
     var endpoint = "http://127.0.0.1:8080" { didSet { defaults.set(endpoint, forKey: endpointKey) } }
     var currentUser: RemoteAccountUser?
+    var pendingOAuthRegistration: PendingRemoteOAuthRegistration?
     var isWorking = false
     var statusMessage: String?
 
@@ -573,6 +690,73 @@ final class AccountSession {
 
     func login(email: String, password: String) async {
         await performAuth(path: "v1/auth/login", body: RemoteLoginRequest(email: email, password: password))
+    }
+
+    func signInWithOAuth(_ provider: RemoteOAuthProvider) async {
+        await beginOAuth(provider: provider, purpose: .signIn, accessToken: nil)
+    }
+
+    func linkOAuth(_ provider: RemoteOAuthProvider) async {
+        do {
+            await beginOAuth(provider: provider, purpose: .link, accessToken: try accessToken())
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func completeOAuthRegistration(displayName: String) async -> Bool {
+        guard let pending = pendingOAuthRegistration else {
+            statusMessage = "没有等待完成的第三方注册。"
+            return false
+        }
+        let normalizedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalizedDisplayName.count >= 2 else {
+            statusMessage = "显示名至少需要 2 个字符。"
+            return false
+        }
+
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let session = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/oauth/registration",
+                method: "POST",
+                token: nil,
+                body: RemoteOAuthRegistrationRequest(state: pending.state, displayName: normalizedDisplayName),
+                response: RemoteAuthSession.self
+            )
+            try applyAuthenticatedSession(session)
+            statusMessage = "已使用 \(pending.provider.displayName) 登录。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func cancelOAuthRegistration() {
+        pendingOAuthRegistration = nil
+    }
+
+    func unlinkOAuth(_ provider: RemoteOAuthProvider) async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/oauth/\(provider.rawValue)",
+                method: "DELETE",
+                token: token,
+                body: Optional<String>.none,
+                response: RemoteAccountUser.self
+            )
+            statusMessage = "已移除 \(provider.displayName) 登录方式。"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
     }
 
     func requestPasswordReset(email: String) async {
@@ -686,6 +870,54 @@ final class AccountSession {
             try tokenStore.save(session.accessToken)
             currentUser = session.user
             statusMessage = "密码已更新；其他设备的登录会话已失效。"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func addPasswordAuthentication(newPassword: String) async -> Bool {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return false
+        }
+        guard newPassword.utf8.count >= 12 else {
+            statusMessage = "新密码至少需要 12 个字节。"
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/password/add",
+                method: "POST",
+                token: token,
+                body: RemoteAddPasswordAuthenticationRequest(newPassword: newPassword),
+                response: RemoteAccountUser.self
+            )
+            statusMessage = "密码登录方式已添加。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func removePasswordAuthentication(currentPassword: String) async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/password",
+                method: "DELETE",
+                token: token,
+                body: RemoteRemovePasswordAuthenticationRequest(currentPassword: currentPassword),
+                response: RemoteAccountUser.self
+            )
+            statusMessage = "密码登录方式已移除；其他设备的登录会话已失效。"
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -889,6 +1121,7 @@ final class AccountSession {
     func signOut() {
         tokenStore.clear()
         currentUser = nil
+        pendingOAuthRegistration = nil
         statusMessage = nil
     }
 
@@ -979,7 +1212,8 @@ final class AccountSession {
                 emailVerified: user.emailVerified,
                 displayName: user.displayName,
                 totalExperience: response.totalExperience,
-                leaderboardOptedOut: user.leaderboardOptedOut
+                leaderboardOptedOut: user.leaderboardOptedOut,
+                authenticationMethods: user.authenticationMethods
             )
         }
         return response
@@ -1145,13 +1379,100 @@ final class AccountSession {
         return token
     }
 
+    private func beginOAuth(
+        provider: RemoteOAuthProvider,
+        purpose: RemoteOAuthPurpose,
+        accessToken: String?
+    ) async {
+        guard !isWorking else {
+            statusMessage = RemoteAccountError.oauthAuthorizationInProgress.localizedDescription
+            return
+        }
+        pendingOAuthRegistration = nil
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let start = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/oauth/\(provider.rawValue)/start",
+                method: "POST",
+                token: accessToken,
+                body: RemoteOAuthStartRequest(purpose: purpose),
+                response: RemoteOAuthStartResponse.self
+            )
+            guard let authorizationURL = URL(string: start.authorizationURL) else {
+                throw RemoteAccountError.unexpectedResponse
+            }
+            let callbackURL = try await oauthBrowser.authorize(url: authorizationURL)
+            let state = try oauthState(from: callbackURL)
+            let completion = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/oauth/completion",
+                method: "GET",
+                token: nil,
+                body: Optional<String>.none,
+                queryItems: [URLQueryItem(name: "state", value: state)],
+                response: RemoteOAuthCompletionResponse.self
+            )
+            try applyOAuthCompletion(completion, provider: provider, state: state)
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func applyOAuthCompletion(
+        _ completion: RemoteOAuthCompletionResponse,
+        provider: RemoteOAuthProvider,
+        state: String
+    ) throws {
+        switch completion.status {
+        case .signedIn:
+            guard let session = completion.session else { throw RemoteAccountError.unexpectedResponse }
+            try applyAuthenticatedSession(session)
+            statusMessage = "已使用 \(provider.displayName) 登录。"
+        case .linked:
+            guard let user = completion.user else { throw RemoteAccountError.unexpectedResponse }
+            currentUser = user
+            statusMessage = "已关联 \(provider.displayName) 登录方式。"
+        case .registrationRequired:
+            guard let email = completion.email else { throw RemoteAccountError.unexpectedResponse }
+            pendingOAuthRegistration = .init(
+                provider: provider,
+                state: state,
+                email: email,
+                suggestedDisplayName: completion.suggestedDisplayName
+            )
+            statusMessage = "请补充显示名以完成 \(provider.displayName) 注册。"
+        case .failed:
+            throw RemoteAccountError.serverMessage(
+                completion.message ?? "第三方登录未能完成。")
+        case .pending, .exchanging:
+            throw RemoteAccountError.serverMessage("第三方登录仍在完成中，请稍后重试。")
+        }
+    }
+
+    private func applyAuthenticatedSession(_ session: RemoteAuthSession) throws {
+        try tokenStore.save(session.accessToken)
+        currentUser = session.user
+        pendingOAuthRegistration = nil
+    }
+
+    private func oauthState(from callbackURL: URL) throws -> String {
+        guard callbackURL.scheme == "typebar",
+              callbackURL.host == "oauth",
+              callbackURL.path == "/callback",
+              let state = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "state" })?.value,
+              !state.isEmpty else {
+            throw RemoteAccountError.invalidOAuthCallback
+        }
+        return state
+    }
+
     private func performAuth<Body: Encodable & Sendable>(path: String, body: Body) async {
         isWorking = true
         defer { isWorking = false }
         do {
             let session = try await RemoteAccountAPI(endpoint: endpoint).request(path: path, method: "POST", token: nil, body: body, response: RemoteAuthSession.self)
-            try tokenStore.save(session.accessToken)
-            currentUser = session.user
+            try applyAuthenticatedSession(session)
             statusMessage = nil
         } catch {
             statusMessage = error.localizedDescription

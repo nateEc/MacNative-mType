@@ -257,6 +257,28 @@ public func configure(
         }
     }
 
+    app.post("v1", "auth", "password", "add") { request async throws -> AuthUserResponse in
+        do {
+            return try await authStore.addPasswordAuthentication(
+                request.content.decode(AddPasswordAuthenticationRequest.self),
+                accessToken: request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.delete("v1", "auth", "password") { request async throws -> AuthUserResponse in
+        do {
+            return try await authStore.removePasswordAuthentication(
+                request.content.decode(RemovePasswordAuthenticationRequest.self),
+                accessToken: request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.post("v1", "auth", "email") { request async throws -> AuthSessionResponse in
         do {
             let accessToken = try request.accessToken()
@@ -623,6 +645,8 @@ private extension AuthStoreError {
             Abort(.conflict, reason: "An account already exists for this email address.")
         case .oauthIdentityAlreadyLinked:
             Abort(.conflict, reason: "That OAuth identity is already linked to a Typebar account.")
+        case .passwordAuthenticationAlreadyLinked:
+            Abort(.conflict, reason: "Password authentication is already linked to this Typebar account.")
         case .cannotRemoveLastAuthentication:
             Abort(.conflict, reason: "A Typebar account must retain at least one authentication method.")
         case .oauthRegistrationNotRequired:
@@ -637,6 +661,8 @@ private extension AuthStoreError {
             Abort(.unauthorized, reason: "This email verification code is invalid or has expired.")
         case .oauthIdentityNotLinked:
             Abort(.notFound, reason: "The requested OAuth identity is not linked to this Typebar account.")
+        case .passwordAuthenticationNotLinked:
+            Abort(.notFound, reason: "Password authentication is not linked to this Typebar account.")
         case .profileNotFound:
             Abort(.notFound, reason: "The requested Typebar profile does not exist.")
         case .cannotConnectToSelf, .connectionNotPending:

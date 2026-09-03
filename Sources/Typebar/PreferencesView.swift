@@ -9,6 +9,7 @@ struct PreferencesView: View {
   @State private var email = ""
   @State private var password = ""
   @State private var displayName = ""
+  @State private var oauthDisplayName = ""
   @State private var passwordResetToken = ""
   @State private var passwordResetPassword = ""
   @State private var confirmedPasswordResetPassword = ""
@@ -19,6 +20,9 @@ struct PreferencesView: View {
   @State private var currentPassword = ""
   @State private var newPassword = ""
   @State private var confirmedNewPassword = ""
+  @State private var passwordAuthenticationPassword = ""
+  @State private var confirmedPasswordAuthenticationPassword = ""
+  @State private var passwordAuthenticationRemovalPassword = ""
   @State private var accountDeletionPassword = ""
   @State private var showingAccountDeletionConfirmation = false
   @State private var showingRestoreDefaultsConfirmation = false
@@ -808,6 +812,36 @@ struct PreferencesView: View {
               .font(.caption)
               .foregroundStyle(.secondary)
             Divider()
+            Text("登录方式").font(.headline)
+            ForEach(user.authenticationMethods) { method in
+              HStack {
+                Text(method.displayName)
+                Spacer()
+                if let provider = method.oauthProvider {
+                  Button("移除", role: .destructive) {
+                    Task { await account.unlinkOAuth(provider) }
+                  }
+                  .disabled(account.isWorking || user.authenticationMethods.count <= 1)
+                }
+              }
+            }
+            ForEach(RemoteOAuthProvider.allCases.filter { provider in
+              !user.authenticationMethods.contains(provider.authenticationMethod)
+            }) { provider in
+              Button("关联 \(provider.displayName)") {
+                Task { await account.linkOAuth(provider) }
+              }
+              .disabled(account.isWorking)
+            }
+            Text("至少要保留一种登录方式。关联时会打开系统授权窗口；Typebar 不会保存第三方访问令牌。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            HStack {
+              Button("刷新资料") { Task { await account.refreshProfile() } }
+              Button("退出登录") { account.signOut() }
+            }
+            Divider()
+            if user.authenticationMethods.contains(.password) {
             Text("更改登录邮箱").font(.headline)
             TextField("新邮箱", text: $updatedEmail)
               .textContentType(.emailAddress)
@@ -828,10 +862,6 @@ struct PreferencesView: View {
             Text("更改成功后，其他设备上的 Typebar 登录会话会失效；新邮箱不会公开。")
               .font(.caption)
               .foregroundStyle(.secondary)
-            HStack {
-              Button("刷新资料") { Task { await account.refreshProfile() } }
-              Button("退出登录") { account.signOut() }
-            }
             Divider()
             SecureField("当前密码", text: $currentPassword)
               .textContentType(.password)
@@ -854,6 +884,23 @@ struct PreferencesView: View {
             Text("更新成功后，其他设备上的 Typebar 登录会话会失效。")
               .font(.caption)
               .foregroundStyle(.secondary)
+            if user.authenticationMethods.count > 1 {
+              Divider()
+              Text("移除密码登录").font(.headline)
+              SecureField("输入当前密码以移除密码登录", text: $passwordAuthenticationRemovalPassword)
+                .textContentType(.password)
+              Button("移除密码登录", role: .destructive) {
+                Task {
+                  await account.removePasswordAuthentication(
+                    currentPassword: passwordAuthenticationRemovalPassword)
+                  passwordAuthenticationRemovalPassword = ""
+                }
+              }
+              .disabled(account.isWorking || passwordAuthenticationRemovalPassword.isEmpty)
+              Text("移除后将保留已关联的第三方登录方式，并撤销其他设备会话。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             Divider()
             Text("删除账户").font(.headline)
             SecureField("输入当前密码以删除账户", text: $accountDeletionPassword)
@@ -865,6 +912,27 @@ struct PreferencesView: View {
             Text("此操作会删除此自建服务中的账户、会话、成绩、同步数据、好友关系、屏蔽和投稿；无法撤销。本机练习历史不会删除。")
               .font(.caption)
               .foregroundStyle(.secondary)
+            } else {
+              Text("添加密码登录").font(.headline)
+              SecureField("新密码（至少 12 字节）", text: $passwordAuthenticationPassword)
+                .textContentType(.newPassword)
+              SecureField("确认新密码", text: $confirmedPasswordAuthenticationPassword)
+                .textContentType(.newPassword)
+              Button("添加密码登录") {
+                Task {
+                  if await account.addPasswordAuthentication(newPassword: passwordAuthenticationPassword) {
+                    passwordAuthenticationPassword = ""
+                    confirmedPasswordAuthenticationPassword = ""
+                  }
+                }
+              }
+              .disabled(
+                account.isWorking || passwordAuthenticationPassword.utf8.count < 12
+                  || passwordAuthenticationPassword != confirmedPasswordAuthenticationPassword)
+              Text("添加后可改用邮箱和密码登录；第三方登录方式仍会保留。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             Divider()
             Text("投稿引语").font(.headline)
             Picker("语言", selection: $submittedQuoteLanguage) {
@@ -918,6 +986,34 @@ struct PreferencesView: View {
               }
             }
           } else {
+            if let pending = account.pendingOAuthRegistration {
+              Text("完成 \(pending.provider.displayName) 注册").font(.headline)
+              Text(pending.email).font(.caption).foregroundStyle(.secondary)
+              TextField("公开显示名", text: $oauthDisplayName)
+                .onAppear {
+                  if oauthDisplayName.isEmpty {
+                    oauthDisplayName = pending.suggestedDisplayName ?? ""
+                  }
+                }
+              Button("完成注册") {
+                Task {
+                  if await account.completeOAuthRegistration(displayName: oauthDisplayName) {
+                    oauthDisplayName = ""
+                  }
+                }
+              }
+              .disabled(
+                account.isWorking
+                  || oauthDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+              Button("取消") {
+                account.cancelOAuthRegistration()
+                oauthDisplayName = ""
+              }
+              .disabled(account.isWorking)
+              Text("邮箱已由 \(pending.provider.displayName) 验证，仅用于自建服务登录，不会公开。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
             Picker("操作", selection: $accountMode) {
               Text("登录").tag(AccountMode.login)
               Text("注册").tag(AccountMode.register)
@@ -980,6 +1076,18 @@ struct PreferencesView: View {
                   || (accountMode == .register
                     && displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
               )
+            }
+            Divider()
+            Text("使用第三方登录").font(.headline)
+            ForEach(RemoteOAuthProvider.allCases) { provider in
+              Button("使用 \(provider.displayName) 登录") {
+                Task { await account.signInWithOAuth(provider) }
+              }
+              .disabled(account.isWorking)
+            }
+            Text("仅当自建服务配置了相应提供商时可用。系统授权窗口完成后会返回 Typebar；访问令牌不会保存在本机或服务端。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
             }
           }
           if account.isWorking { ProgressView() }
@@ -1233,7 +1341,7 @@ struct PreferencesView: View {
   private var accountSectionVisible: Bool {
     matches(
       "自建账户", "账户", "account", "服务", "server", "登录", "login", "注册", "邮箱", "email", "密码", "password",
-      "资料", "profile", "排行榜", "榜单", "leaderboard", "删除", "注销")
+      "GitHub", "Google", "OAuth", "第三方", "关联", "资料", "profile", "排行榜", "榜单", "leaderboard", "删除", "注销")
   }
 
   private var moderationSectionVisible: Bool {

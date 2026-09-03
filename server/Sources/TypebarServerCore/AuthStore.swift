@@ -17,6 +17,14 @@ public struct ChangePasswordRequest: Content, Equatable {
   public let newPassword: String
 }
 
+public struct AddPasswordAuthenticationRequest: Content, Equatable {
+  public let newPassword: String
+}
+
+public struct RemovePasswordAuthenticationRequest: Content, Equatable {
+  public let currentPassword: String
+}
+
 public struct PasswordResetRequest: Content, Equatable {
   public let email: String
 }
@@ -260,6 +268,8 @@ public enum AuthStoreError: Error, Equatable {
   case invalidOAuthIdentity
   case oauthIdentityAlreadyLinked
   case oauthIdentityNotLinked
+  case passwordAuthenticationAlreadyLinked
+  case passwordAuthenticationNotLinked
   case cannotRemoveLastAuthentication
   case invalidOAuthTransaction
   case oauthRegistrationNotRequired
@@ -718,6 +728,59 @@ public actor AuthStore {
     state.oauthIdentities.removeAll { $0.userID == currentUser.id && $0.provider == provider }
     try persist()
     return try userResponse(for: currentUser.id)
+  }
+
+  /// Adds password authentication to an authenticated provider-only account.
+  /// A valid Typebar session is required; passwords never replace or expose a
+  /// provider identity, and are stored only as bcrypt hashes.
+  public func addPasswordAuthentication(
+    _ request: AddPasswordAuthenticationRequest, accessToken: String, now: Date = .now
+  ) throws -> AuthUserResponse {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard let index = state.users.firstIndex(where: { $0.id == currentUser.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    let user = state.users[index]
+    guard user.passwordHash == nil else { throw AuthStoreError.passwordAuthenticationAlreadyLinked }
+    try validatedPassword(request.newPassword)
+    let updatedUser = StoredUser(
+      id: user.id, email: user.email, displayName: user.displayName,
+      passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
+      createdAt: user.createdAt, emailVerified: user.emailVerified,
+      leaderboardOptedOut: user.leaderboardOptedOut)
+    state.users[index] = updatedUser
+    try persist()
+    return try userResponse(for: updatedUser.id)
+  }
+
+  /// Removes password authentication only after verifying it and only when a
+  /// provider identity still keeps the account reachable.
+  public func removePasswordAuthentication(
+    _ request: RemovePasswordAuthenticationRequest, accessToken: String, now: Date = .now
+  ) throws -> AuthUserResponse {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard let index = state.users.firstIndex(where: { $0.id == currentUser.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    let user = state.users[index]
+    guard let passwordHash = user.passwordHash else {
+      throw AuthStoreError.passwordAuthenticationNotLinked
+    }
+    guard try Bcrypt.verify(request.currentPassword, created: passwordHash) else {
+      throw AuthStoreError.invalidCredentials
+    }
+    guard authenticationMethods(for: user.id).count > 1 else {
+      throw AuthStoreError.cannotRemoveLastAuthentication
+    }
+    state.users[index] = StoredUser(
+      id: user.id, email: user.email, displayName: user.displayName,
+      passwordHash: nil, createdAt: user.createdAt, emailVerified: user.emailVerified,
+      leaderboardOptedOut: user.leaderboardOptedOut)
+    state.passwordResetTokens.removeAll { $0.userID == user.id }
+    let currentTokenHash = Self.tokenHash(accessToken)
+    state.sessions.removeAll { $0.userID == user.id && $0.tokenHash != currentTokenHash }
+    try persist()
+    return try userResponse(for: user.id)
   }
 
   /// Starts a short-lived OAuth transaction. The raw state is returned only to

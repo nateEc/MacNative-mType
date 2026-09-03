@@ -21,6 +21,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(paged.hasMore)
   }
 
+  func testRemoteAccountUserDefaultsLegacyServersToPasswordAndDecodesOAuthMethods() throws {
+    let legacy = try JSONDecoder().decode(
+      RemoteAccountUser.self,
+      from: Data(
+        #"{"id":"00000000-0000-0000-0000-000000000001","email":"legacy@example.com","displayName":"Legacy","totalExperience":8}"#
+          .utf8))
+    XCTAssertEqual(legacy.authenticationMethods, [.password])
+
+    let modern = try JSONDecoder().decode(
+      RemoteAccountUser.self,
+      from: Data(
+        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"authenticationMethods":["google","password"]}"#
+          .utf8))
+    XCTAssertTrue(modern.emailVerified)
+    XCTAssertEqual(modern.authenticationMethods, [.google, .password])
+  }
+
   func testTimedTestCompletesAtDeadline() {
     var session = TypingSession(configuration: .timed(seconds: 15), prompt: "amber harbor")
     session.insert("a", at: start)

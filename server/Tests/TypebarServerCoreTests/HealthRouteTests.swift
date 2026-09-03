@@ -635,6 +635,58 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testPasswordAuthenticationRoutesLetProviderUsersAddAndRemovePasswords() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let oauthSession = try await store.registerWithOAuth(
+      .init(provider: .github, subject: "password-route-github", email: "provider@example.com"),
+      displayName: "Provider User")
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(
+        .POST,
+        "v1/auth/password/add",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(oauthSession.accessToken)")
+          try request.content.encode(
+            AddPasswordAuthenticationRequest(newPassword: "a secure password"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          let user = try? response.content.decode(AuthUserResponse.self)
+          XCTAssertEqual(user?.authenticationMethods, [.password, .github])
+        }
+      )
+      try await app.test(
+        .DELETE,
+        "v1/auth/password",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(oauthSession.accessToken)")
+          try request.content.encode(
+            RemovePasswordAuthenticationRequest(currentPassword: "a secure password"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          let user = try? response.content.decode(AuthUserResponse.self)
+          XCTAssertEqual(user?.authenticationMethods, [.github])
+        }
+      )
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+
+    do {
+      _ = try await store.login(
+        .init(email: "provider@example.com", password: "a secure password"))
+      XCTFail("A removed password must no longer be accepted")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidCredentials)
+    }
+  }
+
   func testPasswordResetRevokesSessionsConsumesItsTokenAndExpires() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let start = Date(timeIntervalSince1970: 1_000)
