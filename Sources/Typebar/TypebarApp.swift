@@ -633,7 +633,7 @@ private struct ContentView: View {
       Button("通知", systemImage: "bell") { showingNotifications = true }
     }
     .sheet(isPresented: $showingHistory) {
-      ResultsHistoryView(settings: settings)
+      ResultsHistoryView(settings: settings, currentConfiguration: configuration)
     }
     .sheet(isPresented: $showingPresets) {
       PresetLibraryView(currentPreset: presetDefinition, onApply: apply)
@@ -3310,6 +3310,7 @@ private struct ResultPerformanceChart: View {
 
 private struct ResultsHistoryView: View {
   let settings: AppSettings
+  let currentConfiguration: TestConfiguration
   fileprivate enum ActivityChartMeasure: String, CaseIterable, Identifiable {
     case completedTests
     case typingMinutes
@@ -3455,6 +3456,10 @@ private struct ResultsHistoryView: View {
 
             List {
               Section("筛选") {
+                HStack {
+                  Button("全部", action: resetFilters)
+                  Button("当前测试设置", action: applyCurrentSettingsFilter)
+                }
                 HStack {
                   TextField("筛选预设名称", text: $filterPresetName)
                   Button("保存筛选", action: saveFilterPreset)
@@ -3802,6 +3807,18 @@ private struct ResultsHistoryView: View {
 
   private func applyFilterPreset(_ preset: ResultFilterPresetRecord) {
     guard let filter = preset.filter else { return }
+    apply(filter)
+  }
+
+  private func resetFilters() {
+    apply(.init())
+  }
+
+  private func applyCurrentSettingsFilter() {
+    apply(.currentSettings(currentConfiguration))
+  }
+
+  private func apply(_ filter: ResultHistoryFilter) {
     modeFilter = filter.mode
     languageFilter = filter.language
     tagFilter = filter.tag

@@ -3700,6 +3700,45 @@ final class TypingEngineTests: XCTestCase {
         entries: entries, personalBestIDs: []), [])
   }
 
+  func testResultHistoryCurrentSettingsFilterUsesLocalConfigurationSemantics() {
+    var contentOptions = ContentOptions()
+    contentOptions.includePunctuation = true
+    let configuration = TestConfiguration.timed(
+      seconds: 60, difficulty: .expert, language: .spanish, contentOptions: contentOptions
+    ).with(modifiers: [.crtVisual, .binaryStream])
+    let filter = ResultHistoryFilter.currentSettings(configuration)
+    let matching = ResultHistoryEntry(
+      id: UUID(), mode: .time, language: .spanish, tags: ["kept-unrestricted"],
+      difficulty: .expert, includesPunctuation: true, includesNumbers: false,
+      duration: 60, modifiers: [.crtVisual])
+    let wrongDuration = ResultHistoryEntry(
+      id: UUID(), mode: .time, language: .spanish, tags: [], difficulty: .expert,
+      includesPunctuation: true, includesNumbers: false, duration: 30, modifiers: [.crtVisual])
+    let missingModifier = ResultHistoryEntry(
+      id: UUID(), mode: .time, language: .spanish, tags: [], difficulty: .expert,
+      includesPunctuation: true, includesNumbers: false, duration: 60, modifiers: [])
+    let wrongLanguage = ResultHistoryEntry(
+      id: UUID(), mode: .time, language: .english, tags: [], difficulty: .expert,
+      includesPunctuation: true, includesNumbers: false, duration: 60, modifiers: [.crtVisual])
+
+    XCTAssertEqual(
+      filter.matchingIDs(
+        entries: [matching, wrongDuration, missingModifier, wrongLanguage], personalBestIDs: []),
+      [matching.id]
+    )
+    XCTAssertEqual(filter.quoteLength, nil)
+    XCTAssertEqual(filter.timeLimits, [.seconds60])
+    XCTAssertEqual(filter.wordLimits, Set(ResultHistoryWordLimit.allCases))
+
+    let quoteFilter = ResultHistoryFilter.currentSettings(
+      .init(
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        quoteLength: .long
+      )
+    )
+    XCTAssertEqual(quoteFilter.quoteLength, .long)
+  }
+
   func testResultHistoryDateRangesUseReferenceRollingWindowsAndPreserveLegacyPresets() throws {
     let now = Date(timeIntervalSinceReferenceDate: 1_000_000)
     let onBoundary = UUID()

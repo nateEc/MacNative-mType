@@ -1045,6 +1045,36 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.modifierFilter = modifierFilter
     }
 
+    /// Mirrors the reference product's "current settings" history shortcut
+    /// using only Typebar's current local test configuration. Typebar tags are
+    /// assigned to completed results and have no separate active-tag state, so
+    /// the shortcut deliberately leaves them unrestricted.
+    static func currentSettings(_ configuration: TestConfiguration) -> Self {
+        let selectedModifiers = Set(configuration.modifiers)
+        let timeLimits: Set<ResultHistoryTimeLimit> = configuration.mode == .time
+            ? Set(ResultHistoryTimeLimit.allCases.filter { $0.matches(configuration.duration) })
+            : Set(ResultHistoryTimeLimit.allCases)
+        let wordLimits: Set<ResultHistoryWordLimit> = configuration.mode == .words
+            ? Set(ResultHistoryWordLimit.allCases.filter { $0.matches(configuration.wordLimit) })
+            : Set(ResultHistoryWordLimit.allCases)
+
+        return .init(
+            mode: configuration.mode,
+            language: configuration.language,
+            difficulty: configuration.difficulty,
+            punctuation: configuration.contentOptions.includePunctuation ? .included : .excluded,
+            numbers: configuration.contentOptions.includeNumbers ? .included : .excluded,
+            quoteLength: configuration.mode == .quote && configuration.quoteLength != .all
+                ? configuration.quoteLength : nil,
+            timeLimits: timeLimits,
+            wordLimits: wordLimits,
+            modifierFilter: .init(
+                includesNoModifiers: selectedModifiers.isEmpty,
+                modifiers: selectedModifiers
+            )
+        )
+    }
+
     private enum CodingKeys: String, CodingKey {
         case mode, language, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength,
           timeLimits, wordLimits, modifierFilter
