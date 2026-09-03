@@ -195,12 +195,16 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
   var displayName: String { rawValue.uppercased() }
 
   func converted(wpm: Int) -> Double {
+    converted(wpm: Double(wpm))
+  }
+
+  func converted(wpm: Double) -> Double {
     switch self {
-    case .wpm: Double(wpm)
-    case .cpm: Double(wpm * 5)
-    case .wps: Double(wpm) / 60
-    case .cps: Double(wpm * 5) / 60
-    case .wph: Double(wpm * 60)
+    case .wpm: wpm
+    case .cpm: wpm * 5
+    case .wps: wpm / 60
+    case .cps: wpm * 5 / 60
+    case .wph: wpm * 60
     }
   }
 
@@ -528,6 +532,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var showWordBurstHeatmap = false
   var resultPerformanceVisibility = ResultPerformanceVisibility()
   var startGraphsAtZero = true
+  var historyChartVisibility = HistoryChartVisibility()
   var showAverage: AverageNoticeDisplay = .off
   var showPersonalBest = false
   var typedCharacterEffect: TypedCharacterEffect = .keep
@@ -624,6 +629,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     showWordBurstHeatmap: Bool = false,
     resultPerformanceVisibility: ResultPerformanceVisibility = .init(),
     startGraphsAtZero: Bool = true,
+    historyChartVisibility: HistoryChartVisibility = .init(),
     showAverage: AverageNoticeDisplay = .off,
     showPersonalBest: Bool = false,
     typedCharacterEffect: TypedCharacterEffect = .keep,
@@ -726,6 +732,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.showWordBurstHeatmap = showWordBurstHeatmap
     self.resultPerformanceVisibility = resultPerformanceVisibility
     self.startGraphsAtZero = startGraphsAtZero
+    self.historyChartVisibility = historyChartVisibility
     self.showAverage = showAverage
     self.showPersonalBest = showPersonalBest
     self.typedCharacterEffect = typedCharacterEffect
@@ -766,7 +773,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
       smoothPracticeLineScroll, showAllPracticeLines, smoothCaretMotion, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
       alwaysShowDecimalPlaces, alwaysShowWordsHistory, showWordBurstHeatmap, resultPerformanceVisibility,
-      startGraphsAtZero, showAverage, showPersonalBest,
+      startGraphsAtZero, historyChartVisibility, showAverage, showPersonalBest,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
       liveStatsColor, liveStatsOpacity,
       promptHighlightMode,
@@ -902,6 +909,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(ResultPerformanceVisibility.self, forKey: .resultPerformanceVisibility) ?? .init()
     startGraphsAtZero =
       try values.decodeIfPresent(Bool.self, forKey: .startGraphsAtZero) ?? true
+    historyChartVisibility =
+      try values.decodeIfPresent(HistoryChartVisibility.self, forKey: .historyChartVisibility) ?? .init()
     showAverage =
       try values.decodeIfPresent(AverageNoticeDisplay.self, forKey: .showAverage) ?? .off
     showPersonalBest = try values.decodeIfPresent(Bool.self, forKey: .showPersonalBest) ?? false
@@ -1195,6 +1204,7 @@ final class AppSettings {
   var showWordBurstHeatmap = false { didSet { persist() } }
   var resultPerformanceVisibility = ResultPerformanceVisibility() { didSet { persist() } }
   var startGraphsAtZero = true { didSet { persist() } }
+  var historyChartVisibility = HistoryChartVisibility() { didSet { persist() } }
   var showAverage: AverageNoticeDisplay = .off { didSet { persist() } }
   var showPersonalBest = false { didSet { persist() } }
   var typedCharacterEffect: TypedCharacterEffect = .keep { didSet { persist() } }
@@ -1300,6 +1310,7 @@ final class AppSettings {
     showWordBurstHeatmap = snapshot.showWordBurstHeatmap
     resultPerformanceVisibility = snapshot.resultPerformanceVisibility
     startGraphsAtZero = snapshot.startGraphsAtZero
+    historyChartVisibility = snapshot.historyChartVisibility
     showAverage = snapshot.showAverage
     showPersonalBest = snapshot.showPersonalBest
     typedCharacterEffect = snapshot.typedCharacterEffect
@@ -1352,6 +1363,12 @@ final class AppSettings {
     showKeyboardGuide ? keyboardGuideMode : .off
   }
 
+  func mutateHistoryChartVisibility(_ update: (inout HistoryChartVisibility) -> Void) {
+    var updated = historyChartVisibility
+    update(&updated)
+    historyChartVisibility = updated
+  }
+
   var snapshot: AppSettingsSnapshot {
     .init(
       difficulty: difficulty, strictSpace: strictSpace, stopOnError: stopOnError,
@@ -1399,6 +1416,7 @@ final class AppSettings {
       showWordBurstHeatmap: showWordBurstHeatmap,
       resultPerformanceVisibility: resultPerformanceVisibility,
       startGraphsAtZero: startGraphsAtZero,
+      historyChartVisibility: historyChartVisibility,
       showAverage: showAverage,
       showPersonalBest: showPersonalBest,
       typedCharacterEffect: typedCharacterEffect, liveSpeedStyle: liveSpeedStyle,
@@ -1490,6 +1508,7 @@ final class AppSettings {
     showWordBurstHeatmap = false
     resultPerformanceVisibility = .init()
     startGraphsAtZero = true
+    historyChartVisibility = .init()
     showAverage = .off
     showPersonalBest = false
     typedCharacterEffect = .keep
@@ -1622,6 +1641,7 @@ final class AppSettings {
     showWordBurstHeatmap = snapshot.showWordBurstHeatmap
     resultPerformanceVisibility = snapshot.resultPerformanceVisibility
     startGraphsAtZero = snapshot.startGraphsAtZero
+    historyChartVisibility = snapshot.historyChartVisibility
     showAverage = snapshot.showAverage
     showPersonalBest = snapshot.showPersonalBest
     typedCharacterEffect = snapshot.typedCharacterEffect
@@ -1877,6 +1897,7 @@ final class AppSettings {
       showWordBurstHeatmap: showWordBurstHeatmap,
       resultPerformanceVisibility: resultPerformanceVisibility,
       startGraphsAtZero: startGraphsAtZero,
+      historyChartVisibility: historyChartVisibility,
       showAverage: showAverage,
       showPersonalBest: showPersonalBest,
       typedCharacterEffect: typedCharacterEffect,

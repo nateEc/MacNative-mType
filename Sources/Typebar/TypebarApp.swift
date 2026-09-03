@@ -3292,6 +3292,17 @@ private struct ResultsHistoryView: View {
     }
   }
 
+  private struct HistoryChartPoint: Identifiable {
+    let metric: ResultMetric
+    let speedAverage10: Double
+    let speedAverage100: Double
+    let accuracyAverage10: Double
+    let accuracyAverage100: Double
+    let personalBestSpeed: Double
+
+    var id: UUID { metric.id }
+  }
+
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
   @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var results:
@@ -3382,15 +3393,7 @@ private struct ResultsHistoryView: View {
             )
             .padding(.horizontal)
             .padding(.bottom, 8)
-            Chart(metrics) { metric in
-              LineMark(x: .value("日期", metric.finishedAt), y: .value("WPM", metric.wpm))
-                .foregroundStyle(.tint)
-              PointMark(x: .value("日期", metric.finishedAt), y: .value("WPM", metric.wpm))
-                .foregroundStyle(.tint)
-            }
-            .chartYScale(domain: .automatic(includesZero: settings.startGraphsAtZero))
-            .frame(height: 120)
-            .padding(.horizontal)
+            historyChart
 
             WPMHistogramView(buckets: wpmHistogram)
               .padding(.horizontal)
@@ -3501,6 +3504,144 @@ private struct ResultsHistoryView: View {
         result: result, modeName: modeName(result.configuration?.mode),
         isPersonalBest: personalBestIDs.contains(result.id))
     }
+  }
+
+  private var historyChartPoints: [HistoryChartPoint] {
+    let speeds = metrics.map { Double($0.wpm) }
+    let accuracies = metrics.map { Double($0.accuracy) }
+    let speedAverage10 = HistoryChartPolicy.movingAverage(values: speeds, windowSize: 10)
+    let speedAverage100 = HistoryChartPolicy.movingAverage(values: speeds, windowSize: 100)
+    let accuracyAverage10 = HistoryChartPolicy.movingAverage(values: accuracies, windowSize: 10)
+    let accuracyAverage100 = HistoryChartPolicy.movingAverage(values: accuracies, windowSize: 100)
+    let personalBestSpeed = HistoryChartPolicy.personalBestEnvelope(values: speeds)
+    return metrics.indices.map { index in
+      .init(
+        metric: metrics[index], speedAverage10: speedAverage10[index],
+        speedAverage100: speedAverage100[index], accuracyAverage10: accuracyAverage10[index],
+        accuracyAverage100: accuracyAverage100[index], personalBestSpeed: personalBestSpeed[index])
+    }
+  }
+
+  private var historyChart: some View {
+    let visibility = settings.historyChartVisibility
+    return VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label("历史趋势", systemImage: "chart.xyaxis.line")
+          .font(.caption.weight(.medium))
+        Spacer()
+      }
+      HStack(spacing: 6) {
+        historyChartToggle("速度", systemImage: "gauge", isEnabled: visibility.speed) {
+          settings.mutateHistoryChartVisibility { $0.speed.toggle() }
+        }
+        historyChartToggle("准确率", systemImage: "target", isEnabled: visibility.accuracy) {
+          settings.mutateHistoryChartVisibility { $0.accuracy.toggle() }
+        }
+        historyChartToggle("均值 10", systemImage: "chart.line.uptrend.xyaxis", isEnabled: visibility.average10) {
+          settings.mutateHistoryChartVisibility { $0.average10.toggle() }
+        }
+        historyChartToggle("均值 100", systemImage: "chart.line.uptrend.xyaxis", isEnabled: visibility.average100) {
+          settings.mutateHistoryChartVisibility { $0.average100.toggle() }
+        }
+      }
+      if !visibility.speed && !visibility.accuracy {
+        ContentUnavailableView(
+          "历史曲线已隐藏", systemImage: "chart.xyaxis.line",
+          description: Text("重新开启速度或准确率即可显示本机历史数据。"))
+          .frame(height: 120)
+      } else {
+        if visibility.speed { speedHistoryChart }
+        if visibility.accuracy { accuracyHistoryChart }
+      }
+      if let trend = HistoryChartPolicy.speedChangePerTypingHour(metrics: metrics) {
+        let converted = settings.typingSpeedUnit.converted(wpm: trend)
+        let sign = converted >= 0 ? "+" : ""
+        Text(
+          "每小时练习速度变化：\(sign)\(String(format: "%.2f", converted)) \(settings.typingSpeedUnit.displayName)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .padding(.horizontal)
+    .padding(.bottom, 8)
+  }
+
+  private var speedHistoryChart: some View {
+    let visibility = settings.historyChartVisibility
+    return Chart(historyChartPoints) { point in
+      LineMark(
+        x: .value("日期", point.metric.finishedAt),
+        y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: point.personalBestSpeed)))
+        .foregroundStyle(.secondary.opacity(0.45))
+        .lineStyle(.init(lineWidth: 1, dash: [4, 3]))
+      if visibility.average100 {
+        LineMark(
+          x: .value("日期", point.metric.finishedAt),
+          y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: point.speedAverage100)))
+          .foregroundStyle(.tint.opacity(0.55))
+          .lineStyle(.init(lineWidth: 1.5, dash: [2, 3]))
+      }
+      if visibility.average10 {
+        LineMark(
+          x: .value("日期", point.metric.finishedAt),
+          y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: point.speedAverage10)))
+          .foregroundStyle(.tint.opacity(0.78))
+          .lineStyle(.init(lineWidth: 1.5, dash: [6, 3]))
+      }
+      LineMark(
+        x: .value("日期", point.metric.finishedAt),
+        y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: point.metric.wpm)))
+        .foregroundStyle(.tint)
+      PointMark(
+        x: .value("日期", point.metric.finishedAt),
+        y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: point.metric.wpm)))
+        .foregroundStyle(.tint)
+    }
+    .chartYScale(domain: .automatic(includesZero: settings.startGraphsAtZero))
+    .chartYAxisLabel(settings.typingSpeedUnit.displayName)
+    .frame(height: 120)
+    .accessibilityLabel("本机速度历史趋势")
+  }
+
+  private var accuracyHistoryChart: some View {
+    let visibility = settings.historyChartVisibility
+    return Chart(historyChartPoints) { point in
+      if visibility.average100 {
+        LineMark(
+          x: .value("日期", point.metric.finishedAt), y: .value("准确率", point.accuracyAverage100))
+          .foregroundStyle(.secondary.opacity(0.55))
+          .lineStyle(.init(lineWidth: 1.5, dash: [2, 3]))
+      }
+      if visibility.average10 {
+        LineMark(
+          x: .value("日期", point.metric.finishedAt), y: .value("准确率", point.accuracyAverage10))
+          .foregroundStyle(.secondary.opacity(0.8))
+          .lineStyle(.init(lineWidth: 1.5, dash: [6, 3]))
+      }
+      LineMark(
+        x: .value("日期", point.metric.finishedAt), y: .value("准确率", point.metric.accuracy))
+        .foregroundStyle(.secondary)
+      PointMark(
+        x: .value("日期", point.metric.finishedAt), y: .value("准确率", point.metric.accuracy))
+        .foregroundStyle(.secondary)
+        .symbol(.triangle)
+    }
+    .chartYScale(domain: .automatic(includesZero: settings.startGraphsAtZero))
+    .chartYAxisLabel("准确率 (%)")
+    .frame(height: 120)
+    .accessibilityLabel("本机准确率历史趋势")
+  }
+
+  private func historyChartToggle(
+    _ title: String, systemImage: String, isEnabled: Bool, action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      Label(title, systemImage: systemImage)
+        .font(.caption)
+    }
+    .buttonStyle(.bordered)
+    .tint(isEnabled ? .accentColor : .secondary)
+    .accessibilityValue(isEnabled ? "显示" : "隐藏")
   }
 
   private var statistics: some View {

@@ -16,6 +16,65 @@ struct ResultMetric: Equatable, Identifiable {
     }
 }
 
+/// Controls the four independently visible traces in the local history view.
+/// The defaults mirror the reference account history's initially enabled set,
+/// while the native chart keeps its data entirely on this Mac.
+struct HistoryChartVisibility: Codable, Equatable {
+  var speed = true
+  var accuracy = true
+  var average10 = true
+  var average100 = true
+}
+
+/// Small, deterministic transforms for the local history chart. Inputs are
+/// newest-first, matching the result query order used by the history screen.
+enum HistoryChartPolicy {
+  static func movingAverage(values: [Double], windowSize: Int) -> [Double] {
+    guard windowSize > 0 else { return values }
+    return values.indices.map { index in
+      let upperBound = min(values.count, index + windowSize)
+      let window = values[index..<upperBound]
+      guard !window.isEmpty else { return 0 }
+      return window.reduce(0, +) / Double(window.count)
+    }
+  }
+
+  /// Produces a historical best-speed envelope aligned with newest-first input.
+  static func personalBestEnvelope(values: [Double]) -> [Double] {
+    guard !values.isEmpty else { return [] }
+    var envelope = Array(repeating: 0.0, count: values.count)
+    var currentBest = -Double.infinity
+    for index in values.indices.reversed() {
+      currentBest = max(currentBest, values[index])
+      envelope[index] = currentBest
+    }
+    return envelope
+  }
+
+  /// Estimates speed change per hour of actual typing from the same local
+  /// sequence used for the chart. It intentionally avoids calendar-wall time.
+  static func speedChangePerTypingHour(metrics: [ResultMetric]) -> Double? {
+    guard metrics.count >= 2 else { return nil }
+    let totalTypingSeconds = metrics.map(\.typingSeconds).reduce(0, +)
+    guard totalTypingSeconds > 0 else { return nil }
+
+    let chronological = metrics.reversed()
+    let count = Double(chronological.count)
+    let meanX = (count - 1) / 2
+    let meanY = chronological.map { Double($0.wpm) }.reduce(0, +) / count
+    var numerator = 0.0
+    var denominator = 0.0
+    for (index, metric) in chronological.enumerated() {
+      let centeredX = Double(index) - meanX
+      numerator += centeredX * (Double(metric.wpm) - meanY)
+      denominator += centeredX * centeredX
+    }
+    guard denominator > 0 else { return nil }
+    let fittedChange = numerator / denominator * (count - 1)
+    return fittedChange * 3_600 / totalTypingSeconds
+  }
+}
+
 /// Completed practice that belongs to the current running app process. It
 /// keeps the daily result summary truthful even when the user opted out of
 /// persisting a completed test to SwiftData.

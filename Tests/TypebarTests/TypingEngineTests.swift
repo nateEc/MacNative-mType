@@ -1618,6 +1618,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingPowerPolicy.shakeOffset(xRandomUnit: 1, yRandomUnit: 0), .init(width: 5, height: -5))
   }
 
+  func testHistoryChartPolicyMatchesLocalHistoryTracesAndTypingTimeTrend() throws {
+    XCTAssertEqual(HistoryChartVisibility(), .init())
+    XCTAssertEqual(
+      HistoryChartPolicy.movingAverage(values: [120, 100, 80], windowSize: 10), [100, 90, 80])
+    XCTAssertEqual(
+      HistoryChartPolicy.personalBestEnvelope(values: [95, 110, 90]), [110, 110, 90])
+
+    let older = ResultMetric(
+      finishedAt: .init(timeIntervalSince1970: 1), wpm: 100, accuracy: 97, typingSeconds: 60)
+    let newer = ResultMetric(
+      finishedAt: .init(timeIntervalSince1970: 2), wpm: 120, accuracy: 99, typingSeconds: 60)
+    XCTAssertEqual(
+      try XCTUnwrap(HistoryChartPolicy.speedChangePerTypingHour(metrics: [newer, older])), 600,
+      accuracy: 0.001)
+    XCTAssertEqual(TypingSpeedUnit.cps.converted(wpm: 12.5), 1.041_666_666_7, accuracy: 0.000_001)
+  }
+
   func testIndependentCaretLayoutTracksGlyphsWrapsAndMotionSettings() throws {
     let text = AttributedString("amber harbor willow")
     let font = PracticeFont.monospaced.nsFont(size: 28)
@@ -3667,6 +3684,10 @@ final class TypingEngineTests: XCTestCase {
     settings.showWordBurstHeatmap = true
     settings.resultPerformanceVisibility = .init(raw: false, burst: false, errors: true)
     settings.startGraphsAtZero = false
+    settings.mutateHistoryChartVisibility {
+      $0.accuracy = false
+      $0.average100 = false
+    }
     settings.showAverage = .both
     settings.showPersonalBest = true
     settings.typedCharacterEffect = .dots
@@ -3720,6 +3741,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.customBackgroundFilter, .init(blur: 4, brightness: 0.85, saturation: 1.4, opacity: 0.7))
     XCTAssertTrue(exportedSnapshot.showTypingCompanion)
     XCTAssertEqual(exportedSnapshot.typingPowerMode, .over9000)
+    XCTAssertEqual(
+      exportedSnapshot.historyChartVisibility,
+      .init(speed: true, accuracy: false, average10: true, average100: false))
     XCTAssertEqual(exportedSnapshot.liveProgressStyle, .flashMini)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
@@ -3788,6 +3812,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.showWordBurstHeatmap)
     XCTAssertEqual(restored.resultPerformanceVisibility, .init(raw: false, burst: false, errors: true))
     XCTAssertFalse(restored.startGraphsAtZero)
+    XCTAssertEqual(
+      restored.historyChartVisibility,
+      .init(speed: true, accuracy: false, average10: true, average100: false))
     XCTAssertEqual(restored.showAverage, .both)
     XCTAssertTrue(restored.showPersonalBest)
     XCTAssertEqual(restored.typedCharacterEffect, .dots)
@@ -3921,6 +3948,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(snapshot.showTypingCompanion)
     XCTAssertEqual(snapshot.typingPowerMode, .off)
     XCTAssertTrue(snapshot.startGraphsAtZero)
+    XCTAssertEqual(snapshot.historyChartVisibility, .init())
     XCTAssertEqual(snapshot.englishVariant, .american)
     XCTAssertTrue(snapshot.favoriteQuoteIDs.isEmpty)
     XCTAssertFalse(snapshot.repeatQuotes)
