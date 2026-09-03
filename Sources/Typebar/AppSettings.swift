@@ -360,7 +360,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var showCapsLockWarning = true
   var playErrorBeep = false
   var playKeyclickSound = false
+  var clickSoundStyle: TypingClickSoundStyle = .tink
+  var errorSoundStyle: TypingErrorSoundStyle = .basso
   var timeWarningOffset: TimeWarningOffset = .off
+  var timeWarningSoundStyle: TimeWarningSoundStyle = .glass
   var soundVolume: Double = 0.7
   var globalHotkeyEnabled = false
   var paceGuideMode: PaceGuideMode = .off
@@ -431,7 +434,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
     showCapsLockWarning: Bool = true,
     playErrorBeep: Bool = false,
     playKeyclickSound: Bool = false,
+    clickSoundStyle: TypingClickSoundStyle = .tink,
+    errorSoundStyle: TypingErrorSoundStyle = .basso,
     timeWarningOffset: TimeWarningOffset = .off,
+    timeWarningSoundStyle: TimeWarningSoundStyle = .glass,
     soundVolume: Double = 0.7,
     globalHotkeyEnabled: Bool = false,
     paceGuideMode: PaceGuideMode = .off,
@@ -507,7 +513,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.showCapsLockWarning = showCapsLockWarning
     self.playErrorBeep = playErrorBeep
     self.playKeyclickSound = playKeyclickSound
+    self.clickSoundStyle = clickSoundStyle
+    self.errorSoundStyle = errorSoundStyle
     self.timeWarningOffset = timeWarningOffset
+    self.timeWarningSoundStyle = timeWarningSoundStyle
     self.soundVolume = soundVolume.clamped(to: 0...1)
     self.globalHotkeyEnabled = globalHotkeyEnabled
     self.paceGuideMode = paceGuideMode
@@ -532,7 +541,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       startGraphsAtZero, showAverage, showPersonalBest,
       typedCharacterEffect, liveSpeedStyle, liveAccuracyStyle, liveBurstStyle, liveProgressStyle,
       testModifiers, showFocusWarning,
-      showCapsLockWarning, playErrorBeep, playKeyclickSound, timeWarningOffset, soundVolume,
+      showCapsLockWarning, playErrorBeep, playKeyclickSound, clickSoundStyle, errorSoundStyle,
+      timeWarningOffset, timeWarningSoundStyle, soundVolume,
       globalHotkeyEnabled,
       paceGuideMode, paceGuideCustomWpm, paceCaretStyle, repeatedPace
   }
@@ -641,8 +651,14 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(Bool.self, forKey: .showCapsLockWarning) ?? true
     playErrorBeep = try values.decodeIfPresent(Bool.self, forKey: .playErrorBeep) ?? false
     playKeyclickSound = try values.decodeIfPresent(Bool.self, forKey: .playKeyclickSound) ?? false
+    clickSoundStyle =
+      try values.decodeIfPresent(TypingClickSoundStyle.self, forKey: .clickSoundStyle) ?? .tink
+    errorSoundStyle =
+      try values.decodeIfPresent(TypingErrorSoundStyle.self, forKey: .errorSoundStyle) ?? .basso
     timeWarningOffset =
       try values.decodeIfPresent(TimeWarningOffset.self, forKey: .timeWarningOffset) ?? .off
+    timeWarningSoundStyle =
+      try values.decodeIfPresent(TimeWarningSoundStyle.self, forKey: .timeWarningSoundStyle) ?? .glass
     soundVolume = (try values.decodeIfPresent(Double.self, forKey: .soundVolume) ?? 0.7).clamped(
       to: 0...1)
     globalHotkeyEnabled =
@@ -813,7 +829,10 @@ final class AppSettings {
   var showCapsLockWarning = true { didSet { persist() } }
   var playErrorBeep = false { didSet { persist() } }
   var playKeyclickSound = false { didSet { persist() } }
+  var clickSoundStyle: TypingClickSoundStyle = .tink { didSet { persist() } }
+  var errorSoundStyle: TypingErrorSoundStyle = .basso { didSet { persist() } }
   var timeWarningOffset: TimeWarningOffset = .off { didSet { persist() } }
+  var timeWarningSoundStyle: TimeWarningSoundStyle = .glass { didSet { persist() } }
   var soundVolume: Double = 0.7 { didSet { persist() } }
   var globalHotkeyEnabled = false { didSet { persist() } }
   var paceGuideMode: PaceGuideMode = .off { didSet { persist() } }
@@ -894,7 +913,10 @@ final class AppSettings {
     showCapsLockWarning = snapshot.showCapsLockWarning
     playErrorBeep = snapshot.playErrorBeep
     playKeyclickSound = snapshot.playKeyclickSound
+    clickSoundStyle = snapshot.clickSoundStyle
+    errorSoundStyle = snapshot.errorSoundStyle
     timeWarningOffset = snapshot.timeWarningOffset
+    timeWarningSoundStyle = snapshot.timeWarningSoundStyle
     soundVolume = snapshot.soundVolume
     globalHotkeyEnabled = snapshot.globalHotkeyEnabled
     paceGuideMode = snapshot.paceGuideMode
@@ -1031,7 +1053,10 @@ final class AppSettings {
     showCapsLockWarning = true
     playErrorBeep = false
     playKeyclickSound = false
+    clickSoundStyle = .tink
+    errorSoundStyle = .basso
     timeWarningOffset = .off
+    timeWarningSoundStyle = .glass
     soundVolume = 0.7
     globalHotkeyEnabled = false
     paceGuideMode = .off
@@ -1139,7 +1164,10 @@ final class AppSettings {
     showCapsLockWarning = snapshot.showCapsLockWarning
     playErrorBeep = snapshot.playErrorBeep
     playKeyclickSound = snapshot.playKeyclickSound
+    clickSoundStyle = snapshot.clickSoundStyle
+    errorSoundStyle = snapshot.errorSoundStyle
     timeWarningOffset = snapshot.timeWarningOffset
+    timeWarningSoundStyle = snapshot.timeWarningSoundStyle
     soundVolume = snapshot.soundVolume
     globalHotkeyEnabled = snapshot.globalHotkeyEnabled
     paceGuideMode = snapshot.paceGuideMode
@@ -1287,7 +1315,10 @@ final class AppSettings {
       showCapsLockWarning: showCapsLockWarning,
       playErrorBeep: playErrorBeep,
       playKeyclickSound: playKeyclickSound,
+      clickSoundStyle: clickSoundStyle,
+      errorSoundStyle: errorSoundStyle,
       timeWarningOffset: timeWarningOffset,
+      timeWarningSoundStyle: timeWarningSoundStyle,
       soundVolume: soundVolume,
       globalHotkeyEnabled: globalHotkeyEnabled,
       paceGuideMode: paceGuideMode,

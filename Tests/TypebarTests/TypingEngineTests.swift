@@ -3241,7 +3241,10 @@ final class TypingEngineTests: XCTestCase {
     settings.showCapsLockWarning = false
     settings.playErrorBeep = true
     settings.playKeyclickSound = true
+    settings.clickSoundStyle = .morse
+    settings.errorSoundStyle = .submarine
     settings.timeWarningOffset = .threeSeconds
+    settings.timeWarningSoundStyle = .frog
     settings.soundVolume = 0.4
     settings.globalHotkeyEnabled = true
     settings.paceGuideMode = .custom
@@ -3310,7 +3313,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(restored.showCapsLockWarning)
     XCTAssertTrue(restored.playErrorBeep)
     XCTAssertTrue(restored.playKeyclickSound)
+    XCTAssertEqual(restored.clickSoundStyle, .morse)
+    XCTAssertEqual(restored.errorSoundStyle, .submarine)
     XCTAssertEqual(restored.timeWarningOffset, .threeSeconds)
+    XCTAssertEqual(restored.timeWarningSoundStyle, .frog)
     XCTAssertEqual(restored.soundVolume, 0.4)
     XCTAssertTrue(restored.globalHotkeyEnabled)
     XCTAssertEqual(restored.paceGuideMode, .custom)
@@ -3416,7 +3422,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(snapshot.showFocusWarning)
     XCTAssertTrue(snapshot.showCapsLockWarning)
     XCTAssertFalse(snapshot.playErrorBeep)
+    XCTAssertEqual(snapshot.clickSoundStyle, .tink)
+    XCTAssertEqual(snapshot.errorSoundStyle, .basso)
     XCTAssertEqual(snapshot.timeWarningOffset, .off)
+    XCTAssertEqual(snapshot.timeWarningSoundStyle, .glass)
     XCTAssertEqual(snapshot.paceGuideMode, .off)
     XCTAssertEqual(snapshot.paceGuideCustomWpm, 60)
     XCTAssertEqual(snapshot.paceCaretStyle, .bar)

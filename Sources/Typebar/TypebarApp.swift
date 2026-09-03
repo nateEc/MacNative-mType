@@ -734,7 +734,8 @@ private struct ContentView: View {
       remainingSeconds: remaining, previousSecond: lastTimeWarningSecond,
       offset: settings.timeWarningOffset)
     {
-      TypingFeedbackSound.shared.playError(volume: settings.soundVolume)
+      TypingFeedbackSound.shared.playTimeWarning(
+        style: settings.timeWarningSoundStyle, volume: settings.soundVolume)
     }
     lastTimeWarningSecond = remaining
   }
@@ -1080,10 +1081,12 @@ private struct ContentView: View {
             settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
             forceError: forceError)
           if settings.playKeyclickSound, session.typed.count > typedCountBefore {
-            TypingFeedbackSound.shared.playClick(volume: settings.soundVolume)
+            TypingFeedbackSound.shared.playClick(
+              style: settings.clickSoundStyle, volume: settings.soundVolume)
           }
           if settings.playErrorBeep, session.errors > errorsBefore {
-            TypingFeedbackSound.shared.playError(volume: settings.soundVolume)
+            TypingFeedbackSound.shared.playError(
+              style: settings.errorSoundStyle, volume: settings.soundVolume)
           }
         },
         onDelete: { session.deleteBackward() },

@@ -91,10 +91,39 @@ struct PreferencesView: View {
           Toggle("输入框失焦提示", isOn: $settings.showFocusWarning)
           Toggle("大写锁定提示", isOn: $settings.showCapsLockWarning)
           Toggle("错误提示音", isOn: $settings.playErrorBeep)
+          Picker("错误音型", selection: $settings.errorSoundStyle) {
+            ForEach(TypingErrorSoundStyle.allCases) { style in
+              Text(style.displayName).tag(style)
+            }
+          }
           Toggle("键击提示音", isOn: $settings.playKeyclickSound)
+          Picker("键击音型", selection: $settings.clickSoundStyle) {
+            ForEach(TypingClickSoundStyle.allCases) { style in
+              Text(style.displayName).tag(style)
+            }
+          }
           Picker("倒计时提示音", selection: $settings.timeWarningOffset) {
             ForEach(TimeWarningOffset.allCases) { offset in
               Text(offset.displayName).tag(offset)
+            }
+          }
+          Picker("倒计时音型", selection: $settings.timeWarningSoundStyle) {
+            ForEach(TimeWarningSoundStyle.allCases) { style in
+              Text(style.displayName).tag(style)
+            }
+          }
+          HStack {
+            Button("试听键击") {
+              TypingFeedbackSound.shared.playClick(
+                style: settings.clickSoundStyle, volume: settings.soundVolume)
+            }
+            Button("试听错误") {
+              TypingFeedbackSound.shared.playError(
+                style: settings.errorSoundStyle, volume: settings.soundVolume)
+            }
+            Button("试听倒计时") {
+              TypingFeedbackSound.shared.playTimeWarning(
+                style: settings.timeWarningSoundStyle, volume: settings.soundVolume)
             }
           }
           Slider(value: $settings.soundVolume, in: 0...1, step: 0.1) {
@@ -104,7 +133,7 @@ struct PreferencesView: View {
           } maximumValueLabel: {
             Text("100%")
           }
-          Text("\(Int((settings.soundVolume * 100).rounded()))% · 使用 macOS 系统提示音；三种提示均默认关闭。")
+          Text("\(Int((settings.soundVolume * 100).rounded()))% · 使用 macOS 系统提示音；三种提示均默认关闭，无法载入时不会影响输入或计分。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("自由回退", isOn: $settings.freedomMode)
