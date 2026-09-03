@@ -1465,6 +1465,10 @@ struct TypingSession {
   /// A word can be submitted early with space, so this cannot always be
   /// inferred from the input string's character offset.
   private var typedTargetIndices: [Int?] = []
+  /// Input offsets for extra letters retained in a completed source word.
+  /// They have no target character, but remain scoring errors after that word
+  /// is submitted and the active input buffer becomes empty.
+  private var extraErrorTypedIndices = Set<Int>()
   private var typedCharacterDates: [Date] = []
   private var forcedErrorIndices = Set<Int>()
   /// Target positions at which the user made an input error during this
@@ -1554,7 +1558,7 @@ struct TypingSession {
       guard typedTargetIndices.indices.contains(typedIndex) else { return }
       guard let targetIndex = typedTargetIndices[typedIndex], targetCharacters.indices.contains(targetIndex)
       else {
-        if configuration.mode != .zen && hasUncommittedSpaceDelimitedInput { total += 1 }
+        if extraErrorTypedIndices.contains(typedIndex) { total += 1 }
         return
       }
       if typedCharacters[typedIndex] != targetCharacters[targetIndex]
@@ -1889,9 +1893,17 @@ struct TypingSession {
     let inputCharacter = normalizedInputCharacter(character)
     extendPromptIfNeeded()
     let currentTargetIndex = nextTargetIndex
+    let commitsCurrentWord = inputCharacter == " " && !inputWordIsEmpty
+    if let inputLimit = currentSpaceDelimitedWordInputLimit,
+      activeInputWordLength >= inputLimit, !commitsCurrentWord
+    {
+      return false
+    }
     if currentTargetIndex >= prompt.count {
       if !configuration.rules.hideExtraLetters {
-        appendTypedCharacter(inputCharacter, targetIndex: nil, at: date)
+        appendTypedCharacter(
+          inputCharacter, targetIndex: nil,
+          countsAsExtraError: inputCharacter != " " && hasUncommittedSpaceDelimitedInput, at: date)
         recordWordBurstIfCommitted()
         recordNoSpaceWordBurstIfCommitted()
         return true
@@ -1905,7 +1917,6 @@ struct TypingSession {
     if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator {
       return false
     }
-    let commitsCurrentWord = inputCharacter == " " && !inputWordIsEmpty
     let expected = Array(prompt)[currentTargetIndex]
     let retainsCurrentWordAsExtra = shouldRetainInCurrentWord(
       inputCharacter, expected: expected)
@@ -1944,7 +1955,8 @@ struct TypingSession {
     }
     appendTypedCharacter(
       inputCharacter, targetIndex: targetIndex,
-      forceError: forceError || earlyWordCommitTargetIndex != nil, at: date)
+      forceError: forceError || earlyWordCommitTargetIndex != nil,
+      countsAsExtraError: retainsCurrentWordAsExtra, at: date)
     recordWordBurstIfCommitted()
     recordNoSpaceWordBurstIfCommitted()
 
@@ -2212,6 +2224,26 @@ struct TypingSession {
       && !inputWordIsEmpty
   }
 
+  private var activeInputWordLength: Int {
+    typed.reversed().prefix { $0 != " " }.count
+  }
+
+  /// Mirrors the reference guard of the current word, including its visible
+  /// commit separator when one exists, plus twenty tolerated extra letters.
+  private var currentSpaceDelimitedWordInputLimit: Int? {
+    guard configuration.mode != .zen,
+      configuration.language.usesSpaceDelimitedWords,
+      !configuration.language.isCodeLanguage,
+      !configuration.modifiers.contains(.noSpaces), !prompt.isEmpty
+    else { return nil }
+    let targetCharacters = Array(prompt)
+    let targetIndex = min(nextTargetIndex, targetCharacters.count - 1)
+    let wordStart = targetCharacters[..<targetIndex].lastIndex(of: " ").map { $0 + 1 } ?? 0
+    let wordEnd = targetCharacters[targetIndex...].firstIndex(of: " ") ?? targetCharacters.count
+    let targetLength = wordEnd - wordStart + (wordEnd < targetCharacters.count ? 1 : 0)
+    return targetLength + 20
+  }
+
   /// The reference keeps letters beyond a word's target length in that same
   /// word buffer. They are visible errors but do not advance toward the next
   /// word until the user enters its separator.
@@ -2249,20 +2281,25 @@ struct TypingSession {
   }
 
   private mutating func appendTypedCharacter(
-    _ character: Character, targetIndex: Int?, forceError: Bool = false, at date: Date
+    _ character: Character, targetIndex: Int?, forceError: Bool = false,
+    countsAsExtraError: Bool = false, at date: Date
   ) {
+    let typedIndex = typed.count
     typed.append(character)
     typedTargetIndices.append(targetIndex)
     typedCharacterDates.append(date)
     if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
+    if countsAsExtraError { extraErrorTypedIndices.insert(typedIndex) }
   }
 
   private mutating func removeLastTypedCharacter() {
     guard !typed.isEmpty else { return }
+    let typedIndex = typed.count - 1
     let targetIndex = typedTargetIndices.popLast() ?? nil
     typed.removeLast()
     typedCharacterDates.removeLast()
     if let targetIndex { forcedErrorIndices.remove(targetIndex) }
+    extraErrorTypedIndices.remove(typedIndex)
   }
 
   private func shouldBlockNoSpaceWordAdvance(with character: Character, forceError: Bool) -> Bool {

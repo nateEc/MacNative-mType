@@ -277,9 +277,26 @@ final class TypingEngineTests: XCTestCase {
 
     session.insert(" ", at: start.addingTimeInterval(1))
 
+    XCTAssertEqual(session.errors, 1)
     XCTAssertEqual(session.nextExpectedCharacter, "b")
     XCTAssertEqual(session.completedWordCount, 1)
     XCTAssertEqual(session.wordReviews, [.init(index: 0, target: "amber", typed: "amberx")])
+  }
+
+  func testSpaceDelimitedWordInputCapsExtrasButStillAcceptsTheCommitSeparator() {
+    var session = TypingSession(
+      configuration: .words(2), prompt: "a b")
+
+    session.insert("a" + String(repeating: "x", count: 21), at: start)
+    session.insert("y", at: start)
+
+    XCTAssertEqual(session.typed, "a" + String(repeating: "x", count: 21))
+    XCTAssertEqual(session.errors, 21)
+    XCTAssertEqual(session.nextExpectedCharacter, " ")
+
+    session.insert(" ", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.errors, 21)
+    XCTAssertEqual(session.nextExpectedCharacter, "b")
   }
 
   func testNoSpaceRejectsDirectWhitespaceWithoutRecordingAnError() {
