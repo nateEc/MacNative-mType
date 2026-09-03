@@ -419,6 +419,7 @@ private struct ContentView: View {
   @State private var customTextWordLimit = 25
   @State private var customTextSectionLimit = 1
   @State private var customTextOrdering: CustomTextOrdering = .inOrder
+  @State private var practiceReturnPreset: SavedTestPreset?
   @State private var showingHistory = false
   @State private var showingPresets = false
   @State private var showingDataMigration = false
@@ -602,6 +603,7 @@ private struct ContentView: View {
         publicationMessage: publicationMessage,
         onRestart: {
           completedResult = nil
+          if restoreWordPracticeIfNeeded() { return }
           attemptRestart()
         },
         onHistory: {
@@ -1867,12 +1869,23 @@ private struct ContentView: View {
 
   private func startWordPractice(_ words: [String]) {
     guard !words.isEmpty else { return }
+    if practiceReturnPreset == nil { practiceReturnPreset = presetDefinition }
     customText = WordPracticeText.make(words: words, language: language)
     customTextCompletion = .finish
     customTextOrdering = .inOrder
     mode = .custom
     completedResult = nil
     reset()
+  }
+
+  /// Result-driven word practice is temporary. Its source configuration is
+  /// restored only when the user leaves it for a fresh test; repeating the
+  /// result intentionally keeps the same practice prompt.
+  private func restoreWordPracticeIfNeeded() -> Bool {
+    guard let preset = practiceReturnPreset else { return false }
+    practiceReturnPreset = nil
+    apply(preset)
+    return true
   }
 
   private func publishIfEnabled(_ result: CompletedTestResult) {
