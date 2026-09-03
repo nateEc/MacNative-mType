@@ -560,7 +560,7 @@ private struct ContentView: View {
     }
     .onChange(of: session.outcome) { _, outcome in
       switch outcome {
-      case .completed, .bailedOut:
+      case .completed, .bailedOut, .invalidAFK:
         guard let result = session.result() else { return }
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
         lastCompletedWpm = result.wpm
@@ -607,6 +607,8 @@ private struct ContentView: View {
           publicationMessage = updatedLongTextProgress
             ? "长文本进度已保存；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
             : "本次已中止：结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
+        } else if result.outcome == .invalidAFK {
+          publicationMessage = "检测到结束前持续闲置；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
         } else {
           publicationMessage = "练习模式：本次成绩不会保存、本机统计、同步或发布。"
         }
@@ -1139,6 +1141,7 @@ private struct ContentView: View {
         onCompositionChanged: { compositionText = $0 },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
         onPhysicalKey: { keyCode, isKeyDown, isRepeat in
+          if isKeyDown { session.recordKeyboardActivity() }
           guard settings.showTypingCompanion else { return }
           typingCompanionHands.handle(keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
         }
@@ -1920,7 +1923,7 @@ private struct ContentView: View {
   private func updateLongSavedTextProgress(for outcome: TestOutcome) -> Bool {
     guard let active = activeLongSavedText,
       session.configuration.mode == .custom,
-      outcome == .completed || outcome == .bailedOut || outcome == .failed
+      outcome == .completed || outcome == .bailedOut || outcome == .failed || outcome == .invalidAFK
     else { return false }
     let activeID = active.id
     let descriptor = FetchDescriptor<SavedCustomTextRecord>(
@@ -1937,7 +1940,7 @@ private struct ContentView: View {
     switch outcome {
     case .completed:
       nextProgress = 0
-    case .bailedOut, .failed:
+    case .bailedOut, .failed, .invalidAFK:
       nextProgress = LongSavedTextProgress.advancedOffset(
         in: active.text, from: active.progress, typed: session.typed)
     case .active, .abandoned:
@@ -2025,7 +2028,7 @@ private struct ContentView: View {
       persisted: savedResults.map {
         ResultMetric(
           id: $0.id, finishedAt: $0.finishedAt, wpm: $0.wpm, accuracy: $0.accuracy,
-          typingSeconds: $0.finishedAt.timeIntervalSince($0.startedAt))
+          typingSeconds: $0.engagedDuration)
       },
       currentProcess: currentProcessPractice)
   }
@@ -2547,6 +2550,7 @@ extension TestOutcome {
     case .completed:
       savesResult ? "本次完成 · 已保存到本机" : "本次完成 · 未保存为完成成绩"
     case .failed: "本次失败 · 未保存为完成成绩"
+    case .invalidAFK: "本次因闲置无效 · 未保存为完成成绩"
     case .abandoned: "本次已放弃 · 未保存为完成成绩"
     case .bailedOut: "本次已中止 · 未保存为完成成绩"
     }
@@ -2608,12 +2612,9 @@ private struct CompletedResultView: View {
   var body: some View {
     VStack(spacing: 28) {
       VStack(spacing: 6) {
-        Text(result.outcome == .bailedOut ? "已中止" : "完成")
+        Text(resultOutcomeTitle)
           .font(.title2.weight(.semibold))
-        Text(
-          result.outcome == .bailedOut
-            ? "中止结果只在当前窗口显示，不保存成绩"
-            : savesResult ? "已保存到这台 Mac" : "练习模式：不保存成绩")
+        Text(resultOutcomeSubtitle)
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
@@ -2633,7 +2634,13 @@ private struct CompletedResultView: View {
         }
         GridRow {
           metric("错误", "\(result.errorCount)")
-          metric("用时", "\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
+          metric("总用时", "\(Int(result.elapsedDuration)) 秒")
+        }
+        if result.afkDuration > 0 {
+          GridRow {
+            metric("闲置", "\(Int(result.afkDuration)) 秒")
+            metric("有效键入", "\(Int(result.engagedDuration)) 秒")
+          }
         }
       }
 
@@ -2646,7 +2653,7 @@ private struct CompletedResultView: View {
       ResultPerformanceChart(
         prompt: result.prompt,
         events: result.replayEvents,
-        duration: result.finishedAt.timeIntervalSince(result.startedAt),
+        duration: result.elapsedDuration,
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: startGraphsAtZero,
         visibility: resultPerformanceVisibility,
@@ -2746,6 +2753,23 @@ private struct CompletedResultView: View {
     }
     .padding(32)
     .frame(width: 390)
+  }
+
+  private var resultOutcomeTitle: String {
+    switch result.outcome {
+    case .bailedOut: "已中止"
+    case .invalidAFK: "闲置无效"
+    case .active, .completed, .failed, .abandoned: "完成"
+    }
+  }
+
+  private var resultOutcomeSubtitle: String {
+    switch result.outcome {
+    case .bailedOut: "中止结果只在当前窗口显示，不保存成绩"
+    case .invalidAFK: "结束前连续约 5 秒没有文本输入；结果只在当前窗口显示，不保存成绩"
+    case .active, .completed, .failed, .abandoned:
+      savesResult ? "已保存到这台 Mac" : "练习模式：不保存成绩"
+    }
   }
 
   private func metric(_ title: String, _ value: String) -> some View {
@@ -3346,7 +3370,7 @@ private struct ResultsHistoryView: View {
         finishedAt: $0.finishedAt,
         wpm: $0.wpm,
         accuracy: $0.accuracy,
-        typingSeconds: $0.finishedAt.timeIntervalSince($0.startedAt)
+        typingSeconds: $0.engagedDuration
       )
     }
   }
@@ -3358,7 +3382,7 @@ private struct ResultsHistoryView: View {
         finishedAt: $0.finishedAt,
         wpm: $0.wpm,
         accuracy: $0.accuracy,
-        typingSeconds: $0.finishedAt.timeIntervalSince($0.startedAt)
+        typingSeconds: $0.engagedDuration
       )
     }
   }
@@ -3950,8 +3974,14 @@ private struct ResultDetailView: View {
           Text("\(result.correctCharacterCount)")
         }
         GridRow {
-          Text("用时")
+          Text("总用时")
           Text("\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
+        }
+        if result.afkDuration > 0 {
+          GridRow {
+            Text("闲置 / 有效键入")
+            Text("\(Int(result.afkDuration)) 秒 / \(Int(result.engagedDuration)) 秒")
+          }
         }
       }
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {

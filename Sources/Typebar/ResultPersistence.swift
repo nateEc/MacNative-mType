@@ -14,6 +14,7 @@ final class TestResultRecord {
   var outcome: String
   var startedAt: Date
   var finishedAt: Date
+  var afkDuration: TimeInterval = 0
   var typedCharacterCount: Int
   var correctCharacterCount: Int
   var errorCount: Int
@@ -30,6 +31,7 @@ final class TestResultRecord {
     outcome = result.outcome.rawValue
     startedAt = result.startedAt
     finishedAt = result.finishedAt
+    afkDuration = result.afkDuration
     typedCharacterCount = result.typedCharacterCount
     correctCharacterCount = result.correctCharacterCount
     errorCount = result.errorCount
@@ -55,6 +57,10 @@ final class TestResultRecord {
       ?? []
   }
 
+  var engagedDuration: TimeInterval {
+    max(0, finishedAt.timeIntervalSince(startedAt) - afkDuration)
+  }
+
   func addTag(_ rawTag: String) {
     tags = ResultTagPolicy.appending(rawTag, to: tags)
   }
@@ -71,6 +77,7 @@ final class TestResultRecord {
       outcome: parsedOutcome,
       startedAt: startedAt,
       finishedAt: finishedAt,
+      afkDuration: afkDuration,
       typedCharacterCount: typedCharacterCount,
       correctCharacterCount: correctCharacterCount,
       errorCount: errorCount,

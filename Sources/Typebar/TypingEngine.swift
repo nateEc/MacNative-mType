@@ -1118,8 +1118,53 @@ enum TestOutcome: String, Codable, Equatable {
   case active
   case completed
   case failed
+  case invalidAFK
   case abandoned
   case bailedOut
+}
+
+/// Native equivalent of the reference test's one-second inactivity accounting.
+/// It consumes only local event timestamps; the timer is deliberately not
+/// paused, so timed tests keep their normal wall-clock deadline.
+enum TestInactivityPolicy {
+  static let trailingInactiveIntervals = 5
+
+  static func intervalCounts(
+    activityDates: [Date], startedAt: Date, endedAt: Date, includesFractionalTail: Bool
+  ) -> [Int] {
+    let duration = max(0, endedAt.timeIntervalSince(startedAt))
+    let fullIntervals = Int(duration.rounded(.down))
+    var boundaries = fullIntervals > 0 ? (1...fullIntervals).map(Double.init) : []
+    let remainder = duration - Double(fullIntervals)
+    if includesFractionalTail, remainder >= 0.5 { boundaries.append(duration) }
+
+    return boundaries.enumerated().map { index, boundary in
+      let lowerBound = index == 0 ? -Double.leastNonzeroMagnitude : boundaries[index - 1]
+      return activityDates.reduce(into: 0) { count, date in
+        let offset = date.timeIntervalSince(startedAt)
+        if offset > lowerBound && offset <= boundary { count += 1 }
+      }
+    }
+  }
+
+  static func inactiveDuration(
+    activityDates: [Date], startedAt: Date, endedAt: Date, includesFractionalTail: Bool
+  ) -> TimeInterval {
+    TimeInterval(
+      intervalCounts(
+        activityDates: activityDates, startedAt: startedAt, endedAt: endedAt,
+        includesFractionalTail: includesFractionalTail
+      ).filter { $0 == 0 }.count)
+  }
+
+  static func hasTrailingInactivity(
+    insertionDates: [Date], startedAt: Date, endedAt: Date, includesFractionalTail: Bool
+  ) -> Bool {
+    let counts = intervalCounts(
+      activityDates: insertionDates, startedAt: startedAt, endedAt: endedAt,
+      includesFractionalTail: includesFractionalTail)
+    return !counts.isEmpty && counts.suffix(trailingInactiveIntervals).allSatisfy { $0 == 0 }
+  }
 }
 
 enum TypingPromptCharacterState: Equatable {
@@ -1466,6 +1511,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let outcome: TestOutcome
   let startedAt: Date
   let finishedAt: Date
+  let afkDuration: TimeInterval
   let typedCharacterCount: Int
   let correctCharacterCount: Int
   let errorCount: Int
@@ -1482,6 +1528,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     outcome: TestOutcome,
     startedAt: Date,
     finishedAt: Date,
+    afkDuration: TimeInterval = 0,
     typedCharacterCount: Int,
     correctCharacterCount: Int,
     errorCount: Int,
@@ -1497,6 +1544,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.outcome = outcome
     self.startedAt = startedAt
     self.finishedAt = finishedAt
+    self.afkDuration = max(0, afkDuration)
     self.typedCharacterCount = typedCharacterCount
     self.correctCharacterCount = correctCharacterCount
     self.errorCount = errorCount
@@ -1508,9 +1556,17 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.replayEvents = replayEvents
   }
 
+  var elapsedDuration: TimeInterval {
+    max(0, finishedAt.timeIntervalSince(startedAt))
+  }
+
+  var engagedDuration: TimeInterval {
+    max(0, elapsedDuration - afkDuration)
+  }
+
   private enum CodingKeys: String, CodingKey {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
-      correctCharacterCount, errorCount, wpm, rawWpm, accuracy, tags, prompt, replayEvents
+      afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, tags, prompt, replayEvents
   }
 
   init(from decoder: Decoder) throws {
@@ -1520,6 +1576,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     outcome = try values.decode(TestOutcome.self, forKey: .outcome)
     startedAt = try values.decode(Date.self, forKey: .startedAt)
     finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+    afkDuration = max(0, try values.decodeIfPresent(TimeInterval.self, forKey: .afkDuration) ?? 0)
     typedCharacterCount = try values.decode(Int.self, forKey: .typedCharacterCount)
     correctCharacterCount = try values.decode(Int.self, forKey: .correctCharacterCount)
     errorCount = try values.decode(Int.self, forKey: .errorCount)
@@ -1593,6 +1650,8 @@ struct TypingSession {
   /// is submitted and the active input buffer becomes empty.
   private var extraErrorTypedIndices = Set<Int>()
   private var typedCharacterDates: [Date] = []
+  private var keyboardActivityDates: [Date] = []
+  private var insertionActivityDates: [Date] = []
   private var forcedErrorIndices = Set<Int>()
   /// Target positions at which the user made an input error during this
   /// attempt. Unlike `forcedErrorIndices`, these remain after a backspace so
@@ -1638,6 +1697,18 @@ struct TypingSession {
   var isFinished: Bool { outcome != .active }
   var hasStarted: Bool { startedAt != nil }
   var typedCharacterCount: Int { typed.count }
+  var afkDuration: TimeInterval {
+    guard let startedAt, let finishedAt else { return 0 }
+    return TestInactivityPolicy.inactiveDuration(
+      activityDates: keyboardActivityDates, startedAt: startedAt, endedAt: finishedAt,
+      includesFractionalTail: configuration.duration == nil)
+  }
+
+  mutating func recordKeyboardActivity(at date: Date = .now) {
+    guard !isFinished, startedAt != nil else { return }
+    keyboardActivityDates.append(date)
+  }
+
   var sectionProgress: (completed: Int, total: Int)? {
     guard !sectionEndIndices.isEmpty else { return nil }
     let completed = sectionEndIndices.filter { nextTargetIndex >= $0 }.count
@@ -1922,6 +1993,7 @@ struct TypingSession {
       outcome: outcome,
       startedAt: startedAt,
       finishedAt: finishedAt,
+      afkDuration: afkDuration,
       typedCharacterCount: typed.count,
       correctCharacterCount: correctCharacters,
       errorCount: errors,
@@ -1953,6 +2025,8 @@ struct TypingSession {
   ) {
     guard !isFinished, !text.isEmpty else { return }
     beginIfNeeded(at: date)
+    keyboardActivityDates.append(date)
+    insertionActivityDates.append(date)
     let characters = Array(text)
     for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
@@ -1980,7 +2054,9 @@ struct TypingSession {
   }
 
   mutating func deleteBackward(at date: Date = .now) {
-    guard !isFinished, !typed.isEmpty else { return }
+    guard !isFinished else { return }
+    recordKeyboardActivity(at: date)
+    guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
       removeCodeIndentationBeforeLine(at: date)
@@ -1995,7 +2071,9 @@ struct TypingSession {
   /// without bypassing the same confidence and committed-word protections as
   /// ordinary backspace. Each removed character stays visible to replay.
   mutating func deleteWordBackward(at date: Date = .now) {
-    guard !isFinished, !typed.isEmpty else { return }
+    guard !isFinished else { return }
+    recordKeyboardActivity(at: date)
+    guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
       removeCodeIndentationBeforeLine(at: date)
@@ -2836,9 +2914,16 @@ struct TypingSession {
     {
       fail(at: date)
     } else {
-      outcome = .completed
       finishedAt = date
+      outcome = hasTrailingInactivity(endingAt: date) ? .invalidAFK : .completed
     }
+  }
+
+  private func hasTrailingInactivity(endingAt date: Date) -> Bool {
+    guard let startedAt else { return false }
+    return TestInactivityPolicy.hasTrailingInactivity(
+      insertionDates: insertionActivityDates, startedAt: startedAt, endedAt: date,
+      includesFractionalTail: configuration.duration == nil)
   }
 
   private mutating func fail(at date: Date) {

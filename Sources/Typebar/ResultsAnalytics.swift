@@ -92,7 +92,7 @@ struct CurrentProcessPractice: Equatable, Identifiable {
   init(result: CompletedTestResult) {
     self.init(
       id: result.id, finishedAt: result.finishedAt,
-      typingSeconds: result.finishedAt.timeIntervalSince(result.startedAt))
+      typingSeconds: result.engagedDuration)
   }
 }
 

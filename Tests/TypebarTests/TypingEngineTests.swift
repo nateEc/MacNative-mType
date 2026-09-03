@@ -11,6 +11,7 @@ final class TypingEngineTests: XCTestCase {
   func testTimedTestCompletesAtDeadline() {
     var session = TypingSession(configuration: .timed(seconds: 15), prompt: "amber harbor")
     session.insert("a", at: start)
+    session.insert("m", at: start.addingTimeInterval(11))
     session.tick(at: start.addingTimeInterval(15))
     XCTAssertEqual(session.outcome, .completed)
     XCTAssertEqual(session.remainingSeconds(at: start.addingTimeInterval(15)), 0)
@@ -21,6 +22,7 @@ final class TypingEngineTests: XCTestCase {
     timed.insert("a", at: start)
     timed.tick(at: start.addingTimeInterval(72.9))
     XCTAssertEqual(timed.outcome, .active)
+    timed.insert("m", at: start.addingTimeInterval(72.9))
     timed.tick(at: start.addingTimeInterval(73))
     XCTAssertEqual(timed.outcome, .completed)
 
@@ -28,6 +30,47 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(words.prompt.split(separator: " ").count, 137)
     words.insert(words.prompt, at: start)
     XCTAssertEqual(words.outcome, .completed)
+  }
+
+  func testInactivityPolicyCountsIdleIntervalsAndInvalidatesTrailingIdleTimedTests() throws {
+    let events = [start.addingTimeInterval(0.2), start.addingTimeInterval(2.2)]
+    XCTAssertEqual(
+      TestInactivityPolicy.intervalCounts(
+        activityDates: events, startedAt: start, endedAt: start.addingTimeInterval(4.6),
+        includesFractionalTail: true),
+      [1, 0, 1, 0, 0])
+    XCTAssertEqual(
+      TestInactivityPolicy.inactiveDuration(
+        activityDates: events, startedAt: start, endedAt: start.addingTimeInterval(4.6),
+        includesFractionalTail: true),
+      3)
+
+    var idle = TypingSession(configuration: .timed(seconds: 10), prompt: "amber harbor")
+    idle.insert("a", at: start)
+    idle.tick(at: start.addingTimeInterval(10))
+    let invalidResult = try XCTUnwrap(idle.result(at: start.addingTimeInterval(10)))
+    XCTAssertEqual(idle.outcome, .invalidAFK)
+    XCTAssertEqual(invalidResult.afkDuration, 9)
+    XCTAssertEqual(invalidResult.engagedDuration, 1)
+    XCTAssertEqual(idle.remainingSeconds(at: start.addingTimeInterval(10)), 0)
+    XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: invalidResult.outcome, enabled: true))
+    XCTAssertEqual(
+      invalidResult.outcome.statusText(savesResult: false), "本次因闲置无效 · 未保存为完成成绩")
+
+    var active = TypingSession(configuration: .timed(seconds: 10), prompt: "amber harbor")
+    active.insert("a", at: start)
+    active.insert("m", at: start.addingTimeInterval(8))
+    active.tick(at: start.addingTimeInterval(10))
+    XCTAssertEqual(active.outcome, .completed)
+
+    var keyboardOnly = TypingSession(configuration: .timed(seconds: 10), prompt: "amber harbor")
+    keyboardOnly.insert("a", at: start)
+    keyboardOnly.deleteBackward(at: start.addingTimeInterval(5))
+    keyboardOnly.deleteBackward(at: start.addingTimeInterval(6))
+    keyboardOnly.recordKeyboardActivity(at: start.addingTimeInterval(7))
+    keyboardOnly.tick(at: start.addingTimeInterval(10))
+    let keyboardOnlyResult = try XCTUnwrap(keyboardOnly.result())
+    XCTAssertEqual(keyboardOnlyResult.afkDuration, 6)
   }
 
   func testWordsTestCompletesAtWordLimit() {
@@ -1806,12 +1849,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .failed, enabled: true))
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .abandoned, enabled: true))
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .bailedOut, enabled: true))
+    XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .invalidAFK, enabled: true))
   }
 
   func testCompletedStatusTextReflectsWhetherResultWasSaved() {
     XCTAssertEqual(TestOutcome.completed.statusText(savesResult: true), "本次完成 · 已保存到本机")
     XCTAssertEqual(TestOutcome.completed.statusText(savesResult: false), "本次完成 · 未保存为完成成绩")
     XCTAssertEqual(TestOutcome.bailedOut.statusText(savesResult: true), "本次已中止 · 未保存为完成成绩")
+    XCTAssertEqual(TestOutcome.invalidAFK.statusText(savesResult: true), "本次因闲置无效 · 未保存为完成成绩")
   }
 
   func testCompletedSessionCreatesPortableResult() throws {
@@ -3487,8 +3532,8 @@ final class TypingEngineTests: XCTestCase {
     let settings = AppSettingsSnapshot(fontSize: 32)
     let result = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 30), outcome: .completed, startedAt: start,
-      finishedAt: start.addingTimeInterval(30), typedCharacterCount: 50, correctCharacterCount: 48,
-      errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96)
+      finishedAt: start.addingTimeInterval(30), afkDuration: 7, typedCharacterCount: 50,
+      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96)
     let preset = NamedPreset(
       name: "Short", definition: .init(configuration: .words(10), quoteID: nil, customText: nil))
     let savedTexts = [
@@ -3502,6 +3547,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
     XCTAssertEqual(archive.savedTexts, savedTexts)
+  }
+
+  func testCompletedResultDecodesArchivesWrittenBeforeInactivityTracking() throws {
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30), outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(30), afkDuration: 7, typedCharacterCount: 50,
+      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96)
+    let encoded = try JSONEncoder().encode(result)
+    var legacyPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    legacyPayload.removeValue(forKey: "afkDuration")
+    let legacyData = try JSONSerialization.data(withJSONObject: legacyPayload)
+
+    let restored = try JSONDecoder().decode(CompletedTestResult.self, from: legacyData)
+    XCTAssertEqual(restored.afkDuration, 0)
+    XCTAssertEqual(restored.engagedDuration, 30)
   }
 
   func testArchiveMergeSkipsExistingResultsAndPresets() {
@@ -4171,8 +4231,12 @@ final class TypingEngineTests: XCTestCase {
       configuration: .init(
         mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
       prompt: "amber")
-    session.insert("amber", at: start)
+    session.insert("a", at: start)
+    session.insert("mber", at: start.addingTimeInterval(6))
     let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.afkDuration, 4)
+    XCTAssertEqual(result.engagedDuration, 2)
+    XCTAssertEqual(CurrentProcessPractice(result: result).typingSeconds, 2)
     container.mainContext.insert(TestResultRecord(result: result))
     try container.mainContext.save()
 
@@ -4182,6 +4246,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(stored.configuration?.mode, .quote)
     XCTAssertEqual(stored.wpm, result.wpm)
     XCTAssertEqual(stored.accuracy, 100)
+    XCTAssertEqual(stored.afkDuration, 4)
     XCTAssertEqual(stored.portableResult, result)
 
     stored.addTag("morning")
