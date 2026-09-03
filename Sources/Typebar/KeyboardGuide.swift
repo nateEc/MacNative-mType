@@ -12,6 +12,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ukQwerty
   case spanishQwerty
   case italianQwerty
+  case portugueseQwertyISO
+  case portugueseQwertyANSI
   case frenchAzerty
 
   var id: Self { self }
@@ -28,6 +30,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ukQwerty: "UK QWERTY"
     case .spanishQwerty: "Spanish QWERTY"
     case .italianQwerty: "Italian QWERTY"
+    case .portugueseQwertyISO: "Portuguese QWERTY (ISO)"
+    case .portugueseQwertyANSI: "Portuguese QWERTY (ANSI)"
     case .frenchAzerty: "French AZERTY"
     }
   }
@@ -364,6 +368,48 @@ enum KeyboardGuideModel {
           shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "ç", "°", "§"]
         ),
         isoBottomRow()
+      ]
+    case .portugueseQwertyISO:
+      [
+        row(
+          "number", "\\1234567890'«",
+          characters: ["\\|", "1!", "2\"", "3#", "4$", "5%", "6&", "7/", "8(", "9)", "0=", "'?", "«»"],
+          shiftedLabels: ["|", "!", "\"", "#", "$", "%", "&", "/", "(", ")", "=", "?", "»"]
+        ),
+        row(
+          "top", "QWERTYUIOP+´",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "+*", "´`"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "*", "`"]
+        ),
+        row(
+          "home", "ASDFGHJKLÇº~",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "çÇ", "ºª", "~^"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ç", "ª", "^"]
+        ),
+        isoBottomRow()
+      ]
+    case .portugueseQwertyANSI:
+      [
+        row(
+          "number", "\\1234567890'<",
+          characters: ["\\|", "1!", "2\"", "3#", "4$", "5%", "6&", "7/", "8(", "9)", "0=", "'?", "<>"],
+          shiftedLabels: ["|", "!", "\"", "#", "$", "%", "&", "/", "(", ")", "=", "?", ">"]
+        ),
+        row(
+          "top", "QWERTYUIOP+´~",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "+*", "´`", "~^"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "*", "`", "^"]
+        ),
+        row(
+          "home", "ASDFGHJKLÇº",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "çÇ", "ºª"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ç", "ª"]
+        ),
+        row(
+          "bottom", "ZXCVBNM,.-",
+          characters: ["zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",;", ".:", "-_"],
+          shiftedLabels: ["Z", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
+        ),
       ]
     case .frenchAzerty:
       [

@@ -1518,6 +1518,26 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ç", layout: .spanishQwerty), 42)
   }
 
+  func testPortugueseQwertyLayoutsMapIsoAndAnsiPunctuationPositions() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "«", layout: .portugueseQwertyISO), "number-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "»", layout: .portugueseQwertyISO), "number-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .portugueseQwertyISO), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "~", layout: .portugueseQwertyISO), "home-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "<", layout: .portugueseQwertyANSI), "number-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "~", layout: .portugueseQwertyANSI), "top-12")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 24, modifierFlags: [.shift], layout: .portugueseQwertyISO), "»")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [], layout: .portugueseQwertyISO), "~")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 24, modifierFlags: [], layout: .portugueseQwertyANSI), "<")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [.shift], layout: .portugueseQwertyANSI), "^")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ç", layout: .portugueseQwertyISO), 41)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ª", layout: .portugueseQwertyANSI), 39)
+  }
+
   func testNonDefaultKeyboardLayoutsEmulatePhysicalAnsiKeyPositions() {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
