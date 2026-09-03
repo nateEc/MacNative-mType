@@ -1402,6 +1402,19 @@ final class TypingEngineTests: XCTestCase {
     view.acceptsNewlineInput = false
     view.keyDown(with: enter)
     XCTAssertTrue(accepted.isEmpty)
+
+    let shiftEnter = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false,
+        keyCode: 36))
+    var zenFinishes = 0
+    view.acceptsNewlineInput = true
+    view.finishesOnShiftEnter = true
+    view.onFinishZen = { zenFinishes += 1 }
+    view.keyDown(with: shiftEnter)
+    XCTAssertEqual(zenFinishes, 1)
+    XCTAssertTrue(accepted.isEmpty)
   }
 
   func testZipfFrequencyModifierUsesRankWeightedTypebarLexicon() {
