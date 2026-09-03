@@ -635,6 +635,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(ChallengeCommandCatalog.challengeID(for: "challenge."))
   }
 
+  func testQuoteFavoriteCommandOnlyAppearsForCurrentQuoteAndReflectsState() {
+    XCTAssertNil(QuoteFavoriteCommand.item(currentQuoteID: nil, isFavorite: false))
+    XCTAssertEqual(
+      QuoteFavoriteCommand.item(currentQuoteID: "craft", isFavorite: false)?.title,
+      "收藏当前引语")
+    XCTAssertEqual(
+      QuoteFavoriteCommand.item(currentQuoteID: "craft", isFavorite: true)?.title,
+      "取消收藏当前引语")
+  }
+
   func testClearCurrentWordOnErrorModifierKeepsCompletedWordsAndReplayInSync() {
     var session = TypingSession(
       configuration: .words(2).with(modifiers: [.clearCurrentWordOnError]),

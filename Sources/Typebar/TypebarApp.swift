@@ -1826,6 +1826,12 @@ private struct ContentView: View {
         return .init(id: preset.id, name: preset.name, definition: definition)
       }))
     items.append(contentsOf: ChallengeCommandCatalog.items(challenges: TypebarChallengeLibrary.all))
+    if mode == .quote, let quote = availableQuotes.first(where: { $0.id == selectedQuoteID }),
+      let favoriteCommand = QuoteFavoriteCommand.item(
+        currentQuoteID: quote.id, isFavorite: settings.isFavoriteQuote(quote.id))
+    {
+      items.append(favoriteCommand)
+    }
     return items
   }
 
@@ -1878,6 +1884,10 @@ private struct ContentView: View {
     case "settings": openSettings()
     case "share": showingTestShare = true
     case "bailout": showingCommandBailoutConfirmation = true
+    case QuoteFavoriteCommand.identifier:
+      guard mode == .quote, availableQuotes.contains(where: { $0.id == selectedQuoteID }) else { return }
+      settings.toggleFavoriteQuote(selectedQuoteID)
+      ensureSelectedQuote()
     default: break
     }
   }

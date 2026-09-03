@@ -135,6 +135,20 @@ enum ChallengeCommandCatalog {
     }
 }
 
+enum QuoteFavoriteCommand {
+    static let identifier = "quote.favorite"
+
+    static func item(currentQuoteID: String?, isFavorite: Bool) -> CommandPaletteItem? {
+        guard currentQuoteID != nil else { return nil }
+        return CommandPaletteItem(
+            id: identifier,
+            title: isFavorite ? "取消收藏当前引语" : "收藏当前引语",
+            subtitle: isFavorite ? "从本机引语收藏中移除" : "加入本机引语收藏",
+            systemImage: isFavorite ? "heart.slash" : "heart",
+            keywords: ["quote", "引语", "favorite", "收藏"])
+    }
+}
+
 enum CommandPaletteSearch {
     static func results(items: [CommandPaletteItem], query: String) -> [CommandPaletteItem] {
         let query = normalized(query)
