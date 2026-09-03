@@ -644,7 +644,8 @@ private struct ContentView: View {
       NotificationsView(account: account)
     }
     .sheet(isPresented: $showingCommandPalette) {
-      CommandPaletteView(items: commandPaletteItems, onSelect: runCommand)
+      CommandPaletteView(
+        items: commandPaletteItems, listMode: settings.commandPaletteListMode, onSelect: runCommand)
     }
     .confirmationDialog(
       "中止当前长测试？", isPresented: $showingCommandBailoutConfirmation,
@@ -1971,57 +1972,57 @@ private struct ContentView: View {
     var items: [CommandPaletteItem] = [
       .init(
         id: "restart", title: "重新开始测试", subtitle: "使用当前配置生成新的练习",
-        systemImage: "arrow.counterclockwise", keywords: ["restart", "reset", "重开"]),
+        systemImage: "arrow.counterclockwise", keywords: ["restart", "reset", "重开"], group: .practice),
       .init(
         id: "mode.time", title: "切换到时间模式", subtitle: "按设定时长完成练习", systemImage: "timer",
-        keywords: ["time", "时间", "模式"]),
+        keywords: ["time", "时间", "模式"], group: .practice),
       .init(
         id: "mode.words", title: "切换到字数模式", subtitle: "按设定词数完成练习", systemImage: "text.word.spacing",
-        keywords: ["words", "字数", "模式"]),
+        keywords: ["words", "字数", "模式"], group: .practice),
       .init(
         id: "mode.quote", title: "切换到引语模式", subtitle: "使用原创离线引语练习", systemImage: "quote.opening",
-        keywords: ["quote", "引语", "模式"]),
+        keywords: ["quote", "引语", "模式"], group: .practice),
       .init(
         id: "mode.zen", title: "切换到禅模式", subtitle: "不计时的自由练习", systemImage: "leaf",
-        keywords: ["zen", "禅", "模式"]),
+        keywords: ["zen", "禅", "模式"], group: .practice),
       .init(
         id: "mode.custom", title: "切换到自定义文本", subtitle: "输入或选择自己的练习文本", systemImage: "text.cursor",
-        keywords: ["custom", "文本", "模式"]),
+        keywords: ["custom", "文本", "模式"], group: .practice),
       .init(
         id: "history", title: "打开练习历史", subtitle: "查看成绩、趋势与活动",
-        systemImage: "clock.arrow.circlepath", keywords: ["history", "历史", "统计"]),
+        systemImage: "clock.arrow.circlepath", keywords: ["history", "历史", "统计"], group: .activity),
       .init(
         id: "presets", title: "打开测试预设", subtitle: "保存或应用完整测试配置", systemImage: "slider.horizontal.3",
-        keywords: ["preset", "预设"]),
+        keywords: ["preset", "预设"], group: .library),
       .init(
         id: "challenges", title: "打开离线挑战", subtitle: "加载固定配置并验收速度、准确率和错误",
-        systemImage: "flag.checkered", keywords: ["challenge", "挑战", "目标"]),
+        systemImage: "flag.checkered", keywords: ["challenge", "挑战", "目标"], group: .library),
       .init(
         id: "savedTexts", title: "打开已保存文本", subtitle: "选择本地自定义练习文本", systemImage: "doc.text",
-        keywords: ["saved", "文本", "自定义"]),
+        keywords: ["saved", "文本", "自定义"], group: .library),
       .init(
         id: "data", title: "打开数据管理", subtitle: "导入或导出本地 Typebar 归档", systemImage: "externaldrive",
-        keywords: ["data", "数据", "备份"]),
+        keywords: ["data", "数据", "备份"], group: .data),
       .init(
         id: "sync", title: "打开同步", subtitle: "连接自建服务并同步归档",
-        systemImage: "arrow.triangle.2.circlepath", keywords: ["sync", "同步", "账户"]),
+        systemImage: "arrow.triangle.2.circlepath", keywords: ["sync", "同步", "账户"], group: .connections),
       .init(
         id: "friends", title: "打开好友", subtitle: "搜索用户和管理好友关系", systemImage: "person.2",
-        keywords: ["friend", "好友", "社交"]),
+        keywords: ["friend", "好友", "社交"], group: .connections),
       .init(
         id: "notifications", title: "打开通知", subtitle: "查看好友请求和接受事件", systemImage: "bell",
-        keywords: ["notification", "通知", "好友请求"]),
+        keywords: ["notification", "通知", "好友请求"], group: .connections),
       .init(
         id: "settings", title: "打开设置", subtitle: "修改输入规则、显示和账户选项", systemImage: "gearshape",
-        keywords: ["settings", "设置", "主题", "键盘"]),
+        keywords: ["settings", "设置", "主题", "键盘"], group: .settings),
       .init(
         id: "share", title: "分享当前测试", subtitle: "复制或导入 Typebar 测试配置链接",
-        systemImage: "square.and.arrow.up", keywords: ["share", "分享", "链接", "配置"]),
+        systemImage: "square.and.arrow.up", keywords: ["share", "分享", "链接", "配置"], group: .data),
     ]
     if session.hasStarted, !session.isFinished, commandBailoutAvailable {
       items.append(.init(
         id: "bailout", title: "中止长测试…", subtitle: "确认后显示未保存结果",
-        systemImage: "figure.run", keywords: ["bail", "bailout", "中止", "退出"]))
+        systemImage: "figure.run", keywords: ["bail", "bailout", "中止", "退出"], group: .practice))
     }
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))

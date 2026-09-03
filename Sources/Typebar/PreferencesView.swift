@@ -84,6 +84,14 @@ struct PreferencesView: View {
           Text("在练习页底部显示重开和命令面板的实际快捷键；输入框获得焦点时会淡出。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Picker("命令面板浏览", selection: $settings.commandPaletteListMode) {
+            ForEach(CommandPaletteListMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          Text("单列表需先输入关键词搜索全部命令；分组导航可逐层浏览，输入 > 可随时搜索全部命令。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Toggle("保存完成成绩", isOn: $settings.saveCompletedResults)
           Text("关闭后仍显示本次结果，但不会写入本机历史、统计、同步或排行榜。")
             .font(.caption)
@@ -1037,7 +1045,7 @@ struct PreferencesView: View {
   private var testSectionVisible: Bool {
     matches(
       "测试", "难度", "输入", "strict space", "严格空格", "stop error", "遇错停下", "delete error", "遇错删除", "盲打",
-      "blind", "焦点", "focus", "大写锁定", "caps lock", "快捷键", "key tips", "错误提示音", "键击", "音量", "声音", "sound", "beep", "自由",
+      "blind", "焦点", "focus", "大写锁定", "caps lock", "快捷键", "key tips", "命令", "command", "面板", "palette", "错误提示音", "键击", "音量", "声音", "sound", "beep", "自由",
       "freedom", "回退", "最低速度", "单词速度", "burst", "wpm", "修饰器", "modifier", "无空格", "下划线", "全大写",
       "uppercase", "rot13", "反写", "额外字符", "quick end", "快速结束", "字数")
   }

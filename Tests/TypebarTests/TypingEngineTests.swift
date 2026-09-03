@@ -1514,6 +1514,46 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CommandPaletteSearch.results(items: items, query: ""), items)
   }
 
+  func testCommandPaletteBrowsePolicySeparatesGroupsAndSupportsGlobalSearch() {
+    let restart = CommandPaletteItem(
+      id: "restart", title: "重新开始测试", subtitle: "当前配置", systemImage: "arrow",
+      keywords: ["restart", "重开"], group: .practice)
+    let theme = CommandPaletteItem(
+      id: "theme.builtin.paper", title: "切换主题：纸页", subtitle: "内置主题", systemImage: "paintpalette",
+      keywords: ["theme", "主题"], group: .appearance)
+    let preset = CommandPaletteItem(
+      id: "preset.example", title: "应用预设：冲刺", subtitle: "时间 · 60 秒", systemImage: "slider.horizontal.3",
+      keywords: ["preset", "预设"], group: .library)
+    let items = [restart, theme, preset]
+
+    XCTAssertEqual(
+      CommandPaletteBrowsePolicy.destination(
+        items: items, listMode: .singleList, selectedGroup: nil, query: ""),
+      .searchHint)
+    XCTAssertEqual(
+      CommandPaletteBrowsePolicy.destination(
+        items: items, listMode: .singleList, selectedGroup: nil, query: "主题"),
+      .items([theme]))
+    XCTAssertEqual(
+      CommandPaletteBrowsePolicy.destination(
+        items: items, listMode: .grouped, selectedGroup: nil, query: ""),
+      .groups([.practice, .library, .appearance]))
+    XCTAssertEqual(
+      CommandPaletteBrowsePolicy.destination(
+        items: items, listMode: .grouped, selectedGroup: nil, query: "theme"),
+      .groups([.appearance]))
+    XCTAssertEqual(
+      CommandPaletteBrowsePolicy.destination(
+        items: items, listMode: .grouped, selectedGroup: .practice, query: ""),
+      .items([restart]))
+    XCTAssertEqual(
+      CommandPaletteBrowsePolicy.destination(
+        items: items, listMode: .grouped, selectedGroup: .practice, query: "> theme"),
+      .items([theme]))
+    XCTAssertTrue(CommandPaletteBrowsePolicy.isGlobalSearch("> theme"))
+    XCTAssertEqual(CommandPaletteBrowsePolicy.globalSearchQuery("> theme"), " theme")
+  }
+
   func testSettingsSearchMatchesEveryWhitespaceSeparatedTokenAcrossLocalizedTerms() {
     XCTAssertTrue(
       SettingsSearch.matches(query: "KEYBOARD layout", terms: ["键盘布局", "Keyboard Layout", "下一键"]))
@@ -3406,6 +3446,7 @@ final class TypingEngineTests: XCTestCase {
     settings.quickEnd = true
     settings.quickRestartKey = .enter
     settings.showKeyTips = false
+    settings.commandPaletteListMode = .grouped
     settings.systemLightTheme = .paper
     settings.systemDarkTheme = .grove
     settings.practiceBackdrop = .halos
@@ -3488,6 +3529,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
     XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
     XCTAssertFalse(exportedSnapshot.showKeyTips)
+    XCTAssertEqual(exportedSnapshot.commandPaletteListMode, .grouped)
     XCTAssertEqual(exportedSnapshot.systemLightTheme, .paper)
     XCTAssertEqual(exportedSnapshot.systemDarkTheme, .grove)
     XCTAssertTrue(exportedSnapshot.flipTestColors)
@@ -3518,6 +3560,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.quickEnd)
     XCTAssertEqual(restored.quickRestartKey, .enter)
     XCTAssertFalse(restored.showKeyTips)
+    XCTAssertEqual(restored.commandPaletteListMode, .grouped)
     XCTAssertFalse(restored.followSystemTheme)
     XCTAssertEqual(restored.systemLightTheme, .paper)
     XCTAssertEqual(restored.systemDarkTheme, .grove)
@@ -3672,6 +3715,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertTrue(snapshot.showKeyTips)
+    XCTAssertEqual(snapshot.commandPaletteListMode, .singleList)
     XCTAssertFalse(snapshot.followSystemTheme)
     XCTAssertEqual(snapshot.systemLightTheme, .paper)
     XCTAssertEqual(snapshot.systemDarkTheme, .midnight)

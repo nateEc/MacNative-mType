@@ -1,11 +1,104 @@
 import SwiftUI
 
+/// Controls whether the command palette starts as a global command search or
+/// exposes the same commands through native navigation groups.
+enum CommandPaletteListMode: String, CaseIterable, Codable, Equatable, Identifiable {
+    case singleList
+    case grouped
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .singleList: "单列表搜索"
+        case .grouped: "分组导航"
+        }
+    }
+}
+
+enum CommandPaletteGroup: String, CaseIterable, Codable, Equatable, Hashable, Identifiable {
+    case practice
+    case library
+    case appearance
+    case activity
+    case data
+    case connections
+    case settings
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .practice: "练习与模式"
+        case .library: "文本、预设与挑战"
+        case .appearance: "主题与外观"
+        case .activity: "成绩与历史"
+        case .data: "数据与分享"
+        case .connections: "同步与社交"
+        case .settings: "应用设置"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .practice: "重开练习或切换测试模式"
+        case .library: "打开已保存内容或加载本机挑战"
+        case .appearance: "选择内置或自定义主题"
+        case .activity: "查看本机成绩和趋势"
+        case .data: "导入、导出或分享测试配置"
+        case .connections: "管理自建同步、好友和通知"
+        case .settings: "修改输入、显示和账户选项"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .practice: "keyboard"
+        case .library: "books.vertical"
+        case .appearance: "paintpalette"
+        case .activity: "chart.line.uptrend.xyaxis"
+        case .data: "externaldrive"
+        case .connections: "person.2"
+        case .settings: "gearshape"
+        }
+    }
+
+    var keywords: [String] {
+        switch self {
+        case .practice: ["practice", "test", "mode", "练习", "测试", "模式", "重开"]
+        case .library: ["library", "preset", "challenge", "text", "文本", "预设", "挑战"]
+        case .appearance: ["appearance", "theme", "主题", "外观"]
+        case .activity: ["activity", "history", "result", "成绩", "历史", "统计"]
+        case .data: ["data", "share", "backup", "数据", "分享", "备份"]
+        case .connections: ["sync", "friend", "notification", "同步", "好友", "通知"]
+        case .settings: ["setting", "settings", "设置", "偏好"]
+        }
+    }
+}
+
 struct CommandPaletteItem: Equatable, Identifiable {
     let id: String
     let title: String
     let subtitle: String
     let systemImage: String
     let keywords: [String]
+    let group: CommandPaletteGroup
+
+    init(
+        id: String,
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        keywords: [String],
+        group: CommandPaletteGroup = .practice
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.keywords = keywords
+        self.group = group
+    }
 }
 
 enum ThemeCommandTarget: Equatable {
@@ -79,7 +172,7 @@ enum ThemeCommandCatalog {
             .map { option in
                 CommandPaletteItem(
                     id: identifier(for: option.target), title: option.title, subtitle: option.subtitle,
-                    systemImage: "paintpalette", keywords: option.keywords)
+                    systemImage: "paintpalette", keywords: option.keywords, group: .appearance)
             }
     }
 }
@@ -107,7 +200,7 @@ enum PresetCommandCatalog {
             CommandPaletteItem(
                 id: identifier(for: preset.id), title: "应用预设：\(preset.name)",
                 subtitle: preset.definition.summaryDescription, systemImage: "slider.horizontal.3",
-                keywords: ["preset", "预设", "apply", "应用", preset.name])
+                keywords: ["preset", "预设", "apply", "应用", preset.name], group: .library)
         }
     }
 }
@@ -130,7 +223,7 @@ enum ChallengeCommandCatalog {
                 id: identifier(for: challenge.id), title: "加载挑战：\(challenge.title)",
                 subtitle: "\(challenge.description) · \(challenge.requirements.summary)",
                 systemImage: "flag.checkered",
-                keywords: ["challenge", "挑战", "load", "加载", challenge.title])
+                keywords: ["challenge", "挑战", "load", "加载", challenge.title], group: .library)
         }
     }
 }
@@ -151,14 +244,15 @@ enum QuoteFavoriteCommand {
 
 enum CommandPaletteSearch {
     static func results(items: [CommandPaletteItem], query: String) -> [CommandPaletteItem] {
-        let query = normalized(query)
-        guard !query.isEmpty else { return items }
-
         return items.filter { item in
-            normalized(item.title).contains(query)
-                || normalized(item.subtitle).contains(query)
-                || item.keywords.contains { normalized($0).contains(query) }
+            matches(query: query, terms: [item.title, item.subtitle] + item.keywords)
         }
+    }
+
+    static func matches(query: String, terms: [String]) -> Bool {
+        let normalizedQuery = normalized(query)
+        guard !normalizedQuery.isEmpty else { return true }
+        return terms.contains { normalized($0).contains(normalizedQuery) }
     }
 
     private static func normalized(_ value: String) -> String {
@@ -167,23 +261,97 @@ enum CommandPaletteSearch {
     }
 }
 
+enum CommandPaletteBrowseDestination: Equatable {
+    case searchHint
+    case groups([CommandPaletteGroup])
+    case items([CommandPaletteItem])
+}
+
+/// Keeps command palette navigation deterministic and independent of SwiftUI.
+/// A leading `>` is the explicit escape hatch from grouped navigation to the
+/// global command list, matching the reference command-line interaction.
+enum CommandPaletteBrowsePolicy {
+    static func destination(
+        items: [CommandPaletteItem],
+        listMode: CommandPaletteListMode,
+        selectedGroup: CommandPaletteGroup?,
+        query: String
+    ) -> CommandPaletteBrowseDestination {
+        switch listMode {
+        case .singleList:
+            guard !query.isEmpty else { return .searchHint }
+            return .items(CommandPaletteSearch.results(items: items, query: query))
+        case .grouped:
+            if isGlobalSearch(query) {
+                return .items(CommandPaletteSearch.results(
+                    items: items, query: globalSearchQuery(query)))
+            }
+            if let selectedGroup {
+                return .items(CommandPaletteSearch.results(
+                    items: items.filter { $0.group == selectedGroup }, query: query))
+            }
+            let availableGroups = Set(items.map(\.group))
+            return .groups(CommandPaletteGroup.allCases.filter {
+                availableGroups.contains($0)
+                    && CommandPaletteSearch.matches(
+                        query: query, terms: [$0.title, $0.subtitle] + $0.keywords)
+            })
+        }
+    }
+
+    static func isGlobalSearch(_ query: String) -> Bool {
+        query.first == ">"
+    }
+
+    static func globalSearchQuery(_ query: String) -> String {
+        guard isGlobalSearch(query) else { return query }
+        return String(query.dropFirst())
+    }
+}
+
 struct CommandPaletteView: View {
     @Environment(\.dismiss) private var dismiss
     let items: [CommandPaletteItem]
+    let listMode: CommandPaletteListMode
     let onSelect: (CommandPaletteItem) -> Void
     @State private var query = ""
+    @State private var selectedGroup: CommandPaletteGroup?
     @FocusState private var searchFocused: Bool
 
-    private var results: [CommandPaletteItem] {
-        CommandPaletteSearch.results(items: items, query: query)
+    private var destination: CommandPaletteBrowseDestination {
+        CommandPaletteBrowsePolicy.destination(
+            items: items, listMode: listMode, selectedGroup: selectedGroup, query: query)
+    }
+
+    private var isGlobalSearch: Bool {
+        listMode == .grouped && CommandPaletteBrowsePolicy.isGlobalSearch(query)
+    }
+
+    private var searchPlaceholder: String {
+        if isGlobalSearch { return "搜索全部命令…" }
+        if let selectedGroup { return "搜索\(selectedGroup.title)…" }
+        switch listMode {
+        case .singleList: return "搜索全部命令…"
+        case .grouped: return "选择分类，或输入 > 搜索全部…"
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
+                if listMode == .grouped, selectedGroup != nil, !isGlobalSearch {
+                    Button {
+                        selectedGroup = nil
+                        query = ""
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("返回命令分类")
+                }
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("搜索命令…", text: $query)
+                TextField(searchPlaceholder, text: $query)
                     .textFieldStyle(.plain)
                     .focused($searchFocused)
                 if !query.isEmpty {
@@ -195,34 +363,84 @@ struct CommandPaletteView: View {
 
             Divider()
 
-            if results.isEmpty {
-                ContentUnavailableView("没有匹配的命令", systemImage: "command", description: Text("试试“历史”、“模式”或“设置”。"))
+            switch destination {
+            case .searchHint:
+                ContentUnavailableView(
+                    "搜索全部命令", systemImage: "command",
+                    description: Text("输入“历史”、“模式”或“设置”。"))
                     .frame(maxHeight: .infinity)
-            } else {
-                List(results) { item in
-                    Button {
-                        onSelect(item)
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: item.systemImage)
-                                .frame(width: 18)
-                                .foregroundStyle(.tint)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title)
-                                Text(item.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
+            case .groups(let groups):
+                if groups.isEmpty {
+                    ContentUnavailableView(
+                        "没有匹配的命令分类", systemImage: "command",
+                        description: Text("输入 > 可直接搜索全部命令。"))
+                    .frame(maxHeight: .infinity)
+                } else {
+                    List(groups) { group in
+                        Button {
+                            selectedGroup = group
+                            query = ""
+                        } label: {
+                            groupRow(group)
                         }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .listStyle(.plain)
                 }
-                .listStyle(.plain)
+            case .items(let results):
+                if results.isEmpty {
+                    ContentUnavailableView(
+                        "没有匹配的命令", systemImage: "command",
+                        description: Text("试试“历史”、“模式”或“设置”。"))
+                    .frame(maxHeight: .infinity)
+                } else {
+                    List(results) { item in
+                        Button {
+                            onSelect(item)
+                            dismiss()
+                        } label: {
+                            commandRow(item)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listStyle(.plain)
+                }
             }
         }
         .frame(width: 480, height: 390)
         .onAppear { searchFocused = true }
+    }
+
+    private func groupRow(_ group: CommandPaletteGroup) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: group.systemImage)
+                .frame(width: 18)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(group.title)
+                Text(group.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private func commandRow(_ item: CommandPaletteItem) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: item.systemImage)
+                .frame(width: 18)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                Text(item.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
     }
 }
