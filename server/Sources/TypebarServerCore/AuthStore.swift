@@ -101,6 +101,14 @@ public struct AccountDeletionResponse: Content, Equatable {
   public let deleted: Bool
 }
 
+public struct RevokeSessionsRequest: Content, Equatable {
+  public let currentPassword: String
+}
+
+public struct SessionsRevocationResponse: Content, Equatable {
+  public let revoked: Bool
+}
+
 public struct UpdateProfileRequest: Content, Equatable {
   public let displayName: String
   /// Omitted by older clients, which preserves the existing account choice.
@@ -1159,6 +1167,21 @@ public actor AuthStore {
     let response = makeSession(for: updatedUser, now: now)
     try persist()
     return response
+  }
+
+  /// Revokes every session for the authenticated account after confirming the
+  /// current password. The caller's session is intentionally included, so the
+  /// device that requested this action must sign in again.
+  public func revokeAllSessions(
+    _ request: RevokeSessionsRequest, accessToken: String, now: Date = .now
+  ) throws {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard let user = state.users.first(where: { $0.id == currentUser.id }),
+      let passwordHash = user.passwordHash,
+      try Bcrypt.verify(request.currentPassword, created: passwordHash)
+    else { throw AuthStoreError.invalidCredentials }
+    state.sessions.removeAll { $0.userID == user.id }
+    try persist()
   }
 
   /// Deletes the authenticated account and every record owned by it. A current

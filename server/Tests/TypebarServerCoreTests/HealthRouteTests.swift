@@ -687,6 +687,44 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testSessionRevocationRouteRequiresCurrentPasswordAndRevokesEveryDevice() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let firstSession = try await store.register(
+      .init(email: "revoke@example.com", password: "a secure password", displayName: "Revoke User"))
+    let secondSession = try await store.login(
+      .init(email: "revoke@example.com", password: "a secure password"))
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(
+        .POST,
+        "v1/auth/sessions/revoke",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(firstSession.accessToken)")
+          try request.content.encode(RevokeSessionsRequest(currentPassword: "a secure password"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertTrue((try? response.content.decode(SessionsRevocationResponse.self))?.revoked ?? false)
+        }
+      )
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+
+    for accessToken in [firstSession.accessToken, secondSession.accessToken] {
+      do {
+        _ = try await store.authenticatedUser(for: accessToken)
+        XCTFail("Session revocation must invalidate every active device")
+      } catch let error as AuthStoreError {
+        XCTAssertEqual(error, .invalidAccessToken)
+      }
+    }
+  }
+
   func testPasswordResetRevokesSessionsConsumesItsTokenAndExpires() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let start = Date(timeIntervalSince1970: 1_000)

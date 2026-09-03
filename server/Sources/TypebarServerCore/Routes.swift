@@ -314,6 +314,18 @@ public func configure(
         }
     }
 
+    app.post("v1", "auth", "sessions", "revoke") { request async throws -> SessionsRevocationResponse in
+        do {
+            try await authStore.revokeAllSessions(
+                request.content.decode(RevokeSessionsRequest.self),
+                accessToken: request.accessToken()
+            )
+            return .init(revoked: true)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.get("v1", "profiles", "me") { request async throws -> AuthUserResponse in
         do {
             return try await authStore.authenticatedUser(for: try request.accessToken())

@@ -181,6 +181,8 @@ private struct RemoteChangeEmailRequest: Codable, Sendable {
 
 private struct RemoteDeleteAccountRequest: Codable, Sendable { let currentPassword: String }
 private struct RemoteAccountDeletionResponse: Codable, Sendable { let deleted: Bool }
+private struct RemoteRevokeSessionsRequest: Codable, Sendable { let currentPassword: String }
+private struct RemoteSessionsRevocationResponse: Codable, Sendable { let revoked: Bool }
 
 private struct RemoteUpdateProfileRequest: Codable, Sendable {
     let displayName: String
@@ -967,6 +969,32 @@ final class AccountSession {
             statusMessage = "账户及其自建服务数据已删除；本机练习记录未受影响。"
         } catch {
             statusMessage = error.localizedDescription
+        }
+    }
+
+    func revokeAllSessions(currentPassword: String) async -> Bool {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/sessions/revoke",
+                method: "POST",
+                token: token,
+                body: RemoteRevokeSessionsRequest(currentPassword: currentPassword),
+                response: RemoteSessionsRevocationResponse.self
+            )
+            guard response.revoked else { throw RemoteAccountError.unexpectedResponse }
+            tokenStore.clear()
+            currentUser = nil
+            statusMessage = "所有设备的登录会话已撤销；请重新登录。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
         }
     }
 

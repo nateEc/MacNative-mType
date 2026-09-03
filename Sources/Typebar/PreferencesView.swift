@@ -23,8 +23,10 @@ struct PreferencesView: View {
   @State private var passwordAuthenticationPassword = ""
   @State private var confirmedPasswordAuthenticationPassword = ""
   @State private var passwordAuthenticationRemovalPassword = ""
+  @State private var sessionRevocationPassword = ""
   @State private var accountDeletionPassword = ""
   @State private var showingAccountDeletionConfirmation = false
+  @State private var showingSessionRevocationConfirmation = false
   @State private var showingRestoreDefaultsConfirmation = false
   @State private var submittedQuoteText = ""
   @State private var submittedQuoteAttribution = ""
@@ -902,6 +904,17 @@ struct PreferencesView: View {
                 .foregroundStyle(.secondary)
             }
             Divider()
+            Text("撤销所有设备会话").font(.headline)
+            SecureField("输入当前密码以撤销所有设备会话", text: $sessionRevocationPassword)
+              .textContentType(.password)
+            Button("撤销所有设备会话…", role: .destructive) {
+              showingSessionRevocationConfirmation = true
+            }
+            .disabled(account.isWorking || sessionRevocationPassword.isEmpty)
+            Text("这会立即使包括当前 Mac 在内的所有自建服务登录失效；本机练习历史不会删除。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Divider()
             Text("删除账户").font(.headline)
             SecureField("输入当前密码以删除账户", text: $accountDeletionPassword)
               .textContentType(.password)
@@ -1235,6 +1248,19 @@ struct PreferencesView: View {
       }
     } message: {
       Text("服务端数据将永久移除。本机练习历史仍保留在这台 Mac 上。")
+    }
+    .confirmationDialog(
+      "撤销所有设备会话？", isPresented: $showingSessionRevocationConfirmation, titleVisibility: .visible
+    ) {
+      Button("撤销所有会话", role: .destructive) {
+        Task {
+          if await account.revokeAllSessions(currentPassword: sessionRevocationPassword) {
+            sessionRevocationPassword = ""
+          }
+        }
+      }
+    } message: {
+      Text("你将立即在这台 Mac 和所有其他设备退出自建 Typebar 服务。")
     }
     .fileImporter(isPresented: $showingCustomBackgroundImporter, allowedContentTypes: [.image]) { result in
       switch result {
