@@ -88,6 +88,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingCaretStyle.block.drawsMarker)
   }
 
+  func testPromptTextColorPolicyMapsThemeOptionsWithoutTouchingErrorStates() {
+    XCTAssertEqual(
+      PromptTextColorPolicy.tone(
+        for: .completed, flipsCompletionAndFuture: false, usesAccentForCompleted: false), .primary)
+    XCTAssertEqual(
+      PromptTextColorPolicy.tone(
+        for: .future, flipsCompletionAndFuture: false, usesAccentForCompleted: false), .secondary)
+    XCTAssertEqual(
+      PromptTextColorPolicy.tone(
+        for: .completed, flipsCompletionAndFuture: true, usesAccentForCompleted: false), .secondary)
+    XCTAssertEqual(
+      PromptTextColorPolicy.tone(
+        for: .future, flipsCompletionAndFuture: true, usesAccentForCompleted: false), .primary)
+    XCTAssertEqual(
+      PromptTextColorPolicy.tone(
+        for: .completed, flipsCompletionAndFuture: false, usesAccentForCompleted: true), .accent)
+    XCTAssertEqual(
+      PromptTextColorPolicy.tone(
+        for: .future, flipsCompletionAndFuture: true, usesAccentForCompleted: true), .accent)
+  }
+
   func testNoSpaceWordTestsKeepTheirCommittedWordProgress() {
     let configuration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
     var session = TypingSession(
@@ -3372,6 +3393,8 @@ final class TypingEngineTests: XCTestCase {
     let customThemeID = try XCTUnwrap(settings.customThemes.first?.id)
     settings.toggleFavoriteCustomTheme(customThemeID)
     settings.randomThemeMode = .custom
+    settings.flipTestColors = true
+    settings.colorfulMode = true
     settings.englishVariant = .british
     settings.freedomMode = true
     settings.confidenceMode = .maximum
@@ -3438,6 +3461,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
     XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
     XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
+    XCTAssertTrue(exportedSnapshot.flipTestColors)
+    XCTAssertTrue(exportedSnapshot.colorfulMode)
     XCTAssertEqual(exportedSnapshot.liveProgressStyle, .flashMini)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
@@ -3463,6 +3488,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(restored.followSystemTheme)
     XCTAssertTrue(restored.randomThemeOnRestart)
     XCTAssertEqual(restored.randomThemeMode, .custom)
+    XCTAssertTrue(restored.flipTestColors)
+    XCTAssertTrue(restored.colorfulMode)
     XCTAssertEqual(restored.practiceBackdrop, .halos)
     XCTAssertTrue(restored.reducePracticeMotion)
     XCTAssertTrue(restored.isFavoriteTheme(.grove))
@@ -3609,6 +3636,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(snapshot.followSystemTheme)
     XCTAssertFalse(snapshot.randomThemeOnRestart)
     XCTAssertEqual(snapshot.randomThemeMode, .off)
+    XCTAssertFalse(snapshot.flipTestColors)
+    XCTAssertFalse(snapshot.colorfulMode)
     XCTAssertEqual(snapshot.practiceBackdrop, .solid)
     XCTAssertFalse(snapshot.reducePracticeMotion)
     XCTAssertTrue(snapshot.startGraphsAtZero)

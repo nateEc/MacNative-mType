@@ -1341,7 +1341,7 @@ private struct ContentView: View {
       case .correct:
         switch settings.typedCharacterEffect {
         case .keep:
-          character.foregroundColor = .primary
+          character.foregroundColor = completedPromptColor
         case .hide where completedCharacterIndices.contains(index):
           character.foregroundColor = .clear
         case .fade where completedCharacterIndices.contains(index):
@@ -1349,19 +1349,19 @@ private struct ContentView: View {
         case .dots where turnsIntoDot:
           character.foregroundColor = activeTheme.accent.opacity(0.74)
         default:
-          character.foregroundColor = .primary
+          character.foregroundColor = completedPromptColor
         }
       case .incorrect:
         character.foregroundColor = .red
         character.backgroundColor = .red.opacity(0.16)
       case .current:
         if promptHighlightMode == .off || !settings.caretStyle.drawsMarker {
-          character.foregroundColor = .secondary.opacity(0.55)
+          character.foregroundColor = futurePromptColor
         } else {
           applyCaret(to: &character)
         }
       case .pending:
-        character.foregroundColor = .secondary.opacity(0.55)
+        character.foregroundColor = futurePromptColor
       case .hidden:
         character.foregroundColor = .clear
       case .extra:
@@ -1387,6 +1387,25 @@ private struct ContentView: View {
       }
     }
     return output
+  }
+
+  private var completedPromptColor: Color {
+    promptTextColor(for: .completed)
+  }
+
+  private var futurePromptColor: Color {
+    promptTextColor(for: .future)
+  }
+
+  private func promptTextColor(for role: PromptTextRole) -> Color {
+    switch PromptTextColorPolicy.tone(
+      for: role, flipsCompletionAndFuture: settings.flipTestColors,
+      usesAccentForCompleted: settings.colorfulMode)
+    {
+    case .primary: .primary
+    case .secondary: .secondary.opacity(0.55)
+    case .accent: activeTheme.accent
+    }
   }
 
   private var usesTapePractice: Bool {

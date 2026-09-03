@@ -74,6 +74,36 @@ enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
   var drawsMarker: Bool { self != .off }
 }
 
+enum PromptTextRole: Equatable {
+  case completed
+  case future
+}
+
+enum PromptTextTone: Equatable {
+  case primary
+  case secondary
+  case accent
+}
+
+/// Maps the reference theme preferences to Typebar's own semantic colors.
+/// Error colors deliberately stay independent so mistakes remain legible.
+enum PromptTextColorPolicy {
+  static func tone(
+    for role: PromptTextRole, flipsCompletionAndFuture: Bool, usesAccentForCompleted: Bool
+  ) -> PromptTextTone {
+    switch (role, flipsCompletionAndFuture, usesAccentForCompleted) {
+    case (.completed, false, false): .primary
+    case (.future, false, false): .secondary
+    case (.completed, true, false): .secondary
+    case (.future, true, false): .primary
+    case (.completed, false, true): .accent
+    case (.future, false, true): .secondary
+    case (.completed, true, true): .secondary
+    case (.future, true, true): .accent
+    }
+  }
+}
+
 /// Chooses the native theme pool that is rotated after a completed test.
 /// The temporary selection itself is intentionally never persisted.
 enum RandomThemeMode: String, CaseIterable, Codable, Equatable, Identifiable {
@@ -446,6 +476,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var followSystemTheme = false
   var randomThemeOnRestart = false
   var randomThemeMode: RandomThemeMode = .off
+  var flipTestColors = false
+  var colorfulMode = false
   var practiceBackdrop: PracticeBackdropStyle = .solid
   var reducePracticeMotion = false
   var englishVariant: EnglishVariant = .american
@@ -529,6 +561,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     followSystemTheme: Bool = false,
     randomThemeOnRestart: Bool = false,
     randomThemeMode: RandomThemeMode = .off,
+    flipTestColors: Bool = false,
+    colorfulMode: Bool = false,
     practiceBackdrop: PracticeBackdropStyle = .solid,
     reducePracticeMotion: Bool = false,
     englishVariant: EnglishVariant = .american,
@@ -616,6 +650,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.randomThemeMode = followSystemTheme ? .off : (
       randomThemeMode.isEnabled ? randomThemeMode : (randomThemeOnRestart ? .on : .off))
     self.randomThemeOnRestart = self.randomThemeMode.isEnabled
+    self.flipTestColors = flipTestColors
+    self.colorfulMode = colorfulMode
     self.practiceBackdrop = practiceBackdrop
     self.reducePracticeMotion = reducePracticeMotion
     self.englishVariant = englishVariant
@@ -680,7 +716,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       practiceFont, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, followSystemTheme,
-      randomThemeOnRestart, randomThemeMode, practiceBackdrop, reducePracticeMotion, englishVariant,
+      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, practiceBackdrop, reducePracticeMotion, englishVariant,
       favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
@@ -749,6 +785,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(RandomThemeMode.self, forKey: .randomThemeMode)
         ?? (legacyRandomThemeOnRestart ? .on : .off))
     randomThemeOnRestart = randomThemeMode.isEnabled
+    flipTestColors = try values.decodeIfPresent(Bool.self, forKey: .flipTestColors) ?? false
+    colorfulMode = try values.decodeIfPresent(Bool.self, forKey: .colorfulMode) ?? false
     practiceBackdrop =
       try values.decodeIfPresent(PracticeBackdropStyle.self, forKey: .practiceBackdrop) ?? .solid
     reducePracticeMotion =
@@ -990,6 +1028,8 @@ final class AppSettings {
       persist()
     }
   }
+  var flipTestColors = false { didSet { persist() } }
+  var colorfulMode = false { didSet { persist() } }
   var practiceBackdrop: PracticeBackdropStyle = .solid { didSet { persist() } }
   var reducePracticeMotion = false { didSet { persist() } }
   var englishVariant: EnglishVariant = .american { didSet { persist() } }
@@ -1115,6 +1155,8 @@ final class AppSettings {
     quickRestartKey = snapshot.quickRestartKey
     followSystemTheme = snapshot.followSystemTheme
     randomThemeMode = snapshot.randomThemeMode
+    flipTestColors = snapshot.flipTestColors
+    colorfulMode = snapshot.colorfulMode
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
     englishVariant = snapshot.englishVariant
@@ -1213,6 +1255,7 @@ final class AppSettings {
       quickRestartKey: quickRestartKey,
       followSystemTheme: followSystemTheme, randomThemeOnRestart: randomThemeOnRestart,
       randomThemeMode: randomThemeMode,
+      flipTestColors: flipTestColors, colorfulMode: colorfulMode,
       practiceBackdrop: practiceBackdrop, reducePracticeMotion: reducePracticeMotion,
       englishVariant: englishVariant, favoriteQuoteIDs: favoriteQuoteIDs,
       repeatQuotes: repeatQuotes, freedomMode: freedomMode, confidenceMode: confidenceMode,
@@ -1278,6 +1321,8 @@ final class AppSettings {
     quickRestartKey = .escape
     followSystemTheme = false
     randomThemeMode = .off
+    flipTestColors = false
+    colorfulMode = false
     practiceBackdrop = .solid
     reducePracticeMotion = false
     englishVariant = .american
@@ -1402,6 +1447,8 @@ final class AppSettings {
     quickRestartKey = snapshot.quickRestartKey
     followSystemTheme = snapshot.followSystemTheme
     randomThemeMode = snapshot.randomThemeMode
+    flipTestColors = snapshot.flipTestColors
+    colorfulMode = snapshot.colorfulMode
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
     englishVariant = snapshot.englishVariant
@@ -1610,6 +1657,8 @@ final class AppSettings {
       followSystemTheme: followSystemTheme,
       randomThemeOnRestart: randomThemeOnRestart,
       randomThemeMode: randomThemeMode,
+      flipTestColors: flipTestColors,
+      colorfulMode: colorfulMode,
       practiceBackdrop: practiceBackdrop,
       reducePracticeMotion: reducePracticeMotion,
       englishVariant: englishVariant,

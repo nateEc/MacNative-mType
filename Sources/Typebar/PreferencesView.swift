@@ -270,6 +270,14 @@ struct PreferencesView: View {
           Text("完成测试后从所选范围轮换主题；随机结果只留在当前运行，不会改写手动主题。收藏范围含内置和自定义收藏；“跟随当前系统深浅色”只用对应色调的内置主题。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Toggle("翻转已输入与后续文本颜色", isOn: $settings.flipTestColors)
+          Text("开启后，后续提示比已输入文本更亮；不会改变错误颜色、输入、计分或回放。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          Toggle("彩色测试文字", isOn: $settings.colorfulMode)
+          Text("开启后，已输入文本使用当前主题强调色；与翻转颜色组合时，后续提示使用强调色。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Picker("练习背景", selection: $settings.practiceBackdrop) {
             ForEach(PracticeBackdropStyle.allCases) { style in
               Text(style.displayName).tag(style)
@@ -932,7 +940,7 @@ struct PreferencesView: View {
 
   private var displaySectionVisible: Bool {
     matches(
-      "显示", "主题", "theme", "随机", "random", "系统", "system", "字体", "font", "等宽", "圆角", "衬线", "行宽",
+      "显示", "主题", "theme", "随机", "random", "系统", "system", "翻转", "flip", "彩色", "colorful", "颜色", "字体", "font", "等宽", "圆角", "衬线", "行宽",
       "width", "光标", "caret", "关闭", "条形", "下划线", "块状", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
       "keyboard", "布局", "layout", "下一键")
   }
