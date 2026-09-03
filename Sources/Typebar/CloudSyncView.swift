@@ -221,7 +221,9 @@ struct CloudSyncView: View {
         let namedPresets = presets.compactMap { record in
             record.definition.map { NamedPreset(name: record.name, definition: $0) }
         }
-        let namedSavedTexts = savedTexts.map { NamedSavedText(title: $0.title, text: $0.text) }
+        let namedSavedTexts = savedTexts.map {
+            NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
+        }
         return .init(exportedAt: .now, settings: settings.snapshot, results: portableResults, presets: namedPresets, savedTexts: namedSavedTexts)
     }
 }

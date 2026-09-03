@@ -569,6 +569,11 @@ final class TypingEngineTests: XCTestCase {
       customTextCompletion: .sections, customTextSectionLimit: 1_000)
     XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: customTime))
     XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: customSections))
+    let savedLongText = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .finish)
+    XCTAssertFalse(QuickRestartSafetyPolicy.requiresShift(for: savedLongText))
+    XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: savedLongText, savedLongText: true))
   }
 
   func testClearCurrentWordOnErrorModifierKeepsCompletedWordsAndReplayInSync() {
@@ -2934,14 +2939,17 @@ final class TypingEngineTests: XCTestCase {
       errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96)
     let preset = NamedPreset(
       name: "Short", definition: .init(configuration: .words(10), quoteID: nil, customText: nil))
-    let savedText = NamedSavedText(title: "Notes", text: "An original text for focused practice.")
+    let savedTexts = [
+      NamedSavedText(title: "Notes", text: "An original text for focused practice."),
+      NamedSavedText(title: "Chapter", text: "amber harbor willow", longProgress: 6),
+    ]
     let data = try TypebarDataTransfer.exportArchive(
-      settings: settings, results: [result], presets: [preset], savedTexts: [savedText], at: start)
+      settings: settings, results: [result], presets: [preset], savedTexts: savedTexts, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
-    XCTAssertEqual(archive.savedTexts, [savedText])
+    XCTAssertEqual(archive.savedTexts, savedTexts)
   }
 
   func testArchiveMergeSkipsExistingResultsAndPresets() {
@@ -2980,6 +2988,12 @@ final class TypingEngineTests: XCTestCase {
     let archive = try TypebarDataTransfer.importArchive(from: Data(oldArchive.utf8))
     XCTAssertEqual(archive.version, 1)
     XCTAssertTrue(archive.savedTexts.isEmpty)
+  }
+
+  func testSavedTextArchiveDefaultsMissingLongProgressToAnOrdinaryText() throws {
+    let data = Data("{\"title\":\"Notes\",\"text\":\"A local passage\"}".utf8)
+    let savedText = try JSONDecoder().decode(NamedSavedText.self, from: data)
+    XCTAssertNil(savedText.longProgress)
   }
 
   func testDailyActivityGroupsMetricsByCalendarDay() {
@@ -3503,11 +3517,31 @@ final class TypingEngineTests: XCTestCase {
     )
     container.mainContext.insert(
       SavedCustomTextRecord(title: "Morning", text: "A deliberate beginning."))
+    container.mainContext.insert(
+      SavedCustomTextRecord(title: "Chapter", text: "amber harbor willow", longProgress: 6))
     try container.mainContext.save()
 
-    let savedText = try XCTUnwrap(
-      container.mainContext.fetch(FetchDescriptor<SavedCustomTextRecord>()).first)
+    let savedTexts = try container.mainContext.fetch(FetchDescriptor<SavedCustomTextRecord>())
+    let savedText = try XCTUnwrap(savedTexts.first { $0.title == "Morning" })
     XCTAssertEqual(savedText.title, "Morning")
     XCTAssertEqual(savedText.text, "A deliberate beginning.")
+    XCTAssertFalse(savedText.isLong)
+    let longText = try XCTUnwrap(savedTexts.first { $0.title == "Chapter" })
+    XCTAssertTrue(longText.isLong)
+    XCTAssertEqual(longText.longProgress, 6)
+    XCTAssertEqual(longText.selection.longProgress, 6)
+  }
+
+  func testLongSavedTextProgressAdvancesOnlyThroughFullyMatchedWords() {
+    let text = "amber  harbor\nwillow"
+    XCTAssertEqual(LongSavedTextProgress.advancedOffset(
+      in: text, from: 0, typed: "amber  har"), 7)
+    XCTAssertEqual(LongSavedTextProgress.advancedOffset(
+      in: text, from: 0, typed: "amber  harbor"), 14)
+    XCTAssertEqual(LongSavedTextProgress.advancedOffset(
+      in: text, from: 0, typed: "amber  x"), 7)
+    XCTAssertEqual(
+      LongSavedTextProgress.remainingText(in: text, after: 14), "willow")
+    XCTAssertEqual(LongSavedTextProgress.progressLabel(in: text, offset: 14), "2 / 3 词")
   }
 }

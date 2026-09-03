@@ -410,6 +410,17 @@ private struct SpacePracticeOverlay: View {
   }
 }
 
+private struct ActiveLongSavedText: Equatable {
+  let id: UUID
+  let title: String
+  let text: String
+  var progress: Int
+
+  var remainingText: String {
+    LongSavedTextProgress.remainingText(in: text, after: progress)
+  }
+}
+
 private struct ContentView: View {
   let settings: AppSettings
   let account: AccountSession
@@ -444,6 +455,7 @@ private struct ContentView: View {
   @State private var customTextWordLimit = 25
   @State private var customTextSectionLimit = 1
   @State private var customTextOrdering: CustomTextOrdering = .inOrder
+  @State private var activeLongSavedText: ActiveLongSavedText?
   @State private var practiceReturnPreset: SavedTestPreset?
   @State private var showingHistory = false
   @State private var showingPresets = false
@@ -522,6 +534,7 @@ private struct ContentView: View {
       switch outcome {
       case .completed, .bailedOut:
         guard let result = session.result() else { return }
+        let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
         lastCompletedWpm = result.wpm
         repeatedPaceArmed = settings.repeatedPace
         let savesResult = result.outcome == .completed && settings.saveCompletedResults
@@ -562,12 +575,14 @@ private struct ContentView: View {
         if savesResult {
           publishIfEnabled(result)
         } else if result.outcome == .bailedOut {
-          publicationMessage = "本次已中止：结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
+          publicationMessage = updatedLongTextProgress
+            ? "长文本进度已保存；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
+            : "本次已中止：结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
         } else {
           publicationMessage = "练习模式：本次成绩不会保存、本机统计、同步或发布。"
         }
       case .failed:
-        terminalNotice = .failed
+        terminalNotice = .failed(savedLongTextProgress: updateLongSavedTextProgress(for: outcome))
       case .abandoned:
         terminalNotice = .abandoned
       case .active:
@@ -614,11 +629,7 @@ private struct ContentView: View {
       TestConfigurationShareView(currentPreset: presetDefinition, onApply: apply)
     }
     .sheet(isPresented: $showingSavedTexts) {
-      SavedTextsView { text in
-        customText = text
-        mode = .custom
-        reset()
-      }
+      SavedTextsView(onUse: loadSavedCustomText)
     }
     .sheet(isPresented: $showingSaveCustomText) {
       SaveCustomTextView(text: customText)
@@ -916,31 +927,50 @@ private struct ContentView: View {
           VStack(alignment: .leading, spacing: 10) {
             TextField("输入你自己的练习文本", text: $customText, axis: .vertical)
               .lineLimit(2...4)
+              .disabled(activeLongSavedText != nil)
               .onChange(of: customText) { _, value in
                 let clamped = CustomTextPolicy.clamped(value)
                 if clamped != value { customText = clamped }
                 customTextSectionLimit = min(
                   customTextSectionLimit, max(1, CustomTextPolicy.sections(in: clamped).count))
+                if let activeLongSavedText,
+                  value != activeLongSavedText.remainingText
+                {
+                  self.activeLongSavedText = nil
+                }
               }
             Text("\(customText.count) / \(CustomTextPolicy.maximumLength) 个字符")
               .font(.caption)
               .foregroundStyle(.secondary)
+            if let activeLongSavedText {
+              Label(
+                "继续长文本：\(activeLongSavedText.title) · \(LongSavedTextProgress.progressLabel(in: activeLongSavedText.text, offset: activeLongSavedText.progress))",
+                systemImage: "book.closed")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Button("编辑文本并停止进度跟踪") { self.activeLongSavedText = nil }
+                .buttonStyle(.borderless)
+                .font(.caption)
+            }
             Picker("完成方式", selection: $customTextCompletion) {
               ForEach(CustomTextCompletion.allCases) { completion in
                 Text(completion.displayName).tag(completion)
               }
             }
+            .disabled(activeLongSavedText != nil)
             .onChange(of: customTextCompletion) { _, _ in reset() }
             if customTextCompletion == .time {
               Stepper(value: $customTextDuration, in: 5...3600, step: 5) {
                 LabeledContent("循环时长", value: "\(customTextDuration) 秒")
               }
+              .disabled(activeLongSavedText != nil)
               .onChange(of: customTextDuration) { _, _ in reset() }
             }
             if customTextCompletion == .words {
               Stepper(value: $customTextWordLimit, in: 1...1000) {
                 LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
               }
+              .disabled(activeLongSavedText != nil)
               .onChange(of: customTextWordLimit) { _, _ in reset() }
             }
             if customTextCompletion == .sections {
@@ -948,6 +978,7 @@ private struct ContentView: View {
                 LabeledContent(
                   "完成段数", value: "\(customTextSectionLimit) / \(customTextSections.count) 段")
               }
+              .disabled(activeLongSavedText != nil)
               .onChange(of: customTextSectionLimit) { _, _ in reset() }
               Text("使用竖线 | 分隔段落；练习会按顺序取前面的段落。")
                 .font(.caption)
@@ -958,6 +989,7 @@ private struct ContentView: View {
                   Text(ordering.displayName).tag(ordering)
                 }
               }
+              .disabled(activeLongSavedText != nil)
               .onChange(of: customTextOrdering) { _, _ in reset() }
             }
             HStack {
@@ -1012,12 +1044,11 @@ private struct ContentView: View {
         mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
         acceptsNewlineInput: session.configuration.mode == .zen || session.prompt.contains("\n"),
         acceptsTabInput: session.configuration.mode == .zen || session.prompt.contains("\t"),
-        requiresShiftQuickRestart: QuickRestartSafetyPolicy.requiresShift(
-          for: session.configuration) && settings.quickRestartKey != .enter,
-        disablesQuickRestart: QuickRestartSafetyPolicy.requiresShift(
-          for: session.configuration) && settings.quickRestartKey == .enter,
-        enablesLongTestBailout: QuickRestartSafetyPolicy.requiresShift(
-          for: session.configuration),
+        requiresShiftQuickRestart: quickRestartRequiresProtection
+          && settings.quickRestartKey != .enter,
+        disablesQuickRestart: quickRestartRequiresProtection
+          && settings.quickRestartKey == .enter,
+        enablesLongTestBailout: quickRestartRequiresProtection,
         finishesOnShiftEnter: session.configuration.mode == .zen,
         onInsert: { text, forceError in
           let errorsBefore = session.errors
@@ -1403,7 +1434,16 @@ private struct ContentView: View {
         .foregroundStyle(.secondary)
       Spacer()
       if session.hasStarted && !session.isFinished {
-        Button("放弃本次测试", role: .destructive) { session.abandon() }
+        Button(
+          activeLongSavedText == nil ? "放弃本次测试" : "保存并中止长文本",
+          role: .destructive
+        ) {
+          if activeLongSavedText == nil {
+            session.abandon()
+          } else {
+            session.bailOut()
+          }
+        }
       }
       Button {
         attemptRestart()
@@ -1445,7 +1485,7 @@ private struct ContentView: View {
   }
 
   private var restartInstruction: String {
-    if QuickRestartSafetyPolicy.requiresShift(for: session.configuration) {
+    if quickRestartRequiresProtection {
       let bailout = "双击 Shift+Enter 中止并显示结果"
       switch settings.quickRestartKey {
       case .escape: return "按任意键开始，Shift+Esc 可重新开始；\(bailout)"
@@ -1467,6 +1507,7 @@ private struct ContentView: View {
     bailoutConfirmationMessage = nil
     compositionText = ""
     lastTimeWarningSecond = nil
+    if mode != .custom { activeLongSavedText = nil }
     NativeSpeech.shared.stop()
     if settings.randomThemeOnRestart { settings.randomizeBuiltInTheme() }
     if restarting, mode == .quote,
@@ -1489,6 +1530,70 @@ private struct ContentView: View {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
     requestTypingFocus()
+  }
+
+  private var quickRestartRequiresProtection: Bool {
+    QuickRestartSafetyPolicy.requiresShift(
+      for: session.configuration, savedLongText: activeLongSavedText != nil)
+  }
+
+  private func loadSavedCustomText(_ selection: SavedCustomTextSelection) {
+    mode = .custom
+    guard selection.isLong else {
+      activeLongSavedText = nil
+      customText = selection.text
+      reset()
+      return
+    }
+    var progress = LongSavedTextProgress.normalized(selection.longProgress ?? 0, in: selection.text)
+    if LongSavedTextProgress.remainingText(in: selection.text, after: progress)
+      .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      progress = 0
+    }
+    let active = ActiveLongSavedText(
+      id: selection.id, title: selection.title, text: selection.text, progress: progress)
+    activeLongSavedText = active
+    customText = active.remainingText
+    customTextCompletion = .finish
+    customTextOrdering = .inOrder
+    reset()
+  }
+
+  @discardableResult
+  private func updateLongSavedTextProgress(for outcome: TestOutcome) -> Bool {
+    guard let active = activeLongSavedText,
+      session.configuration.mode == .custom,
+      outcome == .completed || outcome == .bailedOut || outcome == .failed
+    else { return false }
+    let activeID = active.id
+    let descriptor = FetchDescriptor<SavedCustomTextRecord>(
+      predicate: #Predicate { $0.id == activeID })
+    guard let record = try? modelContext.fetch(descriptor).first,
+      record.isLong,
+      record.text == active.text
+    else {
+      activeLongSavedText = nil
+      return false
+    }
+
+    let nextProgress: Int
+    switch outcome {
+    case .completed:
+      nextProgress = 0
+    case .bailedOut, .failed:
+      nextProgress = LongSavedTextProgress.advancedOffset(
+        in: active.text, from: active.progress, typed: session.typed)
+    case .active, .abandoned:
+      return false
+    }
+    record.longProgress = nextProgress
+    var updated = active
+    updated.progress = nextProgress
+    activeLongSavedText = updated
+    customText = updated.remainingText
+    try? modelContext.save()
+    return true
   }
 
   private func armLongTestBailout() {
@@ -2009,8 +2114,8 @@ private struct ContentView: View {
   }
 }
 
-private enum TestTerminalNotice: Identifiable {
-  case failed
+private enum TestTerminalNotice: Hashable, Identifiable {
+  case failed(savedLongTextProgress: Bool)
   case abandoned
 
   var id: Self { self }
@@ -2024,7 +2129,10 @@ private enum TestTerminalNotice: Identifiable {
 
   var message: String {
     switch self {
-    case .failed: "本次没有保存为完成成绩。"
+    case .failed(let savedLongTextProgress):
+      savedLongTextProgress
+        ? "长文本进度已保存；本次没有保存为完成成绩。"
+        : "本次没有保存为完成成绩。"
     case .abandoned: "本次没有保存为完成成绩。"
     }
   }

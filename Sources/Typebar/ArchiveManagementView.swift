@@ -73,7 +73,9 @@ struct ArchiveManagementView: View {
         let namedPresets = presets.compactMap { record in
             record.definition.map { NamedPreset(name: record.name, definition: $0) }
         }
-        let namedSavedTexts = savedTexts.map { NamedSavedText(title: $0.title, text: $0.text) }
+        let namedSavedTexts = savedTexts.map {
+            NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
+        }
         exportDocument = TypebarArchiveDocument(archive: .init(
             version: TypebarArchive.currentVersion,
             exportedAt: .now,

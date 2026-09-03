@@ -44,6 +44,31 @@ struct NamedPreset: Codable, Equatable {
 struct NamedSavedText: Codable, Equatable {
     let title: String
     let text: String
+    /// `nil` preserves the ordinary saved-text behavior used by archives made
+    /// before long-text progress tracking was added.
+    let longProgress: Int?
+
+    init(title: String, text: String, longProgress: Int? = nil) {
+        self.title = title
+        self.text = text
+        self.longProgress = longProgress.map { LongSavedTextProgress.normalized($0, in: text) }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, text, longProgress
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedTitle = try values.decode(String.self, forKey: .title)
+        let decodedText = try values.decode(String.self, forKey: .text)
+        let decodedProgress = try values.decodeIfPresent(Int.self, forKey: .longProgress)
+        title = decodedTitle
+        text = decodedText
+        longProgress = decodedProgress.map {
+            LongSavedTextProgress.normalized($0, in: decodedText)
+        }
+    }
 }
 
 enum DataTransferError: Error, Equatable {
@@ -101,12 +126,17 @@ enum LocalArchiveImport {
         let newPresets = TypebarArchiveMerge.presetsToInsert(from: archive, existing: existingPresets)
         let newSavedTexts = TypebarArchiveMerge.savedTextsToInsert(
             from: archive,
-            existing: savedTexts.map { NamedSavedText(title: $0.title, text: $0.text) }
+            existing: savedTexts.map {
+                NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
+            }
         )
 
         for result in newResults { modelContext.insert(TestResultRecord(result: result)) }
         for preset in newPresets { modelContext.insert(TestPresetRecord(name: preset.name, definition: preset.definition)) }
-        for savedText in newSavedTexts { modelContext.insert(SavedCustomTextRecord(title: savedText.title, text: savedText.text)) }
+        for savedText in newSavedTexts {
+            modelContext.insert(SavedCustomTextRecord(
+                title: savedText.title, text: savedText.text, longProgress: savedText.longProgress))
+        }
         settings.apply(archive.settings)
         try modelContext.save()
         return .init(insertedResults: newResults.count, insertedPresets: newPresets.count, insertedSavedTexts: newSavedTexts.count)
