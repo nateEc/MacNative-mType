@@ -1492,6 +1492,32 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "£", layout: .swissFrench), 42)
   }
 
+  func testRegionalQwertyLayoutsMapVisibleSymbolsAndIsoKeys() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "£", layout: .ukQwerty), "number-3")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "#", layout: .ukQwerty), "top-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "~", layout: .ukQwerty), "top-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ñ", layout: .spanishQwerty), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "¿", layout: .spanishQwerty), "number-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .italianQwerty), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "§", layout: .italianQwerty), "home-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .italianQwerty), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 20, modifierFlags: [.shift], layout: .ukQwerty), "£")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [.shift], layout: .ukQwerty), "~")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [], layout: .spanishQwerty), "ñ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 24, modifierFlags: [.shift], layout: .spanishQwerty), "¿")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [], layout: .italianQwerty), "è")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [.shift], layout: .italianQwerty), "§")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "@", layout: .ukQwerty), 39)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ç", layout: .spanishQwerty), 42)
+  }
+
   func testNonDefaultKeyboardLayoutsEmulatePhysicalAnsiKeyPositions() {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(

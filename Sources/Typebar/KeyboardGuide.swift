@@ -9,6 +9,9 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case germanQwertz
   case swissGerman
   case swissFrench
+  case ukQwerty
+  case spanishQwerty
+  case italianQwerty
   case frenchAzerty
 
   var id: Self { self }
@@ -22,6 +25,9 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .germanQwertz: "German QWERTZ"
     case .swissGerman: "Swiss German"
     case .swissFrench: "Swiss French"
+    case .ukQwerty: "UK QWERTY"
+    case .spanishQwerty: "Spanish QWERTY"
+    case .italianQwerty: "Italian QWERTY"
     case .frenchAzerty: "French AZERTY"
     }
   }
@@ -298,6 +304,67 @@ enum KeyboardGuideModel {
         homeCharacters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "éö", "àä", "$£"],
         homeShiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "ö", "ä", "£"]
       )
+    case .ukQwerty:
+      [
+        row(
+          "number", "`1234567890-=",
+          characters: ["`¬", "1!", "2\"", "3£", "4$", "5%", "6^", "7&", "8*", "9(", "0)", "-_", "=+"],
+          shiftedLabels: ["¬", "!", "\"", "£", "$", "%", "^", "&", "*", "(", ")", "_", "+"]
+        ),
+        row(
+          "top", "QWERTYUIOP[]#",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "[{", "]}", "#~"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "{", "}", "~"]
+        ),
+        row(
+          "home", "ASDFGHJKL;'",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", ";:", "'@"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", ":", "@"]
+        ),
+        row(
+          "bottom", "ZXCVBNM,./",
+          characters: ["zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",<", ".>", "/?"],
+          shiftedLabels: ["Z", "X", "C", "V", "B", "N", "M", "<", ">", "?"]
+        ),
+      ]
+    case .spanishQwerty:
+      [
+        row(
+          "number", "º1234567890'¡",
+          characters: ["ºª", "1!", "2\"", "3·", "4$", "5%", "6&", "7/", "8(", "9)", "0=", "'?", "¡¿"],
+          shiftedLabels: ["ª", "!", "\"", "·", "$", "%", "&", "/", "(", ")", "=", "?", "¿"]
+        ),
+        row(
+          "top", "QWERTYUIOP`+",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "`^", "+*"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "^", "*"]
+        ),
+        row(
+          "home", "ASDFGHJKLÑ´Ç",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "ñÑ", "´¨", "çÇ"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ", "¨", "Ç"]
+        ),
+        isoBottomRow()
+      ]
+    case .italianQwerty:
+      [
+        row(
+          "number", "\\1234567890‘Ì",
+          characters: ["\\|", "1!", "2\"", "3£", "4$", "5%", "6&", "7/", "8(", "9)", "0=", "‘?", "ì^"],
+          shiftedLabels: ["|", "!", "\"", "£", "$", "%", "&", "/", "(", ")", "=", "?", "^"]
+        ),
+        row(
+          "top", "QWERTYUIOPÈ+",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "èé", "+*"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "é", "*"]
+        ),
+        row(
+          "home", "ASDFGHJKLÒÀÙ",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "òç", "à°", "ù§"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "ç", "°", "§"]
+        ),
+        isoBottomRow()
+      ]
     case .frenchAzerty:
       [
         row(
@@ -421,6 +488,14 @@ enum KeyboardGuideModel {
         shiftedLabels: [">", "Y", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
       ),
     ]
+  }
+
+  private static func isoBottomRow() -> [KeyboardGuideKey] {
+    row(
+      "bottom", "<ZXCVBNM,.-",
+      characters: ["<>", "zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",;", ".:", "-_"],
+      shiftedLabels: [">", "Z", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
+    )
   }
 
   private static func nonTypingKey(_ id: String, label: String, width: CGFloat) -> KeyboardGuideKey {
