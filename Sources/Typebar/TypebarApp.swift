@@ -3353,6 +3353,8 @@ private struct ResultsHistoryView: View {
   @State private var punctuationFilter: ResultHistoryBinaryFilter = .all
   @State private var numbersFilter: ResultHistoryBinaryFilter = .all
   @State private var quoteLengthFilter: QuoteLength?
+  @State private var timeLimitFilter = Set(ResultHistoryTimeLimit.allCases)
+  @State private var wordLimitFilter = Set(ResultHistoryWordLimit.allCases)
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
 
@@ -3366,7 +3368,9 @@ private struct ResultsHistoryView: View {
       dateRange: dateRangeFilter,
       punctuation: punctuationFilter,
       numbers: numbersFilter,
-      quoteLength: quoteLengthFilter
+      quoteLength: quoteLengthFilter,
+      timeLimits: timeLimitFilter,
+      wordLimits: wordLimitFilter
     )
     let entries = results.map { result in
       let configuration = result.configuration
@@ -3378,7 +3382,9 @@ private struct ResultsHistoryView: View {
         quoteLength: configuration.flatMap { configuration -> QuoteLength? in
           guard configuration.mode == .quote else { return nil }
           return QuoteLengthPolicy.actualLength(for: result.prompt, language: configuration.language)
-        }
+        },
+        duration: configuration?.duration,
+        wordLimit: configuration?.wordLimit
       )
     }
     let ids = filter.matchingIDs(entries: entries, personalBestIDs: personalBestIDs)
@@ -3497,6 +3503,22 @@ private struct ResultsHistoryView: View {
                   Text("全部长度").tag(QuoteLength?.none)
                   ForEach(QuoteLength.allCases.filter { $0 != .all }, id: \.self) { length in
                     Text(length.displayName).tag(Optional(length))
+                  }
+                }
+                DisclosureGroup(
+                  "时长：\(ResultHistoryTimeLimit.selectionSummary(timeLimitFilter))"
+                ) {
+                  ForEach(ResultHistoryTimeLimit.allCases, id: \.self) { limit in
+                    Toggle(limit.displayName, isOn: timeLimitBinding(for: limit))
+                      .toggleStyle(.checkbox)
+                  }
+                }
+                DisclosureGroup(
+                  "字数：\(ResultHistoryWordLimit.selectionSummary(wordLimitFilter))"
+                ) {
+                  ForEach(ResultHistoryWordLimit.allCases, id: \.self) { limit in
+                    Toggle(limit.displayName, isOn: wordLimitBinding(for: limit))
+                      .toggleStyle(.checkbox)
                   }
                 }
                 Picker("语言", selection: $languageFilter) {
@@ -3749,7 +3771,8 @@ private struct ResultsHistoryView: View {
     .init(
       mode: modeFilter, language: languageFilter, tag: tagFilter,
       personalBestOnly: personalBestOnly, difficulty: difficultyFilter, dateRange: dateRangeFilter,
-      punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter
+      punctuation: punctuationFilter, numbers: numbersFilter, quoteLength: quoteLengthFilter,
+      timeLimits: timeLimitFilter, wordLimits: wordLimitFilter
     )
   }
 
@@ -3772,6 +3795,24 @@ private struct ResultsHistoryView: View {
     punctuationFilter = filter.punctuation
     numbersFilter = filter.numbers
     quoteLengthFilter = filter.quoteLength
+    timeLimitFilter = filter.timeLimits
+    wordLimitFilter = filter.wordLimits
+  }
+
+  private func timeLimitBinding(for limit: ResultHistoryTimeLimit) -> Binding<Bool> {
+    Binding(
+      get: { timeLimitFilter.contains(limit) },
+      set: { selected in
+        if selected { timeLimitFilter.insert(limit) } else { timeLimitFilter.remove(limit) }
+      })
+  }
+
+  private func wordLimitBinding(for limit: ResultHistoryWordLimit) -> Binding<Bool> {
+    Binding(
+      get: { wordLimitFilter.contains(limit) },
+      set: { selected in
+        if selected { wordLimitFilter.insert(limit) } else { wordLimitFilter.remove(limit) }
+      })
   }
 
   private func modeName(_ mode: TestMode?) -> String {

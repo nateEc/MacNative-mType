@@ -3645,6 +3645,37 @@ final class TypingEngineTests: XCTestCase {
       QuoteLengthPolicy.actualLength(for: String(repeating: "x", count: 481), language: .english), .extended)
   }
 
+  func testResultHistoryTimeAndWordLimitsSupportMultiSelectAndCustomValues() {
+    let fifteenSeconds = ResultHistoryEntry(
+      id: UUID(), mode: .time, language: .english, tags: [], duration: 15)
+    let thirtySeconds = ResultHistoryEntry(
+      id: UUID(), mode: .time, language: .english, tags: [], duration: 30)
+    let customSeconds = ResultHistoryEntry(
+      id: UUID(), mode: .time, language: .english, tags: [], duration: 45)
+    let tenWords = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], wordLimit: 10)
+    let fiftyWords = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], wordLimit: 50)
+    let customWords = ResultHistoryEntry(
+      id: UUID(), mode: .words, language: .english, tags: [], wordLimit: 200)
+    let quote = ResultHistoryEntry(id: UUID(), mode: .quote, language: .english, tags: [])
+    let filter = ResultHistoryFilter(
+      timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom])
+
+    XCTAssertEqual(
+      filter.matchingIDs(
+        entries: [fifteenSeconds, thirtySeconds, customSeconds, tenWords, fiftyWords, customWords, quote],
+        personalBestIDs: []),
+      [fifteenSeconds.id, customSeconds.id, fiftyWords.id, customWords.id, quote.id])
+    XCTAssertEqual(
+      ResultHistoryFilter(timeLimits: [], wordLimits: []).matchingIDs(
+        entries: [fifteenSeconds, thirtySeconds, customSeconds, tenWords, fiftyWords, customWords, quote],
+        personalBestIDs: []),
+      [quote.id])
+    XCTAssertTrue(ResultHistoryTimeLimit.selectionSummary([]).contains("无匹配"))
+    XCTAssertEqual(ResultHistoryWordLimit.selectionSummary(Set(ResultHistoryWordLimit.allCases)), "全部")
+  }
+
   func testResultHistoryDateRangesUseReferenceRollingWindowsAndPreserveLegacyPresets() throws {
     let now = Date(timeIntervalSinceReferenceDate: 1_000_000)
     let onBoundary = UUID()
@@ -3677,6 +3708,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(legacy.punctuation, .all)
     XCTAssertEqual(legacy.numbers, .all)
     XCTAssertNil(legacy.quoteLength)
+    XCTAssertEqual(legacy.timeLimits, Set(ResultHistoryTimeLimit.allCases))
+    XCTAssertEqual(legacy.wordLimits, Set(ResultHistoryWordLimit.allCases))
   }
 
   func testPersonalBestMarksEveryTiedHighestResult() {
@@ -4453,7 +4486,7 @@ final class TypingEngineTests: XCTestCase {
     let filter = ResultHistoryFilter(
       mode: .quote, language: .english, tag: "focus", personalBestOnly: true,
       difficulty: .expert, dateRange: .lastMonth, punctuation: .included, numbers: .excluded,
-      quoteLength: .medium)
+      quoteLength: .medium, timeLimits: [.seconds15, .custom], wordLimits: [.words50, .custom])
     let preset = try XCTUnwrap(ResultFilterPresetRecord(name: " Focused English ", filter: filter))
     container.mainContext.insert(preset)
     try container.mainContext.save()

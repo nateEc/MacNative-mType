@@ -157,12 +157,14 @@ struct ResultHistoryEntry: Equatable, Identifiable {
     let includesPunctuation: Bool?
     let includesNumbers: Bool?
     let quoteLength: QuoteLength?
+    let duration: TimeInterval?
+    let wordLimit: Int?
 
     init(
         id: UUID, mode: TestMode?, language: TypingLanguage?, tags: [String],
         finishedAt: Date = .distantPast, difficulty: Difficulty? = nil,
         includesPunctuation: Bool? = nil, includesNumbers: Bool? = nil,
-        quoteLength: QuoteLength? = nil
+        quoteLength: QuoteLength? = nil, duration: TimeInterval? = nil, wordLimit: Int? = nil
     ) {
         self.id = id
         self.mode = mode
@@ -173,6 +175,8 @@ struct ResultHistoryEntry: Equatable, Identifiable {
         self.includesPunctuation = includesPunctuation
         self.includesNumbers = includesNumbers
         self.quoteLength = quoteLength
+        self.duration = duration
+        self.wordLimit = wordLimit
     }
 }
 
@@ -897,6 +901,77 @@ enum ResultHistoryBinaryFilter: String, CaseIterable, Codable, Equatable {
     }
 }
 
+enum ResultHistoryTimeLimit: String, CaseIterable, Codable, Hashable {
+    case seconds15 = "15"
+    case seconds30 = "30"
+    case seconds60 = "60"
+    case seconds120 = "120"
+    case custom
+
+    var displayName: String {
+        switch self {
+        case .seconds15: "15 秒"
+        case .seconds30: "30 秒"
+        case .seconds60: "60 秒"
+        case .seconds120: "120 秒"
+        case .custom: "自定义"
+        }
+    }
+
+    func matches(_ duration: TimeInterval?) -> Bool {
+        guard let duration else { return self == .custom }
+        let rounded = Int(duration.rounded())
+        let isWholeSecond = abs(duration - TimeInterval(rounded)) < 0.0001
+        switch self {
+        case .seconds15: return isWholeSecond && rounded == 15
+        case .seconds30: return isWholeSecond && rounded == 30
+        case .seconds60: return isWholeSecond && rounded == 60
+        case .seconds120: return isWholeSecond && rounded == 120
+        case .custom: return !isWholeSecond || ![15, 30, 60, 120].contains(rounded)
+        }
+    }
+
+    static func selectionSummary(_ selection: Set<Self>) -> String {
+        guard !selection.isEmpty else { return "无匹配档位" }
+        guard selection != Set(allCases) else { return "全部" }
+        return allCases.filter(selection.contains).map(\.displayName).joined(separator: "、")
+    }
+}
+
+enum ResultHistoryWordLimit: String, CaseIterable, Codable, Hashable {
+    case words10 = "10"
+    case words25 = "25"
+    case words50 = "50"
+    case words100 = "100"
+    case custom
+
+    var displayName: String {
+        switch self {
+        case .words10: "10 词"
+        case .words25: "25 词"
+        case .words50: "50 词"
+        case .words100: "100 词"
+        case .custom: "自定义"
+        }
+    }
+
+    func matches(_ wordLimit: Int?) -> Bool {
+        switch self {
+        case .words10: wordLimit == 10
+        case .words25: wordLimit == 25
+        case .words50: wordLimit == 50
+        case .words100: wordLimit == 100
+        case .custom: ![10, 25, 50, 100].contains(wordLimit ?? -1)
+        }
+    }
+
+    static func selectionSummary(_ selection: Set<Self>) -> String {
+        guard !selection.isEmpty else { return "无匹配档位" }
+        guard selection != Set(allCases) else { return "全部" }
+        return allCases.filter(selection.contains).map(\.displayName).joined(separator: "、")
+    }
+}
+
 struct ResultHistoryFilter: Codable, Equatable {
     var mode: TestMode?
     var language: TypingLanguage?
@@ -907,13 +982,17 @@ struct ResultHistoryFilter: Codable, Equatable {
     var punctuation: ResultHistoryBinaryFilter
     var numbers: ResultHistoryBinaryFilter
     var quoteLength: QuoteLength?
+    var timeLimits: Set<ResultHistoryTimeLimit>
+    var wordLimits: Set<ResultHistoryWordLimit>
 
     init(
         mode: TestMode? = nil, language: TypingLanguage? = nil, tag: String? = nil,
         personalBestOnly: Bool = false, difficulty: Difficulty? = nil,
         dateRange: ResultHistoryDateRange = .all,
         punctuation: ResultHistoryBinaryFilter = .all, numbers: ResultHistoryBinaryFilter = .all,
-        quoteLength: QuoteLength? = nil
+        quoteLength: QuoteLength? = nil,
+        timeLimits: Set<ResultHistoryTimeLimit> = Set(ResultHistoryTimeLimit.allCases),
+        wordLimits: Set<ResultHistoryWordLimit> = Set(ResultHistoryWordLimit.allCases)
     ) {
         self.mode = mode
         self.language = language
@@ -924,10 +1003,13 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.punctuation = punctuation
         self.numbers = numbers
         self.quoteLength = quoteLength
+        self.timeLimits = timeLimits
+        self.wordLimits = wordLimits
     }
 
     private enum CodingKeys: String, CodingKey {
-        case mode, language, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength
+        case mode, language, tag, difficulty, personalBestOnly, dateRange, punctuation, numbers, quoteLength,
+          timeLimits, wordLimits
     }
 
     init(from decoder: Decoder) throws {
@@ -941,6 +1023,10 @@ struct ResultHistoryFilter: Codable, Equatable {
         punctuation = try values.decodeIfPresent(ResultHistoryBinaryFilter.self, forKey: .punctuation) ?? .all
         numbers = try values.decodeIfPresent(ResultHistoryBinaryFilter.self, forKey: .numbers) ?? .all
         quoteLength = try values.decodeIfPresent(QuoteLength.self, forKey: .quoteLength)
+        timeLimits = try values.decodeIfPresent(Set<ResultHistoryTimeLimit>.self, forKey: .timeLimits)
+          ?? Set(ResultHistoryTimeLimit.allCases)
+        wordLimits = try values.decodeIfPresent(Set<ResultHistoryWordLimit>.self, forKey: .wordLimits)
+          ?? Set(ResultHistoryWordLimit.allCases)
     }
 
     func matchingIDs(
@@ -957,7 +1043,17 @@ struct ResultHistoryFilter: Codable, Equatable {
                 && punctuation.matches(entry.includesPunctuation)
                 && numbers.matches(entry.includesNumbers)
                 && (quoteLength == nil || entry.quoteLength == quoteLength)
+                && matchesTimeLimit(entry)
+                && matchesWordLimit(entry)
         }.map(\.id))
+    }
+
+    private func matchesTimeLimit(_ entry: ResultHistoryEntry) -> Bool {
+        entry.mode != .time || timeLimits.contains { $0.matches(entry.duration) }
+    }
+
+    private func matchesWordLimit(_ entry: ResultHistoryEntry) -> Bool {
+        entry.mode != .words || wordLimits.contains { $0.matches(entry.wordLimit) }
     }
 }
 
