@@ -1436,7 +1436,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "z", layout: .germanQwertz), "top-5")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "y", layout: .germanQwertz), "bottom-1")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ü", layout: .germanQwertz), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "#", layout: .germanQwertz), "home-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "'", layout: .germanQwertz), "home-11")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .germanQwertz), "bottom-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .germanQwertz), "bottom-8")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ":", layout: .germanQwertz), "bottom-9")
     let numberTwo = KeyboardGuideModel.rows(for: .germanQwertz)[0][1]
     XCTAssertEqual(numberTwo.legend(style: .dynamic, modifierFlags: [.shift], capsLockEnabled: false), "\"")
 
@@ -1448,8 +1452,15 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [], layout: .germanQwertz), "ü")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .germanQwertz), ">")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [.shift], layout: .germanQwertz), "'")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 43, modifierFlags: [.shift], layout: .germanQwertz), ";")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 47, modifierFlags: [.shift], layout: .germanQwertz), ":")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ß", layout: .germanQwertz), 27)
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: ">", layout: .germanQwertz), 10)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "#", layout: .germanQwertz), 42)
   }
 
   func testNonDefaultKeyboardLayoutsEmulatePhysicalAnsiKeyPositions() {

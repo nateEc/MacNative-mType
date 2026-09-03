@@ -265,11 +265,15 @@ enum KeyboardGuideModel {
           characters: ["qQ", "wW", "eE", "rR", "tT", "zZ", "uU", "iI", "oO", "pP", "üÜ", "+*"],
           shiftedLabels: ["Q", "W", "E", "R", "T", "Z", "U", "I", "O", "P", "Ü", "*"]
         ),
-        row("home", "ASDFGHJKLÖÄ"),
+        row(
+          "home", "ASDFGHJKLÖÄ#",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "öÖ", "äÄ", "#'"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ö", "Ä", "'"]
+        ),
         row(
           "bottom", "<YXCVBNM,.-",
-          characters: ["<>", "yY", "xX", "cC", "vV", "bB", "nN", "mM", ",<", ".>", "-_"],
-          shiftedLabels: [">", "Y", "X", "C", "V", "B", "N", "M", "<", ">", "_"]
+          characters: ["<>", "yY", "xX", "cC", "vV", "bB", "nN", "mM", ",;", ".:", "-_"],
+          shiftedLabels: [">", "Y", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
         ),
       ]
     case .frenchAzerty:
