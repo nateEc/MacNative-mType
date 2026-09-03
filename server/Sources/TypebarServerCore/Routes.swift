@@ -4,6 +4,7 @@ public func configure(
     _ app: Application,
     authStore: AuthStore? = nil,
     moderationKey: String? = Environment.get("TYPEBAR_MODERATION_TOKEN"),
+    passwordResetDelivery: PasswordResetDeliveryHandler? = nil,
     maintenanceMode: Bool = TypebarMaintenanceMode.environmentEnabled
 ) throws {
     let authStore = try authStore ?? AuthStore(fileURL: TypebarServerStorage.defaultUserStoreURL(for: app))
@@ -22,6 +23,7 @@ public func configure(
                 "health": .available,
                 "rateLimiting": .partial,
                 "authentication": .available,
+                "passwordReset": passwordResetDelivery == nil ? .planned : .available,
                 "synchronization": .partial,
                 "resultSubmission": .partial,
                 "leaderboards": .partial,
@@ -47,6 +49,42 @@ public func configure(
     app.post("v1", "auth", "login") { request async throws -> AuthSessionResponse in
         do {
             return try await authStore.login(request.content.decode(LoginRequest.self))
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "password-reset", "request") { request async throws -> PasswordResetRequestResponse in
+        guard let passwordResetDelivery else {
+            throw Abort(
+                .serviceUnavailable,
+                reason: "Password reset email delivery is not configured for this Typebar service."
+            )
+        }
+        let reset = try request.content.decode(PasswordResetRequest.self)
+        do {
+            if let delivery = try await authStore.requestPasswordReset(for: reset.email) {
+                do {
+                    try await passwordResetDelivery(delivery)
+                } catch {
+                    try? await authStore.cancelPasswordReset(token: delivery.token)
+                    throw Abort(
+                        .serviceUnavailable,
+                        reason: "Typebar could not deliver the password reset email. Please try again later."
+                    )
+                }
+            }
+            return .init(accepted: true)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "password-reset", "complete") { request async throws -> PasswordResetCompletionResponse in
+        do {
+            try await authStore.completePasswordReset(
+                request.content.decode(CompletePasswordResetRequest.self))
+            return .init(reset: true)
         } catch let error as AuthStoreError {
             throw error.abort
         }
@@ -417,6 +455,8 @@ private extension AuthStoreError {
             Abort(.conflict, reason: "An account already exists for this email address.")
         case .invalidCredentials, .invalidAccessToken:
             Abort(.unauthorized, reason: "Invalid email or password.")
+        case .invalidPasswordResetToken:
+            Abort(.unauthorized, reason: "This password reset code is invalid or has expired.")
         case .profileNotFound:
             Abort(.notFound, reason: "The requested Typebar profile does not exist.")
         case .cannotConnectToSelf, .connectionNotPending:

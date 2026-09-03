@@ -9,6 +9,9 @@ struct PreferencesView: View {
   @State private var email = ""
   @State private var password = ""
   @State private var displayName = ""
+  @State private var passwordResetToken = ""
+  @State private var passwordResetPassword = ""
+  @State private var confirmedPasswordResetPassword = ""
   @State private var updatedDisplayName = ""
   @State private var updatedEmail = ""
   @State private var emailChangePassword = ""
@@ -894,31 +897,66 @@ struct PreferencesView: View {
             Picker("操作", selection: $accountMode) {
               Text("登录").tag(AccountMode.login)
               Text("注册").tag(AccountMode.register)
+              Text("重置密码").tag(AccountMode.passwordReset)
             }
             .pickerStyle(.segmented)
             TextField("邮箱", text: $email)
               .textContentType(.emailAddress)
-            SecureField("密码", text: $password)
-              .textContentType(accountMode == .login ? .password : .newPassword)
+            if accountMode == .passwordReset {
+              Button("发送重置邮件") {
+                Task { await account.requestPasswordReset(email: email) }
+              }
+              .disabled(
+                account.isWorking || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+              Text("服务不会确认邮箱是否已注册。邮件投递由自建服务的部署者配置；未配置时会明确提示。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              SecureField("邮件中的重置码", text: $passwordResetToken)
+                .textContentType(.oneTimeCode)
+              SecureField("新密码（至少 12 字节）", text: $passwordResetPassword)
+                .textContentType(.newPassword)
+              SecureField("确认新密码", text: $confirmedPasswordResetPassword)
+                .textContentType(.newPassword)
+              Button("用重置码更新密码") {
+                Task {
+                  if await account.completePasswordReset(
+                    token: passwordResetToken, newPassword: passwordResetPassword)
+                  {
+                    passwordResetToken = ""
+                    passwordResetPassword = ""
+                    confirmedPasswordResetPassword = ""
+                    accountMode = .login
+                  }
+                }
+              }
+              .disabled(
+                account.isWorking || passwordResetToken.isEmpty || passwordResetPassword.utf8.count < 12
+                  || passwordResetPassword != confirmedPasswordResetPassword)
+            } else {
+              SecureField("密码", text: $password)
+                .textContentType(accountMode == .login ? .password : .newPassword)
+            }
             if accountMode == .register {
               TextField("显示名", text: $displayName)
             }
-            Button(accountMode == .login ? "登录" : "创建账户") {
-              Task {
-                if accountMode == .login {
-                  await account.login(email: email, password: password)
-                } else {
-                  await account.register(email: email, password: password, displayName: displayName)
+            if accountMode != .passwordReset {
+              Button(accountMode == .login ? "登录" : "创建账户") {
+                Task {
+                  if accountMode == .login {
+                    await account.login(email: email, password: password)
+                  } else {
+                    await account.register(email: email, password: password, displayName: displayName)
+                  }
+                  password = ""
                 }
-                password = ""
               }
+              .disabled(
+                account.isWorking || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                  || password.isEmpty
+                  || (accountMode == .register
+                    && displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+              )
             }
-            .disabled(
-              account.isWorking || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                || password.isEmpty
-                || (accountMode == .register
-                  && displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            )
           }
           if account.isWorking { ProgressView() }
           if let status = account.statusMessage {
@@ -1284,4 +1322,5 @@ struct PreferencesView: View {
 private enum AccountMode: Hashable {
   case login
   case register
+  case passwordReset
 }

@@ -51,6 +51,14 @@ private struct RemoteChangePasswordRequest: Codable, Sendable {
     let newPassword: String
 }
 
+private struct RemotePasswordResetRequest: Codable, Sendable { let email: String }
+private struct RemotePasswordResetRequestResponse: Codable, Sendable { let accepted: Bool }
+private struct RemoteCompletePasswordResetRequest: Codable, Sendable {
+    let token: String
+    let newPassword: String
+}
+private struct RemotePasswordResetCompletionResponse: Codable, Sendable { let reset: Bool }
+
 private struct RemoteChangeEmailRequest: Codable, Sendable {
     let currentPassword: String
     let newEmail: String
@@ -559,6 +567,46 @@ final class AccountSession {
 
     func login(email: String, password: String) async {
         await performAuth(path: "v1/auth/login", body: RemoteLoginRequest(email: email, password: password))
+    }
+
+    func requestPasswordReset(email: String) async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/password-reset/request",
+                method: "POST",
+                token: nil,
+                body: RemotePasswordResetRequest(email: email),
+                response: RemotePasswordResetRequestResponse.self
+            )
+            guard response.accepted else { throw RemoteAccountError.unexpectedResponse }
+            statusMessage = "若该邮箱已注册，重置码已发送；请粘贴邮件中的重置码。"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func completePasswordReset(token: String, newPassword: String) async -> Bool {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/password-reset/complete",
+                method: "POST",
+                token: nil,
+                body: RemoteCompletePasswordResetRequest(token: token, newPassword: newPassword),
+                response: RemotePasswordResetCompletionResponse.self
+            )
+            guard response.reset else { throw RemoteAccountError.unexpectedResponse }
+            tokenStore.clear()
+            currentUser = nil
+            statusMessage = "密码已重置；请使用新密码登录。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
+        }
     }
 
     func changePassword(currentPassword: String, newPassword: String) async {

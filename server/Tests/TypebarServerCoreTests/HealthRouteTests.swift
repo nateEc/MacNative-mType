@@ -3,6 +3,14 @@ import XCTest
 
 @testable import TypebarServerCore
 
+private actor PasswordResetDeliveryRecorder {
+  private var deliveries: [PasswordResetDelivery] = []
+
+  func record(_ delivery: PasswordResetDelivery) { deliveries.append(delivery) }
+  func latest() -> PasswordResetDelivery? { deliveries.last }
+  func count() -> Int { deliveries.count }
+}
+
 final class HealthRouteTests: XCTestCase {
   func testHealthRouteReturnsServiceIdentity() async throws {
     let app = try await Application.make(.testing)
@@ -37,6 +45,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["health"], .available)
         XCTAssertEqual(capabilities.capabilities["rateLimiting"], .partial)
         XCTAssertEqual(capabilities.capabilities["authentication"], .available)
+        XCTAssertEqual(capabilities.capabilities["passwordReset"], .planned)
         XCTAssertEqual(capabilities.capabilities["synchronization"], .partial)
         XCTAssertEqual(capabilities.capabilities["resultSubmission"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboards"], .partial)
@@ -613,6 +622,139 @@ final class HealthRouteTests: XCTestCase {
       try await app.asyncShutdown()
     } catch {
       try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
+  func testPasswordResetRevokesSessionsConsumesItsTokenAndExpires() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let start = Date(timeIntervalSince1970: 1_000)
+    let registration = try await store.register(
+      .init(email: "reset@example.com", password: "a secure password", displayName: "Reset User"),
+      now: start)
+    let secondSession = try await store.login(
+      .init(email: "reset@example.com", password: "a secure password"), now: start)
+    let delivery = try await store.requestPasswordReset(for: "RESET@example.com", now: start)
+    XCTAssertEqual(delivery?.email, "reset@example.com")
+    XCTAssertEqual(delivery?.token.count, 43)
+
+    guard let delivery else { return XCTFail("Known accounts must receive a reset delivery") }
+    try await store.completePasswordReset(
+      .init(token: delivery.token, newPassword: "a different secure password"),
+      now: start.addingTimeInterval(1))
+    for token in [registration.accessToken, secondSession.accessToken] {
+      do {
+        _ = try await store.authenticatedUser(for: token, now: start.addingTimeInterval(1))
+        XCTFail("A password reset must revoke every existing session")
+      } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidAccessToken) }
+    }
+    do {
+      try await store.completePasswordReset(
+        .init(token: delivery.token, newPassword: "another secure password"),
+        now: start.addingTimeInterval(2))
+      XCTFail("A reset code must only be usable once")
+    } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidPasswordResetToken) }
+    _ = try await store.login(
+      .init(email: "reset@example.com", password: "a different secure password"),
+      now: start.addingTimeInterval(2))
+    do {
+      _ = try await store.login(
+        .init(email: "reset@example.com", password: "a secure password"),
+        now: start.addingTimeInterval(2))
+      XCTFail("The pre-reset password must no longer work")
+    } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidCredentials) }
+
+    let expiryDelivery = try await store.requestPasswordReset(for: "reset@example.com", now: start)
+    guard let expiryDelivery else { return XCTFail("Known accounts must receive a reset delivery") }
+    do {
+      try await store.completePasswordReset(
+        .init(token: expiryDelivery.token, newPassword: "another secure password"),
+        now: start.addingTimeInterval(20 * 60 + 1))
+      XCTFail("Expired reset codes must be rejected")
+    } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidPasswordResetToken) }
+    let unknownDelivery = try await store.requestPasswordReset(for: "unknown@example.com", now: start)
+    let malformedDelivery = try await store.requestPasswordReset(for: "not-an-email", now: start)
+    XCTAssertNil(unknownDelivery)
+    XCTAssertNil(malformedDelivery)
+  }
+
+  func testPasswordResetRoutesAvoidAccountEnumerationAndRequireDeliveryConfiguration() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let recorder = PasswordResetDeliveryRecorder()
+    _ = try await store.register(
+      .init(email: "route-reset@example.com", password: "a secure password", displayName: "Route Reset"))
+
+    do {
+      try configure(
+        app,
+        authStore: store,
+        passwordResetDelivery: { delivery in await recorder.record(delivery) })
+      try await app.test(.GET, "v1/capabilities") { response async in
+        let capabilities = try? response.content.decode(ServiceCapabilitiesResponse.self)
+        XCTAssertEqual(capabilities?.capabilities["passwordReset"], .available)
+      }
+      try await app.test(
+        .POST,
+        "v1/auth/password-reset/request",
+        beforeRequest: { request async throws in
+          try request.content.encode(PasswordResetRequest(email: "route-reset@example.com"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(try? response.content.decode(PasswordResetRequestResponse.self), .init(accepted: true))
+        }
+      )
+      try await app.test(
+        .POST,
+        "v1/auth/password-reset/request",
+        beforeRequest: { request async throws in
+          try request.content.encode(PasswordResetRequest(email: "unknown@example.com"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(try? response.content.decode(PasswordResetRequestResponse.self), .init(accepted: true))
+        }
+      )
+      let deliveryCount = await recorder.count()
+      XCTAssertEqual(deliveryCount, 1)
+      guard let delivery = await recorder.latest() else {
+        return XCTFail("The configured delivery handler should receive the opaque token")
+      }
+      try await app.test(
+        .POST,
+        "v1/auth/password-reset/complete",
+        beforeRequest: { request async throws in
+          try request.content.encode(
+            CompletePasswordResetRequest(token: delivery.token, newPassword: "a different secure password"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(try? response.content.decode(PasswordResetCompletionResponse.self), .init(reset: true))
+        }
+      )
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+
+    let unavailableApp = try await Application.make(.testing)
+    do {
+      try configureTestApp(unavailableApp)
+      try await unavailableApp.test(
+        .POST,
+        "v1/auth/password-reset/request",
+        beforeRequest: { request async throws in
+          try request.content.encode(PasswordResetRequest(email: "any@example.com"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .serviceUnavailable)
+        }
+      )
+      try await unavailableApp.asyncShutdown()
+    } catch {
+      try? await unavailableApp.asyncShutdown()
       throw error
     }
   }

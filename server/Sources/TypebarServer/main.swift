@@ -6,7 +6,7 @@ enum TypebarServer {
     static func main() async throws {
         let app = try await Application.make(.detect())
 
-        try configure(app)
+        try configure(app, passwordResetDelivery: try PasswordResetWebhookDelivery.fromEnvironment())
 
         do {
             try await app.execute()

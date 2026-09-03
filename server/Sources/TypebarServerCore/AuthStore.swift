@@ -17,6 +17,41 @@ public struct ChangePasswordRequest: Content, Equatable {
   public let newPassword: String
 }
 
+public struct PasswordResetRequest: Content, Equatable {
+  public let email: String
+}
+
+public struct PasswordResetRequestResponse: Content, Equatable {
+  /// This is deliberately identical for registered and unregistered emails.
+  public let accepted: Bool
+}
+
+public struct CompletePasswordResetRequest: Content, Equatable {
+  public let token: String
+  public let newPassword: String
+}
+
+public struct PasswordResetCompletionResponse: Content, Equatable {
+  public let reset: Bool
+}
+
+/// The only point at which a raw reset token leaves the account store. A
+/// deployment supplies a trusted delivery handler; persisted state only keeps
+/// the SHA-256 hash of `token`.
+public struct PasswordResetDelivery: Sendable {
+  public let email: String
+  public let token: String
+  public let expiresAt: Date
+
+  public init(email: String, token: String, expiresAt: Date) {
+    self.email = email
+    self.token = token
+    self.expiresAt = expiresAt
+  }
+}
+
+public typealias PasswordResetDeliveryHandler = @Sendable (PasswordResetDelivery) async throws -> Void
+
 public struct ChangeEmailRequest: Content, Equatable {
   public let currentPassword: String
   public let newEmail: String
@@ -99,6 +134,7 @@ public enum AuthStoreError: Error, Equatable {
   case emailAlreadyRegistered
   case invalidCredentials
   case invalidAccessToken
+  case invalidPasswordResetToken
   case profileNotFound
   case cannotConnectToSelf
   case connectionAlreadyExists
@@ -118,6 +154,7 @@ public actor AuthStore {
   private struct PersistedState: Codable {
     var users: [StoredUser] = []
     var sessions: [StoredSession] = []
+    var passwordResetTokens: [StoredPasswordResetToken] = []
     var syncRecords: [StoredSyncRecord] = []
     var results: [StoredResult] = []
     var connections: [StoredConnection] = []
@@ -131,7 +168,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
+      case users, sessions, passwordResetTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, nextSyncCursor
     }
 
@@ -141,6 +178,8 @@ public actor AuthStore {
       let values = try decoder.container(keyedBy: CodingKeys.self)
       users = try values.decodeIfPresent([StoredUser].self, forKey: .users) ?? []
       sessions = try values.decodeIfPresent([StoredSession].self, forKey: .sessions) ?? []
+      passwordResetTokens =
+        try values.decodeIfPresent([StoredPasswordResetToken].self, forKey: .passwordResetTokens) ?? []
       syncRecords = try values.decodeIfPresent([StoredSyncRecord].self, forKey: .syncRecords) ?? []
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
@@ -198,6 +237,12 @@ public actor AuthStore {
   }
 
   private struct StoredSession: Codable {
+    let tokenHash: String
+    let userID: UUID
+    let expiresAt: Date
+  }
+
+  private struct StoredPasswordResetToken: Codable {
     let tokenHash: String
     let userID: UUID
     let expiresAt: Date
@@ -426,6 +471,66 @@ public actor AuthStore {
     return response
   }
 
+  /// Creates a 20-minute, one-time reset token for a known account. Invalid
+  /// and unknown addresses intentionally return `nil` instead of an error so
+  /// the route can provide the same response to every caller.
+  public func requestPasswordReset(for rawEmail: String, now: Date = .now) throws
+    -> PasswordResetDelivery?
+  {
+    let tokenCount = state.passwordResetTokens.count
+    state.passwordResetTokens.removeAll { $0.expiresAt <= now }
+    guard let email = normalizedEmail(rawEmail),
+      let user = state.users.first(where: { $0.email == email })
+    else {
+      if state.passwordResetTokens.count != tokenCount { try persist() }
+      return nil
+    }
+
+    state.passwordResetTokens.removeAll { $0.userID == user.id }
+    let token = Self.makeAccessToken()
+    let expiresAt = now.addingTimeInterval(20 * 60)
+    state.passwordResetTokens.append(
+      .init(tokenHash: Self.tokenHash(token), userID: user.id, expiresAt: expiresAt))
+    try persist()
+    return .init(email: user.email, token: token, expiresAt: expiresAt)
+  }
+
+  /// Revokes a newly-issued reset token if the configured delivery mechanism
+  /// fails. It intentionally accepts the opaque raw token only transiently.
+  public func cancelPasswordReset(token: String) throws {
+    let tokenHash = Self.tokenHash(token)
+    let count = state.passwordResetTokens.count
+    state.passwordResetTokens.removeAll { $0.tokenHash == tokenHash }
+    if state.passwordResetTokens.count != count { try persist() }
+  }
+
+  /// Replaces a password through a short-lived reset token. It never creates a
+  /// new session: every current device is signed out and the person must log in
+  /// again using the new password.
+  public func completePasswordReset(
+    _ request: CompletePasswordResetRequest, now: Date = .now
+  ) throws {
+    let tokenCount = state.passwordResetTokens.count
+    state.passwordResetTokens.removeAll { $0.expiresAt <= now }
+    let tokenHash = Self.tokenHash(request.token)
+    guard let reset = state.passwordResetTokens.first(where: { $0.tokenHash == tokenHash }),
+      let userIndex = state.users.firstIndex(where: { $0.id == reset.userID })
+    else {
+      if state.passwordResetTokens.count != tokenCount { try persist() }
+      throw AuthStoreError.invalidPasswordResetToken
+    }
+    try validatedPassword(request.newPassword)
+
+    let user = state.users[userIndex]
+    state.users[userIndex] = StoredUser(
+      id: user.id, email: user.email, displayName: user.displayName,
+      passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
+      createdAt: user.createdAt, leaderboardOptedOut: user.leaderboardOptedOut)
+    state.sessions.removeAll { $0.userID == user.id }
+    state.passwordResetTokens.removeAll { $0.userID == user.id }
+    try persist()
+  }
+
   public func authenticatedUser(for accessToken: String, now: Date = .now) throws
     -> AuthUserResponse
   {
@@ -463,6 +568,7 @@ public actor AuthStore {
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
+    state.passwordResetTokens.removeAll { $0.userID == updatedUser.id }
     let response = makeSession(for: updatedUser, now: now)
     try persist()
     return response
@@ -494,6 +600,7 @@ public actor AuthStore {
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
+    state.passwordResetTokens.removeAll { $0.userID == updatedUser.id }
     let response = makeSession(for: updatedUser, now: now)
     try persist()
     return response
@@ -515,6 +622,7 @@ public actor AuthStore {
 
     state.users.remove(at: index)
     state.sessions.removeAll { $0.userID == userID }
+    state.passwordResetTokens.removeAll { $0.userID == userID }
     state.syncRecords.removeAll { $0.userID == userID }
     state.results.removeAll { $0.userID == userID }
     state.connections.removeAll { $0.requesterID == userID || $0.recipientID == userID }
@@ -1397,10 +1505,15 @@ public actor AuthStore {
   }
 
   private func validatedEmail(_ value: String) throws -> String {
+    guard let email = normalizedEmail(value) else { throw AuthStoreError.invalidEmail }
+    return email
+  }
+
+  private func normalizedEmail(_ value: String) -> String? {
     let email = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     let parts = email.split(separator: "@", omittingEmptySubsequences: false)
     guard email.count <= 254, parts.count == 2, !parts[0].isEmpty, parts[1].contains(".") else {
-      throw AuthStoreError.invalidEmail
+      return nil
     }
     return email
   }
