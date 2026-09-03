@@ -114,6 +114,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(unavailable, .init(typing: 0, key: 0))
   }
 
+  func testLegacyLeaderboardResponseDefaultsMissingConsistencyToZero() throws {
+    let id = UUID()
+    let finishedAt = Date(timeIntervalSinceReferenceDate: 1_000)
+    let payload = """
+      {"id":"\(id.uuidString)","rank":1,"userID":"\(UUID().uuidString)","displayName":"Local","mode":"time","language":"english","wpm":80,"accuracy":99,"finishedAt":\(finishedAt.timeIntervalSinceReferenceDate)}
+      """
+
+    let entry = try JSONDecoder().decode(RemoteLeaderboardEntry.self, from: Data(payload.utf8))
+
+    XCTAssertEqual(entry.consistency, 0)
+  }
+
   func testWordsTestCompletesAtWordLimit() {
     var session = TypingSession(configuration: .words(2), prompt: "amber harbor quiet")
     session.insert("amber harbor", at: start)

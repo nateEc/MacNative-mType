@@ -1202,20 +1202,34 @@ final class HealthRouteTests: XCTestCase {
       result(id: firstID, wpm: 74, accuracy: 98, finishedAt: now), accessToken: slower.accessToken,
       now: now)
     _ = try await store.submitResult(
-      result(id: UUID(), wpm: 101, accuracy: 96, finishedAt: now), accessToken: faster.accessToken,
+      result(id: UUID(), wpm: 101, accuracy: 96, consistency: 94, finishedAt: now), accessToken: faster.accessToken,
       now: now)
 
     XCTAssertTrue(first.accepted)
     XCTAssertTrue(duplicate.accepted)
     _ = try await store.submitResult(
-      result(id: UUID(), wpm: 80, accuracy: 99, finishedAt: now.addingTimeInterval(1)),
+      result(
+        id: UUID(), wpm: 80, accuracy: 99, consistency: 77,
+        finishedAt: now.addingTimeInterval(1)),
       accessToken: slower.accessToken, now: now)
     let response = try await store.leaderboard(
       .init(mode: "time", language: "english", period: "all", limit: 10))
     XCTAssertEqual(response.entries.map(\.displayName), ["Faster", "Slower"])
     XCTAssertEqual(response.entries.map(\.rank), [1, 2])
     XCTAssertEqual(response.entries.map(\.wpm), [101, 80])
+    XCTAssertEqual(response.entries.map(\.consistency), [94, 77])
     XCTAssertEqual(response.entries.map(\.id).count, Set(response.entries.map(\.id)).count)
+  }
+
+  func testResultSubmissionDefaultsMissingConsistencyForLegacyClient() throws {
+    let id = UUID()
+    let payload = """
+      {"id":"\(id.uuidString)","mode":"time","language":"english","durationSeconds":30,"wpm":80,"rawWpm":80,"accuracy":100,"errorCount":0,"eventCount":200,"startedAt":1000,"finishedAt":1030}
+      """
+
+    let request = try JSONDecoder().decode(ResultSubmissionRequest.self, from: Data(payload.utf8))
+
+    XCTAssertEqual(request.consistency, 0)
   }
 
   func testExperienceIsServerCalculatedIdempotentAndRankedForTheCurrentISOWeek() async throws {
@@ -1264,6 +1278,15 @@ final class HealthRouteTests: XCTestCase {
         result(id: UUID(), wpm: 401, accuracy: 100, finishedAt: now),
         accessToken: session.accessToken, now: now)
       XCTFail("Out-of-bounds WPM must be rejected")
+    } catch let error as ResultStoreError {
+      XCTAssertEqual(error, .invalidResult)
+    }
+
+    do {
+      _ = try await store.submitResult(
+        result(id: UUID(), wpm: 80, accuracy: 100, consistency: 101, finishedAt: now),
+        accessToken: session.accessToken, now: now)
+      XCTFail("Out-of-bounds consistency must be rejected")
     } catch let error as ResultStoreError {
       XCTAssertEqual(error, .invalidResult)
     }
@@ -1365,7 +1388,9 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(week.entries.map(\.wpm), [90])
   }
 
-  private func result(id: UUID, wpm: Int, accuracy: Int, finishedAt: Date)
+  private func result(
+    id: UUID, wpm: Int, accuracy: Int, consistency: Double = 0, finishedAt: Date
+  )
     -> ResultSubmissionRequest
   {
     let elapsed = 30.0
@@ -1378,8 +1403,9 @@ final class HealthRouteTests: XCTestCase {
     let rawWpm = Int((Double(eventCount) / 5 / elapsed * 60).rounded())
     return .init(
       id: id, mode: "time", language: "english", durationSeconds: 30, wordLimit: nil,
-      wpm: wpm, rawWpm: rawWpm, accuracy: accuracy, errorCount: eventCount - correctCharacters,
-      eventCount: eventCount, startedAt: finishedAt.addingTimeInterval(-elapsed),
+      wpm: wpm, rawWpm: rawWpm, accuracy: accuracy, consistency: consistency,
+      errorCount: eventCount - correctCharacters, eventCount: eventCount,
+      startedAt: finishedAt.addingTimeInterval(-elapsed),
       finishedAt: finishedAt)
   }
 

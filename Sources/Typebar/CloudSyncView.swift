@@ -104,6 +104,9 @@ struct CloudSyncView: View {
                             Spacer()
                             Text("\(entry.wpm) WPM").monospacedDigit()
                             Text("\(entry.accuracy)%").foregroundStyle(.secondary).monospacedDigit()
+                            Text("\(entry.consistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
                         }
                     }
                     Text(leaderboardScope == .friends ? "好友榜只包含你和已接受的好友；每位用户只显示当前筛选下的最佳成绩，待处理请求不会计入。" : "每位用户只显示当前筛选下的最佳 WPM；它不是经过完整反作弊验证的竞赛排名。")

@@ -202,6 +202,7 @@ private struct RemoteResultSubmission: Codable, Sendable {
     let wpm: Int
     let rawWpm: Int
     let accuracy: Int
+    let consistency: Double
     let errorCount: Int
     let eventCount: Int
     let startedAt: Date
@@ -216,6 +217,9 @@ private struct RemoteResultSubmission: Codable, Sendable {
         wpm = result.wpm
         rawWpm = result.rawWpm
         accuracy = result.accuracy
+        consistency = ResultConsistencyPolicy.metrics(
+            events: result.replayEvents, duration: result.elapsedDuration
+        ).typing
         errorCount = result.errorCount
         eventCount = result.typedCharacterCount
         startedAt = result.startedAt
@@ -253,7 +257,26 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     let language: String
     let wpm: Int
     let accuracy: Int
+    let consistency: Double
     let finishedAt: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case id, rank, userID, displayName, mode, language, wpm, accuracy, consistency, finishedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        rank = try values.decode(Int.self, forKey: .rank)
+        userID = try values.decode(UUID.self, forKey: .userID)
+        displayName = try values.decode(String.self, forKey: .displayName)
+        mode = try values.decode(String.self, forKey: .mode)
+        language = try values.decode(String.self, forKey: .language)
+        wpm = try values.decode(Int.self, forKey: .wpm)
+        accuracy = try values.decode(Int.self, forKey: .accuracy)
+        consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
+        finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+    }
 }
 
 struct RemoteLeaderboardResponse: Codable, Sendable {

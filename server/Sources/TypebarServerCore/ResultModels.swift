@@ -10,10 +10,53 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let wpm: Int
     public let rawWpm: Int
     public let accuracy: Int
+    public let consistency: Double
     public let errorCount: Int
     public let eventCount: Int
     public let startedAt: Date
     public let finishedAt: Date
+
+    public init(
+        id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
+        rawWpm: Int, accuracy: Int, consistency: Double = 0, errorCount: Int, eventCount: Int,
+        startedAt: Date, finishedAt: Date
+    ) {
+        self.id = id
+        self.mode = mode
+        self.language = language
+        self.durationSeconds = durationSeconds
+        self.wordLimit = wordLimit
+        self.wpm = wpm
+        self.rawWpm = rawWpm
+        self.accuracy = accuracy
+        self.consistency = consistency
+        self.errorCount = errorCount
+        self.eventCount = eventCount
+        self.startedAt = startedAt
+        self.finishedAt = finishedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
+            errorCount, eventCount, startedAt, finishedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        mode = try values.decode(String.self, forKey: .mode)
+        language = try values.decode(String.self, forKey: .language)
+        durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
+        wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
+        wpm = try values.decode(Int.self, forKey: .wpm)
+        rawWpm = try values.decode(Int.self, forKey: .rawWpm)
+        accuracy = try values.decode(Int.self, forKey: .accuracy)
+        consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
+        errorCount = try values.decode(Int.self, forKey: .errorCount)
+        eventCount = try values.decode(Int.self, forKey: .eventCount)
+        startedAt = try values.decode(Date.self, forKey: .startedAt)
+        finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+    }
 }
 
 public struct ResultSubmissionResponse: Content, Equatable {
@@ -41,6 +84,7 @@ public struct LeaderboardEntry: Content, Equatable, Identifiable {
     public let language: String
     public let wpm: Int
     public let accuracy: Int
+    public let consistency: Double
     public let finishedAt: Date
 }
 

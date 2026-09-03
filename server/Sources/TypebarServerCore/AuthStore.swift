@@ -206,19 +206,21 @@ public actor AuthStore {
     let wpm: Int
     let rawWpm: Int
     let accuracy: Int
+    let consistency: Double
     let errorCount: Int
     let eventCount: Int
     let startedAt: Date
     let finishedAt: Date
 
     private enum CodingKeys: String, CodingKey {
-      case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy,
+      case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
         errorCount, eventCount, startedAt, finishedAt
     }
 
     init(
       id: UUID, userID: UUID, mode: String, language: String, durationSeconds: Int?,
-      wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, errorCount: Int, eventCount: Int,
+      wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, consistency: Double,
+      errorCount: Int, eventCount: Int,
       startedAt: Date, finishedAt: Date
     ) {
       self.id = id
@@ -230,6 +232,7 @@ public actor AuthStore {
       self.wpm = wpm
       self.rawWpm = rawWpm
       self.accuracy = accuracy
+      self.consistency = consistency
       self.errorCount = errorCount
       self.eventCount = eventCount
       self.startedAt = startedAt
@@ -247,6 +250,7 @@ public actor AuthStore {
       wpm = try values.decode(Int.self, forKey: .wpm)
       rawWpm = try values.decode(Int.self, forKey: .rawWpm)
       accuracy = try values.decode(Int.self, forKey: .accuracy)
+      consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
       errorCount = try values.decode(Int.self, forKey: .errorCount)
       eventCount = try values.decode(Int.self, forKey: .eventCount)
       finishedAt = try values.decode(Date.self, forKey: .finishedAt)
@@ -1044,7 +1048,8 @@ public actor AuthStore {
     .init(
       id: record.id, mode: record.mode, language: record.language,
       durationSeconds: record.durationSeconds, wordLimit: record.wordLimit, wpm: record.wpm,
-      rawWpm: record.rawWpm, accuracy: record.accuracy, errorCount: record.errorCount,
+      rawWpm: record.rawWpm, accuracy: record.accuracy, consistency: record.consistency,
+      errorCount: record.errorCount,
       eventCount: record.eventCount, startedAt: record.startedAt, finishedAt: record.finishedAt)
   }
 
@@ -1141,7 +1146,7 @@ public actor AuthStore {
         id: request.id, userID: user.id, mode: request.mode, language: request.language,
         durationSeconds: request.durationSeconds, wordLimit: request.wordLimit,
         wpm: request.wpm, rawWpm: request.rawWpm, accuracy: request.accuracy,
-        errorCount: request.errorCount, eventCount: request.eventCount,
+        consistency: request.consistency, errorCount: request.errorCount, eventCount: request.eventCount,
         startedAt: request.startedAt, finishedAt: request.finishedAt
       ))
     try persist()
@@ -1245,7 +1250,7 @@ public actor AuthStore {
       return .init(
         id: result.id, rank: offset + 1, userID: user.id, displayName: user.displayName,
         mode: result.mode, language: result.language, wpm: result.wpm,
-        accuracy: result.accuracy, finishedAt: result.finishedAt)
+        accuracy: result.accuracy, consistency: result.consistency, finishedAt: result.finishedAt)
     }
     return .init(entries: entries)
   }
@@ -1314,7 +1319,8 @@ public actor AuthStore {
         "mixedEnglishChinese", "mixedLanguages",
       ]).contains(result.language),
       (0...400).contains(result.wpm), (0...500).contains(result.rawWpm),
-      (0...100).contains(result.accuracy), result.errorCount >= 0, result.eventCount >= 0,
+      (0...100).contains(result.accuracy), (0...100).contains(result.consistency),
+      result.errorCount >= 0, result.eventCount >= 0,
       result.rawWpm >= result.wpm, result.errorCount <= result.eventCount,
       result.startedAt <= result.finishedAt,
       result.finishedAt <= now.addingTimeInterval(60 * 5),
