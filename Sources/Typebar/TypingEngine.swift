@@ -1133,36 +1133,49 @@ enum TypingPromptPresentation {
   static func glyphs(
     target: String, typed: String, isFinished: Bool, blindMode: Bool,
     forcedErrorIndices: Set<Int> = [],
+    typedTargetIndices: [Int?]? = nil, currentTargetIndex: Int? = nil,
     visibleFutureWords: Int? = nil, concealAll: Bool = false,
     concealedCurrentAndFutureWords: Int? = nil, concealPendingCharacters: Bool = false
   ) -> [TypingPromptGlyph] {
     let targetCharacters = Array(target)
     let typedCharacters = Array(typed)
+    let effectiveTargetIndices = typedTargetIndices ?? typedCharacters.indices.map(Optional.some)
+    let typedIndexByTarget = effectiveTargetIndices.enumerated().reduce(into: [Int: Int]()) {
+      indices, element in
+      guard let targetIndex = element.element, targetCharacters.indices.contains(targetIndex),
+        indices[targetIndex] == nil
+      else { return }
+      indices[targetIndex] = element.offset
+    }
+    let activeTargetIndex = min(
+      currentTargetIndex ?? min(typedCharacters.count, targetCharacters.count), targetCharacters.count)
     var output = targetCharacters.indices.map { index in
       let state: TypingPromptCharacterState
-      if index < typedCharacters.count {
+      if let typedIndex = typedIndexByTarget[index] {
         state =
           blindMode
           ? .hidden
-          : typedCharacters[index] == targetCharacters[index] && !forcedErrorIndices.contains(index)
+          : typedCharacters[typedIndex] == targetCharacters[index] && !forcedErrorIndices.contains(index)
             ? .correct : .incorrect
-      } else if index == typedCharacters.count, !isFinished {
+      } else if index < activeTargetIndex {
+        state = blindMode ? .hidden : .incorrect
+      } else if index == activeTargetIndex, !isFinished {
         state = .current
       } else {
         state = .pending
       }
       return TypingPromptGlyph(
         character: targetCharacters[index], state: state,
-        typedCharacter: state == .incorrect ? typedCharacters[index] : nil)
+        typedCharacter: state == .incorrect ? typedIndexByTarget[index].map { typedCharacters[$0] } : nil)
     }
 
     if let visibleFutureWords, !isFinished {
-      let currentWord = targetCharacters.prefix(min(typedCharacters.count, targetCharacters.count))
+      let currentWord = targetCharacters.prefix(activeTargetIndex)
         .filter { $0 == " " }.count
       var word = 0
       for index in output.indices {
         if index > 0, targetCharacters[index - 1] == " " { word += 1 }
-        if index >= typedCharacters.count, word > currentWord + visibleFutureWords {
+        if index >= activeTargetIndex, word > currentWord + visibleFutureWords {
           output[index] = .init(
             character: targetCharacters[index], state: .hidden,
             typedCharacter: output[index].typedCharacter)
@@ -1178,14 +1191,14 @@ enum TypingPromptPresentation {
 
     if concealPendingCharacters && !isFinished {
       output = output.enumerated().map { index, glyph in
-        index >= typedCharacters.count
+        index >= activeTargetIndex
           ? .init(character: glyph.character, state: .hidden, typedCharacter: glyph.typedCharacter)
           : glyph
       }
     }
 
     if let concealedCurrentAndFutureWords, !isFinished {
-      let currentWord = targetCharacters.prefix(min(typedCharacters.count, targetCharacters.count))
+      let currentWord = targetCharacters.prefix(activeTargetIndex)
         .filter { $0 == " " }.count
       var word = 0
       for index in output.indices {
@@ -1198,8 +1211,15 @@ enum TypingPromptPresentation {
       }
     }
 
-    guard typedCharacters.count > targetCharacters.count else { return output }
-    output += typedCharacters.dropFirst(targetCharacters.count).map {
+    let extraCharacters: [Character] = typedCharacters.enumerated().compactMap { index, character in
+      guard index >= effectiveTargetIndices.count
+        || effectiveTargetIndices[index] == nil
+        || !(targetCharacters.indices.contains(effectiveTargetIndices[index] ?? -1))
+      else { return nil }
+      return character
+    }
+    guard !extraCharacters.isEmpty else { return output }
+    output += extraCharacters.map {
       TypingPromptGlyph(
         character: $0, state: blindMode || concealAll ? .hidden : .extra)
     }
@@ -1211,14 +1231,19 @@ enum TypedCharacterEffectPolicy {
   /// Returns target-character positions belonging to words already submitted
   /// with a space. Deliberately independent from correctness: this is an
   /// appearance preference, not an input rule.
-  static func completedCharacterIndices(target: String, typed: String, isFinished: Bool) -> Set<Int> {
+  static func completedCharacterIndices(
+    target: String, typed: String, typedTargetIndices: [Int?]? = nil, isFinished: Bool
+  ) -> Set<Int> {
     let targetCharacters = Array(target)
     let typedCharacters = Array(typed)
+    let effectiveTargetIndices = typedTargetIndices ?? typedCharacters.indices.map(Optional.some)
     var indices = Set<Int>()
     var wordStart = 0
 
     for index in targetCharacters.indices where targetCharacters[index] == " " {
-      guard index < typedCharacters.count, typedCharacters[index] == " " else { continue }
+      guard let typedIndex = effectiveTargetIndices.firstIndex(where: { $0 == index }),
+        typedCharacters.indices.contains(typedIndex), typedCharacters[typedIndex] == " "
+      else { continue }
       indices.formUnion(wordStart..<index)
       wordStart = index + 1
     }
@@ -1436,6 +1461,10 @@ struct TypingSession {
   private let repeatingNoSpaceWordLengths: [Int]
   private let repeatingNoSpaceTargetWords: [String]
   private(set) var typed = ""
+  /// Each accepted input character keeps the target position it advanced to.
+  /// A word can be submitted early with space, so this cannot always be
+  /// inferred from the input string's character offset.
+  private var typedTargetIndices: [Int?] = []
   private var typedCharacterDates: [Date] = []
   private var forcedErrorIndices = Set<Int>()
   /// Target positions at which the user made an input error during this
@@ -1484,12 +1513,12 @@ struct TypingSession {
   var typedCharacterCount: Int { typed.count }
   var sectionProgress: (completed: Int, total: Int)? {
     guard !sectionEndIndices.isEmpty else { return nil }
-    let completed = sectionEndIndices.filter { typed.count >= $0 }.count
+    let completed = sectionEndIndices.filter { nextTargetIndex >= $0 }.count
     return (min(completed, sectionEndIndices.count), sectionEndIndices.count)
   }
   var nextExpectedCharacter: Character? {
-    guard !isFinished, typed.count < prompt.count else { return nil }
-    return Array(prompt)[typed.count]
+    guard !isFinished, nextTargetIndex < prompt.count else { return nil }
+    return Array(prompt)[nextTargetIndex]
   }
 
   var promptGlyphs: [TypingPromptGlyph] {
@@ -1503,6 +1532,8 @@ struct TypingSession {
       isFinished: isFinished,
       blindMode: configuration.rules.blindMode,
       forcedErrorIndices: forcedErrorIndices,
+      typedTargetIndices: typedTargetIndices,
+      currentTargetIndex: nextTargetIndex,
       visibleFutureWords: configuration.language.usesSpaceDelimitedWords
         ? configuration.visibleFutureWordCount : nil,
       concealAll: configuration.modifiers.contains(.memory) && hasStarted && !isFinished,
@@ -1511,9 +1542,23 @@ struct TypingSession {
     )
   }
 
+  var completedPromptCharacterIndices: Set<Int> {
+    TypedCharacterEffectPolicy.completedCharacterIndices(
+      target: prompt, typed: typed, typedTargetIndices: typedTargetIndices, isFinished: isFinished)
+  }
+
   var errors: Int {
-    Array(prompt).indices.prefix(typed.count).reduce(into: 0) { total, index in
-      if !isTypedCharacterCorrect(at: index) { total += 1 }
+    let typedCharacters = Array(typed)
+    let targetCharacters = Array(prompt)
+    return typedCharacters.indices.reduce(into: 0) { total, typedIndex in
+      guard typedTargetIndices.indices.contains(typedIndex),
+        let targetIndex = typedTargetIndices[typedIndex], targetCharacters.indices.contains(targetIndex)
+      else { return }
+      if typedCharacters[typedIndex] != targetCharacters[targetIndex]
+        || forcedErrorIndices.contains(targetIndex)
+      {
+        total += 1
+      }
     }
   }
 
@@ -1727,8 +1772,11 @@ struct TypingSession {
     }
     let targetCharacters = Array(prompt)
     let typedCharacters = Array(typed)
-    let committed = targetCharacters.indices.filter {
-      targetCharacters[$0] == " " && $0 < typedCharacters.count && typedCharacters[$0] == " "
+    let committed = targetCharacters.indices.filter { targetIndex in
+      guard targetCharacters[targetIndex] == " ",
+        let typedIndex = typedTargetIndices.firstIndex(where: { $0 == targetIndex })
+      else { return false }
+      return typedCharacters[typedIndex] == " "
     }.count
     guard isFinished, !typed.isEmpty else { return committed }
     return committed + 1
@@ -1774,9 +1822,7 @@ struct TypingSession {
     {
       return
     }
-    typed.removeLast()
-    typedCharacterDates.removeLast()
-    forcedErrorIndices.remove(typed.count)
+    removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", at: date)
   }
 
@@ -1795,9 +1841,7 @@ struct TypingSession {
   mutating func replaceInput(with value: String, at date: Date = .now) {
     guard !isFinished else { return }
     if value.count < typed.count {
-      typed = value
-      typedCharacterDates = Array(typedCharacterDates.prefix(value.count))
-      forcedErrorIndices = Set(forcedErrorIndices.filter { $0 < value.count })
+      while typed.count > value.count { removeLastTypedCharacter() }
       return
     }
     let suffix = String(value.dropFirst(typed.count))
@@ -1841,10 +1885,10 @@ struct TypingSession {
     }
     let inputCharacter = normalizedInputCharacter(character)
     extendPromptIfNeeded()
-    if typed.count >= prompt.count {
+    let currentTargetIndex = nextTargetIndex
+    if currentTargetIndex >= prompt.count {
       if !configuration.rules.hideExtraLetters {
-        typed.append(inputCharacter)
-        typedCharacterDates.append(date)
+        appendTypedCharacter(inputCharacter, targetIndex: nil, at: date)
         recordWordBurstIfCommitted()
         recordNoSpaceWordBurstIfCommitted()
         return true
@@ -1858,9 +1902,13 @@ struct TypingSession {
     if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator {
       return false
     }
-    let expected = Array(prompt)[typed.count]
+    let commitsCurrentWord = inputCharacter == " " && !inputWordIsEmpty
+    let expected = Array(prompt)[currentTargetIndex]
+    let earlyWordCommitTargetIndex = incompleteWordCommitTargetIndex(
+      for: inputCharacter, currentTargetIndex: currentTargetIndex)
+    let targetIndex = earlyWordCommitTargetIndex ?? currentTargetIndex
     let isCorrect = inputCharacter == expected && !forceError
-    if !isCorrect { attemptedErrorCounts[typed.count, default: 0] += 1 }
+    if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
     let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
       with: inputCharacter, forceError: forceError)
     if configuration.modifiers.contains(.correctBeforeAdvance),
@@ -1888,16 +1936,16 @@ struct TypingSession {
       clearCurrentWord(at: date)
       return false
     }
-    typed.append(inputCharacter)
-    typedCharacterDates.append(date)
-    if forceError { forcedErrorIndices.insert(typed.count - 1) }
+    appendTypedCharacter(
+      inputCharacter, targetIndex: targetIndex,
+      forceError: forceError || earlyWordCommitTargetIndex != nil, at: date)
     recordWordBurstIfCommitted()
     recordNoSpaceWordBurstIfCommitted()
 
     if configuration.difficulty == .master && !isCorrect {
       fail(at: date)
     } else if configuration.difficulty == .expert
-      && ((inputCharacter == " " && errorsInCurrentWord() > 0) || committedNoSpaceWordHasError)
+      && ((commitsCurrentWord && (!isCorrect || errorsInCurrentWord() > 0)) || committedNoSpaceWordHasError)
     {
       fail(at: date)
     } else if shouldFailMinimumWordBurst(after: inputCharacter) {
@@ -1915,8 +1963,7 @@ struct TypingSession {
     if activeLength >= 30 && !commitsWord { return false }
     if character == " " && activeLength == 0 { return false }
 
-    typed.append(character)
-    typedCharacterDates.append(date)
+    appendTypedCharacter(character, targetIndex: nil, at: date)
     recordZenWordBurstIfCommitted(after: character)
     if shouldFailMinimumWordBurst(after: character) { fail(at: date) }
     return true
@@ -1937,9 +1984,7 @@ struct TypingSession {
   /// event so result playback reconstructs the same input state.
   private mutating func clearCurrentWord(at date: Date) {
     while let last = typed.last, last != " " {
-      typed.removeLast()
-      typedCharacterDates.removeLast()
-      forcedErrorIndices.remove(typed.count)
+      removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", at: date)
     }
   }
@@ -1965,17 +2010,13 @@ struct TypingSession {
 
   private mutating func removeLastCharacterFromCurrentWord(at date: Date) {
     guard let last = typed.last, !last.isWhitespace else { return }
-    typed.removeLast()
-    typedCharacterDates.removeLast()
-    forcedErrorIndices.remove(typed.count)
+    removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", at: date)
   }
 
   private mutating func removePreviousWordForHardDelete(clearingWord: Bool, at date: Date) {
     guard typed.last?.isWhitespace == true else { return }
-    typed.removeLast()
-    typedCharacterDates.removeLast()
-    forcedErrorIndices.remove(typed.count)
+    removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", at: date)
     if clearingWord {
       clearCurrentWord(at: date)
@@ -2157,6 +2198,52 @@ struct TypingSession {
     typed.isEmpty || typed.last == " "
   }
 
+  /// The target cursor is independent from raw input length when normal
+  /// typing submits an incomplete word with space. All ordinary input keeps
+  /// its original one-to-one mapping, including no-space and code prompts.
+  private var nextTargetIndex: Int {
+    guard let previousTargetIndex = typedTargetIndices.reversed().compactMap({ $0 }).first else {
+      return 0
+    }
+    return min(previousTargetIndex + 1, prompt.count)
+  }
+
+  private func incompleteWordCommitTargetIndex(
+    for character: Character, currentTargetIndex: Int
+  ) -> Int? {
+    guard character == " ", !inputWordIsEmpty,
+      configuration.language.usesSpaceDelimitedWords,
+      !configuration.language.isCodeLanguage,
+      !configuration.modifiers.contains(.noSpaces)
+    else { return nil }
+    let targetCharacters = Array(prompt)
+    guard targetCharacters.indices.contains(currentTargetIndex),
+      targetCharacters[currentTargetIndex] != " "
+    else { return nil }
+    // A finite final word has no following separator in its prompt. Its
+    // submitted space still advances past that word, so anchor the accepted
+    // key at the final target position and let the target cursor reach end.
+    return targetCharacters[currentTargetIndex...].firstIndex(of: " ")
+      ?? targetCharacters.index(before: targetCharacters.endIndex)
+  }
+
+  private mutating func appendTypedCharacter(
+    _ character: Character, targetIndex: Int?, forceError: Bool = false, at date: Date
+  ) {
+    typed.append(character)
+    typedTargetIndices.append(targetIndex)
+    typedCharacterDates.append(date)
+    if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
+  }
+
+  private mutating func removeLastTypedCharacter() {
+    guard !typed.isEmpty else { return }
+    let targetIndex = typedTargetIndices.popLast() ?? nil
+    typed.removeLast()
+    typedCharacterDates.removeLast()
+    if let targetIndex { forcedErrorIndices.remove(targetIndex) }
+  }
+
   private func shouldBlockNoSpaceWordAdvance(with character: Character, forceError: Bool) -> Bool {
     guard configuration.modifiers.contains(.noSpaces),
       let wordIndex = nextNoSpaceCommittedWordIndex,
@@ -2206,17 +2293,19 @@ struct TypingSession {
   private func isTypedCharacterCorrect(at index: Int) -> Bool {
     let typedCharacters = Array(typed)
     let targetCharacters = Array(prompt)
-    guard index < typedCharacters.count, index < targetCharacters.count else { return false }
-    return typedCharacters[index] == targetCharacters[index] && !forcedErrorIndices.contains(index)
+    guard targetCharacters.indices.contains(index),
+      let typedIndex = typedTargetIndices.firstIndex(where: { $0 == index }),
+      typedCharacters.indices.contains(typedIndex)
+    else { return false }
+    return typedCharacters[typedIndex] == targetCharacters[index] && !forcedErrorIndices.contains(index)
   }
 
   private mutating func insertCodeIndentationIfNeeded(after character: Character, at date: Date) {
     guard character == "\n", configuration.language.isCodeLanguage,
-      isTypedCharacterCorrect(at: typed.count - 1)
+      isTypedCharacterCorrect(at: nextTargetIndex - 1)
     else { return }
-    while typed.count < prompt.count, Array(prompt)[typed.count] == "\t" {
-      typed.append("\t")
-      typedCharacterDates.append(date)
+    while nextTargetIndex < prompt.count, Array(prompt)[nextTargetIndex] == "\t" {
+      appendTypedCharacter("\t", targetIndex: nextTargetIndex, at: date)
       recordReplayEvent(kind: .insert, text: "\t", automatic: true, at: date)
     }
   }
@@ -2229,15 +2318,11 @@ struct TypingSession {
       typedCharacters.indices.filter({ $0 >= lineStart }).allSatisfy(isTypedCharacterCorrect)
     else { return false }
     while typed.last == "\t" {
-      typed.removeLast()
-      typedCharacterDates.removeLast()
-      forcedErrorIndices.remove(typed.count)
+      removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
     }
     guard typed.last == "\n" else { return false }
-    typed.removeLast()
-    typedCharacterDates.removeLast()
-    forcedErrorIndices.remove(typed.count)
+    removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
     return true
   }
@@ -2343,26 +2428,26 @@ struct TypingSession {
     switch configuration.mode {
     case .words:
       if configuration.language.isCodeLanguage {
-        if typed.count >= prompt.count { complete(at: date) }
+        if nextTargetIndex >= prompt.count { complete(at: date) }
       } else if !configuration.language.usesSpaceDelimitedWords
         || configuration.modifiers.contains(.noSpaces)
       {
-        if typed.count >= prompt.count { complete(at: date) }
+        if nextTargetIndex >= prompt.count { complete(at: date) }
       } else if shouldFinishEnglishWordsTest {
         complete(at: date)
       }
     case .quote:
-      if typed.count >= prompt.count { complete(at: date) }
+      if nextTargetIndex >= prompt.count { complete(at: date) }
     case .custom:
       switch configuration.customTextCompletion {
       case .finish:
-        if typed.count >= prompt.count { complete(at: date) }
+        if nextTargetIndex >= prompt.count { complete(at: date) }
       case .time:
         break
       case .words:
         if shouldFinishEnglishWordsTest { complete(at: date) }
       case .sections:
-        if typed.count >= prompt.count { complete(at: date) }
+        if nextTargetIndex >= prompt.count { complete(at: date) }
       }
     case .time, .zen:
       break
@@ -2370,7 +2455,7 @@ struct TypingSession {
   }
 
   private mutating func extendPromptIfNeeded() {
-    guard typed.count >= prompt.count, let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
+    guard nextTargetIndex >= prompt.count, let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
     let usesNoSpaceSeparator = configuration.modifiers.contains(.noSpaces)
     let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
     let previousEnd = prompt.count + separator.count

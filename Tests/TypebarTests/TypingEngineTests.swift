@@ -168,6 +168,11 @@ final class TypingEngineTests: XCTestCase {
       configuration: .timed(seconds: 30, difficulty: .expert), prompt: "amber harbor")
     session.insert("amxer ", at: start)
     XCTAssertEqual(session.outcome, .failed)
+
+    var incomplete = TypingSession(
+      configuration: .timed(seconds: 30, difficulty: .expert), prompt: "amber harbor")
+    incomplete.insert("am ", at: start)
+    XCTAssertEqual(incomplete.outcome, .failed)
   }
 
   func testNoSpaceExpertFailsAtTheOriginalWordBoundary() {
@@ -205,6 +210,57 @@ final class TypingEngineTests: XCTestCase {
     session.deleteBackward(at: start.addingTimeInterval(1))
     session.insert("ber ", at: start.addingTimeInterval(2))
     XCTAssertEqual(session.typed, "amber ")
+  }
+
+  func testNormalSpaceCommitsAnIncompleteWordAndAdvancesToTheNextTargetWord() {
+    var session = TypingSession(
+      configuration: .words(3, rules: .init(freedomMode: true)), prompt: "amber bay cedar")
+
+    session.insert("am ", at: start)
+
+    XCTAssertEqual(session.typed, "am ")
+    XCTAssertEqual(session.errors, 1)
+    XCTAssertEqual(session.nextExpectedCharacter, "b")
+    XCTAssertEqual(session.completedWordCount, 1)
+    XCTAssertEqual(session.progressText(at: start), "1/3")
+    XCTAssertEqual(
+      Array(session.promptGlyphs.prefix(6).map(\.state)),
+      [.correct, .correct, .incorrect, .incorrect, .incorrect, .incorrect])
+    XCTAssertEqual(session.promptGlyphs[6].state, .current)
+    XCTAssertEqual(session.completedPromptCharacterIndices, Set(0..<5))
+
+    session.insert("bay ", at: start.addingTimeInterval(1))
+
+    XCTAssertEqual(session.nextExpectedCharacter, "c")
+    XCTAssertEqual(session.completedWordCount, 2)
+    XCTAssertEqual(
+      session.wordReviews,
+      [
+        .init(index: 0, target: "amber", typed: "am"),
+        .init(index: 1, target: "bay", typed: "bay"),
+      ])
+
+    session.deleteBackward(at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.nextExpectedCharacter, " ")
+    session.deleteBackward(at: start.addingTimeInterval(2))
+    session.deleteBackward(at: start.addingTimeInterval(2))
+    session.deleteBackward(at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.typed, "am ")
+    XCTAssertEqual(session.nextExpectedCharacter, "b")
+  }
+
+  func testNormalSpaceCompletesAnIncompleteFiniteFinalWord() {
+    var session = TypingSession(
+      configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      prompt: "amber")
+
+    session.insert("am ", at: start)
+
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.typed, "am ")
+    XCTAssertEqual(session.errors, 1)
+    XCTAssertEqual(session.wordReviews, [.init(index: 0, target: "amber", typed: "am")])
   }
 
   func testNoSpaceRejectsDirectWhitespaceWithoutRecordingAnError() {

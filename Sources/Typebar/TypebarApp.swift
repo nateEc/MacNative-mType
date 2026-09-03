@@ -1180,8 +1180,7 @@ private struct ContentView: View {
 
   private var renderedPrompt: AttributedString {
     var output = AttributedString()
-    let completedCharacterIndices = TypedCharacterEffectPolicy.completedCharacterIndices(
-      target: session.prompt, typed: session.typed, isFinished: session.isFinished)
+    let completedCharacterIndices = session.completedPromptCharacterIndices
     for (index, glyph) in session.promptGlyphs.enumerated() {
       let replacesTypo = glyph.state == .incorrect && settings.typoIndicatorStyle.replacesTarget
       let turnsIntoDot = completedCharacterIndices.contains(index)
