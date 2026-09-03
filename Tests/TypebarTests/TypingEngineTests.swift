@@ -1170,6 +1170,37 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(letter.legend(style: .dynamic, modifierFlags: [.shift], capsLockEnabled: false), "Q")
   }
 
+  func testKeyboardGuideKeySetsMatchReferenceNumberRowPolicies() {
+    XCTAssertEqual(
+      KeyboardGuideModel.displayRows(
+        for: .ansiQwerty, keysMode: .minimal, mode: .staticGuide, nextCharacter: nil).count,
+      3)
+    XCTAssertEqual(
+      KeyboardGuideModel.displayRows(
+        for: .ansiQwerty, keysMode: .minimal, mode: .next, nextCharacter: "7").count,
+      4)
+    XCTAssertEqual(
+      KeyboardGuideModel.displayRows(
+        for: .frenchAzerty, keysMode: .minimal, mode: .staticGuide, nextCharacter: nil).count,
+      4)
+    XCTAssertEqual(
+      KeyboardGuideModel.displayRows(
+        for: .ansiDvorak, keysMode: .minimalNumberRow, mode: .staticGuide, nextCharacter: nil).count,
+      4)
+    let fullRows = KeyboardGuideModel.displayRows(
+      for: .ansiQwerty, keysMode: .full, mode: .staticGuide, nextCharacter: nil)
+    XCTAssertEqual(fullRows.count, 4)
+    XCTAssertEqual(fullRows[0].first?.id, "escape")
+    XCTAssertEqual(
+      fullRows[0].first?.legend(style: .uppercase, modifierFlags: [], capsLockEnabled: false),
+      "Esc")
+    XCTAssertEqual(fullRows[3].first?.id, "left-shift")
+    XCTAssertEqual(KeyboardGuideModel.bottomRow(for: .full).map(\.id), [
+      "left-control", "left-option", "left-command", "space", "right-command", "right-option",
+      "right-control",
+    ])
+  }
+
   func testKeyboardGuideUsesTheSelectedLayoutAndSupportsAsciiPunctuation() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiQwerty), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "q", layout: .ansiDvorak), "bottom-1")
@@ -3330,6 +3361,7 @@ final class TypingEngineTests: XCTestCase {
     settings.keyboardGuideMode = .react
     settings.keyboardGuideScale = 2.7
     settings.keyboardGuideLegendStyle = .dynamic
+    settings.keyboardGuideKeysMode = .full
     settings.showFocusWarning = false
     settings.showCapsLockWarning = false
     settings.playErrorBeep = true
@@ -3350,6 +3382,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideMode, .react)
     XCTAssertEqual(exportedSnapshot.keyboardGuideScale, 2.7)
     XCTAssertEqual(exportedSnapshot.keyboardGuideLegendStyle, .dynamic)
+    XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
     XCTAssertEqual(exportedSnapshot.liveStatsColor, .black)
     XCTAssertEqual(exportedSnapshot.liveStatsOpacity, .half)
     XCTAssertEqual(exportedSnapshot.promptHighlightMode, .nextTwoWords)
@@ -3420,6 +3453,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardGuideMode, .react)
     XCTAssertEqual(restored.keyboardGuideScale, 2.7)
     XCTAssertEqual(restored.keyboardGuideLegendStyle, .dynamic)
+    XCTAssertEqual(restored.keyboardGuideKeysMode, .full)
     XCTAssertEqual(restored.effectiveKeyboardGuideMode, .react)
     restored.keyboardGuideMode = .off
     XCTAssertFalse(restored.showKeyboardGuide)
@@ -3510,6 +3544,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.keyboardGuideMode, .next)
     XCTAssertEqual(snapshot.keyboardGuideScale, 1)
     XCTAssertEqual(snapshot.keyboardGuideLegendStyle, .lowercase)
+    XCTAssertEqual(snapshot.keyboardGuideKeysMode, .minimal)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertFalse(snapshot.followSystemTheme)

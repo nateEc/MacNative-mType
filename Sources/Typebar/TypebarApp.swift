@@ -522,6 +522,7 @@ private struct ContentView: View {
           panel: activeTheme.panel, layout: effectiveKeyboardLayout,
           mirrored: settings.testModifiers.contains(.mirrorKeyboard),
           scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
+          keysMode: settings.keyboardGuideKeysMode,
           modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
       }
       controls

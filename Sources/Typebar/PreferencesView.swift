@@ -485,6 +485,14 @@ struct PreferencesView: View {
             Text("动态图例跟随 Shift 与 Caps Lock；Option 图层继续交给 macOS 原生输入处理。")
               .font(.caption)
               .foregroundStyle(.secondary)
+            Picker("键盘按键", selection: $settings.keyboardGuideKeysMode) {
+              ForEach(KeyboardGuideKeysMode.allCases) { keysMode in
+                Text(keysMode.displayName).tag(keysMode)
+              }
+            }
+            Text("精简档只在所选布局要求或下一键为数字时显示数字行；完整档增加不可输入的功能键图示。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
           Picker("键盘布局", selection: $settings.keyboardLayout) {
             ForEach(KeyboardLayout.allCases) { layout in

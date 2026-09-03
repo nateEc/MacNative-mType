@@ -81,6 +81,38 @@ enum KeyboardGuideLegendStyle: String, Codable, CaseIterable, Identifiable {
   }
 }
 
+/// Mirrors Monkeytype's `keymapKeys` setting without affecting the native
+/// input path. It only changes which visual keys appear in the guide.
+enum KeyboardGuideKeysMode: String, Codable, CaseIterable, Identifiable {
+  case minimal
+  case minimalNumberRow = "minimal_numrow"
+  case full
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .minimal: "精简"
+    case .minimalNumberRow: "精简（数字行）"
+    case .full: "完整"
+    }
+  }
+
+  func showsNumberRow(
+    for layout: KeyboardLayout,
+    mode: KeyboardGuideMode,
+    nextCharacter: Character?
+  ) -> Bool {
+    switch self {
+    case .minimalNumberRow, .full:
+      true
+    case .minimal:
+      layout.showsNumberRowInMinimalGuide
+        || (mode == .next && nextCharacter.map { "0123456789".contains($0) } == true)
+    }
+  }
+}
+
 struct KeyboardGuideKey: Identifiable, Equatable {
   let id: String
   let label: String
@@ -111,6 +143,7 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     modifierFlags: NSEvent.ModifierFlags,
     capsLockEnabled: Bool
   ) -> String {
+    if characters.isEmpty, style != .blank { return label }
     switch style {
     case .blank: return ""
     case .lowercase: return label.lowercased()
@@ -191,6 +224,44 @@ enum KeyboardGuideModel {
       .id
   }
 
+  static func displayRows(
+    for layout: KeyboardLayout,
+    keysMode: KeyboardGuideKeysMode,
+    mode: KeyboardGuideMode,
+    nextCharacter: Character?
+  ) -> [[KeyboardGuideKey]] {
+    let baseRows = rows(for: layout)
+    let contentRows = keysMode.showsNumberRow(
+      for: layout, mode: mode, nextCharacter: nextCharacter)
+      ? baseRows : Array(baseRows.dropFirst())
+    guard keysMode == .full else { return contentRows }
+
+    return [
+      [nonTypingKey("escape", label: "Esc", width: 36)] + baseRows[0]
+        + [nonTypingKey("delete", label: "⌫", width: 40)],
+      [nonTypingKey("tab", label: "⇥", width: 36)] + baseRows[1],
+      [nonTypingKey("caps-lock", label: "⇪", width: 42)] + baseRows[2]
+        + [nonTypingKey("return", label: "↩", width: 44)],
+      [nonTypingKey("left-shift", label: "⇧", width: 52)] + baseRows[3]
+        + [nonTypingKey("right-shift", label: "⇧", width: 58)],
+    ]
+  }
+
+  static func bottomRow(for keysMode: KeyboardGuideKeysMode) -> [KeyboardGuideKey] {
+    if keysMode == .full {
+      return [
+        nonTypingKey("left-control", label: "⌃", width: 34),
+        nonTypingKey("left-option", label: "⌥", width: 34),
+        nonTypingKey("left-command", label: "⌘", width: 38),
+        KeyboardGuideKey("space", label: "空格", characters: " ", width: 170),
+        nonTypingKey("right-command", label: "⌘", width: 38),
+        nonTypingKey("right-option", label: "⌥", width: 34),
+        nonTypingKey("right-control", label: "⌃", width: 34),
+      ]
+    }
+    return [KeyboardGuideKey("space", label: "空格", characters: " ", width: 170)]
+  }
+
   private static func row(_ prefix: String, _ labels: String, characters: [String]? = nil)
     -> [KeyboardGuideKey]
   {
@@ -201,6 +272,16 @@ enum KeyboardGuideModel {
         characters: characters?[safe: offset]
       )
     }
+  }
+
+  private static func nonTypingKey(_ id: String, label: String, width: CGFloat) -> KeyboardGuideKey {
+    KeyboardGuideKey(id, label: label, characters: "", width: width)
+  }
+}
+
+private extension KeyboardLayout {
+  var showsNumberRowInMinimalGuide: Bool {
+    self == .frenchAzerty
   }
 }
 
@@ -220,6 +301,7 @@ struct KeyboardGuide: View {
   let mirrored: Bool
   let scale: Double
   let legendStyle: KeyboardGuideLegendStyle
+  let keysMode: KeyboardGuideKeysMode
   let modifierFlags: NSEvent.ModifierFlags
   let capsLockEnabled: Bool
 
@@ -232,14 +314,17 @@ struct KeyboardGuide: View {
     return KeyboardGuideModel.highlightedKey(
       for: mode.highlightedCharacter(nextCharacter: expected, recentCharacter: nil), layout: layout)
   }
-  private var guideRows: [[KeyboardGuideKey]] { KeyboardGuideModel.rows(for: layout) }
+  private var guideRows: [[KeyboardGuideKey]] {
+    KeyboardGuideModel.displayRows(
+      for: layout, keysMode: keysMode, mode: mode, nextCharacter: nextCharacter)
+  }
 
   var body: some View {
     VStack(spacing: 4 * scale) {
       ForEach(guideRows.indices, id: \.self) { index in
         keyRow(guideRows[index])
       }
-      keyView(KeyboardGuideKey("space", label: "空格", characters: " ", width: 170))
+      keyRow(KeyboardGuideModel.bottomRow(for: keysMode))
     }
     .padding(10 * scale)
     .background(panel.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
