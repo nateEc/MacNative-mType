@@ -62,7 +62,22 @@ public struct PublicProfileResponse: Content, Equatable {
   public let completedResultCount: Int
   public let bestWPM: Int
   public let highestConsistency: Double
+  public let personalBests: [PublicProfileBestResponse]
   public let totalExperience: Int
+}
+
+/// A public, per-standard-mode best. It intentionally excludes the prompt,
+/// input replay, email, and any account-scoped data.
+public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
+  public let id: UUID
+  public let mode: String
+  public let durationSeconds: Int?
+  public let wordLimit: Int?
+  public let language: String
+  public let wpm: Int
+  public let accuracy: Int
+  public let consistency: Double
+  public let finishedAt: Date
 }
 
 public struct PublicProfileSearchResponse: Content, Equatable {
@@ -1034,8 +1049,33 @@ public actor AuthStore {
       completedResultCount: results.count,
       bestWPM: results.map(\.wpm).max() ?? 0,
       highestConsistency: results.map(\.consistency).max() ?? 0,
+      personalBests: publicPersonalBests(from: results),
       totalExperience: experience(for: user.id)
     )
+  }
+
+  private func publicPersonalBests(from results: [StoredResult]) -> [PublicProfileBestResponse] {
+    let standardModes: [(mode: String, durationSeconds: Int?, wordLimit: Int?)] = [
+      ("time", 15, nil), ("time", 30, nil), ("time", 60, nil), ("time", 120, nil),
+      ("words", nil, 10), ("words", nil, 25), ("words", nil, 50), ("words", nil, 100),
+    ]
+
+    return standardModes.compactMap { standard in
+      let candidates = results.filter {
+        $0.mode == standard.mode
+          && $0.durationSeconds == standard.durationSeconds
+          && $0.wordLimit == standard.wordLimit
+      }
+      guard let best = candidates.max(by: { candidate, currentBest in
+        candidate.wpm == currentBest.wpm
+          ? candidate.finishedAt < currentBest.finishedAt
+          : candidate.wpm < currentBest.wpm
+      }) else { return nil }
+      return .init(
+        id: best.id, mode: best.mode, durationSeconds: best.durationSeconds,
+        wordLimit: best.wordLimit, language: best.language, wpm: best.wpm,
+        accuracy: best.accuracy, consistency: best.consistency, finishedAt: best.finishedAt)
+    }
   }
 
   private func experience(for userID: UUID, since: Date? = nil) -> Int {

@@ -136,6 +136,7 @@ final class TypingEngineTests: XCTestCase {
     let profile = try JSONDecoder().decode(RemotePublicProfile.self, from: Data(payload.utf8))
 
     XCTAssertEqual(profile.highestConsistency, 0)
+    XCTAssertTrue(profile.personalBests.isEmpty)
   }
 
   func testWordsTestCompletesAtWordLimit() {

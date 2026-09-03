@@ -255,6 +255,34 @@ private struct PublicProfileView: View {
             Text("加入 \(profile.joinedAt.formatted(date: .abbreviated, time: .omitted))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if !profile.personalBests.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("公开个人最佳")
+                        .font(.headline)
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], spacing: 10
+                    ) {
+                        ForEach(profile.personalBests) { best in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(best.configurationLabel)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("\(best.wpm) WPM")
+                                    .font(.headline.monospacedDigit())
+                                Text("\(best.accuracy)% 准确 · \(best.consistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定")
+                                    .font(.caption2)
+                                Text("\(best.languageLabel) · \(best.finishedAt.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Text("公开资料不会包含邮箱、令牌或本地练习内容。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -273,7 +301,7 @@ private struct PublicProfileView: View {
                 .buttonStyle(.borderedProminent)
         }
         .padding(32)
-        .frame(width: 360)
+        .frame(width: 420)
         .sheet(isPresented: $showingReport) {
             ProfileReportView(profile: profile, account: account)
         }

@@ -302,10 +302,11 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let completedResultCount: Int
     let bestWPM: Int
     let highestConsistency: Double
+    let personalBests: [RemotePublicProfileBest]
     let totalExperience: Int
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, totalExperience
+        case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests, totalExperience
     }
 
     init(from decoder: Decoder) throws {
@@ -316,7 +317,30 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         completedResultCount = try values.decode(Int.self, forKey: .completedResultCount)
         bestWPM = try values.decode(Int.self, forKey: .bestWPM)
         highestConsistency = try values.decodeIfPresent(Double.self, forKey: .highestConsistency) ?? 0
+        personalBests = try values.decodeIfPresent([RemotePublicProfileBest].self, forKey: .personalBests) ?? []
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
+    }
+}
+
+struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
+    let id: UUID
+    let mode: String
+    let durationSeconds: Int?
+    let wordLimit: Int?
+    let language: String
+    let wpm: Int
+    let accuracy: Int
+    let consistency: Double
+    let finishedAt: Date
+
+    var configurationLabel: String {
+        if mode == "time", let durationSeconds { return "\(durationSeconds) 秒" }
+        if mode == "words", let wordLimit { return "\(wordLimit) 词" }
+        return mode
+    }
+
+    var languageLabel: String {
+        TypingLanguage(rawValue: language)?.displayName ?? language
     }
 }
 

@@ -871,6 +871,15 @@ final class HealthRouteTests: XCTestCase {
     _ = try await store.submitResult(
       result(id: UUID(), wpm: 76, accuracy: 98, consistency: 92, finishedAt: now), accessToken: session.accessToken,
       now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 72, accuracy: 97, consistency: 88, durationSeconds: 15,
+        finishedAt: now), accessToken: session.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 66, accuracy: 96, consistency: 75, mode: "words",
+        durationSeconds: nil, wordLimit: 10, finishedAt: now), accessToken: session.accessToken,
+      now: now)
 
     do {
       try configure(app, authStore: store)
@@ -878,9 +887,13 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(response.status, .ok)
         let profile = try? response.content.decode(PublicProfileResponse.self)
         XCTAssertEqual(profile?.displayName, "Profile User")
-        XCTAssertEqual(profile?.completedResultCount, 2)
+        XCTAssertEqual(profile?.completedResultCount, 4)
         XCTAssertEqual(profile?.bestWPM, 88)
         XCTAssertEqual(profile?.highestConsistency, 92)
+        XCTAssertEqual(profile?.personalBests.map(\.durationSeconds), [15, 30, nil])
+        XCTAssertEqual(profile?.personalBests.map(\.wordLimit), [nil, nil, 10])
+        XCTAssertEqual(profile?.personalBests.map(\.wpm), [72, 88, 66])
+        XCTAssertEqual(profile?.personalBests.map(\.consistency), [88, 84, 75])
         XCTAssertFalse(response.body.string.contains("private@example.com"))
       }
       try await app.test(.GET, "v1/profiles/not-a-uuid") { response async in
@@ -1390,11 +1403,12 @@ final class HealthRouteTests: XCTestCase {
   }
 
   private func result(
-    id: UUID, wpm: Int, accuracy: Int, consistency: Double = 0, finishedAt: Date
+    id: UUID, wpm: Int, accuracy: Int, consistency: Double = 0, mode: String = "time",
+    durationSeconds: Int? = 30, wordLimit: Int? = nil, finishedAt: Date
   )
     -> ResultSubmissionRequest
   {
-    let elapsed = 30.0
+    let elapsed = Double(durationSeconds ?? 30)
     let correctCharacters = max(1, Int((Double(wpm) * 5 * elapsed / 60).rounded()))
     let lowerBound = max(correctCharacters, 1)
     let eventCount =
@@ -1403,7 +1417,7 @@ final class HealthRouteTests: XCTestCase {
       } ?? lowerBound
     let rawWpm = Int((Double(eventCount) / 5 / elapsed * 60).rounded())
     return .init(
-      id: id, mode: "time", language: "english", durationSeconds: 30, wordLimit: nil,
+      id: id, mode: mode, language: "english", durationSeconds: durationSeconds, wordLimit: wordLimit,
       wpm: wpm, rawWpm: rawWpm, accuracy: accuracy, consistency: consistency,
       errorCount: eventCount - correctCharacters, eventCount: eventCount,
       startedAt: finishedAt.addingTimeInterval(-elapsed),
