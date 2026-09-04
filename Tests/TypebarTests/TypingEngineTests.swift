@@ -2821,6 +2821,63 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testNoSpaceLanguagesTrackOwnedWordBoundariesForProgressAndResults() {
+    for (language, lexicon, punctuation) in [
+      (TypingLanguage.simplifiedChinese, StarterLexicon.simplifiedChineseWords, "，"),
+      (.traditionalChinese, StarterLexicon.traditionalChineseWords, "，"),
+      (.japaneseHiragana, StarterLexicon.japaneseHiraganaWords, "、"),
+    ] {
+      let configuration = TestConfiguration.words(
+        4, language: language,
+        contentOptions: .init(includePunctuation: true, includeNumbers: true))
+      var session = TestSessionFactory.make(configuration: configuration)
+      guard let firstWord = lexicon.sorted(by: { $0.count > $1.count }).first(where: {
+        session.prompt.hasPrefix($0)
+      }) else {
+        XCTFail("无空格提示未以 Typebar 自有词库项开始：\(language.displayName)")
+        continue
+      }
+      let firstTarget = firstWord + "1" + punctuation
+
+      XCTAssertTrue(session.prompt.hasPrefix(firstTarget), language.displayName)
+      XCTAssertEqual(session.progressText(at: start), "0/4", language.displayName)
+      session.insert(firstTarget, at: start)
+      XCTAssertEqual(session.completedWordCount, 1, language.displayName)
+      XCTAssertEqual(session.progressText(at: start), "1/4", language.displayName)
+
+      session.insert(String(session.prompt.dropFirst(firstTarget.count)), at: start.addingTimeInterval(1))
+      XCTAssertEqual(session.outcome, .completed, language.displayName)
+      XCTAssertEqual(session.progressText(at: start), "4/4", language.displayName)
+      XCTAssertEqual(session.wordReviews.count, 4, language.displayName)
+      XCTAssertTrue(session.wordReviews.allSatisfy(\.isCorrect), language.displayName)
+      XCTAssertEqual(session.wordBurstHistory.count, 4, language.displayName)
+    }
+  }
+
+  func testNoSpaceLanguageBoundariesKeepGeneratedSuffixesAndStopOnErrorWord() {
+    let source = "晨光1，窗边"
+    let modifiers: [TestModifier] = [.backwards]
+    let transformed = TestModifierPolicy.transformed(source, modifiers: modifiers)
+    let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
+      source: source, language: .simplifiedChinese, modifiers: modifiers,
+      transformedPrompt: transformed)
+    XCTAssertEqual(transformed, "边窗，1光晨")
+    XCTAssertEqual(lengths, [2, 4])
+    XCTAssertEqual(
+      NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: transformed), ["边窗", "，1光晨"])
+
+    let configuration = TestConfiguration.words(
+      2, rules: .init(stopOnErrorMode: .word), language: .simplifiedChinese)
+    var session = TypingSession(
+      configuration: configuration, prompt: "晨光窗边", noSpaceWordEndIndices: [2, 4],
+      noSpaceTargetWords: ["晨光", "窗边"])
+    session.insert("晨x", at: start)
+    XCTAssertEqual(session.typed, "晨")
+    session.insert("光", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.completedWordCount, 1)
+    XCTAssertEqual(session.progressText(at: start), "1/2")
+  }
+
   func testMixedEnglishChineseUsesOnlyTypebarOwnedCorporaAndSpaceDelimitedWordCompletion() {
     let configuration = TestConfiguration.words(
       8, language: .mixedEnglishChinese, englishVariant: .british)

@@ -688,14 +688,21 @@ enum CodePracticeContent {
 }
 
 enum NoSpaceWordBoundaryPolicy {
-  /// Returns the end position of each original space-delimited word after it
-  /// has been transformed and concatenated. The session needs this explicit
-  /// metadata because no-space prompts intentionally contain no separators.
+  /// Returns the end position of each source word after it has been
+  /// transformed and concatenated. The session needs this explicit metadata
+  /// because no-space prompts intentionally contain no separators.
   static func wordLengths(
-    source: String, modifiers: [TestModifier], transformedPrompt: String
+    source: String, language: TypingLanguage = .english, modifiers: [TestModifier],
+    transformedPrompt: String
   ) -> [Int] {
-    guard modifiers.contains(.noSpaces) else { return [] }
-    var words = source.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+    var words: [String]
+    if language.isNoSpaceLanguage {
+      guard let parsed = noSpaceLanguageWords(in: source, language: language) else { return [] }
+      words = parsed
+    } else {
+      guard modifiers.contains(.noSpaces) else { return [] }
+      words = source.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+    }
     // `backwards` runs after space removal in the native transform, so the
     // flattened output contains source words in reverse order.
     if modifiers.contains(.backwards) { words.reverse() }
@@ -704,6 +711,33 @@ enum NoSpaceWordBoundaryPolicy {
     }
     guard lengths.reduce(0, +) == transformedPrompt.count else { return [] }
     return lengths
+  }
+
+  /// Parses only prompts which can be completely described by Typebar's own
+  /// no-space lexicons. A number or punctuation suffix remains attached to
+  /// its generated word. Any unknown text deliberately falls back to
+  /// character-level metrics instead of inventing a word boundary.
+  private static func noSpaceLanguageWords(
+    in source: String, language: TypingLanguage
+  ) -> [String]? {
+    let lexicon = (StarterLexicon.noSpaceWords(for: language) ?? []).map { Array($0) }
+      .sorted { $0.count > $1.count }
+    guard !lexicon.isEmpty else { return nil }
+    let characters = Array(source)
+    var words: [String] = []
+    var index = 0
+    while index < characters.count {
+      guard let word = lexicon.first(where: { candidate in
+        let end = index + candidate.count
+        guard end <= characters.count else { return false }
+        return characters[index..<end].elementsEqual(candidate)
+      }) else { return nil }
+      var end = index + word.count
+      while end < characters.count, !characters[end].isLetter { end += 1 }
+      words.append(String(characters[index..<end]))
+      index = end
+    }
+    return words
   }
 
   static func endIndices(for wordLengths: [Int]) -> [Int] {
@@ -807,7 +841,8 @@ struct TestSessionFactory {
       ? prompt
       : TestModifierPolicy.transformed(prompt, modifiers: configuration.modifiers)
     let noSpaceWordLengths = NoSpaceWordBoundaryPolicy.wordLengths(
-      source: noSpaceBoundarySource ?? prompt, modifiers: configuration.modifiers,
+      source: noSpaceBoundarySource ?? prompt, language: configuration.language,
+      modifiers: configuration.modifiers,
       transformedPrompt: transformedPrompt)
     let noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
       for: noSpaceWordLengths, in: transformedPrompt)

@@ -1941,7 +1941,7 @@ struct TypingSession {
   /// space delimiters, or with safely reconstructed no-space boundaries.
   var wordReviews: [TypedWordReview] {
     guard (!typed.isEmpty || !attemptedErrorCounts.isEmpty),
-      configuration.language.usesSpaceDelimitedWords
+      (configuration.language.usesSpaceDelimitedWords || hasNoSpaceWordSegmentation)
     else { return [] }
     let targetWords = resultTargetWords
     guard !targetWords.isEmpty else { return [] }
@@ -1977,7 +1977,7 @@ struct TypingSession {
   func progressText(at date: Date = .now) -> String? {
     if let remaining = remainingSeconds(at: date) { return "\(remaining)s" }
     guard let wordLimit = configuration.wordLimit,
-      configuration.language.usesSpaceDelimitedWords
+      (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts)
     else { return nil }
     return "\(min(wordLimit, completedWordCount))/\(wordLimit)"
   }
@@ -1992,7 +1992,7 @@ struct TypingSession {
       return (date.timeIntervalSince(startedAt) / duration).clamped(to: 0...1)
     }
     guard let wordLimit = configuration.wordLimit,
-      configuration.language.usesSpaceDelimitedWords
+      (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts)
     else { return nil }
     return Double(min(wordLimit, completedWordCount)) / Double(wordLimit)
   }
@@ -2247,7 +2247,7 @@ struct TypingSession {
     let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
       with: inputCharacter, forceError: forceError)
     if configuration.modifiers.contains(.correctBeforeAdvance),
-      configuration.language.usesSpaceDelimitedWords,
+      (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts),
       ((isPromptWordSeparator(inputCharacter) && !configuration.modifiers.contains(.noSpaces)
         && !currentWordIsCorrect)
         || blocksNoSpaceWordAdvance)
@@ -2255,7 +2255,7 @@ struct TypingSession {
       return false
     }
     if configuration.rules.stopOnErrorMode == .word,
-      configuration.language.usesSpaceDelimitedWords,
+      (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts),
       ((isPromptWordSeparator(inputCharacter) && !configuration.modifiers.contains(.noSpaces)
         && !currentWordIsCorrect)
         || blocksNoSpaceWordAdvance)
@@ -2499,8 +2499,9 @@ struct TypingSession {
   }
 
   private var tracksNoSpaceWordBursts: Bool {
-    configuration.language.usesSpaceDelimitedWords
-      && configuration.modifiers.contains(.noSpaces)
+    (configuration.language.isNoSpaceLanguage
+      || (configuration.language.usesSpaceDelimitedWords
+        && configuration.modifiers.contains(.noSpaces)))
       && !noSpaceWordEndIndices.isEmpty
   }
 
@@ -2655,7 +2656,7 @@ struct TypingSession {
   }
 
   private func shouldBlockNoSpaceWordAdvance(with character: Character, forceError: Bool) -> Bool {
-    guard configuration.modifiers.contains(.noSpaces),
+    guard tracksNoSpaceWordBursts,
       let wordIndex = nextNoSpaceCommittedWordIndex,
       let range = noSpaceWordRange(for: wordIndex)
     else { return false }
