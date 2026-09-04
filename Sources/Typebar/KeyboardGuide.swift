@@ -18,6 +18,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case latinAmericanQwerty
   case frenchAzerty
   case turkishQ
+  case hungarianQwertz
   case russianJcuken
   case ukrainianJcuken
   case bulgarianCyrillic
@@ -43,6 +44,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .latinAmericanQwerty: "Latin American QWERTY"
     case .frenchAzerty: "French AZERTY"
     case .turkishQ: "Turkish Q"
+    case .hungarianQwertz: "Hungarian QWERTZ · Typebar"
     case .russianJcuken: "Russian JCUKEN"
     case .ukrainianJcuken: "Ukrainian JCUKEN"
     case .bulgarianCyrillic: "Bulgarian Cyrillic · Typebar"
@@ -73,6 +75,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case latinAmericanQwerty
   case frenchAzerty
   case turkishQ
+  case hungarianQwertz
   case russianJcuken
   case ukrainianJcuken
   case bulgarianCyrillic
@@ -736,6 +739,29 @@ enum KeyboardGuideModel {
           "bottom", "<ZXCVBNMÖÇ.",
           characters: ["<>", "zZ", "xX", "cC", "vV", "bB", "nN", "mM", "öÖ", "çÇ", ".:"],
           shiftedLabels: [">", "Z", "X", "C", "V", "B", "N", "M", "Ö", "Ç", ":"]
+        ),
+      ]
+    case .hungarianQwertz:
+      [
+        row(
+          "number", "-1234567890Ó?",
+          characters: ["-_", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9(", "0)", "óÓ", "??"],
+          shiftedLabels: ["_", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "Ó", "?"]
+        ),
+        row(
+          "top", "QWERTZUIOPŐÚŰ",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "zZ", "uU", "iI", "oO", "pP", "őŐ", "úÚ", "űŰ"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Z", "U", "I", "O", "P", "Ő", "Ú", "Ű"]
+        ),
+        row(
+          "home", "ASDFGHJKLÉÁ",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "éÉ", "áÁ"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "É", "Á"]
+        ),
+        row(
+          "bottom", "<ÍYXCVBNMÖÜ",
+          characters: ["<>", "íÍ", "yY", "xX", "cC", "vV", "bB", "nN", "mM", "öÖ", "üÜ"],
+          shiftedLabels: [">", "Í", "Y", "X", "C", "V", "B", "N", "M", "Ö", "Ü"]
         ),
       ]
     case .russianJcuken:

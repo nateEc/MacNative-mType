@@ -1900,6 +1900,43 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.serbianCyrillic.emulatedLayout, .serbianCyrillic)
   }
 
+  func testHungarianQwertzMapsOriginalAccentedKeysAndPhysicalPositions() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "í", layout: .hungarianQwertz), "bottom-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "z", layout: .hungarianQwertz), "top-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "y", layout: .hungarianQwertz), "bottom-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ő", layout: .hungarianQwertz), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ű", layout: .hungarianQwertz), "top-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "é", layout: .hungarianQwertz), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "á", layout: .hungarianQwertz), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .hungarianQwertz), "bottom-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ü", layout: .hungarianQwertz), "bottom-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "?", layout: .hungarianQwertz), "number-12")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 6, modifierFlags: [], layout: .hungarianQwertz), "í")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [], layout: .hungarianQwertz), "z")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [.shift], layout: .hungarianQwertz), "Y")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [.shift], layout: .hungarianQwertz), "Ő")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [], layout: .hungarianQwertz), "ű")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [.shift], layout: .hungarianQwertz), "É")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [], layout: .hungarianQwertz), "á")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 47, modifierFlags: [.shift], layout: .hungarianQwertz), "Ö")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 44, modifierFlags: [], layout: .hungarianQwertz), "ü")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 24, modifierFlags: [], layout: .hungarianQwertz), "?")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ó", layout: .hungarianQwertz), 27)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ű", layout: .hungarianQwertz), 42)
+    XCTAssertEqual(KeyboardInputLayout.hungarianQwertz.emulatedLayout, .hungarianQwertz)
+  }
+
   @MainActor
   func testTurkishQPersistsAsGuideInputAndLayoutFluidChoice() {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -1983,6 +2020,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardLayout, .serbianCyrillic)
     XCTAssertEqual(restored.keyboardInputLayout, .serbianCyrillic)
     XCTAssertEqual(restored.layoutFluidLayouts, [.serbianCyrillic, .ansiQwerty])
+  }
+
+  @MainActor
+  func testHungarianQwertzPersistsAsGuideInputAndLayoutFluidChoice() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .hungarianQwertz
+    settings.keyboardInputLayout = .hungarianQwertz
+    settings.layoutFluidLayouts = [.hungarianQwertz, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .hungarianQwertz)
+    XCTAssertEqual(restored.keyboardInputLayout, .hungarianQwertz)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.hungarianQwertz, .ansiQwerty])
   }
 
   @MainActor
@@ -3752,7 +3806,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 20)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 21)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
