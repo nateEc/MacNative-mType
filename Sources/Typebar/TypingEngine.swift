@@ -207,6 +207,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case hungarian
   case czech
   case bulgarian
+  case romanian
   case french
   case italian
   case portuguese
@@ -3196,6 +3197,15 @@ enum StarterLexicon {
     "река", "чай", "ключ", "стол", "задача", "кора",
   ]
 
+  // Typebar-authored Romanian starter words exercise the language's comma
+  // below letters and accents without importing a third-party word list.
+  static let romanianWords = [
+    "dimineață", "fereastră", "hârtie", "țărm", "vânt", "exercițiu", "atenție", "liniște",
+    "clar", "lac", "stradă", "masă", "lumină", "drum", "răbdare", "clipă",
+    "oraș", "ploaie", "tăcere", "direcție", "stea", "notiță", "grădină", "respirație",
+    "râu", "ceai", "cheie", "scaun", "sarcină", "umbră",
+  ]
+
   // Typebar-authored French and Italian starter words. These compact lists
   // deliberately include common accented characters for native text input.
   static let frenchWords = [
@@ -3283,6 +3293,10 @@ enum StarterLexicon {
     case .bulgarian:
       return prompt(
         tokens: count, lexicon: bulgarianWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .romanian:
+      return prompt(
+        tokens: count, lexicon: romanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .french:
       return prompt(
@@ -3398,6 +3412,7 @@ enum StarterLexicon {
     case .hungarian: (hungarianWords, [",", ".", "!", "?"])
     case .czech: (czechWords, [",", ".", "!", "?"])
     case .bulgarian: (bulgarianWords, [".", ",", "!", "?"])
+    case .romanian: (romanianWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
@@ -3479,6 +3494,7 @@ extension TypingLanguage {
     case .hungarian: StarterLexicon.hungarianWords
     case .czech: StarterLexicon.czechWords
     case .bulgarian: StarterLexicon.bulgarianWords
+    case .romanian: StarterLexicon.romanianWords
     case .french: StarterLexicon.frenchWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
@@ -3500,7 +3516,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .bulgarian, .french,
+    .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .bulgarian, .romanian, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -3559,6 +3575,7 @@ extension TypingLanguage {
     case .hungarian: "Magyar"
     case .czech: "Čeština"
     case .bulgarian: "Български"
+    case .romanian: "Română"
     case .french: "Français"
     case .italian: "Italiano"
     case .portuguese: "Português"

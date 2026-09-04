@@ -764,6 +764,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "romanian-pas-linistit",
+      title: "Pas liniștit",
+      text: "Un pas liniștit face următoarea sarcină mai clară.",
+      language: .romanian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "romanian-caiet-deschis",
+      title: "Caiet deschis",
+      text: "Un caiet deschis nu rezolvă singur o întrebare grea, dar ajută gândurile să găsească ordine și direcție.",
+      language: .romanian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "romanian-munca-linistita",
+      title: "Muncă liniștită",
+      text: "Progresul apare rareori într-un singur moment zgomotos. Crește când deschidem aceeași pagină, îndreptăm o greșeală, citim o notiță și alegem următoarea sarcină mică. Repetarea face părțile dificile mai familiare și lasă mai mult loc pentru atenție.",
+      language: .romanian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "romanian-masa-lunga",
+      title: "Masă lungă",
+      text: "O masă lungă este utilă fiindcă lasă loc pentru feluri diferite de muncă. La un capăt poate sta prima schiță, la celălalt o frază care mai are nevoie de grijă, iar la mijloc rămâne spațiu pentru următoarea decizie mică. Exercițiul funcționează la fel. Nu cere să rezolvăm totul deodată, ci să avem unde să revenim, să vedem pasul următor și să găsim destulă răbdare pentru a observa ce devine mai ușor după câteva încercări.",
+      language: .romanian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",

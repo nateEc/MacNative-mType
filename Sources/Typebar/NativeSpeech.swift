@@ -34,6 +34,7 @@ extension TypingLanguage {
     case .hungarian: "hu-HU"
     case .czech: "cs-CZ"
     case .bulgarian: "bg-BG"
+    case .romanian: "ro-RO"
     case .french: "fr-FR"
     case .italian: "it-IT"
     case .portuguese: "pt-PT"
