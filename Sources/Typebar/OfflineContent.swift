@@ -820,6 +820,62 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "serbian-mirni-korak",
+      title: "Миран корак",
+      text: "Миран корак чини следећи задатак јаснијим.",
+      language: .serbian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "serbian-otvorena-beleska",
+      title: "Отворена белешка",
+      text: "Отворена белешка не решава тешко питање сама, али помаже мислима да пронађу ред и смер.",
+      language: .serbian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "serbian-tihi-rad",
+      title: "Тихи рад",
+      text: "Напредак ретко настаје у једном гласном тренутку. Расте када отворимо исту страницу, исправимо грешку, прочитамо белешку и изаберемо следећи мали задатак. Понављање чини тешке делове познатијим и оставља више простора за пажњу.",
+      language: .serbian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "serbian-dugacak-sto",
+      title: "Дугачак сто",
+      text: "Дугачак сто је користан јер нуди место за различите врсте рада. На једном крају може бити први нацрт, на другом реченица која још тражи пажњу, а у средини остаје простор за следећу малу одлуку. Вежба делује слично. Не мора да реши све одједном, већ нам може дати место коме се враћамо, приметимо следећи корак и нађемо довољно стрпљења да видимо шта постаје лакше после неколико покушаја.",
+      language: .serbian,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "serbian-latin-mirni-korak",
+      title: "Mirni korak",
+      text: "Mirni korak čini sledeći zadatak jasnijim.",
+      language: .serbianLatin,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "serbian-latin-otvorena-beleska",
+      title: "Otvorena beleška",
+      text: "Otvorena beleška ne rešava teško pitanje sama, ali pomaže mislima da pronađu red i smer.",
+      language: .serbianLatin,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "serbian-latin-tihi-rad",
+      title: "Tihi rad",
+      text: "Napredak retko nastaje u jednom glasnom trenutku. Raste kada otvorimo istu stranicu, ispravimo grešku, pročitamo belešku i izaberemo sledeći mali zadatak. Ponavljanje čini teške delove poznatijim i ostavlja više prostora za pažnju.",
+      language: .serbianLatin,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "serbian-latin-dugacak-sto",
+      title: "Dugačak sto",
+      text: "Dugačak sto je koristan jer nudi mesto za različite vrste rada. Na jednom kraju može biti prvi nacrt, na drugom rečenica koja još traži pažnju, a u sredini ostaje prostor za sledeću malu odluku. Vežba deluje slično. Ne mora da reši sve odjednom, već nam može dati mesto kome se vraćamo, primetimo sledeći korak i nađemo dovoljno strpljenja da vidimo šta postaje lakše posle nekoliko pokušaja.",
+      language: .serbianLatin,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "bulgarian-malka-krachka",
       title: "Малка крачка",
       text: "Една спокойна крачка прави следващата задача по-ясна.",

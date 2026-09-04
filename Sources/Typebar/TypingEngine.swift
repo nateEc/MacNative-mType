@@ -209,6 +209,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case slovak
   case slovenian
   case croatian
+  case serbian
+  case serbianLatin
   case bulgarian
   case romanian
   case finnish
@@ -3224,6 +3226,27 @@ enum StarterLexicon {
     "šuma", "žar", "ćilim", "prijatelj",
   ]
 
+  // Typebar-authored Serbian Cyrillic starter words cover the letters that
+  // distinguish this alphabet without importing a third-party list.
+  static let serbianWords = [
+    "јутро", "прозор", "папир", "обала", "ветар", "вежба", "пажња", "мир",
+    "јасно", "језеро", "улица", "сто", "светло", "пут", "стрпљење", "тренутак",
+    "град", "киша", "тишина", "смер", "звезда", "белешка", "врт", "дах",
+    "река", "чај", "кључ", "столица", "задатак", "сенка", "кућа", "ђак",
+    "шума", "жар", "ћилим", "пријатељ", "џеп", "њива", "љубав",
+  ]
+
+  // This Latin-script Serbian corpus is authored independently of the
+  // Cyrillic corpus. It remains offline so a random Cyrillic page cannot be
+  // substituted into the explicitly selected Latin practice mode.
+  static let serbianLatinWords = [
+    "jutro", "prozor", "papir", "obala", "vetar", "vežba", "pažnja", "mir",
+    "jasno", "jezero", "ulica", "sto", "svetlo", "put", "strpljenje", "trenutak",
+    "grad", "kiša", "tišina", "smer", "zvezda", "beleška", "vrt", "dah",
+    "reka", "čaj", "ključ", "stolica", "zadatak", "senka", "kuća", "đak",
+    "šuma", "žar", "ćilim", "prijatelj", "džep", "njiva", "ljubav",
+  ]
+
   // Typebar-authored Bulgarian starter words provide Cyrillic practice
   // without importing a third-party word list.
   static let bulgarianWords = [
@@ -3365,6 +3388,14 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: croatianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .serbian:
+      return prompt(
+        tokens: count, lexicon: serbianWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .serbianLatin:
+      return prompt(
+        tokens: count, lexicon: serbianLatinWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bulgarian:
       return prompt(
         tokens: count, lexicon: bulgarianWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -3501,6 +3532,8 @@ enum StarterLexicon {
     case .slovak: (slovakWords, [",", ".", "!", "?"])
     case .slovenian: (slovenianWords, [",", ".", "!", "?"])
     case .croatian: (croatianWords, [",", ".", "!", "?"])
+    case .serbian: (serbianWords, [".", ",", "!", "?"])
+    case .serbianLatin: (serbianLatinWords, [",", ".", "!", "?"])
     case .bulgarian: (bulgarianWords, [".", ",", "!", "?"])
     case .romanian: (romanianWords, [",", ".", "!", "?"])
     case .finnish: (finnishWords, [",", ".", "!", "?"])
@@ -3589,6 +3622,8 @@ extension TypingLanguage {
     case .slovak: StarterLexicon.slovakWords
     case .slovenian: StarterLexicon.slovenianWords
     case .croatian: StarterLexicon.croatianWords
+    case .serbian: StarterLexicon.serbianWords
+    case .serbianLatin: StarterLexicon.serbianLatinWords
     case .bulgarian: StarterLexicon.bulgarianWords
     case .romanian: StarterLexicon.romanianWords
     case .finnish: StarterLexicon.finnishWords
@@ -3615,7 +3650,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -3676,6 +3711,8 @@ extension TypingLanguage {
     case .slovak: "Slovenčina"
     case .slovenian: "Slovenščina"
     case .croatian: "Hrvatski"
+    case .serbian: "Српски"
+    case .serbianLatin: "Srpski (Latin)"
     case .bulgarian: "Български"
     case .romanian: "Română"
     case .finnish: "Suomi"

@@ -1875,6 +1875,31 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.bulgarianCyrillic.emulatedLayout, .bulgarianCyrillic)
   }
 
+  func testSerbianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .serbianCyrillic), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ђ", layout: .serbianCyrillic), "top-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ћ", layout: .serbianCyrillic), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ж", layout: .serbianCyrillic), "bottom-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "џ", layout: .serbianCyrillic), "bottom-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .serbianCyrillic), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .serbianCyrillic), "љ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 30, modifierFlags: [.shift], layout: .serbianCyrillic), "Ђ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [], layout: .serbianCyrillic), "ћ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 6, modifierFlags: [.shift], layout: .serbianCyrillic), "Ж")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [], layout: .serbianCyrillic), "џ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 44, modifierFlags: [.shift], layout: .serbianCyrillic), "_")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Љ", layout: .serbianCyrillic), 12)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "џ", layout: .serbianCyrillic), 7)
+    XCTAssertEqual(KeyboardInputLayout.serbianCyrillic.emulatedLayout, .serbianCyrillic)
+  }
+
   @MainActor
   func testTurkishQPersistsAsGuideInputAndLayoutFluidChoice() {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -1941,6 +1966,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardLayout, .bulgarianCyrillic)
     XCTAssertEqual(restored.keyboardInputLayout, .bulgarianCyrillic)
     XCTAssertEqual(restored.layoutFluidLayouts, [.bulgarianCyrillic, .ansiQwerty])
+  }
+
+  @MainActor
+  func testSerbianCyrillicPersistsAsGuideInputAndLayoutFluidChoice() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .serbianCyrillic
+    settings.keyboardInputLayout = .serbianCyrillic
+    settings.layoutFluidLayouts = [.serbianCyrillic, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .serbianCyrillic)
+    XCTAssertEqual(restored.keyboardInputLayout, .serbianCyrillic)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.serbianCyrillic, .ansiQwerty])
   }
 
   @MainActor
@@ -3119,7 +3161,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.greekWords,
       StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
       StarterLexicon.swedishWords,
-      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
+      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
@@ -3129,6 +3171,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 34)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3286,6 +3329,9 @@ final class TypingEngineTests: XCTestCase {
       5, language: .croatian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .croatian), "hr")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .serbian).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .serbian), "sr")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .bulgarian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .bulgarian), "bg")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
@@ -3302,6 +3348,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .icelandic), "is")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .ukrainianLatin).with(modifiers: [.referenceStream])))
+    XCTAssertNil(LivePracticeContentSource.selected(for: .words(
+      5, language: .serbianLatin).with(modifiers: [.referenceStream])))
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .japaneseHiragana).with(modifiers: [.referenceStream])))
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
@@ -3704,7 +3752,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 19)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 20)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
@@ -3945,6 +3993,8 @@ final class TypingEngineTests: XCTestCase {
       (.slovak, StarterLexicon.slovakWords),
       (.slovenian, StarterLexicon.slovenianWords),
       (.croatian, StarterLexicon.croatianWords),
+      (.serbian, StarterLexicon.serbianWords),
+      (.serbianLatin, StarterLexicon.serbianLatinWords),
       (.bulgarian, StarterLexicon.bulgarianWords),
       (.romanian, StarterLexicon.romanianWords),
       (.finnish, StarterLexicon.finnishWords),
@@ -4006,6 +4056,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.slovenianWords.contains("ključ"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.croatian))
     XCTAssertTrue(StarterLexicon.croatianWords.contains("kuća"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.serbian))
+    XCTAssertTrue(StarterLexicon.serbianWords.contains("љубав"))
+    XCTAssertTrue(StarterLexicon.serbianWords.contains("џеп"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.serbianLatin))
+    XCTAssertTrue(StarterLexicon.serbianLatinWords.contains("džep"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.bulgarian))
     XCTAssertTrue(StarterLexicon.bulgarianWords.contains("дъжд"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.romanian))
@@ -4041,6 +4096,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.slovak.speechLocaleIdentifier, "sk-SK")
     XCTAssertEqual(TypingLanguage.slovenian.speechLocaleIdentifier, "sl-SI")
     XCTAssertEqual(TypingLanguage.croatian.speechLocaleIdentifier, "hr-HR")
+    XCTAssertEqual(TypingLanguage.serbian.speechLocaleIdentifier, "sr-RS")
+    XCTAssertEqual(TypingLanguage.serbianLatin.speechLocaleIdentifier, "sr-RS")
     XCTAssertEqual(TypingLanguage.bulgarian.speechLocaleIdentifier, "bg-BG")
     XCTAssertEqual(TypingLanguage.romanian.speechLocaleIdentifier, "ro-RO")
     XCTAssertEqual(TypingLanguage.finnish.speechLocaleIdentifier, "fi-FI")
@@ -4197,6 +4254,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.slovak.ownedPracticeWords(), StarterLexicon.slovakWords)
     XCTAssertEqual(TypingLanguage.slovenian.ownedPracticeWords(), StarterLexicon.slovenianWords)
     XCTAssertEqual(TypingLanguage.croatian.ownedPracticeWords(), StarterLexicon.croatianWords)
+    XCTAssertEqual(TypingLanguage.serbian.ownedPracticeWords(), StarterLexicon.serbianWords)
+    XCTAssertEqual(TypingLanguage.serbianLatin.ownedPracticeWords(), StarterLexicon.serbianLatinWords)
     XCTAssertEqual(TypingLanguage.bulgarian.ownedPracticeWords(), StarterLexicon.bulgarianWords)
     XCTAssertEqual(TypingLanguage.romanian.ownedPracticeWords(), StarterLexicon.romanianWords)
     XCTAssertEqual(TypingLanguage.finnish.ownedPracticeWords(), StarterLexicon.finnishWords)
@@ -4416,7 +4475,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
