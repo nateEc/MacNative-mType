@@ -540,6 +540,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "dutch-kleine-stap",
+      title: "Kleine stap",
+      text: "Een kleine, rustige stap maakt de volgende taak vaak beter zichtbaar.",
+      language: .dutch,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "dutch-open-notitieboek",
+      title: "Open notitieboek",
+      text: "Een open notitieboek lost moeilijke vragen niet vanzelf op, maar helpt om ze in heldere delen te verdelen en later met aandacht terug te keren.",
+      language: .dutch,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "dutch-rustig-werk",
+      title: "Rustig werk",
+      text: "Vooruitgang komt niet altijd met een opvallend moment. Hij groeit in terugkerende handelingen: dezelfde pagina openen, één zin verduidelijken, een fout verbeteren en een bruikbare aanwijzing voor de volgende poging achterlaten. Na verloop van tijd maakt die rustige aandacht moeilijke stukken vertrouwder.",
+      language: .dutch,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "dutch-lange-tafel",
+      title: "Lange tafel",
+      text: "Een lange tafel is nuttig omdat er ruimte blijft voor verschillende soorten werk. Aan één kant kan een eerste schets liggen, aan de andere kant een zin die nog aandacht vraagt, en in het midden blijft plaats voor de volgende kleine beslissing. Oefenen werkt op dezelfde manier: het vraagt niet om elke moeilijkheid tegelijk op te lossen, maar om een plek om terug te keren, een zichtbare volgende stap en genoeg geduld om te merken wat na enkele pogingen gemakkelijker wordt.",
+      language: .dutch,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",

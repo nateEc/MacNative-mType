@@ -199,6 +199,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
   case spanish
   case german
+  case dutch
   case french
   case italian
   case portuguese
@@ -3097,6 +3098,15 @@ enum StarterLexicon {
     "wolke", "zeit", "lernen", "fokus", "schritt", "atmen", "größe", "mühe",
   ]
 
+  // Typebar-authored Dutch starter words. The compact corpus includes a
+  // familiar accented form without importing a third-party word list.
+  static let dutchWords = [
+    "ochtend", "raam", "papier", "oever", "wind", "oefening", "aandacht", "rustig",
+    "helder", "meer", "straat", "tafel", "licht", "reis", "geduld", "moment",
+    "stad", "regen", "stilte", "richting", "ster", "notitie", "tuin", "adem",
+    "klein", "tijd", "één",
+  ]
+
   // Typebar-authored French and Italian starter words. These compact lists
   // deliberately include common accented characters for native text input.
   static let frenchWords = [
@@ -3150,6 +3160,10 @@ enum StarterLexicon {
     case .german:
       return prompt(
         tokens: count, lexicon: germanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .dutch:
+      return prompt(
+        tokens: count, lexicon: dutchWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .french:
       return prompt(
@@ -3247,6 +3261,7 @@ enum StarterLexicon {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
+    case .dutch: (dutchWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
@@ -3311,7 +3326,7 @@ extension TestMode {
 
 extension TypingLanguage {
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,
+    .english, .spanish, .german, .dutch, .french, .italian, .portuguese, .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
     .korean, .turkish, .polish,
   ]
@@ -3359,6 +3374,7 @@ extension TypingLanguage {
     case .english: "English"
     case .spanish: "Español"
     case .german: "Deutsch"
+    case .dutch: "Nederlands"
     case .french: "Français"
     case .italian: "Italiano"
     case .portuguese: "Português"

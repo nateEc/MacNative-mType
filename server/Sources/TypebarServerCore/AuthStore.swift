@@ -1992,7 +1992,7 @@ public actor AuthStore {
     let attribution = request.attribution?.trimmingCharacters(in: .whitespacesAndNewlines)
     guard
       Set([
-        "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
+        "english", "spanish", "german", "dutch", "french", "italian", "portuguese", "simplifiedChinese",
         "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana",
         "korean", "turkish", "polish",
       ])
@@ -2106,7 +2106,7 @@ public actor AuthStore {
     guard
       language == nil
         || Set([
-          "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
+          "english", "spanish", "german", "dutch", "french", "italian", "portuguese", "simplifiedChinese",
           "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana",
           "korean", "turkish", "polish",
         ]).contains(language!)
@@ -2689,7 +2689,7 @@ public actor AuthStore {
   ) throws -> [LeaderboardEntry] {
     let modes = Set(["time", "words", "quote", "zen", "custom"])
     let languages = Set([
-      "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
+      "english", "spanish", "german", "dutch", "french", "italian", "portuguese", "simplifiedChinese",
       "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana",
       "korean", "turkish", "polish",
       "mixedEnglishChinese", "mixedLanguages",
@@ -2985,7 +2985,7 @@ public actor AuthStore {
   private func validate(result: ResultSubmissionRequest, now: Date) throws {
     guard Set(["time", "words", "quote", "zen", "custom"]).contains(result.mode),
       Set([
-        "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
+        "english", "spanish", "german", "dutch", "french", "italian", "portuguese", "simplifiedChinese",
         "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana",
         "korean", "turkish", "polish",
         "mixedEnglishChinese", "mixedLanguages",
