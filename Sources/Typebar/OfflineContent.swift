@@ -624,6 +624,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "afrikaans-rustige-stap",
+      title: "Rustige stap",
+      text: "Elke rustige stap maak die volgende taak duideliker.",
+      language: .afrikaans,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "afrikaans-oop-notas",
+      title: "Oop notas",
+      text: "Oop notas los nie elke moeilike vraag op nie, maar help om die vraag in kleiner dele te verdeel.",
+      language: .afrikaans,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "afrikaans-rustige-werk",
+      title: "Rustige werk",
+      text: "Vordering kom nie altyd met 'n groot oomblik nie. Dit groei uit klein handelinge: om dieselfde bladsy oop te maak, een sin duideliker te skryf, 'n fout reg te stel en 'n nuttige nota vir die volgende poging te laat.",
+      language: .afrikaans,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "afrikaans-lange-tafel",
+      title: "Lang tafel",
+      text: "'n Lang tafel gee ruimte vir verskillende soorte werk. Aan die een kant kan 'n eerste weergawe lê, aan die ander kant 'n sin wat nog aandag nodig het, en in die middel kan die volgende klein besluit wag. Oefening werk op dieselfde manier. Dit vra nie dat elke moeilike deel dadelik opgelos moet word nie, maar dat daar 'n plek is om na terug te keer, 'n sigbare volgende stap en genoeg geduld om te merk wat makliker word ná meer pogings.",
+      language: .afrikaans,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "danish-lille-skridt",
       title: "Lille skridt",
       text: "Et lille, roligt skridt gør den næste opgave lettere at se.",

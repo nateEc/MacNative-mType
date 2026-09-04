@@ -3258,6 +3258,7 @@ final class TypingEngineTests: XCTestCase {
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
+      StarterLexicon.afrikaansWords,
       StarterLexicon.greekWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
       StarterLexicon.norwegianNynorskWords,
@@ -3272,7 +3273,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 36)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 37)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3408,6 +3409,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .greek).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greek), "el")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .afrikaans).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .afrikaans), "af")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -4091,6 +4095,7 @@ final class TypingEngineTests: XCTestCase {
   func testAdditionalSpaceDelimitedLanguagesUseOnlyTypebarOwnedCorporaAndQuotes() {
     for (language, lexicon) in [
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
+      (.afrikaans, StarterLexicon.afrikaansWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4147,6 +4152,8 @@ final class TypingEngineTests: XCTestCase {
     })
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.dutch))
     XCTAssertTrue(StarterLexicon.dutchWords.contains("één"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.afrikaans))
+    XCTAssertTrue(StarterLexicon.afrikaansWords.contains("môre"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4202,6 +4209,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.english.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.spanish.speechLocaleIdentifier, "es-ES")
     XCTAssertEqual(TypingLanguage.german.speechLocaleIdentifier, "de-DE")
+    XCTAssertEqual(TypingLanguage.afrikaans.speechLocaleIdentifier, "af-ZA")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
@@ -4594,7 +4602,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .greek, .greeklish, .dutch, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+      .english, .spanish, .german, .afrikaans, .greek, .greeklish, .dutch, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,

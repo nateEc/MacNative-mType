@@ -199,6 +199,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
   case spanish
   case german
+  case afrikaans
   case greek
   case greeklish
   case dutch
@@ -3135,6 +3136,15 @@ enum StarterLexicon {
     "wolke", "zeit", "lernen", "fokus", "schritt", "atmen", "größe", "mühe",
   ]
 
+  // Typebar-authored Afrikaans starter words. Diacritics remain in the local
+  // corpus for native macOS composed-text practice without imported word lists.
+  static let afrikaansWords = [
+    "môre", "venster", "papier", "kus", "wind", "oefening", "aandag", "rustig",
+    "helder", "meer", "straat", "tafel", "lig", "reis", "geduld", "oomblik",
+    "stad", "reën", "stilte", "rigting", "ster", "nota", "tuin", "asem",
+    "klein", "tyd", "lente", "veld", "boot", "vriend", "wêreld",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -3370,6 +3380,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: germanWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .afrikaans:
+      return prompt(
+        tokens: count, lexicon: afrikaansWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .greek:
       return prompt(
         tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -3552,6 +3566,7 @@ enum StarterLexicon {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
+    case .afrikaans: (afrikaansWords, [",", ".", "!", "?"])
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
@@ -3644,6 +3659,7 @@ extension TypingLanguage {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
+    case .afrikaans: StarterLexicon.afrikaansWords
     case .greek: StarterLexicon.greekWords
     case .greeklish: StarterLexicon.greeklishWords
     case .dutch: StarterLexicon.dutchWords
@@ -3684,7 +3700,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .greek, .greeklish, .dutch, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .greek, .greeklish, .dutch, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -3735,6 +3751,7 @@ extension TypingLanguage {
     case .english: "English"
     case .spanish: "Español"
     case .german: "Deutsch"
+    case .afrikaans: "Afrikaans"
     case .greek: "Ελληνικά"
     case .greeklish: "Greeklish"
     case .dutch: "Nederlands"
