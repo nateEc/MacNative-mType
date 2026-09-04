@@ -452,6 +452,7 @@ private struct ContentView: View {
   @State private var favoriteQuotesOnly = false
   @State private var quoteSearchQuery = ""
   @State private var quoteRatings = QuoteRatingStore()
+  @State private var activeQuoteFeedback: QuoteResultFeedbackTarget?
   @State private var customText = "A calm practice makes the next difficult sentence feel possible."
   @State private var customTextCompletion: CustomTextCompletion = .finish
   @State private var customTextDuration = 30
@@ -583,6 +584,7 @@ private struct ContentView: View {
         completedResult = .init(
           result: result,
           savesResult: savesResult,
+          quoteFeedback: activeQuoteFeedback,
           missedWords: missedWordPractice?.selectedWords ?? [],
           missedWordPracticeWords: missedWordPractice?.exerciseWords ?? [],
           wordReviews: wordReviews,
@@ -701,6 +703,21 @@ private struct ContentView: View {
         accent: activeTheme.accent,
         colorScheme: activeTheme.colorScheme,
         publicationMessage: publicationMessage,
+        quoteFeedback: result.quoteFeedback,
+        settings: settings,
+        quoteRatings: quoteRatings,
+        isSignedIn: account.currentUser != nil,
+        initialCommunityRating: result.quoteFeedback?.communityQuoteID.flatMap {
+          communityQuoteRatings[$0]
+        },
+        onRateCommunity: { quoteID, value in
+          let rating = try await account.rateQuote(quoteID, value: value)
+          communityQuoteRatings[quoteID] = rating
+          return rating
+        },
+        onReportCommunity: { quoteID, reason, note in
+          try await account.reportQuote(quoteID, reason: reason, note: note)
+        },
         onRestart: {
           completedResult = nil
           if restoreWordPracticeIfNeeded() { return }
@@ -1841,10 +1858,14 @@ private struct ContentView: View {
     {
       chooseNextQuote()
     }
+    let selectedQuote = availableQuotes.first { $0.id == selectedQuoteID }
+    activeQuoteFeedback = QuoteResultFeedbackTarget.make(
+      mode: mode, sourceIsCommunity: quoteSource == .community,
+      selectedQuoteID: selectedQuote?.id ?? "")
     session = TestSessionFactory.make(
       configuration: configuration,
       customText: customText,
-      quote: availableQuotes.first { $0.id == selectedQuoteID }
+      quote: selectedQuote
     )
     let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
@@ -2552,6 +2573,7 @@ extension TestOutcome {
 private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
   let savesResult: Bool
+  let quoteFeedback: QuoteResultFeedbackTarget?
   let missedWords: [String]
   let missedWordPracticeWords: [String]
   let wordReviews: [TypedWordReview]
@@ -2580,6 +2602,13 @@ private struct CompletedResultView: View {
   let accent: Color
   let colorScheme: ColorScheme
   let publicationMessage: String?
+  let quoteFeedback: QuoteResultFeedbackTarget?
+  let settings: AppSettings
+  let quoteRatings: QuoteRatingStore
+  let isSignedIn: Bool
+  let initialCommunityRating: RemoteQuoteRatingResponse?
+  let onRateCommunity: (UUID, RemoteQuoteRatingValue) async throws -> RemoteQuoteRatingResponse
+  let onReportCommunity: (UUID, RemoteQuoteReportReason, String?) async throws -> Void
   let onRestart: () -> Void
   let onHistory: () -> Void
   let missedWords: [String]
@@ -2600,6 +2629,11 @@ private struct CompletedResultView: View {
   let onPracticeMissedAndSlowWords: ([String], Int) -> Void
   let onPracticeContextualMissedAndSlowWords: ([String], Int) -> Void
   @State private var exportStatus: String?
+  @State private var communityRating: RemoteQuoteRatingResponse?
+  @State private var quoteFeedbackStatus: String?
+  @State private var quoteReportReason: RemoteQuoteReportReason = .other
+  @State private var quoteReportNote = ""
+  @State private var isUpdatingCommunityQuote = false
 
   var body: some View {
     VStack(spacing: 28) {
@@ -2666,6 +2700,8 @@ private struct CompletedResultView: View {
           .foregroundStyle(.secondary)
           .multilineTextAlignment(.center)
       }
+
+      quoteFeedbackControls
 
       if let exportStatus {
         Text(exportStatus)
@@ -2749,6 +2785,118 @@ private struct CompletedResultView: View {
     }
     .padding(32)
     .frame(width: 390)
+    .onAppear {
+      communityRating = initialCommunityRating
+    }
+  }
+
+  @ViewBuilder
+  private var quoteFeedbackControls: some View {
+    switch quoteFeedback {
+    case let .builtIn(quoteID):
+      VStack(alignment: .leading, spacing: 8) {
+        Label("本轮引语", systemImage: "quote.bubble")
+          .font(.headline)
+        HStack(spacing: 8) {
+          Button(settings.isFavoriteQuote(quoteID) ? "取消收藏" : "收藏引语") {
+            settings.toggleFavoriteQuote(quoteID)
+          }
+          .buttonStyle(.bordered)
+          Button("不适合") { quoteRatings.set(.down, for: quoteID) }
+            .buttonStyle(.bordered)
+            .tint(quoteRatings.rating(for: quoteID) == .down ? .red : .secondary)
+          Button("不错") { quoteRatings.set(.up, for: quoteID) }
+            .buttonStyle(.bordered)
+            .tint(quoteRatings.rating(for: quoteID) == .up ? .green : .secondary)
+          if quoteRatings.rating(for: quoteID) != .neutral {
+            Button("清除评分") { quoteRatings.set(.neutral, for: quoteID) }
+              .buttonStyle(.borderless)
+          }
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+    case let .community(quoteID):
+      VStack(alignment: .leading, spacing: 8) {
+        Label("本轮社区引语", systemImage: "quote.bubble")
+          .font(.headline)
+        Text("社区评价：支持 \(communityRating?.upvotes ?? 0) · 不适合 \(communityRating?.downvotes ?? 0)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        if isSignedIn {
+          HStack(spacing: 8) {
+            Button("不适合") { rateCommunityQuote(quoteID, value: .down) }
+              .buttonStyle(.bordered)
+              .tint(communityRating?.viewerRating == RemoteQuoteRatingValue.down.rawValue ? .red : .secondary)
+            Button("不错") { rateCommunityQuote(quoteID, value: .up) }
+              .buttonStyle(.bordered)
+              .tint(communityRating?.viewerRating == RemoteQuoteRatingValue.up.rawValue ? .green : .secondary)
+            if communityRating?.viewerRating != nil {
+              Button("撤销评价") { rateCommunityQuote(quoteID, value: .neutral) }
+                .buttonStyle(.borderless)
+            }
+          }
+          Picker("举报原因", selection: $quoteReportReason) {
+            ForEach(RemoteQuoteReportReason.allCases, id: \.self) { reason in
+              Text(reason.displayName).tag(reason)
+            }
+          }
+          TextField("举报说明（可选，最多 400 字）", text: $quoteReportNote, axis: .vertical)
+            .lineLimit(1...3)
+            .onChange(of: quoteReportNote) { _, note in
+              if note.count > 400 { quoteReportNote = String(note.prefix(400)) }
+            }
+          Button("私下举报此引语", role: .destructive) { reportCommunityQuote(quoteID) }
+            .disabled(isUpdatingCommunityQuote)
+          Text("举报仅供审核员处理；作者不会收到通知。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          Text("登录后可评价或私下举报社区引语。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        if let quoteFeedbackStatus {
+          Text(quoteFeedbackStatus)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+    case nil:
+      EmptyView()
+    }
+  }
+
+  private func rateCommunityQuote(_ quoteID: UUID, value: RemoteQuoteRatingValue) {
+    guard !isUpdatingCommunityQuote else { return }
+    isUpdatingCommunityQuote = true
+    Task {
+      defer { isUpdatingCommunityQuote = false }
+      do {
+        communityRating = try await onRateCommunity(quoteID, value)
+        quoteFeedbackStatus = value == .neutral ? "已撤销你的社区评价。" : "已更新你的社区评价。"
+      } catch {
+        quoteFeedbackStatus = "无法更新社区评价：\(error.localizedDescription)"
+      }
+    }
+  }
+
+  private func reportCommunityQuote(_ quoteID: UUID) {
+    guard !isUpdatingCommunityQuote else { return }
+    isUpdatingCommunityQuote = true
+    let note = quoteReportNote.trimmingCharacters(in: .whitespacesAndNewlines)
+    Task {
+      defer { isUpdatingCommunityQuote = false }
+      do {
+        try await onReportCommunity(quoteID, quoteReportReason, note.isEmpty ? nil : note)
+        quoteReportNote = ""
+        quoteFeedbackStatus = "已私下提交举报；引语作者不会收到通知。"
+      } catch {
+        quoteFeedbackStatus = "无法提交举报：\(error.localizedDescription)"
+      }
+    }
   }
 
   private var resultOutcomeTitle: String {

@@ -3484,6 +3484,24 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(QuoteRatingStore(defaults: defaults).rating(for: "craft"), .neutral)
   }
 
+  func testResultQuoteFeedbackCapturesOnlyTheCompletedQuoteSource() {
+    let communityID = UUID()
+    XCTAssertEqual(
+      QuoteResultFeedbackTarget.make(
+        mode: .quote, sourceIsCommunity: false, selectedQuoteID: "craft"),
+      .builtIn(quoteID: "craft"))
+    XCTAssertEqual(
+      QuoteResultFeedbackTarget.make(
+        mode: .quote, sourceIsCommunity: true, selectedQuoteID: communityID.uuidString),
+      .community(quoteID: communityID))
+    XCTAssertEqual(
+      QuoteResultFeedbackTarget.make(
+        mode: .words, sourceIsCommunity: false, selectedQuoteID: "craft"), nil)
+    XCTAssertEqual(
+      QuoteResultFeedbackTarget.make(
+        mode: .quote, sourceIsCommunity: true, selectedQuoteID: "craft"), nil)
+  }
+
   func testLegacyConfigurationDefaultsToEnglish() throws {
     let legacy = """
       {"mode":"time","duration":30,"wordLimit":null,"difficulty":"normal","rules":{"strictSpace":false,"stopOnError":false,"deleteOnError":false,"hideExtraLetters":false}}
