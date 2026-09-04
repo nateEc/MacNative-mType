@@ -1128,6 +1128,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "lao-calm-step",
+      title: "ບາດກ້າວທີ່ສະຫງົບ",
+      text: "ບາດກ້າວທີ່ສະຫງົບເຮັດໃຫ້ວຽກຕໍ່ໄປຊັດເຈນຂຶ້ນ.",
+      language: .lao,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "lao-open-notebook",
+      title: "ປຶ້ມບັນທຶກທີ່ເປີດຢູ່",
+      text: "ປຶ້ມບັນທຶກທີ່ເປີດຢູ່ບໍ່ໄດ້ຕອບທຸກຄໍາຖາມທີ່ຍາກ ແຕ່ມັນໃຫ້ບ່ອນສໍາລັບເບິ່ງຄໍາຖາມເປັນສ່ວນນ້ອຍໆ.",
+      language: .lao,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "lao-small-work",
+      title: "ວຽກນ້ອຍ",
+      text: "ຄວາມກ້າວໜ້າບໍ່ໄດ້ປະກົດເປັນຊ່ວງເວລາໃຫຍ່ສະເໝີ. ການເປີດໜ້າເກົ່າອີກຄັ້ງ ການເຮັດໃຫ້ປະໂຫຍກໜຶ່ງຊັດເຈນ ແລະ ການແກ້ໄຂບັນຫານ້ອຍໜຶ່ງ ສ້າງຄວາມໝັ້ນໃຈສໍາລັບຄວາມພະຍາຍາມຄັ້ງຕໍ່ໄປ.",
+      language: .lao,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "lao-long-table",
+      title: "ໂຕະຍາວ",
+      text: "ໂຕະຍາວໜຶ່ງໃຫ້ບ່ອນສໍາລັບວຽກຫຼາຍປະເພດ. ຢູ່ປາຍໜຶ່ງສາມາດວາງຮ່າງທໍາອິດ ອີກປາຍໜຶ່ງສາມາດເກັບປະໂຫຍກທີ່ຕ້ອງການຄວາມໃສ່ໃຈ ແລະ ກາງໂຕະສາມາດລໍຖ້າການຕັດສິນໃຈນ້ອຍຕໍ່ໄປ. ການຝຶກຝົນກໍເດີນໜ້າແບບດຽວກັນ. ບໍ່ຈໍາເປັນຕ້ອງແກ້ໄຂທຸກສ່ວນທີ່ຍາກໃນຄັ້ງດຽວ. ເມື່ອມີບ່ອນໃຫ້ກັບມາ ມີບາດກ້າວຕໍ່ໄປທີ່ຊັດເຈນ ແລະ ມີຄວາມອົດທົນເພື່ອເຫັນສິ່ງທີ່ງ່າຍຂຶ້ນຫຼັງຈາກລອງຫຼາຍຄັ້ງ ຈັງຫວະຈະຄ່ອຍໆເຕີບໂຕ.",
+      language: .lao,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
