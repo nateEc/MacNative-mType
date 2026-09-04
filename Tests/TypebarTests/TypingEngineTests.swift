@@ -1850,6 +1850,31 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.ukrainianJcuken.emulatedLayout, .ukrainianJcuken)
   }
 
+  func testBulgarianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "я", layout: .bulgarianCyrillic), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ъ", layout: .bulgarianCyrillic), "top-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "щ", layout: .bulgarianCyrillic), "top-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ч", layout: .bulgarianCyrillic), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ь", layout: .bulgarianCyrillic), "bottom-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .bulgarianCyrillic), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .bulgarianCyrillic), "я")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [.shift], layout: .bulgarianCyrillic), "Ъ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 30, modifierFlags: [], layout: .bulgarianCyrillic), "щ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [.shift], layout: .bulgarianCyrillic), "Ч")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [], layout: .bulgarianCyrillic), "ь")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 44, modifierFlags: [.shift], layout: .bulgarianCyrillic), "?")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Я", layout: .bulgarianCyrillic), 12)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "щ", layout: .bulgarianCyrillic), 30)
+    XCTAssertEqual(KeyboardInputLayout.bulgarianCyrillic.emulatedLayout, .bulgarianCyrillic)
+  }
+
   @MainActor
   func testTurkishQPersistsAsGuideInputAndLayoutFluidChoice() {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -1899,6 +1924,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardLayout, .ukrainianJcuken)
     XCTAssertEqual(restored.keyboardInputLayout, .ukrainianJcuken)
     XCTAssertEqual(restored.layoutFluidLayouts, [.ukrainianJcuken, .ansiQwerty])
+  }
+
+  @MainActor
+  func testBulgarianCyrillicPersistsAsGuideInputAndLayoutFluidChoice() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .bulgarianCyrillic
+    settings.keyboardInputLayout = .bulgarianCyrillic
+    settings.layoutFluidLayouts = [.bulgarianCyrillic, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .bulgarianCyrillic)
+    XCTAssertEqual(restored.keyboardInputLayout, .bulgarianCyrillic)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.bulgarianCyrillic, .ansiQwerty])
   }
 
   @MainActor
@@ -3641,7 +3683,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 18)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 19)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
