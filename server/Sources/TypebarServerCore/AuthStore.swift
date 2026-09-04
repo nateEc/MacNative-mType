@@ -101,6 +101,15 @@ public struct AccountDeletionResponse: Content, Equatable {
   public let deleted: Bool
 }
 
+public struct DeleteResultsRequest: Content, Equatable {
+  public let currentPassword: String?
+}
+
+public struct ResultDeletionResponse: Content, Equatable {
+  public let deleted: Bool
+  public let removedCount: Int
+}
+
 public struct RevokeSessionsRequest: Content, Equatable {
   public let currentPassword: String?
 }
@@ -2210,6 +2219,32 @@ public actor AuthStore {
     _ request: ResultSubmissionRequest, accessToken: String, now: Date = .now
   ) throws -> ResultSubmissionResponse {
     try submitResult(request, credential: .accessToken(accessToken), now: now)
+  }
+
+  /// Removes only the authenticated account's submitted results after a fresh
+  /// password check or one-time reauthentication. Local app history and every
+  /// other account's records remain outside this operation's scope.
+  public func deleteResults(
+    _ request: DeleteResultsRequest, accessToken: String, reauthenticationToken: String? = nil,
+    now: Date = .now
+  ) throws -> ResultDeletionResponse {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard let user = state.users.first(where: { $0.id == currentUser.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    if let currentPassword = request.currentPassword {
+      guard let passwordHash = user.passwordHash,
+        try Bcrypt.verify(currentPassword, created: passwordHash)
+      else { throw AuthStoreError.invalidCredentials }
+    } else {
+      guard let reauthenticationToken else { throw AuthStoreError.invalidReauthenticationToken }
+      try consumeReauthenticationToken(reauthenticationToken, for: user.id, now: now)
+    }
+    let countBeforeDeletion = state.results.count
+    state.results.removeAll { $0.userID == user.id }
+    let removedCount = countBeforeDeletion - state.results.count
+    try persist()
+    return .init(deleted: true, removedCount: removedCount)
   }
 
   public func results(

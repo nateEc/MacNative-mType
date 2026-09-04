@@ -1858,6 +1858,51 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testDeletingResultsRequiresConfirmationAndPreservesOtherAccounts() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let owner = try await store.register(
+      .init(email: "clear-owner@example.com", password: "a secure password", displayName: "Clear Owner"))
+    let other = try await store.register(
+      .init(email: "clear-other@example.com", password: "a secure password", displayName: "Clear Other"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 100, finishedAt: now), accessToken: owner.accessToken,
+      now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 90, accuracy: 100, finishedAt: now), accessToken: owner.accessToken,
+      now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 100, accuracy: 100, finishedAt: now), accessToken: other.accessToken,
+      now: now)
+
+    do {
+      _ = try await store.deleteResults(.init(currentPassword: nil), accessToken: owner.accessToken, now: now)
+      XCTFail("Deleting remote results must require a fresh account confirmation")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidReauthenticationToken)
+    }
+    do {
+      _ = try await store.deleteResults(
+        .init(currentPassword: "wrong password"), accessToken: owner.accessToken, now: now)
+      XCTFail("Deleting remote results must reject an incorrect password")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidCredentials)
+    }
+
+    let deletion = try await store.deleteResults(
+      .init(currentPassword: "a secure password"), accessToken: owner.accessToken, now: now)
+    let ownerResults = try await store.results(
+      .init(), credential: .accessToken(owner.accessToken), now: now)
+    let otherResults = try await store.results(
+      .init(), credential: .accessToken(other.accessToken), now: now)
+    let currentOwner = try await store.authenticatedUser(for: owner.accessToken, now: now)
+    XCTAssertTrue(deletion.deleted)
+    XCTAssertEqual(deletion.removedCount, 2)
+    XCTAssertTrue(ownerResults.results.isEmpty)
+    XCTAssertEqual(otherResults.results.count, 1)
+    XCTAssertEqual(currentOwner.id, owner.user.id)
+  }
+
   func testOAuthIdentitiesSupportPasswordlessLoginLinkingAndSafeUnlinking() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let github = OAuthProviderIdentity(
@@ -2217,6 +2262,9 @@ final class HealthRouteTests: XCTestCase {
       try await app.test(.POST, "v1/results") { response async in
         XCTAssertEqual(response.status, .unauthorized)
       }
+      try await app.test(.DELETE, "v1/results") { response async in
+        XCTAssertEqual(response.status, .unauthorized)
+      }
       try await app.test(
         .POST, "v1/results",
         beforeRequest: { request async throws in
@@ -2244,6 +2292,18 @@ final class HealthRouteTests: XCTestCase {
       try await app.test(.GET, "v1/leaderboards/experience/friends") { response async in
         XCTAssertEqual(response.status, .unauthorized)
       }
+      try await app.test(
+        .DELETE, "v1/results",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(DeleteResultsRequest(currentPassword: "a secure password"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          let deletion = try? response.content.decode(ResultDeletionResponse.self)
+          XCTAssertTrue(deletion?.deleted ?? false)
+          XCTAssertEqual(deletion?.removedCount, 1)
+        })
       try await app.asyncShutdown()
     } catch {
       try? await app.asyncShutdown()

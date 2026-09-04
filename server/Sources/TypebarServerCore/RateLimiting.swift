@@ -89,6 +89,9 @@ public struct TypebarRateLimitMiddleware: AsyncMiddleware {
         if path == "/v1/results" && request.method == .POST {
             return .init(id: "result-write", maximumRequests: 30, window: 60)
         }
+        if path == "/v1/results" && request.method == .DELETE {
+            return .init(id: "result-delete", maximumRequests: 10, window: 60 * 60)
+        }
         guard request.method != .GET else { return .init(id: "read", maximumRequests: 180, window: 60) }
         return .init(id: "write", maximumRequests: 60, window: 60)
     }

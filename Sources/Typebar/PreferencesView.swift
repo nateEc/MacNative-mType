@@ -23,6 +23,7 @@ struct PreferencesView: View {
   @State private var profileShowsActivity = true
   @State private var developerAccessKeyName = ""
   @State private var newlyCreatedDeveloperAccessKey: String?
+  @State private var remoteResultsDeletionPassword = ""
   @State private var updatedEmail = ""
   @State private var emailChangePassword = ""
   @State private var currentPassword = ""
@@ -35,6 +36,7 @@ struct PreferencesView: View {
   @State private var sessionRevocationPassword = ""
   @State private var accountDeletionPassword = ""
   @State private var showingAccountDeletionConfirmation = false
+  @State private var showingRemoteResultsDeletionConfirmation = false
   @State private var showingSessionRevocationConfirmation = false
   @State private var showingRestoreDefaultsConfirmation = false
   @State private var submittedQuoteText = ""
@@ -962,6 +964,19 @@ struct PreferencesView: View {
                   RemoteAccountResultRow(result: result)
                 }
               }
+              if user.authenticationMethods.contains(.password) {
+                SecureField("输入当前密码以清除服务端成绩", text: $remoteResultsDeletionPassword)
+                  .textContentType(.password)
+              }
+              Button("清除所有服务端成绩…", role: .destructive) {
+                showingRemoteResultsDeletionConfirmation = true
+              }
+              .disabled(
+                account.isWorking || (user.authenticationMethods.contains(.password)
+                  && remoteResultsDeletionPassword.isEmpty))
+              Text("这会永久清除当前账户的服务端成绩和相应 XP；本机练习历史、设置及其他账户不会受到影响。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Divider()
             Text("登录方式").font(.headline)
@@ -1423,6 +1438,22 @@ struct PreferencesView: View {
       Text("练习与外观设置将恢复默认，本地背景图片会移除；本地字体文件和练习历史会保留。")
     }
     .confirmationDialog(
+      "清除所有服务端成绩？", isPresented: $showingRemoteResultsDeletionConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("永久清除", role: .destructive) {
+        Task {
+          if await account.deleteRemoteResults(
+            currentPassword: remoteResultsDeletionPassword.isEmpty ? nil : remoteResultsDeletionPassword)
+          {
+            remoteResultsDeletionPassword = ""
+          }
+        }
+      }
+    } message: {
+      Text("当前账户的自建服务成绩与相应 XP 将永久移除。本机练习历史、设置及其他账户不受影响。")
+    }
+    .confirmationDialog(
       "删除此自建账户？", isPresented: $showingAccountDeletionConfirmation, titleVisibility: .visible
     ) {
       Button("永久删除", role: .destructive) {
@@ -1570,7 +1601,7 @@ struct PreferencesView: View {
   private var accountSectionVisible: Bool {
     matches(
       "自建账户", "账户", "account", "服务", "server", "登录", "login", "注册", "邮箱", "email", "密码", "password",
-      "GitHub", "Google", "OAuth", "第三方", "关联", "资料", "profile", "排行榜", "榜单", "leaderboard", "开发者", "密钥", "key", "自动化", "删除", "注销")
+      "GitHub", "Google", "OAuth", "第三方", "关联", "资料", "profile", "排行榜", "榜单", "leaderboard", "成绩", "results", "XP", "开发者", "密钥", "key", "自动化", "清除", "删除", "注销")
   }
 
   private var moderationSectionVisible: Bool {

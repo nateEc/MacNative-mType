@@ -626,6 +626,20 @@ public func configure(
         }
     }
 
+    app.delete("v1", "results") { request async throws -> ResultDeletionResponse in
+        do {
+            let accessToken = try request.accessToken()
+            let deletion = try request.content.decode(DeleteResultsRequest.self)
+            return try await authStore.deleteResults(
+                deletion,
+                accessToken: accessToken,
+                reauthenticationToken: request.headers.first(name: "X-Typebar-Reauthentication")
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.get("v1", "results") { request async throws -> ResultListResponse in
         do {
             return try await authStore.results(

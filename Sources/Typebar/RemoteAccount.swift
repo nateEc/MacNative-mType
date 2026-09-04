@@ -287,6 +287,15 @@ private struct RemoteAccountResultListResponse: Codable, Sendable {
     let total: Int
 }
 
+private struct RemoteResultDeletionRequest: Codable, Sendable {
+    let currentPassword: String?
+}
+
+private struct RemoteResultDeletionResponse: Codable, Sendable {
+    let deleted: Bool
+    let removedCount: Int
+}
+
 private struct RemoteQuoteSubmissionRequest: Codable, Sendable {
     let language: String
     let text: String
@@ -1239,6 +1248,43 @@ final class AccountSession {
             ).results
         } catch {
             statusMessage = error.localizedDescription
+        }
+    }
+
+    func deleteRemoteResults(currentPassword: String?) async -> Bool {
+        guard let token = tokenStore.load(), let user = currentUser else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let usesPassword = user.authenticationMethods.contains(.password)
+            let freshReauthenticationToken = usesPassword
+                ? nil
+                : try await reauthenticationToken(
+                    for: user, accessToken: token, excluding: nil, currentPassword: nil)
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/results",
+                method: "DELETE",
+                token: token,
+                body: RemoteResultDeletionRequest(currentPassword: currentPassword),
+                headers: freshReauthenticationToken.map { ["X-Typebar-Reauthentication": $0] } ?? [:],
+                response: RemoteResultDeletionResponse.self
+            )
+            guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
+            remoteResults = []
+            currentUser = .init(
+                id: user.id, email: user.email, emailVerified: user.emailVerified,
+                displayName: user.displayName, totalExperience: 0,
+                leaderboardOptedOut: user.leaderboardOptedOut,
+                profileDetails: user.profileDetails,
+                authenticationMethods: user.authenticationMethods)
+            statusMessage = "已清除 (response.removedCount) 条服务端成绩；本机练习历史未受影响。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
         }
     }
 
