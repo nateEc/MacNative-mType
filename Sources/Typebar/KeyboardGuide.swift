@@ -18,6 +18,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case latinAmericanQwerty
   case frenchAzerty
   case turkishQ
+  case russianJcuken
 
   var id: Self { self }
 
@@ -39,6 +40,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .latinAmericanQwerty: "Latin American QWERTY"
     case .frenchAzerty: "French AZERTY"
     case .turkishQ: "Turkish Q"
+    case .russianJcuken: "Russian JCUKEN"
     }
   }
 }
@@ -65,6 +67,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case latinAmericanQwerty
   case frenchAzerty
   case turkishQ
+  case russianJcuken
 
   var id: Self { self }
 
@@ -724,6 +727,29 @@ enum KeyboardGuideModel {
           "bottom", "<ZXCVBNMÖÇ.",
           characters: ["<>", "zZ", "xX", "cC", "vV", "bB", "nN", "mM", "öÖ", "çÇ", ".:"],
           shiftedLabels: [">", "Z", "X", "C", "V", "B", "N", "M", "Ö", "Ç", ":"]
+        ),
+      ]
+    case .russianJcuken:
+      [
+        row(
+          "number", "Ё1234567890-=",
+          characters: ["ёЁ", "1!", "2\"", "3№", "4;", "5%", "6:", "7?", "8*", "9(", "0)", "-_", "=+"],
+          shiftedLabels: ["Ё", "!", "\"", "№", ";", "%", ":", "?", "*", "(", ")", "_", "+"]
+        ),
+        row(
+          "top", "ЙЦУКЕНГШЩЗХЪ\\",
+          characters: ["йЙ", "цЦ", "уУ", "кК", "еЕ", "нН", "гГ", "шШ", "щЩ", "зЗ", "хХ", "ъЪ", "\\/"],
+          shiftedLabels: ["Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х", "Ъ", "/"]
+        ),
+        row(
+          "home", "ФЫВАПРОЛДЖЭ",
+          characters: ["фФ", "ыЫ", "вВ", "аА", "пП", "рР", "оО", "лЛ", "дД", "жЖ", "эЭ"],
+          shiftedLabels: ["Ф", "Ы", "В", "А", "П", "Р", "О", "Л", "Д", "Ж", "Э"]
+        ),
+        row(
+          "bottom", "<ЯЧСМИТЬБЮ.",
+          characters: ["<>", "яЯ", "чЧ", "сС", "мМ", "иИ", "тТ", "ьЬ", "бБ", "юЮ", ".,"],
+          shiftedLabels: [">", "Я", "Ч", "С", "М", "И", "Т", "Ь", "Б", "Ю", ","]
         ),
       ]
     }

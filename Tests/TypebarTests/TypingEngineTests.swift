@@ -1800,6 +1800,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.turkishQ.emulatedLayout, .turkishQ)
   }
 
+  func testRussianJcukenMapsCyrillicLettersAndPhysicalKeyPositions() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ё", layout: .russianJcuken), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "й", layout: .russianJcuken), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ж", layout: .russianJcuken), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "я", layout: .russianJcuken), "bottom-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ",", layout: .russianJcuken), "bottom-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .russianJcuken), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .russianJcuken), "ё")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], layout: .russianJcuken), "Й")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [], layout: .russianJcuken), "ж")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 46, modifierFlags: [.shift], layout: .russianJcuken), "Ь")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 44, modifierFlags: [.shift], layout: .russianJcuken), ",")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Э", layout: .russianJcuken), 39)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "\\", layout: .russianJcuken), 42)
+    XCTAssertEqual(KeyboardInputLayout.russianJcuken.emulatedLayout, .russianJcuken)
+  }
+
   @MainActor
   func testTurkishQPersistsAsGuideInputAndLayoutFluidChoice() {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -1815,6 +1838,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardLayout, .turkishQ)
     XCTAssertEqual(restored.keyboardInputLayout, .turkishQ)
     XCTAssertEqual(restored.layoutFluidLayouts, [.turkishQ, .ansiQwerty])
+  }
+
+  @MainActor
+  func testRussianJcukenPersistsAsGuideInputAndLayoutFluidChoice() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .russianJcuken
+    settings.keyboardInputLayout = .russianJcuken
+    settings.layoutFluidLayouts = [.russianJcuken, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .russianJcuken)
+    XCTAssertEqual(restored.keyboardInputLayout, .russianJcuken)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.russianJcuken, .ansiQwerty])
   }
 
   @MainActor
@@ -3499,7 +3539,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 16)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 17)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
