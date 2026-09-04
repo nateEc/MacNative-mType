@@ -1215,7 +1215,8 @@ private struct ContentView: View {
 
       NativeTypingInput(
         focusRequest: focusRequest, quickRestartKey: settings.quickRestartKey,
-        keyboardLayout: settings.keyboardLayout,
+        keyboardInputLayout: effectiveKeyboardInputLayout,
+        keymapLayout: effectiveKeyboardLayout,
         oppositeShiftMode: settings.oppositeShiftMode,
         mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
         acceptsNewlineInput: session.configuration.mode == .zen || session.prompt.contains("\n"),
@@ -1467,6 +1468,16 @@ private struct ContentView: View {
     return LayoutFluidPolicy.activeLayout(
       completedWords: session.completedWordCount, wordLimit: session.configuration.wordLimit,
       layouts: settings.layoutFluidLayouts)
+  }
+
+  /// Layout Fluid deliberately switches both the visible guide and simulated
+  /// input layout, matching the reference funbox. Outside that mode, input
+  /// emulation remains an opt-in setting and the guide is presentation-only.
+  private var effectiveKeyboardInputLayout: KeyboardInputLayout {
+    guard session.configuration.modifiers.contains(.layoutFluid) else {
+      return settings.keyboardInputLayout
+    }
+    return .init(emulating: effectiveKeyboardLayout)
   }
 
   private var layoutFluidNotice: String? {

@@ -1,15 +1,15 @@
 @preconcurrency import AppKit
 
-/// Converts ANSI physical key positions into Typebar's supported practice layouts.
-/// This is intentionally local and deterministic: it never reads the active system
-/// keyboard layout, so dead keys and IME composition keep using the normal AppKit path.
+/// Converts ANSI physical key positions into an explicitly selected practice layout.
+/// A nil layout leaves the event on AppKit's normal input path, preserving the
+/// active macOS input source, dead keys, and IME composition.
 enum KeyboardLayoutEmulator {
   private typealias KeyPair = (normal: Character, shifted: Character)
 
   static func character(
-    forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, layout: KeyboardLayout
+    forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, layout: KeyboardLayout?
   ) -> Character? {
-    guard layout != .ansiQwerty,
+    guard let layout,
       !modifierFlags.contains(.command),
       !modifierFlags.contains(.control),
       !modifierFlags.contains(.option),

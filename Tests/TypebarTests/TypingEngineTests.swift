@@ -1613,12 +1613,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(
         forKeyCode: 18, modifierFlags: [.shift], layout: .frenchAzerty), "1")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 0, modifierFlags: [], layout: .ansiQwerty), "a")
     XCTAssertNil(
       KeyboardLayoutEmulator.character(
-        forKeyCode: 0, modifierFlags: [], layout: .ansiQwerty))
+        forKeyCode: 0, modifierFlags: [], layout: KeyboardInputLayout.system.emulatedLayout))
     XCTAssertNil(
       KeyboardLayoutEmulator.character(
         forKeyCode: 0, modifierFlags: [.option], layout: .ansiDvorak))
+  }
+
+  func testKeyboardInputLayoutSeparatesSystemInputFromGuideAndPreservesLegacyChoices() {
+    XCTAssertNil(KeyboardInputLayout.system.emulatedLayout)
+    XCTAssertEqual(KeyboardInputLayout.ansiQwerty.emulatedLayout, .ansiQwerty)
+    XCTAssertEqual(KeyboardInputLayout.ansiDvorak.emulatedLayout, .ansiDvorak)
+    XCTAssertEqual(KeyboardInputLayout.legacyDefault(for: .ansiQwerty), .system)
+    XCTAssertEqual(KeyboardInputLayout.legacyDefault(for: .germanQwertz), .germanQwertz)
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 0, modifierFlags: [], layout: KeyboardInputLayout.ansiQwerty.emulatedLayout),
+      "a")
   }
 
   @MainActor
@@ -3069,6 +3084,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(PracticeVisualEffect.make(modifiers: [.chooVisual]).usesChoo, true)
     XCTAssertEqual(PracticeVisualEffect.make(modifiers: [.aslVisual]).usesASL, true)
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
+    XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
+    XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, KeyboardLayout.allCases.count)
+    XCTAssertEqual(
+      LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
+      KeyboardLayout.allCases)
     XCTAssertEqual(
       EarthquakeOffsetPolicy.offset(at: start, isEnabled: true, reducesMotion: true).x, 0)
     XCTAssertEqual(EarthquakeOffsetPolicy.offset(at: start, isEnabled: false, reducesMotion: false).y, 0)
@@ -4585,6 +4605,7 @@ final class TypingEngineTests: XCTestCase {
     settings.publishCompletedResults = true
     settings.saveCompletedResults = false
     settings.keyboardLayout = .ansiDvorak
+    settings.keyboardInputLayout = .swissGerman
     settings.layoutFluidLayouts = [.ansiWorkman, .frenchAzerty, .ansiQwerty]
     settings.quickEnd = true
     settings.quickRestartKey = .enter
@@ -4679,6 +4700,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideLegendStyle, .dynamic)
     XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
     XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
+    XCTAssertEqual(exportedSnapshot.keyboardInputLayout, .swissGerman)
     XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
     XCTAssertFalse(exportedSnapshot.showKeyTips)
     XCTAssertEqual(exportedSnapshot.commandPaletteListMode, .grouped)
@@ -4718,6 +4740,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.publishCompletedResults)
     XCTAssertFalse(restored.saveCompletedResults)
     XCTAssertEqual(restored.keyboardLayout, .ansiDvorak)
+    XCTAssertEqual(restored.keyboardInputLayout, .swissGerman)
     XCTAssertEqual(restored.layoutFluidLayouts, [.ansiWorkman, .frenchAzerty, .ansiQwerty])
     XCTAssertTrue(restored.quickEnd)
     XCTAssertEqual(restored.quickRestartKey, .enter)
@@ -4883,6 +4906,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.keyboardGuideKeysMode, .minimal)
     XCTAssertEqual(snapshot.keyboardGuideStyle, .staggered)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
+    XCTAssertEqual(snapshot.keyboardInputLayout, .system)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertEqual(snapshot.quickRestartKey, .off)
     XCTAssertTrue(snapshot.showKeyTips)
@@ -4954,6 +4978,13 @@ final class TypingEngineTests: XCTestCase {
     let hiddenGuideLegacy = try JSONDecoder().decode(
       AppSettingsSnapshot.self, from: Data("{\"showKeyboardGuide\":false}".utf8))
     XCTAssertEqual(hiddenGuideLegacy.keyboardGuideMode, .off)
+    let legacyEmulatedLayout = try JSONDecoder().decode(
+      AppSettingsSnapshot.self, from: Data("{\"keyboardLayout\":\"ansiDvorak\"}".utf8))
+    XCTAssertEqual(legacyEmulatedLayout.keyboardInputLayout, .ansiDvorak)
+    let explicitSystemInput = try JSONDecoder().decode(
+      AppSettingsSnapshot.self,
+      from: Data("{\"keyboardLayout\":\"ansiDvorak\",\"keyboardInputLayout\":\"system\"}".utf8))
+    XCTAssertEqual(explicitSystemInput.keyboardInputLayout, .system)
     XCTAssertEqual(
       try XCTUnwrap(PracticeLineWidth.compact.maximumWidth(fontSize: 20)), 520.8, accuracy: 0.001)
     XCTAssertEqual(

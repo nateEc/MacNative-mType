@@ -510,6 +510,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var keyboardGuideKeysMode: KeyboardGuideKeysMode = .minimal
   var keyboardGuideStyle: KeyboardGuideStyle = .staggered
   var keyboardLayout: KeyboardLayout = .ansiQwerty
+  var keyboardInputLayout: KeyboardInputLayout = .system
   var quickEnd = false
   var quickRestartKey: QuickRestartKey = .off
   var showKeyTips = true
@@ -610,6 +611,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     keyboardGuideKeysMode: KeyboardGuideKeysMode = .minimal,
     keyboardGuideStyle: KeyboardGuideStyle = .staggered,
     keyboardLayout: KeyboardLayout = .ansiQwerty,
+    keyboardInputLayout: KeyboardInputLayout = .system,
     quickEnd: Bool = false,
     quickRestartKey: QuickRestartKey = .off,
     showKeyTips: Bool = true,
@@ -713,6 +715,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.keyboardGuideKeysMode = keyboardGuideKeysMode
     self.keyboardGuideStyle = keyboardGuideStyle
     self.keyboardLayout = keyboardLayout
+    self.keyboardInputLayout = keyboardInputLayout
     self.quickEnd = quickEnd
     self.quickRestartKey = quickRestartKey
     self.showKeyTips = showKeyTips
@@ -799,7 +802,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       hideExtraLetters, blindMode, fontSize,
       practiceFont, installedPracticeFontName, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
-      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
+      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, keyboardInputLayout, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
       randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, typingPowerMode, englishVariant,
       favoriteQuoteIDs, activeResultTags, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
@@ -863,6 +866,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
       KeyboardGuideStyle.self, forKey: .keyboardGuideStyle) ?? .staggered
     keyboardLayout =
       try values.decodeIfPresent(KeyboardLayout.self, forKey: .keyboardLayout) ?? .ansiQwerty
+    keyboardInputLayout = try values.decodeIfPresent(
+      KeyboardInputLayout.self, forKey: .keyboardInputLayout)
+      ?? KeyboardInputLayout.legacyDefault(for: keyboardLayout)
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
     quickRestartKey = try values.decodeIfPresent(QuickRestartKey.self, forKey: .quickRestartKey) ?? .off
     showKeyTips = try values.decodeIfPresent(Bool.self, forKey: .showKeyTips) ?? true
@@ -1106,6 +1112,7 @@ final class AppSettings {
   var keyboardGuideKeysMode: KeyboardGuideKeysMode = .minimal { didSet { persist() } }
   var keyboardGuideStyle: KeyboardGuideStyle = .staggered { didSet { persist() } }
   var keyboardLayout: KeyboardLayout = .ansiQwerty { didSet { persist() } }
+  var keyboardInputLayout: KeyboardInputLayout = .system { didSet { persist() } }
   var layoutFluidLayouts: [KeyboardLayout] = LayoutFluidPolicy.defaultLayouts {
     didSet { defaults.set(layoutFluidLayouts.map(\.rawValue), forKey: layoutFluidStorageKey) }
   }
@@ -1317,6 +1324,7 @@ final class AppSettings {
     keyboardGuideKeysMode = snapshot.keyboardGuideKeysMode
     keyboardGuideStyle = snapshot.keyboardGuideStyle
     keyboardLayout = snapshot.keyboardLayout
+    keyboardInputLayout = snapshot.keyboardInputLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
     showKeyTips = snapshot.showKeyTips
@@ -1450,7 +1458,9 @@ final class AppSettings {
       keyboardGuideLegendStyle: keyboardGuideLegendStyle,
       keyboardGuideKeysMode: keyboardGuideKeysMode,
       keyboardGuideStyle: keyboardGuideStyle,
-      keyboardLayout: keyboardLayout, quickEnd: quickEnd,
+      keyboardLayout: keyboardLayout,
+      keyboardInputLayout: keyboardInputLayout,
+      quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       showKeyTips: showKeyTips,
       commandPaletteListMode: commandPaletteListMode,
@@ -1532,6 +1542,7 @@ final class AppSettings {
     keyboardGuideKeysMode = .minimal
     keyboardGuideStyle = .staggered
     keyboardLayout = .ansiQwerty
+    keyboardInputLayout = .system
     layoutFluidLayouts = LayoutFluidPolicy.defaultLayouts
     quickEnd = false
     quickRestartKey = .off
@@ -1638,7 +1649,7 @@ final class AppSettings {
   }
 
   func addLayoutFluidLayout() {
-    guard layoutFluidLayouts.count < 5 else { return }
+    guard layoutFluidLayouts.count < LayoutFluidPolicy.maximumSupportedLayouts else { return }
     let candidate = KeyboardLayout.allCases.first { !layoutFluidLayouts.contains($0) } ?? .ansiQwerty
     layoutFluidLayouts = LayoutFluidPolicy.normalizedLayouts(layoutFluidLayouts + [candidate])
   }
@@ -1674,6 +1685,7 @@ final class AppSettings {
     keyboardGuideKeysMode = snapshot.keyboardGuideKeysMode
     keyboardGuideStyle = snapshot.keyboardGuideStyle
     keyboardLayout = snapshot.keyboardLayout
+    keyboardInputLayout = snapshot.keyboardInputLayout
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
     showKeyTips = snapshot.showKeyTips
@@ -1927,6 +1939,7 @@ final class AppSettings {
       keyboardGuideKeysMode: keyboardGuideKeysMode,
       keyboardGuideStyle: keyboardGuideStyle,
       keyboardLayout: keyboardLayout,
+      keyboardInputLayout: keyboardInputLayout,
       quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       showKeyTips: showKeyTips,

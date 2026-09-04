@@ -39,6 +39,49 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   }
 }
 
+/// Matches Monkeytype's separate `layout` input setting. The keyboard guide
+/// can show any supported layout while normal typing remains under macOS's
+/// input-source and IME control unless emulation is explicitly requested.
+enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
+  case system
+  case ansiQwerty
+  case ansiDvorak
+  case ansiColemak
+  case ansiWorkman
+  case germanQwertz
+  case swissGerman
+  case swissFrench
+  case ukQwerty
+  case spanishQwerty
+  case italianQwerty
+  case portugueseQwertyISO
+  case portugueseQwertyANSI
+  case latinAmericanQwerty
+  case frenchAzerty
+
+  var id: Self { self }
+
+  var displayName: String {
+    guard let emulatedLayout else { return "系统当前输入法（推荐）" }
+    return "模拟 \(emulatedLayout.displayName)"
+  }
+
+  var emulatedLayout: KeyboardLayout? {
+    self == .system ? nil : KeyboardLayout(rawValue: rawValue)
+  }
+
+  init(emulating layout: KeyboardLayout) {
+    self = KeyboardInputLayout(rawValue: layout.rawValue) ?? .system
+  }
+
+  /// Typebar versions before this setting used `keyboardLayout` for both
+  /// display and emulation. Keep an existing non-QWERTY choice working when
+  /// decoding one of those archives; fresh settings always use the system.
+  static func legacyDefault(for keyboardLayout: KeyboardLayout) -> Self {
+    keyboardLayout == .ansiQwerty ? .system : .init(emulating: keyboardLayout)
+  }
+}
+
 /// Determines whether the native keyboard guide is hidden, static, reacts to
 /// the last physical key, or directs the next expected key.
 enum KeyboardGuideMode: String, Codable, CaseIterable, Identifiable {

@@ -690,6 +690,14 @@ struct PreferencesView: View {
               Text(layout.displayName).tag(layout)
             }
           }
+          Picker("输入布局模拟", selection: $settings.keyboardInputLayout) {
+            ForEach(KeyboardInputLayout.allCases) { layout in
+              Text(layout.displayName).tag(layout)
+            }
+          }
+          Text("默认使用 macOS 当前输入法；只有明确选择模拟时才会接管物理按键。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           if settings.testModifiers.contains(.layoutFluid) {
             VStack(alignment: .leading, spacing: 8) {
               Text("布局流动序列")
@@ -719,8 +727,8 @@ struct PreferencesView: View {
                 }
               }
               Button("添加布局", systemImage: "plus") { settings.addLayoutFluidLayout() }
-                .disabled(settings.layoutFluidLayouts.count >= 5)
-              Text("字数练习会按完成进度均分各段并依次切换键盘提示；最多五种不同布局。")
+                .disabled(settings.layoutFluidLayouts.count >= LayoutFluidPolicy.maximumSupportedLayouts)
+              Text("Layout Fluid 会按完成进度均分各段并切换键盘提示和输入模拟；当前原生布局最多 \(LayoutFluidPolicy.maximumSupportedLayouts) 种（官方上限为 15）。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
