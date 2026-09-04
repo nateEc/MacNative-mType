@@ -385,6 +385,12 @@ private struct PublicProfileView: View {
                     metric("最高稳定度", "\(profile.highestConsistency.formatted(.number.precision(.fractionLength(0...2))))%")
                     metric("总 XP", "\(profile.totalExperience)")
                 }
+                if let streak = profile.streak {
+                    GridRow {
+                        metric("当前连续", "\(streak.currentDays) 天")
+                        metric("最长连续", "\(streak.longestDays) 天")
+                    }
+                }
             }
             Text("加入 \(profile.joinedAt.formatted(date: .abbreviated, time: .omitted))")
                 .font(.caption)

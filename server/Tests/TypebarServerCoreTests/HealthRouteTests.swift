@@ -1285,6 +1285,28 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(ProfileReportReason.allCases.contains(.inappropriateLinks))
   }
 
+  func testPublicProfileStreakUsesUTCDaysAndRespectsActivityVisibility() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 345_600)
+    let session = try await store.register(
+      .init(email: "streak@example.com", password: "a secure password", displayName: "Streak User"),
+      now: now)
+    for finishedAt in [now, now.addingTimeInterval(-86_400), now.addingTimeInterval(-259_200)] {
+      _ = try await store.submitResult(
+        result(id: UUID(), wpm: 72, accuracy: 98, finishedAt: finishedAt),
+        accessToken: session.accessToken, now: now)
+    }
+
+    let visible = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(visible.streak, .init(currentDays: 2, longestDays: 2))
+
+    _ = try await store.updateProfile(
+      .init(profileDetails: .init(showActivity: false)), accessToken: session.accessToken, now: now)
+    let hidden = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertNil(hidden.activity)
+    XCTAssertNil(hidden.streak)
+  }
+
   func testPublicProfileHidesEmailAndIncludesAggregateResults() async throws {
     let app = try await Application.make(.testing)
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)

@@ -617,6 +617,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let highestConsistency: Double
     let personalBests: [RemotePublicProfileBest]
     let activity: RemotePublicProfileActivity?
+    let streak: RemotePublicProfileStreak?
     let totalExperience: Int
     let profileDetails: RemoteProfileDetails
     let discordAvatar: RemoteDiscordAvatar?
@@ -624,7 +625,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests,
-            activity, totalExperience, profileDetails, discordAvatar, selectedBadge
+            activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge
     }
 
     init(from decoder: Decoder) throws {
@@ -637,6 +638,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         highestConsistency = try values.decodeIfPresent(Double.self, forKey: .highestConsistency) ?? 0
         personalBests = try values.decodeIfPresent([RemotePublicProfileBest].self, forKey: .personalBests) ?? []
         activity = try values.decodeIfPresent(RemotePublicProfileActivity.self, forKey: .activity)
+        streak = try values.decodeIfPresent(RemotePublicProfileStreak.self, forKey: .streak)
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
         discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
@@ -691,6 +693,11 @@ struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
 struct RemotePublicProfileActivity: Codable, Sendable {
     let lastDay: Date
     let testsByDays: [Int]
+}
+
+struct RemotePublicProfileStreak: Codable, Equatable, Sendable {
+    let currentDays: Int
+    let longestDays: Int
 }
 
 private struct RemotePublicProfileSearchResponse: Codable, Sendable {

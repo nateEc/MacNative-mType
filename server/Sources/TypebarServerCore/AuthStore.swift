@@ -340,6 +340,7 @@ public struct PublicProfileResponse: Content, Equatable {
   public let highestConsistency: Double
   public let personalBests: [PublicProfileBestResponse]
   public let activity: PublicProfileActivityResponse?
+  public let streak: PublicProfileStreakResponse?
   public let totalExperience: Int
   public let profileDetails: ProfileDetails
   public let discordAvatar: PublicDiscordAvatarResponse?
@@ -380,6 +381,13 @@ public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
 public struct PublicProfileActivityResponse: Content, Equatable {
   public let lastDay: Date
   public let testsByDays: [Int]
+}
+
+/// A UTC-derived public streak summary. It shares the activity visibility
+/// preference and never includes individual result timestamps.
+public struct PublicProfileStreakResponse: Content, Equatable {
+  public let currentDays: Int
+  public let longestDays: Int
 }
 
 public struct PublicProfileSearchResponse: Content, Equatable {
@@ -2079,18 +2087,21 @@ public actor AuthStore {
 
   private func publicProfile(for user: StoredUser) -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
-    return publicProfile(for: user, results: results, activity: nil)
+    return publicProfile(for: user, results: results, activity: nil, streak: nil)
   }
 
   private func detailedPublicProfile(for user: StoredUser, now: Date) -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
+    let shouldShowActivity = user.profileDetails.showActivity
     return publicProfile(
       for: user, results: results,
-      activity: user.profileDetails.showActivity ? publicActivity(from: results, endingAt: now) : nil)
+      activity: shouldShowActivity ? publicActivity(from: results, endingAt: now) : nil,
+      streak: shouldShowActivity ? publicStreak(from: results, endingAt: now) : nil)
   }
 
   private func publicProfile(
-    for user: StoredUser, results: [StoredResult], activity: PublicProfileActivityResponse?
+    for user: StoredUser, results: [StoredResult], activity: PublicProfileActivityResponse?,
+    streak: PublicProfileStreakResponse?
   ) -> PublicProfileResponse {
     return .init(
       id: user.id,
@@ -2101,6 +2112,7 @@ public actor AuthStore {
       highestConsistency: results.map(\.consistency).max() ?? 0,
       personalBests: publicPersonalBests(from: results),
       activity: activity,
+      streak: streak,
       totalExperience: experience(for: user.id),
       profileDetails: user.profileDetails,
       discordAvatar: publicDiscordAvatar(for: user),
@@ -2166,6 +2178,40 @@ public actor AuthStore {
 
     guard testsByDays.contains(where: { $0 > 0 }) else { return nil }
     return .init(lastDay: lastDay, testsByDays: testsByDays)
+  }
+
+  private func publicStreak(from results: [StoredResult], endingAt now: Date)
+    -> PublicProfileStreakResponse?
+  {
+    guard !results.isEmpty else { return nil }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let days = Set(results.map { calendar.startOfDay(for: $0.finishedAt) })
+    let currentDay = calendar.startOfDay(for: now)
+    var currentDays = 0
+    var cursor = currentDay
+    while days.contains(cursor) {
+      currentDays += 1
+      guard let previousDay = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+      cursor = previousDay
+    }
+
+    let sortedDays = days.sorted()
+    var longestDays = 0
+    var runLength = 0
+    var previousDay: Date?
+    for day in sortedDays {
+      if let previousDay,
+        calendar.date(byAdding: .day, value: 1, to: previousDay) == day
+      {
+        runLength += 1
+      } else {
+        runLength = 1
+      }
+      longestDays = max(longestDays, runLength)
+      previousDay = day
+    }
+    return .init(currentDays: currentDays, longestDays: longestDays)
   }
 
   private func publicPersonalBests(from results: [StoredResult]) -> [PublicProfileBestResponse] {

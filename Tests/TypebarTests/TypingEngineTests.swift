@@ -222,6 +222,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(profile.highestConsistency, 0)
     XCTAssertTrue(profile.personalBests.isEmpty)
     XCTAssertNil(profile.activity)
+    XCTAssertNil(profile.streak)
+
+    let modernPayload = """
+      {"id":"\(id.uuidString)","displayName":"Local","joinedAt":\(joinedAt.timeIntervalSinceReferenceDate),"completedResultCount":3,"bestWPM":80,"totalExperience":42,"streak":{"currentDays":2,"longestDays":4}}
+      """
+    let modern = try JSONDecoder().decode(RemotePublicProfile.self, from: Data(modernPayload.utf8))
+    XCTAssertEqual(modern.streak, .init(currentDays: 2, longestDays: 4))
   }
 
   func testWordsTestCompletesAtWordLimit() {
