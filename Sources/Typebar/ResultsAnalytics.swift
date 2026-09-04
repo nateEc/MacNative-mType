@@ -884,6 +884,65 @@ enum CurrentPersonalBestPolicy {
   }
 }
 
+struct TagPersonalBestFeedback: Equatable, Identifiable {
+  let tag: String
+  let previousBestWpm: Int?
+  let currentWpm: Int
+
+  var id: String { tag }
+  var isNewPersonalBest: Bool {
+    previousBestWpm.map { currentWpm > $0 } ?? true
+  }
+  var improvement: Int? {
+    guard let previousBestWpm, currentWpm > previousBestWpm else { return nil }
+    return currentWpm - previousBestWpm
+  }
+}
+
+/// Derives completed-result tag feedback from Typebar's local history only.
+enum TagPersonalBestPolicy {
+  static func feedback(
+    for result: CompletedTestResult,
+    previousResults: [CompletedTestResult]
+  ) -> [TagPersonalBestFeedback] {
+    guard result.outcome == .completed,
+      CurrentPersonalBestPolicy.isResultEligible(
+        configuration: result.configuration, accuracy: result.accuracy)
+    else { return [] }
+
+    return ResultTagPolicy.normalized(result.tags).map { tag in
+      let previousBest = previousResults
+        .filter {
+          $0.id != result.id
+            && $0.outcome == .completed
+            && CurrentPersonalBestPolicy.isResultEligible(
+              configuration: $0.configuration, accuracy: $0.accuracy)
+            && configurationsMatch($0.configuration, result.configuration)
+            && hasTag(tag, in: $0.tags)
+        }
+        .map(\.wpm)
+        .max()
+      return .init(tag: tag, previousBestWpm: previousBest, currentWpm: result.wpm)
+    }
+  }
+
+  private static func configurationsMatch(_ lhs: TestConfiguration, _ rhs: TestConfiguration) -> Bool {
+    lhs.mode == rhs.mode
+      && lhs.duration == rhs.duration
+      && lhs.wordLimit == rhs.wordLimit
+      && lhs.contentOptions == rhs.contentOptions
+      && lhs.language == rhs.language
+      && lhs.difficulty == rhs.difficulty
+      && lhs.modifiers.contains(.lazyLatin) == rhs.modifiers.contains(.lazyLatin)
+  }
+
+  private static func hasTag(_ tag: String, in tags: [String]) -> Bool {
+    tags.contains {
+      $0.compare(tag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+  }
+}
+
 enum ResultHistoryDateRange: String, CaseIterable, Codable, Equatable {
     case all
     case lastDay

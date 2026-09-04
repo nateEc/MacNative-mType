@@ -569,6 +569,10 @@ private struct ContentView: View {
         lastCompletedWpm = result.wpm
         repeatedPaceArmed = settings.repeatedPace
         let savesResult = result.outcome == .completed && settings.saveCompletedResults
+        let tagPersonalBestFeedback = savesResult
+          ? TagPersonalBestPolicy.feedback(
+            for: result, previousResults: savedResults.compactMap(\.portableResult))
+          : []
         let wordReviews = session.wordReviews
         let wordBursts = session.wordBurstHistory
         let missedWordPractice = MissedWordPracticePlan.make(errorCounts: session.missedWordErrorCounts)
@@ -593,6 +597,7 @@ private struct ContentView: View {
           savesResult: savesResult,
           savedRecord: savedRecord,
           quoteFeedback: activeQuoteFeedback,
+          tagPersonalBestFeedback: tagPersonalBestFeedback,
           missedWords: missedWordPractice?.selectedWords ?? [],
           missedWordPracticeWords: missedWordPractice?.exerciseWords ?? [],
           wordReviews: wordReviews,
@@ -713,6 +718,7 @@ private struct ContentView: View {
         publicationMessage: publicationMessage,
         savedResultRecord: result.savedRecord,
         quoteFeedback: result.quoteFeedback,
+        tagPersonalBestFeedback: result.tagPersonalBestFeedback,
         settings: settings,
         quoteRatings: quoteRatings,
         isSignedIn: account.currentUser != nil,
@@ -2689,6 +2695,7 @@ private struct CompletedResultPresentation: Identifiable {
   let savesResult: Bool
   let savedRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
+  let tagPersonalBestFeedback: [TagPersonalBestFeedback]
   let missedWords: [String]
   let missedWordPracticeWords: [String]
   let wordReviews: [TypedWordReview]
@@ -2719,6 +2726,7 @@ private struct CompletedResultView: View {
   let publicationMessage: String?
   let savedResultRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
+  let tagPersonalBestFeedback: [TagPersonalBestFeedback]
   let settings: AppSettings
   let quoteRatings: QuoteRatingStore
   let isSignedIn: Bool
@@ -2825,6 +2833,8 @@ private struct CompletedResultView: View {
           .foregroundStyle(.secondary)
       }
 
+      tagPersonalBestFeedbackView
+
       if let savedResultRecord {
         ResultTagEditor(result: savedResultRecord)
       }
@@ -2907,6 +2917,35 @@ private struct CompletedResultView: View {
     .frame(width: 390)
     .onAppear {
       communityRating = initialCommunityRating
+    }
+  }
+
+  @ViewBuilder
+  private var tagPersonalBestFeedbackView: some View {
+    if !tagPersonalBestFeedback.isEmpty {
+      VStack(alignment: .leading, spacing: 7) {
+        Label("标签个人最佳", systemImage: "tag")
+          .font(.headline)
+        ForEach(tagPersonalBestFeedback) { feedback in
+          HStack(spacing: 7) {
+            Image(systemName: feedback.isNewPersonalBest ? "crown.fill" : "crown")
+              .foregroundStyle(feedback.isNewPersonalBest ? .yellow : .secondary)
+            Text(feedback.tag)
+            Spacer()
+            if let improvement = feedback.improvement {
+              Text(feedback.previousBestWpm == nil
+                ? "首次 PB · \(feedback.currentWpm) WPM"
+                : "+\(improvement) WPM")
+                .foregroundStyle(accent)
+            } else if let previousBestWpm = feedback.previousBestWpm {
+              Text("PB \(previousBestWpm) WPM")
+                .foregroundStyle(.secondary)
+            }
+          }
+          .font(.caption)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 

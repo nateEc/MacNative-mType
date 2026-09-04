@@ -3687,6 +3687,48 @@ final class TypingEngineTests: XCTestCase {
       .init(count: 3, wpm: 90, accuracy: 98))
   }
 
+  func testTagPersonalBestFeedbackUsesOnlyComparableCompletedLocalResults() {
+    let configuration = TestConfiguration.words(25, language: .english)
+    func result(
+      wpm: Int, tags: [String], configuration: TestConfiguration = configuration,
+      outcome: TestOutcome = .completed
+    ) -> CompletedTestResult {
+      .init(
+        id: UUID(), configuration: configuration, outcome: outcome, startedAt: start,
+        finishedAt: start.addingTimeInterval(30), typedCharacterCount: 100,
+        correctCharacterCount: 100, errorCount: 0, wpm: wpm, rawWpm: wpm, accuracy: 100,
+        tags: tags)
+    }
+
+    let current = result(wpm: 90, tags: ["focus", "review", "fresh"])
+    let feedback = TagPersonalBestPolicy.feedback(
+      for: current,
+      previousResults: [
+        result(wpm: 100, tags: ["FOCUS"]),
+        result(wpm: 85, tags: ["review"]),
+        result(wpm: 250, tags: ["review"], configuration: .words(50, language: .english)),
+        result(wpm: 300, tags: ["review"], outcome: .abandoned),
+      ])
+
+    XCTAssertEqual(
+      feedback,
+      [
+        .init(tag: "focus", previousBestWpm: 100, currentWpm: 90),
+        .init(tag: "review", previousBestWpm: 85, currentWpm: 90),
+        .init(tag: "fresh", previousBestWpm: nil, currentWpm: 90),
+      ])
+    XCTAssertFalse(feedback[0].isNewPersonalBest)
+    XCTAssertNil(feedback[0].improvement)
+    XCTAssertTrue(feedback[1].isNewPersonalBest)
+    XCTAssertEqual(feedback[1].improvement, 5)
+    XCTAssertTrue(feedback[2].isNewPersonalBest)
+    XCTAssertTrue(TagPersonalBestPolicy.feedback(
+      for: result(wpm: 90, tags: ["focus"], configuration: .init(
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        language: .english)),
+      previousResults: [current]).isEmpty)
+  }
+
   func testWordBurstHeatmapUsesCurrentResultQuintilesAndLeavesMissingBurstsNeutral() throws {
     let heatmap = try XCTUnwrap(
       WordBurstHeatmapPolicy.make(bursts: [20, 40, 60, 80, 100, nil, 0]))
