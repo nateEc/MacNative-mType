@@ -4032,6 +4032,38 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.codeSwift.ownedPracticeWords().isEmpty)
   }
 
+  func testCustomTextGeneratorBuildsBoundedLocalTextAndRejectsInvalidSettings() throws {
+    var generator = SystemRandomNumberGenerator()
+    let generated = try CustomTextGenerator.generate(
+      settings: .init(fragments: "a b", minimumFragments: 2, maximumFragments: 4, wordCount: 8),
+      using: &generator).get()
+    let words = generated.split(separator: " ")
+    XCTAssertEqual(words.count, 8)
+    XCTAssertTrue(words.allSatisfy { (2...4).contains($0.count) })
+    XCTAssertTrue(words.allSatisfy { $0.allSatisfy { $0 == "a" || $0 == "b" } })
+
+    XCTAssertEqual(
+      CustomTextGenerator.generate(settings: .init(), using: &generator), .failure(.emptyFragments))
+    XCTAssertEqual(
+      CustomTextGenerator.generate(
+        settings: .init(fragments: "a", minimumFragments: 4, maximumFragments: 2, wordCount: 1),
+        using: &generator), .failure(.invalidFragmentRange))
+    XCTAssertEqual(
+      CustomTextGenerator.generate(
+        settings: .init(fragments: "a", minimumFragments: 1, maximumFragments: 1, wordCount: 0),
+        using: &generator), .failure(.invalidWordCount))
+    XCTAssertEqual(
+      CustomTextGenerator.generate(
+        settings: .init(fragments: "a", minimumFragments: 1, maximumFragments: 1, wordCount: 1_001),
+        using: &generator), .failure(.invalidWordCount))
+    XCTAssertEqual(
+      CustomTextGenerator.generate(
+        settings: .init(
+          fragments: String(repeating: "x", count: 100), minimumFragments: 1,
+          maximumFragments: 20, wordCount: 1_000), using: &generator),
+      .failure(.exceedsCustomTextLimit))
+  }
+
   func testModerationQueueStatesAndReportIdentifiersRemainStable() {
     XCTAssertEqual(
       RemoteQuoteModerationStatus.allCases.map(\.rawValue),

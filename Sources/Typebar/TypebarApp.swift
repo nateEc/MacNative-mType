@@ -480,6 +480,7 @@ private struct ContentView: View {
   @State private var showingSavedTexts = false
   @State private var showingSaveCustomText = false
   @State private var showingWordFilter = false
+  @State private var showingCustomTextGenerator = false
   @State private var completedResult: CompletedResultPresentation?
   @State private var publicationMessage: String?
   @State private var terminalNotice: TestTerminalNotice?
@@ -713,7 +714,12 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingWordFilter) {
       WordFilterView(language: language) { text, appending in
-        applyWordFilter(text, appending: appending)
+        applyGeneratedCustomText(text, appending: appending)
+      }
+    }
+    .sheet(isPresented: $showingCustomTextGenerator) {
+      CustomTextGeneratorView { text, appending in
+        applyGeneratedCustomText(text, appending: appending)
       }
     }
     .sheet(item: $completedResult) { result in
@@ -1114,6 +1120,7 @@ private struct ContentView: View {
                 .disabled(!CustomTextPolicy.isValid(customText))
               Button("已保存文本…") { showingSavedTexts = true }
               Button("筛选词表…") { showingWordFilter = true }
+              Button("生成文本…") { showingCustomTextGenerator = true }
             }
           }
         case .zen:
@@ -2120,10 +2127,10 @@ private struct ContentView: View {
     reset()
   }
 
-  private func applyWordFilter(_ filteredText: String, appending: Bool) {
+  private func applyGeneratedCustomText(_ generatedText: String, appending: Bool) {
     let existing = appending ? customText.trimmingCharacters(in: .whitespacesAndNewlines) : ""
     let separator = existing.isEmpty ? "" : " "
-    let nextText = CustomTextPolicy.clamped(existing + separator + filteredText)
+    let nextText = CustomTextPolicy.clamped(existing + separator + generatedText)
     guard CustomTextPolicy.isValid(nextText) else { return }
     activeChallengeID = nil
     activeLongSavedText = nil
