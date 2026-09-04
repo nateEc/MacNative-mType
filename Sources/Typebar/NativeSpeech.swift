@@ -36,6 +36,7 @@ extension TypingLanguage {
     case .gujarati: "gu-IN"
     case .bangla: "bn-BD"
     case .thai: "th-TH"
+    case .nepali: "ne-NP"
     case .greek, .greeklish: "el-GR"
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"

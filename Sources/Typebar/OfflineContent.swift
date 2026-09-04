@@ -904,6 +904,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "nepali-calm-step",
+      title: "शान्त कदम",
+      text: "शान्त कदमले अर्को कामलाई स्पष्ट बनाउँछ।",
+      language: .nepali,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "nepali-open-notebook",
+      title: "खुला कापी",
+      text: "खुला कापीले सबै कठिन प्रश्नको उत्तर दिँदैन, तर प्रश्नलाई साना भागमा हेर्ने ठाउँ दिन्छ।",
+      language: .nepali,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "nepali-small-work",
+      title: "सानो काम",
+      text: "प्रगति सधैँ ठूलो क्षणमा देखिँदैन। उही पाना फेरि खोल्नु, एउटा वाक्य स्पष्ट बनाउनु, सानो गल्ती सच्याउनु र अर्को प्रयासका लागि उपयोगी टिपोट राख्नु जस्ता कामले भरोसा बिस्तारै बनाउँछन्।",
+      language: .nepali,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "nepali-long-table",
+      title: "लामो टेबल",
+      text: "लामो टेबलमा अधुरा विचारका लागि पनि ठाउँ हुन्छ। एक छेउमा पहिलो मस्यौदा हुन सक्छ, अर्को छेउमा अझ ध्यान चाहिने वाक्य, र बीचमा सानो निर्णय पर्खिरहेको हुन्छ। अभ्यास पनि यस्तै अगाडि बढ्छ: हरेक कठिन भागलाई एउटै प्रयासमा समाधान गर्न आवश्यक छैन। फर्केर आउने ठाउँ, अर्को स्पष्ट कदम र केही प्रयासपछि के सजिलो भयो भनेर हेर्ने धैर्य भए गति आफैँ बढ्छ।",
+      language: .nepali,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
