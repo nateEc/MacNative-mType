@@ -1990,7 +1990,7 @@ struct TypingSession {
     return committed + 1
   }
 
-  func result(at date: Date = .now) -> CompletedTestResult? {
+  func result(at date: Date = .now, tags: [String] = []) -> CompletedTestResult? {
     guard let startedAt, let finishedAt else { return nil }
     return .init(
       id: UUID(),
@@ -2005,6 +2005,7 @@ struct TypingSession {
       wpm: wpm(at: date),
       rawWpm: rawWpm(at: date),
       accuracy: accuracy,
+      tags: ResultTagPolicy.normalized(tags),
       prompt: prompt,
       replayEvents: replayEvents
     )

@@ -460,6 +460,8 @@ private struct ContentView: View {
   @State private var customTextSectionLimit = 1
   @State private var customTextOrdering: CustomTextOrdering = .inOrder
   @State private var activeLongSavedText: ActiveLongSavedText?
+  @State private var activeSessionTags: [String] = []
+  @State private var activeResultTagDraft = ""
   @State private var practiceReturnPreset: SavedTestPreset?
   @State private var showingHistory = false
   @State private var showingPresets = false
@@ -562,7 +564,7 @@ private struct ContentView: View {
     .onChange(of: session.outcome) { _, outcome in
       switch outcome {
       case .completed, .bailedOut, .invalidAFK:
-        guard let result = session.result() else { return }
+        guard let result = session.result(tags: activeSessionTags) else { return }
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
         lastCompletedWpm = result.wpm
         repeatedPaceArmed = settings.repeatedPace
@@ -745,7 +747,7 @@ private struct ContentView: View {
         todayPractice: result.todayPractice,
         onRepeat: {
           completedResult = nil
-          startRepeatedAttempt(result.repeatedSession)
+          startRepeatedAttempt(result.repeatedSession, tags: result.result.tags)
         },
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
@@ -879,6 +881,8 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
         }
+
+        activeResultTagControls
 
         if let liveContentMessage {
           HStack(spacing: 7) {
@@ -1082,6 +1086,92 @@ private struct ContentView: View {
     }
   }
 
+  private var activeResultTagControls: some View {
+    VStack(alignment: .leading, spacing: 7) {
+      Label("活动标签", systemImage: "tag")
+        .font(.headline)
+      Text("活动标签会写入之后开始的每轮已完成成绩，并可用于“活动标签个人最佳”节奏引导。")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      HStack {
+        TextField("新标签（最多 \(ResultTagPolicy.maximumCount) 个）", text: $activeResultTagDraft)
+          .onSubmit { activateResultTag(activeResultTagDraft) }
+        Button("启用") { activateResultTag(activeResultTagDraft) }
+          .disabled(
+            ResultTagPolicy.normalized([activeResultTagDraft]).isEmpty
+              || settings.activeResultTags.count >= ResultTagPolicy.maximumCount)
+      }
+      if !settings.activeResultTags.isEmpty {
+        HStack(spacing: 6) {
+          Text("已启用：")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          ForEach(settings.activeResultTags, id: \.self) { tag in
+            Button {
+              updateActiveResultTags { settings.deactivateResultTag(tag) }
+            } label: {
+              Label(tag, systemImage: "xmark")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+          }
+          Spacer(minLength: 0)
+          Button("清除", role: .destructive) {
+            updateActiveResultTags { settings.clearActiveResultTags() }
+          }
+          .buttonStyle(.borderless)
+          .controlSize(.small)
+        }
+      }
+      if !inactiveKnownResultTags.isEmpty, settings.activeResultTags.count < ResultTagPolicy.maximumCount {
+        Menu("从本机历史启用") {
+          ForEach(inactiveKnownResultTags, id: \.self) { tag in
+            Button(tag) { activateResultTag(tag) }
+          }
+        }
+        .controlSize(.small)
+      }
+      if session.hasStarted, activeSessionTags != settings.activeResultTags {
+        Text("本轮已锁定为：\(activeSessionTags.isEmpty ? "无标签" : activeSessionTags.joined(separator: "、"))；重新开始后才会采用新选择。")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .padding(10)
+    .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+  }
+
+  private var inactiveKnownResultTags: [String] {
+    var tags: [String] = []
+    for rawTag in savedResults.flatMap(\.tags) {
+      guard let tag = ResultTagPolicy.normalized([rawTag]).first else { continue }
+      guard !containsEquivalentResultTag(tag, in: settings.activeResultTags) else { continue }
+      guard !containsEquivalentResultTag(tag, in: tags) else { continue }
+      tags.append(tag)
+    }
+    return tags.sorted {
+      $0.compare($1, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedAscending
+    }
+  }
+
+  private func activateResultTag(_ rawTag: String) {
+    updateActiveResultTags { settings.activateResultTag(rawTag) }
+    activeResultTagDraft = ""
+  }
+
+  private func updateActiveResultTags(_ update: () -> Void) {
+    let tagsBefore = settings.activeResultTags
+    update()
+    guard tagsBefore != settings.activeResultTags, !session.hasStarted else { return }
+    reset()
+  }
+
+  private func containsEquivalentResultTag(_ tag: String, in tags: [String]) -> Bool {
+    tags.contains {
+      $0.compare(tag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+  }
+
   private var typingPanel: some View {
     ZStack(alignment: .topLeading) {
       RoundPracticeContent(
@@ -1253,6 +1343,14 @@ private struct ContentView: View {
     }
     .overlay(alignment: .bottomLeading) {
       VStack(alignment: .leading, spacing: 6) {
+        if !activeSessionTags.isEmpty {
+          Label("标签：\(activeSessionTags.joined(separator: "、"))", systemImage: "tag")
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.thinMaterial, in: Capsule())
+            .accessibilityLabel("本轮活动标签：\(activeSessionTags.joined(separator: "、"))")
+        }
         if let activePaceTargetWpm, let paceGuideIndex {
           Label(
             "节奏 \(activePaceTargetWpm) WPM · \(paceGuideProgressDescription)", systemImage: "metronome"
@@ -1869,6 +1967,7 @@ private struct ContentView: View {
     activeQuoteFeedback = QuoteResultFeedbackTarget.make(
       mode: mode, sourceIsCommunity: quoteSource == .community,
       selectedQuoteID: selectedQuote?.id ?? "")
+    activeSessionTags = settings.activeResultTags
     session = TestSessionFactory.make(
       configuration: configuration,
       customText: customText,
@@ -1993,12 +2092,13 @@ private struct ContentView: View {
     }
   }
 
-  private func startRepeatedAttempt(_ repeatedSession: TypingSession) {
+  private func startRepeatedAttempt(_ repeatedSession: TypingSession, tags: [String]) {
     restartLockMessage = nil
     compositionText = ""
     keyboardGuideFeedback = nil
     lastTimeWarningSecond = nil
     NativeSpeech.shared.stop()
+    activeSessionTags = ResultTagPolicy.normalized(tags)
     session = repeatedSession
     let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
@@ -2032,10 +2132,11 @@ private struct ContentView: View {
       guard let result = record.portableResult else { return nil }
       return .init(
         configuration: result.configuration, prompt: result.prompt, finishedAt: result.finishedAt,
-        wpm: result.wpm, accuracy: result.accuracy)
+        wpm: result.wpm, accuracy: result.accuracy, tags: result.tags)
     }
     guard let average = RecentTestAveragePolicy.average(
-      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples)
+      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples,
+      activeTags: activeSessionTags)
     else {
       return "近 10 次平均：暂无同类本机成绩"
     }
@@ -2070,10 +2171,11 @@ private struct ContentView: View {
       guard let result = record.portableResult else { return nil }
       return .init(
         configuration: result.configuration, prompt: result.prompt, finishedAt: result.finishedAt,
-        wpm: result.wpm, accuracy: result.accuracy)
+        wpm: result.wpm, accuracy: result.accuracy, tags: result.tags)
     }
     guard let personalBest = CurrentPersonalBestPolicy.personalBest(
-      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples)
+      currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples,
+      activeTags: activeSessionTags)
     else {
       return "本机个人最佳：暂无符合资格的同类成绩"
     }
@@ -2099,13 +2201,14 @@ private struct ContentView: View {
       guard let result = record.portableResult else { return nil }
       return .init(
         configuration: result.configuration, outcome: result.outcome, finishedAt: result.finishedAt,
-        wpm: result.wpm)
+        wpm: result.wpm, tags: result.tags)
     }
     return PaceGuidePolicy.targetWpm(
       mode: settings.paceGuideMode,
       customWpm: settings.paceGuideCustomWpm,
       configuration: configuration,
       samples: samples,
+      activeTags: activeSessionTags,
       lastTestWpm: repeatedWpm ?? lastCompletedWpm
     )
   }
@@ -2312,7 +2415,8 @@ private struct ContentView: View {
     .init(
       configuration: configuration,
       quoteID: mode == .quote ? selectedQuoteID : nil,
-      customText: mode == .custom ? customText : nil
+      customText: mode == .custom ? customText : nil,
+      activeResultTags: settings.activeResultTags
     )
   }
 
@@ -2344,6 +2448,9 @@ private struct ContentView: View {
     quoteLength = configuration.quoteLength
     contentOptions = configuration.contentOptions
     settings.apply(configuration)
+    if let activeResultTags = preset.activeResultTags {
+      settings.activeResultTags = activeResultTags
+    }
     reset()
   }
 
@@ -4027,7 +4134,7 @@ private struct ResultsHistoryView: View {
   }
 
   private func applyCurrentSettingsFilter() {
-    apply(.currentSettings(currentConfiguration))
+    apply(.currentSettings(currentConfiguration, activeTags: settings.activeResultTags))
   }
 
   private func apply(_ filter: ResultHistoryFilter) {

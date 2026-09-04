@@ -4,6 +4,7 @@ enum PaceGuideMode: String, CaseIterable, Codable, Equatable, Identifiable {
     case off
     case custom
     case personalBest
+    case activeTagPersonalBest
     case average
     case dailyAverage
     case lastTest
@@ -15,6 +16,7 @@ enum PaceGuideMode: String, CaseIterable, Codable, Equatable, Identifiable {
         case .off: "关闭"
         case .custom: "自定义速度"
         case .personalBest: "同类个人最佳"
+        case .activeTagPersonalBest: "活动标签个人最佳"
         case .average: "同类平均"
         case .dailyAverage: "今日同类平均"
         case .lastTest: "上一轮速度"
@@ -27,6 +29,21 @@ struct PaceGuideSample: Equatable {
     let outcome: TestOutcome
     let finishedAt: Date
     let wpm: Int
+    let tags: [String]
+
+    init(
+        configuration: TestConfiguration,
+        outcome: TestOutcome,
+        finishedAt: Date,
+        wpm: Int,
+        tags: [String] = []
+    ) {
+        self.configuration = configuration
+        self.outcome = outcome
+        self.finishedAt = finishedAt
+        self.wpm = wpm
+        self.tags = tags
+    }
 }
 
 enum PaceGuidePolicy {
@@ -38,6 +55,7 @@ enum PaceGuidePolicy {
         customWpm: Int,
         configuration: TestConfiguration,
         samples: [PaceGuideSample],
+        activeTags: [String] = [],
         lastTestWpm: Int? = nil,
         now: Date = .now,
         calendar: Calendar = .current
@@ -49,6 +67,12 @@ enum PaceGuidePolicy {
             return customWpm.clamped(to: minimumWpm...maximumWpm)
         case .personalBest:
             return matching(configuration: configuration, samples: samples).map(\.wpm).max()
+        case .activeTagPersonalBest:
+            guard !activeTags.isEmpty else { return nil }
+            return matching(configuration: configuration, samples: samples)
+                .filter { sharesActiveTag($0.tags, activeTags: activeTags) }
+                .map(\.wpm)
+                .max()
         case .average:
             return averageWpm(matching(configuration: configuration, samples: samples).map(\.wpm))
         case .dailyAverage:
@@ -79,6 +103,14 @@ enum PaceGuidePolicy {
     private static func averageWpm(_ values: [Int]) -> Int? {
         guard !values.isEmpty else { return nil }
         return Int((Double(values.reduce(0, +)) / Double(values.count)).rounded())
+    }
+
+    private static func sharesActiveTag(_ resultTags: [String], activeTags: [String]) -> Bool {
+        resultTags.contains { resultTag in
+            activeTags.contains {
+                $0.compare(resultTag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+            }
+        }
     }
 }
 

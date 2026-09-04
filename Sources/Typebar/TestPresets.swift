@@ -6,6 +6,9 @@ struct SavedTestPreset: Codable, Equatable {
     var configuration: TestConfiguration
     var quoteID: String?
     var customText: String?
+    /// Nil keeps archives made before active tags were added compatible and
+    /// leaves the user's current global tags unchanged when applied.
+    var activeResultTags: [String]? = nil
 
     var summaryDescription: String {
         switch configuration.mode {

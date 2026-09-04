@@ -530,6 +530,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var typingPowerMode: TypingPowerMode = .off
   var englishVariant: EnglishVariant = .american
   var favoriteQuoteIDs: [String] = []
+  var activeResultTags: [String] = []
   var repeatQuotes = false
   var freedomMode = false
   var confidenceMode: ConfidenceMode = .off
@@ -629,6 +630,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     typingPowerMode: TypingPowerMode = .off,
     englishVariant: EnglishVariant = .american,
     favoriteQuoteIDs: [String] = [],
+    activeResultTags: [String] = [],
     repeatQuotes: Bool = false,
     freedomMode: Bool = false,
     confidenceMode: ConfidenceMode = .off,
@@ -732,6 +734,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.typingPowerMode = typingPowerMode
     self.englishVariant = englishVariant
     self.favoriteQuoteIDs = favoriteQuoteIDs
+    self.activeResultTags = ResultTagPolicy.normalized(activeResultTags)
     self.repeatQuotes = repeatQuotes
     self.freedomMode = freedomMode
     self.confidenceMode = confidenceMode
@@ -798,7 +801,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
       randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, typingPowerMode, englishVariant,
-      favoriteQuoteIDs, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
+      favoriteQuoteIDs, activeResultTags, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
       smoothPracticeLineScroll, showAllPracticeLines, smoothCaretMotion, caretStyle, typoIndicatorStyle, compositionDisplayStyle, typingSpeedUnit,
@@ -894,6 +897,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     englishVariant =
       try values.decodeIfPresent(EnglishVariant.self, forKey: .englishVariant) ?? .american
     favoriteQuoteIDs = try values.decodeIfPresent([String].self, forKey: .favoriteQuoteIDs) ?? []
+    activeResultTags = ResultTagPolicy.normalized(
+      try values.decodeIfPresent([String].self, forKey: .activeResultTags) ?? [])
     repeatQuotes = try values.decodeIfPresent(Bool.self, forKey: .repeatQuotes) ?? false
     freedomMode = try values.decodeIfPresent(Bool.self, forKey: .freedomMode) ?? false
     confidenceMode = try values.decodeIfPresent(ConfidenceMode.self, forKey: .confidenceMode) ?? .off
@@ -1180,6 +1185,16 @@ final class AppSettings {
   var typingPowerMode: TypingPowerMode = .off { didSet { persist() } }
   var englishVariant: EnglishVariant = .american { didSet { persist() } }
   var favoriteQuoteIDs: [String] = [] { didSet { persist() } }
+  var activeResultTags: [String] = [] {
+    didSet {
+      let normalized = ResultTagPolicy.normalized(activeResultTags)
+      if activeResultTags != normalized {
+        activeResultTags = normalized
+      } else {
+        persist()
+      }
+    }
+  }
   var repeatQuotes = false { didSet { persist() } }
   var freedomMode = false { didSet { if freedomMode { confidenceMode = .off }; persist() } }
   var confidenceMode: ConfidenceMode = .off {
@@ -1321,6 +1336,7 @@ final class AppSettings {
     typingPowerMode = snapshot.typingPowerMode
     englishVariant = snapshot.englishVariant
     favoriteQuoteIDs = snapshot.favoriteQuoteIDs
+    activeResultTags = snapshot.activeResultTags
     repeatQuotes = snapshot.repeatQuotes
     freedomMode = snapshot.freedomMode
     confidenceMode = snapshot.confidenceMode
@@ -1448,6 +1464,7 @@ final class AppSettings {
       practiceBackdrop: practiceBackdrop, reducePracticeMotion: reducePracticeMotion,
       showTypingCompanion: showTypingCompanion, typingPowerMode: typingPowerMode,
       englishVariant: englishVariant, favoriteQuoteIDs: favoriteQuoteIDs,
+      activeResultTags: activeResultTags,
       repeatQuotes: repeatQuotes, freedomMode: freedomMode, confidenceMode: confidenceMode,
       oppositeShiftMode: oppositeShiftMode,
       codeUnindentOnBackspace: codeUnindentOnBackspace,
@@ -1535,6 +1552,7 @@ final class AppSettings {
     typingPowerMode = .off
     englishVariant = .american
     favoriteQuoteIDs = []
+    activeResultTags = []
     repeatQuotes = false
     freedomMode = false
     confidenceMode = .off
@@ -1675,6 +1693,7 @@ final class AppSettings {
     typingPowerMode = snapshot.typingPowerMode
     englishVariant = snapshot.englishVariant
     favoriteQuoteIDs = snapshot.favoriteQuoteIDs
+    activeResultTags = snapshot.activeResultTags
     repeatQuotes = snapshot.repeatQuotes
     freedomMode = snapshot.freedomMode
     confidenceMode = snapshot.confidenceMode
@@ -1928,6 +1947,7 @@ final class AppSettings {
       typingPowerMode: typingPowerMode,
       englishVariant: englishVariant,
       favoriteQuoteIDs: favoriteQuoteIDs,
+      activeResultTags: activeResultTags,
       repeatQuotes: repeatQuotes,
       freedomMode: freedomMode,
       confidenceMode: confidenceMode,
@@ -1995,6 +2015,22 @@ final class AppSettings {
     } else {
       favoriteQuoteIDs.append(id)
     }
+  }
+
+  func activateResultTag(_ rawTag: String) {
+    let updated = ResultTagPolicy.normalized(activeResultTags + [rawTag])
+    guard updated != activeResultTags else { return }
+    activeResultTags = updated
+  }
+
+  func deactivateResultTag(_ tag: String) {
+    activeResultTags.removeAll {
+      $0.compare(tag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+  }
+
+  func clearActiveResultTags() {
+    activeResultTags = []
   }
 
   func toggleTestModifier(_ modifier: TestModifier) {

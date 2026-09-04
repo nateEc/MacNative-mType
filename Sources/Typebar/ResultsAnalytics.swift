@@ -191,6 +191,23 @@ struct RecentAverageSample: Equatable {
   let finishedAt: Date
   let wpm: Int
   let accuracy: Int
+  let tags: [String]
+
+  init(
+    configuration: TestConfiguration,
+    prompt: String,
+    finishedAt: Date,
+    wpm: Int,
+    accuracy: Int,
+    tags: [String] = []
+  ) {
+    self.configuration = configuration
+    self.prompt = prompt
+    self.finishedAt = finishedAt
+    self.wpm = wpm
+    self.accuracy = accuracy
+    self.tags = tags
+  }
 }
 
 struct RecentTestAverage: Equatable {
@@ -730,18 +747,19 @@ enum ResultPerformanceTrace {
 }
 
 /// Mirrors the official current-settings average with Typebar's locally stored
-/// result model. Tags are deliberately absent because the native practice screen
-/// has no active tag-filter state.
+/// result model, including its active-tag matching behavior.
 enum RecentTestAveragePolicy {
   static func average(
     currentConfiguration: TestConfiguration,
     currentPrompt: String,
     samples: [RecentAverageSample],
+    activeTags: [String] = [],
     limit: Int = 10
   ) -> RecentTestAverage? {
     guard limit > 0 else { return nil }
     let matching = matchingSamples(
-      currentConfiguration: currentConfiguration, currentPrompt: currentPrompt, samples: samples)
+      currentConfiguration: currentConfiguration, currentPrompt: currentPrompt, samples: samples,
+      activeTags: activeTags)
       .prefix(limit)
 
     guard !matching.isEmpty else { return nil }
@@ -759,12 +777,14 @@ enum RecentTestAveragePolicy {
   static func matchingSamples(
     currentConfiguration: TestConfiguration,
     currentPrompt: String,
-    samples: [RecentAverageSample]
+    samples: [RecentAverageSample],
+    activeTags: [String] = []
   ) -> [RecentAverageSample] {
     samples
       .filter {
         matches(
-          sample: $0, currentConfiguration: currentConfiguration, currentPrompt: currentPrompt)
+          sample: $0, currentConfiguration: currentConfiguration, currentPrompt: currentPrompt,
+          activeTags: activeTags)
       }
       .sorted { $0.finishedAt > $1.finishedAt }
   }
@@ -772,7 +792,8 @@ enum RecentTestAveragePolicy {
   private static func matches(
     sample: RecentAverageSample,
     currentConfiguration: TestConfiguration,
-    currentPrompt: String
+    currentPrompt: String,
+    activeTags: [String]
   ) -> Bool {
     let sampleConfiguration = sample.configuration
     return sampleConfiguration.mode == currentConfiguration.mode
@@ -783,6 +804,7 @@ enum RecentTestAveragePolicy {
       && sampleConfiguration.difficulty == currentConfiguration.difficulty
       && sampleConfiguration.modifiers.contains(.lazyLatin)
         == currentConfiguration.modifiers.contains(.lazyLatin)
+      && (activeTags.isEmpty || sharesActiveTag(sample.tags, activeTags: activeTags))
   }
 
   private static func sameModeParameter(
@@ -799,6 +821,14 @@ enum RecentTestAveragePolicy {
       true
     }
   }
+
+  private static func sharesActiveTag(_ resultTags: [String], activeTags: [String]) -> Bool {
+    resultTags.contains { resultTag in
+      activeTags.contains {
+        $0.compare(resultTag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+      }
+    }
+  }
 }
 
 /// Determines whether a locally completed Typebar result may contribute to a
@@ -808,11 +838,13 @@ enum CurrentPersonalBestPolicy {
   static func personalBest(
     currentConfiguration: TestConfiguration,
     currentPrompt: String,
-    samples: [RecentAverageSample]
+    samples: [RecentAverageSample],
+    activeTags: [String] = []
   ) -> CurrentPersonalBest? {
     guard isConfigurationEligible(currentConfiguration) else { return nil }
     let matching = RecentTestAveragePolicy.matchingSamples(
-      currentConfiguration: currentConfiguration, currentPrompt: currentPrompt, samples: samples)
+      currentConfiguration: currentConfiguration, currentPrompt: currentPrompt, samples: samples,
+      activeTags: activeTags)
       .filter { isResultEligible(configuration: $0.configuration, accuracy: $0.accuracy) }
     guard let highestWpm = matching.map(\.wpm).max(),
       let best = matching.filter({ $0.wpm == highestWpm }).min(by: { $0.finishedAt < $1.finishedAt })
@@ -1146,11 +1178,12 @@ struct ResultHistoryFilter: Codable, Equatable {
         self.modifierFilter = modifierFilter
     }
 
-    /// Mirrors the reference product's "current settings" history shortcut
-    /// using only Typebar's current local test configuration. Typebar tags are
-    /// assigned to completed results and have no separate active-tag state, so
-    /// the shortcut deliberately leaves them unrestricted.
-    static func currentSettings(_ configuration: TestConfiguration) -> Self {
+    /// Mirrors the reference product's "current settings" history shortcut,
+    /// including active tags: no active tag means only untagged results;
+    /// otherwise any active tag is enough to match.
+    static func currentSettings(
+        _ configuration: TestConfiguration, activeTags: [String] = []
+    ) -> Self {
         let selectedModifiers = Set(configuration.modifiers)
         let timeLimits: Set<ResultHistoryTimeLimit> = configuration.mode == .time
             ? Set(ResultHistoryTimeLimit.allCases.filter { $0.matches(configuration.duration) })
@@ -1162,6 +1195,11 @@ struct ResultHistoryFilter: Codable, Equatable {
         return .init(
             modes: [configuration.mode],
             languages: [configuration.language],
+            tagFilter: .init(
+                isUnrestricted: false,
+                includesNoTags: activeTags.isEmpty,
+                tags: Set(activeTags)
+            ),
             difficulties: [configuration.difficulty],
             punctuation: configuration.contentOptions.includePunctuation ? .included : .excluded,
             numbers: configuration.contentOptions.includeNumbers ? .included : .excluded,

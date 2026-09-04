@@ -2110,12 +2110,13 @@ final class TypingEngineTests: XCTestCase {
         mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
       prompt: "amber")
     session.insert("amber", at: start)
-    let result = try XCTUnwrap(session.result())
+    let result = try XCTUnwrap(session.result(tags: [" morning ", "MORNING", "focus"]))
     XCTAssertEqual(result.outcome, .completed)
     XCTAssertEqual(result.typedCharacterCount, 5)
     XCTAssertEqual(result.correctCharacterCount, 5)
     XCTAssertEqual(result.configuration.mode, .custom)
     XCTAssertEqual(result.rawWpm, 60)
+    XCTAssertEqual(result.tags, ["morning", "focus"])
     XCTAssertEqual(result.prompt, "amber")
     XCTAssertEqual(result.replayEvents.map(\.kind), [.insert, .insert, .insert, .insert, .insert])
   }
@@ -3527,7 +3528,8 @@ final class TypingEngineTests: XCTestCase {
       configuration: .init(
         mode: .custom, duration: nil, wordLimit: nil, difficulty: .expert, rules: rules),
       quoteID: nil,
-      customText: "a tailored practice"
+      customText: "a tailored practice",
+      activeResultTags: ["focus", "morning"]
     )
     container.mainContext.insert(TestPresetRecord(name: "Focused practice", definition: definition))
     try container.mainContext.save()
@@ -3537,6 +3539,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(record.name, "Focused practice")
     XCTAssertEqual(record.definition, definition)
     XCTAssertEqual(record.definition?.configuration.rules.minimumWordBurstWpm, 75)
+    XCTAssertEqual(record.definition?.activeResultTags, ["focus", "morning"])
+
+    var legacyPayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(definition)) as? [String: Any])
+    legacyPayload.removeValue(forKey: "activeResultTags")
+    let legacyData = try JSONSerialization.data(withJSONObject: legacyPayload)
+    XCTAssertNil(try JSONDecoder().decode(SavedTestPreset.self, from: legacyData).activeResultTags)
   }
 
   func testResultStatisticsAggregateCompletedTests() {
@@ -3646,6 +3655,36 @@ final class TypingEngineTests: XCTestCase {
         currentConfiguration: TestConfiguration(
           mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
           language: .english), currentPrompt: "quote", samples: [eligible, best]))
+  }
+
+  func testCurrentStatisticsUseAnyActiveResultTagButLeaveEmptyStateUnrestricted() {
+    let configuration = TestConfiguration.words(25, language: .english)
+    let samples = [
+      RecentAverageSample(
+        configuration: configuration, prompt: "one", finishedAt: start, wpm: 60, accuracy: 95,
+        tags: ["morning"]),
+      RecentAverageSample(
+        configuration: configuration, prompt: "two", finishedAt: start.addingTimeInterval(1),
+        wpm: 90, accuracy: 99, tags: ["focus"]),
+      RecentAverageSample(
+        configuration: configuration, prompt: "three", finishedAt: start.addingTimeInterval(2),
+        wpm: 120, accuracy: 100, tags: []),
+    ]
+
+    XCTAssertEqual(
+      RecentTestAveragePolicy.average(
+        currentConfiguration: configuration, currentPrompt: "ignored", samples: samples,
+        activeTags: ["FOCUS"]),
+      .init(count: 1, wpm: 90, accuracy: 99))
+    XCTAssertEqual(
+      CurrentPersonalBestPolicy.personalBest(
+        currentConfiguration: configuration, currentPrompt: "ignored", samples: samples,
+        activeTags: ["morning", "focus"]),
+      .init(wpm: 90, accuracy: 99))
+    XCTAssertEqual(
+      RecentTestAveragePolicy.average(
+        currentConfiguration: configuration, currentPrompt: "ignored", samples: samples),
+      .init(count: 3, wpm: 90, accuracy: 98))
   }
 
   func testWordBurstHeatmapUsesCurrentResultQuintilesAndLeavesMissingBurstsNeutral() throws {
@@ -3987,11 +4026,14 @@ final class TypingEngineTests: XCTestCase {
     let configuration = TestConfiguration.timed(
       seconds: 60, difficulty: .expert, language: .spanish, contentOptions: contentOptions
     ).with(modifiers: [.crtVisual, .binaryStream])
-    let filter = ResultHistoryFilter.currentSettings(configuration)
+    let filter = ResultHistoryFilter.currentSettings(configuration, activeTags: ["focus"])
     let matching = ResultHistoryEntry(
-      id: UUID(), mode: .time, language: .spanish, tags: ["kept-unrestricted"],
+      id: UUID(), mode: .time, language: .spanish, tags: ["focus"],
       difficulty: .expert, includesPunctuation: true, includesNumbers: false,
       duration: 60, modifiers: [.crtVisual])
+    let untagged = ResultHistoryEntry(
+      id: UUID(), mode: .time, language: .spanish, tags: [], difficulty: .expert,
+      includesPunctuation: true, includesNumbers: false, duration: 60, modifiers: [.crtVisual])
     let wrongDuration = ResultHistoryEntry(
       id: UUID(), mode: .time, language: .spanish, tags: [], difficulty: .expert,
       includesPunctuation: true, includesNumbers: false, duration: 30, modifiers: [.crtVisual])
@@ -4004,8 +4046,14 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(
       filter.matchingIDs(
-        entries: [matching, wrongDuration, missingModifier, wrongLanguage], personalBestIDs: []),
+        entries: [matching, untagged, wrongDuration, missingModifier, wrongLanguage], personalBestIDs: []),
       [matching.id]
+    )
+    XCTAssertEqual(
+      ResultHistoryFilter.currentSettings(configuration).matchingIDs(
+        entries: [matching, untagged, wrongDuration, missingModifier, wrongLanguage],
+        personalBestIDs: []),
+      [untagged.id]
     )
     XCTAssertEqual(filter.quoteLength, nil)
     XCTAssertEqual(filter.languageSelections, [.spanish])
@@ -4759,6 +4807,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.historyChartVisibility, .init())
     XCTAssertEqual(snapshot.englishVariant, .american)
     XCTAssertTrue(snapshot.favoriteQuoteIDs.isEmpty)
+    XCTAssertTrue(snapshot.activeResultTags.isEmpty)
     XCTAssertFalse(snapshot.repeatQuotes)
     XCTAssertFalse(snapshot.freedomMode)
     XCTAssertEqual(snapshot.minimumAccuracy, 0)
@@ -4882,6 +4931,37 @@ final class TypingEngineTests: XCTestCase {
       PaceGuidePolicy.expectedCharacterIndex(elapsed: 2, targetWpm: 60, promptLength: 40), 10)
     XCTAssertEqual(
       PaceGuidePolicy.expectedCharacterIndex(elapsed: 120, targetWpm: 300, promptLength: 40), 39)
+  }
+
+  func testActiveTagPersonalBestPaceGuideUsesOnlyMatchingCompletedResults() {
+    let configuration = TestConfiguration.timed(seconds: 30, language: .english)
+    let samples = [
+      PaceGuideSample(
+        configuration: configuration, outcome: .completed, finishedAt: start, wpm: 75,
+        tags: ["morning"]),
+      PaceGuideSample(
+        configuration: configuration, outcome: .completed, finishedAt: start, wpm: 120,
+        tags: ["focus"]),
+      PaceGuideSample(
+        configuration: configuration, outcome: .completed, finishedAt: start, wpm: 180,
+        tags: []),
+      PaceGuideSample(
+        configuration: configuration, outcome: .abandoned, finishedAt: start, wpm: 240,
+        tags: ["focus"]),
+    ]
+
+    XCTAssertEqual(
+      PaceGuidePolicy.targetWpm(
+        mode: .activeTagPersonalBest, customWpm: 60, configuration: configuration, samples: samples,
+        activeTags: ["FOCUS"]), 120)
+    XCTAssertEqual(
+      PaceGuidePolicy.targetWpm(
+        mode: .activeTagPersonalBest, customWpm: 60, configuration: configuration, samples: samples,
+        activeTags: ["morning", "focus"]), 120)
+    XCTAssertNil(
+      PaceGuidePolicy.targetWpm(
+        mode: .activeTagPersonalBest, customWpm: 60, configuration: configuration, samples: samples,
+        activeTags: []))
   }
 
   @MainActor
@@ -5014,6 +5094,30 @@ final class TypingEngineTests: XCTestCase {
       "three", "four",
     ])
     XCTAssertEqual(tags, ["flow", "review", "one", "two", "three"])
+  }
+
+  @MainActor
+  func testActiveResultTagsPersistNormalizeAndCanBeCleared() {
+    let suiteName = "TypebarTests.active-tags.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.activateResultTag(" morning ")
+    settings.activateResultTag("MORNING")
+    settings.activateResultTag("focus")
+    settings.activateResultTag("review")
+    settings.activateResultTag("sprint")
+    settings.activateResultTag("extra")
+    XCTAssertEqual(settings.activeResultTags, ["morning", "focus", "review", "sprint", "extra"])
+    XCTAssertEqual(settings.snapshot.activeResultTags, settings.activeResultTags)
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.activeResultTags, settings.activeResultTags)
+    restored.deactivateResultTag("FOCUS")
+    XCTAssertEqual(restored.activeResultTags, ["morning", "review", "sprint", "extra"])
+    restored.clearActiveResultTags()
+    XCTAssertTrue(restored.activeResultTags.isEmpty)
   }
 
   func testQAStoreModeOnlyUsesExplicitBooleanBundleFlag() {
