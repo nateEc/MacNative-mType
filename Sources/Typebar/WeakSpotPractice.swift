@@ -63,9 +63,10 @@ enum WeakSpotPractice {
     case .french: StarterLexicon.frenchWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
+    case .russian: StarterLexicon.russianWords
     case .mixedEnglishChinese: StarterLexicon.words
     case .mixedLanguages: []
-    case .simplifiedChinese: []
+    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana: []
     default: []
     }
   }

@@ -274,6 +274,18 @@ final class HealthRouteTests: XCTestCase {
         language: "portuguese", text: "Uma prática calma pode clarear o próximo passo.",
         attribution: nil), accessToken: session.accessToken)
     XCTAssertEqual(portugueseSubmission.status, "pending")
+    let traditionalChineseSubmission = try await store.submitQuote(
+      .init(language: "traditionalChinese", text: "安靜的練習能讓下一步慢慢清楚起來。", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(traditionalChineseSubmission.status, "pending")
+    let russianSubmission = try await store.submitQuote(
+      .init(language: "russian", text: "Спокойная практика делает следующий шаг яснее.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(russianSubmission.status, "pending")
+    let hiraganaSubmission = try await store.submitQuote(
+      .init(language: "japaneseHiragana", text: "しずかなれんしゅうはつぎのいっぽをみえやすくする。", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(hiraganaSubmission.status, "pending")
     _ = try await store.submitQuote(
       .init(language: "english", text: "A steady habit creates useful momentum.", attribution: nil),
       accessToken: other.accessToken)
@@ -282,7 +294,8 @@ final class HealthRouteTests: XCTestCase {
       Set(mine.submissions.map(\.id)),
       Set([
         submitted.id, spanishSubmission.id, germanSubmission.id, frenchSubmission.id,
-        italianSubmission.id, portugueseSubmission.id,
+        italianSubmission.id, portugueseSubmission.id, traditionalChineseSubmission.id,
+        russianSubmission.id, hiraganaSubmission.id,
       ]))
     do {
       try await store.withdrawQuoteSubmission(submitted.id, accessToken: other.accessToken)
@@ -295,6 +308,10 @@ final class HealthRouteTests: XCTestCase {
     try await store.withdrawQuoteSubmission(italianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(
       portugueseSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(
+      traditionalChineseSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(russianSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(hiraganaSubmission.id, accessToken: session.accessToken)
     let mineAfterWithdrawal = try await store.quoteSubmissions(accessToken: session.accessToken)
     XCTAssertTrue(mineAfterWithdrawal.submissions.isEmpty)
     do {
@@ -2576,6 +2593,18 @@ final class HealthRouteTests: XCTestCase {
     } catch let error as ResultStoreError {
       XCTAssertEqual(error, .invalidResult)
     }
+
+    for (offset, language) in ["traditionalChinese", "russian", "japaneseHiragana"].enumerated() {
+      let accepted = try await store.submitResult(
+        result(
+          id: UUID(), wpm: 81 + offset, accuracy: 100, language: language,
+          finishedAt: now.addingTimeInterval(Double(offset + 1))),
+        accessToken: session.accessToken, now: now)
+      XCTAssertTrue(accepted.leaderboardEligible)
+      let leaderboard = try await store.leaderboard(
+        .init(mode: "time", language: language, period: "all", limit: 10), now: now)
+      XCTAssertEqual(leaderboard.entries.map(\.wpm), [81 + offset])
+    }
   }
 
   func testResultRoutesRequireAuthenticationAndReturnLeaderboard() async throws {
@@ -2869,7 +2898,8 @@ final class HealthRouteTests: XCTestCase {
 
   private func result(
     id: UUID, wpm: Int, accuracy: Int, consistency: Double = 0, mode: String = "time",
-    durationSeconds: Int? = 30, wordLimit: Int? = nil, restartCount: Int = 0, finishedAt: Date
+    durationSeconds: Int? = 30, wordLimit: Int? = nil, restartCount: Int = 0,
+    language: String = "english", finishedAt: Date
   )
     -> ResultSubmissionRequest
   {
@@ -2882,7 +2912,7 @@ final class HealthRouteTests: XCTestCase {
       } ?? lowerBound
     let rawWpm = Int((Double(eventCount) / 5 / elapsed * 60).rounded())
     return .init(
-      id: id, mode: mode, language: "english", durationSeconds: durationSeconds, wordLimit: wordLimit,
+      id: id, mode: mode, language: language, durationSeconds: durationSeconds, wordLimit: wordLimit,
       wpm: wpm, rawWpm: rawWpm, accuracy: accuracy, consistency: consistency,
       errorCount: eventCount - correctCharacters, eventCount: eventCount,
       restartCount: restartCount,

@@ -549,7 +549,7 @@ enum ResultInputText {
 
 /// Builds the local equivalent of the completed-result "copy words" action.
 /// Normal space-delimited tests copy the reached target words, whereas Zen
-/// mode intentionally copies the user's open-ended input. Chinese prompts use
+/// mode intentionally copies the user's open-ended input. No-space prompts use
 /// Typebar's own generated-word boundaries so a partial current word still
 /// copies its complete target token.
 enum ResultPromptText {
@@ -568,23 +568,26 @@ enum ResultPromptText {
     guard let typed = ResultInputText.make(for: result) else { return nil }
     let reachedCount = min(typed.count, result.prompt.count)
     guard reachedCount > 0 else { return nil }
-    if result.configuration.language == .simplifiedChinese {
-      return chineseTargetText(prompt: result.prompt, reachedCharacterCount: reachedCount)
+    if let tokens = StarterLexicon.noSpaceWords(for: result.configuration.language) {
+      return noSpaceTargetText(
+        prompt: result.prompt, reachedCharacterCount: reachedCount, tokens: tokens)
     }
     return String(result.prompt.prefix(reachedCount))
   }
 
-  private static func chineseTargetText(prompt: String, reachedCharacterCount: Int) -> String {
+  private static func noSpaceTargetText(
+    prompt: String, reachedCharacterCount: Int, tokens: [String]
+  ) -> String {
     let characters = Array(prompt)
-    let tokens = StarterLexicon.simplifiedChineseWords
+    let tokenCharacters = tokens
       .map { Array($0) }
       .sorted { $0.count > $1.count }
-    let trailingPunctuation: Set<Character> = ["，", "。", "！", "？", "：", "；"]
+    let trailingPunctuation: Set<Character> = ["，", "。", "！", "？", "：", "；", "、"]
     var index = 0
 
     while index < characters.count {
       let coreStart = characters[index] == "（" ? index + 1 : index
-      guard let token = tokens.first(where: { token in
+      guard let token = tokenCharacters.first(where: { token in
         let end = coreStart + token.count
         return end <= characters.count && characters[coreStart..<end].elementsEqual(token)
       })

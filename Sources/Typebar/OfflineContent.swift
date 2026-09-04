@@ -344,6 +344,90 @@ enum OfflineContent {
       length: .long
     ),
     OfflineQuote(
+      id: "traditional-tide",
+      title: "潮線",
+      text: "潮線退去後，沙上細小的紋路提醒人慢慢整理下一步。",
+      language: .traditionalChinese,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "traditional-table-light",
+      title: "桌上的光",
+      text: "桌上的光不會替人完成工作，卻能讓一張筆記和下一個小決定顯得更清楚。",
+      language: .traditionalChinese,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "traditional-return-page",
+      title: "回到頁面",
+      text: "有些進步只在回頭時才看得見。每天留下一行清楚的記錄，調整一個小錯誤，久了以後，原本陌生的路也會有自己的節奏。",
+      language: .traditionalChinese,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "traditional-long-window",
+      title: "長窗",
+      text: "長窗旁的桌子不需要擺滿答案。它可以留給剛開始的草稿、仍在思考的句子，以及下一件願意完成的小事。練習也是如此：不必一次解開所有困難，只要替自己留下可以返回的位置，辨認眼前的一步，並在每次嘗試後看看什麼已經變得清楚。每一次返回，都讓原先陌生的難處更容易安放。",
+      language: .traditionalChinese,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "russian-small-step",
+      title: "Небольшой шаг",
+      text: "Небольшой спокойный шаг помогает заметить работу, которая уже стала понятнее.",
+      language: .russian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "russian-open-notebook",
+      title: "Открытая тетрадь",
+      text: "Открытая тетрадь не отвечает на трудный вопрос сама, но помогает разделить его на ясные части и вернуться к нему позже.",
+      language: .russian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "russian-quiet-workshop",
+      title: "Тихая мастерская",
+      text: "Прогресс не всегда приходит с заметным событием. Он собирается в повторяющихся действиях: открыть ту же страницу, уточнить одну фразу, исправить одну ошибку и оставить полезную отметку для следующего раза. Со временем эта спокойная внимательность делает трудные места знакомее.",
+      language: .russian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "russian-long-table",
+      title: "Длинный стол",
+      text: "Длинный стол полезен тем, что на нём хватает места для разных этапов работы. С одного края может лежать первый набросок, с другого — фраза, которой ещё нужна забота, а в середине остаётся место для следующего маленького решения. Практика похожа на такой стол: она просит не решить всё сразу, а вернуться к заметному следующему шагу и увидеть, что после нескольких попыток стало легче.",
+      language: .russian,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "hiragana-small-practice",
+      title: "ちいさなれんしゅう",
+      text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",
+      language: .japaneseHiragana,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "hiragana-open-note",
+      title: "ひらいたのーと",
+      text: "ひらいたのーとはむずかしいこたえをすぐにはださないけれど、かんがえをわけて、つぎにかえるしるしをのこしてくれる。",
+      language: .japaneseHiragana,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "hiragana-quiet-work",
+      title: "しずかなしごと",
+      text: "すすみかたはいつもおおきなできごとにはならない。おなじぺーじをひらき、ひとつのことばをなおし、ひとつのまちがいをたしかめ、つぎのためのめじるしをのこす。そんなくりかえしが、むずかしいところをすこしずつなじみのあるものにしていく。",
+      language: .japaneseHiragana,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "hiragana-long-table",
+      title: "ながいつくえ",
+      text: "ながいつくえがべんりなのは、いろいろなしごとにばしょをのこせるからだ。こちらにはさいしょのめも、あちらにはまだなおしたいことば、まんなかにはつぎのちいさなけっていのためのあきがある。れんしゅうもおなじで、いちどにぜんぶをとくより、もどれるばしょとみえるいっぽをつくり、くりかえすうちにやりやすくなったことをみつけていく。",
+      language: .japaneseHiragana,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "long-table",
       title: "Long Table",
       text: "A long table is useful because it makes room for more than one kind of work. One end can hold the rough sketch, another can hold the sentence that still needs care, and the middle can stay clear enough for the next small decision. Practice works in much the same way. It does not ask you to solve every difficulty at once. It asks for a place to return, a visible next step, and enough patience to notice what becomes easier after you have met it a few more times.",

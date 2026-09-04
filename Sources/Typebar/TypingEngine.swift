@@ -203,6 +203,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case italian
   case portuguese
   case simplifiedChinese
+  case traditionalChinese
+  case russian
+  case japaneseHiragana
   case mixedEnglishChinese
   case mixedLanguages
   case codeSwift
@@ -1380,7 +1383,7 @@ enum TypingAttentionPolicy {
     if showFocusWarning, !isInputFocused, focusWarningDelayElapsed {
       warnings.append(.inputUnfocused)
     }
-    if showCapsLockWarning, capsLockEnabled, language != .simplifiedChinese {
+    if showCapsLockWarning, capsLockEnabled, language.usesSpaceDelimitedWords {
       warnings.append(.capsLockEnabled)
     }
     return warnings
@@ -1873,8 +1876,8 @@ struct TypingSession {
   /// order. The count survives backspaces and repeated mistakes at the same
   /// position so local practice can use it as a weight.
   var missedWordErrorCounts: [MissedWordErrorCount] {
-    if configuration.language == .simplifiedChinese {
-      return missedChineseWordErrorCounts
+    if configuration.language.isNoSpaceLanguage {
+      return missedNoSpaceWordErrorCounts
     }
     let targetWords = resultTargetWords
     guard !targetWords.isEmpty else { return [] }
@@ -1899,9 +1902,9 @@ struct TypingSession {
     return targetWords.indices.map { attemptedInputErrorCount(inWord: $0) }
   }
 
-  private var missedChineseWordErrorCounts: [MissedWordErrorCount] {
+  private var missedNoSpaceWordErrorCounts: [MissedWordErrorCount] {
     let targetCharacters = Array(prompt)
-    let tokens = StarterLexicon.simplifiedChineseWords.map {
+    let tokens = (StarterLexicon.noSpaceWords(for: configuration.language) ?? []).map {
       (text: $0, characters: Array($0))
     }.sorted { $0.characters.count > $1.characters.count }
     var result: [MissedWordErrorCount] = []
@@ -2975,6 +2978,28 @@ enum StarterLexicon {
     "星光", "消息", "花园", "呼吸", "日常", "节奏",
   ]
 
+  // Original Typebar content for traditional Chinese practice. It is authored
+  // separately from the simplified Chinese starter corpus.
+  static let traditionalChineseWords = [
+    "晨霧", "海灣", "筆記", "微雨", "松林", "專注", "緩步", "清楚", "河岸", "茶香",
+    "街燈", "木門", "書頁", "旅途", "耐心", "片刻", "山徑", "風鈴", "安靜", "方向",
+    "星群", "畫布", "庭院", "呼吸",
+  ]
+
+  // Original Typebar content for Cyrillic keyboard practice.
+  static let russianWords = [
+    "утро", "окно", "бумага", "берег", "ветер", "практика", "внимание", "тихо",
+    "ясно", "озеро", "улица", "стол", "свет", "дорога", "терпение", "минута",
+    "город", "дождь", "спокойно", "направление", "звезда", "записка", "сад", "дыхание",
+  ]
+
+  // Hiragana-only prompts keep the selected input mode faithful to its label.
+  static let japaneseHiraganaWords = [
+    "あさ", "まど", "ひかり", "うみ", "かぜ", "れんしゅう", "しゅうちゅう", "しずか",
+    "はっきり", "みずうみ", "みち", "つくえ", "あかり", "たび", "たいせつ", "しばらく",
+    "まち", "あめ", "ゆっくり", "ほうこう", "ほし", "てがみ", "にわ", "こきゅう",
+  ]
+
   // Typebar-authored Spanish starter words. Accented forms deliberately
   // exercise macOS's composed-text input path without importing a web corpus.
   static let spanishWords = [
@@ -3012,6 +3037,15 @@ enum StarterLexicon {
     "porto", "tinta", "jardim", "viagem", "música", "nuvem", "calma", "farol",
     "montanha", "semente", "ritmo", "janela", "margem", "memória", "lápis", "atenção",
   ]
+
+  static func noSpaceWords(for language: TypingLanguage) -> [String]? {
+    switch language {
+    case .simplifiedChinese: simplifiedChineseWords
+    case .traditionalChinese: traditionalChineseWords
+    case .japaneseHiragana: japaneseHiraganaWords
+    default: nil
+    }
+  }
 
   static func prompt(
     wordCount: Int, language: TypingLanguage, englishVariant: EnglishVariant = .american,
@@ -3052,6 +3086,20 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: simplifiedChineseWords, separator: "",
         punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .traditionalChinese:
+      return prompt(
+        tokens: count, lexicon: traditionalChineseWords, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .russian:
+      return prompt(
+        tokens: count, lexicon: russianWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .japaneseHiragana:
+      return prompt(
+        tokens: count, lexicon: japaneseHiraganaWords, separator: "",
+        punctuation: ["、", "。", "！", "？"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .mixedEnglishChinese:
       let englishLexicon = englishVariant == .british ? britishWords : words
@@ -3102,6 +3150,9 @@ enum StarterLexicon {
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
     case .simplifiedChinese: (simplifiedChineseWords, ["，", "。", "！", "？"])
+    case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
+    case .russian: (russianWords, [".", ",", "!", "?"])
+    case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
     default:
       (words, [",", ".", "!", "?"])
     }
@@ -3155,6 +3206,7 @@ extension TestMode {
 extension TypingLanguage {
   static let defaultMixedComponents: [TypingLanguage] = [
     .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,
+    .traditionalChinese, .russian, .japaneseHiragana,
   ]
 
   static var mixableLanguages: [TypingLanguage] { defaultMixedComponents }
@@ -3169,7 +3221,14 @@ extension TypingLanguage {
   }
 
   var usesSpaceDelimitedWords: Bool {
-    self != .simplifiedChinese && !isCodeLanguage
+    !isNoSpaceLanguage && !isCodeLanguage
+  }
+
+  var isNoSpaceLanguage: Bool {
+    switch self {
+    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana: true
+    default: false
+    }
   }
 
   var isCodeLanguage: Bool {
@@ -3190,6 +3249,9 @@ extension TypingLanguage {
     case .italian: "Italiano"
     case .portuguese: "Português"
     case .simplifiedChinese: "简体中文"
+    case .traditionalChinese: "繁體中文"
+    case .russian: "Русский"
+    case .japaneseHiragana: "日本語（ひらがな）"
     case .mixedEnglishChinese: "中英混合"
     case .mixedLanguages: "多语混合"
     default: rawValue

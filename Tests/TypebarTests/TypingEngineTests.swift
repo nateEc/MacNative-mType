@@ -1315,6 +1315,16 @@ final class TypingEngineTests: XCTestCase {
       "窗边")
     XCTAssertEqual(MissedWordCopyText.make(words: ["晨光", "窗边"]), "晨光 窗边")
 
+    var traditionalChinese = TypingSession(
+      configuration: .timed(seconds: 30, language: .traditionalChinese), prompt: "晨霧海灣")
+    traditionalChinese.insert("晨x", at: start)
+    XCTAssertEqual(traditionalChinese.missedWords, ["晨霧"])
+
+    var hiragana = TypingSession(
+      configuration: .timed(seconds: 30, language: .japaneseHiragana), prompt: "あさまど")
+    hiragana.insert("あx", at: start)
+    XCTAssertEqual(hiragana.missedWords, ["あさ"])
+
     var spanish = TypingSession(
       configuration: .timed(seconds: 30, language: .spanish), prompt: "árbol puerto calma")
     spanish.insert("árbol puertx ", at: start)
@@ -2417,6 +2427,20 @@ final class TypingEngineTests: XCTestCase {
       accuracy: 100, prompt: "（晨光）窗边", replayEvents: [.init(offset: 0, kind: .insert, text: "（")])
     XCTAssertEqual(ResultPromptText.make(for: punctuatedChinese, reviews: []), "（晨光）")
 
+    let traditionalChinese = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30, language: .traditionalChinese),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(3),
+      typedCharacterCount: 1, correctCharacterCount: 1, errorCount: 0, wpm: 20, rawWpm: 24,
+      accuracy: 100, prompt: "晨霧海灣", replayEvents: [.init(offset: 0, kind: .insert, text: "晨")])
+    XCTAssertEqual(ResultPromptText.make(for: traditionalChinese, reviews: []), "晨霧")
+
+    let hiragana = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30, language: .japaneseHiragana),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(3),
+      typedCharacterCount: 1, correctCharacterCount: 1, errorCount: 0, wpm: 20, rawWpm: 24,
+      accuracy: 100, prompt: "あさ、まど", replayEvents: [.init(offset: 0, kind: .insert, text: "あ")])
+    XCTAssertEqual(ResultPromptText.make(for: hiragana, reviews: []), "あさ、")
+
     let zen = CompletedTestResult(
       id: UUID(),
       configuration: .init(mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
@@ -2776,14 +2800,25 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(custom.prompt, "own text")
   }
 
-  func testSimplifiedChineseWordsUseOriginalUnspacedTermsAndFinishAtLimit() {
-    let configuration = TestConfiguration.words(10, language: .simplifiedChinese)
-    var session = TestSessionFactory.make(configuration: configuration)
-    XCTAssertFalse(session.prompt.contains(" "))
-    XCTAssertEqual(session.prompt.count, 20)
+  func testNoSpaceLanguagesUseOriginalTermsAndFinishAtLimit() {
+    for (language, lexicon) in [
+      (TypingLanguage.simplifiedChinese, StarterLexicon.simplifiedChineseWords),
+      (.traditionalChinese, StarterLexicon.traditionalChineseWords),
+      (.japaneseHiragana, StarterLexicon.japaneseHiraganaWords),
+    ] {
+      let configuration = TestConfiguration.words(10, language: language)
+      var session = TestSessionFactory.make(configuration: configuration)
+      XCTAssertFalse(session.prompt.contains(" "))
+      XCTAssertFalse(lexicon.isEmpty)
+      XCTAssertFalse(language.usesSpaceDelimitedWords)
+      XCTAssertTrue(language.supportsQuotes)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+      }
 
-    session.insert(session.prompt, at: start)
-    XCTAssertEqual(session.outcome, .completed)
+      session.insert(session.prompt, at: start)
+      XCTAssertEqual(session.outcome, .completed)
+    }
   }
 
   func testMixedEnglishChineseUsesOnlyTypebarOwnedCorporaAndSpaceDelimitedWordCompletion() {
@@ -2809,16 +2844,17 @@ final class TypingEngineTests: XCTestCase {
 
   func testMixedLanguagesCyclesOnlyTypebarOwnedCorporaAndCompletesByWords() {
     let configuration = TestConfiguration.words(
-      8, language: .mixedLanguages, englishVariant: .british)
+      10, language: .mixedLanguages, englishVariant: .british)
     var session = TestSessionFactory.make(configuration: configuration)
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.frenchWords, StarterLexicon.italianWords, StarterLexicon.portugueseWords,
-      StarterLexicon.simplifiedChineseWords,
+      StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
+      StarterLexicon.russianWords, StarterLexicon.japaneseHiraganaWords,
     ]
 
-    XCTAssertEqual(tokens.count, 8)
+    XCTAssertEqual(tokens.count, 10)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3539,10 +3575,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.german.supportsQuotes)
   }
 
-  func testFrenchItalianAndPortugueseUseOnlyTypebarOwnedCorporaAndQuotes() {
+  func testFrenchItalianPortugueseAndRussianUseOnlyTypebarOwnedCorporaAndQuotes() {
     for (language, lexicon) in [
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
-      (.portuguese, StarterLexicon.portugueseWords),
+      (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
     ] {
       let prompt = OfflineContent.generatedPrompt(
         wordCount: 12, language: language,
@@ -3579,6 +3615,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.italian.speechLocaleIdentifier, "it-IT")
     XCTAssertEqual(TypingLanguage.portuguese.speechLocaleIdentifier, "pt-PT")
     XCTAssertEqual(TypingLanguage.simplifiedChinese.speechLocaleIdentifier, "zh-CN")
+    XCTAssertEqual(TypingLanguage.traditionalChinese.speechLocaleIdentifier, "zh-TW")
+    XCTAssertEqual(TypingLanguage.russian.speechLocaleIdentifier, "ru-RU")
+    XCTAssertEqual(TypingLanguage.japaneseHiragana.speechLocaleIdentifier, "ja-JP")
     XCTAssertEqual(TypingLanguage.mixedEnglishChinese.speechLocaleIdentifier, "zh-CN")
     XCTAssertEqual(TypingLanguage.mixedLanguages.speechLocaleIdentifier, "en-US")
   }
@@ -3779,6 +3818,7 @@ final class TypingEngineTests: XCTestCase {
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
       .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,
+      .traditionalChinese, .russian, .japaneseHiragana,
     ]
     for language in languages {
       let quote = try! XCTUnwrap(OfflineContent.quotes(for: language, length: .extended).first)

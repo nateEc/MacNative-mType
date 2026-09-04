@@ -883,7 +883,10 @@ private struct ContentView: View {
           if language == .mixedLanguages {
             VStack(alignment: .leading, spacing: 6) {
               Text("多语组合（至少选择两种）").font(.caption).foregroundStyle(.secondary)
-              HStack(spacing: 10) {
+              LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 105), spacing: 8)], alignment: .leading,
+                spacing: 6
+              ) {
                 ForEach(TypingLanguage.mixableLanguages, id: \.self) { component in
                   Toggle(component.displayName, isOn: mixedLanguageBinding(for: component))
                     .toggleStyle(.checkbox)

@@ -1991,7 +1991,10 @@ public actor AuthStore {
     let text = request.text.trimmingCharacters(in: .whitespacesAndNewlines)
     let attribution = request.attribution?.trimmingCharacters(in: .whitespacesAndNewlines)
     guard
-      Set(["english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese"])
+      Set([
+        "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
+        "traditionalChinese", "russian", "japaneseHiragana",
+      ])
         .contains(request.language), (10...500).contains(text.count), attribution?.count ?? 0 <= 80
     else { throw AuthStoreError.invalidQuoteSubmission }
     let submission = StoredQuoteSubmission(
@@ -2103,6 +2106,7 @@ public actor AuthStore {
       language == nil
         || Set([
           "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
+          "traditionalChinese", "russian", "japaneseHiragana",
         ]).contains(language!)
     else { throw AuthStoreError.invalidQuoteSubmission }
     let viewerID = try accessToken.map { try authenticatedUser(for: $0, now: now).id }
@@ -2684,6 +2688,7 @@ public actor AuthStore {
     let modes = Set(["time", "words", "quote", "zen", "custom"])
     let languages = Set([
       "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
+      "traditionalChinese", "russian", "japaneseHiragana",
       "mixedEnglishChinese", "mixedLanguages",
     ])
     let periods = Set(["all", "day", "yesterday", "week"])
@@ -2978,6 +2983,7 @@ public actor AuthStore {
     guard Set(["time", "words", "quote", "zen", "custom"]).contains(result.mode),
       Set([
         "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
+        "traditionalChinese", "russian", "japaneseHiragana",
         "mixedEnglishChinese", "mixedLanguages",
       ]).contains(result.language),
       (0...400).contains(result.wpm), (0...500).contains(result.rawWpm),

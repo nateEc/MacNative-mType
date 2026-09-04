@@ -30,6 +30,9 @@ extension TypingLanguage {
     case .italian: "it-IT"
     case .portuguese: "pt-PT"
     case .simplifiedChinese, .mixedEnglishChinese: "zh-CN"
+    case .traditionalChinese: "zh-TW"
+    case .russian: "ru-RU"
+    case .japaneseHiragana: "ja-JP"
     case .mixedLanguages: "en-US"
     default: "en-US"
     }

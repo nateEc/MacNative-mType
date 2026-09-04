@@ -130,7 +130,9 @@ enum LivePracticeContentService {
     case .french: return "fr"
     case .italian: return "it"
     case .portuguese: return "pt"
-    case .simplifiedChinese: return "zh"
+    case .simplifiedChinese, .traditionalChinese: return "zh"
+    case .russian: return "ru"
+    case .japaneseHiragana: return "ja"
     default: return "en"
     }
   }
