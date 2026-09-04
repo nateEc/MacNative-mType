@@ -4771,14 +4771,10 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
-    let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .afrikaans, .arabic, .hebrew, .persian, .urdu, .tamil, .hindi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
-      .italian, .portuguese,
-      .simplifiedChinese,
-      .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
-      .japaneseRomaji, .korean, .turkish, .polish,
-    ]
+    let languages = TypingLanguage.allCases.filter(\.supportsQuotes)
+    XCTAssertFalse(languages.isEmpty)
     for language in languages {
+      XCTAssertFalse(language.ownedPracticeWords().isEmpty, language.displayName)
       let quote = try! XCTUnwrap(OfflineContent.quotes(for: language, length: .extended).first)
       XCTAssertEqual(quote.language, language)
       XCTAssertEqual(quote.length, .extended)
