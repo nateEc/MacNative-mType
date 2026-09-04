@@ -44,6 +44,17 @@ final class TypingEngineTests: XCTestCase {
         websiteURL: "https://example.com", showActivity: false))
   }
 
+  func testRemoteDiscordAvatarBuildsOnlyValidatedCDNURLs() {
+    let valid = RemoteDiscordAvatar(
+      subject: "123456789012345678", avatarHash: "a_" + String(repeating: "b", count: 32))
+    XCTAssertEqual(
+      valid.cdnURL?.absoluteString,
+      "https://cdn.discordapp.com/avatars/123456789012345678/a_\(String(repeating: "b", count: 32)).png?size=128")
+    XCTAssertNil(RemoteDiscordAvatar(subject: "../invalid", avatarHash: String(repeating: "b", count: 32)).cdnURL)
+    XCTAssertNil(RemoteDiscordAvatar(subject: "１２３", avatarHash: String(repeating: "b", count: 32)).cdnURL)
+    XCTAssertNil(RemoteDiscordAvatar(subject: "123", avatarHash: "not-a-hash").cdnURL)
+  }
+
   func testTimedTestCompletesAtDeadline() {
     var session = TypingSession(configuration: .timed(seconds: 15), prompt: "amber harbor")
     session.insert("a", at: start)

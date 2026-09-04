@@ -119,5 +119,6 @@
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
-- 完整 `swift test` 已通过 244 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
-- 独立 Vapor 服务的 `swift test` 已通过 60 项测试，其中覆盖 GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证及安全移除；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
+- Discord 头像资料测试覆盖默认不公开、显式开启、关闭后立即隐藏与非法哈希拒绝；客户端同时拒绝非 ASCII 标识与异常 CDN URL。
+- 完整 `swift test` 已通过 245 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
+- 独立 Vapor 服务的 `swift test` 已通过 61 项测试，其中覆盖 GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除及 Discord 头像公开隐私；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。

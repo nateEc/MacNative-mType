@@ -127,7 +127,7 @@ public struct ReauthenticationResponse: Content, Equatable {
 }
 
 /// Account-owned profile details. Every field is intentionally public except
-/// the activity visibility preference, which controls the detail endpoint.
+/// the visibility preferences, which control optional profile data.
 public struct ProfileDetails: Content, Equatable {
   public let bio: String
   public let keyboard: String
@@ -135,10 +135,11 @@ public struct ProfileDetails: Content, Equatable {
   public let socialHandle: String
   public let websiteURL: String
   public let showActivity: Bool
+  public let showDiscordAvatar: Bool
 
   public init(
     bio: String = "", keyboard: String = "", github: String = "", socialHandle: String = "",
-    websiteURL: String = "", showActivity: Bool = true
+    websiteURL: String = "", showActivity: Bool = true, showDiscordAvatar: Bool = false
   ) {
     self.bio = bio
     self.keyboard = keyboard
@@ -146,6 +147,7 @@ public struct ProfileDetails: Content, Equatable {
     self.socialHandle = socialHandle
     self.websiteURL = websiteURL
     self.showActivity = showActivity
+    self.showDiscordAvatar = showDiscordAvatar
   }
 }
 
@@ -291,20 +293,24 @@ public struct OAuthRegistrationRequest: Content, Equatable {
 
 /// A verified identity returned by a configured OAuth provider. It deliberately
 /// contains no provider access or refresh token; Typebar only keeps the stable
-/// provider subject needed for future sign-in.
+/// provider subject needed for future sign-in. Discord may also supply an
+/// optional avatar hash for a separately opt-in public profile image.
 public struct OAuthProviderIdentity: Sendable, Equatable {
   public let provider: OAuthProvider
   public let subject: String
   public let email: String
   public let suggestedDisplayName: String?
+  public let avatarHash: String?
 
   public init(
-    provider: OAuthProvider, subject: String, email: String, suggestedDisplayName: String? = nil
+    provider: OAuthProvider, subject: String, email: String, suggestedDisplayName: String? = nil,
+    avatarHash: String? = nil
   ) {
     self.provider = provider
     self.subject = subject
     self.email = email
     self.suggestedDisplayName = suggestedDisplayName
+    self.avatarHash = avatarHash
   }
 }
 
@@ -330,6 +336,14 @@ public struct PublicProfileResponse: Content, Equatable {
   public let activity: PublicProfileActivityResponse?
   public let totalExperience: Int
   public let profileDetails: ProfileDetails
+  public let discordAvatar: PublicDiscordAvatarResponse?
+}
+
+/// An opt-in Discord CDN identifier. It deliberately excludes email, tokens,
+/// and every other OAuth provider detail.
+public struct PublicDiscordAvatarResponse: Content, Equatable {
+  public let subject: String
+  public let avatarHash: String
 }
 
 /// A public, per-standard-mode best. It intentionally excludes the prompt,
@@ -555,6 +569,7 @@ public actor AuthStore {
     let subject: String
     let userID: UUID
     let linkedAt: Date
+    var avatarHash: String?
   }
 
   private struct StoredOAuthTransaction: Codable {
@@ -568,6 +583,7 @@ public actor AuthStore {
     var subject: String?
     var email: String?
     var suggestedDisplayName: String?
+    var avatarHash: String?
     var authenticatedUserID: UUID?
     var failureMessage: String?
   }
@@ -828,7 +844,9 @@ public actor AuthStore {
       emailVerified: true)
     state.users.append(user)
     state.oauthIdentities.append(
-      .init(provider: identity.provider, subject: subject, userID: user.id, linkedAt: now))
+      .init(
+        provider: identity.provider, subject: subject, userID: user.id, linkedAt: now,
+        avatarHash: Self.discordAvatarHash(from: identity)))
     let response = makeSession(for: user, now: now)
     try persist()
     return response
@@ -857,14 +875,24 @@ public actor AuthStore {
   ) throws -> AuthUserResponse {
     let currentUser = try authenticatedUser(for: accessToken, now: now)
     let (subject, _) = try validatedOAuthIdentity(identity)
-    if let existing = state.oauthIdentities.first(where: {
+    if let existingIndex = state.oauthIdentities.firstIndex(where: {
       $0.provider == identity.provider && $0.subject == subject
     }) {
-      guard existing.userID == currentUser.id else { throw AuthStoreError.oauthIdentityAlreadyLinked }
+      guard state.oauthIdentities[existingIndex].userID == currentUser.id else {
+        throw AuthStoreError.oauthIdentityAlreadyLinked
+      }
+      if let avatarHash = Self.discordAvatarHash(from: identity),
+        state.oauthIdentities[existingIndex].avatarHash != avatarHash
+      {
+        state.oauthIdentities[existingIndex].avatarHash = avatarHash
+        try persist()
+      }
       return try userResponse(for: currentUser.id)
     }
     state.oauthIdentities.append(
-      .init(provider: identity.provider, subject: subject, userID: currentUser.id, linkedAt: now))
+      .init(
+        provider: identity.provider, subject: subject, userID: currentUser.id, linkedAt: now,
+        avatarHash: Self.discordAvatarHash(from: identity)))
     try persist()
     return try userResponse(for: currentUser.id)
   }
@@ -976,7 +1004,7 @@ public actor AuthStore {
       .init(
         provider: provider, stateHash: Self.tokenHash(stateToken), codeVerifier: codeVerifier,
         purpose: purpose, userID: userID, expiresAt: now.addingTimeInterval(10 * 60), status: .pending,
-        subject: nil, email: nil, suggestedDisplayName: nil, authenticatedUserID: nil,
+        subject: nil, email: nil, suggestedDisplayName: nil, avatarHash: nil, authenticatedUserID: nil,
         failureMessage: nil))
     try persist()
     return .init(
@@ -1011,14 +1039,18 @@ public actor AuthStore {
     let (subject, email) = try validatedOAuthIdentity(identity)
     switch state.oauthTransactions[index].purpose {
     case .signIn:
-      if let existing = state.oauthIdentities.first(where: {
+      if let existingIndex = state.oauthIdentities.firstIndex(where: {
         $0.provider == identity.provider && $0.subject == subject
       }) {
+        if let avatarHash = Self.discordAvatarHash(from: identity) {
+          state.oauthIdentities[existingIndex].avatarHash = avatarHash
+        }
         state.oauthTransactions[index].status = .signedIn
         state.oauthTransactions[index].subject = nil
         state.oauthTransactions[index].email = nil
         state.oauthTransactions[index].suggestedDisplayName = nil
-        state.oauthTransactions[index].authenticatedUserID = existing.userID
+        state.oauthTransactions[index].avatarHash = nil
+        state.oauthTransactions[index].authenticatedUserID = state.oauthIdentities[existingIndex].userID
       } else if state.users.contains(where: { $0.email == email }) {
         state.oauthTransactions[index].status = .failed
         state.oauthTransactions[index].failureMessage =
@@ -1028,6 +1060,7 @@ public actor AuthStore {
         state.oauthTransactions[index].subject = subject
         state.oauthTransactions[index].email = email
         state.oauthTransactions[index].suggestedDisplayName = identity.suggestedDisplayName
+        state.oauthTransactions[index].avatarHash = Self.discordAvatarHash(from: identity)
       }
     case .link:
       guard let userID = state.oauthTransactions[index].userID,
@@ -1039,11 +1072,17 @@ public actor AuthStore {
         state.oauthTransactions[index].status = .failed
         state.oauthTransactions[index].failureMessage = "This provider identity is already linked to another Typebar account."
       } else {
-        if !state.oauthIdentities.contains(where: {
+        if let existingIndex = state.oauthIdentities.firstIndex(where: {
           $0.provider == identity.provider && $0.subject == subject && $0.userID == userID
         }) {
+          if let avatarHash = Self.discordAvatarHash(from: identity) {
+            state.oauthIdentities[existingIndex].avatarHash = avatarHash
+          }
+        } else {
           state.oauthIdentities.append(
-            .init(provider: identity.provider, subject: subject, userID: userID, linkedAt: now))
+            .init(
+              provider: identity.provider, subject: subject, userID: userID, linkedAt: now,
+              avatarHash: Self.discordAvatarHash(from: identity)))
         }
         state.oauthTransactions[index].status = .linked
       }
@@ -1156,7 +1195,9 @@ public actor AuthStore {
       emailVerified: true)
     state.users.append(user)
     state.oauthIdentities.append(
-      .init(provider: transaction.provider, subject: subject, userID: user.id, linkedAt: now))
+      .init(
+        provider: transaction.provider, subject: subject, userID: user.id, linkedAt: now,
+        avatarHash: transaction.avatarHash))
     state.oauthTransactions.remove(at: index)
     let session = makeSession(for: user, now: now)
     try persist()
@@ -2035,8 +2076,18 @@ public actor AuthStore {
       personalBests: publicPersonalBests(from: results),
       activity: activity,
       totalExperience: experience(for: user.id),
-      profileDetails: user.profileDetails
+      profileDetails: user.profileDetails,
+      discordAvatar: publicDiscordAvatar(for: user)
     )
+  }
+
+  private func publicDiscordAvatar(for user: StoredUser) -> PublicDiscordAvatarResponse? {
+    guard user.profileDetails.showDiscordAvatar,
+      let identity = state.oauthIdentities.first(where: {
+        $0.userID == user.id && $0.provider == .discord
+      }), let avatarHash = identity.avatarHash
+    else { return nil }
+    return .init(subject: identity.subject, avatarHash: avatarHash)
   }
 
   private func publicActivity(from results: [StoredResult], endingAt now: Date)
@@ -2685,7 +2736,18 @@ public actor AuthStore {
     let websiteURL = try validatedProfileWebsite(value.websiteURL)
     return .init(
       bio: bio, keyboard: keyboard, github: github, socialHandle: socialHandle,
-      websiteURL: websiteURL, showActivity: value.showActivity)
+      websiteURL: websiteURL, showActivity: value.showActivity,
+      showDiscordAvatar: value.showDiscordAvatar)
+  }
+
+  private static func discordAvatarHash(from identity: OAuthProviderIdentity) -> String? {
+    guard identity.provider == .discord,
+      let rawHash = identity.avatarHash?.trimmingCharacters(in: .whitespacesAndNewlines)
+    else { return nil }
+    let normalized = rawHash.lowercased()
+    let hex = normalized.hasPrefix("a_") ? String(normalized.dropFirst(2)) : normalized
+    guard hex.count == 32, hex.allSatisfy({ "0123456789abcdef".contains($0) }) else { return nil }
+    return normalized
   }
 
   private func validatedProfileHandle(_ value: String, maximumLength: Int) throws -> String {

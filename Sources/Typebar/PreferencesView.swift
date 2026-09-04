@@ -21,6 +21,7 @@ struct PreferencesView: View {
   @State private var profileSocialHandle = ""
   @State private var profileWebsiteURL = ""
   @State private var profileShowsActivity = true
+  @State private var profileShowsDiscordAvatar = false
   @State private var developerAccessKeyName = ""
   @State private var newlyCreatedDeveloperAccessKey: String?
   @State private var remoteResultsDeletionPassword = ""
@@ -1010,13 +1011,21 @@ struct PreferencesView: View {
               TextField("个人网站（https://，可选）", text: $profileWebsiteURL)
                 .textContentType(.URL)
               Toggle("在公开资料显示练习活动", isOn: $profileShowsActivity)
+              if user.authenticationMethods.contains(.discord) {
+                Toggle("在公开资料显示 Discord 头像", isOn: $profileShowsDiscordAvatar)
+              } else {
+                Text("关联 Discord 后，可选择在公开资料显示该账户的头像。")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
               Button("更新公开资料") {
                 Task {
                   if await account.updateProfileDetails(
                     .init(
                       bio: profileBio, keyboard: profileKeyboard, github: profileGitHub,
                       socialHandle: profileSocialHandle, websiteURL: profileWebsiteURL,
-                      showActivity: profileShowsActivity))
+                      showActivity: profileShowsActivity,
+                      showDiscordAvatar: profileShowsDiscordAvatar))
                   {
                     profileBio = account.currentUser?.profileDetails.bio ?? profileBio
                     profileKeyboard = account.currentUser?.profileDetails.keyboard ?? profileKeyboard
@@ -1024,6 +1033,8 @@ struct PreferencesView: View {
                     profileSocialHandle = account.currentUser?.profileDetails.socialHandle ?? profileSocialHandle
                     profileWebsiteURL = account.currentUser?.profileDetails.websiteURL ?? profileWebsiteURL
                     profileShowsActivity = account.currentUser?.profileDetails.showActivity ?? profileShowsActivity
+                    profileShowsDiscordAvatar = account.currentUser?.profileDetails.showDiscordAvatar
+                      ?? profileShowsDiscordAvatar
                   }
                 }
               }
@@ -1031,7 +1042,7 @@ struct PreferencesView: View {
                 account.isWorking || profileBio.count > 250 || profileKeyboard.count > 75
                   || profileGitHub.count > 39 || profileSocialHandle.count > 15
                   || profileWebsiteURL.count > 200)
-              Text("简介、键盘说明与链接会出现在公开资料；邮箱、令牌和本机练习内容永不公开。关闭活动后，资料页不再展示每日练习日历。")
+              Text("简介、键盘说明与链接会出现在公开资料；邮箱、令牌和本机练习内容永不公开。关闭活动后，资料页不再展示每日练习日历；Discord 头像仅在你主动开启后显示。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -1648,6 +1659,7 @@ struct PreferencesView: View {
     profileSocialHandle = details.socialHandle
     profileWebsiteURL = details.websiteURL
     profileShowsActivity = details.showActivity
+    profileShowsDiscordAvatar = details.showDiscordAvatar
   }
 
   private func streakDayBoundaryLabel(for offset: Double) -> String {

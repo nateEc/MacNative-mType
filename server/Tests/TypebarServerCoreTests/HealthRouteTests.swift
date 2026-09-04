@@ -1344,6 +1344,37 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testPublicProfileShowsDiscordAvatarOnlyAfterExplicitOptIn() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 37_000)
+    let avatarHash = "a_" + String(repeating: "a", count: 32)
+    let session = try await store.registerWithOAuth(
+      .init(
+        provider: .discord, subject: "123456789012345678", email: "avatar@example.com",
+        avatarHash: avatarHash),
+      displayName: "Avatar User", now: now)
+
+    let privateProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertNil(privateProfile.discordAvatar)
+    _ = try await store.updateProfile(
+      .init(profileDetails: .init(showDiscordAvatar: true)), accessToken: session.accessToken, now: now)
+    let visible = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(visible.discordAvatar, .init(subject: "123456789012345678", avatarHash: avatarHash))
+
+    _ = try await store.updateProfile(
+      .init(profileDetails: .init(showDiscordAvatar: false)), accessToken: session.accessToken, now: now)
+    let hidden = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertNil(hidden.discordAvatar)
+
+    let invalidAvatar = try await store.registerWithOAuth(
+      .init(provider: .discord, subject: "987654321098765432", email: "invalid-avatar@example.com", avatarHash: "../not-an-avatar"),
+      displayName: "Safe Avatar", now: now)
+    _ = try await store.updateProfile(
+      .init(profileDetails: .init(showDiscordAvatar: true)), accessToken: invalidAvatar.accessToken, now: now)
+    let invalid = try await store.publicProfile(id: invalidAvatar.user.id, now: now)
+    XCTAssertNil(invalid.discordAvatar)
+  }
+
   func testConnectionsSupportRequestsAcceptanceAndUserScopedLists() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let alice = try await store.register(

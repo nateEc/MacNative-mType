@@ -317,9 +317,25 @@ private struct PublicProfileView: View {
     var body: some View {
         ScrollView {
           VStack(spacing: 20) {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 54))
-                .foregroundStyle(.secondary)
+            if let avatarURL = profile.discordAvatar?.cdnURL {
+                AsyncImage(url: avatarURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Image(systemName: "person.crop.circle.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 54, height: 54)
+                .clipShape(Circle())
+                .accessibilityLabel("Discord 头像")
+            } else {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 54))
+                    .foregroundStyle(.secondary)
+            }
             Text(profile.displayName).font(.title2.weight(.semibold))
             Grid(horizontalSpacing: 28, verticalSpacing: 12) {
                 GridRow { metric("完成成绩", "\(profile.completedResultCount)"); metric("最佳 WPM", "\(profile.bestWPM)") }

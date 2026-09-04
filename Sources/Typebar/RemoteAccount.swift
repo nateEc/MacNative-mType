@@ -60,14 +60,15 @@ struct RemoteProfileDetails: Codable, Equatable, Sendable {
     let socialHandle: String
     let websiteURL: String
     let showActivity: Bool
+    let showDiscordAvatar: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case bio, keyboard, github, socialHandle, websiteURL, showActivity
+        case bio, keyboard, github, socialHandle, websiteURL, showActivity, showDiscordAvatar
     }
 
     init(
         bio: String = "", keyboard: String = "", github: String = "", socialHandle: String = "",
-        websiteURL: String = "", showActivity: Bool = true
+        websiteURL: String = "", showActivity: Bool = true, showDiscordAvatar: Bool = false
     ) {
         self.bio = bio
         self.keyboard = keyboard
@@ -75,6 +76,7 @@ struct RemoteProfileDetails: Codable, Equatable, Sendable {
         self.socialHandle = socialHandle
         self.websiteURL = websiteURL
         self.showActivity = showActivity
+        self.showDiscordAvatar = showDiscordAvatar
     }
 
     init(from decoder: Decoder) throws {
@@ -85,6 +87,7 @@ struct RemoteProfileDetails: Codable, Equatable, Sendable {
         socialHandle = try values.decodeIfPresent(String.self, forKey: .socialHandle) ?? ""
         websiteURL = try values.decodeIfPresent(String.self, forKey: .websiteURL) ?? ""
         showActivity = try values.decodeIfPresent(Bool.self, forKey: .showActivity) ?? true
+        showDiscordAvatar = try values.decodeIfPresent(Bool.self, forKey: .showDiscordAvatar) ?? false
     }
 }
 
@@ -602,10 +605,11 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let activity: RemotePublicProfileActivity?
     let totalExperience: Int
     let profileDetails: RemoteProfileDetails
+    let discordAvatar: RemoteDiscordAvatar?
 
     private enum CodingKeys: String, CodingKey {
         case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests,
-            activity, totalExperience, profileDetails
+            activity, totalExperience, profileDetails, discordAvatar
     }
 
     init(from decoder: Decoder) throws {
@@ -620,6 +624,23 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         activity = try values.decodeIfPresent(RemotePublicProfileActivity.self, forKey: .activity)
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
+        discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
+    }
+}
+
+struct RemoteDiscordAvatar: Codable, Equatable, Sendable {
+    let subject: String
+    let avatarHash: String
+
+    var cdnURL: URL? {
+        let identifier = subject.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hash = avatarHash.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let hex = hash.hasPrefix("a_") ? String(hash.dropFirst(2)) : hash
+        guard !identifier.isEmpty, identifier.count <= 32,
+            identifier.allSatisfy({ $0.isASCII && $0.isNumber }),
+            hex.count == 32, hex.allSatisfy({ "0123456789abcdef".contains($0) })
+        else { return nil }
+        return URL(string: "https://cdn.discordapp.com/avatars/\(identifier)/\(hash).png?size=128")
     }
 }
 

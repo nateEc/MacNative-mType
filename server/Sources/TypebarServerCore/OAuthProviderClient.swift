@@ -201,7 +201,8 @@ public struct OAuthProviderClient: Sendable {
     let globalName = user.globalName?.trimmingCharacters(in: .whitespacesAndNewlines)
     return .init(
       provider: .discord, subject: user.id, email: email,
-      suggestedDisplayName: globalName?.isEmpty == false ? globalName : user.username)
+      suggestedDisplayName: globalName?.isEmpty == false ? globalName : user.username,
+      avatarHash: user.avatar)
   }
 
   private func authorizedJSON<Response: Decodable>(
@@ -278,6 +279,7 @@ private struct DiscordUser: Decodable {
   let id: String
   let username: String
   let globalName: String?
+  let avatar: String?
   let email: String?
   let verified: Bool?
 
@@ -285,6 +287,7 @@ private struct DiscordUser: Decodable {
     case id
     case username
     case globalName = "global_name"
+    case avatar
     case email
     case verified
   }
