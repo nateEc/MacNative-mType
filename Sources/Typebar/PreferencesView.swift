@@ -50,6 +50,10 @@ struct PreferencesView: View {
   @State private var moderationQuotes: [RemoteModerationQuote] = []
   @State private var profileModerationStatus: RemoteProfileModerationStatus = .open
   @State private var moderationProfileReports: [RemoteModerationProfileReport] = []
+  @State private var announcementMessage = ""
+  @State private var announcementLevel: RemoteAnnouncementLevel = .notice
+  @State private var announcementSticky = false
+  @State private var moderationAnnouncements: [RemoteAnnouncement] = []
   @State private var moderationMessage: String?
   @State private var moderationIsWorking = false
   @State private var customThemeName = ""
@@ -1498,6 +1502,51 @@ struct PreferencesView: View {
           if let moderationMessage {
             Text(moderationMessage).font(.caption).foregroundStyle(.secondary)
           }
+          Divider()
+          Text("服务公告").font(.headline)
+          TextField("所有客户端可见的纯文本公告（最多 500 字）", text: $announcementMessage, axis: .vertical)
+            .lineLimit(2...5)
+          Picker("公告级别", selection: $announcementLevel) {
+            ForEach(RemoteAnnouncementLevel.allCases) { level in
+              Text(level.displayName).tag(level)
+            }
+          }
+          Toggle("置顶：客户端不可在本机关闭", isOn: $announcementSticky)
+          HStack {
+            Button("发布公告") { Task { await publishAnnouncement() } }
+              .buttonStyle(.borderedProminent)
+              .disabled(
+                moderationIsWorking
+                  || moderationKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                  || announcementMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("读取服务公告") { Task { await refreshAnnouncements() } }
+              .disabled(moderationIsWorking)
+          }
+          Text("公告公开读取，不需要账户。普通公告只会在本机关闭；置顶公告会持续显示，直到部署者删除。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          ForEach(moderationAnnouncements) { announcement in
+            VStack(alignment: .leading, spacing: 6) {
+              HStack {
+                Label(announcement.level.displayName, systemImage: announcement.level.systemImage)
+                  .font(.caption.weight(.semibold))
+                if announcement.sticky { Text("置顶").font(.caption).foregroundStyle(.orange) }
+                Spacer()
+                Text(announcement.publishedAt, format: .dateTime.year().month().day().hour().minute())
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
+              Text(announcement.message)
+              Button("删除公告", role: .destructive) {
+                Task { await removeAnnouncement(announcement) }
+              }
+              .disabled(
+                moderationIsWorking
+                  || moderationKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding(.vertical, 4)
+          }
+          Divider()
           ForEach(moderationQuotes) { quote in
             VStack(alignment: .leading, spacing: 6) {
               HStack {
@@ -1851,7 +1900,7 @@ struct PreferencesView: View {
   }
 
   private var moderationSectionVisible: Bool {
-    matches("审核", "审核员", "moderation", "投稿", "引语", "队列", "密钥", "key")
+    matches("审核", "审核员", "moderation", "公告", "announcement", "投稿", "引语", "队列", "密钥", "key")
   }
 
   private var defaultsSectionVisible: Bool {
@@ -1916,6 +1965,51 @@ struct PreferencesView: View {
       try await account.moderateQuote(quote.id, key: moderationKey, status: status)
       moderationMessage = "已将内容标为\(status.displayName)。"
       moderationQuotes.removeAll { $0.id == quote.id }
+    } catch {
+      moderationMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func refreshAnnouncements() async {
+    moderationIsWorking = true
+    defer { moderationIsWorking = false }
+    do {
+      moderationAnnouncements = try await account.publicAnnouncements()
+      moderationMessage =
+        moderationAnnouncements.isEmpty ? "当前没有服务公告。" : "已读取 \(moderationAnnouncements.count) 条服务公告。"
+    } catch {
+      moderationAnnouncements = []
+      moderationMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func publishAnnouncement() async {
+    moderationIsWorking = true
+    defer { moderationIsWorking = false }
+    do {
+      let announcement = try await account.publishAnnouncement(
+        message: announcementMessage, level: announcementLevel, sticky: announcementSticky,
+        key: moderationKey)
+      moderationAnnouncements.insert(announcement, at: 0)
+      announcementMessage = ""
+      announcementLevel = .notice
+      announcementSticky = false
+      moderationMessage = "已发布服务公告。"
+    } catch {
+      moderationMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func removeAnnouncement(_ announcement: RemoteAnnouncement) async {
+    moderationIsWorking = true
+    defer { moderationIsWorking = false }
+    do {
+      try await account.removeAnnouncement(announcement.id, key: moderationKey)
+      moderationAnnouncements.removeAll { $0.id == announcement.id }
+      moderationMessage = "已删除服务公告。"
     } catch {
       moderationMessage = error.localizedDescription
     }

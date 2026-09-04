@@ -1860,6 +1860,32 @@ final class AccountSession {
         ).notifications
     }
 
+    func publicAnnouncements() async throws -> [RemoteAnnouncement] {
+        try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/announcements", method: "GET", token: nil,
+            body: Optional<String>.none, response: RemoteAnnouncementsResponse.self
+        ).announcements
+    }
+
+    func publishAnnouncement(
+        message: String, level: RemoteAnnouncementLevel, sticky: Bool, key: String
+    ) async throws -> RemoteAnnouncement {
+        try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/moderation/announcements", method: "POST", token: nil,
+            body: RemoteAnnouncementPublicationRequest(message: message, level: level, sticky: sticky),
+            headers: ["X-Typebar-Moderation-Key": key], response: RemoteAnnouncement.self
+        )
+    }
+
+    func removeAnnouncement(_ id: UUID, key: String) async throws {
+        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/moderation/announcements/\(id.uuidString)", method: "DELETE", token: nil,
+            body: Optional<String>.none, headers: ["X-Typebar-Moderation-Key": key],
+            response: RemoteConnectionRemovalResponse.self
+        )
+        guard response.removed else { throw RemoteAccountError.unexpectedResponse }
+    }
+
     func markNotificationRead(_ id: UUID) async throws -> RemoteNotification {
         let token = try accessToken()
         return try await RemoteAccountAPI(endpoint: endpoint).request(

@@ -66,6 +66,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["profileReports"], .partial)
         XCTAssertEqual(capabilities.capabilities["directMessages"], .partial)
         XCTAssertEqual(capabilities.capabilities["experience"], .partial)
+        XCTAssertEqual(capabilities.capabilities["announcements"], .available)
       }
       try await app.asyncShutdown()
     } catch {
@@ -104,6 +105,65 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(TypebarMaintenanceMode.isEnabled(value: " ON "))
     XCTAssertFalse(TypebarMaintenanceMode.isEnabled(value: "enabled"))
     XCTAssertFalse(TypebarMaintenanceMode.isEnabled(value: nil))
+  }
+
+  func testPublicAnnouncementsCanBePublishedAndRemovedOnlyWithDeploymentKey() async throws {
+    let app = try await Application.make(.testing)
+    do {
+      try configureTestApp(app, moderationKey: "test-announcement-key")
+      try await app.test(.GET, "v1/announcements") { response async in
+        XCTAssertEqual(response.status, .ok)
+        XCTAssertEqual(try response.content.decode(PublicAnnouncementsResponse.self).announcements, [])
+      }
+      try await app.test(.POST, "v1/moderation/announcements") { response async in
+        XCTAssertEqual(response.status, .forbidden)
+      }
+      var created: PublicAnnouncementResponse?
+      try await app.test(
+        .POST, "v1/moderation/announcements",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "X-Typebar-Moderation-Key", value: "test-announcement-key")
+          try request.content.encode(
+            AnnouncementPublicationRequest(
+              message: "  Service update complete.  ", level: .success, sticky: true))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          created = try? response.content.decode(PublicAnnouncementResponse.self)
+        })
+      let announcement = try XCTUnwrap(created)
+      XCTAssertEqual(announcement.message, "Service update complete.")
+      XCTAssertEqual(announcement.level, .success)
+      XCTAssertTrue(announcement.sticky)
+      try await app.test(.GET, "v1/announcements") { response async in
+        XCTAssertEqual(response.status, .ok)
+        XCTAssertEqual(
+          try? response.content.decode(PublicAnnouncementsResponse.self).announcements,
+          [announcement])
+      }
+      try await app.test(
+        .DELETE, "v1/moderation/announcements/\(announcement.id.uuidString)",
+        beforeRequest: { request async in
+          request.headers.add(name: "X-Typebar-Moderation-Key", value: "test-announcement-key")
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertTrue((try? response.content.decode(ConnectionRemovalResponse.self).removed) ?? false)
+        })
+      try await app.test(
+        .POST, "v1/moderation/announcements",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "X-Typebar-Moderation-Key", value: "test-announcement-key")
+          try request.content.encode(AnnouncementPublicationRequest(message: "   "))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .badRequest)
+        })
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
   }
 
   func testRegisterAndLoginCreateDistinctSecureSessions() async throws {

@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 struct TypebarApp: App {
   @State private var settings = AppSettings()
   @State private var account = AccountSession()
+  @State private var announcements = RemoteAnnouncementCenter()
   @State private var hotkey = GlobalHotkeyMonitor()
   @State private var systemKeyboardGuide = SystemKeyboardGuideMonitor()
 
@@ -34,11 +35,12 @@ struct TypebarApp: App {
 
   private var rootContent: some View {
     ContentView(
-      settings: settings, account: account, hotkey: hotkey,
+      settings: settings, account: account, announcements: announcements, hotkey: hotkey,
       systemKeyboardGuide: systemKeyboardGuide)
       .frame(minWidth: 760, minHeight: 480)
       .task {
         await account.restoreSession()
+        await announcements.refresh(using: account)
         hotkey.setEnabled(settings.globalHotkeyEnabled)
       }
   }
@@ -427,6 +429,7 @@ private struct ActiveLongSavedText: Equatable {
 private struct ContentView: View {
   let settings: AppSettings
   let account: AccountSession
+  let announcements: RemoteAnnouncementCenter
   let hotkey: GlobalHotkeyMonitor
   let systemKeyboardGuide: SystemKeyboardGuideMonitor
   @Environment(\.modelContext) private var modelContext
@@ -512,6 +515,7 @@ private struct ContentView: View {
   var body: some View {
     VStack(spacing: 30) {
       header
+      RemoteAnnouncementBannerStack(center: announcements)
       configurationPanel
       if let averageNotice {
         Label(averageNotice, systemImage: "chart.bar")

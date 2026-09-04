@@ -3732,6 +3732,33 @@ final class TypingEngineTests: XCTestCase {
       [.medium])
   }
 
+  @MainActor
+  func testRemoteAnnouncementCenterPersistsLocalDismissalsButKeepsStickyItems() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let ordinary = RemoteAnnouncement(
+      id: UUID(), message: "A normal update", level: .notice, sticky: false,
+      publishedAt: Date(timeIntervalSince1970: 20))
+    let sticky = RemoteAnnouncement(
+      id: UUID(), message: "A sticky update", level: .warning, sticky: true,
+      publishedAt: Date(timeIntervalSince1970: 10))
+    let center = RemoteAnnouncementCenter(defaults: defaults)
+    center.replace(with: [sticky, ordinary])
+    XCTAssertEqual(center.visibleAnnouncements.map(\.id), [ordinary.id, sticky.id])
+
+    center.dismiss(ordinary)
+    center.dismiss(sticky)
+    XCTAssertEqual(center.visibleAnnouncements.map(\.id), [sticky.id])
+
+    let restored = RemoteAnnouncementCenter(defaults: defaults)
+    restored.replace(with: [ordinary, sticky])
+    XCTAssertEqual(restored.visibleAnnouncements.map(\.id), [sticky.id])
+    restored.replace(with: [])
+    restored.replace(with: [ordinary])
+    XCTAssertEqual(restored.visibleAnnouncements.map(\.id), [ordinary.id])
+  }
+
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
       .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,

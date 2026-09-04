@@ -64,6 +64,7 @@ public func configure(
                 "profileReports": .partial,
                 "directMessages": .partial,
                 "experience": .partial,
+                "announcements": .available,
                 "quotes": .partial
             ]
         )
@@ -468,6 +469,31 @@ public func configure(
 
     app.post("v1", "reports", "quotes") { request async throws -> QuoteReportResponse in
         do { return try await authStore.submitQuoteReport(try request.content.decode(QuoteReportRequest.self), accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.get("v1", "announcements") { _ in
+        await authStore.publicAnnouncements()
+    }
+
+    app.post("v1", "moderation", "announcements") { request async throws -> PublicAnnouncementResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        do { return try await authStore.publishAnnouncement(request.content.decode(AnnouncementPublicationRequest.self)) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.delete("v1", "moderation", "announcements", ":id") { request async throws -> ConnectionRemovalResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The announcement identifier was invalid.")
+        }
+        do { return .init(removed: try await authStore.removeAnnouncement(id)) }
         catch let error as AuthStoreError { throw error.abort }
     }
 
@@ -887,6 +913,8 @@ private extension AuthStoreError {
             Abort(.notFound, reason: "The requested Typebar result does not exist.")
         case .invalidResultTags:
             Abort(.badRequest, reason: "Result tags must be unique, non-empty, and no longer than 24 characters.")
+        case .invalidAnnouncement:
+            Abort(.badRequest, reason: "Announcements must contain 1 to 500 non-whitespace characters.")
         case .directMessageNotAllowed:
             Abort(.forbidden, reason: "Direct messages are only available between accepted Typebar friends.")
         }

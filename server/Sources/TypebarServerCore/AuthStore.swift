@@ -436,6 +436,7 @@ public enum AuthStoreError: Error, Equatable {
   case invalidResultQuery
   case resultNotFound
   case invalidResultTags
+  case invalidAnnouncement
 }
 
 public actor AuthStore {
@@ -458,11 +459,13 @@ public actor AuthStore {
     var profileReports: [StoredProfileReport] = []
     var quoteReports: [StoredQuoteReport] = []
     var directMessages: [StoredDirectMessage] = []
+    var announcements: [StoredAnnouncement] = []
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
       case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
-        quoteRatings, notifications, profileReports, quoteReports, directMessages, nextSyncCursor
+        quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
+        nextSyncCursor
     }
 
     init() {}
@@ -500,6 +503,8 @@ public actor AuthStore {
         try values.decodeIfPresent([StoredQuoteReport].self, forKey: .quoteReports) ?? []
       directMessages =
         try values.decodeIfPresent([StoredDirectMessage].self, forKey: .directMessages) ?? []
+      announcements =
+        try values.decodeIfPresent([StoredAnnouncement].self, forKey: .announcements) ?? []
       nextSyncCursor = try values.decodeIfPresent(Int.self, forKey: .nextSyncCursor) ?? 0
     }
   }
@@ -802,6 +807,18 @@ public actor AuthStore {
     let body: String
     let createdAt: Date
     var readAt: Date?
+  }
+
+  private struct StoredAnnouncement: Codable {
+    let id: UUID
+    let message: String
+    let level: TypebarAnnouncementLevel
+    let sticky: Bool
+    let publishedAt: Date
+
+    func response() -> PublicAnnouncementResponse {
+      .init(id: id, message: message, level: level, sticky: sticky, publishedAt: publishedAt)
+    }
   }
 
   private var state: PersistedState
@@ -1798,6 +1815,40 @@ public actor AuthStore {
     state.profileReports.append(report)
     try persist()
     return .init(id: report.id, submittedAt: report.submittedAt)
+  }
+
+  /// Reads the currently published deployment announcements without requiring
+  /// an account. The server owns the set, so returning it whole avoids making
+  /// a locally dismissed item reappear merely because it fell off a page.
+  public func publicAnnouncements() -> PublicAnnouncementsResponse {
+    .init(
+      announcements: state.announcements
+        .sorted { $0.publishedAt > $1.publishedAt }
+        .map { $0.response() })
+  }
+
+  /// The route layer authorizes the deployment key; this store method only
+  /// validates and persists an original Typebar announcement.
+  public func publishAnnouncement(
+    _ request: AnnouncementPublicationRequest, now: Date = .now
+  ) throws -> PublicAnnouncementResponse {
+    let message = request.message.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !message.isEmpty, message.count <= 500 else { throw AuthStoreError.invalidAnnouncement }
+    let announcement = StoredAnnouncement(
+      id: UUID(), message: message, level: request.level, sticky: request.sticky, publishedAt: now)
+    state.announcements.append(announcement)
+    try persist()
+    return announcement.response()
+  }
+
+  /// Deleting an announcement only removes that public message. It never
+  /// changes accounts, notifications, results, or local acknowledgement data.
+  public func removeAnnouncement(_ id: UUID) throws -> Bool {
+    let oldCount = state.announcements.count
+    state.announcements.removeAll { $0.id == id }
+    guard state.announcements.count != oldCount else { throw AuthStoreError.profileNotFound }
+    try persist()
+    return true
   }
 
   /// Lists only the minimum private-review context for reports whose target
