@@ -43,6 +43,9 @@ struct TypebarApp: App {
         await announcements.refresh(using: account)
         hotkey.setEnabled(settings.globalHotkeyEnabled)
       }
+      .onChange(of: account.currentUser?.id) { _, _ in
+        Task { await announcements.refresh(using: account) }
+      }
   }
 
   private static let modelContainer: ModelContainer = {
