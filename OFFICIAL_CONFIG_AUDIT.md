@@ -7,6 +7,8 @@
 - 本审计只记录用户可见设置的代码级映射。`已映射` 不代替真实设备验收；`部分` 和`未实现`不能在其他文档中表述为已完成。
 - Typebar 的实现、文案、数据模型和测试均为原创；该表不复制参考实现的代码、资产、词表、布局定义或主题数据。
 
+- Catalan 自动化测试覆盖自创词流、四档原创引语、完整多语混排轮转、`ca-ES` 朗读 locale 与仅在明示启用时使用的 `ca` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
+
 状态含义：**已映射** = 有本机可见设置及对应持久化模型；**部分** = 可见意图已实现但选项、数据规模或交互不同；**未实现** = 尚无对应能力；**不适用** = 与“无广告的本机应用”产品约束冲突而有意不实现。
 
 ## 逐项映射
@@ -19,7 +21,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；三十八种原创单语（含希腊语、Greeklish、荷兰语、Filipino、丹麦语、挪威 Bokmål、挪威 Nynorsk、Afrikaans、瑞典语、匈牙利语、捷克语、斯洛伐克语、斯洛文尼亚语、克罗地亚语、塞尔维亚语西里尔、塞尔维亚语 Latin、保加利亚语、罗马尼亚语、芬兰语、爱沙尼亚语、冰岛语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、日语罗马字、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。乌克兰语 Latin、日语罗马字与 Greeklish 仅提供原创 ASCII 离线内容；塞尔维亚语 Latin 保持原创拉丁文本，四者均不让在线原文改写所选书写形式。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；三十九种原创单语（含希腊语、Greeklish、荷兰语、Filipino、Català、丹麦语、挪威 Bokmål、挪威 Nynorsk、Afrikaans、瑞典语、匈牙利语、捷克语、斯洛伐克语、斯洛文尼亚语、克罗地亚语、塞尔维亚语西里尔、塞尔维亚语 Latin、保加利亚语、罗马尼亚语、芬兰语、爱沙尼亚语、冰岛语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、日语罗马字、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。乌克兰语 Latin、日语罗马字与 Greeklish 仅提供原创 ASCII 离线内容；塞尔维亚语 Latin 保持原创拉丁文本，四者均不让在线原文改写所选书写形式。 |
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

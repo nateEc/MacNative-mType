@@ -30,6 +30,7 @@ extension TypingLanguage {
     case .greek, .greeklish: "el-GR"
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"
+    case .catalan: "ca-ES"
     case .danish: "da-DK"
     case .norwegianBokmal: "nb-NO"
     case .norwegianNynorsk: "nn-NO"

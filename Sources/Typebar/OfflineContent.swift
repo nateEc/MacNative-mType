@@ -680,6 +680,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "catalan-pas-tranquil",
+      title: "Pas tranquil",
+      text: "Un pas tranquil fa més clara la tasca següent.",
+      language: .catalan,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "catalan-quadern-obert",
+      title: "Quadern obert",
+      text: "Un quadern obert no resol totes les preguntes difícils, però ajuda a dividir-les en parts més petites.",
+      language: .catalan,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "catalan-feina-petita",
+      title: "Feina petita",
+      text: "El progrés no arriba sempre com un moment gran. Creix en feines petites: obrir la mateixa pàgina, aclarir una frase, corregir un error i deixar una nota útil per al següent intent.",
+      language: .catalan,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "catalan-taula-llarga",
+      title: "Taula llarga",
+      text: "Una taula llarga deixa espai per a diferents tipus de feina. En un costat hi pot haver un primer esborrany, a l'altre una frase que encara demana atenció, i al mig pot esperar la decisió petita següent. La pràctica funciona de manera semblant. No demana resoldre cada part difícil de seguida, sinó tenir un lloc on tornar, un pas següent visible i prou paciència per notar què es torna més fàcil després d'uns quants intents.",
+      language: .catalan,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "danish-lille-skridt",
       title: "Lille skridt",
       text: "Et lille, roligt skridt gør den næste opgave lettere at se.",
