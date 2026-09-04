@@ -882,6 +882,13 @@ private struct ContentView: View {
             }
           }
           .onChange(of: language) { _, language in languageChanged(to: language) }
+          if language == .arabic {
+            Toggle("Arabic 快速输入（省略元音符号）", isOn: $settings.prefersArabicLazyInput)
+              .onChange(of: settings.prefersArabicLazyInput) { _, _ in reset() }
+            Text("默认开启；会省略短元音、tanwin、shadda、sukun，并统一常见的 alef 变体。关闭后保留完整原创 Arabic 提示。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
           if language == .english {
             Picker("英文拼写", selection: $settings.englishVariant) {
               ForEach(EnglishVariant.allCases) { variant in
@@ -2472,7 +2479,10 @@ private struct ContentView: View {
 
   private var configuration: TestConfiguration {
     if let activeChallenge {
-      return activeChallenge.preset.configuration.with(challengeID: activeChallenge.id)
+      let challengeConfiguration = activeChallenge.preset.configuration.with(challengeID: activeChallenge.id)
+      return challengeConfiguration.with(
+        modifiers: effectiveTestModifiers(
+          for: challengeConfiguration.language, baseModifiers: challengeConfiguration.modifiers))
     }
     switch mode {
     case .time:
@@ -2480,26 +2490,26 @@ private struct ContentView: View {
         seconds: TimeInterval(duration), difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         mixedLanguageComponents: mixedLanguageComponents, contentOptions: contentOptions
-      ).with(modifiers: settings.testModifiers)
+      ).with(modifiers: effectiveTestModifiers(for: language))
     case .words:
       return .words(
         wordLimit, difficulty: settings.difficulty, rules: settings.inputRules, language: language,
         englishVariant: settings.englishVariant, mixedLanguageComponents: mixedLanguageComponents,
         contentOptions: contentOptions
-      ).with(modifiers: settings.testModifiers)
+      ).with(modifiers: effectiveTestModifiers(for: language))
     case .quote:
       return .init(
         mode: .quote, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         quoteLength: QuoteLengthSelection.legacyValue(for: quoteLengths), quoteLengths: quoteLengths,
         mixedLanguageComponents: mixedLanguageComponents,
-        modifiers: settings.testModifiers, contentOptions: contentOptions)
+        modifiers: effectiveTestModifiers(for: language), contentOptions: contentOptions)
     case .zen:
       return .init(
         mode: .zen, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         mixedLanguageComponents: mixedLanguageComponents,
-        modifiers: settings.testModifiers, contentOptions: contentOptions)
+        modifiers: effectiveTestModifiers(for: language), contentOptions: contentOptions)
     case .custom:
       let duration = customTextCompletion == .time ? TimeInterval(customTextDuration) : nil
       let wordLimit = customTextCompletion == .words ? customTextWordLimit : nil
@@ -2512,9 +2522,17 @@ private struct ContentView: View {
         customTextCompletion: customTextCompletion,
         customTextSectionLimit: sectionLimit,
         customTextOrdering: customTextCompletion == .sections ? .inOrder : customTextOrdering,
-        mixedLanguageComponents: mixedLanguageComponents, modifiers: settings.testModifiers,
+        mixedLanguageComponents: mixedLanguageComponents, modifiers: effectiveTestModifiers(for: language),
         contentOptions: contentOptions)
     }
+  }
+
+  private func effectiveTestModifiers(
+    for selectedLanguage: TypingLanguage, baseModifiers: [TestModifier]? = nil
+  ) -> [TestModifier] {
+    ArabicLazyInputPolicy.effectiveModifiers(
+      baseModifiers ?? settings.testModifiers, language: selectedLanguage,
+      automaticallyEnabled: settings.prefersArabicLazyInput)
   }
 
   private var availableLanguages: [TypingLanguage] {

@@ -2616,10 +2616,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(settings.soundVolume, 0.5)
     XCTAssertEqual(settings.paceGuideCustomWpm, 100)
     XCTAssertTrue(settings.repeatedPace)
+    XCTAssertTrue(settings.prefersArabicLazyInput)
 
     settings.keyboardGuideMode = .next
     settings.quickRestartKey = .escape
     settings.liveSpeedStyle = .text
+    settings.prefersArabicLazyInput = false
+    XCTAssertFalse(AppSettings(defaults: defaults).prefersArabicLazyInput)
     settings.restoreDefaults()
 
     XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
@@ -4208,7 +4211,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.malayWords.contains("tingkap"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.afrikaans))
     XCTAssertTrue(StarterLexicon.afrikaansWords.contains("môre"))
-    XCTAssertTrue(StarterLexicon.arabicWords.contains("نافذة"))
+    XCTAssertTrue(StarterLexicon.arabicWords.contains("نافِذة"))
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
     XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.arabic))
@@ -4260,6 +4263,25 @@ final class TypingEngineTests: XCTestCase {
 
   func testLazyLatinModifierNormalizesAccentsLigaturesAndGeneratedPrompts() {
     XCTAssertEqual(TypingTextNormalizer.lazyLatin("árvore Straße cœur Łódź"), "arvore Strasse coeur Lodz")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("أَإِآ كِتابٌ مُدَرِّسْ"), "ااا كتاب مدرس")
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([], language: .arabic, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([], language: .arabic, automaticallyEnabled: false),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([.zipf], language: .hebrew, automaticallyEnabled: true),
+      [.zipf])
+    let arabicConfiguration = TestConfiguration.words(2, language: .arabic).with(
+      modifiers: ArabicLazyInputPolicy.effectiveModifiers(
+        [], language: .arabic, automaticallyEnabled: true))
+    var arabicSession = TestSessionFactory.make(
+      configuration: arabicConfiguration, streamPrompt: "كِتاب قَلَم")
+    XCTAssertEqual(arabicSession.prompt, "كتاب قلم")
+    arabicSession.insert(arabicSession.prompt, at: start)
+    XCTAssertEqual(arabicSession.outcome, .completed)
     let session = TestSessionFactory.make(
       configuration: .words(4, language: .german).with(modifiers: [.lazyLatin]))
     XCTAssertFalse(session.prompt.contains("ä"))
@@ -6211,6 +6233,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(snapshot.startGraphsAtZero)
     XCTAssertEqual(snapshot.historyChartVisibility, .init())
     XCTAssertEqual(snapshot.englishVariant, .american)
+    XCTAssertTrue(snapshot.prefersArabicLazyInput)
     XCTAssertTrue(snapshot.favoriteQuoteIDs.isEmpty)
     XCTAssertTrue(snapshot.activeResultTags.isEmpty)
     XCTAssertFalse(snapshot.repeatQuotes)

@@ -50,7 +50,7 @@
 | `indicateTypos` | `typoIndicatorStyle` | 已映射。 |
 | `compositionDisplay` | `compositionDisplayStyle` | 已映射。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |
-| `lazyMode` | `TestModifier.lazyLatin` | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。它不模拟参考对 Arabic 的自动 lazy-mode；Hebrew 保持不适用此修饰器。 |
+| `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。Hebrew 保持不适用此修饰器。 |
 | `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，22 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |

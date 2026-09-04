@@ -533,6 +533,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var showTypingCompanion = false
   var typingPowerMode: TypingPowerMode = .off
   var englishVariant: EnglishVariant = .american
+  var prefersArabicLazyInput = true
   var favoriteQuoteIDs: [String] = []
   var activeResultTags: [String] = []
   var repeatQuotes = false
@@ -637,6 +638,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     showTypingCompanion: Bool = false,
     typingPowerMode: TypingPowerMode = .off,
     englishVariant: EnglishVariant = .american,
+    prefersArabicLazyInput: Bool = true,
     favoriteQuoteIDs: [String] = [],
     activeResultTags: [String] = [],
     repeatQuotes: Bool = false,
@@ -752,6 +754,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.showTypingCompanion = showTypingCompanion
     self.typingPowerMode = typingPowerMode
     self.englishVariant = englishVariant
+    self.prefersArabicLazyInput = prefersArabicLazyInput
     self.favoriteQuoteIDs = favoriteQuoteIDs
     self.activeResultTags = ResultTagPolicy.normalized(activeResultTags)
     self.repeatQuotes = repeatQuotes
@@ -819,7 +822,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       practiceFont, installedPracticeFontName, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, keyboardInputLayout, keyboardGuideLayoutSource, customKeyboardLayouts, customKeyboardLayoutID, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
-      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, typingPowerMode, englishVariant,
+      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, typingPowerMode, englishVariant, prefersArabicLazyInput,
       favoriteQuoteIDs, activeResultTags, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
@@ -935,6 +938,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(TypingPowerMode.self, forKey: .typingPowerMode) ?? .off
     englishVariant =
       try values.decodeIfPresent(EnglishVariant.self, forKey: .englishVariant) ?? .american
+    prefersArabicLazyInput =
+      try values.decodeIfPresent(Bool.self, forKey: .prefersArabicLazyInput) ?? true
     favoriteQuoteIDs = try values.decodeIfPresent([String].self, forKey: .favoriteQuoteIDs) ?? []
     activeResultTags = ResultTagPolicy.normalized(
       try values.decodeIfPresent([String].self, forKey: .activeResultTags) ?? [])
@@ -1231,6 +1236,7 @@ final class AppSettings {
   var showTypingCompanion = false { didSet { persist() } }
   var typingPowerMode: TypingPowerMode = .off { didSet { persist() } }
   var englishVariant: EnglishVariant = .american { didSet { persist() } }
+  var prefersArabicLazyInput = true { didSet { persist() } }
   var favoriteQuoteIDs: [String] = [] { didSet { persist() } }
   var activeResultTags: [String] = [] {
     didSet {
@@ -1386,6 +1392,7 @@ final class AppSettings {
     showTypingCompanion = snapshot.showTypingCompanion
     typingPowerMode = snapshot.typingPowerMode
     englishVariant = snapshot.englishVariant
+    prefersArabicLazyInput = snapshot.prefersArabicLazyInput
     favoriteQuoteIDs = snapshot.favoriteQuoteIDs
     activeResultTags = snapshot.activeResultTags
     repeatQuotes = snapshot.repeatQuotes
@@ -1519,7 +1526,8 @@ final class AppSettings {
       customBackgroundFilter: customBackgroundFilter,
       practiceBackdrop: practiceBackdrop, reducePracticeMotion: reducePracticeMotion,
       showTypingCompanion: showTypingCompanion, typingPowerMode: typingPowerMode,
-      englishVariant: englishVariant, favoriteQuoteIDs: favoriteQuoteIDs,
+      englishVariant: englishVariant, prefersArabicLazyInput: prefersArabicLazyInput,
+      favoriteQuoteIDs: favoriteQuoteIDs,
       activeResultTags: activeResultTags,
       repeatQuotes: repeatQuotes, freedomMode: freedomMode, confidenceMode: confidenceMode,
       oppositeShiftMode: oppositeShiftMode,
@@ -1611,6 +1619,7 @@ final class AppSettings {
     showTypingCompanion = false
     typingPowerMode = .off
     englishVariant = .american
+    prefersArabicLazyInput = true
     favoriteQuoteIDs = []
     activeResultTags = []
     repeatQuotes = false
@@ -1804,6 +1813,7 @@ final class AppSettings {
     showTypingCompanion = snapshot.showTypingCompanion
     typingPowerMode = snapshot.typingPowerMode
     englishVariant = snapshot.englishVariant
+    prefersArabicLazyInput = snapshot.prefersArabicLazyInput
     favoriteQuoteIDs = snapshot.favoriteQuoteIDs
     activeResultTags = snapshot.activeResultTags
     repeatQuotes = snapshot.repeatQuotes
@@ -2099,6 +2109,7 @@ final class AppSettings {
       showTypingCompanion: showTypingCompanion,
       typingPowerMode: typingPowerMode,
       englishVariant: englishVariant,
+      prefersArabicLazyInput: prefersArabicLazyInput,
       favoriteQuoteIDs: favoriteQuoteIDs,
       activeResultTags: activeResultTags,
       repeatQuotes: repeatQuotes,

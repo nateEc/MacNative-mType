@@ -669,6 +669,20 @@ enum TestModifierPolicy {
   }
 }
 
+/// Keeps Arabic's optional simplified-input default separate from the saved
+/// modifier list. The user can still opt out, while non-Arabic configurations
+/// retain only the modifiers they explicitly selected.
+enum ArabicLazyInputPolicy {
+  static func effectiveModifiers(
+    _ modifiers: [TestModifier], language: TypingLanguage, automaticallyEnabled: Bool
+  ) -> [TestModifier] {
+    guard language == .arabic, automaticallyEnabled else {
+      return TestModifierPolicy.normalized(modifiers)
+    }
+    return TestModifierPolicy.normalized(modifiers + [.lazyLatin])
+  }
+}
+
 struct PracticeVisualTransform: Equatable {
   let horizontalScale: Double
   let rotationDegrees: Double
@@ -877,7 +891,26 @@ enum TypingTextNormalizer {
     let expanded = ligatures.reduce(value) { text, replacement in
       text.replacingOccurrences(of: replacement.0, with: replacement.1)
     }
-    return expanded.folding(options: [.diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+    let latinSimplified = expanded.folding(
+      options: [.diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+    return simplifyArabicMarks(in: latinSimplified)
+  }
+
+  /// Arabic simplified input deliberately removes only short-vowel, tanwin,
+  /// shadda and sukun marks that Typebar's own Arabic practice content uses.
+  /// It also normalizes the common hamza-on-alef variants so the generated
+  /// target can be entered without those extra key sequences.
+  private static func simplifyArabicMarks(in value: String) -> String {
+    value.unicodeScalars.reduce(into: "") { output, scalar in
+      switch scalar.value {
+      case 0x0622, 0x0623, 0x0625:
+        output.unicodeScalars.append(UnicodeScalar(0x0627)!)
+      case 0x064B...0x0652:
+        break
+      default:
+        output.unicodeScalars.append(scalar)
+      }
+    }
   }
 }
 
@@ -3216,12 +3249,13 @@ enum StarterLexicon {
     "kecil", "masa", "musim", "perahu", "sahabat", "harapan",
   ]
 
-  // Typebar-authored Arabic starter words use direct Unicode text for macOS
-  // Arabic input sources; they are not an imported word list.
+  // Typebar-authored Arabic starter words use direct Unicode text and short
+  // vowel marks for macOS Arabic input sources; they are not an imported
+  // word list. Arabic simplified input can independently remove those marks.
   static let arabicWords = [
-    "كتاب", "قلم", "نافذة", "طريق", "ضوء", "جسر", "صباح", "ورقة", "حديقة", "سحابة",
-    "هدوء", "منارة", "جبل", "بذرة", "إيقاع", "مكتب", "تأمل", "ملاحظة", "فكرة", "تجربة",
-    "مسافة", "خطوة", "صبر", "توازن",
+    "كِتاب", "قَلَم", "نافِذة", "طَريق", "ضَوْء", "جِسْر", "صَباح", "وَرَقة", "حَديقة", "سَحابة",
+    "هُدوء", "مَنارة", "جَبَل", "بِذرة", "إيقاع", "مَكْتَب", "تَأَمُّل", "مُلاحَظة", "فِكْرة", "تَجْرِبة",
+    "مَسافة", "خُطْوة", "صَبْر", "تَوازُن",
   ]
 
   // Typebar-authored Hebrew starter words use direct Unicode text for macOS
