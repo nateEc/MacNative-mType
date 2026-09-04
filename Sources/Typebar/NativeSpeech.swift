@@ -26,6 +26,7 @@ extension TypingLanguage {
     case .english: "en-US"
     case .spanish: "es-ES"
     case .german: "de-DE"
+    case .greek: "el-GR"
     case .dutch: "nl-NL"
     case .danish: "da-DK"
     case .norwegianBokmal: "nb-NO"

@@ -199,6 +199,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
   case spanish
   case german
+  case greek
   case dutch
   case danish
   case norwegianBokmal
@@ -3102,6 +3103,15 @@ enum StarterLexicon {
     "wolke", "zeit", "lernen", "fokus", "schritt", "atmen", "größe", "mühe",
   ]
 
+  // Typebar-authored Greek starter words. Accented forms exercise the native
+  // Greek input source without importing a third-party word list.
+  static let greekWords = [
+    "πρωί", "παράθυρο", "χαρτί", "ακτή", "άνεμος", "άσκηση", "προσοχή", "ήρεμος",
+    "καθαρός", "λίμνη", "δρόμος", "τραπέζι", "φως", "ταξίδι", "υπομονή", "στιγμή",
+    "πόλη", "βροχή", "σιωπή", "κατεύθυνση", "αστέρι", "σημείωση", "κήπος", "ανάσα",
+    "μικρός", "χρόνος", "άνοιξη", "νησί", "φίλος", "βιβλίο",
+  ]
+
   // Typebar-authored Dutch starter words. The compact corpus includes a
   // familiar accented form without importing a third-party word list.
   static let dutchWords = [
@@ -3200,6 +3210,10 @@ enum StarterLexicon {
     case .german:
       return prompt(
         tokens: count, lexicon: germanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .greek:
+      return prompt(
+        tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .dutch:
       return prompt(
@@ -3317,6 +3331,7 @@ enum StarterLexicon {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
+    case .greek: (greekWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
     case .danish: (danishWords, [",", ".", "!", "?"])
     case .norwegianBokmal: (norwegianBokmalWords, [",", ".", "!", "?"])
@@ -3393,6 +3408,7 @@ extension TypingLanguage {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
+    case .greek: StarterLexicon.greekWords
     case .dutch: StarterLexicon.dutchWords
     case .danish: StarterLexicon.danishWords
     case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
@@ -3417,7 +3433,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
+    .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
@@ -3467,6 +3483,7 @@ extension TypingLanguage {
     case .english: "English"
     case .spanish: "Español"
     case .german: "Deutsch"
+    case .greek: "Ελληνικά"
     case .dutch: "Nederlands"
     case .danish: "Dansk"
     case .norwegianBokmal: "Norsk bokmål"

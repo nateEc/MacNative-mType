@@ -3060,6 +3060,7 @@ final class TypingEngineTests: XCTestCase {
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
+      StarterLexicon.greekWords,
       StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
       StarterLexicon.swedishWords,
       StarterLexicon.hungarianWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
@@ -3203,6 +3204,9 @@ final class TypingEngineTests: XCTestCase {
       5, language: .dutch).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .danish).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .greek).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greek), "el")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .norwegianBokmal).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .norwegianBokmal), "no")
@@ -3842,6 +3846,7 @@ final class TypingEngineTests: XCTestCase {
   func testAdditionalSpaceDelimitedLanguagesUseOnlyTypebarOwnedCorporaAndQuotes() {
     for (language, lexicon) in [
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
+      (.greek, StarterLexicon.greekWords),
       (.danish, StarterLexicon.danishWords),
       (.norwegianBokmal, StarterLexicon.norwegianBokmalWords),
       (.swedish, StarterLexicon.swedishWords),
@@ -3879,6 +3884,8 @@ final class TypingEngineTests: XCTestCase {
     })
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.dutch))
     XCTAssertTrue(StarterLexicon.dutchWords.contains("één"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
+    XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.danish))
     XCTAssertTrue(StarterLexicon.danishWords.contains("åndedræt"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.norwegianBokmal))
@@ -3902,6 +3909,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.english.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.spanish.speechLocaleIdentifier, "es-ES")
     XCTAssertEqual(TypingLanguage.german.speechLocaleIdentifier, "de-DE")
+    XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
     XCTAssertEqual(TypingLanguage.danish.speechLocaleIdentifier, "da-DK")
     XCTAssertEqual(TypingLanguage.norwegianBokmal.speechLocaleIdentifier, "nb-NO")
@@ -3997,6 +4005,14 @@ final class TypingEngineTests: XCTestCase {
       WeakSpotPractice.prompt(
         results: [swedishResult], language: .swedish, englishVariant: .american, wordCount: 1),
       "fönster")
+    let greekResult = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .greek), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 3,
+      correctCharacterCount: 2, errorCount: 1, wpm: 12, rawWpm: 12, accuracy: 67,
+      prompt: "φως", replayEvents: [.init(offset: 1, kind: .insert, text: "φωσ")])
+    let greekWeakSpot = WeakSpotPractice.prompt(
+      results: [greekResult], language: .greek, englishVariant: .american, wordCount: 1)
+    XCTAssertTrue(greekWeakSpot.map(StarterLexicon.greekWords.contains) ?? false)
     let hungarianResult = CompletedTestResult(
       id: UUID(), configuration: .words(1, language: .hungarian), outcome: .completed,
       startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 3,
@@ -4044,6 +4060,7 @@ final class TypingEngineTests: XCTestCase {
   func testOwnedPracticeWordsShareTheLocalFilterAndWeakSpotCorpus() {
     XCTAssertEqual(TypingLanguage.hungarian.ownedPracticeWords(), StarterLexicon.hungarianWords)
     XCTAssertEqual(TypingLanguage.swedish.ownedPracticeWords(), StarterLexicon.swedishWords)
+    XCTAssertEqual(TypingLanguage.greek.ownedPracticeWords(), StarterLexicon.greekWords)
     XCTAssertEqual(
       TypingLanguage.english.ownedPracticeWords(englishVariant: .british), StarterLexicon.britishWords)
     XCTAssertTrue(TypingLanguage.simplifiedChinese.ownedPracticeWords().contains("晨光"))
@@ -4254,7 +4271,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
+      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
