@@ -21,7 +21,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；四十八种原创单语（含 Arabic、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、希腊语、Greeklish、荷兰语、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、丹麦语、挪威 Bokmål、挪威 Nynorsk、Afrikaans、瑞典语、匈牙利语、捷克语、斯洛伐克语、斯洛文尼亚语、克罗地亚语、塞尔维亚语西里尔、塞尔维亚语 Latin、保加利亚语、罗马尼亚语、芬兰语、爱沙尼亚语、冰岛语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、日语罗马字、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Hebrew、Persian 与 Urdu 使用 macOS 输入源、RTL 提示和原生双向文本排版，暂不进入双向多语混排；Tamil、Hindi 与 Gujarati 使用 macOS 输入源及组合输入并可进入多语混排；乌克兰语 Latin、日语罗马字与 Greeklish 仅提供原创 ASCII 离线内容；塞尔维亚语 Latin 保持原创拉丁文本，四者均不让在线原文改写所选书写形式。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；四十九种原创单语（含 Arabic、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、希腊语、Greeklish、荷兰语、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、丹麦语、挪威 Bokmål、挪威 Nynorsk、Afrikaans、瑞典语、匈牙利语、捷克语、斯洛伐克语、斯洛文尼亚语、克罗地亚语、塞尔维亚语西里尔、塞尔维亚语 Latin、保加利亚语、罗马尼亚语、芬兰语、爱沙尼亚语、冰岛语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、日语罗马字、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Hebrew、Persian 与 Urdu 使用 macOS 输入源、RTL 提示和原生双向文本排版，暂不进入双向多语混排；Tamil、Hindi、Gujarati 与 Bangla 使用 macOS 输入源及组合输入并可进入多语混排；乌克兰语 Latin、日语罗马字与 Greeklish 仅提供原创 ASCII 离线内容；塞尔维亚语 Latin 保持原创拉丁文本，四者均不让在线原文改写所选书写形式。 |
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

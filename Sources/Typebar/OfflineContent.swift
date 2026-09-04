@@ -848,6 +848,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "bangla-small-pause",
+      title: "ছোট বিরতি",
+      text: "ছোট বিরতি পরের বাক্যকে আরও পরিষ্কার করে।",
+      language: .bangla,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "bangla-open-notebook",
+      title: "খোলা খাতা",
+      text: "খোলা খাতায় সব উত্তর একসঙ্গে লেখা থাকে না, তবু প্রশ্নকে ছোট অংশে দেখার জায়গা তৈরি হয়।",
+      language: .bangla,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "bangla-small-work",
+      title: "নিয়মিত কাজ",
+      text: "অগ্রগতি সব সময় বড় মুহূর্তে দেখা যায় না। একই পাতায় ফিরে আসা, একটি বাক্য সহজ করা, ছোট ভুল ঠিক করা এবং পরের চেষ্টার জন্য একটি নোট রাখা—এই কাজগুলোতেই ভরসা ধীরে ধীরে তৈরি হয়।",
+      language: .bangla,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "bangla-long-table",
+      title: "লম্বা টেবিল",
+      text: "লম্বা টেবিলে অসমাপ্ত ভাবনারও জায়গা থাকে। এক প্রান্তে প্রথম খসড়া, অন্য প্রান্তে আরও মনোযোগ চাওয়া একটি বাক্য, আর মাঝখানে অপেক্ষায় থাকা ছোট সিদ্ধান্ত। অনুশীলনও এমনই এগোয়: প্রতিটি কঠিন অংশ একবারেই শেষ করতে হয় না। ফিরে আসার সুযোগ, পরের স্পষ্ট পদক্ষেপ এবং কয়েকটি চেষ্টার পরে কোন কাজ সহজ হলো তা দেখার ধৈর্য থাকলে গতি আপনিই বাড়ে।",
+      language: .bangla,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
