@@ -3273,6 +3273,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.malayalamWords,
       StarterLexicon.sanskritWords,
       StarterLexicon.sinhalaWords,
+      StarterLexicon.khmerWords,
       StarterLexicon.greekWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.filipinoWords, StarterLexicon.catalanWords,
       StarterLexicon.indonesianWords, StarterLexicon.malayWords, StarterLexicon.danishWords,
@@ -3289,7 +3290,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 52)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 53)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3485,6 +3486,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .sinhala).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .sinhala), "si")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .khmer).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .khmer), "km")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -3690,6 +3694,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(sinhalaEncyclopedia.text, "කවුළුවෙන් උදෑසන ආලෝකය ඇතුළට එයි")
     XCTAssertEqual(
       sinhalaEncyclopedia.prompt(for: .words(3, language: .sinhala)), "කවුළුවෙන් උදෑසන ආලෝකය")
+    let khmerData = Data("""
+    {"title":"បង្អួច","extract":"ពន្លឺព្រឹកចូលមកតាមបង្អួច។"}
+    """.utf8)
+    let khmerEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: khmerData, language: .khmer))
+    XCTAssertEqual(khmerEncyclopedia.text, "ពន្លឺព្រឹកចូលមកតាមបង្អួច")
+    XCTAssertEqual(
+      khmerEncyclopedia.prompt(for: .words(3, language: .khmer)),
+      "ពន្លឺព្រឹកចូលមកតាមបង្អួច ពន្លឺព្រឹកចូលមកតាមបង្អួច ពន្លឺព្រឹកចូលមកតាមបង្អួច")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4304,6 +4317,7 @@ final class TypingEngineTests: XCTestCase {
       (.malayalam, StarterLexicon.malayalamWords),
       (.sanskrit, StarterLexicon.sanskritWords),
       (.sinhala, StarterLexicon.sinhalaWords),
+      (.khmer, StarterLexicon.khmerWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4441,6 +4455,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.sinhala.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.sinhala))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.sinhala))
+    XCTAssertTrue(StarterLexicon.khmerWords.contains("បង្អួច"))
+    XCTAssertFalse(TypingLanguage.khmer.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.khmer.usesSpaceDelimitedWords)
+    XCTAssertFalse(TypingLanguage.khmer.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.khmer))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.khmer))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4557,6 +4577,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.malayalam.speechLocaleIdentifier, "ml-IN")
     XCTAssertEqual(TypingLanguage.sanskrit.speechLocaleIdentifier, "sa")
     XCTAssertEqual(TypingLanguage.sinhala.speechLocaleIdentifier, "si")
+    XCTAssertEqual(TypingLanguage.khmer.speechLocaleIdentifier, "km-KH")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")

@@ -1072,6 +1072,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "khmer-calm-step",
+      title: "ជំហានស្ងប់ស្ងាត់",
+      text: "ជំហានស្ងប់ស្ងាត់មួយធ្វើឱ្យការងារបន្ទាប់កាន់តែច្បាស់។",
+      language: .khmer,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "khmer-open-notebook",
+      title: "សៀវភៅកំណត់ត្រាបើកចំហ",
+      text: "សៀវភៅកំណត់ត្រាបើកចំហមិនឆ្លើយគ្រប់សំណួរលំបាកទេ ប៉ុន្តែវាផ្តល់កន្លែងសម្រាប់មើលសំណួរជាផ្នែកតូចៗ។",
+      language: .khmer,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "khmer-small-work",
+      title: "ការងារតូច",
+      text: "វឌ្ឍនភាពមិនតែងតែបង្ហាញខ្លួនជាពេលវេលាធំទេ។ ការបើកទំព័រដដែលម្ដងទៀត ការធ្វើឱ្យប្រយោគមួយច្បាស់ និងការកែបញ្ហាតូចមួយ បង្កើតទំនុកចិត្តសម្រាប់ការព្យាយាមបន្ទាប់។",
+      language: .khmer,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "khmer-long-table",
+      title: "តុវែង",
+      text: "តុវែងមួយផ្តល់កន្លែងសម្រាប់ការងារជាច្រើនប្រភេទ។ នៅចុងមួយអាចដាក់សេចក្តីព្រាងដំបូង នៅចុងម្ខាងទៀតអាចទុកប្រយោគដែលត្រូវការការយកចិត្តទុកដាក់ ហើយនៅកណ្តាលអាចរង់ចាំការសម្រេចចិត្តតូចបន្ទាប់។ ការអនុវត្តក៏ដំណើរការដូចគ្នា។ វាមិនទាមទារឱ្យដោះស្រាយគ្រប់ផ្នែកលំបាកភ្លាមៗទេ ប៉ុន្តែត្រូវមានកន្លែងសម្រាប់ត្រឡប់មកវិញ ជំហានបន្ទាប់ដែលច្បាស់ និងការអត់ធ្មត់ដើម្បីសង្កេតថាអ្វីកាន់តែងាយស្រួលបន្ទាប់ពីការព្យាយាមជាច្រើន។",
+      language: .khmer,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
