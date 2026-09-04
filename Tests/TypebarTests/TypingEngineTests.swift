@@ -4492,6 +4492,32 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(session.prompt.contains("ß"))
   }
 
+  func testLazyInputPolicyMirrorsReferenceLanguageAndPolyglotAvailability() {
+    XCTAssertFalse(TypingLanguage.english.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.hindi.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.codeSwift.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.spanish.supportsLazyLatinInput)
+
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin, .zipf], language: .english, automaticallyEnabled: false),
+      [.zipf])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .hindi, mode: .custom, automaticallyEnabled: false),
+      [.lazyLatin])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .mixedLanguages,
+        mixedLanguageComponents: [.english, .hindi], automaticallyEnabled: false),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .mixedLanguages,
+        mixedLanguageComponents: [.english, .spanish], automaticallyEnabled: false),
+      [.lazyLatin])
+  }
+
   func testNativeSpeechUsesStableSystemLocalesForSupportedLanguages() {
     XCTAssertEqual(TypingLanguage.english.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.spanish.speechLocaleIdentifier, "es-ES")

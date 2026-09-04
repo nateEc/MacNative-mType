@@ -2482,7 +2482,9 @@ private struct ContentView: View {
       let challengeConfiguration = activeChallenge.preset.configuration.with(challengeID: activeChallenge.id)
       return challengeConfiguration.with(
         modifiers: effectiveTestModifiers(
-          for: challengeConfiguration.language, baseModifiers: challengeConfiguration.modifiers))
+          for: challengeConfiguration.language, mode: challengeConfiguration.mode,
+          mixedLanguageComponents: challengeConfiguration.mixedLanguageComponents,
+          baseModifiers: challengeConfiguration.modifiers))
     }
     switch mode {
     case .time:
@@ -2490,26 +2492,26 @@ private struct ContentView: View {
         seconds: TimeInterval(duration), difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         mixedLanguageComponents: mixedLanguageComponents, contentOptions: contentOptions
-      ).with(modifiers: effectiveTestModifiers(for: language))
+      ).with(modifiers: effectiveTestModifiers(for: language, mode: .time))
     case .words:
       return .words(
         wordLimit, difficulty: settings.difficulty, rules: settings.inputRules, language: language,
         englishVariant: settings.englishVariant, mixedLanguageComponents: mixedLanguageComponents,
         contentOptions: contentOptions
-      ).with(modifiers: effectiveTestModifiers(for: language))
+      ).with(modifiers: effectiveTestModifiers(for: language, mode: .words))
     case .quote:
       return .init(
         mode: .quote, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         quoteLength: QuoteLengthSelection.legacyValue(for: quoteLengths), quoteLengths: quoteLengths,
         mixedLanguageComponents: mixedLanguageComponents,
-        modifiers: effectiveTestModifiers(for: language), contentOptions: contentOptions)
+        modifiers: effectiveTestModifiers(for: language, mode: .quote), contentOptions: contentOptions)
     case .zen:
       return .init(
         mode: .zen, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         mixedLanguageComponents: mixedLanguageComponents,
-        modifiers: effectiveTestModifiers(for: language), contentOptions: contentOptions)
+        modifiers: effectiveTestModifiers(for: language, mode: .zen), contentOptions: contentOptions)
     case .custom:
       let duration = customTextCompletion == .time ? TimeInterval(customTextDuration) : nil
       let wordLimit = customTextCompletion == .words ? customTextWordLimit : nil
@@ -2522,16 +2524,19 @@ private struct ContentView: View {
         customTextCompletion: customTextCompletion,
         customTextSectionLimit: sectionLimit,
         customTextOrdering: customTextCompletion == .sections ? .inOrder : customTextOrdering,
-        mixedLanguageComponents: mixedLanguageComponents, modifiers: effectiveTestModifiers(for: language),
+        mixedLanguageComponents: mixedLanguageComponents,
+        modifiers: effectiveTestModifiers(for: language, mode: .custom),
         contentOptions: contentOptions)
     }
   }
 
   private func effectiveTestModifiers(
-    for selectedLanguage: TypingLanguage, baseModifiers: [TestModifier]? = nil
+    for selectedLanguage: TypingLanguage, mode: TestMode,
+    mixedLanguageComponents: [TypingLanguage]? = nil, baseModifiers: [TestModifier]? = nil
   ) -> [TestModifier] {
     ArabicLazyInputPolicy.effectiveModifiers(
-      baseModifiers ?? settings.testModifiers, language: selectedLanguage,
+      baseModifiers ?? settings.testModifiers, language: selectedLanguage, mode: mode,
+      mixedLanguageComponents: mixedLanguageComponents ?? self.mixedLanguageComponents,
       automaticallyEnabled: settings.prefersArabicLazyInput)
   }
 

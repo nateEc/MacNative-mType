@@ -686,8 +686,24 @@ enum TestModifierPolicy {
 /// retain only the modifiers they explicitly selected.
 enum ArabicLazyInputPolicy {
   static func effectiveModifiers(
-    _ modifiers: [TestModifier], language: TypingLanguage, automaticallyEnabled: Bool
+    _ modifiers: [TestModifier], language: TypingLanguage, mode: TestMode = .time,
+    mixedLanguageComponents: [TypingLanguage] = [], automaticallyEnabled: Bool
   ) -> [TestModifier] {
+    let supportsLazyInput: Bool
+    if mode == .custom {
+      // Monkeytype allows lazy mode for user-supplied text even when the
+      // selected wordset marks it unavailable.
+      supportsLazyInput = true
+    } else if language == .mixedLanguages {
+      // Its polyglot path enables the feature when any selected component
+      // supports it, rather than requiring every component to do so.
+      supportsLazyInput = mixedLanguageComponents.contains { $0.supportsLazyLatinInput }
+    } else {
+      supportsLazyInput = language.supportsLazyLatinInput
+    }
+    guard supportsLazyInput else {
+      return TestModifierPolicy.normalized(modifiers.filter { $0 != .lazyLatin })
+    }
     guard language == .arabic, automaticallyEnabled else {
       return TestModifierPolicy.normalized(modifiers)
     }
@@ -4047,6 +4063,23 @@ extension TypingLanguage {
 
   var isCodeLanguage: Bool {
     rawValue.hasPrefix("code")
+  }
+
+  /// Mirrors Monkeytype's `noLazyMode` language metadata for every Typebar
+  /// wordset. Code prompts are likewise literal input, never accent-folded.
+  var supportsLazyLatinInput: Bool {
+    guard !isCodeLanguage else { return false }
+    return switch self {
+    case .english, .hebrew, .persian, .urdu,
+      .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam,
+      .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
+      .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
+      .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
+      .mixedEnglishChinese, .mixedLanguages:
+      false
+    default:
+      true
+    }
   }
 
   var supportsCapsLockWarning: Bool {
