@@ -119,6 +119,7 @@ struct CloudSyncView: View {
                     ForEach(leaderboard) { entry in
                         HStack {
                             Text("#\(entry.rank)").monospacedDigit().foregroundStyle(.secondary)
+                            LeaderboardAvatar(avatar: entry.discordAvatar)
                             if let badge = entry.selectedBadge {
                                 Image(systemName: badge.systemImage)
                                     .foregroundStyle(.tint)
@@ -177,6 +178,7 @@ struct CloudSyncView: View {
                     ForEach(experienceLeaderboard) { entry in
                         HStack {
                             Text("#\(entry.rank)").monospacedDigit().foregroundStyle(.secondary)
+                            LeaderboardAvatar(avatar: entry.discordAvatar)
                             if let badge = entry.selectedBadge {
                                 Image(systemName: badge.systemImage)
                                     .foregroundStyle(.tint)
@@ -315,6 +317,28 @@ struct CloudSyncView: View {
             NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
         }
         return .init(exportedAt: .now, settings: settings.snapshot, results: portableResults, presets: namedPresets, savedTexts: namedSavedTexts)
+    }
+}
+
+private struct LeaderboardAvatar: View {
+    let avatar: RemoteDiscordAvatar?
+
+    var body: some View {
+        if let avatarURL = avatar?.cdnURL {
+            AsyncImage(url: avatarURL) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFill()
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 22, height: 22)
+            .clipShape(Circle())
+            .accessibilityLabel("Discord 头像")
+        }
     }
 }
 

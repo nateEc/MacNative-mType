@@ -50,9 +50,12 @@ final class TypingEngineTests: XCTestCase {
     let leaderboardEntry = try JSONDecoder().decode(
       RemoteLeaderboardEntry.self,
       from: Data(
-        #"{"id":"00000000-0000-0000-0000-000000000003","rank":1,"userID":"00000000-0000-0000-0000-000000000002","displayName":"OAuth","mode":"time","language":"english","wpm":80,"accuracy":98,"consistency":99,"finishedAt":0,"selectedBadge":{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}}"#
+        #"{"id":"00000000-0000-0000-0000-000000000003","rank":1,"userID":"00000000-0000-0000-0000-000000000002","displayName":"OAuth","mode":"time","language":"english","wpm":80,"accuracy":98,"consistency":99,"finishedAt":0,"selectedBadge":{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"},"discordAvatar":{"subject":"123456789012345678","avatarHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}"#
           .utf8))
     XCTAssertEqual(leaderboardEntry.selectedBadge?.id, "swift-line")
+    XCTAssertEqual(
+      leaderboardEntry.discordAvatar?.cdnURL?.host,
+      "cdn.discordapp.com")
 
     let legacyExperienceEntry = try JSONDecoder().decode(
       RemoteExperienceLeaderboardEntry.self,

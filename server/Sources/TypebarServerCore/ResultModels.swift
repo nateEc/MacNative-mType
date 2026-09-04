@@ -162,6 +162,7 @@ public struct LeaderboardEntry: Content, Equatable, Identifiable {
     public let consistency: Double
     public let finishedAt: Date
     public let selectedBadge: PublicProfileBadge?
+    public let discordAvatar: PublicDiscordAvatarResponse?
 }
 
 public struct LeaderboardResponse: Content, Equatable {
@@ -183,6 +184,7 @@ public struct ExperienceLeaderboardEntry: Content, Equatable, Identifiable {
     public let displayName: String
     public let totalExperience: Int
     public let selectedBadge: PublicProfileBadge?
+    public let discordAvatar: PublicDiscordAvatarResponse?
 }
 
 public struct ExperienceLeaderboardQuery: Content {

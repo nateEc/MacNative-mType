@@ -1360,11 +1360,24 @@ final class HealthRouteTests: XCTestCase {
       .init(profileDetails: .init(showDiscordAvatar: true)), accessToken: session.accessToken, now: now)
     let visible = try await store.publicProfile(id: session.user.id, now: now)
     XCTAssertEqual(visible.discordAvatar, .init(subject: "123456789012345678", avatarHash: avatarHash))
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 98, finishedAt: now), accessToken: session.accessToken,
+      now: now)
+    let visibleWPMLeaderboard = try await store.leaderboard(
+      .init(mode: nil, language: nil, period: "all", limit: 25), now: now)
+    let visibleExperienceLeaderboard = try await store.experienceLeaderboard(now: now)
+    XCTAssertEqual(visibleWPMLeaderboard.entries.first?.discordAvatar, visible.discordAvatar)
+    XCTAssertEqual(visibleExperienceLeaderboard.entries.first?.discordAvatar, visible.discordAvatar)
 
     _ = try await store.updateProfile(
       .init(profileDetails: .init(showDiscordAvatar: false)), accessToken: session.accessToken, now: now)
     let hidden = try await store.publicProfile(id: session.user.id, now: now)
     XCTAssertNil(hidden.discordAvatar)
+    let hiddenWPMLeaderboard = try await store.leaderboard(
+      .init(mode: nil, language: nil, period: "all", limit: 25), now: now)
+    let hiddenExperienceLeaderboard = try await store.experienceLeaderboard(now: now)
+    XCTAssertNil(hiddenWPMLeaderboard.entries.first?.discordAvatar)
+    XCTAssertNil(hiddenExperienceLeaderboard.entries.first?.discordAvatar)
 
     let invalidAvatar = try await store.registerWithOAuth(
       .init(provider: .discord, subject: "987654321098765432", email: "invalid-avatar@example.com", avatarHash: "../not-an-avatar"),

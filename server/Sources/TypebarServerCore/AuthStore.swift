@@ -2542,7 +2542,8 @@ public actor AuthStore {
     .map { offset, value in
       ExperienceLeaderboardEntry(
         id: value.0.id, rank: offset + 1, userID: value.0.id, displayName: value.0.displayName,
-        totalExperience: value.1, selectedBadge: selectedPublicBadge(for: value.0))
+        totalExperience: value.1, selectedBadge: selectedPublicBadge(for: value.0),
+        discordAvatar: publicDiscordAvatar(for: value.0))
     }
   }
 
@@ -2605,7 +2606,7 @@ public actor AuthStore {
         id: result.id, rank: offset + 1, userID: user.id, displayName: user.displayName,
         mode: result.mode, language: result.language, wpm: result.wpm,
         accuracy: result.accuracy, consistency: result.consistency, finishedAt: result.finishedAt,
-        selectedBadge: selectedPublicBadge(for: user))
+        selectedBadge: selectedPublicBadge(for: user), discordAvatar: publicDiscordAvatar(for: user))
     }
   }
 

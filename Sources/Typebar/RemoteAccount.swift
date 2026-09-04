@@ -557,9 +557,10 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     let consistency: Double
     let finishedAt: Date
     let selectedBadge: RemotePublicProfileBadge?
+    let discordAvatar: RemoteDiscordAvatar?
 
     private enum CodingKeys: String, CodingKey {
-        case id, rank, userID, displayName, mode, language, wpm, accuracy, consistency, finishedAt, selectedBadge
+        case id, rank, userID, displayName, mode, language, wpm, accuracy, consistency, finishedAt, selectedBadge, discordAvatar
     }
 
     init(from decoder: Decoder) throws {
@@ -575,6 +576,7 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
         selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
+        discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
     }
 }
 
@@ -593,6 +595,7 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
     let displayName: String
     let totalExperience: Int
     let selectedBadge: RemotePublicProfileBadge?
+    let discordAvatar: RemoteDiscordAvatar?
 }
 
 private struct RemoteExperienceLeaderboardResponse: Codable, Sendable {
