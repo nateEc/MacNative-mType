@@ -1299,7 +1299,8 @@ private struct ContentView: View {
     .overlay {
       if settings.typingPowerMode.isEnabled, !typingPowerParticles.isEmpty {
         TypingPowerOverlay(
-          particles: typingPowerParticles, accent: activeTheme.accent, error: activeTheme.error,
+          particles: typingPowerParticles, accent: activeTheme.accent,
+          error: activeTheme.errorColor(usesColorfulMode: settings.colorfulMode),
           reducesMotion: settings.reducePracticeMotion)
       }
     }
@@ -1436,7 +1437,7 @@ private struct ContentView: View {
                 font: settings.practiceFont.nsFont(
                   size: settings.fontSize, installedFontName: settings.installedPracticeFontName),
                 lineSpacing: 12,
-                accent: activeTheme.accent,
+                accent: activeTheme.caret,
                 motion: settings.smoothCaretMotion)
             }
           }
@@ -1599,15 +1600,15 @@ private struct ContentView: View {
         case .hide where completedCharacterIndices.contains(index):
           character.foregroundColor = .clear
         case .fade where completedCharacterIndices.contains(index):
-          character.foregroundColor = activeTheme.secondaryText.opacity(0.24)
+          character.foregroundColor = activeTheme.fadedText.opacity(0.24)
         case .dots where turnsIntoDot:
           character.foregroundColor = activeTheme.accent.opacity(0.74)
         default:
           character.foregroundColor = completedPromptColor
         }
       case .incorrect:
-        character.foregroundColor = activeTheme.error
-        character.backgroundColor = activeTheme.error.opacity(0.16)
+        character.foregroundColor = errorFeedbackColor
+        character.backgroundColor = errorFeedbackColor.opacity(0.16)
       case .current:
         if promptHighlightMode == .off || !settings.caretStyle.drawsMarker || usesNativeCaretOverlay {
           character.foregroundColor = futurePromptColor
@@ -1619,8 +1620,8 @@ private struct ContentView: View {
       case .hidden:
         character.foregroundColor = .clear
       case .extra:
-        character.foregroundColor = activeTheme.extraInput
-        character.backgroundColor = activeTheme.extraInput.opacity(0.12)
+        character.foregroundColor = extraInputFeedbackColor
+        character.backgroundColor = extraInputFeedbackColor.opacity(0.12)
         character.strikethroughStyle = .single
       }
       output += character
@@ -1632,7 +1633,7 @@ private struct ContentView: View {
         var hint = AttributedString(String(hintCharacter))
         hint.font = .system(
           size: max(9, settings.fontSize * 0.48), weight: .semibold, design: .monospaced)
-        hint.foregroundColor = activeTheme.error.opacity(0.72)
+        hint.foregroundColor = errorFeedbackColor.opacity(0.72)
         hint.baselineOffset = -settings.fontSize * 0.42
         // Reserve no additional horizontal advance: the hint sits under the
         // erroneous glyph instead of reflowing every following character.
@@ -1645,6 +1646,14 @@ private struct ContentView: View {
 
   private var completedPromptColor: Color {
     promptTextColor(for: .completed)
+  }
+
+  private var errorFeedbackColor: Color {
+    activeTheme.errorColor(usesColorfulMode: settings.colorfulMode)
+  }
+
+  private var extraInputFeedbackColor: Color {
+    activeTheme.extraInputColor(usesColorfulMode: settings.colorfulMode)
   }
 
   private var futurePromptColor: Color {
@@ -1679,17 +1688,17 @@ private struct ContentView: View {
     case .off:
       break
     case .bar:
-      character.foregroundColor = activeTheme.accent
+      character.foregroundColor = activeTheme.caret
       character.underlineStyle = .single
     case .outline:
-      character.backgroundColor = activeTheme.accent.opacity(0.14)
+      character.backgroundColor = activeTheme.caret.opacity(0.14)
     case .underline:
       character.underlineStyle = .single
-      character.backgroundColor = activeTheme.accent.opacity(0.12)
+      character.backgroundColor = activeTheme.caret.opacity(0.12)
     case .block:
-      character.backgroundColor = activeTheme.accent.opacity(0.55)
+      character.backgroundColor = activeTheme.caret.opacity(0.55)
     case .carrot, .banana, .monkey:
-      character.foregroundColor = activeTheme.accent
+      character.foregroundColor = activeTheme.caret
     }
   }
 
@@ -1702,16 +1711,16 @@ private struct ContentView: View {
     case .off:
       break
     case .bar:
-      character.backgroundColor = activeTheme.accent.opacity(0.16)
+      character.backgroundColor = activeTheme.caret.opacity(0.16)
       character.underlineStyle = .single
     case .outline:
-      character.backgroundColor = activeTheme.accent.opacity(0.12)
+      character.backgroundColor = activeTheme.caret.opacity(0.12)
     case .underline:
       character.underlineStyle = .single
     case .block:
-      character.backgroundColor = activeTheme.accent.opacity(0.34)
+      character.backgroundColor = activeTheme.caret.opacity(0.34)
     case .carrot, .banana, .monkey:
-      character.foregroundColor = activeTheme.accent.opacity(0.72)
+      character.foregroundColor = activeTheme.caret.opacity(0.72)
     }
   }
 

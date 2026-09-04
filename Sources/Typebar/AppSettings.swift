@@ -1908,7 +1908,9 @@ final class AppSettings {
   @discardableResult
   func addCustomTheme(
     name: String, background: Color, panel: Color, accent: Color, text: Color? = nil,
-    secondaryText: Color? = nil, error: Color? = nil, extraInput: Color? = nil, prefersDark: Bool
+    secondaryText: Color? = nil, error: Color? = nil, extraInput: Color? = nil,
+    caret: Color? = nil, fadedText: Color? = nil, colorfulError: Color? = nil,
+    colorfulExtraInput: Color? = nil, prefersDark: Bool
   ) -> CustomThemeDefinition? {
     let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedName.isEmpty, trimmedName.count <= 40 else { return nil }
@@ -1916,7 +1918,10 @@ final class AppSettings {
       name: trimmedName, background: .init(color: background), panel: .init(color: panel),
       accent: .init(color: accent), text: text.map(ThemeColor.init(color:)),
       secondaryText: secondaryText.map(ThemeColor.init(color:)), error: error.map(ThemeColor.init(color:)),
-      extraInput: extraInput.map(ThemeColor.init(color:)), prefersDark: prefersDark)
+      extraInput: extraInput.map(ThemeColor.init(color:)), caret: caret.map(ThemeColor.init(color:)),
+      fadedText: fadedText.map(ThemeColor.init(color:)),
+      colorfulError: colorfulError.map(ThemeColor.init(color:)),
+      colorfulExtraInput: colorfulExtraInput.map(ThemeColor.init(color:)), prefersDark: prefersDark)
     customThemes.append(custom)
     activeCustomThemeID = custom.id
     return custom
@@ -1925,7 +1930,9 @@ final class AppSettings {
   @discardableResult
   func updateCustomTheme(
     id: UUID, name: String, background: Color, panel: Color, accent: Color, text: Color? = nil,
-    secondaryText: Color? = nil, error: Color? = nil, extraInput: Color? = nil, prefersDark: Bool
+    secondaryText: Color? = nil, error: Color? = nil, extraInput: Color? = nil,
+    caret: Color? = nil, fadedText: Color? = nil, colorfulError: Color? = nil,
+    colorfulExtraInput: Color? = nil, prefersDark: Bool
   ) -> Bool {
     let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedName.isEmpty, trimmedName.count <= 40,
@@ -1938,6 +1945,11 @@ final class AppSettings {
       secondaryText: secondaryText.map(ThemeColor.init(color:)) ?? existing.secondaryText,
       error: error.map(ThemeColor.init(color:)) ?? existing.error,
       extraInput: extraInput.map(ThemeColor.init(color:)) ?? existing.extraInput,
+      caret: caret.map(ThemeColor.init(color:)) ?? existing.caret,
+      fadedText: fadedText.map(ThemeColor.init(color:)) ?? existing.fadedText,
+      colorfulError: colorfulError.map(ThemeColor.init(color:)) ?? existing.colorfulError,
+      colorfulExtraInput: colorfulExtraInput.map(ThemeColor.init(color:))
+        ?? existing.colorfulExtraInput,
       prefersDark: prefersDark)
     return true
   }

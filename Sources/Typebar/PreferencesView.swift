@@ -58,6 +58,10 @@ struct PreferencesView: View {
   @State private var customThemeSecondaryText = Color(white: 0.68)
   @State private var customThemeError = Color.red
   @State private var customThemeExtraInput = Color.red
+  @State private var customThemeCaret = Color(red: 0.95, green: 0.57, blue: 0.20)
+  @State private var customThemeFadedText = Color(white: 0.68)
+  @State private var customThemeColorfulError = Color.red
+  @State private var customThemeColorfulExtraInput = Color.red
   @State private var customThemePrefersDark = true
   @State private var editingCustomThemeID: UUID?
   @State private var customThemeMessage: String?
@@ -828,6 +832,13 @@ struct PreferencesView: View {
           ColorPicker("辅助文字", selection: $customThemeSecondaryText)
           ColorPicker("错误", selection: $customThemeError)
           ColorPicker("额外输入", selection: $customThemeExtraInput)
+          Divider()
+          Text("光标与彩色反馈")
+            .font(.subheadline.weight(.medium))
+          ColorPicker("光标", selection: $customThemeCaret)
+          ColorPicker("淡化已输入", selection: $customThemeFadedText)
+          ColorPicker("彩色模式错误", selection: $customThemeColorfulError)
+          ColorPicker("彩色模式额外输入", selection: $customThemeColorfulExtraInput)
           Toggle("使用深色界面", isOn: $customThemePrefersDark)
           Button(editingCustomThemeID == nil ? "保存并应用自定义主题" : "更新并应用自定义主题") {
             saveCustomTheme()
@@ -1684,6 +1695,10 @@ struct PreferencesView: View {
     customThemeSecondaryText = theme.secondaryText.color
     customThemeError = theme.error.color
     customThemeExtraInput = theme.extraInput.color
+    customThemeCaret = theme.caret.color
+    customThemeFadedText = theme.fadedText.color
+    customThemeColorfulError = theme.colorfulError.color
+    customThemeColorfulExtraInput = theme.colorfulExtraInput.color
     customThemePrefersDark = theme.prefersDark
     customThemeMessage = nil
   }
@@ -1694,7 +1709,9 @@ struct PreferencesView: View {
         id: id, name: customThemeName, background: customThemeBackground,
         panel: customThemePanel, accent: customThemeAccent, text: customThemeText,
         secondaryText: customThemeSecondaryText, error: customThemeError,
-        extraInput: customThemeExtraInput, prefersDark: customThemePrefersDark)
+        extraInput: customThemeExtraInput, caret: customThemeCaret,
+        fadedText: customThemeFadedText, colorfulError: customThemeColorfulError,
+        colorfulExtraInput: customThemeColorfulExtraInput, prefersDark: customThemePrefersDark)
       else {
         customThemeMessage = "主题名称需为 1–40 个字符。"
         return
@@ -1706,7 +1723,9 @@ struct PreferencesView: View {
         name: customThemeName, background: customThemeBackground,
         panel: customThemePanel, accent: customThemeAccent, text: customThemeText,
         secondaryText: customThemeSecondaryText, error: customThemeError,
-        extraInput: customThemeExtraInput, prefersDark: customThemePrefersDark)
+        extraInput: customThemeExtraInput, caret: customThemeCaret,
+        fadedText: customThemeFadedText, colorfulError: customThemeColorfulError,
+        colorfulExtraInput: customThemeColorfulExtraInput, prefersDark: customThemePrefersDark)
       != nil else {
         customThemeMessage = "主题名称需为 1–40 个字符。"
         return
@@ -1726,6 +1745,10 @@ struct PreferencesView: View {
     customThemeSecondaryText = Color(white: 0.68)
     customThemeError = .red
     customThemeExtraInput = .red
+    customThemeCaret = Color(red: 0.95, green: 0.57, blue: 0.20)
+    customThemeFadedText = Color(white: 0.68)
+    customThemeColorfulError = .red
+    customThemeColorfulExtraInput = .red
     customThemePrefersDark = true
     if !keepingMessage { customThemeMessage = nil }
   }

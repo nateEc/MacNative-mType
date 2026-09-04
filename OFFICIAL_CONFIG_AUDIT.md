@@ -97,7 +97,7 @@
 | `favThemes` | `favoriteThemeIDs` | 已映射。 |
 | `theme` | `theme`、`activeCustomThemeID` | 已映射。 |
 | `customTheme` | `customThemes` | 已映射。 |
-| `customThemeColors` | `CustomThemeDefinition` | 部分；可创建、编辑、应用和归档原创背景、面板、强调色、提示文字、辅助文字、错误、额外输入与明暗偏好；不暴露官方十颜色模型。 |
+| `customThemeColors` | `CustomThemeDefinition` | 已映射；可创建、编辑、应用和归档原创背景、面板、强调色、提示文字、辅助文字、光标、淡化已输入、错误、额外输入与彩色模式两类反馈色。字段与默认色均为 Typebar 原生定义，不复用网页数组或颜色资产。 |
 | `showKeyTips` | `showKeyTips` | 已映射。 |
 | `showOutOfFocusWarning` | `showFocusWarning` | 已映射。 |
 | `capsLockWarning` | `showCapsLockWarning` | 已映射。 |
@@ -118,4 +118,4 @@
 
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
-- 完整 `swift test` 已通过 240 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
+- 完整 `swift test` 已通过 241 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。

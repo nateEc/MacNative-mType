@@ -5285,6 +5285,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(settings.updateCustomTheme(
       id: theme.id, name: "Dusk", background: .black, panel: .blue, accent: .purple,
       text: .yellow, secondaryText: .cyan, error: .pink, extraInput: .mint,
+      caret: .indigo, fadedText: .gray, colorfulError: .orange, colorfulExtraInput: .purple,
       prefersDark: true))
     XCTAssertEqual(settings.activeCustomThemeID, theme.id)
     XCTAssertTrue(settings.isFavoriteCustomTheme(theme.id))
@@ -5295,6 +5296,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(settings.customThemes.first?.secondaryText, ThemeColor(color: .cyan))
     XCTAssertEqual(settings.customThemes.first?.error, ThemeColor(color: .pink))
     XCTAssertEqual(settings.customThemes.first?.extraInput, ThemeColor(color: .mint))
+    XCTAssertEqual(settings.customThemes.first?.caret, ThemeColor(color: .indigo))
+    XCTAssertEqual(settings.customThemes.first?.fadedText, ThemeColor(color: .gray))
+    XCTAssertEqual(settings.customThemes.first?.colorfulError, ThemeColor(color: .orange))
+    XCTAssertEqual(settings.customThemes.first?.colorfulExtraInput, ThemeColor(color: .purple))
     XCTAssertFalse(settings.updateCustomTheme(
       id: theme.id, name: " ", background: .white, panel: .white, accent: .white,
       prefersDark: false))
@@ -5308,6 +5313,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.customThemes.first?.secondaryText, ThemeColor(color: .cyan))
     XCTAssertEqual(restored.customThemes.first?.error, ThemeColor(color: .pink))
     XCTAssertEqual(restored.customThemes.first?.extraInput, ThemeColor(color: .mint))
+    XCTAssertEqual(restored.customThemes.first?.caret, ThemeColor(color: .indigo))
+    XCTAssertEqual(restored.customThemes.first?.fadedText, ThemeColor(color: .gray))
+    XCTAssertEqual(restored.customThemes.first?.colorfulError, ThemeColor(color: .orange))
+    XCTAssertEqual(restored.customThemes.first?.colorfulExtraInput, ThemeColor(color: .purple))
     XCTAssertTrue(restored.isFavoriteCustomTheme(theme.id))
   }
 
@@ -5322,6 +5331,27 @@ final class TypingEngineTests: XCTestCase {
       ThemeColor(color: ResolvedTheme.defaultSecondaryTextColor(for: .dark)))
     XCTAssertEqual(theme.error, ThemeColor(color: ResolvedTheme.defaultErrorColor))
     XCTAssertEqual(theme.extraInput, ThemeColor(color: ResolvedTheme.defaultErrorColor))
+    XCTAssertEqual(theme.caret, theme.accent)
+    XCTAssertEqual(theme.fadedText, theme.secondaryText)
+    XCTAssertEqual(theme.colorfulError, theme.error)
+    XCTAssertEqual(theme.colorfulExtraInput, theme.extraInput)
+  }
+
+  func testCustomThemeFeedbackColorsFollowColorfulMode() {
+    let theme = CustomThemeDefinition(
+      name: "Feedback", background: .init(red: 0.1, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.2, green: 0.3, blue: 0.4), accent: .init(red: 0.3, green: 0.4, blue: 0.5),
+      error: .init(color: .red), extraInput: .init(color: .pink),
+      colorfulError: .init(color: .orange), colorfulExtraInput: .init(color: .purple),
+      prefersDark: true)
+    let resolved = theme.resolvedTheme
+
+    XCTAssertEqual(ThemeColor(color: resolved.errorColor(usesColorfulMode: false)), theme.error)
+    XCTAssertEqual(ThemeColor(color: resolved.errorColor(usesColorfulMode: true)), theme.colorfulError)
+    XCTAssertEqual(ThemeColor(color: resolved.extraInputColor(usesColorfulMode: false)), theme.extraInput)
+    XCTAssertEqual(
+      ThemeColor(color: resolved.extraInputColor(usesColorfulMode: true)),
+      theme.colorfulExtraInput)
   }
 
   @MainActor

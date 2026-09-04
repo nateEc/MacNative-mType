@@ -31,14 +31,19 @@ struct ResolvedTheme {
     let accent: Color
     let text: Color
     let secondaryText: Color
+    let caret: Color
+    let fadedText: Color
     let error: Color
     let extraInput: Color
+    let colorfulError: Color
+    let colorfulExtraInput: Color
     let colorScheme: ColorScheme
 
     init(
         background: Color, panel: Color, accent: Color, colorScheme: ColorScheme,
         text: Color? = nil, secondaryText: Color? = nil, error: Color? = nil,
-        extraInput: Color? = nil
+        extraInput: Color? = nil, caret: Color? = nil, fadedText: Color? = nil,
+        colorfulError: Color? = nil, colorfulExtraInput: Color? = nil
     ) {
         self.background = background
         self.panel = panel
@@ -48,6 +53,10 @@ struct ResolvedTheme {
         self.secondaryText = secondaryText ?? Self.defaultSecondaryTextColor(for: colorScheme)
         self.error = error ?? Self.defaultErrorColor
         self.extraInput = extraInput ?? Self.defaultErrorColor
+        self.caret = caret ?? accent
+        self.fadedText = fadedText ?? self.secondaryText
+        self.colorfulError = colorfulError ?? self.error
+        self.colorfulExtraInput = colorfulExtraInput ?? self.extraInput
     }
 
     static func defaultTextColor(for colorScheme: ColorScheme) -> Color {
@@ -59,6 +68,14 @@ struct ResolvedTheme {
     }
 
     static var defaultErrorColor: Color { .red }
+
+    func errorColor(usesColorfulMode: Bool) -> Color {
+        usesColorfulMode ? colorfulError : error
+    }
+
+    func extraInputColor(usesColorfulMode: Bool) -> Color {
+        usesColorfulMode ? colorfulExtraInput : extraInput
+    }
 }
 
 /// Original, code-drawn practice backgrounds. These intentionally avoid image
@@ -153,14 +170,19 @@ struct CustomThemeDefinition: Codable, Equatable, Identifiable {
     var accent: ThemeColor
     var text: ThemeColor
     var secondaryText: ThemeColor
+    var caret: ThemeColor
+    var fadedText: ThemeColor
     var error: ThemeColor
     var extraInput: ThemeColor
+    var colorfulError: ThemeColor
+    var colorfulExtraInput: ThemeColor
     var prefersDark: Bool
 
     init(
         id: UUID = UUID(), name: String, background: ThemeColor, panel: ThemeColor, accent: ThemeColor,
         text: ThemeColor? = nil, secondaryText: ThemeColor? = nil, error: ThemeColor? = nil,
-        extraInput: ThemeColor? = nil, prefersDark: Bool
+        extraInput: ThemeColor? = nil, caret: ThemeColor? = nil, fadedText: ThemeColor? = nil,
+        colorfulError: ThemeColor? = nil, colorfulExtraInput: ThemeColor? = nil, prefersDark: Bool
     ) {
         self.id = id
         self.name = name
@@ -174,17 +196,24 @@ struct CustomThemeDefinition: Codable, Equatable, Identifiable {
             color: ResolvedTheme.defaultSecondaryTextColor(for: colorScheme))
         self.error = error ?? .init(color: ResolvedTheme.defaultErrorColor)
         self.extraInput = extraInput ?? .init(color: ResolvedTheme.defaultErrorColor)
+        self.caret = caret ?? accent
+        self.fadedText = fadedText ?? self.secondaryText
+        self.colorfulError = colorfulError ?? self.error
+        self.colorfulExtraInput = colorfulExtraInput ?? self.extraInput
     }
 
     var resolvedTheme: ResolvedTheme {
         .init(
             background: background.color, panel: panel.color, accent: accent.color,
             colorScheme: prefersDark ? .dark : .light, text: text.color,
-            secondaryText: secondaryText.color, error: error.color, extraInput: extraInput.color)
+            secondaryText: secondaryText.color, error: error.color, extraInput: extraInput.color,
+            caret: caret.color, fadedText: fadedText.color, colorfulError: colorfulError.color,
+            colorfulExtraInput: colorfulExtraInput.color)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, background, panel, accent, text, secondaryText, error, extraInput, prefersDark
+        case id, name, background, panel, accent, text, secondaryText, error, extraInput, caret,
+            fadedText, colorfulError, colorfulExtraInput, prefersDark
     }
 
     init(from decoder: Decoder) throws {
@@ -204,6 +233,11 @@ struct CustomThemeDefinition: Codable, Equatable, Identifiable {
             ?? .init(color: ResolvedTheme.defaultErrorColor)
         extraInput = try values.decodeIfPresent(ThemeColor.self, forKey: .extraInput)
             ?? .init(color: ResolvedTheme.defaultErrorColor)
+        caret = try values.decodeIfPresent(ThemeColor.self, forKey: .caret) ?? accent
+        fadedText = try values.decodeIfPresent(ThemeColor.self, forKey: .fadedText) ?? secondaryText
+        colorfulError = try values.decodeIfPresent(ThemeColor.self, forKey: .colorfulError) ?? error
+        colorfulExtraInput = try values.decodeIfPresent(ThemeColor.self, forKey: .colorfulExtraInput)
+            ?? extraInput
     }
 
     func encode(to encoder: Encoder) throws {
@@ -217,6 +251,10 @@ struct CustomThemeDefinition: Codable, Equatable, Identifiable {
         try values.encode(secondaryText, forKey: .secondaryText)
         try values.encode(error, forKey: .error)
         try values.encode(extraInput, forKey: .extraInput)
+        try values.encode(caret, forKey: .caret)
+        try values.encode(fadedText, forKey: .fadedText)
+        try values.encode(colorfulError, forKey: .colorfulError)
+        try values.encode(colorfulExtraInput, forKey: .colorfulExtraInput)
         try values.encode(prefersDark, forKey: .prefersDark)
     }
 }
