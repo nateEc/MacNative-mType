@@ -155,6 +155,7 @@ enum LivePracticeContentService {
     case .afrikaans: return "af"
     case .arabic: return "ar"
     case .hebrew: return "he"
+    case .persian: return "fa"
     case .greek, .greeklish: return "el"
     case .dutch: return "nl"
     case .filipino: return "tl"

@@ -202,6 +202,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case afrikaans
   case arabic
   case hebrew
+  case persian
   case greek
   case greeklish
   case dutch
@@ -3266,6 +3267,14 @@ enum StarterLexicon {
     "מרחק", "צעד", "סבלנות", "איזון",
   ]
 
+  // Typebar-authored Persian starter words use direct Unicode text for macOS
+  // Persian input sources; they are not an imported word list.
+  static let persianWords = [
+    "کتاب", "قلم", "پنجره", "راه", "نور", "پل", "صبح", "کاغذ", "باغ", "ابر",
+    "آرامش", "فانوس", "کوه", "بذر", "آهنگ", "میز", "اندیشه", "یادداشت", "ایده", "تجربه",
+    "فاصله", "گام", "صبر", "تعادل",
+  ]
+
   // Typebar-authored Danish starter words. The corpus deliberately includes
   // æ, ø and å for normal macOS composed-text input practice.
   static let danishWords = [
@@ -3484,6 +3493,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: hebrewWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .persian:
+      return prompt(
+        tokens: count, lexicon: persianWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .greek:
       return prompt(
         tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -3685,6 +3698,7 @@ enum StarterLexicon {
     case .afrikaans: (afrikaansWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
+    case .persian: (persianWords, ["،", "؛", "؟", "."])
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
@@ -3784,6 +3798,7 @@ extension TypingLanguage {
     case .afrikaans: StarterLexicon.afrikaansWords
     case .arabic: StarterLexicon.arabicWords
     case .hebrew: StarterLexicon.hebrewWords
+    case .persian: StarterLexicon.persianWords
     case .greek: StarterLexicon.greekWords
     case .greeklish: StarterLexicon.greeklishWords
     case .dutch: StarterLexicon.dutchWords
@@ -3855,7 +3870,7 @@ extension TypingLanguage {
   /// single-language until mixed bidirectional prompt layout has dedicated
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
-    self == .arabic || self == .hebrew
+    self == .arabic || self == .hebrew || self == .persian
   }
 
   var isNoSpaceLanguage: Bool {
@@ -3889,6 +3904,7 @@ extension TypingLanguage {
     case .afrikaans: "Afrikaans"
     case .arabic: "العربية"
     case .hebrew: "עברית"
+    case .persian: "فارسی"
     case .greek: "Ελληνικά"
     case .greeklish: "Greeklish"
     case .dutch: "Nederlands"

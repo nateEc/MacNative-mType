@@ -3435,6 +3435,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .hebrew).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hebrew), "he")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .persian).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .persian), "fa")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -3536,6 +3539,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(hebrewEncyclopedia.text, "חלון פתוח מכניס אור בוקר")
     XCTAssertEqual(
       hebrewEncyclopedia.prompt(for: .words(3, language: .hebrew)), "חלון פתוח מכניס")
+    let persianData = Data("""
+    {"title":"پنجره","extract":"پنجره باز نور صبح را وارد می‌کند."}
+    """.utf8)
+    let persianEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: persianData, language: .persian))
+    XCTAssertEqual(persianEncyclopedia.text, "پنجره باز نور صبح را وارد می‌کند")
+    XCTAssertEqual(
+      persianEncyclopedia.prompt(for: .words(3, language: .persian)), "پنجره باز نور")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4137,6 +4148,7 @@ final class TypingEngineTests: XCTestCase {
       (.afrikaans, StarterLexicon.afrikaansWords),
       (.arabic, StarterLexicon.arabicWords),
       (.hebrew, StarterLexicon.hebrewWords),
+      (.persian, StarterLexicon.persianWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4219,6 +4231,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.hebrew.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.hebrew))
     XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.hebrew))
+    XCTAssertTrue(StarterLexicon.persianWords.contains("پنجره"))
+    XCTAssertTrue(TypingLanguage.persian.usesRightToLeftPrompt)
+    XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.persian))
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.persian))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4296,6 +4312,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.afrikaans.speechLocaleIdentifier, "af-ZA")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
+    XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
@@ -4702,7 +4719,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .afrikaans, .arabic, .hebrew, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+      .english, .spanish, .german, .afrikaans, .arabic, .hebrew, .persian, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,

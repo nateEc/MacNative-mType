@@ -708,6 +708,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "persian-calm-step",
+      title: "گام آرام",
+      text: "یک گام آرام، کار بعدی را روشن‌تر می‌کند.",
+      language: .persian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "persian-open-notebook",
+      title: "دفتر باز",
+      text: "دفتر باز همه پرسش‌های دشوار را حل نمی‌کند، اما کمک می‌کند پرسش را به بخش‌های کوچک‌تر تقسیم کنیم.",
+      language: .persian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "persian-small-work",
+      title: "کار کوچک",
+      text: "پیشرفت همیشه در یک لحظه بزرگ پدیدار نمی‌شود. از کارهای کوچک رشد می‌کند: باز کردن همان صفحه، روشن کردن یک جمله، اصلاح یک اشتباه و گذاشتن یادداشتی مفید برای تلاش بعدی.",
+      language: .persian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "persian-long-table",
+      title: "میز بلند",
+      text: "یک میز بلند برای گونه‌های گوناگون کار جا باز می‌کند. در یک سوی آن شاید پیش نویس نخست باشد و در سوی دیگر جمله‌ای که هنوز به توجه نیاز دارد؛ در میان این دو، یک تصمیم کوچک منتظر می‌ماند. تمرین هم به همین شکل پیش می‌رود: لازم نیست هر بخش دشوار را یکباره حل کنیم. کافی است جایی برای بازگشت، گام بعدی روشن و صبری داشته باشیم تا پس از چند کوشش ببینیم چه چیز آسان‌تر شده است.",
+      language: .persian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

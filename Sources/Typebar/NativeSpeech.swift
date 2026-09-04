@@ -29,6 +29,7 @@ extension TypingLanguage {
     case .afrikaans: "af-ZA"
     case .arabic: "ar-SA"
     case .hebrew: "he-IL"
+    case .persian: "fa-IR"
     case .greek, .greeklish: "el-GR"
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"
