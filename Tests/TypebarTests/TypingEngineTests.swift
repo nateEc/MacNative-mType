@@ -3060,8 +3060,8 @@ final class TypingEngineTests: XCTestCase {
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
-      StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.frenchWords,
-      StarterLexicon.italianWords,
+      StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
+      StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
@@ -3202,6 +3202,9 @@ final class TypingEngineTests: XCTestCase {
       5, language: .dutch).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .danish).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .norwegianBokmal).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .norwegianBokmal), "no")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .ukrainianLatin).with(modifiers: [.referenceStream])))
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
@@ -3833,6 +3836,7 @@ final class TypingEngineTests: XCTestCase {
     for (language, lexicon) in [
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
       (.danish, StarterLexicon.danishWords),
+      (.norwegianBokmal, StarterLexicon.norwegianBokmalWords),
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
       (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
       (.ukrainian, StarterLexicon.ukrainianWords),
@@ -3868,6 +3872,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.dutchWords.contains("één"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.danish))
     XCTAssertTrue(StarterLexicon.danishWords.contains("åndedræt"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.norwegianBokmal))
+    XCTAssertTrue(StarterLexicon.norwegianBokmalWords.contains("fjær"))
   }
 
   func testLazyLatinModifierNormalizesAccentsLigaturesAndGeneratedPrompts() {
@@ -3885,6 +3891,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.german.speechLocaleIdentifier, "de-DE")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
     XCTAssertEqual(TypingLanguage.danish.speechLocaleIdentifier, "da-DK")
+    XCTAssertEqual(TypingLanguage.norwegianBokmal.speechLocaleIdentifier, "nb-NO")
     XCTAssertEqual(TypingLanguage.french.speechLocaleIdentifier, "fr-FR")
     XCTAssertEqual(TypingLanguage.italian.speechLocaleIdentifier, "it-IT")
     XCTAssertEqual(TypingLanguage.portuguese.speechLocaleIdentifier, "pt-PT")
@@ -3956,6 +3963,16 @@ final class TypingEngineTests: XCTestCase {
       WeakSpotPractice.prompt(
         results: [danishResult], language: .danish, englishVariant: .american, wordCount: 1),
       "én")
+    let norwegianBokmalResult = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .norwegianBokmal), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 3,
+      correctCharacterCount: 2, errorCount: 1, wpm: 12, rawWpm: 12, accuracy: 67,
+      prompt: "vær", replayEvents: [.init(offset: 1, kind: .insert, text: "var")])
+    XCTAssertEqual(
+      WeakSpotPractice.prompt(
+        results: [norwegianBokmalResult], language: .norwegianBokmal, englishVariant: .american,
+        wordCount: 1),
+      "vær")
     XCTAssertNil(
       WeakSpotPractice.prompt(results: [], language: .english, englishVariant: .american))
     XCTAssertNil(
@@ -4135,7 +4152,8 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .dutch, .danish, .french, .italian, .portuguese,
+      .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .french, .italian,
+      .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
       .korean, .turkish, .polish,

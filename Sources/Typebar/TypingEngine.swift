@@ -201,6 +201,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case german
   case dutch
   case danish
+  case norwegianBokmal
   case french
   case italian
   case portuguese
@@ -3117,6 +3118,15 @@ enum StarterLexicon {
     "lille", "tid", "én",
   ]
 
+  // Typebar-authored Norwegian Bokmål starter words. The corpus deliberately
+  // includes æ, ø and å for normal macOS composed-text input practice.
+  static let norwegianBokmalWords = [
+    "morgen", "vindu", "papir", "kyst", "vind", "øvelse", "oppmerksomhet", "rolig",
+    "klar", "sjø", "gate", "bord", "lys", "reise", "tålmodighet", "øyeblikk",
+    "by", "regn", "stillhet", "retning", "stjerne", "notat", "hage", "åndedrag",
+    "liten", "tid", "vær", "fjær",
+  ]
+
   // Typebar-authored French and Italian starter words. These compact lists
   // deliberately include common accented characters for native text input.
   static let frenchWords = [
@@ -3178,6 +3188,10 @@ enum StarterLexicon {
     case .danish:
       return prompt(
         tokens: count, lexicon: danishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .norwegianBokmal:
+      return prompt(
+        tokens: count, lexicon: norwegianBokmalWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .french:
       return prompt(
@@ -3277,6 +3291,7 @@ enum StarterLexicon {
     case .german: (germanWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
     case .danish: (danishWords, [",", ".", "!", "?"])
+    case .norwegianBokmal: (norwegianBokmalWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
@@ -3341,7 +3356,8 @@ extension TestMode {
 
 extension TypingLanguage {
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .dutch, .danish, .french, .italian, .portuguese,
+    .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .french, .italian,
+    .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
     .korean, .turkish, .polish,
@@ -3392,6 +3408,7 @@ extension TypingLanguage {
     case .german: "Deutsch"
     case .dutch: "Nederlands"
     case .danish: "Dansk"
+    case .norwegianBokmal: "Norsk bokmål"
     case .french: "Français"
     case .italian: "Italiano"
     case .portuguese: "Português"

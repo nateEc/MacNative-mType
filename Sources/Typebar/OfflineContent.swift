@@ -596,6 +596,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "norwegian-bokmal-lite-steg",
+      title: "Lite steg",
+      text: "Et lite, rolig steg gjør den neste oppgaven lettere å se.",
+      language: .norwegianBokmal,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "norwegian-bokmal-aapen-notatbok",
+      title: "Åpen notatbok",
+      text: "En åpen notatbok løser ikke vanskelige spørsmål alene, men hjelper med å dele dem i klare deler og vende tilbake med oppmerksomhet.",
+      language: .norwegianBokmal,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "norwegian-bokmal-rolig-arbeid",
+      title: "Rolig arbeid",
+      text: "Fremskritt kommer ikke alltid som et tydelig øyeblikk. Det vokser i gjentatte handlinger: å åpne den samme siden, gjøre én setning klarere, rette en feil og etterlate et nyttig notat til neste forsøk. Over tid gjør den rolige oppmerksomheten vanskelige steder mer kjente.",
+      language: .norwegianBokmal,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "norwegian-bokmal-langt-bord",
+      title: "Langt bord",
+      text: "Et langt bord er nyttig fordi det gir plass til ulike slags arbeid. I den ene enden kan et første utkast ligge, i den andre en setning som fortsatt trenger oppmerksomhet, og i midten er det plass til den neste lille beslutningen. Øvelse virker på samme måte: den ber ikke om at alle vanskeligheter skal løses på én gang, men om et sted å vende tilbake til, et synlig neste steg og nok tålmodighet til å legge merke til hva som blir lettere etter noen forsøk.",
+      language: .norwegianBokmal,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",

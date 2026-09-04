@@ -146,7 +146,7 @@ enum LivePracticeContentService {
     return data
   }
 
-  private static func wikipediaLanguageCode(for language: TypingLanguage) -> String {
+  static func wikipediaLanguageCode(for language: TypingLanguage) -> String {
     switch language {
     case .english, .mixedEnglishChinese, .mixedLanguages:
       return "en"
@@ -154,6 +154,7 @@ enum LivePracticeContentService {
     case .german: return "de"
     case .dutch: return "nl"
     case .danish: return "da"
+    case .norwegianBokmal: return "no"
     case .french: return "fr"
     case .italian: return "it"
     case .portuguese: return "pt"
