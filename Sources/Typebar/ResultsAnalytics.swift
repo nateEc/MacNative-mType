@@ -488,17 +488,25 @@ struct ResultPerformanceVisibility: Codable, Equatable {
   var raw: Bool
   var burst: Bool
   var errors: Bool
+  var personalBestLine: Bool
   var tagPersonalBestLine: Bool
 
-  init(raw: Bool = true, burst: Bool = true, errors: Bool = true, tagPersonalBestLine: Bool = true) {
+  init(
+    raw: Bool = true,
+    burst: Bool = true,
+    errors: Bool = true,
+    personalBestLine: Bool = true,
+    tagPersonalBestLine: Bool = true
+  ) {
     self.raw = raw
     self.burst = burst
     self.errors = errors
+    self.personalBestLine = personalBestLine
     self.tagPersonalBestLine = tagPersonalBestLine
   }
 
   private enum CodingKeys: String, CodingKey {
-    case raw, burst, errors, tagPersonalBestLine
+    case raw, burst, errors, personalBestLine, tagPersonalBestLine
   }
 
   init(from decoder: Decoder) throws {
@@ -506,6 +514,7 @@ struct ResultPerformanceVisibility: Codable, Equatable {
     raw = try values.decodeIfPresent(Bool.self, forKey: .raw) ?? true
     burst = try values.decodeIfPresent(Bool.self, forKey: .burst) ?? true
     errors = try values.decodeIfPresent(Bool.self, forKey: .errors) ?? true
+    personalBestLine = try values.decodeIfPresent(Bool.self, forKey: .personalBestLine) ?? true
     tagPersonalBestLine = try values.decodeIfPresent(Bool.self, forKey: .tagPersonalBestLine) ?? true
   }
 
@@ -514,6 +523,7 @@ struct ResultPerformanceVisibility: Codable, Equatable {
     try values.encode(raw, forKey: .raw)
     try values.encode(burst, forKey: .burst)
     try values.encode(errors, forKey: .errors)
+    try values.encode(personalBestLine, forKey: .personalBestLine)
     try values.encode(tagPersonalBestLine, forKey: .tagPersonalBestLine)
   }
 }
@@ -909,6 +919,45 @@ enum CurrentPersonalBestPolicy {
       .focusTwoWords, .focusThreeWords, .lazyLatin:
       true
     }
+  }
+}
+
+struct ResultPersonalBestFeedback: Equatable {
+  let previousBestWpm: Int?
+  let currentWpm: Int
+
+  var isNewPersonalBest: Bool {
+    previousBestWpm.map { currentWpm > $0 } ?? true
+  }
+  var improvement: Int? {
+    guard let previousBestWpm, currentWpm > previousBestWpm else { return nil }
+    return currentWpm - previousBestWpm
+  }
+  var showsPreviousBestLine: Bool {
+    previousBestWpm != nil && !isNewPersonalBest
+  }
+}
+
+/// Derives the completed-result local PB feedback from comparable Typebar history.
+enum ResultPersonalBestPolicy {
+  static func feedback(
+    for result: CompletedTestResult,
+    previousResults: [CompletedTestResult]
+  ) -> ResultPersonalBestFeedback? {
+    guard result.outcome == .completed,
+      CurrentPersonalBestPolicy.isResultEligible(
+        configuration: result.configuration, accuracy: result.accuracy)
+    else { return nil }
+
+    let samples = previousResults.compactMap { previous -> RecentAverageSample? in
+      guard previous.id != result.id, previous.outcome == .completed else { return nil }
+      return .init(
+        configuration: previous.configuration, prompt: previous.prompt,
+        finishedAt: previous.finishedAt, wpm: previous.wpm, accuracy: previous.accuracy)
+    }
+    let previousBest = CurrentPersonalBestPolicy.personalBest(
+      currentConfiguration: result.configuration, currentPrompt: result.prompt, samples: samples)
+    return .init(previousBestWpm: previousBest?.wpm, currentWpm: result.wpm)
   }
 }
 

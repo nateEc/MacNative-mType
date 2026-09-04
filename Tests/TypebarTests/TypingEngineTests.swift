@@ -3732,12 +3732,54 @@ final class TypingEngineTests: XCTestCase {
       previousResults: [current]).isEmpty)
   }
 
-  func testResultPerformanceVisibilityDefaultsTagPBLineForLegacySettings() throws {
+  func testResultPersonalBestFeedbackUsesAllComparableCompletedLocalResults() {
+    let configuration = TestConfiguration.words(25, language: .english)
+    func result(
+      wpm: Int, configuration: TestConfiguration = configuration, outcome: TestOutcome = .completed
+    ) -> CompletedTestResult {
+      .init(
+        id: UUID(), configuration: configuration, outcome: outcome, startedAt: start,
+        finishedAt: start.addingTimeInterval(30), typedCharacterCount: 100,
+        correctCharacterCount: 100, errorCount: 0, wpm: wpm, rawWpm: wpm, accuracy: 100)
+    }
+
+    let current = result(wpm: 90)
+    let feedback = ResultPersonalBestPolicy.feedback(
+      for: current,
+      previousResults: [
+        result(wpm: 100),
+        result(wpm: 85),
+        result(wpm: 250, configuration: .words(50, language: .english)),
+        result(wpm: 300, outcome: .abandoned),
+      ])
+
+    XCTAssertEqual(feedback, .init(previousBestWpm: 100, currentWpm: 90))
+    XCTAssertTrue(feedback?.showsPreviousBestLine == true)
+    XCTAssertFalse(feedback?.isNewPersonalBest == true)
+    let newFeedback = ResultPersonalBestPolicy.feedback(
+      for: result(wpm: 110), previousResults: [result(wpm: 100)])
+    XCTAssertTrue(newFeedback?.isNewPersonalBest == true)
+    XCTAssertEqual(newFeedback?.improvement, 10)
+    XCTAssertFalse(newFeedback?.showsPreviousBestLine == true)
+    let firstFeedback = ResultPersonalBestPolicy.feedback(
+      for: result(wpm: 90), previousResults: [])
+    XCTAssertTrue(firstFeedback?.isNewPersonalBest == true)
+    XCTAssertNil(firstFeedback?.previousBestWpm)
+    XCTAssertNil(ResultPersonalBestPolicy.feedback(
+      for: result(wpm: 90, configuration: .init(
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        language: .english)),
+      previousResults: [current]))
+  }
+
+  func testResultPerformanceVisibilityDefaultsPBLinesForLegacySettings() throws {
     let legacy = try JSONDecoder().decode(
       ResultPerformanceVisibility.self,
       from: Data(#"{"raw":false,"burst":false,"errors":true}"#.utf8))
 
-    XCTAssertEqual(legacy, .init(raw: false, burst: false, errors: true, tagPersonalBestLine: true))
+    XCTAssertEqual(
+      legacy,
+      .init(raw: false, burst: false, errors: true, personalBestLine: true, tagPersonalBestLine: true))
     let restored = try JSONDecoder().decode(
       ResultPerformanceVisibility.self, from: JSONEncoder().encode(legacy))
     XCTAssertEqual(restored, legacy)

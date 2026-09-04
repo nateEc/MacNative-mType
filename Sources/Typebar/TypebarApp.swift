@@ -569,6 +569,10 @@ private struct ContentView: View {
         lastCompletedWpm = result.wpm
         repeatedPaceArmed = settings.repeatedPace
         let savesResult = result.outcome == .completed && settings.saveCompletedResults
+        let resultPersonalBestFeedback = savesResult
+          ? ResultPersonalBestPolicy.feedback(
+            for: result, previousResults: savedResults.compactMap(\.portableResult))
+          : nil
         let tagPersonalBestFeedback = savesResult
           ? TagPersonalBestPolicy.feedback(
             for: result, previousResults: savedResults.compactMap(\.portableResult))
@@ -597,6 +601,7 @@ private struct ContentView: View {
           savesResult: savesResult,
           savedRecord: savedRecord,
           quoteFeedback: activeQuoteFeedback,
+          resultPersonalBestFeedback: resultPersonalBestFeedback,
           tagPersonalBestFeedback: tagPersonalBestFeedback,
           missedWords: missedWordPractice?.selectedWords ?? [],
           missedWordPracticeWords: missedWordPractice?.exerciseWords ?? [],
@@ -718,6 +723,7 @@ private struct ContentView: View {
         publicationMessage: publicationMessage,
         savedResultRecord: result.savedRecord,
         quoteFeedback: result.quoteFeedback,
+        resultPersonalBestFeedback: result.resultPersonalBestFeedback,
         tagPersonalBestFeedback: result.tagPersonalBestFeedback,
         settings: settings,
         quoteRatings: quoteRatings,
@@ -2695,6 +2701,7 @@ private struct CompletedResultPresentation: Identifiable {
   let savesResult: Bool
   let savedRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
+  let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   let tagPersonalBestFeedback: [TagPersonalBestFeedback]
   let missedWords: [String]
   let missedWordPracticeWords: [String]
@@ -2726,6 +2733,7 @@ private struct CompletedResultView: View {
   let publicationMessage: String?
   let savedResultRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
+  let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   let tagPersonalBestFeedback: [TagPersonalBestFeedback]
   let settings: AppSettings
   let quoteRatings: QuoteRatingStore
@@ -2811,6 +2819,7 @@ private struct CompletedResultView: View {
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: startGraphsAtZero,
         visibility: resultPerformanceVisibility,
+        resultPersonalBestFeedback: resultPersonalBestFeedback,
         tagPersonalBestFeedback: tagPersonalBestFeedback,
         onVisibilityChange: onResultPerformanceVisibilityChange,
         accent: accent)
@@ -2833,6 +2842,8 @@ private struct CompletedResultView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+
+      resultPersonalBestFeedbackView
 
       tagPersonalBestFeedbackView
 
@@ -2918,6 +2929,21 @@ private struct CompletedResultView: View {
     .frame(width: 390)
     .onAppear {
       communityRating = initialCommunityRating
+    }
+  }
+
+  @ViewBuilder
+  private var resultPersonalBestFeedbackView: some View {
+    if let feedback = resultPersonalBestFeedback, feedback.isNewPersonalBest {
+      Label(
+        feedback.previousBestWpm == nil
+          ? "本机个人最佳 · 首次 PB \(feedback.currentWpm) WPM"
+          : "本机个人最佳 · +\(feedback.improvement ?? 0) WPM",
+        systemImage: "crown.fill"
+      )
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(.yellow)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
@@ -3506,6 +3532,7 @@ private struct ResultPerformanceChart: View {
   let accent: Color
   let onVisibilityChange: (ResultPerformanceVisibility) -> Void
   @State private var visibility: ResultPerformanceVisibility
+  private let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   private let tagPersonalBestFeedback: [TagPersonalBestFeedback]
 
   init(
@@ -3515,6 +3542,7 @@ private struct ResultPerformanceChart: View {
     typingSpeedUnit: TypingSpeedUnit,
     startsAtZero: Bool,
     visibility: ResultPerformanceVisibility,
+    resultPersonalBestFeedback: ResultPersonalBestFeedback?,
     tagPersonalBestFeedback: [TagPersonalBestFeedback],
     onVisibilityChange: @escaping (ResultPerformanceVisibility) -> Void,
     accent: Color
@@ -3524,6 +3552,8 @@ private struct ResultPerformanceChart: View {
     self.startsAtZero = startsAtZero
     self.onVisibilityChange = onVisibilityChange
     _visibility = State(initialValue: visibility)
+    self.resultPersonalBestFeedback = resultPersonalBestFeedback?.showsPreviousBestLine == true
+      ? resultPersonalBestFeedback : nil
     self.tagPersonalBestFeedback = tagPersonalBestFeedback.filter(\.showsPreviousBestLine)
     self.accent = accent
   }
@@ -3538,6 +3568,9 @@ private struct ResultPerformanceChart: View {
           traceToggle("Raw", isOn: visibilityBinding(\.raw), color: .secondary)
           traceToggle("Burst", isOn: visibilityBinding(\.burst), color: .orange)
           traceToggle("错误", isOn: visibilityBinding(\.errors), color: .red)
+          if resultPersonalBestFeedback != nil {
+            traceToggle("本机 PB", isOn: visibilityBinding(\.personalBestLine), color: .secondary)
+          }
           if !tagPersonalBestFeedback.isEmpty {
             traceToggle("标签 PB", isOn: visibilityBinding(\.tagPersonalBestLine), color: .secondary)
           }
@@ -3564,6 +3597,20 @@ private struct ResultPerformanceChart: View {
             )
             .foregroundStyle(.orange)
             .lineStyle(.init(lineWidth: 1))
+          }
+          if visibility.personalBestLine,
+            let feedback = resultPersonalBestFeedback,
+            let previousBestWpm = feedback.previousBestWpm
+          {
+            RuleMark(
+              y: .value("本机 PB", typingSpeedUnit.converted(wpm: previousBestWpm)))
+              .foregroundStyle(.secondary.opacity(0.6))
+              .lineStyle(.init(lineWidth: 1, dash: [4, 4]))
+              .annotation(position: .top, alignment: .center) {
+                Text("本机 PB \(typingSpeedUnit.formatted(wpm: previousBestWpm))")
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
           }
           if visibility.tagPersonalBestLine {
             ForEach(tagPersonalBestFeedback) { feedback in
@@ -3627,8 +3674,10 @@ private struct ResultPerformanceChart: View {
   }
 
   private var chartDescription: String {
-    let tagPBDescription = tagPersonalBestFeedback.isEmpty ? "" : "；带标签的灰点划线为已有标签 PB"
-    return "强调色为 WPM，灰虚线为 Raw，橙色为 Burst\(tagPBDescription)；数据仅由本机输入回放重建。"
+    var description = "强调色为 WPM，灰虚线为 Raw，橙色为 Burst"
+    if resultPersonalBestFeedback != nil { description += "；灰横线为本机 PB" }
+    if !tagPersonalBestFeedback.isEmpty { description += "；灰点划线为已有标签 PB" }
+    return "\(description)；数据仅由本机输入回放重建。"
   }
 
   private func visibilityBinding(
