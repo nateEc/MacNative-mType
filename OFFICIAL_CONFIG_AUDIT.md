@@ -36,7 +36,7 @@
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
-| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 17 个原创内置布局可任选至多 15 个进入原生序列。 |
+| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 18 个原创内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 部分；自选组合已实现，候选语言仅限 Typebar 原创语言集。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
@@ -49,7 +49,7 @@
 | `compositionDisplay` | `compositionDisplayStyle` | 已映射。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |
 | `lazyMode` | `TestModifier.lazyLatin` | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。 |
-| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，17 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；官方全部命名布局尚未覆盖。 |
+| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，18 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
@@ -110,15 +110,16 @@
 
 ## 当前优先缺口
 
-1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、17 个原创内置模拟布局（含独立实现的 Russian JCUKEN），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
+1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、18 个原创内置模拟布局（含独立实现的 Russian 与 Ukrainian JCUKEN），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
 2. 官方语言、词表、主题、字体和声音的完整目录不应复制。后续以原创或明确授权内容扩大用户可选范围，并逐项标注差异。
 3. 网页账户页图表、猴子外观和广告设置不适合作为原生逐像素复刻目标；对用户可见意图的原生替代仍需设备验收。
 
 ## 本轮新增验证
 
 - Russian JCUKEN 自动化测试覆盖 `ё`、`й`、`ж`、`э`、`я`、`ь`、逗号与 ISO `< >` 的提示高亮、普通/Shift 物理 keycode、反查 keycode；独立设置快照覆盖键盘图、输入模拟与 Layout Fluid 持久化。映射为 Typebar 原生实现，不导入参考布局 JSON。
+- Ukrainian JCUKEN 自动化测试覆盖 `ґ`、`ї`、`і`、`є` 与 ISO `< >` 的提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化。映射按 Typebar 自有定义编写，不读取或导入参考布局 JSON。
 - 乌克兰语自动化测试覆盖原创词表中的 `ї`、`є`、`ґ`、四档原创引语、多语混排、弱项复练、`uk-UA` 朗读 locale 与 `uk` 百科入口；服务端测试覆盖成绩提交、语言筛选排行榜与引语投稿白名单，未读取或导入参考词表/内容。
-- 完整客户端 `swift test` 通过 255 项、独立 Vapor 服务 `swift test` 通过 66 项；两次测试前 `pgrep -x Typebar` 均无输出，未启动图形应用。
+- 完整客户端 `swift test` 通过 257 项、独立 Vapor 服务 `swift test` 通过 66 项；两次测试前 `pgrep -x Typebar` 均无输出，未启动图形应用。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
@@ -128,5 +129,5 @@
 - 公开资料练习统计测试覆盖服务端从已接受成绩起止时间聚合累计时长，以及按随完成提交的重开次数派生开始次数；重复提交同一成绩 ID 不会重复累加，客户端对新旧资料响应安全解码。未完成且未提交练习与本机历史不进入该值。
 - 引语长度与队列测试覆盖多选长度通过预设和 Typebar 配置链接保存、旧单长度配置迁移，以及同一候选集每轮不重复且避免立即重复当前引语；队列仅存于当前进程，不引入参考内容或实现。
 - 服务公告测试覆盖公开读取、部署审核密钥发布/删除、计划日期往返、空白公告拒绝、原生完整日期/日期/相对时间占位符替换，以及本机普通公告关闭、置顶公告保留和服务端移除后的本机确认清理；不复制参考文案、样式或实现。
-- 完整客户端 `swift test` 已通过 255 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
+- 完整客户端 `swift test` 已通过 257 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
 - 独立 Vapor 服务的 `swift test` 已通过 66 项测试，其中覆盖 GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除、Discord 头像公开隐私、原创公开徽章、公开连续练习/开始次数隐私及服务公告；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。

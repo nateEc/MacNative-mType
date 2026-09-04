@@ -1823,6 +1823,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.russianJcuken.emulatedLayout, .russianJcuken)
   }
 
+  func testUkrainianJcukenMapsUkrainianLettersAndPhysicalKeyPositions() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ґ", layout: .ukrainianJcuken), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ї", layout: .ukrainianJcuken), "top-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "і", layout: .ukrainianJcuken), "home-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "є", layout: .ukrainianJcuken), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .ukrainianJcuken), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .ukrainianJcuken), "ґ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 30, modifierFlags: [.shift], layout: .ukrainianJcuken), "Ї")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 1, modifierFlags: [], layout: .ukrainianJcuken), "і")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 39, modifierFlags: [.shift], layout: .ukrainianJcuken), "Є")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ґ", layout: .ukrainianJcuken), 50)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "є", layout: .ukrainianJcuken), 39)
+    XCTAssertEqual(KeyboardInputLayout.ukrainianJcuken.emulatedLayout, .ukrainianJcuken)
+  }
+
   @MainActor
   func testTurkishQPersistsAsGuideInputAndLayoutFluidChoice() {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -1855,6 +1877,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardLayout, .russianJcuken)
     XCTAssertEqual(restored.keyboardInputLayout, .russianJcuken)
     XCTAssertEqual(restored.layoutFluidLayouts, [.russianJcuken, .ansiQwerty])
+  }
+
+  @MainActor
+  func testUkrainianJcukenPersistsAsGuideInputAndLayoutFluidChoice() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .ukrainianJcuken
+    settings.keyboardInputLayout = .ukrainianJcuken
+    settings.layoutFluidLayouts = [.ukrainianJcuken, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .ukrainianJcuken)
+    XCTAssertEqual(restored.keyboardInputLayout, .ukrainianJcuken)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.ukrainianJcuken, .ansiQwerty])
   }
 
   @MainActor
@@ -3552,7 +3591,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 17)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 18)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
