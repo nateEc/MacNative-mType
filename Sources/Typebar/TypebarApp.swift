@@ -445,7 +445,8 @@ private struct ContentView: View {
   @State private var duration = 30
   @State private var wordLimit = 25
   @State private var selectedQuoteID = OfflineContent.quotes(for: .english)[0].id
-  @State private var quoteLength: QuoteLength = .all
+  @State private var quoteLengths = QuoteLengthSelection.selectable
+  @State private var quoteQueue = QuoteQueue()
   @State private var quoteSource: QuoteSource = .builtIn
   @State private var communityQuotes: [OfflineQuote] = []
   @State private var communityQuoteRatings: [UUID: RemoteQuoteRatingResponse] = [:]
@@ -931,25 +932,25 @@ private struct ContentView: View {
           .pickerStyle(.segmented)
           .onChange(of: quoteSource) { _, source in
             if source == .community { refreshCommunityQuotes() }
+            quoteQueue.reset()
             ensureSelectedQuote()
             reset()
           }
-          Picker("引语长度", selection: $quoteLength) {
-            ForEach(QuoteLength.allCases) { length in
-              Text(length.displayName).tag(length)
+          DisclosureGroup("引语长度：\(QuoteLengthSelection.summary(quoteLengths))") {
+            ForEach(QuoteLength.allCases.filter { $0 != .all }) { length in
+              Toggle(length.displayName, isOn: quoteLengthSelectionBinding(for: length))
+                .toggleStyle(.checkbox)
             }
-          }
-          .onChange(of: quoteLength) { _, _ in
-            ensureSelectedQuote()
-            reset()
           }
           Toggle("只显示收藏", isOn: $favoriteQuotesOnly)
             .onChange(of: favoriteQuotesOnly) { _, _ in
+              quoteQueue.reset()
               ensureSelectedQuote()
               reset()
             }
           TextField("搜索当前引语（仅本机）", text: $quoteSearchQuery)
             .onChange(of: quoteSearchQuery) { _, _ in
+              quoteQueue.reset()
               ensureSelectedQuote()
               reset()
             }
@@ -2440,11 +2441,18 @@ private struct ContentView: View {
         englishVariant: settings.englishVariant, mixedLanguageComponents: mixedLanguageComponents,
         contentOptions: contentOptions
       ).with(modifiers: settings.testModifiers)
-    case .quote, .zen:
+    case .quote:
       return .init(
-        mode: mode, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
-        quoteLength: quoteLength, mixedLanguageComponents: mixedLanguageComponents,
+        quoteLength: QuoteLengthSelection.legacyValue(for: quoteLengths), quoteLengths: quoteLengths,
+        mixedLanguageComponents: mixedLanguageComponents,
+        modifiers: settings.testModifiers, contentOptions: contentOptions)
+    case .zen:
+      return .init(
+        mode: .zen, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
+        rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
+        mixedLanguageComponents: mixedLanguageComponents,
         modifiers: settings.testModifiers, contentOptions: contentOptions)
     case .custom:
       let duration = customTextCompletion == .time ? TimeInterval(customTextDuration) : nil
@@ -2455,7 +2463,7 @@ private struct ContentView: View {
       return .init(
         mode: .custom, duration: duration, wordLimit: wordLimit, difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
-        quoteLength: quoteLength, customTextCompletion: customTextCompletion,
+        customTextCompletion: customTextCompletion,
         customTextSectionLimit: sectionLimit,
         customTextOrdering: customTextCompletion == .sections ? .inOrder : customTextOrdering,
         mixedLanguageComponents: mixedLanguageComponents, modifiers: settings.testModifiers,
@@ -2501,7 +2509,8 @@ private struct ContentView: View {
     customTextOrdering = configuration.customTextOrdering
     language = configuration.language
     mixedLanguageComponents = configuration.mixedLanguageComponents
-    quoteLength = configuration.quoteLength
+    quoteLengths = configuration.effectiveQuoteLengths
+    quoteQueue.reset()
     contentOptions = configuration.contentOptions
     settings.apply(configuration)
     if let activeResultTags = preset.activeResultTags {
@@ -2521,7 +2530,10 @@ private struct ContentView: View {
   }
 
   private func languageChanged(to language: TypingLanguage) {
-    if mode == .quote { ensureSelectedQuote() }
+    if mode == .quote {
+      quoteQueue.reset()
+      ensureSelectedQuote()
+    }
     reset()
   }
 
@@ -2545,9 +2557,9 @@ private struct ContentView: View {
   private var availableQuotes: [OfflineQuote] {
     let sourceQuotes =
       quoteSource == .builtIn
-      ? OfflineContent.quotes(for: language, length: quoteLength)
+      ? OfflineContent.quotes(for: language).filter { quoteLengths.contains($0.length) }
       : communityQuotes.filter {
-        $0.language == language && (quoteLength == .all || $0.length == quoteLength)
+        $0.language == language && quoteLengths.contains($0.length)
       }
     let quotes = favoriteQuotesOnly
       ? sourceQuotes.filter { settings.isFavoriteQuote($0.id) }
@@ -2578,6 +2590,7 @@ private struct ContentView: View {
         }
         communityQuoteMessage =
           remoteQuotes.isEmpty ? "该语言还没有已审核内容。" : "已载入 \(remoteQuotes.count) 条已审核内容。"
+        quoteQueue.reset()
         ensureSelectedQuote()
         reset()
       } catch {
@@ -2652,12 +2665,24 @@ private struct ContentView: View {
   }
 
   private func chooseNextQuote() {
-    selectedQuoteID =
-      OfflineContent.nextQuote(
-        from: availableQuotes,
-        currentID: selectedQuoteID,
-        allowsRepeat: false
-      )?.id ?? selectedQuoteID
+    selectedQuoteID = quoteQueue.next(from: availableQuotes, avoiding: selectedQuoteID) ?? selectedQuoteID
+  }
+
+  private func quoteLengthSelectionBinding(for length: QuoteLength) -> Binding<Bool> {
+    Binding(
+      get: { quoteLengths.contains(length) },
+      set: { selected in
+        guard selected || quoteLengths.count > 1 else { return }
+        if selected {
+          quoteLengths.insert(length)
+        } else {
+          quoteLengths.remove(length)
+        }
+        quoteQueue.reset()
+        ensureSelectedQuote()
+        reset()
+      }
+    )
   }
 
   private func startWordPractice(_ words: [String], selectedTargetCount: Int) {

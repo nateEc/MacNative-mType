@@ -24,6 +24,70 @@ enum QuoteLengthPolicy {
   }
 }
 
+/// Mirrors the user-facing quote-length selection without retaining the
+/// reference app's numeric groups or quote data. A selection never becomes
+/// empty: selecting all four lengths is the stable "all" representation.
+enum QuoteLengthSelection {
+  static let selectable = Set(QuoteLength.allCases.filter { $0 != .all })
+
+  static func normalized(_ selection: Set<QuoteLength>) -> Set<QuoteLength> {
+    let supported = selection.intersection(selectable)
+    return supported.isEmpty ? selectable : supported
+  }
+
+  static func fromLegacy(_ length: QuoteLength) -> Set<QuoteLength> {
+    length == .all ? selectable : [length]
+  }
+
+  static func legacyValue(for selection: Set<QuoteLength>) -> QuoteLength {
+    let normalized = normalized(selection)
+    return normalized.count == 1 ? normalized.first! : .all
+  }
+
+  static func summary(_ selection: Set<QuoteLength>) -> String {
+    let normalized = normalized(selection)
+    guard normalized != selectable else { return "全部" }
+    return QuoteLength.allCases.filter(normalized.contains).map(\.displayName).joined(separator: "、")
+  }
+}
+
+/// A process-local quote cycle. It produces every currently eligible quote
+/// once before reshuffling, and avoids showing the active quote again when an
+/// alternative exists. The queue intentionally is not stored in settings.
+struct QuoteQueue {
+  private var sourceIDs: [String] = []
+  private var pendingIDs: [String] = []
+
+  mutating func reset() {
+    sourceIDs = []
+    pendingIDs = []
+  }
+
+  mutating func next(from quotes: [OfflineQuote], avoiding currentID: String?) -> String? {
+    let ids = uniqueIDs(in: quotes)
+    guard !ids.isEmpty else {
+      reset()
+      return nil
+    }
+    if ids != sourceIDs {
+      sourceIDs = ids
+      pendingIDs = []
+    }
+    if pendingIDs.isEmpty { pendingIDs = ids.shuffled() }
+    if pendingIDs.count > 1, let currentID, pendingIDs.first == currentID,
+      let alternative = pendingIDs.firstIndex(where: { $0 != currentID })
+    {
+      pendingIDs.swapAt(0, alternative)
+    }
+    return pendingIDs.removeFirst()
+  }
+
+  private func uniqueIDs(in quotes: [OfflineQuote]) -> [String] {
+    var seen = Set<String>()
+    return quotes.map(\.id).filter { seen.insert($0).inserted }
+  }
+}
+
 enum QuoteRestartPolicy {
   /// Opting in repeats the current quote only when the user restarts an
   /// in-progress attempt, never after it is finished.

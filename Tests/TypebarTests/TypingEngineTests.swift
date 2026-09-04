@@ -3689,6 +3689,49 @@ final class TypingEngineTests: XCTestCase {
         repeatWhileTyping: true, hasStarted: true, isFinished: true))
   }
 
+  func testQuoteQueueCyclesEligibleQuotesWithoutImmediateRepeats() {
+    let quotes = [
+      OfflineQuote(id: "a", title: "A", text: "A", language: .english, length: .short),
+      OfflineQuote(id: "b", title: "B", text: "B", language: .english, length: .medium),
+      OfflineQuote(id: "c", title: "C", text: "C", language: .english, length: .long),
+    ]
+    var queue = QuoteQueue()
+    var current = "a"
+    var firstCycle: [String] = []
+
+    for _ in quotes.indices {
+      let next = try! XCTUnwrap(queue.next(from: quotes, avoiding: current))
+      XCTAssertNotEqual(next, current)
+      firstCycle.append(next)
+      current = next
+    }
+
+    XCTAssertEqual(Set(firstCycle), Set(quotes.map(\.id)))
+    XCTAssertNotEqual(try! XCTUnwrap(queue.next(from: quotes, avoiding: current)), current)
+  }
+
+  func testQuoteLengthSelectionPersistsThroughPresetsAndLegacyConfigurations() throws {
+    let selection: Set<QuoteLength> = [.short, .long]
+    let configuration = TestConfiguration(
+      mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      quoteLengths: selection)
+    let preset = SavedTestPreset(configuration: configuration, quoteID: "craft", customText: nil)
+
+    XCTAssertEqual(configuration.effectiveQuoteLengths, selection)
+    XCTAssertEqual(configuration.quoteLength, .all)
+    XCTAssertEqual(
+      try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset))
+        .configuration.effectiveQuoteLengths,
+      selection)
+
+    let legacy = """
+      {"mode":"quote","duration":null,"wordLimit":null,"difficulty":"normal","rules":{},"quoteLength":"medium","customTextCompletion":"finish","customTextOrdering":"inOrder","mixedLanguageComponents":["english","spanish"],"modifiers":[],"contentOptions":{"includePunctuation":false,"includeNumbers":false}}
+      """
+    XCTAssertEqual(
+      try JSONDecoder().decode(TestConfiguration.self, from: Data(legacy.utf8)).effectiveQuoteLengths,
+      [.medium])
+  }
+
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
       .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,

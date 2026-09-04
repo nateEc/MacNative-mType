@@ -1342,8 +1342,8 @@ struct ResultHistoryFilter: Codable, Equatable {
             difficulties: [configuration.difficulty],
             punctuation: configuration.contentOptions.includePunctuation ? .included : .excluded,
             numbers: configuration.contentOptions.includeNumbers ? .included : .excluded,
-            quoteLengths: configuration.mode == .quote && configuration.quoteLength != .all
-                ? [configuration.quoteLength] : Self.filterableQuoteLengths,
+            quoteLengths: configuration.mode == .quote
+                ? configuration.effectiveQuoteLengths : Self.filterableQuoteLengths,
             timeLimits: timeLimits,
             wordLimits: wordLimits,
             modifierFilter: .init(

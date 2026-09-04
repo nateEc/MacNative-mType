@@ -989,6 +989,9 @@ struct TestConfiguration: Codable, Equatable {
   var language: TypingLanguage
   var englishVariant: EnglishVariant
   var quoteLength: QuoteLength
+  /// Nil preserves single-length configurations written before quote length
+  /// became a multi-selection. New quote presets encode the concrete set.
+  var quoteLengths: Set<QuoteLength>?
   var customTextCompletion: CustomTextCompletion
   var customTextSectionLimit: Int?
   var customTextOrdering: CustomTextOrdering
@@ -1001,6 +1004,7 @@ struct TestConfiguration: Codable, Equatable {
     mode: TestMode, duration: TimeInterval?, wordLimit: Int?, difficulty: Difficulty,
     rules: InputRules, language: TypingLanguage = .english,
     englishVariant: EnglishVariant = .american, quoteLength: QuoteLength = .all,
+    quoteLengths: Set<QuoteLength>? = nil,
     customTextCompletion: CustomTextCompletion = .finish, customTextSectionLimit: Int? = nil,
     customTextOrdering: CustomTextOrdering = .inOrder,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
@@ -1017,7 +1021,9 @@ struct TestConfiguration: Codable, Equatable {
     self.rules = normalizedRules
     self.language = language
     self.englishVariant = englishVariant
-    self.quoteLength = quoteLength
+    let normalizedQuoteLengths = quoteLengths.map(QuoteLengthSelection.normalized)
+    self.quoteLength = normalizedQuoteLengths.map(QuoteLengthSelection.legacyValue) ?? quoteLength
+    self.quoteLengths = normalizedQuoteLengths
     self.customTextCompletion = customTextCompletion
     self.customTextSectionLimit = customTextSectionLimit
     self.customTextOrdering = customTextOrdering
@@ -1082,9 +1088,13 @@ struct TestConfiguration: Codable, Equatable {
     return nil
   }
 
+  var effectiveQuoteLengths: Set<QuoteLength> {
+    quoteLengths ?? QuoteLengthSelection.fromLegacy(quoteLength)
+  }
+
   private enum CodingKeys: String, CodingKey {
     case mode, duration, wordLimit, difficulty, rules, language, englishVariant, quoteLength,
-      customTextCompletion, customTextSectionLimit, customTextOrdering, mixedLanguageComponents,
+      quoteLengths, customTextCompletion, customTextSectionLimit, customTextOrdering, mixedLanguageComponents,
       modifiers, contentOptions, challengeID
   }
 
@@ -1099,7 +1109,10 @@ struct TestConfiguration: Codable, Equatable {
     language = try values.decodeIfPresent(TypingLanguage.self, forKey: .language) ?? .english
     englishVariant =
       try values.decodeIfPresent(EnglishVariant.self, forKey: .englishVariant) ?? .american
-    quoteLength = try values.decodeIfPresent(QuoteLength.self, forKey: .quoteLength) ?? .all
+    let legacyQuoteLength = try values.decodeIfPresent(QuoteLength.self, forKey: .quoteLength) ?? .all
+    quoteLengths = try values.decodeIfPresent(Set<QuoteLength>.self, forKey: .quoteLengths)
+      .map(QuoteLengthSelection.normalized)
+    quoteLength = quoteLengths.map(QuoteLengthSelection.legacyValue) ?? legacyQuoteLength
     customTextCompletion =
       try values.decodeIfPresent(CustomTextCompletion.self, forKey: .customTextCompletion)
       ?? .finish
