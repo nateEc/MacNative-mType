@@ -568,6 +568,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "danish-lille-skridt",
+      title: "Lille skridt",
+      text: "Et lille, roligt skridt gør den næste opgave lettere at se.",
+      language: .danish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "danish-aaben-notesbog",
+      title: "Åben notesbog",
+      text: "En åben notesbog løser ikke vanskelige spørgsmål af sig selv, men hjælper med at dele dem i klare dele og vende tilbage med opmærksomhed.",
+      language: .danish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "danish-roligt-arbejde",
+      title: "Roligt arbejde",
+      text: "Fremskridt kommer ikke altid som et tydeligt øjeblik. Det vokser i gentagne handlinger: at åbne den samme side, gøre én sætning klarere, rette en fejl og efterlade en brugbar note til næste forsøg. Med tiden gør den rolige opmærksomhed svære steder mere velkendte.",
+      language: .danish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "danish-langt-bord",
+      title: "Langt bord",
+      text: "Et langt bord er nyttigt, fordi der bliver plads til forskellige slags arbejde. I den ene ende kan en første skitse ligge, i den anden en sætning der stadig kræver opmærksomhed, og i midten er der plads til den næste lille beslutning. Øvelse virker på samme måde: den beder ikke om at løse enhver vanskelighed på én gang, men om et sted at vende tilbage til, et synligt næste skridt og tålmodighed nok til at opdage, hvad der bliver lettere efter nogle forsøg.",
+      language: .danish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",

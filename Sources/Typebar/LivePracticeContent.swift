@@ -153,6 +153,7 @@ enum LivePracticeContentService {
     case .spanish: return "es"
     case .german: return "de"
     case .dutch: return "nl"
+    case .danish: return "da"
     case .french: return "fr"
     case .italian: return "it"
     case .portuguese: return "pt"

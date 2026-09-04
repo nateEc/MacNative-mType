@@ -200,6 +200,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case spanish
   case german
   case dutch
+  case danish
   case french
   case italian
   case portuguese
@@ -3107,6 +3108,15 @@ enum StarterLexicon {
     "klein", "tijd", "één",
   ]
 
+  // Typebar-authored Danish starter words. The corpus deliberately includes
+  // æ, ø and å for normal macOS composed-text input practice.
+  static let danishWords = [
+    "morgen", "vindue", "papir", "kyst", "vind", "øvelse", "opmærksomhed", "rolig",
+    "klar", "sø", "gade", "bord", "lys", "rejse", "tålmodighed", "øjeblik",
+    "by", "regn", "stilhed", "retning", "stjerne", "note", "have", "åndedræt",
+    "lille", "tid", "én",
+  ]
+
   // Typebar-authored French and Italian starter words. These compact lists
   // deliberately include common accented characters for native text input.
   static let frenchWords = [
@@ -3164,6 +3174,10 @@ enum StarterLexicon {
     case .dutch:
       return prompt(
         tokens: count, lexicon: dutchWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .danish:
+      return prompt(
+        tokens: count, lexicon: danishWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .french:
       return prompt(
@@ -3262,6 +3276,7 @@ enum StarterLexicon {
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
+    case .danish: (danishWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
@@ -3326,7 +3341,8 @@ extension TestMode {
 
 extension TypingLanguage {
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .dutch, .french, .italian, .portuguese, .simplifiedChinese,
+    .english, .spanish, .german, .dutch, .danish, .french, .italian, .portuguese,
+    .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
     .korean, .turkish, .polish,
   ]
@@ -3375,6 +3391,7 @@ extension TypingLanguage {
     case .spanish: "Español"
     case .german: "Deutsch"
     case .dutch: "Nederlands"
+    case .danish: "Dansk"
     case .french: "Français"
     case .italian: "Italiano"
     case .portuguese: "Português"

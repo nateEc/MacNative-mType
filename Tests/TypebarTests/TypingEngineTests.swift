@@ -3060,7 +3060,8 @@ final class TypingEngineTests: XCTestCase {
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
-      StarterLexicon.dutchWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
+      StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.frenchWords,
+      StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
@@ -3199,6 +3200,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: ukrainianConfiguration), .encyclopedia)
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .dutch).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .danish).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .ukrainianLatin).with(modifiers: [.referenceStream])))
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
@@ -3829,6 +3832,7 @@ final class TypingEngineTests: XCTestCase {
   func testAdditionalSpaceDelimitedLanguagesUseOnlyTypebarOwnedCorporaAndQuotes() {
     for (language, lexicon) in [
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
+      (.danish, StarterLexicon.danishWords),
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
       (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
       (.ukrainian, StarterLexicon.ukrainianWords),
@@ -3862,6 +3866,8 @@ final class TypingEngineTests: XCTestCase {
     })
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.dutch))
     XCTAssertTrue(StarterLexicon.dutchWords.contains("één"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.danish))
+    XCTAssertTrue(StarterLexicon.danishWords.contains("åndedræt"))
   }
 
   func testLazyLatinModifierNormalizesAccentsLigaturesAndGeneratedPrompts() {
@@ -3878,6 +3884,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.spanish.speechLocaleIdentifier, "es-ES")
     XCTAssertEqual(TypingLanguage.german.speechLocaleIdentifier, "de-DE")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
+    XCTAssertEqual(TypingLanguage.danish.speechLocaleIdentifier, "da-DK")
     XCTAssertEqual(TypingLanguage.french.speechLocaleIdentifier, "fr-FR")
     XCTAssertEqual(TypingLanguage.italian.speechLocaleIdentifier, "it-IT")
     XCTAssertEqual(TypingLanguage.portuguese.speechLocaleIdentifier, "pt-PT")
@@ -3940,6 +3947,15 @@ final class TypingEngineTests: XCTestCase {
       WeakSpotPractice.prompt(
         results: [dutchResult], language: .dutch, englishVariant: .american, wordCount: 1),
       "één")
+    let danishResult = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .danish), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 2,
+      correctCharacterCount: 1, errorCount: 1, wpm: 12, rawWpm: 12, accuracy: 50,
+      prompt: "én", replayEvents: [.init(offset: 1, kind: .insert, text: "en")])
+    XCTAssertEqual(
+      WeakSpotPractice.prompt(
+        results: [danishResult], language: .danish, englishVariant: .american, wordCount: 1),
+      "én")
     XCTAssertNil(
       WeakSpotPractice.prompt(results: [], language: .english, englishVariant: .american))
     XCTAssertNil(
@@ -4119,7 +4135,8 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .dutch, .french, .italian, .portuguese, .simplifiedChinese,
+      .english, .spanish, .german, .dutch, .danish, .french, .italian, .portuguese,
+      .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
       .korean, .turkish, .polish,
     ]

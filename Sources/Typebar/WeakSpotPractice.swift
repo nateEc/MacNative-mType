@@ -61,6 +61,7 @@ enum WeakSpotPractice {
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
     case .dutch: StarterLexicon.dutchWords
+    case .danish: StarterLexicon.danishWords
     case .french: StarterLexicon.frenchWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
