@@ -1905,16 +1905,32 @@ final class AppSettings {
     randomThemeTarget = randomThemeBag.removeFirst()
   }
 
+  @discardableResult
   func addCustomTheme(
     name: String, background: Color, panel: Color, accent: Color, prefersDark: Bool
-  ) {
+  ) -> CustomThemeDefinition? {
     let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmedName.isEmpty, trimmedName.count <= 40 else { return }
+    guard !trimmedName.isEmpty, trimmedName.count <= 40 else { return nil }
     let custom = CustomThemeDefinition(
       name: trimmedName, background: .init(color: background), panel: .init(color: panel),
       accent: .init(color: accent), prefersDark: prefersDark)
     customThemes.append(custom)
     activeCustomThemeID = custom.id
+    return custom
+  }
+
+  @discardableResult
+  func updateCustomTheme(
+    id: UUID, name: String, background: Color, panel: Color, accent: Color, prefersDark: Bool
+  ) -> Bool {
+    let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedName.isEmpty, trimmedName.count <= 40,
+      let index = customThemes.firstIndex(where: { $0.id == id })
+    else { return false }
+    customThemes[index] = .init(
+      id: id, name: trimmedName, background: .init(color: background), panel: .init(color: panel),
+      accent: .init(color: accent), prefersDark: prefersDark)
+    return true
   }
 
   func selectCustomTheme(_ id: UUID) {

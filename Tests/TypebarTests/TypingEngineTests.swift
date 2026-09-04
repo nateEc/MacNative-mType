@@ -5273,6 +5273,36 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testCustomThemeEditingPreservesIdentityFavoritesAndArchiveReferences() throws {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    let theme = try XCTUnwrap(settings.addCustomTheme(
+      name: "Dawn", background: .white, panel: .gray, accent: .orange, prefersDark: false))
+    settings.toggleFavoriteCustomTheme(theme.id)
+    XCTAssertTrue(settings.updateCustomTheme(
+      id: theme.id, name: "Dusk", background: .black, panel: .blue, accent: .purple,
+      prefersDark: true))
+    XCTAssertEqual(settings.activeCustomThemeID, theme.id)
+    XCTAssertTrue(settings.isFavoriteCustomTheme(theme.id))
+    XCTAssertEqual(settings.customThemes.first?.id, theme.id)
+    XCTAssertEqual(settings.customThemes.first?.name, "Dusk")
+    XCTAssertTrue(settings.customThemes.first?.prefersDark == true)
+    XCTAssertFalse(settings.updateCustomTheme(
+      id: theme.id, name: " ", background: .white, panel: .white, accent: .white,
+      prefersDark: false))
+    XCTAssertEqual(settings.customThemes.first?.name, "Dusk")
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.customThemes.first?.id, theme.id)
+    XCTAssertEqual(restored.customThemes.first?.name, "Dusk")
+    XCTAssertTrue(restored.customThemes.first?.prefersDark == true)
+    XCTAssertTrue(restored.isFavoriteCustomTheme(theme.id))
+  }
+
+  @MainActor
   func testResultRecordRoundTripsThroughSwiftData() throws {
     let container = try ModelContainer(
       for: TestResultRecord.self,

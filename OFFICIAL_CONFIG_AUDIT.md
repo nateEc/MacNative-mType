@@ -17,7 +17,7 @@
 | `numbers` | `ContentOptions.includeNumbers` | 已映射；进入 `TestConfiguration` 与历史筛选。 |
 | `words` | `TestConfiguration.wordLimit` | 已映射；字数模式和自定义循环字数共用限制。 |
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
-| `mode` | `TestMode` | 部分；覆盖 time/words/quote/zen/custom 与原生代码练习，网页特有模式继续按矩阵盘点。 |
+| `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
 | `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；七种原创单语、中英混合和自选多语组合，不复制官方语言目录。 |
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
@@ -97,7 +97,7 @@
 | `favThemes` | `favoriteThemeIDs` | 已映射。 |
 | `theme` | `theme`、`activeCustomThemeID` | 已映射。 |
 | `customTheme` | `customThemes` | 已映射。 |
-| `customThemeColors` | `CustomThemeDefinition` | 部分；目前保存原创背景、面板、强调色和明暗偏好，不暴露官方十颜色模型。 |
+| `customThemeColors` | `CustomThemeDefinition` | 部分；可创建、编辑、应用和归档原创背景、面板、强调色和明暗偏好；不暴露官方十颜色模型。 |
 | `showKeyTips` | `showKeyTips` | 已映射。 |
 | `showOutOfFocusWarning` | `showFocusWarning` | 已映射。 |
 | `capsLockWarning` | `showCapsLockWarning` | 已映射。 |
@@ -118,4 +118,4 @@
 
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
-- 完整 `swift test` 已通过 238 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
+- 完整 `swift test` 已通过 239 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。

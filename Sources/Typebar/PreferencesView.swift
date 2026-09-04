@@ -55,6 +55,8 @@ struct PreferencesView: View {
   @State private var customThemePanel = Color(red: 0.19, green: 0.22, blue: 0.30)
   @State private var customThemeAccent = Color(red: 0.95, green: 0.57, blue: 0.20)
   @State private var customThemePrefersDark = true
+  @State private var editingCustomThemeID: UUID?
+  @State private var customThemeMessage: String?
   @State private var customKeyboardLayoutName = ""
   @State private var customKeyboardNumberRow = "1234567890-="
   @State private var customKeyboardTopRow = "QWERTYUIOP[]"
@@ -816,17 +818,18 @@ struct PreferencesView: View {
           ColorPicker("面板", selection: $customThemePanel)
           ColorPicker("强调色", selection: $customThemeAccent)
           Toggle("使用深色界面", isOn: $customThemePrefersDark)
-          Button("保存并应用自定义主题") {
-            settings.addCustomTheme(
-              name: customThemeName,
-              background: customThemeBackground,
-              panel: customThemePanel,
-              accent: customThemeAccent,
-              prefersDark: customThemePrefersDark
-            )
-            customThemeName = ""
+          Button(editingCustomThemeID == nil ? "保存并应用自定义主题" : "更新并应用自定义主题") {
+            saveCustomTheme()
           }
           .disabled(customThemeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          if editingCustomThemeID != nil {
+            Button("取消编辑") { resetCustomThemeEditor() }
+          }
+          if let customThemeMessage {
+            Text(customThemeMessage)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
 
           ForEach(settings.customThemes) { theme in
             HStack {
@@ -835,6 +838,7 @@ struct PreferencesView: View {
               Spacer()
               if settings.activeCustomThemeID == theme.id { Text("当前").foregroundStyle(.secondary) }
               Button("应用") { settings.selectCustomTheme(theme.id) }
+              Button("编辑") { beginEditingCustomTheme(theme) }
               Button {
                 settings.toggleFavoriteCustomTheme(theme.id)
               } label: {
@@ -847,10 +851,13 @@ struct PreferencesView: View {
               .accessibilityLabel(
                 settings.isFavoriteCustomTheme(theme.id) ? "取消收藏 \(theme.name)" : "收藏 \(theme.name)"
               )
-              Button("删除", role: .destructive) { settings.deleteCustomTheme(theme.id) }
+              Button("删除", role: .destructive) {
+                settings.deleteCustomTheme(theme.id)
+                if editingCustomThemeID == theme.id { resetCustomThemeEditor() }
+              }
             }
           }
-          Text("自定义主题只保存于这台 Mac，并会随 Typebar 归档迁移。选择内置主题会恢复使用内置配色。")
+          Text("可编辑背景、面板和强调色；编辑会保留主题的收藏、当前选择和归档引用。自定义主题只保存于这台 Mac，并会随 Typebar 归档迁移。")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -1654,6 +1661,50 @@ struct PreferencesView: View {
     } catch {
       localPracticeFontMessage = error.localizedDescription
     }
+  }
+
+  private func beginEditingCustomTheme(_ theme: CustomThemeDefinition) {
+    editingCustomThemeID = theme.id
+    customThemeName = theme.name
+    customThemeBackground = theme.background.color
+    customThemePanel = theme.panel.color
+    customThemeAccent = theme.accent.color
+    customThemePrefersDark = theme.prefersDark
+    customThemeMessage = nil
+  }
+
+  private func saveCustomTheme() {
+    if let id = editingCustomThemeID {
+      guard settings.updateCustomTheme(
+        id: id, name: customThemeName, background: customThemeBackground,
+        panel: customThemePanel, accent: customThemeAccent, prefersDark: customThemePrefersDark)
+      else {
+        customThemeMessage = "主题名称需为 1–40 个字符。"
+        return
+      }
+      settings.selectCustomTheme(id)
+      customThemeMessage = "已更新并应用自定义主题。"
+    } else {
+      guard settings.addCustomTheme(
+        name: customThemeName, background: customThemeBackground,
+        panel: customThemePanel, accent: customThemeAccent, prefersDark: customThemePrefersDark)
+      != nil else {
+        customThemeMessage = "主题名称需为 1–40 个字符。"
+        return
+      }
+      customThemeMessage = "已保存并应用自定义主题。"
+    }
+    resetCustomThemeEditor(keepingMessage: true)
+  }
+
+  private func resetCustomThemeEditor(keepingMessage: Bool = false) {
+    editingCustomThemeID = nil
+    customThemeName = ""
+    customThemeBackground = Color(red: 0.12, green: 0.14, blue: 0.20)
+    customThemePanel = Color(red: 0.19, green: 0.22, blue: 0.30)
+    customThemeAccent = Color(red: 0.95, green: 0.57, blue: 0.20)
+    customThemePrefersDark = true
+    if !keepingMessage { customThemeMessage = nil }
   }
 
   private var testSectionVisible: Bool {
