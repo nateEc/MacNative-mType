@@ -764,6 +764,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "slovenian-mirni-korak",
+      title: "Mirni korak",
+      text: "Mirni korak naredi naslednjo nalogo jasnejšo.",
+      language: .slovenian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "slovenian-odprt-zvezek",
+      title: "Odprt zvezek",
+      text: "Odprt zvezek ne reši težkega vprašanja sam, vendar pomaga mislim najti red in smer.",
+      language: .slovenian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "slovenian-tiho-delo",
+      title: "Tiho delo",
+      text: "Napredek redko nastane v enem glasnem trenutku. Raste, ko odpremo isto stran, popravimo napako, preberemo zapisek in izberemo naslednjo majhno nalogo. Ponavljanje naredi težke dele bolj znane in pusti več prostora za pozornost.",
+      language: .slovenian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "slovenian-dolga-miza",
+      title: "Dolga miza",
+      text: "Dolga miza je uporabna, ker ponuja prostor za različne vrste dela. Na enem koncu je lahko prvi osnutek, na drugem stavek, ki še potrebuje pozornost, na sredini pa ostane prostor za naslednjo majhno odločitev. Vaja deluje podobno. Ni ji treba rešiti vsega naenkrat, ampak nam lahko ponudi kraj, kamor se vrnemo, opazimo naslednji korak in najdemo dovolj potrpežljivosti, da vidimo, kaj po nekaj poskusih postane lažje.",
+      language: .slovenian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "bulgarian-malka-krachka",
       title: "Малка крачка",
       text: "Една спокойна крачка прави следващата задача по-ясна.",
