@@ -960,6 +960,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "telugu-calm-step",
+      title: "నిశ్శబ్ద అడుగు",
+      text: "నిశ్శబ్ద అడుగు తదుపరి పనిని స్పష్టంగా చేస్తుంది.",
+      language: .telugu,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "telugu-open-notebook",
+      title: "తెరిచిన నోటుపుస్తకం",
+      text: "తెరిచిన నోటుపుస్తకం ప్రతి కఠినమైన ప్రశ్నకు జవాబు ఇవ్వదు, కానీ ప్రశ్నను చిన్న భాగాలుగా చూడడానికి చోటు ఇస్తుంది.",
+      language: .telugu,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "telugu-small-work",
+      title: "చిన్న పని",
+      text: "పురోగతి ఎప్పుడూ పెద్ద క్షణంలో కనిపించదు. అదే పేజీని మళ్లీ తెరవడం, ఒక వాక్యాన్ని సులభంగా మార్చడం, చిన్న తప్పును సరిచేయడం, తరువాతి ప్రయత్నం కోసం ఉపయోగకరమైన గమనిక రాయడం నెమ్మదిగా నమ్మకాన్ని పెంచుతుంది.",
+      language: .telugu,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "telugu-long-table",
+      title: "పొడవైన బల్ల",
+      text: "పొడవైన బల్లపై పూర్తికాని ఆలోచనలకూ చోటు ఉంటుంది. ఒక వైపున మొదటి ముసాయిదా ఉండవచ్చు, మరొక వైపున మరింత శ్రద్ధ కావాల్సిన వాక్యం ఉండవచ్చు, మధ్యలో చిన్న నిర్ణయం ఎదురుచూస్తూ ఉండవచ్చు. అభ్యాసం కూడా ఇలానే ముందుకు సాగుతుంది: ప్రతి కఠిన భాగాన్ని ఒకే ప్రయత్నంలో సరిచేయాల్సిన అవసరం లేదు. తిరిగి వచ్చే చోటు, తరువాతి స్పష్టమైన అడుగు, కొన్ని ప్రయత్నాల తరువాత ఏది సులభమైందో చూడగల సహనం ఉంటే వేగం తనంతట తానే పెరుగుతుంది.",
+      language: .telugu,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

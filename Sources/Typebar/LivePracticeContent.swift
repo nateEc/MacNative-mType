@@ -164,6 +164,7 @@ enum LivePracticeContentService {
     case .thai: return "th"
     case .nepali: return "ne"
     case .kannada: return "kn"
+    case .telugu: return "te"
     case .greek, .greeklish: return "el"
     case .dutch: return "nl"
     case .filipino: return "tl"
