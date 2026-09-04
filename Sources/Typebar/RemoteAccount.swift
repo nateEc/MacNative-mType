@@ -110,6 +110,7 @@ private struct RemoteLoginRequest: Codable, Sendable {
 private enum RemoteOAuthPurpose: String, Codable, Sendable {
     case signIn
     case link
+    case reauthenticate
 }
 
 private struct RemoteOAuthStartRequest: Codable, Sendable {
@@ -126,6 +127,7 @@ private enum RemoteOAuthCompletionStatus: String, Codable, Sendable {
     case registrationRequired
     case signedIn
     case linked
+    case reauthenticated
     case failed
 }
 
@@ -135,6 +137,7 @@ private struct RemoteOAuthCompletionResponse: Codable, Sendable {
     let suggestedDisplayName: String?
     let session: RemoteAuthSession?
     let user: RemoteAccountUser?
+    let reauthenticationToken: String?
     let message: String?
 }
 
@@ -179,10 +182,12 @@ private struct RemoteChangeEmailRequest: Codable, Sendable {
     let newEmail: String
 }
 
-private struct RemoteDeleteAccountRequest: Codable, Sendable { let currentPassword: String }
+private struct RemoteDeleteAccountRequest: Codable, Sendable { let currentPassword: String? }
 private struct RemoteAccountDeletionResponse: Codable, Sendable { let deleted: Bool }
-private struct RemoteRevokeSessionsRequest: Codable, Sendable { let currentPassword: String }
+private struct RemoteRevokeSessionsRequest: Codable, Sendable { let currentPassword: String? }
 private struct RemoteSessionsRevocationResponse: Codable, Sendable { let revoked: Bool }
+private struct RemotePasswordReauthenticationRequest: Codable, Sendable { let currentPassword: String }
+private struct RemoteReauthenticationResponse: Codable, Sendable { let reauthenticationToken: String }
 
 private struct RemoteUpdateProfileRequest: Codable, Sendable {
     let displayName: String
@@ -740,19 +745,26 @@ final class AccountSession {
         pendingOAuthRegistration = nil
     }
 
-    func unlinkOAuth(_ provider: RemoteOAuthProvider) async {
-        guard let token = tokenStore.load(), currentUser != nil else {
+    func unlinkOAuth(_ provider: RemoteOAuthProvider, currentPassword: String?) async {
+        guard let token = tokenStore.load(), let user = currentUser else {
             statusMessage = "请先登录自建 Typebar 服务。"
             return
         }
         isWorking = true
         defer { isWorking = false }
         do {
+            let freshReauthenticationToken = try await reauthenticationToken(
+                for: user,
+                accessToken: token,
+                excluding: provider.authenticationMethod,
+                currentPassword: currentPassword
+            )
             currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
                 path: "v1/auth/oauth/\(provider.rawValue)",
                 method: "DELETE",
                 token: token,
                 body: Optional<String>.none,
+                headers: ["X-Typebar-Reauthentication": freshReauthenticationToken],
                 response: RemoteAccountUser.self
             )
             statusMessage = "已移除 \(provider.displayName) 登录方式。"
@@ -878,7 +890,7 @@ final class AccountSession {
     }
 
     func addPasswordAuthentication(newPassword: String) async -> Bool {
-        guard let token = tokenStore.load(), currentUser != nil else {
+        guard let token = tokenStore.load(), let user = currentUser else {
             statusMessage = "请先登录自建 Typebar 服务。"
             return false
         }
@@ -889,11 +901,14 @@ final class AccountSession {
         isWorking = true
         defer { isWorking = false }
         do {
+            let freshReauthenticationToken = try await reauthenticationToken(
+                for: user, accessToken: token, excluding: nil, currentPassword: nil)
             currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
                 path: "v1/auth/password/add",
                 method: "POST",
                 token: token,
                 body: RemoteAddPasswordAuthenticationRequest(newPassword: newPassword),
+                headers: ["X-Typebar-Reauthentication": freshReauthenticationToken],
                 response: RemoteAccountUser.self
             )
             statusMessage = "密码登录方式已添加。"
@@ -948,19 +963,25 @@ final class AccountSession {
         }
     }
 
-    func deleteAccount(currentPassword: String) async {
-        guard let token = tokenStore.load(), currentUser != nil else {
+    func deleteAccount(currentPassword: String?) async {
+        guard let token = tokenStore.load(), let user = currentUser else {
             statusMessage = "请先登录自建 Typebar 服务。"
             return
         }
         isWorking = true
         defer { isWorking = false }
         do {
+            let usesPassword = user.authenticationMethods.contains(.password)
+            let freshReauthenticationToken = usesPassword
+                ? nil
+                : try await reauthenticationToken(
+                    for: user, accessToken: token, excluding: nil, currentPassword: nil)
             let response = try await RemoteAccountAPI(endpoint: endpoint).request(
                 path: "v1/auth/account",
                 method: "DELETE",
                 token: token,
                 body: RemoteDeleteAccountRequest(currentPassword: currentPassword),
+                headers: freshReauthenticationToken.map { ["X-Typebar-Reauthentication": $0] } ?? [:],
                 response: RemoteAccountDeletionResponse.self
             )
             guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
@@ -972,19 +993,25 @@ final class AccountSession {
         }
     }
 
-    func revokeAllSessions(currentPassword: String) async -> Bool {
-        guard let token = tokenStore.load(), currentUser != nil else {
+    func revokeAllSessions(currentPassword: String?) async -> Bool {
+        guard let token = tokenStore.load(), let user = currentUser else {
             statusMessage = "请先登录自建 Typebar 服务。"
             return false
         }
         isWorking = true
         defer { isWorking = false }
         do {
+            let usesPassword = user.authenticationMethods.contains(.password)
+            let freshReauthenticationToken = usesPassword
+                ? nil
+                : try await reauthenticationToken(
+                    for: user, accessToken: token, excluding: nil, currentPassword: nil)
             let response = try await RemoteAccountAPI(endpoint: endpoint).request(
                 path: "v1/auth/sessions/revoke",
                 method: "POST",
                 token: token,
                 body: RemoteRevokeSessionsRequest(currentPassword: currentPassword),
+                headers: freshReauthenticationToken.map { ["X-Typebar-Reauthentication": $0] } ?? [:],
                 response: RemoteSessionsRevocationResponse.self
             )
             guard response.revoked else { throw RemoteAccountError.unexpectedResponse }
@@ -1446,6 +1473,58 @@ final class AccountSession {
         }
     }
 
+    private func reauthenticationToken(
+        for user: RemoteAccountUser,
+        accessToken: String,
+        excluding method: RemoteAuthenticationMethod?,
+        currentPassword: String?
+    ) async throws -> String {
+        if user.authenticationMethods.contains(.password), method != .password {
+            guard let currentPassword, !currentPassword.isEmpty else {
+                throw RemoteAccountError.serverMessage("请输入当前密码以确认此项账户操作。")
+            }
+            return try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/reauthentication/password",
+                method: "POST",
+                token: accessToken,
+                body: RemotePasswordReauthenticationRequest(currentPassword: currentPassword),
+                response: RemoteReauthenticationResponse.self
+            ).reauthenticationToken
+        }
+
+        guard let provider = user.authenticationMethods
+            .compactMap(\.oauthProvider)
+            .first(where: { $0.authenticationMethod != method }) else {
+            throw RemoteAccountError.serverMessage("没有可用于确认此项账户操作的其他登录方式。")
+        }
+        let start = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/auth/oauth/\(provider.rawValue)/start",
+            method: "POST",
+            token: accessToken,
+            body: RemoteOAuthStartRequest(purpose: .reauthenticate),
+            response: RemoteOAuthStartResponse.self
+        )
+        guard let authorizationURL = URL(string: start.authorizationURL) else {
+            throw RemoteAccountError.unexpectedResponse
+        }
+        let callbackURL = try await oauthBrowser.authorize(url: authorizationURL)
+        let state = try oauthState(from: callbackURL)
+        let completion = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/auth/oauth/completion",
+            method: "GET",
+            token: nil,
+            body: Optional<String>.none,
+            queryItems: [URLQueryItem(name: "state", value: state)],
+            response: RemoteOAuthCompletionResponse.self
+        )
+        guard completion.status == .reauthenticated,
+              let token = completion.reauthenticationToken else {
+            throw RemoteAccountError.serverMessage(
+                completion.message ?? "第三方身份确认未能完成。")
+        }
+        return token
+    }
+
     private func applyOAuthCompletion(
         _ completion: RemoteOAuthCompletionResponse,
         provider: RemoteOAuthProvider,
@@ -1460,6 +1539,8 @@ final class AccountSession {
             guard let user = completion.user else { throw RemoteAccountError.unexpectedResponse }
             currentUser = user
             statusMessage = "已关联 \(provider.displayName) 登录方式。"
+        case .reauthenticated:
+            throw RemoteAccountError.unexpectedResponse
         case .registrationRequired:
             guard let email = completion.email else { throw RemoteAccountError.unexpectedResponse }
             pendingOAuthRegistration = .init(

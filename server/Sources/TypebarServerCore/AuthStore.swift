@@ -94,7 +94,7 @@ public struct ChangeEmailRequest: Content, Equatable {
 }
 
 public struct DeleteAccountRequest: Content, Equatable {
-  public let currentPassword: String
+  public let currentPassword: String?
 }
 
 public struct AccountDeletionResponse: Content, Equatable {
@@ -102,11 +102,19 @@ public struct AccountDeletionResponse: Content, Equatable {
 }
 
 public struct RevokeSessionsRequest: Content, Equatable {
-  public let currentPassword: String
+  public let currentPassword: String?
 }
 
 public struct SessionsRevocationResponse: Content, Equatable {
   public let revoked: Bool
+}
+
+public struct PasswordReauthenticationRequest: Content, Equatable {
+  public let currentPassword: String
+}
+
+public struct ReauthenticationResponse: Content, Equatable {
+  public let reauthenticationToken: String
 }
 
 public struct UpdateProfileRequest: Content, Equatable {
@@ -143,6 +151,7 @@ public enum AuthenticationMethod: String, Content, CaseIterable, Equatable, Send
 public enum OAuthAuthorizationPurpose: String, Content, Equatable, Sendable {
   case signIn
   case link
+  case reauthenticate
 }
 
 public struct OAuthAuthorizationRequest: Sendable, Equatable {
@@ -173,6 +182,7 @@ public enum OAuthCompletionStatus: String, Content, Equatable, Sendable {
   case registrationRequired
   case signedIn
   case linked
+  case reauthenticated
   case failed
 }
 
@@ -182,6 +192,7 @@ public struct OAuthCompletionResponse: Content, Equatable {
   public let suggestedDisplayName: String?
   public let session: AuthSessionResponse?
   public let user: AuthUserResponse?
+  public let reauthenticationToken: String?
   public let message: String?
 }
 
@@ -279,6 +290,7 @@ public enum AuthStoreError: Error, Equatable {
   case passwordAuthenticationAlreadyLinked
   case passwordAuthenticationNotLinked
   case cannotRemoveLastAuthentication
+  case invalidReauthenticationToken
   case invalidOAuthTransaction
   case oauthRegistrationNotRequired
   case profileNotFound
@@ -304,6 +316,7 @@ public actor AuthStore {
     var emailVerificationTokens: [StoredEmailVerificationToken] = []
     var oauthIdentities: [StoredOAuthIdentity] = []
     var oauthTransactions: [StoredOAuthTransaction] = []
+    var reauthenticationTokens: [StoredReauthenticationToken] = []
     var syncRecords: [StoredSyncRecord] = []
     var results: [StoredResult] = []
     var connections: [StoredConnection] = []
@@ -317,7 +330,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
+      case users, sessions, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, nextSyncCursor
     }
 
@@ -335,6 +348,8 @@ public actor AuthStore {
         try values.decodeIfPresent([StoredOAuthIdentity].self, forKey: .oauthIdentities) ?? []
       oauthTransactions =
         try values.decodeIfPresent([StoredOAuthTransaction].self, forKey: .oauthTransactions) ?? []
+      reauthenticationTokens =
+        try values.decodeIfPresent([StoredReauthenticationToken].self, forKey: .reauthenticationTokens) ?? []
       syncRecords = try values.decodeIfPresent([StoredSyncRecord].self, forKey: .syncRecords) ?? []
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
@@ -396,6 +411,12 @@ public actor AuthStore {
   }
 
   private struct StoredSession: Codable {
+    let tokenHash: String
+    let userID: UUID
+    let expiresAt: Date
+  }
+
+  private struct StoredReauthenticationToken: Codable {
     let tokenHash: String
     let userID: UUID
     let expiresAt: Date
@@ -724,9 +745,10 @@ public actor AuthStore {
   /// Removes a linked provider only if a password or another provider remains.
   /// This prevents making the account permanently inaccessible.
   public func unlinkOAuth(
-    _ provider: OAuthProvider, accessToken: String, now: Date = .now
+    _ provider: OAuthProvider, accessToken: String, reauthenticationToken: String, now: Date = .now
   ) throws -> AuthUserResponse {
     let currentUser = try authenticatedUser(for: accessToken, now: now)
+    try consumeReauthenticationToken(reauthenticationToken, for: currentUser.id, now: now)
     guard state.oauthIdentities.contains(where: {
       $0.userID == currentUser.id && $0.provider == provider
     }) else { throw AuthStoreError.oauthIdentityNotLinked }
@@ -742,9 +764,11 @@ public actor AuthStore {
   /// A valid Typebar session is required; passwords never replace or expose a
   /// provider identity, and are stored only as bcrypt hashes.
   public func addPasswordAuthentication(
-    _ request: AddPasswordAuthenticationRequest, accessToken: String, now: Date = .now
+    _ request: AddPasswordAuthenticationRequest, accessToken: String, reauthenticationToken: String,
+    now: Date = .now
   ) throws -> AuthUserResponse {
     let currentUser = try authenticatedUser(for: accessToken, now: now)
+    try consumeReauthenticationToken(reauthenticationToken, for: currentUser.id, now: now)
     guard let index = state.users.firstIndex(where: { $0.id == currentUser.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
@@ -759,6 +783,19 @@ public actor AuthStore {
     state.users[index] = updatedUser
     try persist()
     return try userResponse(for: updatedUser.id)
+  }
+
+  /// Verifies a password and issues a one-time, five-minute credential for a
+  /// high-risk account operation. Only the credential hash reaches persisted state.
+  public func reauthenticateWithPassword(
+    _ request: PasswordReauthenticationRequest, accessToken: String, now: Date = .now
+  ) throws -> ReauthenticationResponse {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard let user = state.users.first(where: { $0.id == currentUser.id }),
+      let passwordHash = user.passwordHash,
+      try Bcrypt.verify(request.currentPassword, created: passwordHash)
+    else { throw AuthStoreError.invalidCredentials }
+    return try makeReauthenticationToken(for: user.id, now: now)
   }
 
   /// Removes password authentication only after verifying it and only when a
@@ -801,7 +838,7 @@ public actor AuthStore {
     switch purpose {
     case .signIn:
       userID = nil
-    case .link:
+    case .link, .reauthenticate:
       guard let accessToken else { throw AuthStoreError.invalidAccessToken }
       userID = try authenticatedUser(for: accessToken, now: now).id
     }
@@ -883,6 +920,21 @@ public actor AuthStore {
         }
         state.oauthTransactions[index].status = .linked
       }
+    case .reauthenticate:
+      guard let userID = state.oauthTransactions[index].userID,
+        state.users.contains(where: { $0.id == userID })
+      else { throw AuthStoreError.invalidOAuthTransaction }
+      guard state.oauthIdentities.contains(where: {
+        $0.provider == identity.provider && $0.subject == subject && $0.userID == userID
+      }) else {
+        state.oauthTransactions[index].status = .failed
+        state.oauthTransactions[index].failureMessage =
+          "This provider identity is not linked to the current Typebar account."
+        try persist()
+        return
+      }
+      state.oauthTransactions[index].status = .reauthenticated
+      state.oauthTransactions[index].authenticatedUserID = userID
     }
     try persist()
   }
@@ -912,11 +964,12 @@ public actor AuthStore {
     case .pending, .exchanging:
       return .init(
         status: .pending, email: nil, suggestedDisplayName: nil, session: nil, user: nil,
-        message: nil)
+        reauthenticationToken: nil, message: nil)
     case .registrationRequired:
       return .init(
         status: .registrationRequired, email: transaction.email,
-        suggestedDisplayName: transaction.suggestedDisplayName, session: nil, user: nil, message: nil)
+        suggestedDisplayName: transaction.suggestedDisplayName, session: nil, user: nil,
+        reauthenticationToken: nil, message: nil)
     case .signedIn:
       guard let userID = transaction.authenticatedUserID,
         let user = state.users.first(where: { $0.id == userID })
@@ -926,19 +979,30 @@ public actor AuthStore {
       try persist()
       return .init(
         status: .signedIn, email: nil, suggestedDisplayName: nil, session: session, user: nil,
-        message: nil)
+        reauthenticationToken: nil, message: nil)
     case .linked:
       guard let userID = transaction.userID else { throw AuthStoreError.invalidOAuthTransaction }
       let user = try userResponse(for: userID)
       state.oauthTransactions.remove(at: index)
       try persist()
       return .init(
-        status: .linked, email: nil, suggestedDisplayName: nil, session: nil, user: user, message: nil)
+        status: .linked, email: nil, suggestedDisplayName: nil, session: nil, user: user,
+        reauthenticationToken: nil, message: nil)
+    case .reauthenticated:
+      guard let userID = transaction.authenticatedUserID else {
+        throw AuthStoreError.invalidOAuthTransaction
+      }
+      state.oauthTransactions.remove(at: index)
+      let token = try makeReauthenticationToken(for: userID, now: now)
+      return .init(
+        status: .reauthenticated, email: nil, suggestedDisplayName: nil, session: nil, user: nil,
+        reauthenticationToken: token.reauthenticationToken, message: nil)
     case .failed:
       state.oauthTransactions.remove(at: index)
       try persist()
       return .init(
         status: .failed, email: nil, suggestedDisplayName: nil, session: nil, user: nil,
+        reauthenticationToken: nil,
         message: transaction.failureMessage ?? "The provider authentication was not completed.")
     }
   }
@@ -1170,32 +1234,50 @@ public actor AuthStore {
   }
 
   /// Revokes every session for the authenticated account after confirming the
-  /// current password. The caller's session is intentionally included, so the
-  /// device that requested this action must sign in again.
+  /// current password or a one-time reauthentication. The caller's session is
+  /// intentionally included, so the device must sign in again.
   public func revokeAllSessions(
-    _ request: RevokeSessionsRequest, accessToken: String, now: Date = .now
+    _ request: RevokeSessionsRequest, accessToken: String, reauthenticationToken: String? = nil,
+    now: Date = .now
   ) throws {
     let currentUser = try authenticatedUser(for: accessToken, now: now)
-    guard let user = state.users.first(where: { $0.id == currentUser.id }),
-      let passwordHash = user.passwordHash,
-      try Bcrypt.verify(request.currentPassword, created: passwordHash)
-    else { throw AuthStoreError.invalidCredentials }
+    guard let user = state.users.first(where: { $0.id == currentUser.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    if let currentPassword = request.currentPassword {
+      guard let passwordHash = user.passwordHash,
+        try Bcrypt.verify(currentPassword, created: passwordHash)
+      else { throw AuthStoreError.invalidCredentials }
+    } else {
+      guard let reauthenticationToken else { throw AuthStoreError.invalidReauthenticationToken }
+      try consumeReauthenticationToken(reauthenticationToken, for: user.id, now: now)
+    }
     state.sessions.removeAll { $0.userID == user.id }
     try persist()
   }
 
   /// Deletes the authenticated account and every record owned by it. A current
-  /// password is required so a leaked, still-valid access token cannot erase it.
-  public func deleteAccount(_ request: DeleteAccountRequest, accessToken: String, now: Date = .now)
+  /// password or one-time reauthentication is required so a leaked access token
+  /// cannot erase it.
+  public func deleteAccount(
+    _ request: DeleteAccountRequest, accessToken: String, reauthenticationToken: String? = nil,
+    now: Date = .now
+  )
     throws
   {
     let currentUser = try authenticatedUser(for: accessToken, now: now)
     guard let index = state.users.firstIndex(where: { $0.id == currentUser.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
-    guard let passwordHash = state.users[index].passwordHash,
-      try Bcrypt.verify(request.currentPassword, created: passwordHash)
-    else { throw AuthStoreError.invalidCredentials }
+    let user = state.users[index]
+    if let currentPassword = request.currentPassword {
+      guard let passwordHash = user.passwordHash,
+        try Bcrypt.verify(currentPassword, created: passwordHash)
+      else { throw AuthStoreError.invalidCredentials }
+    } else {
+      guard let reauthenticationToken else { throw AuthStoreError.invalidReauthenticationToken }
+      try consumeReauthenticationToken(reauthenticationToken, for: user.id, now: now)
+    }
     let userID = currentUser.id
     let removedQuoteIDs = Set(state.quoteSubmissions.filter { $0.userID == userID }.map(\.id))
 
@@ -1205,6 +1287,7 @@ public actor AuthStore {
     state.emailVerificationTokens.removeAll { $0.userID == userID }
     state.oauthIdentities.removeAll { $0.userID == userID }
     state.oauthTransactions.removeAll { $0.userID == userID }
+    state.reauthenticationTokens.removeAll { $0.userID == userID }
     state.syncRecords.removeAll { $0.userID == userID }
     state.results.removeAll { $0.userID == userID }
     state.connections.removeAll { $0.requesterID == userID || $0.recipientID == userID }
@@ -2055,6 +2138,33 @@ public actor AuthStore {
       accessToken: token,
       expiresAt: expiry
     )
+  }
+
+  private func makeReauthenticationToken(
+    for userID: UUID, now: Date
+  ) throws -> ReauthenticationResponse {
+    state.reauthenticationTokens.removeAll { $0.expiresAt <= now }
+    let token = Self.makeAccessToken()
+    state.reauthenticationTokens.append(
+      .init(
+        tokenHash: Self.tokenHash(token), userID: userID,
+        expiresAt: now.addingTimeInterval(5 * 60)))
+    try persist()
+    return .init(reauthenticationToken: token)
+  }
+
+  private func consumeReauthenticationToken(
+    _ token: String, for userID: UUID, now: Date
+  ) throws {
+    let originalCount = state.reauthenticationTokens.count
+    state.reauthenticationTokens.removeAll { $0.expiresAt <= now }
+    if state.reauthenticationTokens.count != originalCount { try persist() }
+    let tokenHash = Self.tokenHash(token)
+    guard let index = state.reauthenticationTokens.firstIndex(where: {
+      $0.userID == userID && $0.tokenHash == tokenHash
+    }) else { throw AuthStoreError.invalidReauthenticationToken }
+    state.reauthenticationTokens.remove(at: index)
+    try persist()
   }
 
   private func userResponse(for userID: UUID) throws -> AuthUserResponse {

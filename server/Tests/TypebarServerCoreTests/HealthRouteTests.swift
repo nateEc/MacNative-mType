@@ -641,6 +641,14 @@ final class HealthRouteTests: XCTestCase {
     let oauthSession = try await store.registerWithOAuth(
       .init(provider: .github, subject: "password-route-github", email: "provider@example.com"),
       displayName: "Provider User")
+    let oauthReauthentication = try await store.beginOAuth(
+      provider: .github, purpose: .reauthenticate, accessToken: oauthSession.accessToken)
+    _ = try await store.beginOAuthCallback(provider: .github, stateToken: oauthReauthentication.state)
+    try await store.completeOAuthCallback(
+      stateToken: oauthReauthentication.state,
+      identity: .init(provider: .github, subject: "password-route-github", email: "provider@example.com"))
+    let oauthCompletion = try await store.oauthCompletion(stateToken: oauthReauthentication.state)
+    let oauthReauthenticationToken = try XCTUnwrap(oauthCompletion.reauthenticationToken)
 
     do {
       try configure(app, authStore: store)
@@ -649,6 +657,8 @@ final class HealthRouteTests: XCTestCase {
         "v1/auth/password/add",
         beforeRequest: { request async throws in
           request.headers.add(name: "Authorization", value: "Bearer \(oauthSession.accessToken)")
+          request.headers.add(
+            name: "X-Typebar-Reauthentication", value: oauthReauthenticationToken)
           try request.content.encode(
             AddPasswordAuthenticationRequest(newPassword: "a secure password"))
         },
@@ -658,11 +668,15 @@ final class HealthRouteTests: XCTestCase {
           XCTAssertEqual(user?.authenticationMethods, [.password, .github])
         }
       )
+      let passwordReauthentication = try await store.reauthenticateWithPassword(
+        .init(currentPassword: "a secure password"), accessToken: oauthSession.accessToken)
       try await app.test(
         .DELETE,
         "v1/auth/password",
         beforeRequest: { request async throws in
           request.headers.add(name: "Authorization", value: "Bearer \(oauthSession.accessToken)")
+          request.headers.add(
+            name: "X-Typebar-Reauthentication", value: passwordReauthentication.reauthenticationToken)
           try request.content.encode(
             RemovePasswordAuthenticationRequest(currentPassword: "a secure password"))
         },
@@ -1675,8 +1689,16 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(secondOAuthSession.user.id, oauthSession.user.id)
     XCTAssertNotEqual(secondOAuthSession.accessToken, oauthSession.accessToken)
 
+    let githubReauthentication = try await store.beginOAuth(
+      provider: .github, purpose: .reauthenticate, accessToken: oauthSession.accessToken)
+    _ = try await store.beginOAuthCallback(provider: .github, stateToken: githubReauthentication.state)
+    try await store.completeOAuthCallback(stateToken: githubReauthentication.state, identity: github)
+    let githubCompletion = try await store.oauthCompletion(stateToken: githubReauthentication.state)
+    let githubReauthenticationToken = try XCTUnwrap(githubCompletion.reauthenticationToken)
     do {
-      _ = try await store.unlinkOAuth(.github, accessToken: oauthSession.accessToken)
+      _ = try await store.unlinkOAuth(
+        .github, accessToken: oauthSession.accessToken,
+        reauthenticationToken: githubReauthenticationToken)
       XCTFail("The final authentication method must remain linked")
     } catch let error as AuthStoreError {
       XCTAssertEqual(error, .cannotRemoveLastAuthentication)
@@ -1687,7 +1709,14 @@ final class HealthRouteTests: XCTestCase {
     let linkedUser = try await store.linkOAuth(google, accessToken: oauthSession.accessToken)
     XCTAssertEqual(linkedUser.authenticationMethods, [.github, .google])
 
-    let remainingGoogleUser = try await store.unlinkOAuth(.github, accessToken: oauthSession.accessToken)
+    let googleReauthentication = try await store.beginOAuth(
+      provider: .google, purpose: .reauthenticate, accessToken: oauthSession.accessToken)
+    _ = try await store.beginOAuthCallback(provider: .google, stateToken: googleReauthentication.state)
+    try await store.completeOAuthCallback(stateToken: googleReauthentication.state, identity: google)
+    let googleCompletion = try await store.oauthCompletion(stateToken: googleReauthentication.state)
+    let googleReauthenticationToken = try XCTUnwrap(googleCompletion.reauthenticationToken)
+    let remainingGoogleUser = try await store.unlinkOAuth(
+      .github, accessToken: oauthSession.accessToken, reauthenticationToken: googleReauthenticationToken)
     XCTAssertEqual(remainingGoogleUser.authenticationMethods, [.google])
     let googleLogin = try await store.loginWithOAuth(google)
     XCTAssertEqual(googleLogin.user.id, oauthSession.user.id)
@@ -1706,8 +1735,54 @@ final class HealthRouteTests: XCTestCase {
     let linkedPasswordUser = try await store.linkOAuth(
       passwordGitHub, accessToken: passwordSession.accessToken)
     XCTAssertEqual(linkedPasswordUser.authenticationMethods, [.password, .github])
-    let passwordOnlyUser = try await store.unlinkOAuth(.github, accessToken: passwordSession.accessToken)
+    let passwordReauthentication = try await store.reauthenticateWithPassword(
+      .init(currentPassword: "a secure password"), accessToken: passwordSession.accessToken)
+    let passwordOnlyUser = try await store.unlinkOAuth(
+      .github, accessToken: passwordSession.accessToken,
+      reauthenticationToken: passwordReauthentication.reauthenticationToken)
     XCTAssertEqual(passwordOnlyUser.authenticationMethods, [.password])
+  }
+
+  func testReauthenticationCredentialsExpireAndCannotBeReplayed() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 24_000)
+    let github = OAuthProviderIdentity(
+      provider: .github, subject: "reauthentication-user", email: "reauthentication@example.com")
+    let session = try await store.registerWithOAuth(github, displayName: "Reauthentication User", now: now)
+
+    let authorization = try await store.beginOAuth(
+      provider: .github, purpose: .reauthenticate, accessToken: session.accessToken, now: now)
+    _ = try await store.beginOAuthCallback(
+      provider: .github, stateToken: authorization.state, now: now)
+    try await store.completeOAuthCallback(
+      stateToken: authorization.state, identity: github, now: now)
+    let completion = try await store.oauthCompletion(stateToken: authorization.state, now: now)
+    let oauthToken = try XCTUnwrap(completion.reauthenticationToken)
+
+    let user = try await store.addPasswordAuthentication(
+      .init(newPassword: "a secure password"), accessToken: session.accessToken,
+      reauthenticationToken: oauthToken, now: now)
+    XCTAssertEqual(user.authenticationMethods, [.password, .github])
+    do {
+      _ = try await store.addPasswordAuthentication(
+        .init(newPassword: "another secure password"), accessToken: session.accessToken,
+        reauthenticationToken: oauthToken, now: now)
+      XCTFail("A reauthentication credential must be one-time")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidReauthenticationToken)
+    }
+
+    let passwordReauthentication = try await store.reauthenticateWithPassword(
+      .init(currentPassword: "a secure password"), accessToken: session.accessToken, now: now)
+    do {
+      try await store.revokeAllSessions(
+        .init(currentPassword: nil), accessToken: session.accessToken,
+        reauthenticationToken: passwordReauthentication.reauthenticationToken,
+        now: now.addingTimeInterval(5 * 60 + 1))
+      XCTFail("A reauthentication credential must expire after five minutes")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidReauthenticationToken)
+    }
   }
 
   func testOAuthTransactionsAreOneTimeAndCompleteRegistrationOrLinking() async throws {

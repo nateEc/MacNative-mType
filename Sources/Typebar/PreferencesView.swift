@@ -23,6 +23,7 @@ struct PreferencesView: View {
   @State private var passwordAuthenticationPassword = ""
   @State private var confirmedPasswordAuthenticationPassword = ""
   @State private var passwordAuthenticationRemovalPassword = ""
+  @State private var authenticationChangePassword = ""
   @State private var sessionRevocationPassword = ""
   @State private var accountDeletionPassword = ""
   @State private var showingAccountDeletionConfirmation = false
@@ -815,15 +816,32 @@ struct PreferencesView: View {
               .foregroundStyle(.secondary)
             Divider()
             Text("登录方式").font(.headline)
+            if user.authenticationMethods.contains(.password),
+              user.authenticationMethods.contains(where: { $0.oauthProvider != nil })
+            {
+              SecureField("输入当前密码以移除第三方登录", text: $authenticationChangePassword)
+                .textContentType(.password)
+              Text("移除第三方登录需要确认当前密码。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             ForEach(user.authenticationMethods) { method in
               HStack {
                 Text(method.displayName)
                 Spacer()
                 if let provider = method.oauthProvider {
                   Button("移除", role: .destructive) {
-                    Task { await account.unlinkOAuth(provider) }
+                    Task {
+                      await account.unlinkOAuth(
+                        provider,
+                        currentPassword: user.authenticationMethods.contains(.password)
+                          ? authenticationChangePassword : nil)
+                    }
                   }
-                  .disabled(account.isWorking || user.authenticationMethods.count <= 1)
+                  .disabled(
+                    account.isWorking || user.authenticationMethods.count <= 1
+                      || (user.authenticationMethods.contains(.password)
+                        && authenticationChangePassword.isEmpty))
                 }
               }
             }
@@ -835,7 +853,7 @@ struct PreferencesView: View {
               }
               .disabled(account.isWorking)
             }
-            Text("至少要保留一种登录方式。关联时会打开系统授权窗口；Typebar 不会保存第三方访问令牌。")
+            Text("至少要保留一种登录方式。移除方式与高风险账户操作会要求重新确认身份；Typebar 不会保存第三方访问令牌。")
               .font(.caption)
               .foregroundStyle(.secondary)
             HStack {
@@ -943,6 +961,24 @@ struct PreferencesView: View {
                 account.isWorking || passwordAuthenticationPassword.utf8.count < 12
                   || passwordAuthenticationPassword != confirmedPasswordAuthenticationPassword)
               Text("添加后可改用邮箱和密码登录；第三方登录方式仍会保留。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Divider()
+              Text("撤销所有设备会话").font(.headline)
+              Button("撤销所有设备会话…", role: .destructive) {
+                showingSessionRevocationConfirmation = true
+              }
+              .disabled(account.isWorking)
+              Text("此操作会打开已关联第三方登录的系统授权窗口，随后使包括当前 Mac 在内的所有自建服务登录失效；本机练习历史不会删除。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Divider()
+              Text("删除账户").font(.headline)
+              Button("删除自建账户…", role: .destructive) {
+                showingAccountDeletionConfirmation = true
+              }
+              .disabled(account.isWorking)
+              Text("此操作会再次确认已关联的第三方登录，再删除此自建服务中的账户、会话、成绩、同步数据、好友关系、屏蔽和投稿；无法撤销。本机练习历史不会删除。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -1242,7 +1278,8 @@ struct PreferencesView: View {
     ) {
       Button("永久删除", role: .destructive) {
         Task {
-          await account.deleteAccount(currentPassword: accountDeletionPassword)
+          await account.deleteAccount(
+            currentPassword: accountDeletionPassword.isEmpty ? nil : accountDeletionPassword)
           accountDeletionPassword = ""
         }
       }
@@ -1254,7 +1291,9 @@ struct PreferencesView: View {
     ) {
       Button("撤销所有会话", role: .destructive) {
         Task {
-          if await account.revokeAllSessions(currentPassword: sessionRevocationPassword) {
+          if await account.revokeAllSessions(
+            currentPassword: sessionRevocationPassword.isEmpty ? nil : sessionRevocationPassword)
+          {
             sessionRevocationPassword = ""
           }
         }

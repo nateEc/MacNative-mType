@@ -241,7 +241,9 @@ public func configure(
         }
         do {
             return try await authStore.unlinkOAuth(
-                provider, accessToken: try request.accessToken())
+                provider,
+                accessToken: try request.accessToken(),
+                reauthenticationToken: try request.reauthenticationToken())
         } catch let error as AuthStoreError {
             throw error.abort
         }
@@ -261,6 +263,18 @@ public func configure(
         do {
             return try await authStore.addPasswordAuthentication(
                 request.content.decode(AddPasswordAuthenticationRequest.self),
+                accessToken: request.accessToken(),
+                reauthenticationToken: request.reauthenticationToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "auth", "reauthentication", "password") { request async throws -> ReauthenticationResponse in
+        do {
+            return try await authStore.reauthenticateWithPassword(
+                request.content.decode(PasswordReauthenticationRequest.self),
                 accessToken: request.accessToken()
             )
         } catch let error as AuthStoreError {
@@ -306,7 +320,8 @@ public func configure(
             let deletion = try request.content.decode(DeleteAccountRequest.self)
             try await authStore.deleteAccount(
                 deletion,
-                accessToken: accessToken
+                accessToken: accessToken,
+                reauthenticationToken: request.headers.first(name: "X-Typebar-Reauthentication")
             )
             return .init(deleted: true)
         } catch let error as AuthStoreError {
@@ -318,7 +333,8 @@ public func configure(
         do {
             try await authStore.revokeAllSessions(
                 request.content.decode(RevokeSessionsRequest.self),
-                accessToken: request.accessToken()
+                accessToken: request.accessToken(),
+                reauthenticationToken: request.headers.first(name: "X-Typebar-Reauthentication")
             )
             return .init(revoked: true)
         } catch let error as AuthStoreError {
@@ -667,6 +683,8 @@ private extension AuthStoreError {
             Abort(.unauthorized, reason: "Invalid email or password.")
         case .invalidOAuthTransaction:
             Abort(.unauthorized, reason: "This OAuth authorization is invalid or has expired.")
+        case .invalidReauthenticationToken:
+            Abort(.unauthorized, reason: "A recent Typebar reauthentication is required for this action.")
         case .invalidPasswordResetToken:
             Abort(.unauthorized, reason: "This password reset code is invalid or has expired.")
         case .invalidEmailVerificationToken:
@@ -699,6 +717,13 @@ private extension Request {
     func accessToken() throws -> String {
         guard let token = headers.bearerAuthorization?.token, !token.isEmpty else {
             throw Abort(.unauthorized, reason: "A Typebar access token is required.")
+        }
+        return token
+    }
+
+    func reauthenticationToken() throws -> String {
+        guard let token = headers.first(name: "X-Typebar-Reauthentication"), !token.isEmpty else {
+            throw Abort(.unauthorized, reason: "A recent Typebar reauthentication is required for this action.")
         }
         return token
     }
