@@ -2324,6 +2324,13 @@ struct TypingSession {
   /// preserving any already submitted words. Each removal becomes a replay
   /// event so result playback reconstructs the same input state.
   private mutating func clearCurrentWord(at date: Date) {
+    if let range = activeNoSpaceWordRange {
+      while typed.count > range.lowerBound {
+        removeLastTypedCharacter()
+        recordReplayEvent(kind: .delete, text: "", at: date)
+      }
+      return
+    }
     while let last = typed.last, !isPromptWordSeparator(last) {
       removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", at: date)
@@ -2335,9 +2342,10 @@ struct TypingSession {
   /// text is removed, so metrics and replay stay internally consistent.
   private mutating func deleteForError(_ mode: DeleteOnErrorMode, at date: Date) {
     let activeWordIsEmpty = typed.isEmpty || typed.last.map(isPromptWordSeparator) == true
+      || activeNoSpaceWordRange.map { typed.count == $0.lowerBound } == true
     if mode.returnsToPreviousWordAtStart && activeWordIsEmpty,
-      configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces), !typed.isEmpty
+      ((configuration.language.usesSpaceDelimitedWords
+        && !configuration.modifiers.contains(.noSpaces)) || tracksNoSpaceWordBursts), !typed.isEmpty
     {
       removePreviousWordForHardDelete(clearingWord: mode.clearsWholeWord, at: date)
       return
@@ -2356,6 +2364,21 @@ struct TypingSession {
   }
 
   private mutating func removePreviousWordForHardDelete(clearingWord: Bool, at date: Date) {
+    if tracksNoSpaceWordBursts,
+      let wordIndex = noSpaceWordEndIndices.firstIndex(of: typed.count),
+      let previousRange = noSpaceWordRange(for: wordIndex)
+    {
+      if clearingWord {
+        while typed.count > previousRange.lowerBound {
+          removeLastTypedCharacter()
+          recordReplayEvent(kind: .delete, text: "", at: date)
+        }
+      } else {
+        removeLastTypedCharacter()
+        recordReplayEvent(kind: .delete, text: "", at: date)
+      }
+      return
+    }
     guard typed.last.map(isPromptWordSeparator) == true else { return }
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", at: date)
@@ -2515,6 +2538,16 @@ struct TypingSession {
   private var nextNoSpaceCommittedWordIndex: Int? {
     guard tracksNoSpaceWordBursts else { return nil }
     return noSpaceWordEndIndices.firstIndex(of: typed.count + 1)
+  }
+
+  /// A no-space word remains actionable only when its original boundary is
+  /// retained. Unsegmented content deliberately falls through to the legacy
+  /// character-level behavior instead of guessing linguistic word breaks.
+  private var activeNoSpaceWordRange: Range<Int>? {
+    guard tracksNoSpaceWordBursts,
+      let wordIndex = noSpaceWordEndIndices.firstIndex(where: { typed.count < $0 })
+    else { return nil }
+    return noSpaceWordRange(for: wordIndex)
   }
 
   /// Mirrors the reference product's explicit space set. Keep Return outside

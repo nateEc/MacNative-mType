@@ -750,6 +750,43 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.typed, "amber")
   }
 
+  func testNoSpaceDeleteOnErrorUsesRetainedWordBoundaries() {
+    let prompt = "晨光窗边"
+    let boundaries = [2, 4]
+
+    var word = TypingSession(
+      configuration: .words(
+        2, rules: .init(deleteOnErrorMode: .word), language: .simplifiedChinese),
+      prompt: prompt, noSpaceWordEndIndices: boundaries)
+    word.insert("晨", at: start)
+    word.insert("x", at: start.addingTimeInterval(1))
+    XCTAssertEqual(word.typed, "")
+
+    var wordHardWithinCurrentWord = TypingSession(
+      configuration: .words(
+        2, rules: .init(deleteOnErrorMode: .wordHard), language: .simplifiedChinese),
+      prompt: prompt, noSpaceWordEndIndices: boundaries)
+    wordHardWithinCurrentWord.insert("晨光窗", at: start)
+    wordHardWithinCurrentWord.insert("x", at: start.addingTimeInterval(1))
+    XCTAssertEqual(wordHardWithinCurrentWord.typed, "晨光")
+
+    var letterHardAtWordStart = TypingSession(
+      configuration: .words(
+        2, rules: .init(deleteOnErrorMode: .letterHard), language: .simplifiedChinese),
+      prompt: prompt, noSpaceWordEndIndices: boundaries)
+    letterHardAtWordStart.insert("晨光", at: start)
+    letterHardAtWordStart.insert("x", at: start.addingTimeInterval(1))
+    XCTAssertEqual(letterHardAtWordStart.typed, "晨")
+
+    var wordHardAtWordStart = TypingSession(
+      configuration: .words(
+        2, rules: .init(deleteOnErrorMode: .wordHard), language: .simplifiedChinese),
+      prompt: prompt, noSpaceWordEndIndices: boundaries)
+    wordHardAtWordStart.insert("晨光", at: start)
+    wordHardAtWordStart.insert("x", at: start.addingTimeInterval(1))
+    XCTAssertEqual(wordHardAtWordStart.typed, "")
+  }
+
   func testHardDeleteOnErrorReturnsToPreviousWordAtWordStart() {
     var letterHard = TypingSession(
       configuration: .timed(
