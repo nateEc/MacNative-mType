@@ -876,6 +876,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "thai-small-pause",
+      title: "ช่วงพักสั้น",
+      text: "การหยุดสั้น ๆ ทำให้ประโยคถัดไปชัดเจนขึ้น",
+      language: .thai,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "thai-open-notebook",
+      title: "สมุดที่เปิดอยู่",
+      text: "สมุดที่เปิดอยู่ไม่ได้มีคำตอบทุกข้อทันที แต่ช่วยให้เราเห็นคำถามเป็นส่วนเล็ก ๆ ได้",
+      language: .thai,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "thai-steady-work",
+      title: "งานที่สม่ำเสมอ",
+      text: "ความก้าวหน้าไม่ได้ปรากฏในช่วงเวลาที่ยิ่งใหญ่เสมอไป การกลับมาเปิดหน้าเดิม ปรับประโยคให้เรียบง่าย แก้ข้อผิดพลาดเล็กน้อย และเขียนโน้ตสำหรับครั้งต่อไป ล้วนสร้างความมั่นใจทีละนิด",
+      language: .thai,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "thai-long-table",
+      title: "โต๊ะยาว",
+      text: "โต๊ะยาวมีที่ว่างสำหรับความคิดที่ยังไม่เสร็จ ด้านหนึ่งอาจมีร่างแรก อีกด้านมีประโยคที่ต้องใส่ใจ และตรงกลางมีการตัดสินใจเล็ก ๆ รออยู่ การฝึกก็เดินหน้าเช่นนี้ เราไม่จำเป็นต้องแก้ทุกส่วนยากให้ได้ในครั้งเดียว หากมีที่ให้กลับมา มีขั้นตอนถัดไปที่ชัดเจน และมีความอดทนพอจะเห็นว่าสิ่งใดง่ายขึ้นหลังจากลองหลายครั้ง ความเร็วจะค่อย ๆ ตามมาเอง",
+      language: .thai,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

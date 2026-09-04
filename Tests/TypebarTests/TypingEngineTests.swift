@@ -3266,6 +3266,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
       StarterLexicon.banglaWords,
+      StarterLexicon.thaiWords,
       StarterLexicon.greekWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.filipinoWords, StarterLexicon.catalanWords,
       StarterLexicon.indonesianWords, StarterLexicon.malayWords, StarterLexicon.danishWords,
@@ -3282,7 +3283,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 45)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 46)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3457,6 +3458,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .bangla).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .bangla), "bn")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .thai).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .thai), "th")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -3606,6 +3610,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(banglaEncyclopedia.text, "জানালা দিয়ে সকালের আলো ঘরে আসে")
     XCTAssertEqual(
       banglaEncyclopedia.prompt(for: .words(3, language: .bangla)), "জানালা দিয়ে সকালের")
+    let thaiData = Data("""
+    {"title":"หน้าต่าง","extract":"หน้าต่าง สะพาน สวน แสง"}
+    """.utf8)
+    let thaiEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: thaiData, language: .thai))
+    XCTAssertEqual(thaiEncyclopedia.text, "หน้าต่าง สะพาน สวน แสง")
+    XCTAssertEqual(
+      thaiEncyclopedia.prompt(for: .words(3, language: .thai)), "หน้าต่าง สะพาน สวน")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4213,6 +4225,7 @@ final class TypingEngineTests: XCTestCase {
       (.hindi, StarterLexicon.hindiWords),
       (.gujarati, StarterLexicon.gujaratiWords),
       (.bangla, StarterLexicon.banglaWords),
+      (.thai, StarterLexicon.thaiWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4319,6 +4332,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.bangla.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.bangla))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.bangla))
+    XCTAssertTrue(StarterLexicon.thaiWords.contains("หน้าต่าง"))
+    XCTAssertFalse(TypingLanguage.thai.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.thai.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.thai))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.thai))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4402,6 +4420,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.hindi.speechLocaleIdentifier, "hi-IN")
     XCTAssertEqual(TypingLanguage.gujarati.speechLocaleIdentifier, "gu-IN")
     XCTAssertEqual(TypingLanguage.bangla.speechLocaleIdentifier, "bn-BD")
+    XCTAssertEqual(TypingLanguage.thai.speechLocaleIdentifier, "th-TH")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
