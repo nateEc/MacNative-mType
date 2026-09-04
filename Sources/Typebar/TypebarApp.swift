@@ -3854,6 +3854,7 @@ private struct ResultsHistoryView: View {
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
   @State private var csvExportStatus: String?
+  @State private var showingPersonalBestTable = false
 
   private var filteredResults: [TestResultRecord] {
     let filter = ResultHistoryFilter(
@@ -3919,7 +3920,7 @@ private struct ResultsHistoryView: View {
   }
 
   private var personalBestIDs: Set<UUID> {
-    ResultStatistics.personalBestIDs(metrics: allMetrics)
+    Set(LocalPersonalBestTablePolicy.rows(results: results.compactMap(\.portableResult)).map(\.id))
   }
 
   var body: some View {
@@ -4119,6 +4120,9 @@ private struct ResultsHistoryView: View {
           Button("完成") { dismiss() }
         }
         ToolbarItem(placement: .primaryAction) {
+          Button("个人最佳表…") { showingPersonalBestTable = true }
+        }
+        ToolbarItem(placement: .primaryAction) {
           Button("导出 CSV…", action: exportFilteredResultsCSV)
             .disabled(filteredResults.isEmpty)
         }
@@ -4129,6 +4133,9 @@ private struct ResultsHistoryView: View {
       ResultDetailView(
         result: result, modeName: modeName(result.configuration?.mode),
         isPersonalBest: personalBestIDs.contains(result.id))
+    }
+    .sheet(isPresented: $showingPersonalBestTable) {
+      LocalPersonalBestTableView(speedUnit: settings.typingSpeedUnit)
     }
   }
 

@@ -5165,6 +5165,55 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(best, [second, third])
   }
 
+  func testLocalPersonalBestTableKeepsTheBestComparableTimeAndWordResults() {
+    func result(
+      id: UUID = UUID(), configuration: TestConfiguration, wpm: Int, finishedAt: Date,
+      outcome: TestOutcome = .completed
+    ) -> CompletedTestResult {
+      .init(
+        id: id, configuration: configuration, outcome: outcome, startedAt: start,
+        finishedAt: finishedAt, typedCharacterCount: 100, correctCharacterCount: 100,
+        errorCount: 0, wpm: wpm, rawWpm: wpm + 3, accuracy: 98)
+    }
+
+    let englishTime = TestConfiguration.timed(seconds: 30, language: .english)
+    let olderEnglishTimeID = UUID()
+    let lazyEnglishTime = englishTime.with(modifiers: [.lazyLatin])
+    let rows = LocalPersonalBestTablePolicy.rows(results: [
+      result(
+        configuration: englishTime, wpm: 71, finishedAt: start.addingTimeInterval(20)),
+      result(
+        id: olderEnglishTimeID, configuration: englishTime, wpm: 82,
+        finishedAt: start.addingTimeInterval(2)),
+      result(
+        configuration: englishTime, wpm: 82, finishedAt: start.addingTimeInterval(9)),
+      result(
+        configuration: .timed(seconds: 30, language: .spanish), wpm: 91,
+        finishedAt: start.addingTimeInterval(3)),
+      result(
+        configuration: lazyEnglishTime, wpm: 76, finishedAt: start.addingTimeInterval(4)),
+      result(
+        configuration: .words(25, language: .english), wpm: 104,
+        finishedAt: start.addingTimeInterval(5)),
+      result(
+        configuration: englishTime.with(modifiers: [.zipf]), wpm: 999,
+        finishedAt: start.addingTimeInterval(6)),
+      result(
+        configuration: englishTime, wpm: 500, finishedAt: start.addingTimeInterval(7),
+        outcome: .abandoned),
+      result(
+        configuration: .init(
+          mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+          language: .english), wpm: 700, finishedAt: start.addingTimeInterval(8)),
+    ])
+
+    XCTAssertEqual(rows.map(\.mode), [.time, .time, .time, .words])
+    XCTAssertEqual(rows.map(\.wpm), [91, 82, 76, 104])
+    XCTAssertEqual(rows.first { $0.language == .english && !$0.usesLazyLatin }?.id, olderEnglishTimeID)
+    XCTAssertTrue(rows.first { $0.usesLazyLatin }?.optionsLabel.contains("简化重音") == true)
+    XCTAssertEqual(rows.last?.parameterLabel, "25 词")
+  }
+
   func testArchiveRoundTripsIndependentLocalData() throws {
     let settings = AppSettingsSnapshot(fontSize: 32)
     let result = CompletedTestResult(
