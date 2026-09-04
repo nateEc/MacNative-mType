@@ -848,6 +848,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "icelandic-rolegt-skref",
+      title: "Rólegt skref",
+      text: "Rólegt skref gerir næsta verkefni skýrara.",
+      language: .icelandic,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "icelandic-opin-minnisbok",
+      title: "Opin minnisbók",
+      text: "Opin minnisbók leysir ekki erfiða spurningu ein og sér, en hún hjálpar hugsunum að finna röð og stefnu.",
+      language: .icelandic,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "icelandic-hljoðlaust-verk",
+      title: "Hljóðlaust verk",
+      text: "Framfarir verða sjaldan til á einni háværri stundu. Þær vaxa þegar við opnum sömu síðuna, leiðréttum villu, lesum minnisblað og veljum næsta litla verkefni. Endurtekning gerir erfið atriði kunnuglegri og skilur eftir meira rými fyrir athygli.",
+      language: .icelandic,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "icelandic-langt-bord",
+      title: "Langt borð",
+      text: "Langt borð er gagnlegt því þar er pláss fyrir ólíka vinnu. Við annan endann getur verið fyrsta uppkastið, við hinn setning sem þarf enn athygli, og á miðjunni verður pláss fyrir næstu litlu ákvörðun. Æfing virkar á sama hátt. Hún þarf ekki að leysa allt í einu, heldur að gefa okkur stað til að snúa aftur á, sjá næsta skref og finna næga þolinmæði til að taka eftir því sem verður auðveldara eftir nokkrar tilraunir.",
+      language: .icelandic,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",
