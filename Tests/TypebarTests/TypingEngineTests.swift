@@ -1633,6 +1633,42 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ç", layout: .spanishQwerty), 42)
   }
 
+  func testNordicQwertyMapsScandinavianLettersAndIsoKeys() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .nordicQwerty), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ø", layout: .nordicQwerty), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "Æ", layout: .nordicQwerty), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "^", layout: .nordicQwerty), "top-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .nordicQwerty), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [], layout: .nordicQwerty), "å")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [.shift], layout: .nordicQwerty), "Å")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [], layout: .nordicQwerty), "ø")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [.shift], layout: .nordicQwerty), "Æ")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ø", layout: .nordicQwerty), 41)
+    XCTAssertEqual(KeyboardInputLayout.nordicQwerty.emulatedLayout, .nordicQwerty)
+  }
+
+  @MainActor
+  func testNordicQwertyPersistsAsGuideInputAndLayoutFluidChoice() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .nordicQwerty
+    settings.keyboardInputLayout = .nordicQwerty
+    settings.layoutFluidLayouts = [.nordicQwerty, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .nordicQwerty)
+    XCTAssertEqual(restored.keyboardInputLayout, .nordicQwerty)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.nordicQwerty, .ansiQwerty])
+  }
+
   func testPortugueseQwertyLayoutsMapIsoAndAnsiPunctuationPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "«", layout: .portugueseQwertyISO), "number-12")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "»", layout: .portugueseQwertyISO), "number-12")
@@ -3161,6 +3197,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(PracticeVisualEffect.make(modifiers: [.aslVisual]).usesASL, true)
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
+    XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, KeyboardLayout.allCases.count)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
