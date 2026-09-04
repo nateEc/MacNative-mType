@@ -12,7 +12,7 @@ enum WeakSpotPractice {
     guard language.usesSpaceDelimitedWords else { return nil }
     let scores = characterScores(results: results, language: language)
     guard !scores.isEmpty else { return nil }
-    let candidates = lexicon(for: language, englishVariant: englishVariant)
+    let candidates = language.ownedPracticeWords(englishVariant: englishVariant)
     let ranked = candidates.sorted {
       score(word: $0, scores: scores) > score(word: $1, scores: scores)
     }
@@ -52,31 +52,4 @@ enum WeakSpotPractice {
     word.reduce(0) { $0 + (scores[$1] ?? 0) }
   }
 
-  private static func lexicon(for language: TypingLanguage, englishVariant: EnglishVariant)
-    -> [String]
-  {
-    guard !language.isCodeLanguage else { return [] }
-    return switch language {
-    case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
-    case .spanish: StarterLexicon.spanishWords
-    case .german: StarterLexicon.germanWords
-    case .dutch: StarterLexicon.dutchWords
-    case .danish: StarterLexicon.danishWords
-    case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
-    case .hungarian: StarterLexicon.hungarianWords
-    case .french: StarterLexicon.frenchWords
-    case .italian: StarterLexicon.italianWords
-    case .portuguese: StarterLexicon.portugueseWords
-    case .russian: StarterLexicon.russianWords
-    case .ukrainian: StarterLexicon.ukrainianWords
-    case .ukrainianLatin: StarterLexicon.ukrainianLatinWords
-    case .korean: StarterLexicon.koreanWords
-    case .turkish: StarterLexicon.turkishWords
-    case .polish: StarterLexicon.polishWords
-    case .mixedEnglishChinese: StarterLexicon.words
-    case .mixedLanguages: []
-    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana: []
-    default: []
-    }
-  }
 }

@@ -479,6 +479,7 @@ private struct ContentView: View {
   @State private var showingDataMigration = false
   @State private var showingSavedTexts = false
   @State private var showingSaveCustomText = false
+  @State private var showingWordFilter = false
   @State private var completedResult: CompletedResultPresentation?
   @State private var publicationMessage: String?
   @State private var terminalNotice: TestTerminalNotice?
@@ -709,6 +710,11 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingSaveCustomText) {
       SaveCustomTextView(text: customText)
+    }
+    .sheet(isPresented: $showingWordFilter) {
+      WordFilterView(language: language) { text, appending in
+        applyWordFilter(text, appending: appending)
+      }
     }
     .sheet(item: $completedResult) { result in
       completedResultSheet(result)
@@ -1107,6 +1113,7 @@ private struct ContentView: View {
               Button("保存文本…") { showingSaveCustomText = true }
                 .disabled(!CustomTextPolicy.isValid(customText))
               Button("已保存文本…") { showingSavedTexts = true }
+              Button("筛选词表…") { showingWordFilter = true }
             }
           }
         case .zen:
@@ -2110,6 +2117,22 @@ private struct ContentView: View {
     customText = active.remainingText
     customTextCompletion = .finish
     customTextOrdering = .inOrder
+    reset()
+  }
+
+  private func applyWordFilter(_ filteredText: String, appending: Bool) {
+    let existing = appending ? customText.trimmingCharacters(in: .whitespacesAndNewlines) : ""
+    let separator = existing.isEmpty ? "" : " "
+    let nextText = CustomTextPolicy.clamped(existing + separator + filteredText)
+    guard CustomTextPolicy.isValid(nextText) else { return }
+    activeChallengeID = nil
+    activeLongSavedText = nil
+    practiceReturnPreset = nil
+    mode = .custom
+    customText = nextText
+    customTextCompletion = .finish
+    customTextOrdering = .inOrder
+    completedResult = nil
     reset()
   }
 

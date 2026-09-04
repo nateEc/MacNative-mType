@@ -3996,6 +3996,42 @@ final class TypingEngineTests: XCTestCase {
         results: [result], language: .simplifiedChinese, englishVariant: .american))
   }
 
+  func testLocalWordFilterUsesOnlyRequestedCharactersLengthsAndRegularExpressions() throws {
+    let criteria = LocalWordFilter.Criteria(
+      includeCharacters: "a", excludeCharacters: "r", minimumLength: 3, maximumLength: 5,
+      regularExpression: "^a", exactCharactersOnly: false)
+    XCTAssertEqual(
+      try LocalWordFilter.words(in: ["amber", "atlas", "bar", "baker"], matching: criteria).get(),
+      ["atlas"])
+
+    let exact = LocalWordFilter.Criteria(
+      includeCharacters: "a b", excludeCharacters: "ignored", minimumLength: nil,
+      maximumLength: nil, regularExpression: "[", exactCharactersOnly: true)
+    XCTAssertEqual(
+      try LocalWordFilter.words(in: ["aba", "bad", "cab"], matching: exact).get(), ["aba"])
+
+    XCTAssertEqual(
+      LocalWordFilter.words(
+        in: ["amber"], matching: .init(exactCharactersOnly: true)),
+      .failure(.exactCharactersNeedInclude))
+    XCTAssertEqual(
+      LocalWordFilter.words(
+        in: ["amber"], matching: .init(minimumLength: 6, maximumLength: 3)),
+      .failure(.invalidLengthRange))
+    XCTAssertEqual(
+      LocalWordFilter.words(
+        in: ["amber"], matching: .init(regularExpression: "[")),
+      .failure(.invalidRegularExpression))
+  }
+
+  func testOwnedPracticeWordsShareTheLocalFilterAndWeakSpotCorpus() {
+    XCTAssertEqual(TypingLanguage.hungarian.ownedPracticeWords(), StarterLexicon.hungarianWords)
+    XCTAssertEqual(
+      TypingLanguage.english.ownedPracticeWords(englishVariant: .british), StarterLexicon.britishWords)
+    XCTAssertTrue(TypingLanguage.simplifiedChinese.ownedPracticeWords().contains("晨光"))
+    XCTAssertTrue(TypingLanguage.codeSwift.ownedPracticeWords().isEmpty)
+  }
+
   func testModerationQueueStatesAndReportIdentifiersRemainStable() {
     XCTAssertEqual(
       RemoteQuoteModerationStatus.allCases.map(\.rawValue),

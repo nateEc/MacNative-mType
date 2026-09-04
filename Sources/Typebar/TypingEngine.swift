@@ -3370,6 +3370,36 @@ extension TestMode {
 }
 
 extension TypingLanguage {
+  /// Typebar-owned practice words available to local features such as weak
+  /// spot drills and the word filter. This never reads a reference word list.
+  func ownedPracticeWords(englishVariant: EnglishVariant = .american) -> [String] {
+    guard !isCodeLanguage else { return [] }
+    return switch self {
+    case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
+    case .spanish: StarterLexicon.spanishWords
+    case .german: StarterLexicon.germanWords
+    case .dutch: StarterLexicon.dutchWords
+    case .danish: StarterLexicon.danishWords
+    case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
+    case .hungarian: StarterLexicon.hungarianWords
+    case .french: StarterLexicon.frenchWords
+    case .italian: StarterLexicon.italianWords
+    case .portuguese: StarterLexicon.portugueseWords
+    case .simplifiedChinese: StarterLexicon.simplifiedChineseWords
+    case .traditionalChinese: StarterLexicon.traditionalChineseWords
+    case .russian: StarterLexicon.russianWords
+    case .ukrainian: StarterLexicon.ukrainianWords
+    case .ukrainianLatin: StarterLexicon.ukrainianLatinWords
+    case .japaneseHiragana: StarterLexicon.japaneseHiraganaWords
+    case .korean: StarterLexicon.koreanWords
+    case .turkish: StarterLexicon.turkishWords
+    case .polish: StarterLexicon.polishWords
+    case .mixedEnglishChinese: StarterLexicon.words
+    case .mixedLanguages: []
+    default: []
+    }
+  }
+
   static let defaultMixedComponents: [TypingLanguage] = [
     .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .hungarian, .french,
     .italian, .portuguese,
