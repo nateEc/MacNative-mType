@@ -3212,7 +3212,7 @@ final class TypingEngineTests: XCTestCase {
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
-      StarterLexicon.greekWords,
+      StarterLexicon.greekWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
       StarterLexicon.swedishWords,
       StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
@@ -3225,7 +3225,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 34)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 35)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3361,6 +3361,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .greek).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greek), "el")
+    XCTAssertNil(LivePracticeContentSource.selected(for: .words(
+      5, language: .greeklish).with(modifiers: [.referenceStream])))
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .norwegianBokmal).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .norwegianBokmal), "no")
@@ -4039,6 +4042,7 @@ final class TypingEngineTests: XCTestCase {
     for (language, lexicon) in [
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
       (.greek, StarterLexicon.greekWords),
+      (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
       (.norwegianBokmal, StarterLexicon.norwegianBokmalWords),
       (.swedish, StarterLexicon.swedishWords),
@@ -4094,6 +4098,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.dutchWords.contains("één"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
+    XCTAssertTrue(StarterLexicon.greeklishWords.contains("kalimera"))
+    XCTAssertTrue(StarterLexicon.greeklishWords.allSatisfy {
+      $0.unicodeScalars.allSatisfy { $0.isASCII }
+    })
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.danish))
     XCTAssertTrue(StarterLexicon.danishWords.contains("åndedræt"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.norwegianBokmal))
@@ -4141,6 +4150,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.spanish.speechLocaleIdentifier, "es-ES")
     XCTAssertEqual(TypingLanguage.german.speechLocaleIdentifier, "de-DE")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
+    XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
     XCTAssertEqual(TypingLanguage.danish.speechLocaleIdentifier, "da-DK")
     XCTAssertEqual(TypingLanguage.norwegianBokmal.speechLocaleIdentifier, "nb-NO")
@@ -4317,6 +4327,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.icelandic.ownedPracticeWords(), StarterLexicon.icelandicWords)
     XCTAssertEqual(TypingLanguage.swedish.ownedPracticeWords(), StarterLexicon.swedishWords)
     XCTAssertEqual(TypingLanguage.greek.ownedPracticeWords(), StarterLexicon.greekWords)
+    XCTAssertEqual(TypingLanguage.greeklish.ownedPracticeWords(), StarterLexicon.greeklishWords)
     XCTAssertEqual(TypingLanguage.japaneseKatakana.ownedPracticeWords(), StarterLexicon.japaneseKatakanaWords)
     XCTAssertEqual(TypingLanguage.japaneseRomaji.ownedPracticeWords(), StarterLexicon.japaneseRomajiWords)
     XCTAssertEqual(
@@ -4529,7 +4540,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+      .english, .spanish, .german, .greek, .greeklish, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,

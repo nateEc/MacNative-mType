@@ -253,6 +253,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "greeklish-small-step",
+      title: "Mikro vima",
+      text: "Ena iremo vima kanei tin epomeni kinisi pio ksekathari.",
+      language: .greeklish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "greeklish-open-note",
+      title: "Anoichti simeiosi",
+      text: "Mia anoichti simeiosi den lyei moni tis mia dyskoli erotisi, alla voithaei ti skepsi na valei kathara vimata se seira.",
+      language: .greeklish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "greeklish-calm-work",
+      title: "Iremi ergasia",
+      text: "I proodos den fainetai panta se mia megali stigmi. Chtizetai me mikres epistrofes: anoigoume tin idia selida, kanoume mia protasi pio kathari, diorthonoume ena lathos kai afinoume mia chrisimi simeiosi gia tin epomeni prospatheia.",
+      language: .greeklish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "greeklish-long-table",
+      title: "Megalo trapezi",
+      text: "Ena megalo trapezi afinei choro gia diaforetika eidi ergasias. Sti mia akri mporei na yparchei ena proto schedio, stin alli mia protasi pou chreiazetai akomi prosochi, kai sti mesi na mene i epomeni mikri apofasi. I askisi leitourgei me paromoio tropo. Den zita na lythoun oles oi dyskolies amesos, alla na yparchei ena meros opou epistrefoume, na vroume to epomeno vima kai na exoume arketo chrono na paratiroume ti ginetai pio eukolo meta apo merikes prospatheies.",
+      language: .greeklish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "pas-calme",
       title: "Pas calme",
       text: "Un pas attentif peut rendre le prochain geste plus simple et la journée plus claire.",
