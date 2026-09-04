@@ -578,12 +578,18 @@ private struct ContentView: View {
           currentProcessPractice.append(.init(result: result))
           settings.randomizeTheme(for: systemColorScheme)
         }
+        let savedRecord: TestResultRecord?
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
-          modelContext.insert(TestResultRecord(result: result))
+          let record = TestResultRecord(result: result)
+          modelContext.insert(record)
+          savedRecord = record
+        } else {
+          savedRecord = nil
         }
         completedResult = .init(
           result: result,
           savesResult: savesResult,
+          savedRecord: savedRecord,
           quoteFeedback: activeQuoteFeedback,
           missedWords: missedWordPractice?.selectedWords ?? [],
           missedWordPracticeWords: missedWordPractice?.exerciseWords ?? [],
@@ -703,6 +709,7 @@ private struct ContentView: View {
         accent: activeTheme.accent,
         colorScheme: activeTheme.colorScheme,
         publicationMessage: publicationMessage,
+        savedResultRecord: result.savedRecord,
         quoteFeedback: result.quoteFeedback,
         settings: settings,
         quoteRatings: quoteRatings,
@@ -2573,6 +2580,7 @@ extension TestOutcome {
 private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
   let savesResult: Bool
+  let savedRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
   let missedWords: [String]
   let missedWordPracticeWords: [String]
@@ -2602,6 +2610,7 @@ private struct CompletedResultView: View {
   let accent: Color
   let colorScheme: ColorScheme
   let publicationMessage: String?
+  let savedResultRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
   let settings: AppSettings
   let quoteRatings: QuoteRatingStore
@@ -2707,6 +2716,10 @@ private struct CompletedResultView: View {
         Text(exportStatus)
           .font(.caption)
           .foregroundStyle(.secondary)
+      }
+
+      if let savedResultRecord {
+        ResultTagEditor(result: savedResultRecord)
       }
 
       if !wordReviews.isEmpty {
@@ -4296,13 +4309,60 @@ private struct ActivityHeatmapView: View {
   }
 }
 
+private struct ResultTagEditor: View {
+  @Environment(\.modelContext) private var modelContext
+  let result: TestResultRecord
+  @State private var newTag = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 9) {
+      Text("标签").font(.headline)
+      if !result.tags.isEmpty {
+        FlowLayout(spacing: 8) {
+          ForEach(result.tags, id: \.self) { tag in
+            Button {
+              result.removeTag(tag)
+              saveTags()
+            } label: {
+              Label(tag, systemImage: "xmark")
+                .font(.caption)
+            }
+            .buttonStyle(.bordered)
+          }
+        }
+      }
+      HStack {
+        TextField("添加标签", text: $newTag)
+          .onSubmit(addTag)
+        Button("添加", action: addTag)
+          .disabled(
+            newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              || result.tags.count >= ResultTagPolicy.maximumCount)
+      }
+      Text(
+        "最多 \(ResultTagPolicy.maximumCount) 个标签，每个不超过 \(ResultTagPolicy.maximumLength) 个字符。点按标签可移除。"
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+    }
+  }
+
+  private func addTag() {
+    result.addTag(newTag)
+    newTag = ""
+    saveTags()
+  }
+
+  private func saveTags() {
+    try? modelContext.save()
+  }
+}
+
 private struct ResultDetailView: View {
   @Environment(\.dismiss) private var dismiss
-  @Environment(\.modelContext) private var modelContext
   let result: TestResultRecord
   let modeName: String
   let isPersonalBest: Bool
-  @State private var newTag = ""
 
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
@@ -4387,36 +4447,7 @@ private struct ResultDetailView: View {
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
         ReplayTimelineView(prompt: result.prompt, events: result.replayEvents)
       }
-      VStack(alignment: .leading, spacing: 9) {
-        Text("标签").font(.headline)
-        if !result.tags.isEmpty {
-          FlowLayout(spacing: 8) {
-            ForEach(result.tags, id: \.self) { tag in
-              Button {
-                result.removeTag(tag)
-                saveTags()
-              } label: {
-                Label(tag, systemImage: "xmark")
-                  .font(.caption)
-              }
-              .buttonStyle(.bordered)
-            }
-          }
-        }
-        HStack {
-          TextField("添加标签", text: $newTag)
-            .onSubmit(addTag)
-          Button("添加", action: addTag)
-            .disabled(
-              newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                || result.tags.count >= ResultTagPolicy.maximumCount)
-        }
-        Text(
-          "最多 \(ResultTagPolicy.maximumCount) 个标签，每个不超过 \(ResultTagPolicy.maximumLength) 个字符。点按标签可移除。"
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
+      ResultTagEditor(result: result)
       Spacer()
       HStack {
         Spacer()
@@ -4438,15 +4469,6 @@ private struct ResultDetailView: View {
     value.formatted(.number.precision(.fractionLength(0...2)))
   }
 
-  private func addTag() {
-    result.addTag(newTag)
-    newTag = ""
-    saveTags()
-  }
-
-  private func saveTags() {
-    try? modelContext.save()
-  }
 }
 
 private struct FlowLayout: Layout {
