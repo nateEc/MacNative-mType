@@ -3270,6 +3270,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.nepaliWords,
       StarterLexicon.kannadaWords,
       StarterLexicon.teluguWords,
+      StarterLexicon.malayalamWords,
       StarterLexicon.greekWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.filipinoWords, StarterLexicon.catalanWords,
       StarterLexicon.indonesianWords, StarterLexicon.malayWords, StarterLexicon.danishWords,
@@ -3286,7 +3287,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 49)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 50)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3473,6 +3474,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .telugu).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .telugu), "te")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .malayalam).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .malayalam), "ml")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -3654,6 +3658,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(teluguEncyclopedia.text, "కిటికీ నుంచి ఉదయపు వెలుగు లోపలికి వస్తుంది")
     XCTAssertEqual(
       teluguEncyclopedia.prompt(for: .words(3, language: .telugu)), "కిటికీ నుంచి ఉదయపు")
+    let malayalamData = Data("""
+    {"title":"ജാലകം","extract":"ജാലകത്തിലൂടെ രാവിലെ വെളിച്ചം അകത്തേക്ക് വരുന്നു."}
+    """.utf8)
+    let malayalamEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: malayalamData, language: .malayalam))
+    XCTAssertEqual(malayalamEncyclopedia.text, "ജാലകത്തിലൂടെ രാവിലെ വെളിച്ചം അകത്തേക്ക് വരുന്നു")
+    XCTAssertEqual(
+      malayalamEncyclopedia.prompt(for: .words(3, language: .malayalam)), "ജാലകത്തിലൂടെ രാവിലെ വെളിച്ചം")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4265,6 +4277,7 @@ final class TypingEngineTests: XCTestCase {
       (.nepali, StarterLexicon.nepaliWords),
       (.kannada, StarterLexicon.kannadaWords),
       (.telugu, StarterLexicon.teluguWords),
+      (.malayalam, StarterLexicon.malayalamWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4388,6 +4401,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.telugu.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.telugu))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.telugu))
+    XCTAssertTrue(StarterLexicon.malayalamWords.contains("ജാലകം"))
+    XCTAssertFalse(TypingLanguage.malayalam.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.malayalam))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.malayalam))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4475,6 +4492,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.nepali.speechLocaleIdentifier, "ne-NP")
     XCTAssertEqual(TypingLanguage.kannada.speechLocaleIdentifier, "kn-IN")
     XCTAssertEqual(TypingLanguage.telugu.speechLocaleIdentifier, "te-IN")
+    XCTAssertEqual(TypingLanguage.malayalam.speechLocaleIdentifier, "ml-IN")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")

@@ -988,6 +988,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "malayalam-calm-step",
+      title: "ശാന്തമായ ചുവട്",
+      text: "ശാന്തമായ ചുവട് അടുത്ത ജോലിയെ കൂടുതൽ വ്യക്തമാക്കുന്നു.",
+      language: .malayalam,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "malayalam-open-notebook",
+      title: "തുറന്ന കുറിപ്പുപുസ്തകം",
+      text: "തുറന്ന കുറിപ്പുപുസ്തകം എല്ലാ കഠിന ചോദ്യങ്ങൾക്കും മറുപടി നൽകില്ല, പക്ഷേ ചോദ്യത്തെ ചെറിയ ഭാഗങ്ങളായി കാണാൻ ഇടം നൽകും.",
+      language: .malayalam,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "malayalam-small-work",
+      title: "ചെറിയ ജോലി",
+      text: "പുരോഗതി എല്ലായ്പ്പോഴും വലിയ നിമിഷത്തിൽ കാണപ്പെടില്ല. അതേ പേജ് വീണ്ടും തുറക്കുക, ഒരു വാക്യം ലളിതമാക്കുക, ചെറിയ പിശക് തിരുത്തുക, അടുത്ത ശ്രമത്തിനായി ഉപകാരപ്രദമായ കുറിപ്പ് എഴുതുക എന്നിവ വിശ്വാസം പതുക്കെ വളർത്തുന്നു.",
+      language: .malayalam,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "malayalam-long-table",
+      title: "നീളമുള്ള മേശ",
+      text: "നീളമുള്ള മേശയിൽ പൂർത്തിയാകാത്ത ചിന്തകൾക്കും ഇടമുണ്ട്. ഒരു വശത്ത് ആദ്യ കരട് ഉണ്ടാകാം, മറുവശത്ത് കൂടുതൽ ശ്രദ്ധ വേണമെന്ന വാക്യം ഉണ്ടാകാം, നടുവിൽ ചെറിയ തീരുമാനം കാത്തിരിക്കാം. അഭ്യാസവും ഇങ്ങനെയാണ് മുന്നോട്ട് പോകുന്നത്: ഓരോ കഠിന ഭാഗവും ഒരൊറ്റ ശ്രമത്തിൽ പരിഹരിക്കേണ്ടതില്ല. തിരിച്ചുവരാൻ ഒരു സ്ഥലം, അടുത്ത വ്യക്തമായ ചുവട്, പല ശ്രമങ്ങൾക്കുശേഷം എന്താണ് എളുപ്പമായത് എന്ന് കാണാനുള്ള ക്ഷമ എന്നിവ ഉണ്ടെങ്കിൽ വേഗം സ്വയം വളരും.",
+      language: .malayalam,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
