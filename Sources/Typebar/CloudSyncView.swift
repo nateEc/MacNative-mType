@@ -392,6 +392,9 @@ private struct PublicProfileView: View {
                     }
                 }
             }
+            Label("服务端累计练习 \(totalTypingDuration)", systemImage: "timer")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Text("加入 \(profile.joinedAt.formatted(date: .abbreviated, time: .omitted))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -495,6 +498,14 @@ private struct PublicProfileView: View {
         !profile.profileDetails.bio.isEmpty || !profile.profileDetails.keyboard.isEmpty
             || !profile.profileDetails.github.isEmpty || !profile.profileDetails.socialHandle.isEmpty
             || publicWebsite != nil
+    }
+
+    private var totalTypingDuration: String {
+        let seconds = max(0, Int(profile.totalTypingSeconds.rounded(.down)))
+        if seconds < 60 { return "\(seconds) 秒" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes) 分钟" }
+        return "\(minutes / 60) 小时 \(minutes % 60) 分钟"
     }
 
     private var publicWebsite: URL? {

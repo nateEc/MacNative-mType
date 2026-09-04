@@ -1338,6 +1338,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(detailedProfile.activity?.testsByDays.count, 365)
     XCTAssertEqual(detailedProfile.activity?.testsByDays.reduce(0, +), 4)
     XCTAssertEqual(detailedProfile.activity?.testsByDays.last, 4)
+    XCTAssertEqual(detailedProfile.totalTypingSeconds, 135)
 
     do {
       try configure(app, authStore: store)
@@ -1346,6 +1347,7 @@ final class HealthRouteTests: XCTestCase {
         let profile = try? response.content.decode(PublicProfileResponse.self)
         XCTAssertEqual(profile?.displayName, "Profile User")
         XCTAssertEqual(profile?.completedResultCount, 5)
+        XCTAssertEqual(profile?.totalTypingSeconds, 135)
         XCTAssertEqual(profile?.bestWPM, 88)
         XCTAssertEqual(profile?.highestConsistency, 92)
         XCTAssertEqual(profile?.personalBests.map(\.durationSeconds), [15, 30, nil])

@@ -613,6 +613,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let displayName: String
     let joinedAt: Date
     let completedResultCount: Int
+    let totalTypingSeconds: Double
     let bestWPM: Int
     let highestConsistency: Double
     let personalBests: [RemotePublicProfileBest]
@@ -624,7 +625,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let selectedBadge: RemotePublicProfileBadge?
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests,
+        case id, displayName, joinedAt, completedResultCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
             activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge
     }
 
@@ -634,6 +635,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         displayName = try values.decode(String.self, forKey: .displayName)
         joinedAt = try values.decode(Date.self, forKey: .joinedAt)
         completedResultCount = try values.decode(Int.self, forKey: .completedResultCount)
+        totalTypingSeconds = try values.decodeIfPresent(Double.self, forKey: .totalTypingSeconds) ?? 0
         bestWPM = try values.decode(Int.self, forKey: .bestWPM)
         highestConsistency = try values.decodeIfPresent(Double.self, forKey: .highestConsistency) ?? 0
         personalBests = try values.decodeIfPresent([RemotePublicProfileBest].self, forKey: .personalBests) ?? []

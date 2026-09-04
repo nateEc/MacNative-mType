@@ -336,6 +336,7 @@ public struct PublicProfileResponse: Content, Equatable {
   public let displayName: String
   public let joinedAt: Date
   public let completedResultCount: Int
+  public let totalTypingSeconds: Double
   public let bestWPM: Int
   public let highestConsistency: Double
   public let personalBests: [PublicProfileBestResponse]
@@ -2108,6 +2109,7 @@ public actor AuthStore {
       displayName: user.displayName,
       joinedAt: user.createdAt,
       completedResultCount: results.count,
+      totalTypingSeconds: totalTypingSeconds(from: results),
       bestWPM: results.map(\.wpm).max() ?? 0,
       highestConsistency: results.map(\.consistency).max() ?? 0,
       personalBests: publicPersonalBests(from: results),
@@ -2178,6 +2180,12 @@ public actor AuthStore {
 
     guard testsByDays.contains(where: { $0 > 0 }) else { return nil }
     return .init(lastDay: lastDay, testsByDays: testsByDays)
+  }
+
+  private func totalTypingSeconds(from results: [StoredResult]) -> Double {
+    results.reduce(0) { total, result in
+      total + max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+    }
   }
 
   private func publicStreak(from results: [StoredResult], endingAt now: Date)
