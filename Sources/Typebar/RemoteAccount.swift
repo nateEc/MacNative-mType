@@ -577,10 +577,12 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
 
 private struct RemoteExperienceLeaderboardResponse: Codable, Sendable {
     let entries: [RemoteExperienceLeaderboardEntry]
+    let period: String?
 }
 
 struct RemoteExperienceLeaderboardRankResponse: Codable, Sendable {
     let entry: RemoteExperienceLeaderboardEntry?
+    let period: String?
 }
 
 struct RemotePublicProfile: Codable, Identifiable, Sendable {
@@ -790,6 +792,22 @@ enum RemoteLeaderboardScope: String, CaseIterable {
         case .global: "全局榜"
         case .friends: "好友榜"
         }
+    }
+}
+
+enum RemoteExperienceLeaderboardPeriod: String, CaseIterable {
+    case week
+    case lastWeek
+
+    var displayName: String {
+        switch self {
+        case .week: "本周"
+        case .lastWeek: "上周"
+        }
+    }
+
+    func isConfirmed(by responsePeriod: String?) -> Bool {
+        responsePeriod == rawValue || (responsePeriod == nil && self == .week)
     }
 }
 
@@ -1661,18 +1679,24 @@ final class AccountSession {
         return response.entry
     }
 
-    func experienceLeaderboard(scope: RemoteLeaderboardScope = .global) async throws -> [RemoteExperienceLeaderboardEntry] {
+    func experienceLeaderboard(
+        period: RemoteExperienceLeaderboardPeriod = .week,
+        scope: RemoteLeaderboardScope = .global
+    ) async throws -> [RemoteExperienceLeaderboardEntry] {
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends ? "v1/leaderboards/experience/friends" : "v1/leaderboards/experience",
             method: "GET",
             token: scope == .friends ? try accessToken() : nil,
             body: Optional<String>.none,
+            queryItems: [.init(name: "period", value: period.rawValue)],
             response: RemoteExperienceLeaderboardResponse.self
         )
+        try requireConfirmedExperienceLeaderboardPeriod(period, responsePeriod: response.period)
         return response.entries
     }
 
     func experienceLeaderboardRank(
+        period: RemoteExperienceLeaderboardPeriod = .week,
         scope: RemoteLeaderboardScope = .global
     ) async throws -> RemoteExperienceLeaderboardEntry? {
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
@@ -1681,8 +1705,10 @@ final class AccountSession {
             method: "GET",
             token: try accessToken(),
             body: Optional<String>.none,
+            queryItems: [.init(name: "period", value: period.rawValue)],
             response: RemoteExperienceLeaderboardRankResponse.self
         )
+        try requireConfirmedExperienceLeaderboardPeriod(period, responsePeriod: response.period)
         return response.entry
     }
 
@@ -1815,6 +1841,15 @@ final class AccountSession {
             throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
         }
         return token
+    }
+
+    private func requireConfirmedExperienceLeaderboardPeriod(
+        _ requestedPeriod: RemoteExperienceLeaderboardPeriod, responsePeriod: String?
+    ) throws {
+        guard requestedPeriod.isConfirmed(by: responsePeriod) else {
+            if responsePeriod != nil { throw RemoteAccountError.unexpectedResponse }
+            throw RemoteAccountError.serverMessage("此自建 Typebar 服务尚不支持上周 XP 榜。")
+        }
     }
 
     private func beginOAuth(

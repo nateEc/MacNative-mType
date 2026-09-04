@@ -1533,7 +1533,7 @@ final class HealthRouteTests: XCTestCase {
     let friendEntries = try await store.friendLeaderboard(
       .init(mode: nil, language: nil, period: "all", limit: 25), accessToken: bob.accessToken,
       now: now).entries
-    let globalXPEntries = await store.experienceLeaderboard(now: now).entries
+    let globalXPEntries = try await store.experienceLeaderboard(now: now).entries
     let friendXPEntries = try await store.friendExperienceLeaderboard(
       accessToken: bob.accessToken, now: now).entries
     let hiddenWPMRank = try await store.leaderboardRank(
@@ -2235,7 +2235,7 @@ final class HealthRouteTests: XCTestCase {
 
     let bobRequest = result(id: UUID(), wpm: 65, accuracy: 90, finishedAt: now)
     _ = try await store.submitResult(bobRequest, accessToken: bob.accessToken, now: now)
-    let weekly = await store.experienceLeaderboard(now: now)
+    let weekly = try await store.experienceLeaderboard(now: now)
     XCTAssertEqual(weekly.entries.map(\.displayName), ["XP Alice", "XP Bob"])
     XCTAssertEqual(
       weekly.entries.map(\.totalExperience),
@@ -2248,6 +2248,40 @@ final class HealthRouteTests: XCTestCase {
       rawWpm: 80, accuracy: 100, errorCount: 0, eventCount: 60,
       startedAt: now.addingTimeInterval(-9), finishedAt: now)
     XCTAssertEqual(TypebarExperiencePolicy.points(for: zen), 0)
+  }
+
+  func testExperienceLeaderboardSeparatesCurrentAndPreviousISOWeeks() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let current = try await store.register(
+      .init(email: "xp-current@example.com", password: "a secure password", displayName: "Current XP"))
+    let previous = try await store.register(
+      .init(email: "xp-previous@example.com", password: "a secure password", displayName: "Previous XP"))
+    let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-01T12:00:00Z"))
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 70, accuracy: 99, finishedAt: now), accessToken: current.accessToken,
+      now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 75, accuracy: 99, finishedAt: now.addingTimeInterval(-60 * 60 * 24 * 8)),
+      accessToken: previous.accessToken, now: now)
+
+    let thisWeek = try await store.experienceLeaderboard(period: "week", now: now)
+    let lastWeek = try await store.experienceLeaderboard(period: "lastWeek", now: now)
+    let previousRank = try await store.experienceLeaderboardRank(
+      period: "lastWeek", accessToken: previous.accessToken, now: now)
+
+    XCTAssertEqual(thisWeek.period, "week")
+    XCTAssertEqual(thisWeek.entries.map(\.userID), [current.user.id])
+    XCTAssertEqual(lastWeek.period, "lastWeek")
+    XCTAssertEqual(lastWeek.entries.map(\.userID), [previous.user.id])
+    XCTAssertEqual(previousRank.period, "lastWeek")
+    XCTAssertEqual(previousRank.entry?.rank, 1)
+
+    do {
+      _ = try await store.experienceLeaderboard(period: "month", now: now)
+      XCTFail("Unknown experience leaderboard period must be rejected")
+    } catch let error as ResultStoreError {
+      XCTAssertEqual(error, .invalidResult)
+    }
   }
 
   func testResultsRejectImpossibleOrMalformedValues() async throws {
@@ -2358,9 +2392,20 @@ final class HealthRouteTests: XCTestCase {
         })
       try await app.test(.GET, "v1/leaderboards/experience") { response async in
         XCTAssertEqual(response.status, .ok)
-        let entries = try? response.content.decode(ExperienceLeaderboardResponse.self).entries
+        let leaderboard = try? response.content.decode(ExperienceLeaderboardResponse.self)
+        let entries = leaderboard?.entries
+        XCTAssertEqual(leaderboard?.period, "week")
         XCTAssertEqual(entries?.first?.displayName, "Route User")
         XCTAssertTrue((entries?.first?.totalExperience ?? 0) > 0)
+      }
+      try await app.test(.GET, "v1/leaderboards/experience?period=lastWeek") { response async in
+        XCTAssertEqual(response.status, .ok)
+        let leaderboard = try? response.content.decode(ExperienceLeaderboardResponse.self)
+        XCTAssertEqual(leaderboard?.period, "lastWeek")
+        XCTAssertTrue(leaderboard?.entries.isEmpty ?? false)
+      }
+      try await app.test(.GET, "v1/leaderboards/experience?period=month") { response async in
+        XCTAssertEqual(response.status, .badRequest)
       }
       try await app.test(
         .GET, "v1/leaderboards/experience/rank",

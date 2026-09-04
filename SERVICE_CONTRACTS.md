@@ -24,8 +24,8 @@
 | 提交结果 | `POST /v1/results` | 接受 Bearer 令牌或 `X-Typebar-Access-Key`；保存具 UUID 的结果，基本范围/时间校验与重复提交幂等；响应包含服务端重算的本次 XP、总 XP 与可选本周 XP 名次（部分实现） |
 | 排行榜 | `GET /v1/leaderboards`、`GET /v1/leaderboards/friends` | 前者为公开全局结果榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者都可按模式、语言与 `all`/`day`/`yesterday`/`week` 周期筛选；`yesterday` 是服务端当前日历日前的完整一天。每位用户仅保留该筛选下的最佳一条成绩，按此成绩排名，最多返回 100 位用户（部分实现） |
 | 我的 WPM 排名 | `GET /v1/leaderboards/rank`、`GET /v1/leaderboards/friends/rank` | 仅接受 Bearer 令牌，使用与相应全局/好友 WPM 榜完全相同的筛选、隐身和排序规则，返回当前账户的条目或空值；结果不受列表前 100 名限制，开发者密钥无此权限（部分实现） |
-| XP 排行榜 | `GET /v1/leaderboards/experience`、`GET /v1/leaderboards/experience/friends` | 前者为公开全局 ISO 本周 XP 榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者最多返回 100 位用户，返回展示名、本周服务端计算 XP 与名次（部分实现） |
-| 我的 XP 排名 | `GET /v1/leaderboards/experience/rank`、`GET /v1/leaderboards/experience/friends/rank` | 仅接受 Bearer 令牌，按相应全局/好友 ISO 本周 XP 榜的既有规则返回当前账户条目或空值；结果不受前 100 名列表限制，开发者密钥无此权限（部分实现） |
+| XP 排行榜 | `GET /v1/leaderboards/experience`、`GET /v1/leaderboards/experience/friends` | 前者为公开全局 ISO XP 榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。`period` 可为 `week` 或 `lastWeek`，后者只包含前一个完整 ISO 周；响应回显实际范围，避免旧服务静默把上周请求当成本周。两者最多返回 100 位用户，返回展示名、服务端计算 XP 与名次（部分实现） |
+| 我的 XP 排名 | `GET /v1/leaderboards/experience/rank`、`GET /v1/leaderboards/experience/friends/rank` | 仅接受 Bearer 令牌，按相应全局/好友 ISO 周 XP 榜的既有规则返回当前账户条目或空值；`period` 可为 `week` 或 `lastWeek`，响应回显实际范围。结果不受前 100 名列表限制，开发者密钥无此权限（部分实现） |
 | 资料 | `GET /v1/profiles?query=&limit=`、`GET /v1/profiles/{id}`、`GET/PATCH /v1/profiles/me` | 公开资料仅返回展示名、加入时间与聚合成绩；可按展示名搜索（2–40 字符，最多 50 项）；本人可读取/更新显示名及 `leaderboardOptedOut`。设为 `true` 会立即从全局和好友 WPM/XP 榜移除该账户，但不删除其服务端成绩、XP 或同步数据（部分实现） |
 | 好友 | `GET/POST /v1/connections`、`POST /v1/connections/{requesterID}/accept`、`DELETE /v1/connections/{userID}` | 受令牌保护的好友请求、接受、列表与解除关系（部分实现） |
 | 通知 | `GET /v1/notifications`、`POST /v1/notifications/{id}/read` | Bearer 令牌保护；仅返回当前账户的好友请求、接受与新私信事件及触发者公开资料，不携带私信正文，可单条标记已读（部分实现） |

@@ -170,6 +170,12 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertNil(wpm.entry)
     XCTAssertNil(experience.entry)
+    XCTAssertNil(experience.period)
+    XCTAssertEqual(RemoteExperienceLeaderboardPeriod.lastWeek.displayName, "上周")
+    XCTAssertTrue(RemoteExperienceLeaderboardPeriod.week.isConfirmed(by: nil))
+    XCTAssertTrue(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: "lastWeek"))
+    XCTAssertFalse(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: nil))
+    XCTAssertFalse(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: "week"))
   }
 
   func testLegacyPublicProfileResponseDefaultsMissingHighestConsistencyToZero() throws {

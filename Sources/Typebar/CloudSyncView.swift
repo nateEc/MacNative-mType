@@ -21,6 +21,7 @@ struct CloudSyncView: View {
     @State private var leaderboardRank: RemoteLeaderboardEntry?
     @State private var loadedLeaderboardRank = false
     @State private var experienceLeaderboard: [RemoteExperienceLeaderboardEntry] = []
+    @State private var experiencePeriod: RemoteExperienceLeaderboardPeriod = .week
     @State private var experienceScope: RemoteLeaderboardScope = .global
     @State private var isLoadingExperience = false
     @State private var experienceMessage: String?
@@ -134,7 +135,12 @@ struct CloudSyncView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("本周 XP 榜（自建服务）") {
+                Section("XP 榜（自建服务）") {
+                    Picker("范围", selection: $experiencePeriod) {
+                        ForEach(RemoteExperienceLeaderboardPeriod.allCases, id: \.self) { period in
+                            Text(period.displayName).tag(period)
+                        }
+                    }
                     Picker("榜单", selection: $experienceScope) {
                         ForEach(RemoteLeaderboardScope.allCases, id: \.self) { scope in
                             Text(scope.displayName).tag(scope)
@@ -153,11 +159,11 @@ struct CloudSyncView: View {
                                 .foregroundStyle(.secondary)
                         } else if let experienceRank {
                             Label(
-                                "你的本周 XP 排名 #\(experienceRank.rank) · \(experienceRank.totalExperience) XP",
+                                "你的\(experiencePeriod.displayName) XP 排名 #\(experienceRank.rank) · \(experienceRank.totalExperience) XP",
                                 systemImage: "person.fill")
                                 .font(.caption.weight(.medium))
                         } else if loadedExperienceRank {
-                            Text("本周还没有你的有效 XP 成绩。")
+                            Text("\(experiencePeriod.displayName)还没有你的有效 XP 成绩。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -263,18 +269,22 @@ struct CloudSyncView: View {
             isLoadingExperience = true
             defer { isLoadingExperience = false }
             do {
-                experienceLeaderboard = try await account.experienceLeaderboard(scope: experienceScope)
+                experienceLeaderboard = try await account.experienceLeaderboard(
+                    period: experiencePeriod, scope: experienceScope)
                 experienceRank = nil
                 loadedExperienceRank = false
                 if let user = account.currentUser, !user.leaderboardOptedOut {
                     do {
-                        experienceRank = try await account.experienceLeaderboardRank(scope: experienceScope)
+                        experienceRank = try await account.experienceLeaderboardRank(
+                            period: experiencePeriod, scope: experienceScope)
                         loadedExperienceRank = true
                     } catch {
                         // Older self-hosted servers may not have the rank route yet.
                     }
                 }
-                experienceMessage = experienceLeaderboard.isEmpty ? "本周还没有 XP 成绩。" : "已加载 \(experienceLeaderboard.count) 位练习者。"
+                experienceMessage = experienceLeaderboard.isEmpty
+                    ? "\(experiencePeriod.displayName)还没有 XP 成绩。"
+                    : "已加载 \(experienceLeaderboard.count) 位练习者。"
             } catch {
                 experienceLeaderboard = []
                 experienceRank = nil

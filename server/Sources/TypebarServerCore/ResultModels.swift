@@ -183,15 +183,31 @@ public struct ExperienceLeaderboardEntry: Content, Equatable, Identifiable {
     public let totalExperience: Int
 }
 
+public struct ExperienceLeaderboardQuery: Content {
+    public let period: String?
+
+    public init(period: String? = nil) {
+        self.period = period
+    }
+}
+
 public struct ExperienceLeaderboardResponse: Content, Equatable {
     public let entries: [ExperienceLeaderboardEntry]
+    public let period: String
+
+    public init(entries: [ExperienceLeaderboardEntry], period: String) {
+        self.entries = entries
+        self.period = period
+    }
 }
 
 public struct ExperienceLeaderboardRankResponse: Content, Equatable {
     public let entry: ExperienceLeaderboardEntry?
+    public let period: String
 
-    public init(entry: ExperienceLeaderboardEntry?) {
+    public init(entry: ExperienceLeaderboardEntry?, period: String) {
         self.entry = entry
+        self.period = period
     }
 }
 

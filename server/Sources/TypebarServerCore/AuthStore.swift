@@ -2083,9 +2083,13 @@ public actor AuthStore {
     }
   }
 
-  private func experience(for userID: UUID, since: Date? = nil) -> Int {
+  private func experience(for userID: UUID, since: Date? = nil, before: Date? = nil) -> Int {
     state.results
-      .filter { $0.userID == userID && (since == nil || $0.finishedAt >= since!) }
+      .filter {
+        $0.userID == userID
+          && (since == nil || $0.finishedAt >= since!)
+          && (before == nil || $0.finishedAt < before!)
+      }
       .reduce(0) { total, record in
         total + TypebarExperiencePolicy.points(for: resultRequest(from: record))
       }
@@ -2336,36 +2340,47 @@ public actor AuthStore {
       ).first(where: { $0.userID == current.id }))
   }
 
-  public func experienceLeaderboard(eligibleUserIDs: Set<UUID>? = nil, now: Date = .now)
-    -> ExperienceLeaderboardResponse
+  public func experienceLeaderboard(
+    period: String? = nil, eligibleUserIDs: Set<UUID>? = nil, now: Date = .now
+  ) throws -> ExperienceLeaderboardResponse
   {
-    let entries = experienceLeaderboardEntries(eligibleUserIDs: eligibleUserIDs, now: now)
-    return .init(entries: Array(entries.prefix(100)))
+    let resolvedPeriod = try experienceLeaderboardPeriod(period)
+    let entries = experienceLeaderboardEntries(
+      eligibleUserIDs: eligibleUserIDs, period: resolvedPeriod, now: now)
+    return .init(entries: Array(entries.prefix(100)), period: resolvedPeriod.rawValue)
   }
 
   public func experienceLeaderboardRank(
-    accessToken: String, now: Date = .now
+    period: String? = nil, accessToken: String, now: Date = .now
   ) throws -> ExperienceLeaderboardRankResponse {
     let user = try authenticatedUser(for: accessToken, now: now)
+    let resolvedPeriod = try experienceLeaderboardPeriod(period)
     return .init(
-      entry: experienceLeaderboardEntries(now: now).first(where: { $0.userID == user.id }))
+      entry: experienceLeaderboardEntries(period: resolvedPeriod, now: now)
+        .first(where: { $0.userID == user.id }),
+      period: resolvedPeriod.rawValue)
   }
 
-  public func friendExperienceLeaderboard(accessToken: String, now: Date = .now) throws
+  public func friendExperienceLeaderboard(
+    period: String? = nil, accessToken: String, now: Date = .now
+  ) throws
     -> ExperienceLeaderboardResponse
   {
     let current = try authenticatedUser(for: accessToken, now: now)
-    return experienceLeaderboard(eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now)
+    return try experienceLeaderboard(
+      period: period, eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now)
   }
 
   public func friendExperienceLeaderboardRank(
-    accessToken: String, now: Date = .now
+    period: String? = nil, accessToken: String, now: Date = .now
   ) throws -> ExperienceLeaderboardRankResponse {
     let current = try authenticatedUser(for: accessToken, now: now)
+    let resolvedPeriod = try experienceLeaderboardPeriod(period)
     return .init(
       entry: experienceLeaderboardEntries(
-        eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now
-      ).first(where: { $0.userID == current.id }))
+        eligibleUserIDs: acceptedFriendIDs(for: current.id), period: resolvedPeriod, now: now
+      ).first(where: { $0.userID == current.id }),
+      period: resolvedPeriod.rawValue)
   }
 
   private func acceptedFriendIDs(for userID: UUID) -> Set<UUID> {
@@ -2376,16 +2391,38 @@ public actor AuthStore {
     }
   }
 
+  private enum ExperienceLeaderboardPeriod: String {
+    case week
+    case lastWeek
+  }
+
+  private func experienceLeaderboardPeriod(_ rawValue: String?) throws -> ExperienceLeaderboardPeriod {
+    guard let period = ExperienceLeaderboardPeriod(rawValue: rawValue ?? ExperienceLeaderboardPeriod.week.rawValue)
+    else { throw ResultStoreError.invalidResult }
+    return period
+  }
+
   private func experienceLeaderboardEntries(
-    eligibleUserIDs: Set<UUID>? = nil, now: Date
+    eligibleUserIDs: Set<UUID>? = nil, period: ExperienceLeaderboardPeriod = .week, now: Date
   ) -> [ExperienceLeaderboardEntry] {
-    let weekStart =
-      Calendar(identifier: .iso8601).dateInterval(of: .weekOfYear, for: now)?.start ?? now
+    let calendar = Calendar(identifier: .iso8601)
+    let currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
+    let lowerBound: Date
+    let upperBound: Date?
+    switch period {
+    case .week:
+      lowerBound = currentWeekStart
+      upperBound = nil
+    case .lastWeek:
+      lowerBound = calendar.date(byAdding: .weekOfYear, value: -1, to: currentWeekStart)
+        ?? currentWeekStart
+      upperBound = currentWeekStart
+    }
     return state.users.compactMap { user -> (StoredUser, Int)? in
       guard !user.leaderboardOptedOut,
         eligibleUserIDs == nil || eligibleUserIDs!.contains(user.id)
       else { return nil }
-      let weeklyPoints = experience(for: user.id, since: weekStart)
+      let weeklyPoints = experience(for: user.id, since: lowerBound, before: upperBound)
       return weeklyPoints > 0 ? (user, weeklyPoints) : nil
     }
     .sorted {
