@@ -1044,6 +1044,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "sinhala-calm-step",
+      title: "සන්සුන් පියවර",
+      text: "සන්සුන් පියවරක් ඊළඟ කාර්යය පැහැදිලි කරයි.",
+      language: .sinhala,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "sinhala-open-notebook",
+      title: "විවෘත සටහන් පොත",
+      text: "විවෘත සටහන් පොතක් සෑම දුෂ්කර ප්‍රශ්නයකටම පිළිතුරක් නොදෙයි, නමුත් එය ප්‍රශ්නය කුඩා කොටස්වලින් දැකීමට ඉඩ දෙයි.",
+      language: .sinhala,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "sinhala-small-work",
+      title: "කුඩා කාර්යය",
+      text: "දියුණුව සෑම විටම විශාල මොහොතක් ලෙස නොපෙනේ. එකම පිටුව නැවත විවෘත කිරීම, එක් වාක්‍යයක් පැහැදිලි කිරීම, කුඩා දෝෂයක් නිවැරදි කිරීම සහ ඊළඟ උත්සාහයට ප්‍රයෝජනවත් සටහනක් තැබීම විශ්වාසය වැඩි කරයි.",
+      language: .sinhala,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "sinhala-long-table",
+      title: "දිගු මේසය",
+      text: "දිගු මේසයක නිම නොවූ අදහස් සඳහාත් ඉඩ තිබේ. එක් අන්තයක පළමු කෙටුම්පත තැබිය හැක, අනෙක් අන්තයේ වැඩි අවධානයක් අවශ්‍ය වාක්‍යයක් රැඳිය හැක, මැදින් ඊළඟ කුඩා තීරණය බලා සිටිය හැක. පුහුණුවද එලෙසම ඉදිරියට යයි. සෑම දුෂ්කර කොටසක්ම එකම උත්සාහයෙන් විසඳිය යුතු නැත. ආපසු එන්නට තැනක්, පැහැදිලි ඊළඟ පියවරක් සහ උත්සාහ කිහිපයකින් පසු පහසු වූ දේ දැකීමට ඉවසීමක් තිබේ නම් වේගය ස්වභාවිකව වැඩෙයි.",
+      language: .sinhala,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

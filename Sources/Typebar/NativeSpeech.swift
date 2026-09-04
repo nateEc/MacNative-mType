@@ -41,6 +41,7 @@ extension TypingLanguage {
     case .telugu: "te-IN"
     case .malayalam: "ml-IN"
     case .sanskrit: "sa"
+    case .sinhala: "si"
     case .greek, .greeklish: "el-GR"
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"
