@@ -31,6 +31,7 @@ extension TypingLanguage {
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"
     case .catalan: "ca-ES"
+    case .indonesian: "id-ID"
     case .danish: "da-DK"
     case .norwegianBokmal: "nb-NO"
     case .norwegianNynorsk: "nn-NO"

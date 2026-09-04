@@ -708,6 +708,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "indonesian-langkah-tenang",
+      title: "Langkah tenang",
+      text: "Langkah tenang membuat tugas berikutnya lebih jelas.",
+      language: .indonesian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "indonesian-buku-catatan-terbuka",
+      title: "Buku catatan terbuka",
+      text: "Buku catatan terbuka tidak menyelesaikan setiap pertanyaan sulit, tetapi membantu membaginya menjadi bagian yang lebih kecil.",
+      language: .indonesian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "indonesian-pekerjaan-kecil",
+      title: "Pekerjaan kecil",
+      text: "Kemajuan tidak selalu datang sebagai satu momen besar. Ia tumbuh dari pekerjaan kecil: membuka halaman yang sama, menjernihkan satu kalimat, memperbaiki satu kesalahan, dan meninggalkan catatan yang berguna untuk percobaan berikutnya.",
+      language: .indonesian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "indonesian-meja-panjang",
+      title: "Meja panjang",
+      text: "Meja panjang memberi ruang untuk berbagai jenis pekerjaan. Di satu sisi dapat diletakkan draf pertama, di sisi lain sebuah kalimat yang masih membutuhkan perhatian, dan di tengah dapat menunggu keputusan kecil berikutnya. Latihan bekerja dengan cara yang sama. Latihan tidak meminta setiap bagian sulit diselesaikan sekaligus, melainkan menyediakan tempat untuk kembali, langkah berikutnya yang terlihat, dan cukup kesabaran untuk menyadari apa yang menjadi lebih mudah setelah beberapa percobaan.",
+      language: .indonesian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "danish-lille-skridt",
       title: "Lille skridt",
       text: "Et lille, roligt skridt gør den næste opgave lettere at se.",
