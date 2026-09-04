@@ -1362,6 +1362,11 @@ final class TypingEngineTests: XCTestCase {
     hiragana.insert("あx", at: start)
     XCTAssertEqual(hiragana.missedWords, ["あさ"])
 
+    var katakana = TypingSession(
+      configuration: .timed(seconds: 30, language: .japaneseKatakana), prompt: "カメラメモ")
+    katakana.insert("カx", at: start)
+    XCTAssertEqual(katakana.missedWords, ["カメラ"])
+
     var spanish = TypingSession(
       configuration: .timed(seconds: 30, language: .spanish), prompt: "árbol puerto calma")
     spanish.insert("árbol puertx ", at: start)
@@ -2595,6 +2600,13 @@ final class TypingEngineTests: XCTestCase {
       accuracy: 100, prompt: "あさ、まど", replayEvents: [.init(offset: 0, kind: .insert, text: "あ")])
     XCTAssertEqual(ResultPromptText.make(for: hiragana, reviews: []), "あさ、")
 
+    let katakana = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30, language: .japaneseKatakana),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(3),
+      typedCharacterCount: 1, correctCharacterCount: 1, errorCount: 0, wpm: 20, rawWpm: 24,
+      accuracy: 100, prompt: "カメラ、メモ", replayEvents: [.init(offset: 0, kind: .insert, text: "カ")])
+    XCTAssertEqual(ResultPromptText.make(for: katakana, reviews: []), "カメラ、")
+
     let zen = CompletedTestResult(
       id: UUID(),
       configuration: .init(mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
@@ -2959,6 +2971,7 @@ final class TypingEngineTests: XCTestCase {
       (TypingLanguage.simplifiedChinese, StarterLexicon.simplifiedChineseWords),
       (.traditionalChinese, StarterLexicon.traditionalChineseWords),
       (.japaneseHiragana, StarterLexicon.japaneseHiraganaWords),
+      (.japaneseKatakana, StarterLexicon.japaneseKatakanaWords),
     ] {
       let configuration = TestConfiguration.words(10, language: language)
       var session = TestSessionFactory.make(configuration: configuration)
@@ -2980,6 +2993,7 @@ final class TypingEngineTests: XCTestCase {
       (TypingLanguage.simplifiedChinese, StarterLexicon.simplifiedChineseWords, "，"),
       (.traditionalChinese, StarterLexicon.traditionalChineseWords, "，"),
       (.japaneseHiragana, StarterLexicon.japaneseHiraganaWords, "、"),
+      (.japaneseKatakana, StarterLexicon.japaneseKatakanaWords, "、"),
     ] {
       let configuration = TestConfiguration.words(
         4, language: language,
@@ -3068,6 +3082,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
       StarterLexicon.ukrainianLatinWords, StarterLexicon.japaneseHiraganaWords,
+      StarterLexicon.japaneseKatakanaWords,
       StarterLexicon.koreanWords, StarterLexicon.turkishWords, StarterLexicon.polishWords,
     ]
 
@@ -3220,6 +3235,9 @@ final class TypingEngineTests: XCTestCase {
       5, language: .ukrainianLatin).with(modifiers: [.referenceStream])))
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .japaneseHiragana).with(modifiers: [.referenceStream])))
+    XCTAssertNil(LivePracticeContentSource.selected(for: .words(
+      5, language: .japaneseKatakana).with(modifiers: [.referenceStream])))
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .japaneseKatakana), "ja")
     XCTAssertEqual(
       TestSessionFactory.make(
         configuration: poetryConfiguration, streamPrompt: poetry.prompt(for: poetryConfiguration)
@@ -3924,6 +3942,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.ukrainian.speechLocaleIdentifier, "uk-UA")
     XCTAssertEqual(TypingLanguage.ukrainianLatin.speechLocaleIdentifier, "uk-UA")
     XCTAssertEqual(TypingLanguage.japaneseHiragana.speechLocaleIdentifier, "ja-JP")
+    XCTAssertEqual(TypingLanguage.japaneseKatakana.speechLocaleIdentifier, "ja-JP")
     XCTAssertEqual(TypingLanguage.korean.speechLocaleIdentifier, "ko-KR")
     XCTAssertEqual(TypingLanguage.turkish.speechLocaleIdentifier, "tr-TR")
     XCTAssertEqual(TypingLanguage.polish.speechLocaleIdentifier, "pl-PL")
@@ -4061,6 +4080,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.hungarian.ownedPracticeWords(), StarterLexicon.hungarianWords)
     XCTAssertEqual(TypingLanguage.swedish.ownedPracticeWords(), StarterLexicon.swedishWords)
     XCTAssertEqual(TypingLanguage.greek.ownedPracticeWords(), StarterLexicon.greekWords)
+    XCTAssertEqual(TypingLanguage.japaneseKatakana.ownedPracticeWords(), StarterLexicon.japaneseKatakanaWords)
     XCTAssertEqual(
       TypingLanguage.english.ownedPracticeWords(englishVariant: .british), StarterLexicon.britishWords)
     XCTAssertTrue(TypingLanguage.simplifiedChinese.ownedPracticeWords().contains("晨光"))
@@ -4274,7 +4294,7 @@ final class TypingEngineTests: XCTestCase {
       .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
       .italian, .portuguese,
       .simplifiedChinese,
-      .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
+      .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
       .korean, .turkish, .polish,
     ]
     for language in languages {

@@ -319,6 +319,10 @@ final class HealthRouteTests: XCTestCase {
       .init(language: "japaneseHiragana", text: "しずかなれんしゅうはつぎのいっぽをみえやすくする。", attribution: nil),
       accessToken: session.accessToken)
     XCTAssertEqual(hiraganaSubmission.status, "pending")
+    let katakanaSubmission = try await store.submitQuote(
+      .init(language: "japaneseKatakana", text: "チイサナステップデモツギノページヲアケル。", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(katakanaSubmission.status, "pending")
     let koreanSubmission = try await store.submitQuote(
       .init(language: "korean", text: "차분한 연습은 다음에 할 일을 더 또렷하게 만든다.", attribution: nil),
       accessToken: session.accessToken)
@@ -342,6 +346,7 @@ final class HealthRouteTests: XCTestCase {
         norwegianBokmalSubmission.id, swedishSubmission.id, hungarianSubmission.id, frenchSubmission.id,
         italianSubmission.id, portugueseSubmission.id, traditionalChineseSubmission.id,
         russianSubmission.id, ukrainianSubmission.id, ukrainianLatinSubmission.id, hiraganaSubmission.id,
+        katakanaSubmission.id,
         koreanSubmission.id,
         turkishSubmission.id,
         polishSubmission.id,
@@ -369,6 +374,7 @@ final class HealthRouteTests: XCTestCase {
     try await store.withdrawQuoteSubmission(ukrainianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(ukrainianLatinSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(hiraganaSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(katakanaSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(koreanSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(turkishSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(polishSubmission.id, accessToken: session.accessToken)
@@ -2656,7 +2662,7 @@ final class HealthRouteTests: XCTestCase {
 
     for (offset, language) in [
       "traditionalChinese", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "russian",
-      "ukrainian", "ukrainianLatin", "japaneseHiragana", "korean",
+      "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "korean",
       "turkish", "polish",
     ].enumerated() {
       let accepted = try await store.submitResult(

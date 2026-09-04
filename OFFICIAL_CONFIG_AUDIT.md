@@ -19,7 +19,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；二十一种原创单语（含希腊语、荷兰语、丹麦语、挪威 Bokmål、瑞典语、匈牙利语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。乌克兰语 Latin 仅提供原创 ASCII 离线内容，避免把在线西里尔百科内容误作 Latin。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；二十二种原创单语（含希腊语、荷兰语、丹麦语、挪威 Bokmål、瑞典语、匈牙利语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。乌克兰语 Latin 仅提供原创 ASCII 离线内容，避免把在线西里尔百科内容误作 Latin。 |
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |
@@ -125,6 +125,7 @@
 - Norwegian Bokmål 自动化测试覆盖自创词流（含 `æ`、`ø`、`å`）、四档原创引语、完整多语混排轮转、弱项复练、`nb-NO` 朗读 locale 与 `no` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Swedish 自动化测试覆盖自创词流（含 `å`、`ä`、`ö`）、四档原创引语、完整多语混排轮转、弱项复练、`sv-SE` 朗读 locale 与 `sv` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Greek 自动化测试覆盖自创词流（含重音字符）、四档原创引语、完整多语混排轮转、弱项复练、`el-GR` 朗读 locale 与 `el` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
+- Japanese Katakana 自动化测试覆盖自创片假名词流、无空格词界、四档原创引语、完整多语混排轮转、`ja-JP` 朗读 locale 与离线知识短文回退；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Hungarian 自动化测试覆盖自创词流（含 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`）、四档原创引语、完整多语混排轮转、弱项复练、`hu-HU` 朗读 locale 与 `hu` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - 完整客户端 `swift test` 通过 261 项、独立 Vapor 服务 `swift test` 通过 66 项；两次测试前 `pgrep -x Typebar` 均无输出，未启动图形应用。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退。

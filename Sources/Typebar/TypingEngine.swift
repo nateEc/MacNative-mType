@@ -214,6 +214,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case ukrainian
   case ukrainianLatin
   case japaneseHiragana
+  case japaneseKatakana
   case korean
   case turkish
   case polish
@@ -3064,6 +3065,15 @@ enum StarterLexicon {
     "まち", "あめ", "ゆっくり", "ほうこう", "ほし", "てがみ", "にわ", "こきゅう",
   ]
 
+  // Katakana-only prompts preserve this native script option without
+  // transliterating, importing, or adapting a third-party word list.
+  static let japaneseKatakanaWords = [
+    "カメラ", "メモ", "ライト", "テーブル", "リズム", "フォーカス", "ノート", "ページ",
+    "ウィンドウ", "サイン", "コーヒー", "ラジオ", "ギター", "ホテル", "バス", "メール",
+    "カード", "キーボード", "マウス", "タスク", "プラン", "ポイント", "ステップ", "ペン",
+    "ルール", "アイデア", "プロセス", "テスト", "データ", "コード",
+  ]
+
   // Original Typebar content for Hangul keyboard practice.
   static let koreanWords = [
     "아침", "창문", "종이", "해변", "바람", "연습", "집중", "천천히", "분명히", "호수",
@@ -3184,6 +3194,7 @@ enum StarterLexicon {
     case .simplifiedChinese: simplifiedChineseWords
     case .traditionalChinese: traditionalChineseWords
     case .japaneseHiragana: japaneseHiraganaWords
+    case .japaneseKatakana: japaneseKatakanaWords
     default: nil
     }
   }
@@ -3274,6 +3285,11 @@ enum StarterLexicon {
         tokens: count, lexicon: japaneseHiraganaWords, separator: "",
         punctuation: ["、", "。", "！", "？"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .japaneseKatakana:
+      return prompt(
+        tokens: count, lexicon: japaneseKatakanaWords, separator: "",
+        punctuation: ["、", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .korean:
       return prompt(
         tokens: count, lexicon: koreanWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -3346,6 +3362,7 @@ enum StarterLexicon {
     case .ukrainian: (ukrainianWords, [".", ",", "!", "?"])
     case .ukrainianLatin: (ukrainianLatinWords, [".", ",", "!", "?"])
     case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
+    case .japaneseKatakana: (japaneseKatakanaWords, ["、", "。", "！", "？"])
     case .korean: (koreanWords, [".", ",", "!", "?"])
     case .turkish: (turkishWords, [".", ",", "!", "?"])
     case .polish: (polishWords, [".", ",", "!", "?"])
@@ -3423,6 +3440,7 @@ extension TypingLanguage {
     case .ukrainian: StarterLexicon.ukrainianWords
     case .ukrainianLatin: StarterLexicon.ukrainianLatinWords
     case .japaneseHiragana: StarterLexicon.japaneseHiraganaWords
+    case .japaneseKatakana: StarterLexicon.japaneseKatakanaWords
     case .korean: StarterLexicon.koreanWords
     case .turkish: StarterLexicon.turkishWords
     case .polish: StarterLexicon.polishWords
@@ -3436,7 +3454,7 @@ extension TypingLanguage {
     .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
     .italian, .portuguese,
     .simplifiedChinese,
-    .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
+    .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
     .korean, .turkish, .polish,
   ]
 
@@ -3457,7 +3475,7 @@ extension TypingLanguage {
 
   var isNoSpaceLanguage: Bool {
     switch self {
-    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana: true
+    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana, .japaneseKatakana: true
     default: false
     }
   }
@@ -3468,7 +3486,7 @@ extension TypingLanguage {
 
   var supportsCapsLockWarning: Bool {
     switch self {
-    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana, .korean: false
+    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana, .japaneseKatakana, .korean: false
     default: !isCodeLanguage
     }
   }
@@ -3498,6 +3516,7 @@ extension TypingLanguage {
     case .ukrainian: "Українська"
     case .ukrainianLatin: "Українська (Latin)"
     case .japaneseHiragana: "日本語（ひらがな）"
+    case .japaneseKatakana: "日本語（カタカナ）"
     case .korean: "한국어"
     case .turkish: "Türkçe"
     case .polish: "Polski"

@@ -39,7 +39,7 @@ extension TypingLanguage {
     case .traditionalChinese: "zh-TW"
     case .russian: "ru-RU"
     case .ukrainian, .ukrainianLatin: "uk-UA"
-    case .japaneseHiragana: "ja-JP"
+    case .japaneseHiragana, .japaneseKatakana: "ja-JP"
     case .korean: "ko-KR"
     case .turkish: "tr-TR"
     case .polish: "pl-PL"

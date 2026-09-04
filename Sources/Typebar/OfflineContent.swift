@@ -736,6 +736,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "katakana-small-step",
+      title: "チイサナステップ",
+      text: "チイサナステップデモツギノページヲアケル。",
+      language: .japaneseKatakana,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "katakana-open-note",
+      title: "オープンノート",
+      text: "ノートニヒトツノメモヲノコスト、ツギニモドルマデノミチガミエヤスクナル。",
+      language: .japaneseKatakana,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "katakana-calm-work",
+      title: "カームワーク",
+      text: "ヨイリズムハイソグタメノモノデハナイ。ヒトツノページヲヒライテ、ヒトツノミスヲナオシテ、ツギノステップヲメモニノコス。ソノクリカエシガムズカシイタスクヲスコシズツミヂカニスル。",
+      language: .japaneseKatakana,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "katakana-long-table",
+      title: "ロングテーブル",
+      text: "ナガイテーブルニハイロイロナタスクヲオケル。ヒトツノハシニハドラフト、モウヒトツノハシニハマダカクニンガヒツヨウナメモ、ソシテマンナカニハツギノステップノタメノアキバガアル。レッスンモオナジヨウニススム。スベテノモンダイヲイチドニトクノデハナク、モドルバショトミエルステップト、ナンドモカクニンスルタメノジカンヲツクル。",
+      language: .japaneseKatakana,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "long-table",
       title: "Long Table",
       text: "A long table is useful because it makes room for more than one kind of work. One end can hold the rough sketch, another can hold the sentence that still needs care, and the middle can stay clear enough for the next small decision. Practice works in much the same way. It does not ask you to solve every difficulty at once. It asks for a place to return, a visible next step, and enough patience to notice what becomes easier after you have met it a few more times.",
