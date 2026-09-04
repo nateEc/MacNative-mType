@@ -19,7 +19,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；十三种原创单语（含繁体中文、俄语、日语平假名、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；十四种原创单语（含繁体中文、俄语、乌克兰语、日语平假名、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。 |
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |
@@ -117,7 +117,8 @@
 ## 本轮新增验证
 
 - Russian JCUKEN 自动化测试覆盖 `ё`、`й`、`ж`、`э`、`я`、`ь`、逗号与 ISO `< >` 的提示高亮、普通/Shift 物理 keycode、反查 keycode；独立设置快照覆盖键盘图、输入模拟与 Layout Fluid 持久化。映射为 Typebar 原生实现，不导入参考布局 JSON。
-- 完整客户端 `swift test` 通过 255 项、独立 Vapor 服务 `swift test` 通过 65 项；两次测试前 `pgrep -x Typebar` 均无输出，未启动图形应用。
+- 乌克兰语自动化测试覆盖原创词表中的 `ї`、`є`、`ґ`、四档原创引语、多语混排、弱项复练、`uk-UA` 朗读 locale 与 `uk` 百科入口；服务端测试覆盖成绩提交、语言筛选排行榜与引语投稿白名单，未读取或导入参考词表/内容。
+- 完整客户端 `swift test` 通过 255 项、独立 Vapor 服务 `swift test` 通过 66 项；两次测试前 `pgrep -x Typebar` 均无输出，未启动图形应用。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
@@ -127,5 +128,5 @@
 - 公开资料练习统计测试覆盖服务端从已接受成绩起止时间聚合累计时长，以及按随完成提交的重开次数派生开始次数；重复提交同一成绩 ID 不会重复累加，客户端对新旧资料响应安全解码。未完成且未提交练习与本机历史不进入该值。
 - 引语长度与队列测试覆盖多选长度通过预设和 Typebar 配置链接保存、旧单长度配置迁移，以及同一候选集每轮不重复且避免立即重复当前引语；队列仅存于当前进程，不引入参考内容或实现。
 - 服务公告测试覆盖公开读取、部署审核密钥发布/删除、计划日期往返、空白公告拒绝、原生完整日期/日期/相对时间占位符替换，以及本机普通公告关闭、置顶公告保留和服务端移除后的本机确认清理；不复制参考文案、样式或实现。
-- 完整 `swift test` 已通过 248 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
-- 独立 Vapor 服务的 `swift test` 已通过 65 项测试，其中覆盖 GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除、Discord 头像公开隐私、原创公开徽章、公开连续练习/开始次数隐私及服务公告；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
+- 完整客户端 `swift test` 已通过 255 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
+- 独立 Vapor 服务的 `swift test` 已通过 66 项测试，其中覆盖 GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除、Discord 头像公开隐私、原创公开徽章、公开连续练习/开始次数隐私及服务公告；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。

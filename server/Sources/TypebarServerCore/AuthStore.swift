@@ -1993,7 +1993,7 @@ public actor AuthStore {
     guard
       Set([
         "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
-        "traditionalChinese", "russian", "japaneseHiragana",
+        "traditionalChinese", "russian", "ukrainian", "japaneseHiragana",
         "korean", "turkish", "polish",
       ])
         .contains(request.language), (10...500).contains(text.count), attribution?.count ?? 0 <= 80
@@ -2107,7 +2107,7 @@ public actor AuthStore {
       language == nil
         || Set([
           "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
-          "traditionalChinese", "russian", "japaneseHiragana",
+          "traditionalChinese", "russian", "ukrainian", "japaneseHiragana",
           "korean", "turkish", "polish",
         ]).contains(language!)
     else { throw AuthStoreError.invalidQuoteSubmission }
@@ -2690,7 +2690,7 @@ public actor AuthStore {
     let modes = Set(["time", "words", "quote", "zen", "custom"])
     let languages = Set([
       "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
-      "traditionalChinese", "russian", "japaneseHiragana",
+      "traditionalChinese", "russian", "ukrainian", "japaneseHiragana",
       "korean", "turkish", "polish",
       "mixedEnglishChinese", "mixedLanguages",
     ])
@@ -2986,7 +2986,7 @@ public actor AuthStore {
     guard Set(["time", "words", "quote", "zen", "custom"]).contains(result.mode),
       Set([
         "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
-        "traditionalChinese", "russian", "japaneseHiragana",
+        "traditionalChinese", "russian", "ukrainian", "japaneseHiragana",
         "korean", "turkish", "polish",
         "mixedEnglishChinese", "mixedLanguages",
       ]).contains(result.language),

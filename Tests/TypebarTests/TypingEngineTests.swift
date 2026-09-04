@@ -3023,7 +3023,8 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.frenchWords, StarterLexicon.italianWords, StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
-      StarterLexicon.russianWords, StarterLexicon.japaneseHiraganaWords,
+      StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
+      StarterLexicon.japaneseHiraganaWords,
     ]
 
     XCTAssertEqual(tokens.count, 10)
@@ -3152,6 +3153,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       LivePracticeContentSource.selected(for: .words(
         5, language: .traditionalChinese).with(modifiers: [.referenceStream])), .encyclopedia)
+    let ukrainianConfiguration = TestConfiguration.words(
+      5, language: .ukrainian).with(modifiers: [.referenceStream])
+    XCTAssertEqual(LivePracticeContentSource.selected(for: ukrainianConfiguration), .encyclopedia)
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .japaneseHiragana).with(modifiers: [.referenceStream])))
     XCTAssertEqual(
@@ -3189,6 +3193,15 @@ final class TypingEngineTests: XCTestCase {
       configuration: chineseConfiguration, streamPrompt: chinesePrompt)
     chineseSession.insert(chineseSession.prompt, at: .now)
     XCTAssertEqual(chineseSession.outcome, .completed)
+    let ukrainianData = Data("""
+    {"title":"Ранковий запис","extract":"Вітер рухає сторінки записника біля вікна."}
+    """.utf8)
+    let ukrainianEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: ukrainianData, language: .ukrainian))
+    XCTAssertEqual(ukrainianEncyclopedia.text, "Вітер рухає сторінки записника біля вікна")
+    XCTAssertEqual(
+      ukrainianEncyclopedia.prompt(for: ukrainianConfiguration),
+      "Вітер рухає сторінки записника біля")
     XCTAssertNil(LivePracticeContentService.encyclopedia(from: Data("{}".utf8)))
   }
 
@@ -3772,6 +3785,7 @@ final class TypingEngineTests: XCTestCase {
     for (language, lexicon) in [
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
       (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
+      (.ukrainian, StarterLexicon.ukrainianWords),
       (.korean, StarterLexicon.koreanWords), (.turkish, StarterLexicon.turkishWords),
       (.polish, StarterLexicon.polishWords),
     ] {
@@ -3791,6 +3805,10 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertTrue(language.usesSpaceDelimitedWords)
       XCTAssertTrue(language.supportsQuotes)
     }
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.ukrainian))
+    XCTAssertTrue(StarterLexicon.ukrainianWords.contains("їжа"))
+    XCTAssertTrue(StarterLexicon.ukrainianWords.contains("єдність"))
+    XCTAssertTrue(StarterLexicon.ukrainianWords.contains("ґрунт"))
   }
 
   func testLazyLatinModifierNormalizesAccentsLigaturesAndGeneratedPrompts() {
@@ -3812,6 +3830,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.simplifiedChinese.speechLocaleIdentifier, "zh-CN")
     XCTAssertEqual(TypingLanguage.traditionalChinese.speechLocaleIdentifier, "zh-TW")
     XCTAssertEqual(TypingLanguage.russian.speechLocaleIdentifier, "ru-RU")
+    XCTAssertEqual(TypingLanguage.ukrainian.speechLocaleIdentifier, "uk-UA")
     XCTAssertEqual(TypingLanguage.japaneseHiragana.speechLocaleIdentifier, "ja-JP")
     XCTAssertEqual(TypingLanguage.korean.speechLocaleIdentifier, "ko-KR")
     XCTAssertEqual(TypingLanguage.turkish.speechLocaleIdentifier, "tr-TR")
@@ -3837,6 +3856,16 @@ final class TypingEngineTests: XCTestCase {
       prompt?.split(separator: " ").allSatisfy { StarterLexicon.words.contains(String($0)) }
         ?? false)
     XCTAssertTrue(prompt?.contains("amber") ?? false)
+
+    let ukrainianResult = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .ukrainian), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 5,
+      correctCharacterCount: 4, errorCount: 1, wpm: 12, rawWpm: 12, accuracy: 80,
+      prompt: "ґрунт", replayEvents: [.init(offset: 1, kind: .insert, text: "грунт")])
+    XCTAssertEqual(
+      WeakSpotPractice.prompt(
+        results: [ukrainianResult], language: .ukrainian, englishVariant: .american, wordCount: 1),
+      "ґрунт")
     XCTAssertNil(
       WeakSpotPractice.prompt(results: [], language: .english, englishVariant: .american))
     XCTAssertNil(
@@ -4017,7 +4046,7 @@ final class TypingEngineTests: XCTestCase {
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
       .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,
-      .traditionalChinese, .russian, .japaneseHiragana,
+      .traditionalChinese, .russian, .ukrainian, .japaneseHiragana,
       .korean, .turkish, .polish,
     ]
     for language in languages {

@@ -282,6 +282,10 @@ final class HealthRouteTests: XCTestCase {
       .init(language: "russian", text: "Спокойная практика делает следующий шаг яснее.", attribution: nil),
       accessToken: session.accessToken)
     XCTAssertEqual(russianSubmission.status, "pending")
+    let ukrainianSubmission = try await store.submitQuote(
+      .init(language: "ukrainian", text: "Спокійна практика робить наступний крок яснішим.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(ukrainianSubmission.status, "pending")
     let hiraganaSubmission = try await store.submitQuote(
       .init(language: "japaneseHiragana", text: "しずかなれんしゅうはつぎのいっぽをみえやすくする。", attribution: nil),
       accessToken: session.accessToken)
@@ -307,7 +311,8 @@ final class HealthRouteTests: XCTestCase {
       Set([
         submitted.id, spanishSubmission.id, germanSubmission.id, frenchSubmission.id,
         italianSubmission.id, portugueseSubmission.id, traditionalChineseSubmission.id,
-        russianSubmission.id, hiraganaSubmission.id, koreanSubmission.id, turkishSubmission.id,
+        russianSubmission.id, ukrainianSubmission.id, hiraganaSubmission.id, koreanSubmission.id,
+        turkishSubmission.id,
         polishSubmission.id,
       ]))
     do {
@@ -324,6 +329,7 @@ final class HealthRouteTests: XCTestCase {
     try await store.withdrawQuoteSubmission(
       traditionalChineseSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(russianSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(ukrainianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(hiraganaSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(koreanSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(turkishSubmission.id, accessToken: session.accessToken)
@@ -2611,7 +2617,7 @@ final class HealthRouteTests: XCTestCase {
     }
 
     for (offset, language) in [
-      "traditionalChinese", "russian", "japaneseHiragana", "korean", "turkish", "polish",
+      "traditionalChinese", "russian", "ukrainian", "japaneseHiragana", "korean", "turkish", "polish",
     ].enumerated() {
       let accepted = try await store.submitResult(
         result(
@@ -2881,6 +2887,22 @@ final class HealthRouteTests: XCTestCase {
       try? await app.asyncShutdown()
       throw error
     }
+  }
+
+  func testUkrainianResultCanBeSubmittedAndFilteredByLeaderboard() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "ukrainian-result@example.com", password: "a secure password", displayName: "Ukrainian User"))
+    let now = Date(timeIntervalSince1970: 1_735_689_600)
+    let submission = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 72, accuracy: 99, language: "ukrainian", finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    XCTAssertTrue(submission.accepted)
+
+    let leaderboard = try await store.leaderboard(
+      .init(mode: "time", language: "ukrainian", period: "all", limit: 10), now: now)
+    XCTAssertEqual(leaderboard.entries.map(\.wpm), [72])
   }
 
   func testLeaderboardPeriodsUseTodayYesterdayAndISOWeekBoundaries() async throws {
