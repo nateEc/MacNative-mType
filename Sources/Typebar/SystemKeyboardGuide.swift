@@ -4,6 +4,21 @@ import Carbon
 /// It asks the system for labels only; text input remains on the standard
 /// AppKit/IME path and does not use this map for interpretation.
 enum SystemKeyboardGuide {
+  enum ModifierLayer {
+    case base
+    case shift
+    case option
+    case shiftOption
+
+    var includesShift: Bool {
+      self == .shift || self == .shiftOption
+    }
+
+    var includesOption: Bool {
+      self == .option || self == .shiftOption
+    }
+  }
+
   static let physicalRows: [[UInt16]] = [
     [50, 18, 19, 20, 21, 23, 22, 26, 28, 25, 29, 27, 24],
     [12, 13, 14, 15, 17, 16, 32, 34, 31, 35, 33, 30, 42],
@@ -22,23 +37,38 @@ enum SystemKeyboardGuide {
     let keyboardType = UInt32(LMGetKbdType())
     return rows(
       includesISOSectionKey: keyboardType == UInt32(kKeyboardISO)
-    ) { keyCode, shift in
+    ) { keyCode, layer in
       translatedCharacter(
-        layout: layout, keyCode: keyCode, shift: shift, keyboardType: keyboardType)
+        layout: layout, keyCode: keyCode, layer: layer, keyboardType: keyboardType)
+    }
+  }
+
+  /// Convenience overload for tests and callers that only have base/Shift
+  /// labels. The system-backed path below uses all four modifier layers.
+  static func rows(
+    includesISOSectionKey: Bool = false,
+    translate: (_ keyCode: UInt16, _ shift: Bool) -> String?
+  ) -> [[KeyboardGuideKey]]? {
+    rows(includesISOSectionKey: includesISOSectionKey) { keyCode, layer in
+      translate(keyCode, layer.includesShift)
     }
   }
 
   static func rows(
     includesISOSectionKey: Bool = false,
-    translate: (_ keyCode: UInt16, _ shift: Bool) -> String?
+    translateLayer: (_ keyCode: UInt16, _ layer: ModifierLayer) -> String?
   ) -> [[KeyboardGuideKey]]? {
     func mappedKey(_ keyCode: UInt16) -> KeyboardGuideKey? {
-      guard let label = normalizedLabel(translate(keyCode, false)) else { return nil }
-      let shiftedLabel = normalizedLabel(translate(keyCode, true))
+      guard let label = normalizedLabel(translateLayer(keyCode, .base)) else { return nil }
+      let shiftedLabel = normalizedLabel(translateLayer(keyCode, .shift))
+      let optionLabel = normalizedLabel(translateLayer(keyCode, .option))
+      let shiftedOptionLabel = normalizedLabel(translateLayer(keyCode, .shiftOption))
       return KeyboardGuideKey(
         "system-\(keyCode)", label: label,
-        characters: label + (shiftedLabel ?? ""),
-        shiftedLabel: shiftedLabel == label ? nil : shiftedLabel)
+        characters: [label, shiftedLabel, optionLabel, shiftedOptionLabel].compactMap { $0 }.joined(),
+        shiftedLabel: shiftedLabel == label ? nil : shiftedLabel,
+        optionLabel: optionLabel == label ? nil : optionLabel,
+        shiftedOptionLabel: shiftedOptionLabel == optionLabel ? nil : shiftedOptionLabel)
     }
     let mappedRows = physicalRows.map { row in
       row.compactMap(mappedKey)
@@ -54,13 +84,15 @@ enum SystemKeyboardGuide {
   private static func translatedCharacter(
     layout: UnsafePointer<UCKeyboardLayout>,
     keyCode: UInt16,
-    shift: Bool,
+    layer: ModifierLayer,
     keyboardType: UInt32
   ) -> String? {
     var deadKeyState: UInt32 = 0
     var length = 0
     var buffer = Array(repeating: UniChar(0), count: 4)
-    let modifiers = shift ? UInt32(shiftKey >> 8) : 0
+    var modifiers: UInt32 = 0
+    if layer.includesShift { modifiers |= UInt32(shiftKey >> 8) }
+    if layer.includesOption { modifiers |= UInt32(optionKey >> 8) }
     let status = UCKeyTranslate(
       layout, keyCode, UInt16(kUCKeyActionDisplay), modifiers, keyboardType,
       OptionBits(kUCKeyTranslateNoDeadKeysMask), &deadKeyState, buffer.count, &length,

@@ -1465,13 +1465,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "!", rows: rows), "system-18")
     XCTAssertEqual(rows[1][0].label, "q")
     XCTAssertEqual(rows[1][0].shiftedLabel, "Q")
-    XCTAssertNil(SystemKeyboardGuide.rows { keyCode, _ in keyCode == 12 ? nil : "a" })
+    XCTAssertNil(SystemKeyboardGuide.rows(translate: { keyCode, _ in keyCode == 12 ? nil : "a" }))
+    let optionRows = try XCTUnwrap(SystemKeyboardGuide.rows(translateLayer: { keyCode, layer in
+      guard keyCode != 10 else { return nil }
+      switch layer {
+      case .base: return "a"
+      case .shift: return "A"
+      case .option: return "å"
+      case .shiftOption: return "Å"
+      }
+    }))
+    let optionKey = optionRows[0][0]
+    XCTAssertTrue(optionKey.characters.contains("å"))
+    XCTAssertEqual(
+      optionKey.legend(style: .dynamic, modifierFlags: [.option], capsLockEnabled: false), "å")
+    XCTAssertEqual(
+      optionKey.legend(style: .dynamic, modifierFlags: [.option, .shift], capsLockEnabled: false), "Å")
     XCTAssertEqual(KeyboardGuideLayoutSource.allCases, [.builtIn, .systemInput, .custom])
     if let currentRows = SystemKeyboardGuide.currentRows() {
       XCTAssertTrue([[13, 13, 11, 10], [13, 13, 11, 11]].contains(currentRows.map(\.count)))
       XCTAssertTrue(currentRows.flatMap { $0 }.allSatisfy { !$0.label.isEmpty })
     }
-    let isoRows = try XCTUnwrap(SystemKeyboardGuide.rows(includesISOSectionKey: true) { _, _ in "a" })
+    let isoRows = try XCTUnwrap(SystemKeyboardGuide.rows(
+      includesISOSectionKey: true, translate: { _, _ in "a" }))
     XCTAssertEqual(isoRows[3].first?.id, "system-10")
   }
 

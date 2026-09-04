@@ -326,13 +326,17 @@ struct KeyboardGuideKey: Identifiable, Equatable {
   let characters: Set<Character>
   let width: CGFloat
   let shiftedLabel: String?
+  let optionLabel: String?
+  let shiftedOptionLabel: String?
 
   init(
     _ id: String,
     label: String,
     characters: String? = nil,
     width: CGFloat = 28,
-    shiftedLabel: String? = nil
+    shiftedLabel: String? = nil,
+    optionLabel: String? = nil,
+    shiftedOptionLabel: String? = nil
   ) {
     self.id = id
     self.label = label
@@ -340,6 +344,8 @@ struct KeyboardGuideKey: Identifiable, Equatable {
       ?? Set(label.flatMap { KeyboardGuideKey.typedCharacters(for: $0) })
     self.width = width
     self.shiftedLabel = shiftedLabel
+    self.optionLabel = optionLabel
+    self.shiftedOptionLabel = shiftedOptionLabel
   }
 
   private static func typedCharacters(for character: Character) -> [Character] {
@@ -364,6 +370,10 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     case .lowercase: return label.lowercased()
     case .uppercase: return label.uppercased()
     case .dynamic:
+      if modifierFlags.contains(.option) {
+        if modifierFlags.contains(.shift), let shiftedOptionLabel { return shiftedOptionLabel }
+        if let optionLabel { return optionLabel }
+      }
       if modifierFlags.contains(.shift), let shiftedLabel { return shiftedLabel }
       if modifierFlags.contains(.shift), let shiftedSymbol = Self.shiftedSymbol(for: label) {
         return shiftedSymbol
