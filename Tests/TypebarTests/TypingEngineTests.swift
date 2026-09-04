@@ -2176,6 +2176,35 @@ final class TypingEngineTests: XCTestCase {
       "typebar-result-19700101-000000.png")
   }
 
+  func testResultCSVExportEscapesLocalMetadataAndUsesUtcFilename() throws {
+    let configuration = TestConfiguration.timed(
+      seconds: 30, difficulty: .expert, language: .french,
+      contentOptions: .init(includePunctuation: true, includeNumbers: true)
+    )
+    .with(modifiers: [.uppercase, .rot13])
+    let result = CompletedTestResult(
+      id: try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000007")),
+      configuration: configuration, outcome: .completed,
+      startedAt: Date(timeIntervalSince1970: 0),
+      finishedAt: Date(timeIntervalSince1970: 2.5), afkDuration: 0.5,
+      typedCharacterCount: 12, correctCharacterCount: 11, errorCount: 1, wpm: 60, rawWpm: 66,
+      accuracy: 92, tags: ["focus, \"deep\"", "café"], prompt: "private prompt",
+      replayEvents: [.init(offset: 0.5, kind: .insert, text: "bonjour")]
+    )
+
+    let csv = ResultCSVExport.csvString(for: [result])
+    XCTAssertTrue(csv.hasPrefix(ResultCSVExport.columns.joined(separator: ",") + "\r\n"))
+    XCTAssertTrue(csv.contains("00000000-0000-0000-0000-000000000007,completed,60,66,92,"))
+    XCTAssertTrue(csv.contains(",true,true,expert,uppercase;rot13,\"focus, \"\"deep\"\";café\","))
+    XCTAssertTrue(csv.contains("1970-01-01T00:00:00"))
+    XCTAssertFalse(csv.contains("private prompt"))
+    XCTAssertTrue(csv.hasSuffix("\r\n"))
+    XCTAssertEqual(ResultCSVExport.csvString(for: []), ResultCSVExport.columns.joined(separator: ",") + "\r\n")
+    XCTAssertEqual(
+      ResultCSVExport.filename(for: Date(timeIntervalSince1970: 0)),
+      "typebar-results-19700101-000000.csv")
+  }
+
   func testSlowWordPracticeUsesReferenceTwentyPercentSelectionAndWeightsTheSlowest() throws {
     let reviews = [
       TypedWordReview(index: 0, target: "ember", typed: "ember"),

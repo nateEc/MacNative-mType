@@ -3360,6 +3360,7 @@ private struct ResultsHistoryView: View {
   @State private var modifierFilter = Set(TestModifier.allCases)
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
+  @State private var csvExportStatus: String?
 
   private var filteredResults: [TestResultRecord] {
     let filter = ResultHistoryFilter(
@@ -3462,6 +3463,15 @@ private struct ResultsHistoryView: View {
                 HStack {
                   Button("全部", action: resetFilters)
                   Button("当前测试设置", action: applyCurrentSettingsFilter)
+                  Spacer()
+                  Text("\(filteredResults.count) 条")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                if let csvExportStatus {
+                  Text(csvExportStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 HStack {
                   TextField("筛选预设名称", text: $filterPresetName)
@@ -3614,6 +3624,10 @@ private struct ResultsHistoryView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("完成") { dismiss() }
+        }
+        ToolbarItem(placement: .primaryAction) {
+          Button("导出 CSV…", action: exportFilteredResultsCSV)
+            .disabled(filteredResults.isEmpty)
         }
       }
     }
@@ -3800,6 +3814,25 @@ private struct ResultsHistoryView: View {
 
   private func delete(at offsets: IndexSet) {
     for index in offsets { modelContext.delete(filteredResults[index]) }
+  }
+
+  private func exportFilteredResultsCSV() {
+    let portableResults = filteredResults.compactMap(\.portableResult)
+    guard !portableResults.isEmpty else {
+      csvExportStatus = "没有可导出的本机成绩。"
+      return
+    }
+    let panel = NSSavePanel()
+    panel.allowedContentTypes = [.commaSeparatedText]
+    panel.nameFieldStringValue = ResultCSVExport.filename(for: .now)
+    panel.canCreateDirectories = true
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    do {
+      try ResultCSVExport.data(for: portableResults).write(to: url, options: .atomic)
+      csvExportStatus = "已导出 \(portableResults.count) 条本机成绩；不含提示或输入回放。"
+    } catch {
+      csvExportStatus = "无法保存 CSV 文件。"
+    }
   }
 
   private var activeFilter: ResultHistoryFilter {

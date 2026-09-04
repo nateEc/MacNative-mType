@@ -3,6 +3,113 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Produces a portable, spreadsheet-friendly view of local result metadata.
+///
+/// The CSV intentionally omits prompts and replay events. Those fields can
+/// contain user-authored text, while the exported metrics are sufficient for
+/// analysis outside Typebar without exposing that content by default.
+enum ResultCSVExport {
+    static let columns = [
+        "id",
+        "outcome",
+        "wpm",
+        "raw_wpm",
+        "accuracy_percent",
+        "typing_consistency_percent",
+        "key_consistency_percent",
+        "correct_characters",
+        "typed_characters",
+        "errors",
+        "mode",
+        "duration_seconds",
+        "word_limit",
+        "language",
+        "punctuation",
+        "numbers",
+        "difficulty",
+        "modifiers",
+        "tags",
+        "started_at",
+        "finished_at",
+        "elapsed_seconds",
+        "afk_seconds",
+        "engaged_seconds",
+    ]
+
+    static func data(for results: [CompletedTestResult]) -> Data {
+        Data(csvString(for: results).utf8)
+    }
+
+    static func csvString(for results: [CompletedTestResult]) -> String {
+        ([columns] + results.map(row(for:)))
+            .map { $0.map(escaped).joined(separator: ",") }
+            .joined(separator: "\r\n") + "\r\n"
+    }
+
+    static func filename(for date: Date) -> String {
+        "typebar-results-\(filenameFormatter.string(from: date)).csv"
+    }
+
+    private static func row(for result: CompletedTestResult) -> [String] {
+        let consistency = ResultConsistencyPolicy.metrics(
+            events: result.replayEvents, duration: result.elapsedDuration)
+        let configuration = result.configuration
+        return [
+            result.id.uuidString.lowercased(),
+            result.outcome.rawValue,
+            String(result.wpm),
+            String(result.rawWpm),
+            String(result.accuracy),
+            decimal(consistency.typing),
+            decimal(consistency.key),
+            String(result.correctCharacterCount),
+            String(result.typedCharacterCount),
+            String(result.errorCount),
+            configuration.mode.rawValue,
+            configuration.duration.map(decimal) ?? "",
+            configuration.wordLimit.map(String.init) ?? "",
+            configuration.language.rawValue,
+            String(configuration.contentOptions.includePunctuation),
+            String(configuration.contentOptions.includeNumbers),
+            configuration.difficulty.rawValue,
+            configuration.modifiers.map(\.rawValue).joined(separator: ";"),
+            ResultTagPolicy.normalized(result.tags).joined(separator: ";"),
+            iso8601Date(result.startedAt),
+            iso8601Date(result.finishedAt),
+            decimal(result.elapsedDuration),
+            decimal(result.afkDuration),
+            decimal(result.engagedDuration),
+        ]
+    }
+
+    private static func escaped(_ value: String) -> String {
+        guard value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r") else {
+            return value
+        }
+        return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+    }
+
+    private static func decimal(_ value: Double) -> String {
+        String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+
+    private static let filenameFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter
+    }()
+
+    private static func iso8601Date(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter.string(from: date)
+    }
+}
+
 struct TypebarArchive: Codable, Equatable {
     static let currentVersion = 2
     let version: Int
