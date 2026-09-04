@@ -29,7 +29,36 @@ struct ResolvedTheme {
     let background: Color
     let panel: Color
     let accent: Color
+    let text: Color
+    let secondaryText: Color
+    let error: Color
+    let extraInput: Color
     let colorScheme: ColorScheme
+
+    init(
+        background: Color, panel: Color, accent: Color, colorScheme: ColorScheme,
+        text: Color? = nil, secondaryText: Color? = nil, error: Color? = nil,
+        extraInput: Color? = nil
+    ) {
+        self.background = background
+        self.panel = panel
+        self.accent = accent
+        self.colorScheme = colorScheme
+        self.text = text ?? Self.defaultTextColor(for: colorScheme)
+        self.secondaryText = secondaryText ?? Self.defaultSecondaryTextColor(for: colorScheme)
+        self.error = error ?? Self.defaultErrorColor
+        self.extraInput = extraInput ?? Self.defaultErrorColor
+    }
+
+    static func defaultTextColor(for colorScheme: ColorScheme) -> Color {
+        Color(white: colorScheme == .dark ? 0.94 : 0.12)
+    }
+
+    static func defaultSecondaryTextColor(for colorScheme: ColorScheme) -> Color {
+        Color(white: colorScheme == .dark ? 0.68 : 0.38)
+    }
+
+    static var defaultErrorColor: Color { .red }
 }
 
 /// Original, code-drawn practice backgrounds. These intentionally avoid image
@@ -122,19 +151,73 @@ struct CustomThemeDefinition: Codable, Equatable, Identifiable {
     var background: ThemeColor
     var panel: ThemeColor
     var accent: ThemeColor
+    var text: ThemeColor
+    var secondaryText: ThemeColor
+    var error: ThemeColor
+    var extraInput: ThemeColor
     var prefersDark: Bool
 
-    init(id: UUID = UUID(), name: String, background: ThemeColor, panel: ThemeColor, accent: ThemeColor, prefersDark: Bool) {
+    init(
+        id: UUID = UUID(), name: String, background: ThemeColor, panel: ThemeColor, accent: ThemeColor,
+        text: ThemeColor? = nil, secondaryText: ThemeColor? = nil, error: ThemeColor? = nil,
+        extraInput: ThemeColor? = nil, prefersDark: Bool
+    ) {
         self.id = id
         self.name = name
         self.background = background
         self.panel = panel
         self.accent = accent
         self.prefersDark = prefersDark
+        let colorScheme: ColorScheme = prefersDark ? .dark : .light
+        self.text = text ?? .init(color: ResolvedTheme.defaultTextColor(for: colorScheme))
+        self.secondaryText = secondaryText ?? .init(
+            color: ResolvedTheme.defaultSecondaryTextColor(for: colorScheme))
+        self.error = error ?? .init(color: ResolvedTheme.defaultErrorColor)
+        self.extraInput = extraInput ?? .init(color: ResolvedTheme.defaultErrorColor)
     }
 
     var resolvedTheme: ResolvedTheme {
-        .init(background: background.color, panel: panel.color, accent: accent.color, colorScheme: prefersDark ? .dark : .light)
+        .init(
+            background: background.color, panel: panel.color, accent: accent.color,
+            colorScheme: prefersDark ? .dark : .light, text: text.color,
+            secondaryText: secondaryText.color, error: error.color, extraInput: extraInput.color)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, background, panel, accent, text, secondaryText, error, extraInput, prefersDark
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        background = try values.decode(ThemeColor.self, forKey: .background)
+        panel = try values.decode(ThemeColor.self, forKey: .panel)
+        accent = try values.decode(ThemeColor.self, forKey: .accent)
+        prefersDark = try values.decode(Bool.self, forKey: .prefersDark)
+        let colorScheme: ColorScheme = prefersDark ? .dark : .light
+        text = try values.decodeIfPresent(ThemeColor.self, forKey: .text)
+            ?? .init(color: ResolvedTheme.defaultTextColor(for: colorScheme))
+        secondaryText = try values.decodeIfPresent(ThemeColor.self, forKey: .secondaryText)
+            ?? .init(color: ResolvedTheme.defaultSecondaryTextColor(for: colorScheme))
+        error = try values.decodeIfPresent(ThemeColor.self, forKey: .error)
+            ?? .init(color: ResolvedTheme.defaultErrorColor)
+        extraInput = try values.decodeIfPresent(ThemeColor.self, forKey: .extraInput)
+            ?? .init(color: ResolvedTheme.defaultErrorColor)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(name, forKey: .name)
+        try values.encode(background, forKey: .background)
+        try values.encode(panel, forKey: .panel)
+        try values.encode(accent, forKey: .accent)
+        try values.encode(text, forKey: .text)
+        try values.encode(secondaryText, forKey: .secondaryText)
+        try values.encode(error, forKey: .error)
+        try values.encode(extraInput, forKey: .extraInput)
+        try values.encode(prefersDark, forKey: .prefersDark)
     }
 }
 

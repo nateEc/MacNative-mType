@@ -54,6 +54,10 @@ struct PreferencesView: View {
   @State private var customThemeBackground = Color(red: 0.12, green: 0.14, blue: 0.20)
   @State private var customThemePanel = Color(red: 0.19, green: 0.22, blue: 0.30)
   @State private var customThemeAccent = Color(red: 0.95, green: 0.57, blue: 0.20)
+  @State private var customThemeText = Color(white: 0.94)
+  @State private var customThemeSecondaryText = Color(white: 0.68)
+  @State private var customThemeError = Color.red
+  @State private var customThemeExtraInput = Color.red
   @State private var customThemePrefersDark = true
   @State private var editingCustomThemeID: UUID?
   @State private var customThemeMessage: String?
@@ -817,6 +821,13 @@ struct PreferencesView: View {
           ColorPicker("背景", selection: $customThemeBackground)
           ColorPicker("面板", selection: $customThemePanel)
           ColorPicker("强调色", selection: $customThemeAccent)
+          Divider()
+          Text("练习文字与反馈")
+            .font(.subheadline.weight(.medium))
+          ColorPicker("提示文字", selection: $customThemeText)
+          ColorPicker("辅助文字", selection: $customThemeSecondaryText)
+          ColorPicker("错误", selection: $customThemeError)
+          ColorPicker("额外输入", selection: $customThemeExtraInput)
           Toggle("使用深色界面", isOn: $customThemePrefersDark)
           Button(editingCustomThemeID == nil ? "保存并应用自定义主题" : "更新并应用自定义主题") {
             saveCustomTheme()
@@ -1669,6 +1680,10 @@ struct PreferencesView: View {
     customThemeBackground = theme.background.color
     customThemePanel = theme.panel.color
     customThemeAccent = theme.accent.color
+    customThemeText = theme.text.color
+    customThemeSecondaryText = theme.secondaryText.color
+    customThemeError = theme.error.color
+    customThemeExtraInput = theme.extraInput.color
     customThemePrefersDark = theme.prefersDark
     customThemeMessage = nil
   }
@@ -1677,7 +1692,9 @@ struct PreferencesView: View {
     if let id = editingCustomThemeID {
       guard settings.updateCustomTheme(
         id: id, name: customThemeName, background: customThemeBackground,
-        panel: customThemePanel, accent: customThemeAccent, prefersDark: customThemePrefersDark)
+        panel: customThemePanel, accent: customThemeAccent, text: customThemeText,
+        secondaryText: customThemeSecondaryText, error: customThemeError,
+        extraInput: customThemeExtraInput, prefersDark: customThemePrefersDark)
       else {
         customThemeMessage = "主题名称需为 1–40 个字符。"
         return
@@ -1687,7 +1704,9 @@ struct PreferencesView: View {
     } else {
       guard settings.addCustomTheme(
         name: customThemeName, background: customThemeBackground,
-        panel: customThemePanel, accent: customThemeAccent, prefersDark: customThemePrefersDark)
+        panel: customThemePanel, accent: customThemeAccent, text: customThemeText,
+        secondaryText: customThemeSecondaryText, error: customThemeError,
+        extraInput: customThemeExtraInput, prefersDark: customThemePrefersDark)
       != nil else {
         customThemeMessage = "主题名称需为 1–40 个字符。"
         return
@@ -1703,6 +1722,10 @@ struct PreferencesView: View {
     customThemeBackground = Color(red: 0.12, green: 0.14, blue: 0.20)
     customThemePanel = Color(red: 0.19, green: 0.22, blue: 0.30)
     customThemeAccent = Color(red: 0.95, green: 0.57, blue: 0.20)
+    customThemeText = Color(white: 0.94)
+    customThemeSecondaryText = Color(white: 0.68)
+    customThemeError = .red
+    customThemeExtraInput = .red
     customThemePrefersDark = true
     if !keepingMessage { customThemeMessage = nil }
   }

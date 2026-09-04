@@ -5284,12 +5284,17 @@ final class TypingEngineTests: XCTestCase {
     settings.toggleFavoriteCustomTheme(theme.id)
     XCTAssertTrue(settings.updateCustomTheme(
       id: theme.id, name: "Dusk", background: .black, panel: .blue, accent: .purple,
+      text: .yellow, secondaryText: .cyan, error: .pink, extraInput: .mint,
       prefersDark: true))
     XCTAssertEqual(settings.activeCustomThemeID, theme.id)
     XCTAssertTrue(settings.isFavoriteCustomTheme(theme.id))
     XCTAssertEqual(settings.customThemes.first?.id, theme.id)
     XCTAssertEqual(settings.customThemes.first?.name, "Dusk")
     XCTAssertTrue(settings.customThemes.first?.prefersDark == true)
+    XCTAssertEqual(settings.customThemes.first?.text, ThemeColor(color: .yellow))
+    XCTAssertEqual(settings.customThemes.first?.secondaryText, ThemeColor(color: .cyan))
+    XCTAssertEqual(settings.customThemes.first?.error, ThemeColor(color: .pink))
+    XCTAssertEqual(settings.customThemes.first?.extraInput, ThemeColor(color: .mint))
     XCTAssertFalse(settings.updateCustomTheme(
       id: theme.id, name: " ", background: .white, panel: .white, accent: .white,
       prefersDark: false))
@@ -5299,7 +5304,24 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.customThemes.first?.id, theme.id)
     XCTAssertEqual(restored.customThemes.first?.name, "Dusk")
     XCTAssertTrue(restored.customThemes.first?.prefersDark == true)
+    XCTAssertEqual(restored.customThemes.first?.text, ThemeColor(color: .yellow))
+    XCTAssertEqual(restored.customThemes.first?.secondaryText, ThemeColor(color: .cyan))
+    XCTAssertEqual(restored.customThemes.first?.error, ThemeColor(color: .pink))
+    XCTAssertEqual(restored.customThemes.first?.extraInput, ThemeColor(color: .mint))
     XCTAssertTrue(restored.isFavoriteCustomTheme(theme.id))
+  }
+
+  func testLegacyCustomThemeUsesNativePracticeColorDefaults() throws {
+    let legacy = """
+      {"id":"00000000-0000-0000-0000-000000000001","name":"Legacy","background":{"red":0.1,"green":0.2,"blue":0.3,"opacity":1},"panel":{"red":0.2,"green":0.3,"blue":0.4,"opacity":1},"accent":{"red":0.3,"green":0.4,"blue":0.5,"opacity":1},"prefersDark":true}
+      """
+    let theme = try JSONDecoder().decode(CustomThemeDefinition.self, from: Data(legacy.utf8))
+    XCTAssertEqual(theme.text, ThemeColor(color: ResolvedTheme.defaultTextColor(for: .dark)))
+    XCTAssertEqual(
+      theme.secondaryText,
+      ThemeColor(color: ResolvedTheme.defaultSecondaryTextColor(for: .dark)))
+    XCTAssertEqual(theme.error, ThemeColor(color: ResolvedTheme.defaultErrorColor))
+    XCTAssertEqual(theme.extraInput, ThemeColor(color: ResolvedTheme.defaultErrorColor))
   }
 
   @MainActor

@@ -1907,13 +1907,16 @@ final class AppSettings {
 
   @discardableResult
   func addCustomTheme(
-    name: String, background: Color, panel: Color, accent: Color, prefersDark: Bool
+    name: String, background: Color, panel: Color, accent: Color, text: Color? = nil,
+    secondaryText: Color? = nil, error: Color? = nil, extraInput: Color? = nil, prefersDark: Bool
   ) -> CustomThemeDefinition? {
     let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedName.isEmpty, trimmedName.count <= 40 else { return nil }
     let custom = CustomThemeDefinition(
       name: trimmedName, background: .init(color: background), panel: .init(color: panel),
-      accent: .init(color: accent), prefersDark: prefersDark)
+      accent: .init(color: accent), text: text.map(ThemeColor.init(color:)),
+      secondaryText: secondaryText.map(ThemeColor.init(color:)), error: error.map(ThemeColor.init(color:)),
+      extraInput: extraInput.map(ThemeColor.init(color:)), prefersDark: prefersDark)
     customThemes.append(custom)
     activeCustomThemeID = custom.id
     return custom
@@ -1921,15 +1924,21 @@ final class AppSettings {
 
   @discardableResult
   func updateCustomTheme(
-    id: UUID, name: String, background: Color, panel: Color, accent: Color, prefersDark: Bool
+    id: UUID, name: String, background: Color, panel: Color, accent: Color, text: Color? = nil,
+    secondaryText: Color? = nil, error: Color? = nil, extraInput: Color? = nil, prefersDark: Bool
   ) -> Bool {
     let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedName.isEmpty, trimmedName.count <= 40,
       let index = customThemes.firstIndex(where: { $0.id == id })
     else { return false }
+    let existing = customThemes[index]
     customThemes[index] = .init(
       id: id, name: trimmedName, background: .init(color: background), panel: .init(color: panel),
-      accent: .init(color: accent), prefersDark: prefersDark)
+      accent: .init(color: accent), text: text.map(ThemeColor.init(color:)) ?? existing.text,
+      secondaryText: secondaryText.map(ThemeColor.init(color:)) ?? existing.secondaryText,
+      error: error.map(ThemeColor.init(color:)) ?? existing.error,
+      extraInput: extraInput.map(ThemeColor.init(color:)) ?? existing.extraInput,
+      prefersDark: prefersDark)
     return true
   }
 

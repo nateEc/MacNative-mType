@@ -1299,7 +1299,7 @@ private struct ContentView: View {
     .overlay {
       if settings.typingPowerMode.isEnabled, !typingPowerParticles.isEmpty {
         TypingPowerOverlay(
-          particles: typingPowerParticles, accent: activeTheme.accent, error: .red,
+          particles: typingPowerParticles, accent: activeTheme.accent, error: activeTheme.error,
           reducesMotion: settings.reducePracticeMotion)
       }
     }
@@ -1423,7 +1423,7 @@ private struct ContentView: View {
         Text(rendering.text)
           .lineSpacing(12)
           .textSelection(.disabled)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(activeTheme.secondaryText)
           .overlay(alignment: .topLeading) {
             if usesNativeCaretOverlay {
               PromptCaretOverlay(
@@ -1599,15 +1599,15 @@ private struct ContentView: View {
         case .hide where completedCharacterIndices.contains(index):
           character.foregroundColor = .clear
         case .fade where completedCharacterIndices.contains(index):
-          character.foregroundColor = .secondary.opacity(0.24)
+          character.foregroundColor = activeTheme.secondaryText.opacity(0.24)
         case .dots where turnsIntoDot:
           character.foregroundColor = activeTheme.accent.opacity(0.74)
         default:
           character.foregroundColor = completedPromptColor
         }
       case .incorrect:
-        character.foregroundColor = .red
-        character.backgroundColor = .red.opacity(0.16)
+        character.foregroundColor = activeTheme.error
+        character.backgroundColor = activeTheme.error.opacity(0.16)
       case .current:
         if promptHighlightMode == .off || !settings.caretStyle.drawsMarker || usesNativeCaretOverlay {
           character.foregroundColor = futurePromptColor
@@ -1619,8 +1619,8 @@ private struct ContentView: View {
       case .hidden:
         character.foregroundColor = .clear
       case .extra:
-        character.foregroundColor = .red
-        character.backgroundColor = .red.opacity(0.12)
+        character.foregroundColor = activeTheme.extraInput
+        character.backgroundColor = activeTheme.extraInput.opacity(0.12)
         character.strikethroughStyle = .single
       }
       output += character
@@ -1632,7 +1632,7 @@ private struct ContentView: View {
         var hint = AttributedString(String(hintCharacter))
         hint.font = .system(
           size: max(9, settings.fontSize * 0.48), weight: .semibold, design: .monospaced)
-        hint.foregroundColor = .red.opacity(0.72)
+        hint.foregroundColor = activeTheme.error.opacity(0.72)
         hint.baselineOffset = -settings.fontSize * 0.42
         // Reserve no additional horizontal advance: the hint sits under the
         // erroneous glyph instead of reflowing every following character.
@@ -1656,8 +1656,8 @@ private struct ContentView: View {
       for: role, flipsCompletionAndFuture: settings.flipTestColors,
       usesAccentForCompleted: settings.colorfulMode)
     {
-    case .primary: .primary
-    case .secondary: .secondary.opacity(0.55)
+    case .primary: activeTheme.text
+    case .secondary: activeTheme.secondaryText.opacity(0.55)
     case .accent: activeTheme.accent
     }
   }
