@@ -440,6 +440,22 @@ public enum AuthStoreError: Error, Equatable {
 }
 
 public actor AuthStore {
+  /// The server accepts exactly the client-facing, single-language choices
+  /// for community quotes. Result and leaderboard requests add the two
+  /// native mixed-language choices below, so these surfaces cannot drift.
+  private static let supportedSingleLanguageIDs: Set<String> = [
+    "english", "spanish", "german", "afrikaans", "greek", "greeklish", "dutch", "filipino",
+    "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk",
+    "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian",
+    "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french",
+    "italian", "portuguese", "simplifiedChinese", "traditionalChinese", "russian", "ukrainian",
+    "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
+    "turkish", "polish",
+  ]
+  private static let supportedResultLanguageIDs = supportedSingleLanguageIDs.union([
+    "mixedEnglishChinese", "mixedLanguages",
+  ])
+
   private struct PersistedState: Codable {
     var users: [StoredUser] = []
     var sessions: [StoredSession] = []
@@ -1991,13 +2007,8 @@ public actor AuthStore {
     let text = request.text.trimmingCharacters(in: .whitespacesAndNewlines)
     let attribution = request.attribution?.trimmingCharacters(in: .whitespacesAndNewlines)
     guard
-      Set([
-        "english", "spanish", "german", "afrikaans", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
-        "simplifiedChinese",
-        "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
-        "korean", "turkish", "polish",
-      ])
-        .contains(request.language), (10...500).contains(text.count), attribution?.count ?? 0 <= 80
+      Self.supportedSingleLanguageIDs.contains(request.language), (10...500).contains(text.count),
+      attribution?.count ?? 0 <= 80
     else { throw AuthStoreError.invalidQuoteSubmission }
     let submission = StoredQuoteSubmission(
       id: UUID(), userID: user.id, language: request.language, text: text,
@@ -2105,13 +2116,7 @@ public actor AuthStore {
     language: String?, limit: Int?, accessToken: String? = nil, now: Date = .now
   ) throws -> PublicQuoteListResponse {
     guard
-      language == nil
-        || Set([
-          "english", "spanish", "german", "afrikaans", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
-          "simplifiedChinese",
-          "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
-          "korean", "turkish", "polish",
-        ]).contains(language!)
+      language == nil || Self.supportedSingleLanguageIDs.contains(language!)
     else { throw AuthStoreError.invalidQuoteSubmission }
     let viewerID = try accessToken.map { try authenticatedUser(for: $0, now: now).id }
     let resolvedLimit = min(max(limit ?? 50, 1), 100)
@@ -2690,16 +2695,9 @@ public actor AuthStore {
     _ query: LeaderboardQuery, eligibleUserIDs: Set<UUID>?, now: Date
   ) throws -> [LeaderboardEntry] {
     let modes = Set(["time", "words", "quote", "zen", "custom"])
-    let languages = Set([
-      "english", "spanish", "german", "afrikaans", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
-      "simplifiedChinese",
-      "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
-      "korean", "turkish", "polish",
-      "mixedEnglishChinese", "mixedLanguages",
-    ])
     let periods = Set(["all", "day", "yesterday", "week"])
     if let mode = query.mode, !modes.contains(mode) { throw ResultStoreError.invalidResult }
-    if let language = query.language, !languages.contains(language) {
+    if let language = query.language, !Self.supportedResultLanguageIDs.contains(language) {
       throw ResultStoreError.invalidResult
     }
     let period = query.period ?? "all"
@@ -2987,13 +2985,7 @@ public actor AuthStore {
 
   private func validate(result: ResultSubmissionRequest, now: Date) throws {
     guard Set(["time", "words", "quote", "zen", "custom"]).contains(result.mode),
-      Set([
-        "english", "spanish", "german", "afrikaans", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
-        "simplifiedChinese",
-        "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
-        "korean", "turkish", "polish",
-        "mixedEnglishChinese", "mixedLanguages",
-      ]).contains(result.language),
+      Self.supportedResultLanguageIDs.contains(result.language),
       (0...400).contains(result.wpm), (0...500).contains(result.rawWpm),
       (0...100).contains(result.accuracy), (0...100).contains(result.consistency),
       result.errorCount >= 0, result.eventCount >= 0,
