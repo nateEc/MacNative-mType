@@ -1430,6 +1430,7 @@ private struct ContentView: View {
   private var practicePrompt: some View {
     let _ = settings.localPracticeFontRevision
     let rendering = renderedPrompt
+    let isRightToLeft = session.configuration.language.usesRightToLeftPrompt
     return Group {
       if practiceVisualEffect.usesASL {
         ASLPracticePrompt(
@@ -1452,8 +1453,10 @@ private struct ContentView: View {
         Text(rendering.text)
           .lineSpacing(12)
           .textSelection(.disabled)
+          .multilineTextAlignment(isRightToLeft ? .trailing : .leading)
+          .environment(\.layoutDirection, isRightToLeft ? .rightToLeft : .leftToRight)
           .foregroundStyle(activeTheme.secondaryText)
-          .overlay(alignment: .topLeading) {
+          .overlay(alignment: isRightToLeft ? .topTrailing : .topLeading) {
             if usesNativeCaretOverlay {
               PromptCaretOverlay(
                 text: rendering.text,
@@ -1477,10 +1480,10 @@ private struct ContentView: View {
     .frame(
       maxWidth: settings.practiceLineWidth.maximumWidth(
         fontSize: settings.fontSize, customColumns: settings.customPracticeLineColumns),
-      alignment: .leading
+      alignment: isRightToLeft ? .trailing : .leading
     )
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.trailing, 4)
+    .frame(maxWidth: .infinity, alignment: isRightToLeft ? .trailing : .leading)
+    .padding(isRightToLeft ? .leading : .trailing, 4)
   }
 
   private var effectiveKeyboardGuideMode: KeyboardGuideMode {
@@ -1560,7 +1563,9 @@ private struct ContentView: View {
 
   private var usesNativeCaretOverlay: Bool {
     guard settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker else { return false }
-    guard !usesTapePractice, !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo else {
+    guard !session.configuration.language.usesRightToLeftPrompt, !usesTapePractice,
+      !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo
+    else {
       return false
     }
     return !session.configuration.modifiers.contains(.listening)
@@ -1701,6 +1706,7 @@ private struct ContentView: View {
 
   private var usesTapePractice: Bool {
     settings.practiceTapeMode != .off && !session.prompt.contains("\n")
+      && !session.configuration.language.usesRightToLeftPrompt
   }
 
   private var showsAllPracticeLines: Bool {

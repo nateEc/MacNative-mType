@@ -652,6 +652,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "arabic-calm-step",
+      title: "خطوة هادئة",
+      text: "خطوة هادئة تجعل المهمة التالية أوضح.",
+      language: .arabic,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "arabic-open-notebook",
+      title: "دفتر مفتوح",
+      text: "لا يحل الدفتر المفتوح كل سؤال صعب، لكنه يساعد على تقسيم السؤال إلى أجزاء أصغر.",
+      language: .arabic,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "arabic-small-work",
+      title: "عمل صغير",
+      text: "لا يأتي التقدم دائما في لحظة كبيرة. إنه ينمو من أعمال صغيرة: فتح الصفحة نفسها، وتوضيح جملة واحدة، وتصحيح خطأ، وترك ملاحظة نافعة للمحاولة التالية.",
+      language: .arabic,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "arabic-long-table",
+      title: "طاولة طويلة",
+      text: "تمنح الطاولة الطويلة مساحة لأنواع مختلفة من العمل. على أحد طرفيها مسودة أولى، وعلى الطرف الآخر جملة تحتاج إلى مزيد من الانتباه، وفي الوسط قرار صغير ينتظر. تعمل الممارسة بالطريقة نفسها: لا تطلب حل كل جزء صعب دفعة واحدة، بل توفر مكانا للعودة، وخطوة تالية واضحة، وصبرا كافيا لملاحظة ما يصبح أسهل بعد عدة محاولات.",
+      language: .arabic,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

@@ -46,7 +46,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 可重复打包为本地 `Typebar.app`
 - 可从原生界面配置并开始计时、字数、引语、自定义文本、禅模式；计时支持 5–3600 秒、字数支持 1–1000 词的自定义数值
 - 开始后可明确放弃本次测试；放弃与难度失败均不会写入完成成绩
-- 原创 English（美式或英式拼写）、Español、Deutsch、Afrikaans、Ελληνικά、Greeklish、Nederlands、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、Dansk、Norsk bokmål、Norsk nynorsk、Svenska、Magyar、Čeština、Slovenčina、Slovenščina、Hrvatski、Српски、Srpski (Latin)、Български、Română、Suomi、Eesti、Íslenska、Français、Italiano、Português、简体中文、繁體中文、Русский、Українська、Українська (Latin)、日本語（ひらがな）、日本語（カタカナ）、日本語（ローマ字）、한국어、Türkçe 与 Polski 离线词库及引语；乌克兰语 Latin、日语罗马字与 Greeklish 仅提供 Typebar 自创的 ASCII 离线内容；Srpski (Latin) 也只使用原创离线拉丁内容。四种书写形式都不会被随机远端原文替换；日语假名模式也不以随机百科文本替换提示；计时、字数和禅模式还可用中英混合词流，语言选择随测试配置、预设和成绩保存
+- 原创 English（美式或英式拼写）、Español、Deutsch、Afrikaans、العربية、Ελληνικά、Greeklish、Nederlands、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、Dansk、Norsk bokmål、Norsk nynorsk、Svenska、Magyar、Čeština、Slovenčina、Slovenščina、Hrvatski、Српски、Srpski (Latin)、Български、Română、Suomi、Eesti、Íslenska、Français、Italiano、Português、简体中文、繁體中文、Русский、Українська、Українська (Latin)、日本語（ひらがな）、日本語（カタカナ）、日本語（ローマ字）、한국어、Türkçe 与 Polski 离线词库及引语；Arabic 用 macOS 输入源和 RTL 提示呈现，暂不进入双向多语混排。乌克兰语 Latin、日语罗马字与 Greeklish 仅提供 Typebar 自创的 ASCII 离线内容；Srpski (Latin) 也只使用原创离线拉丁内容。四种书写形式都不会被随机远端原文替换；日语假名模式也不以随机百科文本替换提示；计时、字数和禅模式还可用中英混合词流，语言选择随测试配置、预设和成绩保存
 - 代码练习提供与官方当前目录对应的 69 个语言/方言选择，每项使用 Typebar 原创离线片段，并支持换行、自动缩进、可选反缩进和回放；不导入官方代码语料
 - 引语模式可按短、中、长、超长筛选，收藏原创离线引语；完成页会保留本轮引语身份，提供本机收藏/评分，或对已审核社区引语进行账户评价和私有举报；可选择仅在输入中重开时重复当前引语，随机选择则始终避开当前内容；收藏与策略会随本机归档保存
 - 计时、字数和禅模式可按需加入数字与标点，且选项随预设和备份保存
