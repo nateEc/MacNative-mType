@@ -30,6 +30,7 @@ extension TypingLanguage {
     case .dutch: "nl-NL"
     case .danish: "da-DK"
     case .norwegianBokmal: "nb-NO"
+    case .norwegianNynorsk: "nn-NO"
     case .swedish: "sv-SE"
     case .hungarian: "hu-HU"
     case .czech: "cs-CZ"

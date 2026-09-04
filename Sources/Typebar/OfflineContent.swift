@@ -680,6 +680,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "norwegian-nynorsk-lite-steg",
+      title: "Lite steg",
+      text: "Eit roleg steg kan gjere den neste oppgåva klårare.",
+      language: .norwegianNynorsk,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "norwegian-nynorsk-open-notatbok",
+      title: "Open notatbok",
+      text: "Ei open notatbok løyser ikkje vanskelege spørsmål åleine, men ho gjer det lettare å dele dei i små delar.",
+      language: .norwegianNynorsk,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "norwegian-nynorsk-roleg-arbeid",
+      title: "Roleg arbeid",
+      text: "Framgang kjem ikkje alltid i ei stor stund. Han veks i små handlingar: å opne den same sida, gjere ei setning klårare, rette ein feil og leggje att eit nyttig notat til neste forsøk.",
+      language: .norwegianNynorsk,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "norwegian-nynorsk-langt-bord",
+      title: "Langt bord",
+      text: "Eit langt bord gjev rom for ulike slag arbeid. I den eine enden kan eit første utkast liggje, i den andre ei setning som framleis treng merksemd, og i midten kan den neste vesle avgjerda vente. Øving verkar på same måten. Ho krev ikkje at alle vanskelege delar skal løysast med ein gong, men at vi har ein stad å vende attende til, eit synleg neste steg og nok tolmod til å leggje merke til det som vert lettare etter fleire forsøk.",
+      language: .norwegianNynorsk,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "swedish-calm-rhythm",
       title: "Lugn rytm",
       text: "En lugn rytm gör nästa rad lättare att hitta.",
