@@ -213,18 +213,19 @@ public struct AuthSessionResponse: Content, Equatable {
   public let expiresAt: Date
 }
 
-/// The self-hosted providers intentionally mirror the two third-party methods
-/// exposed by the reference product. Their opaque subject identifiers are only
-/// accepted after a configured OAuth exchange has validated them.
+/// OAuth subject identifiers are accepted only after a configured provider
+/// exchange has validated them.
 public enum OAuthProvider: String, Content, CaseIterable, Equatable, Sendable {
   case github
   case google
+  case discord
 }
 
 public enum AuthenticationMethod: String, Content, CaseIterable, Equatable, Sendable {
   case password
   case github
   case google
+  case discord
 }
 
 public enum OAuthAuthorizationPurpose: String, Content, Equatable, Sendable {
@@ -2561,6 +2562,7 @@ public actor AuthStore {
       switch identity.provider {
       case .github: available.insert(.github)
       case .google: available.insert(.google)
+      case .discord: available.insert(.discord)
       }
     }
     return AuthenticationMethod.allCases.filter { available.contains($0) }

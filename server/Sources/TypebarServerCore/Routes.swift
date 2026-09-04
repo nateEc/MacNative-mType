@@ -53,6 +53,7 @@ public func configure(
                 "emailVerification": emailVerificationDelivery == nil ? .planned : .available,
                 "githubOAuth": oauthProviderClient?.isConfigured(for: .github) == true ? .available : .planned,
                 "googleOAuth": oauthProviderClient?.isConfigured(for: .google) == true ? .available : .planned,
+                "discordOAuth": oauthProviderClient?.isConfigured(for: .discord) == true ? .available : .planned,
                 "synchronization": .partial,
                 "resultSubmission": .partial,
                 "resultHistory": .partial,

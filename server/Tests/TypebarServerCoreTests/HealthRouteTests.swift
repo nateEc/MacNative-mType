@@ -1993,6 +1993,13 @@ final class HealthRouteTests: XCTestCase {
     let linkedUser = try await store.linkOAuth(google, accessToken: oauthSession.accessToken)
     XCTAssertEqual(linkedUser.authenticationMethods, [.github, .google])
 
+    let discord = OAuthProviderIdentity(
+      provider: .discord, subject: "discord-user-7", email: "discord@example.com")
+    let linkedDiscordUser = try await store.linkOAuth(discord, accessToken: oauthSession.accessToken)
+    XCTAssertEqual(linkedDiscordUser.authenticationMethods, [.github, .google, .discord])
+    let discordLogin = try await store.loginWithOAuth(discord)
+    XCTAssertEqual(discordLogin.user.id, oauthSession.user.id)
+
     let googleReauthentication = try await store.beginOAuth(
       provider: .google, purpose: .reauthenticate, accessToken: oauthSession.accessToken)
     _ = try await store.beginOAuthCallback(provider: .google, stateToken: googleReauthentication.state)
@@ -2001,7 +2008,7 @@ final class HealthRouteTests: XCTestCase {
     let googleReauthenticationToken = try XCTUnwrap(googleCompletion.reauthenticationToken)
     let remainingGoogleUser = try await store.unlinkOAuth(
       .github, accessToken: oauthSession.accessToken, reauthenticationToken: googleReauthenticationToken)
-    XCTAssertEqual(remainingGoogleUser.authenticationMethods, [.google])
+    XCTAssertEqual(remainingGoogleUser.authenticationMethods, [.google, .discord])
     let googleLogin = try await store.loginWithOAuth(google)
     XCTAssertEqual(googleLogin.user.id, oauthSession.user.id)
 
@@ -2125,9 +2132,12 @@ final class HealthRouteTests: XCTestCase {
       URL(string: "https://typebar.example.com/v1/auth/oauth/github/callback"))
     let googleRedirect = try XCTUnwrap(
       URL(string: "https://typebar.example.com/v1/auth/oauth/google/callback"))
+    let discordRedirect = try XCTUnwrap(
+      URL(string: "https://typebar.example.com/v1/auth/oauth/discord/callback"))
     let client = OAuthProviderClient(configurations: [
       .github: try .init(clientID: "github-client", clientSecret: "github-secret", redirectURL: githubRedirect),
       .google: try .init(clientID: "google-client", clientSecret: "google-secret", redirectURL: googleRedirect),
+      .discord: try .init(clientID: "discord-client", clientSecret: "discord-secret", redirectURL: discordRedirect),
     ])
     let request = OAuthAuthorizationRequest(
       provider: .github, state: "state-token", codeChallenge: "challenge-token")
@@ -2150,41 +2160,52 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(googleQuery["scope"], "openid profile email")
     XCTAssertEqual(googleQuery["prompt"], "select_account")
     XCTAssertEqual(googleQuery["redirect_uri"], googleRedirect.absoluteString)
+
+    let discordURL = try client.authorizationURL(for: .init(
+      provider: .discord, state: "discord-state", codeChallenge: "discord-challenge"))
+    let discordQuery = Dictionary(
+      uniqueKeysWithValues: (URLComponents(url: discordURL, resolvingAgainstBaseURL: false)?.queryItems ?? [])
+        .compactMap { item in item.value.map { (item.name, $0) } })
+    XCTAssertEqual(discordURL.host, "discord.com")
+    XCTAssertEqual(discordURL.path, "/oauth2/authorize")
+    XCTAssertEqual(discordQuery["scope"], "identify email")
+    XCTAssertEqual(discordQuery["state"], "discord-state")
+    XCTAssertEqual(discordQuery["code_challenge_method"], "S256")
   }
 
   func testOAuthRoutesUseInjectedIdentityAndReturnToTheNativeCallback() async throws {
     let app = try await Application.make(.testing)
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let redirectURL = try XCTUnwrap(
-      URL(string: "https://typebar.example.com/v1/auth/oauth/google/callback"))
+      URL(string: "https://typebar.example.com/v1/auth/oauth/discord/callback"))
     let oauthClient = OAuthProviderClient(
       configurations: [
-        .google: try .init(clientID: "google-client", clientSecret: "google-secret", redirectURL: redirectURL)
+        .discord: try .init(clientID: "discord-client", clientSecret: "discord-secret", redirectURL: redirectURL)
       ],
       identityResolver: { provider, _, _ in
-        guard provider == .google else { throw OAuthProviderClientError.providerRejected }
+        guard provider == .discord else { throw OAuthProviderClientError.providerRejected }
         return .init(
-          provider: .google, subject: "route-google-subject", email: "route-google@example.com",
-          suggestedDisplayName: "Route Google")
+          provider: .discord, subject: "route-discord-subject", email: "route-discord@example.com",
+          suggestedDisplayName: "Route Discord")
       })
     do {
       try configure(app, authStore: store, oauthProviderClient: oauthClient)
       try await app.test(.GET, "v1/capabilities") { response async in
         let capabilities = try? response.content.decode(ServiceCapabilitiesResponse.self)
-        XCTAssertEqual(capabilities?.capabilities["googleOAuth"], .available)
+        XCTAssertEqual(capabilities?.capabilities["discordOAuth"], .available)
         XCTAssertEqual(capabilities?.capabilities["githubOAuth"], .planned)
       }
-      try await app.test(.POST, "v1/auth/oauth/google/start", beforeRequest: { request in
+      try await app.test(.POST, "v1/auth/oauth/discord/start", beforeRequest: { request in
         try request.content.encode(OAuthStartRequest(purpose: .signIn))
       }) { response async in
         XCTAssertEqual(response.status, .ok)
         let started = try? response.content.decode(OAuthStartResponse.self)
-        XCTAssertEqual(URL(string: started?.authorizationURL ?? "")?.host, "accounts.google.com")
+        XCTAssertEqual(URL(string: started?.authorizationURL ?? "")?.host, "discord.com")
       }
 
-      let transaction = try await store.beginOAuth(provider: .google, purpose: .signIn)
+      let transaction = try await store.beginOAuth(provider: .discord, purpose: .signIn)
       try await app.test(
-        .GET, "v1/auth/oauth/google/callback?code=test-code&state=\(transaction.state)"
+        .GET, "v1/auth/oauth/discord/callback?code=test-code&state=\(transaction.state)"
       ) { response async in
         XCTAssertEqual(response.status, .found)
         let callbackURL = response.headers.first(name: "Location")
@@ -2195,7 +2216,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(response.status, .ok)
         let completion = try? response.content.decode(OAuthCompletionResponse.self)
         XCTAssertEqual(completion?.status, .registrationRequired)
-        XCTAssertEqual(completion?.email, "route-google@example.com")
+        XCTAssertEqual(completion?.email, "route-discord@example.com")
       }
       try await app.test(.POST, "v1/auth/oauth/registration", beforeRequest: { request in
         try request.content.encode(
@@ -2203,7 +2224,7 @@ final class HealthRouteTests: XCTestCase {
       }) { response async in
         XCTAssertEqual(response.status, .ok)
         let session = try? response.content.decode(AuthSessionResponse.self)
-        XCTAssertEqual(session?.user.authenticationMethods, [.google])
+        XCTAssertEqual(session?.user.authenticationMethods, [.discord])
         XCTAssertTrue(session?.user.emailVerified ?? false)
       }
       try await app.asyncShutdown()

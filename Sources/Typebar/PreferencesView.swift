@@ -1819,7 +1819,7 @@ struct PreferencesView: View {
   private var accountSectionVisible: Bool {
     matches(
       "自建账户", "账户", "account", "服务", "server", "登录", "login", "注册", "邮箱", "email", "密码", "password",
-      "GitHub", "Google", "OAuth", "第三方", "关联", "资料", "profile", "排行榜", "榜单", "leaderboard", "成绩", "results", "XP", "开发者", "密钥", "key", "自动化", "清除", "删除", "注销")
+      "GitHub", "Google", "Discord", "OAuth", "第三方", "关联", "资料", "profile", "排行榜", "榜单", "leaderboard", "成绩", "results", "XP", "开发者", "密钥", "key", "自动化", "清除", "删除", "注销")
   }
 
   private var moderationSectionVisible: Bool {

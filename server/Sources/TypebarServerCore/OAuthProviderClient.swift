@@ -54,7 +54,12 @@ public struct OAuthProviderClient: Sendable {
   public static func fromEnvironment() throws -> Self {
     var configurations: [OAuthProvider: Configuration] = [:]
     for provider in OAuthProvider.allCases {
-      let prefix = provider == .github ? "TYPEBAR_GITHUB_OAUTH" : "TYPEBAR_GOOGLE_OAUTH"
+      let prefix: String
+      switch provider {
+      case .github: prefix = "TYPEBAR_GITHUB_OAUTH"
+      case .google: prefix = "TYPEBAR_GOOGLE_OAUTH"
+      case .discord: prefix = "TYPEBAR_DISCORD_OAUTH"
+      }
       let id = Environment.get("\(prefix)_CLIENT_ID")?.trimmingCharacters(in: .whitespacesAndNewlines)
       let secret = Environment.get("\(prefix)_CLIENT_SECRET")?.trimmingCharacters(in: .whitespacesAndNewlines)
       let redirect = Environment.get("\(prefix)_REDIRECT_URL")?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -79,6 +84,9 @@ public struct OAuthProviderClient: Sendable {
     case .google:
       endpoint = "https://accounts.google.com/o/oauth2/v2/auth"
       scope = "openid profile email"
+    case .discord:
+      endpoint = "https://discord.com/oauth2/authorize"
+      scope = "identify email"
     }
     guard var components = URLComponents(string: endpoint) else {
       throw OAuthProviderClientError.invalidConfiguration
@@ -115,6 +123,8 @@ public struct OAuthProviderClient: Sendable {
       return try await githubIdentity(accessToken: accessToken)
     case .google:
       return try await googleIdentity(accessToken: accessToken)
+    case .discord:
+      return try await discordIdentity(accessToken: accessToken)
     }
   }
 
@@ -128,9 +138,12 @@ public struct OAuthProviderClient: Sendable {
   private func exchangeCode(
     provider: OAuthProvider, code: String, verifier: String, configuration: Configuration
   ) async throws -> String {
-    let endpoint = provider == .github
-      ? "https://github.com/login/oauth/access_token"
-      : "https://oauth2.googleapis.com/token"
+    let endpoint: String
+    switch provider {
+    case .github: endpoint = "https://github.com/login/oauth/access_token"
+    case .google: endpoint = "https://oauth2.googleapis.com/token"
+    case .discord: endpoint = "https://discord.com/api/oauth2/token"
+    }
     guard let url = URL(string: endpoint) else { throw OAuthProviderClientError.invalidConfiguration }
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -144,7 +157,7 @@ public struct OAuthProviderClient: Sendable {
       ("redirect_uri", configuration.redirectURL.absoluteString),
       ("code_verifier", verifier),
     ]
-    if provider == .google { parameters.append(("grant_type", "authorization_code")) }
+    if provider != .github { parameters.append(("grant_type", "authorization_code")) }
     request.httpBody = Self.formData(parameters)
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
@@ -177,6 +190,18 @@ public struct OAuthProviderClient: Sendable {
     guard user.emailVerified else { throw OAuthProviderClientError.unverifiedEmail }
     return .init(
       provider: .google, subject: user.subject, email: user.email, suggestedDisplayName: user.name)
+  }
+
+  private func discordIdentity(accessToken: String) async throws -> OAuthProviderIdentity {
+    let user: DiscordUser = try await authorizedJSON(
+      url: "https://discord.com/api/users/@me", accessToken: accessToken)
+    guard let email = user.email, user.verified == true else {
+      throw OAuthProviderClientError.unverifiedEmail
+    }
+    let globalName = user.globalName?.trimmingCharacters(in: .whitespacesAndNewlines)
+    return .init(
+      provider: .discord, subject: user.id, email: email,
+      suggestedDisplayName: globalName?.isEmpty == false ? globalName : user.username)
   }
 
   private func authorizedJSON<Response: Decodable>(
@@ -246,5 +271,21 @@ private struct GoogleUserInfo: Decodable {
     case email
     case emailVerified = "email_verified"
     case name
+  }
+}
+
+private struct DiscordUser: Decodable {
+  let id: String
+  let username: String
+  let globalName: String?
+  let email: String?
+  let verified: Bool?
+
+  private enum CodingKeys: String, CodingKey {
+    case id
+    case username
+    case globalName = "global_name"
+    case email
+    case verified
   }
 }

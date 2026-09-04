@@ -6,6 +6,7 @@ enum RemoteAuthenticationMethod: String, Codable, CaseIterable, Identifiable, Se
     case password
     case github
     case google
+    case discord
 
     var id: Self { self }
 
@@ -14,6 +15,7 @@ enum RemoteAuthenticationMethod: String, Codable, CaseIterable, Identifiable, Se
         case .password: "密码"
         case .github: "GitHub"
         case .google: "Google"
+        case .discord: "Discord"
         }
     }
 
@@ -22,6 +24,7 @@ enum RemoteAuthenticationMethod: String, Codable, CaseIterable, Identifiable, Se
         case .password: nil
         case .github: .github
         case .google: .google
+        case .discord: .discord
         }
     }
 }
@@ -29,6 +32,7 @@ enum RemoteAuthenticationMethod: String, Codable, CaseIterable, Identifiable, Se
 enum RemoteOAuthProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case github
     case google
+    case discord
 
     var id: Self { self }
 
@@ -36,6 +40,7 @@ enum RemoteOAuthProvider: String, Codable, CaseIterable, Identifiable, Sendable 
         switch self {
         case .github: "GitHub"
         case .google: "Google"
+        case .discord: "Discord"
         }
     }
 
@@ -43,6 +48,7 @@ enum RemoteOAuthProvider: String, Codable, CaseIterable, Identifiable, Sendable 
         switch self {
         case .github: .github
         case .google: .google
+        case .discord: .discord
         }
     }
 }
