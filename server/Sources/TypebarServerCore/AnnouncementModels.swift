@@ -16,11 +16,16 @@ public struct AnnouncementPublicationRequest: Content, Equatable {
   public let message: String
   public let level: TypebarAnnouncementLevel
   public let sticky: Bool
+  public let scheduledAt: Date?
 
-  public init(message: String, level: TypebarAnnouncementLevel = .notice, sticky: Bool = false) {
+  public init(
+    message: String, level: TypebarAnnouncementLevel = .notice, sticky: Bool = false,
+    scheduledAt: Date? = nil
+  ) {
     self.message = message
     self.level = level
     self.sticky = sticky
+    self.scheduledAt = scheduledAt
   }
 }
 
@@ -29,7 +34,20 @@ public struct PublicAnnouncementResponse: Content, Equatable, Identifiable {
   public let message: String
   public let level: TypebarAnnouncementLevel
   public let sticky: Bool
+  public let scheduledAt: Date?
   public let publishedAt: Date
+
+  public init(
+    id: UUID, message: String, level: TypebarAnnouncementLevel, sticky: Bool,
+    scheduledAt: Date? = nil, publishedAt: Date
+  ) {
+    self.id = id
+    self.message = message
+    self.level = level
+    self.sticky = sticky
+    self.scheduledAt = scheduledAt
+    self.publishedAt = publishedAt
+  }
 }
 
 public struct PublicAnnouncementsResponse: Content, Equatable {

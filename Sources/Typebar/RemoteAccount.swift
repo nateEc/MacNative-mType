@@ -1868,11 +1868,12 @@ final class AccountSession {
     }
 
     func publishAnnouncement(
-        message: String, level: RemoteAnnouncementLevel, sticky: Bool, key: String
+        message: String, level: RemoteAnnouncementLevel, sticky: Bool, scheduledAt: Date?, key: String
     ) async throws -> RemoteAnnouncement {
         try await RemoteAccountAPI(endpoint: endpoint).request(
             path: "v1/moderation/announcements", method: "POST", token: nil,
-            body: RemoteAnnouncementPublicationRequest(message: message, level: level, sticky: sticky),
+            body: RemoteAnnouncementPublicationRequest(
+                message: message, level: level, sticky: sticky, scheduledAt: scheduledAt),
             headers: ["X-Typebar-Moderation-Key": key], response: RemoteAnnouncement.self
         )
     }

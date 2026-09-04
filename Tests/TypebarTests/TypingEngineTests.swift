@@ -3743,6 +3743,23 @@ final class TypingEngineTests: XCTestCase {
     let sticky = RemoteAnnouncement(
       id: UUID(), message: "A sticky update", level: .warning, sticky: true,
       publishedAt: Date(timeIntervalSince1970: 10))
+    let scheduled = RemoteAnnouncement(
+      id: UUID(),
+      message: "Maintenance begins {date}; date only {dateNoTime}; relative {dateDifference}.",
+      level: .notice, sticky: false, scheduledAt: Date(timeIntervalSince1970: 1_735_776_000),
+      publishedAt: Date(timeIntervalSince1970: 30))
+    let rendered = scheduled.renderedMessage(
+      at: Date(timeIntervalSince1970: 1_735_689_600), locale: Locale(identifier: "en_US_POSIX"),
+      timeZone: TimeZone(secondsFromGMT: 0)!)
+    XCTAssertFalse(rendered.contains("{date}"))
+    XCTAssertFalse(rendered.contains("{dateNoTime}"))
+    XCTAssertFalse(rendered.contains("{dateDifference}"))
+    XCTAssertTrue(rendered.contains("2025"))
+    var legacyPayload = try! JSONSerialization.jsonObject(with: JSONEncoder().encode(ordinary)) as! [String: Any]
+    legacyPayload.removeValue(forKey: "scheduledAt")
+    let legacyAnnouncement = try! JSONDecoder().decode(
+      RemoteAnnouncement.self, from: JSONSerialization.data(withJSONObject: legacyPayload))
+    XCTAssertNil(legacyAnnouncement.scheduledAt)
     let center = RemoteAnnouncementCenter(defaults: defaults)
     center.replace(with: [sticky, ordinary])
     XCTAssertEqual(center.visibleAnnouncements.map(\.id), [ordinary.id, sticky.id])

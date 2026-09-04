@@ -53,6 +53,8 @@ struct PreferencesView: View {
   @State private var announcementMessage = ""
   @State private var announcementLevel: RemoteAnnouncementLevel = .notice
   @State private var announcementSticky = false
+  @State private var announcementHasScheduledAt = false
+  @State private var announcementScheduledAt = Date.now
   @State private var moderationAnnouncements: [RemoteAnnouncement] = []
   @State private var moderationMessage: String?
   @State private var moderationIsWorking = false
@@ -1512,6 +1514,15 @@ struct PreferencesView: View {
             }
           }
           Toggle("置顶：客户端不可在本机关闭", isOn: $announcementSticky)
+          Toggle("加入计划日期", isOn: $announcementHasScheduledAt)
+          if announcementHasScheduledAt {
+            DatePicker(
+              "计划日期", selection: $announcementScheduledAt,
+              displayedComponents: [.date, .hourAndMinute])
+            Text("正文可用 {date}、{dateNoTime} 和 {dateDifference} 显示计划日期或相对时间。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
           HStack {
             Button("发布公告") { Task { await publishAnnouncement() } }
               .buttonStyle(.borderedProminent)
@@ -1537,6 +1548,11 @@ struct PreferencesView: View {
                   .foregroundStyle(.secondary)
               }
               Text(announcement.message)
+              if let scheduledAt = announcement.scheduledAt {
+                Text(scheduledAt, format: .dateTime.year().month().day().hour().minute())
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
               Button("删除公告", role: .destructive) {
                 Task { await removeAnnouncement(announcement) }
               }
@@ -1991,11 +2007,14 @@ struct PreferencesView: View {
     do {
       let announcement = try await account.publishAnnouncement(
         message: announcementMessage, level: announcementLevel, sticky: announcementSticky,
+        scheduledAt: announcementHasScheduledAt ? announcementScheduledAt : nil,
         key: moderationKey)
       moderationAnnouncements.insert(announcement, at: 0)
       announcementMessage = ""
       announcementLevel = .notice
       announcementSticky = false
+      announcementHasScheduledAt = false
+      announcementScheduledAt = .now
       moderationMessage = "已发布服务公告。"
     } catch {
       moderationMessage = error.localizedDescription

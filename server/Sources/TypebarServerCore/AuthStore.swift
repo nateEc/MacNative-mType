@@ -814,10 +814,13 @@ public actor AuthStore {
     let message: String
     let level: TypebarAnnouncementLevel
     let sticky: Bool
+    let scheduledAt: Date?
     let publishedAt: Date
 
     func response() -> PublicAnnouncementResponse {
-      .init(id: id, message: message, level: level, sticky: sticky, publishedAt: publishedAt)
+      .init(
+        id: id, message: message, level: level, sticky: sticky, scheduledAt: scheduledAt,
+        publishedAt: publishedAt)
     }
   }
 
@@ -1834,8 +1837,12 @@ public actor AuthStore {
   ) throws -> PublicAnnouncementResponse {
     let message = request.message.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !message.isEmpty, message.count <= 500 else { throw AuthStoreError.invalidAnnouncement }
+    guard (request.scheduledAt?.timeIntervalSince1970 ?? 0) >= 0 else {
+      throw AuthStoreError.invalidAnnouncement
+    }
     let announcement = StoredAnnouncement(
-      id: UUID(), message: message, level: request.level, sticky: request.sticky, publishedAt: now)
+      id: UUID(), message: message, level: request.level, sticky: request.sticky,
+      scheduledAt: request.scheduledAt, publishedAt: now)
     state.announcements.append(announcement)
     try persist()
     return announcement.response()

@@ -40,13 +40,63 @@ struct RemoteAnnouncement: Codable, Equatable, Identifiable, Sendable {
   let message: String
   let level: RemoteAnnouncementLevel
   let sticky: Bool
+  let scheduledAt: Date?
   let publishedAt: Date
+
+  init(
+    id: UUID, message: String, level: RemoteAnnouncementLevel, sticky: Bool,
+    scheduledAt: Date? = nil, publishedAt: Date
+  ) {
+    self.id = id
+    self.message = message
+    self.level = level
+    self.sticky = sticky
+    self.scheduledAt = scheduledAt
+    self.publishedAt = publishedAt
+  }
+
+  func renderedMessage(
+    at date: Date = .now, locale: Locale = .current, timeZone: TimeZone = .current
+  ) -> String {
+    guard let scheduledAt else { return message }
+    let dateTime = dateText(for: scheduledAt, dateStyle: .medium, timeStyle: .short, locale: locale, timeZone: timeZone)
+    let dateOnly = dateText(for: scheduledAt, dateStyle: .medium, timeStyle: .none, locale: locale, timeZone: timeZone)
+    let relativeFormatter = RelativeDateTimeFormatter()
+    relativeFormatter.locale = locale
+    let relative = relativeFormatter.localizedString(for: scheduledAt, relativeTo: date)
+    return message
+      .replacingOccurrences(of: "{dateDifference}", with: relative)
+      .replacingOccurrences(of: "{dateNoTime}", with: dateOnly)
+      .replacingOccurrences(of: "{date}", with: dateTime)
+  }
+
+  private func dateText(
+    for date: Date, dateStyle: DateFormatter.Style, timeStyle: DateFormatter.Style,
+    locale: Locale, timeZone: TimeZone
+  ) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = locale
+    formatter.timeZone = timeZone
+    formatter.dateStyle = dateStyle
+    formatter.timeStyle = timeStyle
+    return formatter.string(from: date)
+  }
 }
 
 struct RemoteAnnouncementPublicationRequest: Codable, Sendable {
   let message: String
   let level: RemoteAnnouncementLevel
   let sticky: Bool
+  let scheduledAt: Date?
+
+  init(
+    message: String, level: RemoteAnnouncementLevel, sticky: Bool, scheduledAt: Date? = nil
+  ) {
+    self.message = message
+    self.level = level
+    self.sticky = sticky
+    self.scheduledAt = scheduledAt
+  }
 }
 
 struct RemoteAnnouncementsResponse: Codable, Sendable {
@@ -122,7 +172,7 @@ struct RemoteAnnouncementBannerStack: View {
         Image(systemName: announcement.level.systemImage)
           .foregroundStyle(announcement.level.tint)
           .accessibilityHidden(true)
-        Text(announcement.message)
+        Text(announcement.renderedMessage())
           .font(.callout)
           .fixedSize(horizontal: false, vertical: true)
         Spacer(minLength: 0)

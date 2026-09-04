@@ -118,6 +118,7 @@ final class HealthRouteTests: XCTestCase {
       try await app.test(.POST, "v1/moderation/announcements") { response async in
         XCTAssertEqual(response.status, .forbidden)
       }
+      let scheduledAt = Date(timeIntervalSince1970: 1_735_776_000)
       var created: PublicAnnouncementResponse?
       try await app.test(
         .POST, "v1/moderation/announcements",
@@ -125,7 +126,8 @@ final class HealthRouteTests: XCTestCase {
           request.headers.add(name: "X-Typebar-Moderation-Key", value: "test-announcement-key")
           try request.content.encode(
             AnnouncementPublicationRequest(
-              message: "  Service update complete.  ", level: .success, sticky: true))
+              message: "  Service update complete.  ", level: .success, sticky: true,
+              scheduledAt: scheduledAt))
         },
         afterResponse: { response async in
           XCTAssertEqual(response.status, .ok)
@@ -135,6 +137,7 @@ final class HealthRouteTests: XCTestCase {
       XCTAssertEqual(announcement.message, "Service update complete.")
       XCTAssertEqual(announcement.level, .success)
       XCTAssertTrue(announcement.sticky)
+      XCTAssertEqual(announcement.scheduledAt, scheduledAt)
       try await app.test(.GET, "v1/announcements") { response async in
         XCTAssertEqual(response.status, .ok)
         XCTAssertEqual(
