@@ -58,6 +58,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["emailVerification"], .planned)
         XCTAssertEqual(capabilities.capabilities["synchronization"], .partial)
         XCTAssertEqual(capabilities.capabilities["resultSubmission"], .partial)
+        XCTAssertEqual(capabilities.capabilities["resultHistory"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboards"], .partial)
         XCTAssertEqual(capabilities.capabilities["profiles"], .partial)
         XCTAssertEqual(capabilities.capabilities["connections"], .partial)
@@ -1803,6 +1804,60 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testAccountResultHistoryIsPrivatePagedAndAvailableToDeveloperKeys() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let owner = try await store.register(
+      .init(email: "history-owner@example.com", password: "a secure password", displayName: "History Owner"))
+    let other = try await store.register(
+      .init(email: "history-other@example.com", password: "a secure password", displayName: "History Other"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let key = try await store.createDeveloperAccessKey(
+      .init(name: "result-reader"), accessToken: owner.accessToken, now: now)
+    let oldID = UUID()
+    let recentID = UUID()
+    let otherID = UUID()
+    _ = try await store.submitResult(
+      result(id: oldID, wpm: 70, accuracy: 100, finishedAt: now.addingTimeInterval(-120)),
+      accessToken: owner.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(id: recentID, wpm: 90, accuracy: 100, finishedAt: now.addingTimeInterval(-30)),
+      credential: .developerAccessKey(key.accessKey), now: now)
+    _ = try await store.submitResult(
+      result(id: otherID, wpm: 110, accuracy: 100, finishedAt: now.addingTimeInterval(-10)),
+      accessToken: other.accessToken, now: now)
+
+    let firstPage = try await store.results(
+      .init(offset: 0, limit: 1), credential: .developerAccessKey(key.accessKey), now: now)
+    XCTAssertEqual(firstPage.total, 2)
+    XCTAssertEqual(firstPage.results.map(\.id), [recentID])
+    let secondPage = try await store.results(
+      .init(offset: 1, limit: 1), credential: .accessToken(owner.accessToken), now: now)
+    XCTAssertEqual(secondPage.results.map(\.id), [oldID])
+    let filtered = try await store.results(
+      .init(finishedOnOrAfter: now.addingTimeInterval(-60).timeIntervalSince1970),
+      credential: .accessToken(owner.accessToken), now: now)
+    XCTAssertEqual(filtered.results.map(\.id), [recentID])
+    let detail = try await store.result(
+      id: recentID, credential: .developerAccessKey(key.accessKey), now: now)
+    let usedKey = try await store.developerAccessKeys(accessToken: owner.accessToken, now: now).keys.first
+    XCTAssertEqual(detail.id, recentID)
+    XCTAssertEqual(usedKey?.lastUsedAt, now)
+
+    do {
+      _ = try await store.result(id: otherID, credential: .accessToken(owner.accessToken), now: now)
+      XCTFail("An account must not read another account's submitted result")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .resultNotFound)
+    }
+    do {
+      _ = try await store.results(
+        .init(offset: -1, limit: 1), credential: .accessToken(owner.accessToken), now: now)
+      XCTFail("Negative result pagination offsets must be rejected")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidResultQuery)
+    }
+  }
+
   func testOAuthIdentitiesSupportPasswordlessLoginLinkingAndSafeUnlinking() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let github = OAuthProviderIdentity(
@@ -2196,7 +2251,7 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
-  func testDeveloperKeyRoutesOnlyAuthorizeResultSubmission() async throws {
+  func testDeveloperKeyRoutesAuthorizeOnlyOwnResults() async throws {
     let app = try await Application.make(.testing)
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let session = try await store.register(
@@ -2204,6 +2259,7 @@ final class HealthRouteTests: XCTestCase {
     let key = try await store.createDeveloperAccessKey(
       .init(name: "external-uploader"), accessToken: session.accessToken)
     let now = Date.now
+    let resultID = UUID()
 
     do {
       try configure(app, authStore: store)
@@ -2237,10 +2293,32 @@ final class HealthRouteTests: XCTestCase {
         "v1/results",
         beforeRequest: { request async throws in
           request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
-          try request.content.encode(result(id: UUID(), wpm: 88, accuracy: 100, finishedAt: now))
+          try request.content.encode(result(id: resultID, wpm: 88, accuracy: 100, finishedAt: now))
         },
         afterResponse: { response async in
           XCTAssertEqual(response.status, .ok)
+        })
+      try await app.test(
+        .GET,
+        "v1/results?limit=1",
+        beforeRequest: { request async in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          let results = try? response.content.decode(ResultListResponse.self)
+          XCTAssertEqual(results?.total, 1)
+          XCTAssertEqual(results?.results.map(\.id), [resultID])
+        })
+      try await app.test(
+        .GET,
+        "v1/results/\(resultID.uuidString)",
+        beforeRequest: { request async in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual((try? response.content.decode(AccountResultResponse.self))?.id, resultID)
         })
       try await app.test(
         .PATCH,
@@ -2264,6 +2342,15 @@ final class HealthRouteTests: XCTestCase {
           XCTAssertEqual(response.status, .forbidden)
         })
       try await app.test(
+        .GET,
+        "v1/results",
+        beforeRequest: { request async in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .forbidden)
+        })
+      try await app.test(
         .DELETE,
         "v1/developer-keys/\(key.key.id.uuidString)",
         beforeRequest: { request async in
@@ -2279,6 +2366,15 @@ final class HealthRouteTests: XCTestCase {
         beforeRequest: { request async throws in
           request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
           try request.content.encode(result(id: UUID(), wpm: 88, accuracy: 100, finishedAt: now))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unauthorized)
+        })
+      try await app.test(
+        .GET,
+        "v1/results",
+        beforeRequest: { request async in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
         },
         afterResponse: { response async in
           XCTAssertEqual(response.status, .unauthorized)

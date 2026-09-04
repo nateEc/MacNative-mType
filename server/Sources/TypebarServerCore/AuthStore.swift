@@ -193,7 +193,7 @@ public struct DeveloperAccessKeyDeletionResponse: Content, Equatable, Sendable {
   public let deleted: Bool
 }
 
-public enum ResultSubmissionCredential: Sendable {
+public enum ResultServiceCredential: Sendable {
   case accessToken(String)
   case developerAccessKey(String)
 }
@@ -384,6 +384,8 @@ public enum AuthStoreError: Error, Equatable {
   case inactiveDeveloperAccessKey
   case developerAccessKeyNotFound
   case developerAccessKeyLimitReached
+  case invalidResultQuery
+  case resultNotFound
 }
 
 public actor AuthStore {
@@ -640,6 +642,14 @@ public actor AuthStore {
       startedAt =
         try values.decodeIfPresent(Date.self, forKey: .startedAt)
         ?? finishedAt.addingTimeInterval(-legacyDuration)
+    }
+
+    func response() -> AccountResultResponse {
+      .init(
+        id: id, mode: mode, language: language, durationSeconds: durationSeconds,
+        wordLimit: wordLimit, wpm: wpm, rawWpm: rawWpm, accuracy: accuracy,
+        consistency: consistency, errorCount: errorCount, eventCount: eventCount,
+        startedAt: startedAt, finishedAt: finishedAt)
     }
   }
 
@@ -2177,15 +2187,9 @@ public actor AuthStore {
   }
 
   public func submitResult(
-    _ request: ResultSubmissionRequest, credential: ResultSubmissionCredential, now: Date = .now
+    _ request: ResultSubmissionRequest, credential: ResultServiceCredential, now: Date = .now
   ) throws -> ResultSubmissionResponse {
-    let user: AuthUserResponse
-    switch credential {
-    case .accessToken(let accessToken):
-      user = try authenticatedUser(for: accessToken, now: now)
-    case .developerAccessKey(let accessKey):
-      user = try authenticatedUser(forDeveloperAccessKey: accessKey, now: now)
-    }
+    let user = try authenticatedUser(for: credential, now: now)
     try validate(result: request, now: now)
     if state.results.contains(where: { $0.userID == user.id && $0.id == request.id }) {
       return resultSubmissionResponse(for: request, userID: user.id, now: now)
@@ -2206,6 +2210,40 @@ public actor AuthStore {
     _ request: ResultSubmissionRequest, accessToken: String, now: Date = .now
   ) throws -> ResultSubmissionResponse {
     try submitResult(request, credential: .accessToken(accessToken), now: now)
+  }
+
+  public func results(
+    _ query: ResultListQuery, credential: ResultServiceCredential, now: Date = .now
+  ) throws -> ResultListResponse {
+    let user = try authenticatedUser(for: credential, now: now)
+    let offset = query.offset ?? 0
+    let limit = query.limit ?? 50
+    guard offset >= 0, (0...1_000).contains(limit),
+      query.finishedOnOrAfter.map(\.isFinite) ?? true
+    else { throw AuthStoreError.invalidResultQuery }
+    let cutoff = query.finishedOnOrAfter.map(Date.init(timeIntervalSince1970:))
+    let records = state.results
+      .filter { record in
+        record.userID == user.id && cutoff.map { record.finishedAt >= $0 } != false
+      }
+      .sorted {
+        $0.finishedAt == $1.finishedAt
+          ? $0.id.uuidString > $1.id.uuidString
+          : $0.finishedAt > $1.finishedAt
+      }
+    return .init(
+      results: Array(records.dropFirst(offset).prefix(limit)).map { $0.response() },
+      total: records.count)
+  }
+
+  public func result(
+    id: UUID, credential: ResultServiceCredential, now: Date = .now
+  ) throws -> AccountResultResponse {
+    let user = try authenticatedUser(for: credential, now: now)
+    guard let record = state.results.first(where: { $0.id == id && $0.userID == user.id }) else {
+      throw AuthStoreError.resultNotFound
+    }
+    return record.response()
   }
 
   public func leaderboard(_ query: LeaderboardQuery, now: Date = .now) throws -> LeaderboardResponse
@@ -2411,6 +2449,17 @@ public actor AuthStore {
       enabled: key.enabled, createdAt: key.createdAt, modifiedAt: key.modifiedAt, lastUsedAt: now)
     try persist()
     return userResponse(for: user)
+  }
+
+  private func authenticatedUser(for credential: ResultServiceCredential, now: Date) throws
+    -> AuthUserResponse
+  {
+    switch credential {
+    case .accessToken(let accessToken):
+      try authenticatedUser(for: accessToken, now: now)
+    case .developerAccessKey(let accessKey):
+      try authenticatedUser(forDeveloperAccessKey: accessKey, now: now)
+    }
   }
 
   private func persist() throws {

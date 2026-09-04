@@ -68,6 +68,68 @@ public struct ResultSubmissionResponse: Content, Equatable {
     public let weeklyExperienceRank: Int?
 }
 
+/// A compact, account-scoped view of a submitted result. It deliberately
+/// excludes prompt text, input replay, and every profile or credential field.
+public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable {
+    public let id: UUID
+    public let mode: String
+    public let language: String
+    public let durationSeconds: Int?
+    public let wordLimit: Int?
+    public let wpm: Int
+    public let rawWpm: Int
+    public let accuracy: Int
+    public let consistency: Double
+    public let errorCount: Int
+    public let eventCount: Int
+    public let startedAt: Date
+    public let finishedAt: Date
+
+    public init(
+        id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
+        rawWpm: Int, accuracy: Int, consistency: Double, errorCount: Int, eventCount: Int,
+        startedAt: Date, finishedAt: Date
+    ) {
+        self.id = id
+        self.mode = mode
+        self.language = language
+        self.durationSeconds = durationSeconds
+        self.wordLimit = wordLimit
+        self.wpm = wpm
+        self.rawWpm = rawWpm
+        self.accuracy = accuracy
+        self.consistency = consistency
+        self.errorCount = errorCount
+        self.eventCount = eventCount
+        self.startedAt = startedAt
+        self.finishedAt = finishedAt
+    }
+}
+
+/// `finishedOnOrAfter` is a UTC Unix timestamp in seconds. Results are always
+/// scoped to the authenticated account and ordered newest first.
+public struct ResultListQuery: Content, Sendable {
+    public let finishedOnOrAfter: Double?
+    public let offset: Int?
+    public let limit: Int?
+
+    public init(finishedOnOrAfter: Double? = nil, offset: Int? = nil, limit: Int? = nil) {
+        self.finishedOnOrAfter = finishedOnOrAfter
+        self.offset = offset
+        self.limit = limit
+    }
+}
+
+public struct ResultListResponse: Content, Equatable, Sendable {
+    public let results: [AccountResultResponse]
+    public let total: Int
+
+    public init(results: [AccountResultResponse], total: Int) {
+        self.results = results
+        self.total = total
+    }
+}
+
 public struct LeaderboardQuery: Content {
     public let mode: String?
     public let language: String?

@@ -55,6 +55,7 @@ public func configure(
                 "googleOAuth": oauthProviderClient?.isConfigured(for: .google) == true ? .available : .planned,
                 "synchronization": .partial,
                 "resultSubmission": .partial,
+                "resultHistory": .partial,
                 "leaderboards": .partial,
                 "profiles": .partial,
                 "connections": .partial,
@@ -625,9 +626,31 @@ public func configure(
         }
     }
 
+    app.get("v1", "results") { request async throws -> ResultListResponse in
+        do {
+            return try await authStore.results(
+                request.query.decode(ResultListQuery.self),
+                credential: try request.resultCredential()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.get("v1", "results", ":id") { request async throws -> AccountResultResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The result identifier was invalid.")
+        }
+        do {
+            return try await authStore.result(id: id, credential: try request.resultCredential())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.post("v1", "results") { request async throws -> ResultSubmissionResponse in
         do {
-            let credential = try request.resultSubmissionCredential()
+            let credential = try request.resultCredential()
             let submission = try request.content.decode(ResultSubmissionRequest.self)
             return try await authStore.submitResult(
                 submission,
@@ -763,6 +786,10 @@ private extension AuthStoreError {
             Abort(.notFound, reason: "The requested Typebar developer key does not exist.")
         case .developerAccessKeyLimitReached:
             Abort(.conflict, reason: "A Typebar account can have at most five developer keys.")
+        case .invalidResultQuery:
+            Abort(.badRequest, reason: "The requested result range was invalid.")
+        case .resultNotFound:
+            Abort(.notFound, reason: "The requested Typebar result does not exist.")
         case .directMessageNotAllowed:
             Abort(.forbidden, reason: "Direct messages are only available between accepted Typebar friends.")
         }
@@ -777,7 +804,7 @@ private extension Request {
         return token
     }
 
-    func resultSubmissionCredential() throws -> ResultSubmissionCredential {
+    func resultCredential() throws -> ResultServiceCredential {
         if let key = headers.first(name: "X-Typebar-Access-Key") {
             guard !key.isEmpty else {
                 throw Abort(.unauthorized, reason: "A Typebar developer key is required.")

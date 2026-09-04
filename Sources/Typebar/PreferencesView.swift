@@ -898,7 +898,7 @@ struct PreferencesView: View {
             Divider()
             VStack(alignment: .leading, spacing: 9) {
               Text("开发者密钥").font(.headline)
-              Text("为自己的自动化工具创建仅能上传成绩的密钥；它不能读取邮箱、同步数据或更改账户。")
+              Text("为自己的自动化工具创建只能读取或上传自己成绩元数据的密钥；它不能读取邮箱、同步数据或更改账户。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
               HStack {
@@ -934,11 +934,35 @@ struct PreferencesView: View {
                   DeveloperAccessKeyRow(key: key, account: account)
                 }
               }
-              Text("自动化客户端向 POST /v1/results 发送 X-Typebar-Access-Key 请求头。禁用或删除会立即拒绝后续上传；服务端只保存密钥哈希。")
+              Text("自动化客户端向 GET 或 POST /v1/results 发送 X-Typebar-Access-Key 请求头。禁用或删除会立即拒绝后续读取和上传；服务端只保存密钥哈希。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            .task(id: user.id) { await account.refreshDeveloperAccessKeys() }
+            .task(id: user.id) {
+              await account.refreshDeveloperAccessKeys()
+              await account.refreshRemoteResults()
+            }
+            Divider()
+            VStack(alignment: .leading, spacing: 9) {
+              HStack {
+                Text("服务端近期成绩").font(.headline)
+                Spacer()
+                Button("刷新") { Task { await account.refreshRemoteResults() } }
+                  .disabled(account.isWorking)
+              }
+              Text("只显示当前账户已提交到自建服务的成绩元数据，不包含提示、输入回放或本机历史。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              if account.remoteResults.isEmpty {
+                Text("服务端还没有可显示的已提交成绩。")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              } else {
+                ForEach(account.remoteResults) { result in
+                  RemoteAccountResultRow(result: result)
+                }
+              }
+            }
             Divider()
             Text("登录方式").font(.headline)
             if user.authenticationMethods.contains(.password),
@@ -1697,6 +1721,27 @@ private struct DeveloperAccessKeyRow: View {
       )
       .font(.caption)
       .foregroundStyle(.secondary)
+    }
+    .padding(8)
+    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+  }
+}
+
+private struct RemoteAccountResultRow: View {
+  let result: RemoteAccountResult
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack {
+        Text("\(result.wpm) WPM").font(.subheadline.weight(.semibold))
+        Text("准确率 \(result.accuracy)%")
+        Spacer()
+        Text(result.finishedAt.formatted(date: .abbreviated, time: .shortened))
+          .foregroundStyle(.secondary)
+      }
+      Text("\(result.mode) · \(result.language) · Raw \(result.rawWpm) · 一致性 \(Int(result.consistency.rounded()))%")
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
     .padding(8)
     .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))

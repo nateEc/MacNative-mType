@@ -266,6 +266,27 @@ private struct RemoteDeveloperAccessKeyDeletionResponse: Codable, Sendable {
     let deleted: Bool
 }
 
+struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let mode: String
+    let language: String
+    let durationSeconds: Int?
+    let wordLimit: Int?
+    let wpm: Int
+    let rawWpm: Int
+    let accuracy: Int
+    let consistency: Double
+    let errorCount: Int
+    let eventCount: Int
+    let startedAt: Date
+    let finishedAt: Date
+}
+
+private struct RemoteAccountResultListResponse: Codable, Sendable {
+    let results: [RemoteAccountResult]
+    let total: Int
+}
+
 private struct RemoteQuoteSubmissionRequest: Codable, Sendable {
     let language: String
     let text: String
@@ -757,10 +778,14 @@ final class AccountSession {
     var endpoint = "http://127.0.0.1:8080" { didSet { defaults.set(endpoint, forKey: endpointKey) } }
     var currentUser: RemoteAccountUser? {
         didSet {
-            if currentUser == nil { developerAccessKeys = [] }
+            if currentUser == nil {
+                developerAccessKeys = []
+                remoteResults = []
+            }
         }
     }
     var developerAccessKeys: [RemoteDeveloperAccessKey] = []
+    var remoteResults: [RemoteAccountResult] = []
     var pendingOAuthRegistration: PendingRemoteOAuthRegistration?
     var isWorking = false
     var statusMessage: String?
@@ -1198,6 +1223,25 @@ final class AccountSession {
         }
     }
 
+    func refreshRemoteResults(limit: Int = 20) async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            remoteResults = []
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            remoteResults = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/results", method: "GET", token: token,
+                body: Optional<String>.none,
+                queryItems: [URLQueryItem(name: "limit", value: "\(min(max(limit, 1), 100))")],
+                response: RemoteAccountResultListResponse.self
+            ).results
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
     func createDeveloperAccessKey(name: String) async -> String? {
         guard let token = tokenStore.load(), currentUser != nil else {
             statusMessage = "请先登录自建 Typebar 服务。"
@@ -1372,6 +1416,7 @@ final class AccountSession {
         tokenStore.clear()
         currentUser = nil
         developerAccessKeys = []
+        remoteResults = []
         pendingOAuthRegistration = nil
         statusMessage = nil
     }
@@ -1758,6 +1803,7 @@ final class AccountSession {
         try tokenStore.save(session.accessToken)
         currentUser = session.user
         developerAccessKeys = []
+        remoteResults = []
         pendingOAuthRegistration = nil
     }
 
