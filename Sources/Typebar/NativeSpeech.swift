@@ -33,6 +33,9 @@ extension TypingLanguage {
     case .traditionalChinese: "zh-TW"
     case .russian: "ru-RU"
     case .japaneseHiragana: "ja-JP"
+    case .korean: "ko-KR"
+    case .turkish: "tr-TR"
+    case .polish: "pl-PL"
     case .mixedLanguages: "en-US"
     default: "en-US"
     }

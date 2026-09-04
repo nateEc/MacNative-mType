@@ -1994,6 +1994,7 @@ public actor AuthStore {
       Set([
         "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
         "traditionalChinese", "russian", "japaneseHiragana",
+        "korean", "turkish", "polish",
       ])
         .contains(request.language), (10...500).contains(text.count), attribution?.count ?? 0 <= 80
     else { throw AuthStoreError.invalidQuoteSubmission }
@@ -2107,6 +2108,7 @@ public actor AuthStore {
         || Set([
           "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
           "traditionalChinese", "russian", "japaneseHiragana",
+          "korean", "turkish", "polish",
         ]).contains(language!)
     else { throw AuthStoreError.invalidQuoteSubmission }
     let viewerID = try accessToken.map { try authenticatedUser(for: $0, now: now).id }
@@ -2689,6 +2691,7 @@ public actor AuthStore {
     let languages = Set([
       "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
       "traditionalChinese", "russian", "japaneseHiragana",
+      "korean", "turkish", "polish",
       "mixedEnglishChinese", "mixedLanguages",
     ])
     let periods = Set(["all", "day", "yesterday", "week"])
@@ -2984,6 +2987,7 @@ public actor AuthStore {
       Set([
         "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
         "traditionalChinese", "russian", "japaneseHiragana",
+        "korean", "turkish", "polish",
         "mixedEnglishChinese", "mixedLanguages",
       ]).contains(result.language),
       (0...400).contains(result.wpm), (0...500).contains(result.rawWpm),

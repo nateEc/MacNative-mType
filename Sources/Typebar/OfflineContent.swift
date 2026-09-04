@@ -344,6 +344,90 @@ enum OfflineContent {
       length: .long
     ),
     OfflineQuote(
+      id: "korean-small-step",
+      title: "작은 걸음",
+      text: "작은 연습을 꾸준히 하면 다음에 할 일이 조금 더 또렷해진다.",
+      language: .korean,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "korean-open-page",
+      title: "펼친 페이지",
+      text: "펼친 페이지가 어려운 답을 바로 주지는 않지만, 생각을 나누고 다음에 돌아올 자리를 남겨 준다.",
+      language: .korean,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "korean-quiet-work",
+      title: "조용한 일",
+      text: "진전은 언제나 큰 소식으로 찾아오지 않는다. 같은 페이지를 다시 열고, 한 문장을 고치고, 한 번의 실수를 살피며 다음 시도를 위한 표시를 남기는 일에서 조금씩 쌓인다. 이런 차분한 주의가 어려운 부분을 익숙한 길로 바꾼다.",
+      language: .korean,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "korean-long-table",
+      title: "긴 책상",
+      text: "긴 책상이 쓸모 있는 이유는 서로 다른 단계의 일을 함께 놓을 수 있기 때문이다. 한쪽에는 처음 쓴 메모를 두고, 다른 쪽에는 아직 다듬을 문장을 두며, 가운데에는 다음 작은 결정을 위한 빈자리를 남길 수 있다. 연습도 이와 같다. 모든 어려움을 한 번에 풀기보다, 다시 돌아올 곳과 눈에 보이는 다음 걸음을 만들고 여러 번의 시도 끝에 무엇이 쉬워졌는지 살펴보게 한다.",
+      language: .korean,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "turkish-kucuk-adim",
+      title: "Küçük adım",
+      text: "Küçük ve sakin bir adım, sıradaki işi daha açık görmeye yardım eder.",
+      language: .turkish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "turkish-acik-defter",
+      title: "Açık defter",
+      text: "Açık bir defter zor bir soruyu tek başına çözmez, ama onu anlaşılır parçalara ayırmaya ve sonra geri dönmeye yardım eder.",
+      language: .turkish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "turkish-sessiz-calisma",
+      title: "Sessiz çalışma",
+      text: "İlerleme her zaman büyük bir duyuruyla gelmez. Aynı sayfayı açmak, bir cümleyi düzeltmek, bir hatayı incelemek ve sonraki deneme için küçük bir işaret bırakmakla birikir. Bu sakin dikkat, zor görünen bölümleri zamanla daha tanıdık hâle getirir.",
+      language: .turkish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "turkish-uzun-masa",
+      title: "Uzun masa",
+      text: "Uzun bir masa, çalışmanın farklı aşamalarına yer açtığı için kullanışlıdır. Bir ucunda ilk taslak, diğer ucunda hâlâ özen isteyen bir cümle durabilir; ortada ise sıradaki küçük karar için boşluk kalır. Alıştırma da buna benzer. Her zorluğu hemen çözmeyi değil, dönülebilecek bir yer, görünür bir sonraki adım ve birkaç denemeden sonra kolaylaşanı fark edecek sabrı ister.",
+      language: .turkish,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "polish-maly-krok",
+      title: "Mały krok",
+      text: "Mały, spokojny krok pomaga wyraźniej zobaczyć następną rzecz do zrobienia.",
+      language: .polish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "polish-otwarty-notatnik",
+      title: "Otwarty notatnik",
+      text: "Otwarty notatnik nie odpowiada sam na trudne pytanie, ale pomaga podzielić je na jasne części i zostawić ślad na później.",
+      language: .polish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "polish-cicha-praca",
+      title: "Cicha praca",
+      text: "Postęp nie zawsze przychodzi jako ważne wydarzenie. Zbiera się w powtarzanych czynnościach: otwarciu tej samej strony, poprawieniu jednego zdania, sprawdzeniu jednego błędu i zostawieniu użytecznej wskazówki na następną próbę. Z czasem taka spokojna uwaga sprawia, że trudne miejsca stają się bardziej znajome.",
+      language: .polish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "polish-dlugi-stol",
+      title: "Długi stół",
+      text: "Długi stół jest użyteczny, ponieważ mieści różne etapy pracy. Na jednym końcu może leżeć pierwszy szkic, na drugim zdanie wymagające jeszcze troski, a pośrodku zostaje miejsce na następną małą decyzję. Ćwiczenie działa podobnie: nie prosi o rozwiązanie wszystkich trudności naraz, lecz o miejsce, do którego można wrócić, widoczny kolejny krok i cierpliwość potrzebną, by zauważyć, co po kilku próbach stało się łatwiejsze.",
+      language: .polish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "traditional-tide",
       title: "潮線",
       text: "潮線退去後，沙上細小的紋路提醒人慢慢整理下一步。",

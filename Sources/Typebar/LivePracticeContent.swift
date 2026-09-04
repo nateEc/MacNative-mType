@@ -133,6 +133,9 @@ enum LivePracticeContentService {
     case .simplifiedChinese, .traditionalChinese: return "zh"
     case .russian: return "ru"
     case .japaneseHiragana: return "ja"
+    case .korean: return "ko"
+    case .turkish: return "tr"
+    case .polish: return "pl"
     default: return "en"
     }
   }

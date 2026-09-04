@@ -19,7 +19,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；十种原创单语（含繁体中文、俄语与日语平假名）、中英混合和自选多语组合，不复制官方语言目录。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；十三种原创单语（含繁体中文、俄语、日语平假名、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。 |
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

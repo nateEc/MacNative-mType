@@ -3575,10 +3575,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.german.supportsQuotes)
   }
 
-  func testFrenchItalianPortugueseAndRussianUseOnlyTypebarOwnedCorporaAndQuotes() {
+  func testAdditionalSpaceDelimitedLanguagesUseOnlyTypebarOwnedCorporaAndQuotes() {
     for (language, lexicon) in [
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
       (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
+      (.korean, StarterLexicon.koreanWords), (.turkish, StarterLexicon.turkishWords),
+      (.polish, StarterLexicon.polishWords),
     ] {
       let prompt = OfflineContent.generatedPrompt(
         wordCount: 12, language: language,
@@ -3618,6 +3620,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.traditionalChinese.speechLocaleIdentifier, "zh-TW")
     XCTAssertEqual(TypingLanguage.russian.speechLocaleIdentifier, "ru-RU")
     XCTAssertEqual(TypingLanguage.japaneseHiragana.speechLocaleIdentifier, "ja-JP")
+    XCTAssertEqual(TypingLanguage.korean.speechLocaleIdentifier, "ko-KR")
+    XCTAssertEqual(TypingLanguage.turkish.speechLocaleIdentifier, "tr-TR")
+    XCTAssertEqual(TypingLanguage.polish.speechLocaleIdentifier, "pl-PL")
+    XCTAssertFalse(TypingLanguage.korean.supportsCapsLockWarning)
     XCTAssertEqual(TypingLanguage.mixedEnglishChinese.speechLocaleIdentifier, "zh-CN")
     XCTAssertEqual(TypingLanguage.mixedLanguages.speechLocaleIdentifier, "en-US")
   }
@@ -3819,6 +3825,7 @@ final class TypingEngineTests: XCTestCase {
     let languages: [TypingLanguage] = [
       .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,
       .traditionalChinese, .russian, .japaneseHiragana,
+      .korean, .turkish, .polish,
     ]
     for language in languages {
       let quote = try! XCTUnwrap(OfflineContent.quotes(for: language, length: .extended).first)

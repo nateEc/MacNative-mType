@@ -286,6 +286,18 @@ final class HealthRouteTests: XCTestCase {
       .init(language: "japaneseHiragana", text: "しずかなれんしゅうはつぎのいっぽをみえやすくする。", attribution: nil),
       accessToken: session.accessToken)
     XCTAssertEqual(hiraganaSubmission.status, "pending")
+    let koreanSubmission = try await store.submitQuote(
+      .init(language: "korean", text: "차분한 연습은 다음에 할 일을 더 또렷하게 만든다.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(koreanSubmission.status, "pending")
+    let turkishSubmission = try await store.submitQuote(
+      .init(language: "turkish", text: "Sakin bir alıştırma sonraki adımı daha açık gösterir.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(turkishSubmission.status, "pending")
+    let polishSubmission = try await store.submitQuote(
+      .init(language: "polish", text: "Spokojne ćwiczenie pomaga wyraźniej zobaczyć kolejny krok.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(polishSubmission.status, "pending")
     _ = try await store.submitQuote(
       .init(language: "english", text: "A steady habit creates useful momentum.", attribution: nil),
       accessToken: other.accessToken)
@@ -295,7 +307,8 @@ final class HealthRouteTests: XCTestCase {
       Set([
         submitted.id, spanishSubmission.id, germanSubmission.id, frenchSubmission.id,
         italianSubmission.id, portugueseSubmission.id, traditionalChineseSubmission.id,
-        russianSubmission.id, hiraganaSubmission.id,
+        russianSubmission.id, hiraganaSubmission.id, koreanSubmission.id, turkishSubmission.id,
+        polishSubmission.id,
       ]))
     do {
       try await store.withdrawQuoteSubmission(submitted.id, accessToken: other.accessToken)
@@ -312,6 +325,9 @@ final class HealthRouteTests: XCTestCase {
       traditionalChineseSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(russianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(hiraganaSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(koreanSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(turkishSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(polishSubmission.id, accessToken: session.accessToken)
     let mineAfterWithdrawal = try await store.quoteSubmissions(accessToken: session.accessToken)
     XCTAssertTrue(mineAfterWithdrawal.submissions.isEmpty)
     do {
@@ -2594,7 +2610,9 @@ final class HealthRouteTests: XCTestCase {
       XCTAssertEqual(error, .invalidResult)
     }
 
-    for (offset, language) in ["traditionalChinese", "russian", "japaneseHiragana"].enumerated() {
+    for (offset, language) in [
+      "traditionalChinese", "russian", "japaneseHiragana", "korean", "turkish", "polish",
+    ].enumerated() {
       let accepted = try await store.submitResult(
         result(
           id: UUID(), wpm: 81 + offset, accuracy: 100, language: language,

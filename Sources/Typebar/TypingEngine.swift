@@ -206,6 +206,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case traditionalChinese
   case russian
   case japaneseHiragana
+  case korean
+  case turkish
+  case polish
   case mixedEnglishChinese
   case mixedLanguages
   case codeSwift
@@ -1383,7 +1386,7 @@ enum TypingAttentionPolicy {
     if showFocusWarning, !isInputFocused, focusWarningDelayElapsed {
       warnings.append(.inputUnfocused)
     }
-    if showCapsLockWarning, capsLockEnabled, language.usesSpaceDelimitedWords {
+    if showCapsLockWarning, capsLockEnabled, language.supportsCapsLockWarning {
       warnings.append(.capsLockEnabled)
     }
     return warnings
@@ -3000,6 +3003,29 @@ enum StarterLexicon {
     "まち", "あめ", "ゆっくり", "ほうこう", "ほし", "てがみ", "にわ", "こきゅう",
   ]
 
+  // Original Typebar content for Hangul keyboard practice.
+  static let koreanWords = [
+    "아침", "창문", "종이", "해변", "바람", "연습", "집중", "천천히", "분명히", "호수",
+    "거리", "책상", "빛", "여행", "인내", "잠시", "도시", "비", "고요", "방향",
+    "별빛", "쪽지", "정원", "호흡",
+  ]
+
+  // Original Typebar content for Turkish practice, including dotted and
+  // dotless i plus commonly used Turkish diacritics.
+  static let turkishWords = [
+    "sabah", "pencere", "kağıt", "kıyı", "rüzgar", "alıştırma", "odak", "sakin",
+    "açık", "göl", "sokak", "masa", "ışık", "yolculuk", "sabır", "an",
+    "şehir", "yağmur", "sessiz", "yön", "yıldız", "not", "bahçe", "nefes",
+  ]
+
+  // Original Typebar content for Polish practice, including its native
+  // accented characters without importing an external word list.
+  static let polishWords = [
+    "poranek", "okno", "papier", "brzeg", "wiatr", "ćwiczenie", "uwaga", "spokój",
+    "jasno", "jezioro", "ulica", "stół", "światło", "podróż", "cierpliwość", "chwila",
+    "miasto", "deszcz", "cisza", "kierunek", "gwiazda", "notatka", "ogród", "oddech",
+  ]
+
   // Typebar-authored Spanish starter words. Accented forms deliberately
   // exercise macOS's composed-text input path without importing a web corpus.
   static let spanishWords = [
@@ -3101,6 +3127,18 @@ enum StarterLexicon {
         tokens: count, lexicon: japaneseHiraganaWords, separator: "",
         punctuation: ["、", "。", "！", "？"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .korean:
+      return prompt(
+        tokens: count, lexicon: koreanWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .turkish:
+      return prompt(
+        tokens: count, lexicon: turkishWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .polish:
+      return prompt(
+        tokens: count, lexicon: polishWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .mixedEnglishChinese:
       let englishLexicon = englishVariant == .british ? britishWords : words
       return (0..<count).map { index in
@@ -3153,6 +3191,9 @@ enum StarterLexicon {
     case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
     case .russian: (russianWords, [".", ",", "!", "?"])
     case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
+    case .korean: (koreanWords, [".", ",", "!", "?"])
+    case .turkish: (turkishWords, [".", ",", "!", "?"])
+    case .polish: (polishWords, [".", ",", "!", "?"])
     default:
       (words, [",", ".", "!", "?"])
     }
@@ -3207,6 +3248,7 @@ extension TypingLanguage {
   static let defaultMixedComponents: [TypingLanguage] = [
     .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,
     .traditionalChinese, .russian, .japaneseHiragana,
+    .korean, .turkish, .polish,
   ]
 
   static var mixableLanguages: [TypingLanguage] { defaultMixedComponents }
@@ -3235,6 +3277,13 @@ extension TypingLanguage {
     rawValue.hasPrefix("code")
   }
 
+  var supportsCapsLockWarning: Bool {
+    switch self {
+    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana, .korean: false
+    default: !isCodeLanguage
+    }
+  }
+
   var supportsQuotes: Bool {
     self != .mixedEnglishChinese && self != .mixedLanguages && !isCodeLanguage
   }
@@ -3252,6 +3301,9 @@ extension TypingLanguage {
     case .traditionalChinese: "繁體中文"
     case .russian: "Русский"
     case .japaneseHiragana: "日本語（ひらがな）"
+    case .korean: "한국어"
+    case .turkish: "Türkçe"
+    case .polish: "Polski"
     case .mixedEnglishChinese: "中英混合"
     case .mixedLanguages: "多语混合"
     default: rawValue
