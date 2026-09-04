@@ -202,6 +202,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case dutch
   case danish
   case norwegianBokmal
+  case swedish
   case hungarian
   case french
   case italian
@@ -3128,6 +3129,15 @@ enum StarterLexicon {
     "liten", "tid", "vær", "fjær",
   ]
 
+  // Typebar-authored Swedish starter words. The corpus deliberately includes
+  // å, ä and ö for normal macOS composed-text input practice.
+  static let swedishWords = [
+    "morgon", "fönster", "papper", "strand", "vind", "övning", "fokus", "lugn",
+    "klar", "sjö", "gata", "bord", "ljus", "resa", "tålamod", "stund",
+    "stad", "regn", "tystnad", "riktning", "stjärna", "anteckning", "trädgård", "andetag",
+    "liten", "tid", "vår", "äng", "båt", "vän",
+  ]
+
   // Typebar-authored Hungarian starter words. The corpus deliberately
   // includes the language's short and long accented vowels for macOS input.
   static let hungarianWords = [
@@ -3202,6 +3212,10 @@ enum StarterLexicon {
     case .norwegianBokmal:
       return prompt(
         tokens: count, lexicon: norwegianBokmalWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .swedish:
+      return prompt(
+        tokens: count, lexicon: swedishWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hungarian:
       return prompt(
@@ -3306,6 +3320,7 @@ enum StarterLexicon {
     case .dutch: (dutchWords, [",", ".", "!", "?"])
     case .danish: (danishWords, [",", ".", "!", "?"])
     case .norwegianBokmal: (norwegianBokmalWords, [",", ".", "!", "?"])
+    case .swedish: (swedishWords, [",", ".", "!", "?"])
     case .hungarian: (hungarianWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
@@ -3381,6 +3396,7 @@ extension TypingLanguage {
     case .dutch: StarterLexicon.dutchWords
     case .danish: StarterLexicon.danishWords
     case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
+    case .swedish: StarterLexicon.swedishWords
     case .hungarian: StarterLexicon.hungarianWords
     case .french: StarterLexicon.frenchWords
     case .italian: StarterLexicon.italianWords
@@ -3401,7 +3417,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .hungarian, .french,
+    .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
@@ -3454,6 +3470,7 @@ extension TypingLanguage {
     case .dutch: "Nederlands"
     case .danish: "Dansk"
     case .norwegianBokmal: "Norsk bokmål"
+    case .swedish: "Svenska"
     case .hungarian: "Magyar"
     case .french: "Français"
     case .italian: "Italiano"

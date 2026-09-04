@@ -624,6 +624,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "swedish-calm-rhythm",
+      title: "Lugn rytm",
+      text: "En lugn rytm gör nästa rad lättare att hitta.",
+      language: .swedish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "swedish-small-note",
+      title: "Liten anteckning",
+      text: "En liten anteckning behöver inte lösa hela frågan. Den kan visa var arbetet ska börja när du återvänder.",
+      language: .swedish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "swedish-return",
+      title: "Återkomst",
+      text: "Arbetet blir ofta tydligare efter en kort paus. Läs den senaste raden, välj en sak att förbättra och lämna en enkel markering för nästa gång. Så får varje återkomst ett mindre avstånd att överbrygga, även när uppgiften fortfarande är svår.",
+      language: .swedish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "swedish-open-table",
+      title: "Öppet bord",
+      text: "På ett bord med gott om plats kan ett utkast ligga öppet bredvid en lista med frågor. Det gör det lättare att flytta blicken mellan det som redan är säkert och det som ännu behöver provas. En övning kan fungera på samma sätt: skriv en rad, kontrollera en detalj och behåll ett tydligt nästa steg. När allt inte måste bli klart på en gång får uppmärksamheten tid att bygga en tryggare rytm.",
+      language: .swedish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hungarian-kis-lepes",
       title: "Kis lépés",
       text: "Egy kis, nyugodt lépés tisztábbá teszi a következő feladatot.",

@@ -3061,6 +3061,7 @@ final class TypingEngineTests: XCTestCase {
     let corpora = [
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
+      StarterLexicon.swedishWords,
       StarterLexicon.hungarianWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
@@ -3205,6 +3206,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .norwegianBokmal).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .norwegianBokmal), "no")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .swedish).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swedish), "sv")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .hungarian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hungarian), "hu")
@@ -3840,6 +3844,7 @@ final class TypingEngineTests: XCTestCase {
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
       (.danish, StarterLexicon.danishWords),
       (.norwegianBokmal, StarterLexicon.norwegianBokmalWords),
+      (.swedish, StarterLexicon.swedishWords),
       (.hungarian, StarterLexicon.hungarianWords),
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
       (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
@@ -3878,6 +3883,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.danishWords.contains("åndedræt"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.norwegianBokmal))
     XCTAssertTrue(StarterLexicon.norwegianBokmalWords.contains("fjær"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.swedish))
+    XCTAssertTrue(StarterLexicon.swedishWords.contains("äng"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.hungarian))
     XCTAssertTrue(StarterLexicon.hungarianWords.contains("tűz"))
   }
@@ -3898,6 +3905,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
     XCTAssertEqual(TypingLanguage.danish.speechLocaleIdentifier, "da-DK")
     XCTAssertEqual(TypingLanguage.norwegianBokmal.speechLocaleIdentifier, "nb-NO")
+    XCTAssertEqual(TypingLanguage.swedish.speechLocaleIdentifier, "sv-SE")
     XCTAssertEqual(TypingLanguage.hungarian.speechLocaleIdentifier, "hu-HU")
     XCTAssertEqual(TypingLanguage.french.speechLocaleIdentifier, "fr-FR")
     XCTAssertEqual(TypingLanguage.italian.speechLocaleIdentifier, "it-IT")
@@ -3980,6 +3988,15 @@ final class TypingEngineTests: XCTestCase {
         results: [norwegianBokmalResult], language: .norwegianBokmal, englishVariant: .american,
         wordCount: 1),
       "vær")
+    let swedishResult = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .swedish), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 3,
+      correctCharacterCount: 2, errorCount: 1, wpm: 12, rawWpm: 12, accuracy: 67,
+      prompt: "sjö", replayEvents: [.init(offset: 1, kind: .insert, text: "sjo")])
+    XCTAssertEqual(
+      WeakSpotPractice.prompt(
+        results: [swedishResult], language: .swedish, englishVariant: .american, wordCount: 1),
+      "fönster")
     let hungarianResult = CompletedTestResult(
       id: UUID(), configuration: .words(1, language: .hungarian), outcome: .completed,
       startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 3,
@@ -4026,6 +4043,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testOwnedPracticeWordsShareTheLocalFilterAndWeakSpotCorpus() {
     XCTAssertEqual(TypingLanguage.hungarian.ownedPracticeWords(), StarterLexicon.hungarianWords)
+    XCTAssertEqual(TypingLanguage.swedish.ownedPracticeWords(), StarterLexicon.swedishWords)
     XCTAssertEqual(
       TypingLanguage.english.ownedPracticeWords(englishVariant: .british), StarterLexicon.britishWords)
     XCTAssertTrue(TypingLanguage.simplifiedChinese.ownedPracticeWords().contains("晨光"))
@@ -4236,7 +4254,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .hungarian, .french,
+      .english, .spanish, .german, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
