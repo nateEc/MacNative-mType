@@ -95,8 +95,15 @@ public struct TypebarRateLimitMiddleware: AsyncMiddleware {
 
     private func limiterKey(for request: Request) -> String {
         if let token = request.headers.bearerAuthorization?.token, !token.isEmpty {
-            return "token:\(token)"
+            return "token:\(opaqueKey(token))"
+        }
+        if let key = request.headers.first(name: "X-Typebar-Access-Key"), !key.isEmpty {
+            return "developer-key:\(opaqueKey(key))"
         }
         return "source:\(request.remoteAddress?.ipAddress ?? "unknown")"
+    }
+
+    private func opaqueKey(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -48,6 +48,7 @@ public func configure(
                 "health": .available,
                 "rateLimiting": .partial,
                 "authentication": .available,
+                "developerAccessKeys": .partial,
                 "passwordReset": passwordResetDelivery == nil ? .planned : .available,
                 "emailVerification": emailVerificationDelivery == nil ? .planned : .available,
                 "githubOAuth": oauthProviderClient?.isConfigured(for: .github) == true ? .available : .planned,
@@ -581,13 +582,56 @@ public func configure(
         }
     }
 
+    app.get("v1", "developer-keys") { request async throws -> DeveloperAccessKeyListResponse in
+        do {
+            return try await authStore.developerAccessKeys(accessToken: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.post("v1", "developer-keys") { request async throws -> CreateDeveloperAccessKeyResponse in
+        do {
+            return try await authStore.createDeveloperAccessKey(
+                request.content.decode(CreateDeveloperAccessKeyRequest.self),
+                accessToken: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.patch("v1", "developer-keys", ":id") { request async throws -> DeveloperAccessKey in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The developer key identifier was invalid.")
+        }
+        do {
+            return try await authStore.updateDeveloperAccessKey(
+                id: id, request: request.content.decode(UpdateDeveloperAccessKeyRequest.self),
+                accessToken: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.delete("v1", "developer-keys", ":id") { request async throws -> DeveloperAccessKeyDeletionResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The developer key identifier was invalid.")
+        }
+        do {
+            try await authStore.deleteDeveloperAccessKey(id: id, accessToken: try request.accessToken())
+            return .init(deleted: true)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.post("v1", "results") { request async throws -> ResultSubmissionResponse in
         do {
-            let accessToken = try request.accessToken()
+            let credential = try request.resultSubmissionCredential()
             let submission = try request.content.decode(ResultSubmissionRequest.self)
             return try await authStore.submitResult(
                 submission,
-                accessToken: accessToken
+                credential: credential
             )
         } catch let error as AuthStoreError {
             throw error.abort
@@ -681,6 +725,10 @@ private extension AuthStoreError {
             Abort(.conflict, reason: "This OAuth authorization does not require account registration.")
         case .invalidCredentials, .invalidAccessToken:
             Abort(.unauthorized, reason: "Invalid email or password.")
+        case .invalidDeveloperAccessKey:
+            Abort(.unauthorized, reason: "The Typebar developer key is invalid.")
+        case .inactiveDeveloperAccessKey:
+            Abort(.forbidden, reason: "The Typebar developer key is disabled.")
         case .invalidOAuthTransaction:
             Abort(.unauthorized, reason: "This OAuth authorization is invalid or has expired.")
         case .invalidReauthenticationToken:
@@ -709,6 +757,12 @@ private extension AuthStoreError {
             Abort(.badRequest, reason: "A public profile search requires 2 to 40 display-name characters.")
         case .invalidProfileDetails:
             Abort(.badRequest, reason: "The public profile details are invalid.")
+        case .invalidDeveloperAccessKeyName:
+            Abort(.badRequest, reason: "A developer key name must be 1 to 20 ASCII letters, numbers, hyphens, or underscores and begin with a letter or number.")
+        case .developerAccessKeyNotFound:
+            Abort(.notFound, reason: "The requested Typebar developer key does not exist.")
+        case .developerAccessKeyLimitReached:
+            Abort(.conflict, reason: "A Typebar account can have at most five developer keys.")
         case .directMessageNotAllowed:
             Abort(.forbidden, reason: "Direct messages are only available between accepted Typebar friends.")
         }
@@ -721,6 +775,16 @@ private extension Request {
             throw Abort(.unauthorized, reason: "A Typebar access token is required.")
         }
         return token
+    }
+
+    func resultSubmissionCredential() throws -> ResultSubmissionCredential {
+        if let key = headers.first(name: "X-Typebar-Access-Key") {
+            guard !key.isEmpty else {
+                throw Abort(.unauthorized, reason: "A Typebar developer key is required.")
+            }
+            return .developerAccessKey(key)
+        }
+        return .accessToken(try accessToken())
     }
 
     func reauthenticationToken() throws -> String {

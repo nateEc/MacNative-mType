@@ -157,6 +157,47 @@ public struct UpdateProfileRequest: Content, Equatable {
   }
 }
 
+/// A scoped credential for automation clients. It deliberately has no account
+/// management authority: Typebar only accepts it when receiving a result.
+public struct DeveloperAccessKey: Content, Equatable, Identifiable, Sendable {
+  public let id: UUID
+  public let name: String
+  public let enabled: Bool
+  public let createdAt: Date
+  public let modifiedAt: Date
+  public let lastUsedAt: Date?
+}
+
+public struct DeveloperAccessKeyListResponse: Content, Equatable, Sendable {
+  public let keys: [DeveloperAccessKey]
+}
+
+public struct CreateDeveloperAccessKeyRequest: Content, Equatable, Sendable {
+  public let name: String
+}
+
+/// The raw key is returned only from creation. Persisted state stores only its
+/// SHA-256 hash, so neither later list responses nor a server backup can
+/// reveal it.
+public struct CreateDeveloperAccessKeyResponse: Content, Equatable, Sendable {
+  public let key: DeveloperAccessKey
+  public let accessKey: String
+}
+
+public struct UpdateDeveloperAccessKeyRequest: Content, Equatable, Sendable {
+  public let name: String?
+  public let enabled: Bool?
+}
+
+public struct DeveloperAccessKeyDeletionResponse: Content, Equatable, Sendable {
+  public let deleted: Bool
+}
+
+public enum ResultSubmissionCredential: Sendable {
+  case accessToken(String)
+  case developerAccessKey(String)
+}
+
 public struct AuthSessionResponse: Content, Equatable {
   public let user: AuthUserResponse
   public let accessToken: String
@@ -338,12 +379,18 @@ public enum AuthStoreError: Error, Equatable {
   case invalidProfileReport
   case directMessageNotAllowed
   case invalidDirectMessage
+  case invalidDeveloperAccessKeyName
+  case invalidDeveloperAccessKey
+  case inactiveDeveloperAccessKey
+  case developerAccessKeyNotFound
+  case developerAccessKeyLimitReached
 }
 
 public actor AuthStore {
   private struct PersistedState: Codable {
     var users: [StoredUser] = []
     var sessions: [StoredSession] = []
+    var developerAccessKeys: [StoredDeveloperAccessKey] = []
     var passwordResetTokens: [StoredPasswordResetToken] = []
     var emailVerificationTokens: [StoredEmailVerificationToken] = []
     var oauthIdentities: [StoredOAuthIdentity] = []
@@ -362,7 +409,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
+      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, nextSyncCursor
     }
 
@@ -372,6 +419,8 @@ public actor AuthStore {
       let values = try decoder.container(keyedBy: CodingKeys.self)
       users = try values.decodeIfPresent([StoredUser].self, forKey: .users) ?? []
       sessions = try values.decodeIfPresent([StoredSession].self, forKey: .sessions) ?? []
+      developerAccessKeys =
+        try values.decodeIfPresent([StoredDeveloperAccessKey].self, forKey: .developerAccessKeys) ?? []
       passwordResetTokens =
         try values.decodeIfPresent([StoredPasswordResetToken].self, forKey: .passwordResetTokens) ?? []
       emailVerificationTokens =
@@ -451,6 +500,23 @@ public actor AuthStore {
     let tokenHash: String
     let userID: UUID
     let expiresAt: Date
+  }
+
+  private struct StoredDeveloperAccessKey: Codable {
+    let id: UUID
+    let userID: UUID
+    let tokenHash: String
+    let name: String
+    let enabled: Bool
+    let createdAt: Date
+    let modifiedAt: Date
+    let lastUsedAt: Date?
+
+    func response() -> DeveloperAccessKey {
+      .init(
+        id: id, name: name, enabled: enabled, createdAt: createdAt,
+        modifiedAt: modifiedAt, lastUsedAt: lastUsedAt)
+    }
   }
 
   private struct StoredReauthenticationToken: Codable {
@@ -1200,6 +1266,66 @@ public actor AuthStore {
     return userResponse(for: user)
   }
 
+  public func developerAccessKeys(accessToken: String, now: Date = .now) throws
+    -> DeveloperAccessKeyListResponse
+  {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    let keys = state.developerAccessKeys
+      .filter { $0.userID == user.id }
+      .sorted { $0.createdAt > $1.createdAt }
+      .map { $0.response() }
+    return .init(keys: keys)
+  }
+
+  public func createDeveloperAccessKey(
+    _ request: CreateDeveloperAccessKeyRequest, accessToken: String, now: Date = .now
+  ) throws -> CreateDeveloperAccessKeyResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    guard state.developerAccessKeys.filter({ $0.userID == user.id }).count < 5 else {
+      throw AuthStoreError.developerAccessKeyLimitReached
+    }
+    let name = try validatedDeveloperAccessKeyName(request.name)
+    let accessKey = "tbak_\(Self.makeAccessToken())"
+    let stored = StoredDeveloperAccessKey(
+      id: UUID(), userID: user.id, tokenHash: Self.tokenHash(accessKey), name: name,
+      enabled: true, createdAt: now, modifiedAt: now, lastUsedAt: nil)
+    state.developerAccessKeys.append(stored)
+    try persist()
+    return .init(key: stored.response(), accessKey: accessKey)
+  }
+
+  public func updateDeveloperAccessKey(
+    id: UUID, request: UpdateDeveloperAccessKeyRequest, accessToken: String, now: Date = .now
+  ) throws -> DeveloperAccessKey {
+    guard request.name != nil || request.enabled != nil else {
+      throw AuthStoreError.invalidDeveloperAccessKeyName
+    }
+    let user = try authenticatedUser(for: accessToken, now: now)
+    guard let index = state.developerAccessKeys.firstIndex(where: {
+      $0.id == id && $0.userID == user.id
+    }) else { throw AuthStoreError.developerAccessKeyNotFound }
+    let existing = state.developerAccessKeys[index]
+    let updated = StoredDeveloperAccessKey(
+      id: existing.id, userID: existing.userID, tokenHash: existing.tokenHash,
+      name: try request.name.map(validatedDeveloperAccessKeyName) ?? existing.name,
+      enabled: request.enabled ?? existing.enabled, createdAt: existing.createdAt,
+      modifiedAt: now, lastUsedAt: existing.lastUsedAt)
+    state.developerAccessKeys[index] = updated
+    try persist()
+    return updated.response()
+  }
+
+  public func deleteDeveloperAccessKey(
+    id: UUID, accessToken: String, now: Date = .now
+  ) throws {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    guard let index = state.developerAccessKeys.firstIndex(where: {
+      $0.id == id && $0.userID == user.id
+    }) else { throw AuthStoreError.developerAccessKeyNotFound }
+    state.developerAccessKeys.remove(at: index)
+    try persist()
+  }
+
   /// Replaces the password only after checking the existing password, then
   /// invalidates every existing device session and returns one fresh session.
   public func changePassword(
@@ -1322,6 +1448,7 @@ public actor AuthStore {
 
     state.users.remove(at: index)
     state.sessions.removeAll { $0.userID == userID }
+    state.developerAccessKeys.removeAll { $0.userID == userID }
     state.passwordResetTokens.removeAll { $0.userID == userID }
     state.emailVerificationTokens.removeAll { $0.userID == userID }
     state.oauthIdentities.removeAll { $0.userID == userID }
@@ -2050,9 +2177,15 @@ public actor AuthStore {
   }
 
   public func submitResult(
-    _ request: ResultSubmissionRequest, accessToken: String, now: Date = .now
+    _ request: ResultSubmissionRequest, credential: ResultSubmissionCredential, now: Date = .now
   ) throws -> ResultSubmissionResponse {
-    let user = try authenticatedUser(for: accessToken, now: now)
+    let user: AuthUserResponse
+    switch credential {
+    case .accessToken(let accessToken):
+      user = try authenticatedUser(for: accessToken, now: now)
+    case .developerAccessKey(let accessKey):
+      user = try authenticatedUser(forDeveloperAccessKey: accessKey, now: now)
+    }
     try validate(result: request, now: now)
     if state.results.contains(where: { $0.userID == user.id && $0.id == request.id }) {
       return resultSubmissionResponse(for: request, userID: user.id, now: now)
@@ -2067,6 +2200,12 @@ public actor AuthStore {
       ))
     try persist()
     return resultSubmissionResponse(for: request, userID: user.id, now: now)
+  }
+
+  public func submitResult(
+    _ request: ResultSubmissionRequest, accessToken: String, now: Date = .now
+  ) throws -> ResultSubmissionResponse {
+    try submitResult(request, credential: .accessToken(accessToken), now: now)
   }
 
   public func leaderboard(_ query: LeaderboardQuery, now: Date = .now) throws -> LeaderboardResponse
@@ -2254,6 +2393,26 @@ public actor AuthStore {
     )
   }
 
+  private func authenticatedUser(forDeveloperAccessKey accessKey: String, now: Date) throws
+    -> AuthUserResponse
+  {
+    guard accessKey.hasPrefix("tbak_") else { throw AuthStoreError.invalidDeveloperAccessKey }
+    let hash = Self.tokenHash(accessKey)
+    guard let index = state.developerAccessKeys.firstIndex(where: { $0.tokenHash == hash }) else {
+      throw AuthStoreError.invalidDeveloperAccessKey
+    }
+    let key = state.developerAccessKeys[index]
+    guard key.enabled else { throw AuthStoreError.inactiveDeveloperAccessKey }
+    guard let user = state.users.first(where: { $0.id == key.userID }) else {
+      throw AuthStoreError.invalidDeveloperAccessKey
+    }
+    state.developerAccessKeys[index] = StoredDeveloperAccessKey(
+      id: key.id, userID: key.userID, tokenHash: key.tokenHash, name: key.name,
+      enabled: key.enabled, createdAt: key.createdAt, modifiedAt: key.modifiedAt, lastUsedAt: now)
+    try persist()
+    return userResponse(for: user)
+  }
+
   private func persist() throws {
     guard let fileURL else { return }
     let directory = fileURL.deletingLastPathComponent()
@@ -2285,6 +2444,17 @@ public actor AuthStore {
   private func validatedDisplayName(_ value: String) throws -> String {
     let name = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard (2...32).contains(name.count) else { throw AuthStoreError.invalidDisplayName }
+    return name
+  }
+
+  private func validatedDeveloperAccessKeyName(_ value: String) throws -> String {
+    let name = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard (1...20).contains(name.count), let first = name.first,
+      first.isASCII && (first.isLetter || first.isNumber),
+      name.allSatisfy({ character in
+        character.isASCII && (character.isLetter || character.isNumber || character == "-" || character == "_")
+      })
+    else { throw AuthStoreError.invalidDeveloperAccessKeyName }
     return name
   }
 

@@ -53,6 +53,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["health"], .available)
         XCTAssertEqual(capabilities.capabilities["rateLimiting"], .partial)
         XCTAssertEqual(capabilities.capabilities["authentication"], .available)
+        XCTAssertEqual(capabilities.capabilities["developerAccessKeys"], .partial)
         XCTAssertEqual(capabilities.capabilities["passwordReset"], .planned)
         XCTAssertEqual(capabilities.capabilities["emailVerification"], .planned)
         XCTAssertEqual(capabilities.capabilities["synchronization"], .partial)
@@ -1718,6 +1719,90 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(request.consistency, 0)
   }
 
+  func testDeveloperAccessKeysAreScopedHashedAndCanBeRevoked() async throws {
+    let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("typebar-developer-key-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let store = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let owner = try await store.register(
+      .init(email: "key-owner@example.com", password: "a secure password", displayName: "Key Owner"))
+    let other = try await store.register(
+      .init(email: "key-other@example.com", password: "a secure password", displayName: "Key Other"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let created = try await store.createDeveloperAccessKey(
+      .init(name: "results-uploader"), accessToken: owner.accessToken, now: now)
+
+    XCTAssertTrue(created.accessKey.hasPrefix("tbak_"))
+    XCTAssertEqual(created.key.name, "results-uploader")
+    XCTAssertTrue(created.key.enabled)
+    XCTAssertNil(created.key.lastUsedAt)
+    XCTAssertFalse(try String(contentsOf: fileURL).contains(created.accessKey))
+    let ownerKeys = try await store.developerAccessKeys(accessToken: owner.accessToken, now: now).keys
+    let otherKeys = try await store.developerAccessKeys(accessToken: other.accessToken, now: now).keys
+    XCTAssertEqual(ownerKeys, [created.key])
+    XCTAssertTrue(otherKeys.isEmpty)
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 100, finishedAt: now),
+      credential: .developerAccessKey(created.accessKey), now: now)
+    let used = try await store.developerAccessKeys(accessToken: owner.accessToken, now: now).keys
+    XCTAssertEqual(used.first?.lastUsedAt, now)
+
+    let renamed = try await store.updateDeveloperAccessKey(
+      id: created.key.id, request: .init(name: "ci_uploader", enabled: false),
+      accessToken: owner.accessToken, now: now.addingTimeInterval(1))
+    XCTAssertEqual(renamed.name, "ci_uploader")
+    XCTAssertFalse(renamed.enabled)
+    XCTAssertEqual(renamed.lastUsedAt, now)
+    do {
+      _ = try await store.submitResult(
+        result(id: UUID(), wpm: 80, accuracy: 100, finishedAt: now),
+        credential: .developerAccessKey(created.accessKey), now: now)
+      XCTFail("Disabled developer keys must not upload results")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .inactiveDeveloperAccessKey)
+    }
+    do {
+      _ = try await store.updateDeveloperAccessKey(
+        id: created.key.id, request: .init(name: "taken", enabled: nil),
+        accessToken: other.accessToken, now: now)
+      XCTFail("A developer key must not be manageable from another account")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .developerAccessKeyNotFound)
+    }
+    try await store.deleteDeveloperAccessKey(id: created.key.id, accessToken: owner.accessToken, now: now)
+    do {
+      _ = try await store.submitResult(
+        result(id: UUID(), wpm: 80, accuracy: 100, finishedAt: now),
+        credential: .developerAccessKey(created.accessKey), now: now)
+      XCTFail("Deleted developer keys must not upload results")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidDeveloperAccessKey)
+    }
+  }
+
+  func testDeveloperAccessKeyNamesAndLimitsAreValidated() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "key-limit@example.com", password: "a secure password", displayName: "Key Limit"))
+    do {
+      _ = try await store.createDeveloperAccessKey(.init(name: "not allowed"), accessToken: session.accessToken)
+      XCTFail("Developer key names must be slug-like")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidDeveloperAccessKeyName)
+    }
+    for number in 1...5 {
+      _ = try await store.createDeveloperAccessKey(
+        .init(name: "key-\(number)"), accessToken: session.accessToken)
+    }
+    do {
+      _ = try await store.createDeveloperAccessKey(.init(name: "one-more"), accessToken: session.accessToken)
+      XCTFail("An account must not create more than five developer keys")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .developerAccessKeyLimitReached)
+    }
+  }
+
   func testOAuthIdentitiesSupportPasswordlessLoginLinkingAndSafeUnlinking() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let github = OAuthProviderIdentity(
@@ -2104,6 +2189,100 @@ final class HealthRouteTests: XCTestCase {
       try await app.test(.GET, "v1/leaderboards/experience/friends") { response async in
         XCTAssertEqual(response.status, .unauthorized)
       }
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
+  func testDeveloperKeyRoutesOnlyAuthorizeResultSubmission() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "route-key@example.com", password: "a secure password", displayName: "Route Key"))
+    let key = try await store.createDeveloperAccessKey(
+      .init(name: "external-uploader"), accessToken: session.accessToken)
+    let now = Date.now
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(.GET, "v1/developer-keys") { response async in
+        XCTAssertEqual(response.status, .unauthorized)
+      }
+      try await app.test(
+        .POST,
+        "v1/developer-keys",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(CreateDeveloperAccessKeyRequest(name: "native-client"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          let created = try? response.content.decode(CreateDeveloperAccessKeyResponse.self)
+          XCTAssertEqual(created?.key.name, "native-client")
+          XCTAssertTrue(created?.accessKey.hasPrefix("tbak_") ?? false)
+        })
+      try await app.test(
+        .GET,
+        "v1/profiles/me",
+        beforeRequest: { request async in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unauthorized)
+        })
+      try await app.test(
+        .POST,
+        "v1/results",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+          try request.content.encode(result(id: UUID(), wpm: 88, accuracy: 100, finishedAt: now))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+        })
+      try await app.test(
+        .PATCH,
+        "v1/developer-keys/\(key.key.id.uuidString)",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(UpdateDeveloperAccessKeyRequest(name: nil, enabled: false))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertFalse((try? response.content.decode(DeveloperAccessKey.self))?.enabled ?? true)
+        })
+      try await app.test(
+        .POST,
+        "v1/results",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+          try request.content.encode(result(id: UUID(), wpm: 88, accuracy: 100, finishedAt: now))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .forbidden)
+        })
+      try await app.test(
+        .DELETE,
+        "v1/developer-keys/\(key.key.id.uuidString)",
+        beforeRequest: { request async in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertTrue((try? response.content.decode(DeveloperAccessKeyDeletionResponse.self))?.deleted ?? false)
+        })
+      try await app.test(
+        .POST,
+        "v1/results",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+          try request.content.encode(result(id: UUID(), wpm: 88, accuracy: 100, finishedAt: now))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unauthorized)
+        })
       try await app.asyncShutdown()
     } catch {
       try? await app.asyncShutdown()

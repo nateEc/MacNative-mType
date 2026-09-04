@@ -235,6 +235,37 @@ private struct RemoteUpdateProfileRequest: Codable, Sendable {
     let profileDetails: RemoteProfileDetails?
 }
 
+struct RemoteDeveloperAccessKey: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let name: String
+    let enabled: Bool
+    let createdAt: Date
+    let modifiedAt: Date
+    let lastUsedAt: Date?
+}
+
+private struct RemoteDeveloperAccessKeyListResponse: Codable, Sendable {
+    let keys: [RemoteDeveloperAccessKey]
+}
+
+private struct RemoteCreateDeveloperAccessKeyRequest: Codable, Sendable {
+    let name: String
+}
+
+private struct RemoteCreateDeveloperAccessKeyResponse: Codable, Sendable {
+    let key: RemoteDeveloperAccessKey
+    let accessKey: String
+}
+
+private struct RemoteUpdateDeveloperAccessKeyRequest: Codable, Sendable {
+    let name: String?
+    let enabled: Bool?
+}
+
+private struct RemoteDeveloperAccessKeyDeletionResponse: Codable, Sendable {
+    let deleted: Bool
+}
+
 private struct RemoteQuoteSubmissionRequest: Codable, Sendable {
     let language: String
     let text: String
@@ -724,7 +755,12 @@ final class AccountSession {
     @ObservationIgnored private let oauthBrowser = OAuthWebAuthenticationSession()
 
     var endpoint = "http://127.0.0.1:8080" { didSet { defaults.set(endpoint, forKey: endpointKey) } }
-    var currentUser: RemoteAccountUser?
+    var currentUser: RemoteAccountUser? {
+        didSet {
+            if currentUser == nil { developerAccessKeys = [] }
+        }
+    }
+    var developerAccessKeys: [RemoteDeveloperAccessKey] = []
     var pendingOAuthRegistration: PendingRemoteOAuthRegistration?
     var isWorking = false
     var statusMessage: String?
@@ -1145,6 +1181,92 @@ final class AccountSession {
         }
     }
 
+    func refreshDeveloperAccessKeys() async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            developerAccessKeys = []
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            developerAccessKeys = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/developer-keys", method: "GET", token: token,
+                body: Optional<String>.none, response: RemoteDeveloperAccessKeyListResponse.self
+            ).keys
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func createDeveloperAccessKey(name: String) async -> String? {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return nil
+        }
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedName.isEmpty else {
+            statusMessage = "请输入开发者密钥名称。"
+            return nil
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/developer-keys", method: "POST", token: token,
+                body: RemoteCreateDeveloperAccessKeyRequest(name: normalizedName),
+                response: RemoteCreateDeveloperAccessKeyResponse.self
+            )
+            developerAccessKeys.insert(response.key, at: 0)
+            statusMessage = "开发者密钥已创建；请立即保存明文。"
+            return response.accessKey
+        } catch {
+            statusMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func updateDeveloperAccessKey(id: UUID, name: String? = nil, enabled: Bool? = nil) async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let key = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/developer-keys/\(id.uuidString)", method: "PATCH", token: token,
+                body: RemoteUpdateDeveloperAccessKeyRequest(name: name, enabled: enabled),
+                response: RemoteDeveloperAccessKey.self
+            )
+            if let index = developerAccessKeys.firstIndex(where: { $0.id == key.id }) {
+                developerAccessKeys[index] = key
+            }
+            statusMessage = "开发者密钥已更新。"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func deleteDeveloperAccessKey(id: UUID) async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/developer-keys/\(id.uuidString)", method: "DELETE", token: token,
+                body: Optional<String>.none, response: RemoteDeveloperAccessKeyDeletionResponse.self
+            )
+            guard response.deleted else { throw RemoteAccountError.unexpectedResponse }
+            developerAccessKeys.removeAll { $0.id == id }
+            statusMessage = "开发者密钥已删除。"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
     func submitQuote(language: TypingLanguage, text: String, attribution: String?) async {
         guard let token = tokenStore.load(), currentUser != nil else { statusMessage = "请先登录自建 Typebar 服务。"; return }
         isWorking = true
@@ -1249,6 +1371,7 @@ final class AccountSession {
     func signOut() {
         tokenStore.clear()
         currentUser = nil
+        developerAccessKeys = []
         pendingOAuthRegistration = nil
         statusMessage = nil
     }
@@ -1634,6 +1757,7 @@ final class AccountSession {
     private func applyAuthenticatedSession(_ session: RemoteAuthSession) throws {
         try tokenStore.save(session.accessToken)
         currentUser = session.user
+        developerAccessKeys = []
         pendingOAuthRegistration = nil
     }
 

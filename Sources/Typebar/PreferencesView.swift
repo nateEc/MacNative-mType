@@ -21,6 +21,8 @@ struct PreferencesView: View {
   @State private var profileSocialHandle = ""
   @State private var profileWebsiteURL = ""
   @State private var profileShowsActivity = true
+  @State private var developerAccessKeyName = ""
+  @State private var newlyCreatedDeveloperAccessKey: String?
   @State private var updatedEmail = ""
   @State private var emailChangePassword = ""
   @State private var currentPassword = ""
@@ -894,6 +896,50 @@ struct PreferencesView: View {
             .onAppear { loadProfileDetails(user.profileDetails) }
             .onChange(of: user.profileDetails) { _, details in loadProfileDetails(details) }
             Divider()
+            VStack(alignment: .leading, spacing: 9) {
+              Text("开发者密钥").font(.headline)
+              Text("为自己的自动化工具创建仅能上传成绩的密钥；它不能读取邮箱、同步数据或更改账户。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              HStack {
+                TextField("名称（1–20 个字母、数字、- 或 _）", text: $developerAccessKeyName)
+                Button("创建密钥") {
+                  Task {
+                    if let key = await account.createDeveloperAccessKey(name: developerAccessKeyName) {
+                      newlyCreatedDeveloperAccessKey = key
+                      developerAccessKeyName = ""
+                    }
+                  }
+                }
+                .disabled(account.isWorking || developerAccessKeyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+              }
+              if let newlyCreatedDeveloperAccessKey {
+                VStack(alignment: .leading, spacing: 5) {
+                  Text("新密钥（只显示这一次）").font(.subheadline.weight(.semibold))
+                  Text(newlyCreatedDeveloperAccessKey)
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                  Button("我已安全保存") { self.newlyCreatedDeveloperAccessKey = nil }
+                }
+              }
+              if account.developerAccessKeys.isEmpty {
+                Text("尚未创建开发者密钥。每个账户最多可保留 5 个。")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              } else {
+                ForEach(account.developerAccessKeys) { key in
+                  DeveloperAccessKeyRow(key: key, account: account)
+                }
+              }
+              Text("自动化客户端向 POST /v1/results 发送 X-Typebar-Access-Key 请求头。禁用或删除会立即拒绝后续上传；服务端只保存密钥哈希。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .task(id: user.id) { await account.refreshDeveloperAccessKeys() }
+            Divider()
             Text("登录方式").font(.headline)
             if user.authenticationMethods.contains(.password),
               user.authenticationMethods.contains(where: { $0.oauthProvider != nil })
@@ -1500,7 +1546,7 @@ struct PreferencesView: View {
   private var accountSectionVisible: Bool {
     matches(
       "自建账户", "账户", "account", "服务", "server", "登录", "login", "注册", "邮箱", "email", "密码", "password",
-      "GitHub", "Google", "OAuth", "第三方", "关联", "资料", "profile", "排行榜", "榜单", "leaderboard", "删除", "注销")
+      "GitHub", "Google", "OAuth", "第三方", "关联", "资料", "profile", "排行榜", "榜单", "leaderboard", "开发者", "密钥", "key", "自动化", "删除", "注销")
   }
 
   private var moderationSectionVisible: Bool {
@@ -1607,6 +1653,53 @@ struct PreferencesView: View {
 
   private func languageTitle(_ rawValue: String) -> String {
     TypingLanguage(rawValue: rawValue)?.displayName ?? rawValue
+  }
+}
+
+private struct DeveloperAccessKeyRow: View {
+  let key: RemoteDeveloperAccessKey
+  let account: AccountSession
+  @State private var name: String
+
+  init(key: RemoteDeveloperAccessKey, account: AccountSession) {
+    self.key = key
+    self.account = account
+    _name = State(initialValue: key.name)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      HStack {
+        TextField("密钥名称", text: $name)
+          .onChange(of: key.name) { _, value in name = value }
+        Button("保存名称") {
+          Task { await account.updateDeveloperAccessKey(id: key.id, name: name) }
+        }
+        .disabled(
+          account.isWorking || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name == key.name)
+        Button("删除", role: .destructive) {
+          Task { await account.deleteDeveloperAccessKey(id: key.id) }
+        }
+        .disabled(account.isWorking)
+      }
+      Toggle(
+        "启用此密钥",
+        isOn: Binding(
+          get: { key.enabled },
+          set: { enabled in
+            Task { await account.updateDeveloperAccessKey(id: key.id, enabled: enabled) }
+          }
+        )
+      )
+      .disabled(account.isWorking)
+      Text(
+        "创建 \(key.createdAt.formatted(date: .abbreviated, time: .shortened)) · 最近使用 \(key.lastUsedAt?.formatted(date: .abbreviated, time: .shortened) ?? "从未")"
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+    }
+    .padding(8)
+    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
   }
 }
 
