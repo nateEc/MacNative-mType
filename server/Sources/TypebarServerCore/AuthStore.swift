@@ -336,6 +336,7 @@ public struct PublicProfileResponse: Content, Equatable {
   public let displayName: String
   public let joinedAt: Date
   public let completedResultCount: Int
+  public let startedTestCount: Int
   public let totalTypingSeconds: Double
   public let bestWPM: Int
   public let highestConsistency: Double
@@ -513,17 +514,19 @@ public actor AuthStore {
     let leaderboardOptedOut: Bool
     let profileDetails: ProfileDetails
     let selectedBadgeID: String?
+    var startedTestCount: Int
 
     private enum CodingKeys: String, CodingKey {
       case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut,
-        profileDetails, selectedBadgeID
+        profileDetails, selectedBadgeID, startedTestCount
     }
 
     init(
       id: UUID, email: String, displayName: String, passwordHash: String?, createdAt: Date,
       emailVerified: Bool = false,
       leaderboardOptedOut: Bool = false,
-      profileDetails: ProfileDetails = .init(), selectedBadgeID: String? = nil
+      profileDetails: ProfileDetails = .init(), selectedBadgeID: String? = nil,
+      startedTestCount: Int = 0
     ) {
       self.id = id
       self.email = email
@@ -534,6 +537,7 @@ public actor AuthStore {
       self.leaderboardOptedOut = leaderboardOptedOut
       self.profileDetails = profileDetails
       self.selectedBadgeID = selectedBadgeID
+      self.startedTestCount = startedTestCount
     }
 
     init(from decoder: Decoder) throws {
@@ -547,6 +551,7 @@ public actor AuthStore {
       leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
       profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
       selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
+      startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
     }
   }
 
@@ -962,7 +967,7 @@ public actor AuthStore {
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID)
+      selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
     try persist()
     return try userResponse(for: updatedUser.id)
@@ -1004,7 +1009,7 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: nil, createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID)
+      selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.passwordResetTokens.removeAll { $0.userID == user.id }
     let currentTokenHash = Self.tokenHash(accessToken)
     state.sessions.removeAll { $0.userID == user.id && $0.tokenHash != currentTokenHash }
@@ -1289,7 +1294,7 @@ public actor AuthStore {
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID)
+      selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.sessions.removeAll { $0.userID == user.id }
     state.passwordResetTokens.removeAll { $0.userID == user.id }
     try persist()
@@ -1347,7 +1352,7 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: user.passwordHash, createdAt: user.createdAt, emailVerified: true,
       leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID)
+      selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.emailVerificationTokens.removeAll { $0.userID == user.id }
     try persist()
   }
@@ -1448,7 +1453,8 @@ public actor AuthStore {
       emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut,
       profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID
+      selectedBadgeID: user.selectedBadgeID,
+      startedTestCount: user.startedTestCount
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
@@ -1485,7 +1491,8 @@ public actor AuthStore {
       emailVerified: false,
       leaderboardOptedOut: user.leaderboardOptedOut,
       profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID
+      selectedBadgeID: user.selectedBadgeID,
+      startedTestCount: user.startedTestCount
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
@@ -1584,7 +1591,8 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: displayName, passwordHash: user.passwordHash,
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut,
-      profileDetails: profileDetails, selectedBadgeID: selectedBadgeID)
+      profileDetails: profileDetails, selectedBadgeID: selectedBadgeID,
+      startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
     try persist()
     return userResponse(for: updatedUser)
@@ -2109,6 +2117,7 @@ public actor AuthStore {
       displayName: user.displayName,
       joinedAt: user.createdAt,
       completedResultCount: results.count,
+      startedTestCount: user.startedTestCount,
       totalTypingSeconds: totalTypingSeconds(from: results),
       bestWPM: results.map(\.wpm).max() ?? 0,
       highestConsistency: results.map(\.consistency).max() ?? 0,
@@ -2385,6 +2394,10 @@ public actor AuthStore {
         tags: tags,
         startedAt: request.startedAt, finishedAt: request.finishedAt
       ))
+    guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    state.users[userIndex].startedTestCount += request.restartCount + 1
     try persist()
     return resultSubmissionResponse(for: request, userID: user.id, now: now)
   }
@@ -2403,9 +2416,10 @@ public actor AuthStore {
     now: Date = .now
   ) throws -> ResultDeletionResponse {
     let currentUser = try authenticatedUser(for: accessToken, now: now)
-    guard let user = state.users.first(where: { $0.id == currentUser.id }) else {
+    guard let userIndex = state.users.firstIndex(where: { $0.id == currentUser.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
+    let user = state.users[userIndex]
     if let currentPassword = request.currentPassword {
       guard let passwordHash = user.passwordHash,
         try Bcrypt.verify(currentPassword, created: passwordHash)
@@ -2416,6 +2430,7 @@ public actor AuthStore {
     }
     let countBeforeDeletion = state.results.count
     state.results.removeAll { $0.userID == user.id }
+    state.users[userIndex].startedTestCount = 0
     let removedCount = countBeforeDeletion - state.results.count
     try persist()
     return .init(deleted: true, removedCount: removedCount)
@@ -2910,6 +2925,7 @@ public actor AuthStore {
       (0...400).contains(result.wpm), (0...500).contains(result.rawWpm),
       (0...100).contains(result.accuracy), (0...100).contains(result.consistency),
       result.errorCount >= 0, result.eventCount >= 0,
+      (0...1_000).contains(result.restartCount),
       result.rawWpm >= result.wpm, result.errorCount <= result.eventCount,
       result.startedAt <= result.finishedAt,
       result.finishedAt <= now.addingTimeInterval(60 * 5),

@@ -1337,6 +1337,7 @@ final class HealthRouteTests: XCTestCase {
     let detailedProfile = try await store.publicProfile(id: session.user.id, now: now)
     XCTAssertEqual(detailedProfile.activity?.testsByDays.count, 365)
     XCTAssertEqual(detailedProfile.activity?.testsByDays.reduce(0, +), 4)
+    XCTAssertEqual(detailedProfile.startedTestCount, 5)
     XCTAssertEqual(detailedProfile.activity?.testsByDays.last, 4)
     XCTAssertEqual(detailedProfile.totalTypingSeconds, 135)
 
@@ -1347,6 +1348,7 @@ final class HealthRouteTests: XCTestCase {
         let profile = try? response.content.decode(PublicProfileResponse.self)
         XCTAssertEqual(profile?.displayName, "Profile User")
         XCTAssertEqual(profile?.completedResultCount, 5)
+        XCTAssertEqual(profile?.startedTestCount, 5)
         XCTAssertEqual(profile?.totalTypingSeconds, 135)
         XCTAssertEqual(profile?.bestWPM, 88)
         XCTAssertEqual(profile?.highestConsistency, 92)
@@ -1875,6 +1877,35 @@ final class HealthRouteTests: XCTestCase {
     let request = try JSONDecoder().decode(ResultSubmissionRequest.self, from: Data(payload.utf8))
 
     XCTAssertEqual(request.consistency, 0)
+    XCTAssertEqual(request.restartCount, 0)
+  }
+
+  func testSubmittedResultsTrackRestartCountsWithoutDoubleCountingRetries() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "restart-count@example.com", password: "a secure password", displayName: "Restart Count"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let firstID = UUID()
+
+    _ = try await store.submitResult(
+      result(id: firstID, wpm: 72, accuracy: 98, restartCount: 2, finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(id: firstID, wpm: 72, accuracy: 98, restartCount: 2, finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 74, accuracy: 99, finishedAt: now),
+      accessToken: session.accessToken, now: now)
+
+    let profile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(profile.completedResultCount, 2)
+    XCTAssertEqual(profile.startedTestCount, 4)
+
+    _ = try await store.deleteResults(
+      .init(currentPassword: "a secure password"), accessToken: session.accessToken, now: now)
+    let clearedProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(clearedProfile.completedResultCount, 0)
+    XCTAssertEqual(clearedProfile.startedTestCount, 0)
   }
 
   func testDeveloperAccessKeysAreScopedHashedAndCanBeRevoked() async throws {
@@ -2775,7 +2806,7 @@ final class HealthRouteTests: XCTestCase {
 
   private func result(
     id: UUID, wpm: Int, accuracy: Int, consistency: Double = 0, mode: String = "time",
-    durationSeconds: Int? = 30, wordLimit: Int? = nil, finishedAt: Date
+    durationSeconds: Int? = 30, wordLimit: Int? = nil, restartCount: Int = 0, finishedAt: Date
   )
     -> ResultSubmissionRequest
   {
@@ -2791,6 +2822,7 @@ final class HealthRouteTests: XCTestCase {
       id: id, mode: mode, language: "english", durationSeconds: durationSeconds, wordLimit: wordLimit,
       wpm: wpm, rawWpm: rawWpm, accuracy: accuracy, consistency: consistency,
       errorCount: eventCount - correctCharacters, eventCount: eventCount,
+      restartCount: restartCount,
       startedAt: finishedAt.addingTimeInterval(-elapsed),
       finishedAt: finishedAt)
   }

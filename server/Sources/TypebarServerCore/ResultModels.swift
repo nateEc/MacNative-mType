@@ -13,6 +13,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let consistency: Double
     public let errorCount: Int
     public let eventCount: Int
+    public let restartCount: Int
     public let tags: [String]
     public let startedAt: Date
     public let finishedAt: Date
@@ -20,7 +21,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public init(
         id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
         rawWpm: Int, accuracy: Int, consistency: Double = 0, errorCount: Int, eventCount: Int,
-        tags: [String] = [], startedAt: Date, finishedAt: Date
+        restartCount: Int = 0, tags: [String] = [], startedAt: Date, finishedAt: Date
     ) {
         self.id = id
         self.mode = mode
@@ -33,6 +34,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.consistency = consistency
         self.errorCount = errorCount
         self.eventCount = eventCount
+        self.restartCount = restartCount
         self.tags = tags
         self.startedAt = startedAt
         self.finishedAt = finishedAt
@@ -40,7 +42,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, startedAt, finishedAt
+            errorCount, eventCount, restartCount, tags, startedAt, finishedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -56,6 +58,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
         errorCount = try values.decode(Int.self, forKey: .errorCount)
         eventCount = try values.decode(Int.self, forKey: .eventCount)
+        restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         startedAt = try values.decode(Date.self, forKey: .startedAt)
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)

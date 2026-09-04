@@ -500,11 +500,12 @@ private struct RemoteResultSubmission: Codable, Sendable {
     let consistency: Double
     let errorCount: Int
     let eventCount: Int
+    let restartCount: Int
     let tags: [String]
     let startedAt: Date
     let finishedAt: Date
 
-    init(result: CompletedTestResult) {
+    init(result: CompletedTestResult, restartCount: Int) {
         id = result.id
         mode = result.configuration.mode.rawValue
         language = result.configuration.language.rawValue
@@ -518,6 +519,7 @@ private struct RemoteResultSubmission: Codable, Sendable {
         ).typing
         errorCount = result.errorCount
         eventCount = result.typedCharacterCount
+        self.restartCount = max(0, restartCount)
         tags = result.tags
         startedAt = result.startedAt
         finishedAt = result.finishedAt
@@ -613,6 +615,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let displayName: String
     let joinedAt: Date
     let completedResultCount: Int
+    let startedTestCount: Int
     let totalTypingSeconds: Double
     let bestWPM: Int
     let highestConsistency: Double
@@ -625,7 +628,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let selectedBadge: RemotePublicProfileBadge?
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, joinedAt, completedResultCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
+        case id, displayName, joinedAt, completedResultCount, startedTestCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
             activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge
     }
 
@@ -635,6 +638,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         displayName = try values.decode(String.self, forKey: .displayName)
         joinedAt = try values.decode(Date.self, forKey: .joinedAt)
         completedResultCount = try values.decode(Int.self, forKey: .completedResultCount)
+        startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
         totalTypingSeconds = try values.decodeIfPresent(Double.self, forKey: .totalTypingSeconds) ?? 0
         bestWPM = try values.decode(Int.self, forKey: .bestWPM)
         highestConsistency = try values.decodeIfPresent(Double.self, forKey: .highestConsistency) ?? 0
@@ -1677,7 +1681,9 @@ final class AccountSession {
         }
     }
 
-    func submitCompletedResult(_ result: CompletedTestResult) async throws -> RemoteResultSubmissionResponse {
+    func submitCompletedResult(
+        _ result: CompletedTestResult, restartCount: Int = 0
+    ) async throws -> RemoteResultSubmissionResponse {
         guard let token = tokenStore.load(), currentUser != nil else {
             throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
         }
@@ -1685,7 +1691,7 @@ final class AccountSession {
             path: "v1/results",
             method: "POST",
             token: token,
-            body: RemoteResultSubmission(result: result),
+            body: RemoteResultSubmission(result: result, restartCount: restartCount),
             response: RemoteResultSubmissionResponse.self
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }

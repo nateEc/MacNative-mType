@@ -118,7 +118,7 @@ struct ConnectionsView: View {
     private func profileSummary(_ profile: RemotePublicProfile) -> String {
         let consistency = profile.highestConsistency.formatted(
             .number.precision(.fractionLength(0...2)))
-        return "最佳 \(profile.bestWPM) WPM · \(consistency)% 稳定 · \(profile.completedResultCount) 次完成"
+        return "最佳 \(profile.bestWPM) WPM · \(consistency)% 稳定 · \(profile.completedResultCount) 次完成 · \(profile.startedTestCount) 次开始"
     }
 
     private func loadAsync() async {

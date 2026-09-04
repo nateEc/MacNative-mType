@@ -392,7 +392,9 @@ private struct PublicProfileView: View {
                     }
                 }
             }
-            Label("服务端累计练习 \(totalTypingDuration)", systemImage: "timer")
+            Label(
+                "服务端累计练习 \(totalTypingDuration) · \(profile.startedTestCount) 次开始",
+                systemImage: "timer")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text("加入 \(profile.joinedAt.formatted(date: .abbreviated, time: .omitted))")
