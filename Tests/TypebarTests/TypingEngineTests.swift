@@ -1779,6 +1779,44 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.nordicQwerty.emulatedLayout, .nordicQwerty)
   }
 
+  func testTurkishQMapsTurkishLettersAndIsoPunctuation() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ğ", layout: .turkishQ), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ı", layout: .turkishQ), "top-7")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "İ", layout: .turkishQ), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .turkishQ), "bottom-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .turkishQ), "home-11")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [], layout: .turkishQ), "ğ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 30, modifierFlags: [.shift], layout: .turkishQ), "Ü")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 34, modifierFlags: [], layout: .turkishQ), "ı")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [.shift], layout: .turkishQ), "İ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [.shift], layout: .turkishQ), ";")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ç", layout: .turkishQ), 47)
+    XCTAssertEqual(KeyboardInputLayout.turkishQ.emulatedLayout, .turkishQ)
+  }
+
+  @MainActor
+  func testTurkishQPersistsAsGuideInputAndLayoutFluidChoice() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .turkishQ
+    settings.keyboardInputLayout = .turkishQ
+    settings.layoutFluidLayouts = [.turkishQ, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .turkishQ)
+    XCTAssertEqual(restored.keyboardInputLayout, .turkishQ)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.turkishQ, .ansiQwerty])
+  }
+
   @MainActor
   func testNordicQwertyPersistsAsGuideInputAndLayoutFluidChoice() {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -3461,10 +3499,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, KeyboardLayout.allCases.count)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 16)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
-      KeyboardLayout.allCases)
+      Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
     XCTAssertEqual(
       EarthquakeOffsetPolicy.offset(at: start, isEnabled: true, reducesMotion: true).x, 0)
     XCTAssertEqual(EarthquakeOffsetPolicy.offset(at: start, isEnabled: false, reducesMotion: false).y, 0)

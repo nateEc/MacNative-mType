@@ -185,6 +185,13 @@ enum KeyboardLayoutEmulator {
           + "12:aA 13:zZ 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:^¨ 30:$£ "
           + "0:qQ 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:mM 39:ù% "
           + "6:wW 7:xX 8:cC 9:vV 11:bB 45:nN 46:,? 43:;. 47::/ 44:!§")
+    case .turkishQ:
+      map(
+        "50:\"é 18:1! 19:2' 20:3^ 21:4+ 23:5% 22:6& 26:7/ 28:8( 25:9) 29:0= 27:*? 24:-_ "
+          + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:yY 32:uU 34:ıI 31:oO 35:pP 33:ğĞ 30:üÜ "
+          + "0:aA 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:şŞ 39:iİ 42:,; "
+          + "10:<> 6:zZ 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:öÖ 47:çÇ 44:.:"
+      )
     }
   }
 

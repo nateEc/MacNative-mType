@@ -744,7 +744,7 @@ enum ASLHandshapePolicy {
 enum LayoutFluidPolicy {
   static let defaultLayouts: [KeyboardLayout] = [.ansiQwerty, .ansiColemak, .ansiDvorak]
   /// The reference configuration permits up to fifteen unique layouts. The
-  /// native picker cannot exceed the layouts implemented by this app.
+  /// native sequence therefore truncates only its selected layouts.
   static let maximumLayouts = 15
   static let maximumSupportedLayouts = min(maximumLayouts, KeyboardLayout.allCases.count)
 

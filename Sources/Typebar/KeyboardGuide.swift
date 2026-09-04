@@ -17,6 +17,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case portugueseQwertyANSI
   case latinAmericanQwerty
   case frenchAzerty
+  case turkishQ
 
   var id: Self { self }
 
@@ -37,6 +38,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .portugueseQwertyANSI: "Portuguese QWERTY (ANSI)"
     case .latinAmericanQwerty: "Latin American QWERTY"
     case .frenchAzerty: "French AZERTY"
+    case .turkishQ: "Turkish Q"
     }
   }
 }
@@ -62,6 +64,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case portugueseQwertyANSI
   case latinAmericanQwerty
   case frenchAzerty
+  case turkishQ
 
   var id: Self { self }
 
@@ -698,6 +701,29 @@ enum KeyboardGuideModel {
         row(
           "bottom", "WXCVBN,;:!",
           characters: ["w", "x", "c", "v", "b", "n", ",?", ";.", ":/", "!§"]
+        ),
+      ]
+    case .turkishQ:
+      [
+        row(
+          "number", "\"1234567890*-",
+          characters: ["\"é", "1!", "2'", "3^", "4+", "5%", "6&", "7/", "8(", "9)", "0=", "*?", "-_"],
+          shiftedLabels: ["é", "!", "'", "^", "+", "%", "&", "/", "(", ")", "=", "?", "_"]
+        ),
+        row(
+          "top", "QWERTYUIOPĞÜ",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "ıI", "oO", "pP", "ğĞ", "üÜ"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "Ğ", "Ü"]
+        ),
+        row(
+          "home", "ASDFGHJKLŞİ,",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "şŞ", "iİ", ",;"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ş", "İ", ";"]
+        ),
+        row(
+          "bottom", "<ZXCVBNMÖÇ.",
+          characters: ["<>", "zZ", "xX", "cC", "vV", "bB", "nN", "mM", "öÖ", "çÇ", ".:"],
+          shiftedLabels: [">", "Z", "X", "C", "V", "B", "N", "M", "Ö", "Ç", ":"]
         ),
       ]
     }
