@@ -36,6 +36,7 @@ extension TypingLanguage {
     case .bulgarian: "bg-BG"
     case .romanian: "ro-RO"
     case .finnish: "fi-FI"
+    case .estonian: "et-EE"
     case .french: "fr-FR"
     case .italian: "it-IT"
     case .portuguese: "pt-PT"

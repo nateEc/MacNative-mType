@@ -300,6 +300,10 @@ final class HealthRouteTests: XCTestCase {
       .init(language: "finnish", text: "Rauhallinen askel tekee seuraavasta tehtävästä selvemmän.", attribution: nil),
       accessToken: session.accessToken)
     XCTAssertEqual(finnishSubmission.status, "pending")
+    let estonianSubmission = try await store.submitQuote(
+      .init(language: "estonian", text: "Rahulik samm teeb järgmise ülesande selgemaks.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(estonianSubmission.status, "pending")
     let frenchSubmission = try await store.submitQuote(
       .init(
         language: "french", text: "Une pratique calme peut éclairer la prochaine étape.",
@@ -363,7 +367,7 @@ final class HealthRouteTests: XCTestCase {
       Set(mine.submissions.map(\.id)),
       Set([
         submitted.id, spanishSubmission.id, germanSubmission.id, greekSubmission.id, dutchSubmission.id, danishSubmission.id,
-        norwegianBokmalSubmission.id, swedishSubmission.id, hungarianSubmission.id, czechSubmission.id, bulgarianSubmission.id, romanianSubmission.id, finnishSubmission.id, frenchSubmission.id,
+        norwegianBokmalSubmission.id, swedishSubmission.id, hungarianSubmission.id, czechSubmission.id, bulgarianSubmission.id, romanianSubmission.id, finnishSubmission.id, estonianSubmission.id, frenchSubmission.id,
         italianSubmission.id, portugueseSubmission.id, traditionalChineseSubmission.id,
         russianSubmission.id, ukrainianSubmission.id, ukrainianLatinSubmission.id, hiraganaSubmission.id,
         katakanaSubmission.id, romajiSubmission.id,
@@ -388,6 +392,7 @@ final class HealthRouteTests: XCTestCase {
     try await store.withdrawQuoteSubmission(bulgarianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(romanianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(finnishSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(estonianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(frenchSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(italianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(
@@ -2686,7 +2691,7 @@ final class HealthRouteTests: XCTestCase {
     }
 
     for (offset, language) in [
-      "traditionalChinese", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "bulgarian", "romanian", "finnish", "russian",
+      "traditionalChinese", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "bulgarian", "romanian", "finnish", "estonian", "russian",
       "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
       "turkish", "polish",
     ].enumerated() {

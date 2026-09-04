@@ -3119,7 +3119,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.greekWords,
       StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
       StarterLexicon.swedishWords,
-      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
+      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
@@ -3285,6 +3285,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .finnish).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .finnish), "fi")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .estonian).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .estonian), "et")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .ukrainianLatin).with(modifiers: [.referenceStream])))
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
@@ -3930,6 +3933,7 @@ final class TypingEngineTests: XCTestCase {
       (.bulgarian, StarterLexicon.bulgarianWords),
       (.romanian, StarterLexicon.romanianWords),
       (.finnish, StarterLexicon.finnishWords),
+      (.estonian, StarterLexicon.estonianWords),
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
       (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
       (.ukrainian, StarterLexicon.ukrainianWords),
@@ -3986,6 +3990,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.romanianWords.contains("dimineață"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.finnish))
     XCTAssertTrue(StarterLexicon.finnishWords.contains("järvi"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.estonian))
+    XCTAssertTrue(StarterLexicon.estonianWords.contains("jõgi"))
   }
 
   func testLazyLatinModifierNormalizesAccentsLigaturesAndGeneratedPrompts() {
@@ -4011,6 +4017,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.bulgarian.speechLocaleIdentifier, "bg-BG")
     XCTAssertEqual(TypingLanguage.romanian.speechLocaleIdentifier, "ro-RO")
     XCTAssertEqual(TypingLanguage.finnish.speechLocaleIdentifier, "fi-FI")
+    XCTAssertEqual(TypingLanguage.estonian.speechLocaleIdentifier, "et-EE")
     XCTAssertEqual(TypingLanguage.french.speechLocaleIdentifier, "fr-FR")
     XCTAssertEqual(TypingLanguage.italian.speechLocaleIdentifier, "it-IT")
     XCTAssertEqual(TypingLanguage.portuguese.speechLocaleIdentifier, "pt-PT")
@@ -4162,6 +4169,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.bulgarian.ownedPracticeWords(), StarterLexicon.bulgarianWords)
     XCTAssertEqual(TypingLanguage.romanian.ownedPracticeWords(), StarterLexicon.romanianWords)
     XCTAssertEqual(TypingLanguage.finnish.ownedPracticeWords(), StarterLexicon.finnishWords)
+    XCTAssertEqual(TypingLanguage.estonian.ownedPracticeWords(), StarterLexicon.estonianWords)
     XCTAssertEqual(TypingLanguage.swedish.ownedPracticeWords(), StarterLexicon.swedishWords)
     XCTAssertEqual(TypingLanguage.greek.ownedPracticeWords(), StarterLexicon.greekWords)
     XCTAssertEqual(TypingLanguage.japaneseKatakana.ownedPracticeWords(), StarterLexicon.japaneseKatakanaWords)
@@ -4376,7 +4384,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .bulgarian, .romanian, .finnish, .french,
+      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .bulgarian, .romanian, .finnish, .estonian, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,

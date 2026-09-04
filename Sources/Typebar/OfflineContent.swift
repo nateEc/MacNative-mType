@@ -820,6 +820,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "estonian-rahulik-samm",
+      title: "Rahulik samm",
+      text: "Rahulik samm teeb järgmise ülesande selgemaks.",
+      language: .estonian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "estonian-avatud-markmik",
+      title: "Avatud märkmik",
+      text: "Avatud märkmik ei lahenda rasket küsimust üksi, kuid aitab mõtetel leida korra ja suuna.",
+      language: .estonian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "estonian-vaikne-too",
+      title: "Vaikne töö",
+      text: "Edasiminek ei sünni tavaliselt ühe valju hetkega. See kasvab siis, kui avame sama lehe, parandame vea, loeme märkme läbi ja valime järgmise väikese ülesande. Kordamine teeb keerulised asjad tuttavamaks ning jätab tähelepanule rohkem ruumi.",
+      language: .estonian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "estonian-pikk-laud",
+      title: "Pikk laud",
+      text: "Pikk laud on kasulik, sest sellel on ruumi eri liiki töö jaoks. Ühes otsas võib olla esimene visand, teises lause, mis vajab veel tähelepanu, ning keskele jääb ruumi järgmisele väikesele otsusele. Harjutamine toimib samamoodi. See ei pea kõike korraga lahendama, vaid peab andma meile koha, kuhu tagasi tulla, näha järgmist sammu ja leida piisavalt kannatlikkust, et märgata, mis muutub mõne katse järel lihtsamaks.",
+      language: .estonian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",
