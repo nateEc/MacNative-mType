@@ -31,6 +31,7 @@ extension TypingLanguage {
     case .hebrew: "he-IL"
     case .persian: "fa-IR"
     case .urdu: "ur-PK"
+    case .tamil: "ta-IN"
     case .greek, .greeklish: "el-GR"
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"

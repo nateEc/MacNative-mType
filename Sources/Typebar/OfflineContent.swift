@@ -764,6 +764,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "tamil-calm-step",
+      title: "அமைதியான அடி",
+      text: "ஒரு அமைதியான அடி அடுத்த வேலையைத் தெளிவாக்கும்.",
+      language: .tamil,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "tamil-open-notebook",
+      title: "திறந்த குறிப்பேடு",
+      text: "திறந்த குறிப்பேடு ஒவ்வொரு கடினமான கேள்விக்கும் பதில் தராது, ஆனால் கேள்வியைச் சிறிய பகுதிகளாகப் பிரிக்க உதவும்.",
+      language: .tamil,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "tamil-small-work",
+      title: "சிறிய வேலை",
+      text: "முன்னேற்றம் எப்போதும் ஒரு பெரிய தருணத்தில் தெரியாது. அதே பக்கத்தைத் திறப்பது, ஒரு வாக்கியத்தைத் தெளிவாக்குவது, ஒரு தவறைச் சரிசெய்வது, அடுத்த முயற்சிக்கான பயனுள்ள குறிப்பை வைப்பது போன்ற சிறிய வேலைகளில் அது வளரும்.",
+      language: .tamil,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "tamil-long-table",
+      title: "நீண்ட மேசை",
+      text: "நீண்ட மேசை பலவகை வேலைகளுக்கு இடம் தருகிறது. அதன் ஒரு முனையில் முதல் வரைவு இருக்கலாம்; மற்றொரு முனையில் இன்னும் கவனம் தேவைப்படும் வாக்கியம் இருக்கலாம்; இவ்விரண்டுக்கும் நடுவில் ஒரு சிறிய முடிவு காத்திருக்கும். பயிற்சியும் இதேபோல் நகர்கிறது: கடினமான ஒவ்வொரு பகுதியையும் ஒரே முறையில் தீர்க்க வேண்டியதில்லை. திரும்பி வர இடம், தெளிவான அடுத்த அடி, சில முயற்சிகளுக்குப் பிறகு எது எளிதானது என்று காணும் பொறுமை இருந்தால் போதும்.",
+      language: .tamil,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
