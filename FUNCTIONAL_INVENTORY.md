@@ -48,6 +48,8 @@
 
 2026-09-04 补充：当前内置键盘图更新为二十一种，新增 `Hungarian QWERTZ · Typebar`。该 Typebar 自写映射覆盖现有原创 Magyar 词流中的 `á/é/í/ó/ö/ő/ú/ü/ű`、QWERTZ 的 Y/Z 位置与练习所需标点，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；它不导入官方或系统布局资产，未收录的死键和 Option 层仍交给 macOS 当前输入源。
 
+2026-09-04 补充：当前内置键盘图更新为二十二种，新增 `Greek Alphabetic · Typebar`。该 Typebar 自写的字母顺序映射覆盖现有原创 Greek 词流的二十四个基本字母、七个重音元音、词末 `ς` 与练习标点，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；它不是 macOS 或官方布局资产的导入，未收录字符、死键和 Option 层仍交给 macOS 当前输入源。此条同时取代 `VIS-02` / `VIS-05` 中将 Greek 列入未覆盖非 Latin 映射的较早表述。
+
 2026-09-04 补充：当时 `CFG-02`、`VIS-02` 与 `VIS-05` 的非拉丁布局覆盖新增 `Bulgarian Cyrillic · Typebar`。它是 Typebar 自写的第 19 个内置物理键位映射，覆盖 `я/ъ/щ/ч/ь` 与 ISO `< >`，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；这不是官方或系统 BDS 布局的复制，需精确系统布局时用户仍可选择 macOS 当前输入源。
 | INP-01 | 输入、逐字符状态、退格、长词 | `input/handlers/*` | TypingEngine | 部分实现 |
 | INP-02 | 组合输入/IME、焦点及 Caps Lock 提示 | `input/*`, `CapsWarning.tsx` | AppKitInputBridge | 部分实现：原生 AppKit 输入桥支持组合输入；标记文本在确认前只更新可选的关闭/下方/替换当前字符组合显示，不会改变提示、输入、计分或回放，确认提交时才进入输入引擎。输入视图会回传实际 responder 焦点，连续失焦满 1 秒时才显示可点击恢复焦点的提示，重新获焦会取消等待；有大小写语义的拉丁文与西里尔文练习会读取 macOS Caps Lock 状态显示警告，中文、日语假名与韩语不会显示无意义的提示。组合显示和两类提示均可在本机设置持久化；IME 最终人工验收尚未完成 |

@@ -1937,6 +1937,35 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.hungarianQwertz.emulatedLayout, .hungarianQwertz)
   }
 
+  func testGreekAlphabeticMapsOriginalGreekPracticeCharactersAndPhysicalPositions() {
+    XCTAssertTrue(
+      Set(StarterLexicon.greekWords.joined()).allSatisfy {
+        KeyboardGuideModel.highlightedKey(for: $0, layout: .greekAlphabetic) != nil
+      })
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "α", layout: .greekAlphabetic), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "π", layout: .greekAlphabetic), "home-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ω", layout: .greekAlphabetic), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ί", layout: .greekAlphabetic), "bottom-3")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ς", layout: .greekAlphabetic), "bottom-7")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "?", layout: .greekAlphabetic), "number-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .greekAlphabetic), "α")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 2, modifierFlags: [.shift], layout: .greekAlphabetic), "Π")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [], layout: .greekAlphabetic), "ω")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 9, modifierFlags: [.shift], layout: .greekAlphabetic), "Ό")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 46, modifierFlags: [], layout: .greekAlphabetic), "ς")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 18, modifierFlags: [.shift], layout: .greekAlphabetic), "!")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ά", layout: .greekAlphabetic), 10)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ί", layout: .greekAlphabetic), 8)
+    XCTAssertEqual(KeyboardInputLayout.greekAlphabetic.emulatedLayout, .greekAlphabetic)
+  }
+
   @MainActor
   func testTurkishQPersistsAsGuideInputAndLayoutFluidChoice() {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
@@ -2037,6 +2066,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardLayout, .hungarianQwertz)
     XCTAssertEqual(restored.keyboardInputLayout, .hungarianQwertz)
     XCTAssertEqual(restored.layoutFluidLayouts, [.hungarianQwertz, .ansiQwerty])
+  }
+
+  @MainActor
+  func testGreekAlphabeticPersistsAsGuideInputAndLayoutFluidChoice() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .greekAlphabetic
+    settings.keyboardInputLayout = .greekAlphabetic
+    settings.layoutFluidLayouts = [.greekAlphabetic, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .greekAlphabetic)
+    XCTAssertEqual(restored.keyboardInputLayout, .greekAlphabetic)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.greekAlphabetic, .ansiQwerty])
   }
 
   @MainActor
@@ -3809,7 +3855,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 21)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 22)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
