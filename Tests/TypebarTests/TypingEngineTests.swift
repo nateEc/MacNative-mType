@@ -3429,6 +3429,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .arabic).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .arabic), "ar")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .hebrew).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hebrew), "he")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -3522,6 +3525,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(arabicEncyclopedia.text, "نافذة واسعة تستقبل ضوء الصباح")
     XCTAssertEqual(
       arabicEncyclopedia.prompt(for: .words(3, language: .arabic)), "نافذة واسعة تستقبل")
+    let hebrewData = Data("""
+    {"title":"חלון","extract":"חלון פתוח מכניס אור בוקר."}
+    """.utf8)
+    let hebrewEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: hebrewData, language: .hebrew))
+    XCTAssertEqual(hebrewEncyclopedia.text, "חלון פתוח מכניס אור בוקר")
+    XCTAssertEqual(
+      hebrewEncyclopedia.prompt(for: .words(3, language: .hebrew)), "חלון פתוח מכניס")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4122,6 +4133,7 @@ final class TypingEngineTests: XCTestCase {
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
       (.afrikaans, StarterLexicon.afrikaansWords),
       (.arabic, StarterLexicon.arabicWords),
+      (.hebrew, StarterLexicon.hebrewWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4167,6 +4179,10 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(OfflineContent.quotes(for: language, length: .extended).count, 1)
       XCTAssertTrue(language.usesSpaceDelimitedWords)
       XCTAssertTrue(language.supportsQuotes)
+      var session = TypingSession(
+        configuration: .words(prompt.split(separator: " ").count, language: language), prompt: prompt)
+      session.insert(prompt, at: start)
+      XCTAssertEqual(session.outcome, .completed)
     }
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.ukrainian))
     XCTAssertTrue(StarterLexicon.ukrainianWords.contains("їжа"))
@@ -4196,6 +4212,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
     XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.arabic))
+    XCTAssertTrue(StarterLexicon.hebrewWords.contains("חלון"))
+    XCTAssertTrue(TypingLanguage.hebrew.usesRightToLeftPrompt)
+    XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.hebrew))
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.hebrew))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4253,6 +4273,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.german.speechLocaleIdentifier, "de-DE")
     XCTAssertEqual(TypingLanguage.afrikaans.speechLocaleIdentifier, "af-ZA")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
+    XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
@@ -4659,7 +4680,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .afrikaans, .arabic, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+      .english, .spanish, .german, .afrikaans, .arabic, .hebrew, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,

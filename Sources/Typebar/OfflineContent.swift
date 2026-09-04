@@ -680,6 +680,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "hebrew-calm-step",
+      title: "צעד שקט",
+      text: "צעד שקט מבהיר את המשימה הבאה.",
+      language: .hebrew,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "hebrew-open-notebook",
+      title: "מחברת פתוחה",
+      text: "מחברת פתוחה אינה פותרת כל שאלה קשה, אבל היא עוזרת לחלק את השאלה לחלקים קטנים יותר.",
+      language: .hebrew,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "hebrew-small-work",
+      title: "עבודה קטנה",
+      text: "התקדמות לא תמיד מגיעה ברגע גדול. היא צומחת מעבודות קטנות: פתיחת אותו דף, הבהרת משפט אחד, תיקון טעות והשארת הערה מועילה לניסיון הבא.",
+      language: .hebrew,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "hebrew-long-table",
+      title: "שולחן ארוך",
+      text: "שולחן ארוך נותן מקום לסוגים שונים של עבודה. בקצה אחד יכולה להיות טיוטה ראשונה, ובקצה השני משפט שעדיין דורש תשומת לב, ובאמצע מחכה החלטה קטנה. כך פועל גם התרגול: אין צורך לפתור כל חלק קשה בבת אחת, אלא להשאיר מקום לחזור אליו, צעד הבא ברור וסבלנות שמאפשרת לראות מה נעשה קל יותר אחרי כמה ניסיונות.",
+      language: .hebrew,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

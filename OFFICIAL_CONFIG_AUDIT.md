@@ -21,7 +21,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；四十二种原创单语（含 Arabic、希腊语、Greeklish、荷兰语、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、丹麦语、挪威 Bokmål、挪威 Nynorsk、Afrikaans、瑞典语、匈牙利语、捷克语、斯洛伐克语、斯洛文尼亚语、克罗地亚语、塞尔维亚语西里尔、塞尔维亚语 Latin、保加利亚语、罗马尼亚语、芬兰语、爱沙尼亚语、冰岛语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、日语罗马字、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。Arabic 使用 macOS 输入源与 RTL 提示呈现，暂不进入双向多语混排；乌克兰语 Latin、日语罗马字与 Greeklish 仅提供原创 ASCII 离线内容；塞尔维亚语 Latin 保持原创拉丁文本，四者均不让在线原文改写所选书写形式。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；四十三种原创单语（含 Arabic、Hebrew、希腊语、Greeklish、荷兰语、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、丹麦语、挪威 Bokmål、挪威 Nynorsk、Afrikaans、瑞典语、匈牙利语、捷克语、斯洛伐克语、斯洛文尼亚语、克罗地亚语、塞尔维亚语西里尔、塞尔维亚语 Latin、保加利亚语、罗马尼亚语、芬兰语、爱沙尼亚语、冰岛语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、日语罗马字、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。Arabic 与 Hebrew 使用 macOS 输入源、RTL 提示和原生双向文本排版，暂不进入双向多语混排；乌克兰语 Latin、日语罗马字与 Greeklish 仅提供原创 ASCII 离线内容；塞尔维亚语 Latin 保持原创拉丁文本，四者均不让在线原文改写所选书写形式。 |
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |
@@ -50,7 +50,7 @@
 | `indicateTypos` | `typoIndicatorStyle` | 已映射。 |
 | `compositionDisplay` | `compositionDisplayStyle` | 已映射。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |
-| `lazyMode` | `TestModifier.lazyLatin` | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。它不模拟参考对 Arabic 的自动 lazy-mode。 |
+| `lazyMode` | `TestModifier.lazyLatin` | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。它不模拟参考对 Arabic 的自动 lazy-mode；Hebrew 保持不适用此修饰器。 |
 | `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，22 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
