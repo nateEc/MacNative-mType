@@ -512,6 +512,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "ukrainian-latin-small-note",
+      title: "Mala notatka",
+      text: "Mala notatka pro zroblene dopomahaie pobachyty nastupnyi krok yasnishe.",
+      language: .ukrainianLatin,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "ukrainian-latin-one-fact",
+      title: "Odin fakt",
+      text: "Koly zadacha zdaietsia zaplutanoiu, korysno vypysaty lyshe odnu rich, yaku vzhe vidomo. Taka korotka notatka ne rozviazuie vse, ale daie oporu dlia nastupnoi dii.",
+      language: .ukrainianLatin,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "ukrainian-latin-return",
+      title: "Povernennia",
+      text: "Robota rukhaietsia ne tilky v myti velykoho natkhnennia. Vona skladaietsia z prostykh povernenn: pereviryty chyslo, utochnyty rechennia, prybraty zaive slovo i vidklasty pytannia, na yake shche nemaie vidpovidi. Kozhna taka diia robyt nastupne povernennia trokhy lehshym i zalyshaie pomitnyi slid dlia sebe.",
+      language: .ukrainianLatin,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "ukrainian-latin-workshop",
+      title: "Krai stolu",
+      text: "U maisterni korysno maty vilnyi krai stolu. Tudy mozhna poklasty pershyi eskiz, spysok zapytan i korotkyi zapys pro te, shcho vzhe perevireno. Koly uvaha rozsiiuietsia, tsei krai ne vymahaie shvydkoi vidpovidi: vin nahaduie pro malenku diiu, yaku mozhna zavershyty zaraz. Tak postupovo ziavliaietsia poriadok ne z idealnoho planu, a z pomitnykh krokiv, do yakykh lehko povertatysia nastupnoho dnia.",
+      language: .ukrainianLatin,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",

@@ -32,7 +32,7 @@ extension TypingLanguage {
     case .simplifiedChinese, .mixedEnglishChinese: "zh-CN"
     case .traditionalChinese: "zh-TW"
     case .russian: "ru-RU"
-    case .ukrainian: "uk-UA"
+    case .ukrainian, .ukrainianLatin: "uk-UA"
     case .japaneseHiragana: "ja-JP"
     case .korean: "ko-KR"
     case .turkish: "tr-TR"

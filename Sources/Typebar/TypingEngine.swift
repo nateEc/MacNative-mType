@@ -206,6 +206,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case traditionalChinese
   case russian
   case ukrainian
+  case ukrainianLatin
   case japaneseHiragana
   case korean
   case turkish
@@ -3040,6 +3041,16 @@ enum StarterLexicon {
     "їжа", "єдність", "ґрунт",
   ]
 
+  // Typebar-authored ASCII prompts for Ukrainian Latin keyboard practice.
+  // This is a native learning mode, not a copied word list or an automatic
+  // transliteration service.
+  static let ukrainianLatinWords = [
+    "ranok", "vikno", "papir", "bereh", "viter", "vprava", "uvaha", "spokii",
+    "yasno", "ozero", "vulytsia", "stil", "svitlo", "doroha", "terpinnia", "khvylyna",
+    "misto", "doshch", "tysha", "napriamok", "zirka", "notatka", "sad", "podikh",
+    "yizha", "yednist", "grunt",
+  ]
+
   // Hiragana-only prompts keep the selected input mode faithful to its label.
   static let japaneseHiraganaWords = [
     "あさ", "まど", "ひかり", "うみ", "かぜ", "れんしゅう", "しゅうちゅう", "しずか",
@@ -3170,6 +3181,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: ukrainianWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainianLatin:
+      return prompt(
+        tokens: count, lexicon: ukrainianLatinWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseHiragana:
       return prompt(
         tokens: count, lexicon: japaneseHiraganaWords, separator: "",
@@ -3239,6 +3254,7 @@ enum StarterLexicon {
     case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
     case .russian: (russianWords, [".", ",", "!", "?"])
     case .ukrainian: (ukrainianWords, [".", ",", "!", "?"])
+    case .ukrainianLatin: (ukrainianLatinWords, [".", ",", "!", "?"])
     case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
     case .korean: (koreanWords, [".", ",", "!", "?"])
     case .turkish: (turkishWords, [".", ",", "!", "?"])
@@ -3296,7 +3312,7 @@ extension TestMode {
 extension TypingLanguage {
   static let defaultMixedComponents: [TypingLanguage] = [
     .english, .spanish, .german, .french, .italian, .portuguese, .simplifiedChinese,
-    .traditionalChinese, .russian, .ukrainian, .japaneseHiragana,
+    .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana,
     .korean, .turkish, .polish,
   ]
 
@@ -3350,6 +3366,7 @@ extension TypingLanguage {
     case .traditionalChinese: "繁體中文"
     case .russian: "Русский"
     case .ukrainian: "Українська"
+    case .ukrainianLatin: "Українська (Latin)"
     case .japaneseHiragana: "日本語（ひらがな）"
     case .korean: "한국어"
     case .turkish: "Türkçe"
