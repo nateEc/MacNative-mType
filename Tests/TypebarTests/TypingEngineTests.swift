@@ -3082,7 +3082,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
       StarterLexicon.ukrainianLatinWords, StarterLexicon.japaneseHiraganaWords,
-      StarterLexicon.japaneseKatakanaWords,
+      StarterLexicon.japaneseKatakanaWords, StarterLexicon.japaneseRomajiWords,
       StarterLexicon.koreanWords, StarterLexicon.turkishWords, StarterLexicon.polishWords,
     ]
 
@@ -3237,7 +3237,10 @@ final class TypingEngineTests: XCTestCase {
       5, language: .japaneseHiragana).with(modifiers: [.referenceStream])))
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .japaneseKatakana).with(modifiers: [.referenceStream])))
+    XCTAssertNil(LivePracticeContentSource.selected(for: .words(
+      5, language: .japaneseRomaji).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .japaneseKatakana), "ja")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .japaneseRomaji), "ja")
     XCTAssertEqual(
       TestSessionFactory.make(
         configuration: poetryConfiguration, streamPrompt: poetry.prompt(for: poetryConfiguration)
@@ -3873,6 +3876,7 @@ final class TypingEngineTests: XCTestCase {
       (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
       (.ukrainian, StarterLexicon.ukrainianWords),
       (.ukrainianLatin, StarterLexicon.ukrainianLatinWords),
+      (.japaneseRomaji, StarterLexicon.japaneseRomajiWords),
       (.korean, StarterLexicon.koreanWords), (.turkish, StarterLexicon.turkishWords),
       (.polish, StarterLexicon.polishWords),
     ] {
@@ -3898,6 +3902,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.ukrainianWords.contains("ґрунт"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.ukrainianLatin))
     XCTAssertTrue(StarterLexicon.ukrainianLatinWords.allSatisfy {
+      $0.unicodeScalars.allSatisfy { $0.isASCII }
+    })
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.japaneseRomaji))
+    XCTAssertTrue(StarterLexicon.japaneseRomajiWords.allSatisfy {
       $0.unicodeScalars.allSatisfy { $0.isASCII }
     })
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.dutch))
@@ -3943,10 +3951,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.ukrainianLatin.speechLocaleIdentifier, "uk-UA")
     XCTAssertEqual(TypingLanguage.japaneseHiragana.speechLocaleIdentifier, "ja-JP")
     XCTAssertEqual(TypingLanguage.japaneseKatakana.speechLocaleIdentifier, "ja-JP")
+    XCTAssertEqual(TypingLanguage.japaneseRomaji.speechLocaleIdentifier, "ja-JP")
     XCTAssertEqual(TypingLanguage.korean.speechLocaleIdentifier, "ko-KR")
     XCTAssertEqual(TypingLanguage.turkish.speechLocaleIdentifier, "tr-TR")
     XCTAssertEqual(TypingLanguage.polish.speechLocaleIdentifier, "pl-PL")
     XCTAssertFalse(TypingLanguage.korean.supportsCapsLockWarning)
+    XCTAssertTrue(TypingLanguage.japaneseRomaji.supportsCapsLockWarning)
     XCTAssertEqual(TypingLanguage.mixedEnglishChinese.speechLocaleIdentifier, "zh-CN")
     XCTAssertEqual(TypingLanguage.mixedLanguages.speechLocaleIdentifier, "en-US")
   }
@@ -4081,6 +4091,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.swedish.ownedPracticeWords(), StarterLexicon.swedishWords)
     XCTAssertEqual(TypingLanguage.greek.ownedPracticeWords(), StarterLexicon.greekWords)
     XCTAssertEqual(TypingLanguage.japaneseKatakana.ownedPracticeWords(), StarterLexicon.japaneseKatakanaWords)
+    XCTAssertEqual(TypingLanguage.japaneseRomaji.ownedPracticeWords(), StarterLexicon.japaneseRomajiWords)
     XCTAssertEqual(
       TypingLanguage.english.ownedPracticeWords(englishVariant: .british), StarterLexicon.britishWords)
     XCTAssertTrue(TypingLanguage.simplifiedChinese.ownedPracticeWords().contains("晨光"))
@@ -4295,7 +4306,7 @@ final class TypingEngineTests: XCTestCase {
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
-      .korean, .turkish, .polish,
+      .japaneseRomaji, .korean, .turkish, .polish,
     ]
     for language in languages {
       let quote = try! XCTUnwrap(OfflineContent.quotes(for: language, length: .extended).first)

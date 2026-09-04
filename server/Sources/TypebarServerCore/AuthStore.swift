@@ -1994,7 +1994,7 @@ public actor AuthStore {
       Set([
         "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "french", "italian", "portuguese",
         "simplifiedChinese",
-        "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana",
+        "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
         "korean", "turkish", "polish",
       ])
         .contains(request.language), (10...500).contains(text.count), attribution?.count ?? 0 <= 80
@@ -2109,7 +2109,7 @@ public actor AuthStore {
         || Set([
           "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "french", "italian", "portuguese",
           "simplifiedChinese",
-          "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana",
+          "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
           "korean", "turkish", "polish",
         ]).contains(language!)
     else { throw AuthStoreError.invalidQuoteSubmission }
@@ -2693,7 +2693,7 @@ public actor AuthStore {
     let languages = Set([
       "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "french", "italian", "portuguese",
       "simplifiedChinese",
-      "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana",
+      "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
       "korean", "turkish", "polish",
       "mixedEnglishChinese", "mixedLanguages",
     ])
@@ -2990,7 +2990,7 @@ public actor AuthStore {
       Set([
         "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "french", "italian", "portuguese",
         "simplifiedChinese",
-        "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana",
+        "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
         "korean", "turkish", "polish",
         "mixedEnglishChinese", "mixedLanguages",
       ]).contains(result.language),

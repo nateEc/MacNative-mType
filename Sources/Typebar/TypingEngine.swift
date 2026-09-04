@@ -215,6 +215,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case ukrainianLatin
   case japaneseHiragana
   case japaneseKatakana
+  case japaneseRomaji
   case korean
   case turkish
   case polish
@@ -3074,6 +3075,14 @@ enum StarterLexicon {
     "ルール", "アイデア", "プロセス", "テスト", "データ", "コード",
   ]
 
+  // Typebar-authored ASCII romaji prompts provide Japanese practice without
+  // importing or adapting a third-party transliteration list.
+  static let japaneseRomajiWords = [
+    "asa", "mado", "hikari", "umi", "kaze", "renshuu", "shuuchuu", "shizuka",
+    "hakkiri", "mizuumi", "michi", "tsukue", "akari", "tabi", "taisetsu", "shibaraku",
+    "machi", "ame", "yukkuri", "houkou", "hoshi", "tegami", "niwa", "kokyuu",
+  ]
+
   // Original Typebar content for Hangul keyboard practice.
   static let koreanWords = [
     "아침", "창문", "종이", "해변", "바람", "연습", "집중", "천천히", "분명히", "호수",
@@ -3195,6 +3204,7 @@ enum StarterLexicon {
     case .traditionalChinese: traditionalChineseWords
     case .japaneseHiragana: japaneseHiraganaWords
     case .japaneseKatakana: japaneseKatakanaWords
+    case .japaneseRomaji: japaneseRomajiWords
     default: nil
     }
   }
@@ -3290,6 +3300,11 @@ enum StarterLexicon {
         tokens: count, lexicon: japaneseKatakanaWords, separator: "",
         punctuation: ["、", "。", "！", "？"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .japaneseRomaji:
+      return prompt(
+        tokens: count, lexicon: japaneseRomajiWords, separator: " ",
+        punctuation: [".", ",", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .korean:
       return prompt(
         tokens: count, lexicon: koreanWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -3363,6 +3378,7 @@ enum StarterLexicon {
     case .ukrainianLatin: (ukrainianLatinWords, [".", ",", "!", "?"])
     case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
     case .japaneseKatakana: (japaneseKatakanaWords, ["、", "。", "！", "？"])
+    case .japaneseRomaji: (japaneseRomajiWords, [".", ",", "!", "?"])
     case .korean: (koreanWords, [".", ",", "!", "?"])
     case .turkish: (turkishWords, [".", ",", "!", "?"])
     case .polish: (polishWords, [".", ",", "!", "?"])
@@ -3441,6 +3457,7 @@ extension TypingLanguage {
     case .ukrainianLatin: StarterLexicon.ukrainianLatinWords
     case .japaneseHiragana: StarterLexicon.japaneseHiraganaWords
     case .japaneseKatakana: StarterLexicon.japaneseKatakanaWords
+    case .japaneseRomaji: StarterLexicon.japaneseRomajiWords
     case .korean: StarterLexicon.koreanWords
     case .turkish: StarterLexicon.turkishWords
     case .polish: StarterLexicon.polishWords
@@ -3455,6 +3472,7 @@ extension TypingLanguage {
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
+    .japaneseRomaji,
     .korean, .turkish, .polish,
   ]
 
@@ -3517,6 +3535,7 @@ extension TypingLanguage {
     case .ukrainianLatin: "Українська (Latin)"
     case .japaneseHiragana: "日本語（ひらがな）"
     case .japaneseKatakana: "日本語（カタカナ）"
+    case .japaneseRomaji: "日本語（ローマ字）"
     case .korean: "한국어"
     case .turkish: "Türkçe"
     case .polish: "Polski"

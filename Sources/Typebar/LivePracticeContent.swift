@@ -164,7 +164,7 @@ enum LivePracticeContentService {
     case .simplifiedChinese, .traditionalChinese: return "zh"
     case .russian: return "ru"
     case .ukrainian, .ukrainianLatin: return "uk"
-    case .japaneseHiragana, .japaneseKatakana: return "ja"
+    case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: return "ja"
     case .korean: return "ko"
     case .turkish: return "tr"
     case .polish: return "pl"
@@ -204,13 +204,14 @@ enum LivePracticeContentService {
 }
 
 private extension TypingLanguage {
-  /// Japanese script variants and Ukrainian Latin are intentionally excluded:
-  /// those native options promise hiragana-only, katakana-only, and ASCII-Latin prompts respectively,
+  /// Japanese native variants and Ukrainian Latin are intentionally excluded:
+  /// those native options promise hiragana-only, katakana-only, ASCII romaji,
+  /// and ASCII-Latin prompts respectively,
   /// while a random encyclopedia extract cannot preserve that promise. Chinese
   /// source text remains directly typeable through the selected macOS IME and
   /// is segmented by the system tokenizer above.
   var supportsLiveEncyclopedia: Bool {
-    self != .ukrainianLatin
+    self != .ukrainianLatin && self != .japaneseRomaji
       && (usesSpaceDelimitedWords || self == .simplifiedChinese || self == .traditionalChinese)
   }
 }

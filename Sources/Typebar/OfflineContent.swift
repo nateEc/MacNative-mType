@@ -764,6 +764,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "romaji-tomorrow-note",
+      title: "Ashita no memo",
+      text: "Kyou no memo wa, ashita no hajime no basho o tsukuru.",
+      language: .japaneseRomaji,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "romaji-quiet-order",
+      title: "Shizuka na junban",
+      text: "Shizuka ni tsukutta junban wa, omoi tsuki o wake, tsugi ni kaku koto o mitsukeyasuku suru.",
+      language: .japaneseRomaji,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "romaji-daily-practice",
+      title: "Mainichi no renshuu",
+      text: "Mainichi no renshuu wa, hayaku kotae ni todoku tame dake no jikan de wa nai. Mado o akete, memo o yomi, machigaeta basho o naoshite, tsugi ni tamesu koto o erabu. Sono chiisana kurikaeshi ga, muzukashii tasku o sukoshi zutsu chikaku suru.",
+      language: .japaneseRomaji,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "romaji-open-table",
+      title: "Aketa teeburu",
+      text: "Nagaku tsuzuku teeburu ni wa, iroiro na shigoto no basho ga aru. Hitotsu no hashi ni wa mada awai dorafuto, mou hitotsu no hashi ni wa kakunin o matsu memo, soshite mannaka ni wa tsugi no sentaku no tame no aki ga aru. Renshuu mo onaji you ni susumu. Subete no mondai o ichido ni tokou to suru no de wa naku, modoru basho to mieru ippo o tsukuri, sukoshi jikan o totte, nani ga yasuku natta ka o mite iku.",
+      language: .japaneseRomaji,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "long-table",
       title: "Long Table",
       text: "A long table is useful because it makes room for more than one kind of work. One end can hold the rough sketch, another can hold the sentence that still needs care, and the middle can stay clear enough for the next small decision. Practice works in much the same way. It does not ask you to solve every difficulty at once. It asks for a place to return, a visible next step, and enough patience to notice what becomes easier after you have met it a few more times.",
