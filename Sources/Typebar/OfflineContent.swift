@@ -736,6 +736,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "slovak-tichy-krok",
+      title: "Tichý krok",
+      text: "Tichý krok robí ďalšiu úlohu jasnejšou.",
+      language: .slovak,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "slovak-otvoreny-zapisnik",
+      title: "Otvorený zápisník",
+      text: "Otvorený zápisník nevyrieši ťažkú otázku sám, ale pomôže myšlienkam nájsť poradie a smer.",
+      language: .slovak,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "slovak-ticha-praca",
+      title: "Tichá práca",
+      text: "Pokrok zriedka vznikne v jednej hlučnej chvíli. Rastie, keď otvoríme tú istú stránku, opravíme chybu, prečítame si poznámku a vyberieme ďalšiu malú úlohu. Opakovanie robí ťažké veci známejšími a necháva viac priestoru pre pozornosť.",
+      language: .slovak,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "slovak-dlhy-stol",
+      title: "Dlhý stôl",
+      text: "Dlhý stôl je užitočný, pretože na ňom zostane miesto pre rozličnú prácu. Na jednom konci môže ležať prvý návrh, na druhom veta, ktorá ešte potrebuje pozornosť, a uprostred ostane priestor pre ďalšie malé rozhodnutie. Cvičenie funguje podobne. Nemusí vyriešiť všetko naraz, stačí, ak nám dá miesto, kam sa môžeme vrátiť, všimnúť si ďalší krok a nájsť dosť trpezlivosti, aby sme si všimli, čo je po niekoľkých pokusoch ľahšie.",
+      language: .slovak,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "bulgarian-malka-krachka",
       title: "Малка крачка",
       text: "Една спокойна крачка прави следващата задача по-ясна.",

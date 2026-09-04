@@ -3119,7 +3119,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.greekWords,
       StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
       StarterLexicon.swedishWords,
-      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
+      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
@@ -3276,6 +3276,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .czech).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .czech), "cs")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .slovak).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .slovak), "sk")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .bulgarian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .bulgarian), "bg")
@@ -3933,6 +3936,7 @@ final class TypingEngineTests: XCTestCase {
       (.swedish, StarterLexicon.swedishWords),
       (.hungarian, StarterLexicon.hungarianWords),
       (.czech, StarterLexicon.czechWords),
+      (.slovak, StarterLexicon.slovakWords),
       (.bulgarian, StarterLexicon.bulgarianWords),
       (.romanian, StarterLexicon.romanianWords),
       (.finnish, StarterLexicon.finnishWords),
@@ -3988,6 +3992,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.hungarianWords.contains("tűz"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.czech))
     XCTAssertTrue(StarterLexicon.czechWords.contains("řeka"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.slovak))
+    XCTAssertTrue(StarterLexicon.slovakWords.contains("kľúč"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.bulgarian))
     XCTAssertTrue(StarterLexicon.bulgarianWords.contains("дъжд"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.romanian))
@@ -4020,6 +4026,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.swedish.speechLocaleIdentifier, "sv-SE")
     XCTAssertEqual(TypingLanguage.hungarian.speechLocaleIdentifier, "hu-HU")
     XCTAssertEqual(TypingLanguage.czech.speechLocaleIdentifier, "cs-CZ")
+    XCTAssertEqual(TypingLanguage.slovak.speechLocaleIdentifier, "sk-SK")
     XCTAssertEqual(TypingLanguage.bulgarian.speechLocaleIdentifier, "bg-BG")
     XCTAssertEqual(TypingLanguage.romanian.speechLocaleIdentifier, "ro-RO")
     XCTAssertEqual(TypingLanguage.finnish.speechLocaleIdentifier, "fi-FI")
@@ -4173,6 +4180,7 @@ final class TypingEngineTests: XCTestCase {
   func testOwnedPracticeWordsShareTheLocalFilterAndWeakSpotCorpus() {
     XCTAssertEqual(TypingLanguage.hungarian.ownedPracticeWords(), StarterLexicon.hungarianWords)
     XCTAssertEqual(TypingLanguage.czech.ownedPracticeWords(), StarterLexicon.czechWords)
+    XCTAssertEqual(TypingLanguage.slovak.ownedPracticeWords(), StarterLexicon.slovakWords)
     XCTAssertEqual(TypingLanguage.bulgarian.ownedPracticeWords(), StarterLexicon.bulgarianWords)
     XCTAssertEqual(TypingLanguage.romanian.ownedPracticeWords(), StarterLexicon.romanianWords)
     XCTAssertEqual(TypingLanguage.finnish.ownedPracticeWords(), StarterLexicon.finnishWords)
@@ -4392,7 +4400,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .slovak, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
