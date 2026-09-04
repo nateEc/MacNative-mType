@@ -47,6 +47,41 @@ enum RemoteOAuthProvider: String, Codable, CaseIterable, Identifiable, Sendable 
     }
 }
 
+struct RemoteProfileDetails: Codable, Equatable, Sendable {
+    let bio: String
+    let keyboard: String
+    let github: String
+    let socialHandle: String
+    let websiteURL: String
+    let showActivity: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case bio, keyboard, github, socialHandle, websiteURL, showActivity
+    }
+
+    init(
+        bio: String = "", keyboard: String = "", github: String = "", socialHandle: String = "",
+        websiteURL: String = "", showActivity: Bool = true
+    ) {
+        self.bio = bio
+        self.keyboard = keyboard
+        self.github = github
+        self.socialHandle = socialHandle
+        self.websiteURL = websiteURL
+        self.showActivity = showActivity
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        bio = try values.decodeIfPresent(String.self, forKey: .bio) ?? ""
+        keyboard = try values.decodeIfPresent(String.self, forKey: .keyboard) ?? ""
+        github = try values.decodeIfPresent(String.self, forKey: .github) ?? ""
+        socialHandle = try values.decodeIfPresent(String.self, forKey: .socialHandle) ?? ""
+        websiteURL = try values.decodeIfPresent(String.self, forKey: .websiteURL) ?? ""
+        showActivity = try values.decodeIfPresent(Bool.self, forKey: .showActivity) ?? true
+    }
+}
+
 struct RemoteAccountUser: Codable, Equatable, Sendable {
     let id: UUID
     let email: String
@@ -54,10 +89,12 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     let displayName: String
     let totalExperience: Int
     let leaderboardOptedOut: Bool
+    let profileDetails: RemoteProfileDetails
     let authenticationMethods: [RemoteAuthenticationMethod]
 
     private enum CodingKeys: String, CodingKey {
-        case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut, authenticationMethods
+        case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut, profileDetails,
+            authenticationMethods
     }
 
     init(
@@ -67,6 +104,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         displayName: String,
         totalExperience: Int,
         leaderboardOptedOut: Bool = false,
+        profileDetails: RemoteProfileDetails = .init(),
         authenticationMethods: [RemoteAuthenticationMethod] = [.password]
     ) {
         self.id = id
@@ -75,6 +113,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         self.displayName = displayName
         self.totalExperience = totalExperience
         self.leaderboardOptedOut = leaderboardOptedOut
+        self.profileDetails = profileDetails
         self.authenticationMethods = authenticationMethods
     }
 
@@ -86,6 +125,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         displayName = try values.decode(String.self, forKey: .displayName)
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
+        profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
         authenticationMethods = try values.decodeIfPresent([RemoteAuthenticationMethod].self, forKey: .authenticationMethods) ?? [.password]
     }
 }
@@ -190,8 +230,9 @@ private struct RemotePasswordReauthenticationRequest: Codable, Sendable { let cu
 private struct RemoteReauthenticationResponse: Codable, Sendable { let reauthenticationToken: String }
 
 private struct RemoteUpdateProfileRequest: Codable, Sendable {
-    let displayName: String
-    let leaderboardOptedOut: Bool
+    let displayName: String?
+    let leaderboardOptedOut: Bool?
+    let profileDetails: RemoteProfileDetails?
 }
 
 private struct RemoteQuoteSubmissionRequest: Codable, Sendable {
@@ -453,9 +494,11 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let personalBests: [RemotePublicProfileBest]
     let activity: RemotePublicProfileActivity?
     let totalExperience: Int
+    let profileDetails: RemoteProfileDetails
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests, activity, totalExperience
+        case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests,
+            activity, totalExperience, profileDetails
     }
 
     init(from decoder: Decoder) throws {
@@ -469,6 +512,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         personalBests = try values.decodeIfPresent([RemotePublicProfileBest].self, forKey: .personalBests) ?? []
         activity = try values.decodeIfPresent(RemotePublicProfileActivity.self, forKey: .activity)
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
+        profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
     }
 }
 
@@ -506,6 +550,8 @@ private struct RemotePublicProfileSearchResponse: Codable, Sendable {
 enum RemoteProfileReportReason: String, CaseIterable, Codable, Sendable {
     case misleadingProfile
     case abusiveName
+    case inappropriateBio
+    case inappropriateLinks
     case suspiciousResults
     case other
 
@@ -513,6 +559,8 @@ enum RemoteProfileReportReason: String, CaseIterable, Codable, Sendable {
         switch self {
         case .misleadingProfile: "资料具有误导性"
         case .abusiveName: "显示名不当"
+        case .inappropriateBio: "简介不当"
+        case .inappropriateLinks: "链接不当"
         case .suspiciousResults: "成绩看起来异常"
         case .other: "其他问题"
         }
@@ -1039,7 +1087,8 @@ final class AccountSession {
                 token: token,
                 body: RemoteUpdateProfileRequest(
                     displayName: displayName,
-                    leaderboardOptedOut: currentUser?.leaderboardOptedOut ?? false),
+                    leaderboardOptedOut: currentUser?.leaderboardOptedOut ?? false,
+                    profileDetails: nil),
                 response: RemoteAccountUser.self
             )
             statusMessage = "显示名已更新。"
@@ -1061,7 +1110,7 @@ final class AccountSession {
                 method: "PATCH",
                 token: token,
                 body: RemoteUpdateProfileRequest(
-                    displayName: user.displayName, leaderboardOptedOut: optedOut),
+                    displayName: user.displayName, leaderboardOptedOut: optedOut, profileDetails: nil),
                 response: RemoteAccountUser.self
             )
             statusMessage = optedOut
@@ -1069,6 +1118,30 @@ final class AccountSession {
                 : "你已重新显示在自建服务的排行榜中。"
         } catch {
             statusMessage = error.localizedDescription
+        }
+    }
+
+    func updateProfileDetails(_ details: RemoteProfileDetails) async -> Bool {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/profiles/me",
+                method: "PATCH",
+                token: token,
+                body: RemoteUpdateProfileRequest(
+                    displayName: nil, leaderboardOptedOut: nil, profileDetails: details),
+                response: RemoteAccountUser.self
+            )
+            statusMessage = "公开资料已更新。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
         }
     }
 

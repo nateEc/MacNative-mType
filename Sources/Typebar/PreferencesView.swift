@@ -15,6 +15,12 @@ struct PreferencesView: View {
   @State private var confirmedPasswordResetPassword = ""
   @State private var emailVerificationToken = ""
   @State private var updatedDisplayName = ""
+  @State private var profileBio = ""
+  @State private var profileKeyboard = ""
+  @State private var profileGitHub = ""
+  @State private var profileSocialHandle = ""
+  @State private var profileWebsiteURL = ""
+  @State private var profileShowsActivity = true
   @State private var updatedEmail = ""
   @State private var emailChangePassword = ""
   @State private var currentPassword = ""
@@ -815,6 +821,60 @@ struct PreferencesView: View {
               .font(.caption)
               .foregroundStyle(.secondary)
             Divider()
+            VStack(alignment: .leading, spacing: 9) {
+              Text("公开资料").font(.headline)
+              TextEditor(text: $profileBio)
+                .font(.body)
+                .frame(minHeight: 72)
+                .overlay(alignment: .topLeading) {
+                  if profileBio.isEmpty {
+                    Text("简介（可选，最多 250 个字符）")
+                      .foregroundStyle(.tertiary)
+                      .padding(.horizontal, 5)
+                      .padding(.vertical, 8)
+                      .allowsHitTesting(false)
+                  }
+                }
+              HStack {
+                Spacer()
+                Text("\(profileBio.count)/250")
+                  .font(.caption.monospacedDigit())
+                  .foregroundStyle(.secondary)
+              }
+              TextField("使用的键盘或布局（可选，最多 75 个字符）", text: $profileKeyboard)
+              TextField("GitHub 用户名（可选）", text: $profileGitHub)
+              TextField("X / Twitter 用户名（可选）", text: $profileSocialHandle)
+              TextField("个人网站（https://，可选）", text: $profileWebsiteURL)
+                .textContentType(.URL)
+              Toggle("在公开资料显示练习活动", isOn: $profileShowsActivity)
+              Button("更新公开资料") {
+                Task {
+                  if await account.updateProfileDetails(
+                    .init(
+                      bio: profileBio, keyboard: profileKeyboard, github: profileGitHub,
+                      socialHandle: profileSocialHandle, websiteURL: profileWebsiteURL,
+                      showActivity: profileShowsActivity))
+                  {
+                    profileBio = account.currentUser?.profileDetails.bio ?? profileBio
+                    profileKeyboard = account.currentUser?.profileDetails.keyboard ?? profileKeyboard
+                    profileGitHub = account.currentUser?.profileDetails.github ?? profileGitHub
+                    profileSocialHandle = account.currentUser?.profileDetails.socialHandle ?? profileSocialHandle
+                    profileWebsiteURL = account.currentUser?.profileDetails.websiteURL ?? profileWebsiteURL
+                    profileShowsActivity = account.currentUser?.profileDetails.showActivity ?? profileShowsActivity
+                  }
+                }
+              }
+              .disabled(
+                account.isWorking || profileBio.count > 250 || profileKeyboard.count > 75
+                  || profileGitHub.count > 39 || profileSocialHandle.count > 15
+                  || profileWebsiteURL.count > 200)
+              Text("简介、键盘说明与链接会出现在公开资料；邮箱、令牌和本机练习内容永不公开。关闭活动后，资料页不再展示每日练习日历。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .onAppear { loadProfileDetails(user.profileDetails) }
+            .onChange(of: user.profileDetails) { _, details in loadProfileDetails(details) }
+            Divider()
             Text("登录方式").font(.headline)
             if user.authenticationMethods.contains(.password),
               user.authenticationMethods.contains(where: { $0.oauthProvider != nil })
@@ -1319,6 +1379,15 @@ struct PreferencesView: View {
     .onAppear { customBackgroundURLDraft = settings.customBackgroundURL }
     .frame(width: 440)
     .padding()
+  }
+
+  private func loadProfileDetails(_ details: RemoteProfileDetails) {
+    profileBio = details.bio
+    profileKeyboard = details.keyboard
+    profileGitHub = details.github
+    profileSocialHandle = details.socialHandle
+    profileWebsiteURL = details.websiteURL
+    profileShowsActivity = details.showActivity
   }
 
   private func applyCustomBackgroundURL() {

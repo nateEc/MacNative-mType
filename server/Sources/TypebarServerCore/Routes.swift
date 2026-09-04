@@ -707,6 +707,8 @@ private extension AuthStoreError {
             Abort(.conflict, reason: "A matching report has already been submitted by this account.")
         case .invalidProfileSearch:
             Abort(.badRequest, reason: "A public profile search requires 2 to 40 display-name characters.")
+        case .invalidProfileDetails:
+            Abort(.badRequest, reason: "The public profile details are invalid.")
         case .directMessageNotAllowed:
             Abort(.forbidden, reason: "Direct messages are only available between accepted Typebar friends.")
         }

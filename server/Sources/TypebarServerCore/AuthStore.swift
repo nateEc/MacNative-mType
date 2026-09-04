@@ -117,14 +117,43 @@ public struct ReauthenticationResponse: Content, Equatable {
   public let reauthenticationToken: String
 }
 
+/// Account-owned profile details. Every field is intentionally public except
+/// the activity visibility preference, which controls the detail endpoint.
+public struct ProfileDetails: Content, Equatable {
+  public let bio: String
+  public let keyboard: String
+  public let github: String
+  public let socialHandle: String
+  public let websiteURL: String
+  public let showActivity: Bool
+
+  public init(
+    bio: String = "", keyboard: String = "", github: String = "", socialHandle: String = "",
+    websiteURL: String = "", showActivity: Bool = true
+  ) {
+    self.bio = bio
+    self.keyboard = keyboard
+    self.github = github
+    self.socialHandle = socialHandle
+    self.websiteURL = websiteURL
+    self.showActivity = showActivity
+  }
+}
+
 public struct UpdateProfileRequest: Content, Equatable {
-  public let displayName: String
+  public let displayName: String?
   /// Omitted by older clients, which preserves the existing account choice.
   public let leaderboardOptedOut: Bool?
+  /// Omitted by older clients, which preserves existing public details.
+  public let profileDetails: ProfileDetails?
 
-  public init(displayName: String, leaderboardOptedOut: Bool? = nil) {
+  public init(
+    displayName: String? = nil, leaderboardOptedOut: Bool? = nil,
+    profileDetails: ProfileDetails? = nil
+  ) {
     self.displayName = displayName
     self.leaderboardOptedOut = leaderboardOptedOut
+    self.profileDetails = profileDetails
   }
 }
 
@@ -235,6 +264,7 @@ public struct AuthUserResponse: Content, Equatable {
   public let displayName: String
   public let totalExperience: Int
   public let leaderboardOptedOut: Bool
+  public let profileDetails: ProfileDetails
   public let authenticationMethods: [AuthenticationMethod]
 }
 
@@ -248,6 +278,7 @@ public struct PublicProfileResponse: Content, Equatable {
   public let personalBests: [PublicProfileBestResponse]
   public let activity: PublicProfileActivityResponse?
   public let totalExperience: Int
+  public let profileDetails: ProfileDetails
 }
 
 /// A public, per-standard-mode best. It intentionally excludes the prompt,
@@ -291,6 +322,7 @@ public enum AuthStoreError: Error, Equatable {
   case passwordAuthenticationNotLinked
   case cannotRemoveLastAuthentication
   case invalidReauthenticationToken
+  case invalidProfileDetails
   case invalidOAuthTransaction
   case oauthRegistrationNotRequired
   case profileNotFound
@@ -379,15 +411,18 @@ public actor AuthStore {
     let createdAt: Date
     let emailVerified: Bool
     let leaderboardOptedOut: Bool
+    let profileDetails: ProfileDetails
 
     private enum CodingKeys: String, CodingKey {
-      case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut
+      case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut,
+        profileDetails
     }
 
     init(
       id: UUID, email: String, displayName: String, passwordHash: String?, createdAt: Date,
       emailVerified: Bool = false,
-      leaderboardOptedOut: Bool = false
+      leaderboardOptedOut: Bool = false,
+      profileDetails: ProfileDetails = .init()
     ) {
       self.id = id
       self.email = email
@@ -396,6 +431,7 @@ public actor AuthStore {
       self.createdAt = createdAt
       self.emailVerified = emailVerified
       self.leaderboardOptedOut = leaderboardOptedOut
+      self.profileDetails = profileDetails
     }
 
     init(from decoder: Decoder) throws {
@@ -407,6 +443,7 @@ public actor AuthStore {
       createdAt = try values.decode(Date.self, forKey: .createdAt)
       emailVerified = try values.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
       leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
+      profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
     }
   }
 
@@ -779,7 +816,7 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt, emailVerified: user.emailVerified,
-      leaderboardOptedOut: user.leaderboardOptedOut)
+      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails)
     state.users[index] = updatedUser
     try persist()
     return try userResponse(for: updatedUser.id)
@@ -820,7 +857,7 @@ public actor AuthStore {
     state.users[index] = StoredUser(
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: nil, createdAt: user.createdAt, emailVerified: user.emailVerified,
-      leaderboardOptedOut: user.leaderboardOptedOut)
+      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails)
     state.passwordResetTokens.removeAll { $0.userID == user.id }
     let currentTokenHash = Self.tokenHash(accessToken)
     state.sessions.removeAll { $0.userID == user.id && $0.tokenHash != currentTokenHash }
@@ -1091,7 +1128,7 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt, emailVerified: user.emailVerified,
-      leaderboardOptedOut: user.leaderboardOptedOut)
+      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails)
     state.sessions.removeAll { $0.userID == user.id }
     state.passwordResetTokens.removeAll { $0.userID == user.id }
     try persist()
@@ -1148,7 +1185,7 @@ public actor AuthStore {
     state.users[userIndex] = StoredUser(
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: user.passwordHash, createdAt: user.createdAt, emailVerified: true,
-      leaderboardOptedOut: user.leaderboardOptedOut)
+      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails)
     state.emailVerificationTokens.removeAll { $0.userID == user.id }
     try persist()
   }
@@ -1187,7 +1224,8 @@ public actor AuthStore {
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt,
       emailVerified: user.emailVerified,
-      leaderboardOptedOut: user.leaderboardOptedOut
+      leaderboardOptedOut: user.leaderboardOptedOut,
+      profileDetails: user.profileDetails
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
@@ -1222,7 +1260,8 @@ public actor AuthStore {
       id: user.id, email: email, displayName: user.displayName,
       passwordHash: user.passwordHash, createdAt: user.createdAt,
       emailVerified: false,
-      leaderboardOptedOut: user.leaderboardOptedOut
+      leaderboardOptedOut: user.leaderboardOptedOut,
+      profileDetails: user.profileDetails
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
@@ -1308,15 +1347,17 @@ public actor AuthStore {
     throws -> AuthUserResponse
   {
     let currentUser = try authenticatedUser(for: accessToken, now: now)
-    let displayName = try validatedDisplayName(request.displayName)
     guard let index = state.users.firstIndex(where: { $0.id == currentUser.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
     let user = state.users[index]
+    let displayName = try request.displayName.map(validatedDisplayName) ?? user.displayName
+    let profileDetails = try request.profileDetails.map(validatedProfileDetails) ?? user.profileDetails
     let updatedUser = StoredUser(
       id: user.id, email: user.email, displayName: displayName, passwordHash: user.passwordHash,
       createdAt: user.createdAt, emailVerified: user.emailVerified,
-      leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut)
+      leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut,
+      profileDetails: profileDetails)
     state.users[index] = updatedUser
     try persist()
     return userResponse(for: updatedUser)
@@ -1826,7 +1867,8 @@ public actor AuthStore {
   private func detailedPublicProfile(for user: StoredUser, now: Date) -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
     return publicProfile(
-      for: user, results: results, activity: publicActivity(from: results, endingAt: now))
+      for: user, results: results,
+      activity: user.profileDetails.showActivity ? publicActivity(from: results, endingAt: now) : nil)
   }
 
   private func publicProfile(
@@ -1841,7 +1883,8 @@ public actor AuthStore {
       highestConsistency: results.map(\.consistency).max() ?? 0,
       personalBests: publicPersonalBests(from: results),
       activity: activity,
-      totalExperience: experience(for: user.id)
+      totalExperience: experience(for: user.id),
+      profileDetails: user.profileDetails
     )
   }
 
@@ -2178,6 +2221,7 @@ public actor AuthStore {
     .init(
       id: user.id, email: user.email, emailVerified: user.emailVerified, displayName: user.displayName,
       totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut,
+      profileDetails: user.profileDetails,
       authenticationMethods: authenticationMethods(for: user.id))
   }
 
@@ -2242,6 +2286,37 @@ public actor AuthStore {
     let name = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard (2...32).contains(name.count) else { throw AuthStoreError.invalidDisplayName }
     return name
+  }
+
+  private func validatedProfileDetails(_ value: ProfileDetails) throws -> ProfileDetails {
+    let bio = value.bio.trimmingCharacters(in: .whitespacesAndNewlines)
+    let keyboard = value.keyboard.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard bio.count <= 250, keyboard.count <= 75 else { throw AuthStoreError.invalidProfileDetails }
+    let github = try validatedProfileHandle(value.github, maximumLength: 39)
+    let socialHandle = try validatedProfileHandle(value.socialHandle, maximumLength: 15)
+    let websiteURL = try validatedProfileWebsite(value.websiteURL)
+    return .init(
+      bio: bio, keyboard: keyboard, github: github, socialHandle: socialHandle,
+      websiteURL: websiteURL, showActivity: value.showActivity)
+  }
+
+  private func validatedProfileHandle(_ value: String, maximumLength: Int) throws -> String {
+    let handle = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard handle.count <= maximumLength else { throw AuthStoreError.invalidProfileDetails }
+    guard handle.allSatisfy({ character in
+      character.isASCII && (character.isLetter || character.isNumber || character == "-" || character == "_")
+    }) else { throw AuthStoreError.invalidProfileDetails }
+    return handle
+  }
+
+  private func validatedProfileWebsite(_ value: String) throws -> String {
+    let website = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard website.count <= 200 else { throw AuthStoreError.invalidProfileDetails }
+    guard !website.isEmpty else { return "" }
+    guard let components = URLComponents(string: website), components.scheme == "https",
+      let host = components.host, !host.isEmpty
+    else { throw AuthStoreError.invalidProfileDetails }
+    return website
   }
 
   private func validatedPassword(_ value: String) throws {

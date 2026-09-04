@@ -1233,6 +1233,56 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testPublicProfileDetailsValidateAndControlActivityVisibility() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 36_000)
+    let session = try await store.register(
+      .init(email: "details@example.com", password: "a secure password", displayName: "Details User"),
+      now: now)
+    let details = ProfileDetails(
+      bio: "Building a quiet native typing desk.", keyboard: "Split ANSI QWERTY",
+      github: "typebar-user", socialHandle: "typebar", websiteURL: "https://example.com/typebar",
+      showActivity: true)
+    let updated = try await store.updateProfile(
+      .init(profileDetails: details), accessToken: session.accessToken, now: now)
+    XCTAssertEqual(updated.profileDetails, details)
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 72, accuracy: 98, finishedAt: now), accessToken: session.accessToken,
+      now: now)
+    let publicProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(publicProfile.profileDetails, details)
+    XCTAssertNotNil(publicProfile.activity)
+
+    let hiddenActivityDetails = ProfileDetails(
+      bio: details.bio, keyboard: details.keyboard, github: details.github,
+      socialHandle: details.socialHandle, websiteURL: details.websiteURL, showActivity: false)
+    _ = try await store.updateProfile(
+      .init(profileDetails: hiddenActivityDetails), accessToken: session.accessToken, now: now)
+    let hiddenActivityProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(hiddenActivityProfile.profileDetails, hiddenActivityDetails)
+    XCTAssertNil(hiddenActivityProfile.activity)
+
+    do {
+      _ = try await store.updateProfile(
+        .init(profileDetails: .init(websiteURL: "http://example.com")),
+        accessToken: session.accessToken, now: now)
+      XCTFail("Public profile links must use HTTPS")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidProfileDetails)
+    }
+    do {
+      _ = try await store.updateProfile(
+        .init(profileDetails: .init(socialHandle: "this-handle-is-too-long")),
+        accessToken: session.accessToken, now: now)
+      XCTFail("Social handles must stay within the public profile limit")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidProfileDetails)
+    }
+    XCTAssertTrue(ProfileReportReason.allCases.contains(.inappropriateBio))
+    XCTAssertTrue(ProfileReportReason.allCases.contains(.inappropriateLinks))
+  }
+
   func testPublicProfileHidesEmailAndIncludesAggregateResults() async throws {
     let app = try await Application.make(.testing)
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)

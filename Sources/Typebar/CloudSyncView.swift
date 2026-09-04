@@ -259,6 +259,38 @@ private struct PublicProfileView: View {
             Text("加入 \(profile.joinedAt.formatted(date: .abbreviated, time: .omitted))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if hasPublicDetails {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("关于")
+                        .font(.headline)
+                    if !profile.profileDetails.bio.isEmpty {
+                        Text(profile.profileDetails.bio)
+                            .textSelection(.enabled)
+                    }
+                    if !profile.profileDetails.keyboard.isEmpty {
+                        Label(profile.profileDetails.keyboard, systemImage: "keyboard")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 12) {
+                        if !profile.profileDetails.github.isEmpty,
+                            let github = URL(string: "https://github.com/\(profile.profileDetails.github)")
+                        {
+                            Link("GitHub @\(profile.profileDetails.github)", destination: github)
+                        }
+                        if !profile.profileDetails.socialHandle.isEmpty,
+                            let social = URL(string: "https://x.com/\(profile.profileDetails.socialHandle)")
+                        {
+                            Link("@\(profile.profileDetails.socialHandle)", destination: social)
+                        }
+                        if let website = publicWebsite {
+                            Link("个人网站", destination: website)
+                        }
+                    }
+                    .font(.caption)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if !profile.personalBests.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("公开个人最佳")
@@ -321,6 +353,19 @@ private struct PublicProfileView: View {
             Text(title).font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var hasPublicDetails: Bool {
+        !profile.profileDetails.bio.isEmpty || !profile.profileDetails.keyboard.isEmpty
+            || !profile.profileDetails.github.isEmpty || !profile.profileDetails.socialHandle.isEmpty
+            || publicWebsite != nil
+    }
+
+    private var publicWebsite: URL? {
+        guard let website = URL(string: profile.profileDetails.websiteURL),
+            website.scheme?.lowercased() == "https", website.host != nil
+        else { return nil }
+        return website
     }
 
     private func sendRequest() {

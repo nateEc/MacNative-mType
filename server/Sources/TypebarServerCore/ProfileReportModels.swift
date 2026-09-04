@@ -6,6 +6,8 @@ import Vapor
 public enum ProfileReportReason: String, CaseIterable, Content, Equatable {
     case misleadingProfile
     case abusiveName
+    case inappropriateBio
+    case inappropriateLinks
     case suspiciousResults
     case other
 }

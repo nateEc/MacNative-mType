@@ -28,14 +28,20 @@ final class TypingEngineTests: XCTestCase {
         #"{"id":"00000000-0000-0000-0000-000000000001","email":"legacy@example.com","displayName":"Legacy","totalExperience":8}"#
           .utf8))
     XCTAssertEqual(legacy.authenticationMethods, [.password])
+    XCTAssertEqual(legacy.profileDetails, .init())
 
     let modern = try JSONDecoder().decode(
       RemoteAccountUser.self,
       from: Data(
-        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"authenticationMethods":["google","password"]}"#
+        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"authenticationMethods":["google","password"],"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
           .utf8))
     XCTAssertTrue(modern.emailVerified)
     XCTAssertEqual(modern.authenticationMethods, [.google, .password])
+    XCTAssertEqual(
+      modern.profileDetails,
+      .init(
+        bio: "Native first", keyboard: "ANSI", github: "typebar", socialHandle: "typist",
+        websiteURL: "https://example.com", showActivity: false))
   }
 
   func testTimedTestCompletesAtDeadline() {
