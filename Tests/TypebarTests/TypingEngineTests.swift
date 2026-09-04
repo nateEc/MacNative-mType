@@ -3260,7 +3260,8 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.afrikaansWords,
       StarterLexicon.greekWords, StarterLexicon.greeklishWords,
-      StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
+      StarterLexicon.dutchWords, StarterLexicon.filipinoWords, StarterLexicon.danishWords,
+      StarterLexicon.norwegianBokmalWords,
       StarterLexicon.norwegianNynorskWords,
       StarterLexicon.swedishWords,
       StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
@@ -3273,7 +3274,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 37)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 38)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3404,6 +3405,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: ukrainianConfiguration), .encyclopedia)
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .dutch).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .filipino).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .filipino), "tl")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .danish).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
@@ -4099,6 +4103,7 @@ final class TypingEngineTests: XCTestCase {
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
+      (.filipino, StarterLexicon.filipinoWords),
       (.norwegianBokmal, StarterLexicon.norwegianBokmalWords),
       (.norwegianNynorsk, StarterLexicon.norwegianNynorskWords),
       (.swedish, StarterLexicon.swedishWords),
@@ -4152,6 +4157,8 @@ final class TypingEngineTests: XCTestCase {
     })
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.dutch))
     XCTAssertTrue(StarterLexicon.dutchWords.contains("één"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.filipino))
+    XCTAssertTrue(StarterLexicon.filipinoWords.contains("pagsasanay"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.afrikaans))
     XCTAssertTrue(StarterLexicon.afrikaansWords.contains("môre"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
@@ -4213,6 +4220,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
+    XCTAssertEqual(TypingLanguage.filipino.speechLocaleIdentifier, "fil-PH")
     XCTAssertEqual(TypingLanguage.danish.speechLocaleIdentifier, "da-DK")
     XCTAssertEqual(TypingLanguage.norwegianBokmal.speechLocaleIdentifier, "nb-NO")
     XCTAssertEqual(TypingLanguage.norwegianNynorsk.speechLocaleIdentifier, "nn-NO")
@@ -4602,7 +4610,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .afrikaans, .greek, .greeklish, .dutch, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+      .english, .spanish, .german, .afrikaans, .greek, .greeklish, .dutch, .filipino, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,

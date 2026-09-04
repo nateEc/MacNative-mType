@@ -652,6 +652,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "filipino-payapang-hakbang",
+      title: "Payapang hakbang",
+      text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
+      language: .filipino,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "filipino-bukas-na-talaan",
+      title: "Bukas na talaan",
+      text: "Hindi nalulutas ng bukas na talaan ang bawat mahirap na tanong, ngunit nakatutulong itong hatiin ang tanong sa maliliit na bahagi.",
+      language: .filipino,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "filipino-maliit-na-gawain",
+      title: "Maliit na gawain",
+      text: "Hindi laging dumarating ang pag-unlad bilang malaking sandali. Lumalago ito sa maliliit na gawain: buksan ang parehong pahina, linawin ang isang pangungusap, itama ang isang pagkakamali at mag-iwan ng kapaki-pakinabang na tala para sa susunod na pagsubok.",
+      language: .filipino,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "filipino-mahabang-mesa",
+      title: "Mahabang mesa",
+      text: "Ang mahabang mesa ay nagbibigay ng lugar para sa iba't ibang uri ng gawain. Sa isang dulo ay maaaring ilagay ang unang bersiyon, sa kabila ay isang pangungusap na kailangan pa ng pansin, at sa gitna ay maaaring maghintay ang susunod na maliit na pasiya. Ganiyan din ang pagsasanay. Hindi nito hinihingi na malutas agad ang bawat mahirap na bahagi, kundi na magkaroon ng lugar na babalikan, malinaw na susunod na hakbang at sapat na tiyaga upang mapansin kung alin ang nagiging mas madali pagkatapos ng ilang pagsubok.",
+      language: .filipino,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "danish-lille-skridt",
       title: "Lille skridt",
       text: "Et lille, roligt skridt gør den næste opgave lettere at se.",

@@ -203,6 +203,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case greek
   case greeklish
   case dutch
+  case filipino
   case danish
   case norwegianBokmal
   case norwegianNynorsk
@@ -3174,6 +3175,15 @@ enum StarterLexicon {
     "klein", "tijd", "één",
   ]
 
+  // Typebar-authored Filipino starter words are compact local practice
+  // content, not an imported word list or a transformed reference corpus.
+  static let filipinoWords = [
+    "umaga", "bintana", "papel", "baybay", "hangin", "pagsasanay", "pansin", "payapa",
+    "malinaw", "lawa", "daan", "mesa", "ilaw", "lakbay", "tiyaga", "saglit",
+    "lungsod", "ulan", "tahimik", "direksiyon", "bituin", "tala", "hardin", "hininga",
+    "maliit", "oras", "tagsibol", "bangka", "kaibigan", "pag-asa",
+  ]
+
   // Typebar-authored Danish starter words. The corpus deliberately includes
   // æ, ø and å for normal macOS composed-text input practice.
   static let danishWords = [
@@ -3396,6 +3406,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: dutchWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .filipino:
+      return prompt(
+        tokens: count, lexicon: filipinoWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .danish:
       return prompt(
         tokens: count, lexicon: danishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -3570,6 +3584,7 @@ enum StarterLexicon {
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
+    case .filipino: (filipinoWords, [",", ".", "!", "?"])
     case .danish: (danishWords, [",", ".", "!", "?"])
     case .norwegianBokmal: (norwegianBokmalWords, [",", ".", "!", "?"])
     case .norwegianNynorsk: (norwegianNynorskWords, [",", ".", "!", "?"])
@@ -3663,6 +3678,7 @@ extension TypingLanguage {
     case .greek: StarterLexicon.greekWords
     case .greeklish: StarterLexicon.greeklishWords
     case .dutch: StarterLexicon.dutchWords
+    case .filipino: StarterLexicon.filipinoWords
     case .danish: StarterLexicon.danishWords
     case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
     case .norwegianNynorsk: StarterLexicon.norwegianNynorskWords
@@ -3700,7 +3716,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .greek, .greeklish, .dutch, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .greek, .greeklish, .dutch, .filipino, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -3755,6 +3771,7 @@ extension TypingLanguage {
     case .greek: "Ελληνικά"
     case .greeklish: "Greeklish"
     case .dutch: "Nederlands"
+    case .filipino: "Filipino"
     case .danish: "Dansk"
     case .norwegianBokmal: "Norsk bokmål"
     case .norwegianNynorsk: "Norsk nynorsk"

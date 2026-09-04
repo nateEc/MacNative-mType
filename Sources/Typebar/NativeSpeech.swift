@@ -29,6 +29,7 @@ extension TypingLanguage {
     case .afrikaans: "af-ZA"
     case .greek, .greeklish: "el-GR"
     case .dutch: "nl-NL"
+    case .filipino: "fil-PH"
     case .danish: "da-DK"
     case .norwegianBokmal: "nb-NO"
     case .norwegianNynorsk: "nn-NO"
