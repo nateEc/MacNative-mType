@@ -1491,6 +1491,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(isoRows[3].first?.id, "system-10")
   }
 
+  @MainActor
+  func testSystemKeyboardGuideRefreshesOnlyForTheSelectedInputSourceNotification() {
+    let monitor = SystemKeyboardGuideMonitor(observesInputSourceChanges: false)
+    XCTAssertEqual(monitor.revision, 0)
+    monitor.receive(notificationName: "TypebarUnrelatedNotification")
+    XCTAssertEqual(monitor.revision, 0)
+    monitor.receive(notificationName: SystemKeyboardGuideMonitor.selectedInputSourceChanged.rawValue)
+    XCTAssertEqual(monitor.revision, 1)
+  }
+
   func testKeyboardGuideStylesCoverReferenceChoicesWithNativeGeometries() {
     XCTAssertEqual(KeyboardGuideStyle.allCases.map(\.rawValue), [
       "staggered", "alice", "matrix", "split", "split_matrix", "steno", "steno_matrix",

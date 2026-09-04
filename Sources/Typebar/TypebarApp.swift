@@ -9,6 +9,7 @@ struct TypebarApp: App {
   @State private var settings = AppSettings()
   @State private var account = AccountSession()
   @State private var hotkey = GlobalHotkeyMonitor()
+  @State private var systemKeyboardGuide = SystemKeyboardGuideMonitor()
 
   var body: some Scene {
     WindowGroup("Typebar") {
@@ -32,7 +33,9 @@ struct TypebarApp: App {
   }
 
   private var rootContent: some View {
-    ContentView(settings: settings, account: account, hotkey: hotkey)
+    ContentView(
+      settings: settings, account: account, hotkey: hotkey,
+      systemKeyboardGuide: systemKeyboardGuide)
       .frame(minWidth: 760, minHeight: 480)
       .task {
         await account.restoreSession()
@@ -425,6 +428,7 @@ private struct ContentView: View {
   let settings: AppSettings
   let account: AccountSession
   let hotkey: GlobalHotkeyMonitor
+  let systemKeyboardGuide: SystemKeyboardGuideMonitor
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.colorScheme) private var systemColorScheme
@@ -1477,6 +1481,7 @@ private struct ContentView: View {
     case .builtIn:
       return nil
     case .systemInput:
+      _ = systemKeyboardGuide.revision
       return SystemKeyboardGuide.currentRows()
     case .custom:
       guard let id = settings.customKeyboardLayoutID else { return nil }
