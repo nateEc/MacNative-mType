@@ -35,6 +35,7 @@ extension TypingLanguage {
     case .czech: "cs-CZ"
     case .slovak: "sk-SK"
     case .slovenian: "sl-SI"
+    case .croatian: "hr-HR"
     case .bulgarian: "bg-BG"
     case .romanian: "ro-RO"
     case .finnish: "fi-FI"

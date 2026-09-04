@@ -1992,7 +1992,7 @@ public actor AuthStore {
     let attribution = request.attribution?.trimmingCharacters(in: .whitespacesAndNewlines)
     guard
       Set([
-        "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "slovak", "slovenian", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
+        "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
         "simplifiedChinese",
         "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
         "korean", "turkish", "polish",
@@ -2107,7 +2107,7 @@ public actor AuthStore {
     guard
       language == nil
         || Set([
-          "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "slovak", "slovenian", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
+          "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
           "simplifiedChinese",
           "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
           "korean", "turkish", "polish",
@@ -2691,7 +2691,7 @@ public actor AuthStore {
   ) throws -> [LeaderboardEntry] {
     let modes = Set(["time", "words", "quote", "zen", "custom"])
     let languages = Set([
-      "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "slovak", "slovenian", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
+      "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
       "simplifiedChinese",
       "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
       "korean", "turkish", "polish",
@@ -2988,7 +2988,7 @@ public actor AuthStore {
   private func validate(result: ResultSubmissionRequest, now: Date) throws {
     guard Set(["time", "words", "quote", "zen", "custom"]).contains(result.mode),
       Set([
-        "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "slovak", "slovenian", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
+        "english", "spanish", "german", "greek", "dutch", "danish", "norwegianBokmal", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french", "italian", "portuguese",
         "simplifiedChinese",
         "traditionalChinese", "russian", "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji",
         "korean", "turkish", "polish",

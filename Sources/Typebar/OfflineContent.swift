@@ -792,6 +792,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "croatian-mirni-korak",
+      title: "Mirni korak",
+      text: "Mirni korak čini sljedeći zadatak jasnijim.",
+      language: .croatian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "croatian-otvorena-biljeznica",
+      title: "Otvorena bilježnica",
+      text: "Otvorena bilježnica ne rješava teško pitanje sama, ali pomaže mislima pronaći red i smjer.",
+      language: .croatian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "croatian-tiha-vjezba",
+      title: "Tiha vježba",
+      text: "Napredak rijetko nastane u jednom glasnom trenutku. Raste kada otvorimo istu stranicu, ispravimo pogrešku, pročitamo bilješku i odaberemo sljedeći mali zadatak. Ponavljanje čini teške dijelove poznatijima i ostavlja više prostora za pažnju.",
+      language: .croatian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "croatian-dugi-stol",
+      title: "Dugi stol",
+      text: "Dugi stol je koristan jer nudi mjesto za različite vrste rada. Na jednom kraju može biti prvi nacrt, na drugom rečenica koja još treba pažnju, a u sredini ostaje prostor za sljedeću malu odluku. Vježba djeluje slično. Ne mora riješiti sve odjednom, nego nam može dati mjesto kojem se vraćamo, primijetimo sljedeći korak i pronađemo dovoljno strpljenja da vidimo što postaje lakše nakon nekoliko pokušaja.",
+      language: .croatian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "bulgarian-malka-krachka",
       title: "Малка крачка",
       text: "Една спокойна крачка прави следващата задача по-ясна.",
