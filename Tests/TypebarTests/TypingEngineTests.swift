@@ -2974,7 +2974,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: poetryConfiguration), .poetry)
     XCTAssertNil(LivePracticeContentSource.selected(for: .init(
       mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())))
-    XCTAssertNil(LivePracticeContentSource.selected(for: .words(4, language: .simplifiedChinese)))
+    let chineseConfiguration = TestConfiguration.words(
+      5, language: .simplifiedChinese).with(modifiers: [.referenceStream])
+    XCTAssertEqual(LivePracticeContentSource.selected(for: chineseConfiguration), .encyclopedia)
+    XCTAssertEqual(
+      LivePracticeContentSource.selected(for: .words(
+        5, language: .traditionalChinese).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertNil(LivePracticeContentSource.selected(for: .words(
+      5, language: .japaneseHiragana).with(modifiers: [.referenceStream])))
     XCTAssertEqual(
       TestSessionFactory.make(
         configuration: poetryConfiguration, streamPrompt: poetry.prompt(for: poetryConfiguration)
@@ -2996,6 +3003,20 @@ final class TypingEngineTests: XCTestCase {
     let encyclopedia = try XCTUnwrap(LivePracticeContentService.encyclopedia(from: encyclopediaData))
     XCTAssertEqual(encyclopedia.text, "A harbor holds boats safely near shore")
     XCTAssertEqual(encyclopedia.prompt(for: .words(3)), "A harbor holds")
+    let chineseData = Data("""
+    {"title":"晨间笔记","extract":"晨光落在窗边。微风穿过纸页。"}
+    """.utf8)
+    let chineseEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: chineseData, language: .simplifiedChinese))
+    XCTAssertFalse(chineseEncyclopedia.text.contains(" "))
+    XCTAssertTrue(chineseEncyclopedia.text.allSatisfy(\.isLetter))
+    let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
+    XCTAssertFalse(chinesePrompt.contains(" "))
+    XCTAssertFalse(chinesePrompt.isEmpty)
+    var chineseSession = TestSessionFactory.make(
+      configuration: chineseConfiguration, streamPrompt: chinesePrompt)
+    chineseSession.insert(chineseSession.prompt, at: .now)
+    XCTAssertEqual(chineseSession.outcome, .completed)
     XCTAssertNil(LivePracticeContentService.encyclopedia(from: Data("{}".utf8)))
   }
 

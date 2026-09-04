@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 /// Public content sources used by the reference product's poetry and
 /// encyclopedia practice modes. Typebar requests them only after the user
@@ -16,11 +17,17 @@ enum LivePracticeContentSource: Equatable {
   }
 
   static func selected(for configuration: TestConfiguration) -> Self? {
-    guard configuration.mode == .time || configuration.mode == .words,
+    guard configuration.mode == .time || configuration.mode == .words else { return nil }
+    if configuration.modifiers.contains(.poetryStream),
       configuration.language.usesSpaceDelimitedWords
-    else { return nil }
-    if configuration.modifiers.contains(.poetryStream) { return .poetry }
-    if configuration.modifiers.contains(.referenceStream) { return .encyclopedia }
+    {
+      return .poetry
+    }
+    if configuration.modifiers.contains(.referenceStream),
+      configuration.language.supportsLiveEncyclopedia
+    {
+      return .encyclopedia
+    }
     return nil
   }
 }
@@ -30,6 +37,20 @@ struct LivePracticeContent: Equatable {
   let title: String
   let byline: String?
   let text: String
+  private let tokens: [String]
+  private let separator: String
+
+  init(
+    source: LivePracticeContentSource, title: String, byline: String?, tokens: [String],
+    separator: String
+  ) {
+    self.source = source
+    self.title = title
+    self.byline = byline
+    self.tokens = tokens
+    self.separator = separator
+    text = tokens.joined(separator: separator)
+  }
 
   var attribution: String {
     let detail = [title, byline].compactMap { $0 }.joined(separator: " · ")
@@ -37,8 +58,7 @@ struct LivePracticeContent: Equatable {
   }
 
   func prompt(for configuration: TestConfiguration) -> String {
-    let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
-    guard !words.isEmpty else { return text }
+    guard !tokens.isEmpty else { return text }
     let targetCount: Int
     switch configuration.mode {
     case .time:
@@ -46,9 +66,9 @@ struct LivePracticeContent: Equatable {
     case .words:
       targetCount = configuration.wordLimit ?? 25
     case .quote, .zen, .custom:
-      targetCount = words.count
+      targetCount = tokens.count
     }
-    return (0..<targetCount).map { words[$0 % words.count] }.joined(separator: " ")
+    return (0..<targetCount).map { tokens[$0 % tokens.count] }.joined(separator: separator)
   }
 }
 
@@ -87,14 +107,19 @@ enum LivePracticeContentService {
       let first = document.first
     else { return nil }
     return makeContent(
-      source: .poetry, title: first.title, byline: first.author, rawText: first.lines.joined(separator: " "))
+      source: .poetry, title: first.title, byline: first.author, rawText: first.lines.joined(separator: " "),
+      language: .english)
   }
 
-  static func encyclopedia(from data: Data) -> LivePracticeContent? {
+  static func encyclopedia(
+    from data: Data, language: TypingLanguage = .english
+  ) -> LivePracticeContent? {
     guard let document = try? JSONDecoder().decode(EncyclopediaSummary.self, from: data) else {
       return nil
     }
-    return makeContent(source: .encyclopedia, title: document.title, byline: nil, rawText: document.extract)
+    return makeContent(
+      source: .encyclopedia, title: document.title, byline: nil, rawText: document.extract,
+      language: language)
   }
 
   private static func fetchPoetry() async -> LivePracticeContent? {
@@ -107,7 +132,7 @@ enum LivePracticeContentService {
     guard let url = URL(string: "https://\(wikipediaLanguageCode(for: language)).wikipedia.org/api/rest_v1/page/random/summary")
     else { return nil }
     guard let data = await data(from: url) else { return nil }
-    return encyclopedia(from: data)
+    return encyclopedia(from: data, language: language)
   }
 
   private static func data(from url: URL) async -> Data? {
@@ -141,15 +166,42 @@ enum LivePracticeContentService {
   }
 
   private static func makeContent(
-    source: LivePracticeContentSource, title: String, byline: String?, rawText: String
+    source: LivePracticeContentSource, title: String, byline: String?, rawText: String,
+    language: TypingLanguage
   ) -> LivePracticeContent? {
-    let words = rawText.split(whereSeparator: { !$0.isLetter }).map(String.init)
-    guard !words.isEmpty else { return nil }
+    let tokens = tokens(in: rawText, language: language)
+    guard !tokens.isEmpty else { return nil }
     let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
     let normalizedByline = byline?.trimmingCharacters(in: .whitespacesAndNewlines)
     return .init(
       source: source, title: normalizedTitle.isEmpty ? source.displayName : normalizedTitle,
       byline: normalizedByline?.isEmpty == false ? normalizedByline : nil,
-      text: words.joined(separator: " "))
+      tokens: tokens, separator: language.isNoSpaceLanguage ? "" : " ")
+  }
+
+  private static func tokens(in rawText: String, language: TypingLanguage) -> [String] {
+    guard language.isNoSpaceLanguage else {
+      return rawText.split(whereSeparator: { !$0.isLetter }).map(String.init)
+    }
+    let tokenizer = NLTokenizer(unit: .word)
+    tokenizer.string = rawText
+    let range = rawText.startIndex..<rawText.endIndex
+    var tokens: [String] = []
+    tokenizer.enumerateTokens(in: range) { tokenRange, _ in
+      let token = String(rawText[tokenRange])
+      if token.allSatisfy(\.isLetter) { tokens.append(token) }
+      return true
+    }
+    return tokens
+  }
+}
+
+private extension TypingLanguage {
+  /// Japanese is intentionally excluded: this native option promises
+  /// hiragana-only prompts, while a random Japanese encyclopedia extract can
+  /// contain kanji. Chinese source text remains directly typeable through the
+  /// selected macOS IME and is segmented by the system tokenizer above.
+  var supportsLiveEncyclopedia: Bool {
+    usesSpaceDelimitedWords || self == .simplifiedChinese || self == .traditionalChinese
   }
 }
