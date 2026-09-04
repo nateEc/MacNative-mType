@@ -768,12 +768,14 @@ private struct RemoteNotificationsResponse: Codable, Sendable { let notification
 enum RemoteLeaderboardPeriod: String, CaseIterable {
     case all
     case day
+    case yesterday
     case week
 
     var displayName: String {
         switch self {
         case .all: "全部时间"
         case .day: "今天"
+        case .yesterday: "昨天"
         case .week: "本周"
         }
     }

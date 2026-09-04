@@ -22,7 +22,7 @@
 | 私有成绩标签 | `PATCH /v1/results/{id}/tags` | 仅接受 Bearer 令牌，且只可修改当前账户自己的成绩；标签为最多五个非空、去首尾空白后最长 24 个字符的字符串，不允许大小写或重音差异的重复项。旧服务或旧数据未提供标签时客户端安全回退为空数组，开发者密钥无此权限（部分实现） |
 | 清除私有成绩 | `DELETE /v1/results` | 仅接受 Bearer 令牌；密码账户必须提交当前密码，纯第三方账户必须携带一次性 `X-Typebar-Reauthentication`。只删除当前账户的远端成绩与相应 XP，返回删除数量；本机历史、同步和其他账户不受影响。每令牌每小时最多 10 次（部分实现） |
 | 提交结果 | `POST /v1/results` | 接受 Bearer 令牌或 `X-Typebar-Access-Key`；保存具 UUID 的结果，基本范围/时间校验与重复提交幂等；响应包含服务端重算的本次 XP、总 XP 与可选本周 XP 名次（部分实现） |
-| 排行榜 | `GET /v1/leaderboards`、`GET /v1/leaderboards/friends` | 前者为公开全局结果榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者都可按模式、语言与 `all`/`day`/`week` 周期筛选；每位用户仅保留该筛选下的最佳一条成绩，按此成绩排名，最多返回 100 位用户（部分实现） |
+| 排行榜 | `GET /v1/leaderboards`、`GET /v1/leaderboards/friends` | 前者为公开全局结果榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者都可按模式、语言与 `all`/`day`/`yesterday`/`week` 周期筛选；`yesterday` 是服务端当前日历日前的完整一天。每位用户仅保留该筛选下的最佳一条成绩，按此成绩排名，最多返回 100 位用户（部分实现） |
 | 我的 WPM 排名 | `GET /v1/leaderboards/rank`、`GET /v1/leaderboards/friends/rank` | 仅接受 Bearer 令牌，使用与相应全局/好友 WPM 榜完全相同的筛选、隐身和排序规则，返回当前账户的条目或空值；结果不受列表前 100 名限制，开发者密钥无此权限（部分实现） |
 | XP 排行榜 | `GET /v1/leaderboards/experience`、`GET /v1/leaderboards/experience/friends` | 前者为公开全局 ISO 本周 XP 榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者最多返回 100 位用户，返回展示名、本周服务端计算 XP 与名次（部分实现） |
 | 我的 XP 排名 | `GET /v1/leaderboards/experience/rank`、`GET /v1/leaderboards/experience/friends/rank` | 仅接受 Bearer 令牌，按相应全局/好友 ISO 本周 XP 榜的既有规则返回当前账户条目或空值；结果不受前 100 名列表限制，开发者密钥无此权限（部分实现） |

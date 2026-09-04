@@ -2548,7 +2548,7 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
-  func testLeaderboardPeriodsUseTodayAndISOWeekBoundaries() async throws {
+  func testLeaderboardPeriodsUseTodayYesterdayAndISOWeekBoundaries() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let session = try await store.register(
       .init(email: "period@example.com", password: "a secure password", displayName: "Period User"))
@@ -2568,8 +2568,15 @@ final class HealthRouteTests: XCTestCase {
       .init(mode: "time", language: "english", period: "day", limit: 10), now: now)
     let week = try await store.leaderboard(
       .init(mode: "time", language: "english", period: "week", limit: 10), now: now)
+    let yesterday = try await store.leaderboard(
+      .init(mode: "time", language: "english", period: "yesterday", limit: 10), now: now)
+    let yesterdayRank = try await store.leaderboardRank(
+      .init(mode: "time", language: "english", period: "yesterday", limit: 10),
+      accessToken: session.accessToken, now: now)
     XCTAssertEqual(today.entries.map(\.wpm), [80])
+    XCTAssertEqual(yesterday.entries.map(\.wpm), [90])
     XCTAssertEqual(week.entries.map(\.wpm), [90])
+    XCTAssertEqual(yesterdayRank.entry?.wpm, 90)
   }
 
   private func result(

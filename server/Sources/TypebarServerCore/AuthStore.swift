@@ -2412,26 +2412,39 @@ public actor AuthStore {
       "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
       "mixedEnglishChinese", "mixedLanguages",
     ])
-    let periods = Set(["all", "day", "week"])
+    let periods = Set(["all", "day", "yesterday", "week"])
     if let mode = query.mode, !modes.contains(mode) { throw ResultStoreError.invalidResult }
     if let language = query.language, !languages.contains(language) {
       throw ResultStoreError.invalidResult
     }
     let period = query.period ?? "all"
     guard periods.contains(period) else { throw ResultStoreError.invalidResult }
-    let cutoff: Date? =
-      switch period {
-      case "day": Calendar.current.startOfDay(for: now)
-      case "week": Calendar(identifier: .iso8601).dateInterval(of: .weekOfYear, for: now)?.start
-      default: nil
-      }
+    let calendar = Calendar.current
+    let todayStart = calendar.startOfDay(for: now)
+    let lowerBound: Date?
+    let upperBound: Date?
+    switch period {
+    case "day":
+      lowerBound = todayStart
+      upperBound = nil
+    case "yesterday":
+      lowerBound = calendar.date(byAdding: .day, value: -1, to: todayStart)
+      upperBound = todayStart
+    case "week":
+      lowerBound = Calendar(identifier: .iso8601).dateInterval(of: .weekOfYear, for: now)?.start
+      upperBound = nil
+    default:
+      lowerBound = nil
+      upperBound = nil
+    }
     let users = Dictionary(uniqueKeysWithValues: state.users.map { ($0.id, $0) })
     let records = state.results.filter { result in
       (eligibleUserIDs == nil || eligibleUserIDs!.contains(result.userID))
         && users[result.userID]?.leaderboardOptedOut == false
         && (query.mode == nil || result.mode == query.mode)
         && (query.language == nil || result.language == query.language)
-        && (cutoff == nil || result.finishedAt >= cutoff!)
+        && (lowerBound == nil || result.finishedAt >= lowerBound!)
+        && (upperBound == nil || result.finishedAt < upperBound!)
     }.sorted {
       if $0.wpm != $1.wpm { return $0.wpm > $1.wpm }
       if $0.accuracy != $1.accuracy { return $0.accuracy > $1.accuracy }
