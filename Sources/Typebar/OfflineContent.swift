@@ -792,6 +792,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "finnish-rauhallinen-askel",
+      title: "Rauhallinen askel",
+      text: "Rauhallinen askel tekee seuraavasta tehtävästä selvemmän.",
+      language: .finnish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "finnish-avoin-muistikirja",
+      title: "Avoin muistikirja",
+      text: "Avoin muistikirja ei ratkaise vaikeaa kysymystä yksin, mutta se auttaa ajatuksia löytämään järjestyksen ja suunnan.",
+      language: .finnish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "finnish-hiljainen-tyo",
+      title: "Hiljainen työ",
+      text: "Edistyminen ei yleensä synny yhdessä äänekkäässä hetkessä. Se kasvaa, kun avaamme saman sivun, korjaamme virheen, luemme muistiinpanon ja valitsemme seuraavan pienen tehtävän. Toisto tekee vaikeista asioista tutumpia ja jättää enemmän tilaa huomiolle.",
+      language: .finnish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "finnish-pitka-poyta",
+      title: "Pitkä pöytä",
+      text: "Pitkä pöytä on hyödyllinen, koska sillä on tilaa monenlaiselle työlle. Toisessa päässä voi olla ensimmäinen luonnos, toisessa lause, joka tarvitsee vielä huomiota, ja keskelle jää tilaa seuraavalle pienelle päätökselle. Harjoittelu toimii samalla tavalla. Sen ei tarvitse ratkaista kaikkea kerralla, vaan sen pitää antaa meille paikka, johon voi palata, nähdä seuraava askel ja löytää riittävästi kärsivällisyyttä huomata, mikä muuttuu helpommaksi muutaman yrityksen jälkeen.",
+      language: .finnish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",
