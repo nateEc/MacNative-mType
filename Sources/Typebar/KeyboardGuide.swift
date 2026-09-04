@@ -122,9 +122,8 @@ enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
   }
 }
 
-/// A user-authored visual keymap. It intentionally controls only the guide:
-/// macOS remains responsible for actual input unless an explicit built-in
-/// layout simulation has been selected.
+/// A user-authored visual keymap. It can remain presentation-only or be
+/// explicitly selected as the native input mapping.
 struct CustomKeyboardGuideLayout: Codable, Equatable, Identifiable {
   var id: UUID
   var name: String
@@ -132,10 +131,15 @@ struct CustomKeyboardGuideLayout: Codable, Equatable, Identifiable {
   var topRow: String
   var homeRow: String
   var bottomRow: String
+  var shiftedNumberRow: String?
+  var shiftedTopRow: String?
+  var shiftedHomeRow: String?
+  var shiftedBottomRow: String?
 
   init(
     id: UUID = UUID(), name: String, numberRow: String, topRow: String, homeRow: String,
-    bottomRow: String
+    bottomRow: String, shiftedNumberRow: String? = nil, shiftedTopRow: String? = nil,
+    shiftedHomeRow: String? = nil, shiftedBottomRow: String? = nil
   ) {
     self.id = id
     self.name = name
@@ -143,13 +147,25 @@ struct CustomKeyboardGuideLayout: Codable, Equatable, Identifiable {
     self.topRow = topRow
     self.homeRow = homeRow
     self.bottomRow = bottomRow
+    self.shiftedNumberRow = shiftedNumberRow
+    self.shiftedTopRow = shiftedTopRow
+    self.shiftedHomeRow = shiftedHomeRow
+    self.shiftedBottomRow = shiftedBottomRow
   }
 
   var guideRows: [[KeyboardGuideKey]] {
-    [numberRow, topRow, homeRow, bottomRow].enumerated().map { rowIndex, labels in
-      Array(labels).enumerated().map { keyIndex, label in
-        KeyboardGuideKey(
-          "custom-\(id.uuidString)-\(rowIndex)-\(keyIndex)", label: String(label))
+    zip(inputRows, shiftedInputRows).enumerated().map { rowIndex, rows in
+      let (labels, shiftedLabels) = rows
+      return Array(labels).enumerated().map { keyIndex, label in
+        let shiftedLabel: String?
+        if let shiftedLabels, shiftedLabels.indices.contains(keyIndex) {
+          shiftedLabel = String(shiftedLabels[keyIndex])
+        } else {
+          shiftedLabel = nil
+        }
+        return KeyboardGuideKey(
+          "custom-\(id.uuidString)-\(rowIndex)-\(keyIndex)", label: String(label),
+          characters: String(label) + (shiftedLabel ?? ""), shiftedLabel: shiftedLabel)
       }
     }
   }
@@ -159,6 +175,10 @@ struct CustomKeyboardGuideLayout: Codable, Equatable, Identifiable {
   /// value with Shift rather than guessing a punctuation pairing.
   var inputRows: [[Character]] {
     [numberRow, topRow, homeRow, bottomRow].map(Array.init)
+  }
+
+  var shiftedInputRows: [[Character]?] {
+    [shiftedNumberRow, shiftedTopRow, shiftedHomeRow, shiftedBottomRow].map { $0.map(Array.init) }
   }
 
   /// Visual rows may contain up to sixteen labels, while a standard physical
@@ -177,10 +197,14 @@ enum CustomKeyboardGuideLayoutPolicy {
   private static let nameLengthRange = 1...40
 
   static func make(
-    name: String, numberRow: String, topRow: String, homeRow: String, bottomRow: String
+    name: String, numberRow: String, topRow: String, homeRow: String, bottomRow: String,
+    shiftedNumberRow: String? = nil, shiftedTopRow: String? = nil, shiftedHomeRow: String? = nil,
+    shiftedBottomRow: String? = nil
   ) -> CustomKeyboardGuideLayout? {
     normalized(.init(
-      name: name, numberRow: numberRow, topRow: topRow, homeRow: homeRow, bottomRow: bottomRow))
+      name: name, numberRow: numberRow, topRow: topRow, homeRow: homeRow, bottomRow: bottomRow,
+      shiftedNumberRow: shiftedNumberRow, shiftedTopRow: shiftedTopRow,
+      shiftedHomeRow: shiftedHomeRow, shiftedBottomRow: shiftedBottomRow))
   }
 
   static func normalized(_ layout: CustomKeyboardGuideLayout) -> CustomKeyboardGuideLayout? {
@@ -189,11 +213,18 @@ enum CustomKeyboardGuideLayoutPolicy {
       let numberRow = normalizedRow(layout.numberRow),
       let topRow = normalizedRow(layout.topRow),
       let homeRow = normalizedRow(layout.homeRow),
-      let bottomRow = normalizedRow(layout.bottomRow)
+      let bottomRow = normalizedRow(layout.bottomRow),
+      isValidShiftedRow(layout.shiftedNumberRow, matching: numberRow.count),
+      isValidShiftedRow(layout.shiftedTopRow, matching: topRow.count),
+      isValidShiftedRow(layout.shiftedHomeRow, matching: homeRow.count),
+      isValidShiftedRow(layout.shiftedBottomRow, matching: bottomRow.count)
     else { return nil }
     return .init(
       id: layout.id, name: name, numberRow: numberRow, topRow: topRow, homeRow: homeRow,
-      bottomRow: bottomRow)
+      bottomRow: bottomRow, shiftedNumberRow: normalizedShiftedRow(layout.shiftedNumberRow),
+      shiftedTopRow: normalizedShiftedRow(layout.shiftedTopRow),
+      shiftedHomeRow: normalizedShiftedRow(layout.shiftedHomeRow),
+      shiftedBottomRow: normalizedShiftedRow(layout.shiftedBottomRow))
   }
 
   static func normalizedLayouts(
@@ -219,6 +250,18 @@ enum CustomKeyboardGuideLayoutPolicy {
     let visible = String(row.filter { !$0.isWhitespace && !$0.isNewline })
     guard rowLengthRange.contains(visible.count) else { return nil }
     return visible
+  }
+
+  private static func isValidShiftedRow(_ row: String?, matching length: Int) -> Bool {
+    guard let row else { return true }
+    let visible = String(row.filter { !$0.isWhitespace && !$0.isNewline })
+    return visible.isEmpty || visible.count == length
+  }
+
+  private static func normalizedShiftedRow(_ row: String?) -> String? {
+    guard let row else { return nil }
+    let visible = String(row.filter { !$0.isWhitespace && !$0.isNewline })
+    return visible.isEmpty ? nil : visible
   }
 }
 

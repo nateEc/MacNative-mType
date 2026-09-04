@@ -1462,6 +1462,27 @@ final class TypingEngineTests: XCTestCase {
       name: "Visual only", numberRow: "12345678901234", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
     XCTAssertFalse(visualOnlyLayout.supportsPhysicalInputMapping)
     XCTAssertEqual(KeyboardInputLayout.custom.inputMapping(for: visualOnlyLayout), .system)
+
+    let symbolLayout = try XCTUnwrap(CustomKeyboardGuideLayoutPolicy.make(
+      name: "Symbols", numberRow: "12", topRow: "q", homeRow: "a", bottomRow: "z",
+      shiftedNumberRow: "!@", shiftedTopRow: "Q", shiftedHomeRow: "A", shiftedBottomRow: "Z"))
+    XCTAssertEqual(symbolLayout.guideRows[0][0].shiftedLabel, "!")
+    XCTAssertEqual(
+      symbolLayout.guideRows[0][0].legend(
+        style: .dynamic, modifierFlags: [.shift], capsLockEnabled: false), "!")
+    let symbolMapping = KeyboardInputLayout.custom.inputMapping(for: symbolLayout)
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], mapping: symbolMapping),
+      "!")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "@", mapping: symbolMapping), 18)
+    XCTAssertNil(CustomKeyboardGuideLayoutPolicy.make(
+      name: "Mismatch", numberRow: "12", topRow: "q", homeRow: "a", bottomRow: "z",
+      shiftedNumberRow: "!"))
+
+    let legacy = try JSONDecoder().decode(
+      CustomKeyboardGuideLayout.self,
+      from: Data("{\"id\":\"A37ACD3C-2E19-4D36-9D41-9BF6189E2A5D\",\"name\":\"Legacy\",\"numberRow\":\"1\",\"topRow\":\"q\",\"homeRow\":\"a\",\"bottomRow\":\"z\"}".utf8))
+    XCTAssertNil(legacy.shiftedNumberRow)
   }
 
   func testSystemKeyboardGuideBuildsCompleteShiftAwarePhysicalRows() throws {
@@ -1773,7 +1794,8 @@ final class TypingEngineTests: XCTestCase {
 
     let settings = AppSettings(defaults: defaults)
     let layout = try XCTUnwrap(settings.addCustomKeyboardLayout(
-      name: "Cyrillic", numberRow: "123", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
+      name: "Cyrillic", numberRow: "123", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС",
+      shiftedNumberRow: "!\"#"))
     settings.keyboardInputLayout = .custom
 
     XCTAssertEqual(settings.selectedCustomKeyboardLayout, layout)
@@ -1786,6 +1808,7 @@ final class TypingEngineTests: XCTestCase {
     let restored = AppSettings(defaults: defaults)
     XCTAssertEqual(restored.keyboardInputLayout, .custom)
     XCTAssertEqual(restored.selectedCustomKeyboardLayout, layout)
+    XCTAssertEqual(restored.selectedCustomKeyboardLayout?.shiftedNumberRow, "!\"#")
 
     restored.deleteCustomKeyboardLayout(layout.id)
     XCTAssertEqual(restored.keyboardInputLayout, .system)

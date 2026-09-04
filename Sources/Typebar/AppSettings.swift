@@ -1716,12 +1716,17 @@ final class AppSettings {
     numberRow: String,
     topRow: String,
     homeRow: String,
-    bottomRow: String
+    bottomRow: String,
+    shiftedNumberRow: String? = nil,
+    shiftedTopRow: String? = nil,
+    shiftedHomeRow: String? = nil,
+    shiftedBottomRow: String? = nil
   ) -> CustomKeyboardGuideLayout? {
     guard customKeyboardLayouts.count < CustomKeyboardGuideLayoutPolicy.maximumLayoutCount,
       let layout = CustomKeyboardGuideLayoutPolicy.make(
         name: name, numberRow: numberRow, topRow: topRow, homeRow: homeRow,
-        bottomRow: bottomRow),
+        bottomRow: bottomRow, shiftedNumberRow: shiftedNumberRow, shiftedTopRow: shiftedTopRow,
+        shiftedHomeRow: shiftedHomeRow, shiftedBottomRow: shiftedBottomRow),
       !customKeyboardLayouts.contains(where: {
         CustomKeyboardGuideLayoutPolicy.normalizedName($0.name)
           == CustomKeyboardGuideLayoutPolicy.normalizedName(layout.name)

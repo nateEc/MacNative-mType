@@ -70,6 +70,10 @@ struct PreferencesView: View {
   @State private var customKeyboardTopRow = "QWERTYUIOP[]"
   @State private var customKeyboardHomeRow = "ASDFGHJKL;'"
   @State private var customKeyboardBottomRow = "ZXCVBNM,./"
+  @State private var customKeyboardShiftedNumberRow = ""
+  @State private var customKeyboardShiftedTopRow = ""
+  @State private var customKeyboardShiftedHomeRow = ""
+  @State private var customKeyboardShiftedBottomRow = ""
   @State private var customKeyboardLayoutMessage: String?
   @State private var searchQuery = ""
   @State private var customBackgroundURLDraft = ""
@@ -731,18 +735,33 @@ struct PreferencesView: View {
               TextField("顶行", text: $customKeyboardTopRow)
               TextField("主行", text: $customKeyboardHomeRow)
               TextField("底行", text: $customKeyboardBottomRow)
+              Text("可选 Shift 图例（留空时字母自动使用大写）")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              TextField("Shift 数字行", text: $customKeyboardShiftedNumberRow)
+              TextField("Shift 顶行", text: $customKeyboardShiftedTopRow)
+              TextField("Shift 主行", text: $customKeyboardShiftedHomeRow)
+              TextField("Shift 底行", text: $customKeyboardShiftedBottomRow)
               Button("添加并应用", systemImage: "plus") {
                 guard let layout = settings.addCustomKeyboardLayout(
                   name: customKeyboardLayoutName,
                   numberRow: customKeyboardNumberRow,
                   topRow: customKeyboardTopRow,
                   homeRow: customKeyboardHomeRow,
-                  bottomRow: customKeyboardBottomRow
+                  bottomRow: customKeyboardBottomRow,
+                  shiftedNumberRow: customKeyboardShiftedNumberRow,
+                  shiftedTopRow: customKeyboardShiftedTopRow,
+                  shiftedHomeRow: customKeyboardShiftedHomeRow,
+                  shiftedBottomRow: customKeyboardShiftedBottomRow
                 ) else {
-                  customKeyboardLayoutMessage = "名称需为 1–40 个字符，四行各需 1–16 个可见字符且名称不能重复。"
+                  customKeyboardLayoutMessage = "名称需为 1–40 个字符，四行各需 1–16 个可见字符且名称不能重复；填写 Shift 行时须与对应基础行等长。"
                   return
                 }
                 customKeyboardLayoutName = ""
+                customKeyboardShiftedNumberRow = ""
+                customKeyboardShiftedTopRow = ""
+                customKeyboardShiftedHomeRow = ""
+                customKeyboardShiftedBottomRow = ""
                 customKeyboardLayoutMessage = "已应用“\(layout.name)”。"
               }
               .disabled(
@@ -768,7 +787,7 @@ struct PreferencesView: View {
                   .accessibilityLabel("删除 \(layout.name)")
                 }
               }
-              Text("每行可写 1–16 个 Unicode 可见字符，最多保存 \(CustomKeyboardGuideLayoutPolicy.maximumLayoutCount) 个。它可只作为键盘提示，也可在下方选择“模拟自定义键盘图”；后者让字母按小写/Shift 大写映射，单字符符号不臆造 Shift 配对。Layout Fluid 继续只使用内置布局。")
+              Text("每行可写 1–16 个 Unicode 可见字符，最多保存 \(CustomKeyboardGuideLayoutPolicy.maximumLayoutCount) 个。它可只作为键盘提示，也可在下方选择“模拟自定义键盘图”；Shift 行为空时字母按小写/Shift 大写映射，填写时可为符号定义精确 Shift 配对。Layout Fluid 继续只使用内置布局。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -1771,7 +1790,7 @@ struct PreferencesView: View {
     guard layout.supportsPhysicalInputMapping else {
       return "当前图各行最多只能为 13/13/11/10 个字符才能模拟；超出的图保留为视觉提示，输入会安全回退。"
     }
-    return "字母标签会按小写/Shift 大写模拟；符号保持原样，Option、Control 与 Command 仍由 macOS 处理。"
+    return "填写的 Shift 图例会按键位精确模拟；未填写时字母按小写/Shift 大写、其他字符保持原样。Option、Control 与 Command 仍由 macOS 处理。"
   }
 
   private var testSectionVisible: Bool {

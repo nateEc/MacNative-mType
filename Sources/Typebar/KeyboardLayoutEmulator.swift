@@ -67,9 +67,19 @@ enum KeyboardLayoutEmulator {
   }
 
   private static func keys(for layout: CustomKeyboardGuideLayout) -> [UInt16: KeyPair] {
-    Dictionary(uniqueKeysWithValues: zip(physicalRows, layout.inputRows).flatMap { keyCodes, labels in
-      zip(keyCodes, labels).map { keyCode, label in
-        (keyCode, casePair(for: label))
+    Dictionary(uniqueKeysWithValues: zip(physicalRows, layout.inputRows).enumerated().flatMap {
+      rowIndex, keyCodesAndLabels in
+      let (keyCodes, labels) = keyCodesAndLabels
+      let shiftedLabels = layout.shiftedInputRows[rowIndex]
+      return zip(keyCodes, labels).enumerated().map { keyIndex, keyCodeAndLabel in
+        let (keyCode, label) = keyCodeAndLabel
+        let pair: KeyPair
+        if let shiftedLabels, shiftedLabels.indices.contains(keyIndex) {
+          pair = (normal: label, shifted: shiftedLabels[keyIndex])
+        } else {
+          pair = casePair(for: label)
+        }
+        return (keyCode, pair)
       }
     })
   }
