@@ -3411,11 +3411,13 @@ private struct ResultsHistoryView: View {
   }
 
   private var activity: [DailyActivity] {
-    ActivityAggregation.daily(metrics: metrics)
+    ActivityAggregation.daily(
+      metrics: metrics, dayBoundaryOffsetHours: settings.streakDayBoundaryOffsetHours)
   }
 
   private var recentActivity: [ActivityBarPoint] {
-    ActivityAggregation.recentDays(activity: activity)
+    ActivityAggregation.recentDays(
+      activity: activity, dayBoundaryOffsetHours: settings.streakDayBoundaryOffsetHours)
   }
 
   private var wpmHistogram: [WPMHistogramBucket] {
@@ -3450,7 +3452,8 @@ private struct ResultsHistoryView: View {
               .padding(.horizontal)
               .padding(.top, 8)
 
-            ActivityHeatmapView(activity: activity)
+            ActivityHeatmapView(
+              activity: activity, dayBoundaryOffsetHours: settings.streakDayBoundaryOffsetHours)
               .padding(.horizontal)
               .padding(.bottom, 10)
 
@@ -3762,7 +3765,8 @@ private struct ResultsHistoryView: View {
 
   private var statistics: some View {
     let summary = ResultStatistics(metrics: metrics)
-    let streak = ActivityAggregation.currentStreak(activity: activity)
+    let streak = ActivityAggregation.currentStreak(
+      activity: activity, dayBoundaryOffsetHours: settings.streakDayBoundaryOffsetHours)
     return LazyVGrid(
       columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 10
     ) {
@@ -4070,9 +4074,10 @@ private struct ActivityBarChartView: View {
 
 private struct ActivityHeatmapView: View {
   let activity: [DailyActivity]
+  let dayBoundaryOffsetHours: Double
 
   private var cells: [ActivityHeatmapCell] {
-    ActivityHeatmap.cells(activity: activity)
+    ActivityHeatmap.cells(activity: activity, dayBoundaryOffsetHours: dayBoundaryOffsetHours)
   }
 
   private let rows = Array(repeating: GridItem(.fixed(11), spacing: 3), count: 7)

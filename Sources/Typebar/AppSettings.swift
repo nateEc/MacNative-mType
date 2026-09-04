@@ -52,6 +52,29 @@ enum PracticeTapeMode: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 }
 
+/// Defines the local clock boundary used to group completed tests into
+/// practice days. The half-hour choices deliberately match the range exposed
+/// by the reference product, while the underlying analytics remain Typebar's
+/// own local-only implementation.
+enum StreakDayBoundaryPolicy {
+  static let supportedRange = -11.0...12.0
+  static let step = 0.5
+  static let supportedOffsets = stride(
+    from: supportedRange.lowerBound, through: supportedRange.upperBound, by: step
+  ).map { $0 }
+
+  static func isSupported(_ value: Double) -> Bool {
+    guard value.isFinite, supportedRange.contains(value) else { return false }
+    return abs((value / step).rounded() * step - value) < 0.000_001
+  }
+
+  static func normalized(_ value: Double) -> Double {
+    guard value.isFinite else { return 0 }
+    let clamped = min(max(value, supportedRange.lowerBound), supportedRange.upperBound)
+    return (clamped / step).rounded() * step
+  }
+}
+
 /// A small set of native caret treatments for the active prompt character.
 /// They use SwiftUI text attributes only and do not depend on copied CSS.
 enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
@@ -558,6 +581,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var paceGuideCustomWpm = 100
   var paceCaretStyle: TypingCaretStyle = .bar
   var repeatedPace = true
+  var streakDayBoundaryOffsetHours = 0.0
+  var hasSetStreakDayBoundary = false
 
   init(
     difficulty: Difficulty = .normal,
@@ -654,7 +679,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     paceGuideMode: PaceGuideMode = .off,
     paceGuideCustomWpm: Int = 100,
     paceCaretStyle: TypingCaretStyle = .bar,
-    repeatedPace: Bool = true
+    repeatedPace: Bool = true,
+    streakDayBoundaryOffsetHours: Double = 0,
+    hasSetStreakDayBoundary: Bool = false
   ) {
     self.difficulty = difficulty
     self.strictSpace = strictSpace
@@ -759,6 +786,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
       to: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm)
     self.paceCaretStyle = paceCaretStyle
     self.repeatedPace = repeatedPace
+    self.streakDayBoundaryOffsetHours = StreakDayBoundaryPolicy.normalized(
+      streakDayBoundaryOffsetHours)
+    self.hasSetStreakDayBoundary = hasSetStreakDayBoundary
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -781,7 +811,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
       showCapsLockWarning, playErrorBeep, playKeyclickSound, clickSoundStyle, errorSoundStyle,
       timeWarningOffset, timeWarningSoundStyle, soundVolume,
       globalHotkeyEnabled,
-      paceGuideMode, paceGuideCustomWpm, paceCaretStyle, repeatedPace
+      paceGuideMode, paceGuideCustomWpm, paceCaretStyle, repeatedPace,
+      streakDayBoundaryOffsetHours, hasSetStreakDayBoundary
   }
 
   init(from decoder: Decoder) throws {
@@ -947,6 +978,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
       .clamped(to: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm)
     paceCaretStyle = try values.decodeIfPresent(TypingCaretStyle.self, forKey: .paceCaretStyle) ?? .bar
     repeatedPace = try values.decodeIfPresent(Bool.self, forKey: .repeatedPace) ?? true
+    streakDayBoundaryOffsetHours = StreakDayBoundaryPolicy.normalized(
+      try values.decodeIfPresent(Double.self, forKey: .streakDayBoundaryOffsetHours) ?? 0)
+    hasSetStreakDayBoundary = try values.decodeIfPresent(Bool.self, forKey: .hasSetStreakDayBoundary) ?? false
   }
 }
 
@@ -1230,6 +1264,8 @@ final class AppSettings {
   var paceGuideCustomWpm = 100 { didSet { persist() } }
   var paceCaretStyle: TypingCaretStyle = .bar { didSet { persist() } }
   var repeatedPace = true { didSet { persist() } }
+  private(set) var streakDayBoundaryOffsetHours = 0.0 { didSet { persist() } }
+  private(set) var hasSetStreakDayBoundary = false { didSet { persist() } }
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
@@ -1336,6 +1372,20 @@ final class AppSettings {
     paceGuideCustomWpm = snapshot.paceGuideCustomWpm
     paceCaretStyle = snapshot.paceCaretStyle
     repeatedPace = snapshot.repeatedPace
+    streakDayBoundaryOffsetHours = snapshot.streakDayBoundaryOffsetHours
+    hasSetStreakDayBoundary = snapshot.hasSetStreakDayBoundary
+  }
+
+  /// Locks in the local practice-day boundary after the first explicit choice.
+  /// It affects only derived history statistics; timestamps remain unchanged.
+  @discardableResult
+  func setStreakDayBoundary(offsetHours: Double) -> Bool {
+    guard !hasSetStreakDayBoundary, StreakDayBoundaryPolicy.isSupported(offsetHours) else {
+      return false
+    }
+    streakDayBoundaryOffsetHours = offsetHours
+    hasSetStreakDayBoundary = true
+    return true
   }
 
   var inputRules: InputRules {
@@ -1431,7 +1481,9 @@ final class AppSettings {
       soundVolume: soundVolume,
       globalHotkeyEnabled: globalHotkeyEnabled, paceGuideMode: paceGuideMode,
       paceGuideCustomWpm: paceGuideCustomWpm, paceCaretStyle: paceCaretStyle,
-      repeatedPace: repeatedPace)
+      repeatedPace: repeatedPace,
+      streakDayBoundaryOffsetHours: streakDayBoundaryOffsetHours,
+      hasSetStreakDayBoundary: hasSetStreakDayBoundary)
   }
 
   func restoreDefaults() {
@@ -1534,6 +1586,8 @@ final class AppSettings {
     paceGuideCustomWpm = 100
     paceCaretStyle = .bar
     repeatedPace = true
+    streakDayBoundaryOffsetHours = 0
+    hasSetStreakDayBoundary = false
   }
 
   func apply(_ configuration: TestConfiguration) {
@@ -1667,6 +1721,8 @@ final class AppSettings {
     paceGuideCustomWpm = snapshot.paceGuideCustomWpm
     paceCaretStyle = snapshot.paceCaretStyle
     repeatedPace = snapshot.repeatedPace
+    streakDayBoundaryOffsetHours = snapshot.streakDayBoundaryOffsetHours
+    hasSetStreakDayBoundary = snapshot.hasSetStreakDayBoundary
   }
 
   var activeTheme: ResolvedTheme {
@@ -1922,7 +1978,9 @@ final class AppSettings {
       paceGuideMode: paceGuideMode,
       paceGuideCustomWpm: paceGuideCustomWpm,
       paceCaretStyle: paceCaretStyle,
-      repeatedPace: repeatedPace
+      repeatedPace: repeatedPace,
+      streakDayBoundaryOffsetHours: streakDayBoundaryOffsetHours,
+      hasSetStreakDayBoundary: hasSetStreakDayBoundary
     )
     defaults.set(try? JSONEncoder().encode(snapshot), forKey: storageKey)
   }

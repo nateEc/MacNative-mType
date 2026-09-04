@@ -2021,6 +2021,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(
       SettingsSearch.matches(query: "KEYBOARD layout", terms: ["键盘布局", "Keyboard Layout", "下一键"]))
     XCTAssertTrue(SettingsSearch.matches(query: "快速结束", terms: ["最后一词快速结束", "Quick End"]))
+    XCTAssertTrue(
+      SettingsSearch.matches(
+        query: "连续 统计日", terms: ["连续练习日分界", "统计日", "活动", "Streak"]))
     XCTAssertFalse(SettingsSearch.matches(query: "账户 主题", terms: ["自建账户", "登录", "邮箱"]))
     XCTAssertTrue(SettingsSearch.matches(query: "   ", terms: ["任意设置"]))
   }
@@ -4300,6 +4303,46 @@ final class TypingEngineTests: XCTestCase {
       ActivityAggregation.currentStreak(activity: activity, today: today, calendar: calendar), 2)
   }
 
+  func testPracticeDayBoundaryMovesActivityChartsAndStreakTogether() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    XCTAssertTrue(StreakDayBoundaryPolicy.isSupported(-11))
+    XCTAssertTrue(StreakDayBoundaryPolicy.isSupported(12))
+    XCTAssertFalse(StreakDayBoundaryPolicy.isSupported(-11.5))
+    XCTAssertFalse(StreakDayBoundaryPolicy.isSupported(3.25))
+    XCTAssertEqual(StreakDayBoundaryPolicy.normalized(99), 12)
+    let day = Date(timeIntervalSince1970: 86_400)
+    let metrics = [
+      ResultMetric(
+        finishedAt: day.addingTimeInterval(2.5 * 3_600), wpm: 40, accuracy: 90,
+        typingSeconds: 10),
+      ResultMetric(
+        finishedAt: day.addingTimeInterval(3.5 * 3_600), wpm: 60, accuracy: 95,
+        typingSeconds: 20),
+    ]
+    let activity = ActivityAggregation.daily(
+      metrics: metrics, dayBoundaryOffsetHours: 3, calendar: calendar)
+
+    XCTAssertEqual(activity.map(\.day), [Date(timeIntervalSince1970: 0), day])
+    XCTAssertEqual(activity.map(\.completedTests), [1, 1])
+    let nextDayBeforeBoundary = day.addingTimeInterval(86_400 + 2 * 3_600)
+    XCTAssertEqual(
+      ActivityAggregation.currentStreak(
+        activity: activity, today: nextDayBeforeBoundary, dayBoundaryOffsetHours: 3,
+        calendar: calendar),
+      2)
+    XCTAssertEqual(
+      ActivityAggregation.recentDays(
+        activity: activity, days: 2, endingAt: nextDayBeforeBoundary, dayBoundaryOffsetHours: 3,
+        calendar: calendar).map(\.completedTests),
+      [1, 1])
+    XCTAssertEqual(
+      ActivityHeatmap.cells(
+        activity: activity, days: 2, endingAt: nextDayBeforeBoundary, dayBoundaryOffsetHours: 3,
+        calendar: calendar).map(\.completedTests),
+      [1, 1])
+  }
+
   func testHeatmapIncludesEmptyDaysAndMapsIntensity() {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -4417,6 +4460,8 @@ final class TypingEngineTests: XCTestCase {
     settings.paceGuideCustomWpm = 95
     settings.paceCaretStyle = .off
     settings.repeatedPace = true
+    XCTAssertTrue(settings.setStreakDayBoundary(offsetHours: 3.5))
+    XCTAssertFalse(settings.setStreakDayBoundary(offsetHours: 4))
 
     let exportedSnapshot = settings.snapshot
     XCTAssertTrue(exportedSnapshot.codeUnindentOnBackspace)
@@ -4449,6 +4494,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.timeWarningSoundStyle, .frog)
     XCTAssertEqual(exportedSnapshot.smoothCaretMotion, .fast)
     XCTAssertEqual(exportedSnapshot.installedPracticeFontName, NativePracticeFont.fallbackPostScriptName)
+    XCTAssertEqual(exportedSnapshot.streakDayBoundaryOffsetHours, 3.5)
+    XCTAssertTrue(exportedSnapshot.hasSetStreakDayBoundary)
 
     let restored = AppSettings(defaults: defaults)
     XCTAssertEqual(restored.difficulty, .master)
@@ -4553,6 +4600,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.paceGuideCustomWpm, 95)
     XCTAssertEqual(restored.paceCaretStyle, .off)
     XCTAssertTrue(restored.repeatedPace)
+    XCTAssertEqual(restored.streakDayBoundaryOffsetHours, 3.5)
+    XCTAssertTrue(restored.hasSetStreakDayBoundary)
   }
 
   @MainActor
@@ -4686,6 +4735,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.paceGuideCustomWpm, 100)
     XCTAssertEqual(snapshot.paceCaretStyle, .bar)
     XCTAssertTrue(snapshot.repeatedPace)
+    XCTAssertEqual(snapshot.streakDayBoundaryOffsetHours, 0)
+    XCTAssertFalse(snapshot.hasSetStreakDayBoundary)
     let legacyRandom = try JSONDecoder().decode(
       AppSettingsSnapshot.self, from: Data("{\"randomThemeOnRestart\":true}".utf8))
     XCTAssertEqual(legacyRandom.randomThemeMode, .on)

@@ -1449,8 +1449,12 @@ struct ActivityHeatmapCell: Equatable, Identifiable {
 }
 
 enum ActivityAggregation {
-    static func daily(metrics: [ResultMetric], calendar: Calendar = .current) -> [DailyActivity] {
-        let grouped = Dictionary(grouping: metrics) { calendar.startOfDay(for: $0.finishedAt) }
+    static func daily(
+        metrics: [ResultMetric], dayBoundaryOffsetHours: Double = 0, calendar: Calendar = .current
+    ) -> [DailyActivity] {
+        let grouped = Dictionary(grouping: metrics) {
+            practiceDay(for: $0.finishedAt, dayBoundaryOffsetHours: dayBoundaryOffsetHours, calendar: calendar)
+        }
         return grouped.map { day, values in
             DailyActivity(
                 day: day,
@@ -1462,9 +1466,13 @@ enum ActivityAggregation {
         .sorted { $0.day < $1.day }
     }
 
-    static func currentStreak(activity: [DailyActivity], today: Date = .now, calendar: Calendar = .current) -> Int {
+    static func currentStreak(
+        activity: [DailyActivity], today: Date = .now, dayBoundaryOffsetHours: Double = 0,
+        calendar: Calendar = .current
+    ) -> Int {
         let days = Set(activity.filter { $0.completedTests > 0 }.map { calendar.startOfDay(for: $0.day) })
-        var cursor = calendar.startOfDay(for: today)
+        var cursor = practiceDay(
+            for: today, dayBoundaryOffsetHours: dayBoundaryOffsetHours, calendar: calendar)
         var streak = 0
         while days.contains(cursor) {
             streak += 1
@@ -1477,13 +1485,15 @@ enum ActivityAggregation {
         activity: [DailyActivity],
         days: Int = 28,
         endingAt endDate: Date = .now,
+        dayBoundaryOffsetHours: Double = 0,
         calendar: Calendar = .current
     ) -> [ActivityBarPoint] {
         guard days > 0 else { return [] }
         let byDay = Dictionary(uniqueKeysWithValues: activity.map {
             (calendar.startOfDay(for: $0.day), $0)
         })
-        let end = calendar.startOfDay(for: endDate)
+        let end = practiceDay(
+            for: endDate, dayBoundaryOffsetHours: dayBoundaryOffsetHours, calendar: calendar)
         return (0..<days).compactMap { offset in
             guard let day = calendar.date(byAdding: .day, value: offset - days + 1, to: end) else { return nil }
             let value = byDay[day]
@@ -1495,6 +1505,13 @@ enum ActivityAggregation {
             )
         }
     }
+
+    static func practiceDay(
+        for date: Date, dayBoundaryOffsetHours: Double, calendar: Calendar
+    ) -> Date {
+        let offset = dayBoundaryOffsetHours.isFinite ? dayBoundaryOffsetHours : 0
+        return calendar.startOfDay(for: date.addingTimeInterval(-offset * 3_600))
+    }
 }
 
 enum ActivityHeatmap {
@@ -1502,10 +1519,12 @@ enum ActivityHeatmap {
         activity: [DailyActivity],
         days: Int = 84,
         endingAt endDate: Date = .now,
+        dayBoundaryOffsetHours: Double = 0,
         calendar: Calendar = .current
     ) -> [ActivityHeatmapCell] {
         let countByDay = Dictionary(uniqueKeysWithValues: activity.map { (calendar.startOfDay(for: $0.day), $0.completedTests) })
-        let end = calendar.startOfDay(for: endDate)
+        let end = ActivityAggregation.practiceDay(
+            for: endDate, dayBoundaryOffsetHours: dayBoundaryOffsetHours, calendar: calendar)
         return (0..<days).compactMap { offset in
             guard let day = calendar.date(byAdding: .day, value: offset - days + 1, to: end) else { return nil }
             return ActivityHeatmapCell(day: day, completedTests: countByDay[day] ?? 0)

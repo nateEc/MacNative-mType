@@ -543,6 +543,25 @@ struct PreferencesView: View {
           Text("关闭后，历史速度趋势图和结果速度轨迹会按实际数据范围缩放；完成次数、练习分钟和错误图仍从零开始。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Picker(
+            "连续练习日分界",
+            selection: Binding(
+              get: { settings.streakDayBoundaryOffsetHours },
+              set: { _ = settings.setStreakDayBoundary(offsetHours: $0) }
+            )
+          ) {
+            ForEach(StreakDayBoundaryPolicy.supportedOffsets, id: \.self) { offset in
+              Text(streakDayBoundaryLabel(for: offset)).tag(offset)
+            }
+          }
+          .disabled(settings.hasSetStreakDayBoundary)
+          Text(
+            settings.hasSetStreakDayBoundary
+              ? "已固定本机统计日的分界：\(streakDayBoundaryLabel(for: settings.streakDayBoundaryOffsetHours))。连续天数、28 日活动图和热力图会使用该分界；不会修改成绩时间。"
+              : "可把本机统计日的开始时间向前或向后移动，范围为 −11 至 +12 小时、每次 30 分钟。首次选择后会锁定，重置偏好前不能更改；不会修改成绩时间。"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
           Picker("已输入字符效果", selection: $settings.typedCharacterEffect) {
             ForEach(TypedCharacterEffect.allCases) { effect in
               Text(effect.displayName).tag(effect)
@@ -1390,6 +1409,12 @@ struct PreferencesView: View {
     profileShowsActivity = details.showActivity
   }
 
+  private func streakDayBoundaryLabel(for offset: Double) -> String {
+    let magnitude = offset.magnitude.formatted(.number.precision(.fractionLength(0...1)))
+    let sign = offset > 0 ? "+" : (offset < 0 ? "−" : "")
+    return "\(sign)\(magnitude) 小时"
+  }
+
   private func applyCustomBackgroundURL() {
     guard let normalized = CustomBackgroundURLPolicy.normalizedRemoteURL(customBackgroundURLDraft) else {
       customBackgroundMessage = "请输入 HTTP(S) 的 PNG、JPG、GIF 或 WebP 图片 URL。"
@@ -1461,7 +1486,7 @@ struct PreferencesView: View {
     matches(
       "显示", "主题", "theme", "随机", "random", "系统", "system", "翻转", "flip", "彩色", "colorful", "颜色", "背景", "图片", "image", "url", "模糊", "blur", "亮度", "brightness", "饱和度", "saturation", "不透明度", "opacity", "伙伴", "companion", "手部", "hand", "字体", "font", "等宽", "圆角", "衬线", "行宽",
       "width", "光标", "caret", "平滑", "smooth", "关闭", "条形", "轮廓", "outline", "下划线", "块状", "胡萝卜", "香蕉", "小猴", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
-      "keyboard", "布局", "layout", "下一键")
+      "keyboard", "布局", "layout", "下一键", "连续", "streak", "统计日", "日分界", "活动", "activity")
   }
 
   private var customThemeSectionVisible: Bool {
