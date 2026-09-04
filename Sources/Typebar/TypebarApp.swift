@@ -1220,7 +1220,7 @@ private struct ContentView: View {
 
       NativeTypingInput(
         focusRequest: focusRequest, quickRestartKey: settings.quickRestartKey,
-        keyboardInputLayout: effectiveKeyboardInputLayout,
+        keyboardInputMapping: effectiveKeyboardInputMapping,
         keymapLayout: effectiveKeyboardLayout,
         oppositeShiftMode: settings.oppositeShiftMode,
         mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
@@ -1493,11 +1493,11 @@ private struct ContentView: View {
   /// Layout Fluid deliberately switches both the visible guide and simulated
   /// input layout, matching the reference funbox. Outside that mode, input
   /// emulation remains an opt-in setting and the guide is presentation-only.
-  private var effectiveKeyboardInputLayout: KeyboardInputLayout {
-    guard session.configuration.modifiers.contains(.layoutFluid) else {
-      return settings.keyboardInputLayout
+  private var effectiveKeyboardInputMapping: KeyboardInputMapping {
+    guard !session.configuration.modifiers.contains(.layoutFluid) else {
+      return .builtIn(effectiveKeyboardLayout)
     }
-    return .init(emulating: effectiveKeyboardLayout)
+    return settings.keyboardInputLayout.inputMapping(for: settings.selectedCustomKeyboardLayout)
   }
 
   private var layoutFluidNotice: String? {

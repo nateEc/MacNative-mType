@@ -6,26 +6,84 @@
 enum KeyboardLayoutEmulator {
   private typealias KeyPair = (normal: Character, shifted: Character)
 
+  private static let physicalRows: [[UInt16]] = [
+    [50, 18, 19, 20, 21, 23, 22, 26, 28, 25, 29, 27, 24],
+    [12, 13, 14, 15, 17, 16, 32, 34, 31, 35, 33, 30, 42],
+    [0, 1, 2, 3, 5, 4, 38, 40, 37, 41, 39],
+    [6, 7, 8, 9, 11, 45, 46, 43, 47, 44],
+  ]
+
+  static func character(
+    forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, mapping: KeyboardInputMapping
+  ) -> Character? {
+    guard !modifierFlags.contains(.command),
+      !modifierFlags.contains(.control),
+      !modifierFlags.contains(.option)
+    else { return nil }
+    let pair: KeyPair?
+    switch mapping {
+    case .system:
+      pair = nil
+    case let .builtIn(layout):
+      pair = keys(for: layout)[keyCode]
+    case let .custom(layout):
+      pair = keys(for: layout)[keyCode]
+    }
+    guard let pair else { return nil }
+    return modifierFlags.contains(.shift) ? pair.shifted : pair.normal
+  }
+
   static func character(
     forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, layout: KeyboardLayout?
   ) -> Character? {
-    guard let layout,
-      !modifierFlags.contains(.command),
-      !modifierFlags.contains(.control),
-      !modifierFlags.contains(.option),
-      let pair = keys(for: layout)[keyCode]
-    else { return nil }
-    return modifierFlags.contains(.shift) ? pair.shifted : pair.normal
+    character(
+      forKeyCode: keyCode, modifierFlags: modifierFlags,
+      mapping: layout.map(KeyboardInputMapping.builtIn) ?? .system)
   }
 
   /// Resolves a character through a selected layout for input devices which
   /// report remapped logical characters instead of their physical key code.
   static func keyCode(for character: Character, layout: KeyboardLayout) -> UInt16? {
-    keys(for: layout).first { _, pair in
+    keyCode(for: character, keys: keys(for: layout))
+  }
+
+  static func keyCode(for character: Character, mapping: KeyboardInputMapping) -> UInt16? {
+    switch mapping {
+    case .system:
+      nil
+    case let .builtIn(layout):
+      keyCode(for: character, layout: layout)
+    case let .custom(layout):
+      keyCode(for: character, keys: keys(for: layout))
+    }
+  }
+
+  private static func keyCode(for character: Character, keys: [UInt16: KeyPair]) -> UInt16? {
+    keys.first { _, pair in
       pair.normal == character || pair.shifted == character
         || String(pair.normal).caseInsensitiveCompare(String(character)) == .orderedSame
         || String(pair.shifted).caseInsensitiveCompare(String(character)) == .orderedSame
     }?.key
+  }
+
+  private static func keys(for layout: CustomKeyboardGuideLayout) -> [UInt16: KeyPair] {
+    Dictionary(uniqueKeysWithValues: zip(physicalRows, layout.inputRows).flatMap { keyCodes, labels in
+      zip(keyCodes, labels).map { keyCode, label in
+        (keyCode, casePair(for: label))
+      }
+    })
+  }
+
+  private static func casePair(for character: Character) -> KeyPair {
+    let lower = singleCharacter(String(character).lowercased()) ?? character
+    let upper = singleCharacter(String(character).uppercased()) ?? character
+    return (lower, upper)
+  }
+
+  private static func singleCharacter(_ string: String) -> Character? {
+    let characters = Array(string)
+    guard characters.count == 1 else { return nil }
+    return characters[0]
   }
 
   private static func keys(for layout: KeyboardLayout) -> [UInt16: KeyPair] {

@@ -4,7 +4,7 @@ import SwiftUI
 struct NativeTypingInput: NSViewRepresentable {
     var focusRequest: Int
     var quickRestartKey: QuickRestartKey
-    var keyboardInputLayout: KeyboardInputLayout
+    var keyboardInputMapping: KeyboardInputMapping
     var keymapLayout: KeyboardLayout
     var oppositeShiftMode: OppositeShiftMode
     var mapsArrowKeysToInput: Bool
@@ -42,7 +42,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onDeleteWord = onDeleteWord
         view.onRestart = onRestart
         view.quickRestartKey = quickRestartKey
-        view.keyboardInputLayout = keyboardInputLayout
+        view.keyboardInputMapping = keyboardInputMapping
         view.keymapLayout = keymapLayout
         view.oppositeShiftMode = oppositeShiftMode
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
@@ -74,7 +74,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onBailoutArmed: () -> Void = {}
     var onBailout: () -> Void = {}
     var quickRestartKey: QuickRestartKey = .off
-    var keyboardInputLayout: KeyboardInputLayout = .system
+    var keyboardInputMapping: KeyboardInputMapping = .system
     var keymapLayout: KeyboardLayout = .ansiQwerty
     var oppositeShiftMode: OppositeShiftMode = .off
     var mapsArrowKeysToInput = false
@@ -188,7 +188,8 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         if oppositeShiftMode == .keymap,
            let logicalCharacter = event.characters?.first,
            let mappedKeyCode = KeyboardLayoutEmulator.keyCode(
-             for: logicalCharacter, layout: keymapLayout)
+             for: logicalCharacter, mapping: keyboardInputMapping)
+             ?? KeyboardLayoutEmulator.keyCode(for: logicalCharacter, layout: keymapLayout)
         {
             shiftComparisonKeyCode = mappedKeyCode
         } else {
@@ -200,7 +201,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             rightShiftPressed: rightShiftPressed)
         if let emulatedCharacter = KeyboardLayoutEmulator.character(
             forKeyCode: event.keyCode, modifierFlags: event.modifierFlags,
-            layout: keyboardInputLayout.emulatedLayout
+            mapping: keyboardInputMapping
         ) {
             onInsert(String(emulatedCharacter), forcesError)
             return

@@ -1446,6 +1446,22 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(CustomKeyboardGuideLayoutPolicy.make(
       name: "Broken", numberRow: "", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
     XCTAssertEqual(CustomKeyboardGuideLayoutPolicy.normalizedLayouts([layout, layout]).count, 1)
+
+    let mapping = KeyboardInputLayout.custom.inputMapping(for: layout)
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], mapping: mapping), "й")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], mapping: mapping), "Й")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 0, modifierFlags: [.shift], mapping: mapping), "Ф")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ы", mapping: mapping), 1)
+    XCTAssertNil(KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.option], mapping: mapping))
+    XCTAssertEqual(KeyboardInputLayout.custom.inputMapping(for: nil), .system)
+
+    let visualOnlyLayout = try XCTUnwrap(CustomKeyboardGuideLayoutPolicy.make(
+      name: "Visual only", numberRow: "12345678901234", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
+    XCTAssertFalse(visualOnlyLayout.supportsPhysicalInputMapping)
+    XCTAssertEqual(KeyboardInputLayout.custom.inputMapping(for: visualOnlyLayout), .system)
   }
 
   func testSystemKeyboardGuideBuildsCompleteShiftAwarePhysicalRows() throws {
@@ -1738,6 +1754,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testKeyboardInputLayoutSeparatesSystemInputFromGuideAndPreservesLegacyChoices() {
     XCTAssertNil(KeyboardInputLayout.system.emulatedLayout)
+    XCTAssertNil(KeyboardInputLayout.custom.emulatedLayout)
     XCTAssertEqual(KeyboardInputLayout.ansiQwerty.emulatedLayout, .ansiQwerty)
     XCTAssertEqual(KeyboardInputLayout.ansiDvorak.emulatedLayout, .ansiDvorak)
     XCTAssertEqual(KeyboardInputLayout.legacyDefault(for: .ansiQwerty), .system)
@@ -1746,6 +1763,35 @@ final class TypingEngineTests: XCTestCase {
       KeyboardLayoutEmulator.character(
         forKeyCode: 0, modifierFlags: [], layout: KeyboardInputLayout.ansiQwerty.emulatedLayout),
       "a")
+  }
+
+  @MainActor
+  func testCustomKeyboardInputMappingPersistsAndFallsBackWhenItsLayoutIsDeleted() throws {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    let layout = try XCTUnwrap(settings.addCustomKeyboardLayout(
+      name: "Cyrillic", numberRow: "123", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
+    settings.keyboardInputLayout = .custom
+
+    XCTAssertEqual(settings.selectedCustomKeyboardLayout, layout)
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 12, modifierFlags: [],
+        mapping: settings.keyboardInputLayout.inputMapping(for: settings.selectedCustomKeyboardLayout)),
+      "й")
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardInputLayout, .custom)
+    XCTAssertEqual(restored.selectedCustomKeyboardLayout, layout)
+
+    restored.deleteCustomKeyboardLayout(layout.id)
+    XCTAssertEqual(restored.keyboardInputLayout, .system)
+    XCTAssertNil(restored.selectedCustomKeyboardLayout)
+
+    XCTAssertEqual(AppSettingsSnapshot(keyboardInputLayout: .custom).keyboardInputLayout, .system)
   }
 
   @MainActor

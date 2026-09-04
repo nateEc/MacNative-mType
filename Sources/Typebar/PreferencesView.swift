@@ -768,7 +768,7 @@ struct PreferencesView: View {
                   .accessibilityLabel("删除 \(layout.name)")
                 }
               }
-              Text("每行可写 1–16 个 Unicode 可见字符，最多保存 \(CustomKeyboardGuideLayoutPolicy.maximumLayoutCount) 个。它只改变键盘提示；实际输入仍由 macOS 或“输入布局模拟”控制，Layout Fluid 继续只使用内置布局。")
+              Text("每行可写 1–16 个 Unicode 可见字符，最多保存 \(CustomKeyboardGuideLayoutPolicy.maximumLayoutCount) 个。它可只作为键盘提示，也可在下方选择“模拟自定义键盘图”；后者让字母按小写/Shift 大写映射，单字符符号不臆造 Shift 配对。Layout Fluid 继续只使用内置布局。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -777,6 +777,17 @@ struct PreferencesView: View {
             ForEach(KeyboardInputLayout.allCases) { layout in
               Text(layout.displayName).tag(layout)
             }
+          }
+          if settings.keyboardInputLayout == .custom {
+            Picker("模拟的自定义键盘图", selection: $settings.customKeyboardLayoutID) {
+              Text("选择要模拟的图").tag(nil as UUID?)
+              ForEach(settings.customKeyboardLayouts) { layout in
+                Text(layout.name).tag(layout.id as UUID?)
+              }
+            }
+            Text(customKeyboardInputMappingMessage)
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
           Text("默认使用 macOS 当前输入法；只有明确选择模拟时才会接管物理按键。")
             .font(.caption)
@@ -1751,6 +1762,16 @@ struct PreferencesView: View {
     customThemeColorfulExtraInput = .red
     customThemePrefersDark = true
     if !keepingMessage { customThemeMessage = nil }
+  }
+
+  private var customKeyboardInputMappingMessage: String {
+    guard let layout = settings.selectedCustomKeyboardLayout else {
+      return "尚未选择自定义键盘图，因此会安全回退到 macOS 当前输入法。"
+    }
+    guard layout.supportsPhysicalInputMapping else {
+      return "当前图各行最多只能为 13/13/11/10 个字符才能模拟；超出的图保留为视觉提示，输入会安全回退。"
+    }
+    return "字母标签会按小写/Shift 大写模拟；符号保持原样，Option、Control 与 Command 仍由 macOS 处理。"
   }
 
   private var testSectionVisible: Bool {

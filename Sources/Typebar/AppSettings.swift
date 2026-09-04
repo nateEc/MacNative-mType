@@ -727,6 +727,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.customKeyboardLayoutID = customKeyboardLayoutID.flatMap { id in
       self.customKeyboardLayouts.contains(where: { $0.id == id }) ? id : nil
     }
+    if self.keyboardInputLayout == .custom, self.customKeyboardLayoutID == nil {
+      self.keyboardInputLayout = .system
+    }
     self.keyboardGuideLayoutSource = keyboardGuideLayoutSource == .custom
       && self.customKeyboardLayoutID == nil ? .builtIn : keyboardGuideLayoutSource
     self.quickEnd = quickEnd
@@ -889,6 +892,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(UUID.self, forKey: .customKeyboardLayoutID)
     ).flatMap { id in
       customKeyboardLayouts.contains(where: { $0.id == id }) ? id : nil
+    }
+    if keyboardInputLayout == .custom, customKeyboardLayoutID == nil {
+      keyboardInputLayout = .system
     }
     keyboardGuideLayoutSource = try values.decodeIfPresent(
       KeyboardGuideLayoutSource.self, forKey: .keyboardGuideLayoutSource)
@@ -1143,6 +1149,10 @@ final class AppSettings {
   var keyboardGuideLayoutSource: KeyboardGuideLayoutSource = .builtIn { didSet { persist() } }
   var customKeyboardLayouts: [CustomKeyboardGuideLayout] = [] { didSet { persist() } }
   var customKeyboardLayoutID: UUID? { didSet { persist() } }
+  var selectedCustomKeyboardLayout: CustomKeyboardGuideLayout? {
+    guard let customKeyboardLayoutID else { return nil }
+    return customKeyboardLayouts.first(where: { $0.id == customKeyboardLayoutID })
+  }
   var layoutFluidLayouts: [KeyboardLayout] = LayoutFluidPolicy.defaultLayouts {
     didSet { defaults.set(layoutFluidLayouts.map(\.rawValue), forKey: layoutFluidStorageKey) }
   }
@@ -1739,6 +1749,7 @@ final class AppSettings {
     if customKeyboardLayoutID == id {
       customKeyboardLayoutID = nil
       if keyboardGuideLayoutSource == .custom { keyboardGuideLayoutSource = .builtIn }
+      if keyboardInputLayout == .custom { keyboardInputLayout = .system }
     }
   }
 

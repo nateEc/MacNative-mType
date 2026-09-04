@@ -46,6 +46,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
 /// input-source and IME control unless emulation is explicitly requested.
 enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case system
+  case custom
   case ansiQwerty
   case ansiDvorak
   case ansiColemak
@@ -65,12 +66,14 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   var id: Self { self }
 
   var displayName: String {
+    if self == .system { return "系统当前输入法（推荐）" }
+    if self == .custom { return "模拟自定义键盘图" }
     guard let emulatedLayout else { return "系统当前输入法（推荐）" }
     return "模拟 \(emulatedLayout.displayName)"
   }
 
   var emulatedLayout: KeyboardLayout? {
-    self == .system ? nil : KeyboardLayout(rawValue: rawValue)
+    self == .system || self == .custom ? nil : KeyboardLayout(rawValue: rawValue)
   }
 
   init(emulating layout: KeyboardLayout) {
@@ -83,6 +86,23 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   static func legacyDefault(for keyboardLayout: KeyboardLayout) -> Self {
     keyboardLayout == .ansiQwerty ? .system : .init(emulating: keyboardLayout)
   }
+
+  func inputMapping(for customLayout: CustomKeyboardGuideLayout?) -> KeyboardInputMapping {
+    if let layout = emulatedLayout { return .builtIn(layout) }
+    if self == .custom, let customLayout, customLayout.supportsPhysicalInputMapping {
+      return .custom(customLayout)
+    }
+    return .system
+  }
+}
+
+/// The effective native mapping used by the AppKit input bridge. Keeping this
+/// separate from the picker value makes a missing or deleted custom layout
+/// safely fall back to the active macOS input source.
+enum KeyboardInputMapping: Equatable {
+  case system
+  case builtIn(KeyboardLayout)
+  case custom(CustomKeyboardGuideLayout)
 }
 
 /// Chooses the source for a visual keyboard without changing text input.
@@ -133,10 +153,26 @@ struct CustomKeyboardGuideLayout: Codable, Equatable, Identifiable {
       }
     }
   }
+
+  /// A custom layout has one label per physical position. Letter labels follow
+  /// their Unicode lower/uppercase pair; single-case symbols keep the same
+  /// value with Shift rather than guessing a punctuation pairing.
+  var inputRows: [[Character]] {
+    [numberRow, topRow, homeRow, bottomRow].map(Array.init)
+  }
+
+  /// Visual rows may contain up to sixteen labels, while a standard physical
+  /// keyboard has fewer positions on the lower rows. Oversized rows remain
+  /// valid for display but cannot safely act as an input map.
+  var supportsPhysicalInputMapping: Bool {
+    zip(inputRows, CustomKeyboardGuideLayoutPolicy.physicalInputRowMaximums)
+      .allSatisfy { row, maximum in row.count <= maximum }
+  }
 }
 
 enum CustomKeyboardGuideLayoutPolicy {
   static let maximumLayoutCount = 20
+  static let physicalInputRowMaximums = [13, 13, 11, 10]
   private static let rowLengthRange = 1...16
   private static let nameLengthRange = 1...40
 
