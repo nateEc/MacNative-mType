@@ -932,6 +932,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "kannada-calm-step",
+      title: "ಶಾಂತ ಹೆಜ್ಜೆ",
+      text: "ಶಾಂತ ಹೆಜ್ಜೆ ಮುಂದಿನ ಕೆಲಸವನ್ನು ಸ್ಪಷ್ಟಗೊಳಿಸುತ್ತದೆ.",
+      language: .kannada,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "kannada-open-notebook",
+      title: "ತೆರೆದ ಟಿಪ್ಪಣಿಪುಸ್ತಕ",
+      text: "ತೆರೆದ ಟಿಪ್ಪಣಿಪುಸ್ತಕ ಪ್ರತಿಯೊಂದು ಕಠಿಣ ಪ್ರಶ್ನೆಗೆ ಉತ್ತರ ಕೊಡುವುದಿಲ್ಲ, ಆದರೆ ಪ್ರಶ್ನೆಯನ್ನು ಸಣ್ಣ ಭಾಗಗಳಾಗಿ ನೋಡುವ ಜಾಗವನ್ನು ಕೊಡುತ್ತದೆ.",
+      language: .kannada,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "kannada-small-work",
+      title: "ಸಣ್ಣ ಕೆಲಸ",
+      text: "ಪ್ರಗತಿ ಯಾವಾಗಲೂ ದೊಡ್ಡ ಕ್ಷಣದಲ್ಲಿ ಕಾಣಿಸುವುದಿಲ್ಲ. ಅದೇ ಪುಟವನ್ನು ಮತ್ತೆ ತೆರೆಯುವುದು, ಒಂದು ವಾಕ್ಯವನ್ನು ಸರಳಗೊಳಿಸುವುದು, ಸಣ್ಣ ತಪ್ಪನ್ನು ಸರಿಪಡಿಸುವುದು ಮತ್ತು ಮುಂದಿನ ಪ್ರಯತ್ನಕ್ಕೆ ಉಪಯುಕ್ತ ಟಿಪ್ಪಣಿ ಬರೆಯುವುದು ನಿಧಾನವಾಗಿ ವಿಶ್ವಾಸವನ್ನು ಕಟ್ಟುತ್ತದೆ.",
+      language: .kannada,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "kannada-long-table",
+      title: "ಉದ್ದನೆಯ ಮೇಜು",
+      text: "ಉದ್ದನೆಯ ಮೇಜು ಅಪೂರ್ಣ ಆಲೋಚನೆಗಳಿಗೂ ಜಾಗ ಕೊಡುತ್ತದೆ. ಒಂದು ಬದಿಯಲ್ಲಿ ಮೊದಲ ಕರಡು ಇರಬಹುದು, ಇನ್ನೊಂದು ಬದಿಯಲ್ಲಿ ಇನ್ನಷ್ಟು ಗಮನ ಬೇಕಾದ ವಾಕ್ಯ ಇರಬಹುದು, ಮಧ್ಯದಲ್ಲಿ ಸಣ್ಣ ನಿರ್ಧಾರ ಕಾಯುತ್ತಿರಬಹುದು. ಅಭ್ಯಾಸವೂ ಹೀಗೆ ಮುಂದೆ ಸಾಗುತ್ತದೆ: ಪ್ರತಿಯೊಂದು ಕಠಿಣ ಭಾಗವನ್ನು ಒಂದೇ ಪ್ರಯತ್ನದಲ್ಲಿ ಸರಿಪಡಿಸುವ ಅಗತ್ಯವಿಲ್ಲ. ಮರಳಿ ಬರುವ ಜಾಗ, ಮುಂದಿನ ಸ್ಪಷ್ಟ ಹೆಜ್ಜೆ ಮತ್ತು ಹಲವು ಪ್ರಯತ್ನಗಳ ನಂತರ ಯಾವುದು ಸುಲಭವಾಯಿತು ಎಂದು ನೋಡುವ ತಾಳ್ಮೆ ಇದ್ದರೆ ವೇಗವು ತಾನೇ ಬೆಳೆಯುತ್ತದೆ.",
+      language: .kannada,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
