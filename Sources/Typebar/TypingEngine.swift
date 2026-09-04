@@ -206,6 +206,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case urdu
   case tamil
   case hindi
+  case gujarati
   case greek
   case greeklish
   case dutch
@@ -3302,6 +3303,14 @@ enum StarterLexicon {
     "दूरी", "कदम", "धैर्य", "संतुलन",
   ]
 
+  // Typebar-authored Gujarati starter words exercise normal macOS composed-text
+  // input without importing a third-party or reference word list.
+  static let gujaratiWords = [
+    "બારી", "પતંગ", "નદી", "દીવો", "પર્ણ", "રંગ", "ચિત્ર", "ઘડિયાળ", "સફર", "સૂરજ",
+    "વાદળ", "પુલ", "કિનારો", "સંગીત", "પ્રશ્ન", "જવાબ", "કલ્પના", "નોંધપોથી", "પ્રયત્ન", "વિરામ",
+    "હિંમત", "ધીરજ", "સરળતા", "તાલ",
+  ]
+
   // Typebar-authored Danish starter words. The corpus deliberately includes
   // æ, ø and å for normal macOS composed-text input practice.
   static let danishWords = [
@@ -3536,6 +3545,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: hindiWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .gujarati:
+      return prompt(
+        tokens: count, lexicon: gujaratiWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .greek:
       return prompt(
         tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -3741,6 +3754,7 @@ enum StarterLexicon {
     case .urdu: (urduWords, ["،", "؛", "؟", "."])
     case .tamil: (tamilWords, [",", ".", "!", "?"])
     case .hindi: (hindiWords, [",", ".", "!", "?"])
+    case .gujarati: (gujaratiWords, [",", ".", "!", "?"])
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
@@ -3844,6 +3858,7 @@ extension TypingLanguage {
     case .urdu: StarterLexicon.urduWords
     case .tamil: StarterLexicon.tamilWords
     case .hindi: StarterLexicon.hindiWords
+    case .gujarati: StarterLexicon.gujaratiWords
     case .greek: StarterLexicon.greekWords
     case .greeklish: StarterLexicon.greeklishWords
     case .dutch: StarterLexicon.dutchWords
@@ -3888,7 +3903,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .gujarati, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -3953,6 +3968,7 @@ extension TypingLanguage {
     case .urdu: "اردو"
     case .tamil: "தமிழ்"
     case .hindi: "हिन्दी"
+    case .gujarati: "ગુજરાતી"
     case .greek: "Ελληνικά"
     case .greeklish: "Greeklish"
     case .dutch: "Nederlands"

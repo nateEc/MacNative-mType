@@ -287,6 +287,10 @@ final class HealthRouteTests: XCTestCase {
       .init(language: "hindi", text: "एक शांत कदम अगले काम को स्पष्ट बनाता है।", attribution: nil),
       accessToken: session.accessToken)
     XCTAssertEqual(hindiSubmission.status, "pending")
+    let gujaratiSubmission = try await store.submitQuote(
+      .init(language: "gujarati", text: "ધીમો વિરામ આગળનું વાક્ય વધુ સ્પષ્ટ બનાવે છે.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(gujaratiSubmission.status, "pending")
     let greekSubmission = try await store.submitQuote(
       .init(
         language: "greek", text: "Μια ήρεμη άσκηση κάνει την επόμενη κίνηση πιο καθαρή.",
@@ -443,7 +447,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(
       Set(mine.submissions.map(\.id)),
       Set([
-        submitted.id, spanishSubmission.id, germanSubmission.id, afrikaansSubmission.id, arabicSubmission.id, hebrewSubmission.id, persianSubmission.id, urduSubmission.id, tamilSubmission.id, hindiSubmission.id, greekSubmission.id, greeklishSubmission.id, dutchSubmission.id, filipinoSubmission.id, catalanSubmission.id, indonesianSubmission.id, malaySubmission.id, danishSubmission.id,
+        submitted.id, spanishSubmission.id, germanSubmission.id, afrikaansSubmission.id, arabicSubmission.id, hebrewSubmission.id, persianSubmission.id, urduSubmission.id, tamilSubmission.id, hindiSubmission.id, gujaratiSubmission.id, greekSubmission.id, greeklishSubmission.id, dutchSubmission.id, filipinoSubmission.id, catalanSubmission.id, indonesianSubmission.id, malaySubmission.id, danishSubmission.id,
         norwegianBokmalSubmission.id, norwegianNynorskSubmission.id, swedishSubmission.id, hungarianSubmission.id, czechSubmission.id, slovakSubmission.id, slovenianSubmission.id, croatianSubmission.id, serbianSubmission.id, serbianLatinSubmission.id, bulgarianSubmission.id, romanianSubmission.id, finnishSubmission.id, estonianSubmission.id, icelandicSubmission.id, frenchSubmission.id,
         italianSubmission.id, portugueseSubmission.id, traditionalChineseSubmission.id,
         russianSubmission.id, ukrainianSubmission.id, ukrainianLatinSubmission.id, hiraganaSubmission.id,
@@ -466,6 +470,7 @@ final class HealthRouteTests: XCTestCase {
     try await store.withdrawQuoteSubmission(urduSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(tamilSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(hindiSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(gujaratiSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(greekSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(greeklishSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(dutchSubmission.id, accessToken: session.accessToken)
@@ -2794,7 +2799,7 @@ final class HealthRouteTests: XCTestCase {
     }
 
     for (offset, language) in [
-      "traditionalChinese", "afrikaans", "arabic", "hebrew", "persian", "urdu", "tamil", "hindi", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "russian",
+      "traditionalChinese", "afrikaans", "arabic", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "russian",
       "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
       "turkish", "polish",
     ].enumerated() {

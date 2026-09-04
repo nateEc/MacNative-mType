@@ -159,6 +159,7 @@ enum LivePracticeContentService {
     case .urdu: return "ur"
     case .tamil: return "ta"
     case .hindi: return "hi"
+    case .gujarati: return "gu"
     case .greek, .greeklish: return "el"
     case .dutch: return "nl"
     case .filipino: return "tl"

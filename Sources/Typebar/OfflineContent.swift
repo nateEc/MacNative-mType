@@ -820,6 +820,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "gujarati-steady-pause",
+      title: "ધીમો વિરામ",
+      text: "ધીમો વિરામ આગળનું વાક્ય વધુ સ્પષ્ટ બનાવે છે.",
+      language: .gujarati,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "gujarati-open-notebook",
+      title: "ખુલેલી નોંધપોથી",
+      text: "ખુલેલી નોંધપોથી દરેક જવાબ તરત આપતી નથી, પરંતુ પ્રશ્નને નાના ભાગોમાં જોવાની જગ્યા આપે છે.",
+      language: .gujarati,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "gujarati-small-work",
+      title: "નાનું કામ",
+      text: "પ્રગતિ હંમેશા મોટા ક્ષણમાં દેખાતી નથી. એ જ પાનું ફરી ખોલવું, એક વાક્યને સાફ કરવું, નાની ભૂલ સુધારવી અને આગળના પ્રયત્ન માટે ટૂંકી નોંધ મૂકવી — આ કામોથી વિશ્વાસ ધીમે ધીમે બને છે.",
+      language: .gujarati,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "gujarati-long-table",
+      title: "લાંબી મેજ",
+      text: "લાંબી મેજ પર અનેક અધૂરાં વિચારોને પણ જગ્યા મળે છે. એક છેડે પ્રથમ ખાકો હોય છે, બીજા છેડે હજુ ધ્યાન માંગતું વાક્ય, અને વચ્ચે પસંદગીની રાહ જોતો નાનો પ્રશ્ન. અભ્યાસ પણ આવો જ છે: દરેક મુશ્કેલ ભાગને એક જ પ્રયત્નમાં પૂરો કરવો જરૂરી નથી. પાછા ફરવાની જગ્યા, આગળનું સ્પષ્ટ પગલું અને થોડા પ્રયાસો પછી શું સરળ બન્યું તે જોવાની ધીરજ હોય, તો ગતિ સ્વાભાવિક રીતે વધે છે.",
+      language: .gujarati,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
