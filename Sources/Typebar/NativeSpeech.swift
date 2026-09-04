@@ -29,6 +29,7 @@ extension TypingLanguage {
     case .dutch: "nl-NL"
     case .danish: "da-DK"
     case .norwegianBokmal: "nb-NO"
+    case .hungarian: "hu-HU"
     case .french: "fr-FR"
     case .italian: "it-IT"
     case .portuguese: "pt-PT"

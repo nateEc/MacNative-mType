@@ -624,6 +624,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "hungarian-kis-lepes",
+      title: "Kis lépés",
+      text: "Egy kis, nyugodt lépés tisztábbá teszi a következő feladatot.",
+      language: .hungarian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "hungarian-nyitott-jegyzet",
+      title: "Nyitott jegyzet",
+      text: "Egy nyitott jegyzetfüzet nem old meg nehéz kérdéseket önmagában, de segít világos részekre bontani őket, és figyelemmel visszatérni hozzájuk.",
+      language: .hungarian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "hungarian-nyugodt-munka",
+      title: "Nyugodt munka",
+      text: "A fejlődés nem mindig egy jól látható pillanatban érkezik. Ismétlődő cselekvésekből nő ki: ugyanannak az oldalnak a megnyitásából, egy mondat tisztábbá tételéből, egy hiba kijavításából és egy hasznos jegyzet hátrahagyásából a következő próbálkozáshoz. Idővel a nyugodt figyelem ismerősebbé teszi a nehéz részeket.",
+      language: .hungarian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "hungarian-hosszu-asztal",
+      title: "Hosszú asztal",
+      text: "Egy hosszú asztal azért hasznos, mert többféle munkának is helyet ad. Az egyik végén egy első vázlat lehet, a másikon egy mondat, amely még figyelmet igényel, középen pedig marad hely a következő kis döntésnek. A gyakorlás is így működik: nem azt kéri, hogy minden nehézséget egyszerre oldjunk meg, hanem hogy legyen hová visszatérni, lássuk a következő lépést, és legyen elég türelmünk észrevenni, mi válik könnyebbé néhány próbálkozás után.",
+      language: .hungarian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",
