@@ -736,6 +736,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "urdu-calm-step",
+      title: "پرسکون قدم",
+      text: "ایک پرسکون قدم اگلا کام واضح کر دیتا ہے۔",
+      language: .urdu,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "urdu-open-notebook",
+      title: "کھلی نوٹ بک",
+      text: "کھلی نوٹ بک ہر مشکل سوال حل نہیں کرتی، مگر سوال کو چھوٹے حصوں میں بانٹنے میں مدد دیتی ہے۔",
+      language: .urdu,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "urdu-small-work",
+      title: "چھوٹا کام",
+      text: "پیش رفت ہمیشہ ایک بڑے لمحے میں نظر نہیں آتی۔ وہ چھوٹے کاموں سے بنتی ہے: وہی صفحہ کھولنا، ایک جملہ واضح کرنا، ایک غلطی درست کرنا اور اگلی کوشش کے لیے مفید نوٹ رکھ دینا۔",
+      language: .urdu,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "urdu-long-table",
+      title: "لمبی میز",
+      text: "ایک لمبی میز مختلف کاموں کے لیے جگہ بناتی ہے۔ اس کے ایک سرے پر پہلا مسودہ ہو سکتا ہے اور دوسرے سرے پر وہ جملہ جسے ابھی توجہ چاہیے؛ ان دونوں کے درمیان ایک چھوٹا فیصلہ منتظر رہتا ہے۔ مشق بھی اسی طرح آگے بڑھتی ہے: ہمیں ہر مشکل حصے کو ایک ہی بار میں حل کرنے کی ضرورت نہیں۔ بس واپس آنے کی جگہ، اگلا واضح قدم اور اتنا صبر چاہیے کہ چند کوششوں کے بعد نظر آ سکے کہ کیا آسان ہو گیا ہے۔",
+      language: .urdu,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
