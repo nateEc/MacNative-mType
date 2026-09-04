@@ -1016,6 +1016,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "sanskrit-calm-step",
+      title: "शान्तं पदम्",
+      text: "शान्तं पदम् अग्रिमं कार्यं स्पष्टं करोति।",
+      language: .sanskrit,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "sanskrit-open-notebook",
+      title: "उद्घाटितं पुस्तकम्",
+      text: "उद्घाटितं लेखनपुस्तकम् सर्वेषां कठिनप्रश्नानाम् उत्तरं न ददाति, किन्तु प्रश्नं लघुभागेषु द्रष्टुं स्थानं ददाति।",
+      language: .sanskrit,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "sanskrit-small-work",
+      title: "लघु कार्यम्",
+      text: "प्रगतिः सर्वदा महति क्षणे न दृश्यते। पुनः तत् पत्रं उद्घाटयितुम्, एकं वाक्यं सरलम् कर्तुम्, लघुदोषं शोधयितुम्, पुनः प्रयासाय उपयोगिनीं टिप्पणीं लिखितुम् च धैर्येण विश्वासः वर्धते।",
+      language: .sanskrit,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "sanskrit-long-table",
+      title: "दीर्घम् आसनम्",
+      text: "दीर्घे पीठे अपूर्णविचारेभ्यः अपि स्थानम् अस्ति। एकस्मिन् पार्श्वे प्रथमः आलेखः भवेत्, अन्यस्मिन् अधिकं ध्यानं याचमानं वाक्यम्, मध्ये च लघु निर्णयः प्रतीक्षते। अभ्यासः अपि एवं प्रवर्तते: प्रत्येकं कठिनभागं एकेनैव प्रयत्नेन समाधातुं न आवश्यकम्। पुनरागमनाय स्थानम्, अग्रिमं स्पष्टं पदम्, बहुषु प्रयत्नेषु किं सुकरम् अभवत् इति द्रष्टुं धैर्यं च यदि स्यात्, तर्हि वेगः स्वयमेव वर्धते।",
+      language: .sanskrit,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
