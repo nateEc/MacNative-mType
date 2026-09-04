@@ -3263,6 +3263,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.afrikaansWords,
       StarterLexicon.tamilWords,
+      StarterLexicon.hindiWords,
       StarterLexicon.greekWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.filipinoWords, StarterLexicon.catalanWords,
       StarterLexicon.indonesianWords, StarterLexicon.malayWords, StarterLexicon.danishWords,
@@ -3279,7 +3280,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 42)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 43)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3445,6 +3446,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .tamil).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .tamil), "ta")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .hindi).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hindi), "hi")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -3570,6 +3574,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(tamilEncyclopedia.text, "சாளரம் காலை ஒளியை உள்ளே கொண்டு வருகிறது")
     XCTAssertEqual(
       tamilEncyclopedia.prompt(for: .words(3, language: .tamil)), "சாளரம் காலை ஒளியை")
+    let hindiData = Data("""
+    {"title":"खिड़की","extract":"खिड़की सुबह की रोशनी भीतर लाती है।"}
+    """.utf8)
+    let hindiEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: hindiData, language: .hindi))
+    XCTAssertEqual(hindiEncyclopedia.text, "खिड़की सुबह की रोशनी भीतर लाती है")
+    XCTAssertEqual(
+      hindiEncyclopedia.prompt(for: .words(3, language: .hindi)), "खिड़की सुबह की")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4174,6 +4186,7 @@ final class TypingEngineTests: XCTestCase {
       (.persian, StarterLexicon.persianWords),
       (.urdu, StarterLexicon.urduWords),
       (.tamil, StarterLexicon.tamilWords),
+      (.hindi, StarterLexicon.hindiWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4268,6 +4281,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.tamil.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tamil))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.tamil))
+    XCTAssertTrue(StarterLexicon.hindiWords.contains("खिड़की"))
+    XCTAssertFalse(TypingLanguage.hindi.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.hindi))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.hindi))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4348,6 +4365,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")
     XCTAssertEqual(TypingLanguage.urdu.speechLocaleIdentifier, "ur-PK")
     XCTAssertEqual(TypingLanguage.tamil.speechLocaleIdentifier, "ta-IN")
+    XCTAssertEqual(TypingLanguage.hindi.speechLocaleIdentifier, "hi-IN")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")
@@ -4754,7 +4772,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .afrikaans, .arabic, .hebrew, .persian, .urdu, .tamil, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+      .english, .spanish, .german, .afrikaans, .arabic, .hebrew, .persian, .urdu, .tamil, .hindi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,

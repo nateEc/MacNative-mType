@@ -792,6 +792,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "hindi-calm-step",
+      title: "शांत कदम",
+      text: "एक शांत कदम अगले काम को स्पष्ट बनाता है।",
+      language: .hindi,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "hindi-open-notebook",
+      title: "खुली नोटबुक",
+      text: "खुली नोटबुक हर कठिन प्रश्न का उत्तर नहीं देती, लेकिन प्रश्न को छोटे भागों में बाँटने में मदद करती है।",
+      language: .hindi,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "hindi-small-work",
+      title: "छोटा काम",
+      text: "प्रगति हमेशा किसी बड़े क्षण में दिखाई नहीं देती। वह छोटे कामों से बनती है: उसी पन्ने को खोलना, एक वाक्य को स्पष्ट करना, एक गलती को सुधारना और अगले प्रयास के लिए उपयोगी टिप्पणी छोड़ना।",
+      language: .hindi,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "hindi-long-table",
+      title: "लंबी मेज़",
+      text: "लंबी मेज़ अलग-अलग कामों के लिए जगह बनाती है। उसके एक सिरे पर पहला मसौदा हो सकता है और दूसरे सिरे पर वह वाक्य जिसे अभी ध्यान चाहिए; इन दोनों के बीच एक छोटा निर्णय प्रतीक्षा करता है। अभ्यास भी इसी तरह आगे बढ़ता है: हर कठिन हिस्से को एक ही बार में हल करना आवश्यक नहीं है। वापस आने की जगह, अगला स्पष्ट कदम और इतना धैर्य पर्याप्त है कि कुछ प्रयासों के बाद दिख सके कि क्या आसान हो गया है।",
+      language: .hindi,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
