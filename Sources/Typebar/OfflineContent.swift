@@ -708,6 +708,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "czech-maly-krok",
+      title: "Malý krok",
+      text: "Malý klidný krok může zpřesnit příští úkol.",
+      language: .czech,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "czech-otevreny-zapis",
+      title: "Otevřený zápis",
+      text: "Otevřený zápisník nevyřeší těžkou otázku sám, ale pomůže rozdělit myšlenky a vrátit se k nim pozorněji.",
+      language: .czech,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "czech-ticha-prace",
+      title: "Tichá práce",
+      text: "Pokrok se často neukáže v jediném hlasitém okamžiku. Vzniká, když otevřeme stejnou stránku, opravíme jednu chybu, přečteme si poznámku a vybereme další malý krok. Takové opakování dává složitým věcem známější tvar a uvolňuje místo pro soustředění.",
+      language: .czech,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "czech-dlouhy-stul",
+      title: "Dlouhý stůl",
+      text: "Dlouhý stůl je užitečný, protože nechává místo pro různé druhy práce. Na jednom konci může ležet první náčrt, na druhém věta, která ještě potřebuje péči, a uprostřed zůstane volný prostor pro další malé rozhodnutí. Cvičení funguje podobně. Nežádá, abychom vyřešili všechno najednou, ale abychom měli kam se vrátit, viděli další krok a našli dost trpělivosti všimnout si toho, co je po několika pokusech snazší.",
+      language: .czech,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hiragana-small-practice",
       title: "ちいさなれんしゅう",
       text: "ちいさなれんしゅうをかさねると、つぎのいっぽがすこしみえやすくなる。",

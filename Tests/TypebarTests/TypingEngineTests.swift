@@ -3077,7 +3077,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.greekWords,
       StarterLexicon.dutchWords, StarterLexicon.danishWords, StarterLexicon.norwegianBokmalWords,
       StarterLexicon.swedishWords,
-      StarterLexicon.hungarianWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
+      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
@@ -3231,6 +3231,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .hungarian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hungarian), "hu")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .czech).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .czech), "cs")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .ukrainianLatin).with(modifiers: [.referenceStream])))
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
@@ -3872,6 +3875,7 @@ final class TypingEngineTests: XCTestCase {
       (.norwegianBokmal, StarterLexicon.norwegianBokmalWords),
       (.swedish, StarterLexicon.swedishWords),
       (.hungarian, StarterLexicon.hungarianWords),
+      (.czech, StarterLexicon.czechWords),
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
       (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
       (.ukrainian, StarterLexicon.ukrainianWords),
@@ -3920,6 +3924,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.swedishWords.contains("äng"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.hungarian))
     XCTAssertTrue(StarterLexicon.hungarianWords.contains("tűz"))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.czech))
+    XCTAssertTrue(StarterLexicon.czechWords.contains("řeka"))
   }
 
   func testLazyLatinModifierNormalizesAccentsLigaturesAndGeneratedPrompts() {
@@ -3941,6 +3947,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.norwegianBokmal.speechLocaleIdentifier, "nb-NO")
     XCTAssertEqual(TypingLanguage.swedish.speechLocaleIdentifier, "sv-SE")
     XCTAssertEqual(TypingLanguage.hungarian.speechLocaleIdentifier, "hu-HU")
+    XCTAssertEqual(TypingLanguage.czech.speechLocaleIdentifier, "cs-CZ")
     XCTAssertEqual(TypingLanguage.french.speechLocaleIdentifier, "fr-FR")
     XCTAssertEqual(TypingLanguage.italian.speechLocaleIdentifier, "it-IT")
     XCTAssertEqual(TypingLanguage.portuguese.speechLocaleIdentifier, "pt-PT")
@@ -4088,6 +4095,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testOwnedPracticeWordsShareTheLocalFilterAndWeakSpotCorpus() {
     XCTAssertEqual(TypingLanguage.hungarian.ownedPracticeWords(), StarterLexicon.hungarianWords)
+    XCTAssertEqual(TypingLanguage.czech.ownedPracticeWords(), StarterLexicon.czechWords)
     XCTAssertEqual(TypingLanguage.swedish.ownedPracticeWords(), StarterLexicon.swedishWords)
     XCTAssertEqual(TypingLanguage.greek.ownedPracticeWords(), StarterLexicon.greekWords)
     XCTAssertEqual(TypingLanguage.japaneseKatakana.ownedPracticeWords(), StarterLexicon.japaneseKatakanaWords)
@@ -4302,7 +4310,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession() {
     let languages: [TypingLanguage] = [
-      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
+      .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .french,
       .italian, .portuguese,
       .simplifiedChinese,
       .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,

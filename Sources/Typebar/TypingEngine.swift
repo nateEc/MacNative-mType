@@ -205,6 +205,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case norwegianBokmal
   case swedish
   case hungarian
+  case czech
   case french
   case italian
   case portuguese
@@ -3176,6 +3177,15 @@ enum StarterLexicon {
     "kis", "idő", "ősz", "tűz", "kör", "út",
   ]
 
+  // Typebar-authored Czech starter words exercise the language's accented
+  // characters without importing a third-party word list.
+  static let czechWords = [
+    "ráno", "okno", "papír", "břeh", "vítr", "cvičení", "pozornost", "klid",
+    "jasně", "jezero", "ulice", "stůl", "světlo", "cesta", "trpělivost", "chvíle",
+    "město", "déšť", "ticho", "směr", "hvězda", "poznámka", "zahrada", "dech",
+    "řeka", "čaj", "klíč", "židle", "úkol", "kůra",
+  ]
+
   // Typebar-authored French and Italian starter words. These compact lists
   // deliberately include common accented characters for native text input.
   static let frenchWords = [
@@ -3255,6 +3265,10 @@ enum StarterLexicon {
     case .hungarian:
       return prompt(
         tokens: count, lexicon: hungarianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .czech:
+      return prompt(
+        tokens: count, lexicon: czechWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .french:
       return prompt(
@@ -3368,6 +3382,7 @@ enum StarterLexicon {
     case .norwegianBokmal: (norwegianBokmalWords, [",", ".", "!", "?"])
     case .swedish: (swedishWords, [",", ".", "!", "?"])
     case .hungarian: (hungarianWords, [",", ".", "!", "?"])
+    case .czech: (czechWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
@@ -3447,6 +3462,7 @@ extension TypingLanguage {
     case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
     case .swedish: StarterLexicon.swedishWords
     case .hungarian: StarterLexicon.hungarianWords
+    case .czech: StarterLexicon.czechWords
     case .french: StarterLexicon.frenchWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
@@ -3468,7 +3484,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .french,
+    .english, .spanish, .german, .greek, .dutch, .danish, .norwegianBokmal, .swedish, .hungarian, .czech, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -3525,6 +3541,7 @@ extension TypingLanguage {
     case .norwegianBokmal: "Norsk bokmål"
     case .swedish: "Svenska"
     case .hungarian: "Magyar"
+    case .czech: "Čeština"
     case .french: "Français"
     case .italian: "Italiano"
     case .portuguese: "Português"

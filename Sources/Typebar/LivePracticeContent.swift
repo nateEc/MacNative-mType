@@ -158,6 +158,7 @@ enum LivePracticeContentService {
     case .norwegianBokmal: return "no"
     case .swedish: return "sv"
     case .hungarian: return "hu"
+    case .czech: return "cs"
     case .french: return "fr"
     case .italian: return "it"
     case .portuguese: return "pt"

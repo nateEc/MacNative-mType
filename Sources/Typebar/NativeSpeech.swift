@@ -32,6 +32,7 @@ extension TypingLanguage {
     case .norwegianBokmal: "nb-NO"
     case .swedish: "sv-SE"
     case .hungarian: "hu-HU"
+    case .czech: "cs-CZ"
     case .french: "fr-FR"
     case .italian: "it-IT"
     case .portuguese: "pt-PT"
