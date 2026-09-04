@@ -2,6 +2,9 @@ import Foundation
 import Vapor
 
 public enum QuoteReportReason: String, CaseIterable, Content, Equatable {
+    case grammaticalError
+    case duplicateQuote
+    case lowQualityContent
     case copyright
     case abusiveContent
     case inaccurateAttribution

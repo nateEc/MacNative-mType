@@ -419,10 +419,14 @@ struct RemoteQuoteRatingResponse: Codable, Sendable {
 }
 
 enum RemoteQuoteReportReason: String, CaseIterable, Codable, Sendable {
+    case grammaticalError, duplicateQuote, lowQualityContent
     case copyright, abusiveContent, inaccurateAttribution, other
 
     var displayName: String {
         switch self {
+        case .grammaticalError: "语法错误"
+        case .duplicateQuote: "重复引语"
+        case .lowQualityContent: "低质量内容"
         case .copyright: "版权或授权问题"
         case .abusiveContent: "不当内容"
         case .inaccurateAttribution: "署名或来源不准确"

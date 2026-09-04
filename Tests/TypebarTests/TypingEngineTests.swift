@@ -4465,6 +4465,16 @@ final class TypingEngineTests: XCTestCase {
       RemoteQuoteModerationStatus.allCases.map(\.rawValue),
       ["pending", "approved", "rejected"]
     )
+    XCTAssertEqual(
+      RemoteQuoteReportReason.allCases.map(\.rawValue),
+      [
+        "grammaticalError", "duplicateQuote", "lowQualityContent", "copyright", "abusiveContent",
+        "inaccurateAttribution", "other",
+      ]
+    )
+    XCTAssertEqual(RemoteQuoteReportReason.grammaticalError.displayName, "语法错误")
+    XCTAssertEqual(RemoteQuoteReportReason.duplicateQuote.displayName, "重复引语")
+    XCTAssertEqual(RemoteQuoteReportReason.lowQualityContent.displayName, "低质量内容")
     let report = RemoteModerationQuoteReport(
       reason: .inaccurateAttribution,
       note: "Needs source review.",

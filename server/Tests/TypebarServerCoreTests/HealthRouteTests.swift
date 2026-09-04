@@ -538,12 +538,19 @@ final class HealthRouteTests: XCTestCase {
         quoteID: submitted.id, reason: .inaccurateAttribution,
         note: "The stated source needs review."), accessToken: reporter.accessToken)
     XCTAssertNotEqual(report.id, UUID())
+    let grammaticalReport = try await store.submitQuoteReport(
+      .init(quoteID: submitted.id, reason: .grammaticalError, note: "A verb is missing."),
+      accessToken: reporter.accessToken)
+    XCTAssertNotEqual(grammaticalReport.id, report.id)
     let moderationQueue = try await store.moderationQuotes(status: "approved", limit: 10)
     XCTAssertEqual(moderationQueue.quotes.count, 1)
     XCTAssertEqual(moderationQueue.quotes.first?.id, submitted.id)
     XCTAssertEqual(
       moderationQueue.quotes.first?.reports,
       [
+        .init(
+          reason: .grammaticalError, note: "A verb is missing.",
+          submittedAt: grammaticalReport.submittedAt),
         .init(
           reason: .inaccurateAttribution, note: "The stated source needs review.",
           submittedAt: report.submittedAt)
