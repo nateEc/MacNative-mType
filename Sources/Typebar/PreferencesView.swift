@@ -55,6 +55,12 @@ struct PreferencesView: View {
   @State private var customThemePanel = Color(red: 0.19, green: 0.22, blue: 0.30)
   @State private var customThemeAccent = Color(red: 0.95, green: 0.57, blue: 0.20)
   @State private var customThemePrefersDark = true
+  @State private var customKeyboardLayoutName = ""
+  @State private var customKeyboardNumberRow = "1234567890-="
+  @State private var customKeyboardTopRow = "QWERTYUIOP[]"
+  @State private var customKeyboardHomeRow = "ASDFGHJKL;'"
+  @State private var customKeyboardBottomRow = "ZXCVBNM,./"
+  @State private var customKeyboardLayoutMessage: String?
   @State private var searchQuery = ""
   @State private var customBackgroundURLDraft = ""
   @State private var customBackgroundMessage: String?
@@ -685,10 +691,65 @@ struct PreferencesView: View {
               .font(.caption)
               .foregroundStyle(.secondary)
           }
-          Picker("键盘布局", selection: $settings.keyboardLayout) {
+          Picker("内置键盘布局", selection: $settings.keyboardLayout) {
             ForEach(KeyboardLayout.allCases) { layout in
               Text(layout.displayName).tag(layout)
             }
+          }
+          Picker("自定义键盘图", selection: $settings.customKeyboardLayoutID) {
+            Text("使用内置布局").tag(nil as UUID?)
+            ForEach(settings.customKeyboardLayouts) { layout in
+              Text(layout.name).tag(layout.id as UUID?)
+            }
+          }
+          VStack(alignment: .leading, spacing: 8) {
+            Text("自定义键盘图")
+              .font(.subheadline.weight(.medium))
+            TextField("名称", text: $customKeyboardLayoutName)
+            TextField("数字行", text: $customKeyboardNumberRow)
+            TextField("顶行", text: $customKeyboardTopRow)
+            TextField("主行", text: $customKeyboardHomeRow)
+            TextField("底行", text: $customKeyboardBottomRow)
+            Button("添加并应用", systemImage: "plus") {
+              guard let layout = settings.addCustomKeyboardLayout(
+                name: customKeyboardLayoutName,
+                numberRow: customKeyboardNumberRow,
+                topRow: customKeyboardTopRow,
+                homeRow: customKeyboardHomeRow,
+                bottomRow: customKeyboardBottomRow
+              ) else {
+                customKeyboardLayoutMessage = "名称需为 1–40 个字符，四行各需 1–16 个可见字符且名称不能重复。"
+                return
+              }
+              customKeyboardLayoutName = ""
+              customKeyboardLayoutMessage = "已应用“\(layout.name)”。"
+            }
+            .disabled(
+              settings.customKeyboardLayouts.count
+                >= CustomKeyboardGuideLayoutPolicy.maximumLayoutCount)
+            if let customKeyboardLayoutMessage {
+              Text(customKeyboardLayoutMessage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            ForEach(settings.customKeyboardLayouts) { layout in
+              HStack {
+                Text(layout.name)
+                Spacer()
+                Button("使用") { settings.selectCustomKeyboardLayout(layout.id) }
+                  .buttonStyle(.borderless)
+                Button(role: .destructive) {
+                  settings.deleteCustomKeyboardLayout(layout.id)
+                } label: {
+                  Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("删除 \(layout.name)")
+              }
+            }
+            Text("每行可写 1–16 个 Unicode 可见字符，最多保存 \(CustomKeyboardGuideLayoutPolicy.maximumLayoutCount) 个。它只改变键盘提示；实际输入仍由 macOS 或“输入布局模拟”控制，Layout Fluid 继续只使用内置布局。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
           Picker("输入布局模拟", selection: $settings.keyboardInputLayout) {
             ForEach(KeyboardInputLayout.allCases) { layout in

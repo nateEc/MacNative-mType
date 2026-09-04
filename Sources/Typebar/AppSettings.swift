@@ -511,6 +511,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var keyboardGuideStyle: KeyboardGuideStyle = .staggered
   var keyboardLayout: KeyboardLayout = .ansiQwerty
   var keyboardInputLayout: KeyboardInputLayout = .system
+  var customKeyboardLayouts: [CustomKeyboardGuideLayout] = []
+  var customKeyboardLayoutID: UUID?
   var quickEnd = false
   var quickRestartKey: QuickRestartKey = .off
   var showKeyTips = true
@@ -612,6 +614,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     keyboardGuideStyle: KeyboardGuideStyle = .staggered,
     keyboardLayout: KeyboardLayout = .ansiQwerty,
     keyboardInputLayout: KeyboardInputLayout = .system,
+    customKeyboardLayouts: [CustomKeyboardGuideLayout] = [],
+    customKeyboardLayoutID: UUID? = nil,
     quickEnd: Bool = false,
     quickRestartKey: QuickRestartKey = .off,
     showKeyTips: Bool = true,
@@ -716,6 +720,11 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.keyboardGuideStyle = keyboardGuideStyle
     self.keyboardLayout = keyboardLayout
     self.keyboardInputLayout = keyboardInputLayout
+    self.customKeyboardLayouts = CustomKeyboardGuideLayoutPolicy.normalizedLayouts(
+      customKeyboardLayouts)
+    self.customKeyboardLayoutID = customKeyboardLayoutID.flatMap { id in
+      self.customKeyboardLayouts.contains(where: { $0.id == id }) ? id : nil
+    }
     self.quickEnd = quickEnd
     self.quickRestartKey = quickRestartKey
     self.showKeyTips = showKeyTips
@@ -802,7 +811,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       hideExtraLetters, blindMode, fontSize,
       practiceFont, installedPracticeFontName, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
-      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, keyboardInputLayout, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
+      favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, keyboardInputLayout, customKeyboardLayouts, customKeyboardLayoutID, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
       randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, typingPowerMode, englishVariant,
       favoriteQuoteIDs, activeResultTags, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
@@ -869,6 +878,14 @@ struct AppSettingsSnapshot: Codable, Equatable {
     keyboardInputLayout = try values.decodeIfPresent(
       KeyboardInputLayout.self, forKey: .keyboardInputLayout)
       ?? KeyboardInputLayout.legacyDefault(for: keyboardLayout)
+    customKeyboardLayouts = CustomKeyboardGuideLayoutPolicy.normalizedLayouts(
+      try values.decodeIfPresent(
+        [CustomKeyboardGuideLayout].self, forKey: .customKeyboardLayouts) ?? [])
+    customKeyboardLayoutID = (
+      try values.decodeIfPresent(UUID.self, forKey: .customKeyboardLayoutID)
+    ).flatMap { id in
+      customKeyboardLayouts.contains(where: { $0.id == id }) ? id : nil
+    }
     quickEnd = try values.decodeIfPresent(Bool.self, forKey: .quickEnd) ?? false
     quickRestartKey = try values.decodeIfPresent(QuickRestartKey.self, forKey: .quickRestartKey) ?? .off
     showKeyTips = try values.decodeIfPresent(Bool.self, forKey: .showKeyTips) ?? true
@@ -1113,6 +1130,8 @@ final class AppSettings {
   var keyboardGuideStyle: KeyboardGuideStyle = .staggered { didSet { persist() } }
   var keyboardLayout: KeyboardLayout = .ansiQwerty { didSet { persist() } }
   var keyboardInputLayout: KeyboardInputLayout = .system { didSet { persist() } }
+  var customKeyboardLayouts: [CustomKeyboardGuideLayout] = [] { didSet { persist() } }
+  var customKeyboardLayoutID: UUID? { didSet { persist() } }
   var layoutFluidLayouts: [KeyboardLayout] = LayoutFluidPolicy.defaultLayouts {
     didSet { defaults.set(layoutFluidLayouts.map(\.rawValue), forKey: layoutFluidStorageKey) }
   }
@@ -1325,6 +1344,8 @@ final class AppSettings {
     keyboardGuideStyle = snapshot.keyboardGuideStyle
     keyboardLayout = snapshot.keyboardLayout
     keyboardInputLayout = snapshot.keyboardInputLayout
+    customKeyboardLayouts = snapshot.customKeyboardLayouts
+    customKeyboardLayoutID = snapshot.customKeyboardLayoutID
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
     showKeyTips = snapshot.showKeyTips
@@ -1460,6 +1481,8 @@ final class AppSettings {
       keyboardGuideStyle: keyboardGuideStyle,
       keyboardLayout: keyboardLayout,
       keyboardInputLayout: keyboardInputLayout,
+      customKeyboardLayouts: customKeyboardLayouts,
+      customKeyboardLayoutID: customKeyboardLayoutID,
       quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       showKeyTips: showKeyTips,
@@ -1543,6 +1566,8 @@ final class AppSettings {
     keyboardGuideStyle = .staggered
     keyboardLayout = .ansiQwerty
     keyboardInputLayout = .system
+    customKeyboardLayouts = []
+    customKeyboardLayoutID = nil
     layoutFluidLayouts = LayoutFluidPolicy.defaultLayouts
     quickEnd = false
     quickRestartKey = .off
@@ -1661,6 +1686,43 @@ final class AppSettings {
     layoutFluidLayouts = LayoutFluidPolicy.normalizedLayouts(layouts)
   }
 
+  @discardableResult
+  func addCustomKeyboardLayout(
+    name: String,
+    numberRow: String,
+    topRow: String,
+    homeRow: String,
+    bottomRow: String
+  ) -> CustomKeyboardGuideLayout? {
+    guard customKeyboardLayouts.count < CustomKeyboardGuideLayoutPolicy.maximumLayoutCount,
+      let layout = CustomKeyboardGuideLayoutPolicy.make(
+        name: name, numberRow: numberRow, topRow: topRow, homeRow: homeRow,
+        bottomRow: bottomRow),
+      !customKeyboardLayouts.contains(where: {
+        CustomKeyboardGuideLayoutPolicy.normalizedName($0.name)
+          == CustomKeyboardGuideLayoutPolicy.normalizedName(layout.name)
+      })
+    else { return nil }
+    customKeyboardLayouts.append(layout)
+    customKeyboardLayoutID = layout.id
+    return layout
+  }
+
+  func selectCustomKeyboardLayout(_ id: UUID?) {
+    guard let id else {
+      customKeyboardLayoutID = nil
+      return
+    }
+    guard customKeyboardLayouts.contains(where: { $0.id == id }) else { return }
+    customKeyboardLayoutID = id
+  }
+
+  func deleteCustomKeyboardLayout(_ id: UUID) {
+    guard customKeyboardLayouts.contains(where: { $0.id == id }) else { return }
+    customKeyboardLayouts.removeAll(where: { $0.id == id })
+    if customKeyboardLayoutID == id { customKeyboardLayoutID = nil }
+  }
+
   func apply(_ snapshot: AppSettingsSnapshot) {
     difficulty = snapshot.difficulty
     strictSpace = snapshot.strictSpace
@@ -1686,6 +1748,8 @@ final class AppSettings {
     keyboardGuideStyle = snapshot.keyboardGuideStyle
     keyboardLayout = snapshot.keyboardLayout
     keyboardInputLayout = snapshot.keyboardInputLayout
+    customKeyboardLayouts = snapshot.customKeyboardLayouts
+    customKeyboardLayoutID = snapshot.customKeyboardLayoutID
     quickEnd = snapshot.quickEnd
     quickRestartKey = snapshot.quickRestartKey
     showKeyTips = snapshot.showKeyTips
@@ -1940,6 +2004,8 @@ final class AppSettings {
       keyboardGuideStyle: keyboardGuideStyle,
       keyboardLayout: keyboardLayout,
       keyboardInputLayout: keyboardInputLayout,
+      customKeyboardLayouts: customKeyboardLayouts,
+      customKeyboardLayoutID: customKeyboardLayoutID,
       quickEnd: quickEnd,
       quickRestartKey: quickRestartKey,
       showKeyTips: showKeyTips,

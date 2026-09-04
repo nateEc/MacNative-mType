@@ -1425,6 +1425,29 @@ final class TypingEngineTests: XCTestCase {
     ])
   }
 
+  func testCustomKeyboardGuideLayoutsNormalizeUnicodeRowsAndHighlightKeys() throws {
+    let layout = try XCTUnwrap(CustomKeyboardGuideLayoutPolicy.make(
+      name: "  Cyrillic  ", numberRow: "123", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
+    XCTAssertEqual(layout.name, "Cyrillic")
+    XCTAssertEqual(layout.guideRows[1].map(\.label), ["Й", "Ц", "У"])
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ы", rows: layout.guideRows),
+      layout.guideRows[2][1].id)
+    XCTAssertEqual(
+      KeyboardGuideModel.displayRows(
+        for: layout.guideRows, keysMode: .minimal, mode: .staticGuide, nextCharacter: nil).count,
+      3)
+    XCTAssertEqual(
+      KeyboardGuideModel.displayRows(
+        for: layout.guideRows, keysMode: .minimal, mode: .next, nextCharacter: "1").count,
+      4)
+    XCTAssertNil(CustomKeyboardGuideLayoutPolicy.make(
+      name: "", numberRow: "123", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
+    XCTAssertNil(CustomKeyboardGuideLayoutPolicy.make(
+      name: "Broken", numberRow: "", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
+    XCTAssertEqual(CustomKeyboardGuideLayoutPolicy.normalizedLayouts([layout, layout]).count, 1)
+  }
+
   func testKeyboardGuideStylesCoverReferenceChoicesWithNativeGeometries() {
     XCTAssertEqual(KeyboardGuideStyle.allCases.map(\.rawValue), [
       "staggered", "alice", "matrix", "split", "split_matrix", "steno", "steno_matrix",
@@ -4606,6 +4629,8 @@ final class TypingEngineTests: XCTestCase {
     settings.saveCompletedResults = false
     settings.keyboardLayout = .ansiDvorak
     settings.keyboardInputLayout = .swissGerman
+    let customKeyboard = try XCTUnwrap(settings.addCustomKeyboardLayout(
+      name: "Cyrillic", numberRow: "123", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
     settings.layoutFluidLayouts = [.ansiWorkman, .frenchAzerty, .ansiQwerty]
     settings.quickEnd = true
     settings.quickRestartKey = .enter
@@ -4701,6 +4726,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardGuideKeysMode, .full)
     XCTAssertEqual(exportedSnapshot.keyboardGuideStyle, .alice)
     XCTAssertEqual(exportedSnapshot.keyboardInputLayout, .swissGerman)
+    XCTAssertEqual(exportedSnapshot.customKeyboardLayouts, [customKeyboard])
+    XCTAssertEqual(exportedSnapshot.customKeyboardLayoutID, customKeyboard.id)
     XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
     XCTAssertFalse(exportedSnapshot.showKeyTips)
     XCTAssertEqual(exportedSnapshot.commandPaletteListMode, .grouped)
@@ -4741,6 +4768,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(restored.saveCompletedResults)
     XCTAssertEqual(restored.keyboardLayout, .ansiDvorak)
     XCTAssertEqual(restored.keyboardInputLayout, .swissGerman)
+    XCTAssertEqual(restored.customKeyboardLayouts, [customKeyboard])
+    XCTAssertEqual(restored.customKeyboardLayoutID, customKeyboard.id)
     XCTAssertEqual(restored.layoutFluidLayouts, [.ansiWorkman, .frenchAzerty, .ansiQwerty])
     XCTAssertTrue(restored.quickEnd)
     XCTAssertEqual(restored.quickRestartKey, .enter)
@@ -4907,6 +4936,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.keyboardGuideStyle, .staggered)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertEqual(snapshot.keyboardInputLayout, .system)
+    XCTAssertTrue(snapshot.customKeyboardLayouts.isEmpty)
+    XCTAssertNil(snapshot.customKeyboardLayoutID)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertEqual(snapshot.quickRestartKey, .off)
     XCTAssertTrue(snapshot.showKeyTips)

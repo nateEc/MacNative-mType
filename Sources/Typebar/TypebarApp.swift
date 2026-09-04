@@ -530,6 +530,7 @@ private struct ContentView: View {
           nextCharacter: session.nextExpectedCharacter, mode: effectiveKeyboardGuideMode,
           feedback: keyboardGuideFeedback, accent: activeTheme.accent,
           panel: activeTheme.panel, layout: effectiveKeyboardLayout,
+          customLayout: effectiveCustomKeyboardGuideLayout,
           mirrored: settings.testModifiers.contains(.mirrorKeyboard),
           scale: settings.keyboardGuideScale, legendStyle: settings.keyboardGuideLegendStyle,
           keysMode: settings.keyboardGuideKeysMode,
@@ -1468,6 +1469,13 @@ private struct ContentView: View {
     return LayoutFluidPolicy.activeLayout(
       completedWords: session.completedWordCount, wordLimit: session.configuration.wordLimit,
       layouts: settings.layoutFluidLayouts)
+  }
+
+  private var effectiveCustomKeyboardGuideLayout: CustomKeyboardGuideLayout? {
+    guard !session.configuration.modifiers.contains(.layoutFluid),
+      let id = settings.customKeyboardLayoutID
+    else { return nil }
+    return settings.customKeyboardLayouts.first(where: { $0.id == id })
   }
 
   /// Layout Fluid deliberately switches both the visible guide and simulated

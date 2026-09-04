@@ -82,6 +82,90 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   }
 }
 
+/// A user-authored visual keymap. It intentionally controls only the guide:
+/// macOS remains responsible for actual input unless an explicit built-in
+/// layout simulation has been selected.
+struct CustomKeyboardGuideLayout: Codable, Equatable, Identifiable {
+  var id: UUID
+  var name: String
+  var numberRow: String
+  var topRow: String
+  var homeRow: String
+  var bottomRow: String
+
+  init(
+    id: UUID = UUID(), name: String, numberRow: String, topRow: String, homeRow: String,
+    bottomRow: String
+  ) {
+    self.id = id
+    self.name = name
+    self.numberRow = numberRow
+    self.topRow = topRow
+    self.homeRow = homeRow
+    self.bottomRow = bottomRow
+  }
+
+  var guideRows: [[KeyboardGuideKey]] {
+    [numberRow, topRow, homeRow, bottomRow].enumerated().map { rowIndex, labels in
+      Array(labels).enumerated().map { keyIndex, label in
+        KeyboardGuideKey(
+          "custom-\(id.uuidString)-\(rowIndex)-\(keyIndex)", label: String(label))
+      }
+    }
+  }
+}
+
+enum CustomKeyboardGuideLayoutPolicy {
+  static let maximumLayoutCount = 20
+  private static let rowLengthRange = 1...16
+  private static let nameLengthRange = 1...40
+
+  static func make(
+    name: String, numberRow: String, topRow: String, homeRow: String, bottomRow: String
+  ) -> CustomKeyboardGuideLayout? {
+    normalized(.init(
+      name: name, numberRow: numberRow, topRow: topRow, homeRow: homeRow, bottomRow: bottomRow))
+  }
+
+  static func normalized(_ layout: CustomKeyboardGuideLayout) -> CustomKeyboardGuideLayout? {
+    let name = layout.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard nameLengthRange.contains(name.count),
+      let numberRow = normalizedRow(layout.numberRow),
+      let topRow = normalizedRow(layout.topRow),
+      let homeRow = normalizedRow(layout.homeRow),
+      let bottomRow = normalizedRow(layout.bottomRow)
+    else { return nil }
+    return .init(
+      id: layout.id, name: name, numberRow: numberRow, topRow: topRow, homeRow: homeRow,
+      bottomRow: bottomRow)
+  }
+
+  static func normalizedLayouts(
+    _ layouts: [CustomKeyboardGuideLayout]
+  ) -> [CustomKeyboardGuideLayout] {
+    var identifiers = Set<UUID>()
+    var names = Set<String>()
+    var acceptedLayouts: [CustomKeyboardGuideLayout] = []
+    for layout in layouts {
+      guard let layout = normalized(layout), identifiers.insert(layout.id).inserted else { continue }
+      let name = normalizedName(layout.name)
+      guard names.insert(name).inserted else { continue }
+      acceptedLayouts.append(layout)
+    }
+    return Array(acceptedLayouts.prefix(maximumLayoutCount))
+  }
+
+  static func normalizedName(_ name: String) -> String {
+    name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+  }
+
+  private static func normalizedRow(_ row: String) -> String? {
+    let visible = String(row.filter { !$0.isWhitespace && !$0.isNewline })
+    guard rowLengthRange.contains(visible.count) else { return nil }
+    return visible
+  }
+}
+
 /// Determines whether the native keyboard guide is hidden, static, reacts to
 /// the last physical key, or directs the next expected key.
 enum KeyboardGuideMode: String, Codable, CaseIterable, Identifiable {
@@ -506,6 +590,19 @@ enum KeyboardGuideModel {
       .id
   }
 
+  static func highlightedKey(
+    for character: Character?,
+    rows: [[KeyboardGuideKey]],
+    style: KeyboardGuideStyle = .staggered
+  ) -> String? {
+    guard let character else { return nil }
+    if character == " " { return style.isSteno ? "steno-space" : "space" }
+    let keys = style.isSteno ? stenoRows().flatMap { $0 } : rows.flatMap { $0 }
+    return keys
+      .first(where: { $0.characters.contains(Character(String(character).lowercased())) })?
+      .id
+  }
+
   static func displayRows(
     for layout: KeyboardLayout,
     keysMode: KeyboardGuideKeysMode,
@@ -527,6 +624,31 @@ enum KeyboardGuideModel {
       [nonTypingKey("caps-lock", label: "⇪", width: 42)] + baseRows[2]
         + [nonTypingKey("return", label: "↩", width: 44)],
       [nonTypingKey("left-shift", label: "⇧", width: 52)] + baseRows[3]
+        + [nonTypingKey("right-shift", label: "⇧", width: 58)],
+    ]
+  }
+
+  static func displayRows(
+    for rows: [[KeyboardGuideKey]],
+    keysMode: KeyboardGuideKeysMode,
+    mode: KeyboardGuideMode,
+    nextCharacter: Character?,
+    style: KeyboardGuideStyle = .staggered
+  ) -> [[KeyboardGuideKey]] {
+    if style.isSteno { return stenoRows() }
+    guard rows.count == 4 else { return rows }
+    let showsNumberRow = keysMode == .minimalNumberRow || keysMode == .full
+      || (mode == .next && nextCharacter.map { "0123456789".contains($0) } == true)
+    let contentRows = showsNumberRow ? rows : Array(rows.dropFirst())
+    guard keysMode == .full else { return contentRows }
+
+    return [
+      [nonTypingKey("escape", label: "Esc", width: 36)] + rows[0]
+        + [nonTypingKey("delete", label: "⌫", width: 40)],
+      [nonTypingKey("tab", label: "⇥", width: 36)] + rows[1],
+      [nonTypingKey("caps-lock", label: "⇪", width: 42)] + rows[2]
+        + [nonTypingKey("return", label: "↩", width: 44)],
+      [nonTypingKey("left-shift", label: "⇧", width: 52)] + rows[3]
         + [nonTypingKey("right-shift", label: "⇧", width: 58)],
     ]
   }
@@ -642,6 +764,7 @@ struct KeyboardGuide: View {
   let accent: Color
   let panel: Color
   let layout: KeyboardLayout
+  let customLayout: CustomKeyboardGuideLayout?
   let mirrored: Bool
   let scale: Double
   let legendStyle: KeyboardGuideLegendStyle
@@ -653,15 +776,27 @@ struct KeyboardGuide: View {
   @State private var flashedKey: String?
   @State private var flashedKeyIsCorrect = true
 
+  private var baseGuideRows: [[KeyboardGuideKey]] {
+    customLayout?.guideRows ?? KeyboardGuideModel.rows(for: layout)
+  }
+
   private var highlightedKey: String? {
     if mode == .react { return flashedKey }
     let expected = nextCharacter.map { mirrored ? KeyboardMirror.transform($0) : $0 }
-    return KeyboardGuideModel.highlightedKey(
-      for: mode.highlightedCharacter(nextCharacter: expected, recentCharacter: nil), layout: layout,
-      style: style)
+    let character = mode.highlightedCharacter(nextCharacter: expected, recentCharacter: nil)
+    if let customLayout {
+      return KeyboardGuideModel.highlightedKey(
+        for: character, rows: customLayout.guideRows, style: style)
+    }
+    return KeyboardGuideModel.highlightedKey(for: character, layout: layout, style: style)
   }
   private var guideRows: [[KeyboardGuideKey]] {
-    KeyboardGuideModel.displayRows(
+    if let customLayout {
+      return KeyboardGuideModel.displayRows(
+        for: customLayout.guideRows, keysMode: keysMode, mode: mode,
+        nextCharacter: nextCharacter, style: style)
+    }
+    return KeyboardGuideModel.displayRows(
       for: layout, keysMode: keysMode, mode: mode, nextCharacter: nextCharacter, style: style)
   }
 
@@ -685,8 +820,13 @@ struct KeyboardGuide: View {
         flashedKey = nil
         return
       }
-      flashedKey = KeyboardGuideModel.highlightedKey(
-        for: feedback.character, layout: layout, style: style)
+      if let customLayout {
+        flashedKey = KeyboardGuideModel.highlightedKey(
+          for: feedback.character, rows: customLayout.guideRows, style: style)
+      } else {
+        flashedKey = KeyboardGuideModel.highlightedKey(
+          for: feedback.character, layout: layout, style: style)
+      }
       flashedKeyIsCorrect = feedback.isCorrect
       try? await Task.sleep(nanoseconds: 180_000_000)
       guard !Task.isCancelled else { return }
@@ -705,7 +845,7 @@ struct KeyboardGuide: View {
 
   private var highlightedLabel: String? {
     if highlightedKey == "space" { return "空格" }
-    return KeyboardGuideModel.rows(for: layout).flatMap { $0 }.first(where: {
+    return baseGuideRows.flatMap { $0 }.first(where: {
       $0.id == highlightedKey
     })?.label
   }
