@@ -691,65 +691,77 @@ struct PreferencesView: View {
               .font(.caption)
               .foregroundStyle(.secondary)
           }
-          Picker("内置键盘布局", selection: $settings.keyboardLayout) {
-            ForEach(KeyboardLayout.allCases) { layout in
-              Text(layout.displayName).tag(layout)
+          Picker("键盘图来源", selection: $settings.keyboardGuideLayoutSource) {
+            ForEach(KeyboardGuideLayoutSource.allCases) { source in
+              Text(source.displayName).tag(source)
             }
           }
-          Picker("自定义键盘图", selection: $settings.customKeyboardLayoutID) {
-            Text("使用内置布局").tag(nil as UUID?)
-            ForEach(settings.customKeyboardLayouts) { layout in
-              Text(layout.name).tag(layout.id as UUID?)
-            }
-          }
-          VStack(alignment: .leading, spacing: 8) {
-            Text("自定义键盘图")
-              .font(.subheadline.weight(.medium))
-            TextField("名称", text: $customKeyboardLayoutName)
-            TextField("数字行", text: $customKeyboardNumberRow)
-            TextField("顶行", text: $customKeyboardTopRow)
-            TextField("主行", text: $customKeyboardHomeRow)
-            TextField("底行", text: $customKeyboardBottomRow)
-            Button("添加并应用", systemImage: "plus") {
-              guard let layout = settings.addCustomKeyboardLayout(
-                name: customKeyboardLayoutName,
-                numberRow: customKeyboardNumberRow,
-                topRow: customKeyboardTopRow,
-                homeRow: customKeyboardHomeRow,
-                bottomRow: customKeyboardBottomRow
-              ) else {
-                customKeyboardLayoutMessage = "名称需为 1–40 个字符，四行各需 1–16 个可见字符且名称不能重复。"
-                return
+          if settings.keyboardGuideLayoutSource == .builtIn {
+            Picker("内置键盘布局", selection: $settings.keyboardLayout) {
+              ForEach(KeyboardLayout.allCases) { layout in
+                Text(layout.displayName).tag(layout)
               }
-              customKeyboardLayoutName = ""
-              customKeyboardLayoutMessage = "已应用“\(layout.name)”。"
             }
-            .disabled(
-              settings.customKeyboardLayouts.count
-                >= CustomKeyboardGuideLayoutPolicy.maximumLayoutCount)
-            if let customKeyboardLayoutMessage {
-              Text(customKeyboardLayoutMessage)
+          } else if settings.keyboardGuideLayoutSource == .systemInput {
+            Text("从 macOS 当前键盘输入源读取物理键位标签；切换输入源后会在下一次练习界面刷新时更新。它只影响视觉提示，不改变 IME 或文字输入。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          } else {
+            Picker("自定义键盘图", selection: $settings.customKeyboardLayoutID) {
+              Text("选择要使用的图").tag(nil as UUID?)
+              ForEach(settings.customKeyboardLayouts) { layout in
+                Text(layout.name).tag(layout.id as UUID?)
+              }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+              Text("自定义键盘图")
+                .font(.subheadline.weight(.medium))
+              TextField("名称", text: $customKeyboardLayoutName)
+              TextField("数字行", text: $customKeyboardNumberRow)
+              TextField("顶行", text: $customKeyboardTopRow)
+              TextField("主行", text: $customKeyboardHomeRow)
+              TextField("底行", text: $customKeyboardBottomRow)
+              Button("添加并应用", systemImage: "plus") {
+                guard let layout = settings.addCustomKeyboardLayout(
+                  name: customKeyboardLayoutName,
+                  numberRow: customKeyboardNumberRow,
+                  topRow: customKeyboardTopRow,
+                  homeRow: customKeyboardHomeRow,
+                  bottomRow: customKeyboardBottomRow
+                ) else {
+                  customKeyboardLayoutMessage = "名称需为 1–40 个字符，四行各需 1–16 个可见字符且名称不能重复。"
+                  return
+                }
+                customKeyboardLayoutName = ""
+                customKeyboardLayoutMessage = "已应用“\(layout.name)”。"
+              }
+              .disabled(
+                settings.customKeyboardLayouts.count
+                  >= CustomKeyboardGuideLayoutPolicy.maximumLayoutCount)
+              if let customKeyboardLayoutMessage {
+                Text(customKeyboardLayoutMessage)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              ForEach(settings.customKeyboardLayouts) { layout in
+                HStack {
+                  Text(layout.name)
+                  Spacer()
+                  Button("使用") { settings.selectCustomKeyboardLayout(layout.id) }
+                    .buttonStyle(.borderless)
+                  Button(role: .destructive) {
+                    settings.deleteCustomKeyboardLayout(layout.id)
+                  } label: {
+                    Image(systemName: "trash")
+                  }
+                  .buttonStyle(.borderless)
+                  .accessibilityLabel("删除 \(layout.name)")
+                }
+              }
+              Text("每行可写 1–16 个 Unicode 可见字符，最多保存 \(CustomKeyboardGuideLayoutPolicy.maximumLayoutCount) 个。它只改变键盘提示；实际输入仍由 macOS 或“输入布局模拟”控制，Layout Fluid 继续只使用内置布局。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            ForEach(settings.customKeyboardLayouts) { layout in
-              HStack {
-                Text(layout.name)
-                Spacer()
-                Button("使用") { settings.selectCustomKeyboardLayout(layout.id) }
-                  .buttonStyle(.borderless)
-                Button(role: .destructive) {
-                  settings.deleteCustomKeyboardLayout(layout.id)
-                } label: {
-                  Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("删除 \(layout.name)")
-              }
-            }
-            Text("每行可写 1–16 个 Unicode 可见字符，最多保存 \(CustomKeyboardGuideLayoutPolicy.maximumLayoutCount) 个。它只改变键盘提示；实际输入仍由 macOS 或“输入布局模拟”控制，Layout Fluid 继续只使用内置布局。")
-              .font(.caption)
-              .foregroundStyle(.secondary)
           }
           Picker("输入布局模拟", selection: $settings.keyboardInputLayout) {
             ForEach(KeyboardInputLayout.allCases) { layout in

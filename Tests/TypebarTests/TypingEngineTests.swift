@@ -1448,6 +1448,33 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CustomKeyboardGuideLayoutPolicy.normalizedLayouts([layout, layout]).count, 1)
   }
 
+  func testSystemKeyboardGuideBuildsCompleteShiftAwarePhysicalRows() throws {
+    let rows = try XCTUnwrap(SystemKeyboardGuide.rows { keyCode, shift in
+      switch keyCode {
+      case 10: nil
+      case 12: shift ? "Q" : "q"
+      case 18: shift ? "!" : "1"
+      default: shift ? "*" : "a"
+      }
+    })
+    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(rows[0][1].id, "system-18")
+    XCTAssertEqual(rows[0][1].label, "1")
+    XCTAssertEqual(rows[0][1].shiftedLabel, "!")
+    XCTAssertTrue(rows[0][1].characters.contains("!"))
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "!", rows: rows), "system-18")
+    XCTAssertEqual(rows[1][0].label, "q")
+    XCTAssertEqual(rows[1][0].shiftedLabel, "Q")
+    XCTAssertNil(SystemKeyboardGuide.rows { keyCode, _ in keyCode == 12 ? nil : "a" })
+    XCTAssertEqual(KeyboardGuideLayoutSource.allCases, [.builtIn, .systemInput, .custom])
+    if let currentRows = SystemKeyboardGuide.currentRows() {
+      XCTAssertTrue([[13, 13, 11, 10], [13, 13, 11, 11]].contains(currentRows.map(\.count)))
+      XCTAssertTrue(currentRows.flatMap { $0 }.allSatisfy { !$0.label.isEmpty })
+    }
+    let isoRows = try XCTUnwrap(SystemKeyboardGuide.rows(includesISOSectionKey: true) { _, _ in "a" })
+    XCTAssertEqual(isoRows[3].first?.id, "system-10")
+  }
+
   func testKeyboardGuideStylesCoverReferenceChoicesWithNativeGeometries() {
     XCTAssertEqual(KeyboardGuideStyle.allCases.map(\.rawValue), [
       "staggered", "alice", "matrix", "split", "split_matrix", "steno", "steno_matrix",
@@ -4631,6 +4658,8 @@ final class TypingEngineTests: XCTestCase {
     settings.keyboardInputLayout = .swissGerman
     let customKeyboard = try XCTUnwrap(settings.addCustomKeyboardLayout(
       name: "Cyrillic", numberRow: "123", topRow: "ЙЦУ", homeRow: "ФЫВ", bottomRow: "ЯЧС"))
+    XCTAssertEqual(settings.keyboardGuideLayoutSource, .custom)
+    settings.keyboardGuideLayoutSource = .systemInput
     settings.layoutFluidLayouts = [.ansiWorkman, .frenchAzerty, .ansiQwerty]
     settings.quickEnd = true
     settings.quickRestartKey = .enter
@@ -4728,6 +4757,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exportedSnapshot.keyboardInputLayout, .swissGerman)
     XCTAssertEqual(exportedSnapshot.customKeyboardLayouts, [customKeyboard])
     XCTAssertEqual(exportedSnapshot.customKeyboardLayoutID, customKeyboard.id)
+    XCTAssertEqual(exportedSnapshot.keyboardGuideLayoutSource, .systemInput)
     XCTAssertEqual(exportedSnapshot.randomThemeMode, .custom)
     XCTAssertFalse(exportedSnapshot.showKeyTips)
     XCTAssertEqual(exportedSnapshot.commandPaletteListMode, .grouped)
@@ -4770,6 +4800,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.keyboardInputLayout, .swissGerman)
     XCTAssertEqual(restored.customKeyboardLayouts, [customKeyboard])
     XCTAssertEqual(restored.customKeyboardLayoutID, customKeyboard.id)
+    XCTAssertEqual(restored.keyboardGuideLayoutSource, .systemInput)
     XCTAssertEqual(restored.layoutFluidLayouts, [.ansiWorkman, .frenchAzerty, .ansiQwerty])
     XCTAssertTrue(restored.quickEnd)
     XCTAssertEqual(restored.quickRestartKey, .enter)
@@ -4936,8 +4967,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(snapshot.keyboardGuideStyle, .staggered)
     XCTAssertEqual(snapshot.keyboardLayout, .ansiQwerty)
     XCTAssertEqual(snapshot.keyboardInputLayout, .system)
+    XCTAssertEqual(snapshot.keyboardGuideLayoutSource, .builtIn)
     XCTAssertTrue(snapshot.customKeyboardLayouts.isEmpty)
     XCTAssertNil(snapshot.customKeyboardLayoutID)
+    XCTAssertEqual(
+      AppSettingsSnapshot(keyboardGuideLayoutSource: .custom).keyboardGuideLayoutSource,
+      .builtIn)
     XCTAssertFalse(snapshot.quickEnd)
     XCTAssertEqual(snapshot.quickRestartKey, .off)
     XCTAssertTrue(snapshot.showKeyTips)

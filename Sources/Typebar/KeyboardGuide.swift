@@ -82,6 +82,23 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   }
 }
 
+/// Chooses the source for a visual keyboard without changing text input.
+enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
+  case builtIn
+  case systemInput
+  case custom
+
+  var id: Self { self }
+
+  var displayName: String {
+    switch self {
+    case .builtIn: "内置布局"
+    case .systemInput: "跟随 macOS 当前输入源"
+    case .custom: "自定义键盘图"
+    }
+  }
+}
+
 /// A user-authored visual keymap. It intentionally controls only the guide:
 /// macOS remains responsible for actual input unless an explicit built-in
 /// layout simulation has been selected.
@@ -764,7 +781,7 @@ struct KeyboardGuide: View {
   let accent: Color
   let panel: Color
   let layout: KeyboardLayout
-  let customLayout: CustomKeyboardGuideLayout?
+  let overrideRows: [[KeyboardGuideKey]]?
   let mirrored: Bool
   let scale: Double
   let legendStyle: KeyboardGuideLegendStyle
@@ -777,23 +794,23 @@ struct KeyboardGuide: View {
   @State private var flashedKeyIsCorrect = true
 
   private var baseGuideRows: [[KeyboardGuideKey]] {
-    customLayout?.guideRows ?? KeyboardGuideModel.rows(for: layout)
+    overrideRows ?? KeyboardGuideModel.rows(for: layout)
   }
 
   private var highlightedKey: String? {
     if mode == .react { return flashedKey }
     let expected = nextCharacter.map { mirrored ? KeyboardMirror.transform($0) : $0 }
     let character = mode.highlightedCharacter(nextCharacter: expected, recentCharacter: nil)
-    if let customLayout {
+    if let overrideRows {
       return KeyboardGuideModel.highlightedKey(
-        for: character, rows: customLayout.guideRows, style: style)
+        for: character, rows: overrideRows, style: style)
     }
     return KeyboardGuideModel.highlightedKey(for: character, layout: layout, style: style)
   }
   private var guideRows: [[KeyboardGuideKey]] {
-    if let customLayout {
+    if let overrideRows {
       return KeyboardGuideModel.displayRows(
-        for: customLayout.guideRows, keysMode: keysMode, mode: mode,
+        for: overrideRows, keysMode: keysMode, mode: mode,
         nextCharacter: nextCharacter, style: style)
     }
     return KeyboardGuideModel.displayRows(
@@ -820,9 +837,9 @@ struct KeyboardGuide: View {
         flashedKey = nil
         return
       }
-      if let customLayout {
+      if let overrideRows {
         flashedKey = KeyboardGuideModel.highlightedKey(
-          for: feedback.character, rows: customLayout.guideRows, style: style)
+          for: feedback.character, rows: overrideRows, style: style)
       } else {
         flashedKey = KeyboardGuideModel.highlightedKey(
           for: feedback.character, layout: layout, style: style)
