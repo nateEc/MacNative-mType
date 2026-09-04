@@ -2105,7 +2105,7 @@ public actor AuthStore {
     for request: ResultSubmissionRequest, userID: UUID, now: Date
   ) -> ResultSubmissionResponse {
     let isLeaderboardEligible = !state.users.first(where: { $0.id == userID })!.leaderboardOptedOut
-    let weeklyEntries = experienceLeaderboard(now: now).entries
+    let weeklyEntries = experienceLeaderboardEntries(now: now)
     return .init(
       id: request.id,
       accepted: true,
@@ -2303,27 +2303,85 @@ public actor AuthStore {
 
   public func leaderboard(_ query: LeaderboardQuery, now: Date = .now) throws -> LeaderboardResponse
   {
-    try leaderboard(query, eligibleUserIDs: nil, now: now)
+    let entries = try leaderboardEntries(query, eligibleUserIDs: nil, now: now)
+    return .init(entries: Array(entries.prefix(leaderboardLimit(query))))
+  }
+
+  public func leaderboardRank(
+    _ query: LeaderboardQuery, accessToken: String, now: Date = .now
+  ) throws -> LeaderboardRankResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    return .init(
+      entry: try leaderboardEntries(query, eligibleUserIDs: nil, now: now)
+        .first(where: { $0.userID == user.id }))
   }
 
   public func friendLeaderboard(_ query: LeaderboardQuery, accessToken: String, now: Date = .now)
     throws -> LeaderboardResponse
   {
     let current = try authenticatedUser(for: accessToken, now: now)
-    let friendIDs = state.connections.reduce(into: Set([current.id])) { ids, connection in
-      guard connection.status == "accepted" else { return }
-      if connection.requesterID == current.id { ids.insert(connection.recipientID) }
-      if connection.recipientID == current.id { ids.insert(connection.requesterID) }
-    }
-    return try leaderboard(query, eligibleUserIDs: friendIDs, now: now)
+    let entries = try leaderboardEntries(
+      query, eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now
+    )
+    return .init(entries: Array(entries.prefix(leaderboardLimit(query))))
+  }
+
+  public func friendLeaderboardRank(
+    _ query: LeaderboardQuery, accessToken: String, now: Date = .now
+  ) throws -> LeaderboardRankResponse {
+    let current = try authenticatedUser(for: accessToken, now: now)
+    return .init(
+      entry: try leaderboardEntries(
+        query, eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now
+      ).first(where: { $0.userID == current.id }))
   }
 
   public func experienceLeaderboard(eligibleUserIDs: Set<UUID>? = nil, now: Date = .now)
     -> ExperienceLeaderboardResponse
   {
+    let entries = experienceLeaderboardEntries(eligibleUserIDs: eligibleUserIDs, now: now)
+    return .init(entries: Array(entries.prefix(100)))
+  }
+
+  public func experienceLeaderboardRank(
+    accessToken: String, now: Date = .now
+  ) throws -> ExperienceLeaderboardRankResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    return .init(
+      entry: experienceLeaderboardEntries(now: now).first(where: { $0.userID == user.id }))
+  }
+
+  public func friendExperienceLeaderboard(accessToken: String, now: Date = .now) throws
+    -> ExperienceLeaderboardResponse
+  {
+    let current = try authenticatedUser(for: accessToken, now: now)
+    return experienceLeaderboard(eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now)
+  }
+
+  public func friendExperienceLeaderboardRank(
+    accessToken: String, now: Date = .now
+  ) throws -> ExperienceLeaderboardRankResponse {
+    let current = try authenticatedUser(for: accessToken, now: now)
+    return .init(
+      entry: experienceLeaderboardEntries(
+        eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now
+      ).first(where: { $0.userID == current.id }))
+  }
+
+  private func acceptedFriendIDs(for userID: UUID) -> Set<UUID> {
+    state.connections.reduce(into: Set([userID])) { ids, connection in
+      guard connection.status == "accepted" else { return }
+      if connection.requesterID == userID { ids.insert(connection.recipientID) }
+      if connection.recipientID == userID { ids.insert(connection.requesterID) }
+    }
+  }
+
+  private func experienceLeaderboardEntries(
+    eligibleUserIDs: Set<UUID>? = nil, now: Date
+  ) -> [ExperienceLeaderboardEntry] {
     let weekStart =
       Calendar(identifier: .iso8601).dateInterval(of: .weekOfYear, for: now)?.start ?? now
-    let entries = state.users.compactMap { user -> (StoredUser, Int)? in
+    return state.users.compactMap { user -> (StoredUser, Int)? in
       guard !user.leaderboardOptedOut,
         eligibleUserIDs == nil || eligibleUserIDs!.contains(user.id)
       else { return nil }
@@ -2334,31 +2392,21 @@ public actor AuthStore {
       if $0.1 != $1.1 { return $0.1 > $1.1 }
       return $0.0.displayName.localizedCaseInsensitiveCompare($1.0.displayName) == .orderedAscending
     }
-    .prefix(100)
     .enumerated()
     .map { offset, value in
       ExperienceLeaderboardEntry(
         id: value.0.id, rank: offset + 1, userID: value.0.id, displayName: value.0.displayName,
         totalExperience: value.1)
     }
-    return .init(entries: entries)
   }
 
-  public func friendExperienceLeaderboard(accessToken: String, now: Date = .now) throws
-    -> ExperienceLeaderboardResponse
-  {
-    let current = try authenticatedUser(for: accessToken, now: now)
-    let friendIDs = state.connections.reduce(into: Set([current.id])) { ids, connection in
-      guard connection.status == "accepted" else { return }
-      if connection.requesterID == current.id { ids.insert(connection.recipientID) }
-      if connection.recipientID == current.id { ids.insert(connection.requesterID) }
-    }
-    return experienceLeaderboard(eligibleUserIDs: friendIDs, now: now)
+  private func leaderboardLimit(_ query: LeaderboardQuery) -> Int {
+    min(max(query.limit ?? 25, 1), 100)
   }
 
-  private func leaderboard(_ query: LeaderboardQuery, eligibleUserIDs: Set<UUID>?, now: Date) throws
-    -> LeaderboardResponse
-  {
+  private func leaderboardEntries(
+    _ query: LeaderboardQuery, eligibleUserIDs: Set<UUID>?, now: Date
+  ) throws -> [LeaderboardEntry] {
     let modes = Set(["time", "words", "quote", "zen", "custom"])
     let languages = Set([
       "english", "spanish", "german", "french", "italian", "portuguese", "simplifiedChinese",
@@ -2371,7 +2419,6 @@ public actor AuthStore {
     }
     let period = query.period ?? "all"
     guard periods.contains(period) else { throw ResultStoreError.invalidResult }
-    let limit = min(max(query.limit ?? 25, 1), 100)
     let cutoff: Date? =
       switch period {
       case "day": Calendar.current.startOfDay(for: now)
@@ -2392,7 +2439,7 @@ public actor AuthStore {
     }
     var representedUsers = Set<UUID>()
     let bestRecordPerUser = records.filter { representedUsers.insert($0.userID).inserted }
-    let entries = bestRecordPerUser.prefix(limit).enumerated().compactMap {
+    return bestRecordPerUser.enumerated().compactMap {
       offset, result -> LeaderboardEntry? in
       guard let user = users[result.userID] else { return nil }
       return .init(
@@ -2400,7 +2447,6 @@ public actor AuthStore {
         mode: result.mode, language: result.language, wpm: result.wpm,
         accuracy: result.accuracy, consistency: result.consistency, finishedAt: result.finishedAt)
     }
-    return .init(entries: entries)
   }
 
   private func makeSession(for user: StoredUser, now: Date) -> AuthSessionResponse {

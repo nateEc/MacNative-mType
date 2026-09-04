@@ -563,6 +563,10 @@ struct RemoteLeaderboardResponse: Codable, Sendable {
     let entries: [RemoteLeaderboardEntry]
 }
 
+struct RemoteLeaderboardRankResponse: Codable, Sendable {
+    let entry: RemoteLeaderboardEntry?
+}
+
 struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
     let id: UUID
     let rank: Int
@@ -573,6 +577,10 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
 
 private struct RemoteExperienceLeaderboardResponse: Codable, Sendable {
     let entries: [RemoteExperienceLeaderboardEntry]
+}
+
+struct RemoteExperienceLeaderboardRankResponse: Codable, Sendable {
+    let entry: RemoteExperienceLeaderboardEntry?
 }
 
 struct RemotePublicProfile: Codable, Identifiable, Sendable {
@@ -1633,6 +1641,24 @@ final class AccountSession {
         return response.entries
     }
 
+    func leaderboardRank(
+        mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        scope: RemoteLeaderboardScope = .global
+    ) async throws -> RemoteLeaderboardEntry? {
+        var queryItems = [URLQueryItem(name: "period", value: period.rawValue)]
+        if let mode { queryItems.append(.init(name: "mode", value: mode.rawValue)) }
+        if let language { queryItems.append(.init(name: "language", value: language.rawValue)) }
+        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: scope == .friends ? "v1/leaderboards/friends/rank" : "v1/leaderboards/rank",
+            method: "GET",
+            token: try accessToken(),
+            body: Optional<String>.none,
+            queryItems: queryItems,
+            response: RemoteLeaderboardRankResponse.self
+        )
+        return response.entry
+    }
+
     func experienceLeaderboard(scope: RemoteLeaderboardScope = .global) async throws -> [RemoteExperienceLeaderboardEntry] {
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends ? "v1/leaderboards/experience/friends" : "v1/leaderboards/experience",
@@ -1642,6 +1668,20 @@ final class AccountSession {
             response: RemoteExperienceLeaderboardResponse.self
         )
         return response.entries
+    }
+
+    func experienceLeaderboardRank(
+        scope: RemoteLeaderboardScope = .global
+    ) async throws -> RemoteExperienceLeaderboardEntry? {
+        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: scope == .friends
+                ? "v1/leaderboards/experience/friends/rank" : "v1/leaderboards/experience/rank",
+            method: "GET",
+            token: try accessToken(),
+            body: Optional<String>.none,
+            response: RemoteExperienceLeaderboardRankResponse.self
+        )
+        return response.entry
     }
 
     func publicProfile(id: UUID) async throws -> RemotePublicProfile {

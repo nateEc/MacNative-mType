@@ -162,6 +162,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(entry.consistency, 0)
   }
 
+  func testLeaderboardRankResponsesDecodeAnAbsentStanding() throws {
+    let wpm = try JSONDecoder().decode(
+      RemoteLeaderboardRankResponse.self, from: Data(#"{"entry":null}"#.utf8))
+    let experience = try JSONDecoder().decode(
+      RemoteExperienceLeaderboardRankResponse.self, from: Data(#"{"entry":null}"#.utf8))
+
+    XCTAssertNil(wpm.entry)
+    XCTAssertNil(experience.entry)
+  }
+
   func testLegacyPublicProfileResponseDefaultsMissingHighestConsistencyToZero() throws {
     let id = UUID()
     let joinedAt = Date(timeIntervalSinceReferenceDate: 1_000)

@@ -167,6 +167,14 @@ public struct LeaderboardResponse: Content, Equatable {
     public let entries: [LeaderboardEntry]
 }
 
+public struct LeaderboardRankResponse: Content, Equatable {
+    public let entry: LeaderboardEntry?
+
+    public init(entry: LeaderboardEntry?) {
+        self.entry = entry
+    }
+}
+
 public struct ExperienceLeaderboardEntry: Content, Equatable, Identifiable {
     public let id: UUID
     public let rank: Int
@@ -177,6 +185,14 @@ public struct ExperienceLeaderboardEntry: Content, Equatable, Identifiable {
 
 public struct ExperienceLeaderboardResponse: Content, Equatable {
     public let entries: [ExperienceLeaderboardEntry]
+}
+
+public struct ExperienceLeaderboardRankResponse: Content, Equatable {
+    public let entry: ExperienceLeaderboardEntry?
+
+    public init(entry: ExperienceLeaderboardEntry?) {
+        self.entry = entry
+    }
 }
 
 /// Typebar's transparent experience policy. It uses only server-validated

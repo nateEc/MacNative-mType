@@ -18,10 +18,14 @@ struct CloudSyncView: View {
     @State private var leaderboardScope: RemoteLeaderboardScope = .global
     @State private var isLoadingLeaderboard = false
     @State private var leaderboardMessage: String?
+    @State private var leaderboardRank: RemoteLeaderboardEntry?
+    @State private var loadedLeaderboardRank = false
     @State private var experienceLeaderboard: [RemoteExperienceLeaderboardEntry] = []
     @State private var experienceScope: RemoteLeaderboardScope = .global
     @State private var isLoadingExperience = false
     @State private var experienceMessage: String?
+    @State private var experienceRank: RemoteExperienceLeaderboardEntry?
+    @State private var loadedExperienceRank = false
     @State private var selectedProfile: RemotePublicProfile?
     @State private var profileMessage: String?
 
@@ -92,6 +96,22 @@ struct CloudSyncView: View {
                     if let leaderboardMessage {
                         Text(leaderboardMessage).font(.caption).foregroundStyle(.secondary)
                     }
+                    if let user = account.currentUser, leaderboardMessage != nil {
+                        if user.leaderboardOptedOut {
+                            Text("你已选择从自建服务排行榜隐藏。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if let leaderboardRank {
+                            Label(
+                                "你的排名 #\(leaderboardRank.rank) · \(leaderboardRank.wpm) WPM",
+                                systemImage: "person.fill")
+                                .font(.caption.weight(.medium))
+                        } else if loadedLeaderboardRank {
+                            Text("当前筛选没有你的有效成绩。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     if let profileMessage {
                         Text(profileMessage).font(.caption).foregroundStyle(.red)
                     }
@@ -125,6 +145,22 @@ struct CloudSyncView: View {
                     if isLoadingExperience { ProgressView() }
                     if let experienceMessage {
                         Text(experienceMessage).font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let user = account.currentUser, experienceMessage != nil {
+                        if user.leaderboardOptedOut {
+                            Text("你已选择从自建服务排行榜隐藏。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if let experienceRank {
+                            Label(
+                                "你的本周 XP 排名 #\(experienceRank.rank) · \(experienceRank.totalExperience) XP",
+                                systemImage: "person.fill")
+                                .font(.caption.weight(.medium))
+                        } else if loadedExperienceRank {
+                            Text("本周还没有你的有效 XP 成绩。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     ForEach(experienceLeaderboard) { entry in
                         HStack {
@@ -189,9 +225,23 @@ struct CloudSyncView: View {
             defer { isLoadingLeaderboard = false }
             do {
                 leaderboard = try await account.leaderboard(mode: leaderboardMode, language: leaderboardLanguage, period: leaderboardPeriod, scope: leaderboardScope)
+                leaderboardRank = nil
+                loadedLeaderboardRank = false
+                if let user = account.currentUser, !user.leaderboardOptedOut {
+                    do {
+                        leaderboardRank = try await account.leaderboardRank(
+                            mode: leaderboardMode, language: leaderboardLanguage,
+                            period: leaderboardPeriod, scope: leaderboardScope)
+                        loadedLeaderboardRank = true
+                    } catch {
+                        // Older self-hosted servers may not have the rank route yet.
+                    }
+                }
                 leaderboardMessage = leaderboard.isEmpty ? "当前筛选没有成绩。" : "已加载 \(leaderboard.count) 条成绩。"
             } catch {
                 leaderboard = []
+                leaderboardRank = nil
+                loadedLeaderboardRank = false
                 leaderboardMessage = error.localizedDescription
             }
         }
@@ -214,9 +264,21 @@ struct CloudSyncView: View {
             defer { isLoadingExperience = false }
             do {
                 experienceLeaderboard = try await account.experienceLeaderboard(scope: experienceScope)
+                experienceRank = nil
+                loadedExperienceRank = false
+                if let user = account.currentUser, !user.leaderboardOptedOut {
+                    do {
+                        experienceRank = try await account.experienceLeaderboardRank(scope: experienceScope)
+                        loadedExperienceRank = true
+                    } catch {
+                        // Older self-hosted servers may not have the rank route yet.
+                    }
+                }
                 experienceMessage = experienceLeaderboard.isEmpty ? "本周还没有 XP 成绩。" : "已加载 \(experienceLeaderboard.count) 位练习者。"
             } catch {
                 experienceLeaderboard = []
+                experienceRank = nil
+                loadedExperienceRank = false
                 experienceMessage = error.localizedDescription
             }
         }

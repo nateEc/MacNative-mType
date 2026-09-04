@@ -693,6 +693,30 @@ public func configure(
         }
     }
 
+    app.get("v1", "leaderboards", "rank") { request async throws -> LeaderboardRankResponse in
+        do {
+            return try await authStore.leaderboardRank(
+                request.query.decode(LeaderboardQuery.self), accessToken: try request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        } catch is ResultStoreError {
+            throw Abort(.badRequest, reason: "The leaderboard filters were invalid.")
+        }
+    }
+
+    app.get("v1", "leaderboards", "friends", "rank") { request async throws -> LeaderboardRankResponse in
+        do {
+            return try await authStore.friendLeaderboardRank(
+                request.query.decode(LeaderboardQuery.self), accessToken: try request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        } catch is ResultStoreError {
+            throw Abort(.badRequest, reason: "The leaderboard filters were invalid.")
+        }
+    }
+
     app.get("v1", "leaderboards", "friends") { request async throws -> LeaderboardResponse in
         do {
             return try await authStore.friendLeaderboard(
@@ -711,6 +735,22 @@ public func configure(
             return try await authStore.leaderboard(request.query.decode(LeaderboardQuery.self))
         } catch is ResultStoreError {
             throw Abort(.badRequest, reason: "The leaderboard filters were invalid.")
+        }
+    }
+
+    app.get("v1", "leaderboards", "experience", "rank") { request async throws -> ExperienceLeaderboardRankResponse in
+        do {
+            return try await authStore.experienceLeaderboardRank(accessToken: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
+    app.get("v1", "leaderboards", "experience", "friends", "rank") { request async throws -> ExperienceLeaderboardRankResponse in
+        do {
+            return try await authStore.friendExperienceLeaderboardRank(accessToken: try request.accessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
         }
     }
 

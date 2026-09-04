@@ -1477,6 +1477,11 @@ final class HealthRouteTests: XCTestCase {
     ).entries
     XCTAssertEqual(entries.map(\.displayName), ["Bob", "Alice"])
     XCTAssertEqual(entries.map(\.rank), [1, 2])
+    let aliceRank = try await store.friendLeaderboardRank(
+      .init(mode: nil, language: nil, period: "all", limit: 1), accessToken: alice.accessToken,
+      now: now)
+    XCTAssertEqual(aliceRank.entry?.userID, alice.user.id)
+    XCTAssertEqual(aliceRank.entry?.rank, 2)
   }
 
   func testFriendLeaderboardRouteRequiresAuthentication() async throws {
@@ -1484,6 +1489,12 @@ final class HealthRouteTests: XCTestCase {
     do {
       try configureTestApp(app)
       try await app.test(.GET, "v1/leaderboards/friends") { response async in
+        XCTAssertEqual(response.status, .unauthorized)
+      }
+      try await app.test(.GET, "v1/leaderboards/rank") { response async in
+        XCTAssertEqual(response.status, .unauthorized)
+      }
+      try await app.test(.GET, "v1/leaderboards/experience/rank") { response async in
         XCTAssertEqual(response.status, .unauthorized)
       }
       try await app.asyncShutdown()
@@ -1525,10 +1536,17 @@ final class HealthRouteTests: XCTestCase {
     let globalXPEntries = await store.experienceLeaderboard(now: now).entries
     let friendXPEntries = try await store.friendExperienceLeaderboard(
       accessToken: bob.accessToken, now: now).entries
+    let hiddenWPMRank = try await store.leaderboardRank(
+      .init(mode: nil, language: nil, period: "all", limit: 1), accessToken: alice.accessToken,
+      now: now)
+    let hiddenXPRank = try await store.experienceLeaderboardRank(
+      accessToken: alice.accessToken, now: now)
     XCTAssertEqual(globalEntries.map(\.userID), [bob.user.id])
     XCTAssertEqual(friendEntries.map(\.userID), [bob.user.id])
     XCTAssertTrue(globalXPEntries.allSatisfy { $0.userID != alice.user.id })
     XCTAssertTrue(friendXPEntries.allSatisfy { $0.userID != alice.user.id })
+    XCTAssertNil(hiddenWPMRank.entry)
+    XCTAssertNil(hiddenXPRank.entry)
 
     let submission = try await store.submitResult(
       result(id: UUID(), wpm: 110, accuracy: 100, finishedAt: now), accessToken: alice.accessToken,
@@ -1701,12 +1719,23 @@ final class HealthRouteTests: XCTestCase {
         finishedAt: now.addingTimeInterval(1)),
       accessToken: slower.accessToken, now: now)
     let response = try await store.leaderboard(
+      .init(mode: "time", language: "english", period: "all", limit: 1))
+    let fasterRank = try await store.leaderboardRank(
+      .init(mode: "time", language: "english", period: "all", limit: 1),
+      accessToken: faster.accessToken)
+    let slowerRank = try await store.leaderboardRank(
+      .init(mode: "time", language: "english", period: "all", limit: 1),
+      accessToken: slower.accessToken)
+    XCTAssertEqual(response.entries.map(\.displayName), ["Faster"])
+    XCTAssertEqual(fasterRank.entry?.rank, 1)
+    XCTAssertEqual(slowerRank.entry?.rank, 2)
+    let fullResponse = try await store.leaderboard(
       .init(mode: "time", language: "english", period: "all", limit: 10))
-    XCTAssertEqual(response.entries.map(\.displayName), ["Faster", "Slower"])
-    XCTAssertEqual(response.entries.map(\.rank), [1, 2])
-    XCTAssertEqual(response.entries.map(\.wpm), [101, 80])
-    XCTAssertEqual(response.entries.map(\.consistency), [94, 77])
-    XCTAssertEqual(response.entries.map(\.id).count, Set(response.entries.map(\.id)).count)
+    XCTAssertEqual(fullResponse.entries.map(\.displayName), ["Faster", "Slower"])
+    XCTAssertEqual(fullResponse.entries.map(\.rank), [1, 2])
+    XCTAssertEqual(fullResponse.entries.map(\.wpm), [101, 80])
+    XCTAssertEqual(fullResponse.entries.map(\.consistency), [94, 77])
+    XCTAssertEqual(fullResponse.entries.map(\.id).count, Set(fullResponse.entries.map(\.id)).count)
   }
 
   func testResultSubmissionDefaultsMissingConsistencyForLegacyClient() throws {
@@ -2211,6 +2240,8 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(
       weekly.entries.map(\.totalExperience),
       [aliceResponse.totalExperience, TypebarExperiencePolicy.points(for: bobRequest)])
+    let bobRank = try await store.experienceLeaderboardRank(accessToken: bob.accessToken, now: now)
+    XCTAssertEqual(bobRank.entry?.rank, 2)
 
     let zen = ResultSubmissionRequest(
       id: UUID(), mode: "zen", language: "english", durationSeconds: nil, wordLimit: nil, wpm: 80,
@@ -2314,12 +2345,34 @@ final class HealthRouteTests: XCTestCase {
           (try? response.content.decode(LeaderboardResponse.self))?.entries.first?.displayName,
           "Route User")
       }
+      try await app.test(
+        .GET, "v1/leaderboards/rank?mode=time&language=english",
+        beforeRequest: { request async in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            (try? response.content.decode(LeaderboardRankResponse.self))?.entry?.displayName,
+            "Route User")
+        })
       try await app.test(.GET, "v1/leaderboards/experience") { response async in
         XCTAssertEqual(response.status, .ok)
         let entries = try? response.content.decode(ExperienceLeaderboardResponse.self).entries
         XCTAssertEqual(entries?.first?.displayName, "Route User")
         XCTAssertTrue((entries?.first?.totalExperience ?? 0) > 0)
       }
+      try await app.test(
+        .GET, "v1/leaderboards/experience/rank",
+        beforeRequest: { request async in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            (try? response.content.decode(ExperienceLeaderboardRankResponse.self))?.entry?.displayName,
+            "Route User")
+        })
       try await app.test(.GET, "v1/leaderboards/experience/friends") { response async in
         XCTAssertEqual(response.status, .unauthorized)
       }
@@ -2373,6 +2426,15 @@ final class HealthRouteTests: XCTestCase {
       try await app.test(
         .GET,
         "v1/profiles/me",
+        beforeRequest: { request async in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unauthorized)
+        })
+      try await app.test(
+        .GET,
+        "v1/leaderboards/rank",
         beforeRequest: { request async in
           request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
         },
