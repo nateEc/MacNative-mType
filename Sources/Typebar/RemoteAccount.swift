@@ -278,8 +278,32 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let consistency: Double
     let errorCount: Int
     let eventCount: Int
+    let tags: [String]
     let startedAt: Date
     let finishedAt: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
+            errorCount, eventCount, tags, startedAt, finishedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        mode = try values.decode(String.self, forKey: .mode)
+        language = try values.decode(String.self, forKey: .language)
+        durationSeconds = try values.decodeIfPresent(Int.self, forKey: .durationSeconds)
+        wordLimit = try values.decodeIfPresent(Int.self, forKey: .wordLimit)
+        wpm = try values.decode(Int.self, forKey: .wpm)
+        rawWpm = try values.decode(Int.self, forKey: .rawWpm)
+        accuracy = try values.decode(Int.self, forKey: .accuracy)
+        consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
+        errorCount = try values.decode(Int.self, forKey: .errorCount)
+        eventCount = try values.decode(Int.self, forKey: .eventCount)
+        tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+        startedAt = try values.decode(Date.self, forKey: .startedAt)
+        finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+    }
 }
 
 private struct RemoteAccountResultListResponse: Codable, Sendable {
@@ -294,6 +318,10 @@ private struct RemoteResultDeletionRequest: Codable, Sendable {
 private struct RemoteResultDeletionResponse: Codable, Sendable {
     let deleted: Bool
     let removedCount: Int
+}
+
+private struct RemoteUpdateResultTagsRequest: Codable, Sendable {
+    let tags: [String]
 }
 
 private struct RemoteQuoteSubmissionRequest: Codable, Sendable {
@@ -455,6 +483,7 @@ private struct RemoteResultSubmission: Codable, Sendable {
     let consistency: Double
     let errorCount: Int
     let eventCount: Int
+    let tags: [String]
     let startedAt: Date
     let finishedAt: Date
 
@@ -472,6 +501,7 @@ private struct RemoteResultSubmission: Codable, Sendable {
         ).typing
         errorCount = result.errorCount
         eventCount = result.typedCharacterCount
+        tags = result.tags
         startedAt = result.startedAt
         finishedAt = result.finishedAt
     }
@@ -1285,6 +1315,30 @@ final class AccountSession {
         } catch {
             statusMessage = error.localizedDescription
             return false
+        }
+    }
+
+    func updateRemoteResultTags(id: UUID, tags: [String]) async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let result = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/results/\(id.uuidString)/tags",
+                method: "PATCH",
+                token: token,
+                body: RemoteUpdateResultTagsRequest(tags: tags),
+                response: RemoteAccountResult.self
+            )
+            if let index = remoteResults.firstIndex(where: { $0.id == id }) {
+                remoteResults[index] = result
+            }
+            statusMessage = "服务端成绩标签已更新。"
+        } catch {
+            statusMessage = error.localizedDescription
         }
     }
 

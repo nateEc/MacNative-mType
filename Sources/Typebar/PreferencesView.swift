@@ -961,7 +961,7 @@ struct PreferencesView: View {
                   .foregroundStyle(.secondary)
               } else {
                 ForEach(account.remoteResults) { result in
-                  RemoteAccountResultRow(result: result)
+                  RemoteAccountResultRow(result: result, account: account)
                 }
               }
               if user.authenticationMethods.contains(.password) {
@@ -1760,6 +1760,8 @@ private struct DeveloperAccessKeyRow: View {
 
 private struct RemoteAccountResultRow: View {
   let result: RemoteAccountResult
+  let account: AccountSession
+  @State private var newTag = ""
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
@@ -1773,9 +1775,48 @@ private struct RemoteAccountResultRow: View {
       Text("\(result.mode) · \(result.language) · Raw \(result.rawWpm) · 一致性 \(Int(result.consistency.rounded()))%")
         .font(.caption)
         .foregroundStyle(.secondary)
+      if !result.tags.isEmpty {
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 6) {
+            ForEach(result.tags, id: \.self) { tag in
+              Button {
+                Task {
+                  await account.updateRemoteResultTags(
+                    id: result.id, tags: result.tags.filter { $0 != tag })
+                }
+              } label: {
+                Label(tag, systemImage: "xmark")
+                  .font(.caption)
+              }
+              .buttonStyle(.bordered)
+              .disabled(account.isWorking)
+            }
+          }
+        }
+      }
+      HStack {
+        TextField("添加服务端标签", text: $newTag)
+          .onSubmit(addTag)
+        Button("添加", action: addTag)
+          .disabled(
+            account.isWorking || newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              || result.tags.count >= ResultTagPolicy.maximumCount)
+      }
+      Text("最多 \(ResultTagPolicy.maximumCount) 个标签，每个不超过 \(ResultTagPolicy.maximumLength) 个字符。")
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
     .padding(8)
     .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+  }
+
+  private func addTag() {
+    let tags = ResultTagPolicy.appending(newTag, to: result.tags)
+    guard tags != result.tags else { return }
+    Task {
+      await account.updateRemoteResultTags(id: result.id, tags: tags)
+      newTag = ""
+    }
   }
 }
 

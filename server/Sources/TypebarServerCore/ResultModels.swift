@@ -13,13 +13,14 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let consistency: Double
     public let errorCount: Int
     public let eventCount: Int
+    public let tags: [String]
     public let startedAt: Date
     public let finishedAt: Date
 
     public init(
         id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
         rawWpm: Int, accuracy: Int, consistency: Double = 0, errorCount: Int, eventCount: Int,
-        startedAt: Date, finishedAt: Date
+        tags: [String] = [], startedAt: Date, finishedAt: Date
     ) {
         self.id = id
         self.mode = mode
@@ -32,13 +33,14 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.consistency = consistency
         self.errorCount = errorCount
         self.eventCount = eventCount
+        self.tags = tags
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, startedAt, finishedAt
+            errorCount, eventCount, tags, startedAt, finishedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -54,6 +56,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
         errorCount = try values.decode(Int.self, forKey: .errorCount)
         eventCount = try values.decode(Int.self, forKey: .eventCount)
+        tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         startedAt = try values.decode(Date.self, forKey: .startedAt)
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
     }
@@ -82,13 +85,14 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let consistency: Double
     public let errorCount: Int
     public let eventCount: Int
+    public let tags: [String]
     public let startedAt: Date
     public let finishedAt: Date
 
     public init(
         id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
         rawWpm: Int, accuracy: Int, consistency: Double, errorCount: Int, eventCount: Int,
-        startedAt: Date, finishedAt: Date
+        tags: [String], startedAt: Date, finishedAt: Date
     ) {
         self.id = id
         self.mode = mode
@@ -101,6 +105,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.consistency = consistency
         self.errorCount = errorCount
         self.eventCount = eventCount
+        self.tags = tags
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }
@@ -127,6 +132,14 @@ public struct ResultListResponse: Content, Equatable, Sendable {
     public init(results: [AccountResultResponse], total: Int) {
         self.results = results
         self.total = total
+    }
+}
+
+public struct UpdateResultTagsRequest: Content, Equatable, Sendable {
+    public let tags: [String]
+
+    public init(tags: [String]) {
+        self.tags = tags
     }
 }
 

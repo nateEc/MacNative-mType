@@ -640,6 +640,22 @@ public func configure(
         }
     }
 
+    app.patch("v1", "results", ":id", "tags") { request async throws -> AccountResultResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The result identifier was invalid.")
+        }
+        do {
+            let accessToken = try request.accessToken()
+            return try await authStore.updateResultTags(
+                id: id,
+                request: request.content.decode(UpdateResultTagsRequest.self),
+                accessToken: accessToken
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.get("v1", "results") { request async throws -> ResultListResponse in
         do {
             return try await authStore.results(
@@ -804,6 +820,8 @@ private extension AuthStoreError {
             Abort(.badRequest, reason: "The requested result range was invalid.")
         case .resultNotFound:
             Abort(.notFound, reason: "The requested Typebar result does not exist.")
+        case .invalidResultTags:
+            Abort(.badRequest, reason: "Result tags must be unique, non-empty, and no longer than 24 characters.")
         case .directMessageNotAllowed:
             Abort(.forbidden, reason: "Direct messages are only available between accepted Typebar friends.")
         }

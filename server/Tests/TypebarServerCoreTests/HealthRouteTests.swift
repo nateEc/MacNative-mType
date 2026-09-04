@@ -1825,11 +1825,16 @@ final class HealthRouteTests: XCTestCase {
     _ = try await store.submitResult(
       result(id: otherID, wpm: 110, accuracy: 100, finishedAt: now.addingTimeInterval(-10)),
       accessToken: other.accessToken, now: now)
+    let tagged = try await store.updateResultTags(
+      id: recentID, request: .init(tags: ["review", "café"]), accessToken: owner.accessToken,
+      now: now)
 
     let firstPage = try await store.results(
       .init(offset: 0, limit: 1), credential: .developerAccessKey(key.accessKey), now: now)
     XCTAssertEqual(firstPage.total, 2)
     XCTAssertEqual(firstPage.results.map(\.id), [recentID])
+    XCTAssertEqual(tagged.tags, ["review", "café"])
+    XCTAssertEqual(firstPage.results.first?.tags, ["review", "café"])
     let secondPage = try await store.results(
       .init(offset: 1, limit: 1), credential: .accessToken(owner.accessToken), now: now)
     XCTAssertEqual(secondPage.results.map(\.id), [oldID])
@@ -1848,6 +1853,21 @@ final class HealthRouteTests: XCTestCase {
       XCTFail("An account must not read another account's submitted result")
     } catch let error as AuthStoreError {
       XCTAssertEqual(error, .resultNotFound)
+    }
+    do {
+      _ = try await store.updateResultTags(
+        id: otherID, request: .init(tags: ["private"]), accessToken: owner.accessToken, now: now)
+      XCTFail("An account must not modify another account's result tags")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .resultNotFound)
+    }
+    do {
+      _ = try await store.updateResultTags(
+        id: recentID, request: .init(tags: ["duplicate", "DUPLICATE"]),
+        accessToken: owner.accessToken, now: now)
+      XCTFail("Duplicate result tags must be rejected")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidResultTags)
     }
     do {
       _ = try await store.results(
@@ -2256,6 +2276,7 @@ final class HealthRouteTests: XCTestCase {
     let session = try await store.register(
       .init(email: "me@example.com", password: "a secure password", displayName: "Route User"))
     let now = Date.now
+    let resultID = UUID()
 
     do {
       try configure(app, authStore: store)
@@ -2269,13 +2290,23 @@ final class HealthRouteTests: XCTestCase {
         .POST, "v1/results",
         beforeRequest: { request async throws in
           request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
-          try request.content.encode(result(id: UUID(), wpm: 88, accuracy: 99, finishedAt: now))
+          try request.content.encode(result(id: resultID, wpm: 88, accuracy: 99, finishedAt: now))
         },
         afterResponse: { response async in
           XCTAssertEqual(response.status, .ok)
           XCTAssertTrue(
             (try? response.content.decode(ResultSubmissionResponse.self))?.leaderboardEligible
               ?? false)
+        })
+      try await app.test(
+        .PATCH, "v1/results/\(resultID.uuidString)/tags",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(UpdateResultTagsRequest(tags: ["route"]))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual((try? response.content.decode(AccountResultResponse.self))?.tags, ["route"])
         })
       try await app.test(.GET, "v1/leaderboards?mode=time&language=english") { response async in
         XCTAssertEqual(response.status, .ok)
@@ -2379,6 +2410,15 @@ final class HealthRouteTests: XCTestCase {
         afterResponse: { response async in
           XCTAssertEqual(response.status, .ok)
           XCTAssertEqual((try? response.content.decode(AccountResultResponse.self))?.id, resultID)
+        })
+      try await app.test(
+        .PATCH,
+        "v1/results/\(resultID.uuidString)/tags",
+        beforeRequest: { request async in
+          request.headers.add(name: "X-Typebar-Access-Key", value: key.accessKey)
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unauthorized)
         })
       try await app.test(
         .PATCH,

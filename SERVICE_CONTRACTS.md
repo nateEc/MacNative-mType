@@ -19,6 +19,7 @@
 | 同步拉取 | `GET /v1/sync?cursor=` | → 变更列表、下一游标（已实现服务端基础） |
 | 同步推送 | `POST /v1/sync` | 带 UUID、版本和删除标记的变更 → 接受/冲突结果（已实现服务端基础） |
 | 私有成绩 | `GET /v1/results`、`GET /v1/results/{id}` | 接受 Bearer 令牌或 `X-Typebar-Access-Key`；只返回认证账户已提交成绩的最小元数据，不含提示、输入回放、邮箱或资料。列表按完成时间倒序，可用 UTC 秒级 `finishedOnOrAfter`、`offset` 和最多 1,000 条的 `limit` 过滤分页（部分实现） |
+| 私有成绩标签 | `PATCH /v1/results/{id}/tags` | 仅接受 Bearer 令牌，且只可修改当前账户自己的成绩；标签为最多五个非空、去首尾空白后最长 24 个字符的字符串，不允许大小写或重音差异的重复项。旧服务或旧数据未提供标签时客户端安全回退为空数组，开发者密钥无此权限（部分实现） |
 | 清除私有成绩 | `DELETE /v1/results` | 仅接受 Bearer 令牌；密码账户必须提交当前密码，纯第三方账户必须携带一次性 `X-Typebar-Reauthentication`。只删除当前账户的远端成绩与相应 XP，返回删除数量；本机历史、同步和其他账户不受影响。每令牌每小时最多 10 次（部分实现） |
 | 提交结果 | `POST /v1/results` | 接受 Bearer 令牌或 `X-Typebar-Access-Key`；保存具 UUID 的结果，基本范围/时间校验与重复提交幂等；响应包含服务端重算的本次 XP、总 XP 与可选本周 XP 名次（部分实现） |
 | 排行榜 | `GET /v1/leaderboards`、`GET /v1/leaderboards/friends` | 前者为公开全局结果榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者都可按模式、语言与 `all`/`day`/`week` 周期筛选；每位用户仅保留该筛选下的最佳一条成绩，按此成绩排名，最多返回 100 位用户（部分实现） |

@@ -395,6 +395,7 @@ public enum AuthStoreError: Error, Equatable {
   case developerAccessKeyLimitReached
   case invalidResultQuery
   case resultNotFound
+  case invalidResultTags
 }
 
 public actor AuthStore {
@@ -600,18 +601,19 @@ public actor AuthStore {
     let consistency: Double
     let errorCount: Int
     let eventCount: Int
+    var tags: [String]
     let startedAt: Date
     let finishedAt: Date
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, startedAt, finishedAt
+        errorCount, eventCount, tags, startedAt, finishedAt
     }
 
     init(
       id: UUID, userID: UUID, mode: String, language: String, durationSeconds: Int?,
       wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, consistency: Double,
-      errorCount: Int, eventCount: Int,
+      errorCount: Int, eventCount: Int, tags: [String],
       startedAt: Date, finishedAt: Date
     ) {
       self.id = id
@@ -626,6 +628,7 @@ public actor AuthStore {
       self.consistency = consistency
       self.errorCount = errorCount
       self.eventCount = eventCount
+      self.tags = tags
       self.startedAt = startedAt
       self.finishedAt = finishedAt
     }
@@ -644,6 +647,7 @@ public actor AuthStore {
       consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
       errorCount = try values.decode(Int.self, forKey: .errorCount)
       eventCount = try values.decode(Int.self, forKey: .eventCount)
+      tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
       finishedAt = try values.decode(Date.self, forKey: .finishedAt)
       let legacyDuration =
         durationSeconds.map(TimeInterval.init)
@@ -657,7 +661,7 @@ public actor AuthStore {
       .init(
         id: id, mode: mode, language: language, durationSeconds: durationSeconds,
         wordLimit: wordLimit, wpm: wpm, rawWpm: rawWpm, accuracy: accuracy,
-        consistency: consistency, errorCount: errorCount, eventCount: eventCount,
+        consistency: consistency, errorCount: errorCount, eventCount: eventCount, tags: tags,
         startedAt: startedAt, finishedAt: finishedAt)
     }
   }
@@ -2093,7 +2097,8 @@ public actor AuthStore {
       durationSeconds: record.durationSeconds, wordLimit: record.wordLimit, wpm: record.wpm,
       rawWpm: record.rawWpm, accuracy: record.accuracy, consistency: record.consistency,
       errorCount: record.errorCount,
-      eventCount: record.eventCount, startedAt: record.startedAt, finishedAt: record.finishedAt)
+      eventCount: record.eventCount, tags: record.tags, startedAt: record.startedAt,
+      finishedAt: record.finishedAt)
   }
 
   private func resultSubmissionResponse(
@@ -2200,6 +2205,7 @@ public actor AuthStore {
   ) throws -> ResultSubmissionResponse {
     let user = try authenticatedUser(for: credential, now: now)
     try validate(result: request, now: now)
+    let tags = try validatedResultTags(request.tags)
     if state.results.contains(where: { $0.userID == user.id && $0.id == request.id }) {
       return resultSubmissionResponse(for: request, userID: user.id, now: now)
     }
@@ -2209,6 +2215,7 @@ public actor AuthStore {
         durationSeconds: request.durationSeconds, wordLimit: request.wordLimit,
         wpm: request.wpm, rawWpm: request.rawWpm, accuracy: request.accuracy,
         consistency: request.consistency, errorCount: request.errorCount, eventCount: request.eventCount,
+        tags: tags,
         startedAt: request.startedAt, finishedAt: request.finishedAt
       ))
     try persist()
@@ -2245,6 +2252,19 @@ public actor AuthStore {
     let removedCount = countBeforeDeletion - state.results.count
     try persist()
     return .init(deleted: true, removedCount: removedCount)
+  }
+
+  public func updateResultTags(
+    id: UUID, request: UpdateResultTagsRequest, accessToken: String, now: Date = .now
+  ) throws -> AccountResultResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    let tags = try validatedResultTags(request.tags)
+    guard let index = state.results.firstIndex(where: { $0.id == id && $0.userID == user.id }) else {
+      throw AuthStoreError.resultNotFound
+    }
+    state.results[index].tags = tags
+    try persist()
+    return state.results[index].response()
   }
 
   public func results(
@@ -2540,6 +2560,22 @@ public actor AuthStore {
       })
     else { throw AuthStoreError.invalidDeveloperAccessKeyName }
     return name
+  }
+
+  private func validatedResultTags(_ values: [String]) throws -> [String] {
+    guard values.count <= 5 else { throw AuthStoreError.invalidResultTags }
+    var seen = Set<String>()
+    var tags: [String] = []
+    for value in values {
+      let tag = value.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !tag.isEmpty, tag.count <= 24 else { throw AuthStoreError.invalidResultTags }
+      let key = tag.folding(
+        options: [.caseInsensitive, .diacriticInsensitive],
+        locale: Locale(identifier: "en_US_POSIX"))
+      guard seen.insert(key).inserted else { throw AuthStoreError.invalidResultTags }
+      tags.append(tag)
+    }
+    return tags
   }
 
   private func validatedProfileDetails(_ value: ProfileDetails) throws -> ProfileDetails {
