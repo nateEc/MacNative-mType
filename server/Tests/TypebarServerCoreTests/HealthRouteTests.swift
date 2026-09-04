@@ -1375,6 +1375,66 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertNil(invalid.discordAvatar)
   }
 
+  func testPublicBadgesAreServerDerivedSelectableAndRemovedWithResults() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 38_000)
+    let session = try await store.register(
+      .init(email: "badges@example.com", password: "a secure password", displayName: "Badge User"),
+      now: now)
+    XCTAssertTrue(session.user.availableBadges.isEmpty)
+    XCTAssertNil(session.user.selectedBadgeID)
+
+    do {
+      _ = try await store.updateProfile(
+        .init(selectedBadgeID: "swift-line"), accessToken: session.accessToken, now: now)
+      XCTFail("Users cannot select a badge that has not been earned from server results")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidProfileDetails)
+    }
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 98, durationSeconds: 15 * 60, finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    let earned = try await store.authenticatedUser(for: session.accessToken, now: now)
+    XCTAssertEqual(
+      earned.availableBadges.map(\.id), ["first-finish", "clear-key", "swift-line", "steady-room"])
+    XCTAssertNil(earned.selectedBadgeID)
+
+    let selected = try await store.updateProfile(
+      .init(selectedBadgeID: "swift-line"), accessToken: session.accessToken, now: now)
+    XCTAssertEqual(selected.selectedBadgeID, "swift-line")
+    let selectedPublicProfile = try await store.publicProfile(id: session.user.id, now: now)
+    let wpmLeaderboard = try await store.leaderboard(
+      .init(mode: nil, language: nil, period: "all", limit: 25), now: now)
+    let experienceLeaderboard = try await store.experienceLeaderboard(now: now)
+    XCTAssertEqual(selectedPublicProfile.selectedBadge?.id, "swift-line")
+    XCTAssertEqual(wpmLeaderboard.entries.first?.selectedBadge?.id, "swift-line")
+    XCTAssertEqual(experienceLeaderboard.entries.first?.selectedBadge?.id, "swift-line")
+
+    let legacyProfileUpdate = try JSONDecoder().decode(
+      UpdateProfileRequest.self,
+      from: Data(#"{"displayName":"Badge User Updated"}"#.utf8))
+    let preserved = try await store.updateProfile(
+      legacyProfileUpdate, accessToken: session.accessToken, now: now)
+    XCTAssertEqual(preserved.selectedBadgeID, "swift-line")
+
+    let hidden = try await store.updateProfile(
+      .init(selectedBadgeID: ""), accessToken: session.accessToken, now: now)
+    XCTAssertNil(hidden.selectedBadgeID)
+    let hiddenPublicProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertNil(hiddenPublicProfile.selectedBadge)
+
+    _ = try await store.updateProfile(
+      .init(selectedBadgeID: "steady-room"), accessToken: session.accessToken, now: now)
+    _ = try await store.deleteResults(
+      .init(currentPassword: "a secure password"), accessToken: session.accessToken, now: now)
+    let afterDeletion = try await store.authenticatedUser(for: session.accessToken, now: now)
+    let deletedPublicProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertTrue(afterDeletion.availableBadges.isEmpty)
+    XCTAssertNil(afterDeletion.selectedBadgeID)
+    XCTAssertNil(deletedPublicProfile.selectedBadge)
+  }
+
   func testConnectionsSupportRequestsAcceptanceAndUserScopedLists() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let alice = try await store.register(

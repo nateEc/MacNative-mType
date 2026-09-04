@@ -157,14 +157,18 @@ public struct UpdateProfileRequest: Content, Equatable {
   public let leaderboardOptedOut: Bool?
   /// Omitted by older clients, which preserves existing public details.
   public let profileDetails: ProfileDetails?
+  /// Omitted by older clients, which preserves the existing badge. An empty
+  /// string explicitly clears the public badge selection.
+  public let selectedBadgeID: String?
 
   public init(
     displayName: String? = nil, leaderboardOptedOut: Bool? = nil,
-    profileDetails: ProfileDetails? = nil
+    profileDetails: ProfileDetails? = nil, selectedBadgeID: String? = nil
   ) {
     self.displayName = displayName
     self.leaderboardOptedOut = leaderboardOptedOut
     self.profileDetails = profileDetails
+    self.selectedBadgeID = selectedBadgeID
   }
 }
 
@@ -323,6 +327,8 @@ public struct AuthUserResponse: Content, Equatable {
   public let leaderboardOptedOut: Bool
   public let profileDetails: ProfileDetails
   public let authenticationMethods: [AuthenticationMethod]
+  public let availableBadges: [PublicProfileBadge]
+  public let selectedBadgeID: String?
 }
 
 public struct PublicProfileResponse: Content, Equatable {
@@ -337,6 +343,15 @@ public struct PublicProfileResponse: Content, Equatable {
   public let totalExperience: Int
   public let profileDetails: ProfileDetails
   public let discordAvatar: PublicDiscordAvatarResponse?
+  public let selectedBadge: PublicProfileBadge?
+}
+
+/// A Typebar-owned badge that can be selected for public profiles and
+/// leaderboards. It contains presentation metadata only, never user activity.
+public struct PublicProfileBadge: Content, Equatable, Identifiable, Sendable {
+  public let id: String
+  public let title: String
+  public let systemImage: String
 }
 
 /// An opt-in Discord CDN identifier. It deliberately excludes email, tokens,
@@ -488,17 +503,18 @@ public actor AuthStore {
     let emailVerified: Bool
     let leaderboardOptedOut: Bool
     let profileDetails: ProfileDetails
+    let selectedBadgeID: String?
 
     private enum CodingKeys: String, CodingKey {
       case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut,
-        profileDetails
+        profileDetails, selectedBadgeID
     }
 
     init(
       id: UUID, email: String, displayName: String, passwordHash: String?, createdAt: Date,
       emailVerified: Bool = false,
       leaderboardOptedOut: Bool = false,
-      profileDetails: ProfileDetails = .init()
+      profileDetails: ProfileDetails = .init(), selectedBadgeID: String? = nil
     ) {
       self.id = id
       self.email = email
@@ -508,6 +524,7 @@ public actor AuthStore {
       self.emailVerified = emailVerified
       self.leaderboardOptedOut = leaderboardOptedOut
       self.profileDetails = profileDetails
+      self.selectedBadgeID = selectedBadgeID
     }
 
     init(from decoder: Decoder) throws {
@@ -520,6 +537,7 @@ public actor AuthStore {
       emailVerified = try values.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
       leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
       profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
+      selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
     }
   }
 
@@ -934,7 +952,8 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt, emailVerified: user.emailVerified,
-      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails)
+      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails,
+      selectedBadgeID: user.selectedBadgeID)
     state.users[index] = updatedUser
     try persist()
     return try userResponse(for: updatedUser.id)
@@ -975,7 +994,8 @@ public actor AuthStore {
     state.users[index] = StoredUser(
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: nil, createdAt: user.createdAt, emailVerified: user.emailVerified,
-      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails)
+      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails,
+      selectedBadgeID: user.selectedBadgeID)
     state.passwordResetTokens.removeAll { $0.userID == user.id }
     let currentTokenHash = Self.tokenHash(accessToken)
     state.sessions.removeAll { $0.userID == user.id && $0.tokenHash != currentTokenHash }
@@ -1259,7 +1279,8 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt, emailVerified: user.emailVerified,
-      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails)
+      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails,
+      selectedBadgeID: user.selectedBadgeID)
     state.sessions.removeAll { $0.userID == user.id }
     state.passwordResetTokens.removeAll { $0.userID == user.id }
     try persist()
@@ -1316,7 +1337,8 @@ public actor AuthStore {
     state.users[userIndex] = StoredUser(
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: user.passwordHash, createdAt: user.createdAt, emailVerified: true,
-      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails)
+      leaderboardOptedOut: user.leaderboardOptedOut, profileDetails: user.profileDetails,
+      selectedBadgeID: user.selectedBadgeID)
     state.emailVerificationTokens.removeAll { $0.userID == user.id }
     try persist()
   }
@@ -1416,7 +1438,8 @@ public actor AuthStore {
       createdAt: user.createdAt,
       emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut,
-      profileDetails: user.profileDetails
+      profileDetails: user.profileDetails,
+      selectedBadgeID: user.selectedBadgeID
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
@@ -1452,7 +1475,8 @@ public actor AuthStore {
       passwordHash: user.passwordHash, createdAt: user.createdAt,
       emailVerified: false,
       leaderboardOptedOut: user.leaderboardOptedOut,
-      profileDetails: user.profileDetails
+      profileDetails: user.profileDetails,
+      selectedBadgeID: user.selectedBadgeID
     )
     state.users[index] = updatedUser
     state.sessions.removeAll { $0.userID == updatedUser.id }
@@ -1545,11 +1569,13 @@ public actor AuthStore {
     let user = state.users[index]
     let displayName = try request.displayName.map(validatedDisplayName) ?? user.displayName
     let profileDetails = try request.profileDetails.map(validatedProfileDetails) ?? user.profileDetails
+    let selectedBadgeID = try validatedSelectedBadgeID(
+      request.selectedBadgeID, existing: user.selectedBadgeID, userID: user.id)
     let updatedUser = StoredUser(
       id: user.id, email: user.email, displayName: displayName, passwordHash: user.passwordHash,
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut,
-      profileDetails: profileDetails)
+      profileDetails: profileDetails, selectedBadgeID: selectedBadgeID)
     state.users[index] = updatedUser
     try persist()
     return userResponse(for: updatedUser)
@@ -2077,8 +2103,39 @@ public actor AuthStore {
       activity: activity,
       totalExperience: experience(for: user.id),
       profileDetails: user.profileDetails,
-      discordAvatar: publicDiscordAvatar(for: user)
+      discordAvatar: publicDiscordAvatar(for: user),
+      selectedBadge: selectedPublicBadge(for: user)
     )
+  }
+
+  private func availablePublicBadges(for userID: UUID) -> [PublicProfileBadge] {
+    let results = state.results.filter { $0.userID == userID }
+    let accurateRunExists = results.contains {
+      $0.accuracy >= 98 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 15
+    }
+    let bestWPM = results.map(\.wpm).max() ?? 0
+    let totalTypingSeconds = results.reduce(0.0) { partial, result in
+      partial + max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+    }
+    var badges: [PublicProfileBadge] = []
+    if !results.isEmpty {
+      badges.append(.init(id: "first-finish", title: "起步", systemImage: "flag.checkered"))
+    }
+    if accurateRunExists {
+      badges.append(.init(id: "clear-key", title: "清晰按键", systemImage: "checkmark.seal"))
+    }
+    if bestWPM >= 80 {
+      badges.append(.init(id: "swift-line", title: "迅捷一行", systemImage: "bolt"))
+    }
+    if totalTypingSeconds >= 15 * 60 {
+      badges.append(.init(id: "steady-room", title: "稳定练习", systemImage: "timer"))
+    }
+    return badges
+  }
+
+  private func selectedPublicBadge(for user: StoredUser) -> PublicProfileBadge? {
+    guard let selectedBadgeID = user.selectedBadgeID else { return nil }
+    return availablePublicBadges(for: user.id).first { $0.id == selectedBadgeID }
   }
 
   private func publicDiscordAvatar(for user: StoredUser) -> PublicDiscordAvatarResponse? {
@@ -2485,7 +2542,7 @@ public actor AuthStore {
     .map { offset, value in
       ExperienceLeaderboardEntry(
         id: value.0.id, rank: offset + 1, userID: value.0.id, displayName: value.0.displayName,
-        totalExperience: value.1)
+        totalExperience: value.1, selectedBadge: selectedPublicBadge(for: value.0))
     }
   }
 
@@ -2547,7 +2604,8 @@ public actor AuthStore {
       return .init(
         id: result.id, rank: offset + 1, userID: user.id, displayName: user.displayName,
         mode: result.mode, language: result.language, wpm: result.wpm,
-        accuracy: result.accuracy, consistency: result.consistency, finishedAt: result.finishedAt)
+        accuracy: result.accuracy, consistency: result.consistency, finishedAt: result.finishedAt,
+        selectedBadge: selectedPublicBadge(for: user))
     }
   }
 
@@ -2598,11 +2656,14 @@ public actor AuthStore {
   }
 
   private func userResponse(for user: StoredUser) -> AuthUserResponse {
-    .init(
+    let availableBadges = availablePublicBadges(for: user.id)
+    let selectedBadgeID = selectedPublicBadge(for: user)?.id
+    return .init(
       id: user.id, email: user.email, emailVerified: user.emailVerified, displayName: user.displayName,
       totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut,
       profileDetails: user.profileDetails,
-      authenticationMethods: authenticationMethods(for: user.id))
+      authenticationMethods: authenticationMethods(for: user.id), availableBadges: availableBadges,
+      selectedBadgeID: selectedBadgeID)
   }
 
   private func authenticationMethods(for userID: UUID) -> [AuthenticationMethod] {
@@ -2738,6 +2799,18 @@ public actor AuthStore {
       bio: bio, keyboard: keyboard, github: github, socialHandle: socialHandle,
       websiteURL: websiteURL, showActivity: value.showActivity,
       showDiscordAvatar: value.showDiscordAvatar)
+  }
+
+  private func validatedSelectedBadgeID(_ requested: String?, existing: String?, userID: UUID) throws
+    -> String?
+  {
+    guard let requested else { return existing }
+    let selectedBadgeID = requested.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !selectedBadgeID.isEmpty else { return nil }
+    guard availablePublicBadges(for: userID).contains(where: { $0.id == selectedBadgeID }) else {
+      throw AuthStoreError.invalidProfileDetails
+    }
+    return selectedBadgeID
   }
 
   private static func discordAvatarHash(from identity: OAuthProviderIdentity) -> String? {

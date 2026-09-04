@@ -119,6 +119,12 @@ struct CloudSyncView: View {
                     ForEach(leaderboard) { entry in
                         HStack {
                             Text("#\(entry.rank)").monospacedDigit().foregroundStyle(.secondary)
+                            if let badge = entry.selectedBadge {
+                                Image(systemName: badge.systemImage)
+                                    .foregroundStyle(.tint)
+                                    .help(badge.title)
+                                    .accessibilityLabel("\(badge.title) 徽章")
+                            }
                             Button(entry.displayName) { loadProfile(id: entry.userID) }
                                 .buttonStyle(.plain)
                                 .lineLimit(1)
@@ -171,6 +177,12 @@ struct CloudSyncView: View {
                     ForEach(experienceLeaderboard) { entry in
                         HStack {
                             Text("#\(entry.rank)").monospacedDigit().foregroundStyle(.secondary)
+                            if let badge = entry.selectedBadge {
+                                Image(systemName: badge.systemImage)
+                                    .foregroundStyle(.tint)
+                                    .help(badge.title)
+                                    .accessibilityLabel("\(badge.title) 徽章")
+                            }
                             Button(entry.displayName) { loadProfile(id: entry.userID) }
                                 .buttonStyle(.plain)
                                 .lineLimit(1)
@@ -337,6 +349,12 @@ private struct PublicProfileView: View {
                     .foregroundStyle(.secondary)
             }
             Text(profile.displayName).font(.title2.weight(.semibold))
+            if let badge = profile.selectedBadge {
+                Label(badge.title, systemImage: badge.systemImage)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.tint)
+                    .accessibilityLabel("公开徽章：\(badge.title)")
+            }
             Grid(horizontalSpacing: 28, verticalSpacing: 12) {
                 GridRow { metric("完成成绩", "\(profile.completedResultCount)"); metric("最佳 WPM", "\(profile.bestWPM)") }
                 GridRow {

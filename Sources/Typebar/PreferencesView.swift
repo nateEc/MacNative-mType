@@ -22,6 +22,7 @@ struct PreferencesView: View {
   @State private var profileWebsiteURL = ""
   @State private var profileShowsActivity = true
   @State private var profileShowsDiscordAvatar = false
+  @State private var profileSelectedBadgeID = ""
   @State private var developerAccessKeyName = ""
   @State private var newlyCreatedDeveloperAccessKey: String?
   @State private var remoteResultsDeletionPassword = ""
@@ -1018,6 +1019,17 @@ struct PreferencesView: View {
                   .font(.caption)
                   .foregroundStyle(.secondary)
               }
+              Picker("公开资料徽章", selection: $profileSelectedBadgeID) {
+                Text("不显示").tag("")
+                ForEach(user.availableBadges) { badge in
+                  Label(badge.title, systemImage: badge.systemImage).tag(badge.id)
+                }
+              }
+              if user.availableBadges.isEmpty {
+                Text("完成并同步服务端接受的练习后，可在这里选择公开展示的原创徽章。")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
               Button("更新公开资料") {
                 Task {
                   if await account.updateProfileDetails(
@@ -1025,7 +1037,8 @@ struct PreferencesView: View {
                       bio: profileBio, keyboard: profileKeyboard, github: profileGitHub,
                       socialHandle: profileSocialHandle, websiteURL: profileWebsiteURL,
                       showActivity: profileShowsActivity,
-                      showDiscordAvatar: profileShowsDiscordAvatar))
+                      showDiscordAvatar: profileShowsDiscordAvatar),
+                    selectedBadgeID: profileSelectedBadgeID)
                   {
                     profileBio = account.currentUser?.profileDetails.bio ?? profileBio
                     profileKeyboard = account.currentUser?.profileDetails.keyboard ?? profileKeyboard
@@ -1035,6 +1048,8 @@ struct PreferencesView: View {
                     profileShowsActivity = account.currentUser?.profileDetails.showActivity ?? profileShowsActivity
                     profileShowsDiscordAvatar = account.currentUser?.profileDetails.showDiscordAvatar
                       ?? profileShowsDiscordAvatar
+                    profileSelectedBadgeID = account.currentUser?.selectedBadgeID
+                      ?? profileSelectedBadgeID
                   }
                 }
               }
@@ -1042,7 +1057,7 @@ struct PreferencesView: View {
                 account.isWorking || profileBio.count > 250 || profileKeyboard.count > 75
                   || profileGitHub.count > 39 || profileSocialHandle.count > 15
                   || profileWebsiteURL.count > 200)
-              Text("简介、键盘说明与链接会出现在公开资料；邮箱、令牌和本机练习内容永不公开。关闭活动后，资料页不再展示每日练习日历；Discord 头像仅在你主动开启后显示。")
+              Text("简介、键盘说明与链接会出现在公开资料；邮箱、令牌和本机练习内容永不公开。关闭活动后，资料页不再展示每日练习日历；Discord 头像仅在你主动开启后显示。公开徽章只来自服务端已接受的成绩。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -1660,6 +1675,7 @@ struct PreferencesView: View {
     profileWebsiteURL = details.websiteURL
     profileShowsActivity = details.showActivity
     profileShowsDiscordAvatar = details.showDiscordAvatar
+    profileSelectedBadgeID = account.currentUser?.selectedBadgeID ?? ""
   }
 
   private func streakDayBoundaryLabel(for offset: Double) -> String {

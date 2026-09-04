@@ -100,10 +100,12 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     let leaderboardOptedOut: Bool
     let profileDetails: RemoteProfileDetails
     let authenticationMethods: [RemoteAuthenticationMethod]
+    let availableBadges: [RemotePublicProfileBadge]
+    let selectedBadgeID: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut, profileDetails,
-            authenticationMethods
+            authenticationMethods, availableBadges, selectedBadgeID
     }
 
     init(
@@ -114,7 +116,8 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         totalExperience: Int,
         leaderboardOptedOut: Bool = false,
         profileDetails: RemoteProfileDetails = .init(),
-        authenticationMethods: [RemoteAuthenticationMethod] = [.password]
+        authenticationMethods: [RemoteAuthenticationMethod] = [.password],
+        availableBadges: [RemotePublicProfileBadge] = [], selectedBadgeID: String? = nil
     ) {
         self.id = id
         self.email = email
@@ -124,6 +127,8 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         self.leaderboardOptedOut = leaderboardOptedOut
         self.profileDetails = profileDetails
         self.authenticationMethods = authenticationMethods
+        self.availableBadges = availableBadges
+        self.selectedBadgeID = selectedBadgeID
     }
 
     init(from decoder: Decoder) throws {
@@ -136,6 +141,8 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
         profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
         authenticationMethods = try values.decodeIfPresent([RemoteAuthenticationMethod].self, forKey: .authenticationMethods) ?? [.password]
+        availableBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .availableBadges) ?? []
+        selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
     }
 }
 
@@ -242,6 +249,7 @@ private struct RemoteUpdateProfileRequest: Codable, Sendable {
     let displayName: String?
     let leaderboardOptedOut: Bool?
     let profileDetails: RemoteProfileDetails?
+    let selectedBadgeID: String?
 }
 
 struct RemoteDeveloperAccessKey: Codable, Equatable, Identifiable, Sendable {
@@ -548,9 +556,10 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     let accuracy: Int
     let consistency: Double
     let finishedAt: Date
+    let selectedBadge: RemotePublicProfileBadge?
 
     private enum CodingKeys: String, CodingKey {
-        case id, rank, userID, displayName, mode, language, wpm, accuracy, consistency, finishedAt
+        case id, rank, userID, displayName, mode, language, wpm, accuracy, consistency, finishedAt, selectedBadge
     }
 
     init(from decoder: Decoder) throws {
@@ -565,6 +574,7 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
         accuracy = try values.decode(Int.self, forKey: .accuracy)
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+        selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
     }
 }
 
@@ -582,6 +592,7 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
     let userID: UUID
     let displayName: String
     let totalExperience: Int
+    let selectedBadge: RemotePublicProfileBadge?
 }
 
 private struct RemoteExperienceLeaderboardResponse: Codable, Sendable {
@@ -606,10 +617,11 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let totalExperience: Int
     let profileDetails: RemoteProfileDetails
     let discordAvatar: RemoteDiscordAvatar?
+    let selectedBadge: RemotePublicProfileBadge?
 
     private enum CodingKeys: String, CodingKey {
         case id, displayName, joinedAt, completedResultCount, bestWPM, highestConsistency, personalBests,
-            activity, totalExperience, profileDetails, discordAvatar
+            activity, totalExperience, profileDetails, discordAvatar, selectedBadge
     }
 
     init(from decoder: Decoder) throws {
@@ -625,7 +637,14 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
         discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
+        selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
     }
+}
+
+struct RemotePublicProfileBadge: Codable, Equatable, Identifiable, Sendable {
+    let id: String
+    let title: String
+    let systemImage: String
 }
 
 struct RemoteDiscordAvatar: Codable, Equatable, Sendable {
@@ -1243,7 +1262,7 @@ final class AccountSession {
                 body: RemoteUpdateProfileRequest(
                     displayName: displayName,
                     leaderboardOptedOut: currentUser?.leaderboardOptedOut ?? false,
-                    profileDetails: nil),
+                    profileDetails: nil, selectedBadgeID: nil),
                 response: RemoteAccountUser.self
             )
             statusMessage = "显示名已更新。"
@@ -1265,7 +1284,8 @@ final class AccountSession {
                 method: "PATCH",
                 token: token,
                 body: RemoteUpdateProfileRequest(
-                    displayName: user.displayName, leaderboardOptedOut: optedOut, profileDetails: nil),
+                    displayName: user.displayName, leaderboardOptedOut: optedOut, profileDetails: nil,
+                    selectedBadgeID: nil),
                 response: RemoteAccountUser.self
             )
             statusMessage = optedOut
@@ -1276,7 +1296,7 @@ final class AccountSession {
         }
     }
 
-    func updateProfileDetails(_ details: RemoteProfileDetails) async -> Bool {
+    func updateProfileDetails(_ details: RemoteProfileDetails, selectedBadgeID: String) async -> Bool {
         guard let token = tokenStore.load(), currentUser != nil else {
             statusMessage = "请先登录自建 Typebar 服务。"
             return false
@@ -1289,7 +1309,8 @@ final class AccountSession {
                 method: "PATCH",
                 token: token,
                 body: RemoteUpdateProfileRequest(
-                    displayName: nil, leaderboardOptedOut: nil, profileDetails: details),
+                    displayName: nil, leaderboardOptedOut: nil, profileDetails: details,
+                    selectedBadgeID: selectedBadgeID),
                 response: RemoteAccountUser.self
             )
             statusMessage = "公开资料已更新。"

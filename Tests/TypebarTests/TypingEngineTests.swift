@@ -29,11 +29,13 @@ final class TypingEngineTests: XCTestCase {
           .utf8))
     XCTAssertEqual(legacy.authenticationMethods, [.password])
     XCTAssertEqual(legacy.profileDetails, .init())
+    XCTAssertTrue(legacy.availableBadges.isEmpty)
+    XCTAssertNil(legacy.selectedBadgeID)
 
     let modern = try JSONDecoder().decode(
       RemoteAccountUser.self,
       from: Data(
-        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"authenticationMethods":["google","password","discord"],"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
+        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
           .utf8))
     XCTAssertTrue(modern.emailVerified)
     XCTAssertEqual(modern.authenticationMethods, [.google, .password, .discord])
@@ -42,6 +44,22 @@ final class TypingEngineTests: XCTestCase {
       .init(
         bio: "Native first", keyboard: "ANSI", github: "typebar", socialHandle: "typist",
         websiteURL: "https://example.com", showActivity: false))
+    XCTAssertEqual(modern.availableBadges.map(\.id), ["swift-line"])
+    XCTAssertEqual(modern.selectedBadgeID, "swift-line")
+
+    let leaderboardEntry = try JSONDecoder().decode(
+      RemoteLeaderboardEntry.self,
+      from: Data(
+        #"{"id":"00000000-0000-0000-0000-000000000003","rank":1,"userID":"00000000-0000-0000-0000-000000000002","displayName":"OAuth","mode":"time","language":"english","wpm":80,"accuracy":98,"consistency":99,"finishedAt":0,"selectedBadge":{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}}"#
+          .utf8))
+    XCTAssertEqual(leaderboardEntry.selectedBadge?.id, "swift-line")
+
+    let legacyExperienceEntry = try JSONDecoder().decode(
+      RemoteExperienceLeaderboardEntry.self,
+      from: Data(
+        #"{"id":"00000000-0000-0000-0000-000000000004","rank":1,"userID":"00000000-0000-0000-0000-000000000002","displayName":"OAuth","totalExperience":12}"#
+          .utf8))
+    XCTAssertNil(legacyExperienceEntry.selectedBadge)
   }
 
   func testRemoteDiscordAvatarBuildsOnlyValidatedCDNURLs() {
