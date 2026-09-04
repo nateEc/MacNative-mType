@@ -2811,6 +2811,7 @@ private struct CompletedResultView: View {
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: startGraphsAtZero,
         visibility: resultPerformanceVisibility,
+        tagPersonalBestFeedback: tagPersonalBestFeedback,
         onVisibilityChange: onResultPerformanceVisibilityChange,
         accent: accent)
 
@@ -3505,6 +3506,7 @@ private struct ResultPerformanceChart: View {
   let accent: Color
   let onVisibilityChange: (ResultPerformanceVisibility) -> Void
   @State private var visibility: ResultPerformanceVisibility
+  private let tagPersonalBestFeedback: [TagPersonalBestFeedback]
 
   init(
     prompt: String,
@@ -3513,6 +3515,7 @@ private struct ResultPerformanceChart: View {
     typingSpeedUnit: TypingSpeedUnit,
     startsAtZero: Bool,
     visibility: ResultPerformanceVisibility,
+    tagPersonalBestFeedback: [TagPersonalBestFeedback],
     onVisibilityChange: @escaping (ResultPerformanceVisibility) -> Void,
     accent: Color
   ) {
@@ -3521,6 +3524,7 @@ private struct ResultPerformanceChart: View {
     self.startsAtZero = startsAtZero
     self.onVisibilityChange = onVisibilityChange
     _visibility = State(initialValue: visibility)
+    self.tagPersonalBestFeedback = tagPersonalBestFeedback.filter(\.showsPreviousBestLine)
     self.accent = accent
   }
 
@@ -3534,6 +3538,9 @@ private struct ResultPerformanceChart: View {
           traceToggle("Raw", isOn: visibilityBinding(\.raw), color: .secondary)
           traceToggle("Burst", isOn: visibilityBinding(\.burst), color: .orange)
           traceToggle("错误", isOn: visibilityBinding(\.errors), color: .red)
+          if !tagPersonalBestFeedback.isEmpty {
+            traceToggle("标签 PB", isOn: visibilityBinding(\.tagPersonalBestLine), color: .secondary)
+          }
         }
         Chart(points) { point in
           LineMark(
@@ -3557,6 +3564,22 @@ private struct ResultPerformanceChart: View {
             )
             .foregroundStyle(.orange)
             .lineStyle(.init(lineWidth: 1))
+          }
+          if visibility.tagPersonalBestLine {
+            ForEach(tagPersonalBestFeedback) { feedback in
+              if let previousBestWpm = feedback.previousBestWpm {
+                RuleMark(
+                  y: .value(
+                    "标签 PB", typingSpeedUnit.converted(wpm: previousBestWpm)))
+                  .foregroundStyle(.secondary.opacity(0.6))
+                  .lineStyle(.init(lineWidth: 1, dash: [1, 4]))
+                  .annotation(position: .top, alignment: .leading) {
+                    Text("\(feedback.tag) PB \(typingSpeedUnit.formatted(wpm: previousBestWpm))")
+                      .font(.caption2)
+                      .foregroundStyle(.secondary)
+                  }
+              }
+            }
           }
         }
         .chartYScale(domain: .automatic(includesZero: startsAtZero))
@@ -3585,7 +3608,7 @@ private struct ResultPerformanceChart: View {
           .frame(height: 30)
           .accessibilityLabel("按秒重建的错误轨迹")
         }
-        Text("强调色为 WPM，灰虚线为 Raw，橙色为 Burst；数据仅由本机输入回放重建。")
+        Text(chartDescription)
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
@@ -3601,6 +3624,11 @@ private struct ResultPerformanceChart: View {
       .tint(isOn.wrappedValue ? color : .secondary)
       .accessibilityLabel("\(title)轨迹")
       .accessibilityValue(isOn.wrappedValue ? "显示" : "隐藏")
+  }
+
+  private var chartDescription: String {
+    let tagPBDescription = tagPersonalBestFeedback.isEmpty ? "" : "；带标签的灰点划线为已有标签 PB"
+    return "强调色为 WPM，灰虚线为 Raw，橙色为 Burst\(tagPBDescription)；数据仅由本机输入回放重建。"
   }
 
   private func visibilityBinding(

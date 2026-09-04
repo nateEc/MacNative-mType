@@ -3719,14 +3719,28 @@ final class TypingEngineTests: XCTestCase {
       ])
     XCTAssertFalse(feedback[0].isNewPersonalBest)
     XCTAssertNil(feedback[0].improvement)
+    XCTAssertTrue(feedback[0].showsPreviousBestLine)
     XCTAssertTrue(feedback[1].isNewPersonalBest)
     XCTAssertEqual(feedback[1].improvement, 5)
+    XCTAssertFalse(feedback[1].showsPreviousBestLine)
     XCTAssertTrue(feedback[2].isNewPersonalBest)
+    XCTAssertFalse(feedback[2].showsPreviousBestLine)
     XCTAssertTrue(TagPersonalBestPolicy.feedback(
       for: result(wpm: 90, tags: ["focus"], configuration: .init(
         mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
         language: .english)),
       previousResults: [current]).isEmpty)
+  }
+
+  func testResultPerformanceVisibilityDefaultsTagPBLineForLegacySettings() throws {
+    let legacy = try JSONDecoder().decode(
+      ResultPerformanceVisibility.self,
+      from: Data(#"{"raw":false,"burst":false,"errors":true}"#.utf8))
+
+    XCTAssertEqual(legacy, .init(raw: false, burst: false, errors: true, tagPersonalBestLine: true))
+    let restored = try JSONDecoder().decode(
+      ResultPerformanceVisibility.self, from: JSONEncoder().encode(legacy))
+    XCTAssertEqual(restored, legacy)
   }
 
   func testWordBurstHeatmapUsesCurrentResultQuintilesAndLeavesMissingBurstsNeutral() throws {

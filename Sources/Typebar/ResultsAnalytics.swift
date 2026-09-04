@@ -485,9 +485,37 @@ struct ResultPerformancePoint: Equatable, Identifiable {
 }
 
 struct ResultPerformanceVisibility: Codable, Equatable {
-  var raw = true
-  var burst = true
-  var errors = true
+  var raw: Bool
+  var burst: Bool
+  var errors: Bool
+  var tagPersonalBestLine: Bool
+
+  init(raw: Bool = true, burst: Bool = true, errors: Bool = true, tagPersonalBestLine: Bool = true) {
+    self.raw = raw
+    self.burst = burst
+    self.errors = errors
+    self.tagPersonalBestLine = tagPersonalBestLine
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case raw, burst, errors, tagPersonalBestLine
+  }
+
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    raw = try values.decodeIfPresent(Bool.self, forKey: .raw) ?? true
+    burst = try values.decodeIfPresent(Bool.self, forKey: .burst) ?? true
+    errors = try values.decodeIfPresent(Bool.self, forKey: .errors) ?? true
+    tagPersonalBestLine = try values.decodeIfPresent(Bool.self, forKey: .tagPersonalBestLine) ?? true
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    try values.encode(raw, forKey: .raw)
+    try values.encode(burst, forKey: .burst)
+    try values.encode(errors, forKey: .errors)
+    try values.encode(tagPersonalBestLine, forKey: .tagPersonalBestLine)
+  }
 }
 
 enum ResultImageExport {
@@ -896,6 +924,9 @@ struct TagPersonalBestFeedback: Equatable, Identifiable {
   var improvement: Int? {
     guard let previousBestWpm, currentWpm > previousBestWpm else { return nil }
     return currentWpm - previousBestWpm
+  }
+  var showsPreviousBestLine: Bool {
+    previousBestWpm != nil && !isNewPersonalBest
   }
 }
 
