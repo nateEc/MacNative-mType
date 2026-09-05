@@ -1184,6 +1184,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "armenian-calm-step",
+      title: "Հանգիստ քայլ",
+      text: "Հանգիստ քայլը հաջորդ աշխատանքը ավելի պարզ է դարձնում։",
+      language: .armenian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "armenian-open-notebook",
+      title: "Բաց նոթատետր",
+      text: "Բաց նոթատետրը չի պատասխանում բոլոր դժվար հարցերին, բայց այն տեղ է տալիս հարցը փոքր մասերով տեսնելու համար։",
+      language: .armenian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "armenian-small-work",
+      title: "Փոքր աշխատանք",
+      text: "Առաջընթացը միշտ չէ, որ երևում է որպես մեծ պահ։ Նույն էջը նորից բացելը, մի նախադասություն պարզելը և մի փոքր խնդիր շտկելը վստահություն են ստեղծում հաջորդ փորձի համար։",
+      language: .armenian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "armenian-long-table",
+      title: "Երկար սեղան",
+      text: "Երկար սեղանը տեղ է տալիս բազմազան աշխատանքի համար։ Մի ծայրում կարող է լինել առաջին սևագիրը, մյուս ծայրում՝ ավելի մեծ ուշադրություն պահանջող նախադասությունը, իսկ մեջտեղում՝ հաջորդ փոքր որոշումը։ Վարժությունն էլ այդպես է առաջ գնում։ Պետք չէ յուրաքանչյուր դժվար մաս լուծել միանգամից։ Երբ կա վերադառնալու տեղ, հստակ հաջորդ քայլ և համբերություն՝ մի քանի փորձից հետո հեշտացածը նկատելու համար, արագությունը բնականորեն աճում է։",
+      language: .armenian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

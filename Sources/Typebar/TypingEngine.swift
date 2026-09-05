@@ -219,6 +219,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case myanmarBurmese
   case lao
   case amharic
+  case armenian
   case greek
   case greeklish
   case dutch
@@ -3435,6 +3436,14 @@ enum StarterLexicon {
     "ርቀት", "እርምጃ", "ትዕግሥት", "ሚዛን",
   ]
 
+  // Typebar-authored Armenian starter words exercise the native macOS input
+  // source without importing a third-party or reference word list.
+  static let armenianWords = [
+    "գիրք", "գրիչ", "պատուհան", "ճանապարհ", "լույս", "կամուրջ", "առավոտ", "թուղթ", "այգի", "ամպ",
+    "լռություն", "լապտեր", "լեռ", "սերմ", "երաժշտություն", "սեղան", "միտք", "նշում", "աշխատանք", "փորձ",
+    "հեռավորություն", "քայլ", "համբերություն", "հավասարակշռություն",
+  ]
+
   // Typebar-authored Danish starter words. The corpus deliberately includes
   // æ, ø and å for normal macOS composed-text input practice.
   static let danishWords = [
@@ -3721,6 +3730,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: amharicWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .armenian:
+      return prompt(
+        tokens: count, lexicon: armenianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .greek:
       return prompt(
         tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -3939,6 +3952,7 @@ enum StarterLexicon {
     case .myanmarBurmese: (myanmarBurmeseWords, [",", ".", "!", "?"])
     case .lao: (laoWords, [",", ".", "!", "?"])
     case .amharic: (amharicWords, [",", ".", "!", "?"])
+    case .armenian: (armenianWords, [",", ".", "!", "?"])
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
@@ -4055,6 +4069,7 @@ extension TypingLanguage {
     case .myanmarBurmese: StarterLexicon.myanmarBurmeseWords
     case .lao: StarterLexicon.laoWords
     case .amharic: StarterLexicon.amharicWords
+    case .armenian: StarterLexicon.armenianWords
     case .greek: StarterLexicon.greekWords
     case .greeklish: StarterLexicon.greeklishWords
     case .dutch: StarterLexicon.dutchWords
@@ -4099,7 +4114,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4150,6 +4165,7 @@ extension TypingLanguage {
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .khmer,
       .myanmarBurmese,
+      .armenian,
       .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
       .mixedEnglishChinese, .mixedLanguages:
@@ -4196,6 +4212,7 @@ extension TypingLanguage {
     case .myanmarBurmese: "မြန်မာ"
     case .lao: "ລາວ"
     case .amharic: "አማርኛ"
+    case .armenian: "Հայերեն"
     case .greek: "Ελληνικά"
     case .greeklish: "Greeklish"
     case .dutch: "Nederlands"
