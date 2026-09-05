@@ -1492,6 +1492,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "kabyle-calm-step",
+      title: "Ameẓyan meɛqel",
+      text: "Ameẓyan meɛqel yeskan-d iḍris n uxeddim i d-iteddun.",
+      language: .kabyle,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "kabyle-open-book",
+      title: "Adlis yeldin",
+      text: "Adlis yeldin ur d-yerr ara akk isteqsiyen, maca yeldi abrid i tikti timaynutin.",
+      language: .kabyle,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "kabyle-small-effort",
+      title: "Ameẓyan n usenfali",
+      text: "Ameẓyan n usenfali n wass-a ur yesra ara ad yemmed akk tura. Ldi adlis, beddel yiwen wawal, rnu tazmilt i uzekka. Akud yeshal awal n tazwara.",
+      language: .kabyle,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "kabyle-return-place",
+      title: "Amkan n tuɣalin",
+      text: "Deg taggara n yal ass, ur yesri ara uɣawas ameẓyan ad yesɛu tiririt temmed. Yezmer ad yeǧǧ yiwen wawal ur nemmid ara, asteqsi, d tazmilt tawezlant i usenfali i d-iteddun. Akken tettuɣal d afud i uxeddim. Mi ara tmuqleḍ tikkelt-nniḍen, ad twaliḍ belli tikti teddunt s zdat, u tazwara ur telli ara tebɛid. Ameẓyan meɛqel yeǧǧa anezgum deg ubrid.",
+      language: .kabyle,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

@@ -77,6 +77,7 @@
 2026-09-05 更新：单语数量增至一百种，新增 Frisian（`frisian`）：基础与 1k 参考配置均定义 `bcp47: fy-FY`，没有 RTL、连写、`noLazyMode` 或词频排序标记。Typebar 使用原创 Frisian 词流与四档引语、LTR 空格提交；知识短文按 BCP 首段使用 `fy`，系统朗读精确使用 `fy-FY`。该语言进入已测试的默认/自选多语混排、预设、归档、社区投稿、成绩及服务端排行榜全路径；保留用户显式选择的简化输入，Zipf 启用时显示可能不支持的七秒提示但不移除修饰器。
 2026-09-05 更新：单语数量增至一百零一种，新增 Zulu（`zulu`）：固定参考配置没有 BCP-47、RTL、连写、`noLazyMode` 或词频排序标记。Typebar 使用原创 isiZulu 词流与四档引语、LTR 空格提交；知识短文与系统朗读严格复用缺省 `en` 与 `en-US`，不补造 Zulu 代码。该语言进入已测试的默认/自选多语混排、预设、归档、社区投稿、成绩及服务端排行榜全路径；保留用户显式选择的简化输入，Zipf 启用时显示可能不支持的七秒提示但不移除修饰器。
 2026-09-05 更新：单语数量增至一百零二种，新增 Hawaiian（`hawaiian`）：基础与 1k 参考配置均定义 `rightToLeft: false`、`bcp47: haw` 与 `orderedByFrequency: true`，没有连写或 `noLazyMode`。Typebar 使用原创 Hawaiian 词流与四档引语、LTR 空格提交；知识短文与系统朗读均精确使用 `haw`。该语言进入已测试的默认/自选多语混排、预设、归档、社区投稿、成绩及服务端排行榜全路径；保留用户显式选择的简化输入与 Zipf 高频词。
+2026-09-05 更新：单语数量增至一百零三种，新增 Kabyle（`kabyle`）：基础、1k、2k、5k 与 10k 参考配置均定义 `bcp47: kab` 与 `orderedByFrequency: false`，没有 RTL、连写或 `noLazyMode`。Typebar 使用原创 Taqbaylit 词流与四档引语、LTR 空格提交；知识短文与系统朗读均精确使用 `kab`。该语言进入已测试的默认/自选多语混排、预设、归档、社区投稿、成绩及服务端排行榜全路径；保留用户显式选择的简化输入，Zipf 启用时显示不支持的七秒提示但不移除修饰器。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |
