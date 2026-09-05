@@ -3268,6 +3268,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.esperantoWords,
       StarterLexicon.esperantoXSystemWords,
       StarterLexicon.esperantoHSystemWords,
+      StarterLexicon.latinWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3309,7 +3310,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 72)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 73)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3478,6 +3479,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .esperantoHSystem).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .esperantoHSystem), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .latin).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .latin), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .arabic).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .arabic), "ar")
@@ -3940,6 +3944,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       esperantoEncyclopedia.prompt(for: .words(3, language: .esperanto)),
       "Matena lumo venas")
+    let latinData = Data("""
+    {"title":"Fenestra","extract":"Lux matutina per fenestram apertam venit."}
+    """.utf8)
+    let latinEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: latinData, language: .latin))
+    XCTAssertEqual(latinEncyclopedia.text, "Lux matutina per fenestram apertam venit")
+    XCTAssertEqual(
+      latinEncyclopedia.prompt(for: .words(3, language: .latin)),
+      "Lux matutina per")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4140,6 +4153,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.esperanto.zipfFrequencySupport, .supported)
     XCTAssertEqual(TypingLanguage.esperantoHSystem.zipfFrequencySupport, .supported)
     XCTAssertEqual(TypingLanguage.esperantoXSystem.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.latin.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.armenian.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.bemba.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.albanian.zipfFrequencySupport, .unknown)
@@ -4150,6 +4164,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .esperantoXSystem, modifiers: [.zipf]),
       "Esperanto · X-sistemo 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .latin, modifiers: [.zipf]),
+      "Latina 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
     )
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .armenian, modifiers: [.zipf]),
@@ -4577,6 +4595,7 @@ final class TypingEngineTests: XCTestCase {
       (.esperanto, StarterLexicon.esperantoWords),
       (.esperantoXSystem, StarterLexicon.esperantoXSystemWords),
       (.esperantoHSystem, StarterLexicon.esperantoHSystemWords),
+      (.latin, StarterLexicon.latinWords),
       (.arabic, StarterLexicon.arabicWords),
       (.hebrew, StarterLexicon.hebrewWords),
       (.persian, StarterLexicon.persianWords),
@@ -4645,7 +4664,7 @@ final class TypingEngineTests: XCTestCase {
           let normalized = token.trimmingCharacters(
             in: CharacterSet.punctuationCharacters.union(.decimalDigits))
           return lexicon.contains(normalized)
-        })
+        }, "\(language.rawValue): \(prompt)")
       XCTAssertEqual(OfflineContent.quotes(for: language, length: .short).count, 1)
       XCTAssertEqual(OfflineContent.quotes(for: language, length: .medium).count, 1)
       XCTAssertEqual(OfflineContent.quotes(for: language, length: .long).count, 1)
@@ -4713,6 +4732,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.esperantoHSystem.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.esperantoHSystem))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.esperantoHSystem))
+    XCTAssertTrue(StarterLexicon.latinWords.contains("fenestra"))
+    XCTAssertFalse(TypingLanguage.latin.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.latin.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.latin.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.latin))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.latin))
     XCTAssertTrue(StarterLexicon.arabicWords.contains("نافِذة"))
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
@@ -4944,6 +4969,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.esperanto.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.esperantoXSystem.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.esperantoHSystem.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.latin.supportsLazyLatinInput)
 
     XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers(
@@ -4980,6 +5006,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.esperanto.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.esperantoXSystem.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.esperantoHSystem.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.latin.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
     XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")

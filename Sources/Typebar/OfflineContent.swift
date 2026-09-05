@@ -820,6 +820,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "latin-gradus-tranquillus",
+      title: "Gradus tranquillus",
+      text: "Gradus tranquillus novam cogitationem aperit.",
+      language: .latin,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "latin-una-discimus",
+      title: "Una discimus",
+      text: "Una discimus, attente audimus, et bonas sententias dividimus.",
+      language: .latin,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "latin-lux-matutina",
+      title: "Lux matutina",
+      text: "Lux matutina per fenestram apertam venit, et liber cum charta in mensa manet. Una discimus, attente audimus, et bonas sententias dividimus.",
+      language: .latin,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "latin-bonum-consilium",
+      title: "Bonum consilium",
+      text: "Lux matutina per fenestram apertam venit, et liber cum charta in mensa manet. Parvum exercitium tempus dat ad clariorem cogitationem. Cum una discimus, attente audimus et bonas sententias dividimus. Gradus tranquillus non omnia statim solvit, sed nos adiuvat ut quaestionem sequentem videamus, auxilium petamus et iter continuemus. Sic ex patientia, labore et colloquio dies cum bono consilio crescit.",
+      language: .latin,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",
