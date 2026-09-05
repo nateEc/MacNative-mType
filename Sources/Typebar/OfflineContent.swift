@@ -1408,6 +1408,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "frisian-calm-step",
+      title: "Rêstige stap",
+      text: "In rêstige stap makket it folgjende wurk dúdliker.",
+      language: .frisian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "frisian-open-book",
+      title: "Iepen boek",
+      text: "In iepen boek jout net op alle fragen antwurd, mar lit romte foar nije ideeën.",
+      language: .frisian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "frisian-small-effort",
+      title: "Lytse ynspanning",
+      text: "De lytse ynspanning fan hjoed hoecht net alles tagelyk ôf te meitsjen. Iepenje it boek, feroarje ien wurd en lit in nuttige notysje foar moarn stean. Tiid makket de lytse stap makliker om te begjinnen.",
+      language: .frisian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "frisian-return-place",
+      title: "Plak om werom te kommen",
+      text: "Oan 'e ein fan elke dei hoecht in lytse wurklist gjin folslein antwurd te hawwen. Der kin in heale sin, in fraach en in koarte notysje foar it folgjende besykjen yn stean. Sa wurdt weromkomme nei it wurk makliker. As do opnij sjochst, silst merke dat de ideeën fierder gien binne en dat de earste stap net mear sa fier fuort is. Elke rêstige stap lit in teken op it paad.",
+      language: .frisian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",
