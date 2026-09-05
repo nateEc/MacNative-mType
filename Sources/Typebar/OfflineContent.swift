@@ -1324,6 +1324,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "pinyin-calm-step",
+      title: "Man man de bu fa",
+      text: "Man man de bu fa, rang xia yi bu de gong zuo geng qing chu.",
+      language: .pinyin,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "pinyin-open-page",
+      title: "Da kai de shu ye",
+      text: "Da kai de shu ye bu hui da wan quan bu de wen ti, dan hui liu gei xin de xiang fa yi ge wei zhi.",
+      language: .pinyin,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "pinyin-small-effort",
+      title: "Xiao xiao de nu li",
+      text: "Jin tian de xiao xiao nu li bu bi yi ci wan cheng quan bu. Da kai shu, gai yi ge zi, gei ming tian liu xia yi ge you yong de ji hao. Shi jian hui rang xiao bu fa geng rong yi kai shi.",
+      language: .pinyin,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "pinyin-return-place",
+      title: "Ke yi hui lai de di fang",
+      text: "Mei yi tian de zui hou, xiao shu bu xu yao yi ge wan zheng de da an. Li mian ke yi you ban ge wen zi, yi ge wen ti, he yi ge gei xia ci shi shi de xiao ji hao. Zhe yang jiu ke yi wei ni zhun bei yi ge hui lai de di fang. Dang ni zai kan, ni hui fa xian xiang fa yi jing zou de geng yuan, kai shi de di fang ye bu zai na me yuan. Mei yi ge man man de bu fa, dou hui zai lu shang liu xia yi ge ji hao.",
+      language: .pinyin,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

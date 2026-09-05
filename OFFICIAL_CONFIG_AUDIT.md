@@ -70,6 +70,7 @@
 2026-09-05 更新：单语数量增至九十四种，新增 Vietnamese（`vietnamese`）：参考配置没有 BCP-47、RTL、连写、`noLazyMode` 或词频排序标记。Typebar 使用原创词流与四档引语、LTR 空格提交；知识短文与系统朗读严格复用缺省 `en` 与 `en-US`，不补造 Vietnamese 代码。该语言进入已测试的默认/自选多语混排、预设、归档、社区投稿、成绩及服务端排行榜全路径；保留用户显式选择的简化输入，Zipf 启用时显示可能不支持的七秒提示但不移除修饰器。
 
 2026-09-05 更新：单语数量增至九十五种，新增 Jyutping（`jyutping`）：参考配置定义 `bcp47: zh-Hant`，没有 RTL、连写、`noLazyMode` 或词频排序标记。Typebar 使用原创 ASCII 加声调数字词流与四档引语、LTR 空格提交；知识短文按 BCP 首段使用 `zh`，返回的汉字内容按中文词界分词，系统朗读精确使用 `zh-Hant`。该语言进入已测试的默认/自选多语混排、预设、归档、社区投稿、成绩及服务端排行榜全路径；保留用户显式选择的简化输入，Zipf 启用时显示可能不支持的七秒提示但不移除修饰器。
+2026-09-05 更新：单语数量增至九十六种，新增 Pinyin（`pinyin`）：基础、1k 与 10k 参考配置均只定义名称，没有 BCP-47、RTL、连写、`noLazyMode` 或词频排序标记。Typebar 使用原创 ASCII 拼音词流与四档引语、LTR 空格提交；知识短文与系统朗读严格复用缺省 `en` 与 `en-US`，不补造 Pinyin 代码。该语言进入已测试的默认/自选多语混排、预设、归档、社区投稿、成绩及服务端排行榜全路径；保留用户显式选择的简化输入，Zipf 启用时显示可能不支持的七秒提示但不移除修饰器。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

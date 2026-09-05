@@ -3282,6 +3282,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.kazakhWords,
       StarterLexicon.vietnameseWords,
       StarterLexicon.jyutpingWords,
+      StarterLexicon.pinyinWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3323,7 +3324,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 86)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 87)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3531,6 +3532,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .jyutping).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .jyutping), "zh")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .pinyin).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .pinyin), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
@@ -4364,6 +4368,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.kazakh.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.vietnamese.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.jyutping.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.pinyin.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.swissGerman.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
@@ -4881,6 +4886,7 @@ final class TypingEngineTests: XCTestCase {
       (.kazakh, StarterLexicon.kazakhWords),
       (.vietnamese, StarterLexicon.vietnameseWords),
       (.jyutping, StarterLexicon.jyutpingWords),
+      (.pinyin, StarterLexicon.pinyinWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
@@ -5118,6 +5124,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.jyutping.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.jyutping))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.jyutping))
+    XCTAssertTrue(StarterLexicon.pinyinWords.contains("ni"))
+    XCTAssertFalse(TypingLanguage.pinyin.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.pinyin.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.pinyin.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.pinyin.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.pinyin.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.pinyin.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.pinyin))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.pinyin))
     XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5410,6 +5425,9 @@ final class TypingEngineTests: XCTestCase {
       ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .jyutping, automaticallyEnabled: true),
       [.lazyLatin])
     XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .pinyin, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers([.zipf], language: .hebrew, automaticallyEnabled: true),
       [.zipf])
     let arabicConfiguration = TestConfiguration.words(2, language: .arabic).with(
@@ -5493,6 +5511,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.kazakh.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.vietnamese.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.jyutping.speechLocaleIdentifier, "zh-Hant")
+    XCTAssertEqual(TypingLanguage.pinyin.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")
