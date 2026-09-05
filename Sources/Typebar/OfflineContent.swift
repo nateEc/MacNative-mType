@@ -848,6 +848,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "friulian-lus-matine",
+      title: "Lûs di matine",
+      text: "La lûs di matine impie la strade serene.",
+      language: .friulian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "friulian-stelis-sere",
+      title: "Stelis di sere",
+      text: "Lis stelis di sere dan sperance a une citât cidine.",
+      language: .friulian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "friulian-libri-mar",
+      title: "Libri e mar",
+      text: "Un libri viert e il mar lontan dan plui spazi al pensâ di une zornade.",
+      language: .friulian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "friulian-strade-insiemi",
+      title: "Stradis insiemi",
+      text: "La lûs di matine impie la strade serene e la ploe nete l'aiar. Lis stelis di sere dan sperance a une citât cidine, cence fâ rumôr. Un libri viert e il mar lontan dan plui spazi al pensâ di une zornade. Cu la vôs, il cûr e une sielte clare, o cjatin stradis par imparâ insiemi. Ogni pas plui piçul al puarte une gnove memorie e un doman plui vierç.",
+      language: .friulian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",
