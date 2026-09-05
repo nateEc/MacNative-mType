@@ -23,6 +23,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case polishProgrammers
   case frenchAzerty
   case turkishQ
+  case turkishF
   case hungarianQwertz
   case greekAlphabetic
   case russianJcuken
@@ -55,6 +56,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .polishProgrammers: "Polish (Programmers)"
     case .frenchAzerty: "French AZERTY"
     case .turkishQ: "Turkish Q"
+    case .turkishF: "Turkish F"
     case .hungarianQwertz: "Hungarian QWERTZ · Typebar"
     case .greekAlphabetic: "Greek Alphabetic · Typebar"
     case .russianJcuken: "Russian JCUKEN"
@@ -92,6 +94,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case polishProgrammers
   case frenchAzerty
   case turkishQ
+  case turkishF
   case hungarianQwertz
   case greekAlphabetic
   case russianJcuken
@@ -824,6 +827,27 @@ enum KeyboardGuideModel {
           "bottom", "<ZXCVBNMÖÇ.",
           characters: ["<>", "zZ", "xX", "cC", "vV", "bB", "nN", "mM", "öÖ", "çÇ", ".:"],
           shiftedLabels: [">", "Z", "X", "C", "V", "B", "N", "M", "Ö", "Ç", ":"]
+        ),
+      ]
+    case .turkishF:
+      [
+        row(
+          "number", "+1234567890/-",
+          characters: ["+*", "1!", "2\"", "3^", "4$", "5%", "6&", "7'", "8(", "9)", "0=", "/?", "-_"],
+          shiftedLabels: ["*", "!", "\"", "^", "$", "%", "&", "'", "(", ")", "=", "?", "_"]
+        ),
+        row(
+          "top", "FGĞIODRNHPQW",
+          characters: ["fF", "gG", "ğĞ", "ıI", "oO", "dD", "rR", "nN", "hH", "pP", "qQ", "wW"]
+        ),
+        row(
+          "home", "UİEAÜTKMLYŞX",
+          characters: ["uU", "iİ", "eE", "aA", "üÜ", "tT", "kK", "mM", "lL", "yY", "şŞ", "xX"]
+        ),
+        row(
+          "bottom", "<JÖVCÇZSB.,",
+          characters: ["<>", "jJ", "öÖ", "vV", "cC", "çÇ", "zZ", "sS", "bB", ".:", ",;"],
+          shiftedLabels: [">", "J", "Ö", "V", "C", "Ç", "Z", "S", "B", ":", ";"]
         ),
       ]
     case .hungarianQwertz:

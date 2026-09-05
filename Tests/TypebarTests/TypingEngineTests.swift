@@ -1919,6 +1919,44 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testTurkishFMapsTurkishLettersAndPersists() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ğ", layout: .turkishF), "top-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ı", layout: .turkishF), "top-3")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "İ", layout: .turkishF), "home-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ü", layout: .turkishF), "home-4")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .turkishF), "bottom-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .turkishF), "bottom-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ">", layout: .turkishF), "bottom-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "?", layout: .turkishF), "number-11")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 15, modifierFlags: [.shift], layout: .turkishF), "I")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 1, modifierFlags: [.shift], layout: .turkishF), "İ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [], layout: .turkishF), "ö")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .turkishF), "*")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .turkishF), ">")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ş", layout: .turkishF), 39)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "?", layout: .turkishF), 27)
+    XCTAssertEqual(KeyboardInputLayout.turkishF.emulatedLayout, .turkishF)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .turkishF
+    settings.keyboardInputLayout = .turkishF
+    settings.layoutFluidLayouts = [.turkishF, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .turkishF)
+    XCTAssertEqual(restored.keyboardInputLayout, .turkishF)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.turkishF, .ansiQwerty])
+  }
+
+  @MainActor
   func testPolishProgrammersMapsOptionLayersAndPersists() {
     XCTAssertTrue([
       "ą", "ć", "ę", "ł", "ń", "ó", "ś", "ź", "ż",
@@ -4923,7 +4961,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 27)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 28)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

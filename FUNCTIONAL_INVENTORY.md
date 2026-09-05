@@ -230,6 +230,8 @@
 
 2026-09-05 补充：当前内置键盘图更新为二十七种，新增 `ANSI Colemak-DH`。它按公开 ANSI 基础变体独立定义相对标准 Colemak 的 `B/G`、`D/V`、`H/M` 键位，用于原生提示、显式物理输入模拟、反查、归档和 Layout Fluid；ISO、wide 与其他 DH 变体仍由系统输入或自定义键盘图处理，不读取或导入 Monkeytype 布局 JSON。
 
+2026-09-05 补充：当前内置键盘图更新为二十八种，新增 `Turkish F`。它按公开基础行独立定义 `ğ/ı/i/İ/ü/ö/ç/ş`、数字行和 ISO `< >`，用于原生提示、显式物理输入模拟、反查、归档和 Layout Fluid；AltGr 与组合式死键仍由 macOS 处理，不读取或导入 Monkeytype 布局 JSON。
+
 2026-09-04 补充：当时 `CFG-02`、`VIS-02` 与 `VIS-05` 的非拉丁布局覆盖新增 `Bulgarian Cyrillic · Typebar`。它是 Typebar 自写的第 19 个内置物理键位映射，覆盖 `я/ъ/щ/ч/ь` 与 ISO `< >`，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；这不是官方或系统 BDS 布局的复制，需精确系统布局时用户仍可选择 macOS 当前输入源。
 | INP-01 | 输入、逐字符状态、退格、长词 | `input/handlers/*` | TypingEngine | 部分实现 |
 | INP-02 | 组合输入/IME、焦点及 Caps Lock 提示 | `input/*`, `CapsWarning.tsx` | AppKitInputBridge | 部分实现：原生 AppKit 输入桥支持组合输入；标记文本在确认前只更新可选的关闭/下方/替换当前字符组合显示，不会改变提示、输入、计分或回放，确认提交时才进入输入引擎。输入视图会回传实际 responder 焦点，连续失焦满 1 秒时才显示可点击恢复焦点的提示，重新获焦会取消等待；有大小写语义的拉丁文与西里尔文练习会读取 macOS Caps Lock 状态显示警告，中文、日语假名与韩语不会显示无意义的提示。组合显示和两类提示均可在本机设置持久化；IME 最终人工验收尚未完成 |
