@@ -3290,6 +3290,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.hawaiianWords,
       StarterLexicon.kabyleWords,
       StarterLexicon.malteseWords,
+      StarterLexicon.tokiPonaWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3332,7 +3333,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 95)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 96)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3564,6 +3565,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .maltese).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .maltese), "mt")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .tokiPona).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .tokiPona), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
@@ -4927,6 +4931,7 @@ final class TypingEngineTests: XCTestCase {
       (.hawaiian, StarterLexicon.hawaiianWords),
       (.kabyle, StarterLexicon.kabyleWords),
       (.maltese, StarterLexicon.malteseWords),
+      (.tokiPona, StarterLexicon.tokiPonaWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
@@ -5237,6 +5242,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.maltese.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.maltese))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.maltese))
+    XCTAssertTrue(StarterLexicon.tokiPonaWords.contains("nasin"))
+    XCTAssertFalse(TypingLanguage.tokiPona.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.tokiPona.usesSpaceDelimitedWords)
+    XCTAssertFalse(TypingLanguage.tokiPona.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.tokiPona.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.tokiPona.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.tokiPona.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPona))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.tokiPona))
     XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5580,6 +5594,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.hawaiian.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.kabyle.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.maltese.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.tokiPona.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.armenianWestern.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
 
@@ -5594,6 +5609,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers(
         [.lazyLatin], language: .hindi, mode: .custom, automaticallyEnabled: false),
+      [.lazyLatin])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .tokiPona, automaticallyEnabled: false),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .tokiPona, mode: .custom, automaticallyEnabled: false),
       [.lazyLatin])
     XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers(
@@ -5640,6 +5663,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.hawaiian.speechLocaleIdentifier, "haw")
     XCTAssertEqual(TypingLanguage.kabyle.speechLocaleIdentifier, "kab")
     XCTAssertEqual(TypingLanguage.maltese.speechLocaleIdentifier, "mt")
+    XCTAssertEqual(TypingLanguage.tokiPona.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")

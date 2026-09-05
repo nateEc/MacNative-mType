@@ -1548,6 +1548,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "toki-pona-small-step",
+      title: "nasin pona",
+      text: "tenpo lili la, o pali e nasin pona.",
+      language: .tokiPona,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "toki-pona-open-page",
+      title: "lipu open",
+      text: "lipu open li pana e sona sin, taso sina ken lukin e ona kepeken tenpo.",
+      language: .tokiPona,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "toki-pona-small-work",
+      title: "pali lili",
+      text: "pali pona li wile ala e ijo mute lon tenpo open. o open e lipu, o sitelen e nimi wan, o awen lon nasin sina. tenpo kama la, pali lili sina li kama suli.",
+      language: .tokiPona,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "toki-pona-return-path",
+      title: "nasin sin",
+      text: "tenpo pini la, sina ken lukin e pali sina. ona li ken ala pona mute, taso ona li pana e sona. o sitelen e nimi pi tenpo kama, o awen e nasin lili, o tawa sin lon tenpo suno kama. pali lili li lon tenpo ale, li pana e wawa tawa pali sin. tenpo mute la, nasin sina li kama pona.",
+      language: .tokiPona,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

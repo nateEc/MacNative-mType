@@ -219,3 +219,4 @@
 - 完整客户端 `swift test` 已通过 261 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
 - 独立 Vapor 服务的 `swift test` 已通过 66 项测试，其中覆盖 GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除、Discord 头像公开隐私、原创公开徽章、公开连续练习/开始次数隐私及服务公告；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
 - Maltese 审计只读取 `maltese.json` 与 `maltese_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 `bcp47: mt`，不定义 RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的 Maltese 内容与 LTR 空格分词，知识短文和朗读均精确使用 `mt`。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
+- toki pona 审计只读取 `toki_pona.json`、`toki_pona_ku_suli.json` 与 `toki_pona_ku_lili.json` 的元数据，不读取其中词表或引语文本。三者定义 `noLazyMode: true`，不定义 BCP-47、RTL、连写或词频排序；实现因此使用独立自写的 toki pona 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。普通练习移除简化输入，自定义文本保留例外；Zipf 走未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
