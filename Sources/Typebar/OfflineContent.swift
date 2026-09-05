@@ -1660,6 +1660,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "udmurt-clear-step",
+      title: "Выль вӧл",
+      text: "Пичи вӧл ужлэсь кутсконзэ гажатэ.",
+      language: .udmurt,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "udmurt-open-book",
+      title: "Усьтыса книга",
+      text: "Усьтыса книга быд юанлы валэктон сётэ но, выль малпанлы сюрес усьтэ.",
+      language: .udmurt,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "udmurt-small-work",
+      title: "Пичи уж",
+      text: "Уж кутскон дыръя быдтӥз гожтэмын луон уг ков. Бам усьты, одӥг кыл гожты, малпанлы ас сюресз шедьтыны вакыт сёт. Туне пичи вӧл вӧсь мӧд лунэ ӧвӧл луэ.",
+      language: .udmurt,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "udmurt-return-page",
+      title: "Бамлань бертскон",
+      text: "Лун пырон азьын пичи план тырмытэк луны быгатэ. Со одӥг юан, нош ик лыдӟыны кыл но мӧд лунлы пичи пус сётны быгатэ. Татӥсь пичи ужъёс малпанлы сюрес сётӥзы. Бамлань бертскыку, тон малпанлэсь азин сектэмз но уж кутскон пыдсы уг луэмз адӟиськод. Гажана вӧл ужлэсь вӧлмытэн азин сектэмз утчато.",
+      language: .udmurt,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "yiddish-clear-step",
       title: "אַ קלאָרער שריט",
       text: "אַ קליינער שריט מאַכט דעם אָנהייב קלאָר.",
