@@ -230,6 +230,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case maltese
   case tokiPona
   case xhosa
+  case tibetan
   case arabic
   case arabicEgypt
   case arabicMorocco
@@ -1170,6 +1171,13 @@ struct TestConfiguration: Codable, Equatable {
   var modifiers: [TestModifier]
   var contentOptions: ContentOptions
   var challengeID: String?
+
+  /// Mirrors reference `joiningScript` metadata for native prompt shaping.
+  /// A mixed prompt needs this behavior when any selected component needs it.
+  var usesJoiningScriptPrompt: Bool {
+    language.usesJoiningScriptPrompt
+      || (language == .mixedLanguages && mixedLanguageComponents.contains { $0.usesJoiningScriptPrompt })
+  }
 
   init(
     mode: TestMode, duration: TimeInterval?, wordLimit: Int?, difficulty: Difficulty,
@@ -3524,6 +3532,14 @@ enum StarterLexicon {
     "iphepha", "ingcinga", "umsebenzi", "isiqalo", "inyathelo", "igama", "umbuzo", "impendulo",
   ]
 
+  // Typebar-authored Tibetan starter words use native macOS shaping for
+  // the `bo-TI` practice path without importing a reference wordset.
+  static let tibetanWords = [
+    "ང་", "ཁྱེད་", "མི་", "ཁང་པ་", "ལམ་", "འོད་", "ཆུ་", "ཉི་མ་", "ཟླ་བ་", "དུས་",
+    "དཔེ་ཆ་", "སྨྱུ་གུ་", "ཤོག་བུ་", "བསམ་པ་", "ལས་", "གསར་པ་", "ཆུང་ཆུང་", "ཆེན་པོ་",
+    "འགོ་", "རིམ་པ་", "ཚིག་", "དྲི་བ་", "ལན་", "སང་ཉིན་", "དེ་རིང་", "ཡིད་",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -4204,6 +4220,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: xhosaWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tibetan:
+      return prompt(
+        tokens: count, lexicon: tibetanWords, separator: " ", punctuation: ["།"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4573,6 +4593,7 @@ enum StarterLexicon {
     case .maltese: (malteseWords, [",", ".", "!", "?"])
     case .tokiPona: (tokiPonaWords, [",", ".", "!", "?"])
     case .xhosa: (xhosaWords, [",", ".", "!", "?"])
+    case .tibetan: (tibetanWords, ["།"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
     case .arabicMorocco: (arabicMoroccoWords, ["،", "؛", "؟", "."])
@@ -4746,6 +4767,7 @@ extension TypingLanguage {
     case .maltese: StarterLexicon.malteseWords
     case .tokiPona: StarterLexicon.tokiPonaWords
     case .xhosa: StarterLexicon.xhosaWords
+    case .tibetan: StarterLexicon.tibetanWords
     case .arabic: StarterLexicon.arabicWords
     case .arabicEgypt: StarterLexicon.arabicEgyptWords
     case .arabicMorocco: StarterLexicon.arabicMoroccoWords
@@ -4825,7 +4847,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4853,6 +4875,11 @@ extension TypingLanguage {
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
     self == .arabic || self == .arabicEgypt || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral
+  }
+
+  /// Preserve native shaping for source-pinned joining scripts.
+  var usesJoiningScriptPrompt: Bool {
+    self == .tibetan
   }
 
   var isNoSpaceLanguage: Bool {
@@ -4885,6 +4912,7 @@ extension TypingLanguage {
       .marathi,
       .malagasy,
       .tokiPona,
+      .tibetan,
       .esperantoXSystem, .esperantoHSystem,
       .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
@@ -4963,6 +4991,7 @@ extension TypingLanguage {
     case .maltese: "Malti"
     case .tokiPona: "toki pona"
     case .xhosa: "isiXhosa"
+    case .tibetan: "བོད་སྐད་"
     case .arabic: "العربية"
     case .arabicEgypt: "العربية المصرية"
     case .arabicMorocco: "العربية المغربية"

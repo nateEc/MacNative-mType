@@ -1454,6 +1454,7 @@ private struct ContentView: View {
     let _ = settings.localPracticeFontRevision
     let rendering = renderedPrompt
     let isRightToLeft = session.configuration.language.usesRightToLeftPrompt
+    let usesJoiningScript = session.configuration.usesJoiningScriptPrompt
     return Group {
       if practiceVisualEffect.usesASL {
         ASLPracticePrompt(
@@ -1474,7 +1475,7 @@ private struct ContentView: View {
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll)
       } else {
         Text(rendering.text)
-          .lineSpacing(12)
+          .lineSpacing(usesJoiningScript ? 8 : 12)
           .textSelection(.disabled)
           .multilineTextAlignment(isRightToLeft ? .trailing : .leading)
           .environment(\.layoutDirection, isRightToLeft ? .rightToLeft : .leftToRight)
@@ -1490,7 +1491,7 @@ private struct ContentView: View {
                 paceStyle: settings.paceCaretStyle,
                 font: settings.practiceFont.nsFont(
                   size: settings.fontSize, installedFontName: settings.installedPracticeFontName),
-                lineSpacing: 12,
+                lineSpacing: usesJoiningScript ? 8 : 12,
                 accent: activeTheme.caret,
                 motion: settings.smoothCaretMotion)
             }
@@ -1619,6 +1620,7 @@ private struct ContentView: View {
       let replacesTypo = glyph.state == .incorrect && settings.typoIndicatorStyle.replacesTarget
       let turnsIntoDot = completedCharacterIndices.contains(index)
         && settings.typedCharacterEffect == .dots
+        && !session.configuration.usesJoiningScriptPrompt
         && !glyph.character.isWhitespace
       let replacesCurrentWithComposition = glyph.state == .current
         && settings.compositionDisplayStyle == .replace

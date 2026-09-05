@@ -41,6 +41,7 @@ extension TypingLanguage {
     case .kabyle: "kab"
     case .maltese: "mt"
     case .xhosa: "xh"
+    case .tibetan: "bo-TI"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"
