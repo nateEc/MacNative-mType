@@ -3280,6 +3280,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.oromoWords,
       StarterLexicon.macedonianWords,
       StarterLexicon.kazakhWords,
+      StarterLexicon.vietnameseWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3321,7 +3322,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 84)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 85)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3523,6 +3524,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .kazakh).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .kazakh), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .vietnamese).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .vietnamese), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
@@ -4127,6 +4131,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(kazakhEncyclopedia.text, "Кітап әр таң сайын ашық")
     XCTAssertEqual(
       kazakhEncyclopedia.prompt(for: .words(3, language: .kazakh)), "Кітап әр таң")
+    let vietnameseData = Data("""
+    {"title":"Sách mở","extract":"Sách mở mỗi buổi sáng."}
+    """.utf8)
+    let vietnameseEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: vietnameseData, language: .vietnamese))
+    XCTAssertEqual(vietnameseEncyclopedia.text, "Sách mở mỗi buổi sáng")
+    XCTAssertEqual(
+      vietnameseEncyclopedia.prompt(for: .words(3, language: .vietnamese)), "Sách mở mỗi")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4338,6 +4350,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.oromo.zipfFrequencySupport, .supported)
     XCTAssertEqual(TypingLanguage.macedonian.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.kazakh.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.vietnamese.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.swissGerman.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
@@ -4853,6 +4866,7 @@ final class TypingEngineTests: XCTestCase {
       (.oromo, StarterLexicon.oromoWords),
       (.macedonian, StarterLexicon.macedonianWords),
       (.kazakh, StarterLexicon.kazakhWords),
+      (.vietnamese, StarterLexicon.vietnameseWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
@@ -5071,6 +5085,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.kazakh.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.kazakh))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.kazakh))
+    XCTAssertTrue(StarterLexicon.vietnameseWords.contains("sách"))
+    XCTAssertFalse(TypingLanguage.vietnamese.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.vietnamese.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.vietnamese.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.vietnamese.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.vietnamese.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.vietnamese.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.vietnamese))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.vietnamese))
     XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5441,6 +5464,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.oromo.speechLocaleIdentifier, "om")
     XCTAssertEqual(TypingLanguage.macedonian.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.kazakh.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.vietnamese.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")

@@ -1268,6 +1268,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "vietnamese-calm-step",
+      title: "Bước đi bình tĩnh",
+      text: "Bước đi bình tĩnh làm cho việc tiếp theo rõ ràng hơn.",
+      language: .vietnamese,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "vietnamese-open-page",
+      title: "Trang sách mở",
+      text: "Trang sách mở không trả lời mọi câu hỏi, nhưng để lại chỗ cho một ý nghĩ mới.",
+      language: .vietnamese,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "vietnamese-small-effort",
+      title: "Một cố gắng nhỏ",
+      text: "Một cố gắng nhỏ hôm nay không cần hoàn thành mọi thứ. Hãy mở sách, sửa một câu và để lại ghi chú hữu ích cho ngày mai. Theo thời gian, những bước nhỏ này làm cho khởi đầu dễ hơn.",
+      language: .vietnamese,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "vietnamese-return-place",
+      title: "Nơi quay lại",
+      text: "Cuối ngày, quyển sách nhỏ không đòi hỏi một câu trả lời trọn vẹn. Trong đó có thể còn nửa câu, một câu hỏi và một ghi chú ngắn cho lần thử tiếp theo. Như vậy đã đủ để chuẩn bị nơi bạn sẽ quay lại. Khi nhìn lại, bạn sẽ thấy ý nghĩ đã tiến thêm một chút và điểm bắt đầu không còn xa. Mỗi bước đi bình tĩnh để lại một dấu trên đường, và những dấu ấy cho thấy việc lớn có thể được giữ trong những phần nhỏ.",
+      language: .vietnamese,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",
