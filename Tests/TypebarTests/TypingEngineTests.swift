@@ -3581,6 +3581,9 @@ final class TypingEngineTests: XCTestCase {
       5, language: .kyrgyz).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .kyrgyz), "ky")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .yiddish).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .yiddish), "yi")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
@@ -4947,6 +4950,7 @@ final class TypingEngineTests: XCTestCase {
       (.xhosa, StarterLexicon.xhosaWords),
       (.tibetan, StarterLexicon.tibetanWords),
       (.kyrgyz, StarterLexicon.kyrgyzWords),
+      (.yiddish, StarterLexicon.yiddishWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
@@ -5304,6 +5308,19 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.kyrgyz.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.kyrgyz))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.kyrgyz))
+    XCTAssertTrue(StarterLexicon.yiddishWords.contains("בוך"))
+    XCTAssertTrue(TypingLanguage.yiddish.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.yiddish.usesJoiningScriptPrompt)
+    XCTAssertTrue(TypingLanguage.yiddish.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.yiddish.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.yiddish.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.yiddish.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.yiddish.zipfFrequencySupport, .unknown)
+    XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.yiddish))
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.yiddish))
+    let yiddishConfiguration = TestConfiguration(
+      mode: .words, duration: nil, wordLimit: 10, difficulty: .normal, rules: .init(), language: .yiddish)
+    XCTAssertTrue(yiddishConfiguration.usesJoiningScriptPrompt)
     XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5651,6 +5668,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.xhosa.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.tibetan.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.kyrgyz.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.yiddish.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.armenianWestern.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
 
@@ -5723,6 +5741,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.xhosa.speechLocaleIdentifier, "xh")
     XCTAssertEqual(TypingLanguage.tibetan.speechLocaleIdentifier, "bo-TI")
     XCTAssertEqual(TypingLanguage.kyrgyz.speechLocaleIdentifier, "ky-KY")
+    XCTAssertEqual(TypingLanguage.yiddish.speechLocaleIdentifier, "yi")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")

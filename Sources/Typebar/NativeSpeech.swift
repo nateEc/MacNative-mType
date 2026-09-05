@@ -43,6 +43,7 @@ extension TypingLanguage {
     case .xhosa: "xh"
     case .tibetan: "bo-TI"
     case .kyrgyz: "ky-KY"
+    case .yiddish: "yi"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"

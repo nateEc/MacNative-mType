@@ -168,6 +168,7 @@ enum LivePracticeContentService {
     case .xhosa: return "xh"
     case .tibetan: return "bo"
     case .kyrgyz: return "ky"
+    case .yiddish: return "yi"
     case .friulian: return "fur"
     case .bemba: return "bem"
     case .azerbaijani: return "az"

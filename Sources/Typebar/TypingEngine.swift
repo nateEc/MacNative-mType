@@ -232,6 +232,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case xhosa
   case tibetan
   case kyrgyz
+  case yiddish
   case arabic
   case arabicEgypt
   case arabicMorocco
@@ -3549,6 +3550,14 @@ enum StarterLexicon {
     "ой", "иш", "баштоо", "кадам", "сөз", "суроо", "жооп", "тоо",
   ]
 
+  // Typebar-authored Yiddish starter words keep the selected `yi` path
+  // without importing a reference wordset.
+  static let yiddishWords = [
+    "שלום", "איך", "דו", "מיר", "בוך", "בליי", "הויז", "וועג", "ליכט", "צייט",
+    "וואַסער", "ים", "טאָג", "נאכט", "פרייַנד", "מאָרגן", "הייַנט", "בלאַט", "געדאַנק", "אַרבעט",
+    "אָנהייב", "שריט", "וואָרט", "פֿראַגע", "ענטפֿער", "בוים",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -4237,6 +4246,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: kyrgyzWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .yiddish:
+      return prompt(
+        tokens: count, lexicon: yiddishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4608,6 +4621,7 @@ enum StarterLexicon {
     case .xhosa: (xhosaWords, [",", ".", "!", "?"])
     case .tibetan: (tibetanWords, ["།"])
     case .kyrgyz: (kyrgyzWords, [",", ".", "!", "?"])
+    case .yiddish: (yiddishWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
     case .arabicMorocco: (arabicMoroccoWords, ["،", "؛", "؟", "."])
@@ -4783,6 +4797,7 @@ extension TypingLanguage {
     case .xhosa: StarterLexicon.xhosaWords
     case .tibetan: StarterLexicon.tibetanWords
     case .kyrgyz: StarterLexicon.kyrgyzWords
+    case .yiddish: StarterLexicon.yiddishWords
     case .arabic: StarterLexicon.arabicWords
     case .arabicEgypt: StarterLexicon.arabicEgyptWords
     case .arabicMorocco: StarterLexicon.arabicMoroccoWords
@@ -4889,12 +4904,12 @@ extension TypingLanguage {
   /// single-language until mixed bidirectional prompt layout has dedicated
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
-    self == .arabic || self == .arabicEgypt || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral
+    self == .arabic || self == .arabicEgypt || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral || self == .yiddish
   }
 
   /// Preserve native shaping for source-pinned joining scripts.
   var usesJoiningScriptPrompt: Bool {
-    self == .tibetan
+    self == .tibetan || self == .yiddish
   }
 
   var isNoSpaceLanguage: Bool {
@@ -5008,6 +5023,7 @@ extension TypingLanguage {
     case .xhosa: "isiXhosa"
     case .tibetan: "བོད་སྐད་"
     case .kyrgyz: "Кыргызча"
+    case .yiddish: "ייִדיש"
     case .arabic: "العربية"
     case .arabicEgypt: "العربية المصرية"
     case .arabicMorocco: "العربية المغربية"
