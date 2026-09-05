@@ -55,6 +55,7 @@
 | `underscore_spaces` | 下划线分隔 | 等价实现 | 纯文本变换 |
 | `ALL_CAPS` | 全大写 | 等价实现 | 纯文本变换 |
 | `polyglot` | 多语混排 | 等价实现 | 使用 Typebar 自有一百零一种可混排 LTR 语言内容 |
+| `polyglot`（2026-09-05 更正） | 多语混排 | 等价实现 | 使用 Typebar 自有一百零二种可混排 LTR 语言内容；新增 Swahili 的 `noLazyMode` 边界已由轮转测试覆盖 |
 | `asl` | ASL 指语练习 | 等价实现 | 字母到原创原生矢量手势提示、J 弧线/Z 折线运动提示、当前/正确/错误状态与键盘计分均已覆盖；不导入官方专用字体，视觉设计有意不同，且不宣称可替代正式 ASL 教学 |
 | `rot13` | ROT13 | 等价实现 | 纯文本变换 |
 | `no_quit` | 锁定重开 | 等价实现 | `FUN-01` |
@@ -62,6 +63,8 @@
 ## 审计结论
 
 48 项官方 funbox 均已有用户可见的功能等价实现，0 项部分覆盖、0 项未实现。ASL 指语提示以原创原生矢量而非官方专用字体呈现；其他涉及视觉细节、互动、外部内容源或本地替代策略的实现也会持续审计，不能据此宣称逐像素或逐数据源复刻。Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi 与 Yiddish 的固定参考元数据均为 RTL／连写，因而和其余五个 RTL 单语一样刻意排除在 101 种 LTR 多语混排候选之外；Occitan、Oromo、Macedonian、Kazakh、Vietnamese、Jyutping、Pinyin、Western Armenian、Bashkir、Euskera、Frisian、Zulu、Hawaiian、Kabyle、Maltese、toki pona、Xhosa、Tibetan、Kyrgyz、Udmurt 与 Yoruba 的 LTR 路径均已由混排轮转测试覆盖。
+
+2026-09-05 更正：LTR 多语混排候选现为 102 种；Swahili 作为 `noLazyMode: true` 的 LTR 语言已纳入轮转覆盖，普通练习禁用简化输入而自定义文本保留例外。
 
 ## 本机个人最佳资格
 
