@@ -680,6 +680,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "bemba-tulefunda-pamo",
+      title: "Tulefunda pamo",
+      text: "Tulefunda pamo, tulebomba pamo.",
+      language: .bemba,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "bemba-inshita-ya-ukufunda",
+      title: "Inshita ya ukufunda",
+      text: "Tulefunda pamo, tulebomba pamo, kabili tulefwaya ukwishiba bwino pa nshita imbi.",
+      language: .bemba,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "bemba-ubwafwilisho",
+      title: "Ubwafwilisho",
+      text: "Umuntu umo alafunda, lelo abantu abengi balafwilishanya. Nga tulebomba pamo, ubwafya buba bwafya panono, kabili inshita ya ukufunda iba bwino.",
+      language: .bemba,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "bemba-umulimo-wa-pamo",
+      title: "Umulimo wa pamo",
+      text: "Tulefunda pamo, tulebomba pamo, kabili tulefwaya ukwishiba bwino. Umulimo umo waangala nga abantu balafwilishanya, no muntu umo alingile ukubwelela ku buku no kwishiba ifyo alefwaya. Inshita shonse te shaba shangu, lelo akalimo kanono kalenga umusebo ube bwino. Nga twalanda bwino no kutemwa ukufunda, tulemona ifintu fyesu mu mweo wa nshita. Ubwafya bumo buba bwafya panono nga tulebomba pamo, kabili ubwaice bwa mu mushi bwalaba bwino.",
+      language: .bemba,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",

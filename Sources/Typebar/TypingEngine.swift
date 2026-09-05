@@ -201,6 +201,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case german
   case afrikaans
   case albanian
+  case bemba
   case arabic
   case hebrew
   case persian
@@ -3260,6 +3261,14 @@ enum StarterLexicon {
     "qytet", "lumë", "erë", "kohë", "zë", "pyetje", "përgjigje", "shpresë", "e ardhme", "hap",
   ]
 
+  // Typebar-authored Bemba starter words use a compact local vocabulary for
+  // practice without importing the reference dictionary or word list.
+  static let bembaWords = [
+    "buku", "amenshi", "inshita", "umulimo", "abantu", "umwana", "umushi", "ubwafya", "amano", "ifintu",
+    "umunwe", "ulushishi", "ukufunda", "ukubomba", "ukwafwana", "mukwai", "bwino", "pamo", "umweo", "umusebo",
+    "umwelu", "akalimo", "milimo", "ubwafwilisho", "ukuseka", "ukulanda", "ukubwelela", "ukutemwa", "ulupwa", "icishinka",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -3780,6 +3789,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: albanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .bemba:
+      return prompt(
+        tokens: count, lexicon: bembaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4100,6 +4113,7 @@ enum StarterLexicon {
     case .german: (germanWords, [",", ".", "!", "?"])
     case .afrikaans: (afrikaansWords, [",", ".", "!", "?"])
     case .albanian: (albanianWords, [",", ".", "!", "?"])
+    case .bemba: (bembaWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
@@ -4228,6 +4242,7 @@ extension TypingLanguage {
     case .german: StarterLexicon.germanWords
     case .afrikaans: StarterLexicon.afrikaansWords
     case .albanian: StarterLexicon.albanianWords
+    case .bemba: StarterLexicon.bembaWords
     case .arabic: StarterLexicon.arabicWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
@@ -4302,7 +4317,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .albanian, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4385,7 +4400,7 @@ extension TypingLanguage {
     case .english, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
-    case .armenian, .bulgarian, .hungarian, .lao:
+    case .armenian, .bemba, .bulgarian, .hungarian, .lao:
       return .unsupported
     default:
       return .unknown
@@ -4400,6 +4415,7 @@ extension TypingLanguage {
     case .german: "Deutsch"
     case .afrikaans: "Afrikaans"
     case .albanian: "Shqip"
+    case .bemba: "Ichibemba"
     case .arabic: "العربية"
     case .hebrew: "עברית"
     case .persian: "فارسی"

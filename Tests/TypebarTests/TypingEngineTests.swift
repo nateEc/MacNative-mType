@@ -3263,6 +3263,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.afrikaansWords,
       StarterLexicon.albanianWords,
+      StarterLexicon.bembaWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3304,7 +3305,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 67)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 68)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3458,6 +3459,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .albanian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .albanian), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .bemba).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .bemba), "bem")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .arabic).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .arabic), "ar")
@@ -3893,6 +3897,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       albanianEncyclopedia.prompt(for: .words(3, language: .albanian)),
       "Drita e mëngjesit")
+    let bembaData = Data("""
+    {"title":"Buku","extract":"Abantu balebelenga buku pamo mu nshita ya lucelo."}
+    """.utf8)
+    let bembaEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: bembaData, language: .bemba))
+    XCTAssertEqual(bembaEncyclopedia.text, "Abantu balebelenga buku pamo mu nshita ya lucelo")
+    XCTAssertEqual(
+      bembaEncyclopedia.prompt(for: .words(3, language: .bemba)),
+      "Abantu balebelenga buku")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4090,11 +4103,16 @@ final class TypingEngineTests: XCTestCase {
   func testZipfFrequencyNoticesMatchPinnedWordListMetadata() {
     XCTAssertEqual(TypingLanguage.marathi.zipfFrequencySupport, .supported)
     XCTAssertEqual(TypingLanguage.armenian.zipfFrequencySupport, .unsupported)
+    XCTAssertEqual(TypingLanguage.bemba.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.albanian.zipfFrequencySupport, .unknown)
     XCTAssertNil(ZipfFrequencyPolicy.notice(for: .marathi, modifiers: [.zipf]))
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .armenian, modifiers: [.zipf]),
       "Հայերեն 不支持 Zipf 高频词：该词表未按词频排序。请选择其他词表。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .bemba, modifiers: [.zipf]),
+      "Ichibemba 不支持 Zipf 高频词：该词表未按词频排序。请选择其他词表。"
     )
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .albanian, modifiers: [.zipf]),
@@ -4509,6 +4527,7 @@ final class TypingEngineTests: XCTestCase {
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
       (.afrikaans, StarterLexicon.afrikaansWords),
       (.albanian, StarterLexicon.albanianWords),
+      (.bemba, StarterLexicon.bembaWords),
       (.arabic, StarterLexicon.arabicWords),
       (.hebrew, StarterLexicon.hebrewWords),
       (.persian, StarterLexicon.persianWords),
@@ -4619,6 +4638,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.albanian.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.albanian))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.albanian))
+    XCTAssertTrue(StarterLexicon.bembaWords.contains("buku"))
+    XCTAssertFalse(TypingLanguage.bemba.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.bemba.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.bemba.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.bemba))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.bemba))
     XCTAssertTrue(StarterLexicon.arabicWords.contains("نافِذة"))
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
@@ -4874,6 +4899,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.german.speechLocaleIdentifier, "de-DE")
     XCTAssertEqual(TypingLanguage.afrikaans.speechLocaleIdentifier, "af-ZA")
     XCTAssertEqual(TypingLanguage.albanian.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.bemba.speechLocaleIdentifier, "bem")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
     XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")
