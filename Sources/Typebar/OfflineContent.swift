@@ -1296,6 +1296,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "jyutping-calm-step",
+      title: "Maan6 maan2 ge3 bou6 faat3",
+      text: "Maan6 maan2 ge3 bou6 faat3, ling6 haa6 jat1 bou6 ge3 gung1 zok3 cing4 co1.",
+      language: .jyutping,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "jyutping-open-page",
+      title: "Hoi1 zo2 ge3 syu1 min6",
+      text: "Hoi1 zo2 ge3 syu1 min6, m4 wui5 daap3 soeng6 jat1 go3 maan6 tai4, daan6 hai6 bei2 san1 ji3 si1 lau4 wai2 zi6.",
+      language: .jyutping,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "jyutping-small-effort",
+      title: "Siu2 siu2 nou5 lik6",
+      text: "Gam1 jat6 ge3 siu2 siu2 nou5 lik6, m4 sai2 jat1 ci3 gwo3 syun4 bou6. Hoi1 syu1, gaai2 jat1 go3 maan6 zi6, bei2 ming4 jat6 lau4 haa6 jat1 go3 jau5 jung6 ge3 gei3 hou6. Si4 gaan3 jat1 gau6, siu2 bou6 faat3 wui5 ling6 hoi1 tau4 gang3 jung4 ji6.",
+      language: .jyutping,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "jyutping-return-place",
+      title: "Zyun2 tau4 ge3 wai2 zi6",
+      text: "Jat1 jat6 ge3 zeoi3 hau6, siu2 syu1 m4 sai2 jiu3 jyu4 jat1 go3 jyun4 zing2 ge3 daap3 on3. Keoi5 ho2 ji5 lau4 haa6 bun3 go3 maan6 zi6, jat1 go3 maan6 tai4, tung4 jat1 go3 bei2 haa6 ci3 si3 ge3 siu2 gei3 hou6. Gam2 joeng6 jau5 gau3 bei2 nei5 zyun2 tau4. Dang2 nei5 zoi3 tai2, nei5 wui5 gin3 dou3 ji3 si1 jau5 ceot1 faat3, tung4 hoi1 tau4 m4 zoi3 jyun5. Mui5 jat1 bou6 maan6 maan2 ge3 bou6 faat3, dou1 bei2 lou6 soeng6 lau4 haa6 jat1 go3 gei3 hou6.",
+      language: .jyutping,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",
@@ -2966,8 +2994,8 @@ enum NoSpaceWordBoundaryPolicy {
   }
 
   /// Parses only prompts which can be completely described by Typebar's own
-  /// no-space lexicons. A number or punctuation suffix remains attached to
-  /// its generated word. Any unknown text deliberately falls back to
+  /// no-space lexicons. Independent numeric tokens and punctuation suffixes
+  /// remain attached to their generated words. Any unknown text deliberately falls back to
   /// character-level metrics instead of inventing a word boundary.
   private static func noSpaceLanguageWords(
     in source: String, language: TypingLanguage
@@ -2979,6 +3007,12 @@ enum NoSpaceWordBoundaryPolicy {
     var words: [String] = []
     var index = 0
     while index < characters.count {
+      if characters[index].isNumber {
+        let start = index
+        while index < characters.count, characters[index].isNumber { index += 1 }
+        words.append(String(characters[start..<index]))
+        continue
+      }
       guard let word = lexicon.first(where: { candidate in
         let end = index + candidate.count
         guard end <= characters.count else { return false }

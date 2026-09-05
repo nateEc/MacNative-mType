@@ -158,6 +158,7 @@ enum LivePracticeContentService {
     case .uzbek: return "uz"
     case .occitan: return "oc"
     case .oromo: return "om"
+    case .jyutping: return "zh"
     case .friulian: return "fur"
     case .bemba: return "bem"
     case .azerbaijani: return "az"
@@ -233,11 +234,11 @@ enum LivePracticeContentService {
     return .init(
       source: source, title: normalizedTitle.isEmpty ? source.displayName : normalizedTitle,
       byline: normalizedByline?.isEmpty == false ? normalizedByline : nil,
-      tokens: tokens, separator: language.isNoSpaceLanguage ? "" : " ")
+      tokens: tokens, separator: language.usesNoSpaceLiveText ? "" : " ")
   }
 
   private static func tokens(in rawText: String, language: TypingLanguage) -> [String] {
-    guard language.isNoSpaceLanguage else {
+    guard language.usesNoSpaceLiveText else {
       return rawText.split(whereSeparator: { !$0.isLetter }).map(String.init)
     }
     let tokenizer = NLTokenizer(unit: .word)
@@ -254,6 +255,13 @@ enum LivePracticeContentService {
 }
 
 private extension TypingLanguage {
+  /// Jyutping practice keeps its own tone-number words space-delimited, while
+  /// its pinned `zh-Hant` encyclopedia stream is Chinese source text and must
+  /// preserve the system tokenizer's no-space boundaries.
+  var usesNoSpaceLiveText: Bool {
+    isNoSpaceLanguage || self == .jyutping
+  }
+
   /// Japanese native variants, Ukrainian Latin, Serbian Latin, and Greeklish are intentionally excluded:
   /// those native options promise hiragana-only, katakana-only, ASCII romaji,
   /// ASCII-Latin prompts, Serbian Latin prompts, and ASCII Greeklish prompts respectively,

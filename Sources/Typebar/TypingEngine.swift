@@ -219,6 +219,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case macedonian
   case kazakh
   case vietnamese
+  case jyutping
   case arabic
   case arabicEgypt
   case arabicMorocco
@@ -3424,6 +3425,14 @@ enum StarterLexicon {
     "nghiệm", "khoảng", "cách", "bước", "kiên", "nhẫn", "cân", "bằng", "làng", "mưa",
   ]
 
+  // Typebar-authored Jyutping starter words retain ASCII tone-number input
+  // without importing the reference dictionary or word list.
+  static let jyutpingWords = [
+    "nei5", "hou2", "ngo5", "keoi5", "dei6", "go3", "si6", "hok6", "saang1", "syu1",
+    "man6", "zi6", "sik1", "saan1", "hoi2", "jyu5", "jyu4", "gung1", "zok3", "jyun4",
+    "si1", "gaan3", "ceot1", "faat3", "sam1", "zi3", "lou6", "cing4", "ging2", "hoi1",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -4052,6 +4061,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: vietnameseWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .jyutping:
+      return prompt(
+        tokens: count, lexicon: jyutpingWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4406,6 +4419,7 @@ enum StarterLexicon {
     case .macedonian: (macedonianWords, [",", ".", "!", "?"])
     case .kazakh: (kazakhWords, [",", ".", "!", "?"])
     case .vietnamese: (vietnameseWords, [",", ".", "!", "?"])
+    case .jyutping: (jyutpingWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
     case .arabicMorocco: (arabicMoroccoWords, ["،", "؛", "؟", "."])
@@ -4489,8 +4503,13 @@ enum StarterLexicon {
     let tokenIndex = usesZipfFrequency
       ? ZipfWordSelection.index(in: lexicon.count)
       : Int.random(in: lexicon.indices)
+    if contentOptions.includeNumbers, index.isMultiple(of: 9) {
+      // The reference generator replaces a word with an independent number
+      // token. Keeping it separate is essential for languages such as
+      // Jyutping, whose lexical tone markers are already decimal digits.
+      return String(index / 9 + 1)
+    }
     var token = lexicon[tokenIndex]
-    if contentOptions.includeNumbers, index.isMultiple(of: 9) { token += String(index / 9 + 1) }
     if contentOptions.includePunctuation, index.isMultiple(of: 7) {
       token += punctuation[index / 7 % punctuation.count]
     }
@@ -4562,6 +4581,7 @@ extension TypingLanguage {
     case .macedonian: StarterLexicon.macedonianWords
     case .kazakh: StarterLexicon.kazakhWords
     case .vietnamese: StarterLexicon.vietnameseWords
+    case .jyutping: StarterLexicon.jyutpingWords
     case .arabic: StarterLexicon.arabicWords
     case .arabicEgypt: StarterLexicon.arabicEgyptWords
     case .arabicMorocco: StarterLexicon.arabicMoroccoWords
@@ -4640,7 +4660,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4766,6 +4786,7 @@ extension TypingLanguage {
     case .macedonian: "Македонски"
     case .kazakh: "Қазақша"
     case .vietnamese: "Tiếng Việt"
+    case .jyutping: "Jyutping"
     case .arabic: "العربية"
     case .arabicEgypt: "العربية المصرية"
     case .arabicMorocco: "العربية المغربية"

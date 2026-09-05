@@ -3176,25 +3176,25 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testNoSpaceLanguagesTrackOwnedWordBoundariesForProgressAndResults() {
-    for (language, lexicon, punctuation) in [
-      (TypingLanguage.simplifiedChinese, StarterLexicon.simplifiedChineseWords, "，"),
-      (.traditionalChinese, StarterLexicon.traditionalChineseWords, "，"),
-      (.japaneseHiragana, StarterLexicon.japaneseHiraganaWords, "、"),
-      (.japaneseKatakana, StarterLexicon.japaneseKatakanaWords, "、"),
+    for (language, lexicon) in [
+      (TypingLanguage.simplifiedChinese, StarterLexicon.simplifiedChineseWords),
+      (.traditionalChinese, StarterLexicon.traditionalChineseWords),
+      (.japaneseHiragana, StarterLexicon.japaneseHiraganaWords),
+      (.japaneseKatakana, StarterLexicon.japaneseKatakanaWords),
     ] {
       let configuration = TestConfiguration.words(
         4, language: language,
         contentOptions: .init(includePunctuation: true, includeNumbers: true))
       var session = TestSessionFactory.make(configuration: configuration)
       guard let firstWord = lexicon.sorted(by: { $0.count > $1.count }).first(where: {
-        session.prompt.hasPrefix($0)
+        session.prompt.dropFirst().hasPrefix($0)
       }) else {
-        XCTFail("无空格提示未以 Typebar 自有词库项开始：\(language.displayName)")
+        XCTFail("无空格提示未在独立数字后接续 Typebar 自有词库项：\(language.displayName)")
         continue
       }
-      let firstTarget = firstWord + "1" + punctuation
+      let firstTarget = "1"
 
-      XCTAssertTrue(session.prompt.hasPrefix(firstTarget), language.displayName)
+      XCTAssertTrue(session.prompt.hasPrefix(firstTarget + firstWord), language.displayName)
       XCTAssertEqual(session.progressText(at: start), "0/4", language.displayName)
       session.insert(firstTarget, at: start)
       XCTAssertEqual(session.completedWordCount, 1, language.displayName)
@@ -3281,6 +3281,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.macedonianWords,
       StarterLexicon.kazakhWords,
       StarterLexicon.vietnameseWords,
+      StarterLexicon.jyutpingWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3322,7 +3323,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 85)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 86)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3527,6 +3528,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .vietnamese).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .vietnamese), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .jyutping).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .jyutping), "zh")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
@@ -4139,6 +4143,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(vietnameseEncyclopedia.text, "Sách mở mỗi buổi sáng")
     XCTAssertEqual(
       vietnameseEncyclopedia.prompt(for: .words(3, language: .vietnamese)), "Sách mở mỗi")
+    let jyutpingData = Data("""
+    {"title":"開書","extract":"書在早上打開。"}
+    """.utf8)
+    let jyutpingEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: jyutpingData, language: .jyutping))
+    XCTAssertEqual(jyutpingEncyclopedia.text, "書在早上打開")
+    XCTAssertEqual(
+      jyutpingEncyclopedia.prompt(for: .words(3, language: .jyutping)), "書在早上")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4351,6 +4363,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.macedonian.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.kazakh.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.vietnamese.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.jyutping.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.swissGerman.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
@@ -4804,8 +4817,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(prompt.contains(" "))
     XCTAssertTrue(
       prompt.split(separator: " ").allSatisfy { token in
-        let normalized = token.trimmingCharacters(
-          in: CharacterSet.punctuationCharacters.union(.decimalDigits))
+        if token.allSatisfy(\.isNumber) { return true }
+        let normalized = token.trimmingCharacters(in: .punctuationCharacters)
         return StarterLexicon.germanWords.contains(normalized)
       })
     XCTAssertEqual(OfflineContent.quotes(for: .german, length: .short).count, 1)
@@ -4867,6 +4880,7 @@ final class TypingEngineTests: XCTestCase {
       (.macedonian, StarterLexicon.macedonianWords),
       (.kazakh, StarterLexicon.kazakhWords),
       (.vietnamese, StarterLexicon.vietnameseWords),
+      (.jyutping, StarterLexicon.jyutpingWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
@@ -4936,8 +4950,9 @@ final class TypingEngineTests: XCTestCase {
         contentOptions: .init(includePunctuation: true, includeNumbers: true))
       XCTAssertTrue(
         prompt.split(separator: " ").allSatisfy { token in
+          if token.allSatisfy(\.isNumber) { return true }
           let normalized = token.trimmingCharacters(
-            in: CharacterSet.punctuationCharacters.union(.decimalDigits))
+            in: .punctuationCharacters)
           return lexicon.contains(normalized)
         }, "\(language.rawValue): \(prompt)")
       XCTAssertEqual(OfflineContent.quotes(for: language, length: .short).count, 1)
@@ -5094,6 +5109,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.vietnamese.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.vietnamese))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.vietnamese))
+    XCTAssertTrue(StarterLexicon.jyutpingWords.contains("nei5"))
+    XCTAssertFalse(TypingLanguage.jyutping.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.jyutping.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.jyutping.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.jyutping.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.jyutping.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.jyutping.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.jyutping))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.jyutping))
     XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5383,6 +5407,9 @@ final class TypingEngineTests: XCTestCase {
       ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .sindhi, automaticallyEnabled: true),
       [.lazyLatin])
     XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .jyutping, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers([.zipf], language: .hebrew, automaticallyEnabled: true),
       [.zipf])
     let arabicConfiguration = TestConfiguration.words(2, language: .arabic).with(
@@ -5465,6 +5492,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.macedonian.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.kazakh.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.vietnamese.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.jyutping.speechLocaleIdentifier, "zh-Hant")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")
