@@ -5,6 +5,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiQwerty
   case ansiDvorak
   case ansiColemak
+  case ansiColemakDH
   case ansiWorkman
   case germanQwertz
   case swissGerman
@@ -36,6 +37,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ansiQwerty: "ANSI QWERTY"
     case .ansiDvorak: "ANSI Dvorak"
     case .ansiColemak: "ANSI Colemak"
+    case .ansiColemakDH: "ANSI Colemak-DH"
     case .ansiWorkman: "ANSI Workman"
     case .germanQwertz: "German QWERTZ"
     case .swissGerman: "Swiss German"
@@ -72,6 +74,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ansiQwerty
   case ansiDvorak
   case ansiColemak
+  case ansiColemakDH
   case ansiWorkman
   case germanQwertz
   case swissGerman
@@ -530,6 +533,13 @@ enum KeyboardGuideModel {
         row("top", "QWFPGJLUY;[]"),
         row("home", "ARSTDHNEIO'"),
         row("bottom", "ZXCVBKM,./"),
+      ]
+    case .ansiColemakDH:
+      [
+        row("number", "1234567890-="),
+        row("top", "QWFPBJLUY;[]"),
+        row("home", "ARSTGMNEIO'"),
+        row("bottom", "ZXCDVKH,./"),
       ]
     case .ansiWorkman:
       [

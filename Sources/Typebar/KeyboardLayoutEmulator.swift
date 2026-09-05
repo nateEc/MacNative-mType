@@ -131,6 +131,11 @@ enum KeyboardLayoutEmulator {
         "12:qQ 13:wW 14:fF 15:pP 17:gG 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "
           + "0:aA 1:rR 2:sS 3:tT 5:dD 4:hH 38:nN 40:eE 37:iI 41:oO 39:'\" "
           + "6:zZ 7:xX 8:cC 9:vV 11:bB 45:kK 46:mM 43:,< 47:.> 44:/?")
+    case .ansiColemakDH:
+      map(
+        "12:qQ 13:wW 14:fF 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "
+          + "0:aA 1:rR 2:sS 3:tT 5:gG 4:mM 38:nN 40:eE 37:iI 41:oO 39:'\" "
+          + "6:zZ 7:xX 8:cC 9:dD 11:vV 45:kK 46:hH 43:,< 47:.> 44:/?")
     case .ansiWorkman:
       map(
         "12:qQ 13:dD 14:rR 15:wW 17:bB 16:jJ 32:fF 34:uU 31:pP 35:;: 33:[{ 30:]} "
