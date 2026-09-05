@@ -708,6 +708,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "bosnian-miran-korak",
+      title: "Miran korak",
+      text: "Miran korak otvara prostor za novu misao.",
+      language: .bosnian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "bosnian-ucimo-zajedno",
+      title: "Učimo zajedno",
+      text: "Učimo zajedno, slušamo pažljivo i dijelimo znanje kroz svaki miran dan.",
+      language: .bosnian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "bosnian-otvoreni-prozori",
+      title: "Otvoreni prozori",
+      text: "Jutro u malom gradu počinje tihim razgovorima i otvorenim prozorima. Kada učimo zajedno, pažljivo slušamo i dijelimo znanje, posao postaje lakši.",
+      language: .bosnian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "bosnian-dan-koji-ima-smisla",
+      title: "Dan koji ima smisla",
+      text: "Jutro u malom gradu počinje tihim razgovorima i otvorenim prozorima. Na stolu su knjiga, bilješka i olovka, a svaka mala vježba donosi jasniju misao. Kada učimo zajedno, pažljivo slušamo i dijelimo znanje, posao postaje lakši. Miran korak ne rješava sve odmah, ali daje vremena da primijetimo dobru ideju, pitamo za pomoć i nastavimo dalje. Tako se od strpljenja, rada i razgovora gradi dan koji ima smisla.",
+      language: .bosnian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",

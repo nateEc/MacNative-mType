@@ -202,6 +202,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case afrikaans
   case albanian
   case bemba
+  case bosnian
   case arabic
   case hebrew
   case persian
@@ -3269,6 +3270,14 @@ enum StarterLexicon {
     "umwelu", "akalimo", "milimo", "ubwafwilisho", "ukuseka", "ukulanda", "ukubwelela", "ukutemwa", "ulupwa", "icishinka",
   ]
 
+  // Typebar-authored Bosnian starter words retain native diacritics for local
+  // practice without importing the reference dictionary or word list.
+  static let bosnianWords = [
+    "jutro", "prozor", "papir", "svjetlo", "vjetar", "vježba", "pažnja", "mirno", "jasno", "jezero",
+    "ulica", "stol", "putovanje", "strpljenje", "trenutak", "grad", "kiša", "tišina", "smjer", "zvijezda",
+    "bilješka", "vrt", "dah", "mali", "čitanje", "učenje", "zajedno", "dobrota", "sloboda", "vrijeme",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -3793,6 +3802,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: bembaWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .bosnian:
+      return prompt(
+        tokens: count, lexicon: bosnianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4114,6 +4127,7 @@ enum StarterLexicon {
     case .afrikaans: (afrikaansWords, [",", ".", "!", "?"])
     case .albanian: (albanianWords, [",", ".", "!", "?"])
     case .bemba: (bembaWords, [",", ".", "!", "?"])
+    case .bosnian: (bosnianWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
@@ -4243,6 +4257,7 @@ extension TypingLanguage {
     case .afrikaans: StarterLexicon.afrikaansWords
     case .albanian: StarterLexicon.albanianWords
     case .bemba: StarterLexicon.bembaWords
+    case .bosnian: StarterLexicon.bosnianWords
     case .arabic: StarterLexicon.arabicWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
@@ -4317,7 +4332,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4397,7 +4412,7 @@ extension TypingLanguage {
   /// wordsets. Dictionaries without that field intentionally remain unknown.
   var zipfFrequencySupport: ZipfFrequencySupport {
     switch self {
-    case .english, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
+    case .english, .bosnian, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
     case .armenian, .bemba, .bulgarian, .hungarian, .lao:
@@ -4416,6 +4431,7 @@ extension TypingLanguage {
     case .afrikaans: "Afrikaans"
     case .albanian: "Shqip"
     case .bemba: "Ichibemba"
+    case .bosnian: "Bosanski"
     case .arabic: "العربية"
     case .hebrew: "עברית"
     case .persian: "فارسی"
