@@ -2381,6 +2381,42 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.arabic101, .ansiQwerty])
   }
 
+  @MainActor
+  func testHebrewMapsStandardLettersShiftLayerAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .hebrew)
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .hebrew), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ק", layout: .hebrew), "top-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ש", layout: .hebrew), "home-0")
+    XCTAssertEqual(rows[3][0].label, "\\")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ץ", layout: .hebrew), "bottom-9")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 14, modifierFlags: [], layout: .hebrew), "ק")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 14, modifierFlags: [.shift], layout: .hebrew), "E")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 43, modifierFlags: [], layout: .hebrew), "ת")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 43, modifierFlags: [.shift], layout: .hebrew), ">")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .hebrew), "|")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "צ", layout: .hebrew), 46)
+    XCTAssertEqual(KeyboardInputLayout.hebrew.emulatedLayout, .hebrew)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .hebrew
+    settings.keyboardInputLayout = .hebrew
+    settings.layoutFluidLayouts = [.hebrew, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .hebrew)
+    XCTAssertEqual(restored.keyboardInputLayout, .hebrew)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.hebrew, .ansiQwerty])
+  }
+
   func testSerbianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .serbianCyrillic), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ђ", layout: .serbianCyrillic), "top-11")
@@ -5269,7 +5305,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 35)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 36)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

@@ -36,6 +36,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case estonian
   case persianStandard
   case arabic101
+  case hebrew
   case serbianCyrillic
 
   var id: Self { self }
@@ -76,6 +77,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .estonian: "Estonian"
     case .persianStandard: "Persian (Standard)"
     case .arabic101: "Arabic (101)"
+    case .hebrew: "Hebrew"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
   }
@@ -121,6 +123,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case estonian
   case persianStandard
   case arabic101
+  case hebrew
   case serbianCyrillic
 
   var id: Self { self }
@@ -1148,6 +1151,29 @@ enum KeyboardGuideModel {
           "bottom", labels: ["\\", "ئ", "ء", "ؤ", "ر", "لا", "ى", "ة", "و", "ز", "ظ"],
           characters: ["\\|", "ئ~", "ءْ", "ؤ}", "ر{", "لالآ", "ىآ", "ة’", "و,", "ز.", "ظ؟"],
           shiftedLabels: ["|", "~", "ْ", "}", "{", "لآ", "آ", "’", ",", ".", "؟"]
+        ),
+      ]
+    case .hebrew:
+      [
+        row(
+          "number", ";1234567890-=",
+          characters: [";~", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9)", "0(", "-_", "=+"],
+          shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "*", ")", "(", "_", "+"]
+        ),
+        row(
+          "top", "/'קראטוןםפ][\\",
+          characters: ["/Q", "'W", "קE", "רR", "אT", "טY", "וU", "ןI", "םO", "פP", "]}", "[{", "\\|"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "}", "{", "|"]
+        ),
+        row(
+          "home", "שדגכעיחלךף,",
+          characters: ["שA", "דS", "גD", "כF", "עG", "יH", "חJ", "לK", "ךL", "ף:", ",\""],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", ":", "\""]
+        ),
+        row(
+          "bottom", labels: ["\\", "ז", "ס", "ב", "ה", "נ", "מ", "צ", "ת", "ץ", "."],
+          characters: ["\\|", "זZ", "סX", "בC", "הV", "נB", "מN", "צM", "ת>", "ץ<", ".?"],
+          shiftedLabels: ["|", "Z", "X", "C", "V", "B", "N", "M", ">", "<", "?"]
         ),
       ]
     case .serbianCyrillic:
