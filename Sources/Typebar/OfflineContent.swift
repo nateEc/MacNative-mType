@@ -1296,6 +1296,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "kurdish-central-hengawi-aram",
+      title: "هەنگاوی ئارام",
+      text: "هەنگاوی ئارام کاری داهاتوو ڕوونتر دەکات.",
+      language: .kurdishCentral,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "kurdish-central-defteri-krawa",
+      title: "دەفتەری کراوە",
+      text: "دەفتەری کراوە هەموو وەڵامەکان نازانێت، بەڵام شوێن بۆ بینینی پرسیار بە بەشە بچووکەکان دەهێڵێت.",
+      language: .kurdishCentral,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "kurdish-central-kari-bchook",
+      title: "کاری بچووک",
+      text: "پێشکەوتن هەمیشە وەک ساتێکی گەورە دیار نابێت. کردنەوەی هەمان پەڕە، ڕوونکردنەوەی یەک ڕستە و چاککردنی کێشەیەکی بچووک بۆ هەوڵی داهاتوو متمانە دروست دەکات.",
+      language: .kurdishCentral,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "kurdish-central-mezi-dreh",
+      title: "مێزی درێژ",
+      text: "مێزی درێژ شوێن بۆ جۆرەها کار دەهێڵێت. لە یەک لاوە ڕەشنووسی یەکەم دادەنرێت، لە لاوەی تر ڕستەیەک چاوەڕێی سەرنجی زیاترە، و لە ناوەڕاستدا بڕیارێکی بچووک نۆرەی خۆی دەوێت. ڕاهێنانیش بە هەمان شێوە پێش دەچێت. پێویست نییە هەموو بەشە سەختەکان یەکجار چارەسەر بکرێن. کاتێک شوێنی گەڕانەوە، هەنگاوی داهاتووی ڕوون و ئارامی بۆ بینینی ئاسانبوون دوای چەند هەوڵێک هەبێت، خێرایی بە سروشتی زیاد دەبێت.",
+      language: .kurdishCentral,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

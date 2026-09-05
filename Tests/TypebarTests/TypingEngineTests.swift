@@ -3461,6 +3461,9 @@ final class TypingEngineTests: XCTestCase {
       5, language: .urdu).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .urdu), "ur")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .kurdishCentral).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .kurdishCentral), "ckb")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .tamil).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .tamil), "ta")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
@@ -3634,6 +3637,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(urduEncyclopedia.text, "کھڑکی سے صبح کی روشنی اندر آتی ہے")
     XCTAssertEqual(
       urduEncyclopedia.prompt(for: .words(3, language: .urdu)), "کھڑکی سے صبح")
+    let kurdishCentralData = Data("""
+    {"title":"پەنجەرە","extract":"ڕووناکی بەیانی لە پەنجەرەوە دەچێتە ژوورەوە."}
+    """.utf8)
+    let kurdishCentralEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: kurdishCentralData, language: .kurdishCentral))
+    XCTAssertEqual(kurdishCentralEncyclopedia.text, "ڕووناکی بەیانی لە پەنجەرەوە دەچێتە ژوورەوە")
+    XCTAssertEqual(
+      kurdishCentralEncyclopedia.prompt(for: .words(3, language: .kurdishCentral)),
+      "ڕووناکی بەیانی لە")
     let tamilData = Data("""
     {"title":"சாளரம்","extract":"சாளரம் காலை ஒளியை உள்ளே கொண்டு வருகிறது."}
     """.utf8)
@@ -4393,6 +4405,7 @@ final class TypingEngineTests: XCTestCase {
       (.hebrew, StarterLexicon.hebrewWords),
       (.persian, StarterLexicon.persianWords),
       (.urdu, StarterLexicon.urduWords),
+      (.kurdishCentral, StarterLexicon.kurdishCentralWords),
       (.tamil, StarterLexicon.tamilWords),
       (.hindi, StarterLexicon.hindiWords),
       (.gujarati, StarterLexicon.gujaratiWords),
@@ -4502,6 +4515,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.urdu.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.urdu))
     XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.urdu))
+    XCTAssertTrue(StarterLexicon.kurdishCentralWords.contains("پەنجەرە"))
+    XCTAssertTrue(TypingLanguage.kurdishCentral.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.kurdishCentral.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.kurdishCentral.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.kurdishCentral))
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.kurdishCentral))
     XCTAssertTrue(StarterLexicon.tamilWords.contains("சாளரம்"))
     XCTAssertFalse(TypingLanguage.tamil.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tamil))
@@ -4702,6 +4721,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
     XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")
     XCTAssertEqual(TypingLanguage.urdu.speechLocaleIdentifier, "ur-PK")
+    XCTAssertEqual(TypingLanguage.kurdishCentral.speechLocaleIdentifier, "ckb")
     XCTAssertEqual(TypingLanguage.tamil.speechLocaleIdentifier, "ta-IN")
     XCTAssertEqual(TypingLanguage.hindi.speechLocaleIdentifier, "hi-IN")
     XCTAssertEqual(TypingLanguage.gujarati.speechLocaleIdentifier, "gu-IN")

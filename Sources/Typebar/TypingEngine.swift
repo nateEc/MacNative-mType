@@ -223,6 +223,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case georgian
   case azerbaijani
   case belarusian
+  case kurdishCentral
   case greek
   case greeklish
   case dutch
@@ -3471,6 +3472,14 @@ enum StarterLexicon {
     "сябар", "горад", "рака", "вецер", "час", "голас", "пытанне", "адказ", "надзея", "будучыня",
   ]
 
+  // Typebar-authored Central Kurdish starter words use direct Unicode text
+  // for macOS RTL input sources; they are not an imported word list.
+  static let kurdishCentralWords = [
+    "کتێب", "قەڵەم", "پەنجەرە", "ڕێگا", "ڕووناکی", "پرد", "بەیانی", "کاغەز", "باخچە", "هەور",
+    "ئارامی", "چراغ", "چیا", "تۆو", "مۆسیقا", "مێز", "بیر", "تێبینی", "کار", "هەوڵ",
+    "هاوڕێ", "شار", "دەریا", "گوند", "کات", "دەنگ", "پرسیار", "وەڵام", "هیوە", "داهاتوو",
+  ]
+
   // Typebar-authored Danish starter words. The corpus deliberately includes
   // æ, ø and å for normal macOS composed-text input practice.
   static let danishWords = [
@@ -3773,6 +3782,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: belarusianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .kurdishCentral:
+      return prompt(
+        tokens: count, lexicon: kurdishCentralWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .greek:
       return prompt(
         tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -3995,6 +4008,7 @@ enum StarterLexicon {
     case .georgian: (georgianWords, [",", ".", "!", "?"])
     case .azerbaijani: (azerbaijaniWords, [",", ".", "!", "?"])
     case .belarusian: (belarusianWords, [",", ".", "!", "?"])
+    case .kurdishCentral: (kurdishCentralWords, ["،", "؛", "؟", "."])
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
@@ -4115,6 +4129,7 @@ extension TypingLanguage {
     case .georgian: StarterLexicon.georgianWords
     case .azerbaijani: StarterLexicon.azerbaijaniWords
     case .belarusian: StarterLexicon.belarusianWords
+    case .kurdishCentral: StarterLexicon.kurdishCentralWords
     case .greek: StarterLexicon.greekWords
     case .greeklish: StarterLexicon.greeklishWords
     case .dutch: StarterLexicon.dutchWords
@@ -4186,7 +4201,7 @@ extension TypingLanguage {
   /// single-language until mixed bidirectional prompt layout has dedicated
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
-    self == .arabic || self == .hebrew || self == .persian || self == .urdu
+    self == .arabic || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral
   }
 
   var isNoSpaceLanguage: Bool {
@@ -4263,6 +4278,7 @@ extension TypingLanguage {
     case .georgian: "ქართული"
     case .azerbaijani: "Azərbaycanca"
     case .belarusian: "Беларуская"
+    case .kurdishCentral: "کوردی ناوەندی"
     case .greek: "Ελληνικά"
     case .greeklish: "Greeklish"
     case .dutch: "Nederlands"
