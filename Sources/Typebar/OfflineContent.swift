@@ -1688,6 +1688,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "yoruba-clear-step",
+      title: "Ìgbésẹ̀ kékeré",
+      text: "Ìgbésẹ̀ kékeré kan mú ìbẹ̀rẹ̀ kedere.",
+      language: .yoruba,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "yoruba-open-book",
+      title: "Ìwé tí ó ṣí",
+      text: "Ìwé tí ó ṣí silẹ̀ kì í dá gbogbo ìbéèrè lóhùn, ṣùgbọ́n ó ṣí ọ̀nà sí ìrònú tuntun.",
+      language: .yoruba,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "yoruba-small-work",
+      title: "Iṣẹ́ kékeré",
+      text: "Iṣẹ́ rere kì í bẹ̀rẹ̀ pẹ̀lú pé ohun gbogbo ti ṣetan. Ṣí ojúewé kan, kọ ọ̀rọ̀ kan, kí o sì jẹ́ kí ìrònú rí ọ̀nà rẹ̀. Ìgbésẹ̀ kékeré òní jẹ́ kí ọ̀la rọrùn.",
+      language: .yoruba,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "yoruba-return-page",
+      title: "Padà sí ojúewé",
+      text: "Ní òpin ọjọ́, ètò kékeré kò gbọdọ̀ pé pátápátá. Ó lè fi ìbéèrè kan sílẹ̀, ọ̀rọ̀ kan láti kà lẹ́ẹ̀kansi, àti àmì kékeré fún ọ̀la. Àwọn nǹkan kékeré wọ̀nyí ń fún iṣẹ́ ní ọ̀nà. Tí o bá padà sí ojúewé, ìwọ yóò rí i pé ìrònú ti lọ síwájú, àti pé bẹ̀rẹ̀ iṣẹ́ kò le mọ́. Ìgbésẹ̀ kékeré tó mọ́ ń jẹ́ kí iṣẹ́ tẹ̀síwájú.",
+      language: .yoruba,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "yiddish-clear-step",
       title: "אַ קלאָרער שריט",
       text: "אַ קליינער שריט מאַכט דעם אָנהייב קלאָר.",
