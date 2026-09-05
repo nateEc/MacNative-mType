@@ -1380,6 +1380,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "basque-calm-step",
+      title: "Urrats lasaia",
+      text: "Urrats lasai batek hurrengo lana argiago egiten du.",
+      language: .basque,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "basque-open-book",
+      title: "Liburu irekia",
+      text: "Irekitako liburuak ez die galdera guztiei erantzuten, baina ideia berrientzako lekua uzten du.",
+      language: .basque,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "basque-small-effort",
+      title: "Ahalegin txikia",
+      text: "Gaurko ahalegin txikiak ez du dena aldi berean amaitu behar. Ireki liburua, aldatu hitz bat eta utzi biharko ohar erabilgarri bat. Denborak urrats txikiari hasiera errazagoa ematen dio.",
+      language: .basque,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "basque-return-place",
+      title: "Itzultzeko lekua",
+      text: "Egun bakoitzaren amaieran, lanen zerrenda txikiak ez du erantzun osoa behar. Esaldi erdi bat, galdera bat eta hurrengo saiakerarako ohar labur bat gorde ditzake. Horrela, lanera itzultzea errazagoa da. Berriro begiratzen duzunean, ideiak aurrera joan direla ikusiko duzu, eta lehen urratsa ez da hain urrun egongo. Urrats lasai bakoitzak seinale bat uzten du bidean.",
+      language: .basque,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

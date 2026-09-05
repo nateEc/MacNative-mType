@@ -35,6 +35,7 @@ extension TypingLanguage {
     case .oromo: "om"
     case .jyutping: "zh-Hant"
     case .bashkir: "ba"
+    case .basque: "eu"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"
