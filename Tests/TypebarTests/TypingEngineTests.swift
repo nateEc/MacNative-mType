@@ -2338,6 +2338,49 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.persianStandard, .ansiQwerty])
   }
 
+  @MainActor
+  func testArabic101PreservesLigatureOutputsAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .arabic101)
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ذ", layout: .arabic101), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ّ", layout: .arabic101), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ض", layout: .arabic101), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "إ", layout: .arabic101), "top-4")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ش", layout: .arabic101), "home-0")
+    XCTAssertEqual(rows[3][5].label, "لا")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ظ", layout: .arabic101), "bottom-10")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .arabic101), "ض")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], layout: .arabic101), "َ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 17, modifierFlags: [.shift], layout: .arabic101), "لإ")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.character(forKeyCode: 17, modifierFlags: [.shift], layout: .arabic101))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 11, modifierFlags: [], layout: .arabic101), "لا")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 11, modifierFlags: [.shift], layout: .arabic101), "لآ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .arabic101), "|")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ض", layout: .arabic101), 12)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "لأ", layout: .arabic101), 5)
+    XCTAssertEqual(KeyboardInputLayout.arabic101.emulatedLayout, .arabic101)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .arabic101
+    settings.keyboardInputLayout = .arabic101
+    settings.layoutFluidLayouts = [.arabic101, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .arabic101)
+    XCTAssertEqual(restored.keyboardInputLayout, .arabic101)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.arabic101, .ansiQwerty])
+  }
+
   func testSerbianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .serbianCyrillic), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ђ", layout: .serbianCyrillic), "top-11")
@@ -5226,7 +5269,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 34)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 35)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

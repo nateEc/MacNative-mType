@@ -199,11 +199,11 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
           && !OppositeShiftPolicy.usesOppositeShift(
             keyCode: shiftComparisonKeyCode, leftShiftPressed: leftShiftPressed,
             rightShiftPressed: rightShiftPressed)
-        if let emulatedCharacter = KeyboardLayoutEmulator.character(
+        if let emulatedText = KeyboardLayoutEmulator.text(
             forKeyCode: event.keyCode, modifierFlags: event.modifierFlags,
             mapping: keyboardInputMapping
         ) {
-            onInsert(String(emulatedCharacter), forcesError)
+            onInsert(emulatedText, forcesError)
             return
         }
         pendingForcedError = forcesError

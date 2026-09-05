@@ -5,14 +5,14 @@
 /// active macOS input source, dead keys, and IME composition.
 enum KeyboardLayoutEmulator {
   private struct KeyLayers {
-    let normal: Character
-    let shifted: Character
-    let option: Character?
-    let shiftedOption: Character?
+    let normal: String
+    let shifted: String
+    let option: String?
+    let shiftedOption: String?
 
     init(
-      normal: Character, shifted: Character, option: Character? = nil,
-      shiftedOption: Character? = nil
+      normal: String, shifted: String, option: String? = nil,
+      shiftedOption: String? = nil
     ) {
       self.normal = normal
       self.shifted = shifted
@@ -21,7 +21,7 @@ enum KeyboardLayoutEmulator {
     }
   }
 
-  private typealias OptionPair = (normal: Character, shifted: Character)
+  private typealias OptionPair = (normal: String, shifted: String)
 
   private static let physicalRows: [[UInt16]] = [
     [50, 18, 19, 20, 21, 23, 22, 26, 28, 25, 29, 27, 24],
@@ -33,6 +33,14 @@ enum KeyboardLayoutEmulator {
   static func character(
     forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, mapping: KeyboardInputMapping
   ) -> Character? {
+    text(forKeyCode: keyCode, modifierFlags: modifierFlags, mapping: mapping).flatMap(singleCharacter)
+  }
+
+  /// Returns all text emitted by a selected physical key. Most layouts emit a
+  /// single character, while a few public system layouts define ligature keys.
+  static func text(
+    forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, mapping: KeyboardInputMapping
+  ) -> String? {
     guard !modifierFlags.contains(.command),
       !modifierFlags.contains(.control)
     else { return nil }
@@ -60,10 +68,22 @@ enum KeyboardLayoutEmulator {
       mapping: layout.map(KeyboardInputMapping.builtIn) ?? .system)
   }
 
+  static func text(
+    forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, layout: KeyboardLayout?
+  ) -> String? {
+    text(
+      forKeyCode: keyCode, modifierFlags: modifierFlags,
+      mapping: layout.map(KeyboardInputMapping.builtIn) ?? .system)
+  }
+
   /// Resolves a character through a selected layout for input devices which
   /// report remapped logical characters instead of their physical key code.
   static func keyCode(for character: Character, layout: KeyboardLayout) -> UInt16? {
     keyCode(for: character, keys: keys(for: layout))
+  }
+
+  static func keyCode(forOutput output: String, layout: KeyboardLayout) -> UInt16? {
+    keyCode(forOutput: output, keys: keys(for: layout))
   }
 
   static func keyCode(for character: Character, mapping: KeyboardInputMapping) -> UInt16? {
@@ -78,11 +98,15 @@ enum KeyboardLayoutEmulator {
   }
 
   private static func keyCode(for character: Character, keys: [UInt16: KeyLayers]) -> UInt16? {
+    keyCode(forOutput: String(character), keys: keys)
+  }
+
+  private static func keyCode(forOutput output: String, keys: [UInt16: KeyLayers]) -> UInt16? {
     keys.first { _, layers in
       [layers.normal, layers.shifted, layers.option, layers.shiftedOption]
         .compactMap { $0 }
         .contains {
-          $0 == character || String($0).caseInsensitiveCompare(String(character)) == .orderedSame
+          $0 == output || $0.caseInsensitiveCompare(output) == .orderedSame
         }
     }?.key
   }
@@ -96,7 +120,7 @@ enum KeyboardLayoutEmulator {
         let (keyCode, label) = keyCodeAndLabel
         let layers: KeyLayers
         if let shiftedLabels, shiftedLabels.indices.contains(keyIndex) {
-          layers = .init(normal: label, shifted: shiftedLabels[keyIndex])
+          layers = .init(normal: String(label), shifted: String(shiftedLabels[keyIndex]))
         } else {
           layers = casePair(for: label)
         }
@@ -106,8 +130,8 @@ enum KeyboardLayoutEmulator {
   }
 
   private static func casePair(for character: Character) -> KeyLayers {
-    let lower = singleCharacter(String(character).lowercased()) ?? character
-    let upper = singleCharacter(String(character).uppercased()) ?? character
+    let lower = String(character).lowercased()
+    let upper = String(character).uppercased()
     return .init(normal: lower, shifted: upper)
   }
 
@@ -318,6 +342,13 @@ enum KeyboardLayoutEmulator {
           + "0:شؤ 1:سئ 2:یي 3:بإ 5:لأ 4:اآ 38:تة 40:ن» 37:م« 41:ک: 39:گ؛ "
           + "10:\\| 6:ظك 7:طط 8:زژ 9:ر|ٰ 11:ذ|\u{200C} 45:د|\u{0654} 46:پء 43:و> 47:.< 44:/؟"
       )
+    case .arabic101:
+      map(
+        "50:ذ|ّ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9) 29:0( 27:-_ 24:=+ "
+          + "12:ض|َ 13:ص|ً 14:ث|ُ 15:ق|ٌ 17:ف|لإ 16:غإ 32:ع‘ 34:ه÷ 31:خ× 35:ح؛ 33:ج< 30:د> 42:\\| "
+          + "0:ش|ِ 1:س|ٍ 2:ي] 3:ب[ 5:ل|لأ 4:اأ 38:تـ 40:ن، 37:م/ 41:ك: 39:ط\" "
+          + "10:\\| 6:ئ~ 7:ء|ْ 8:ؤ} 9:ر{ 11:لا|لآ 45:ىآ 46:ة’ 43:و, 47:ز. 44:ظ؟"
+      )
     case .serbianCyrillic:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
@@ -359,14 +390,14 @@ enum KeyboardLayoutEmulator {
       if let separator = layerScalars.firstIndex(of: "|") {
         let normalString = String(layerScalars[..<separator])
         let shiftedString = String(layerScalars[layerScalars.index(after: separator)...])
-        if let normal = singleCharacter(normalString), let shifted = singleCharacter(shiftedString) {
-          return (keyCode, .init(normal: normal, shifted: shifted))
+        if !normalString.isEmpty, !shiftedString.isEmpty {
+          return (keyCode, .init(normal: normalString, shifted: shiftedString))
         }
       }
       let layerString = String(layerScalars)
       guard layerString.count == 2 else { return nil }
       let symbols = Array(layerString)
-      return (keyCode, .init(normal: symbols[0], shifted: symbols[1]))
+      return (keyCode, .init(normal: String(symbols[0]), shifted: String(symbols[1])))
     })
   }
 
