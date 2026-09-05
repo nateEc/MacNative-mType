@@ -2073,6 +2073,66 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.bulgarianCyrillic.emulatedLayout, .bulgarianCyrillic)
   }
 
+  @MainActor
+  func testBulgarianPhoneticTraditionalMapsCyrillicAndPersists() {
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ч", layout: .bulgarianPhoneticTraditional), "number-0")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "я", layout: .bulgarianPhoneticTraditional), "top-0")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ъ", layout: .bulgarianPhoneticTraditional), "top-5")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ш", layout: .bulgarianPhoneticTraditional), "top-10")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "щ", layout: .bulgarianPhoneticTraditional), "top-11")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ю", layout: .bulgarianPhoneticTraditional), "home-11")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ѝ", layout: .bulgarianPhoneticTraditional), "bottom-2")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "№", layout: .bulgarianPhoneticTraditional), "number-3")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "€", layout: .bulgarianPhoneticTraditional), "number-6")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: ">", layout: .bulgarianPhoneticTraditional), "bottom-9")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .bulgarianPhoneticTraditional),
+      "ч")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 12, modifierFlags: [.shift], layout: .bulgarianPhoneticTraditional), "Я")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 7, modifierFlags: [.shift], layout: .bulgarianPhoneticTraditional), "ѝ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 20, modifierFlags: [.shift], layout: .bulgarianPhoneticTraditional), "№")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 22, modifierFlags: [.shift], layout: .bulgarianPhoneticTraditional), "€")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .bulgarianPhoneticTraditional),
+      "ю")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "№", layout: .bulgarianPhoneticTraditional), 20)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ѝ", layout: .bulgarianPhoneticTraditional), 7)
+    XCTAssertEqual(
+      KeyboardInputLayout.bulgarianPhoneticTraditional.emulatedLayout, .bulgarianPhoneticTraditional)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .bulgarianPhoneticTraditional
+    settings.keyboardInputLayout = .bulgarianPhoneticTraditional
+    settings.layoutFluidLayouts = [.bulgarianPhoneticTraditional, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .bulgarianPhoneticTraditional)
+    XCTAssertEqual(restored.keyboardInputLayout, .bulgarianPhoneticTraditional)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.bulgarianPhoneticTraditional, .ansiQwerty])
+  }
+
   func testSerbianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .serbianCyrillic), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ђ", layout: .serbianCyrillic), "top-11")
@@ -4961,7 +5021,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 28)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 29)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

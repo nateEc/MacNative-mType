@@ -94,7 +94,7 @@
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
-| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 28 个原创内置布局可任选至多 15 个进入原生序列。 |
+| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 29 个原创内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 部分；自选组合已实现，候选语言仅限 Typebar 原创语言集。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
@@ -109,7 +109,7 @@
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。依据固定参考版本的 `noLazyMode`，非自定义模式会禁用 English、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Greeklish、Dutch、Filipino、Indonesian、Serbian Cyrillic、Bulgarian、Macedonian、Kazakh、中日韩／日语罗马字、Ukrainian 与 Ukrainian Latin，以及所有代码练习的该修饰器；自定义文本仍可使用。可配置多语练习只有至少一个选择的组成语言允许时才保留它。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
-| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，28 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；Polish (Programmers) 额外有独立的 Option/Shift+Option 字符层，官方全部命名布局尚未覆盖。 |
+| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，29 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；Polish (Programmers) 额外有独立的 Option/Shift+Option 字符层，官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
@@ -170,7 +170,7 @@
 
 ## 当前优先缺口
 
-1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、28 个原创内置模拟布局（含独立实现的 ANSI Colemak-DH、Turkish F、Swedish QWERTY、Danish QWERTY、Norwegian QWERTY、Greek Alphabetic · Typebar、Hungarian QWERTZ · Typebar、Polish (Programmers)、Russian、Ukrainian JCUKEN、Bulgarian Cyrillic · Typebar 与 Serbian Cyrillic · Typebar），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
+1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、29 个原创内置模拟布局（含独立实现的 ANSI Colemak-DH、Turkish F、Bulgarian Phonetic Traditional、Swedish QWERTY、Danish QWERTY、Norwegian QWERTY、Greek Alphabetic · Typebar、Hungarian QWERTZ · Typebar、Polish (Programmers)、Russian、Ukrainian JCUKEN、Bulgarian Cyrillic · Typebar 与 Serbian Cyrillic · Typebar），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
 2. 官方语言、词表、主题、字体和声音的完整目录不应复制。后续以原创或明确授权内容扩大用户可选范围，并逐项标注差异；语言候选、语义边界和准入条件见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 3. 网页账户页图表、猴子外观和广告设置不适合作为原生逐像素复刻目标；对用户可见意图的原生替代仍需设备验收。
 
@@ -179,6 +179,7 @@
 - Russian JCUKEN 自动化测试覆盖 `ё`、`й`、`ж`、`э`、`я`、`ь`、逗号与 ISO `< >` 的提示高亮、普通/Shift 物理 keycode、反查 keycode；独立设置快照覆盖键盘图、输入模拟与 Layout Fluid 持久化。映射为 Typebar 原生实现，不导入参考布局 JSON。
 - Ukrainian JCUKEN 自动化测试覆盖 `ґ`、`ї`、`і`、`є` 与 ISO `< >` 的提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化。映射按 Typebar 自有定义编写，不读取或导入参考布局 JSON。
 - Bulgarian Cyrillic · Typebar 自动化测试覆盖 Typebar 自写的 `я`、`ъ`、`щ`、`ч`、`ь` 与 ISO `< >` 提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化；它不是官方或系统 BDS 布局的导入，用户可继续选择 macOS 当前输入源取得系统布局。
+- Bulgarian Phonetic Traditional 自动化测试覆盖公开普通/Shift 键位的 `ч`、`я`、`ъ`、`ш`、`щ`、`ю`、`ь/ѝ`、`№`、`€`、ISO 物理键上的 `ю` 与 `< >` 标点，及提示高亮、反查 keycode、键盘图、输入模拟和 Layout Fluid 持久化。AltGr 继续由 macOS 当前输入源处理；实现不读取或导入 Monkeytype 布局 JSON。
 - Serbian Cyrillic · Typebar 自动化测试覆盖 Typebar 自写的 `љ`、`ђ`、`ћ`、`ж`、`џ` 与 ISO `< >` 提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化；它不是官方或系统塞尔维亚语布局资产的导入，用户可继续选择 macOS 当前输入源取得系统布局。
 - Hungarian QWERTZ · Typebar 自动化测试覆盖 Typebar 自写的 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`、QWERTZ Y/Z 与练习标点的提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化；它不导入官方或系统匈牙利语布局资产，未收录的死键和 Option 层继续交给 macOS 当前输入源。
 - Greek Alphabetic · Typebar 自动化测试覆盖 Typebar 自写的二十四个基本 Greek 字母、七个重音元音、词末 `ς` 与练习标点的提示高亮、普通/Shift 物理 keycode、反查 keycode、原创词库字符覆盖，以及键盘图、输入模拟和 Layout Fluid 持久化；它不导入官方或系统希腊语布局资产，未收录字符、死键和 Option 层继续交给 macOS 当前输入源。

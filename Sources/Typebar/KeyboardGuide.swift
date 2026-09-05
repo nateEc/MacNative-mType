@@ -29,6 +29,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case russianJcuken
   case ukrainianJcuken
   case bulgarianCyrillic
+  case bulgarianPhoneticTraditional
   case serbianCyrillic
 
   var id: Self { self }
@@ -62,6 +63,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .russianJcuken: "Russian JCUKEN"
     case .ukrainianJcuken: "Ukrainian JCUKEN"
     case .bulgarianCyrillic: "Bulgarian Cyrillic · Typebar"
+    case .bulgarianPhoneticTraditional: "Bulgarian Phonetic Traditional"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
   }
@@ -100,6 +102,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case russianJcuken
   case ukrainianJcuken
   case bulgarianCyrillic
+  case bulgarianPhoneticTraditional
   case serbianCyrillic
 
   var id: Self { self }
@@ -963,6 +966,29 @@ enum KeyboardGuideModel {
           "bottom", "<ЗЬЦВБНМ,./",
           characters: ["<>", "зЗ", "ьЬ", "цЦ", "вВ", "бБ", "нН", "мМ", ",<", ".>", "/?"],
           shiftedLabels: [">", "З", "Ь", "Ц", "В", "Б", "Н", "М", "<", ">", "?"]
+        ),
+      ]
+    case .bulgarianPhoneticTraditional:
+      [
+        row(
+          "number", "Ч1234567890-=",
+          characters: ["чЧ", "1!", "2@", "3№", "4$", "5%", "6€", "7§", "8*", "9(", "0)", "-_", "=+"],
+          shiftedLabels: ["Ч", "!", "@", "№", "$", "%", "€", "§", "*", "(", ")", "_", "+"]
+        ),
+        row(
+          "top", "ЯВЕРТЪУИОПШЩ",
+          characters: ["яЯ", "вВ", "еЕ", "рР", "тТ", "ъЪ", "уУ", "иИ", "оО", "пП", "шШ", "щЩ"],
+          shiftedLabels: ["Я", "В", "Е", "Р", "Т", "Ъ", "У", "И", "О", "П", "Ш", "Щ"]
+        ),
+        row(
+          "home", "АСДФГХЙКЛ;'Ю",
+          characters: ["аА", "сС", "дД", "фФ", "гГ", "хХ", "йЙ", "кК", "лЛ", ";:", "'\"", "юЮ"],
+          shiftedLabels: ["А", "С", "Д", "Ф", "Г", "Х", "Й", "К", "Л", ":", "\"", "Ю"]
+        ),
+        row(
+          "bottom", "ЮЗЬЦЖБНМ,./",
+          characters: ["юЮ", "зЗ", "ьѝ", "цЦ", "жЖ", "бБ", "нН", "мМ", ",<", ".>", "/?"],
+          shiftedLabels: ["Ю", "З", "Ѝ", "Ц", "Ж", "Б", "Н", "М", "<", ">", "?"]
         ),
       ]
     case .serbianCyrillic:
