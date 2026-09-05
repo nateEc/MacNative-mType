@@ -3319,6 +3319,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.georgianWords,
       StarterLexicon.azerbaijaniWords,
       StarterLexicon.belarusianWords,
+      StarterLexicon.belarusianLacinkaWords,
       StarterLexicon.lithuanianWords,
       StarterLexicon.latvianWords,
       StarterLexicon.mongolianWords,
@@ -3341,7 +3342,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 104)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 105)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3693,6 +3694,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .belarusian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .belarusian), "be")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .belarusianLacinka).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .belarusianLacinka), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .lithuanian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .lithuanian), "en")
@@ -5007,6 +5011,7 @@ final class TypingEngineTests: XCTestCase {
       (.georgian, StarterLexicon.georgianWords),
       (.azerbaijani, StarterLexicon.azerbaijaniWords),
       (.belarusian, StarterLexicon.belarusianWords),
+      (.belarusianLacinka, StarterLexicon.belarusianLacinkaWords),
       (.lithuanian, StarterLexicon.lithuanianWords),
       (.latvian, StarterLexicon.latvianWords),
       (.mongolian, StarterLexicon.mongolianWords),
@@ -5561,6 +5566,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.belarusian.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.belarusian))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.belarusian))
+    XCTAssertTrue(StarterLexicon.belarusianLacinkaWords.contains("kniha"))
+    XCTAssertFalse(TypingLanguage.belarusianLacinka.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.belarusianLacinka.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.belarusianLacinka.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.belarusianLacinka.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.belarusianLacinka.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.belarusianLacinka.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.belarusianLacinka))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.belarusianLacinka))
     XCTAssertTrue(StarterLexicon.lithuanianWords.contains("langas"))
     XCTAssertFalse(TypingLanguage.lithuanian.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.lithuanian.usesSpaceDelimitedWords)
@@ -5853,6 +5867,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.georgian.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.azerbaijani.speechLocaleIdentifier, "az-AZ")
     XCTAssertEqual(TypingLanguage.belarusian.speechLocaleIdentifier, "be-BY")
+    XCTAssertEqual(TypingLanguage.belarusianLacinka.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.lithuanian.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.latvian.speechLocaleIdentifier, "lv")
     XCTAssertEqual(TypingLanguage.mongolian.speechLocaleIdentifier, "en-US")

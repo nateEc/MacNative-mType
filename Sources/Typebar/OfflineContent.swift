@@ -2472,6 +2472,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "belarusian-lacinka-clear-step",
+      title: "Mały krok",
+      text: "Mały krok robić pačatak jasniejšym.",
+      language: .belarusianLacinka,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "belarusian-lacinka-open-book",
+      title: "Adčynienaja kniha",
+      text: "Adčynienaja kniha nie adkazvaje na ŭsie pytańni, ale daje miesca dla novaj dumki.",
+      language: .belarusianLacinka,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "belarusian-lacinka-small-work",
+      title: "Małaja praca",
+      text: "Dobraja praca nie patrabuje, kab usio było hatova adrazu. Adčyni staronku, napišy adno słova i daj dumcy čas znajści svoj šlach. Mały krok siońnia daje zaŭtra bolš jasnaści.",
+      language: .belarusianLacinka,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "belarusian-lacinka-return-page",
+      title: "Viartannie da staronki",
+      text: "Naprykanicy dnia mały plan nie musić być zakońčany. Jon moža pakinuć pytańnie, słova dla paŭtornaha čytannia i znak dla zaŭtra. Hetyja małyja rečy dajuć pracy kirunak. Kali viartaiešsia da staronki, bačyš, što dumka ŭžo idzie napierad i što pačynać nie tako ciažka. Jasny mały krok dapamahaje pracy isci dalej.",
+      language: .belarusianLacinka,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "lithuanian-ramus-zingsnis",
       title: "Ramus žingsnis",
       text: "Ramus žingsnis padeda aiškiau pamatyti kitą darbą.",

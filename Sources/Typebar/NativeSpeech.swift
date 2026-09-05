@@ -50,6 +50,7 @@ extension TypingLanguage {
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"
     case .belarusian: "be-BY"
+    case .belarusianLacinka: "en-US"
     case .latvian: "lv"
     case .irish: "ga-IE"
     case .galician: "gl-ES"
