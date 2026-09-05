@@ -228,6 +228,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case mongolian
   case irish
   case galician
+  case marathi
   case kurdishCentral
   case greek
   case greeklish
@@ -3517,6 +3518,14 @@ enum StarterLexicon {
     "cidade", "río", "vento", "tempo", "voz", "pregunta", "resposta", "esperanza", "futuro", "paso",
   ]
 
+  // Typebar-authored Marathi starter words retain the reference language's
+  // frequency-ordered LTR behavior without importing its word list.
+  static let marathiWords = [
+    "पुस्तक", "खिडकी", "रस्ता", "प्रकाश", "पूल", "सकाळ", "कागद", "बाग", "ढग", "शांतता",
+    "दिवा", "डोंगर", "बी", "संगीत", "टेबल", "विचार", "नोंद", "काम", "प्रयत्न", "मित्र",
+    "शहर", "नदी", "वारा", "वेळ", "आवाज", "प्रश्न", "उत्तर", "आशा", "भविष्य", "पाऊल",
+  ]
+
   // Typebar-authored Central Kurdish starter words use direct Unicode text
   // for macOS RTL input sources; they are not an imported word list.
   static let kurdishCentralWords = [
@@ -3847,6 +3856,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: galicianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .marathi:
+      return prompt(
+        tokens: count, lexicon: marathiWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kurdishCentral:
       return prompt(
         tokens: count, lexicon: kurdishCentralWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4078,6 +4091,7 @@ enum StarterLexicon {
     case .mongolian: (mongolianWords, [",", ".", "!", "?"])
     case .irish: (irishWords, [",", ".", "!", "?"])
     case .galician: (galicianWords, [",", ".", "!", "?"])
+    case .marathi: (marathiWords, [",", ".", "!", "?"])
     case .kurdishCentral: (kurdishCentralWords, ["،", "؛", "؟", "."])
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
@@ -4204,6 +4218,7 @@ extension TypingLanguage {
     case .mongolian: StarterLexicon.mongolianWords
     case .irish: StarterLexicon.irishWords
     case .galician: StarterLexicon.galicianWords
+    case .marathi: StarterLexicon.marathiWords
     case .kurdishCentral: StarterLexicon.kurdishCentralWords
     case .greek: StarterLexicon.greekWords
     case .greeklish: StarterLexicon.greeklishWords
@@ -4249,7 +4264,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4304,6 +4319,7 @@ extension TypingLanguage {
       .georgian,
       .belarusian,
       .mongolian,
+      .marathi,
       .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
       .mixedEnglishChinese, .mixedLanguages:
@@ -4359,6 +4375,7 @@ extension TypingLanguage {
     case .mongolian: "Монгол"
     case .irish: "Gaeilge"
     case .galician: "Galego"
+    case .marathi: "मराठी"
     case .kurdishCentral: "کوردی ناوەندی"
     case .greek: "Ελληνικά"
     case .greeklish: "Greeklish"

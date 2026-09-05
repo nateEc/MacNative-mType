@@ -3286,6 +3286,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.mongolianWords,
       StarterLexicon.irishWords,
       StarterLexicon.galicianWords,
+      StarterLexicon.marathiWords,
       StarterLexicon.greekWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.filipinoWords, StarterLexicon.catalanWords,
       StarterLexicon.indonesianWords, StarterLexicon.malayWords, StarterLexicon.danishWords,
@@ -3302,7 +3303,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 65)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 66)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3540,6 +3541,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .galician).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .galician), "gl")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .marathi).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .marathi), "en")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -3867,6 +3871,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       galicianEncyclopedia.prompt(for: .words(3, language: .galician)),
       "A luz da")
+    let marathiData = Data("""
+    {"title":"खिडकी","extract":"सकाळचा प्रकाश खिडकीतून खोलीत येतो."}
+    """.utf8)
+    let marathiEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: marathiData, language: .marathi))
+    XCTAssertEqual(marathiEncyclopedia.text, "सकाळचा प्रकाश खिडकीतून खोलीत येतो")
+    XCTAssertEqual(
+      marathiEncyclopedia.prompt(for: .words(3, language: .marathi)),
+      "सकाळचा प्रकाश खिडकीतून")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4495,6 +4508,7 @@ final class TypingEngineTests: XCTestCase {
       (.mongolian, StarterLexicon.mongolianWords),
       (.irish, StarterLexicon.irishWords),
       (.galician, StarterLexicon.galicianWords),
+      (.marathi, StarterLexicon.marathiWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4716,6 +4730,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.galician.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.galician))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.galician))
+    XCTAssertTrue(StarterLexicon.marathiWords.contains("खिडकी"))
+    XCTAssertFalse(TypingLanguage.marathi.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.marathi.usesSpaceDelimitedWords)
+    XCTAssertFalse(TypingLanguage.marathi.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.marathi))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.marathi))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4846,6 +4866,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.mongolian.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.irish.speechLocaleIdentifier, "ga-IE")
     XCTAssertEqual(TypingLanguage.galician.speechLocaleIdentifier, "gl-ES")
+    XCTAssertEqual(TypingLanguage.marathi.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")

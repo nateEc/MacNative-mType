@@ -1436,6 +1436,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "marathi-shant-paul",
+      title: "शांत पाऊल",
+      text: "शांत पाऊल पुढचे काम अधिक स्पष्ट करते.",
+      language: .marathi,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "marathi-ughadi-vahi",
+      title: "उघडी वही",
+      text: "उघडी वही सर्व प्रश्नांची उत्तरे देत नाही, पण प्रश्नांना लहान भागांत विभागण्यासाठी जागा ठेवते.",
+      language: .marathi,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "marathi-lahan-pragati",
+      title: "लहान प्रगती",
+      text: "प्रगती नेहमी मोठी दिसत नाही. त्याच पानाकडे परत जाणे, एक वाक्य अधिक स्पष्ट करणे आणि छोटी चूक दुरुस्त करणे पुढच्या प्रयत्नासाठी अधिक विश्वास देते.",
+      language: .marathi,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "marathi-lamb-table",
+      title: "लांब टेबल",
+      text: "लांब टेबल अनेक कामांसाठी जागा ठेवते. एका टोकाला पहिला मसुदा पडलेला असू शकतो, दुसऱ्या टोकाला अधिक लक्ष हवे असलेले वाक्य थांबते आणि मधोमध पुढचा छोटा निर्णय असतो. सरावही अशाच प्रकारे पुढे जातो. प्रत्येक कठीण भाग लगेच सोडवणे आवश्यक नाही. परत येण्यासाठी जागा असेल, तर पुढचे पाऊल दिसते आणि काही प्रयत्नांनंतर जे सोपे झाले ते लक्षात घेण्याचा संयम वाढतो, वेग नैसर्गिकपणे वाढतो.",
+      language: .marathi,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kurdish-central-hengawi-aram",
       title: "هەنگاوی ئارام",
       text: "هەنگاوی ئارام کاری داهاتوو ڕوونتر دەکات.",
