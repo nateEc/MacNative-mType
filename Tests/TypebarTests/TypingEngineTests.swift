@@ -2169,6 +2169,48 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.belarusian, .ansiQwerty])
   }
 
+  @MainActor
+  func testMacedonianMapsDistinctCyrillicKeysAndPersists() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .macedonian), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ѕ", layout: .macedonian), "top-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ѓ", layout: .macedonian), "top-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ж", layout: .macedonian), "top-12")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ќ", layout: .macedonian), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ѐ", layout: .macedonian), "bottom-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "џ", layout: .macedonian), "bottom-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "„", layout: .macedonian), "number-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "‘", layout: .macedonian), "number-7")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [], layout: .macedonian), "ѕ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 30, modifierFlags: [.shift], layout: .macedonian), "Ѓ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [], layout: .macedonian), "ж")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .macedonian), "Ѐ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 19, modifierFlags: [.shift], layout: .macedonian), "„")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 43, modifierFlags: [.shift], layout: .macedonian), ";")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ќ", layout: .macedonian), 39)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Џ", layout: .macedonian), 7)
+    XCTAssertEqual(KeyboardInputLayout.macedonian.emulatedLayout, .macedonian)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .macedonian
+    settings.keyboardInputLayout = .macedonian
+    settings.layoutFluidLayouts = [.macedonian, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .macedonian)
+    XCTAssertEqual(restored.keyboardInputLayout, .macedonian)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.macedonian, .ansiQwerty])
+  }
+
   func testSerbianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .serbianCyrillic), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ђ", layout: .serbianCyrillic), "top-11")
@@ -5057,7 +5099,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 30)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 31)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
