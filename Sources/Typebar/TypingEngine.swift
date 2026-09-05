@@ -208,6 +208,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case esperantoHSystem
   case latin
   case friulian
+  case malagasy
   case arabic
   case hebrew
   case persian
@@ -3324,6 +3325,14 @@ enum StarterLexicon {
     "fuee", "cjante", "pâs", "sperance", "int", "insiemi", "libartât", "sielte", "memorie", "sumi",
   ]
 
+  // Typebar-authored Malagasy starter words provide local practice without
+  // importing the reference dictionary or word list.
+  static let malagasyWords = [
+    "masoandro", "volana", "kintana", "voninkazo", "tendrombohitra", "ranomasina", "boky", "lalana", "feo", "fo",
+    "fitiavana", "fiainana", "ora", "tanàna", "firenena", "andro", "hariva", "maraina", "orana", "rivotra",
+    "ravina", "hira", "fiadanana", "fanantenana", "olona", "miaraka", "fahafahana", "safidy", "fahatsiarovana", "nofy",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -3872,6 +3881,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: friulianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .malagasy:
+      return prompt(
+        tokens: count, lexicon: malagasyWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4199,6 +4212,7 @@ enum StarterLexicon {
     case .esperantoHSystem: (esperantoHSystemWords, [",", ".", "!", "?"])
     case .latin: (latinWords, [",", ".", "!", "?"])
     case .friulian: (friulianWords, [",", ".", "!", "?"])
+    case .malagasy: (malagasyWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
@@ -4334,6 +4348,7 @@ extension TypingLanguage {
     case .esperantoHSystem: StarterLexicon.esperantoHSystemWords
     case .latin: StarterLexicon.latinWords
     case .friulian: StarterLexicon.friulianWords
+    case .malagasy: StarterLexicon.malagasyWords
     case .arabic: StarterLexicon.arabicWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
@@ -4408,7 +4423,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4464,6 +4479,7 @@ extension TypingLanguage {
       .belarusian,
       .mongolian,
       .marathi,
+      .malagasy,
       .esperantoXSystem, .esperantoHSystem,
       .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
@@ -4514,6 +4530,7 @@ extension TypingLanguage {
     case .esperantoHSystem: "Esperanto · H-sistemo"
     case .latin: "Latina"
     case .friulian: "Friulian"
+    case .malagasy: "Malagasy"
     case .arabic: "العربية"
     case .hebrew: "עברית"
     case .persian: "فارسی"

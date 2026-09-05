@@ -876,6 +876,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "malagasy-masoandro-maraina",
+      title: "Masoandro maraina",
+      text: "Ny masoandro maraina manokatra lalana mangina.",
+      language: .malagasy,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "malagasy-kintana-hariva",
+      title: "Kintana hariva",
+      text: "Ny kintana hariva mitondra fanantenana ho an'ny tanàna milamina.",
+      language: .malagasy,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "malagasy-boky-ranomasina",
+      title: "Boky sy ranomasina",
+      text: "Ny boky misokatra sy ny ranomasina lavitra manome toerana malalaka ho an'ny saina.",
+      language: .malagasy,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "malagasy-lalana-miaraka",
+      title: "Lalana miaraka",
+      text: "Ny masoandro maraina manokatra lalana mangina ary ny orana manadio ny rivotra. Ny kintana hariva mitondra fanantenana ho an'ny tanàna milamina. Ny boky misokatra sy ny ranomasina lavitra manome toerana malalaka ho an'ny saina. Rehefa miara-mihaino isika dia mahita safidy mazava ary mitahiry fahatsiarovana vaovao ho an'ny andro manaraka.",
+      language: .malagasy,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",
