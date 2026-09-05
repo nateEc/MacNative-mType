@@ -29,6 +29,7 @@ extension TypingLanguage {
     case .afrikaans: "af-ZA"
     case .hausa: "ha"
     case .tatar: "tt"
+    case .uzbek: "uz-UZ"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"

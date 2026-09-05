@@ -212,6 +212,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case welsh
   case hausa
   case tatar
+  case uzbek
   case arabic
   case hebrew
   case persian
@@ -3360,6 +3361,14 @@ enum StarterLexicon {
     "җыр", "тынычлык", "өмет", "кеше", "бергә", "ирек", "сайлау", "истәлек", "хыял", "тынлык",
   ]
 
+  // Typebar-authored Uzbek starter words provide local practice without
+  // importing the reference dictionary or word list.
+  static let uzbekWords = [
+    "tong", "oy", "yulduz", "gul", "togʻ", "dengiz", "kitob", "yoʻl", "ovoz", "yurak",
+    "doʻstlik", "hayot", "vaqt", "shahar", "yer", "kecha", "ertalab", "suv", "shamol", "barg",
+    "qoʻshiq", "tinchlik", "umid", "odam", "birga", "erkinlik", "tanlov", "xotira", "orzu", "sukunat",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -3924,6 +3933,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tatarWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .uzbek:
+      return prompt(
+        tokens: count, lexicon: uzbekWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4255,6 +4268,7 @@ enum StarterLexicon {
     case .welsh: (welshWords, [",", ".", "!", "?"])
     case .hausa: (hausaWords, [",", ".", "!", "?"])
     case .tatar: (tatarWords, [",", ".", "!", "?"])
+    case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
@@ -4394,6 +4408,7 @@ extension TypingLanguage {
     case .welsh: StarterLexicon.welshWords
     case .hausa: StarterLexicon.hausaWords
     case .tatar: StarterLexicon.tatarWords
+    case .uzbek: StarterLexicon.uzbekWords
     case .arabic: StarterLexicon.arabicWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
@@ -4468,7 +4483,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4579,6 +4594,7 @@ extension TypingLanguage {
     case .welsh: "Cymraeg"
     case .hausa: "Hausa"
     case .tatar: "Татарча"
+    case .uzbek: "Oʻzbekcha"
     case .arabic: "العربية"
     case .hebrew: "עברית"
     case .persian: "فارسی"

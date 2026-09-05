@@ -988,6 +988,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "uzbek-ertalab-yol",
+      title: "Ertalab yoʻl",
+      text: "Ertalab tinch yoʻl ochadi.",
+      language: .uzbek,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "uzbek-tungi-yulduzlar",
+      title: "Tungi yulduzlar",
+      text: "Tungi yulduzlar shaharga umid olib keladi.",
+      language: .uzbek,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "uzbek-kitob-dengiz",
+      title: "Kitob va dengiz",
+      text: "Kitob va uzoq dengiz fikrga kenglik beradi.",
+      language: .uzbek,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "uzbek-birga-yol",
+      title: "Birga yoʻl",
+      text: "Ertalab tinch yoʻl ochadi, mayin yomgʻir havoni yangilaydi. Tungi yulduzlar shaharga umid olib keladi. Kitob va uzoq dengiz fikrga kenglik beradi. Odamlar birga tinglaganda, ular yaxshi tanlovni koʻradi va keyingi kun uchun yangi fikr saqlaydi.",
+      language: .uzbek,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",
