@@ -1352,6 +1352,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "bashkir-calm-step",
+      title: "Тыныс аҙым",
+      text: "Тыныс аҙым киләһе эште анығыраҡ итә.",
+      language: .bashkir,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "bashkir-open-book",
+      title: "Асыҡ китап",
+      text: "Асыҡ китап бөтә һорауҙарға ла яуап бирмәй, әммә яңы уйҙарға урын ҡалдыра.",
+      language: .bashkir,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "bashkir-small-effort",
+      title: "Бәләкәй тырышлыҡ",
+      text: "Бөгөнгө бәләкәй тырышлыҡ бөтә нәмәне бер юлы тамамларға тейеш түгел. Китапты ас, бер һүҙҙе үҙгәрт, иртәгәгә файҙалы билдә ҡалдыр. Ваҡыт бәләкәй аҙымды еңелерәк башланғысҡа әйләндерә.",
+      language: .bashkir,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "bashkir-return-place",
+      title: "Ҡайтыр урын",
+      text: "Көн аҙағында бәләкәй эштәр исемлеге тулы яуапты талап итмәй. Унда ярты һөйләм, бер һорау һәм киләһе аҙым өсөн ҡыҫҡа билдә ҡала ала. Шулай булғанда эшкә ҡайтыу еңелерәк була. Тағы ҡарағанда уйҙарҙың алға киткәнен күрерһең, ә беренсе аҙым алыҫ күренмәҫ. Һәр тыныс аҙым юлда бер билдә ҡалдыра.",
+      language: .bashkir,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

@@ -159,6 +159,7 @@ enum LivePracticeContentService {
     case .occitan: return "oc"
     case .oromo: return "om"
     case .jyutping: return "zh"
+    case .bashkir: return "ba"
     case .friulian: return "fur"
     case .bemba: return "bem"
     case .azerbaijani: return "az"
