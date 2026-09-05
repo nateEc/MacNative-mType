@@ -171,6 +171,7 @@ enum LivePracticeContentService {
     case .khmer: return "km"
     case .myanmarBurmese: return "my"
     case .lao: return "lo"
+    case .amharic: return "am"
     case .greek, .greeklish: return "el"
     case .dutch: return "nl"
     case .filipino: return "tl"

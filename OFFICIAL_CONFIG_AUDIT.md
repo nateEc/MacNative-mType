@@ -26,6 +26,8 @@
 2026-09-04 更新：单语数量增至五十八种，新增 Burmese（`myanmarBurmese`）：参考配置为 `joiningScript: true`、`noLazyMode: true`、LTR、`my-MM`。Typebar 使用原创词流、四档引语、macOS 组合输入和空格提交，并以 `my` 访问知识短文、`my-MM` 调用系统朗读；该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。
 
 2026-09-04 更新：单语数量增至五十九种，新增 Lao（`lao`）：参考配置为 LTR、`joiningScript: false`、未设置 `noLazyMode`、`bcp47: lo`。Typebar 使用原创词流、四档引语和空格提交，以 `lo` 访问知识短文及调用系统朗读；保留用户选择的简化输入，并将该语言接入混排、预设、归档、社区投稿及服务端排行榜全路径。参考的 `Noto Sans Lao` 字体资产未被导入，原生显示交由 macOS。
+
+2026-09-05 更新：单语数量增至六十种，新增 Amharic（`amharic`）：参考配置仅定义 `bcp47: am-ET`，没有 `rightToLeft`、`joiningScript` 或 `noLazyMode`。Typebar 使用原创词流、四档引语、LTR 空格提交，以 `am` 访问知识短文并以 `am-ET` 调用系统朗读；保留用户选择的简化输入，并将该语言接入混排、预设、归档、社区投稿及服务端排行榜全路径。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

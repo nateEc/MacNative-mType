@@ -1156,6 +1156,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "amharic-calm-step",
+      title: "የተረጋጋ እርምጃ",
+      text: "የተረጋጋ እርምጃ ቀጣዩን ሥራ ይበልጥ ግልጽ ያደርገዋል።",
+      language: .amharic,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "amharic-open-notebook",
+      title: "ክፍት ማስታወሻ",
+      text: "ክፍት ማስታወሻ ደብተር እያንዳንዱን አስቸጋሪ ጥያቄ አይመልስም፤ ጥያቄውን በትናንሽ ክፍሎች ለማየት ግን ቦታ ይሰጣል።",
+      language: .amharic,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "amharic-small-work",
+      title: "ትንሽ ሥራ",
+      text: "እድገት ሁልጊዜ እንደ ትልቅ ጊዜ አይታይም። አንድን ገጽ እንደገና መክፈት፣ አንድን አረፍተ ነገር ግልጽ ማድረግ እና ትንሽ ችግር መጠገን ለቀጣዩ ሙከራ እምነት ይፈጥራሉ።",
+      language: .amharic,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "amharic-long-table",
+      title: "ረጅም ጠረጴዛ",
+      text: "ረጅም ጠረጴዛ ለብዙ ዓይነት ሥራ ቦታ ይሰጣል። በአንድ ጫፍ የመጀመሪያ ረቂቅ ሊቀመጥ ይችላል፣ በሌላው ጫፍ ተጨማሪ ትኩረት የሚፈልግ አረፍተ ነገር ሊጠብቅ ይችላል፣ በመሃልም ቀጣዩ ትንሽ ውሳኔ ሊጠብቅ ይችላል። ልምምድም እንዲሁ ይሄዳል። እያንዳንዱን አስቸጋሪ ክፍል በአንድ ጊዜ መፍታት አያስፈልግም። ለመመለስ ቦታ፣ ግልጽ ቀጣይ እርምጃ እና ከብዙ ሙከራ በኋላ ቀላል የሆነውን ለማስተዋል ትዕግሥት ሲኖር ፍጥነት በተፈጥሮ ያድጋል።",
+      language: .amharic,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
