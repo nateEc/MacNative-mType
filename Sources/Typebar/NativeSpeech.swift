@@ -34,6 +34,7 @@ extension TypingLanguage {
     case .klingon: "tlh"
     case .quenya: "en-US"
     case .viossa, .viossaNjutro: "en-US"
+    case .maori: "en-US"
     case .uzbek: "uz-UZ"
     case .occitan: "oc-FR"
     case .oromo: "om"

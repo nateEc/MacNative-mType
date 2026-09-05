@@ -1156,6 +1156,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "maori-mauri-ora",
+      title: "Mauri Ora",
+      text: "Mauri ora.",
+      language: .maori,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "maori-rangi-moana",
+      title: "Rangi Moana",
+      text: "Rangi, moana, whenua.",
+      language: .maori,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "maori-korero-mahi",
+      title: "Kōrero Mahi",
+      text: "Kōrero mārie, mahi ngātahi, tiaki whenua.",
+      language: .maori,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "maori-whanau-hui",
+      title: "Whānau Hui",
+      text: "Mauri ora. Rangi, moana, whenua. Kōrero mārie, mahi ngātahi, tiaki whenua. Whānau hui i te marae, waiata mō te rā hou. Ka rere te manu, ka tū te rākau.",
+      language: .maori,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "uzbek-ertalab-yol",
       title: "Ertalab yoʻl",
       text: "Ertalab tinch yoʻl ochadi.",

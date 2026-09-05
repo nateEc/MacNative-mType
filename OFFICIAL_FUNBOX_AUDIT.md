@@ -87,6 +87,8 @@
 
 2026-09-05 更正：LTR 多语混排候选现为 111 种；Viossa 与 Njutro 的固定配置均未定义 BCP-47、RTL 或连写，故两套独立的原创练习 idiolect 均以 `en`／`en-US` 处理在线知识短文与朗读，且 `orderedByFrequency: false` 显示 Zipf 不支持提示。Njutro 额外定义 `noLazyMode: true`，故普通练习禁用简化输入而自定义文本保留例外；两者均已纳入轮转覆盖。
 
+2026-09-05 更正：LTR 多语混排候选现为 112 种；Māori 的固定参考仅为 `maori_1k`，未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，故保留 macron 的原创 LTR 词流以 `en`／`en-US` 处理在线知识短文与朗读，保留简化输入与 Zipf 未知提示，并已纳入轮转覆盖。
+
 ## 本机个人最佳资格
 
 参考项目的个人最佳查询会拒绝任一 `canGetPb: false` 的 funbox，并且不会为引语模式保存本地 PB。Typebar 的 `CurrentPersonalBestPolicy` 据此维护显式的资格表：视觉、布局、可见性、听写、反写/双写、ROT13、ASL 和简化重音输入可参与；字符/特殊文本流、大小写与分隔符变换、即时消息、Zipf、多语混排和无空格流不会参与。Typebar 的中英混排与自定义多语也对应 polyglot 的资格限制，因而不会参与。Typebar 自有的“修正后再前进”和“遇错清除当前词”也被额外排除，因为它们改变了输入纠错机制；开启“遇错停下”时，只有 100% 准确率的完成成绩可参与。资格判断不复用参考项目代码或数据。

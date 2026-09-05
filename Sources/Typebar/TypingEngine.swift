@@ -219,6 +219,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case quenya
   case viossa
   case viossaNjutro
+  case maori
   case uzbek
   case occitan
   case oromo
@@ -3461,6 +3462,15 @@ enum StarterLexicon {
     "nöko", "pësa", "qöri", "råni", "sümi", "tåri", "vëmi", "wåro", "xëni", "yülo",
   ]
 
+  // Typebar-authored Māori practice words preserve macrons for long vowels
+  // without importing a reference dictionary or word list.
+  static let maoriWords = [
+    "āhua", "āio", "ao", "aroha", "ata", "awa", "hāere", "hau", "hui", "iwi",
+    "kai", "kōrero", "mahi", "mana", "marae", "mauri", "moana", "ngā", "puna", "rā",
+    "rangi", "reo", "rimu", "tāngata", "tau", "tiaki", "tīmata", "wā", "wai", "waiata",
+    "whānau", "whenua", "whare", "whetū",
+  ]
+
   // Typebar-authored Uzbek starter words provide local practice without
   // importing the reference dictionary or word list.
   static let uzbekWords = [
@@ -4305,6 +4315,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: viossaNjutroWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .maori:
+      return prompt(
+        tokens: count, lexicon: maoriWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .uzbek:
       return prompt(
         tokens: count, lexicon: uzbekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4767,6 +4781,7 @@ enum StarterLexicon {
     case .quenya: (quenyaWords, [",", ".", "!", "?"])
     case .viossa: (viossaWords, [",", ".", "!", "?"])
     case .viossaNjutro: (viossaNjutroWords, [",", ".", "!", "?"])
+    case .maori: (maoriWords, [",", ".", "!", "?"])
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .occitan: (occitanWords, [",", ".", "!", "?"])
     case .oromo: (oromoWords, [",", ".", "!", "?"])
@@ -4955,6 +4970,7 @@ extension TypingLanguage {
     case .quenya: StarterLexicon.quenyaWords
     case .viossa: StarterLexicon.viossaWords
     case .viossaNjutro: StarterLexicon.viossaNjutroWords
+    case .maori: StarterLexicon.maoriWords
     case .uzbek: StarterLexicon.uzbekWords
     case .occitan: StarterLexicon.occitanWords
     case .oromo: StarterLexicon.oromoWords
@@ -5060,7 +5076,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -5199,6 +5215,7 @@ extension TypingLanguage {
     case .quenya: "Quenya"
     case .viossa: "Viossa"
     case .viossaNjutro: "Viossa · Njutro"
+    case .maori: "Te reo Māori"
     case .uzbek: "Oʻzbekcha"
     case .occitan: "Occitan"
     case .oromo: "Oromo"

@@ -246,6 +246,8 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 ## 2026-09-05 兼容性审计更正
 
+- `TypingLanguage` 当前有一百二十二种 Typebar 自有单语；默认与自选多语混排使用一百一十二种 LTR 单语。新增 `Te reo Māori` 只对应固定源码的 `maori_1k` 映射；该配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，因此以保留 macron 的原创 LTR 词流及四档引语、`en`／`en-US` 缺省在线/朗读路径、显式简化输入和 Zipf 未知提示实现，并覆盖投稿、撤回、成绩和排行榜。
+
 - `TypingLanguage` 当前有九十五种 Typebar 自有单语；默认与自选多语混排使用八十六种 LTR 单语，九种 RTL 单语不参与混排。新增 Jyutping 使用 Typebar 自有 ASCII 加声调数字内容与四档原创引语；固定 `bcp47: zh-Hant` 按首段选取 `zh` 百科短文、精确选取 `zh-Hant` 朗读，并只在该汉字百科路径启用中文词界。它保留显式简化输入与 Zipf 未知提示，且已覆盖投稿、撤回、成绩和排行榜。
 - `TypingLanguage` 当前有九十六种 Typebar 自有单语；默认与自选多语混排使用八十七种 LTR 单语，九种 RTL 单语不参与混排。新增 Pinyin 的基础、1k 与 10k 参考配置都只提供名称，Typebar 因此保持独立自写 ASCII 拼音词流与四档引语，以 `en`／`en-US` 缺省分支处理在线内容与朗读，保留显式简化输入和 Zipf 未知提示，并覆盖投稿、撤回、成绩和排行榜。
 - `TypingLanguage` 当前有九十七种 Typebar 自有单语；默认与自选多语混排使用八十八种 LTR 单语，九种 RTL 单语不参与混排。新增 Western Armenian 的基础与 1k 参考配置都定义 `bcp47: hyw`，Typebar 因此以独立自写的西部亚美尼亚语正字法词流与四档引语处理 LTR 输入、`hyw` 在线内容及朗读，保留显式简化输入和 Zipf 未知提示，并覆盖投稿、撤回、成绩和排行榜。

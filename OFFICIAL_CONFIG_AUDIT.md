@@ -234,3 +234,4 @@
 - Klingon 审计只读取 `klingon.json` 与 `klingon_1k.json` 的元数据，不读取其中词表或引语文本。两个配置均定义 `bcp47: tlh`，不定义 RTL、连写、`noLazyMode` 或词频排序；实现因此以独立自写的大小写敏感、词内撇号内容走 LTR 空格分词，知识短文和朗读均精确使用 `tlh`。未定义 `noLazyMode`，故保留简化输入；词内 `'` 被保留为目标词组成部分而不按装饰标点规范化；Zipf 走未知提示，并进入默认／自选多语混排、社区投稿、成绩和排行榜。
 - Quenya 审计只读取 `quenya.json` 的元数据，不读取其中词表或引语文本。配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序；实现因此以独立自写内容走 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。保留简化输入；Zipf 走未知提示，并进入默认／自选多语混排、社区投稿、成绩和排行榜。
 - Viossa 审计只读取 `viossa.json` 与 `viossa_njutro.json` 的元数据，不读取其中词表或引语文本。两者均未定义 BCP-47、RTL 或连写，且均定义 `orderedByFrequency: false`；实现以两套独立、明示为 Typebar 原创练习 idiolect 的内容走 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径，Zipf 显示不支持提示。基础 Viossa 未定义 `noLazyMode`，故保留简化输入；Njutro 定义 `noLazyMode: true`，普通练习禁用简化输入而自定义文本保留例外。两者均进入默认／自选多语混排、社区投稿、成绩和排行榜。
+- Māori 审计只读取 `maori_1k.json` 的元数据，不读取其中词表或引语文本。配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序；实现以保留 macron 的独立自写内容走 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。保留简化输入；Zipf 走未知提示，并进入默认／自选多语混排、社区投稿、成绩和排行榜。

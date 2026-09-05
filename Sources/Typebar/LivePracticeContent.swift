@@ -159,6 +159,7 @@ enum LivePracticeContentService {
     case .klingon: return "tlh"
     case .quenya: return "en"
     case .viossa, .viossaNjutro: return "en"
+    case .maori: return "en"
     case .uzbek: return "uz"
     case .occitan: return "oc"
     case .oromo: return "om"
