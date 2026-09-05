@@ -31,6 +31,7 @@ extension TypingLanguage {
     case .belarusian: "be-BY"
     case .latvian: "lv"
     case .irish: "ga-IE"
+    case .galician: "gl-ES"
     case .kurdishCentral: "ckb"
     case .arabic: "ar-SA"
     case .hebrew: "he-IL"

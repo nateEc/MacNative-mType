@@ -42,6 +42,7 @@
 2026-09-05 更新：单语数量增至六十七种，新增 Latvian（`latvian`）：参考配置仅定义 `bcp47: lv`，没有 RTL、连写或 `noLazyMode`。Typebar 使用原创词流、四档引语与 LTR 空格提交；知识短文与系统朗读均精确使用 `lv`，保留用户选择的简化输入，并接入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的六十六种数量。
 2026-09-05 更新：单语数量增至六十八种，新增 Mongolian（`mongolian`）：参考配置仅定义 `noLazyMode: true`，没有 BCP-47、RTL 或连写。Typebar 使用原创词流、四档引语与 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Mongolian 代码，并禁用简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的六十七种数量。
 2026-09-05 更新：单语数量增至六十九种，新增 Irish（`irish`）：参考配置仅定义 `bcp47: ga-IE`，没有 RTL、连写或 `noLazyMode`。Typebar 使用原创词流、四档引语与 LTR 空格提交；知识短文按 BCP-47 首段使用 `ga`，系统朗读精确使用 `ga-IE`，并保留用户选择的简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的六十八种数量。
+2026-09-05 更新：单语数量增至七十种，新增 Galician（`galician`）：参考配置定义 `bcp47: gl-ES` 与 `orderedByFrequency: true`，没有 RTL、连写或 `noLazyMode`。Typebar 使用原创、按自有排名排列的词流与四档引语，保持 LTR 空格提交；知识短文按 BCP-47 首段使用 `gl`，系统朗读精确使用 `gl-ES`，并保留 Zipf 高频词与用户选择的简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的六十九种数量。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

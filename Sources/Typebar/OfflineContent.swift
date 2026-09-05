@@ -1408,6 +1408,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "galician-paso-calmo",
+      title: "Paso calmo",
+      text: "Un paso calmo axuda a ver con claridade o seguinte traballo.",
+      language: .galician,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "galician-caderno-aberto",
+      title: "Caderno aberto",
+      text: "Un caderno aberto non responde todas as preguntas, pero deixa espazo para dividilas en partes pequenas.",
+      language: .galician,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "galician-progreso-pequeno",
+      title: "Progreso pequeno",
+      text: "O progreso non sempre parece grande. Volver á mesma páxina, aclarar unha frase e corrixir un erro pequeno dá máis confianza para o seguinte intento.",
+      language: .galician,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "galician-mesa-longa",
+      title: "Mesa longa",
+      text: "Unha mesa longa deixa espazo para traballos diferentes. Nun extremo pode quedar o primeiro borrador, no outro agarda unha frase que precisa máis atención e no medio está a seguinte decisión pequena. Así avanza tamén a práctica. Non é necesario resolver de contado cada parte difícil. Cando hai un lugar ao que volver, aparece o seguinte paso e medra a paciencia para notar o que se fixo máis doado despois de varios intentos, a velocidade aumenta de maneira natural.",
+      language: .galician,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kurdish-central-hengawi-aram",
       title: "هەنگاوی ئارام",
       text: "هەنگاوی ئارام کاری داهاتوو ڕوونتر دەکات.",
