@@ -162,6 +162,7 @@ enum LivePracticeContentService {
     case .bashkir: return "ba"
     case .basque: return "eu"
     case .frisian: return "fy"
+    case .hawaiian: return "haw"
     case .friulian: return "fur"
     case .bemba: return "bem"
     case .azerbaijani: return "az"

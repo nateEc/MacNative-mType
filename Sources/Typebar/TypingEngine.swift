@@ -225,6 +225,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case basque
   case frisian
   case zulu
+  case hawaiian
   case arabic
   case arabicEgypt
   case arabicMorocco
@@ -3479,6 +3480,14 @@ enum StarterLexicon {
     "ukucabanga", "inothi", "umsebenzi", "umzamo", "ibanga", "isinyathelo", "ukubekezela", "ibhalansi",
   ]
 
+  // Typebar-authored Hawaiian starter words keep the selected `haw` content
+  // and speech path without importing a reference dictionary.
+  static let hawaiianWords = [
+    "aloha", "au", "ʻoe", "mākou", "puke", "peni", "puka", "makani", "ala", "mālamalama",
+    "alahaka", "kakahiaka", "pepa", "māla", "ao", "mālie", "kukui", "mauna", "hua", "mele",
+    "pākaukau", "manaʻo", "memo", "hana", "hoʻāʻo", "mamao", "kaʻanuʻu", "ahonui", "kaulike",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -4139,6 +4148,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: zuluWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .hawaiian:
+      return prompt(
+        tokens: count, lexicon: hawaiianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4503,6 +4516,7 @@ enum StarterLexicon {
     case .basque: (basqueWords, [",", ".", "!", "?"])
     case .frisian: (frisianWords, [",", ".", "!", "?"])
     case .zulu: (zuluWords, [",", ".", "!", "?"])
+    case .hawaiian: (hawaiianWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
     case .arabicMorocco: (arabicMoroccoWords, ["،", "؛", "؟", "."])
@@ -4671,6 +4685,7 @@ extension TypingLanguage {
     case .basque: StarterLexicon.basqueWords
     case .frisian: StarterLexicon.frisianWords
     case .zulu: StarterLexicon.zuluWords
+    case .hawaiian: StarterLexicon.hawaiianWords
     case .arabic: StarterLexicon.arabicWords
     case .arabicEgypt: StarterLexicon.arabicEgyptWords
     case .arabicMorocco: StarterLexicon.arabicMoroccoWords
@@ -4750,7 +4765,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4840,7 +4855,7 @@ extension TypingLanguage {
   /// wordsets. Dictionaries without that field intentionally remain unknown.
   var zipfFrequencySupport: ZipfFrequencySupport {
     switch self {
-    case .english, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
+    case .english, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
     case .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .hungarian, .lao:
@@ -4882,6 +4897,7 @@ extension TypingLanguage {
     case .basque: "Euskara"
     case .frisian: "Frysk"
     case .zulu: "isiZulu"
+    case .hawaiian: "ʻŌlelo Hawaiʻi"
     case .arabic: "العربية"
     case .arabicEgypt: "العربية المصرية"
     case .arabicMorocco: "العربية المغربية"

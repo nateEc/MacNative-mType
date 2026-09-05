@@ -37,6 +37,7 @@ extension TypingLanguage {
     case .bashkir: "ba"
     case .basque: "eu"
     case .frisian: "fy-FY"
+    case .hawaiian: "haw"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"

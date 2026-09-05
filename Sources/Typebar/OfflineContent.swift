@@ -1464,6 +1464,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "hawaiian-calm-step",
+      title: "Kaʻanuʻu mālie",
+      text: "Mālama ke kaʻanuʻu mālie i ka maopopo o ka hana aʻe.",
+      language: .hawaiian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "hawaiian-open-book",
+      title: "Puke hāmama",
+      text: "ʻAʻole pane ka puke hāmama i nā nīnau a pau, akā hāmama ia i wahi no nā manaʻo hou.",
+      language: .hawaiian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "hawaiian-small-effort",
+      title: "Hoʻoikaika liʻiliʻi",
+      text: "ʻAʻole pono e pau nā mea a pau i ka hoʻāʻo liʻiliʻi o kēia lā. E wehe i ka puke, e hoʻololi i hoʻokahi huaʻōlelo, a e waiho i memo pono no ka lā aʻe. Hoʻomāmā ka manawa i ka hoʻomaka ʻana o ke kaʻanuʻu liʻiliʻi.",
+      language: .hawaiian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "hawaiian-return-place",
+      title: "Wahi e hoʻi ai",
+      text: "I ka pau ʻana o kēlā me kēia lā, ʻaʻole pono ka papa hana liʻiliʻi e loaʻa ka pane piha. Hiki ke noho ma laila kekahi ʻōlelo i pau ʻole, he nīnau, a he memo pōkole no ka hoʻāʻo aʻe. Ma laila e maʻalahi ai ka hoʻi ʻana i ka hana. Ke nānā hou ʻoe, e ʻike ana ʻoe ua neʻe aku nā manaʻo a ʻaʻole mamao hou ke kaʻanuʻu mua. Waiho ke kaʻanuʻu mālie i kona hōʻailona ma ke ala.",
+      language: .hawaiian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",
