@@ -2551,7 +2551,17 @@ enum OfflineContent {
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
-    quotes.filter { $0.language == language && (length == .all || $0.length == length) }
+    if language == .swissGerman {
+      return quotes(for: .german, length: length).map { quote in
+        .init(
+          id: "swiss-german-\(quote.id)",
+          title: quote.title.replacingOccurrences(of: "ß", with: "ss"),
+          text: quote.text.replacingOccurrences(of: "ß", with: "ss"),
+          language: .swissGerman,
+          length: quote.length)
+      }
+    }
+    return quotes.filter { $0.language == language && (length == .all || $0.length == length) }
   }
 
   static func nextQuote(
@@ -2695,7 +2705,9 @@ enum NoSpaceWordBoundaryPolicy {
     // flattened output contains source words in reverse order.
     if modifiers.contains(.backwards) { words.reverse() }
     let lengths = words.map {
-      TestModifierPolicy.transformed($0, modifiers: modifiers).count
+      language.presentationText(
+        TestModifierPolicy.transformed($0, modifiers: modifiers)
+      ).count
     }
     guard lengths.reduce(0, +) == transformedPrompt.count else { return [] }
     return lengths
@@ -2805,7 +2817,8 @@ struct TestSessionFactory {
           let limit = min(
             max(configuration.customTextSectionLimit ?? sections.count, 1), sections.count)
           let transformedSections = sections.prefix(limit).map {
-            TestModifierPolicy.transformed($0, modifiers: configuration.modifiers)
+            configuration.language.presentationText(
+              TestModifierPolicy.transformed($0, modifiers: configuration.modifiers))
           }
           noSpaceBoundarySource = sections.prefix(limit).joined(separator: " ")
           let separator =
@@ -2824,10 +2837,10 @@ struct TestSessionFactory {
         }
       }
     }
-    let transformedPrompt =
+    let transformedPrompt = configuration.language.presentationText(
       configuration.mode == .custom && configuration.customTextCompletion == .sections
-      ? prompt
-      : TestModifierPolicy.transformed(prompt, modifiers: configuration.modifiers)
+        ? prompt
+        : TestModifierPolicy.transformed(prompt, modifiers: configuration.modifiers))
     let noSpaceWordLengths = NoSpaceWordBoundaryPolicy.wordLengths(
       source: noSpaceBoundarySource ?? prompt, language: configuration.language,
       modifiers: configuration.modifiers,

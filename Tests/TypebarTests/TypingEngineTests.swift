@@ -3261,6 +3261,7 @@ final class TypingEngineTests: XCTestCase {
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
+      StarterLexicon.swissGermanWords,
       StarterLexicon.afrikaansWords,
       StarterLexicon.albanianWords,
       StarterLexicon.bembaWords,
@@ -3316,7 +3317,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 79)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 80)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3506,6 +3507,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .uzbek).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .uzbek), "uz")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .arabic).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .arabic), "ar")
@@ -4238,6 +4242,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.hausa.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.tatar.zipfFrequencySupport, .supported)
     XCTAssertEqual(TypingLanguage.uzbek.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.swissGerman.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.armenian.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.bemba.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.albanian.zipfFrequencySupport, .unknown)
@@ -4273,6 +4278,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .uzbek, modifiers: [.zipf]),
       "Oʻzbekcha 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .swissGerman, modifiers: [.zipf]),
+      "Swiss German 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
     )
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .armenian, modifiers: [.zipf]),
@@ -4690,9 +4699,39 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.german.supportsQuotes)
   }
 
+  func testSwissGermanDerivesOnlyTypebarOwnedGermanContentAndAppliesEszettRule() {
+    XCTAssertEqual(
+      StarterLexicon.swissGermanWords,
+      StarterLexicon.germanWords.map { $0.replacingOccurrences(of: "ß", with: "ss") })
+    XCTAssertFalse(StarterLexicon.swissGermanWords.joined().contains("ß"))
+    XCTAssertEqual(
+      OfflineContent.quotes(for: .swissGerman).map(\.text),
+      OfflineContent.quotes(for: .german).map { $0.text.replacingOccurrences(of: "ß", with: "ss") })
+    XCTAssertTrue(OfflineContent.quotes(for: .swissGerman).allSatisfy {
+      $0.language == .swissGerman && !$0.title.contains("ß") && !$0.text.contains("ß")
+    })
+
+    let custom = TestSessionFactory.make(
+      configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        language: .swissGerman),
+      customText: "straße größe")
+    XCTAssertEqual(custom.prompt, "strasse grösse")
+
+    var noSpace = TestSessionFactory.make(
+      configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        language: .swissGerman, modifiers: [.noSpaces]),
+      customText: "straße größe")
+    XCTAssertEqual(noSpace.prompt, "strassegrösse")
+    noSpace.insert(noSpace.prompt, at: start)
+    XCTAssertEqual(noSpace.outcome, .completed)
+  }
+
   func testAdditionalSpaceDelimitedLanguagesUseOnlyTypebarOwnedCorporaAndQuotes() {
     for (language, lexicon) in [
       (TypingLanguage.dutch, StarterLexicon.dutchWords),
+      (.swissGerman, StarterLexicon.swissGermanWords),
       (.afrikaans, StarterLexicon.afrikaansWords),
       (.albanian, StarterLexicon.albanianWords),
       (.bemba, StarterLexicon.bembaWords),
@@ -4885,6 +4924,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.uzbek.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.uzbek))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.uzbek))
+    XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.swissGerman.supportsQuotes)
+    XCTAssertFalse(TypingLanguage.swissGerman.supportsCommunityQuoteSubmission)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.swissGerman))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.swissGerman))
     XCTAssertTrue(StarterLexicon.arabicWords.contains("نافِذة"))
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
@@ -5123,6 +5169,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.hausa.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.tatar.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.uzbek.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
 
     XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers(
@@ -5152,6 +5199,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.english.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.spanish.speechLocaleIdentifier, "es-ES")
     XCTAssertEqual(TypingLanguage.german.speechLocaleIdentifier, "de-DE")
+    XCTAssertEqual(TypingLanguage.swissGerman.speechLocaleIdentifier, "de-CH")
     XCTAssertEqual(TypingLanguage.afrikaans.speechLocaleIdentifier, "af-ZA")
     XCTAssertEqual(TypingLanguage.albanian.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.bemba.speechLocaleIdentifier, "bem")

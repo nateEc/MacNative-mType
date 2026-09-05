@@ -972,7 +972,7 @@ private struct ContentView: View {
           .onChange(of: wordLimit) { _, _ in reset() }
         case .quote:
           Picker("内容来源", selection: $quoteSource) {
-            ForEach(QuoteSource.allCases) { source in Text(source.title).tag(source) }
+            ForEach(availableQuoteSources) { source in Text(source.title).tag(source) }
           }
           .pickerStyle(.segmented)
           .onChange(of: quoteSource) { _, source in
@@ -2572,6 +2572,10 @@ private struct ContentView: View {
     mode == .quote ? TypingLanguage.allCases.filter(\.supportsQuotes) : TypingLanguage.allCases
   }
 
+  private var availableQuoteSources: [QuoteSource] {
+    language.supportsCommunityQuoteSubmission ? Array(QuoteSource.allCases) : [.builtIn]
+  }
+
   private var presetDefinition: SavedTestPreset {
     .init(
       configuration: configuration,
@@ -2605,6 +2609,7 @@ private struct ContentView: View {
     }
     customTextOrdering = configuration.customTextOrdering
     language = configuration.language
+    constrainQuoteSource(for: language)
     mixedLanguageComponents = configuration.mixedLanguageComponents
     quoteLengths = configuration.effectiveQuoteLengths
     quoteQueue.reset()
@@ -2627,11 +2632,21 @@ private struct ContentView: View {
   }
 
   private func languageChanged(to language: TypingLanguage) {
+    constrainQuoteSource(for: language)
     if mode == .quote {
       quoteQueue.reset()
       ensureSelectedQuote()
     }
     reset()
+  }
+
+  private func constrainQuoteSource(for language: TypingLanguage) {
+    guard !language.supportsCommunityQuoteSubmission, quoteSource == .community else { return }
+      quoteSource = .builtIn
+      communityQuotes = []
+      communityQuoteRatings = [:]
+      communityQuoteMessage =
+        "Swiss German 的参考路径复用 Typebar 自有 German 引语，不使用社区投稿。"
   }
 
   private func mixedLanguageBinding(for component: TypingLanguage) -> Binding<Bool> {

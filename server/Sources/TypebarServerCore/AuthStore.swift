@@ -453,7 +453,7 @@ public actor AuthStore {
     "turkish", "polish",
   ]
   private static let supportedResultLanguageIDs = supportedSingleLanguageIDs.union([
-    "mixedEnglishChinese", "mixedLanguages",
+    "swissGerman", "mixedEnglishChinese", "mixedLanguages",
   ])
 
   private struct PersistedState: Codable {

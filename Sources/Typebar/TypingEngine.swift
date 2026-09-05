@@ -199,6 +199,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
   case spanish
   case german
+  case swissGerman
   case afrikaans
   case albanian
   case bemba
@@ -3255,6 +3256,11 @@ enum StarterLexicon {
     "wolke", "zeit", "lernen", "fokus", "schritt", "atmen", "größe", "mühe",
   ]
 
+  // The pinned reference derives Swiss German words from its German wordsets
+  // and replaces ß with ss. Keep the same behavior over Typebar-owned German
+  // content rather than importing the reference dictionaries.
+  static let swissGermanWords = germanWords.map { $0.replacingOccurrences(of: "ß", with: "ss") }
+
   // Typebar-authored Afrikaans starter words. Diacritics remain in the local
   // corpus for native macOS composed-text practice without imported word lists.
   static let afrikaansWords = [
@@ -3881,6 +3887,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: germanWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .swissGerman:
+      return prompt(
+        tokens: count, lexicon: swissGermanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .afrikaans:
       return prompt(
         tokens: count, lexicon: afrikaansWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4255,6 +4265,7 @@ enum StarterLexicon {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
+    case .swissGerman: (swissGermanWords, [",", ".", "!", "?"])
     case .afrikaans: (afrikaansWords, [",", ".", "!", "?"])
     case .albanian: (albanianWords, [",", ".", "!", "?"])
     case .bemba: (bembaWords, [",", ".", "!", "?"])
@@ -4387,6 +4398,12 @@ extension TestMode {
 }
 
 extension TypingLanguage {
+  /// Mirrors the pinned reference's Swiss German word-generator branch for
+  /// every visible local prompt, including user-provided custom text.
+  func presentationText(_ text: String) -> String {
+    self == .swissGerman ? text.replacingOccurrences(of: "ß", with: "ss") : text
+  }
+
   /// Typebar-owned practice words available to local features such as weak
   /// spot drills and the word filter. This never reads a reference word list.
   func ownedPracticeWords(englishVariant: EnglishVariant = .american) -> [String] {
@@ -4395,6 +4412,7 @@ extension TypingLanguage {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
+    case .swissGerman: StarterLexicon.swissGermanWords
     case .afrikaans: StarterLexicon.afrikaansWords
     case .albanian: StarterLexicon.albanianWords
     case .bemba: StarterLexicon.bembaWords
@@ -4483,7 +4501,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4561,6 +4579,12 @@ extension TypingLanguage {
     self != .mixedEnglishChinese && self != .mixedLanguages && !isCodeLanguage
   }
 
+  /// The pinned reference excludes Swiss German from community quote
+  /// submission and redirects its built-in quote path to German instead.
+  var supportsCommunityQuoteSubmission: Bool {
+    supportsQuotes && self != .swissGerman
+  }
+
   /// Pinned-reference `orderedByFrequency` metadata for the built-in base
   /// wordsets. Dictionaries without that field intentionally remain unknown.
   var zipfFrequencySupport: ZipfFrequencySupport {
@@ -4581,6 +4605,7 @@ extension TypingLanguage {
     case .english: "English"
     case .spanish: "Español"
     case .german: "Deutsch"
+    case .swissGerman: "Swiss German"
     case .afrikaans: "Afrikaans"
     case .albanian: "Shqip"
     case .bemba: "Ichibemba"

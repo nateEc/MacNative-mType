@@ -698,6 +698,13 @@ final class HealthRouteTests: XCTestCase {
           attribution: nil), accessToken: session.accessToken)
       XCTFail("Unsupported quote languages must be rejected")
     } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidQuoteSubmission) }
+    do {
+      _ = try await store.submitQuote(
+        .init(
+          language: "swissGerman", text: "Eine ruhige Übung macht den nächsten Schritt klarer.",
+          attribution: nil), accessToken: session.accessToken)
+      XCTFail("Swiss German community quote submissions must be rejected")
+    } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidQuoteSubmission) }
   }
 
   func testOnlyApprovedQuotesAreExposedPubliclyAndCanBeModerated() async throws {
@@ -2979,7 +2986,7 @@ final class HealthRouteTests: XCTestCase {
     }
 
     for (offset, language) in [
-      "traditionalChinese", "afrikaans", "albanian", "bemba", "bosnian", "esperanto", "esperantoXSystem", "esperantoHSystem", "latin", "friulian", "malagasy", "welsh", "hausa", "tatar", "uzbek", "azerbaijani", "belarusian", "lithuanian", "latvian", "mongolian", "irish", "galician", "marathi", "kurdishCentral", "arabic", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "bangla", "thai", "nepali", "kannada", "telugu", "malayalam", "sanskrit", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "georgian", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "russian",
+      "traditionalChinese", "swissGerman", "afrikaans", "albanian", "bemba", "bosnian", "esperanto", "esperantoXSystem", "esperantoHSystem", "latin", "friulian", "malagasy", "welsh", "hausa", "tatar", "uzbek", "azerbaijani", "belarusian", "lithuanian", "latvian", "mongolian", "irish", "galician", "marathi", "kurdishCentral", "arabic", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "bangla", "thai", "nepali", "kannada", "telugu", "malayalam", "sanskrit", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "georgian", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "russian",
       "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
       "turkish", "polish",
     ].enumerated() {

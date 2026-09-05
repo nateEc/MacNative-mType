@@ -26,6 +26,7 @@ extension TypingLanguage {
     case .english: "en-US"
     case .spanish: "es-ES"
     case .german: "de-DE"
+    case .swissGerman: "de-CH"
     case .afrikaans: "af-ZA"
     case .hausa: "ha"
     case .tatar: "tt"

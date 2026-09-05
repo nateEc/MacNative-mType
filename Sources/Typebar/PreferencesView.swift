@@ -1321,7 +1321,7 @@ struct PreferencesView: View {
             Divider()
             Text("投稿引语").font(.headline)
             Picker("语言", selection: $submittedQuoteLanguage) {
-              ForEach(TypingLanguage.allCases.filter(\.supportsQuotes), id: \.self) { language in
+              ForEach(TypingLanguage.allCases.filter(\.supportsCommunityQuoteSubmission), id: \.self) { language in
                 Text(language.displayName).tag(language)
               }
             }
