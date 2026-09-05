@@ -1212,6 +1212,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "macedonian-calm-step",
+      title: "Мирен чекор",
+      text: "Мирниот чекор ја прави следната работа појасна.",
+      language: .macedonian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "macedonian-open-page",
+      title: "Отворена страница",
+      text: "Отворената страница не ги решава сите прашања, но остава место за нова мисла.",
+      language: .macedonian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "macedonian-small-effort",
+      title: "Мал обид",
+      text: "Малиот обид денес не мора да заврши сè. Отвори книга, поправи една реченица и остави корисна белешка за утре. Со време, овие мали чекори го прават почетокот полесен.",
+      language: .macedonian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "macedonian-return-place",
+      title: "Место за враќање",
+      text: "На крајот од денот, малата книга не бара целосен одговор. Во неа може да останат половина реченица, едно прашање и кратка белешка за следниот обид. Тоа е доволно за да подготви место каде што ќе се вратиш. Кога повторно ќе погледнеш, ќе видиш дека мислата малку напредувала и дека почетокот не е далеку. Секој мирен чекор остава знак на патеката, а тие знаци покажуваат дека големата работа може да се држи во мали делови.",
+      language: .macedonian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

@@ -216,6 +216,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case uzbek
   case occitan
   case oromo
+  case macedonian
   case arabic
   case arabicEgypt
   case arabicMorocco
@@ -3397,6 +3398,14 @@ enum StarterLexicon {
     "obsaa", "madaallii", "ganda", "rooba", "urjii", "hiriyyaa", "abdii", "hojii", "laga", "birraa",
   ]
 
+  // Typebar-authored Macedonian starter words provide local practice without
+  // importing the reference dictionary or word list.
+  static let macedonianWords = [
+    "книга", "врата", "патека", "светло", "мост", "утро", "страница", "место", "облак", "тишина",
+    "планина", "семе", "глас", "маса", "идеја", "реченица", "поглед", "искуство", "далечина", "чекор",
+    "трпение", "рамнотежа", "село", "дожд", "ѕвезда", "пријател", "надеж", "работа", "река", "пролет",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -4013,6 +4022,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: oromoWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .macedonian:
+      return prompt(
+        tokens: count, lexicon: macedonianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4364,6 +4377,7 @@ enum StarterLexicon {
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .occitan: (occitanWords, [",", ".", "!", "?"])
     case .oromo: (oromoWords, [",", ".", "!", "?"])
+    case .macedonian: (macedonianWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
     case .arabicMorocco: (arabicMoroccoWords, ["،", "؛", "؟", "."])
@@ -4517,6 +4531,7 @@ extension TypingLanguage {
     case .uzbek: StarterLexicon.uzbekWords
     case .occitan: StarterLexicon.occitanWords
     case .oromo: StarterLexicon.oromoWords
+    case .macedonian: StarterLexicon.macedonianWords
     case .arabic: StarterLexicon.arabicWords
     case .arabicEgypt: StarterLexicon.arabicEgyptWords
     case .arabicMorocco: StarterLexicon.arabicMoroccoWords
@@ -4595,7 +4610,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4649,6 +4664,7 @@ extension TypingLanguage {
       .armenian,
       .georgian,
       .belarusian,
+      .macedonian,
       .mongolian,
       .marathi,
       .malagasy,
@@ -4716,6 +4732,7 @@ extension TypingLanguage {
     case .uzbek: "Oʻzbekcha"
     case .occitan: "Occitan"
     case .oromo: "Oromo"
+    case .macedonian: "Македонски"
     case .arabic: "العربية"
     case .arabicEgypt: "العربية المصرية"
     case .arabicMorocco: "العربية المغربية"

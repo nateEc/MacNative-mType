@@ -3278,6 +3278,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.uzbekWords,
       StarterLexicon.occitanWords,
       StarterLexicon.oromoWords,
+      StarterLexicon.macedonianWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3319,7 +3320,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 82)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 83)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3515,6 +3516,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .oromo).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .oromo), "om")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .macedonian).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .macedonian), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
@@ -4103,6 +4107,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(oromoEncyclopedia.text, "Mana kitaabni ganama balbala isaa bana")
     XCTAssertEqual(
       oromoEncyclopedia.prompt(for: .words(3, language: .oromo)), "Mana kitaabni ganama")
+    let macedonianData = Data("""
+    {"title":"Отворена книга","extract":"Книгата е отворена секое утро."}
+    """.utf8)
+    let macedonianEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: macedonianData, language: .macedonian))
+    XCTAssertEqual(macedonianEncyclopedia.text, "Книгата е отворена секое утро")
+    XCTAssertEqual(
+      macedonianEncyclopedia.prompt(for: .words(3, language: .macedonian)), "Книгата е отворена")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4312,6 +4324,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.uzbek.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.occitan.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.oromo.zipfFrequencySupport, .supported)
+    XCTAssertEqual(TypingLanguage.macedonian.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.swissGerman.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
@@ -4825,6 +4838,7 @@ final class TypingEngineTests: XCTestCase {
       (.uzbek, StarterLexicon.uzbekWords),
       (.occitan, StarterLexicon.occitanWords),
       (.oromo, StarterLexicon.oromoWords),
+      (.macedonian, StarterLexicon.macedonianWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
@@ -5025,6 +5039,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.oromo.zipfFrequencySupport, .supported)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.oromo))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.oromo))
+    XCTAssertTrue(StarterLexicon.macedonianWords.contains("книга"))
+    XCTAssertFalse(TypingLanguage.macedonian.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.macedonian.usesSpaceDelimitedWords)
+    XCTAssertFalse(TypingLanguage.macedonian.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.macedonian.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.macedonian.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.macedonian.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.macedonian))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.macedonian))
     XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5292,6 +5315,14 @@ final class TypingEngineTests: XCTestCase {
         [.lazyLatin], language: .pashto, mode: .custom, automaticallyEnabled: true),
       [.lazyLatin])
     XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .macedonian, automaticallyEnabled: true),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .macedonian, mode: .custom, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers([], language: .sindhi, automaticallyEnabled: true),
       [])
     XCTAssertEqual(
@@ -5377,6 +5408,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.uzbek.speechLocaleIdentifier, "uz-UZ")
     XCTAssertEqual(TypingLanguage.occitan.speechLocaleIdentifier, "oc-FR")
     XCTAssertEqual(TypingLanguage.oromo.speechLocaleIdentifier, "om")
+    XCTAssertEqual(TypingLanguage.macedonian.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")
