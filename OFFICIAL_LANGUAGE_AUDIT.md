@@ -77,6 +77,7 @@ Typebar 现有 111 个可单独练习并支持 Typebar 自有引语的语言／�
 - 2026-09-05 更正：当前单语总数为一百一十三种、默认／自选 LTR 多语候选为一百零三种。Kinyarwanda 审计只读取 `kinyarwanda.json` 的元数据，不读取其中词表或引语文本；它定义 `noLazyMode: true`、`orderedByFrequency: true` 与 `bcp47: rw-RW`，不定义 RTL 或连写。因此 Typebar 以独立自写的 Kinyarwanda 内容走 LTR 空格分词，知识短文按 BCP 首段使用 `rw`，朗读精确使用 `rw-RW`；普通练习移除简化输入而自定义文本保留例外，Zipf 使用自有高频词，并已覆盖多语轮转、社区投稿、成绩和排行榜。
 - 2026-09-05 更正：当前单语总数为一百一十四种、默认／自选 LTR 多语候选为一百零四种。Shona 审计只读取 `shona.json` 和 `shona_1k.json` 的元数据，不读取其中词表或引语文本；它们只定义名称，不定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序。因此 Typebar 以独立自写的 Shona 内容走 LTR 空格分词和 `en`／`en-US` 缺省在线/朗读路径；保留简化输入与 Zipf 未知提示，并已覆盖多语轮转、社区投稿、成绩和排行榜。
 - 2026-09-05 更正：当前单语总数为一百一十五种、默认／自选 LTR 多语候选为一百零五种。Belarusian Łacinka 审计只读取 `belarusian_lacinka.json` 和 `belarusian_lacinka_1k.json` 的元数据，不读取其中词表或引语文本；它们定义 `noLazyMode: false`，不定义 BCP-47、RTL、连写或词频排序。因此 Typebar 以独立自写的拉丁转写内容走 LTR 空格分词和 `en`／`en-US` 缺省在线/朗读路径；保留简化输入与 Zipf 未知提示，并已覆盖多语轮转、社区投稿、成绩和排行榜。
+- 2026-09-05 更正：当前单语总数为一百一十七种、默认／自选 LTR 多语候选为一百零七种。Crimean Tatar 拉丁与西里尔书写审计分别只读取五个 `tatar_crimean*` 和五个 `tatar_crimean_cyrillic*` 配置的元数据，不读取词表或引语文本；十个配置均定义 `noLazyMode: true` 与 `bcp47: crh-CRH`，不定义 RTL、连写或词频排序。Typebar 以两套独立自写词流及各自四档引语保留书写选择，均使用 LTR 空格分词、`crh` 在线知识短文与 `crh-CRH` 朗读；普通练习移除简化输入而自定义文本保留例外，Zipf 走未知提示，并已覆盖多语轮转、社区投稿、成绩和排行榜。
 
 ## 后续候选与准入条件
 

@@ -988,6 +988,62 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "tatar-crimean-erteki-adim",
+      title: "Erteki adım",
+      text: "Erteki küçük adım, bugünki yolda ışıq olur.",
+      language: .tatarCrimean,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "tatar-crimean-kitap-sualler",
+      title: "Kitap ve sualler",
+      text: "Kitap açıq bolsa, suallerge yer açılır.",
+      language: .tatarCrimean,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "tatar-crimean-sessiz-masa",
+      title: "Sessiz masa",
+      text: "Sessiz masa tınç fikir içün yer bere.",
+      language: .tatarCrimean,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "tatar-crimean-satir-pencere",
+      title: "Satır ve pencere",
+      text: "Erteki küçük adım, bugünki yolda ışıq olur. Kitap açıq bolsa, suallerge yer açılır. Sessiz masa tınç fikir içün yer bere. Her satır yeni denemege pencere aça.",
+      language: .tatarCrimean,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "tatar-crimean-cyrillic-erteki-adim",
+      title: "Эртеки адым",
+      text: "Эртеки кючюк адым, бугюнки ёлда ышык олур.",
+      language: .tatarCrimeanCyrillic,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "tatar-crimean-cyrillic-kitap-sualler",
+      title: "Китап ве суаллер",
+      text: "Китап ачык болса, суаллерге ер ачылыр.",
+      language: .tatarCrimeanCyrillic,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "tatar-crimean-cyrillic-sessiz-masa",
+      title: "Сессиз маса",
+      text: "Сессиз маса тынч фикир ичюн ер бере.",
+      language: .tatarCrimeanCyrillic,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "tatar-crimean-cyrillic-satir-pencere",
+      title: "Сатыр ве пенджере",
+      text: "Эртеки кючюк адым, бугюнки ёлда ышык олур. Китап ачык болса, суаллерге ер ачылыр. Сессиз маса тынч фикир ичюн ер бере. Эр сатыр ени денемеге пенджере ача.",
+      language: .tatarCrimeanCyrillic,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "uzbek-ertalab-yol",
       title: "Ertalab yoʻl",
       text: "Ertalab tinch yoʻl ochadi.",

@@ -213,6 +213,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case welsh
   case hausa
   case tatar
+  case tatarCrimean
+  case tatarCrimeanCyrillic
   case uzbek
   case occitan
   case oromo
@@ -3404,6 +3406,25 @@ enum StarterLexicon {
     "җыр", "тынычлык", "өмет", "кеше", "бергә", "ирек", "сайлау", "истәлек", "хыял", "тынлык",
   ]
 
+  // Typebar-authored Crimean Tatar starter words keep the Latin script path
+  // separate from its Cyrillic counterpart without importing either reference
+  // dictionary or word list.
+  static let tatarCrimeanWords = [
+    "selâm", "men", "sen", "biz", "qırım", "kitap", "qalem", "pencere", "yol", "ışıq",
+    "köprü", "saba", "kâğıt", "bağ", "bulut", "sükûnet", "lampa", "dağ", "tohum", "muzıka",
+    "masa", "fikir", "not", "iş", "tecrübe", "dost", "şeer", "deniz", "köy", "vaqıt",
+    "ses", "sual", "cevap", "ümit", "kelecek",
+  ]
+
+  // Typebar-authored Crimean Tatar Cyrillic starter words intentionally use
+  // their own corpus so script selection stays visible in offline practice.
+  static let tatarCrimeanCyrillicWords = [
+    "селям", "мен", "сен", "биз", "къырым", "китап", "къалем", "пенджере", "ёл", "ышык",
+    "копрю", "саба", "кягъыт", "багъ", "булут", "сукюнет", "лампа", "дагъ", "тохум", "музыка",
+    "маса", "фикир", "нот", "иш", "теджрюбе", "дост", "шеер", "дениз", "кой", "вакъыт",
+    "сес", "суаль", "джевап", "юмют", "келеджек",
+  ]
+
   // Typebar-authored Uzbek starter words provide local practice without
   // importing the reference dictionary or word list.
   static let uzbekWords = [
@@ -4224,6 +4245,14 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tatarWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tatarCrimean:
+      return prompt(
+        tokens: count, lexicon: tatarCrimeanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tatarCrimeanCyrillic:
+      return prompt(
+        tokens: count, lexicon: tatarCrimeanCyrillicWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .uzbek:
       return prompt(
         tokens: count, lexicon: uzbekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4680,6 +4709,8 @@ enum StarterLexicon {
     case .welsh: (welshWords, [",", ".", "!", "?"])
     case .hausa: (hausaWords, [",", ".", "!", "?"])
     case .tatar: (tatarWords, [",", ".", "!", "?"])
+    case .tatarCrimean: (tatarCrimeanWords, [",", ".", "!", "?"])
+    case .tatarCrimeanCyrillic: (tatarCrimeanCyrillicWords, [",", ".", "!", "?"])
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .occitan: (occitanWords, [",", ".", "!", "?"])
     case .oromo: (oromoWords, [",", ".", "!", "?"])
@@ -4862,6 +4893,8 @@ extension TypingLanguage {
     case .welsh: StarterLexicon.welshWords
     case .hausa: StarterLexicon.hausaWords
     case .tatar: StarterLexicon.tatarWords
+    case .tatarCrimean: StarterLexicon.tatarCrimeanWords
+    case .tatarCrimeanCyrillic: StarterLexicon.tatarCrimeanCyrillicWords
     case .uzbek: StarterLexicon.uzbekWords
     case .occitan: StarterLexicon.occitanWords
     case .oromo: StarterLexicon.oromoWords
@@ -4967,7 +5000,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -5035,6 +5068,8 @@ extension TypingLanguage {
       .tibetan,
       .swahili,
       .kinyarwanda,
+      .tatarCrimean,
+      .tatarCrimeanCyrillic,
       .esperantoXSystem, .esperantoHSystem,
       .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
@@ -5096,6 +5131,8 @@ extension TypingLanguage {
     case .welsh: "Cymraeg"
     case .hausa: "Hausa"
     case .tatar: "Татарча"
+    case .tatarCrimean: "Qırımtatarca"
+    case .tatarCrimeanCyrillic: "Къырымтатарджа"
     case .uzbek: "Oʻzbekcha"
     case .occitan: "Occitan"
     case .oromo: "Oromo"
