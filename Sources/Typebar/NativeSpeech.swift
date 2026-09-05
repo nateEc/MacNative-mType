@@ -42,6 +42,7 @@ extension TypingLanguage {
     case .arabic: "ar-SA"
     case .arabicEgypt: "ar-EG"
     case .arabicMorocco: "ar-MA"
+    case .pashto: "ps"
     case .hebrew: "he-IL"
     case .persian: "fa-IR"
     case .urdu: "ur-PK"

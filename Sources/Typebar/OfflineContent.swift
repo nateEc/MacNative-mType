@@ -1100,6 +1100,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "pashto-calm-step",
+      title: "ارام ګام",
+      text: "یو ارام ګام راتلونکی کار روښانه کوي.",
+      language: .pashto,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "pashto-open-page",
+      title: "پرانیستې پاڼه",
+      text: "پرانیستې پاڼه هره پوښتنه نه حل کوي، خو فکر ته د پیل ځای ورکوي.",
+      language: .pashto,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "pashto-small-work",
+      title: "وړه هڅه",
+      text: "وړه هڅه اړ نه ده چې نن هر څه بشپړ کړي. کتابچه پرانیزه، یوه جمله سمبال کړه، او د سبا لپاره یوه ګټوره نښه پرېږده. په وخت سره همدا کوچني ګامونه د کار پیل اسانه کوي.",
+      language: .pashto,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "pashto-return-path",
+      title: "د بېرته راتلو ځای",
+      text: "د ورځې په پای کې کتابچه بشپړ ځواب نه غواړي. پکې کېدای شي نیمه جمله، یوه پوښتنه او د بلې هڅې لپاره یو لنډ یادښت وي. همدا کافي ده چې د بېرته راتلو ځای جوړ شي. کله چې بیا ور وګرځې، وبه وینې چې فکر لږ مخته تللی او پیل دومره لرې نه دی. هر ارام ګام په لاره کې یوه نښه زیاتوي، او له دغو نښو سره لوی کار په وړو برخو کې نیول کېدای شي.",
+      language: .pashto,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",
