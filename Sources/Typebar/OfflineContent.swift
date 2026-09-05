@@ -1716,6 +1716,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "swahili-clear-step",
+      title: "Hatua ndogo",
+      text: "Hatua ndogo hufanya mwanzo uwe wazi.",
+      language: .swahili,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "swahili-open-book",
+      title: "Kitabu wazi",
+      text: "Kitabu kilicho wazi hakijibu kila swali, lakini hufungua njia kwa wazo jipya.",
+      language: .swahili,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "swahili-small-work",
+      title: "Kazi ndogo",
+      text: "Kazi nzuri haihitaji kila kitu kiwe tayari mwanzoni. Fungua ukurasa, andika neno moja, na upe wazo muda wa kupata njia yake. Hatua ndogo ya leo hufanya kesho iwe nyepesi.",
+      language: .swahili,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "swahili-return-page",
+      title: "Rudi kwenye ukurasa",
+      text: "Mwisho wa siku, mpango mdogo hauhitaji kuwa kamili. Unaweza kuacha swali, neno la kusoma tena, na alama fupi kwa kesho. Vitu hivi vidogo huipa kazi mwelekeo. Unaporudi kwenye ukurasa, utaona kuwa wazo limesonga mbele na kuanza si kugumu tena. Hatua ndogo iliyo wazi husaidia kazi kuendelea.",
+      language: .swahili,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "yiddish-clear-step",
       title: "אַ קלאָרער שריט",
       text: "אַ קליינער שריט מאַכט דעם אָנהייב קלאָר.",
