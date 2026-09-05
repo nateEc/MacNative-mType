@@ -1212,6 +1212,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "georgian-calm-step",
+      title: "მშვიდი ნაბიჯი",
+      text: "მშვიდი ნაბიჯი შემდეგ საქმეს უფრო ნათელს ხდის.",
+      language: .georgian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "georgian-open-notebook",
+      title: "ღია რვეული",
+      text: "ღია რვეული ყველა რთულ კითხვას არ პასუხობს, მაგრამ კითხვას პატარა ნაწილებად დასანახად ადგილს ტოვებს.",
+      language: .georgian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "georgian-small-work",
+      title: "პატარა საქმე",
+      text: "წინსვლა ყოველთვის დიდ მომენტად არ ჩანს. იმავე გვერდის ხელახლა გახსნა, ერთი წინადადების გარკვევა და პატარა პრობლემის გამოსწორება შემდეგი მცდელობისთვის ნდობას ქმნის.",
+      language: .georgian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "georgian-long-table",
+      title: "გრძელი მაგიდა",
+      text: "გრძელი მაგიდა მრავალგვარი საქმისთვის ადგილს იძლევა. ერთ ბოლოში შეიძლება პირველი მონახაზი იდოს, მეორე ბოლოში კი მეტი ყურადღების მომთხოვნი წინადადება დარჩეს, შუაში კი შემდეგი პატარა გადაწყვეტილება დაელოდოს. ვარჯიშიც ასე მიდის წინ. ყველა რთული ნაწილის ერთბაშად გადაწყვეტა საჭირო არ არის. როცა დაბრუნების ადგილი, ნათელი შემდეგი ნაბიჯი და რამდენიმე მცდელობის შემდეგ გამარტივებულის შესამჩნევი მოთმინება არსებობს, სიჩქარე ბუნებრივად იზრდება.",
+      language: .georgian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",

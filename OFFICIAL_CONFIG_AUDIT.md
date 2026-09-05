@@ -30,6 +30,8 @@
 2026-09-05 更新：单语数量增至六十种，新增 Amharic（`amharic`）：参考配置仅定义 `bcp47: am-ET`，没有 `rightToLeft`、`joiningScript` 或 `noLazyMode`。Typebar 使用原创词流、四档引语、LTR 空格提交，以 `am` 访问知识短文并以 `am-ET` 调用系统朗读；保留用户选择的简化输入，并将该语言接入混排、预设、归档、社区投稿及服务端排行榜全路径。
 
 2026-09-05 更新：单语数量增至六十一种，新增 Armenian（`armenian`）：参考配置仅定义 `noLazyMode: true`，没有 BCP-47、RTL 或连写标记。Typebar 使用原创词流、四档引语和 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Armenian 代码。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径，且不应用简化输入。
+
+2026-09-05 更新：单语数量增至六十二种，新增 Georgian（`georgian`）：参考配置仅定义 `noLazyMode: true`，没有 BCP-47、RTL 或连写标记。Typebar 使用原创词流、四档引语和 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Georgian 代码。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径，且不应用简化输入。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |
