@@ -203,6 +203,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case albanian
   case bemba
   case bosnian
+  case esperanto
+  case esperantoXSystem
+  case esperantoHSystem
   case arabic
   case hebrew
   case persian
@@ -3278,6 +3281,31 @@ enum StarterLexicon {
     "bilješka", "vrt", "dah", "mali", "čitanje", "učenje", "zajedno", "dobrota", "sloboda", "vrijeme",
   ]
 
+  // Typebar-authored Esperanto starter words exercise its native diacritics
+  // without importing the reference dictionary or word list.
+  static let esperantoWords = [
+    "mateno", "fenestro", "papero", "lumo", "vento", "ekzerco", "atento", "trankvila", "klara", "lago",
+    "strato", "tablo", "vojaĝo", "pacienco", "momento", "urbo", "pluvo", "silento", "direkto", "stelo",
+    "noto", "ĝardeno", "spiro", "malgranda", "tempo", "amiko", "libro", "demando", "respondo", "horo",
+    "ĉielo", "ĥoro", "ĵurnalo", "ŝipo", "aŭtuno",
+  ]
+
+  // These are independent Typebar-authored practice corpora for the two
+  // ASCII spelling systems, not transliterations of a reference word list.
+  static let esperantoXSystemWords = [
+    "mateno", "fenestro", "papero", "lumo", "vento", "ekzerco", "atento", "trankvila", "klara", "lago",
+    "strato", "tablo", "vojagxo", "pacienco", "momento", "urbo", "pluvo", "silento", "direkto", "stelo",
+    "noto", "gxardeno", "spiro", "malgranda", "tempo", "amiko", "libro", "demando", "respondo", "horo",
+    "cxielo", "hxoro", "jxurnalo", "sxipo", "auxtuno",
+  ]
+
+  static let esperantoHSystemWords = [
+    "mateno", "fenestro", "papero", "lumo", "vento", "ekzerco", "atento", "trankvila", "klara", "lago",
+    "strato", "tablo", "vojagho", "pacienco", "momento", "urbo", "pluvo", "silento", "direkto", "stelo",
+    "noto", "ghardeno", "spiro", "malgranda", "tempo", "amiko", "libro", "demando", "respondo", "horo",
+    "chielo", "hhoro", "jhurnalo", "shipo", "autuno",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -3806,6 +3834,18 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: bosnianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .esperanto:
+      return prompt(
+        tokens: count, lexicon: esperantoWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .esperantoXSystem:
+      return prompt(
+        tokens: count, lexicon: esperantoXSystemWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .esperantoHSystem:
+      return prompt(
+        tokens: count, lexicon: esperantoHSystemWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4128,6 +4168,9 @@ enum StarterLexicon {
     case .albanian: (albanianWords, [",", ".", "!", "?"])
     case .bemba: (bembaWords, [",", ".", "!", "?"])
     case .bosnian: (bosnianWords, [",", ".", "!", "?"])
+    case .esperanto: (esperantoWords, [",", ".", "!", "?"])
+    case .esperantoXSystem: (esperantoXSystemWords, [",", ".", "!", "?"])
+    case .esperantoHSystem: (esperantoHSystemWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
@@ -4258,6 +4301,9 @@ extension TypingLanguage {
     case .albanian: StarterLexicon.albanianWords
     case .bemba: StarterLexicon.bembaWords
     case .bosnian: StarterLexicon.bosnianWords
+    case .esperanto: StarterLexicon.esperantoWords
+    case .esperantoXSystem: StarterLexicon.esperantoXSystemWords
+    case .esperantoHSystem: StarterLexicon.esperantoHSystemWords
     case .arabic: StarterLexicon.arabicWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
@@ -4332,7 +4378,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4388,6 +4434,7 @@ extension TypingLanguage {
       .belarusian,
       .mongolian,
       .marathi,
+      .esperantoXSystem, .esperantoHSystem,
       .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
       .mixedEnglishChinese, .mixedLanguages:
@@ -4412,7 +4459,7 @@ extension TypingLanguage {
   /// wordsets. Dictionaries without that field intentionally remain unknown.
   var zipfFrequencySupport: ZipfFrequencySupport {
     switch self {
-    case .english, .bosnian, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
+    case .english, .bosnian, .esperanto, .esperantoHSystem, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
     case .armenian, .bemba, .bulgarian, .hungarian, .lao:
@@ -4432,6 +4479,9 @@ extension TypingLanguage {
     case .albanian: "Shqip"
     case .bemba: "Ichibemba"
     case .bosnian: "Bosanski"
+    case .esperanto: "Esperanto"
+    case .esperantoXSystem: "Esperanto · X-sistemo"
+    case .esperantoHSystem: "Esperanto · H-sistemo"
     case .arabic: "العربية"
     case .hebrew: "עברית"
     case .persian: "فارسی"

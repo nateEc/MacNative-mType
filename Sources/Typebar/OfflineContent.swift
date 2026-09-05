@@ -736,6 +736,90 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "esperanto-trankvila-paso",
+      title: "Trankvila paŝo",
+      text: "Trankvila paŝo malfermas spacon por nova penso.",
+      language: .esperanto,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "esperanto-ni-lernas-kune",
+      title: "Ni lernas kune",
+      text: "Ni lernas kune, aŭskultas atente kaj dividas bonajn ideojn.",
+      language: .esperanto,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "esperanto-matena-lumo",
+      title: "Matena lumo",
+      text: "Matene la lumo venas tra malfermita fenestro, kaj sur la tablo atendas libro kaj papero. Ni lernas kune, aŭskultas atente kaj dividas bonajn ideojn.",
+      language: .esperanto,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "esperanto-bona-direkto",
+      title: "Bona direkto",
+      text: "Matene la lumo venas tra malfermita fenestro, kaj sur la tablo atendas libro kaj papero. Ĉiu malgranda ekzerco donas tempon por pli klara penso. Kiam ni lernas kune, ni aŭskultas atente kaj dividas bonajn ideojn. Trankvila paŝo ne solvas ĉion tuj, sed ĝi helpas nin vidi la sekvan demandon, peti helpon kaj daŭrigi la vojaĝon. Tiel el pacienco, laboro kaj interparolo kreskas tago kun bona direkto.",
+      language: .esperanto,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "esperanto-x-trankvila-pasxo",
+      title: "Trankvila pasxo",
+      text: "Trankvila pasxo malfermas spacon por nova penso.",
+      language: .esperantoXSystem,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "esperanto-x-ni-lernas-kune",
+      title: "Ni lernas kune",
+      text: "Ni lernas kune, auxskultas atente kaj dividas bonajn ideojn.",
+      language: .esperantoXSystem,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "esperanto-x-matena-lumo",
+      title: "Matena lumo",
+      text: "Matene la lumo venas tra malfermita fenestro, kaj sur la tablo atendas libro kaj papero. Ni lernas kune, auxskultas atente kaj dividas bonajn ideojn.",
+      language: .esperantoXSystem,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "esperanto-x-bona-direkto",
+      title: "Bona direkto",
+      text: "Matene la lumo venas tra malfermita fenestro, kaj sur la tablo atendas libro kaj papero. Cxiu malgranda ekzerco donas tempon por pli klara penso. Kiam ni lernas kune, ni auxskultas atente kaj dividas bonajn ideojn. Trankvila pasxo ne solvas cxion tuj, sed gxi helpas nin vidi la sekvan demandon, peti helpon kaj dauxrigi la vojagxon. Tiel el pacienco, laboro kaj interparolo kreskas tago kun bona direkto.",
+      language: .esperantoXSystem,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "esperanto-h-trankvila-pasho",
+      title: "Trankvila pasho",
+      text: "Trankvila pasho malfermas spacon por nova penso.",
+      language: .esperantoHSystem,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "esperanto-h-ni-lernas-kune",
+      title: "Ni lernas kune",
+      text: "Ni lernas kune, auskultas atente kaj dividas bonajn ideojn.",
+      language: .esperantoHSystem,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "esperanto-h-matena-lumo",
+      title: "Matena lumo",
+      text: "Matene la lumo venas tra malfermita fenestro, kaj sur la tablo atendas libro kaj papero. Ni lernas kune, auskultas atente kaj dividas bonajn ideojn.",
+      language: .esperantoHSystem,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "esperanto-h-bona-direkto",
+      title: "Bona direkto",
+      text: "Matene la lumo venas tra malfermita fenestro, kaj sur la tablo atendas libro kaj papero. Chiu malgranda ekzerco donas tempon por pli klara penso. Kiam ni lernas kune, ni auskultas atente kaj dividas bonajn ideojn. Trankvila pasho ne solvas chion tuj, sed ghi helpas nin vidi la sekvan demandon, peti helpon kaj daurigi la vojaghon. Tiel el pacienco, laboro kaj interparolo kreskas tago kun bona direkto.",
+      language: .esperantoHSystem,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",
