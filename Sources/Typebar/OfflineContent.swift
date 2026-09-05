@@ -1156,6 +1156,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "occitan-tranquil-step",
+      title: "Pas tranquil",
+      text: "Un pas tranquil fa mai clar lo trabalh que ven.",
+      language: .occitan,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "occitan-open-page",
+      title: "Pagina dubèrta",
+      text: "Una pagina dubèrta respond pas a tot, mas dona un luòc per començar de pensar.",
+      language: .occitan,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "occitan-small-effort",
+      title: "Pichon esfòrç",
+      text: "Un pichon esfòrç deu pas acabar tot uèi. Dubrís lo quasèrn, melhora una frasa, e daissa un signe utile per deman. Amb lo temps, aqueles pichons passes fan mai aisit de començar.",
+      language: .occitan,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "occitan-return-place",
+      title: "Luòc per tornar",
+      text: "Al cap del jorn, lo quasèrn demanda pas una responsa complèta. Pòt gardar una mitat de frasa, una question e una nòta brèva per l'ensag seguent. Aquò basta per preparar un luòc ont tornar. Quand l'obrissès de nòu, veiràs que la pensada a avançat un pauc e que lo començament sembla pas tant luènh. Cada pas tranquil apond un signe sul camin, e aqueles signes fan venir lo grand trabalh mai manejable.",
+      language: .occitan,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

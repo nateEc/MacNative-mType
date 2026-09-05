@@ -3276,6 +3276,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.hausaWords,
       StarterLexicon.tatarWords,
       StarterLexicon.uzbekWords,
+      StarterLexicon.occitanWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3317,7 +3318,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 80)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 81)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3507,6 +3508,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .uzbek).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .uzbek), "uz")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .occitan).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .occitan), "oc")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
@@ -4079,6 +4083,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       uzbekEncyclopedia.prompt(for: .words(3, language: .uzbek)),
       "Ertalab tinch yoʻl")
+    let occitanData = Data("""
+    {"title":"Bibliotèca","extract":"La bibliotèca del vilatge dubrís sas pòrtas cada matin."}
+    """.utf8)
+    let occitanEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: occitanData, language: .occitan))
+    XCTAssertEqual(occitanEncyclopedia.text, "La bibliotèca del vilatge dubrís sas pòrtas cada matin")
+    XCTAssertEqual(
+      occitanEncyclopedia.prompt(for: .words(3, language: .occitan)), "La bibliotèca del")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4286,6 +4298,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.hausa.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.tatar.zipfFrequencySupport, .supported)
     XCTAssertEqual(TypingLanguage.uzbek.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.occitan.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.swissGerman.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
@@ -4797,6 +4810,7 @@ final class TypingEngineTests: XCTestCase {
       (.hausa, StarterLexicon.hausaWords),
       (.tatar, StarterLexicon.tatarWords),
       (.uzbek, StarterLexicon.uzbekWords),
+      (.occitan, StarterLexicon.occitanWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
@@ -4979,6 +4993,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.uzbek.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.uzbek))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.uzbek))
+    XCTAssertTrue(StarterLexicon.occitanWords.contains("camin"))
+    XCTAssertFalse(TypingLanguage.occitan.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.occitan.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.occitan.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.occitan.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.occitan.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.occitan.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.occitan))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.occitan))
     XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5329,6 +5352,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.hausa.speechLocaleIdentifier, "ha")
     XCTAssertEqual(TypingLanguage.tatar.speechLocaleIdentifier, "tt")
     XCTAssertEqual(TypingLanguage.uzbek.speechLocaleIdentifier, "uz-UZ")
+    XCTAssertEqual(TypingLanguage.occitan.speechLocaleIdentifier, "oc-FR")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")

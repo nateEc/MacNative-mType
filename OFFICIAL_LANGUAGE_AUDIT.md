@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 89 个可单独练习并支持 Typebar 自有引语的语言／书写方式：English、Español、Deutsch、Swiss German、Afrikaans、Shqip、Ichibemba、Bosanski、Esperanto、Esperanto · X-sistemo、Esperanto · H-sistemo、Latina、Friulian、Malagasy、Cymraeg、Hausa、Татарча、Oʻzbekcha、Azərbaycanca、Беларуская、Lietuvių、Latviešu、Монгол、Gaeilge、Galego、मराठी、کوردی ناوەندی、العربية、العربية المصرية、العربية المغربية、پښتو、سنڌي、עברית、فارسی、اردو、தமிழ்、हिन्दी、ગુજરાતી、বাংলা、ไทย、नेपाली、ಕನ್ನಡ、తెలుగు、മലയാളം、संस्कृतम्、සිංහල、ខ្មែរ、မြန်မာ、ລາວ、አማርኛ、Հայերեն、ქართული、Ελληνικά、Greeklish、Nederlands、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、Dansk、Norsk Bokmål、Norsk Nynorsk、Svenska、Magyar、Čeština、Slovenčina、Slovenščina、Hrvatski、Српски、Srpski Latin、Български、Română、Suomi、Eesti、Íslenska、Français、Italiano、Português、简体中文、繁體中文、Русский、Українська、Ukrainian Latin、日本語・ひらがな、日本語・カタカナ、日本語・ローマ字、한국어、Türkçe、Polski。另有中英混合与可配置的多语混合练习。
+Typebar 现有 90 个可单独练习并支持 Typebar 自有引语的语言／书写方式：English、Español、Deutsch、Swiss German、Afrikaans、Shqip、Ichibemba、Bosanski、Esperanto、Esperanto · X-sistemo、Esperanto · H-sistemo、Latina、Friulian、Malagasy、Cymraeg、Hausa、Татарча、Oʻzbekcha、Occitan、Azərbaycanca、Беларуская、Lietuvių、Latviešu、Монгол、Gaeilge、Galego、मराठी、کوردی ناوەندی、العربية、العربية المصرية、العربية المغربية、پښتو、سنڌي、עברית、فارسی、اردو、தமிழ்、हिन्दी、ગુજરાતી、বাংলা、ไทย、नेपाली、ಕನ್ನಡ、తెలుగు、മലയാളം、संस्कृतम्、සිංහල、ខ្មែរ、မြန်မာ、ລາວ、አማርኛ、Հայերեն、ქართული、Ελληνικά、Greeklish、Nederlands、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、Dansk、Norsk Bokmål、Norsk Nynorsk、Svenska、Magyar、Čeština、Slovenčina、Slovenščina、Hrvatski、Српски、Srpski Latin、Български、Română、Suomi、Eesti、Íslenska、Français、Italiano、Português、简体中文、繁體中文、Русский、Українська、Ukrainian Latin、日本語・ひらがな、日本語・カタカナ、日本語・ローマ字、한국어、Türkçe、Polski。另有中英混合与可配置的多语混合练习。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -51,6 +51,7 @@ Typebar 现有 89 个可单独练习并支持 Typebar 自有引语的语言／�
 - Moroccan Arabic 审计读取 `arabic_morocco.json` 的元数据，不读取其中词表或引语文本。它定义 RTL、连写、`orderedByFrequency: false` 和 `bcp47: ar-MA`，不定义 `noLazyMode`；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-MA` 朗读、手动可选简化输入和明确的 Zipf 不支持提示，并进入社区投稿、成绩及排行榜。
 - Pashto 审计只读取 `pashto.json` 的元数据，不读取其中词表或引语文本。它定义 RTL、连写、`noLazyMode: true` 和 `bcp47: ps`，没有词频排序标记；实现因此使用自有内容、原生 RTL/连写排版、`ps` 百科入口和朗读，在非自定义练习禁用简化输入、在自定义文本保留该例外，并以未知状态提示 Zipf，同时进入社区投稿、成绩及排行榜。
 - Sindhi 审计只读取 `sindhi.json` 的元数据，不读取其中词表或引语文本。它定义 RTL、连写、`orderedByFrequency: false` 和 `bcp47: sd`，不定义 `noLazyMode`；实现因此使用自有内容、原生 RTL/连写排版、`sd` 百科入口和朗读、手动可选简化输入和明确的 Zipf 不支持提示，并进入社区投稿、成绩及排行榜。
+- Occitan 审计只读取 `occitan.json` 的元数据，不读取其中词表或引语文本。它定义 `bcp47: oc-FR`，不定义 RTL、连写、`noLazyMode` 或词频排序；实现因此使用自有内容、LTR 空格分词、`oc` 百科入口、`oc-FR` 朗读、手动可选简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 
 ## 后续候选与准入条件
 
