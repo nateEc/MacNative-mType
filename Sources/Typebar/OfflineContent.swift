@@ -1520,6 +1520,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "maltese-clear-step",
+      title: "Pass ċar",
+      text: "Pass żgħir magħżul b'attenzjoni jagħmel il-bidu aktar ċar.",
+      language: .maltese,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "maltese-open-book",
+      title: "Ktieb miftuħ",
+      text: "Ktieb miftuħ ma jagħtix kull tweġiba, iżda jwassal għal mistoqsija aħjar.",
+      language: .maltese,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "maltese-small-effort",
+      title: "Ħidma żgħira",
+      text: "Ħidma tajba ma titlobx li kollox ikun lest mill-ewwel. Iftaħ paġna, ikteb kelma, u agħti ħin lill-ħsieb biex isib triq. B'pass żgħir illum, l-għada tibda b'aktar ċertezza.",
+      language: .maltese,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "maltese-return-page",
+      title: "Paġna ta' ritorn",
+      text: "Fl-aħħar ta' kull ġurnata, pjan żgħir ma għandux għalfejn ikun perfett. Jista' jħalli mistoqsija, kelma biex tinqara mill-ġdid, u nota qasira għall-għada. Dawn l-affarijiet żgħar jagħtu direzzjoni lill-ħidma. Meta terġa' lura lejn il-paġna, tara li l-ħsieb diġà mexa 'l quddiem u li l-ewwel pass ma kienx daqshekk diffiċli. Pass ċar iżomm il-bidu ħaj.",
+      language: .maltese,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

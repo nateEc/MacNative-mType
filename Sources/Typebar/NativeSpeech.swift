@@ -39,6 +39,7 @@ extension TypingLanguage {
     case .frisian: "fy-FY"
     case .hawaiian: "haw"
     case .kabyle: "kab"
+    case .maltese: "mt"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"
