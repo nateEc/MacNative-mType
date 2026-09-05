@@ -2211,6 +2211,52 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.macedonian, .ansiQwerty])
   }
 
+  @MainActor
+  func testPashtoMapsArabicScriptLayersAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .pashto)
+    XCTAssertEqual(rows[0][0].label, "ZWJ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{200D}", layout: .pashto), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "۲", layout: .pashto), "number-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ض", layout: .pashto), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ځ", layout: .pashto), "top-8")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ک", layout: .pashto), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ئ", layout: .pashto), "bottom-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{200C}", layout: .pashto), "bottom-4")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .pashto), "ض")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [], layout: .pashto), "\u{200D}")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], layout: .pashto), "ْ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 6, modifierFlags: [.shift], layout: .pashto), "ظ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 7, modifierFlags: [], layout: .pashto), "ې")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 43, modifierFlags: [.shift], layout: .pashto), "،")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 47, modifierFlags: [], layout: .pashto), "ږ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .pashto), "\u{200C}")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ؤ", layout: .pashto), 46)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "\u{200D}", layout: .pashto), 50)
+    XCTAssertEqual(KeyboardInputLayout.pashto.emulatedLayout, .pashto)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .pashto
+    settings.keyboardInputLayout = .pashto
+    settings.layoutFluidLayouts = [.pashto, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .pashto)
+    XCTAssertEqual(restored.keyboardInputLayout, .pashto)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.pashto, .ansiQwerty])
+  }
+
   func testSerbianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .serbianCyrillic), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ђ", layout: .serbianCyrillic), "top-11")
@@ -5099,7 +5145,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 31)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 32)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

@@ -32,6 +32,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case bulgarianPhoneticTraditional
   case belarusian
   case macedonian
+  case pashto
   case serbianCyrillic
 
   var id: Self { self }
@@ -68,6 +69,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .bulgarianPhoneticTraditional: "Bulgarian Phonetic Traditional"
     case .belarusian: "Belarusian"
     case .macedonian: "Macedonian"
+    case .pashto: "Pashto"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
   }
@@ -109,6 +111,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case bulgarianPhoneticTraditional
   case belarusian
   case macedonian
+  case pashto
   case serbianCyrillic
 
   var id: Self { self }
@@ -470,7 +473,10 @@ struct KeyboardGuideKey: Identifiable, Equatable {
   ) {
     self.id = id
     self.label = label
-    self.characters = characters.map { Set($0.lowercased()) }
+    self.characters = characters.map { characters in
+      let normalized = characters.lowercased()
+      return Set(normalized).union(normalized.unicodeScalars.map { Character(String($0)) })
+    }
       ?? Set(label.flatMap { KeyboardGuideKey.typedCharacters(for: $0) })
     self.width = width
     self.shiftedLabel = shiftedLabel
@@ -1043,6 +1049,29 @@ enum KeyboardGuideModel {
           shiftedLabels: ["Ѐ", "З", "Џ", "Ц", "В", "Б", "Н", "М", ";", ":", "/"]
         ),
       ]
+    case .pashto:
+      [
+        row(
+          "number", labels: ["ZWJ", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۰", "-", "="],
+          characters: ["\u{200D}\u{0654}", "۱!", "۲٬", "۳٫", "۴؋", "۵٪", "۶×", "۷»", "۸«", "۹)", "۰(", "-ـ", "=+"],
+          shiftedLabels: ["ٔ", "!", "٬", "٫", "؋", "٪", "×", "»", "«", ")", "(", "ـ", "+"]
+        ),
+        row(
+          "top", "ضصثقفغعهخحجچ\\",
+          characters: ["ضْ", "صٌ", "ثٍ", "قً", "فُ", "غِ", "عَ", "هّ", "خځ", "حڅ", "ج]", "چ[", "\\*"],
+          shiftedLabels: ["ْ", "ٌ", "ٍ", "ً", "ُ", "ِ", "َ", "ّ", "ځ", "څ", "]", "[", "*"]
+        ),
+        row(
+          "home", "شسیبلاتنمکګ",
+          characters: ["شښ", "سۍ", "یي", "بپ", "لأ", "اآ", "تټ", "نڼ", "مة", "ک:", "ګ؛"],
+          shiftedLabels: ["ښ", "ۍ", "ي", "پ", "أ", "آ", "ټ", "ڼ", "ة", ":", "؛"]
+        ),
+        row(
+          "bottom", "ئېزردړوږ/",
+          characters: ["ئظ", "ېط", "زژ", "رء", "ذ\u{200C}", "دډ", "ړؤ", "و،", "ږ.", "/؟"],
+          shiftedLabels: ["ظ", "ط", "ژ", "ء", "ZWNJ", "ډ", "ؤ", "،", ".", "؟"]
+        ),
+      ]
     case .serbianCyrillic:
       [
         row(
@@ -1184,10 +1213,25 @@ enum KeyboardGuideModel {
   )
     -> [KeyboardGuideKey]
   {
-    Array(labels).enumerated().map { offset, label in
+    row(
+      prefix, labels: Array(labels).map(String.init), characters: characters,
+      shiftedLabels: shiftedLabels, optionLabels: optionLabels, shiftedOptionLabels: shiftedOptionLabels)
+  }
+
+  private static func row(
+    _ prefix: String,
+    labels: [String],
+    characters: [String]? = nil,
+    shiftedLabels: [String]? = nil,
+    optionLabels: [String?]? = nil,
+    shiftedOptionLabels: [String?]? = nil
+  )
+    -> [KeyboardGuideKey]
+  {
+    labels.enumerated().map { offset, label in
       KeyboardGuideKey(
         "\(prefix)-\(offset)",
-        label: String(label),
+        label: label,
         characters: characters?[safe: offset],
         shiftedLabel: shiftedLabels?[safe: offset],
         optionLabel: optionLabels.flatMap { labels in

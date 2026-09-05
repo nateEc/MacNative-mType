@@ -297,6 +297,13 @@ enum KeyboardLayoutEmulator {
           + "0:аА 1:сС 2:дД 3:фФ 5:гГ 4:хХ 38:јЈ 40:кК 37:лЛ 41:чЧ 39:ќЌ "
           + "10:ѐЀ 6:зЗ 7:џЏ 8:цЦ 9:вВ 11:бБ 45:нН 46:мМ 43:,; 47:.: 44://"
       )
+    case .pashto:
+      map(
+        "50:\u{200D}|\u{0654} 18:۱! 19:۲٬ 20:۳٫ 21:۴؋ 23:۵٪ 22:۶× 26:۷» 28:۸« 25:۹) 29:۰( 27:-ـ 24:=+ "
+          + "12:ض|ْ 13:ص|ٌ 14:ث|ٍ 15:ق|ً 17:ف|ُ 16:غ|ِ 32:ع|َ 34:ه|ّ 31:خځ 35:حڅ 33:ج] 30:چ[ 42:\\* "
+          + "0:شښ 1:سۍ 2:یي 3:بپ 5:لأ 4:اآ 38:تټ 40:نڼ 37:مة 41:ک: 39:ګ؛ "
+          + "6:ئظ 7:ېط 8:زژ 9:رء 11:ذ|\u{200C} 45:دډ 46:ړؤ 43:و، 47:ږ. 44:/؟"
+      )
     case .serbianCyrillic:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
@@ -330,10 +337,23 @@ enum KeyboardLayoutEmulator {
 
   private static func map(_ definition: String) -> [UInt16: KeyLayers] {
     Dictionary(uniqueKeysWithValues: definition.split(separator: " ").compactMap { token in
-      let pieces = token.split(separator: ":", maxSplits: 1)
-      guard pieces.count == 2, let keyCode = UInt16(pieces[0]), pieces[1].count == 2 else { return nil }
-      let symbols = Array(pieces[1])
+      let tokenScalars = token.unicodeScalars
+      guard let colon = tokenScalars.firstIndex(of: ":"),
+        let keyCode = UInt16(String(tokenScalars[..<colon]))
+      else { return nil }
+      let layerScalars = tokenScalars[tokenScalars.index(after: colon)...]
+      if let separator = layerScalars.firstIndex(of: "|") {
+        let normalString = String(layerScalars[..<separator])
+        let shiftedString = String(layerScalars[layerScalars.index(after: separator)...])
+        if let normal = singleCharacter(normalString), let shifted = singleCharacter(shiftedString) {
+          return (keyCode, .init(normal: normal, shifted: shifted))
+        }
+      }
+      let layerString = String(layerScalars)
+      guard layerString.count == 2 else { return nil }
+      let symbols = Array(layerString)
       return (keyCode, .init(normal: symbols[0], shifted: symbols[1]))
     })
   }
+
 }
