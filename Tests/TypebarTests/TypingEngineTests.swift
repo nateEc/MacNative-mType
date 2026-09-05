@@ -1788,12 +1788,14 @@ final class TypingEngineTests: XCTestCase {
   func testAnsiColemakDHMapsItsDistinctCoreKeysAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "b", layout: .ansiColemakDH), "top-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "g", layout: .ansiColemakDH), "home-4")
-    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "d", layout: .ansiColemakDH), "bottom-3")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "d", layout: .ansiColemakDH), "bottom-2")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "h", layout: .ansiColemakDH), "bottom-6")
     XCTAssertEqual(
       KeyboardLayoutEmulator.character(forKeyCode: 17, modifierFlags: [], layout: .ansiColemakDH), "b")
     XCTAssertEqual(
-      KeyboardLayoutEmulator.character(forKeyCode: 9, modifierFlags: [.shift], layout: .ansiColemakDH), "D")
+      KeyboardLayoutEmulator.character(forKeyCode: 8, modifierFlags: [.shift], layout: .ansiColemakDH), "D")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [], layout: .ansiColemakDH), "z")
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "H", layout: .ansiColemakDH), 46)
     XCTAssertEqual(KeyboardInputLayout.ansiColemakDH.emulatedLayout, .ansiColemakDH)
 

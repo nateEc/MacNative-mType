@@ -539,7 +539,7 @@ enum KeyboardGuideModel {
         row("number", "1234567890-="),
         row("top", "QWFPBJLUY;[]"),
         row("home", "ARSTGMNEIO'"),
-        row("bottom", "ZXCDVKH,./"),
+        row("bottom", "XCDVZKH,./"),
       ]
     case .ansiWorkman:
       [
