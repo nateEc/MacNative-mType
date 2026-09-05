@@ -1744,6 +1744,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "kinyarwanda-clear-step",
+      title: "Intambwe nto",
+      text: "Intambwe nto ituma intangiriro isobanuka.",
+      language: .kinyarwanda,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "kinyarwanda-open-book",
+      title: "Igitabo gifunguye",
+      text: "Igitabo gifunguye ntigisubiza buri kibazo, ariko gifungura inzira y'igitekerezo gishya.",
+      language: .kinyarwanda,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "kinyarwanda-small-work",
+      title: "Akazi gato",
+      text: "Akazi keza ntigakeneye ko byose biba byiteguye mu ntangiriro. Fungura urupapuro, andika ijambo rimwe, maze uhe igitekerezo umwanya wo kubona inzira yacyo. Intambwe nto y'uyu munsi yoroshya ejo.",
+      language: .kinyarwanda,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "kinyarwanda-return-page",
+      title: "Garuka ku rupapuro",
+      text: "Ku mpera y'umunsi, gahunda nto ntigomba kuba yuzuye. Ishobora gusiga ikibazo, ijambo ryo gusoma ukundi, n'ikimenyetso kigufi cya ejo. Ibi bintu bito biha akazi icyerekezo. Nusubira ku rupapuro, uzabona ko igitekerezo cyamaze gutera imbere kandi ko gutangira bitakigoye cyane. Intambwe nto isobanutse ifasha akazi gukomeza.",
+      language: .kinyarwanda,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "yiddish-clear-step",
       title: "אַ קלאָרער שריט",
       text: "אַ קליינער שריט מאַכט דעם אָנהייב קלאָר.",

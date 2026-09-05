@@ -3297,6 +3297,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.udmurtWords,
       StarterLexicon.yorubaWords,
       StarterLexicon.swahiliWords,
+      StarterLexicon.kinyarwandaWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3339,7 +3340,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 102)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 103)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3592,6 +3593,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swahili).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swahili), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .kinyarwanda).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .kinyarwanda), "rw")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .yiddish).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .yiddish), "yi")
@@ -4432,6 +4436,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.vietnamese.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.jyutping.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.pinyin.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.kinyarwanda.zipfFrequencySupport, .supported)
     XCTAssertEqual(TypingLanguage.swissGerman.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
@@ -4444,6 +4449,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(ZipfFrequencyPolicy.notice(for: .bosnian, modifiers: [.zipf]))
     XCTAssertNil(ZipfFrequencyPolicy.notice(for: .esperanto, modifiers: [.zipf]))
     XCTAssertNil(ZipfFrequencyPolicy.notice(for: .esperantoHSystem, modifiers: [.zipf]))
+    XCTAssertNil(ZipfFrequencyPolicy.notice(for: .kinyarwanda, modifiers: [.zipf]))
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .esperantoXSystem, modifiers: [.zipf]),
       "Esperanto · X-sistemo 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
@@ -4965,6 +4971,7 @@ final class TypingEngineTests: XCTestCase {
       (.udmurt, StarterLexicon.udmurtWords),
       (.yoruba, StarterLexicon.yorubaWords),
       (.swahili, StarterLexicon.swahiliWords),
+      (.kinyarwanda, StarterLexicon.kinyarwandaWords),
       (.yiddish, StarterLexicon.yiddishWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
@@ -5350,6 +5357,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.swahili.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.swahili))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.swahili))
+    XCTAssertTrue(StarterLexicon.kinyarwandaWords.contains("igitabo"))
+    XCTAssertFalse(TypingLanguage.kinyarwanda.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.kinyarwanda.usesSpaceDelimitedWords)
+    XCTAssertFalse(TypingLanguage.kinyarwanda.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.kinyarwanda.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.kinyarwanda.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.kinyarwanda.zipfFrequencySupport, .supported)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.kinyarwanda))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.kinyarwanda))
     XCTAssertTrue(StarterLexicon.yiddishWords.contains("בוך"))
     XCTAssertTrue(TypingLanguage.yiddish.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.yiddish.usesJoiningScriptPrompt)
@@ -5713,6 +5729,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.udmurt.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.yoruba.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.swahili.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.kinyarwanda.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.yiddish.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.armenianWestern.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5789,6 +5806,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.udmurt.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.yoruba.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.swahili.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.kinyarwanda.speechLocaleIdentifier, "rw-RW")
     XCTAssertEqual(TypingLanguage.yiddish.speechLocaleIdentifier, "yi")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")

@@ -227,3 +227,4 @@
 - Udmurt 审计只读取 `udmurt.json` 的元数据，不读取其中词表或引语文本。它只定义名称，不定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的 Udmurt 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - Yoruba 审计只读取 `yoruba_1k.json` 的元数据，不读取其中词表或引语文本。它只定义名称，不定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的含声调 Yoruba 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - Swahili 审计只读取 `swahili_1k.json` 的元数据，不读取其中词表或引语文本。它定义 `noLazyMode: true`，不定义 BCP-47、RTL、连写或词频排序；实现因此使用独立自写的 Swahili 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。普通练习移除简化输入，自定义文本保留例外；Zipf 走未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
+- Kinyarwanda 审计只读取 `kinyarwanda.json` 的元数据，不读取其中词表或引语文本。它定义 `noLazyMode: true`、`orderedByFrequency: true` 与 `bcp47: rw-RW`，不定义 RTL 或连写；实现因此使用独立自写的 Kinyarwanda 内容与 LTR 空格分词，知识短文按 BCP 首段使用 `rw`，朗读精确使用 `rw-RW`。普通练习移除简化输入，自定义文本保留例外；Zipf 使用自有高频词，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
