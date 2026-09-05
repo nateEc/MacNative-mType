@@ -210,6 +210,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case friulian
   case malagasy
   case welsh
+  case hausa
   case arabic
   case hebrew
   case persian
@@ -3342,6 +3343,14 @@ enum StarterLexicon {
     "deilen", "cân", "heddwch", "gobaith", "pobl", "gyda", "rhyddid", "dewis", "atgof", "breuddwyd",
   ]
 
+  // Typebar-authored Hausa starter words provide local practice without
+  // importing the reference dictionary or word list.
+  static let hausaWords = [
+    "rana", "wata", "taurari", "fure", "dutse", "teku", "littafi", "hanya", "murya", "zuciya",
+    "soyayya", "rayuwa", "lokaci", "birni", "ƙasa", "yamma", "safe", "ruwa", "iska", "ganye",
+    "waka", "salama", "bege", "mutane", "tare", "yanci", "zabi", "tuna", "mafarki", "nutsuwa",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -3898,6 +3907,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: welshWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .hausa:
+      return prompt(
+        tokens: count, lexicon: hausaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4227,6 +4240,7 @@ enum StarterLexicon {
     case .friulian: (friulianWords, [",", ".", "!", "?"])
     case .malagasy: (malagasyWords, [",", ".", "!", "?"])
     case .welsh: (welshWords, [",", ".", "!", "?"])
+    case .hausa: (hausaWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
@@ -4364,6 +4378,7 @@ extension TypingLanguage {
     case .friulian: StarterLexicon.friulianWords
     case .malagasy: StarterLexicon.malagasyWords
     case .welsh: StarterLexicon.welshWords
+    case .hausa: StarterLexicon.hausaWords
     case .arabic: StarterLexicon.arabicWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
@@ -4438,7 +4453,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4547,6 +4562,7 @@ extension TypingLanguage {
     case .friulian: "Friulian"
     case .malagasy: "Malagasy"
     case .welsh: "Cymraeg"
+    case .hausa: "Hausa"
     case .arabic: "العربية"
     case .hebrew: "עברית"
     case .persian: "فارسی"

@@ -932,6 +932,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "hausa-ranar-safe",
+      title: "Ranar safe",
+      text: "Ranar safe tana buɗe hanya mai shiru.",
+      language: .hausa,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "hausa-taurarin-dare",
+      title: "Taurarin dare",
+      text: "Taurarin dare suna kawo bege ga birni mai nutsuwa.",
+      language: .hausa,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "hausa-littafi-teku",
+      title: "Littafi da teku",
+      text: "Littafi a buɗe da teku mai nisa suna ba tunani sarari.",
+      language: .hausa,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "hausa-hanya-tare",
+      title: "Hanya tare",
+      text: "Ranar safe tana buɗe hanya mai shiru, ruwa mai laushi yana wanke iska. Taurarin dare suna kawo bege ga birni mai nutsuwa. Littafi a buɗe da teku mai nisa suna ba tunani sarari. Lokacin da mutane suka saurara tare, suna ganin zabi mai kyau kuma suna ajiye sabon tunani domin rana mai zuwa.",
+      language: .hausa,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",
