@@ -1576,6 +1576,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "xhosa-clear-step",
+      title: "Inyathelo elicacileyo",
+      text: "Inyathelo elincinci lenza isiqalo sicace.",
+      language: .xhosa,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "xhosa-open-book",
+      title: "Incwadi evulekileyo",
+      text: "Incwadi evulekileyo ayiniki yonke impendulo, kodwa ivula umbuzo omtsha.",
+      language: .xhosa,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "xhosa-small-work",
+      title: "Umsebenzi omncinci",
+      text: "Umsebenzi olungileyo awufuni yonke into igqibelele ekuqaleni. Vula iphepha, bhala igama elinye, uze unike ingcinga ixesha lokufumana indlela. Inyathelo elincinci namhlanje lenza ngomso kube lula.",
+      language: .xhosa,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "xhosa-return-page",
+      title: "Iphepha lokubuya",
+      text: "Ekupheleni kwemini, isicwangciso esincinci asifuni ukugqibelela. Sinokushiya umbuzo, igama lokubuyela kulo, kunye nenqaku elifutshane langomso. Ezi zinto zincinci zinika umsebenzi indlela. Xa ubuyela ephepheni, uya kubona ukuba ingcinga ihambe phambili kwaye isiqalo besingekude. Inyathelo elicacileyo ligcina umsebenzi uqala.",
+      language: .xhosa,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

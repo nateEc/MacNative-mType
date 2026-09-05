@@ -40,6 +40,7 @@ extension TypingLanguage {
     case .hawaiian: "haw"
     case .kabyle: "kab"
     case .maltese: "mt"
+    case .xhosa: "xh"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"
