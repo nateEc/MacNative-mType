@@ -1184,6 +1184,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "oromo-calm-step",
+      title: "Tarkaanfii tasgabbaa'aa",
+      text: "Tarkaanfiin tasgabbaa'aan hojii itti aanu ifa godha.",
+      language: .oromo,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "oromo-open-page",
+      title: "Fuula banaa",
+      text: "Fuulli banaan gaaffii hunda hin deebisu, garuu yaaduuf bakka jalqabaa kenna.",
+      language: .oromo,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "oromo-small-effort",
+      title: "Yaalii xiqqaa",
+      text: "Yaaliin xiqqaan har'a waan hunda xumuruun isa hin barbaachisu. Kitaaba xinnaa bani, hima tokko sirreessi, boruuf mallattoo faayidaa qabu dhiisi. Yeroo wajjin tarkaanfiileen xixiqqoon kun jalqabuun akka salphatu godhu.",
+      language: .oromo,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "oromo-return-place",
+      title: "Bakka itti deebi'an",
+      text: "Xumura guyyaatti, kitaabni xinnaan deebii guutuu hin gaafatu. Inni walakkaa himaa, gaaffii tokko fi yaalii itti aanuuf yaadannoo gabaabaa qabachuu danda'a. Kun bakka itti deebitan qopheessuuf ga'a. Yeroo deebi'anii ilaalan, yaadni xiqqoo akka duratti tarkaanfate fi jalqabni akka hin fagaanne argitu. Tarkaanfiin tasgabbaa'aan hundi karaa irratti mallattoo tokko dabala, mallattooleen sunis hojii guddaa kutaa xixiqqoo keessatti qabamuu danda'u.",
+      language: .oromo,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

@@ -32,6 +32,7 @@ extension TypingLanguage {
     case .tatar: "tt"
     case .uzbek: "uz-UZ"
     case .occitan: "oc-FR"
+    case .oromo: "om"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"

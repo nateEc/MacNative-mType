@@ -157,6 +157,7 @@ enum LivePracticeContentService {
     case .tatar: return "tt"
     case .uzbek: return "uz"
     case .occitan: return "oc"
+    case .oromo: return "om"
     case .friulian: return "fur"
     case .bemba: return "bem"
     case .azerbaijani: return "az"
