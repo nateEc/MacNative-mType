@@ -1100,6 +1100,62 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "viossa-tavi-mone",
+      title: "Tåvi Möna",
+      text: "Tåvi möne süla.",
+      language: .viossa,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "viossa-lenu-riva",
+      title: "Lënu Riva",
+      text: "Lënu süla, väni riva.",
+      language: .viossa,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "viossa-doma-tumi",
+      title: "Döma Tumi",
+      text: "Döma möne, kiri tumi väni.",
+      language: .viossa,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "viossa-gema-vari",
+      title: "Gëna Våri",
+      text: "Tåvi möne süla. Lënu süla, väni riva. Döma möne, kiri tumi väni. Gëna våri såvi lënu, mora pira nåto. Jåvi qira, fali ruka; welo xari tumi. Zëna auni vësi, båvo nori låvi. Hori soki yoma, kumo polo riva.",
+      language: .viossa,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "viossa-njutro-njutra-solu",
+      title: "Njütra Sölu",
+      text: "Njütra sölu fëna.",
+      language: .viossaNjutro,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "viossa-njutro-kavi-ruma",
+      title: "Kåvi Rüma",
+      text: "Kåvi rüma, sümi tövi.",
+      language: .viossaNjutro,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "viossa-njutro-veto-nura",
+      title: "Vëto Nüra",
+      text: "Vëto nüra, xëni yülo låni.",
+      language: .viossaNjutro,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "viossa-njutro-meka-qori",
+      title: "Mëka Qöri",
+      text: "Njütra sölu fëna. Kåvi rüma, sümi tövi. Vëto nüra, xëni yülo låni. Mëka qöri pësa, fëna råni håro. Lüso vëmi sölu, mïvo jümi këra. Wåro xëni, bëna tåri vëto. Påvi nöko, gïra sëla döri.",
+      language: .viossaNjutro,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "uzbek-ertalab-yol",
       title: "Ertalab yoʻl",
       text: "Ertalab tinch yoʻl ochadi.",

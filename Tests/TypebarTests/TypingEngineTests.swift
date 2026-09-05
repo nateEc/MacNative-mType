@@ -3279,6 +3279,8 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.tatarCrimeanCyrillicWords,
       StarterLexicon.klingonWords,
       StarterLexicon.quenyaWords,
+      StarterLexicon.viossaWords,
+      StarterLexicon.viossaNjutroWords,
       StarterLexicon.uzbekWords,
       StarterLexicon.occitanWords,
       StarterLexicon.oromoWords,
@@ -3346,7 +3348,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 109)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 111)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3545,6 +3547,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .quenya).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .quenya), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .viossa).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .viossa), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .viossaNjutro).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .viossaNjutro), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .uzbek).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .uzbek), "uz")
@@ -4456,6 +4464,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.tatarCrimeanCyrillic.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.klingon.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.quenya.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.viossa.zipfFrequencySupport, .unsupported)
+    XCTAssertEqual(TypingLanguage.viossaNjutro.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.uzbek.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.occitan.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.oromo.zipfFrequencySupport, .supported)
@@ -4518,6 +4528,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .quenya, modifiers: [.zipf]),
       "Quenya 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .viossa, modifiers: [.zipf]),
+      "Viossa 不支持 Zipf 高频词：该词表未按词频排序。请选择其他词表。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .viossaNjutro, modifiers: [.zipf]),
+      "Viossa · Njutro 不支持 Zipf 高频词：该词表未按词频排序。请选择其他词表。"
     )
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .uzbek, modifiers: [.zipf]),
@@ -4997,6 +5015,8 @@ final class TypingEngineTests: XCTestCase {
       (.tatarCrimeanCyrillic, StarterLexicon.tatarCrimeanCyrillicWords),
       (.klingon, StarterLexicon.klingonWords),
       (.quenya, StarterLexicon.quenyaWords),
+      (.viossa, StarterLexicon.viossaWords),
+      (.viossaNjutro, StarterLexicon.viossaNjutroWords),
       (.uzbek, StarterLexicon.uzbekWords),
       (.occitan, StarterLexicon.occitanWords),
       (.oromo, StarterLexicon.oromoWords),
@@ -5242,6 +5262,24 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.quenya.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.quenya))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.quenya))
+    XCTAssertTrue(StarterLexicon.viossaWords.contains("tåvi"))
+    XCTAssertFalse(TypingLanguage.viossa.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.viossa.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.viossa.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.viossa.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.viossa.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.viossa.zipfFrequencySupport, .unsupported)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.viossa))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.viossa))
+    XCTAssertTrue(StarterLexicon.viossaNjutroWords.contains("njütra"))
+    XCTAssertFalse(TypingLanguage.viossaNjutro.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.viossaNjutro.usesSpaceDelimitedWords)
+    XCTAssertFalse(TypingLanguage.viossaNjutro.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.viossaNjutro.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.viossaNjutro.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.viossaNjutro.zipfFrequencySupport, .unsupported)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.viossaNjutro))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.viossaNjutro))
     XCTAssertTrue(StarterLexicon.uzbekWords.contains("yulduz"))
     XCTAssertFalse(TypingLanguage.uzbek.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.uzbek.usesSpaceDelimitedWords)
@@ -5783,6 +5821,17 @@ final class TypingEngineTests: XCTestCase {
       ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .sindhi, automaticallyEnabled: true),
       [.lazyLatin])
     XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .viossa, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .viossaNjutro, automaticallyEnabled: true),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .viossaNjutro, mode: .custom, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .jyutping, automaticallyEnabled: true),
       [.lazyLatin])
     XCTAssertEqual(
@@ -5824,6 +5873,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.tatarCrimeanCyrillic.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.klingon.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.quenya.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.viossa.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.viossaNjutro.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.uzbek.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.bashkir.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.basque.supportsLazyLatinInput)
@@ -5899,6 +5950,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.tatarCrimeanCyrillic.speechLocaleIdentifier, "crh-CRH")
     XCTAssertEqual(TypingLanguage.klingon.speechLocaleIdentifier, "tlh")
     XCTAssertEqual(TypingLanguage.quenya.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.viossa.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.viossaNjutro.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.uzbek.speechLocaleIdentifier, "uz-UZ")
     XCTAssertEqual(TypingLanguage.occitan.speechLocaleIdentifier, "oc-FR")
     XCTAssertEqual(TypingLanguage.oromo.speechLocaleIdentifier, "om")
