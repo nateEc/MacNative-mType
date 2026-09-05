@@ -215,6 +215,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case tatar
   case tatarCrimean
   case tatarCrimeanCyrillic
+  case klingon
   case uzbek
   case occitan
   case oromo
@@ -3425,6 +3426,14 @@ enum StarterLexicon {
     "сес", "суаль", "джевап", "юмют", "келеджек",
   ]
 
+  // Typebar-authored Klingon starter words retain the language's case and
+  // apostrophe conventions without importing the reference dictionary.
+  static let klingonWords = [
+    "tlhIngan", "Hol", "Qapla'", "jIyaj", "maj", "QaQ", "Hov", "Duj", "Suv", "yIn",
+    "Daq", "wa'", "cha'", "wej", "loS", "vagh", "pov", "ram", "jaj", "yuQ",
+    "QeD", "Soj", "ghoj", "mu'", "jatlh", "meq", "Huch", "Qap", "He", "ghom",
+  ]
+
   // Typebar-authored Uzbek starter words provide local practice without
   // importing the reference dictionary or word list.
   static let uzbekWords = [
@@ -4253,6 +4262,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tatarCrimeanCyrillicWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .klingon:
+      return prompt(
+        tokens: count, lexicon: klingonWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .uzbek:
       return prompt(
         tokens: count, lexicon: uzbekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4711,6 +4724,7 @@ enum StarterLexicon {
     case .tatar: (tatarWords, [",", ".", "!", "?"])
     case .tatarCrimean: (tatarCrimeanWords, [",", ".", "!", "?"])
     case .tatarCrimeanCyrillic: (tatarCrimeanCyrillicWords, [",", ".", "!", "?"])
+    case .klingon: (klingonWords, [",", ".", "!", "?"])
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .occitan: (occitanWords, [",", ".", "!", "?"])
     case .oromo: (oromoWords, [",", ".", "!", "?"])
@@ -4895,6 +4909,7 @@ extension TypingLanguage {
     case .tatar: StarterLexicon.tatarWords
     case .tatarCrimean: StarterLexicon.tatarCrimeanWords
     case .tatarCrimeanCyrillic: StarterLexicon.tatarCrimeanCyrillicWords
+    case .klingon: StarterLexicon.klingonWords
     case .uzbek: StarterLexicon.uzbekWords
     case .occitan: StarterLexicon.occitanWords
     case .oromo: StarterLexicon.oromoWords
@@ -5000,7 +5015,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -5133,6 +5148,7 @@ extension TypingLanguage {
     case .tatar: "Татарча"
     case .tatarCrimean: "Qırımtatarca"
     case .tatarCrimeanCyrillic: "Къырымтатарджа"
+    case .klingon: "tlhIngan Hol"
     case .uzbek: "Oʻzbekcha"
     case .occitan: "Occitan"
     case .oromo: "Oromo"

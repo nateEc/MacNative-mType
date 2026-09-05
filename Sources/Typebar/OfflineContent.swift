@@ -1044,6 +1044,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "klingon-hov-duj",
+      title: "Hov Duj",
+      text: "Hov QaQ, Duj maj.",
+      language: .klingon,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "klingon-jaj-hol",
+      title: "jaj Hol",
+      text: "jaj QaQ DaqDaq Hol yIn.",
+      language: .klingon,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "klingon-ghoj-mut",
+      title: "ghoj mu'",
+      text: "ghojmeH, mu' QaQ yIghItlh.",
+      language: .klingon,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "klingon-qapla",
+      title: "Qapla'",
+      text: "Hov QaQ, Duj maj. jaj QaQ DaqDaq Hol yIn. ghojmeH, mu' QaQ yIghItlh. tlhIngan Hol ghojmeH, jaj HochDaq mu' yIjatlh. Hovmey DaqDaq Dujmey Suv. Qapla'.",
+      language: .klingon,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "uzbek-ertalab-yol",
       title: "Ertalab yoʻl",
       text: "Ertalab tinch yoʻl ochadi.",
