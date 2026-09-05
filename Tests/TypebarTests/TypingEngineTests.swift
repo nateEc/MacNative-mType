@@ -3523,6 +3523,9 @@ final class TypingEngineTests: XCTestCase {
       5, language: .pashto).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .pashto), "ps")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .sindhi).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .sindhi), "sd")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .hebrew).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hebrew), "he")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
@@ -3726,6 +3729,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(pashtoEncyclopedia.text, "د ښار کتابتون په سهار کې د خلکو لپاره پرانیستی وي")
     XCTAssertEqual(
       pashtoEncyclopedia.prompt(for: .words(3, language: .pashto)), "د ښار کتابتون")
+    let sindhiData = Data("""
+    {"title":"شهر جو ڪتابخانو","extract":"شهر جو ڪتابخانو صبح جو ماڻهن لاءِ کليل هوندو آهي."}
+    """.utf8)
+    let sindhiEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: sindhiData, language: .sindhi))
+    XCTAssertEqual(sindhiEncyclopedia.text, "شهر جو ڪتابخانو صبح جو ماڻهن لاءِ کليل هوندو آهي")
+    XCTAssertEqual(
+      sindhiEncyclopedia.prompt(for: .words(3, language: .sindhi)), "شهر جو ڪتابخانو")
     let hebrewData = Data("""
     {"title":"חלון","extract":"חלון פתוח מכניס אור בוקר."}
     """.utf8)
@@ -4277,6 +4288,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.uzbek.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.swissGerman.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.arabicMorocco.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.armenian.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.bemba.zipfFrequencySupport, .unsupported)
@@ -4789,6 +4801,7 @@ final class TypingEngineTests: XCTestCase {
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
       (.pashto, StarterLexicon.pashtoWords),
+      (.sindhi, StarterLexicon.sindhiWords),
       (.hebrew, StarterLexicon.hebrewWords),
       (.persian, StarterLexicon.persianWords),
       (.urdu, StarterLexicon.urduWords),
@@ -5003,6 +5016,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.pashto))
     XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.pashto))
+    XCTAssertTrue(StarterLexicon.sindhiWords.contains("ڪتاب"))
+    XCTAssertTrue(TypingLanguage.sindhi.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.sindhi.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.sindhi.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.sindhi.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.sindhi.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
+    XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.sindhi))
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.sindhi))
     XCTAssertTrue(StarterLexicon.hebrewWords.contains("חלון"))
     XCTAssertTrue(TypingLanguage.hebrew.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.hebrew))
@@ -5224,6 +5246,12 @@ final class TypingEngineTests: XCTestCase {
         [.lazyLatin], language: .pashto, mode: .custom, automaticallyEnabled: true),
       [.lazyLatin])
     XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([], language: .sindhi, automaticallyEnabled: true),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .sindhi, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers([.zipf], language: .hebrew, automaticallyEnabled: true),
       [.zipf])
     let arabicConfiguration = TestConfiguration.words(2, language: .arabic).with(
@@ -5305,6 +5333,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")
     XCTAssertEqual(TypingLanguage.pashto.speechLocaleIdentifier, "ps")
+    XCTAssertEqual(TypingLanguage.sindhi.speechLocaleIdentifier, "sd")
     XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
     XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")
     XCTAssertEqual(TypingLanguage.urdu.speechLocaleIdentifier, "ur-PK")

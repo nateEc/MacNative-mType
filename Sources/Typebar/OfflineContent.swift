@@ -1128,6 +1128,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "sindhi-simple-step",
+      title: "سادو قدم",
+      text: "هڪ سادو قدم ايندڙ ڪم کي روشن ڪري ٿو.",
+      language: .sindhi,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "sindhi-open-page",
+      title: "کليل صفحو",
+      text: "کليل صفحو هر سوال جو جواب نه ڏيندو، پر سوچ لاءِ شروعاتي جاءِ ڏئي ٿو.",
+      language: .sindhi,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "sindhi-small-effort",
+      title: "ننڍي ڪوشش",
+      text: "ننڍي ڪوشش کي اڄ سڀ ڪجهه پورو ڪرڻ ضروري ناهي. ڪتابچو کوليو، هڪ جملو سنواريو، ۽ سڀاڻي لاءِ هڪ ڪارائتي نشاني ڇڏيو. وقت سان اهي ننڍا قدم ڪم جي شروعات آسان ڪن ٿا.",
+      language: .sindhi,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "sindhi-return-place",
+      title: "موٽڻ جي جاءِ",
+      text: "ڏينهن جي پڇاڙيءَ ۾ ڪتابچو مڪمل جواب نٿو گهري. ان ۾ اڌ جملو، هڪ سوال ۽ ايندڙ ڪوشش لاءِ مختصر نوٽ ٿي سگهي ٿو. ايترو ڪافي آهي جو موٽڻ جي جاءِ ٺهي وڃي. جڏهن وري ڏسندؤ، ته خيال ٿورو اڳتي وڌيل ۽ شروعات گهٽ پري لڳندي. هر آرام وارو قدم رستي تي هڪ نشاني وڌائي ٿو، ۽ انهن نشانين سان وڏو ڪم ننڍن حصن ۾ پڪڙي سگهجي ٿو.",
+      language: .sindhi,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

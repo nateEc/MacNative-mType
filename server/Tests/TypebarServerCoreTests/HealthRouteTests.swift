@@ -331,6 +331,10 @@ final class HealthRouteTests: XCTestCase {
       .init(language: "pashto", text: "یو ارام ګام راتلونکی کار روښانه کوي.", attribution: nil),
       accessToken: session.accessToken)
     XCTAssertEqual(pashtoSubmission.status, "pending")
+    let sindhiSubmission = try await store.submitQuote(
+      .init(language: "sindhi", text: "هڪ سادو قدم ايندڙ ڪم کي روشن ڪري ٿو.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(sindhiSubmission.status, "pending")
     let hebrewSubmission = try await store.submitQuote(
       .init(language: "hebrew", text: "צעד שקט מבהיר את המשימה הבאה.", attribution: nil),
       accessToken: session.accessToken)
@@ -603,7 +607,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(
       Set(mine.submissions.map(\.id)),
       Set([
-        submitted.id, spanishSubmission.id, germanSubmission.id, afrikaansSubmission.id, albanianSubmission.id, bembaSubmission.id, bosnianSubmission.id, esperantoSubmission.id, esperantoXSubmission.id, esperantoHSubmission.id, latinSubmission.id, friulianSubmission.id, malagasySubmission.id, welshSubmission.id, hausaSubmission.id, tatarSubmission.id, uzbekSubmission.id, arabicSubmission.id, arabicEgyptSubmission.id, arabicMoroccoSubmission.id, pashtoSubmission.id, hebrewSubmission.id, persianSubmission.id, urduSubmission.id, kurdishCentralSubmission.id, tamilSubmission.id, hindiSubmission.id, gujaratiSubmission.id, banglaSubmission.id, thaiSubmission.id, nepaliSubmission.id, kannadaSubmission.id, teluguSubmission.id, malayalamSubmission.id, sanskritSubmission.id, sinhalaSubmission.id, khmerSubmission.id, myanmarSubmission.id, laoSubmission.id, amharicSubmission.id, armenianSubmission.id, georgianSubmission.id, azerbaijaniSubmission.id, belarusianSubmission.id, lithuanianSubmission.id, latvianSubmission.id, mongolianSubmission.id, irishSubmission.id, galicianSubmission.id, marathiSubmission.id, greekSubmission.id, greeklishSubmission.id, dutchSubmission.id, filipinoSubmission.id, catalanSubmission.id, indonesianSubmission.id, malaySubmission.id, danishSubmission.id,
+        submitted.id, spanishSubmission.id, germanSubmission.id, afrikaansSubmission.id, albanianSubmission.id, bembaSubmission.id, bosnianSubmission.id, esperantoSubmission.id, esperantoXSubmission.id, esperantoHSubmission.id, latinSubmission.id, friulianSubmission.id, malagasySubmission.id, welshSubmission.id, hausaSubmission.id, tatarSubmission.id, uzbekSubmission.id, arabicSubmission.id, arabicEgyptSubmission.id, arabicMoroccoSubmission.id, pashtoSubmission.id, sindhiSubmission.id, hebrewSubmission.id, persianSubmission.id, urduSubmission.id, kurdishCentralSubmission.id, tamilSubmission.id, hindiSubmission.id, gujaratiSubmission.id, banglaSubmission.id, thaiSubmission.id, nepaliSubmission.id, kannadaSubmission.id, teluguSubmission.id, malayalamSubmission.id, sanskritSubmission.id, sinhalaSubmission.id, khmerSubmission.id, myanmarSubmission.id, laoSubmission.id, amharicSubmission.id, armenianSubmission.id, georgianSubmission.id, azerbaijaniSubmission.id, belarusianSubmission.id, lithuanianSubmission.id, latvianSubmission.id, mongolianSubmission.id, irishSubmission.id, galicianSubmission.id, marathiSubmission.id, greekSubmission.id, greeklishSubmission.id, dutchSubmission.id, filipinoSubmission.id, catalanSubmission.id, indonesianSubmission.id, malaySubmission.id, danishSubmission.id,
         norwegianBokmalSubmission.id, norwegianNynorskSubmission.id, swedishSubmission.id, hungarianSubmission.id, czechSubmission.id, slovakSubmission.id, slovenianSubmission.id, croatianSubmission.id, serbianSubmission.id, serbianLatinSubmission.id, bulgarianSubmission.id, romanianSubmission.id, finnishSubmission.id, estonianSubmission.id, icelandicSubmission.id, frenchSubmission.id,
         italianSubmission.id, portugueseSubmission.id, traditionalChineseSubmission.id,
         russianSubmission.id, ukrainianSubmission.id, ukrainianLatinSubmission.id, hiraganaSubmission.id,
@@ -637,6 +641,7 @@ final class HealthRouteTests: XCTestCase {
     try await store.withdrawQuoteSubmission(arabicEgyptSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(arabicMoroccoSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(pashtoSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(sindhiSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(hebrewSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(persianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(urduSubmission.id, accessToken: session.accessToken)
@@ -3001,7 +3006,7 @@ final class HealthRouteTests: XCTestCase {
     }
 
     for (offset, language) in [
-      "traditionalChinese", "swissGerman", "afrikaans", "albanian", "bemba", "bosnian", "esperanto", "esperantoXSystem", "esperantoHSystem", "latin", "friulian", "malagasy", "welsh", "hausa", "tatar", "uzbek", "azerbaijani", "belarusian", "lithuanian", "latvian", "mongolian", "irish", "galician", "marathi", "kurdishCentral", "arabic", "arabicEgypt", "arabicMorocco", "pashto", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "bangla", "thai", "nepali", "kannada", "telugu", "malayalam", "sanskrit", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "georgian", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "russian",
+      "traditionalChinese", "swissGerman", "afrikaans", "albanian", "bemba", "bosnian", "esperanto", "esperantoXSystem", "esperantoHSystem", "latin", "friulian", "malagasy", "welsh", "hausa", "tatar", "uzbek", "azerbaijani", "belarusian", "lithuanian", "latvian", "mongolian", "irish", "galician", "marathi", "kurdishCentral", "arabic", "arabicEgypt", "arabicMorocco", "pashto", "sindhi", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "bangla", "thai", "nepali", "kannada", "telugu", "malayalam", "sanskrit", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "georgian", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "russian",
       "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
       "turkish", "polish",
     ].enumerated() {
