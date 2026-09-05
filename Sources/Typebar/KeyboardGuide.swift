@@ -10,6 +10,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case swissGerman
   case swissFrench
   case nordicQwerty
+  case norwegianQwerty
   case swedishQwerty
   case danishQwerty
   case ukQwerty
@@ -40,6 +41,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .swissGerman: "Swiss German"
     case .swissFrench: "Swiss French"
     case .nordicQwerty: "Nordic QWERTY"
+    case .norwegianQwerty: "Norwegian QWERTY"
     case .swedishQwerty: "Swedish QWERTY"
     case .danishQwerty: "Danish QWERTY"
     case .ukQwerty: "UK QWERTY"
@@ -75,6 +77,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case swissGerman
   case swissFrench
   case nordicQwerty
+  case norwegianQwerty
   case swedishQwerty
   case danishQwerty
   case ukQwerty
@@ -576,7 +579,7 @@ enum KeyboardGuideModel {
         homeCharacters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "éö", "àä", "$£"],
         homeShiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "ö", "ä", "£"]
       )
-    case .nordicQwerty:
+    case .nordicQwerty, .norwegianQwerty:
       [
         row(
           "number", "§1234567890+\\",

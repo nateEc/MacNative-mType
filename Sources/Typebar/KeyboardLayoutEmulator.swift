@@ -154,7 +154,7 @@ enum KeyboardLayoutEmulator {
           + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:zZ 32:uU 34:iI 31:oO 35:pP 33:èü 30:‥! "
           + "0:aA 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:éö 39:àä 42:$£ "
           + "10:<> 6:yY 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,; 47:.: 44:-_")
-    case .nordicQwerty:
+    case .nordicQwerty, .norwegianQwerty:
       map(
         "50:§° 18:1! 19:2\" 20:3# 21:4¤ 23:5% 22:6& 26:7/ 28:8( 25:9) 29:0= 27:+? 24:\\` "
           + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:åÅ 30:¨^ "

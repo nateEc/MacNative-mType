@@ -1785,6 +1785,32 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testNorwegianQwertyExposesTheCompatibleNordicMappingAndPersists() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .norwegianQwerty), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ø", layout: .norwegianQwerty), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "æ", layout: .norwegianQwerty), "home-10")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [], layout: .norwegianQwerty), "ø")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [.shift], layout: .norwegianQwerty), "Æ")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ø", layout: .norwegianQwerty), 41)
+    XCTAssertEqual(KeyboardInputLayout.norwegianQwerty.emulatedLayout, .norwegianQwerty)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .norwegianQwerty
+    settings.keyboardInputLayout = .norwegianQwerty
+    settings.layoutFluidLayouts = [.norwegianQwerty, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .norwegianQwerty)
+    XCTAssertEqual(restored.keyboardInputLayout, .norwegianQwerty)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.norwegianQwerty, .ansiQwerty])
+  }
+
+  @MainActor
   func testSwedishQwertyMapsSwedishLettersAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .swedishQwerty), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .swedishQwerty), "home-9")
@@ -4868,7 +4894,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 25)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 26)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
