@@ -3282,6 +3282,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.azerbaijaniWords,
       StarterLexicon.belarusianWords,
       StarterLexicon.lithuanianWords,
+      StarterLexicon.latvianWords,
       StarterLexicon.greekWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.filipinoWords, StarterLexicon.catalanWords,
       StarterLexicon.indonesianWords, StarterLexicon.malayWords, StarterLexicon.danishWords,
@@ -3298,7 +3299,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 61)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 62)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3524,6 +3525,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .lithuanian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .lithuanian), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .latvian).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .latvian), "lv")
     XCTAssertNil(LivePracticeContentSource.selected(for: .words(
       5, language: .greeklish).with(modifiers: [.referenceStream])))
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greeklish), "el")
@@ -3815,6 +3819,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       lithuanianEncyclopedia.prompt(for: .words(3, language: .lithuanian)),
       "Ryto šviesa pro")
+    let latvianData = Data("""
+    {"title":"Logs","extract":"Rīta gaisma caur logu ienāk istabā."}
+    """.utf8)
+    let latvianEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: latvianData, language: .latvian))
+    XCTAssertEqual(latvianEncyclopedia.text, "Rīta gaisma caur logu ienāk istabā")
+    XCTAssertEqual(
+      latvianEncyclopedia.prompt(for: .words(3, language: .latvian)),
+      "Rīta gaisma caur")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4439,6 +4452,7 @@ final class TypingEngineTests: XCTestCase {
       (.azerbaijani, StarterLexicon.azerbaijaniWords),
       (.belarusian, StarterLexicon.belarusianWords),
       (.lithuanian, StarterLexicon.lithuanianWords),
+      (.latvian, StarterLexicon.latvianWords),
       (.greek, StarterLexicon.greekWords),
       (.greeklish, StarterLexicon.greeklishWords),
       (.danish, StarterLexicon.danishWords),
@@ -4636,6 +4650,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.lithuanian.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.lithuanian))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.lithuanian))
+    XCTAssertTrue(StarterLexicon.latvianWords.contains("logs"))
+    XCTAssertFalse(TypingLanguage.latvian.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.latvian.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.latvian.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.latvian))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.latvian))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greek))
     XCTAssertTrue(StarterLexicon.greekWords.contains("πρωί"))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.greeklish))
@@ -4762,6 +4782,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.azerbaijani.speechLocaleIdentifier, "az-AZ")
     XCTAssertEqual(TypingLanguage.belarusian.speechLocaleIdentifier, "be-BY")
     XCTAssertEqual(TypingLanguage.lithuanian.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.latvian.speechLocaleIdentifier, "lv")
     XCTAssertEqual(TypingLanguage.greek.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.greeklish.speechLocaleIdentifier, "el-GR")
     XCTAssertEqual(TypingLanguage.dutch.speechLocaleIdentifier, "nl-NL")

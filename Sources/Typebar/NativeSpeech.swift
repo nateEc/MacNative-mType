@@ -29,6 +29,7 @@ extension TypingLanguage {
     case .afrikaans: "af-ZA"
     case .azerbaijani: "az-AZ"
     case .belarusian: "be-BY"
+    case .latvian: "lv"
     case .kurdishCentral: "ckb"
     case .arabic: "ar-SA"
     case .hebrew: "he-IL"

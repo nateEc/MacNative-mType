@@ -1324,6 +1324,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "latvian-rams-solis",
+      title: "Rāms solis",
+      text: "Rāms solis palīdz skaidrāk ieraudzīt nākamo darbu.",
+      language: .latvian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "latvian-atverta-piezimju-gramata",
+      title: "Atvērta piezīmju grāmata",
+      text: "Atvērta piezīmju grāmata neatbild uz visiem jautājumiem, bet atstāj vietu tos sadalīt mazākās daļās.",
+      language: .latvian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "latvian-mazs-darbs",
+      title: "Mazs darbs",
+      text: "Progress ne vienmēr izskatās iespaidīgs. Atgriešanās pie tās pašas lapas, viena teikuma precizēšana un mazas kļūdas labošana dod vairāk pārliecības nākamajam mēģinājumam.",
+      language: .latvian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "latvian-garss-galds",
+      title: "Garš galds",
+      text: "Garš galds atstāj vietu dažādiem darbiem. Vienā galā var gulēt pirmais melnraksts, otrā gaidīt teikums, kam vajag vairāk uzmanības, bet vidū — nākamais mazais lēmums. Tā kustas arī prakse. Nav nepieciešams uzreiz atrisināt katru sarežģīto daļu. Kad ir kur atgriezties, redzams nākamais solis un pietiek pacietības pamanīt to, kas pēc vairākiem mēģinājumiem kļuvis vieglāks, ātrums aug dabiski.",
+      language: .latvian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kurdish-central-hengawi-aram",
       title: "هەنگاوی ئارام",
       text: "هەنگاوی ئارام کاری داهاتوو ڕوونتر دەکات.",
