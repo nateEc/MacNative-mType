@@ -1072,6 +1072,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "arabic-morocco-easy-line",
+      title: "بشوية عليك",
+      text: "بشوية عليك، السطر الجاي يبان أصفى.",
+      language: .arabicMorocco,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "arabic-morocco-quiet-minute",
+      title: "دقيقة هادئة",
+      text: "إلى خليتي دقيقة هادئة، الفكرة تلقى بلاصة باش تبان.",
+      language: .arabicMorocco,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "arabic-morocco-small-work",
+      title: "خدمة صغيرة",
+      text: "الخدمة الصغيرة ما خاصهاش تسالي كلشي اليوم. يكفي تفتح الكناش، ترتب جوج كلمات، وتخلي علامة ترجع ليها من بعد. مع الوقت الخطوة البسيطة كتولي عادة كتعاونك تبدا بلا دوشة.",
+      language: .arabicMorocco,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "arabic-morocco-return-path",
+      title: "بلاصة للرجوع",
+      text: "فآخر النهار، الكناش ما كيطلبش جواب كامل. ممكن تلقى فيه سطر ممسوح، سؤال باقي محلول، وملاحظة خفيفة على حاجة بغيتي تجربها غدا. هاد الشي كافي باش تخلي بلاصة للرجوع. ملي ترجع، غادي تلقى التفكير تحرك شوية، والبداية ما بقاتش بعيدة بحال قبل. كل محاولة هادئة كتزيد علامة صغيرة فالطريق، ومع هاد العلامات الخدمة الكبيرة كتولي قابلة تتشد خطوة بخطوة.",
+      language: .arabicMorocco,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

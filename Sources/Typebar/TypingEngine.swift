@@ -216,6 +216,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case uzbek
   case arabic
   case arabicEgypt
+  case arabicMorocco
   case hebrew
   case persian
   case urdu
@@ -3459,6 +3460,15 @@ enum StarterLexicon {
     "طريق", "موسيقى", "صورة", "تجربة", "راحة", "لمحة", "مفتاح", "نقطة", "اختيار", "محاولة",
   ]
 
+  // Typebar-authored Moroccan Arabic starter words are an independent local
+  // dialect practice corpus. They do not import Monkeytype's word lists;
+  // macOS supplies the Arabic joining glyph shaping for this RTL prompt.
+  static let arabicMoroccoWords = [
+    "اليوم", "غدا", "شرجم", "درب", "أتاي", "خدمة", "صاحبي", "فلوكة", "بحر", "ضو",
+    "صوت", "سكون", "خطوة", "بلاصة", "فكرة", "كناش", "رسالة", "وقت", "حكاية", "مكان",
+    "زنقة", "موسيقى", "تصويرة", "تجربة", "راحة", "لمحة", "مفتاح", "نقطة", "اختيار", "محاولة",
+  ]
+
   // Typebar-authored Hebrew starter words use direct Unicode text for macOS
   // Hebrew input sources; they are not an imported word list.
   static let hebrewWords = [
@@ -3965,6 +3975,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: arabicEgyptWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .arabicMorocco:
+      return prompt(
+        tokens: count, lexicon: arabicMoroccoWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hebrew:
       return prompt(
         tokens: count, lexicon: hebrewWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4296,6 +4310,7 @@ enum StarterLexicon {
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
+    case .arabicMorocco: (arabicMoroccoWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
     case .urdu: (urduWords, ["،", "؛", "؟", "."])
@@ -4444,6 +4459,7 @@ extension TypingLanguage {
     case .uzbek: StarterLexicon.uzbekWords
     case .arabic: StarterLexicon.arabicWords
     case .arabicEgypt: StarterLexicon.arabicEgyptWords
+    case .arabicMorocco: StarterLexicon.arabicMoroccoWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
     case .urdu: StarterLexicon.urduWords
@@ -4544,7 +4560,7 @@ extension TypingLanguage {
   /// single-language until mixed bidirectional prompt layout has dedicated
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
-    self == .arabic || self == .arabicEgypt || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral
+    self == .arabic || self == .arabicEgypt || self == .arabicMorocco || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral
   }
 
   var isNoSpaceLanguage: Bool {
@@ -4608,7 +4624,7 @@ extension TypingLanguage {
     case .english, .bosnian, .esperanto, .esperantoHSystem, .tatar, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
-    case .armenian, .bemba, .bulgarian, .hungarian, .lao:
+    case .arabicMorocco, .armenian, .bemba, .bulgarian, .hungarian, .lao:
       return .unsupported
     default:
       return .unknown
@@ -4638,6 +4654,7 @@ extension TypingLanguage {
     case .uzbek: "Oʻzbekcha"
     case .arabic: "العربية"
     case .arabicEgypt: "العربية المصرية"
+    case .arabicMorocco: "العربية المغربية"
     case .hebrew: "עברית"
     case .persian: "فارسی"
     case .urdu: "اردو"
