@@ -10,6 +10,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case swissGerman
   case swissFrench
   case nordicQwerty
+  case swedishQwerty
   case ukQwerty
   case spanishQwerty
   case italianQwerty
@@ -38,6 +39,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .swissGerman: "Swiss German"
     case .swissFrench: "Swiss French"
     case .nordicQwerty: "Nordic QWERTY"
+    case .swedishQwerty: "Swedish QWERTY"
     case .ukQwerty: "UK QWERTY"
     case .spanishQwerty: "Spanish QWERTY"
     case .italianQwerty: "Italian QWERTY"
@@ -71,6 +73,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case swissGerman
   case swissFrench
   case nordicQwerty
+  case swedishQwerty
   case ukQwerty
   case spanishQwerty
   case italianQwerty
@@ -586,6 +589,25 @@ enum KeyboardGuideModel {
           "home", "ASDFGHJKLØÆ'",
           characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "øØ", "æÆ", "'*"],
           shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ø", "Æ", "*"]
+        ),
+        isoBottomRow()
+      ]
+    case .swedishQwerty:
+      [
+        row(
+          "number", "§1234567890+´",
+          characters: ["§½", "1!", "2\"", "3#", "4¤", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "´`"],
+          shiftedLabels: ["½", "!", "\"", "#", "¤", "%", "&", "/", "(", ")", "=", "?", "`"]
+        ),
+        row(
+          "top", "QWERTYUIOPÅ¨",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "åÅ", "¨^"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "Å", "^"]
+        ),
+        row(
+          "home", "ASDFGHJKLÖÄ'",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "öÖ", "äÄ", "'*"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ö", "Ä", "*"]
         ),
         isoBottomRow()
       ]

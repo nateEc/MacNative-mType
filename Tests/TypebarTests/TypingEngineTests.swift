@@ -1784,6 +1784,35 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.nordicQwerty.emulatedLayout, .nordicQwerty)
   }
 
+  @MainActor
+  func testSwedishQwertyMapsSwedishLettersAndPersists() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .swedishQwerty), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .swedishQwerty), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ä", layout: .swedishQwerty), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "½", layout: .swedishQwerty), "number-0")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [], layout: .swedishQwerty), "ö")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [.shift], layout: .swedishQwerty), "Ä")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .swedishQwerty), "½")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ö", layout: .swedishQwerty), 41)
+    XCTAssertEqual(KeyboardInputLayout.swedishQwerty.emulatedLayout, .swedishQwerty)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .swedishQwerty
+    settings.keyboardInputLayout = .swedishQwerty
+    settings.layoutFluidLayouts = [.swedishQwerty, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .swedishQwerty)
+    XCTAssertEqual(restored.keyboardInputLayout, .swedishQwerty)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.swedishQwerty, .ansiQwerty])
+  }
+
   func testTurkishQMapsTurkishLettersAndIsoPunctuation() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ğ", layout: .turkishQ), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ı", layout: .turkishQ), "top-7")
@@ -4810,7 +4839,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 23)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 24)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
