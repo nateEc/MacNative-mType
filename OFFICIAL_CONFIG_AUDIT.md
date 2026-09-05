@@ -21,7 +21,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；五十七种原创单语（含 Arabic、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala、Khmer、希腊语、Greeklish、荷兰语、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、丹麦语、挪威 Bokmål、挪威 Nynorsk、Afrikaans、瑞典语、匈牙利语、捷克语、斯洛伐克语、斯洛文尼亚语、克罗地亚语、塞尔维亚语西里尔、塞尔维亚语 Latin、保加利亚语、罗马尼亚语、芬兰语、爱沙尼亚语、冰岛语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、日语罗马字、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Hebrew、Persian 与 Urdu 使用 macOS 输入源、RTL 提示和原生双向文本排版，暂不进入双向多语混排；Tamil、Hindi、Gujarati、Bangla、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala、Khmer 与 Thai 使用 macOS 输入源、LTR 文本排版及空格提交并可进入多语混排；Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala 与 Khmer 使用组合输入；Thai 的空格提交来自参考实际生成器，而非从自然书写习惯推断。Sanskrit 的知识短文与朗读标识都精确使用参考配置的 `sa`，不补造地区后缀；Sinhala 精确使用 `si`，同样不补造地区后缀；Khmer 的朗读使用精确的 `km-KH`，百科入口使用 `km`。乌克兰语 Latin、日语罗马字与 Greeklish 仅提供原创 ASCII 离线内容；塞尔维亚语 Latin 保持原创拉丁文本，四者均不让在线原文改写所选书写形式。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；六十三种原创单语（含 Arabic、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala、Khmer、Burmese、Lao、Amharic、Armenian、Georgian、Azerbaijani、希腊语、Greeklish、荷兰语、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、丹麦语、挪威 Bokmål、挪威 Nynorsk、Afrikaans、瑞典语、匈牙利语、捷克语、斯洛伐克语、斯洛文尼亚语、克罗地亚语、塞尔维亚语西里尔、塞尔维亚语 Latin、保加利亚语、罗马尼亚语、芬兰语、爱沙尼亚语、冰岛语、繁体中文、俄语、乌克兰语、乌克兰语 Latin、日语平假名、日语片假名、日语罗马字、韩语、土耳其语与波兰语）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Hebrew、Persian 与 Urdu 使用 macOS 输入源、RTL 提示和原生双向文本排版，暂不进入双向多语混排；Tamil、Hindi、Gujarati、Bangla、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala、Khmer、Burmese 与 Thai 使用 macOS 输入源、LTR 文本排版及空格提交并可进入多语混排；Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala、Khmer 与 Burmese 使用组合输入；Thai 的空格提交来自参考实际生成器，而非从自然书写习惯推断。Sanskrit 的知识短文与朗读标识都精确使用参考配置的 `sa`，不补造地区后缀；Sinhala 精确使用 `si`，同样不补造地区后缀；Khmer 的朗读使用精确的 `km-KH`，百科入口使用 `km`。Azerbaijani 以官方 `az-AZ` 的首段访问 `az` 百科入口，并以完整 `az-AZ` 调用朗读。乌克兰语 Latin、日语罗马字与 Greeklish 仅提供原创 ASCII 离线内容；塞尔维亚语 Latin 保持原创拉丁文本，四者均不让在线原文改写所选书写形式。 |
 
 2026-09-04 更新：单语数量增至五十八种，新增 Burmese（`myanmarBurmese`）：参考配置为 `joiningScript: true`、`noLazyMode: true`、LTR、`my-MM`。Typebar 使用原创词流、四档引语、macOS 组合输入和空格提交，并以 `my` 访问知识短文、`my-MM` 调用系统朗读；该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。
 
@@ -32,6 +32,8 @@
 2026-09-05 更新：单语数量增至六十一种，新增 Armenian（`armenian`）：参考配置仅定义 `noLazyMode: true`，没有 BCP-47、RTL 或连写标记。Typebar 使用原创词流、四档引语和 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Armenian 代码。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径，且不应用简化输入。
 
 2026-09-05 更新：单语数量增至六十二种，新增 Georgian（`georgian`）：参考配置仅定义 `noLazyMode: true`，没有 BCP-47、RTL 或连写标记。Typebar 使用原创词流、四档引语和 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Georgian 代码。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径，且不应用简化输入。
+
+2026-09-05 更新：单语数量增至六十三种，新增 Azerbaijani（`azerbaijani`）：参考配置仅定义 `bcp47: az-AZ`，没有 RTL、连写或 `noLazyMode` 标记。Typebar 使用原创词流、四档引语与 LTR 空格提交；知识短文按 BCP-47 首段使用 `az`，系统朗读精确使用 `az-AZ`，保留用户选择的简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

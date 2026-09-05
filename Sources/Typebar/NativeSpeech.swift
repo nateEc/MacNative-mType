@@ -27,6 +27,7 @@ extension TypingLanguage {
     case .spanish: "es-ES"
     case .german: "de-DE"
     case .afrikaans: "af-ZA"
+    case .azerbaijani: "az-AZ"
     case .arabic: "ar-SA"
     case .hebrew: "he-IL"
     case .persian: "fa-IR"

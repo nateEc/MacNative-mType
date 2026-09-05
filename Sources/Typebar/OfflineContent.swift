@@ -1240,6 +1240,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "azerbaijani-sakit-addim",
+      title: "Sakit addım",
+      text: "Sakit addım növbəti işi daha aydın göstərir.",
+      language: .azerbaijani,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "azerbaijani-aciq-defter",
+      title: "Açıq dəftər",
+      text: "Açıq dəftər bütün suallara cavab vermir, amma sualı kiçik hissələrə ayırmaq üçün yer yaradır.",
+      language: .azerbaijani,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "azerbaijani-kicik-is",
+      title: "Kiçik iş",
+      text: "İrəliləyiş həmişə böyük bir an kimi görünmür. Eyni səhifəni yenidən açmaq, bir cümləni aydınlaşdırmaq və kiçik problemi düzəltmək növbəti cəhd üçün inam yaradır.",
+      language: .azerbaijani,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "azerbaijani-uzun-masa",
+      title: "Uzun masa",
+      text: "Uzun masa müxtəlif işlər üçün kifayət qədər yer yaradır. Bir ucunda ilk qaralama, o biri ucunda daha çox diqqət istəyən cümlə, ortada isə növbəti kiçik qərar gözləyə bilər. Məşq də belə irəliləyir. Hər çətin hissəni birdən həll etmək lazım deyil. Geri dönmək üçün yer, aydın növbəti addım və bir neçə cəhddən sonra asanlaşanı görmək üçün səbir olduqda sürət təbii şəkildə artır.",
+      language: .azerbaijani,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
