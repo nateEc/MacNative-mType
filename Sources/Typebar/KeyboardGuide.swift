@@ -33,6 +33,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case belarusian
   case macedonian
   case pashto
+  case estonian
   case serbianCyrillic
 
   var id: Self { self }
@@ -70,6 +71,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .belarusian: "Belarusian"
     case .macedonian: "Macedonian"
     case .pashto: "Pashto"
+    case .estonian: "Estonian"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
   }
@@ -112,6 +114,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case belarusian
   case macedonian
   case pashto
+  case estonian
   case serbianCyrillic
 
   var id: Self { self }
@@ -1070,6 +1073,29 @@ enum KeyboardGuideModel {
           "bottom", "ئېزردړوږ/",
           characters: ["ئظ", "ېط", "زژ", "رء", "ذ\u{200C}", "دډ", "ړؤ", "و،", "ږ.", "/؟"],
           shiftedLabels: ["ظ", "ط", "ژ", "ء", "ZWNJ", "ډ", "ؤ", "،", ".", "؟"]
+        ),
+      ]
+    case .estonian:
+      [
+        row(
+          "number", "ˇ1234567890+´",
+          characters: ["ˇ~", "1!", "2\"", "3#", "4¤", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "´`"],
+          shiftedLabels: ["~", "!", "\"", "#", "¤", "%", "&", "/", "(", ")", "=", "?", "`"]
+        ),
+        row(
+          "top", "QWERTYUIOPÜÕ'",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "yY", "uU", "iI", "oO", "pP", "üÜ", "õÕ", "'*"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "Ü", "Õ", "*"]
+        ),
+        row(
+          "home", "ASDFGHJKLÖÄ",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "öÖ", "äÄ"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ö", "Ä"]
+        ),
+        row(
+          "bottom", "<ZXCVBNM,.-",
+          characters: ["<>", "zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",;", ".:", "-_"],
+          shiftedLabels: [">", "Z", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
         ),
       ]
     case .serbianCyrillic:

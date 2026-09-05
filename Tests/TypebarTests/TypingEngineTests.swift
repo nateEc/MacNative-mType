@@ -2257,6 +2257,44 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.pashto, .ansiQwerty])
   }
 
+  @MainActor
+  func testEstonianMapsRegionalLettersAndPersists() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "õ", layout: .estonian), "top-11")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ü", layout: .estonian), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ö", layout: .estonian), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ä", layout: .estonian), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ˇ", layout: .estonian), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "<", layout: .estonian), "bottom-0")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 30, modifierFlags: [], layout: .estonian), "õ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 33, modifierFlags: [.shift], layout: .estonian), "Ü")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [], layout: .estonian), "ä")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .estonian), ">")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 27, modifierFlags: [.shift], layout: .estonian), "?")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 44, modifierFlags: [], layout: .estonian), "-")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ö", layout: .estonian), 41)
+    XCTAssertEqual(KeyboardInputLayout.estonian.emulatedLayout, .estonian)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .estonian
+    settings.keyboardInputLayout = .estonian
+    settings.layoutFluidLayouts = [.estonian, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .estonian)
+    XCTAssertEqual(restored.keyboardInputLayout, .estonian)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.estonian, .ansiQwerty])
+  }
+
   func testSerbianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .serbianCyrillic), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ђ", layout: .serbianCyrillic), "top-11")
@@ -5145,7 +5183,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 32)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 33)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
