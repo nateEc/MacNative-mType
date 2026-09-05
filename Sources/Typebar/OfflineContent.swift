@@ -904,6 +904,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "welsh-haul-bore",
+      title: "Haul y bore",
+      text: "Mae haul y bore yn agor ffordd dawel.",
+      language: .welsh,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "welsh-ser-nos",
+      title: "Sêr y nos",
+      text: "Mae sêr y nos yn rhoi gobaith i ddinas dawel.",
+      language: .welsh,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "welsh-llyfr-mor",
+      title: "Llyfr a môr",
+      text: "Mae llyfr agored a môr pell yn rhoi lle i feddwl.",
+      language: .welsh,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "welsh-ffordd-gyda",
+      title: "Ffordd gyda",
+      text: "Mae haul y bore yn agor ffordd dawel, a glaw ysgafn yn clirio'r gwynt. Mae sêr y nos yn rhoi gobaith i ddinas dawel. Mae llyfr agored a môr pell yn rhoi lle i feddwl. Pan fydd pobl yn gwrando gyda'i gilydd, maent yn dod o hyd i ddewis clir ac atgof newydd i'r diwrnod nesaf.",
+      language: .welsh,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",

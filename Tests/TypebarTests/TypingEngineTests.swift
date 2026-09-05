@@ -3271,6 +3271,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.latinWords,
       StarterLexicon.friulianWords,
       StarterLexicon.malagasyWords,
+      StarterLexicon.welshWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3312,7 +3313,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 75)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 76)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3490,6 +3491,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .malagasy).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .malagasy), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .welsh).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .welsh), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .arabic).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .arabic), "ar")
@@ -3979,6 +3983,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       malagasyEncyclopedia.prompt(for: .words(3, language: .malagasy)),
       "Ny masoandro maraina")
+    let welshData = Data("""
+    {"title":"Haul","extract":"Mae haul y bore yn agor ffordd dawel."}
+    """.utf8)
+    let welshEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: welshData, language: .welsh))
+    XCTAssertEqual(welshEncyclopedia.text, "Mae haul y bore yn agor ffordd dawel")
+    XCTAssertEqual(
+      welshEncyclopedia.prompt(for: .words(3, language: .welsh)),
+      "Mae haul y")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4182,6 +4195,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.latin.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.friulian.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.malagasy.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.welsh.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.armenian.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.bemba.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.albanian.zipfFrequencySupport, .unknown)
@@ -4204,6 +4218,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .malagasy, modifiers: [.zipf]),
       "Malagasy 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .welsh, modifiers: [.zipf]),
+      "Cymraeg 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
     )
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .armenian, modifiers: [.zipf]),
@@ -4634,6 +4652,7 @@ final class TypingEngineTests: XCTestCase {
       (.latin, StarterLexicon.latinWords),
       (.friulian, StarterLexicon.friulianWords),
       (.malagasy, StarterLexicon.malagasyWords),
+      (.welsh, StarterLexicon.welshWords),
       (.arabic, StarterLexicon.arabicWords),
       (.hebrew, StarterLexicon.hebrewWords),
       (.persian, StarterLexicon.persianWords),
@@ -4788,6 +4807,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.malagasy.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.malagasy))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.malagasy))
+    XCTAssertTrue(StarterLexicon.welshWords.contains("lleuad"))
+    XCTAssertFalse(TypingLanguage.welsh.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.welsh.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.welsh.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.welsh))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.welsh))
     XCTAssertTrue(StarterLexicon.arabicWords.contains("نافِذة"))
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
@@ -5022,6 +5047,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.latin.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.friulian.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.malagasy.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.welsh.supportsLazyLatinInput)
 
     XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers(
@@ -5061,6 +5087,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.latin.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.friulian.speechLocaleIdentifier, "fur")
     XCTAssertEqual(TypingLanguage.malagasy.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.welsh.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
     XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")
