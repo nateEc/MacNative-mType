@@ -200,6 +200,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case spanish
   case german
   case afrikaans
+  case albanian
   case arabic
   case hebrew
   case persian
@@ -3228,6 +3229,14 @@ enum StarterLexicon {
     "klein", "tyd", "lente", "veld", "boot", "vriend", "wêreld",
   ]
 
+  // Typebar-authored Albanian starter words keep native diacritics in a
+  // local corpus and deliberately do not import the reference word list.
+  static let albanianWords = [
+    "libër", "dritare", "rrugë", "dritë", "urë", "mëngjes", "letër", "kopsht", "re", "qetësi",
+    "llambë", "mal", "farë", "muzikë", "tavolinë", "ide", "shënim", "punë", "përpjekje", "mik",
+    "qytet", "lumë", "erë", "kohë", "zë", "pyetje", "përgjigje", "shpresë", "e ardhme", "hap",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -3744,6 +3753,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: afrikaansWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .albanian:
+      return prompt(
+        tokens: count, lexicon: albanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4063,6 +4076,7 @@ enum StarterLexicon {
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
     case .afrikaans: (afrikaansWords, [",", ".", "!", "?"])
+    case .albanian: (albanianWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
@@ -4190,6 +4204,7 @@ extension TypingLanguage {
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
     case .afrikaans: StarterLexicon.afrikaansWords
+    case .albanian: StarterLexicon.albanianWords
     case .arabic: StarterLexicon.arabicWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
@@ -4264,7 +4279,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .albanian, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4347,6 +4362,7 @@ extension TypingLanguage {
     case .spanish: "Español"
     case .german: "Deutsch"
     case .afrikaans: "Afrikaans"
+    case .albanian: "Shqip"
     case .arabic: "العربية"
     case .hebrew: "עברית"
     case .persian: "فارسی"

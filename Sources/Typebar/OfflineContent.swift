@@ -652,6 +652,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "albanian-hap-i-qete",
+      title: "Hap i qetë",
+      text: "Një hap i qetë e bën punën e radhës më të qartë.",
+      language: .albanian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "albanian-fletore-e-hapur",
+      title: "Fletore e hapur",
+      text: "Një fletore e hapur nuk u përgjigjet të gjitha pyetjeve, por lë vend për t'i ndarë në pjesë të vogla.",
+      language: .albanian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "albanian-perparim-i-vogel",
+      title: "Përparim i vogël",
+      text: "Përparimi nuk duket gjithmonë i madh. Kthimi te e njëjta faqe, sqarimi i një fjalie dhe korrigjimi i një gabimi të vogël i japin më shumë besim përpjekjes së radhës.",
+      language: .albanian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "albanian-tavoline-e-gjate",
+      title: "Tavolinë e gjatë",
+      text: "Një tavolinë e gjatë lë hapësirë për punë të ndryshme. Në njërin skaj mund të qëndrojë skica e parë, në tjetrin pret një fjali që kërkon më shumë vëmendje, dhe në mes është vendimi i vogël i radhës. Edhe praktika përparon kështu. Nuk është e nevojshme të zgjidhet menjëherë çdo pjesë e vështirë. Kur ka një vend ku mund të kthehesh, hapi i radhës shfaqet dhe durimi rritet për të vënë re çfarë është bërë më e lehtë pas disa përpjekjeve; shpejtësia rritet natyrshëm.",
+      language: .albanian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",
