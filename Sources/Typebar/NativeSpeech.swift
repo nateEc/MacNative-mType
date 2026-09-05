@@ -65,6 +65,7 @@ extension TypingLanguage {
     case .myanmarBurmese: "my-MM"
     case .lao: "lo"
     case .amharic: "am-ET"
+    case .armenianWestern: "hyw"
     case .greek, .greeklish: "el-GR"
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"

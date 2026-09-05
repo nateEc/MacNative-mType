@@ -1884,6 +1884,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "armenian-western-calm-step",
+      title: "Հանգիստ քայլ",
+      text: "Հանգիստ քայլը յաջորդ գործը աւելի յստակ կը դարձնէ։",
+      language: .armenianWestern,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "armenian-western-open-book",
+      title: "Բաց գիրք",
+      text: "Բաց գիրքը բոլոր հարցերը անմիջապէս չի պատասխաներ, բայց նոր մտքերու համար տեղ կու տայ։",
+      language: .armenianWestern,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "armenian-western-small-effort",
+      title: "Փոքր ջանք",
+      text: "Այսօրուան փոքր ջանքը պէտք չէ ամէն ինչ միանգամէն աւարտէ։ Գիրքը բացէ, մէկ բառ փոխէ, ու վաղուան համար օգտակար նշում մը ձգէ։ Ժամանակը փոքր քայլը աւելի դիւրին սկիզբ կ՚ընէ։",
+      language: .armenianWestern,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "armenian-western-return-place",
+      title: "Վերադառնալու տեղ",
+      text: "Ամէն օրուան վերջը փոքր գործած ցուցակը ամբողջական պատասխան մը չունենալու կարիք չունի։ Ան կրնայ պահել կիսատ նախադասութիւն մը, հարց մը, եւ յաջորդ փորձին համար փոքր նշում մը։ Այդ ձեւով աշխատանքին դարձը աւելի դիւրին կ՚ըլլայ։ Երբ դարձեալ նայիս, պիտի տեսնես թէ միտքերը շարժած են, իսկ առաջին քայլը այլեւս այդքան հեռու չէ։ Ամէն հանգիստ քայլ ճամբուն վրայ նշան մը կը ձգէ։",
+      language: .armenianWestern,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "georgian-calm-step",
       title: "მშვიდი ნაბიჯი",
       text: "მშვიდი ნაბიჯი შემდეგ საქმეს უფრო ნათელს ხდის.",

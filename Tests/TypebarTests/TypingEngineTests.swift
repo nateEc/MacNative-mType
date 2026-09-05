@@ -3299,6 +3299,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.laoWords,
       StarterLexicon.amharicWords,
       StarterLexicon.armenianWords,
+      StarterLexicon.armenianWesternWords,
       StarterLexicon.georgianWords,
       StarterLexicon.azerbaijaniWords,
       StarterLexicon.belarusianWords,
@@ -3324,7 +3325,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 87)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 88)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3613,6 +3614,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .armenian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .armenian), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .armenianWestern).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .armenianWestern), "hyw")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .georgian).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .georgian), "en")
@@ -4374,6 +4378,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.arabicMorocco.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.armenian.zipfFrequencySupport, .unsupported)
+    XCTAssertEqual(TypingLanguage.armenianWestern.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.bemba.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.albanian.zipfFrequencySupport, .unknown)
     XCTAssertNil(ZipfFrequencyPolicy.notice(for: .marathi, modifiers: [.zipf]))
@@ -4912,6 +4917,7 @@ final class TypingEngineTests: XCTestCase {
       (.lao, StarterLexicon.laoWords),
       (.amharic, StarterLexicon.amharicWords),
       (.armenian, StarterLexicon.armenianWords),
+      (.armenianWestern, StarterLexicon.armenianWesternWords),
       (.georgian, StarterLexicon.georgianWords),
       (.azerbaijani, StarterLexicon.azerbaijaniWords),
       (.belarusian, StarterLexicon.belarusianWords),
@@ -5274,6 +5280,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.armenian.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.armenian))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.armenian))
+    XCTAssertTrue(StarterLexicon.armenianWesternWords.contains("բարեւ"))
+    XCTAssertFalse(TypingLanguage.armenianWestern.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.armenianWestern.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.armenianWestern.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.armenianWestern.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.armenianWestern.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.armenianWestern.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.armenianWestern))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.armenianWestern))
     XCTAssertTrue(StarterLexicon.georgianWords.contains("ფანჯარა"))
     XCTAssertFalse(TypingLanguage.georgian.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.georgian.usesSpaceDelimitedWords)
@@ -5460,6 +5475,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.hausa.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.tatar.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.uzbek.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.armenianWestern.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
 
     XCTAssertEqual(
@@ -5537,6 +5553,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.lao.speechLocaleIdentifier, "lo")
     XCTAssertEqual(TypingLanguage.amharic.speechLocaleIdentifier, "am-ET")
     XCTAssertEqual(TypingLanguage.armenian.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.armenianWestern.speechLocaleIdentifier, "hyw")
     XCTAssertEqual(TypingLanguage.georgian.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.azerbaijani.speechLocaleIdentifier, "az-AZ")
     XCTAssertEqual(TypingLanguage.belarusian.speechLocaleIdentifier, "be-BY")

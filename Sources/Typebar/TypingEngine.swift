@@ -245,6 +245,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case lao
   case amharic
   case armenian
+  case armenianWestern
   case georgian
   case azerbaijani
   case belarusian
@@ -3704,6 +3705,14 @@ enum StarterLexicon {
     "հեռավորություն", "քայլ", "համբերություն", "հավասարակշռություն",
   ]
 
+  // Typebar-authored Western Armenian starter words use its own orthography
+  // and keep the separate `hyw` configuration independent of Armenian.
+  static let armenianWesternWords = [
+    "բարեւ", "դուն", "ես", "մենք", "խօսք", "գիր", "ճամբայ", "լոյս", "կամուրջ", "առաւօտ",
+    "պատուհան", "թուղթ", "այգի", "ամպ", "լռութիւն", "լապտեր", "լեռ", "սերմ", "երաժշտութիւն", "սեղան",
+    "միտք", "նշում", "աշխատանք", "փորձ", "հեռաւորութիւն", "քայլ", "համբերութիւն", "հաւասարակշռութիւն",
+  ]
+
   // Typebar-authored Georgian starter words exercise the native macOS input
   // source without importing a third-party or reference word list.
   static let georgianWords = [
@@ -4174,6 +4183,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: armenianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .armenianWestern:
+      return prompt(
+        tokens: count, lexicon: armenianWesternWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .georgian:
       return prompt(
         tokens: count, lexicon: georgianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4458,6 +4471,7 @@ enum StarterLexicon {
     case .lao: (laoWords, [",", ".", "!", "?"])
     case .amharic: (amharicWords, [",", ".", "!", "?"])
     case .armenian: (armenianWords, [",", ".", "!", "?"])
+    case .armenianWestern: (armenianWesternWords, [",", ".", "!", "?"])
     case .georgian: (georgianWords, [",", ".", "!", "?"])
     case .azerbaijani: (azerbaijaniWords, [",", ".", "!", "?"])
     case .belarusian: (belarusianWords, [",", ".", "!", "?"])
@@ -4621,6 +4635,7 @@ extension TypingLanguage {
     case .lao: StarterLexicon.laoWords
     case .amharic: StarterLexicon.amharicWords
     case .armenian: StarterLexicon.armenianWords
+    case .armenianWestern: StarterLexicon.armenianWesternWords
     case .georgian: StarterLexicon.georgianWords
     case .azerbaijani: StarterLexicon.azerbaijaniWords
     case .belarusian: StarterLexicon.belarusianWords
@@ -4675,7 +4690,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4827,6 +4842,7 @@ extension TypingLanguage {
     case .lao: "ລາວ"
     case .amharic: "አማርኛ"
     case .armenian: "Հայերեն"
+    case .armenianWestern: "Հայերէն (Արեւմտեան)"
     case .georgian: "ქართული"
     case .azerbaijani: "Azərbaycanca"
     case .belarusian: "Беларуская"
