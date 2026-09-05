@@ -1436,6 +1436,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "zulu-calm-step",
+      title: "Isinyathelo esizolile",
+      text: "Isinyathelo esizolile senza umsebenzi olandelayo ucace.",
+      language: .zulu,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "zulu-open-book",
+      title: "Incwadi evulekile",
+      text: "Incwadi evulekile ayiphenduli yonke imibuzo, kodwa ivulela imibono emisha indawo.",
+      language: .zulu,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "zulu-small-effort",
+      title: "Umzamo omncane",
+      text: "Umzamo omncane wanamuhla awudingi ukuqeda konke ngesikhathi esisodwa. Vula incwadi, shintsha igama elilodwa, bese ushiya inothi eliwusizo lakusasa. Isikhathi senza isinyathelo esincane sibe lula ukuqala.",
+      language: .zulu,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "zulu-return-place",
+      title: "Indawo yokubuyela",
+      text: "Ekupheleni kosuku, uhlu oluncane lomsebenzi aludingi ukuba nempendulo ephelele. Lungaba nomusho ongakaqedwa, umbuzo nenothi elifushane lomzamo olandelayo. Lokhu kwenza ukubuyela emsebenzini kube lula. Lapho ubheka futhi, uzobona ukuthi imibono iqhubekele phambili nokuthi isinyathelo sokuqala asisekude kakhulu. Isinyathelo esizolile sishiya uphawu endleleni.",
+      language: .zulu,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",
