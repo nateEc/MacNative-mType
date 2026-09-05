@@ -34,6 +34,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case macedonian
   case pashto
   case estonian
+  case persianStandard
   case serbianCyrillic
 
   var id: Self { self }
@@ -72,6 +73,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .macedonian: "Macedonian"
     case .pashto: "Pashto"
     case .estonian: "Estonian"
+    case .persianStandard: "Persian (Standard)"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
   }
@@ -115,6 +117,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case macedonian
   case pashto
   case estonian
+  case persianStandard
   case serbianCyrillic
 
   var id: Self { self }
@@ -1096,6 +1099,29 @@ enum KeyboardGuideModel {
           "bottom", "<ZXCVBNM,.-",
           characters: ["<>", "zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",;", ".:", "-_"],
           shiftedLabels: [">", "Z", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
+        ),
+      ]
+    case .persianStandard:
+      [
+        row(
+          "number", labels: ["ZWJ", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۰", "-", "="],
+          characters: ["\u{200D}", "۱!", "۲٬", "۳٫", "۴﷼", "۵٪", "۶×", "۷،", "۸*", "۹)", "۰(", "-ـ", "=+"],
+          shiftedLabels: ["ZWJ", "!", "٬", "٫", "﷼", "٪", "×", "،", "*", ")", "(", "ـ", "+"]
+        ),
+        row(
+          "top", "ضصثقفغعهخحجچ\\",
+          characters: ["ضْ", "صٌ", "ثٍ", "قً", "فُ", "غِ", "عَ", "هّ", "خ]", "ح[", "ج}", "چ{", "\\|"],
+          shiftedLabels: ["ْ", "ٌ", "ٍ", "ً", "ُ", "ِ", "َ", "ّ", "]", "[", "}", "{", "|"]
+        ),
+        row(
+          "home", "شسیبلاتنمکگ",
+          characters: ["شؤ", "سئ", "یي", "بإ", "لأ", "اآ", "تة", "ن»", "م«", "ک:", "گ؛"],
+          shiftedLabels: ["ؤ", "ئ", "ي", "إ", "أ", "آ", "ة", "»", "«", ":", "؛"]
+        ),
+        row(
+          "bottom", "\\ظطزرذدپو./",
+          characters: ["\\|", "ظك", "طط", "زژ", "رٰ", "ذ\u{200C}", "د\u{0654}", "پء", "و>", ".<", "/؟"],
+          shiftedLabels: ["|", "ك", "ط", "ژ", "ٰ", "ZWNJ", "ٔ", "ء", ">", "<", "؟"]
         ),
       ]
     case .serbianCyrillic:

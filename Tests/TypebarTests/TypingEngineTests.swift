@@ -2295,6 +2295,49 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.estonian, .ansiQwerty])
   }
 
+  @MainActor
+  func testPersianStandardMapsArabicScriptLayersAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .persianStandard)
+    XCTAssertEqual(rows[0][0].label, "ZWJ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{200D}", layout: .persianStandard), "number-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "﷼", layout: .persianStandard), "number-4")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ض", layout: .persianStandard), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ؤ", layout: .persianStandard), "home-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ظ", layout: .persianStandard), "bottom-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "\u{200C}", layout: .persianStandard), "bottom-5")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .persianStandard), "ض")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.shift], layout: .persianStandard), "ْ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 21, modifierFlags: [.shift], layout: .persianStandard), "﷼")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .persianStandard), "\\")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 9, modifierFlags: [.shift], layout: .persianStandard), "ٰ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .persianStandard), "\u{200C}")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 45, modifierFlags: [.shift], layout: .persianStandard), "ٔ")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "پ", layout: .persianStandard), 46)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "\u{200D}", layout: .persianStandard), 50)
+    XCTAssertEqual(KeyboardInputLayout.persianStandard.emulatedLayout, .persianStandard)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .persianStandard
+    settings.keyboardInputLayout = .persianStandard
+    settings.layoutFluidLayouts = [.persianStandard, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .persianStandard)
+    XCTAssertEqual(restored.keyboardInputLayout, .persianStandard)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.persianStandard, .ansiQwerty])
+  }
+
   func testSerbianCyrillicMapsOriginalCyrillicKeysAndPhysicalPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "љ", layout: .serbianCyrillic), "top-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ђ", layout: .serbianCyrillic), "top-11")
@@ -5183,7 +5226,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 33)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 34)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
