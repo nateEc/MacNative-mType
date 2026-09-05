@@ -36,6 +36,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case estonian
   case persianStandard
   case arabic101
+  case arabic102
   case hebrew
   case serbianCyrillic
 
@@ -77,6 +78,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .estonian: "Estonian"
     case .persianStandard: "Persian (Standard)"
     case .arabic101: "Arabic (101)"
+    case .arabic102: "Arabic (102)"
     case .hebrew: "Hebrew"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
@@ -123,6 +125,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case estonian
   case persianStandard
   case arabic101
+  case arabic102
   case hebrew
   case serbianCyrillic
 
@@ -1151,6 +1154,29 @@ enum KeyboardGuideModel {
           "bottom", labels: ["\\", "ئ", "ء", "ؤ", "ر", "لا", "ى", "ة", "و", "ز", "ظ"],
           characters: ["\\|", "ئ~", "ءْ", "ؤ}", "ر{", "لالآ", "ىآ", "ة’", "و,", "ز.", "ظ؟"],
           shiftedLabels: ["|", "~", "ْ", "}", "{", "لآ", "آ", "’", ",", ".", "؟"]
+        ),
+      ]
+    case .arabic102:
+      [
+        row(
+          "number", ">1234567890-=",
+          characters: ["><", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9)", "0(", "-_", "=+"],
+          shiftedLabels: ["<", "!", "@", "#", "$", "%", "^", "&", "*", ")", "(", "_", "+"]
+        ),
+        row(
+          "top", "ضصثقفغعهخحجدذ",
+          characters: ["ضَ", "صً", "ثُ", "قٌ", "فلإ", "غإ", "ع‘", "ه÷", "خ×", "ح؛", "ج}", "د{", "ذّ"],
+          shiftedLabels: ["َ", "ً", "ُ", "ٌ", "لإ", "إ", "‘", "÷", "×", "؛", "}", "{", "ّ"]
+        ),
+        row(
+          "home", "شسيبلاتنمكط",
+          characters: ["ش\\", "س\u{0000}", "ي]", "ب[", "للأ", "اأ", "تـ", "ن،", "م/", "ك:", "ط\""],
+          shiftedLabels: ["\\", "NUL", "]", "[", "لأ", "أ", "ـ", "،", "/", ":", "\""]
+        ),
+        row(
+          "bottom", labels: ["ـ", "ئ", "ء", "ؤ", "ر", "لا", "ى", "ة", "و", "ز", "ظ"],
+          characters: ["ـ|", "ئ~", "ءْ", "ؤِ", "رٍ", "لالآ", "ىآ", "ة’", "و,", "ز.", "ظ؟"],
+          shiftedLabels: ["|", "~", "ْ", "ِ", "ٍ", "لآ", "آ", "’", ",", ".", "؟"]
         ),
       ]
     case .hebrew:

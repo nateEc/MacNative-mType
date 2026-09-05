@@ -83,7 +83,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 可选择当前词、当前词加 1/2/3 个预读词四档可见范围；它只影响提示显示，不改变输入、成绩或回放
 - 原生 AppKit 键盘输入（文字提交、退格、Esc / ⌘R 重开与 IME 组合输入协议）
 - 快速重开键可设为关闭、Esc、Tab 或 Enter；⌘R 始终可用
-- 可选原创键盘提示：三十六种内置布局（含 Typebar 自写的希腊字母、匈牙利语 QWERTZ、保加利亚语与塞尔维亚语西里尔图，以及 Polish (Programmers) 的公开标准 Option 字符层、Swedish QWERTY、Macedonian、Pashto、Estonian、Persian Standard、Arabic 101 与 Hebrew）、跟随 macOS 当前输入源的动态物理键位图，以及最多二十种用户自写的 Unicode 四行键盘图；七种原生几何样式、关闭/静态/按键反馈/下一键模式、精简/数字行/完整按键集、0.5–3.5 倍大小及小写/大写/空白/动态图例均可持久化。视觉键盘图不改变输入，输入默认始终交给 macOS 当前输入法，只有明确开启内置布局模拟时才接管物理键。Layout Fluid 会按阶段同时切换内置键盘图与模拟布局（每轮最多选择十五种）；Swedish QWERTY 独立模拟 `å`、`ö`、`ä`、`½` 的普通/Shift 实体键位，Arabic 101 也保留 `لإ/لأ/لا/لآ` 的完整文本输出，动态图例随 Shift、Caps Lock 及 Polish (Programmers) 的 Option/Shift+Option 层更新；死键与其余 Option 输入仍由 macOS 处理
+- 可选原创键盘提示：三十七种内置布局（含 Typebar 自写的希腊字母、匈牙利语 QWERTZ、保加利亚语与塞尔维亚语西里尔图，以及 Polish (Programmers) 的公开标准 Option 字符层、Swedish QWERTY、Macedonian、Pashto、Estonian、Persian Standard、Arabic 101、Arabic 102 与 Hebrew）、跟随 macOS 当前输入源的动态物理键位图，以及最多二十种用户自写的 Unicode 四行键盘图；七种原生几何样式、关闭/静态/按键反馈/下一键模式、精简/数字行/完整按键集、0.5–3.5 倍大小及小写/大写/空白/动态图例均可持久化。视觉键盘图不改变输入，输入默认始终交给 macOS 当前输入法，只有明确开启内置布局模拟时才接管物理键。Layout Fluid 会按阶段同时切换内置键盘图与模拟布局（每轮最多选择十五种）；Swedish QWERTY 独立模拟 `å`、`ö`、`ä`、`½` 的普通/Shift 实体键位，Arabic 101 也保留 `لإ/لأ/لا/لآ` 的完整文本输出，动态图例随 Shift、Caps Lock 及 Polish (Programmers) 的 Option/Shift+Option 层更新；死键与其余 Option 输入仍由 macOS 处理
 - 当前内置键盘图为二十五种：新增 Danish QWERTY，独立模拟 `å`、`æ`、`ø`、`§` 与其普通/Shift 实体键位；该项取代上条的“二十四种”计数。死键和 Option/AltGr 层继续保持 macOS 原生输入路径，不导入 Monkeytype 布局资产
 - 当前内置键盘图为二十六种：新增 Norwegian QWERTY，公开现有 Nordic 键位对应的 `å`、`ø`、`æ` 实体映射，保留 Nordic 作为已有设置的兼容选项；该项取代上条的“二十五种”计数。死键和 Option/AltGr 层仍保持 macOS 原生输入路径，不导入 Monkeytype 布局资产
 - 当前内置键盘图为二十七种：新增 ANSI Colemak-DH，独立模拟与标准 Colemak 不同的 `B/G`、`D/V`、`H/M` 位置；该项取代上条的“二十六种”计数。ISO、wide 与其他 Colemak-DH 变体仍由系统输入或自定义布局处理，不导入 Monkeytype 布局资产
@@ -96,6 +96,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 当前内置键盘图为三十四种：新增 Persian (Standard)，独立模拟波斯字母、东阿拉伯数字、`﷼`、组合音标、ZWJ/ZWNJ、ISO 与区域标点的普通/Shift 键位；AltGr 和方向控制继续由 macOS 处理，不导入 Monkeytype 布局资产
 - 当前内置键盘图为三十五种：新增 Arabic (101)，独立模拟阿拉伯字母、组合音标、`لإ/لأ/لا/لآ` 完整文本输出、ISO 与区域标点的普通/Shift 键位；AltGr、ZWJ/ZWNJ 与方向控制继续由 macOS 处理，不导入 Monkeytype 布局资产
 - 当前内置键盘图为三十六种：新增 Hebrew，独立模拟希伯来字母、Shift 拉丁/标点层与 ISO 键的普通/Shift 实体键位；AltGr、Caps Lock 元音点和方向控制继续由 macOS 处理，不导入 Monkeytype 布局资产
+- 当前内置键盘图为三十七种：新增 Arabic (102)，独立模拟 `ذ`、ISO tatweel、组合音标、连字与区域标点的实际普通/Shift 键位；AltGr、ZWJ/ZWNJ 与方向控制继续由 macOS 处理，不导入 Monkeytype 布局资产
 - 原生设置窗口：难度、输入规则与字体大小会保存到本机
 - 可选 macOS 系统键击音、错误提示音及 0–100% 音量；默认关闭，不携带音频资产
 - 原生设置窗口支持中英文关键词搜索，可过滤测试、显示、主题、账户和恢复默认设置分组
@@ -174,7 +175,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 新增原创 Viossa 与 Viossa · Njutro 离线词流及各自四档引语，作为独立的 LTR 空格分词练习加入默认和自选多语混排。两项均未提供 BCP-47，知识短文与系统朗读严格按 `en`／`en-US` 缺省路径处理，且 `orderedByFrequency: false` 会显示 Zipf 不支持提示；Njutro 额外按 `noLazyMode: true` 在普通练习禁用简化输入、自定义文本保留例外。两个词流都是 Typebar 明示的原创练习 idiolect，不导入参考词表或引语，均已接入预设、归档、社区投稿、成绩和排行榜。
 - 新增原创 Te reo Māori 离线词流及四档引语，保留长元音 macron 并作为 LTR 空格分词练习加入默认和自选多语混排。固定参考仅提供 `maori_1k`，未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，故知识短文与系统朗读严格按 `en`／`en-US` 缺省路径处理，保留简化输入并显示 Zipf 可能不支持提示；它已接入预设、归档、社区投稿、成绩和排行榜，且不导入参考词表或引语。
 - 新增原创 Lojban · gismu 与 Lojban · cmavo 离线词流及各自四档引语，作为独立的 LTR 空格分词练习加入默认和自选多语混排。前者只练习五字母词根，后者独立保留 `.` 与 `'` 的语言内输入语义。两个固定参考配置均有 `noLazyMode: true`，故普通练习禁用简化输入而自定义文本保留例外；均未定义 BCP-47、RTL、连写或词频排序，知识短文与系统朗读严格按 `en`／`en-US` 缺省路径处理，Zipf 显示可能不支持提示。两个词流不导入参考词表或引语，均已接入预设、归档、社区投稿、成绩和排行榜。
-- 286 个引擎、内容、存储、偏好设置、预设、统计、归档、CSV 导出和账户响应兼容性单元测试
+- 287 个引擎、内容、存储、偏好设置、预设、统计、归档、CSV 导出和账户响应兼容性单元测试
 - 66 个自建服务自动化测试，覆盖账号、密码重置与邮箱验证、一次性重新验证与会话撤销、OAuth 授权码/PKCE/一次性状态、第三方与密码身份关联保护、Discord 头像公开隐私、服务端公开徽章、公开资料 UTC 连续练习/活动隐私/开始次数与搜索、开发者密钥与私有远端成绩及标签管理、排行榜隐身、好友关系、同步、成绩、WPM/XP 排行榜、审核引语/资料举报、社区评分、服务公告、请求限速与维护模式
 
 ## 后续范围（尚未完成）
