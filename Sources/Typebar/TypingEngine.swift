@@ -223,6 +223,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case georgian
   case azerbaijani
   case belarusian
+  case lithuanian
   case kurdishCentral
   case greek
   case greeklish
@@ -3472,6 +3473,14 @@ enum StarterLexicon {
     "сябар", "горад", "рака", "вецер", "час", "голас", "пытанне", "адказ", "надзея", "будучыня",
   ]
 
+  // Typebar-authored Lithuanian starter words keep the reference language's
+  // normal LTR and space-delimited behavior without importing its word list.
+  static let lithuanianWords = [
+    "knyga", "langas", "kelias", "šviesa", "tiltas", "rytas", "popierius", "sodas", "debesis", "ramybė",
+    "lempa", "kalnas", "sėkla", "muzika", "stalas", "mintis", "užrašas", "darbas", "bandymas", "draugas",
+    "miestas", "upė", "vėjas", "laikas", "balsas", "klausimas", "atsakymas", "viltis", "ateitis", "žingsnis",
+  ]
+
   // Typebar-authored Central Kurdish starter words use direct Unicode text
   // for macOS RTL input sources; they are not an imported word list.
   static let kurdishCentralWords = [
@@ -3782,6 +3791,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: belarusianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .lithuanian:
+      return prompt(
+        tokens: count, lexicon: lithuanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kurdishCentral:
       return prompt(
         tokens: count, lexicon: kurdishCentralWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4008,6 +4021,7 @@ enum StarterLexicon {
     case .georgian: (georgianWords, [",", ".", "!", "?"])
     case .azerbaijani: (azerbaijaniWords, [",", ".", "!", "?"])
     case .belarusian: (belarusianWords, [",", ".", "!", "?"])
+    case .lithuanian: (lithuanianWords, [",", ".", "!", "?"])
     case .kurdishCentral: (kurdishCentralWords, ["،", "؛", "؟", "."])
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
@@ -4129,6 +4143,7 @@ extension TypingLanguage {
     case .georgian: StarterLexicon.georgianWords
     case .azerbaijani: StarterLexicon.azerbaijaniWords
     case .belarusian: StarterLexicon.belarusianWords
+    case .lithuanian: StarterLexicon.lithuanianWords
     case .kurdishCentral: StarterLexicon.kurdishCentralWords
     case .greek: StarterLexicon.greekWords
     case .greeklish: StarterLexicon.greeklishWords
@@ -4174,7 +4189,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .afrikaans, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .georgian, .azerbaijani, .belarusian, .lithuanian, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4278,6 +4293,7 @@ extension TypingLanguage {
     case .georgian: "ქართული"
     case .azerbaijani: "Azərbaycanca"
     case .belarusian: "Беларуская"
+    case .lithuanian: "Lietuvių"
     case .kurdishCentral: "کوردی ناوەندی"
     case .greek: "Ελληνικά"
     case .greeklish: "Greeklish"

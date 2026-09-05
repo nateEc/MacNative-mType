@@ -1296,6 +1296,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "lithuanian-ramus-zingsnis",
+      title: "Ramus žingsnis",
+      text: "Ramus žingsnis padeda aiškiau pamatyti kitą darbą.",
+      language: .lithuanian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "lithuanian-atverstas-sasiuvinis",
+      title: "Atverstas sąsiuvinis",
+      text: "Atverstas sąsiuvinis neatsako į visus klausimus, bet palieka vietos juos išskaidyti į mažesnes dalis.",
+      language: .lithuanian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "lithuanian-mazas-darbas",
+      title: "Mažas darbas",
+      text: "Pažanga ne visada atrodo didelė. Grįžti prie to paties puslapio, patikslinti vieną sakinį ir ištaisyti mažą klaidą suteikia daugiau pasitikėjimo kitam bandymui.",
+      language: .lithuanian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "lithuanian-ilgas-stalas",
+      title: "Ilgas stalas",
+      text: "Ilgas stalas palieka vietos įvairiems darbams. Viename gale gali gulėti pirmas juodraštis, kitame laukti sakinys, kuriam reikia daugiau dėmesio, o viduryje – kitas mažas sprendimas. Taip juda ir praktika. Nebūtina iš karto išspręsti kiekvienos sudėtingos dalies. Kai yra kur sugrįžti, aiškus kitas žingsnis ir kantrybė pastebėti, kas po kelių bandymų tapo lengviau, greitis auga natūraliai.",
+      language: .lithuanian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kurdish-central-hengawi-aram",
       title: "هەنگاوی ئارام",
       text: "هەنگاوی ئارام کاری داهاتوو ڕوونتر دەکات.",

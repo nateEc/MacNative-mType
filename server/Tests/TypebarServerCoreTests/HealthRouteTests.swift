@@ -355,6 +355,10 @@ final class HealthRouteTests: XCTestCase {
       .init(language: "belarusian", text: "Спакойны крок робіць наступную справу яснейшай.", attribution: nil),
       accessToken: session.accessToken)
     XCTAssertEqual(belarusianSubmission.status, "pending")
+    let lithuanianSubmission = try await store.submitQuote(
+      .init(language: "lithuanian", text: "Ramus žingsnis padeda aiškiau pamatyti kitą darbą.", attribution: nil),
+      accessToken: session.accessToken)
+    XCTAssertEqual(lithuanianSubmission.status, "pending")
     let kurdishCentralSubmission = try await store.submitQuote(
       .init(language: "kurdishCentral", text: "هەنگاوی ئارام کاری داهاتوو ڕوونتر دەکات.", attribution: nil),
       accessToken: session.accessToken)
@@ -515,7 +519,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(
       Set(mine.submissions.map(\.id)),
       Set([
-        submitted.id, spanishSubmission.id, germanSubmission.id, afrikaansSubmission.id, arabicSubmission.id, hebrewSubmission.id, persianSubmission.id, urduSubmission.id, kurdishCentralSubmission.id, tamilSubmission.id, hindiSubmission.id, gujaratiSubmission.id, banglaSubmission.id, thaiSubmission.id, nepaliSubmission.id, kannadaSubmission.id, teluguSubmission.id, malayalamSubmission.id, sanskritSubmission.id, sinhalaSubmission.id, khmerSubmission.id, myanmarSubmission.id, laoSubmission.id, amharicSubmission.id, armenianSubmission.id, georgianSubmission.id, azerbaijaniSubmission.id, belarusianSubmission.id, greekSubmission.id, greeklishSubmission.id, dutchSubmission.id, filipinoSubmission.id, catalanSubmission.id, indonesianSubmission.id, malaySubmission.id, danishSubmission.id,
+        submitted.id, spanishSubmission.id, germanSubmission.id, afrikaansSubmission.id, arabicSubmission.id, hebrewSubmission.id, persianSubmission.id, urduSubmission.id, kurdishCentralSubmission.id, tamilSubmission.id, hindiSubmission.id, gujaratiSubmission.id, banglaSubmission.id, thaiSubmission.id, nepaliSubmission.id, kannadaSubmission.id, teluguSubmission.id, malayalamSubmission.id, sanskritSubmission.id, sinhalaSubmission.id, khmerSubmission.id, myanmarSubmission.id, laoSubmission.id, amharicSubmission.id, armenianSubmission.id, georgianSubmission.id, azerbaijaniSubmission.id, belarusianSubmission.id, lithuanianSubmission.id, greekSubmission.id, greeklishSubmission.id, dutchSubmission.id, filipinoSubmission.id, catalanSubmission.id, indonesianSubmission.id, malaySubmission.id, danishSubmission.id,
         norwegianBokmalSubmission.id, norwegianNynorskSubmission.id, swedishSubmission.id, hungarianSubmission.id, czechSubmission.id, slovakSubmission.id, slovenianSubmission.id, croatianSubmission.id, serbianSubmission.id, serbianLatinSubmission.id, bulgarianSubmission.id, romanianSubmission.id, finnishSubmission.id, estonianSubmission.id, icelandicSubmission.id, frenchSubmission.id,
         italianSubmission.id, portugueseSubmission.id, traditionalChineseSubmission.id,
         russianSubmission.id, ukrainianSubmission.id, ukrainianLatinSubmission.id, hiraganaSubmission.id,
@@ -555,6 +559,7 @@ final class HealthRouteTests: XCTestCase {
     try await store.withdrawQuoteSubmission(georgianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(azerbaijaniSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(belarusianSubmission.id, accessToken: session.accessToken)
+    try await store.withdrawQuoteSubmission(lithuanianSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(kurdishCentralSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(greekSubmission.id, accessToken: session.accessToken)
     try await store.withdrawQuoteSubmission(greeklishSubmission.id, accessToken: session.accessToken)
@@ -2884,7 +2889,7 @@ final class HealthRouteTests: XCTestCase {
     }
 
     for (offset, language) in [
-      "traditionalChinese", "afrikaans", "azerbaijani", "belarusian", "kurdishCentral", "arabic", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "bangla", "thai", "nepali", "kannada", "telugu", "malayalam", "sanskrit", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "georgian", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "russian",
+      "traditionalChinese", "afrikaans", "azerbaijani", "belarusian", "lithuanian", "kurdishCentral", "arabic", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "bangla", "thai", "nepali", "kannada", "telugu", "malayalam", "sanskrit", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "georgian", "greek", "greeklish", "dutch", "filipino", "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk", "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian", "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "russian",
       "ukrainian", "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
       "turkish", "polish",
     ].enumerated() {

@@ -38,6 +38,7 @@
 2026-09-05 更新：单语数量增至六十四种，新增 Belarusian（`belarusian`）：参考配置定义 `noLazyMode: true` 与 `bcp47: be-BY`，没有 RTL 或连写标记。Typebar 使用原创词流、四档引语与 LTR 空格提交；知识短文按 BCP-47 首段使用 `be`，系统朗读精确使用 `be-BY`，并禁用简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径；独立的拉丁变体尚未以本项代替。
 
 2026-09-05 更新：单语数量增至六十五种，新增 Central Kurdish（`kurdishCentral`）：参考配置定义 `rightToLeft: true`、`joiningScript: true` 与 `bcp47: ckb`，未定义 `noLazyMode`。Typebar 使用原创词流与四档引语，交由 macOS 原生 RTL 文本系统呈现连写字形；知识短文与系统朗读均精确使用 `ckb`，保留用户选择的简化输入。该语言进入单语配置、预设、归档、社区投稿及服务端排行榜全路径，但不进入未验收的双向多语混排。
+2026-09-05 更新：单语数量增至六十六种，新增 Lithuanian（`lithuanian`）：参考配置仅定义名称，没有 BCP-47、RTL、连写或 `noLazyMode`。Typebar 使用原创词流、四档引语与 LTR 空格提交，并严格保留参考的缺省分支：知识短文使用 `en`，系统朗读使用 `en-US`，不补造 Lithuanian 代码；该语言保留简化输入并进入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的六十五种数量。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |
