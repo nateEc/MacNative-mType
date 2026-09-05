@@ -1044,6 +1044,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "arabic-egypt-easy-line",
+      title: "على مهلك",
+      text: "على مهلك، السطر الجاي هيبان أوضح.",
+      language: .arabicEgypt,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "arabic-egypt-quiet-minute",
+      title: "دقيقة هادية",
+      text: "لما تسيب لنفسك دقيقة هادية، تقدر تسمع الفكرة قبل ما تكتبها.",
+      language: .arabicEgypt,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "arabic-egypt-small-work",
+      title: "شغل صغير",
+      text: "الشغل الصغير مش لازم يخلص كل حاجة النهارده. يكفي تفتح الصفحة، ترتب كلمتين، وتسيب علامة ترجع لها بعدين. مع الوقت الخطوة البسيطة بتبقى عادة تساعدك تبدأ من غير دوشة.",
+      language: .arabicEgypt,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "arabic-egypt-return-path",
+      title: "مكان للرجوع",
+      text: "في آخر اليوم، الكراسة مش بتطلب إجابة كاملة. ممكن تلاقي فيها سطر متشطب، سؤال لسه مفتوح، وملاحظة سريعة عن حاجة عايز تجربها بكرة. ده كفاية عشان تسيب مكان للعودة. لما ترجع، هتلاقي إن التفكير اتحرك شوية، وإن البداية مش بعيدة زي ما كانت. كل محاولة هادية بتضيف علامة صغيرة للطريق، ومع العلامات دي الشغل الكبير بيبقى قابل للمسك خطوة خطوة.",
+      language: .arabicEgypt,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",

@@ -40,6 +40,7 @@ extension TypingLanguage {
     case .galician: "gl-ES"
     case .kurdishCentral: "ckb"
     case .arabic: "ar-SA"
+    case .arabicEgypt: "ar-EG"
     case .hebrew: "he-IL"
     case .persian: "fa-IR"
     case .urdu: "ur-PK"

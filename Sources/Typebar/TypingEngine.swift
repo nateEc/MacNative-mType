@@ -215,6 +215,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case tatar
   case uzbek
   case arabic
+  case arabicEgypt
   case hebrew
   case persian
   case urdu
@@ -3449,6 +3450,15 @@ enum StarterLexicon {
     "مَسافة", "خُطْوة", "صَبْر", "تَوازُن",
   ]
 
+  // Typebar-authored Egyptian Arabic starter words are an independent local
+  // dialect practice corpus. They do not import Monkeytype's word lists;
+  // macOS supplies the Arabic joining glyph shaping for this RTL prompt.
+  static let arabicEgyptWords = [
+    "دلوقتي", "بكرة", "شباك", "شارع", "قهوة", "شغل", "صاحب", "مركب", "بحر", "نور",
+    "صوت", "هدوء", "خطوة", "مساحة", "فكرة", "كراسة", "رسالة", "وقت", "حكاية", "مكان",
+    "طريق", "موسيقى", "صورة", "تجربة", "راحة", "لمحة", "مفتاح", "نقطة", "اختيار", "محاولة",
+  ]
+
   // Typebar-authored Hebrew starter words use direct Unicode text for macOS
   // Hebrew input sources; they are not an imported word list.
   static let hebrewWords = [
@@ -3951,6 +3961,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .arabicEgypt:
+      return prompt(
+        tokens: count, lexicon: arabicEgyptWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hebrew:
       return prompt(
         tokens: count, lexicon: hebrewWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4281,6 +4295,7 @@ enum StarterLexicon {
     case .tatar: (tatarWords, [",", ".", "!", "?"])
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
+    case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
     case .urdu: (urduWords, ["،", "؛", "؟", "."])
@@ -4428,6 +4443,7 @@ extension TypingLanguage {
     case .tatar: StarterLexicon.tatarWords
     case .uzbek: StarterLexicon.uzbekWords
     case .arabic: StarterLexicon.arabicWords
+    case .arabicEgypt: StarterLexicon.arabicEgyptWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
     case .urdu: StarterLexicon.urduWords
@@ -4528,7 +4544,7 @@ extension TypingLanguage {
   /// single-language until mixed bidirectional prompt layout has dedicated
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
-    self == .arabic || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral
+    self == .arabic || self == .arabicEgypt || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral
   }
 
   var isNoSpaceLanguage: Bool {
@@ -4621,6 +4637,7 @@ extension TypingLanguage {
     case .tatar: "Татарча"
     case .uzbek: "Oʻzbekcha"
     case .arabic: "العربية"
+    case .arabicEgypt: "العربية المصرية"
     case .hebrew: "עברית"
     case .persian: "فارسی"
     case .urdu: "اردو"

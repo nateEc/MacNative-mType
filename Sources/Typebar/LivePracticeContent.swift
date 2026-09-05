@@ -164,7 +164,7 @@ enum LivePracticeContentService {
     case .irish: return "ga"
     case .galician: return "gl"
     case .kurdishCentral: return "ckb"
-    case .arabic: return "ar"
+    case .arabic, .arabicEgypt: return "ar"
     case .hebrew: return "he"
     case .persian: return "fa"
     case .urdu: return "ur"

@@ -3514,6 +3514,9 @@ final class TypingEngineTests: XCTestCase {
       5, language: .arabic).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .arabic), "ar")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .arabicEgypt).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .arabicEgypt), "ar")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .hebrew).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hebrew), "he")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
@@ -3693,6 +3696,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(arabicEncyclopedia.text, "نافذة واسعة تستقبل ضوء الصباح")
     XCTAssertEqual(
       arabicEncyclopedia.prompt(for: .words(3, language: .arabic)), "نافذة واسعة تستقبل")
+    let egyptianArabicData = Data("""
+    {"title":"مكتبة الحي","extract":"مكتبة الحي تفتح بابها للناس في الصباح."}
+    """.utf8)
+    let egyptianArabicEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: egyptianArabicData, language: .arabicEgypt))
+    XCTAssertEqual(egyptianArabicEncyclopedia.text, "مكتبة الحي تفتح بابها للناس في الصباح")
+    XCTAssertEqual(
+      egyptianArabicEncyclopedia.prompt(for: .words(3, language: .arabicEgypt)), "مكتبة الحي تفتح")
     let hebrewData = Data("""
     {"title":"חלון","extract":"חלון פתוח מכניס אור בוקר."}
     """.utf8)
@@ -4747,6 +4758,7 @@ final class TypingEngineTests: XCTestCase {
       (.tatar, StarterLexicon.tatarWords),
       (.uzbek, StarterLexicon.uzbekWords),
       (.arabic, StarterLexicon.arabicWords),
+      (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.hebrew, StarterLexicon.hebrewWords),
       (.persian, StarterLexicon.persianWords),
       (.urdu, StarterLexicon.urduWords),
@@ -4935,6 +4947,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
     XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.arabic))
+    XCTAssertTrue(StarterLexicon.arabicEgyptWords.contains("دلوقتي"))
+    XCTAssertTrue(TypingLanguage.arabicEgypt.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.arabicEgypt.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.arabicEgypt.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.arabicEgypt.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.arabicEgypt.supportsCommunityQuoteSubmission)
+    XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabicEgypt))
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.arabicEgypt))
     XCTAssertTrue(StarterLexicon.hebrewWords.contains("חלון"))
     XCTAssertTrue(TypingLanguage.hebrew.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.hebrew))
@@ -5137,6 +5157,12 @@ final class TypingEngineTests: XCTestCase {
       ArabicLazyInputPolicy.effectiveModifiers([], language: .arabic, automaticallyEnabled: false),
       [])
     XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([], language: .arabicEgypt, automaticallyEnabled: true),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .arabicEgypt, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers([.zipf], language: .hebrew, automaticallyEnabled: true),
       [.zipf])
     let arabicConfiguration = TestConfiguration.words(2, language: .arabic).with(
@@ -5215,6 +5241,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.tatar.speechLocaleIdentifier, "tt")
     XCTAssertEqual(TypingLanguage.uzbek.speechLocaleIdentifier, "uz-UZ")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
+    XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
     XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")
     XCTAssertEqual(TypingLanguage.urdu.speechLocaleIdentifier, "ur-PK")
