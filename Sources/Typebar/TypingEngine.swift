@@ -231,6 +231,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case tokiPona
   case xhosa
   case tibetan
+  case kyrgyz
   case arabic
   case arabicEgypt
   case arabicMorocco
@@ -3540,6 +3541,14 @@ enum StarterLexicon {
     "འགོ་", "རིམ་པ་", "ཚིག་", "དྲི་བ་", "ལན་", "སང་ཉིན་", "དེ་རིང་", "ཡིད་",
   ]
 
+  // Typebar-authored Kyrgyz starter words keep the selected `ky-KY` path
+  // without importing a reference wordset.
+  static let kyrgyzWords = [
+    "салам", "мен", "сен", "биз", "китеп", "калем", "үй", "жол", "жарык", "убакыт",
+    "суу", "деңиз", "күн", "түн", "ай", "дос", "эртең", "бүгүн", "көз", "барак",
+    "ой", "иш", "баштоо", "кадам", "сөз", "суроо", "жооп", "тоо",
+  ]
+
   // Typebar-authored Greek starter words. Accented forms exercise the native
   // Greek input source without importing a third-party word list.
   static let greekWords = [
@@ -4224,6 +4233,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tibetanWords, separator: " ", punctuation: ["།"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .kyrgyz:
+      return prompt(
+        tokens: count, lexicon: kyrgyzWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
@@ -4594,6 +4607,7 @@ enum StarterLexicon {
     case .tokiPona: (tokiPonaWords, [",", ".", "!", "?"])
     case .xhosa: (xhosaWords, [",", ".", "!", "?"])
     case .tibetan: (tibetanWords, ["།"])
+    case .kyrgyz: (kyrgyzWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
     case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
     case .arabicMorocco: (arabicMoroccoWords, ["،", "؛", "؟", "."])
@@ -4768,6 +4782,7 @@ extension TypingLanguage {
     case .tokiPona: StarterLexicon.tokiPonaWords
     case .xhosa: StarterLexicon.xhosaWords
     case .tibetan: StarterLexicon.tibetanWords
+    case .kyrgyz: StarterLexicon.kyrgyzWords
     case .arabic: StarterLexicon.arabicWords
     case .arabicEgypt: StarterLexicon.arabicEgyptWords
     case .arabicMorocco: StarterLexicon.arabicMoroccoWords
@@ -4847,7 +4862,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -4992,6 +5007,7 @@ extension TypingLanguage {
     case .tokiPona: "toki pona"
     case .xhosa: "isiXhosa"
     case .tibetan: "བོད་སྐད་"
+    case .kyrgyz: "Кыргызча"
     case .arabic: "العربية"
     case .arabicEgypt: "العربية المصرية"
     case .arabicMorocco: "العربية المغربية"

@@ -3293,6 +3293,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.tokiPonaWords,
       StarterLexicon.xhosaWords,
       StarterLexicon.tibetanWords,
+      StarterLexicon.kyrgyzWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3335,7 +3336,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 98)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 99)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3576,6 +3577,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .tibetan).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .tibetan), "bo")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .kyrgyz).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .kyrgyz), "ky")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .swissGerman).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .swissGerman), "de")
@@ -4942,6 +4946,7 @@ final class TypingEngineTests: XCTestCase {
       (.tokiPona, StarterLexicon.tokiPonaWords),
       (.xhosa, StarterLexicon.xhosaWords),
       (.tibetan, StarterLexicon.tibetanWords),
+      (.kyrgyz, StarterLexicon.kyrgyzWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
       (.arabicMorocco, StarterLexicon.arabicMoroccoWords),
@@ -5290,6 +5295,15 @@ final class TypingEngineTests: XCTestCase {
       mode: .words, duration: nil, wordLimit: 10, difficulty: .normal, rules: .init(),
       language: .mixedLanguages, mixedLanguageComponents: [.english, .tibetan])
     XCTAssertTrue(mixedTibetanConfiguration.usesJoiningScriptPrompt)
+    XCTAssertTrue(StarterLexicon.kyrgyzWords.contains("китеп"))
+    XCTAssertFalse(TypingLanguage.kyrgyz.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.kyrgyz.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.kyrgyz.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.kyrgyz.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.kyrgyz.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.kyrgyz.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.kyrgyz))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.kyrgyz))
     XCTAssertFalse(TypingLanguage.swissGerman.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.swissGerman.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
@@ -5636,6 +5650,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.tokiPona.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.xhosa.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.tibetan.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.kyrgyz.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.armenianWestern.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.swissGerman.supportsLazyLatinInput)
 
@@ -5707,6 +5722,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.tokiPona.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.xhosa.speechLocaleIdentifier, "xh")
     XCTAssertEqual(TypingLanguage.tibetan.speechLocaleIdentifier, "bo-TI")
+    XCTAssertEqual(TypingLanguage.kyrgyz.speechLocaleIdentifier, "ky-KY")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
     XCTAssertEqual(TypingLanguage.arabicMorocco.speechLocaleIdentifier, "ar-MA")

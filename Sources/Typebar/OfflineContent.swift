@@ -1632,6 +1632,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "kyrgyz-clear-step",
+      title: "Ачык кадам",
+      text: "Кичине кадам иштин башын ачык кылат.",
+      language: .kyrgyz,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "kyrgyz-open-book",
+      title: "Ачык китеп",
+      text: "Ачык китеп бардык жоопту бербейт, бирок жаңы суроого жол ачат.",
+      language: .kyrgyz,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "kyrgyz-small-work",
+      title: "Кичине иш",
+      text: "Жакшы иш башында баары даяр болушун талап кылбайт. Баракты ач, бир сөз жаз, ойго жол табууга убакыт бер. Бүгүнкү кичине кадам эртеңки ишти жеңилдетет.",
+      language: .kyrgyz,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "kyrgyz-return-page",
+      title: "Баракка кайтуу",
+      text: "Ар бир күндүн аягында кичине план толук болушу шарт эмес. Ал суроону, кайра окуй турган бир сөздү жана эртеңге кыска белги калтыра алат. Ушул кичине нерселер ишке багыт берет. Баракка кайра келгенде, ой мурунтан эле алдыга жылганын жана баштоо анчалык оор болбогонун көрөсүң. Ачык кадам ишти улантууга жардам берет.",
+      language: .kyrgyz,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hebrew-calm-step",
       title: "צעד שקט",
       text: "צעד שקט מבהיר את המשימה הבאה.",
