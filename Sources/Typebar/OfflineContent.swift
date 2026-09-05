@@ -1380,6 +1380,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "irish-ceim-chiui",
+      title: "Céim chiúin",
+      text: "Cuireann céim chiúin an chéad obair eile i bhfianaise.",
+      language: .irish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "irish-leabhar-notai-oscailte",
+      title: "Leabhar nótaí oscailte",
+      text: "Ní thugann leabhar nótaí oscailte gach freagra, ach fágann sé spás chun ceisteanna a roinnt ina gcodanna beaga.",
+      language: .irish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "irish-obair-bheag",
+      title: "Obair bheag",
+      text: "Ní bhíonn an dul chun cinn mór le feiceáil i gcónaí. Tugann filleadh ar an leathanach céanna, abairt amháin a dhéanamh níos soiléire, agus botún beag a cheartú níos mó muiníne don chéad iarracht eile.",
+      language: .irish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "irish-bord-fada",
+      title: "Bord fada",
+      text: "Fágann bord fada spás do go leor oibre. Ar cheann amháin is féidir leis an gcéad dréacht luí, ar an gceann eile fanann abairt a dteastaíonn níos mó aire uaithi, agus sa lár bíonn an chéad chinneadh beag eile. Sin mar a ghluaiseann cleachtadh freisin. Ní gá gach cuid chasta a réiteach láithreach. Nuair atá áit ann le filleadh chuici, feictear an chéad chéim eile agus fásann an fhoighne chun a thabhairt faoi deara cad a d’éirigh níos éasca tar éis cúpla iarracht, méadaíonn an luas go nádúrtha.",
+      language: .irish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kurdish-central-hengawi-aram",
       title: "هەنگاوی ئارام",
       text: "هەنگاوی ئارام کاری داهاتوو ڕوونتر دەکات.",

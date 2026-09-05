@@ -30,6 +30,7 @@ extension TypingLanguage {
     case .azerbaijani: "az-AZ"
     case .belarusian: "be-BY"
     case .latvian: "lv"
+    case .irish: "ga-IE"
     case .kurdishCentral: "ckb"
     case .arabic: "ar-SA"
     case .hebrew: "he-IL"

@@ -444,7 +444,7 @@ public actor AuthStore {
   /// for community quotes. Result and leaderboard requests add the two
   /// native mixed-language choices below, so these surfaces cannot drift.
   private static let supportedSingleLanguageIDs: Set<String> = [
-    "english", "spanish", "german", "afrikaans", "azerbaijani", "belarusian", "lithuanian", "latvian", "mongolian", "kurdishCentral", "arabic", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "bangla", "thai", "nepali", "kannada", "telugu", "malayalam", "sanskrit", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "georgian", "greek", "greeklish", "dutch", "filipino",
+    "english", "spanish", "german", "afrikaans", "azerbaijani", "belarusian", "lithuanian", "latvian", "mongolian", "irish", "kurdishCentral", "arabic", "hebrew", "persian", "urdu", "tamil", "hindi", "gujarati", "bangla", "thai", "nepali", "kannada", "telugu", "malayalam", "sanskrit", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "georgian", "greek", "greeklish", "dutch", "filipino",
     "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk",
     "swedish", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian",
     "serbianLatin", "bulgarian", "romanian", "finnish", "estonian", "icelandic", "french",
