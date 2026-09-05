@@ -1072,6 +1072,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "quenya-elen-calima",
+      title: "Elen Calima",
+      text: "Elen calima ná.",
+      language: .quenya,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "quenya-alda-linta",
+      title: "Alda Linta",
+      text: "Alda linta ar lassë ninquë nar.",
+      language: .quenya,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "quenya-aure-calma",
+      title: "Aurë Calma",
+      text: "Aurë calma tulta lindë i mindon.",
+      language: .quenya,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "quenya-menel-sure",
+      title: "Menel Súrë",
+      text: "Elen calima ortë i nén sírë. Alda linta ar lassë ninquë nar. Aurë calma tulta lindë i mindon. Menel alta hlarë súrë malda. Ciryë lanta ve lótë mi nén. Sairë quenta tulta calma ilyë aurë. Anar laurë tulta nén silmë, ar hwindë linta hlarë i lassi.",
+      language: .quenya,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "uzbek-ertalab-yol",
       title: "Ertalab yoʻl",
       text: "Ertalab tinch yoʻl ochadi.",

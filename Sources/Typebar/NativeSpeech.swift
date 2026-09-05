@@ -32,6 +32,7 @@ extension TypingLanguage {
     case .tatar: "tt"
     case .tatarCrimean, .tatarCrimeanCyrillic: "crh-CRH"
     case .klingon: "tlh"
+    case .quenya: "en-US"
     case .uzbek: "uz-UZ"
     case .occitan: "oc-FR"
     case .oromo: "om"
