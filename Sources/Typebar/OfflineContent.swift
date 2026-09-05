@@ -1352,6 +1352,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "mongolian-taivan-alham",
+      title: "Тайван алхам",
+      text: "Тайван алхам дараагийн ажлыг тодруулдаг.",
+      language: .mongolian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "mongolian-neelttei-devter",
+      title: "Нээлттэй дэвтэр",
+      text: "Нээлттэй дэвтэр бүх хариуг өгдөггүй ч асуултыг жижиг хэсэгт хуваах зай үлдээнэ.",
+      language: .mongolian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "mongolian-jijig-ajil",
+      title: "Жижиг ажил",
+      text: "Ахиц үргэлж гайхамшигтай харагддаггүй. Нэг хуудсанд буцаж очих, нэг өгүүлбэрийг нарийвчлах, жижиг алдааг засах нь дараагийн оролдлогод илүү итгэл өгдөг.",
+      language: .mongolian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "mongolian-urt-shiree",
+      title: "Урт ширээ",
+      text: "Урт ширээ олон ажилд зай гаргадаг. Нэг талд нь эхний ноорог хэвтэж, нөгөө талд нь илүү анхаарал хэрэгтэй өгүүлбэр хүлээж, дунд нь дараагийн жижиг шийдвэр байрлана. Дасгал ч мөн ингэж урагшилдаг. Хэцүү хэсэг бүрийг шууд шийдэх шаардлагагүй. Буцаж очих газар байвал дараагийн алхам харагдаж, хэд хэдэн оролдлогын дараа хялбар болсон зүйлийг анзаарах тэвчээр төрнө, хурд аяндаа нэмэгддэг.",
+      language: .mongolian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kurdish-central-hengawi-aram",
       title: "هەنگاوی ئارام",
       text: "هەنگاوی ئارام کاری داهاتوو ڕوونتر دەکات.",
