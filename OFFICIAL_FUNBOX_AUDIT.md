@@ -57,6 +57,7 @@
 | `polyglot` | 多语混排 | 等价实现 | 使用 Typebar 自有一百零一种可混排 LTR 语言内容 |
 | `polyglot`（2026-09-05 更正） | 多语混排 | 等价实现 | 使用 Typebar 自有一百零二种可混排 LTR 语言内容；新增 Swahili 的 `noLazyMode` 边界已由轮转测试覆盖 |
 | `polyglot`（2026-09-05 更正） | 多语混排 | 等价实现 | 使用 Typebar 自有一百零三种可混排 LTR 语言内容；新增 Kinyarwanda 的 `noLazyMode` 和 Zipf 高频词边界已由轮转测试覆盖 |
+| `polyglot`（2026-09-05 更正） | 多语混排 | 等价实现 | 使用 Typebar 自有一百零四种可混排 LTR 语言内容；新增 Shona 的缺省在线/朗读与 Zipf 未知边界已由轮转测试覆盖 |
 | `asl` | ASL 指语练习 | 等价实现 | 字母到原创原生矢量手势提示、J 弧线/Z 折线运动提示、当前/正确/错误状态与键盘计分均已覆盖；不导入官方专用字体，视觉设计有意不同，且不宣称可替代正式 ASL 教学 |
 | `rot13` | ROT13 | 等价实现 | 纯文本变换 |
 | `no_quit` | 锁定重开 | 等价实现 | `FUN-01` |
@@ -68,6 +69,8 @@
 2026-09-05 更正：LTR 多语混排候选现为 102 种；Swahili 作为 `noLazyMode: true` 的 LTR 语言已纳入轮转覆盖，普通练习禁用简化输入而自定义文本保留例外。
 
 2026-09-05 更正：LTR 多语混排候选现为 103 种；Kinyarwanda 作为 `noLazyMode: true` 且 `orderedByFrequency: true` 的 LTR 语言已纳入轮转覆盖，普通练习禁用简化输入而自定义文本保留例外，Zipf 使用 Typebar 自有高频词。
+
+2026-09-05 更正：LTR 多语混排候选现为 104 种；Shona 未定义 BCP-47、`noLazyMode` 或词频排序，故知识短文与朗读使用 `en`／`en-US` 缺省路径，保留简化输入与 Zipf 未知提示，并已纳入轮转覆盖。
 
 ## 本机个人最佳资格
 

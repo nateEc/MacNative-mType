@@ -75,6 +75,7 @@ Typebar 现有 111 个可单独练习并支持 Typebar 自有引语的语言／�
 - Yoruba 审计只读取 `yoruba_1k.json` 的元数据，不读取其中词表或引语文本。它只定义名称，不定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的含声调 Yoruba 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - 2026-09-05 更正：当前单语总数为一百一十二种、默认／自选 LTR 多语候选为一百零二种。Swahili 审计只读取 `swahili_1k.json` 的元数据，不读取其中词表或引语文本；它定义 `noLazyMode: true`，不定义 BCP-47、RTL、连写或词频排序。因此 Typebar 以独立自写的 Swahili 内容走 LTR 空格分词和 `en`／`en-US` 缺省在线/朗读路径；普通练习移除简化输入而自定义文本保留例外，Zipf 使用未知提示，并已覆盖多语轮转、社区投稿、成绩和排行榜。
 - 2026-09-05 更正：当前单语总数为一百一十三种、默认／自选 LTR 多语候选为一百零三种。Kinyarwanda 审计只读取 `kinyarwanda.json` 的元数据，不读取其中词表或引语文本；它定义 `noLazyMode: true`、`orderedByFrequency: true` 与 `bcp47: rw-RW`，不定义 RTL 或连写。因此 Typebar 以独立自写的 Kinyarwanda 内容走 LTR 空格分词，知识短文按 BCP 首段使用 `rw`，朗读精确使用 `rw-RW`；普通练习移除简化输入而自定义文本保留例外，Zipf 使用自有高频词，并已覆盖多语轮转、社区投稿、成绩和排行榜。
+- 2026-09-05 更正：当前单语总数为一百一十四种、默认／自选 LTR 多语候选为一百零四种。Shona 审计只读取 `shona.json` 和 `shona_1k.json` 的元数据，不读取其中词表或引语文本；它们只定义名称，不定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序。因此 Typebar 以独立自写的 Shona 内容走 LTR 空格分词和 `en`／`en-US` 缺省在线/朗读路径；保留简化输入与 Zipf 未知提示，并已覆盖多语轮转、社区投稿、成绩和排行榜。
 
 ## 后续候选与准入条件
 

@@ -1772,6 +1772,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "shona-clear-step",
+      title: "Nhanho diki",
+      text: "Nhanho diki inoita kuti kutanga kujeke.",
+      language: .shona,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "shona-open-book",
+      title: "Bhuku rakazaruka",
+      text: "Bhuku rakazaruka haripinduri mubvunzo wose, asi rinovhura nzira yepfungwa itsva.",
+      language: .shona,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "shona-small-work",
+      title: "Basa diki",
+      text: "Basa rakanaka haridi kuti zvinhu zvose zvigadzirire pakutanga. Vhura pepa, nyora shoko rimwe, uye ipa pfungwa nguva yekuwana nzira yayo. Nhanho diki yanhasi inoita kuti mangwana ave nyore.",
+      language: .shona,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "shona-return-page",
+      title: "Dzokera kupepa",
+      text: "Pakupera kwezuva, hurongwa hudiki hahufaniri kunge hwakakwana. Hunogona kusiya mubvunzo, shoko rekuverenga zvakare, nechiratidzo chipfupi chemangwana. Zvinhu izvi zvidiki zvinopa basa gwara. Paunodzokera kupepa, uchaona kuti pfungwa yafamba mberi uye kuti kutanga hakuchina kuoma zvakanyanya. Nhanho diki yakajeka inobatsira basa kuenderera mberi.",
+      language: .shona,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "yiddish-clear-step",
       title: "אַ קלאָרער שריט",
       text: "אַ קליינער שריט מאַכט דעם אָנהייב קלאָר.",

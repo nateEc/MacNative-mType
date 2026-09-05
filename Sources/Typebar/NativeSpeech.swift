@@ -44,6 +44,7 @@ extension TypingLanguage {
     case .tibetan: "bo-TI"
     case .kyrgyz: "ky-KY"
     case .kinyarwanda: "rw-RW"
+    case .shona: "en-US"
     case .yiddish: "yi"
     case .friulian: "fur"
     case .bemba: "bem"
