@@ -4087,6 +4087,22 @@ final class TypingEngineTests: XCTestCase {
       TestModifierPolicy.toggling(.zipf, in: [.uppercase]), [.uppercase, .zipf])
   }
 
+  func testZipfFrequencyNoticesMatchPinnedWordListMetadata() {
+    XCTAssertEqual(TypingLanguage.marathi.zipfFrequencySupport, .supported)
+    XCTAssertEqual(TypingLanguage.armenian.zipfFrequencySupport, .unsupported)
+    XCTAssertEqual(TypingLanguage.albanian.zipfFrequencySupport, .unknown)
+    XCTAssertNil(ZipfFrequencyPolicy.notice(for: .marathi, modifiers: [.zipf]))
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .armenian, modifiers: [.zipf]),
+      "Հայերեն 不支持 Zipf 高频词：该词表未按词频排序。请选择其他词表。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .albanian, modifiers: [.zipf]),
+      "Shqip 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
+    )
+    XCTAssertNil(ZipfFrequencyPolicy.notice(for: .armenian, modifiers: []))
+  }
+
   func testTextBoundaryModifiersTransformPromptsFinishWordsAndRemainMutuallyExclusive() {
     let noSpaceConfiguration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
     var noSpaceSession = TestSessionFactory.make(configuration: noSpaceConfiguration)

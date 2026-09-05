@@ -698,6 +698,29 @@ enum TestModifierPolicy {
   }
 }
 
+/// Mirrors the reference word-list metadata used to describe whether Zipf
+/// sampling is meaningful. It is informational: Zipf stays enabled and keeps
+/// its rank-weighted generator, exactly as the reference funbox does.
+enum ZipfFrequencySupport: Equatable {
+  case supported
+  case unsupported
+  case unknown
+}
+
+enum ZipfFrequencyPolicy {
+  static func notice(for language: TypingLanguage, modifiers: [TestModifier]) -> String? {
+    guard modifiers.contains(.zipf) else { return nil }
+    switch language.zipfFrequencySupport {
+    case .supported:
+      return nil
+    case .unsupported:
+      return "\(language.displayName) 不支持 Zipf 高频词：该词表未按词频排序。请选择其他词表。"
+    case .unknown:
+      return "\(language.displayName) 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
+    }
+  }
+}
+
 /// Keeps Arabic's optional simplified-input default separate from the saved
 /// modifier list. The user can still opt out, while non-Arabic configurations
 /// retain only the modifiers they explicitly selected.
@@ -4353,6 +4376,20 @@ extension TypingLanguage {
 
   var supportsQuotes: Bool {
     self != .mixedEnglishChinese && self != .mixedLanguages && !isCodeLanguage
+  }
+
+  /// Pinned-reference `orderedByFrequency` metadata for the built-in base
+  /// wordsets. Dictionaries without that field intentionally remain unknown.
+  var zipfFrequencySupport: ZipfFrequencySupport {
+    switch self {
+    case .english, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
+      .russian, .icelandic, .galician, .marathi:
+      return .supported
+    case .armenian, .bulgarian, .hungarian, .lao:
+      return .unsupported
+    default:
+      return .unknown
+    }
   }
 
   var displayName: String {

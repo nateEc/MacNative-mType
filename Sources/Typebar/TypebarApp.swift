@@ -516,12 +516,23 @@ private struct ContentView: View {
   @State private var liveContentRequestID = UUID()
   @State private var isLoadingLiveContent = false
   @State private var liveContentMessage: String?
+  @State private var zipfNotice: String?
+  @State private var zipfNoticeGeneration = 0
 
   var body: some View {
     VStack(spacing: 30) {
       header
       RemoteAnnouncementBannerStack(center: announcements)
       configurationPanel
+      if let zipfNotice {
+        Label(zipfNotice, systemImage: "exclamationmark.triangle")
+          .font(.caption.weight(.medium))
+          .foregroundStyle(.orange)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .background(.thinMaterial, in: Capsule())
+          .accessibilityLabel(zipfNotice)
+      }
       if let averageNotice {
         Label(averageNotice, systemImage: "chart.bar")
           .font(.caption.weight(.medium))
@@ -570,12 +581,14 @@ private struct ContentView: View {
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
+    .onChange(of: settings.testModifiers) { _, _ in refreshZipfNotice() }
     .onChange(of: settings.typingPowerMode) { _, mode in
       if !mode.isEnabled { clearTypingPowerEffect() }
     }
     .task { await runClock() }
     .onAppear {
       reset()
+      refreshZipfNotice()
     }
     .onChange(of: session.outcome) { _, outcome in
       switch outcome {
@@ -881,7 +894,10 @@ private struct ContentView: View {
               Text(language.displayName).tag(language)
             }
           }
-          .onChange(of: language) { _, language in languageChanged(to: language) }
+          .onChange(of: language) { _, language in
+            languageChanged(to: language)
+            refreshZipfNotice()
+          }
           if language == .arabic {
             Toggle("Arabic 快速输入（省略元音符号）", isOn: $settings.prefersArabicLazyInput)
               .onChange(of: settings.prefersArabicLazyInput) { _, _ in reset() }
@@ -2538,6 +2554,18 @@ private struct ContentView: View {
       baseModifiers ?? settings.testModifiers, language: selectedLanguage, mode: mode,
       mixedLanguageComponents: mixedLanguageComponents ?? self.mixedLanguageComponents,
       automaticallyEnabled: settings.prefersArabicLazyInput)
+  }
+
+  private func refreshZipfNotice() {
+    zipfNotice = ZipfFrequencyPolicy.notice(for: language, modifiers: settings.testModifiers)
+    zipfNoticeGeneration &+= 1
+    let generation = zipfNoticeGeneration
+    guard zipfNotice != nil else { return }
+    Task { @MainActor in
+      try? await Task.sleep(for: .seconds(7))
+      guard generation == zipfNoticeGeneration else { return }
+      zipfNotice = nil
+    }
   }
 
   private var availableLanguages: [TypingLanguage] {

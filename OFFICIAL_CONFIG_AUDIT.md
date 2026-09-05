@@ -45,6 +45,7 @@
 2026-09-05 更新：单语数量增至七十种，新增 Galician（`galician`）：参考配置定义 `bcp47: gl-ES` 与 `orderedByFrequency: true`，没有 RTL、连写或 `noLazyMode`。Typebar 使用原创、按自有排名排列的词流与四档引语，保持 LTR 空格提交；知识短文按 BCP-47 首段使用 `gl`，系统朗读精确使用 `gl-ES`，并保留 Zipf 高频词与用户选择的简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的六十九种数量。
 2026-09-05 更新：单语数量增至七十一种，新增 Marathi（`marathi`）：参考配置定义 `noLazyMode: true` 与 `orderedByFrequency: true`，没有 BCP-47、RTL 或连写。Typebar 使用原创、按自有排名排列的词流与四档引语，保持 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Marathi 代码，并保留 Zipf 高频词、禁用简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的七十种数量。
 2026-09-05 更新：单语数量增至七十二种，新增 Albanian（`albanian`）：参考配置仅定义 `name: albanian`，没有 BCP-47、RTL、连写、`noLazyMode` 或词频排序标记。Typebar 使用原创词流与四档引语，保持 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Albanian 代码，并保留用户选择的简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的七十一种数量。
+2026-09-05 更新：补齐 Zipf 词频元数据语义：Typebar 保留现有秩次加权生成器，并以固定参考的 `orderedByFrequency` 字段区分已确认、明确不支持与未知三种状态。启用 Zipf 后，明确不支持与未知会显示七秒原生提示，但不会移除修饰器或改变生成路径，和参考 `debouncedZipfCheck` 的可观测行为一致。该策略已覆盖现有 Armenian、Bulgarian、Hungarian、Lao 等明确不支持词表及未标注排序的语言。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

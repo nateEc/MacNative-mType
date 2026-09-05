@@ -46,7 +46,7 @@
 | `IPv6` | IPv6 地址流 | 等价实现 | Typebar 自有确定性地址流 |
 | `binary` | 二进制流 | 等价实现 | Typebar 自有生成器 |
 | `hexadecimal` | 十六进制流 | 等价实现 | Typebar 自有生成器 |
-| `zipf` | Zipf 高频词 | 等价实现 | Typebar 自有词表与秩次加权；`FUN-04` |
+| `zipf` | Zipf 高频词 | 等价实现 | Typebar 自有词表与秩次加权；参考为 `orderedByFrequency: false` 时会提示词表未按频率排序，未定义时会提示可能不支持，提示持续七秒且不会移除修饰器；`FUN-04` |
 | `morse` | 摩斯符号流 | 等价实现 | Typebar 自有编码流 |
 | `crt` | CRT 练习区 | 等价实现 | 原生扫描线、色调与边缘光晕，不改变输入或计分 |
 | `backwards` | 逐词反写 | 等价实现 | 纯文本变换 |
