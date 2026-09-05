@@ -1268,6 +1268,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "belarusian-spakoyny-krok",
+      title: "Спакойны крок",
+      text: "Спакойны крок робіць наступную справу яснейшай.",
+      language: .belarusian,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "belarusian-adkryty-natatnik",
+      title: "Адкрыты нататнік",
+      text: "Адкрыты нататнік не ведае ўсіх адказаў, але пакідае месца, каб убачыць пытанне па частках.",
+      language: .belarusian,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "belarusian-malaya-praca",
+      title: "Малая праца",
+      text: "Рух наперад не заўсёды выглядае як вялікі момант. Зноў адкрыць тую ж старонку, удакладніць адзін сказ і выправіць малую памылку дапамагае набраць упэўненасць для наступнай спробы.",
+      language: .belarusian,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "belarusian-dougi-stol",
+      title: "Доўгі стол",
+      text: "Доўгі стол пакідае месца для рознай працы. На адным канцы можа ляжаць першы чарнавік, на другім — сказ, якому трэба больш увагі, а пасярэдзіне чакае наступнае малое рашэнне. Так рухаецца і практыка. Не трэба вырашаць кожную складаную частку адразу. Калі ёсць куды вярнуцца, бачны наступны крок і цярпенне заўважыць тое, што стала лягчэйшым пасля некалькіх спроб, хуткасць расце натуральна.",
+      language: .belarusian,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "filipino-payapang-hakbang",
       title: "Payapang hakbang",
       text: "Ang payapang hakbang ay nagpapalinaw sa susunod na gawain.",
