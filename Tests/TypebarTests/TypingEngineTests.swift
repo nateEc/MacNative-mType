@@ -1813,6 +1813,35 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.layoutFluidLayouts, [.swedishQwerty, .ansiQwerty])
   }
 
+  @MainActor
+  func testDanishQwertyMapsDanishLettersAndPersists() {
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .danishQwerty), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "æ", layout: .danishQwerty), "home-9")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ø", layout: .danishQwerty), "home-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "§", layout: .danishQwerty), "number-0")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [], layout: .danishQwerty), "æ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 39, modifierFlags: [.shift], layout: .danishQwerty), "Ø")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 50, modifierFlags: [.shift], layout: .danishQwerty), "§")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Æ", layout: .danishQwerty), 41)
+    XCTAssertEqual(KeyboardInputLayout.danishQwerty.emulatedLayout, .danishQwerty)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .danishQwerty
+    settings.keyboardInputLayout = .danishQwerty
+    settings.layoutFluidLayouts = [.danishQwerty, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .danishQwerty)
+    XCTAssertEqual(restored.keyboardInputLayout, .danishQwerty)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.danishQwerty, .ansiQwerty])
+  }
+
   func testTurkishQMapsTurkishLettersAndIsoPunctuation() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ğ", layout: .turkishQ), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ı", layout: .turkishQ), "top-7")
@@ -4839,7 +4868,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 24)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 25)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

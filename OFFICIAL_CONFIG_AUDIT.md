@@ -94,7 +94,7 @@
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
-| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 24 个原创内置布局可任选至多 15 个进入原生序列。 |
+| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 25 个原创内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 部分；自选组合已实现，候选语言仅限 Typebar 原创语言集。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
@@ -109,7 +109,7 @@
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。依据固定参考版本的 `noLazyMode`，非自定义模式会禁用 English、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Greeklish、Dutch、Filipino、Indonesian、Serbian Cyrillic、Bulgarian、Macedonian、Kazakh、中日韩／日语罗马字、Ukrainian 与 Ukrainian Latin，以及所有代码练习的该修饰器；自定义文本仍可使用。可配置多语练习只有至少一个选择的组成语言允许时才保留它。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
-| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，24 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；Polish (Programmers) 额外有独立的 Option/Shift+Option 字符层，官方全部命名布局尚未覆盖。 |
+| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，25 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；Polish (Programmers) 额外有独立的 Option/Shift+Option 字符层，官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
@@ -170,7 +170,7 @@
 
 ## 当前优先缺口
 
-1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、24 个原创内置模拟布局（含独立实现的 Swedish QWERTY、Greek Alphabetic · Typebar、Hungarian QWERTZ · Typebar、Polish (Programmers)、Russian、Ukrainian JCUKEN、Bulgarian Cyrillic · Typebar 与 Serbian Cyrillic · Typebar），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
+1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、25 个原创内置模拟布局（含独立实现的 Swedish QWERTY、Danish QWERTY、Greek Alphabetic · Typebar、Hungarian QWERTZ · Typebar、Polish (Programmers)、Russian、Ukrainian JCUKEN、Bulgarian Cyrillic · Typebar 与 Serbian Cyrillic · Typebar），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
 2. 官方语言、词表、主题、字体和声音的完整目录不应复制。后续以原创或明确授权内容扩大用户可选范围，并逐项标注差异；语言候选、语义边界和准入条件见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 3. 网页账户页图表、猴子外观和广告设置不适合作为原生逐像素复刻目标；对用户可见意图的原生替代仍需设备验收。
 
@@ -184,6 +184,7 @@
 - Greek Alphabetic · Typebar 自动化测试覆盖 Typebar 自写的二十四个基本 Greek 字母、七个重音元音、词末 `ς` 与练习标点的提示高亮、普通/Shift 物理 keycode、反查 keycode、原创词库字符覆盖，以及键盘图、输入模拟和 Layout Fluid 持久化；它不导入官方或系统希腊语布局资产，未收录字符、死键和 Option 层继续交给 macOS 当前输入源。
 - Polish (Programmers) 自动化测试覆盖公开标准的 `ą`、`ć`、`ę`、`ł`、`ń`、`ó`、`ś`、`ź`、`ż` 与 `€` Option/Shift+Option 层：提示高亮、动态图例、物理 keycode、反查 keycode、Control+Option 安全回退，以及键盘图、输入模拟和 Layout Fluid 持久化。实现只依据公开标准独立编写，不读取或导入 Monkeytype 布局 JSON。
 - Swedish QWERTY 自动化测试覆盖公开标准的 `å`、`ö`、`ä`、`½` 与对应普通/Shift 物理 keycode、提示高亮、反查 keycode、键盘图、输入模拟和 Layout Fluid 持久化。死键和 Option 层继续由 macOS 当前输入源处理；实现不读取或导入 Monkeytype 布局 JSON。
+- Danish QWERTY 自动化测试覆盖公开标准的 `å`、`æ`、`ø`、`§` 与对应普通/Shift 物理 keycode、提示高亮、反查 keycode、键盘图、输入模拟和 Layout Fluid 持久化。死键和 Option/AltGr 层继续由 macOS 当前输入源处理；实现不读取或导入 Monkeytype 布局 JSON。
 - 乌克兰语自动化测试覆盖原创词表中的 `ї`、`є`、`ґ`、四档原创引语、多语混排、弱项复练、`uk-UA` 朗读 locale 与 `uk` 百科入口；服务端测试覆盖成绩提交、语言筛选排行榜与引语投稿白名单，未读取或导入参考词表/内容。
 - 乌克兰语 Latin 自动化测试覆盖全 ASCII 自创词流、四档原创引语、完整多语混排轮转、弱项复练、`uk-UA` 朗读 locale 与服务端投稿/排行榜白名单；参考流会保守留在离线内容，以免远端西里尔文本违反 Latin 承诺。
 - Dutch 自动化测试覆盖自创词流（含 `één`）、四档原创引语、完整多语混排轮转、弱项复练、`nl-NL` 朗读 locale 与 `nl` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
