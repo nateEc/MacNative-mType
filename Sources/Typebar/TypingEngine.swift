@@ -220,6 +220,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case viossa
   case viossaNjutro
   case maori
+  case lojbanGismu
+  case lojbanCmavo
   case uzbek
   case occitan
   case oromo
@@ -3471,6 +3473,21 @@ enum StarterLexicon {
     "whānau", "whenua", "whare", "whetū",
   ]
 
+  // Typebar-authored Lojban practice selections keep roots and structure words
+  // separate without importing either reference word list.
+  static let lojbanGismuWords = [
+    "bangu", "barda", "blanu", "bridi", "cadzu", "catlu", "ciska", "cmalu", "cukta", "dansu",
+    "djica", "fonxa", "gerku", "gismu", "karce", "klama", "melbi", "mlatu", "nanmu", "pelxu",
+    "prenu", "skami", "solri", "stagi", "tavla", "viska", "xamgu", "zdani", "zutse",
+  ]
+
+  static let lojbanCmavoWords = [
+    ".a", ".e", ".i", ".o", "ba", "ca", "ci", "coi", "cu", "do",
+    "do'o", "fa", "fe", "fi", "fo", "fu", "ke'a", "ki", "ko", "la",
+    "le", "lo", "mi", "mi'o", "mu", "na", "no", "pa", "pu", "re",
+    "ro", "se", "ta", "te", "ti", "tu", "ve", "vo", "xa", "xe", "ze", "zo'e",
+  ]
+
   // Typebar-authored Uzbek starter words provide local practice without
   // importing the reference dictionary or word list.
   static let uzbekWords = [
@@ -4319,6 +4336,14 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: maoriWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .lojbanGismu:
+      return prompt(
+        tokens: count, lexicon: lojbanGismuWords, separator: " ", punctuation: [",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .lojbanCmavo:
+      return prompt(
+        tokens: count, lexicon: lojbanCmavoWords, separator: " ", punctuation: [",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .uzbek:
       return prompt(
         tokens: count, lexicon: uzbekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4782,6 +4807,8 @@ enum StarterLexicon {
     case .viossa: (viossaWords, [",", ".", "!", "?"])
     case .viossaNjutro: (viossaNjutroWords, [",", ".", "!", "?"])
     case .maori: (maoriWords, [",", ".", "!", "?"])
+    case .lojbanGismu: (lojbanGismuWords, [",", "!", "?"])
+    case .lojbanCmavo: (lojbanCmavoWords, [",", "!", "?"])
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .occitan: (occitanWords, [",", ".", "!", "?"])
     case .oromo: (oromoWords, [",", ".", "!", "?"])
@@ -4971,6 +4998,8 @@ extension TypingLanguage {
     case .viossa: StarterLexicon.viossaWords
     case .viossaNjutro: StarterLexicon.viossaNjutroWords
     case .maori: StarterLexicon.maoriWords
+    case .lojbanGismu: StarterLexicon.lojbanGismuWords
+    case .lojbanCmavo: StarterLexicon.lojbanCmavoWords
     case .uzbek: StarterLexicon.uzbekWords
     case .occitan: StarterLexicon.occitanWords
     case .oromo: StarterLexicon.oromoWords
@@ -5076,7 +5105,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -5147,6 +5176,8 @@ extension TypingLanguage {
       .tatarCrimean,
       .tatarCrimeanCyrillic,
       .viossaNjutro,
+      .lojbanGismu,
+      .lojbanCmavo,
       .esperantoXSystem, .esperantoHSystem,
       .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
@@ -5216,6 +5247,8 @@ extension TypingLanguage {
     case .viossa: "Viossa"
     case .viossaNjutro: "Viossa · Njutro"
     case .maori: "Te reo Māori"
+    case .lojbanGismu: "Lojban · gismu"
+    case .lojbanCmavo: "Lojban · cmavo"
     case .uzbek: "Oʻzbekcha"
     case .occitan: "Occitan"
     case .oromo: "Oromo"

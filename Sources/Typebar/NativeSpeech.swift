@@ -35,6 +35,7 @@ extension TypingLanguage {
     case .quenya: "en-US"
     case .viossa, .viossaNjutro: "en-US"
     case .maori: "en-US"
+    case .lojbanGismu, .lojbanCmavo: "en-US"
     case .uzbek: "uz-UZ"
     case .occitan: "oc-FR"
     case .oromo: "om"

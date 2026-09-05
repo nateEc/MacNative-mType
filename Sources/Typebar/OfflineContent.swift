@@ -1184,6 +1184,62 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "lojban-gismu-bangu-bridi",
+      title: "Bangu Bridi",
+      text: "bangu bridi.",
+      language: .lojbanGismu,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "lojban-gismu-klama-zdani",
+      title: "Klama Zdani",
+      text: "klama melbi, xamgu zdani.",
+      language: .lojbanGismu,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "lojban-gismu-cadzu-cukta",
+      title: "Cadzu Cukta",
+      text: "cadzu tavla, viska solri; ciska cukta.",
+      language: .lojbanGismu,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "lojban-gismu-prenu-stagi",
+      title: "Prenu Stagi",
+      text: "bangu bridi. klama melbi, xamgu zdani. cadzu tavla, viska solri; ciska cukta. prenu catlu gerku, mlatu stagi. barda karce dansu, pelxu fonxa. nanmu zutze, djica skami. gismu xamgu, bridi bangu.",
+      language: .lojbanGismu,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "lojban-cmavo-mi-do",
+      title: "Mi Do",
+      text: "mi do .i",
+      language: .lojbanCmavo,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "lojban-cmavo-mio-doo",
+      title: "Mi'o Do'o",
+      text: "mi'o ca ba .i do'o",
+      language: .lojbanCmavo,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "lojban-cmavo-le-lo-la",
+      title: "Le Lo La",
+      text: "le lo la, se te ve xe.",
+      language: .lojbanCmavo,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "lojban-cmavo-pa-re-ci",
+      title: "Pa Re Ci",
+      text: "mi do .i mi'o do'o .i le lo la. pa re ci vo, mu xa ze. ba ca pu, fa fe fi fo fu. ke'a ki ko, na no ro zo'e. ti ta tu, se te ve xe. coi .a .e .o.",
+      language: .lojbanCmavo,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "uzbek-ertalab-yol",
       title: "Ertalab yoʻl",
       text: "Ertalab tinch yoʻl ochadi.",

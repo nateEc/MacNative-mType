@@ -3282,6 +3282,8 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.viossaWords,
       StarterLexicon.viossaNjutroWords,
       StarterLexicon.maoriWords,
+      StarterLexicon.lojbanGismuWords,
+      StarterLexicon.lojbanCmavoWords,
       StarterLexicon.uzbekWords,
       StarterLexicon.occitanWords,
       StarterLexicon.oromoWords,
@@ -3349,7 +3351,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 112)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 114)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3557,6 +3559,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .maori).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .maori), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .lojbanGismu).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .lojbanGismu), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .lojbanCmavo).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .lojbanCmavo), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .uzbek).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .uzbek), "uz")
@@ -4471,6 +4479,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.viossa.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.viossaNjutro.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.maori.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.lojbanGismu.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.lojbanCmavo.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.uzbek.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.occitan.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.oromo.zipfFrequencySupport, .supported)
@@ -4545,6 +4555,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .maori, modifiers: [.zipf]),
       "Te reo Māori 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .lojbanGismu, modifiers: [.zipf]),
+      "Lojban · gismu 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
+    )
+    XCTAssertEqual(
+      ZipfFrequencyPolicy.notice(for: .lojbanCmavo, modifiers: [.zipf]),
+      "Lojban · cmavo 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
     )
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .uzbek, modifiers: [.zipf]),
@@ -5027,6 +5045,8 @@ final class TypingEngineTests: XCTestCase {
       (.viossa, StarterLexicon.viossaWords),
       (.viossaNjutro, StarterLexicon.viossaNjutroWords),
       (.maori, StarterLexicon.maoriWords),
+      (.lojbanGismu, StarterLexicon.lojbanGismuWords),
+      (.lojbanCmavo, StarterLexicon.lojbanCmavoWords),
       (.uzbek, StarterLexicon.uzbekWords),
       (.occitan, StarterLexicon.occitanWords),
       (.oromo, StarterLexicon.oromoWords),
@@ -5128,7 +5148,9 @@ final class TypingEngineTests: XCTestCase {
             ? CharacterSet(charactersIn: "།")
             : language == .klingon
               ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "'"))
-              : CharacterSet.punctuationCharacters
+              : language == .lojbanCmavo
+                ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: ".'"))
+                : CharacterSet.punctuationCharacters
           let normalized = token.trimmingCharacters(
             in: punctuation)
           return lexicon.contains(normalized)
@@ -5299,6 +5321,24 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.maori.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.maori))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.maori))
+    XCTAssertTrue(StarterLexicon.lojbanGismuWords.contains("bridi"))
+    XCTAssertFalse(TypingLanguage.lojbanGismu.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.lojbanGismu.usesSpaceDelimitedWords)
+    XCTAssertFalse(TypingLanguage.lojbanGismu.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.lojbanGismu.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.lojbanGismu.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.lojbanGismu.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.lojbanGismu))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.lojbanGismu))
+    XCTAssertTrue(StarterLexicon.lojbanCmavoWords.contains("mi'o"))
+    XCTAssertFalse(TypingLanguage.lojbanCmavo.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.lojbanCmavo.usesSpaceDelimitedWords)
+    XCTAssertFalse(TypingLanguage.lojbanCmavo.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.lojbanCmavo.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.lojbanCmavo.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.lojbanCmavo.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.lojbanCmavo))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.lojbanCmavo))
     XCTAssertTrue(StarterLexicon.uzbekWords.contains("yulduz"))
     XCTAssertFalse(TypingLanguage.uzbek.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.uzbek.usesSpaceDelimitedWords)
@@ -5851,6 +5891,22 @@ final class TypingEngineTests: XCTestCase {
         [.lazyLatin], language: .viossaNjutro, mode: .custom, automaticallyEnabled: true),
       [.lazyLatin])
     XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .lojbanGismu, automaticallyEnabled: true),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .lojbanGismu, mode: .custom, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .lojbanCmavo, automaticallyEnabled: true),
+      [])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [.lazyLatin], language: .lojbanCmavo, mode: .custom, automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers([.lazyLatin], language: .jyutping, automaticallyEnabled: true),
       [.lazyLatin])
     XCTAssertEqual(
@@ -5895,6 +5951,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.viossa.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.viossaNjutro.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.maori.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.lojbanGismu.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.lojbanCmavo.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.uzbek.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.bashkir.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.basque.supportsLazyLatinInput)
@@ -5973,6 +6031,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.viossa.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.viossaNjutro.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.maori.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.lojbanGismu.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.lojbanCmavo.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.uzbek.speechLocaleIdentifier, "uz-UZ")
     XCTAssertEqual(TypingLanguage.occitan.speechLocaleIdentifier, "oc-FR")
     XCTAssertEqual(TypingLanguage.oromo.speechLocaleIdentifier, "om")
