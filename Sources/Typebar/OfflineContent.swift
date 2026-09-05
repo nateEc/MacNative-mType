@@ -960,6 +960,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "tatar-irtange-kon",
+      title: "Иртәнге көн",
+      text: "Иртәнге көн тыныч юл ача.",
+      language: .tatar,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "tatar-kichke-yoldyzlar",
+      title: "Кичке йолдызлар",
+      text: "Кичке йолдызлар шәһәргә өмет китерә.",
+      language: .tatar,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "tatar-kitap-dingez",
+      title: "Китап һәм диңгез",
+      text: "Китап белән ерак диңгез уйга киңлек бирә.",
+      language: .tatar,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "tatar-yul-bergya",
+      title: "Бергә юл",
+      text: "Иртәнге көн тыныч юл ача, ә йомшак су җилне яңарта. Кичке йолдызлар шәһәргә өмет китерә. Китап белән ерак диңгез уйга киңлек бирә. Кешеләр бергә тыңлаганда, алар яхшы сайлауны күрә һәм киләсе көн өчен яңа фикер саклый.",
+      language: .tatar,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "arabic-calm-step",
       title: "خطوة هادئة",
       text: "خطوة هادئة تجعل المهمة التالية أوضح.",

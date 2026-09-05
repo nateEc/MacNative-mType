@@ -21,7 +21,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；八十二种原创单语（包括 Bemba、Bosnian、Latin、Friulian、Malagasy、Welsh、Hausa 与三种 Esperanto 书写方式）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版，Central Kurdish 同时使用系统原生连写字形，均暂不进入双向多语混排；经配置验证的 LTR 语言可进入混排，Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文和朗读严格按每项配置或其缺省分支处理：Sanskrit 使用 `sa`，Sinhala 使用 `si`，Khmer 使用 `km`／`km-KH`，Azerbaijani 与 Belarusian 使用完整 BCP-47 的首段／完整标识，Central Kurdish 使用 `ckb`，Bemba 使用 `bem`，Friulian 使用 `fur`，Hausa 使用 `ha`；Bosnian、Latin、Malagasy、Welsh 和三个无 BCP-47 的 Esperanto 书写方式严格回退 `en`／`en-US`。Zipf 的 `orderedByFrequency` 分支、输入简化规则、原创内容边界及各语言的完整映射均记录在后续审计条目与自动化测试中。乌克兰语 Latin、日语罗马字、Greeklish 以及 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；八十三种原创单语（包括 Bemba、Bosnian、Latin、Friulian、Malagasy、Welsh、Hausa、Tatar 与三种 Esperanto 书写方式）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版，Central Kurdish 同时使用系统原生连写字形，均暂不进入双向多语混排；经配置验证的 LTR 语言可进入混排，Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文和朗读严格按每项配置或其缺省分支处理：Sanskrit 使用 `sa`，Sinhala 使用 `si`，Khmer 使用 `km`／`km-KH`，Azerbaijani 与 Belarusian 使用完整 BCP-47 的首段／完整标识，Central Kurdish 使用 `ckb`，Bemba 使用 `bem`，Friulian 使用 `fur`，Hausa 使用 `ha`，Tatar 使用 `tt`；Bosnian、Latin、Malagasy、Welsh 和三个无 BCP-47 的 Esperanto 书写方式严格回退 `en`／`en-US`。Zipf 的 `orderedByFrequency` 分支、输入简化规则、原创内容边界及各语言的完整映射均记录在后续审计条目与自动化测试中。乌克兰语 Latin、日语罗马字、Greeklish 以及 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们。 |
 
 2026-09-04 更新：单语数量增至五十八种，新增 Burmese（`myanmarBurmese`）：参考配置为 `joiningScript: true`、`noLazyMode: true`、LTR、`my-MM`。Typebar 使用原创词流、四档引语、macOS 组合输入和空格提交，并以 `my` 访问知识短文、`my-MM` 调用系统朗读；该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。
 
@@ -54,6 +54,7 @@
 2026-09-05 更新：单语数量增至八十种，新增 Malagasy（`malagasy`）：参考配置仅定义 `noLazyMode: true`，没有 BCP-47、RTL、连写或词频排序标记。Typebar 使用原创词流与四档引语，保持 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Malagasy 代码，并禁用简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径；启用 Zipf 时显示可能不支持的七秒提示，但不移除修饰器。本行取代语言映射概览中较早的七十九种数量。
 2026-09-05 更新：单语数量增至八十一种，新增 Welsh（`welsh`）：参考配置仅定义 `name: welsh`，没有 BCP-47、RTL、连写、`noLazyMode` 或词频排序标记。Typebar 使用原创词流与四档引语，保持 LTR 空格提交；知识短文与系统朗读严格复用参考的缺省分支，分别为 `en` 和 `en-US`，不补造 Welsh 代码，并保留用户选择的简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径；启用 Zipf 时显示可能不支持的七秒提示，但不移除修饰器。本行取代语言映射概览中较早的八十种数量。
 2026-09-05 更新：单语数量增至八十二种，新增 Hausa（`hausa`）：参考配置定义 `bcp47: ha`，没有 RTL、连写、`noLazyMode` 或词频排序标记。Typebar 使用原创词流与四档引语，保持 LTR 空格提交；知识短文与系统朗读均精确使用 `ha`，并保留用户选择的简化输入。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径；启用 Zipf 时显示可能不支持的七秒提示，但不移除修饰器。本行取代语言映射概览中较早的八十一种数量。
+2026-09-05 更新：单语数量增至八十三种，新增 Tatar（`tatar`）：参考配置定义 `bcp47: tt` 与 `orderedByFrequency: true`，没有 RTL、连写或 `noLazyMode` 标记。Typebar 使用原创 Unicode 西里尔词流与四档引语，保持 LTR 空格提交；知识短文与系统朗读均精确使用 `tt`，保留用户选择的简化输入和 Zipf 高频词。该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。本行取代语言映射概览中较早的八十二种数量。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
 | `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |

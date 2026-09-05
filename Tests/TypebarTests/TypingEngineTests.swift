@@ -3273,6 +3273,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.malagasyWords,
       StarterLexicon.welshWords,
       StarterLexicon.hausaWords,
+      StarterLexicon.tatarWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -3314,7 +3315,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 77)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 78)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -3498,6 +3499,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .hausa).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hausa), "ha")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .tatar).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .tatar), "tt")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .arabic).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .arabic), "ar")
@@ -4005,6 +4009,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       hausaEncyclopedia.prompt(for: .words(3, language: .hausa)),
       "Ranar safe tana")
+    let tatarData = Data("""
+    {"title":"Көн","extract":"Иртәнге көн тыныч юл ача."}
+    """.utf8)
+    let tatarEncyclopedia = try XCTUnwrap(
+      LivePracticeContentService.encyclopedia(from: tatarData, language: .tatar))
+    XCTAssertEqual(tatarEncyclopedia.text, "Иртәнге көн тыныч юл ача")
+    XCTAssertEqual(
+      tatarEncyclopedia.prompt(for: .words(3, language: .tatar)),
+      "Иртәнге көн тыныч")
     let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
@@ -4210,6 +4223,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.malagasy.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.welsh.zipfFrequencySupport, .unknown)
     XCTAssertEqual(TypingLanguage.hausa.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(TypingLanguage.tatar.zipfFrequencySupport, .supported)
     XCTAssertEqual(TypingLanguage.armenian.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.bemba.zipfFrequencySupport, .unsupported)
     XCTAssertEqual(TypingLanguage.albanian.zipfFrequencySupport, .unknown)
@@ -4241,6 +4255,7 @@ final class TypingEngineTests: XCTestCase {
       ZipfFrequencyPolicy.notice(for: .hausa, modifiers: [.zipf]),
       "Hausa 可能不支持 Zipf 高频词：参考配置未说明词表是否按词频排序。"
     )
+    XCTAssertNil(ZipfFrequencyPolicy.notice(for: .tatar, modifiers: [.zipf]))
     XCTAssertEqual(
       ZipfFrequencyPolicy.notice(for: .armenian, modifiers: [.zipf]),
       "Հայերեն 不支持 Zipf 高频词：该词表未按词频排序。请选择其他词表。"
@@ -4672,6 +4687,7 @@ final class TypingEngineTests: XCTestCase {
       (.malagasy, StarterLexicon.malagasyWords),
       (.welsh, StarterLexicon.welshWords),
       (.hausa, StarterLexicon.hausaWords),
+      (.tatar, StarterLexicon.tatarWords),
       (.arabic, StarterLexicon.arabicWords),
       (.hebrew, StarterLexicon.hebrewWords),
       (.persian, StarterLexicon.persianWords),
@@ -4838,6 +4854,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.hausa.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.hausa))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.hausa))
+    XCTAssertTrue(StarterLexicon.tatarWords.contains("йолдыз"))
+    XCTAssertFalse(TypingLanguage.tatar.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.tatar.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.tatar.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tatar))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.tatar))
     XCTAssertTrue(StarterLexicon.arabicWords.contains("نافِذة"))
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
@@ -5074,6 +5096,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TypingLanguage.malagasy.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.welsh.supportsLazyLatinInput)
     XCTAssertTrue(TypingLanguage.hausa.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.tatar.supportsLazyLatinInput)
 
     XCTAssertEqual(
       ArabicLazyInputPolicy.effectiveModifiers(
@@ -5115,6 +5138,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.malagasy.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.welsh.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.hausa.speechLocaleIdentifier, "ha")
+    XCTAssertEqual(TypingLanguage.tatar.speechLocaleIdentifier, "tt")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.hebrew.speechLocaleIdentifier, "he-IL")
     XCTAssertEqual(TypingLanguage.persian.speechLocaleIdentifier, "fa-IR")

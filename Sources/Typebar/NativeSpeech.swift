@@ -28,6 +28,7 @@ extension TypingLanguage {
     case .german: "de-DE"
     case .afrikaans: "af-ZA"
     case .hausa: "ha"
+    case .tatar: "tt"
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"

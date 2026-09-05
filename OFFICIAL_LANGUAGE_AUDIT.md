@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 82 个可单独练习并支持原创引语的语言／书写方式：English、Español、Deutsch、Afrikaans、Shqip、Ichibemba、Bosanski、Esperanto、Esperanto · X-sistemo、Esperanto · H-sistemo、Latina、Friulian、Malagasy、Cymraeg、Hausa、Azərbaycanca、Беларуская、Lietuvių、Latviešu、Монгол、Gaeilge、Galego、मराठी、کوردی ناوەندی、العربية、עברית、فارسی、اردو、தமிழ்、हिन्दी、ગુજરાતી、বাংলা、ไทย、नेपाली、ಕನ್ನಡ、తెలుగు、മലയാളം、संस्कृतम्、සිංහල、ខ្មែរ、မြန်မာ、ລາວ、አማርኛ、Հայերեն、ქართული、Ελληνικά、Greeklish、Nederlands、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、Dansk、Norsk Bokmål、Norsk Nynorsk、Svenska、Magyar、Čeština、Slovenčina、Slovenščina、Hrvatski、Српски、Srpski Latin、Български、Română、Suomi、Eesti、Íslenska、Français、Italiano、Português、简体中文、繁體中文、Русский、Українська、Ukrainian Latin、日本語・ひらがな、日本語・カタカナ、日本語・ローマ字、한국어、Türkçe、Polski。另有中英混合与可配置的多语混合练习。
+Typebar 现有 83 个可单独练习并支持原创引语的语言／书写方式：English、Español、Deutsch、Afrikaans、Shqip、Ichibemba、Bosanski、Esperanto、Esperanto · X-sistemo、Esperanto · H-sistemo、Latina、Friulian、Malagasy、Cymraeg、Hausa、Татарча、Azərbaycanca、Беларуская、Lietuvių、Latviešu、Монгол、Gaeilge、Galego、मराठी、کوردی ناوەندی、العربية、עברית、فارسی、اردو、தமிழ்、हिन्दी、ગુજરાતી、বাংলা、ไทย、नेपाली、ಕನ್ನಡ、తెలుగు、മലയാളം、संस्कृतम्、සිංහල、ខ្មែរ、မြန်မာ、ລາວ、አማርኛ、Հայերեն、ქართული、Ελληνικά、Greeklish、Nederlands、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、Dansk、Norsk Bokmål、Norsk Nynorsk、Svenska、Magyar、Čeština、Slovenčina、Slovenščina、Hrvatski、Српски、Srpski Latin、Български、Română、Suomi、Eesti、Íslenska、Français、Italiano、Português、简体中文、繁體中文、Русский、Українська、Ukrainian Latin、日本語・ひらがな、日本語・カタカナ、日本語・ローマ字、한국어、Türkçe、Polski。另有中英混合与可配置的多语混合练习。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -23,7 +23,8 @@ Typebar 现有 82 个可单独练习并支持原创引语的语言／书写方�
 | Malagasy 缺省配置 | `malagasy` 仅定义 `noLazyMode: true`，不含 BCP-47、RTL、连写或词频排序。Typebar 因此使用 LTR 空格分词、禁用简化输入，并使知识短文／朗读分别回退 `en`／`en-US`；Zipf 显示七秒可能不支持提示而不移除修饰器。 | 不补造 `mg` 或地区代码，也不导入参考词表。 |
 | Welsh 缺省配置 | `welsh` 仅定义名称，不含 BCP-47、RTL、连写、`noLazyMode` 或词频排序。Typebar 因此使用 LTR 空格分词、保留简化输入，并使知识短文／朗读分别回退 `en`／`en-US`；Zipf 显示七秒可能不支持提示而不移除修饰器。 | 不补造 `cy` 或地区代码，也不导入参考词表。 |
 | Hausa BCP-47 | `hausa` 定义 `bcp47: ha`，未设 RTL、连写、`noLazyMode` 或词频排序。Typebar 使用 LTR 空格分词、保留简化输入，并使知识短文／朗读均精确使用 `ha`；Zipf 显示七秒可能不支持提示而不移除修饰器。 | 不导入参考词表或补造地区代码。 |
-| Zipf 词频状态 | `orderedByFrequency: true` 时无提示，`false` 时显示七秒“未按频率排序”提示，缺失时显示七秒“可能不支持”提示；提示不移除 Zipf。Bemba 使用明确 `false` 路径，Bosnian、Esperanto 和 Esperanto H 使用明确 `true` 路径，Esperanto X、Latin、Friulian、Malagasy、Welsh 与 Hausa 使用未知路径。 | 使用自有词表排序，不导入参考词表。 |
+| Tatar BCP-47 与词频 | `tatar` 定义 `bcp47: tt` 与 `orderedByFrequency: true`，未设 RTL、连写或 `noLazyMode`。Typebar 使用 LTR 空格分词、保留简化输入，并使知识短文／朗读均精确使用 `tt`；Zipf 保持可用且不显示警告。 | 不导入参考词表或补造地区代码。 |
+| Zipf 词频状态 | `orderedByFrequency: true` 时无提示，`false` 时显示七秒“未按频率排序”提示，缺失时显示七秒“可能不支持”提示；提示不移除 Zipf。Bemba 使用明确 `false` 路径，Bosnian、Esperanto、Esperanto H 与 Tatar 使用明确 `true` 路径，Esperanto X、Latin、Friulian、Malagasy、Welsh 与 Hausa 使用未知路径。 | 使用自有词表排序，不导入参考词表。 |
 | 无空格词界 | 简体／繁体中文、日语平假名与片假名走无空格的原生词界与计分路径。 | 仅在已验证脚本上启用，不能由语言名称推断。 |
 | 罗马化／替代书写 | Greeklish、Ukrainian Latin、Japanese Romaji 使用原创 ASCII 离线内容，且不会被在线原文替换为另一书写方式。 | 不把参考项目的变体词表纳入应用。 |
 | 代码 | 69 个代码选择以原创短片段覆盖缩进、输入、回放与结果路径。 | 标识可参考公开语言目录；所有片段、标签组合与 UI 均由 Typebar 自写。 |
@@ -42,7 +43,7 @@ Typebar 现有 82 个可单独练习并支持原创引语的语言／书写方�
 ## 自动化守卫
 
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
-- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu 与 Central Kurdish 等 RTL 语言明确被排除，Albanian、Bemba、Bosnian、Esperanto、Esperanto X、Esperanto H、Latin、Friulian、Malagasy、Welsh、Hausa、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala、Khmer、Burmese、Lao、Amharic、Armenian、Georgian、Azerbaijani、Belarusian、Lithuanian、Latvian、Mongolian、Irish、Galician 与 Marathi 明确被包含。
+- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu 与 Central Kurdish 等 RTL 语言明确被排除，Albanian、Bemba、Bosnian、Esperanto、Esperanto X、Esperanto H、Latin、Friulian、Malagasy、Welsh、Hausa、Tatar、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala、Khmer、Burmese、Lao、Amharic、Armenian、Georgian、Azerbaijani、Belarusian、Lithuanian、Latvian、Mongolian、Irish、Galician 与 Marathi 明确被包含。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜。
 
 ## 后续候选与准入条件
