@@ -4,7 +4,24 @@
 /// A nil layout leaves the event on AppKit's normal input path, preserving the
 /// active macOS input source, dead keys, and IME composition.
 enum KeyboardLayoutEmulator {
-  private typealias KeyPair = (normal: Character, shifted: Character)
+  private struct KeyLayers {
+    let normal: Character
+    let shifted: Character
+    let option: Character?
+    let shiftedOption: Character?
+
+    init(
+      normal: Character, shifted: Character, option: Character? = nil,
+      shiftedOption: Character? = nil
+    ) {
+      self.normal = normal
+      self.shifted = shifted
+      self.option = option
+      self.shiftedOption = shiftedOption
+    }
+  }
+
+  private typealias OptionPair = (normal: Character, shifted: Character)
 
   private static let physicalRows: [[UInt16]] = [
     [50, 18, 19, 20, 21, 23, 22, 26, 28, 25, 29, 27, 24],
@@ -17,20 +34,22 @@ enum KeyboardLayoutEmulator {
     forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, mapping: KeyboardInputMapping
   ) -> Character? {
     guard !modifierFlags.contains(.command),
-      !modifierFlags.contains(.control),
-      !modifierFlags.contains(.option)
+      !modifierFlags.contains(.control)
     else { return nil }
-    let pair: KeyPair?
+    let layers: KeyLayers?
     switch mapping {
     case .system:
-      pair = nil
+      layers = nil
     case let .builtIn(layout):
-      pair = keys(for: layout)[keyCode]
+      layers = keys(for: layout)[keyCode]
     case let .custom(layout):
-      pair = keys(for: layout)[keyCode]
+      layers = keys(for: layout)[keyCode]
     }
-    guard let pair else { return nil }
-    return modifierFlags.contains(.shift) ? pair.shifted : pair.normal
+    guard let layers else { return nil }
+    if modifierFlags.contains(.option) {
+      return modifierFlags.contains(.shift) ? layers.shiftedOption : layers.option
+    }
+    return modifierFlags.contains(.shift) ? layers.shifted : layers.normal
   }
 
   static func character(
@@ -58,36 +77,38 @@ enum KeyboardLayoutEmulator {
     }
   }
 
-  private static func keyCode(for character: Character, keys: [UInt16: KeyPair]) -> UInt16? {
-    keys.first { _, pair in
-      pair.normal == character || pair.shifted == character
-        || String(pair.normal).caseInsensitiveCompare(String(character)) == .orderedSame
-        || String(pair.shifted).caseInsensitiveCompare(String(character)) == .orderedSame
+  private static func keyCode(for character: Character, keys: [UInt16: KeyLayers]) -> UInt16? {
+    keys.first { _, layers in
+      [layers.normal, layers.shifted, layers.option, layers.shiftedOption]
+        .compactMap { $0 }
+        .contains {
+          $0 == character || String($0).caseInsensitiveCompare(String(character)) == .orderedSame
+        }
     }?.key
   }
 
-  private static func keys(for layout: CustomKeyboardGuideLayout) -> [UInt16: KeyPair] {
+  private static func keys(for layout: CustomKeyboardGuideLayout) -> [UInt16: KeyLayers] {
     Dictionary(uniqueKeysWithValues: zip(physicalRows, layout.inputRows).enumerated().flatMap {
       rowIndex, keyCodesAndLabels in
       let (keyCodes, labels) = keyCodesAndLabels
       let shiftedLabels = layout.shiftedInputRows[rowIndex]
       return zip(keyCodes, labels).enumerated().map { keyIndex, keyCodeAndLabel in
         let (keyCode, label) = keyCodeAndLabel
-        let pair: KeyPair
+        let layers: KeyLayers
         if let shiftedLabels, shiftedLabels.indices.contains(keyIndex) {
-          pair = (normal: label, shifted: shiftedLabels[keyIndex])
+          layers = .init(normal: label, shifted: shiftedLabels[keyIndex])
         } else {
-          pair = casePair(for: label)
+          layers = casePair(for: label)
         }
-        return (keyCode, pair)
+        return (keyCode, layers)
       }
     })
   }
 
-  private static func casePair(for character: Character) -> KeyPair {
+  private static func casePair(for character: Character) -> KeyLayers {
     let lower = singleCharacter(String(character).lowercased()) ?? character
     let upper = singleCharacter(String(character).uppercased()) ?? character
-    return (lower, upper)
+    return .init(normal: lower, shifted: upper)
   }
 
   private static func singleCharacter(_ string: String) -> Character? {
@@ -96,14 +117,10 @@ enum KeyboardLayoutEmulator {
     return characters[0]
   }
 
-  private static func keys(for layout: KeyboardLayout) -> [UInt16: KeyPair] {
+  private static func keys(for layout: KeyboardLayout) -> [UInt16: KeyLayers] {
     switch layout {
     case .ansiQwerty:
-      map(
-        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
-          + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:[{ 30:]} "
-          + "0:aA 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:;: 39:'\" "
-          + "6:zZ 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,< 47:.> 44:/?")
+      ansiQwertyKeys()
     case .ansiDvorak:
       map(
         "12:'\" 13:,< 14:.> 15:pP 17:yY 16:fF 32:gG 34:cC 31:rR 35:lL 33:/? 30:=+ "
@@ -179,6 +196,14 @@ enum KeyboardLayoutEmulator {
           + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:´¨ 30:+* "
           + "0:aA 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:ñÑ 39:{[ "
           + "10:<> 6:zZ 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,; 47:.: 44:-_")
+    case .polishProgrammers:
+      withOptionLayers(
+        ansiQwertyKeys(),
+        options: [
+          0: ("ą", "Ą"), 1: ("ś", "Ś"), 6: ("ż", "Ż"), 7: ("ź", "Ź"),
+          8: ("ć", "Ć"), 14: ("ę", "Ę"), 31: ("ó", "Ó"), 32: ("€", "€"),
+          37: ("ł", "Ł"), 45: ("ń", "Ń"),
+        ])
     case .frenchAzerty:
       map(
         "18:&1 19:é2 20:\"3 21:'4 23:(5 22:-6 26:è7 28:_8 25:ç9 29:à0 27:)° 24:=+ "
@@ -237,12 +262,33 @@ enum KeyboardLayoutEmulator {
     }
   }
 
-  private static func map(_ definition: String) -> [UInt16: KeyPair] {
+  private static func ansiQwertyKeys() -> [UInt16: KeyLayers] {
+    map(
+      "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+        + "12:qQ 13:wW 14:eE 15:rR 17:tT 16:yY 32:uU 34:iI 31:oO 35:pP 33:[{ 30:]} "
+        + "0:aA 1:sS 2:dD 3:fF 5:gG 4:hH 38:jJ 40:kK 37:lL 41:;: 39:'\" "
+        + "6:zZ 7:xX 8:cC 9:vV 11:bB 45:nN 46:mM 43:,< 47:.> 44:/?")
+  }
+
+  private static func withOptionLayers(
+    _ keys: [UInt16: KeyLayers], options: [UInt16: OptionPair]
+  ) -> [UInt16: KeyLayers] {
+    var layeredKeys = keys
+    for (keyCode, option) in options {
+      guard let existing = layeredKeys[keyCode] else { continue }
+      layeredKeys[keyCode] = .init(
+        normal: existing.normal, shifted: existing.shifted, option: option.normal,
+        shiftedOption: option.shifted)
+    }
+    return layeredKeys
+  }
+
+  private static func map(_ definition: String) -> [UInt16: KeyLayers] {
     Dictionary(uniqueKeysWithValues: definition.split(separator: " ").compactMap { token in
       let pieces = token.split(separator: ":", maxSplits: 1)
       guard pieces.count == 2, let keyCode = UInt16(pieces[0]), pieces[1].count == 2 else { return nil }
       let symbols = Array(pieces[1])
-      return (keyCode, (symbols[0], symbols[1]))
+      return (keyCode, .init(normal: symbols[0], shifted: symbols[1]))
     })
   }
 }

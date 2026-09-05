@@ -1805,6 +1805,53 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.turkishQ.emulatedLayout, .turkishQ)
   }
 
+  @MainActor
+  func testPolishProgrammersMapsOptionLayersAndPersists() {
+    XCTAssertTrue([
+      "ą", "ć", "ę", "ł", "ń", "ó", "ś", "ź", "ż",
+    ].allSatisfy {
+      KeyboardGuideModel.highlightedKey(for: $0, layout: .polishProgrammers) != nil
+    })
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ą", layout: .polishProgrammers), "home-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ę", layout: .polishProgrammers), "top-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ł", layout: .polishProgrammers), "home-8")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ź", layout: .polishProgrammers), "bottom-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "€", layout: .polishProgrammers), "top-6")
+
+    let aKey = KeyboardGuideModel.rows(for: .polishProgrammers)[2][0]
+    XCTAssertEqual(aKey.legend(style: .dynamic, modifierFlags: [.option], capsLockEnabled: false), "ą")
+    XCTAssertEqual(
+      aKey.legend(style: .dynamic, modifierFlags: [.option, .shift], capsLockEnabled: false), "Ą")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 0, modifierFlags: [.option], layout: .polishProgrammers), "ą")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 14, modifierFlags: [.option, .shift], layout: .polishProgrammers), "Ę")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 32, modifierFlags: [.option], layout: .polishProgrammers), "€")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 0, modifierFlags: [.option, .control], layout: .polishProgrammers))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Ł", layout: .polishProgrammers), 37)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "€", layout: .polishProgrammers), 32)
+    XCTAssertEqual(KeyboardInputLayout.polishProgrammers.emulatedLayout, .polishProgrammers)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .polishProgrammers
+    settings.keyboardInputLayout = .polishProgrammers
+    settings.layoutFluidLayouts = [.polishProgrammers, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .polishProgrammers)
+    XCTAssertEqual(restored.keyboardInputLayout, .polishProgrammers)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.polishProgrammers, .ansiQwerty])
+  }
+
   func testRussianJcukenMapsCyrillicLettersAndPhysicalKeyPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ё", layout: .russianJcuken), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "й", layout: .russianJcuken), "top-0")
@@ -4763,7 +4810,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 22)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 23)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

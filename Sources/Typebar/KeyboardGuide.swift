@@ -16,6 +16,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case portugueseQwertyISO
   case portugueseQwertyANSI
   case latinAmericanQwerty
+  case polishProgrammers
   case frenchAzerty
   case turkishQ
   case hungarianQwertz
@@ -43,6 +44,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .portugueseQwertyISO: "Portuguese QWERTY (ISO)"
     case .portugueseQwertyANSI: "Portuguese QWERTY (ANSI)"
     case .latinAmericanQwerty: "Latin American QWERTY"
+    case .polishProgrammers: "Polish (Programmers)"
     case .frenchAzerty: "French AZERTY"
     case .turkishQ: "Turkish Q"
     case .hungarianQwertz: "Hungarian QWERTZ · Typebar"
@@ -75,6 +77,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case portugueseQwertyISO
   case portugueseQwertyANSI
   case latinAmericanQwerty
+  case polishProgrammers
   case frenchAzerty
   case turkishQ
   case hungarianQwertz
@@ -708,6 +711,28 @@ enum KeyboardGuideModel {
         ),
         isoBottomRow()
       ]
+    case .polishProgrammers:
+      [
+        row("number", "1234567890-="),
+        row(
+          "top", "QWERTYUIOP[]",
+          characters: ["qQ", "wW", "eEęĘ", "rR", "tT", "yY", "uU€", "iI", "oOóÓ", "pP", "[{", "]}"],
+          optionLabels: [nil, nil, "ę", nil, nil, nil, "€", nil, "ó", nil, nil, nil],
+          shiftedOptionLabels: [nil, nil, "Ę", nil, nil, nil, "€", nil, "Ó", nil, nil, nil]
+        ),
+        row(
+          "home", "ASDFGHJKL;'",
+          characters: ["aAąĄ", "sSśŚ", "dD", "fF", "gG", "hH", "jJ", "kK", "lLłŁ", ";:", "'\""],
+          optionLabels: ["ą", "ś", nil, nil, nil, nil, nil, nil, "ł", nil, nil],
+          shiftedOptionLabels: ["Ą", "Ś", nil, nil, nil, nil, nil, nil, "Ł", nil, nil]
+        ),
+        row(
+          "bottom", "ZXCVBNM,./",
+          characters: ["zZżŻ", "xXźŹ", "cCćĆ", "vV", "bB", "nNńŃ", "mM", ",<", ".>", "/?"],
+          optionLabels: ["ż", "ź", "ć", nil, nil, "ń", nil, nil, nil, nil],
+          shiftedOptionLabels: ["Ż", "Ź", "Ć", nil, nil, "Ń", nil, nil, nil, nil]
+        ),
+      ]
     case .frenchAzerty:
       [
         row(
@@ -994,7 +1019,9 @@ enum KeyboardGuideModel {
     _ prefix: String,
     _ labels: String,
     characters: [String]? = nil,
-    shiftedLabels: [String]? = nil
+    shiftedLabels: [String]? = nil,
+    optionLabels: [String?]? = nil,
+    shiftedOptionLabels: [String?]? = nil
   )
     -> [KeyboardGuideKey]
   {
@@ -1003,7 +1030,13 @@ enum KeyboardGuideModel {
         "\(prefix)-\(offset)",
         label: String(label),
         characters: characters?[safe: offset],
-        shiftedLabel: shiftedLabels?[safe: offset]
+        shiftedLabel: shiftedLabels?[safe: offset],
+        optionLabel: optionLabels.flatMap { labels in
+          labels.indices.contains(offset) ? labels[offset] : nil
+        },
+        shiftedOptionLabel: shiftedOptionLabels.flatMap { labels in
+          labels.indices.contains(offset) ? labels[offset] : nil
+        }
       )
     }
   }
