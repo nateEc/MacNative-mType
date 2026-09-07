@@ -21,7 +21,7 @@ enum KeyboardLayoutEmulator {
     }
   }
 
-  private typealias OptionPair = (normal: String, shifted: String)
+  private typealias OptionPair = (normal: String?, shifted: String?)
 
   private static let physicalRows: [[UInt16]] = [
     [50, 18, 19, 20, 21, 23, 22, 26, 28, 25, 29, 27, 24],
@@ -356,6 +356,30 @@ enum KeyboardLayoutEmulator {
           + "0:ش\\ 1:س|\u{0000} 2:ي] 3:ب[ 5:ل|لأ 4:اأ 38:تـ 40:ن، 37:م/ 41:ك: 39:ط\" "
           + "10:ـ| 6:ئ~ 7:ء|ْ 8:ؤ|ِ 9:ر|ٍ 11:لا|لآ 45:ىآ 46:ة’ 43:و, 47:ز. 44:ظ؟"
       )
+    case .arabicMac:
+      withOptionLayers(
+        withSuppressedShift(
+          map(
+            "50:ـ|ـ 18:١! 19:٢@ 20:٣# 21:٤$ 23:٥٪ 22:٦^ 26:٧& 28:٨* 25:٩) 29:٠( 27:-ـ 24:=+ "
+              + "12:ض|َ 13:ص|ً 14:ث|ِ 15:ق|ٍ 17:ف|ُ 16:غ|ٌ 32:ع|ْ 34:ه|ّ 31:خ] 35:ح[ 33:ج} 30:ة{ 42:\\| "
+              + "0:ش» 1:س« 2:يى 3:ب|ب 5:ل|ل 4:اآ 38:ت|ت 40:ن٫ 37:م٬ 41:ك: 39:؛\" "
+              + "6:ظ' 7:ط|ط 8:ذئ 9:دء 11:زأ 45:رإ 46:وؤ 43:،> 47:.< 44:/؟"
+          ),
+          keyCodes: [3, 5, 7, 38, 50]
+        ),
+        options: [
+          1: ("ے", "ے"), 2: ("ی", "ی"), 3: ("پ", "پ"),
+          4: ("\u{0670}", nil), 5: ("\u{0653}", nil), 8: ("ڈ", "ڈ"),
+          9: ("ڑ", "ڑ"), 11: ("ژ", "ژ"), 12: ("‘", nil),
+          13: ("’", nil), 14: ("“", nil), 15: ("”", "؉"),
+          17: ("ڤ", "ڤ"), 18: ("ظ", "ظ"), 19: ("ط", "❊"),
+          20: ("ذ", "£"), 21: ("د", "€"), 22: ("ٱ", nil),
+          23: ("∞", nil), 27: ("_", "_"), 29: ("°", nil),
+          32: ("ە", "ە"), 33: ("چ", "چ"), 38: ("ٹ", "ٹ"),
+          39: ("…", "…"), 40: ("ں", "ں"), 41: ("گ", "ک"),
+          43: (",", ","), 44: ("÷", "÷"),
+        ]
+      )
     case .hebrew:
       map(
         "50:;~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9) 29:0( 27:-_ 24:=+ "
@@ -390,6 +414,22 @@ enum KeyboardLayoutEmulator {
       layeredKeys[keyCode] = .init(
         normal: existing.normal, shifted: existing.shifted, option: option.normal,
         shiftedOption: option.shifted)
+    }
+    return layeredKeys
+  }
+
+  /// An empty translated string consumes the physical key without inserting
+  /// text. This matches layouts whose system keymap intentionally leaves a
+  /// modifier layer unassigned, instead of falling through to another input source.
+  private static func withSuppressedShift(
+    _ keys: [UInt16: KeyLayers], keyCodes: Set<UInt16>
+  ) -> [UInt16: KeyLayers] {
+    var layeredKeys = keys
+    for keyCode in keyCodes {
+      guard let existing = layeredKeys[keyCode] else { continue }
+      layeredKeys[keyCode] = .init(
+        normal: existing.normal, shifted: "", option: existing.option,
+        shiftedOption: existing.shiftedOption)
     }
     return layeredKeys
   }

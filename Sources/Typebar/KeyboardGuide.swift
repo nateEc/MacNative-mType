@@ -37,6 +37,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case persianStandard
   case arabic101
   case arabic102
+  case arabicMac
   case hebrew
   case serbianCyrillic
 
@@ -79,6 +80,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .persianStandard: "Persian (Standard)"
     case .arabic101: "Arabic (101)"
     case .arabic102: "Arabic (102)"
+    case .arabicMac: "Arabic (macOS)"
     case .hebrew: "Hebrew"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
@@ -126,6 +128,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case persianStandard
   case arabic101
   case arabic102
+  case arabicMac
   case hebrew
   case serbianCyrillic
 
@@ -1179,6 +1182,37 @@ enum KeyboardGuideModel {
           shiftedLabels: ["|", "~", "ْ", "ِ", "ٍ", "لآ", "آ", "’", ",", ".", "؟"]
         ),
       ]
+    case .arabicMac:
+      [
+        row(
+          "number", "ـ١٢٣٤٥٦٧٨٩٠-=",
+          characters: ["ـ", "١!ظ", "٢@ط❊", "٣#ذ£", "٤$د€", "٥٪∞", "٦^ٱ", "٧&", "٨*", "٩)", "٠(°", "-ـ_", "=+"],
+          shiftedLabels: [nil, "!", "@", "#", "$", "٪", "^", "&", "*", ")", "(", "ـ", "+"],
+          optionLabels: [nil, "ظ", "ط", "ذ", "د", "∞", "ٱ", nil, nil, nil, "°", "_", nil],
+          shiftedOptionLabels: [nil, "ظ", "❊", "£", "€", nil, nil, nil, nil, nil, nil, "_", nil]
+        ),
+        row(
+          "top", "ضصثقفغعهخحجة\\",
+          characters: ["ضَ‘", "صً’", "ثِ“", "قٍ”؉", "فُڤ", "غٌ", "عْە", "هّ", "خ]", "ح[", "ج}چ", "ة{", "\\|"],
+          shiftedLabels: ["َ", "ً", "ِ", "ٍ", "ُ", "ٌ", "ْ", "ّ", "]", "[", "}", "{", "|"],
+          optionLabels: ["‘", "’", "“", "”", "ڤ", nil, "ە", nil, nil, nil, "چ", nil, nil],
+          shiftedOptionLabels: [nil, nil, nil, "؉", "ڤ", nil, "ە", nil, nil, nil, "چ", nil, nil]
+        ),
+        row(
+          "home", "شسيبلاتنمك؛",
+          characters: ["ش»", "س«ے", "يىی", "بپ", "لٓ", "اآٰ", "تٹ", "ن٫ں", "م٬", "ك:گک", "؛\"…"],
+          shiftedLabels: ["»", "«", "ى", nil, nil, "آ", nil, "٫", "٬", ":", "\""],
+          optionLabels: [nil, "ے", "ی", "پ", "ٓ", "ٰ", "ٹ", "ں", nil, "گ", "…"],
+          shiftedOptionLabels: [nil, "ے", "ی", "پ", nil, nil, "ٹ", "ں", nil, "ک", "…"]
+        ),
+        row(
+          "bottom", "ظطذدزرو،./",
+          characters: ["ظ'", "ط", "ذئڈ", "دءڑ", "زأژ", "رإ", "وؤ", "،>,", ".<", "/؟÷"],
+          shiftedLabels: ["'", nil, "ئ", "ء", "أ", "إ", "ؤ", ">", "<", "؟"],
+          optionLabels: [nil, nil, "ڈ", "ڑ", "ژ", nil, nil, ",", nil, "÷"],
+          shiftedOptionLabels: [nil, nil, "ڈ", "ڑ", "ژ", nil, nil, ",", nil, "÷"]
+        ),
+      ]
     case .hebrew:
       [
         row(
@@ -1337,7 +1371,7 @@ enum KeyboardGuideModel {
     _ prefix: String,
     _ labels: String,
     characters: [String]? = nil,
-    shiftedLabels: [String]? = nil,
+    shiftedLabels: [String?]? = nil,
     optionLabels: [String?]? = nil,
     shiftedOptionLabels: [String?]? = nil
   )
@@ -1352,7 +1386,7 @@ enum KeyboardGuideModel {
     _ prefix: String,
     labels: [String],
     characters: [String]? = nil,
-    shiftedLabels: [String]? = nil,
+    shiftedLabels: [String?]? = nil,
     optionLabels: [String?]? = nil,
     shiftedOptionLabels: [String?]? = nil
   )
@@ -1363,7 +1397,9 @@ enum KeyboardGuideModel {
         "\(prefix)-\(offset)",
         label: label,
         characters: characters?[safe: offset],
-        shiftedLabel: shiftedLabels?[safe: offset],
+        shiftedLabel: shiftedLabels.flatMap { labels in
+          labels.indices.contains(offset) ? labels[offset] : nil
+        },
         optionLabel: optionLabels.flatMap { labels in
           labels.indices.contains(offset) ? labels[offset] : nil
         },

@@ -2417,6 +2417,43 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testArabicMacMapsSystemLayersSuppressesUnassignedShiftAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .arabicMac)
+    XCTAssertEqual(rows[0][0].label, "ـ")
+    XCTAssertNil(rows[0][0].shiftedLabel)
+    XCTAssertEqual(rows[0][2].optionLabel, "ط")
+    XCTAssertEqual(rows[0][2].shiftedOptionLabel, "❊")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ٱ", layout: .arabicMac), "number-6")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "چ", layout: .arabicMac), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ؤ", layout: .arabicMac), "bottom-6")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 18, modifierFlags: [], layout: .arabicMac), "١")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 19, modifierFlags: [.option, .shift], layout: .arabicMac), "❊")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 41, modifierFlags: [.option, .shift], layout: .arabicMac), "ک")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 3, modifierFlags: [.shift], layout: .arabicMac), "")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ة", layout: .arabicMac), 30)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ژ", layout: .arabicMac), 11)
+    XCTAssertEqual(KeyboardInputLayout.arabicMac.emulatedLayout, .arabicMac)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .arabicMac
+    settings.keyboardInputLayout = .arabicMac
+    settings.layoutFluidLayouts = [.arabicMac, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .arabicMac)
+    XCTAssertEqual(restored.keyboardInputLayout, .arabicMac)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.arabicMac, .ansiQwerty])
+  }
+
+  @MainActor
   func testHebrewMapsStandardLettersShiftLayerAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .hebrew)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .hebrew), "number-0")
@@ -5340,7 +5377,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 37)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 38)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

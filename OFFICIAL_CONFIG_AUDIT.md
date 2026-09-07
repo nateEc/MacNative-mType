@@ -109,7 +109,7 @@
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。依据固定参考版本的 `noLazyMode`，非自定义模式会禁用 English、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Greeklish、Dutch、Filipino、Indonesian、Serbian Cyrillic、Bulgarian、Macedonian、Kazakh、中日韩／日语罗马字、Ukrainian 与 Ukrainian Latin，以及所有代码练习的该修饰器；自定义文本仍可使用。可配置多语练习只有至少一个选择的组成语言允许时才保留它。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
-| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，37 种原创物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；Arabic (101)/(102) 可保留单键完整文本输出，Polish (Programmers) 额外有独立的 Option/Shift+Option 字符层，官方全部命名布局尚未覆盖。 |
+| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，38 种原生物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；Arabic (101)/(102) 可保留单键完整文本输出，Polish (Programmers) 与 Arabic (macOS) 有独立的 Option/Shift+Option 字符层，官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
@@ -170,7 +170,7 @@
 
 ## 当前优先缺口
 
-1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、37 个原创内置模拟布局（含独立实现的 ANSI Colemak-DH、Turkish F、Bulgarian Phonetic Traditional、Belarusian、Macedonian、Pashto、Estonian、Persian (Standard)、Arabic (101)/(102)、Hebrew、Swedish QWERTY、Danish QWERTY、Norwegian QWERTY、Greek Alphabetic · Typebar、Hungarian QWERTZ · Typebar、Polish (Programmers)、Russian、Ukrainian JCUKEN、Bulgarian Cyrillic · Typebar 与 Serbian Cyrillic · Typebar），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
+1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、38 个原生内置模拟布局（含独立实现的 ANSI Colemak-DH、Turkish F、Bulgarian Phonetic Traditional、Belarusian、Macedonian、Pashto、Estonian、Persian (Standard)、Arabic (101)/(102)/(macOS)、Hebrew、Swedish QWERTY、Danish QWERTY、Norwegian QWERTY、Greek Alphabetic · Typebar、Hungarian QWERTZ · Typebar、Polish (Programmers)、Russian、Ukrainian JCUKEN、Bulgarian Cyrillic · Typebar 与 Serbian Cyrillic · Typebar），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
 2. 官方语言、词表、主题、字体和声音的完整目录不应复制。后续以原创或明确授权内容扩大用户可选范围，并逐项标注差异；语言候选、语义边界和准入条件见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 3. 网页账户页图表、猴子外观和广告设置不适合作为原生逐像素复刻目标；对用户可见意图的原生替代仍需设备验收。
 
@@ -188,6 +188,7 @@
 - Arabic (101) 自动化测试覆盖公开普通/Shift 键位的阿拉伯字母、组合音标、`لإ/لأ/لا/لآ` 完整文本输出、ISO 与区域标点，及提示高亮、完整输出反查、键盘图、输入模拟和 Layout Fluid 持久化。模拟器的布局层保留单键多字符输出，而既有单字符 API 保持原语义；AltGr、ZWJ/ZWNJ 与方向控制继续由 macOS 当前输入源处理，实现不读取或导入 Monkeytype 布局 JSON。
 - Hebrew 自动化测试覆盖公开普通/Shift 键位的希伯来字母、Shift 拉丁/标点层与 ISO 键，及提示高亮、反查 keycode、键盘图、输入模拟和 Layout Fluid 持久化。AltGr、Caps Lock 元音点和方向控制继续由 macOS 当前输入源处理，实现不读取或导入 Monkeytype 布局 JSON。
 - Arabic (102) 自动化测试覆盖其与 Arabic (101) 不同的 `ذ` 位置、ISO tatweel、组合音标、连字与区域标点，及提示图例、反查 keycode、输入模拟和 Layout Fluid 持久化；AltGr、ZWJ/ZWNJ 与方向控制继续由 macOS 当前输入源处理，实现不读取或导入 Monkeytype 布局 JSON。
+- Arabic (macOS) 自动化测试覆盖 macOS TIS/`UCKeyTranslate` 返回的阿拉伯数字、组合音标、区域标点、Option/Shift+Option 字符层、无输出 Shift 键的消费语义、提示高亮、反查 keycode、输入模拟和 Layout Fluid 持久化。固定参考源码只用于确认 `arabic_mac` 功能名，不读取或导入其布局 JSON、文本或资产。
 - Serbian Cyrillic · Typebar 自动化测试覆盖 Typebar 自写的 `љ`、`ђ`、`ћ`、`ж`、`џ` 与 ISO `< >` 提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化；它不是官方或系统塞尔维亚语布局资产的导入，用户可继续选择 macOS 当前输入源取得系统布局。
 - Hungarian QWERTZ · Typebar 自动化测试覆盖 Typebar 自写的 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`、QWERTZ Y/Z 与练习标点的提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化；它不导入官方或系统匈牙利语布局资产，未收录的死键和 Option 层继续交给 macOS 当前输入源。
 - Greek Alphabetic · Typebar 自动化测试覆盖 Typebar 自写的二十四个基本 Greek 字母、七个重音元音、词末 `ς` 与练习标点的提示高亮、普通/Shift 物理 keycode、反查 keycode、原创词库字符覆盖，以及键盘图、输入模拟和 Layout Fluid 持久化；它不导入官方或系统希腊语布局资产，未收录字符、死键和 Option 层继续交给 macOS 当前输入源。
@@ -221,7 +222,7 @@
 - Croatian 自动化测试覆盖自创词流（含 `č`、`ć`、`đ`、`š` 与 `ž`）、四档原创引语、完整多语混排轮转、弱项复练、`hr-HR` 朗读 locale 与 `hr` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Serbian 自动化测试覆盖自创西里尔词流（含 `љ`、`њ`、`ђ`、`ћ`、`џ`、`ч`、`ш` 与 `ж`）、四档原创引语、完整多语混排轮转、弱项复练、`sr-RS` 朗读 locale 与 `sr` 百科入口；Serbian Latin 同样覆盖四档原创离线拉丁引语、混排、弱项复练与 `sr-RS`，并拒绝百科替换以保持当前书写形式；服务端测试覆盖两者的投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Hungarian 自动化测试覆盖自创词流（含 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`）、四档原创引语、完整多语混排轮转、弱项复练、`hu-HU` 朗读 locale 与 `hu` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
-- 完整客户端 `swift test` 通过 287 项、独立 Vapor 服务 `swift test` 通过 66 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 完整客户端 `swift test` 通过 288 项、独立 Vapor 服务 `swift test` 通过 66 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退；macOS `UCKeyTranslate` 返回的多字符或多码点图例会完整保留，不再截断为首字符。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
