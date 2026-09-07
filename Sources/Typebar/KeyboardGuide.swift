@@ -60,6 +60,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case klauser
   case oneproduct
   case pine
+  case pineV4 = "pine_v4"
+  case three
+  case asset
+  case dwarf
+  case flaw
   case real
   case sertain
   case ctgap
@@ -188,6 +193,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .klauser: "Klauser"
     case .oneproduct: "Oneproduct"
     case .pine: "Pine"
+    case .pineV4: "Pine v4"
+    case .three: "Three"
+    case .asset: "Asset"
+    case .dwarf: "Dwarf"
+    case .flaw: "Flaw"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -321,6 +331,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case klauser
   case oneproduct
   case pine
+  case pineV4 = "pine_v4"
+  case three
+  case asset
+  case dwarf
+  case flaw
   case real
   case sertain
   case ctgap
@@ -1482,6 +1497,49 @@ enum KeyboardGuideModel {
         row("top", "YLRDWJMOU,[]\\"),
         row("home", "CSNTGPHAEI;"),
         row("bottom", "XZQVKBF'/."),
+      ]
+    case .pineV4:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QLCMK'FUOY[]\\"),
+        row("home", "NRSTWPHEAI/"),
+        row("bottom", "JXZGVBD;,.")
+      ]
+    case .three:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QFUYZXKCWB[]\\"),
+        row("home", "OHEAIDRTNS/"),
+        row("bottom", ",M.J;GLPV'")
+      ]
+    case .asset:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QWJFGYPUL;[]\\"),
+        row("home", "ASETDHNIOR'"),
+        row("bottom", "ZXCVBKM,./")
+      ]
+    case .dwarf:
+      [
+        row("number", "`1234567890-="),
+        row(
+          "top", "VLHKJGWOU,[]\\",
+          characters: ["vV", "lL", "hH", "kK", "jJ", "gG", "wW", "oO", "uU", ",>", "[{", "]}", "\\|"],
+          shiftedLabels: ["V", "L", "H", "K", "J", "G", "W", "O", "U", ">", "{", "}", "|"]
+        ),
+        row("home", "SRNTMYDAEI/"),
+        row(
+          "bottom", "XQBFZPC';.",
+          characters: ["xX", "qQ", "bB", "fF", "zZ", "pP", "cC", "'\"", ";:", ".<"],
+          shiftedLabels: ["X", "Q", "B", "F", "Z", "P", "C", "\"", ":", "<"]
+        )
+      ]
+    case .flaw:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FLAWPZKUR/[]\\"),
+        row("home", "HSOYCMTENI;"),
+        row("bottom", "BJ'GVQD.X,")
       ]
     case .real:
       [
