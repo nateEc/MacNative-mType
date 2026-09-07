@@ -201,6 +201,20 @@ enum KeyboardLayoutEmulator {
         "12:qQ 13:wW 14:fF 15:pP 17:gG 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "
           + "0:aA 1:rR 2:sS 3:tT 5:dD 4:hH 38:nN 40:eE 37:iI 41:oO 39:'\" "
           + "6:zZ 7:xX 8:cC 9:vV 11:bB 45:kK 46:mM 43:,< 47:.> 44:/?")
+    case .ansiColemakAngle:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:qQ 13:wW 14:fF 15:pP 17:gG 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} 42:\\| "
+          + "0:aA 1:rR 2:sS 3:tT 5:dD 4:hH 38:nN 40:eE 37:iI 41:oO 39:'\" "
+          + "6:xX 7:cC 8:vV 9:bB 11:zZ 45:kK 46:mM 43:,< 47:.> 44:/?"
+      )
+    case .ansiColemakWide:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:=+ 28:7& 25:8* 29:9( 27:0) 24:-_ "
+          + "12:qQ 13:wW 14:fF 15:pP 17:gG 16:[{ 32:jJ 34:lL 31:uU 35:yY 33:;: 30:'\" 42:\\| "
+          + "0:aA 1:rR 2:sS 3:tT 5:dD 4:]} 38:hH 40:nN 37:eE 41:iI 39:oO "
+          + "6:zZ 7:xX 8:cC 9:vV 11:bB 45:/? 46:kK 43:mM 47:,< 44:.>"
+      )
     case .ansiColemakDH:
       map(
         "12:qQ 13:wW 14:fF 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "
@@ -238,6 +252,13 @@ enum KeyboardLayoutEmulator {
         "12:qQ 13:wW 14:fF 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "
           + "0:aA 1:rR 2:sS 3:tT 5:gG 4:kK 38:nN 40:eE 37:iI 41:oO 39:'\" "
           + "10:zZ 6:xX 7:cC 8:dD 9:vV 11:`~ 45:mM 46:hH 43:,< 47:.> 44:/?")
+    case .ansiNorman:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:qQ 13:wW 14:dD 15:fF 17:kK 16:jJ 32:uU 34:rR 31:lL 35:;: 33:[{ 30:]} 42:\\| "
+          + "0:aA 1:sS 2:eE 3:tT 5:gG 4:yY 38:nN 40:iI 37:oO 41:hH 39:'\" "
+          + "6:zZ 7:xX 8:cC 9:vV 11:bB 45:pP 46:mM 43:,< 47:.> 44:/?"
+      )
     case .ansiWorkman:
       map(
         "12:qQ 13:dD 14:rR 15:wW 17:bB 16:jJ 32:fF 34:uU 31:pP 35:;: 33:[{ 30:]} "

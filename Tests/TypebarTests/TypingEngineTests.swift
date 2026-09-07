@@ -2051,6 +2051,75 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testColemakAngleWideAndNormanMapEveryAnsiKeyAndPersist() {
+    func outputs(
+      _ layout: KeyboardLayout, flags: NSEvent.ModifierFlags = []
+    ) -> [String] {
+      SystemKeyboardGuide.physicalRows.map { row in
+        row.compactMap {
+          KeyboardLayoutEmulator.text(
+            forKeyCode: $0, modifierFlags: flags, layout: layout)
+        }.joined()
+      }
+    }
+
+    XCTAssertEqual(
+      outputs(.ansiColemakAngle),
+      ["`1234567890-=", "qwfpgjluy;[]\\", "arstdhneio'", "xcvbzkm,./"])
+    XCTAssertEqual(
+      outputs(.ansiColemakAngle, flags: [.shift]),
+      ["~!@#$%^&*()_+", "QWFPGJLUY:{}|", "ARSTDHNEIO\"", "XCVBZKM<>?"])
+    XCTAssertEqual(
+      outputs(.ansiColemakWide),
+      ["`123456=7890-", "qwfpg[jluy;'\\", "arstd]hneio", "zxcvb/km,."])
+    XCTAssertEqual(
+      outputs(.ansiColemakWide, flags: [.shift]),
+      ["~!@#$%^+&*()_", "QWFPG{JLUY:\"|", "ARSTD}HNEIO", "ZXCVB?KM<>"])
+    XCTAssertEqual(
+      outputs(.ansiNorman),
+      ["`1234567890-=", "qwdfkjurl;[]\\", "asetgynioh'", "zxcvbpm,./"])
+    XCTAssertEqual(
+      outputs(.ansiNorman, flags: [.shift]),
+      ["~!@#$%^&*()_+", "QWDFKJURL:{}|", "ASETGYNIOH\"", "ZXCVBPM<>?"])
+
+    XCTAssertEqual(
+      KeyboardGuideModel.rows(for: .ansiColemakAngle)[3].map(\.label).joined(),
+      "XCVBZKM,./")
+    XCTAssertEqual(
+      KeyboardGuideModel.rows(for: .ansiColemakWide)[0].map(\.label).joined(),
+      "123456=7890-")
+    XCTAssertEqual(
+      KeyboardGuideModel.rows(for: .ansiNorman)[2].map(\.label).joined(),
+      "ASETGYNIOH'")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "z", layout: .ansiColemakAngle), "bottom-4")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "/", layout: .ansiColemakWide), "bottom-5")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "p", layout: .ansiNorman), "bottom-5")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Z", layout: .ansiColemakAngle), 11)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "=", layout: .ansiColemakWide), 26)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "H", layout: .ansiNorman), 41)
+
+    for layout in [
+      KeyboardLayout.ansiColemakAngle, .ansiColemakWide, .ansiNorman,
+    ] {
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+  }
+
+  @MainActor
   func testAnsiColemakDHMapsItsDistinctCoreKeysAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "b", layout: .ansiColemakDH), "top-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "g", layout: .ansiColemakDH), "home-4")
@@ -6310,7 +6379,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 56)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 59)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

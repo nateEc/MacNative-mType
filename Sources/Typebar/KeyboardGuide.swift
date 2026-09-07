@@ -7,6 +7,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case dvorakLeft
   case dvorakRight
   case ansiColemak
+  case ansiColemakAngle
+  case ansiColemakWide
   case ansiColemakDH
   case colemakDHISO
   case colemakDHMatrix
@@ -14,6 +16,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case colemakDHWideISO
   case colemakDHKANSI
   case colemakDHKISO
+  case ansiNorman
   case ansiWorkman
   case germanQwertz
   case swissGerman
@@ -68,6 +71,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .dvorakLeft: "Dvorak – Left-Handed"
     case .dvorakRight: "Dvorak – Right-Handed"
     case .ansiColemak: "ANSI Colemak"
+    case .ansiColemakAngle: "ANSI Colemak Angle"
+    case .ansiColemakWide: "ANSI Colemak Wide"
     case .ansiColemakDH: "ANSI Colemak-DH"
     case .colemakDHISO: "Colemak-DH ISO"
     case .colemakDHMatrix: "Colemak-DH Matrix"
@@ -75,6 +80,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .colemakDHWideISO: "Colemak-DH Wide ISO"
     case .colemakDHKANSI: "Colemak-DHk ANSI"
     case .colemakDHKISO: "Colemak-DHk ISO"
+    case .ansiNorman: "ANSI Norman"
     case .ansiWorkman: "ANSI Workman"
     case .germanQwertz: "German QWERTZ"
     case .swissGerman: "Swiss German"
@@ -134,6 +140,8 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case dvorakLeft
   case dvorakRight
   case ansiColemak
+  case ansiColemakAngle
+  case ansiColemakWide
   case ansiColemakDH
   case colemakDHISO
   case colemakDHMatrix
@@ -141,6 +149,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case colemakDHWideISO
   case colemakDHKANSI
   case colemakDHKISO
+  case ansiNorman
   case ansiWorkman
   case germanQwertz
   case swissGerman
@@ -688,6 +697,20 @@ enum KeyboardGuideModel {
         row("home", "ARSTDHNEIO'"),
         row("bottom", "ZXCVBKM,./"),
       ]
+    case .ansiColemakAngle:
+      [
+        row("number", "1234567890-="),
+        row("top", "QWFPGJLUY;[]"),
+        row("home", "ARSTDHNEIO'"),
+        row("bottom", "XCVBZKM,./"),
+      ]
+    case .ansiColemakWide:
+      [
+        row("number", "123456=7890-"),
+        row("top", "QWFPG[JLUY;'\\"),
+        row("home", "ARSTD]HNEIO"),
+        row("bottom", "ZXCVB/KM,."),
+      ]
     case .ansiColemakDH:
       [
         row("number", "1234567890-="),
@@ -736,6 +759,13 @@ enum KeyboardGuideModel {
         row("top", "QWFPBJLUY;[]"),
         row("home", "ARSTGKNEIO'"),
         row("bottom", "ZXCDV`MH,./"),
+      ]
+    case .ansiNorman:
+      [
+        row("number", "1234567890-="),
+        row("top", "QWDFKJURL;[]"),
+        row("home", "ASETGYNIOH'"),
+        row("bottom", "ZXCVBPM,./"),
       ]
     case .ansiWorkman:
       [
