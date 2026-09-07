@@ -1932,6 +1932,43 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testColemakDHKLayoutsKeepKOnHomeAndPersistDistinctPhysicalVariants() {
+    XCTAssertEqual(
+      KeyboardGuideModel.rows(for: .colemakDHKANSI)[2].map(\.label).joined(), "ARSTGKNEIO'")
+    XCTAssertEqual(
+      KeyboardGuideModel.rows(for: .colemakDHKANSI)[3].map(\.label).joined(), "XCDVZMH,./")
+    XCTAssertEqual(
+      KeyboardGuideModel.rows(for: .colemakDHKISO)[3].map(\.label).joined(), "ZXCDV`MH,./")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "k", layout: .colemakDHKANSI), "home-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "m", layout: .colemakDHKISO), "bottom-6")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 4, modifierFlags: [], layout: .colemakDHKANSI), "k")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [], layout: .colemakDHKANSI), "z")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [.shift], layout: .colemakDHKISO), "Z")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.shift], layout: .colemakDHKISO), "~")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "M", layout: .colemakDHKANSI), 45)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "Z", layout: .colemakDHKISO), 10)
+
+    for layout in [KeyboardLayout.colemakDHKANSI, .colemakDHKISO] {
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+  }
+
+  @MainActor
   func testNorwegianQwertyExposesTheCompatibleNordicMappingAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .norwegianQwerty), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ø", layout: .norwegianQwerty), "home-9")
@@ -5899,7 +5936,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 51)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 53)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

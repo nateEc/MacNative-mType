@@ -94,7 +94,7 @@
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
-| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 51 个原生内置布局可任选至多 15 个进入原生序列。 |
+| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 53 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 部分；自选组合已实现，候选语言仅限 Typebar 原创语言集。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
@@ -109,7 +109,7 @@
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。依据固定参考版本的 `noLazyMode`，非自定义模式会禁用 English、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Greeklish、Dutch、Filipino、Indonesian、Serbian Cyrillic、Bulgarian、Macedonian、Kazakh、中日韩／日语罗马字、Ukrainian 与 Ukrainian Latin，以及所有代码练习的该修饰器；自定义文本仍可使用。可配置多语练习只有至少一个选择的组成语言允许时才保留它。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
-| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，51 种原生物理布局和用户自写四行布局可显式模拟；Colemak-DH ANSI、ISO 与 Matrix 是独立映射，ISO 与 Brazilian ABNT2 保留额外实体键，Tamil99 与 Hindi InScript 等布局保留完整文本输出和空层语义，Dvorak Left/Right-Handed、Mongolian Cyrillic、Armenian HM QWERTY、Polish (Programmers)、Arabic (macOS) 与 Urdu Phonetic 有独立 Option 层，官方全部命名布局尚未覆盖。 |
+| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，53 种原生物理布局和用户自写四行布局可显式模拟；Colemak-DH ANSI/ISO/Matrix 与 DHk ANSI/ISO 是独立映射，ISO 与 Brazilian ABNT2 保留额外实体键，Tamil99 与 Hindi InScript 等布局保留完整文本输出和空层语义，Dvorak Left/Right-Handed、Mongolian Cyrillic、Armenian HM QWERTY、Polish (Programmers)、Arabic (macOS) 与 Urdu Phonetic 有独立 Option 层，官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
@@ -170,7 +170,7 @@
 
 ## 当前优先缺口
 
-1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、51 个原生内置模拟布局（包括相互独立的 Colemak-DH ANSI、ISO 与 Matrix，以及区域、非拉丁和单手布局），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
+1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、53 个原生内置模拟布局（包括相互独立的 Colemak-DH ANSI/ISO/Matrix 与 DHk ANSI/ISO，以及区域、非拉丁和单手布局），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
 2. 官方语言、词表、主题、字体和声音的完整目录不应复制。后续以原创或明确授权内容扩大用户可选范围，并逐项标注差异；语言候选、语义边界和准入条件见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 3. 网页账户页图表、猴子外观和广告设置不适合作为原生逐像素复刻目标；对用户可见意图的原生替代仍需设备验收。
 
@@ -209,6 +209,7 @@
 - ANSI Colemak-DH 自动化测试覆盖公开 ANSI 基础变体相对标准 Colemak 的 `B/G`、`D/V`、`H/M` 位置、提示高亮、普通/Shift 物理 keycode、反查 keycode、键盘图、输入模拟和 Layout Fluid 持久化。ANSI、ISO 与 Matrix 现为独立原生布局；wide 与其他变体仍使用系统输入或原创自定义布局，实现不读取或导入 Monkeytype 布局 JSON。
 - Colemak-DH ISO 自动化测试覆盖[官方 ISO Angle Mod 说明](https://colemakmods.github.io/mod-dh/keyboards.html)中的额外 `Z` 实体键、`X C D V`、中央反引号和 `K H , . /` 基础层，以及提示高亮、普通/Shift 物理 keycode、反查 keycode、键盘图、输入模拟和 Layout Fluid 持久化。映射依据该公开说明与[官方 CC0 macOS 基础层](https://github.com/ColemakMods/mod-dh/blob/master/macOS/Colemak%20DH.bundle/Contents/Resources/Colemak%20DH%20ISO.keylayout)独立编写；wide 与其他变体仍使用系统输入或原创自定义布局，不读取或导入 Monkeytype 布局 JSON、代码或资产。
 - Colemak-DH Matrix 自动化测试覆盖[官方 CC0 macOS 基础层](https://github.com/ColemakMods/mod-dh/blob/master/macOS/Colemak%20DH.bundle/Contents/Resources/Colemak%20DH%20Matrix.keylayout)中的正交底行 `Z X C D V K H , . /`，验证它与 ANSI 的中央 `Z` 重定位及 ISO 的额外实体键不同，并覆盖提示高亮、普通/Shift 物理 keycode、反查 keycode、键盘图、输入模拟和 Layout Fluid 持久化；实现不读取或导入 Monkeytype 布局 JSON、代码或资产。
+- Colemak-DHk ANSI/ISO 自动化测试覆盖 ColemakMods 官方 CC0 macOS 基础层中的主行 `K`、底行 `M/H`、ANSI 中央 `Z` 及 ISO 额外 `Z`/中央反引号实体键，并验证提示高亮、普通/Shift 物理 keycode、反查 keycode、两套键盘图、输入模拟和 Layout Fluid 持久化；实现不读取或导入 Monkeytype 布局 JSON、代码或资产。
 - Turkish F 自动化测试覆盖公开基础行的 `ğ`、`ı`、`i/İ`、`ü`、`ö`、`ç`、`ş`、数字行、ISO `< >`、提示高亮、普通/Shift 物理 keycode、反查 keycode、键盘图、输入模拟和 Layout Fluid 持久化。AltGr 与组合式死键继续由 macOS 当前输入源处理；实现不读取或导入 Monkeytype 布局 JSON。
 - 乌克兰语自动化测试覆盖原创词表中的 `ї`、`є`、`ґ`、四档原创引语、多语混排、弱项复练、`uk-UA` 朗读 locale 与 `uk` 百科入口；服务端测试覆盖成绩提交、语言筛选排行榜与引语投稿白名单，未读取或导入参考词表/内容。
 - 乌克兰语 Latin 自动化测试覆盖全 ASCII 自创词流、四档原创引语、完整多语混排轮转、弱项复练、`uk-UA` 朗读 locale 与服务端投稿/排行榜白名单；参考流会保守留在离线内容，以免远端西里尔文本违反 Latin 承诺。
@@ -234,8 +235,8 @@
 - Croatian 自动化测试覆盖自创词流（含 `č`、`ć`、`đ`、`š` 与 `ž`）、四档原创引语、完整多语混排轮转、弱项复练、`hr-HR` 朗读 locale 与 `hr` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Serbian 自动化测试覆盖自创西里尔词流（含 `љ`、`њ`、`ђ`、`ћ`、`џ`、`ч`、`ш` 与 `ж`）、四档原创引语、完整多语混排轮转、弱项复练、`sr-RS` 朗读 locale 与 `sr` 百科入口；Serbian Latin 同样覆盖四档原创离线拉丁引语、混排、弱项复练与 `sr-RS`，并拒绝百科替换以保持当前书写形式；服务端测试覆盖两者的投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Hungarian 自动化测试覆盖自创词流（含 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`）、四档原创引语、完整多语混排轮转、弱项复练、`hu-HU` 朗读 locale 与 `hu` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
-- 完整客户端 `swift test` 通过 306 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
-- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、46/3/190 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
+- 完整客户端 `swift test` 通过 307 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、48/3/188 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退；macOS `UCKeyTranslate` 返回的多字符或多码点图例会完整保留，不再截断为首字符。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
