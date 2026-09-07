@@ -21,6 +21,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case italianQwerty
   case portugueseQwertyISO
   case portugueseQwertyANSI
+  case brazilianABNT2
   case latinAmericanQwerty
   case polishProgrammers
   case frenchAzerty
@@ -73,6 +74,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .italianQwerty: "Italian QWERTY"
     case .portugueseQwertyISO: "Portuguese QWERTY (ISO)"
     case .portugueseQwertyANSI: "Portuguese QWERTY (ANSI)"
+    case .brazilianABNT2: "Brazilian – ABNT2"
     case .latinAmericanQwerty: "Latin American QWERTY"
     case .polishProgrammers: "Polish (Programmers)"
     case .frenchAzerty: "French AZERTY"
@@ -130,6 +132,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case italianQwerty
   case portugueseQwertyISO
   case portugueseQwertyANSI
+  case brazilianABNT2
   case latinAmericanQwerty
   case polishProgrammers
   case frenchAzerty
@@ -874,6 +877,33 @@ enum KeyboardGuideModel {
           "bottom", "ZXCVBNM,.-",
           characters: ["zZ", "xX", "cC", "vV", "bB", "nN", "mM", ",;", ".:", "-_"],
           shiftedLabels: ["Z", "X", "C", "V", "B", "N", "M", ";", ":", "_"]
+        ),
+      ]
+    case .brazilianABNT2:
+      [
+        layeredRow(
+          "number", labels: ["'", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          shiftedLabels: ["\"", "!", "@", "#", "$", "%", "¨", "&", "*", "(", ")", "_", "+"],
+          optionLabels: ["`", "¹", "²", "³", "£", "¢", "¬", "¶", "•", "∑", "º", "–", "§"],
+          shiftedOptionLabels: ["’", "¡", "½", "¾", "¼", "⅜", "¨", "⅞", "×", "·", "°", "—", "±"]
+        ),
+        layeredRow(
+          "top", labels: ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "´", "[", "]"],
+          shiftedLabels: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "`", "{", "}"],
+          optionLabels: ["/", "?", "€", "®", "ŧ", "←", "↓", "→", "ø", "þ", "´", "ª", "º"],
+          shiftedOptionLabels: ["\\", "¿", "€", "®", "Ŧ", "¥", "↑", "ı", "Ø", "Þ", "`", "ª", "º"]
+        ),
+        layeredRow(
+          "home", labels: ["a", "s", "d", "f", "g", "h", "j", "k", "l", "ç", "~"],
+          shiftedLabels: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ç", "^"],
+          optionLabels: ["æ", "ß", "ð", "đ", "∆", "ħ", "ʝ", "ĸ", "ł", "·", "~"],
+          shiftedOptionLabels: ["Æ", "§", "Ð", "◊", "˝", "Ħ", "&", "", "Ł", "ő", "^"]
+        ),
+        layeredRow(
+          "bottom", labels: ["\\", "z", "x", "c", "v", "b", "n", "m", ",", ".", ";", "/"],
+          shiftedLabels: ["|", "Z", "X", "C", "V", "B", "N", "M", "<", ">", ":", "?"],
+          optionLabels: ["∏", "Ω", "≈", "₢", "ʋ", "∫", "ŋ", "µ", "≤", "≥", "…", "°"],
+          shiftedOptionLabels: ["ă", "<", ">", "©", "Ʋ", "™", "Ŋ", "µ", "«", "»", "…", "¿"]
         ),
       ]
     case .latinAmericanQwerty:

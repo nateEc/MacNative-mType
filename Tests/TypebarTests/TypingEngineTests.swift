@@ -3065,6 +3065,47 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ª", layout: .portugueseQwertyANSI), 39)
   }
 
+  @MainActor
+  func testBrazilianABNT2MapsMacLayersAndBothExtraPhysicalKeys() {
+    let rows = KeyboardGuideModel.rows(for: .brazilianABNT2)
+    let keyRows = [
+      SystemKeyboardGuide.physicalRows[0],
+      SystemKeyboardGuide.physicalRows[1],
+      SystemKeyboardGuide.physicalRows[2],
+      [UInt16(10)] + SystemKeyboardGuide.physicalRows[3] + [UInt16(94)],
+    ]
+    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 12])
+    for (keyCodes, guideRow) in zip(keyRows, rows) {
+      for (keyCode, key) in zip(keyCodes, guideRow) {
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: .brazilianABNT2), key.label)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .brazilianABNT2), key.shiftedLabel)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .brazilianABNT2), key.optionLabel)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .brazilianABNT2), key.shiftedOptionLabel)
+      }
+    }
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ç", layout: .brazilianABNT2), "home-9")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 10, modifierFlags: [], layout: .brazilianABNT2), "\\")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 10, modifierFlags: [.option, .shift], layout: .brazilianABNT2), "ă")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [], layout: .brazilianABNT2), "/")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [.shift], layout: .brazilianABNT2), "?")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [.option], layout: .brazilianABNT2), "°")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 94, modifierFlags: [.option, .shift], layout: .brazilianABNT2), "¿")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ă", layout: .brazilianABNT2), 10)
+    XCTAssertEqual(KeyboardInputLayout.brazilianABNT2.emulatedLayout, .brazilianABNT2)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .brazilianABNT2
+    settings.keyboardInputLayout = .brazilianABNT2
+    settings.layoutFluidLayouts = [.brazilianABNT2, .ansiQwerty]
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .brazilianABNT2)
+    XCTAssertEqual(restored.keyboardInputLayout, .brazilianABNT2)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.brazilianABNT2, .ansiQwerty])
+  }
+
   func testLatinAmericanQwertyLeavesItsDeadKeyToMacOSAndMapsTypedSymbols() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ñ", layout: .latinAmericanQwerty), "home-9")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "¡", layout: .latinAmericanQwerty), "number-12")
@@ -5706,7 +5747,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 47)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 48)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

@@ -270,6 +270,8 @@
 
 2026-09-07 补充：当前内置键盘图更新为四十七种，新增 `Dvorak – Left-Handed` 与 `Dvorak – Right-Handed`。固定参考源码只用于确认 `dvorak_L` / `dvorak_R` 功能名；依据 macOS 同名系统输入源独立实现 Base、Shift、Option 与 Shift+Option 四层，并用于提示、模拟、反查、归档与 Layout Fluid。Apple 与 Unicode CLDR 资料用于交叉确认左右手语义；此条取代本文较早“四十五种”的计数，不读取或导入 Monkeytype 布局 JSON、代码或资产。
 
+2026-09-07 补充：当前内置键盘图更新为四十八种，新增 `Brazilian – ABNT2`。固定参考源码只用于确认 `ABNT2` 功能名；依据 macOS 同名系统输入源独立实现 Base、Shift、Option 与 Shift+Option 四层，并以 12 键底行支持 ISO keyCode 10 和 ABNT2 专用 keyCode 94，用于提示、模拟、反查、归档与 Layout Fluid。Unicode CLDR 用于交叉确认 103 键几何；此条取代本文较早“四十七种”的计数，不读取或导入 Monkeytype 布局 JSON、代码或资产。
+
 2026-09-04 补充：当时 `CFG-02`、`VIS-02` 与 `VIS-05` 的非拉丁布局覆盖新增 `Bulgarian Cyrillic · Typebar`。它是 Typebar 自写的第 19 个内置物理键位映射，覆盖 `я/ъ/щ/ч/ь` 与 ISO `< >`，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；这不是官方或系统 BDS 布局的复制，需精确系统布局时用户仍可选择 macOS 当前输入源。
 | INP-01 | 输入、逐字符状态、退格、长词 | `input/handlers/*` | TypingEngine | 部分实现 |
 | INP-02 | 组合输入/IME、焦点及 Caps Lock 提示 | `input/*`, `CapsWarning.tsx` | AppKitInputBridge | 部分实现：原生 AppKit 输入桥支持组合输入；标记文本在确认前只更新可选的关闭/下方/替换当前字符组合显示，不会改变提示、输入、计分或回放，确认提交时才进入输入引擎。输入视图会回传实际 responder 焦点，连续失焦满 1 秒时才显示可点击恢复焦点的提示，重新获焦会取消等待；有大小写语义的拉丁文与西里尔文练习会读取 macOS Caps Lock 状态显示警告，中文、日语假名与韩语不会显示无意义的提示。组合显示和两类提示均可在本机设置持久化；IME 最终人工验收尚未完成 |
