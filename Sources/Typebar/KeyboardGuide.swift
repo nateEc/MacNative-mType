@@ -39,6 +39,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case isrtAngle
   case engram
   case engrammer
+  case semimak
+  case semimakJQ
+  case semimakJQC
+  case canary
+  case canaryMatrix
   case halmak
   case qgmlwb
   case qgmlwy
@@ -137,6 +142,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .isrtAngle: "ISRT Angle"
     case .engram: "Engram"
     case .engrammer: "Engrammer"
+    case .semimak: "Semimak"
+    case .semimakJQ: "Semimak JQ"
+    case .semimakJQC: "Semimak JQC"
+    case .canary: "Canary"
+    case .canaryMatrix: "Canary Matrix"
     case .halmak: "Halmak"
     case .qgmlwb: "QGMLWB"
     case .qgmlwy: "QGMLWY"
@@ -240,6 +250,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case isrtAngle
   case engram
   case engrammer
+  case semimak
+  case semimakJQ
+  case semimakJQC
+  case canary
+  case canaryMatrix
   case halmak
   case qgmlwb
   case qgmlwy
@@ -1229,6 +1244,41 @@ enum KeyboardGuideModel {
         row("top", "BYOU';LDWVZ=\\"),
         row("home", "CIEA,.HTSNQ"),
         row("bottom", "GXJK-/RMFP"),
+      ]
+    case .semimak:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FLHVZQWUOY[]\\"),
+        row("home", "SRNTKCDEAI;"),
+        row("bottom", "X'BMJPG,./"),
+      ]
+    case .semimakJQ:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FLHVZ'WUOY[]\\"),
+        row("home", "SRNTKCDEAI;"),
+        row("bottom", "XJBMQPG,./"),
+      ]
+    case .semimakJQC:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FLHVZ'WUOY[]\\"),
+        row("home", "SRNTKGDEAI;"),
+        row("bottom", "XJBMQPC,./"),
+      ]
+    case .canary:
+      [
+        row("number", "`1234567890-="),
+        row("top", "WLYPKZXOU;[]\\"),
+        row("home", "CRSTBFNEIA'"),
+        row("bottom", "JVDGQMH/,."),
+      ]
+    case .canaryMatrix:
+      [
+        row("number", "`1234567890-="),
+        row("top", "WLYPBZFOU'[]\\"),
+        row("home", "CRSTGMNEIA;"),
+        row("bottom", "QJVDKXH/,."),
       ]
     case .ansiColemak:
       [
