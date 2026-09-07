@@ -475,6 +475,7 @@ private struct ContentView: View {
   @State private var activeResultTagDraft = ""
   @State private var practiceReturnPreset: SavedTestPreset?
   @State private var showingHistory = false
+  @State private var showingWeakSpots = false
   @State private var showingPresets = false
   @State private var showingDataMigration = false
   @State private var showingSavedTexts = false
@@ -678,6 +679,7 @@ private struct ContentView: View {
       Button("预设", systemImage: "slider.horizontal.3") { showingPresets = true }
       Button("挑战", systemImage: "flag.checkered") { showingChallenges = true }
       Button("历史", systemImage: "clock.arrow.circlepath") { showingHistory = true }
+      Button("弱项", systemImage: "scope") { showingWeakSpots = true }
       Button("数据", systemImage: "externaldrive") { showingDataMigration = true }
       Button("同步", systemImage: "arrow.triangle.2.circlepath") { showingSync = true }
       Button("好友", systemImage: "person.2") { showingConnections = true }
@@ -685,6 +687,11 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingHistory) {
       ResultsHistoryView(settings: settings, currentConfiguration: configuration)
+    }
+    .sheet(isPresented: $showingWeakSpots) {
+      WeakSpotHistoryView(
+        initialLanguage: language, englishVariant: settings.englishVariant,
+        onStart: startWeakSpotPractice(prompt:language:))
     }
     .sheet(isPresented: $showingPresets) {
       PresetLibraryView(currentPreset: presetDefinition, onApply: apply)
@@ -2312,7 +2319,14 @@ private struct ContentView: View {
 
   private func startWeakSpotPractice() {
     guard let weakSpotPrompt else { return }
+    startWeakSpotPractice(prompt: weakSpotPrompt, language: language)
+  }
+
+  private func startWeakSpotPractice(
+    prompt weakSpotPrompt: String, language weakSpotLanguage: TypingLanguage
+  ) {
     activeChallengeID = nil
+    language = weakSpotLanguage
     customText = weakSpotPrompt
     customTextCompletion = .words
     customTextWordLimit = weakSpotPrompt.split(separator: " ").count
@@ -2388,6 +2402,9 @@ private struct ContentView: View {
       .init(
         id: "history", title: "打开练习历史", subtitle: "查看成绩、趋势与活动",
         systemImage: "clock.arrow.circlepath", keywords: ["history", "历史", "统计"], group: .activity),
+      .init(
+        id: "weakSpots", title: "打开弱项分析", subtitle: "从本机回放查看错误字符并开始训练",
+        systemImage: "scope", keywords: ["weak", "weakspot", "弱项", "错误", "训练"], group: .activity),
       .init(
         id: "presets", title: "打开测试预设", subtitle: "保存或应用完整测试配置", systemImage: "slider.horizontal.3",
         keywords: ["preset", "预设"], group: .library),
@@ -2477,6 +2494,7 @@ private struct ContentView: View {
       mode = .custom
       reset()
     case "history": showingHistory = true
+    case "weakSpots": showingWeakSpots = true
     case "presets": showingPresets = true
     case "challenges": showingChallenges = true
     case "savedTexts": showingSavedTexts = true

@@ -7254,6 +7254,61 @@ final class TypingEngineTests: XCTestCase {
         results: [result], language: .simplifiedChinese, englishVariant: .american))
   }
 
+  func testWeakSpotReportAggregatesSavedReplayAndBuildsDeterministicPractice() throws {
+    let repeatedErrors = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .english), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 3,
+      correctCharacterCount: 0, errorCount: 3, wpm: 0, rawWpm: 7, accuracy: 0,
+      prompt: "amber",
+      replayEvents: [
+        .init(offset: 1, kind: .insert, text: "x"),
+        .init(offset: 2, kind: .delete, text: ""),
+        .init(offset: 3, kind: .insert, text: "yx"),
+      ])
+    let cleanReplay = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .english), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 5,
+      correctCharacterCount: 5, errorCount: 0, wpm: 12, rawWpm: 12, accuracy: 100,
+      prompt: "amber", replayEvents: [.init(offset: 1, kind: .insert, text: "amber")])
+    let otherLanguage = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .spanish), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(5), typedCharacterCount: 3,
+      correctCharacterCount: 2, errorCount: 1, wpm: 12, rawWpm: 12, accuracy: 67,
+      prompt: "mar", replayEvents: [.init(offset: 1, kind: .insert, text: "xar")])
+    let abandoned = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .english), outcome: .abandoned,
+      startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 1,
+      correctCharacterCount: 0, errorCount: 1, wpm: 0, rawWpm: 6, accuracy: 0,
+      prompt: "amber", replayEvents: [.init(offset: 1, kind: .insert, text: "x")])
+
+    let results = [repeatedErrors, cleanReplay, otherLanguage, abandoned]
+    let report = try XCTUnwrap(
+      WeakSpotPractice.report(
+        results: results, language: .english, englishVariant: .american, suggestionLimit: 3))
+
+    XCTAssertEqual(report.language, .english)
+    XCTAssertEqual(report.analyzedResultCount, 2)
+    XCTAssertEqual(report.totalMistakeCount, 3)
+    XCTAssertEqual(
+      report.characters,
+      [
+        .init(character: "a", mistakeCount: 2),
+        .init(character: "m", mistakeCount: 1),
+      ])
+    XCTAssertEqual(report.suggestedWords.count, 3)
+    XCTAssertTrue(report.suggestedWords.allSatisfy(StarterLexicon.words.contains))
+    XCTAssertTrue(report.suggestedWords[0].contains("a"))
+
+    let prompt = try XCTUnwrap(
+      WeakSpotPractice.prompt(
+        results: results, language: .english, englishVariant: .american, wordCount: 10))
+    XCTAssertEqual(prompt.split(separator: " ").count, 10)
+    XCTAssertEqual(
+      WeakSpotPractice.report(
+        results: results, language: .spanish, englishVariant: .american)?.totalMistakeCount,
+      1)
+  }
+
   func testLocalWordFilterUsesOnlyRequestedCharactersLengthsAndRegularExpressions() throws {
     let criteria = LocalWordFilter.Criteria(
       includeCharacters: "a", excludeCharacters: "r", minimumLength: 3, maximumLength: 5,
