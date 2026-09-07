@@ -140,7 +140,7 @@
 | `fontSize` | `fontSize` | 已映射。 |
 | `fontFamily` | `practiceFont`、本机字体名称/导入 | 部分；使用 macOS 已安装或用户导入字体，不复用网页字体资产。 |
 | `keymapMode` | `keyboardGuideMode` | 已映射。 |
-| `keymapLayout` | `keyboardGuideLayoutSource`、`keyboardLayout`、自定义图 | 部分；可选内置、当前 macOS 输入源或用户自写 Unicode 图；239 份官方命名资产不打包。 |
+| `keymapLayout` | `keyboardGuideLayoutSource`、`keyboardLayout`、自定义图 | 部分；可选内置、当前 macOS 输入源或用户自写 Unicode 图；239 份官方命名资产不打包，逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md` 与机器清单 `Compatibility/official-layouts.json`。 |
 | `keymapStyle` | `keyboardGuideStyle` | 已映射。 |
 | `keymapLegendStyle` | `keyboardGuideLegendStyle` | 已映射。 |
 | `keymapKeys` | `keyboardGuideKeysMode` | 已映射。 |
@@ -224,7 +224,8 @@
 - Croatian 自动化测试覆盖自创词流（含 `č`、`ć`、`đ`、`š` 与 `ž`）、四档原创引语、完整多语混排轮转、弱项复练、`hr-HR` 朗读 locale 与 `hr` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Serbian 自动化测试覆盖自创西里尔词流（含 `љ`、`њ`、`ђ`、`ћ`、`џ`、`ч`、`ш` 与 `ж`）、四档原创引语、完整多语混排轮转、弱项复练、`sr-RS` 朗读 locale 与 `sr` 百科入口；Serbian Latin 同样覆盖四档原创离线拉丁引语、混排、弱项复练与 `sr-RS`，并拒绝百科替换以保持当前书写形式；服务端测试覆盖两者的投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Hungarian 自动化测试覆盖自创词流（含 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`）、四档原创引语、完整多语混排轮转、弱项复练、`hu-HU` 朗读 locale 与 `hu` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
-- 完整客户端 `swift test` 通过 290 项、独立 Vapor 服务 `swift test` 通过 66 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 完整客户端 `swift test` 通过 291 项、独立 Vapor 服务 `swift test` 通过 66 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、35/3/201 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退；macOS `UCKeyTranslate` 返回的多字符或多码点图例会完整保留，不再截断为首字符。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。

@@ -58,7 +58,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 2026-09-07 当前状态更正：内置键盘图现为三十九种，新增 `Persian (Farsi)`。固定参考源码只用于确认 `persian_farsi` 功能名；键位依据 Microsoft Persian KLID `00000429` 的公开键位表独立实现，覆盖 Farsi Yeh、Keheh、Gaf、ISO `پ`、组合音标和 `ریال` 多字符快捷键。下一键提示优先匹配精确单字符输出，避免多字符快捷键抢占其中字符；Control 层继续走 macOS。本文较早的三十八种计数均由此当前数值取代，不读取或导入 Monkeytype 布局 JSON、文本或资产。
 
-2026-09-07 当前状态更正：内置键盘图现为四十种，新增 `Urdu Phonetic (CRULP)`。固定参考源码只用于确认 `urdu_phonetic` 功能名；键位依据 CLE/CRULP v1.1 规范和 SIL Keyman 开放映射交叉独立实现，覆盖 Urdu 字母、数字、组合音标、宗教符号、Option/Right Alt 层及明确无输出的 Shift+F。本文较早的三十九种计数均由此当前数值取代，不读取或导入 Monkeytype 布局 JSON、第三方代码、字体或键盘资产。
+2026-09-07 当前状态更正：内置键盘图现为四十种，新增 `Urdu Phonetic (CRULP)`。固定参考源码只用于确认 `urdu_phonetic` 功能名；键位依据 CLE/CRULP v1.1 规范和 SIL Keyman 开放映射交叉独立实现，覆盖 Urdu 字母、数字、组合音标、宗教符号、Option/Right Alt 层及明确无输出的 Shift+F。本文较早的三十九种计数均由此当前数值取代，不读取或导入 Monkeytype 布局 JSON、第三方代码、字体或键盘资产。固定源码全部 239 个布局名称的当前状态由 `OFFICIAL_LAYOUT_AUDIT.md` 和 `Compatibility/official-layouts.json` 逐项追踪：35 项精确原生、3 项相关替代、201 项系统输入或自定义回退。
 
 | 域 | 必须覆盖的能力 | 状态 |
 | --- | --- | --- |

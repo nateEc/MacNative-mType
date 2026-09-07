@@ -4,6 +4,8 @@
 
 官方 48 项 funbox 的逐项来源、映射与未实现缺口见 `OFFICIAL_FUNBOX_AUDIT.md`；该审计是本表 FUN-01/FUN-02 的细化证据。
 
+官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 35 项精确原生、3 项相关替代、201 项系统输入或自定义回退均由自动化测试守恒校验。
+
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
 | TST-01 | 五类测试与模式参数 | `components/pages/test/TestConfig.tsx` | TestDomain | 部分实现 |
