@@ -40,6 +40,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case arabic102
   case arabicMac
   case urduPhonetic
+  case thaiKedmanee
   case hebrew
   case serbianCyrillic
 
@@ -85,6 +86,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .arabic102: "Arabic (102)"
     case .arabicMac: "Arabic (macOS)"
     case .urduPhonetic: "Urdu Phonetic (CRULP)"
+    case .thaiKedmanee: "Thai Kedmanee"
     case .hebrew: "Hebrew"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
@@ -135,6 +137,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case arabic102
   case arabicMac
   case urduPhonetic
+  case thaiKedmanee
   case hebrew
   case serbianCyrillic
 
@@ -1278,6 +1281,33 @@ enum KeyboardGuideModel {
           characters: ["زذ؏", "شژ؎", "چث؃", "طظؕ", "بݨ﷽", "نں؀", "م٘", "،ٌ>", "۔٫<", "/؟"],
           shiftedLabels: ["ذ", "ژ", "ث", "ظ", "ݨ", "ں", "٘", "ٌ", "٫", "؟"],
           optionLabels: ["؏", "؎", "؃", "ؕ", "﷽", "؀", nil, ">", "<", nil]
+        ),
+      ]
+    case .thaiKedmanee:
+      [
+        row(
+          "number",
+          labels: ["_", "ๅ", "/", "-", "ภ", "ถ", "ุ", "ึ", "ค", "ต", "จ", "ข", "ช"],
+          characters: ["_%", "ๅ+", "/๑", "-๒", "ภ๓", "ถ๔", "ุู", "ึ฿", "ค๕", "ต๖", "จ๗", "ข๘", "ช๙"],
+          shiftedLabels: ["%", "+", "๑", "๒", "๓", "๔", "ู", "฿", "๕", "๖", "๗", "๘", "๙"]
+        ),
+        row(
+          "top",
+          labels: ["ๆ", "ไ", "ำ", "พ", "ะ", "ั", "ี", "ร", "น", "ย", "บ", "ล", "ฃ"],
+          characters: ["ๆ๐", "ไ\"", "ำฎ", "พฑ", "ะธ", "ัํ", "ี๊", "รณ", "นฯ", "ยญ", "บฐ", "ล,", "ฃฅ"],
+          shiftedLabels: ["๐", "\"", "ฎ", "ฑ", "ธ", "ํ", "๊", "ณ", "ฯ", "ญ", "ฐ", ",", "ฅ"]
+        ),
+        row(
+          "home",
+          labels: ["ฟ", "ห", "ก", "ด", "เ", "้", "่", "า", "ส", "ว", "ง"],
+          characters: ["ฟฤ", "หฆ", "กฏ", "ดโ", "เฌ", "้็", "่๋", "าษ", "สศ", "วซ", "ง."],
+          shiftedLabels: ["ฤ", "ฆ", "ฏ", "โ", "ฌ", "็", "๋", "ษ", "ศ", "ซ", "."]
+        ),
+        row(
+          "bottom",
+          labels: ["ผ", "ป", "แ", "อ", "ิ", "ื", "ท", "ม", "ใ", "ฝ"],
+          characters: ["ผ(", "ป)", "แฉ", "อฮ", "ิฺ", "ื์", "ท?", "มฒ", "ใฬ", "ฝฦ"],
+          shiftedLabels: ["(", ")", "ฉ", "ฮ", "ฺ", "์", "?", "ฒ", "ฬ", "ฦ"]
         ),
       ]
     case .hebrew:

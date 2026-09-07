@@ -60,6 +60,8 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 2026-09-07 当前状态更正：内置键盘图现为四十种，新增 `Urdu Phonetic (CRULP)`。固定参考源码只用于确认 `urdu_phonetic` 功能名；键位依据 CLE/CRULP v1.1 规范和 SIL Keyman 开放映射交叉独立实现，覆盖 Urdu 字母、数字、组合音标、宗教符号、Option/Right Alt 层及明确无输出的 Shift+F。本文较早的三十九种计数均由此当前数值取代，不读取或导入 Monkeytype 布局 JSON、第三方代码、字体或键盘资产。固定源码全部 239 个布局名称的当前状态由 `OFFICIAL_LAYOUT_AUDIT.md` 和 `Compatibility/official-layouts.json` 逐项追踪：35 项精确原生、3 项相关替代、201 项系统输入或自定义回退。
 
+2026-09-07 当前状态更正：内置键盘图现为四十一种，新增 `Thai Kedmanee`。固定参考源码只用于确认 `thai_kedmanee` 功能名；普通/Shift 键位依据 Microsoft Thai Kedmanee KLID `0000041E` 公开键位表与 NECTEC 的 TIS 820 资料独立实现，并以 macOS `com.apple.keylayout.Thai` 的系统翻译结果交叉核对。本文较早的四十种计数及 35/3/201 矩阵均由此当前数值取代：36 项精确原生、3 项相关替代、200 项系统输入或自定义回退；Option 与组合输入继续交给 macOS，不读取或导入 Monkeytype 布局 JSON、代码或资产。
+
 | 域 | 必须覆盖的能力 | 状态 |
 | --- | --- | --- |
 | 核心测试 | time、words、quote、zen、custom 五种测试；自定义时长/字数/文本；开始、重启、结束和放弃 | 部分实现：五种离线模式可在 UI 配置；计时可设为 5–3600 秒、字数可设为 1–1000 词；开始后可从原生控制栏明确放弃，放弃与失败不会写入完成成绩；自定义保存文本可选长文本恢复：以完整词边界的原始字符偏移保留进度，选择时固定为完成全文，中止时保存剩余位置、完成时复位，旧归档兼容为普通文本；保存长文本、时长至少 1 小时或禅模式进行中时，命令面板也会提供需确认的中止入口；计时、字数和引语模式支持原创 English/Español/Deutsch/Français/Italiano/Português/简体中文内容；禅模式不生成提示，呈现用户本机自由输入，空格/换行提交词、Tab 保留为文本，Shift+Enter 明确结束；模式终止、放弃与内容工厂已测试 |

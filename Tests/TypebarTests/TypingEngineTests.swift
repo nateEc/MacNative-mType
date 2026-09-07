@@ -2528,6 +2528,55 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testThaiKedmaneeMapsStandardLayersAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .thaiKedmanee)
+    XCTAssertEqual(rows[0][0].label, "_")
+    XCTAssertEqual(rows[0][0].shiftedLabel, "%")
+    XCTAssertEqual(rows[1][5].label, "ั")
+    XCTAssertEqual(rows[1][5].shiftedLabel, "ํ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ๆ", layout: .thaiKedmanee), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "฿", layout: .thaiKedmanee), "number-7")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ฝ", layout: .thaiKedmanee), "bottom-9")
+
+    for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
+      for (keyCode, key) in zip(keyCodes, guideRow) {
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: [], layout: .thaiKedmanee),
+          key.label)
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: [.shift], layout: .thaiKedmanee),
+          key.shiftedLabel)
+      }
+    }
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .thaiKedmanee), "ๆ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 26, modifierFlags: [.shift], layout: .thaiKedmanee), "฿")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 44, modifierFlags: [], layout: .thaiKedmanee), "ฝ")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [.option], layout: .thaiKedmanee))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "โ", layout: .thaiKedmanee), 3)
+    XCTAssertEqual(KeyboardInputLayout.thaiKedmanee.emulatedLayout, .thaiKedmanee)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .thaiKedmanee
+    settings.keyboardInputLayout = .thaiKedmanee
+    settings.layoutFluidLayouts = [.thaiKedmanee, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .thaiKedmanee)
+    XCTAssertEqual(restored.keyboardInputLayout, .thaiKedmanee)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.thaiKedmanee, .ansiQwerty])
+  }
+
+  @MainActor
   func testHebrewMapsStandardLettersShiftLayerAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .hebrew)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .hebrew), "number-0")
@@ -5451,7 +5500,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 40)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 41)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
