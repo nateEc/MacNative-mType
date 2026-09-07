@@ -54,6 +54,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case quartz
   case arensito
   case arts
+  case capewellDvorak
+  case colman
+  case heart
+  case klauser
+  case oneproduct
   case halmak
   case qgmlwb
   case qgmlwy
@@ -167,6 +172,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .quartz: "Quartz"
     case .arensito: "Arensito"
     case .arts: "ARTS"
+    case .capewellDvorak: "Capewell Dvorak"
+    case .colman: "Colman"
+    case .heart: "Heart"
+    case .klauser: "Klauser"
+    case .oneproduct: "Oneproduct"
     case .halmak: "Halmak"
     case .qgmlwb: "QGMLWB"
     case .qgmlwy: "QGMLWY"
@@ -285,6 +295,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case quartz
   case arensito
   case arts
+  case capewellDvorak
+  case colman
+  case heart
+  case klauser
+  case oneproduct
   case halmak
   case qgmlwb
   case qgmlwy
@@ -1391,6 +1406,45 @@ enum KeyboardGuideModel {
         row("top", "QLDYGJMOU;[]\\"),
         row("home", "ARTSCPNEIH/"),
         row("bottom", "ZXKWVBF',."),
+      ]
+    case .capewellDvorak:
+      [
+        row("number", "`1234567890[]"),
+        row("top", "',.PYQFGRK/=\\"),
+        row("home", "OAEIUDHTNS-"),
+        row("bottom", "ZXCVJLMWB;"),
+      ]
+    case .colman:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QLRWBJMUY;[]\\"),
+        row("home", "ANHSFPTEIO'"),
+        row("bottom", "ZXCVKGD,./"),
+      ]
+    case .heart:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QGDVXJYOU;[]\\"),
+        row("home", "RSTHLPNAIE'"),
+        row("bottom", "WCBMKZF,./"),
+      ]
+    case .klauser:
+      [
+        row("number", "`1234567890-="),
+        row("top", "K,UYPWLMFC[]\\"),
+        row("home", "OAEIDRNTHS'"),
+        row("bottom", "Q.';ZXVGBJ"),
+      ]
+    case .oneproduct:
+      [
+        row("number", "`1234567890-="),
+        row("top", "PLDWGJXOYQ[]\\"),
+        row("home", "NRSTMUAEIH'"),
+        row(
+          "bottom", "ZCFVB,.?;K",
+          characters: ["zZ", "cC", "fF", "vV", "bB", ",<", ".>", "?/", ";:", "kK"],
+          shiftedLabels: ["Z", "C", "F", "V", "B", "<", ">", "/", ":", "K"]
+        ),
       ]
     case .ansiColemak:
       [
@@ -2737,7 +2791,7 @@ enum KeyboardGuideModel {
 private extension KeyboardLayout {
   var showsNumberRowInMinimalGuide: Bool {
     self == .frenchAzerty || self == .mtgapFull || self == .engram || self == .engrammer
-      || self == .booMangle || self == .quartz
+      || self == .booMangle || self == .quartz || self == .capewellDvorak
   }
 }
 
