@@ -4,7 +4,7 @@
 
 官方 48 项 funbox 的逐项来源、映射与未实现缺口见 `OFFICIAL_FUNBOX_AUDIT.md`；该审计是本表 FUN-01/FUN-02 的细化证据。
 
-官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 44 项精确原生、3 项相关替代、192 项系统输入或自定义回退均由自动化测试守恒校验。
+官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 45 项精确原生、3 项相关替代、191 项系统输入或自定义回退均由自动化测试守恒校验。
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -273,6 +273,8 @@
 2026-09-07 补充：当前内置键盘图更新为四十八种，新增 `Brazilian – ABNT2`。固定参考源码只用于确认 `ABNT2` 功能名；依据 macOS 同名系统输入源独立实现 Base、Shift、Option 与 Shift+Option 四层，并以 12 键底行支持 ISO keyCode 10 和 ABNT2 专用 keyCode 94，用于提示、模拟、反查、归档与 Layout Fluid。Unicode CLDR 用于交叉确认 103 键几何；此条取代本文较早“四十七种”的计数，不读取或导入 Monkeytype 布局 JSON、代码或资产。
 
 2026-09-07 补充：当前内置键盘图更新为四十九种，新增 `Tamil99 (macOS)`。固定参考源码只用于确认 `tamil99` 功能名；依据 macOS 同名系统输入源独立实现 Base、Shift、Option 与 Shift+Option 四层，并保留 Tamil 组合符、`ஸ்ரீ` 多码点输出和明确空输出的修饰层，用于提示、模拟、完整输出反查、归档与 Layout Fluid。Microsoft 与 Unicode CLDR 资料用于标准家族交叉核对；此条取代本文较早“四十八种”的计数，不读取或导入 Monkeytype 布局 JSON、代码或资产。
+
+2026-09-07 补充：当前内置键盘图更新为五十种，新增 `Colemak-DH ISO`。固定参考源码只用于确认 `colemak_dh_iso` 功能名；依据 Colemak-DH 官方公开说明与 CC0 macOS 基础层独立实现 ISO Angle Mod，把 `Z` 放在左 Shift 右侧的额外实体键，并保留 `X C D V`、中央反引号和 `K H , . /` 的普通/Shift 映射，用于提示、模拟、反查、归档与 Layout Fluid。此条取代本文较早“四十九种”的计数，不读取或导入 Monkeytype 布局 JSON、代码或资产。
 
 2026-09-04 补充：当时 `CFG-02`、`VIS-02` 与 `VIS-05` 的非拉丁布局覆盖新增 `Bulgarian Cyrillic · Typebar`。它是 Typebar 自写的第 19 个内置物理键位映射，覆盖 `я/ъ/щ/ч/ь` 与 ISO `< >`，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；这不是官方或系统 BDS 布局的复制，需精确系统布局时用户仍可选择 macOS 当前输入源。
 | INP-01 | 输入、逐字符状态、退格、长词 | `input/handlers/*` | TypingEngine | 部分实现 |

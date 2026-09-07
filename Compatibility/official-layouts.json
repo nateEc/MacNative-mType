@@ -250,6 +250,7 @@
     "dvorak_R": "dvorakRight",
     "colemak": "ansiColemak",
     "colemak_dh": "ansiColemakDH",
+    "colemak_dh_iso": "colemakDHISO",
     "qwertz": "germanQwertz",
     "swiss_german": "swissGerman",
     "swiss_french": "swissFrench",
