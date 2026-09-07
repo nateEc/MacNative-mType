@@ -1049,6 +1049,36 @@ enum KeyboardLayoutEmulator {
           normal: ["^1234567890-`", "k.o,yvgclßz'", "haeiudtrnsf ", " xqäüöbpwmj"],
           shifted: ["ˇ°§ℓ»«$€„“”—¸", "K•O–YVGCLẞZ~", "HAEIUDTRNSF ", " XQÄÜÖBPWMJ"]
         ), overrides: [:])
+    case .threeL:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: [" 1234567890  ", "qfuyzxkcwb   ", "oheaidrtns ", ",m.j;glpv "],
+          shifted: [" 1234567890  ", "QFUYZXKCWB   ", "OHEAIDRTNS ", ",M.J;GLPV "]
+        ), overrides: [:])
+    case .korean:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ[]\\", "ㅁㄴㅇㄹㅎㅗㅓㅏㅣ;'", "ㅋㅌㅊㅍㅠㅜㅡ,./"],
+          shifted: ["~!@#$%^&*()_+", "ㅃㅉㄸㄲㅆㅛㅕㅑㅒㅖ{}|", "ㅁㄴㅇㄹㅎㅗㅓㅏㅣ:\"", "ㅋㅌㅊㅍㅠㅜㅡ<>?"]
+        ), overrides: [:])
+    case .ekvertoB:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["`1234567890-=", "ŝĝertŭuiopĵĥ", "asdfghjkl;'\\", "<zĉcvbnm,./"],
+          shifted: ["~!@#$%^&*()_+", "ŜĜERTŬUIOPĴĤ", "ASDFGHJKL:\"|", ">ZĈCVBNM<>?"]
+        ), overrides: [:])
+    case .sturdyAngleANSI:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "vmlcpxfouj[]\\", "strdy.naei/", "kqgwzbh';,"],
+          shifted: ["~!@#$%^&*<>_+", "VMLCPXFOUJ{}|", "STRDY(NAEI?", "KQGWZBH\":)"]
+        ), overrides: [:])
+    case .sturdyAngleISO:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["`1234567890-=", "vmlcpxfouj[]", "strdy.naei/\\", "zkqgw!bh';,"],
+          shifted: ["~!@#$%^&*<>_+", "VMLCPXFOUJ{}", "STRDY(NAEI?|", "ZKQGW?BH\":)"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
@@ -1674,6 +1704,14 @@ enum KeyboardLayoutEmulator {
         physicalRows[0], Array(physicalRows[1].dropLast()), physicalRows[2] + [42],
         [10] + physicalRows[3],
       ],
+      normalRows: normal.map { $0.map(String.init) },
+      shiftedRows: shifted.map { $0.map(String.init) }
+    )
+  }
+
+  private static func ansiBaseShiftMap(normal: [String], shifted: [String]) -> [UInt16: KeyLayers] {
+    baseShiftMap(
+      keyRows: physicalRows,
       normalRows: normal.map { $0.map(String.init) },
       shiftedRows: shifted.map { $0.map(String.init) }
     )

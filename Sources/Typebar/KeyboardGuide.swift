@@ -120,6 +120,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case mine
   case noted
   case koy
+  case threeL = "3l"
+  case korean
+  case ekvertoB = "ekverto_b"
+  case sturdyAngleANSI = "sturdy_angle_ansi"
+  case sturdyAngleISO = "sturdy_angle_iso"
   case real
   case sertain
   case ctgap
@@ -308,6 +313,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .mine: "Mine"
     case .noted: "Noted"
     case .koy: "Koy"
+    case .threeL: "3l"
+    case .korean: "Korean"
+    case .ekvertoB: "Ekverto B"
+    case .sturdyAngleANSI: "Sturdy Angle ANSI"
+    case .sturdyAngleISO: "Sturdy Angle ISO"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -501,6 +511,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case mine
   case noted
   case koy
+  case threeL = "3l"
+  case korean
+  case ekvertoB = "ekverto_b"
+  case sturdyAngleANSI = "sturdy_angle_ansi"
+  case sturdyAngleISO = "sturdy_angle_iso"
   case real
   case sertain
   case ctgap
@@ -2306,6 +2321,31 @@ enum KeyboardGuideModel {
       baseShiftRows(
         normal: ["^1234567890-`", "k.o,yvgclßz'", "haeiudtrnsf ", " xqäüöbpwmj"],
         shifted: ["ˇ°§ℓ»«$€„“”—¸", "K•O–YVGCLẞZ~", "HAEIUDTRNSF ", " XQÄÜÖBPWMJ"]
+      )
+    case .threeL:
+      baseShiftRows(
+        normal: [" 1234567890  ", "qfuyzxkcwb   ", "oheaidrtns ", ",m.j;glpv "],
+        shifted: [" 1234567890  ", "QFUYZXKCWB   ", "OHEAIDRTNS ", ",M.J;GLPV "]
+      )
+    case .korean:
+      baseShiftRows(
+        normal: ["`1234567890-=", "ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ[]\\", "ㅁㄴㅇㄹㅎㅗㅓㅏㅣ;'", "ㅋㅌㅊㅍㅠㅜㅡ,./"],
+        shifted: ["~!@#$%^&*()_+", "ㅃㅉㄸㄲㅆㅛㅕㅑㅒㅖ{}|", "ㅁㄴㅇㄹㅎㅗㅓㅏㅣ:\"", "ㅋㅌㅊㅍㅠㅜㅡ<>?"]
+      )
+    case .ekvertoB:
+      baseShiftRows(
+        normal: ["`1234567890-=", "ŝĝertŭuiopĵĥ", "asdfghjkl;'\\", "<zĉcvbnm,./"],
+        shifted: ["~!@#$%^&*()_+", "ŜĜERTŬUIOPĴĤ", "ASDFGHJKL:\"|", ">ZĈCVBNM<>?"]
+      )
+    case .sturdyAngleANSI:
+      baseShiftRows(
+        normal: ["`1234567890-=", "vmlcpxfouj[]\\", "strdy.naei/", "kqgwzbh';,"],
+        shifted: ["~!@#$%^&*<>_+", "VMLCPXFOUJ{}|", "STRDY(NAEI?", "KQGWZBH\":)"]
+      )
+    case .sturdyAngleISO:
+      baseShiftRows(
+        normal: ["`1234567890-=", "vmlcpxfouj[]", "strdy.naei/\\", "zkqgw!bh';,"],
+        shifted: ["~!@#$%^&*<>_+", "VMLCPXFOUJ{}", "STRDY(NAEI?|", "ZKQGW?BH\":)"]
       )
     case .real:
       [

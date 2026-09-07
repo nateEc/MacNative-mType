@@ -94,7 +94,7 @@
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
-| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 183 个原生内置布局可任选至多 15 个进入原生序列。 |
+| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 188 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 部分；自选组合已实现，候选语言仅限 Typebar 原创语言集。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
@@ -170,7 +170,7 @@
 
 ## 当前优先缺口
 
-1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、183 个原生内置模拟布局（包括 Bone、AdNW、Mine、Noted、Koy、BEAKL 19、BEAKL 19 Bis、Rolll、Whorfmax Ortho、Neo、ColemaQ、ColemaQ F、Thai Manoonchai、Brasileiro Nativo、BEAKL 15、Redaktor、JUIYAF、Zubachev、Colemak Qi;x、Colemak Qi、Hands Down Promethium、Statica 3×5、Vestnik、Diktor、Diktor Voronov Mod、BEAKL Zi、Snorkle、MALTRON、PRSTEN、RSTHD、Whix2、Haruka、Kuntum、Kuntem、Kuntem-JQ、Scythe、Inqwerted、Rain、Night、Night STIC、Nila、Noctum、Cascade、Vylet、Romak、Octa8、Nerps、Gallium、Gallium Angle、Gallium v2、STNDC、UCIEA、Whorf、Whorf 6、Whorfmax、Pine v4、Three、Asset、Dwarf、Flaw、Focal、Zenith、Dhorf、Gust、Recurva、Pine、Real、Sertain、CTGAP、Graphite、Capewell Dvorak、Colman、Heart、Klauser、Oneproduct、Middlemak-NH、Foalmak、Quartz、Arensito、ARTS、Boo/Mangle、APT/Angle、Middlemak、Semimak/JQ/JQC、Canary/Matrix、TypeHack、ISRT/Angle、Engram/Engrammer、MTGAP/Full、Ina、Soul、Niro、Hands Down/Alt/Neu/Neu Inverted、French Bépo AFNOR、ANSI Alpha、Swedish Colemak/Dvorak、French Dvorak、French AZERTY AFNOR、French Bépo、Programmer Dvorak/Prime、German Dvorak/Improved、Spanish Dvorak、MTGAP ASRT、Halmak、QGMLWB、QGMLWY、QWPR、Colemak 变体、Norman、Programmer Workman、Turkish E、Japanese Hiragana，以及区域、非拉丁和单手布局），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
+1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、188 个原生内置模拟布局（包括 3l、Korean、Ekverto B、Sturdy Angle ANSI、Sturdy Angle ISO、Bone、AdNW、Mine、Noted、Koy、BEAKL 19、BEAKL 19 Bis、Rolll、Whorfmax Ortho、Neo、ColemaQ、ColemaQ F、Thai Manoonchai、Brasileiro Nativo、BEAKL 15、Redaktor、JUIYAF、Zubachev、Colemak Qi;x、Colemak Qi、Hands Down Promethium、Statica 3×5、Vestnik、Diktor、Diktor Voronov Mod、BEAKL Zi、Snorkle、MALTRON、PRSTEN、RSTHD、Whix2、Haruka、Kuntum、Kuntem、Kuntem-JQ、Scythe、Inqwerted、Rain、Night、Night STIC、Nila、Noctum、Cascade、Vylet、Romak、Octa8、Nerps、Gallium、Gallium Angle、Gallium v2、STNDC、UCIEA、Whorf、Whorf 6、Whorfmax、Pine v4、Three、Asset、Dwarf、Flaw、Focal、Zenith、Dhorf、Gust、Recurva、Pine、Real、Sertain、CTGAP、Graphite、Capewell Dvorak、Colman、Heart、Klauser、Oneproduct、Middlemak-NH、Foalmak、Quartz、Arensito、ARTS、Boo/Mangle、APT/Angle、Middlemak、Semimak/JQ/JQC、Canary/Matrix、TypeHack、ISRT/Angle、Engram/Engrammer、MTGAP/Full、Ina、Soul、Niro、Hands Down/Alt/Neu/Neu Inverted、French Bépo AFNOR、ANSI Alpha、Swedish Colemak/Dvorak、French Dvorak、French AZERTY AFNOR、French Bépo、Programmer Dvorak/Prime、German Dvorak/Improved、Spanish Dvorak、MTGAP ASRT、Halmak、QGMLWB、QGMLWY、QWPR、Colemak 变体、Norman、Programmer Workman、Turkish E、Japanese Hiragana，以及区域、非拉丁和单手布局），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
 2. 官方语言、词表、主题、字体和声音的完整目录不应复制。后续以原创或明确授权内容扩大用户可选范围，并逐项标注差异；语言候选、语义边界和准入条件见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 3. 网页账户页图表、猴子外观和广告设置不适合作为原生逐像素复刻目标；对用户可见意图的原生替代仍需设备验收。
 
@@ -242,11 +242,12 @@
 - ColemaQ、ColemaQ F、Thai Manoonchai、Brasileiro Nativo 与 BEAKL 15 自动化测试覆盖完整 Base/Shift、AltGr 回退、ANSI/ISO 实体行、Manoonchai 独立组合符键、精简数字行策略、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
 - BEAKL 19、BEAKL 19 Bis、Rolll、Whorfmax Ortho 与 Neo 自动化测试覆盖完整 Base/Shift、AltGr 回退、ANSI/ISO 实体行、Neo 单层空格键、精简数字行策略、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
 - Bone、AdNW、Mine、Noted 与 Koy 自动化测试覆盖完整 ISO Base/Shift、变体差异、AltGr 回退、单层空格实体键、精简数字行策略、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
-- 完整客户端 `swift test` 通过 342 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 3l、Korean、Ekverto B、Sturdy Angle ANSI 与 Sturdy Angle ISO 自动化测试覆盖完整 Base/Shift、单层键、Jamo、AltGr 回退、ANSI/ISO 差异、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
+- 完整客户端 `swift test` 通过 343 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
 - 无限测试自动化覆盖 time、words 与自定义循环的 0 值配置、正向秒数/词数、提示扩展、无自动终止、Bail Out、长测试快捷键、预设/分享往返、旧配置冲突迁移及固定参考八项 `noInfiniteDuration` 修饰器；无限结果不保存、不上传，服务端继续拒绝 0 值正式成绩。
 - 结果字符分类自动化覆盖提前提交造成的跳过、词尾额外输入、强制物理键位错误、禅模式、旧归档保守回退、SwiftData 往返与 CSV 四列导出；实现从 Typebar 原生最终输入映射派生，不读取或导入参考结果逻辑、代码或资产。
 - 原生按键时序自动化覆盖 AppKit keyDown/repeat/keyUp 通路、闭合按住样本、连续按下间隔、多键重叠总时长、均值/总体标准差、未配对与结束边界、SwiftData/归档兼容和 CSV 导出；仅保存匿名时序，不复制参考事件代码或上传键码。
-- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、178/3/58 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
+- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、183/3/53 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退；macOS `UCKeyTranslate` 返回的多字符或多码点图例会完整保留，不再截断为首字符。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
