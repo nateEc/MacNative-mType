@@ -2851,6 +2851,94 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testBooAPTAndMiddlemakVariantsMapEveryAnsiKeyAndPersist() {
+    let ansiRows = SystemKeyboardGuide.physicalRows
+    func outputs(
+      _ layout: KeyboardLayout, flags: NSEvent.ModifierFlags = []
+    ) -> [String] {
+      ansiRows.map { row in
+        row.compactMap {
+          KeyboardLayoutEmulator.text(
+            forKeyCode: $0, modifierFlags: flags, layout: layout)
+        }.joined()
+      }
+    }
+
+    let expected: [(KeyboardLayout, [String], [String])] = [
+      (
+        .boo,
+        ["`1234567890[]", ",.ucvqfdly?=\\", "aoesgbntri-", ";x'wzphmkj"],
+        ["~!@#$%^&*(){}", "<>UCVQFDLY/+|", "AOESGBNTRI_", ":X\"WZPHMKJ"]
+      ),
+      (
+        .booMangle,
+        ["$&[{}(=*)+]!#", ",.ucvqfdly/@\\", "aoesgbntri-", "x'w;zphmkj"],
+        ["~%7531902468`", "<>UCVQFDLY?^|", "AOESGBNTRI_", "X\"W:ZPHMKJ"]
+      ),
+      (
+        .apt,
+        ["`1234567890-=", "wgdfbqluoy[]\\", "rsthkjneai;", "xcmpvz,.'/"],
+        ["~!@#$%^&*()_+", "WGDFBQLUOY{}|", "RSTHKJNEAI:", "XCMPVZ<>\"?"]
+      ),
+      (
+        .aptAngle,
+        ["`1234567890-=", "wgdfbqluoy[]\\", "rsthkjneai;", "cmpvxz,.'/"],
+        ["~!@#$%^&*()_+", "WGDFBQLUOY{}|", "RSTHKJNEAI:", "CMPVXZ<>\"?"]
+      ),
+      (
+        .middlemak,
+        ["`1234567890-=", "qwldgjfou;[]\\", "asrtpyneih'", "zxcvbkm,./"],
+        ["~!@#$%^&*()_+", "QWLDGJFOU:{}|", "ASRTPYNEIH\"", "ZXCVBKM<>?"]
+      ),
+    ]
+
+    for (layout, normal, shifted) in expected {
+      XCTAssertEqual(outputs(layout), normal, layout.displayName)
+      XCTAssertEqual(outputs(layout, flags: [.shift]), shifted, layout.displayName)
+      let guideRows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(guideRows.map(\.count), [13, 13, 11, 10])
+      for (keyCodes, guideRow) in zip(ansiRows, guideRows) {
+        for (keyCode, key) in zip(keyCodes, guideRow) {
+          for flags in [NSEvent.ModifierFlags(), .shift] {
+            let output = KeyboardLayoutEmulator.character(
+              forKeyCode: keyCode, modifierFlags: flags, layout: layout)
+            XCTAssertEqual(
+              output.map { key.characters.contains(Character(String($0).lowercased())) }, true)
+          }
+        }
+      }
+    }
+
+    XCTAssertFalse(
+      KeyboardGuideKeysMode.minimal.showsNumberRow(
+        for: .boo, mode: .staticGuide, nextCharacter: nil))
+    XCTAssertTrue(
+      KeyboardGuideKeysMode.minimal.showsNumberRow(
+        for: .booMangle, mode: .staticGuide, nextCharacter: nil))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: ";", layout: .boo), 6)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: ";", layout: .booMangle), 9)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "1", layout: .booMangle), 23)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "x", layout: .apt), 6)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "x", layout: .aptAngle), 11)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "p", layout: .middlemak), 5)
+
+    for (layout, _, _) in expected {
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+  }
+
+  @MainActor
   func testAnsiColemakDHMapsItsDistinctCoreKeysAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "b", layout: .ansiColemakDH), "top-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "g", layout: .ansiColemakDH), "home-4")
@@ -7110,7 +7198,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 98)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 103)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
