@@ -489,6 +489,7 @@ private struct ContentView: View {
   @State private var showingSync = false
   @State private var showingConnections = false
   @State private var showingNotifications = false
+  @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
@@ -587,6 +588,7 @@ private struct ContentView: View {
       if !mode.isEnabled { clearTypingPowerEffect() }
     }
     .task { await runClock() }
+    .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear {
       reset()
       refreshZipfNotice()
@@ -683,7 +685,20 @@ private struct ContentView: View {
       Button("数据", systemImage: "externaldrive") { showingDataMigration = true }
       Button("同步", systemImage: "arrow.triangle.2.circlepath") { showingSync = true }
       Button("好友", systemImage: "person.2") { showingConnections = true }
-      Button("通知", systemImage: "bell") { showingNotifications = true }
+      Button { showingNotifications = true } label: {
+        HStack(spacing: 4) {
+          Label("通知", systemImage: "bell")
+          if let unreadNotificationCount, unreadNotificationCount > 0 {
+            Text("\(unreadNotificationCount)")
+              .font(.caption2.monospacedDigit().weight(.semibold))
+              .padding(.horizontal, 5)
+              .padding(.vertical, 2)
+              .background(activeTheme.accent, in: Capsule())
+              .foregroundStyle(activeTheme.background)
+          }
+        }
+      }
+      .accessibilityLabel(notificationAccessibilityLabel)
     }
     .sheet(isPresented: $showingHistory) {
       ResultsHistoryView(settings: settings, currentConfiguration: configuration)
@@ -708,8 +723,10 @@ private struct ContentView: View {
     .sheet(isPresented: $showingConnections) {
       ConnectionsView(account: account)
     }
-    .sheet(isPresented: $showingNotifications) {
-      NotificationsView(account: account)
+    .sheet(isPresented: $showingNotifications, onDismiss: {
+      Task { await refreshNotificationSummary() }
+    }) {
+      NotificationsView(account: account) { unreadNotificationCount = $0 }
     }
     .sheet(isPresented: $showingCommandPalette) {
       CommandPaletteView(
@@ -836,6 +853,24 @@ private struct ContentView: View {
       guard !Task.isCancelled else { return }
       advanceClock(at: .now)
     }
+  }
+
+  @MainActor
+  private func refreshNotificationSummary() async {
+    guard let userID = account.currentUser?.id else {
+      unreadNotificationCount = nil
+      return
+    }
+    unreadNotificationCount = nil
+    guard let inbox = try? await account.notificationInbox(), account.currentUser?.id == userID else {
+      return
+    }
+    unreadNotificationCount = inbox.unreadCount
+  }
+
+  private var notificationAccessibilityLabel: String {
+    guard let unreadNotificationCount, unreadNotificationCount > 0 else { return "通知" }
+    return "通知，\(unreadNotificationCount) 条未读"
   }
 
   private func advanceClock(at now: Date) {

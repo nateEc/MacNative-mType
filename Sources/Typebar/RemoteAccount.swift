@@ -831,7 +831,24 @@ struct RemoteNotification: Codable, Identifiable, Sendable {
     let readAt: Date?
 }
 
-private struct RemoteNotificationsResponse: Codable, Sendable { let notifications: [RemoteNotification] }
+struct RemoteNotificationsResponse: Codable, Sendable {
+    let notifications: [RemoteNotification]
+    let unreadCount: Int
+
+    private enum CodingKeys: String, CodingKey { case notifications, unreadCount }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        notifications = try values.decode([RemoteNotification].self, forKey: .notifications)
+        unreadCount = try values.decodeIfPresent(Int.self, forKey: .unreadCount)
+            ?? notifications.lazy.filter { $0.readAt == nil }.count
+    }
+}
+
+struct RemoteNotificationInbox: Sendable {
+    let notifications: [RemoteNotification]
+    let unreadCount: Int
+}
 
 private struct RemoteNotificationDeletionResponse: Codable, Sendable { let deletedCount: Int }
 
@@ -1859,11 +1876,16 @@ final class AccountSession {
     }
 
     func notifications() async throws -> [RemoteNotification] {
+        try await notificationInbox().notifications
+    }
+
+    func notificationInbox() async throws -> RemoteNotificationInbox {
         let token = try accessToken()
-        return try await RemoteAccountAPI(endpoint: endpoint).request(
+        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: "v1/notifications", method: "GET", token: token,
             body: Optional<String>.none, response: RemoteNotificationsResponse.self
-        ).notifications
+        )
+        return .init(notifications: response.notifications, unreadCount: response.unreadCount)
     }
 
     func publicAnnouncements() async throws -> [RemoteAnnouncement] {

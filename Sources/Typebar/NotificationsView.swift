@@ -3,6 +3,7 @@ import SwiftUI
 struct NotificationsView: View {
     @Environment(\.dismiss) private var dismiss
     let account: AccountSession
+    let onUnreadCountChange: (Int) -> Void
     @State private var notifications: [RemoteNotification] = []
     @State private var isLoading = false
     @State private var message: String?
@@ -98,7 +99,9 @@ struct NotificationsView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            notifications = try await account.notifications()
+            let inbox = try await account.notificationInbox()
+            notifications = inbox.notifications
+            onUnreadCountChange(inbox.unreadCount)
             message = notifications.isEmpty ? "没有新通知。" : "已加载 \(notifications.count) 条通知。"
         } catch { message = error.localizedDescription }
     }
@@ -109,6 +112,7 @@ struct NotificationsView: View {
                 let updated = try await account.markNotificationRead(notification.id)
                 guard let index = notifications.firstIndex(where: { $0.id == updated.id }) else { return }
                 notifications[index] = updated
+                publishUnreadCount()
             } catch { message = error.localizedDescription }
         }
     }
@@ -118,6 +122,7 @@ struct NotificationsView: View {
             do {
                 try await account.deleteNotification(notification.id)
                 notifications.removeAll { $0.id == notification.id }
+                publishUnreadCount()
                 message = "通知已删除。"
             } catch { message = error.localizedDescription }
         }
@@ -128,8 +133,13 @@ struct NotificationsView: View {
             do {
                 let deletedCount = try await account.deleteAllNotifications()
                 notifications.removeAll()
+                publishUnreadCount()
                 message = "已删除 \(deletedCount) 条通知。"
             } catch { message = error.localizedDescription }
         }
+    }
+
+    private func publishUnreadCount() {
+        onUnreadCountChange(notifications.lazy.filter { $0.readAt == nil }.count)
     }
 }

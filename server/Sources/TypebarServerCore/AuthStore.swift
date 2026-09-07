@@ -1781,7 +1781,9 @@ public actor AuthStore {
         createdAt: notification.createdAt, readAt: notification.readAt)
     }
     .sorted { $0.createdAt > $1.createdAt }
-    return .init(notifications: notifications)
+    return .init(
+      notifications: notifications,
+      unreadCount: notifications.lazy.filter { $0.readAt == nil }.count)
   }
 
   public func markNotificationRead(_ id: UUID, accessToken: String, now: Date = .now) throws

@@ -2244,12 +2244,14 @@ final class HealthRouteTests: XCTestCase {
       .init(recipientID: bob.user.id), accessToken: alice.accessToken, now: now)
     let bobNotifications = try await store.notifications(accessToken: bob.accessToken, now: now)
     XCTAssertEqual(bobNotifications.notifications.count, 1)
+    XCTAssertEqual(bobNotifications.unreadCount, 1)
     XCTAssertEqual(bobNotifications.notifications[0].kind, .connectionRequest)
     XCTAssertEqual(bobNotifications.notifications[0].actor.id, alice.user.id)
     XCTAssertNil(bobNotifications.notifications[0].readAt)
     let charlieNotifications = try await store.notifications(
       accessToken: charlie.accessToken, now: now)
     XCTAssertTrue(charlieNotifications.notifications.isEmpty)
+    XCTAssertEqual(charlieNotifications.unreadCount, 0)
 
     do {
       _ = try await store.markNotificationRead(
@@ -2263,6 +2265,8 @@ final class HealthRouteTests: XCTestCase {
       bobNotifications.notifications[0].id, accessToken: bob.accessToken,
       now: now.addingTimeInterval(5))
     XCTAssertEqual(read.readAt, now.addingTimeInterval(5))
+    let bobAfterRead = try await store.notifications(accessToken: bob.accessToken)
+    XCTAssertEqual(bobAfterRead.unreadCount, 0)
 
     do {
       _ = try await store.deleteNotification(
@@ -2290,6 +2294,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(
       Set(aliceNotifications.notifications.map(\.kind)), [.connectionAccepted, .directMessage])
     XCTAssertTrue(aliceNotifications.notifications.allSatisfy { $0.actor.id == bob.user.id })
+    XCTAssertEqual(aliceNotifications.unreadCount, 2)
 
     let deletedAll = try await store.deleteAllNotifications(
       accessToken: alice.accessToken, now: now.addingTimeInterval(13))
@@ -2298,7 +2303,9 @@ final class HealthRouteTests: XCTestCase {
     let bobAfterAliceDeleteAll = try await store.notifications(accessToken: bob.accessToken)
     let repeatedDeleteAll = try await store.deleteAllNotifications(accessToken: alice.accessToken)
     XCTAssertTrue(aliceAfterDeleteAll.notifications.isEmpty)
+    XCTAssertEqual(aliceAfterDeleteAll.unreadCount, 0)
     XCTAssertEqual(bobAfterAliceDeleteAll.notifications.count, 1)
+    XCTAssertEqual(bobAfterAliceDeleteAll.unreadCount, 1)
     XCTAssertEqual(repeatedDeleteAll.deletedCount, 0)
   }
 

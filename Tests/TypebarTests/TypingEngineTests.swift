@@ -21,6 +21,20 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(paged.hasMore)
   }
 
+  func testNotificationInboxDecodesServerUnreadCountAndLegacyFallback() throws {
+    let notification = #"{"id":"00000000-0000-0000-0000-000000000010","kind":"directMessage","actor":{"id":"00000000-0000-0000-0000-000000000011","displayName":"Friend","joinedAt":0,"completedResultCount":0,"bestWPM":0},"createdAt":0,"readAt":null}"#
+    let legacy = try JSONDecoder().decode(
+      RemoteNotificationsResponse.self,
+      from: Data("{\"notifications\":[\(notification)]}".utf8))
+    XCTAssertEqual(legacy.notifications.count, 1)
+    XCTAssertEqual(legacy.unreadCount, 1)
+
+    let current = try JSONDecoder().decode(
+      RemoteNotificationsResponse.self,
+      from: Data("{\"notifications\":[\(notification)],\"unreadCount\":1}".utf8))
+    XCTAssertEqual(current.unreadCount, 1)
+  }
+
   func testRemoteAccountUserDefaultsLegacyServersToPasswordAndDecodesOAuthMethods() throws {
     let legacy = try JSONDecoder().decode(
       RemoteAccountUser.self,
