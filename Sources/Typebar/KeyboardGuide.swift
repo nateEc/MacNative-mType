@@ -115,6 +115,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case rolll
   case whorfmaxOrtho = "whorfmax_ortho"
   case neo
+  case bone
+  case adnw = "AdNW"
+  case mine
+  case noted
+  case koy
   case real
   case sertain
   case ctgap
@@ -298,6 +303,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .rolll: "Rolll"
     case .whorfmaxOrtho: "Whorfmax Ortho"
     case .neo: "Neo"
+    case .bone: "Bone"
+    case .adnw: "AdNW"
+    case .mine: "Mine"
+    case .noted: "Noted"
+    case .koy: "Koy"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -486,6 +496,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case rolll
   case whorfmaxOrtho = "whorfmax_ortho"
   case neo
+  case bone
+  case adnw = "AdNW"
+  case mine
+  case noted
+  case koy
   case real
   case sertain
   case ctgap
@@ -2266,6 +2281,31 @@ enum KeyboardGuideModel {
       baseShiftRows(
         normal: ["^1234567890-`", "xvlcwkhgfqß'", "uiaeosnrtdy ", " üöäpzbm,.j"],
         shifted: ["ˇ°§ℓ»«$€„“”—¸", "XVLCWKHGFQẞ~", "UIAEOSNRTDY ", " ÜÖÄPZBM–•J"]
+      )
+    case .bone:
+      baseShiftRows(
+        normal: ["^1234567890-`", "jduaxphlmwß'", "ctieobnrsgq ", " fvüäöyz,.k"],
+        shifted: ["ˇ°§ℓ»«$€„“”—¸", "JDUAXPHLMWẞ~", "CTIEOBNRSGQ ", " FVÜÄÖYZ–•K"]
+      )
+    case .adnw:
+      baseShiftRows(
+        normal: ["^1234567890-`", "kuü.ävgcljf'", "hieaodtrnsß ", " xyö,qbpwmz"],
+        shifted: ["ˇ°§ℓ»«$€„“”—¸", "KUÜ•ÄVGCLJF~", "HIEAODTRNSẞ ", " XYÖ–QBPWMZ"]
+      )
+    case .mine:
+      baseShiftRows(
+        normal: ["^1234567890-`", "jluaqwbdgyzß", "crieomntsh '", " vxüäöpf,.k"],
+        shifted: ["ˇ°§ℓ»«$€„“”—¸", "JLUAQWBDGYZẞ", "CRIEOMNTSH ~", " VXÜÄÖPF–•K"]
+      )
+    case .noted:
+      baseShiftRows(
+        normal: ["^1234567890-`", "zyuaqpbmlfjß", "csieodtnrh '", " vxüäöwg,.k"],
+        shifted: ["ˇ°§ℓ»«$€„“”—¸", "ZYUAQPBMLFJẞ", "CSIEODTNRH ~", " VXÜÄÖWG–•K"]
+      )
+    case .koy:
+      baseShiftRows(
+        normal: ["^1234567890-`", "k.o,yvgclßz'", "haeiudtrnsf ", " xqäüöbpwmj"],
+        shifted: ["ˇ°§ℓ»«$€„“”—¸", "K•O–YVGCLẞZ~", "HAEIUDTRNSF ", " XQÄÜÖBPWMJ"]
       )
     case .real:
       [

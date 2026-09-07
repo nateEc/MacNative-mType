@@ -1019,6 +1019,36 @@ enum KeyboardLayoutEmulator {
             [" ", "Ü", "Ö", "Ä", "P", "Z", "B", "M", "–", "•", "J"],
           ]
         ), overrides: [:])
+    case .bone:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["^1234567890-`", "jduaxphlmwß'", "ctieobnrsgq ", " fvüäöyz,.k"],
+          shifted: ["ˇ°§ℓ»«$€„“”—¸", "JDUAXPHLMWẞ~", "CTIEOBNRSGQ ", " FVÜÄÖYZ–•K"]
+        ), overrides: [:])
+    case .adnw:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["^1234567890-`", "kuü.ävgcljf'", "hieaodtrnsß ", " xyö,qbpwmz"],
+          shifted: ["ˇ°§ℓ»«$€„“”—¸", "KUÜ•ÄVGCLJF~", "HIEAODTRNSẞ ", " XYÖ–QBPWMZ"]
+        ), overrides: [:])
+    case .mine:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["^1234567890-`", "jluaqwbdgyzß", "crieomntsh '", " vxüäöpf,.k"],
+          shifted: ["ˇ°§ℓ»«$€„“”—¸", "JLUAQWBDGYZẞ", "CRIEOMNTSH ~", " VXÜÄÖPF–•K"]
+        ), overrides: [:])
+    case .noted:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["^1234567890-`", "zyuaqpbmlfjß", "csieodtnrh '", " vxüäöwg,.k"],
+          shifted: ["ˇ°§ℓ»«$€„“”—¸", "ZYUAQPBMLFJẞ", "CSIEODTNRH ~", " VXÜÄÖWG–•K"]
+        ), overrides: [:])
+    case .koy:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["^1234567890-`", "k.o,yvgclßz'", "haeiudtrnsf ", " xqäüöbpwmj"],
+          shifted: ["ˇ°§ℓ»«$€„“”—¸", "K•O–YVGCLẞZ~", "HAEIUDTRNSF ", " XQÄÜÖBPWMJ"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
@@ -1636,6 +1666,17 @@ enum KeyboardLayoutEmulator {
         return (keyCode, KeyLayers(normal: output.0, shifted: output.1))
       }
     })
+  }
+
+  private static func isoBaseShiftMap(normal: [String], shifted: [String]) -> [UInt16: KeyLayers] {
+    baseShiftMap(
+      keyRows: [
+        physicalRows[0], Array(physicalRows[1].dropLast()), physicalRows[2] + [42],
+        [10] + physicalRows[3],
+      ],
+      normalRows: normal.map { $0.map(String.init) },
+      shiftedRows: shifted.map { $0.map(String.init) }
+    )
   }
 
   private static func withSpaceLayers(
