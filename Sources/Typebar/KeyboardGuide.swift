@@ -155,6 +155,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ints
   case rollla
   case wreathy
+  case saiga
+  case saigaE = "saiga-e"
+  case krai
+  case mir
+  case ergol
   case real
   case sertain
   case ctgap
@@ -378,6 +383,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ints: "Ints"
     case .rollla: "Rollla"
     case .wreathy: "Wreathy"
+    case .saiga: "Saiga"
+    case .saigaE: "Saiga E"
+    case .krai: "Krai"
+    case .mir: "Mir"
+    case .ergol: "Ergol"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -606,6 +616,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ints
   case rollla
   case wreathy
+  case saiga
+  case saigaE = "saiga-e"
+  case krai
+  case mir
+  case ergol
   case real
   case sertain
   case ctgap
@@ -2623,6 +2638,31 @@ enum KeyboardGuideModel {
       baseShiftRows(
         normal: ["`1234567890-=", "qgdfvjluo,[]\\", "nsthywreai;", "bcmpkzx/'."],
         shifted: ["~!@#$%^&*()_+", "QGDFVJLUO<{}|", "NSTHYWREAI:", "BCMPKZX?\">"]
+      )
+    case .saiga:
+      baseShiftRows(
+        normal: ["`1234567890-=", ".ourqfdlbw[]\\", "iaenxyhtsc'", ",/;jzkpmvg"],
+        shifted: ["~!@#$%^&*()_+", ">OURQFDLBW{}|", "IAENXYHTSC\"", "<?:JZKPMVG"]
+      )
+    case .saigaE:
+      baseShiftRows(
+        normal: ["`1234567890-=", ";ourqfdlbw[]\\", "eainxyhtsc'", "/.,jzkpmvg"],
+        shifted: ["~!@#$%^&*()_+", ":OURQFDLBW{}|", "EAINXYHTSC\"", "?><JZKPMVG"]
+      )
+    case .krai:
+      baseShiftRows(
+        normal: ["`1234567890-=", "jourqvdlbg[]\\", "eainxyhtsc'", "/.,;zkpmfw"],
+        shifted: ["~!@#$%^&*()_+", "JOURQVDLBG{}|", "EAINXYHTSC\"", "?><:ZKPMFW"]
+      )
+    case .mir:
+      baseShiftRows(
+        normal: ["`1234567890-=", "jourqfdlbg[]\\", "eainxyhtsc'", "/.,z;kpmvw"],
+        shifted: ["~!@#$%^&*()_+", "JOURQFDLBG{}|", "EAINXYHTSC\"", "?><Z:KPMVW"]
+      )
+    case .ergol:
+      baseShiftRows(
+        normal: ["`1234567890/=", "qcopwjmd’y[]\\", "asenflrtiu'", "zx-vb.hg,k"],
+        shifted: ["~€«»$%^&*#@_+", "QCOPWJMD!Y{}|", "ASENFLRTIU\"", "ZX?VB:HG;K"]
       )
     case .real:
       [

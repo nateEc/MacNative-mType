@@ -4,7 +4,7 @@
 
 官方 48 项 funbox 的逐项来源、映射与未实现缺口见 `OFFICIAL_FUNBOX_AUDIT.md`；该审计是本表 FUN-01/FUN-02 的细化证据。
 
-官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 213 项精确原生、3 项相关替代、23 项系统输入或自定义回退均由自动化测试守恒校验。
+官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 218 项精确原生、3 项相关替代、18 项系统输入或自定义回退均由自动化测试守恒校验。
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -353,6 +353,8 @@
 2026-09-07 补充：当前内置键盘图更新为二百一十三种，新增 `Tarmak 1`、`Tarmak 2`、`Tarmak 3` 与 `Tarmak 4`。四项均以独立 ANSI Base/Shift 键表保留从 QWERTY 向 Colemak 迁移的阶段差异，并实现 AltGr 基础层回退、提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 208 项精确原生、3 项相关替代、28 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
 
 2026-09-07 补充：当前内置键盘图更新为二百一十八种，新增 `Stronk`、`Seht Drai`、`Ints`、`Rollla` 与 `Wreathy`。五项均以独立 ANSI Base/Shift 键表保留各自字母与标点位置，并实现 AltGr 基础层回退、提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 213 项精确原生、3 项相关替代、23 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
+
+2026-09-07 补充：当前内置键盘图更新为二百二十三种，新增 `Saiga`、`Saiga E`、`Krai`、`Mir` 与 `Ergol`。五项均以独立 ANSI Base/Shift 键表保留各自字母与标点位置；Ergol 额外保留欧元、书名号、弯引号与非对称 Shift 配对。全部接入 AltGr 基础层回退、提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 218 项精确原生、3 项相关替代、18 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
 
 2026-09-04 补充：当时 `CFG-02`、`VIS-02` 与 `VIS-05` 的非拉丁布局覆盖新增 `Bulgarian Cyrillic · Typebar`。它是 Typebar 自写的第 19 个内置物理键位映射，覆盖 `я/ъ/щ/ч/ь` 与 ISO `< >`，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；这不是官方或系统 BDS 布局的复制，需精确系统布局时用户仍可选择 macOS 当前输入源。
 | INP-01 | 输入、逐字符状态、退格、长词 | `input/handlers/*` | TypingEngine | 部分实现 |
