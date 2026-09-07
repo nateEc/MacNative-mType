@@ -105,6 +105,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case zubachev = "Zubachev"
   case colemakQix = "colemak_Qix"
   case colemakQi = "colemak_Qi"
+  case colemaQ
+  case colemaQF = "colemaQ_F"
+  case thaiManoonchai = "thai_manoonchai"
+  case brasileiroNativo = "brasileiro_nativo"
+  case beakl15 = "beakl_15"
   case real
   case sertain
   case ctgap
@@ -278,6 +283,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .zubachev: "Zubachev"
     case .colemakQix: "Colemak Qi;x"
     case .colemakQi: "Colemak Qi"
+    case .colemaQ: "ColemaQ"
+    case .colemaQF: "ColemaQ F"
+    case .thaiManoonchai: "Thai Manoonchai"
+    case .brasileiroNativo: "Brasileiro Nativo"
+    case .beakl15: "BEAKL 15"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -456,6 +466,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case zubachev = "Zubachev"
   case colemakQix = "colemak_Qix"
   case colemakQi = "colemak_Qi"
+  case colemaQ
+  case colemaQF = "colemaQ_F"
+  case thaiManoonchai = "thai_manoonchai"
+  case brasileiroNativo = "brasileiro_nativo"
+  case beakl15 = "beakl_15"
   case real
   case sertain
   case ctgap
@@ -2177,6 +2192,41 @@ enum KeyboardGuideModel {
           shiftedOptionLabels: Array(repeating: nil, count: 10)
         ),
       ]
+    case .colemaQ:
+      baseShiftRows(
+        normal: ["`1234567890=[", ";wfpbjluyq-]\\", "arstgmneio'", "xcdkzvh/.,"],
+        shifted: ["~!@#$%^&*()+{", ":WFPBJLUYQ_}|", "ARSTGMNEIO\"", "XCDKZVH?><"]
+      )
+    case .colemaQF:
+      baseShiftRows(
+        normal: ["`1234567890=[", ";wgpbjluyq-]\\", "arstfmneio'", "xcdkzvh/.,"],
+        shifted: ["~!@#$%^&*()+{", ":WGPBJLUYQ_}|", "ARSTFMNEIO\"", "XCDKZVH?><"]
+      )
+    case .thaiManoonchai:
+      baseShiftRows(
+        normalLabels: [
+          ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          ["ใ", "ต", "ห", "ล", "ส", "ป", "ั", "ก", "ิ", "บ", "็", "ฬ", "ฯ"],
+          ["ง", "เ", "ร", "น", "ม", "อ", "า", "่", "้", "ว", "ื"],
+          ["ุ", "ไ", "ท", "ย", "จ", "ค", "ี", "ด", "ะ", "ู"],
+        ],
+        shiftedLabels: [
+          ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"],
+          ["ฒ", "ฏ", "ซ", "ญ", "ฟ", "ฉ", "ึ", "ธ", "ฐ", "ฎ", "ฆ", "ฑ", "ฌ"],
+          ["ษ", "ถ", "แ", "ช", "พ", "ผ", "ำ", "ข", "โ", "ภ", "\""],
+          ["ฤ", "ฝ", "ๆ", "ณ", "๊", "๋", "์", "ศ", "ฮ", "?"],
+        ]
+      )
+    case .brasileiroNativo:
+      baseShiftRows(
+        normal: ["=1234567890[]", "/,.hxwltcp~-", "ieaoumdsrn´'", ";yçjbkqvgfz"],
+        shifted: ["+!@#$%¨&*(){}", "?<>HXWLTCP^_", "IEAOUMDSRN`\"", ":YÇJBKQVGFZ"]
+      )
+    case .beakl15:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qhouxgcrfz[]\\", "yiea.dstnb;", "j/,k'wmlpv"],
+        shifted: ["~!@#$%^&*()_+", "QHOUXGCRFZ{}|", "YIEA>DSTNB:", "J?<K\"WMLPV"]
+      )
     case .real:
       [
         row("number", "`1234567890[]"),
@@ -3601,6 +3651,28 @@ enum KeyboardGuideModel {
     )
   }
 
+  private static func baseShiftRows(normal: [String], shifted: [String]) -> [[KeyboardGuideKey]] {
+    baseShiftRows(
+      normalLabels: normal.map { $0.map(String.init) },
+      shiftedLabels: shifted.map { $0.map(String.init) }
+    )
+  }
+
+  private static func baseShiftRows(
+    normalLabels: [[String]], shiftedLabels: [[String]]
+  ) -> [[KeyboardGuideKey]] {
+    zip(["number", "top", "home", "bottom"], zip(normalLabels, shiftedLabels)).map { entry in
+      let (rowID, labels) = entry
+      return layeredRow(
+        rowID,
+        labels: labels.0,
+        shiftedLabels: labels.1,
+        optionLabels: Array(repeating: nil, count: labels.0.count),
+        shiftedOptionLabels: Array(repeating: nil, count: labels.0.count)
+      )
+    }
+  }
+
   private static func nonTypingKey(_ id: String, label: String, width: CGFloat) -> KeyboardGuideKey {
     KeyboardGuideKey(id, label: label, characters: "", width: width)
   }
@@ -3622,7 +3694,8 @@ private extension KeyboardLayout {
       || self == .booMangle || self == .quartz || self == .capewellDvorak || self == .real
       || self == .stndc || self == .uciea || self == .diktor || self == .diktorVoronovMod
       || self == .redaktor || self == .juiyaf || self == .zubachev
-      || self == .colemakQix || self == .colemakQi
+      || self == .colemakQix || self == .colemakQi || self == .colemaQ
+      || self == .thaiManoonchai
   }
 }
 

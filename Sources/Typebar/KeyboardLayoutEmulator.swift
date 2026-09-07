@@ -918,6 +918,55 @@ enum KeyboardLayoutEmulator {
             + "0:aA 1:rR 2:sS 3:tT 5:gG 4:pP 38:nN 40:eE 37:iI 41:oO 39:;: "
             + "6:zZ 7:xX 8:cC 9:dD 11:vV 45:bB 46:hH 43:,< 47:.> 44:/?"
         ), overrides: [:])
+    case .colemaQ:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:=+ 24:[{ "
+            + "12:;: 13:wW 14:fF 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:qQ 33:-_ 30:]} 42:\\| "
+            + "0:aA 1:rR 2:sS 3:tT 5:gG 4:mM 38:nN 40:eE 37:iI 41:oO 39:'\" "
+            + "6:xX 7:cC 8:dD 9:kK 11:zZ 45:vV 46:hH 43:/? 47:.> 44:,<"
+        ), overrides: [:])
+    case .colemaQF:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:=+ 24:[{ "
+            + "12:;: 13:wW 14:gG 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:qQ 33:-_ 30:]} 42:\\| "
+            + "0:aA 1:rR 2:sS 3:tT 5:fF 4:mM 38:nN 40:eE 37:iI 41:oO 39:'\" "
+            + "6:xX 7:cC 8:dD 9:kK 11:zZ 45:vV 46:hH 43:/? 47:.> 44:,<"
+        ), overrides: [:])
+    case .thaiManoonchai:
+      withBaseFallbackOptionLayers(
+        baseShiftMap(
+          keyRows: physicalRows,
+          normalRows: [
+            ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+            ["ใ", "ต", "ห", "ล", "ส", "ป", "ั", "ก", "ิ", "บ", "็", "ฬ", "ฯ"],
+            ["ง", "เ", "ร", "น", "ม", "อ", "า", "่", "้", "ว", "ื"],
+            ["ุ", "ไ", "ท", "ย", "จ", "ค", "ี", "ด", "ะ", "ู"],
+          ],
+          shiftedRows: [
+            ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"],
+            ["ฒ", "ฏ", "ซ", "ญ", "ฟ", "ฉ", "ึ", "ธ", "ฐ", "ฎ", "ฆ", "ฑ", "ฌ"],
+            ["ษ", "ถ", "แ", "ช", "พ", "ผ", "ำ", "ข", "โ", "ภ", "\""],
+            ["ฤ", "ฝ", "ๆ", "ณ", "๊", "๋", "์", "ศ", "ฮ", "?"],
+          ]
+        ), overrides: [:])
+    case .brasileiroNativo:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:=+ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6¨ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
+            + "12:/? 13:,< 14:.> 15:hH 17:xX 16:wW 32:lL 34:tT 31:cC 35:pP 33:~^ 30:-_ "
+            + "0:iI 1:eE 2:aA 3:oO 5:uU 4:mM 38:dD 40:sS 37:rR 41:nN 39:´` 42:'\" "
+            + "10:;: 6:yY 7:çÇ 8:jJ 9:bB 11:kK 45:qQ 46:vV 43:gG 47:fF 44:zZ"
+        ), overrides: [:])
+    case .beakl15:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:qQ 13:hH 14:oO 15:uU 17:xX 16:gG 32:cC 34:rR 31:fF 35:zZ 33:[{ 30:]} 42:\\| "
+            + "0:yY 1:iI 2:eE 3:aA 5:.> 4:dD 38:sS 40:tT 37:nN 41:bB 39:;: "
+            + "6:jJ 7:/? 8:,< 9:kK 11:'\" 45:wW 46:mM 43:lL 47:pP 44:vV"
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
@@ -1523,6 +1572,18 @@ enum KeyboardLayoutEmulator {
         shiftedOption: override?.shifted ?? layers.shifted)
     }
     return layeredKeys
+  }
+
+  private static func baseShiftMap(
+    keyRows: [[UInt16]], normalRows: [[String]], shiftedRows: [[String]]
+  ) -> [UInt16: KeyLayers] {
+    Dictionary(uniqueKeysWithValues: zip(keyRows, zip(normalRows, shiftedRows)).flatMap { entry in
+      let (keyCodes, labels) = entry
+      return zip(keyCodes, zip(labels.0, labels.1)).map { keyEntry in
+        let (keyCode, output) = keyEntry
+        return (keyCode, KeyLayers(normal: output.0, shifted: output.1))
+      }
+    })
   }
 
   private static func withSpaceLayers(
