@@ -2331,6 +2331,99 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testSwedishAndFrenchLayoutsMapEveryISOKeyAndPersist() {
+    let isoRows = [
+      SystemKeyboardGuide.physicalRows[0],
+      Array(SystemKeyboardGuide.physicalRows[1].prefix(12)),
+      SystemKeyboardGuide.physicalRows[2] + [UInt16(42)],
+      [UInt16(10)] + SystemKeyboardGuide.physicalRows[3],
+    ]
+    func outputs(
+      _ layout: KeyboardLayout, flags: NSEvent.ModifierFlags = []
+    ) -> [String] {
+      isoRows.map { row in
+        row.compactMap {
+          KeyboardLayoutEmulator.text(
+            forKeyCode: $0, modifierFlags: flags, layout: layout)
+        }.joined()
+      }
+    }
+
+    let twoLayerExpected: [(KeyboardLayout, [String], [String])] = [
+      (
+        .swedishColemak,
+        ["§1234567890+´", "qwfpgjluyöå¨", "arstdhneioä'", "<zxcvbkm,.-"],
+        ["½!\"#¤%&/()=?`", "QWFPGJLUYÖÅ^", "ARSTDHNEIOÄ*", ">ZXCVBKM;:_"]
+      ),
+      (
+        .swedishDvorak,
+        ["§1234567890+´", "åäöpyfgcrl,¨", "aoeuidhtns-'", "<.qjkxbmwvz"],
+        ["°!\"#€%&/()=?`", "ÅÄÖPYFGCRL;^", "AOEUIDHTNS_*", ">:QJKXBMWVZ"]
+      ),
+      (
+        .frenchDvorak,
+        ["*1234567890+%", "?<>g!hvcmkz=", "oauebfstndw#", "ç|q@iyxrlpj"],
+        ["«»/-è\\^(`)_[]", ":'éG.HVCMKZ-", "OAUEBFSTNDW~", "à;Q,IYXRLPJ"]
+      ),
+    ]
+    for (layout, normal, shifted) in twoLayerExpected {
+      XCTAssertEqual(outputs(layout), normal, layout.displayName)
+      XCTAssertEqual(outputs(layout, flags: [.shift]), shifted, layout.displayName)
+    }
+
+    for layout in [KeyboardLayout.frenchAzertyAFNOR, .frenchBepo] {
+      let guideRows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(guideRows.map(\.count), [13, 12, 12, 11])
+      for (keyCodes, guideRow) in zip(isoRows, guideRows) {
+        for (keyCode, key) in zip(keyCodes, guideRow) {
+          XCTAssertEqual(
+            KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: layout),
+            key.label)
+          XCTAssertEqual(
+            KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: layout),
+            key.shiftedLabel)
+          XCTAssertEqual(
+            KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: layout),
+            key.optionLabel)
+          XCTAssertEqual(
+            KeyboardLayoutEmulator.text(
+              forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: layout),
+            key.shiftedOptionLabel)
+        }
+      }
+    }
+
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [.option, .shift], layout: .frenchAzertyAFNOR), "À")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 33, modifierFlags: [.option, .shift], layout: .frenchAzertyAFNOR), "‑")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: [.option], layout: .frenchAzertyAFNOR), " ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: [.option, .shift], layout: .frenchAzertyAFNOR), " ")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 17, modifierFlags: [.option, .shift], layout: .frenchBepo), "`")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 46, modifierFlags: [.option, .shift], layout: .frenchBepo), "̊")
+    XCTAssertNil(KeyboardLayoutEmulator.text(forKeyCode: 16, modifierFlags: [.option, .shift], layout: .frenchBepo))
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: [], layout: .frenchBepo), " ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .swedishColemak), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ä", layout: .swedishDvorak), "top-1")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "é", layout: .frenchDvorak), "top-2")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "Œ", layout: .frenchAzertyAFNOR), "top-8")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "Þ", layout: .frenchBepo), "home-6")
+
+    for layout in twoLayerExpected.map(\.0) + [.frenchAzertyAFNOR, .frenchBepo] {
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+  }
+
+  @MainActor
   func testAnsiColemakDHMapsItsDistinctCoreKeysAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "b", layout: .ansiColemakDH), "top-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "g", layout: .ansiColemakDH), "home-4")
@@ -6590,7 +6683,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 72)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 77)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

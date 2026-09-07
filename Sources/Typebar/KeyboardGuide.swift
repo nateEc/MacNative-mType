@@ -11,6 +11,9 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case germanDvorak
   case germanDvorakImproved
   case spanishDvorak
+  case swedishColemak
+  case swedishDvorak
+  case frenchDvorak
   case ansiColemak
   case ansiColemakAngle
   case ansiColemakWide
@@ -46,6 +49,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case latinAmericanQwerty
   case polishProgrammers
   case frenchAzerty
+  case frenchAzertyAFNOR
+  case frenchBepo
   case turkishQ
   case turkishF
   case turkishE
@@ -88,6 +93,9 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .germanDvorak: "German Dvorak"
     case .germanDvorakImproved: "German Dvorak Improved"
     case .spanishDvorak: "Spanish Dvorak"
+    case .swedishColemak: "Swedish Colemak"
+    case .swedishDvorak: "Swedish Dvorak"
+    case .frenchDvorak: "French Dvorak"
     case .ansiColemak: "ANSI Colemak"
     case .ansiColemakAngle: "ANSI Colemak Angle"
     case .ansiColemakWide: "ANSI Colemak Wide"
@@ -123,6 +131,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .latinAmericanQwerty: "Latin American QWERTY"
     case .polishProgrammers: "Polish (Programmers)"
     case .frenchAzerty: "French AZERTY"
+    case .frenchAzertyAFNOR: "French AZERTY (AFNOR)"
+    case .frenchBepo: "French Bépo"
     case .turkishQ: "Turkish Q"
     case .turkishF: "Turkish F"
     case .turkishE: "Turkish E"
@@ -170,6 +180,9 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case germanDvorak
   case germanDvorakImproved
   case spanishDvorak
+  case swedishColemak
+  case swedishDvorak
+  case frenchDvorak
   case ansiColemak
   case ansiColemakAngle
   case ansiColemakWide
@@ -205,6 +218,8 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case latinAmericanQwerty
   case polishProgrammers
   case frenchAzerty
+  case frenchAzertyAFNOR
+  case frenchBepo
   case turkishQ
   case turkishF
   case turkishE
@@ -815,6 +830,129 @@ enum KeyboardGuideModel {
           shiftedLabels: ["A", "O", "E", "U", "I", "D", "R", "T", "N", "S", "¨", "Ç"]
         ),
         row("bottom", "<-QJKXBMWVZ"),
+      ]
+    case .swedishColemak:
+      [
+        row(
+          "number", "§1234567890+´",
+          characters: ["§½", "1!", "2\"", "3#", "4¤", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "´`"],
+          shiftedLabels: ["½", "!", "\"", "#", "¤", "%", "&", "/", "(", ")", "=", "?", "`"]
+        ),
+        row("top", "QWFPGJLUYÖÅ¨"),
+        row(
+          "home", "ARSTDHNEIOÄ'",
+          characters: ["aA", "rR", "sS", "tT", "dD", "hH", "nN", "eE", "iI", "oO", "äÄ", "'*"],
+          shiftedLabels: ["A", "R", "S", "T", "D", "H", "N", "E", "I", "O", "Ä", "*"]
+        ),
+        row(
+          "bottom", "<ZXCVBKM,.-",
+          characters: ["<>", "zZ", "xX", "cC", "vV", "bB", "kK", "mM", ",;", ".:", "-_"],
+          shiftedLabels: [">", "Z", "X", "C", "V", "B", "K", "M", ";", ":", "_"]
+        ),
+      ]
+    case .swedishDvorak:
+      [
+        row(
+          "number", "§1234567890+´",
+          characters: ["§°", "1!", "2\"", "3#", "4€", "5%", "6&", "7/", "8(", "9)", "0=", "+?", "´`"],
+          shiftedLabels: ["°", "!", "\"", "#", "€", "%", "&", "/", "(", ")", "=", "?", "`"]
+        ),
+        row(
+          "top", "ÅÄÖPYFGCRL,¨",
+          characters: ["åÅ", "äÄ", "öÖ", "pP", "yY", "fF", "gG", "cC", "rR", "lL", ",;", "¨^"],
+          shiftedLabels: ["Å", "Ä", "Ö", "P", "Y", "F", "G", "C", "R", "L", ";", "^"]
+        ),
+        row(
+          "home", "AOEUIDHTNS-'",
+          characters: ["aA", "oO", "eE", "uU", "iI", "dD", "hH", "tT", "nN", "sS", "-_", "'*"],
+          shiftedLabels: ["A", "O", "E", "U", "I", "D", "H", "T", "N", "S", "_", "*"]
+        ),
+        row("bottom", "<.QJKXBMWVZ"),
+      ]
+    case .frenchDvorak:
+      [
+        row(
+          "number", "*1234567890+%",
+          characters: ["*«", "1»", "2/", "3-", "4è", "5\\", "6^", "7(", "8`", "9)", "0_", "+[", "%]"],
+          shiftedLabels: ["«", "»", "/", "-", "è", "\\", "^", "(", "`", ")", "_", "[", "]"]
+        ),
+        row(
+          "top", "?<>G!HVCMKZ=",
+          characters: ["?:", "<'", ">é", "gG", "!.", "hH", "vV", "cC", "mM", "kK", "zZ", "=-"],
+          shiftedLabels: [":", "'", "é", "G", ".", "H", "V", "C", "M", "K", "Z", "-"]
+        ),
+        row(
+          "home", "OAUEBFSTNDW#",
+          characters: ["oO", "aA", "uU", "eE", "bB", "fF", "sS", "tT", "nN", "dD", "wW", "#~"],
+          shiftedLabels: ["O", "A", "U", "E", "B", "F", "S", "T", "N", "D", "W", "~"]
+        ),
+        row(
+          "bottom", "Ç|Q@IYXRLPJ",
+          characters: ["çà", "|;", "qQ", "@,", "iI", "yY", "xX", "rR", "lL", "pP", "jJ"],
+          shiftedLabels: ["à", ";", "Q", ",", "I", "Y", "X", "R", "L", "P", "J"]
+        ),
+      ]
+    case .frenchAzertyAFNOR:
+      [
+        layeredRow(
+          "number",
+          labels: ["@", "à", "é", "é", "ê", "(", ")", "‘", "’", "«", "»", "'", "^"],
+          shiftedLabels: ["#", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "\"", "¨"],
+          optionLabels: ["˘", "§", "´", "`", "&", "[", "]", "¯", "_", "“", "”", "°", "ˇ"],
+          shiftedOptionLabels: [nil, "À", "É", "È", "Ê", "˝", nil, nil, "—", "‹", "›", "˚", nil]
+        ),
+        layeredRow(
+          "top",
+          labels: ["a", "z", "e", "r", "t", "y", "u", "i", "o", "p", "-", "+"],
+          shiftedLabels: ["A", "Z", "E", "R", "T", "Y", "U", "I", "O", "P", "–", "±"],
+          optionLabels: ["æ", "£", "€", "®", "{", "}", "ù", "˙", "œ", "%", "−", "†"],
+          shiftedOptionLabels: ["Æ", nil, nil, nil, "™", nil, "Ù", nil, "Œ", "‰", "‑", "‡"]
+        ),
+        layeredRow(
+          "home",
+          labels: ["q", "s", "d", "f", "g", "h", "j", "k", "l", "m", "/", "*"],
+          shiftedLabels: ["Q", "S", "D", "F", "G", "H", "J", "K", "L", "M", "\\", "½"],
+          optionLabels: ["θ", "ß", "$", "¤", "µ", nil, nil, "⁄", "|", "∞", "÷", "×"],
+          shiftedOptionLabels: [nil, "ẞ", nil, nil, nil, nil, nil, nil, nil, nil, "√", "¼"]
+        ),
+        layeredRow(
+          "bottom",
+          labels: ["<", "w", "x", "c", "v", "b", "n", ".", ",", ":", ";"],
+          shiftedLabels: [">", "W", "X", "C", "V", "B", "N", "?", "!", "…", "="],
+          optionLabels: ["≤", "ʒ", "©", "ç", "¸", nil, "~", "¿", "¡", "·", "≃"],
+          shiftedOptionLabels: ["≥", "Ʒ", nil, "Ç", "˛", nil, nil, nil, nil, nil, "≠"]
+        ),
+      ]
+    case .frenchBepo:
+      [
+        layeredRow(
+          "number",
+          labels: ["$", "\"", "«", "»", "(", ")", "@", "+", "-", "/", "*", "=", "%"],
+          shiftedLabels: ["#", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "°", "`"],
+          optionLabels: ["–", "—", "<", ">", "[", "]", "^", "±", "−", "÷", "×", "≠", "″"],
+          shiftedOptionLabels: ["¶", "„", "“", "”", "⩽", "⩾", nil, "¬", "¼", "½", "¾", nil, "″"]
+        ),
+        layeredRow(
+          "top",
+          labels: ["b", "é", "p", "o", "è", "ô", "v", "d", "l", "j", "z", "w"],
+          shiftedLabels: ["B", "É", "P", "O", "È", "!", "V", "D", "L", "J", "Z", "W"],
+          optionLabels: ["|", "ó", "&", "œ", "ò", "¡", "ǒ", "ð", "ø", "ĳ", "ə", "ŏ"],
+          shiftedOptionLabels: ["¦", "ő", "§", "Œ", "`", nil, nil, "Ð", nil, "Ĳ", "Ə", nil]
+        ),
+        layeredRow(
+          "home",
+          labels: ["a", "u", "i", "e", ",", "c", "t", "s", "r", "n", "m", "ç"],
+          shiftedLabels: ["A", "U", "I", "E", ";", "C", "T", "S", "R", "N", "M", "Ç"],
+          optionLabels: ["æ", "ù", "ö", "€", "’", "©", "þ", "ß", "®", "õ", "ō", "¸"],
+          shiftedOptionLabels: ["Æ", "Ù", "ȯ", "¤", "ǫ", "ſ", "Þ", "ẞ", "™", nil, "º", ","]
+        ),
+        layeredRow(
+          "bottom",
+          labels: ["ê", "à", "y", "x", ".", "k", "'", "q", "g", "h", "f"],
+          shiftedLabels: ["Ê", "À", "Y", "X", ":", "K", "?", "Q", "G", "H", "F"],
+          optionLabels: ["/", "\\", "{", "}", "…", "~", "¿", "o", "Ω", "†", "ǫ"],
+          shiftedOptionLabels: [nil, nil, "‘", "’", "·", nil, "ỏ", "̊", nil, "‡", "ª"]
+        ),
       ]
     case .ansiColemak:
       [
