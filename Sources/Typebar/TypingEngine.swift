@@ -1750,7 +1750,7 @@ struct ResultCharacterStats: Codable, Equatable {
   }
 }
 
-struct ResultKeyDurationStats: Equatable {
+struct ResultKeyTimingStats: Equatable {
   let averageMilliseconds: Double
   let standardDeviationMilliseconds: Double
   let sampleCount: Int
@@ -1784,6 +1784,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let accuracy: Int
   let characterStats: ResultCharacterStats
   let keyDurationSamples: [TimeInterval]
+  let keySpacingSamples: [TimeInterval]
+  let keyOverlapDuration: TimeInterval
   let tags: [String]
   let prompt: String
   let replayEvents: [TypingReplayEvent]
@@ -1803,6 +1805,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     accuracy: Int,
     characterStats: ResultCharacterStats? = nil,
     keyDurationSamples: [TimeInterval] = [],
+    keySpacingSamples: [TimeInterval] = [],
+    keyOverlapDuration: TimeInterval = 0,
     tags: [String] = [],
     prompt: String = "",
     replayEvents: [TypingReplayEvent] = []
@@ -1823,6 +1827,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       typedCharacterCount: typedCharacterCount,
       correctCharacterCount: correctCharacterCount)
     self.keyDurationSamples = keyDurationSamples.filter { $0.isFinite && $0 >= 0 }
+    self.keySpacingSamples = keySpacingSamples.filter { $0.isFinite && $0 >= 0 }
+    self.keyOverlapDuration = keyOverlapDuration.isFinite ? max(0, keyOverlapDuration) : 0
     self.tags = tags
     self.prompt = prompt
     self.replayEvents = replayEvents
@@ -1841,14 +1847,18 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     return afkDuration / elapsedDuration * 100
   }
 
-  var keyDurationStats: ResultKeyDurationStats? {
-    ResultKeyDurationStats.make(samples: keyDurationSamples)
+  var keyDurationStats: ResultKeyTimingStats? {
+    ResultKeyTimingStats.make(samples: keyDurationSamples)
+  }
+
+  var keySpacingStats: ResultKeyTimingStats? {
+    ResultKeyTimingStats.make(samples: keySpacingSamples)
   }
 
   private enum CodingKeys: String, CodingKey {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
-      keyDurationSamples, tags, prompt, replayEvents
+      keyDurationSamples, keySpacingSamples, keyOverlapDuration, tags, prompt, replayEvents
   }
 
   init(from decoder: Decoder) throws {
@@ -1872,6 +1882,13 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     keyDurationSamples = try values.decodeIfPresent(
       [TimeInterval].self, forKey: .keyDurationSamples
     )?.filter { $0.isFinite && $0 >= 0 } ?? []
+    keySpacingSamples = try values.decodeIfPresent(
+      [TimeInterval].self, forKey: .keySpacingSamples
+    )?.filter { $0.isFinite && $0 >= 0 } ?? []
+    let decodedKeyOverlapDuration = try values.decodeIfPresent(
+      TimeInterval.self, forKey: .keyOverlapDuration) ?? 0
+    keyOverlapDuration = decodedKeyOverlapDuration.isFinite
+      ? max(0, decodedKeyOverlapDuration) : 0
     tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
     prompt = try values.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     replayEvents = try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? []
@@ -1950,6 +1967,10 @@ struct TypingSession {
   private var replayEvents: [TypingReplayEvent] = []
   private var activePhysicalKeyDownDates: [UInt16: Date] = [:]
   private var completedPhysicalKeyDurations: [TimeInterval] = []
+  private var lastPhysicalKeyDownDate: Date?
+  private var physicalKeySpacingSamples: [TimeInterval] = []
+  private var physicalKeyOverlapStartedAt: Date?
+  private var completedPhysicalKeyOverlapDuration: TimeInterval = 0
   private(set) var startedAt: Date?
   private(set) var finishedAt: Date?
   private(set) var outcome: TestOutcome = .active
@@ -2008,13 +2029,28 @@ struct TypingSession {
     guard !isFinished else { return }
     if isKeyDown {
       guard !isRepeat, activePhysicalKeyDownDates[keyCode] == nil else { return }
+      if startedAt != nil, let previousDate = lastPhysicalKeyDownDate {
+        let spacing = date.timeIntervalSince(previousDate)
+        if spacing.isFinite, spacing >= 0 { physicalKeySpacingSamples.append(spacing) }
+      }
+      lastPhysicalKeyDownDate = date
       activePhysicalKeyDownDates[keyCode] = date
+      if startedAt != nil, activePhysicalKeyDownDates.count > 1,
+        physicalKeyOverlapStartedAt == nil
+      {
+        physicalKeyOverlapStartedAt = date
+      }
       return
     }
     guard startedAt != nil, let keyDownDate = activePhysicalKeyDownDates.removeValue(forKey: keyCode)
     else { return }
     let duration = date.timeIntervalSince(keyDownDate)
     if duration.isFinite, duration >= 0 { completedPhysicalKeyDurations.append(duration) }
+    if activePhysicalKeyDownDates.count == 1, let overlapStartedAt = physicalKeyOverlapStartedAt {
+      let overlap = date.timeIntervalSince(overlapStartedAt)
+      if overlap.isFinite, overlap >= 0 { completedPhysicalKeyOverlapDuration += overlap }
+      physicalKeyOverlapStartedAt = nil
+    }
   }
 
   var sectionProgress: (completed: Int, total: Int)? {
@@ -2348,6 +2384,8 @@ struct TypingSession {
       accuracy: accuracy,
       characterStats: characterStats,
       keyDurationSamples: completedPhysicalKeyDurations,
+      keySpacingSamples: physicalKeySpacingSamples,
+      keyOverlapDuration: completedPhysicalKeyOverlapDuration,
       tags: ResultTagPolicy.normalized(tags),
       prompt: prompt,
       replayEvents: replayEvents
@@ -2500,7 +2538,10 @@ struct TypingSession {
   }
 
   private mutating func beginIfNeeded(at date: Date) {
-    if startedAt == nil { startedAt = date }
+    if startedAt == nil {
+      startedAt = date
+      if activePhysicalKeyDownDates.count > 1 { physicalKeyOverlapStartedAt = date }
+    }
   }
 
   /// The reference expands the typographic ellipsis only when it is not the

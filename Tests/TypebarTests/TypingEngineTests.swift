@@ -199,7 +199,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(unavailable, .init(typing: 0, key: 0))
   }
 
-  func testPhysicalKeyDurationsUseOnlyClosedNonRepeatPairs() throws {
+  func testPhysicalKeyTimingsUseOnlyClosedNonRepeatEvents() throws {
     var session = TypingSession(configuration: .timed(seconds: 1), prompt: "amber")
     session.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
     session.insert("a", at: start.addingTimeInterval(0.01))
@@ -215,6 +215,8 @@ final class TypingEngineTests: XCTestCase {
       keyCode: 1, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.4))
     session.recordPhysicalKeyEvent(
       keyCode: 2, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(0.8))
+    session.recordPhysicalKeyEvent(
+      keyCode: 3, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(0.9))
     session.tick(at: start.addingTimeInterval(1.01))
 
     let result = try XCTUnwrap(session.result(at: start.addingTimeInterval(1.01)))
@@ -225,12 +227,40 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(stats.averageMilliseconds, 150, accuracy: 0.000_001)
     XCTAssertEqual(stats.standardDeviationMilliseconds, 50, accuracy: 0.000_001)
     XCTAssertEqual(stats.sampleCount, 2)
+    XCTAssertEqual(result.keyOverlapDuration, 0)
 
     session.recordPhysicalKeyEvent(
       keyCode: 2, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(1.1))
+    session.recordPhysicalKeyEvent(
+      keyCode: 3, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(1.2))
     XCTAssertEqual(
       try XCTUnwrap(session.result(at: start.addingTimeInterval(1.01))).keyDurationSamples.count,
       2)
+
+    var overlap = TypingSession(configuration: .timed(seconds: 1), prompt: "amber")
+    overlap.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
+    overlap.insert("a", at: start)
+    overlap.recordPhysicalKeyEvent(
+      keyCode: 1, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(0.1))
+    overlap.recordPhysicalKeyEvent(
+      keyCode: 0, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.15))
+    overlap.recordPhysicalKeyEvent(
+      keyCode: 1, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.2))
+    overlap.recordPhysicalKeyEvent(
+      keyCode: 2, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(0.3))
+    overlap.recordPhysicalKeyEvent(
+      keyCode: 2, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.4))
+    overlap.tick(at: start.addingTimeInterval(1))
+
+    let overlapResult = try XCTUnwrap(overlap.result(at: start.addingTimeInterval(1)))
+    XCTAssertEqual(overlapResult.keySpacingSamples.count, 2)
+    XCTAssertEqual(overlapResult.keySpacingSamples[0], 0.1, accuracy: 0.000_001)
+    XCTAssertEqual(overlapResult.keySpacingSamples[1], 0.2, accuracy: 0.000_001)
+    let spacingStats = try XCTUnwrap(overlapResult.keySpacingStats)
+    XCTAssertEqual(spacingStats.averageMilliseconds, 150, accuracy: 0.000_001)
+    XCTAssertEqual(spacingStats.standardDeviationMilliseconds, 50, accuracy: 0.000_001)
+    XCTAssertEqual(spacingStats.sampleCount, 2)
+    XCTAssertEqual(overlapResult.keyOverlapDuration, 0.05, accuracy: 0.000_001)
   }
 
   func testLegacyLeaderboardResponseDefaultsMissingConsistencyToZero() throws {
@@ -784,6 +814,9 @@ final class TypingEngineTests: XCTestCase {
       restored.typedCharacterCount)
     XCTAssertTrue(restored.keyDurationSamples.isEmpty)
     XCTAssertNil(restored.keyDurationStats)
+    XCTAssertTrue(restored.keySpacingSamples.isEmpty)
+    XCTAssertNil(restored.keySpacingStats)
+    XCTAssertEqual(restored.keyOverlapDuration, 0)
   }
 
   func testSpaceDelimitedWordInputCapsExtrasButStillAcceptsTheCommitSeparator() {
@@ -4148,6 +4181,7 @@ final class TypingEngineTests: XCTestCase {
       typedCharacterCount: 12, correctCharacterCount: 11, errorCount: 1, wpm: 60, rawWpm: 66,
       accuracy: 92, characterStats: .init(matched: 9, incorrect: 1, extra: 2, missed: 3),
       keyDurationSamples: [0.08, 0.12],
+      keySpacingSamples: [0.1, 0.2], keyOverlapDuration: 0.03,
       tags: ["focus, \"deep\"", "café"], prompt: "private prompt",
       replayEvents: [.init(offset: 0.5, kind: .insert, text: "bonjour")]
     )
@@ -4155,7 +4189,8 @@ final class TypingEngineTests: XCTestCase {
     let csv = ResultCSVExport.csvString(for: [result])
     XCTAssertTrue(csv.hasPrefix(ResultCSVExport.columns.joined(separator: ",") + "\r\n"))
     XCTAssertTrue(csv.contains("00000000-0000-0000-0000-000000000007,completed,60,66,92,"))
-    XCTAssertTrue(csv.contains(",11,12,1,9,1,2,3,100.00,20.00,2,time,"))
+    XCTAssertTrue(
+      csv.contains(",11,12,1,9,1,2,3,100.00,20.00,2,150.00,50.00,2,30.00,time,"))
     XCTAssertTrue(csv.contains(",true,true,expert,uppercase;rot13,\"focus, \"\"deep\"\";café\","))
     XCTAssertTrue(csv.contains("1970-01-01T00:00:00"))
     XCTAssertFalse(csv.contains("private prompt"))
@@ -9910,7 +9945,11 @@ final class TypingEngineTests: XCTestCase {
     session.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
     session.insert("a", at: start)
     session.recordPhysicalKeyEvent(
+      keyCode: 1, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(0.05))
+    session.recordPhysicalKeyEvent(
       keyCode: 0, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.1))
+    session.recordPhysicalKeyEvent(
+      keyCode: 1, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.15))
     session.insert("mber", at: start.addingTimeInterval(6))
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.afkDuration, 4)
@@ -9926,11 +9965,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(stored.wpm, result.wpm)
     XCTAssertEqual(stored.accuracy, 100)
     XCTAssertEqual(stored.afkDuration, 4)
-    XCTAssertEqual(stored.keyDurationSamples.count, 1)
+    XCTAssertEqual(stored.keyDurationSamples.count, 2)
     XCTAssertEqual(stored.keyDurationSamples[0], 0.1, accuracy: 0.000_001)
     XCTAssertEqual(
       try XCTUnwrap(stored.portableResult?.keyDurationStats).averageMilliseconds,
       100, accuracy: 0.000_001)
+    XCTAssertEqual(stored.keySpacingSamples.count, 1)
+    XCTAssertEqual(stored.keySpacingSamples[0], 0.05, accuracy: 0.000_001)
+    XCTAssertEqual(try XCTUnwrap(stored.keyOverlapDuration), 0.05, accuracy: 0.000_001)
     XCTAssertEqual(stored.afkPercentage, 66.666_666_666_7, accuracy: 0.000_001)
     XCTAssertEqual(stored.portableResult, result)
 

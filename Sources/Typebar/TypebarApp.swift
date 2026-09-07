@@ -3054,6 +3054,20 @@ private struct CompletedResultView: View {
               "\(keyDurationText(keyDurationStats.standardDeviationMilliseconds)) · \(keyDurationStats.sampleCount) 次")
           }
         }
+        if let keySpacingStats = result.keySpacingStats {
+          GridRow {
+            metric("平均按键间隔", keyDurationText(keySpacingStats.averageMilliseconds))
+            metric(
+              "按键间隔波动",
+              "\(keyDurationText(keySpacingStats.standardDeviationMilliseconds)) · \(keySpacingStats.sampleCount) 次")
+          }
+        }
+        if result.keyDurationStats != nil || result.keySpacingStats != nil {
+          GridRow {
+            metric("按键重叠", keyDurationText(result.keyOverlapDuration * 1_000))
+            metric("重叠占比", keyOverlapPercentageText)
+          }
+        }
       }
 
       Label(
@@ -3189,6 +3203,12 @@ private struct CompletedResultView: View {
 
   private func keyDurationText(_ milliseconds: Double) -> String {
     "\(milliseconds.formatted(.number.precision(.fractionLength(0...1)))) ms"
+  }
+
+  private var keyOverlapPercentageText: String {
+    guard result.elapsedDuration > 0 else { return "0%" }
+    let percentage = result.keyOverlapDuration / result.elapsedDuration * 100
+    return "\(percentage.formatted(.number.precision(.fractionLength(0...2))))%"
   }
 
   @ViewBuilder
@@ -4944,6 +4964,24 @@ private struct ResultDetailView: View {
             )
           }
         }
+        if let keySpacingStats = result.portableResult?.keySpacingStats {
+          GridRow {
+            Text("按键间隔（平均 / 波动）")
+            Text(
+              "\(keyDurationText(keySpacingStats.averageMilliseconds)) / \(keyDurationText(keySpacingStats.standardDeviationMilliseconds)) · \(keySpacingStats.sampleCount) 次"
+            )
+          }
+        }
+        if let portableResult = result.portableResult,
+          portableResult.keyDurationStats != nil || portableResult.keySpacingStats != nil
+        {
+          GridRow {
+            Text("按键重叠 / 占比")
+            Text(
+              "\(keyDurationText(portableResult.keyOverlapDuration * 1_000)) / \(keyOverlapPercentageText(portableResult))"
+            )
+          }
+        }
       }
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
         ReplayTimelineView(prompt: result.prompt, events: result.replayEvents)
@@ -4977,6 +5015,12 @@ private struct ResultDetailView: View {
 
   private func keyDurationText(_ milliseconds: Double) -> String {
     "\(milliseconds.formatted(.number.precision(.fractionLength(0...1)))) ms"
+  }
+
+  private func keyOverlapPercentageText(_ result: CompletedTestResult) -> String {
+    guard result.elapsedDuration > 0 else { return "0%" }
+    let percentage = result.keyOverlapDuration / result.elapsedDuration * 100
+    return "\(percentage.formatted(.number.precision(.fractionLength(0...2))))%"
   }
 
 }

@@ -23,6 +23,8 @@ final class TestResultRecord {
   var accuracy: Int
   var characterStatsData: Data?
   var keyDurationSamplesData: Data?
+  var keySpacingSamplesData: Data?
+  var keyOverlapDuration: TimeInterval?
   var tagsData: Data
   var prompt: String
   var replayEventsData: Data?
@@ -42,6 +44,8 @@ final class TestResultRecord {
     accuracy = result.accuracy
     characterStatsData = try? JSONEncoder().encode(result.characterStats)
     keyDurationSamplesData = try? JSONEncoder().encode(result.keyDurationSamples)
+    keySpacingSamplesData = try? JSONEncoder().encode(result.keySpacingSamples)
+    keyOverlapDuration = result.keyOverlapDuration
     tagsData = (try? JSONEncoder().encode(ResultTagPolicy.normalized(result.tags))) ?? Data()
     prompt = result.prompt
     replayEventsData = try? JSONEncoder().encode(result.replayEvents)
@@ -70,6 +74,11 @@ final class TestResultRecord {
 
   var keyDurationSamples: [TimeInterval] {
     keyDurationSamplesData.flatMap { try? JSONDecoder().decode([TimeInterval].self, from: $0) }
+      ?? []
+  }
+
+  var keySpacingSamples: [TimeInterval] {
+    keySpacingSamplesData.flatMap { try? JSONDecoder().decode([TimeInterval].self, from: $0) }
       ?? []
   }
 
@@ -108,6 +117,8 @@ final class TestResultRecord {
       accuracy: accuracy,
       characterStats: characterStats,
       keyDurationSamples: keyDurationSamples,
+      keySpacingSamples: keySpacingSamples,
+      keyOverlapDuration: keyOverlapDuration ?? 0,
       tags: tags,
       prompt: prompt,
       replayEvents: replayEvents

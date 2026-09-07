@@ -27,6 +27,10 @@ enum ResultCSVExport {
         "key_duration_average_ms",
         "key_duration_sd_ms",
         "key_duration_samples",
+        "key_spacing_average_ms",
+        "key_spacing_sd_ms",
+        "key_spacing_samples",
+        "key_overlap_ms",
         "mode",
         "duration_seconds",
         "word_limit",
@@ -62,6 +66,7 @@ enum ResultCSVExport {
             events: result.replayEvents, duration: result.elapsedDuration)
         let configuration = result.configuration
         let keyDurationStats = result.keyDurationStats
+        let keySpacingStats = result.keySpacingStats
         return [
             result.id.uuidString.lowercased(),
             result.outcome.rawValue,
@@ -80,6 +85,10 @@ enum ResultCSVExport {
             keyDurationStats.map { decimal($0.averageMilliseconds) } ?? "",
             keyDurationStats.map { decimal($0.standardDeviationMilliseconds) } ?? "",
             keyDurationStats.map { String($0.sampleCount) } ?? "0",
+            keySpacingStats.map { decimal($0.averageMilliseconds) } ?? "",
+            keySpacingStats.map { decimal($0.standardDeviationMilliseconds) } ?? "",
+            keySpacingStats.map { String($0.sampleCount) } ?? "0",
+            decimal(result.keyOverlapDuration * 1_000),
             configuration.mode.rawValue,
             configuration.duration.map(decimal) ?? "",
             configuration.wordLimit.map(String.init) ?? "",
