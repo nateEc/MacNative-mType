@@ -70,6 +70,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case whorf
   case whorf6
   case whorfmax
+  case octa8
+  case nerps
+  case gallium
+  case galliumAngle = "gallium_angle"
+  case galliumV2 = "gallium_v2"
   case real
   case sertain
   case ctgap
@@ -208,6 +213,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .whorf: "Whorf"
     case .whorf6: "Whorf 6"
     case .whorfmax: "Whorfmax"
+    case .octa8: "Octa8"
+    case .nerps: "Nerps"
+    case .gallium: "Gallium"
+    case .galliumAngle: "Gallium Angle"
+    case .galliumV2: "Gallium v2"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -351,6 +361,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case whorf
   case whorf6
   case whorfmax
+  case octa8
+  case nerps
+  case gallium
+  case galliumAngle = "gallium_angle"
+  case galliumV2 = "gallium_v2"
   case real
   case sertain
   case ctgap
@@ -1606,6 +1621,41 @@ enum KeyboardGuideModel {
         row("top", "FLHYKQWOU,-=\\"),
         row("home", "SRNTPCDAEI/"),
         row("bottom", "XJBVZMG';.")
+      ]
+    case .octa8:
+      [
+        row("number", "`1234567890-="),
+        row("top", "YOUKXGWDL,[]\\"),
+        row("home", "IAENFBSTRC;"),
+        row("bottom", "/ZH'QVPMJ.")
+      ]
+    case .nerps:
+      [
+        row("number", "`1234567890-="),
+        row("top", "XLDPVZKOU;[]\\"),
+        row("home", "NRTSGYHEIA/"),
+        row("bottom", "JMCWQBF',.")
+      ]
+    case .gallium:
+      [
+        row("number", "`1234567890-="),
+        row("top", "BLDCVZYOU,[]\\"),
+        row("home", "NRTSGPHAEI/"),
+        row("bottom", "QXMWJKF';.")
+      ]
+    case .galliumAngle:
+      [
+        row("number", "`1234567890-="),
+        row("top", "BLDCJZYOU,[]\\"),
+        row("home", "NRTSVPHAEI/"),
+        row("bottom", "XMWGQKF';.")
+      ]
+    case .galliumV2:
+      [
+        row("number", "`1234567890-="),
+        row("top", "BLDCVJFOU,[]\\"),
+        row("home", "NRTSGYHAEI/"),
+        row("bottom", "XQMWZKP';.")
       ]
     case .real:
       [
