@@ -35,6 +35,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case pashto
   case estonian
   case persianStandard
+  case persianFarsi
   case arabic101
   case arabic102
   case arabicMac
@@ -78,6 +79,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .pashto: "Pashto"
     case .estonian: "Estonian"
     case .persianStandard: "Persian (Standard)"
+    case .persianFarsi: "Persian (Farsi)"
     case .arabic101: "Arabic (101)"
     case .arabic102: "Arabic (102)"
     case .arabicMac: "Arabic (macOS)"
@@ -126,6 +128,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case pashto
   case estonian
   case persianStandard
+  case persianFarsi
   case arabic101
   case arabic102
   case arabicMac
@@ -511,6 +514,16 @@ struct KeyboardGuideKey: Identifiable, Equatable {
     let normalized = Character(String(character).lowercased())
     if let shifted = shiftedPairs[normalized] { return [normalized, shifted] }
     return [normalized]
+  }
+
+  func exactlyProduces(_ character: Character) -> Bool {
+    let target = Character(String(character).lowercased())
+    return [label, shiftedLabel, optionLabel, shiftedOptionLabel]
+      .compactMap { $0 }
+      .contains { output in
+        let characters = Array(output.lowercased())
+        return characters.count == 1 && characters[0] == target
+      }
   }
 
   func legend(
@@ -1136,6 +1149,29 @@ enum KeyboardGuideModel {
           shiftedLabels: ["|", "ك", "ط", "ژ", "ٰ", "ZWNJ", "ٔ", "ء", ">", "<", "؟"]
         ),
       ]
+    case .persianFarsi:
+      [
+        row(
+          "number", "÷1234567890-=",
+          characters: ["÷×", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9)", "0(", "-_", "=+"],
+          shiftedLabels: ["×", "!", "@", "#", "$", "%", "^", "&", "*", ")", "(", "_", "+"]
+        ),
+        row(
+          "top", "ضصثقفغعهخحجچپ",
+          characters: ["ضً", "صٌ", "ثٍ", "قریال", "ف،", "غ؛", "ع,", "ه]", "خ[", "ح\\", "ج}", "چ{", "پ|"],
+          shiftedLabels: ["ً", "ٌ", "ٍ", "ریال", "،", "؛", ",", "]", "[", "\\", "}", "{", "|"]
+        ),
+        row(
+          "home", "شسیبلاتنمکگ",
+          characters: ["شَ", "سُ", "یِ", "بّ", "لۀ", "اآ", "تـ", "ن«", "م»", "ک:", "گ\""],
+          shiftedLabels: ["َ", "ُ", "ِ", "ّ", "ۀ", "آ", "ـ", "«", "»", ":", "\""]
+        ),
+        row(
+          "bottom", "پظطزرذدئو./",
+          characters: ["پ|", "ظة", "طي", "زژ", "رؤ", "ذإ", "دأ", "ئء", "و<", ".>", "/؟"],
+          shiftedLabels: ["|", "ة", "ي", "ژ", "ؤ", "إ", "أ", "ء", "<", ">", "؟"]
+        ),
+      ]
     case .arabic101:
       [
         row(
@@ -1272,9 +1308,9 @@ enum KeyboardGuideModel {
     guard let character else { return nil }
     if character == " " { return style.isSteno ? "steno-space" : "space" }
     let keys = style.isSteno ? stenoRows().flatMap { $0 } : rows(for: layout).flatMap { $0 }
-    return keys
-      .first(where: { $0.characters.contains(Character(String(character).lowercased())) })?
-      .id
+    let normalized = Character(String(character).lowercased())
+    return keys.first(where: { $0.exactlyProduces(normalized) })?.id
+      ?? keys.first(where: { $0.characters.contains(normalized) })?.id
   }
 
   static func highlightedKey(
@@ -1285,9 +1321,9 @@ enum KeyboardGuideModel {
     guard let character else { return nil }
     if character == " " { return style.isSteno ? "steno-space" : "space" }
     let keys = style.isSteno ? stenoRows().flatMap { $0 } : rows.flatMap { $0 }
-    return keys
-      .first(where: { $0.characters.contains(Character(String(character).lowercased())) })?
-      .id
+    let normalized = Character(String(character).lowercased())
+    return keys.first(where: { $0.exactlyProduces(normalized) })?.id
+      ?? keys.first(where: { $0.characters.contains(normalized) })?.id
   }
 
   static func displayRows(
