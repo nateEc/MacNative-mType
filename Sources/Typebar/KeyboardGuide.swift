@@ -34,6 +34,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ina
   case soul
   case niro
+  case typehack
+  case isrt
+  case isrtAngle
+  case engram
+  case engrammer
   case halmak
   case qgmlwb
   case qgmlwy
@@ -127,6 +132,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ina: "Ina"
     case .soul: "Soul"
     case .niro: "Niro"
+    case .typehack: "TypeHack"
+    case .isrt: "ISRT"
+    case .isrtAngle: "ISRT Angle"
+    case .engram: "Engram"
+    case .engrammer: "Engrammer"
     case .halmak: "Halmak"
     case .qgmlwb: "QGMLWB"
     case .qgmlwy: "QGMLWY"
@@ -225,6 +235,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ina
   case soul
   case niro
+  case typehack
+  case isrt
+  case isrtAngle
+  case engram
+  case engrammer
   case halmak
   case qgmlwb
   case qgmlwy
@@ -1159,6 +1174,61 @@ enum KeyboardGuideModel {
         row("top", "QWUDPJFYL;[]\\"),
         row("home", "ASETGHNIRO'"),
         row("bottom", "ZXCVBKM,./"),
+      ]
+    case .typehack:
+      [
+        row(
+          "number", labels: ["^", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*", "\\"],
+          characters: ["^~", "1!", "2@", "3#", "4$", "5%", "6&", "7`", "8(", "9)", "0=", "*+", "\\|"],
+          shiftedLabels: ["~", "!", "@", "#", "$", "%", "&", "`", "(", ")", "=", "+", "|"]
+        ),
+        row("top", "JGHPFQVOU;/[]"),
+        row("home", "RSNTKYIAEL-"),
+        row("bottom", "ZWMDBC,'.X"),
+      ]
+    case .isrt:
+      [
+        row("number", "`1234567890-="),
+        row("top", "YCLMKZFU,'[]\\"),
+        row("home", "ISRTGPNEAO;"),
+        row("bottom", "QVWDJBH/.X"),
+      ]
+    case .isrtAngle:
+      [
+        row("number", "`1234567890-="),
+        row("top", "YCLMKZFU,'[]\\"),
+        row("home", "ISRTGPNEAO;"),
+        row("bottom", "VWDJQBH/.X"),
+      ]
+    case .engram:
+      [
+        row(
+          "number", labels: ["[", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "]", "/"],
+          characters: ["[{", "1|", "2=", "3~", "4+", "5<", "6>", "7^", "8&", "9%", "0*", "]}", "/\\"],
+          shiftedLabels: ["{", "|", "=", "~", "+", "<", ">", "^", "&", "%", "*", "}", "\\"]
+        ),
+        row(
+          "top", labels: ["b", "y", "o", "u", "'", "\"", "l", "d", "w", "v", "z", "#", "@"],
+          characters: ["bB", "yY", "oO", "uU", "'(", "\")", "lL", "dD", "wW", "vV", "zZ", "#$", "@`"],
+          shiftedLabels: ["B", "Y", "O", "U", "(", ")", "L", "D", "W", "V", "Z", "$", "`"]
+        ),
+        row(
+          "home", labels: ["c", "i", "e", "a", ",", ".", "h", "t", "s", "n", "q"],
+          characters: ["cC", "iI", "eE", "aA", ",;", ".:", "hH", "tT", "sS", "nN", "qQ"],
+          shiftedLabels: ["C", "I", "E", "A", ";", ":", "H", "T", "S", "N", "Q"]
+        ),
+        row(
+          "bottom", labels: ["g", "x", "j", "k", "-", "?", "r", "m", "f", "p"],
+          characters: ["gG", "xX", "jJ", "kK", "-_", "?!", "rR", "mM", "fF", "pP"],
+          shiftedLabels: ["G", "X", "J", "K", "_", "!", "R", "M", "F", "P"]
+        ),
+      ]
+    case .engrammer:
+      [
+        row("number", "`1234567890[]"),
+        row("top", "BYOU';LDWVZ=\\"),
+        row("home", "CIEA,.HTSNQ"),
+        row("bottom", "GXJK-/RMFP"),
       ]
     case .ansiColemak:
       [
@@ -2504,7 +2574,7 @@ enum KeyboardGuideModel {
 
 private extension KeyboardLayout {
   var showsNumberRowInMinimalGuide: Bool {
-    self == .frenchAzerty || self == .mtgapFull
+    self == .frenchAzerty || self == .mtgapFull || self == .engram || self == .engrammer
   }
 }
 
