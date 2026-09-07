@@ -274,6 +274,8 @@
     "dvorak_fr": "frenchDvorak",
     "azerty_AFNOR": "frenchAzertyAFNOR",
     "bepo": "frenchBepo",
+    "bepo_AFNOR": "frenchBepoAFNOR",
+    "alpha": "ansiAlpha",
     "qwertz": "germanQwertz",
     "swiss_german": "swissGerman",
     "swiss_french": "swissFrench",

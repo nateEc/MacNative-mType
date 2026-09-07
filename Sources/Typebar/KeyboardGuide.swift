@@ -51,6 +51,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case frenchAzerty
   case frenchAzertyAFNOR
   case frenchBepo
+  case frenchBepoAFNOR
+  case ansiAlpha
   case turkishQ
   case turkishF
   case turkishE
@@ -133,6 +135,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .frenchAzerty: "French AZERTY"
     case .frenchAzertyAFNOR: "French AZERTY (AFNOR)"
     case .frenchBepo: "French Bépo"
+    case .frenchBepoAFNOR: "French Bépo (AFNOR)"
+    case .ansiAlpha: "ANSI Alpha"
     case .turkishQ: "Turkish Q"
     case .turkishF: "Turkish F"
     case .turkishE: "Turkish E"
@@ -220,6 +224,8 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case frenchAzerty
   case frenchAzertyAFNOR
   case frenchBepo
+  case frenchBepoAFNOR
+  case ansiAlpha
   case turkishQ
   case turkishF
   case turkishE
@@ -953,6 +959,44 @@ enum KeyboardGuideModel {
           optionLabels: ["/", "\\", "{", "}", "…", "~", "¿", "o", "Ω", "†", "ǫ"],
           shiftedOptionLabels: [nil, nil, "‘", "’", "·", nil, "ỏ", "̊", nil, "‡", "ª"]
         ),
+      ]
+    case .frenchBepoAFNOR:
+      [
+        layeredRow(
+          "number",
+          labels: ["$", "\"", "«", "»", "(", ")", "@", "+", "-", "/", "*", "=", "%"],
+          shiftedLabels: ["#", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "°", "`"],
+          optionLabels: ["–", "—", "<", ">", "[", "]", "^", "±", "−", "÷", "×", "≠", "‰"],
+          shiftedOptionLabels: ["¶", "„", "“", "”", "⩽", "⩾", nil, "¬", "¼", "½", "¾", "′", "″"]
+        ),
+        layeredRow(
+          "top",
+          labels: ["b", "é", "p", "o", "è", "ô", "v", "d", "l", "j", "z", "w"],
+          shiftedLabels: ["B", "É", "P", "O", "È", "!", "V", "D", "L", "J", "Z", "W"],
+          optionLabels: ["|", "ó", "&", "œ", "ò", "¡", "ǒ", "∞", "ø", nil, "ɵ", nil],
+          shiftedOptionLabels: ["_", nil, "§", "Œ", "`", nil, nil, nil, "£", nil, nil, nil]
+        ),
+        layeredRow(
+          "home",
+          labels: ["a", "u", "i", "e", ",", "c", "t", "s", "r", "n", "m", "ç"],
+          shiftedLabels: ["A", "U", "I", "E", ";", "C", "T", "S", "R", "N", "M", "Ç"],
+          optionLabels: ["æ", "ù", "ö", "€", "'", "¸", "ᵉ", "ß", "ŏ", "õ", "ō", nil],
+          shiftedOptionLabels: ["Æ", "Ù", "ȯ", "¤", "ț", "©", "™", "ſ", "®", nil, nil, nil]
+        ),
+        layeredRow(
+          "bottom",
+          labels: ["ê", "à", "y", "x", ".", "k", "’", "q", "g", "h", "f"],
+          shiftedLabels: ["Ê", "À", "Y", "X", ":", "K", "?", "Q", "G", "H", "F"],
+          optionLabels: ["/", "\\", "{", "}", "…", "~", "¿", "å", "Ω", "ọ", "ǫ"],
+          shiftedOptionLabels: ["^", "‚", "‘", "’", "·", "‑", "ỏ", "ơ", "†", "‡", nil]
+        ),
+      ]
+    case .ansiAlpha:
+      [
+        row("number", "`1234567890-="),
+        row("top", "ABCDEFGHIJ[]\\"),
+        row("home", "KLMNOPQRS;'"),
+        row("bottom", "TUVWXYZ,./"),
       ]
     case .ansiColemak:
       [

@@ -2424,6 +2424,97 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testBepoAFNORAndAlphaMapEveryPhysicalKeyAndPersist() {
+    let ansiRows = SystemKeyboardGuide.physicalRows
+    let isoRows = [
+      ansiRows[0],
+      Array(ansiRows[1].prefix(12)),
+      ansiRows[2] + [UInt16(42)],
+      [UInt16(10)] + ansiRows[3],
+    ]
+
+    let alphaNormal = ["`1234567890-=", "abcdefghij[]\\", "klmnopqrs;'", "tuvwxyz,./"]
+    let alphaShifted = ["~!@#$%^&*()_+", "ABCDEFGHIJ{}|", "KLMNOPQRS:\"", "TUVWXYZ<>?"]
+    let alphaGuideRows = KeyboardGuideModel.rows(for: .ansiAlpha)
+    XCTAssertEqual(alphaGuideRows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(
+      alphaGuideRows.map { $0.map(\.label).joined() },
+      ["`1234567890-=", "ABCDEFGHIJ[]\\", "KLMNOPQRS;'", "TUVWXYZ,./"])
+    for (flags, expected) in [
+      (NSEvent.ModifierFlags(), alphaNormal),
+      (NSEvent.ModifierFlags.shift, alphaShifted),
+    ] {
+      XCTAssertEqual(
+        ansiRows.map { row in
+          row.compactMap {
+            KeyboardLayoutEmulator.text(
+              forKeyCode: $0, modifierFlags: flags, layout: .ansiAlpha)
+          }.joined()
+        },
+        expected)
+    }
+
+    let bepoGuideRows = KeyboardGuideModel.rows(for: .frenchBepoAFNOR)
+    XCTAssertEqual(bepoGuideRows.map(\.count), [13, 12, 12, 11])
+    for (keyCodes, guideRow) in zip(isoRows, bepoGuideRows) {
+      for (keyCode, key) in zip(keyCodes, guideRow) {
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: [], layout: .frenchBepoAFNOR),
+          key.label)
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: [.shift], layout: .frenchBepoAFNOR),
+          key.shiftedLabel)
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: [.option], layout: .frenchBepoAFNOR),
+          key.optionLabel)
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: [.option, .shift],
+            layout: .frenchBepoAFNOR),
+          key.shiftedOptionLabel)
+      }
+    }
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(
+        forKeyCode: 24, modifierFlags: [.option], layout: .frenchBepoAFNOR),
+      "‰")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(
+        forKeyCode: 31, modifierFlags: [.option, .shift], layout: .frenchBepoAFNOR),
+      "£")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.text(
+        forKeyCode: 35, modifierFlags: [.option], layout: .frenchBepoAFNOR))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(
+        forKeyCode: 49, modifierFlags: [], layout: .frenchBepoAFNOR),
+      " ")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ɵ", layout: .frenchBepoAFNOR), "top-10")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "z", layout: .ansiAlpha), "bottom-6")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "j", layout: .ansiAlpha), 35)
+
+    for layout in [KeyboardLayout.frenchBepoAFNOR, .ansiAlpha] {
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+  }
+
+  @MainActor
   func testAnsiColemakDHMapsItsDistinctCoreKeysAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "b", layout: .ansiColemakDH), "top-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "g", layout: .ansiColemakDH), "home-4")
@@ -6683,7 +6774,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 77)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 79)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

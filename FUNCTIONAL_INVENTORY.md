@@ -4,7 +4,7 @@
 
 官方 48 项 funbox 的逐项来源、映射与未实现缺口见 `OFFICIAL_FUNBOX_AUDIT.md`；该审计是本表 FUN-01/FUN-02 的细化证据。
 
-官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 72 项精确原生、3 项相关替代、164 项系统输入或自定义回退均由自动化测试守恒校验。
+官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 74 项精确原生、3 项相关替代、162 项系统输入或自定义回退均由自动化测试守恒校验。
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -293,6 +293,8 @@
 2026-09-07 补充：当前内置键盘图更新为七十二种，新增 `Programmer Dvorak`、`Programmer Dvorak Prime`、`German Dvorak`、`German Dvorak Improved` 与 `Spanish Dvorak`。两项 Programmer 变体完整覆盖 47 个 ANSI Base/Shift 位置并保留各自符号数字层，三项区域变体完整覆盖含额外 ISO 键的 48 个位置；全部进入提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 67 项精确原生、3 项相关替代、169 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
 
 2026-09-07 补充：当前内置键盘图更新为七十七种，新增 `Swedish Colemak`、`Swedish Dvorak`、`French Dvorak`、`French AZERTY (AFNOR)` 与 `French Bépo`。五项均完整覆盖 48 个 ISO 物理位置；前三项覆盖 Base/Shift，AFNOR 与 Bépo 另完整覆盖 Option/Shift+Option，AFNOR 还实现空格键的 NBSP/窄 NBSP 层。全部进入提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 72 项精确原生、3 项相关替代、164 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
+
+2026-09-07 补充：当前内置键盘图更新为七十九种，新增 `French Bépo (AFNOR)` 与 `ANSI Alpha`。Bépo AFNOR 完整覆盖 48 个 ISO 位置的 Base/Shift/Option/Shift+Option 与普通空格，保留未分配层为空；Alpha 完整覆盖 47 个 ANSI Base/Shift 位置。两项均进入提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 74 项精确原生、3 项相关替代、162 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
 
 2026-09-04 补充：当时 `CFG-02`、`VIS-02` 与 `VIS-05` 的非拉丁布局覆盖新增 `Bulgarian Cyrillic · Typebar`。它是 Typebar 自写的第 19 个内置物理键位映射，覆盖 `я/ъ/щ/ч/ь` 与 ISO `< >`，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；这不是官方或系统 BDS 布局的复制，需精确系统布局时用户仍可选择 macOS 当前输入源。
 | INP-01 | 输入、逐字符状态、退格、长词 | `input/handlers/*` | TypingEngine | 部分实现 |

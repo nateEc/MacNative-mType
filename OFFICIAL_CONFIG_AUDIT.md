@@ -94,7 +94,7 @@
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
-| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 77 个原生内置布局可任选至多 15 个进入原生序列。 |
+| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 79 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 部分；自选组合已实现，候选语言仅限 Typebar 原创语言集。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
@@ -109,7 +109,7 @@
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。依据固定参考版本的 `noLazyMode`，非自定义模式会禁用 English、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Greeklish、Dutch、Filipino、Indonesian、Serbian Cyrillic、Bulgarian、Macedonian、Kazakh、中日韩／日语罗马字、Ukrainian 与 Ukrainian Latin，以及所有代码练习的该修饰器；自定义文本仍可使用。可配置多语练习只有至少一个选择的组成语言允许时才保留它。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
-| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，77 种原生物理布局和用户自写四行布局可显式模拟；Swedish Colemak/Dvorak 与 French Dvorak 完整映射 48 个 ISO Base/Shift 位置，French AZERTY (AFNOR) 与 French Bépo 另覆盖 Option/Shift+Option，AFNOR 包含 NBSP/窄 NBSP 空格层；Programmer Dvorak/Prime、German Dvorak/Improved、Spanish Dvorak、MTGAP ASRT、Halmak、QGMLWB、QGMLWY、QWPR、Colemak 变体、Norman 与 Programmer Workman 同样是独立映射，Turkish E、Japanese Hiragana、ISO 与 Brazilian ABNT2 保留各自区域或额外实体键，Tamil99 与 Hindi InScript 等布局保留完整文本输出和空层语义，Dvorak Left/Right-Handed、Mongolian Cyrillic、Armenian HM QWERTY、Polish (Programmers)、Arabic (macOS) 与 Urdu Phonetic 有独立 Option 层，官方全部命名布局尚未覆盖。 |
+| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，79 种原生物理布局和用户自写四行布局可显式模拟；French Bépo (AFNOR) 完整覆盖 48 个 ISO 四层位置与普通空格，ANSI Alpha 覆盖 47 个 ANSI Base/Shift 位置；Swedish Colemak/Dvorak 与 French Dvorak 完整映射 48 个 ISO Base/Shift 位置，French AZERTY (AFNOR) 与 French Bépo 另覆盖 Option/Shift+Option，AFNOR 包含 NBSP/窄 NBSP 空格层；Programmer Dvorak/Prime、German Dvorak/Improved、Spanish Dvorak、MTGAP ASRT、Halmak、QGMLWB、QGMLWY、QWPR、Colemak 变体、Norman 与 Programmer Workman 同样是独立映射，Turkish E、Japanese Hiragana、ISO 与 Brazilian ABNT2 保留各自区域或额外实体键，Tamil99 与 Hindi InScript 等布局保留完整文本输出和空层语义，Dvorak Left/Right-Handed、Mongolian Cyrillic、Armenian HM QWERTY、Polish (Programmers)、Arabic (macOS) 与 Urdu Phonetic 有独立 Option 层，官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
@@ -170,7 +170,7 @@
 
 ## 当前优先缺口
 
-1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、77 个原生内置模拟布局（包括 Swedish Colemak/Dvorak、French Dvorak、French AZERTY AFNOR、French Bépo、Programmer Dvorak/Prime、German Dvorak/Improved、Spanish Dvorak、MTGAP ASRT、Halmak、QGMLWB、QGMLWY、QWPR、Colemak 变体、Norman、Programmer Workman、Turkish E、Japanese Hiragana，以及区域、非拉丁和单手布局），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
+1. 官方 239 份命名 `keymapLayout` 资产与输入模拟尚未全部覆盖。当前策略优先使用 macOS 当前输入源（普通、Shift、Option、Shift+Option 四层标签，并通过 TIS 输入源切换通知刷新）、79 个原生内置模拟布局（包括 French Bépo AFNOR、ANSI Alpha、Swedish Colemak/Dvorak、French Dvorak、French AZERTY AFNOR、French Bépo、Programmer Dvorak/Prime、German Dvorak/Improved、Spanish Dvorak、MTGAP ASRT、Halmak、QGMLWB、QGMLWY、QWPR、Colemak 变体、Norman、Programmer Workman、Turkish E、Japanese Hiragana，以及区域、非拉丁和单手布局），以及可由用户自写四行/Shift 图例定义的基础映射，避免复制资产；仍需继续扩展原创输入映射覆盖。
 2. 官方语言、词表、主题、字体和声音的完整目录不应复制。后续以原创或明确授权内容扩大用户可选范围，并逐项标注差异；语言候选、语义边界和准入条件见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 3. 网页账户页图表、猴子外观和广告设置不适合作为原生逐像素复刻目标；对用户可见意图的原生替代仍需设备验收。
 
@@ -236,11 +236,11 @@
 - Croatian 自动化测试覆盖自创词流（含 `č`、`ć`、`đ`、`š` 与 `ž`）、四档原创引语、完整多语混排轮转、弱项复练、`hr-HR` 朗读 locale 与 `hr` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Serbian 自动化测试覆盖自创西里尔词流（含 `љ`、`њ`、`ђ`、`ћ`、`џ`、`ч`、`ш` 与 `ж`）、四档原创引语、完整多语混排轮转、弱项复练、`sr-RS` 朗读 locale 与 `sr` 百科入口；Serbian Latin 同样覆盖四档原创离线拉丁引语、混排、弱项复练与 `sr-RS`，并拒绝百科替换以保持当前书写形式；服务端测试覆盖两者的投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Hungarian 自动化测试覆盖自创词流（含 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`）、四档原创引语、完整多语混排轮转、弱项复练、`hu-HU` 朗读 locale 与 `hu` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
-- 完整客户端 `swift test` 通过 320 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 完整客户端 `swift test` 通过 321 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
 - 无限测试自动化覆盖 time、words 与自定义循环的 0 值配置、正向秒数/词数、提示扩展、无自动终止、Bail Out、长测试快捷键、预设/分享往返、旧配置冲突迁移及固定参考八项 `noInfiniteDuration` 修饰器；无限结果不保存、不上传，服务端继续拒绝 0 值正式成绩。
 - 结果字符分类自动化覆盖提前提交造成的跳过、词尾额外输入、强制物理键位错误、禅模式、旧归档保守回退、SwiftData 往返与 CSV 四列导出；实现从 Typebar 原生最终输入映射派生，不读取或导入参考结果逻辑、代码或资产。
 - 原生按键时序自动化覆盖 AppKit keyDown/repeat/keyUp 通路、闭合按住样本、连续按下间隔、多键重叠总时长、均值/总体标准差、未配对与结束边界、SwiftData/归档兼容和 CSV 导出；仅保存匿名时序，不复制参考事件代码或上传键码。
-- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、72/3/164 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
+- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、74/3/162 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退；macOS `UCKeyTranslate` 返回的多字符或多码点图例会完整保留，不再截断为首字符。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
