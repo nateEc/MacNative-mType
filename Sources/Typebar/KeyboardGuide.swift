@@ -85,6 +85,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case rain
   case night
   case nightSTIC = "night_stic"
+  case whix2
+  case haruka
+  case kuntum
+  case kuntem = "Kuntem"
+  case kuntemJQ = "kuntem-jq"
   case real
   case sertain
   case ctgap
@@ -238,6 +243,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .rain: "Rain"
     case .night: "Night"
     case .nightSTIC: "Night STIC"
+    case .whix2: "Whix2"
+    case .haruka: "Haruka"
+    case .kuntum: "Kuntum"
+    case .kuntem: "Kuntem"
+    case .kuntemJQ: "Kuntem-JQ"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -396,6 +406,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case rain
   case night
   case nightSTIC = "night_stic"
+  case whix2
+  case haruka
+  case kuntum
+  case kuntem = "Kuntem"
+  case kuntemJQ = "kuntem-jq"
   case real
   case sertain
   case ctgap
@@ -1772,6 +1787,56 @@ enum KeyboardGuideModel {
         row("top", "BFLDVYPOU/[]\\"),
         row("home", "NSHTMGCAEI-"),
         row("bottom", "QXJKZ'W,;.")
+      ]
+    case .whix2:
+      [
+        row(
+          "number",
+          labels: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "", "", ""],
+          characters: ["1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9(", "0)", "", "", ""],
+          shiftedLabels: ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", nil, nil, nil]
+        ),
+        row(
+          "top",
+          labels: ["B", "L", "N", "D", "K", "'", "F", "O", "U", "J", "", "", ""],
+          characters: ["bB", "lL", "nN", "dD", "kK", "'\"", "fF", "oO", "uU", "jJ", "", "", ""],
+          shiftedLabels: ["B", "L", "N", "D", "K", "\"", "F", "O", "U", "J", nil, nil, nil]
+        ),
+        row(
+          "home",
+          labels: ["S", "H", "R", "T", "W", "Y", "C", "A", "E", "I", ""],
+          characters: ["sS", "hH", "rR", "tT", "wW", "yY", "cC", "aA", "eE", "iI", ""],
+          shiftedLabels: ["S", "H", "R", "T", "W", "Y", "C", "A", "E", "I", nil]
+        ),
+        row("bottom", "QXMVZPG,./")
+      ]
+    case .haruka:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QUOPZVFDLM[]\\"),
+        row("home", "IEANBGSTRC'"),
+        row("bottom", ",/.H;JYKXW")
+      ]
+    case .kuntum:
+      [
+        row("number", "`1234567890-="),
+        row("top", "VLNDKJWOU,[]\\"),
+        row("home", "TSRHFGCAEI;"),
+        row("bottom", "ZXPB'MYQ/.")
+      ]
+    case .kuntem:
+      [
+        row("number", "`1234567890-="),
+        row("top", "VLNDKJWOUQ[]\\"),
+        row("home", "TSRHFGCAIE;"),
+        row("bottom", "ZXPB'MY.,/")
+      ]
+    case .kuntemJQ:
+      [
+        row("number", "`1234567890-="),
+        row("top", "VLNDKQWOUJ[]\\"),
+        row("home", "TSRHFGCAIE;"),
+        row("bottom", "ZXPB'MY.,/")
       ]
     case .real:
       [

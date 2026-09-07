@@ -755,6 +755,44 @@ enum KeyboardLayoutEmulator {
           + "0:nN 1:sS 2:hH 3:tT 5:mM 4:gG 38:cC 40:aA 37:eE 41:iI 39:-_ "
           + "6:qQ 7:xX 8:jJ 9:kK 11:zZ 45:'\" 46:wW 43:,< 47:;: 44:.>"
       )
+    case .whix2:
+      withSuppressedKeys(
+        map(
+          "50:1! 18:2@ 19:3# 20:4$ 21:5% 23:6^ 22:7& 26:8* 28:9( 25:0) "
+            + "12:bB 13:lL 14:nN 15:dD 17:kK 16:'\" 32:fF 34:oO 31:uU 35:jJ "
+            + "0:sS 1:hH 2:rR 3:tT 5:wW 4:yY 38:cC 40:aA 37:eE 41:iI "
+            + "6:qQ 7:xX 8:mM 9:vV 11:zZ 45:pP 46:gG 43:,< 47:.> 44:/?"
+        ),
+        keyCodes: [29, 27, 24, 33, 30, 42, 39]
+      )
+    case .haruka:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:qQ 13:uU 14:oO 15:pP 17:zZ 16:vV 32:fF 34:dD 31:lL 35:mM 33:[{ 30:]} 42:\\| "
+          + "0:iI 1:eE 2:aA 3:nN 5:bB 4:gG 38:sS 40:tT 37:rR 41:cC 39:'\" "
+          + "6:,< 7:/? 8:.> 9:hH 11:;: 45:jJ 46:yY 43:kK 47:xX 44:wW"
+      )
+    case .kuntum:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:vV 13:lL 14:nN 15:dD 17:kK 16:jJ 32:wW 34:oO 31:uU 35:,< 33:[{ 30:]} 42:\\| "
+          + "0:tT 1:sS 2:rR 3:hH 5:fF 4:gG 38:cC 40:aA 37:eE 41:iI 39:;: "
+          + "6:zZ 7:xX 8:pP 9:bB 11:'\" 45:mM 46:yY 43:qQ 47:/? 44:.>"
+      )
+    case .kuntem:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:vV 13:lL 14:nN 15:dD 17:kK 16:jJ 32:wW 34:oO 31:uU 35:qQ 33:[{ 30:]} 42:\\| "
+          + "0:tT 1:sS 2:rR 3:hH 5:fF 4:gG 38:cC 40:aA 37:iI 41:eE 39:;: "
+          + "6:zZ 7:xX 8:pP 9:bB 11:'\" 45:mM 46:yY 43:.> 47:,< 44:/?"
+      )
+    case .kuntemJQ:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:vV 13:lL 14:nN 15:dD 17:kK 16:qQ 32:wW 34:oO 31:uU 35:jJ 33:[{ 30:]} 42:\\| "
+          + "0:tT 1:sS 2:rR 3:hH 5:fF 4:gG 38:cC 40:aA 37:iI 41:eE 39:;: "
+          + "6:zZ 7:xX 8:pP 9:bB 11:'\" 45:mM 46:yY 43:.> 47:,< 44:/?"
+      )
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
@@ -1381,6 +1419,18 @@ enum KeyboardLayoutEmulator {
       layeredKeys[keyCode] = .init(
         normal: "", shifted: existing.shifted, option: existing.option,
         shiftedOption: existing.shiftedOption)
+    }
+    return layeredKeys
+  }
+
+  /// Keeps intentionally blank physical positions inside an emulated layout
+  /// from falling through to the active macOS input source.
+  private static func withSuppressedKeys(
+    _ keys: [UInt16: KeyLayers], keyCodes: Set<UInt16>
+  ) -> [UInt16: KeyLayers] {
+    var layeredKeys = keys
+    for keyCode in keyCodes {
+      layeredKeys[keyCode] = .init(normal: "", shifted: "")
     }
     return layeredKeys
   }
