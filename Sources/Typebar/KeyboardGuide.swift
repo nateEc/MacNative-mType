@@ -65,6 +65,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case asset
   case dwarf
   case flaw
+  case stndc
+  case uciea
+  case whorf
+  case whorf6
+  case whorfmax
   case real
   case sertain
   case ctgap
@@ -198,6 +203,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .asset: "Asset"
     case .dwarf: "Dwarf"
     case .flaw: "Flaw"
+    case .stndc: "STNDC"
+    case .uciea: "UCIEA"
+    case .whorf: "Whorf"
+    case .whorf6: "Whorf 6"
+    case .whorfmax: "Whorfmax"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -336,6 +346,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case asset
   case dwarf
   case flaw
+  case stndc
+  case uciea
+  case whorf
+  case whorf6
+  case whorfmax
   case real
   case sertain
   case ctgap
@@ -1540,6 +1555,57 @@ enum KeyboardGuideModel {
         row("top", "FLAWPZKUR/[]\\"),
         row("home", "HSOYCMTENI;"),
         row("bottom", "BJ'GVQD.X,")
+      ]
+    case .stndc:
+      [
+        row(
+          "number", "`1234567890()",
+          characters: ["`~", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9{", "0}", "([", ")]"],
+          shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "*", "{", "}", "[", "]"]
+        ),
+        row("top", "VMHGPXLOUYJ=\\"),
+        row("home", "STNDCWRAEI-"),
+        row(
+          "bottom", "ZKBFQ,.'\"?",
+          characters: ["zZ", "kK", "bB", "fF", "qQ", ",;", ".:", "'<", "\">", "?!"],
+          shiftedLabels: ["Z", "K", "B", "F", "Q", ";", ":", "<", ">", "!"]
+        )
+      ]
+    case .uciea:
+      [
+        row("number", "`1234567890[]"),
+        row("top", "PYUO-KDHFXQ=\\"),
+        row(
+          "home", "CIEA'GTNSRV",
+          characters: ["cC", "iI", "eE", "aA", "'/", "gG", "tT", "nN", "sS", "rR", "vV"],
+          shiftedLabels: ["C", "I", "E", "A", "/", "G", "T", "N", "S", "R", "V"]
+        ),
+        row(
+          "bottom", "Z\",.;WMLBJ",
+          characters: ["zZ", "\"?", ",<", ".>", ";:", "wW", "mM", "lL", "bB", "jJ"],
+          shiftedLabels: ["Z", "?", "<", ">", ":", "W", "M", "L", "B", "J"]
+        )
+      ]
+    case .whorf:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FLHDMVWOU,[]\\"),
+        row("home", "SRNTKGYAEI/"),
+        row("bottom", "XJBZQPC';.")
+      ]
+    case .whorf6:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FLHDVZGOU.[]\\"),
+        row("home", "SRNTMPYEIA/"),
+        row("bottom", "XJBKQCW',;")
+      ]
+    case .whorfmax:
+      [
+        row("number", "`1234567890[]"),
+        row("top", "FLHYKQWOU,-=\\"),
+        row("home", "SRNTPCDAEI/"),
+        row("bottom", "XJBVZMG';.")
       ]
     case .real:
       [
@@ -2962,6 +3028,7 @@ private extension KeyboardLayout {
   var showsNumberRowInMinimalGuide: Bool {
     self == .frenchAzerty || self == .mtgapFull || self == .engram || self == .engrammer
       || self == .booMangle || self == .quartz || self == .capewellDvorak || self == .real
+      || self == .stndc || self == .uciea
   }
 }
 
