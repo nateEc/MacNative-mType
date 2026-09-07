@@ -255,17 +255,21 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case sindhi
   case hebrew
   case persian
+  case persianRomanized
   case urdu
+  case urduRoman
   case tamil
   case hindi
   case gujarati
   case bangla
   case thai
   case nepali
+  case nepaliRomanized
   case kannada
   case telugu
   case malayalam
   case sanskrit
+  case sanskritRoman
   case sinhala
   case khmer
   case myanmarBurmese
@@ -303,6 +307,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case serbian
   case serbianLatin
   case bulgarian
+  case bulgarianLatin
   case romanian
   case finnish
   case estonian
@@ -3823,12 +3828,28 @@ enum StarterLexicon {
     "فاصله", "گام", "صبر", "تعادل",
   ]
 
+  // Typebar-authored Latin-script Persian practice. This is a deliberately
+  // readable training corpus, not an imported or claimed-lossless transliteration.
+  static let persianRomanizedWords = [
+    "dorud", "salam", "sepas", "lotfan", "bale", "na", "man", "to", "ma", "khane",
+    "ab", "ketab", "zaban", "neveshtan", "khandan", "yadgiri", "ruz", "shab", "rah", "dust",
+    "kar", "shahr", "rusta", "aram", "ghadam", "soal", "javab", "roshan",
+  ]
+
   // Typebar-authored Urdu starter words use direct Unicode text for macOS
   // Urdu input sources; they are not an imported word list.
   static let urduWords = [
     "کتاب", "قلم", "کھڑکی", "راستہ", "روشنی", "پل", "صبح", "کاغذ", "باغ", "بادل",
     "سکون", "چراغ", "پہاڑ", "بیج", "آواز", "میز", "خیال", "نوٹ", "تصور", "تجربہ",
     "فاصلہ", "قدم", "صبر", "توازن",
+  ]
+
+  // Typebar-authored Roman Urdu practice keeps the fixed source's explicit
+  // Latin-script selection separate from the native Urdu prompt.
+  static let urduRomanWords = [
+    "adaab", "salam", "shukriya", "meherbani", "haan", "nahin", "main", "tum", "hum", "ghar",
+    "pani", "kitab", "zaban", "likhna", "parhna", "seekhna", "din", "raat", "rasta", "dost",
+    "kaam", "shehar", "gaon", "aahista", "qadam", "sawal", "jawab", "roshni",
   ]
 
   // Typebar-authored Tamil starter words exercise normal macOS composed-text
@@ -3879,6 +3900,14 @@ enum StarterLexicon {
     "दूरी", "कदम", "धैर्य", "सन्तुलन",
   ]
 
+  // Typebar-authored Romanized Nepali practice is independent of the native
+  // Devanagari corpus and does not imply a reversible transliteration scheme.
+  static let nepaliRomanizedWords = [
+    "namaste", "dhanyabad", "kripaya", "ho", "haina", "ma", "timi", "hami", "ghar", "pani",
+    "kitab", "bhasha", "shabda", "lekha", "padha", "sikai", "samaya", "din", "raat", "bato",
+    "sathi", "kaam", "sahar", "gaun", "ramro", "sano", "kadam", "ujyalo",
+  ]
+
   // Typebar-authored Kannada starter words exercise normal macOS composed-text
   // input without importing a third-party or reference word list.
   static let kannadaWords = [
@@ -3909,6 +3938,14 @@ enum StarterLexicon {
     "पुस्तकम्", "लेखनी", "वातायनम्", "मार्गः", "प्रकाशः", "सेतुः", "प्रभातः", "पत्रम्", "उद्यानम्", "मेघः",
     "शान्तिः", "दीपः", "पर्वतः", "बीजम्", "संगीतम्", "पीठम्", "विचारः", "टिप्पणी", "कल्पना", "प्रयत्नः",
     "दूरम्", "पदम्", "धैर्यम्", "सन्तुलनम्",
+  ]
+
+  // Typebar-authored Roman Sanskrit practice uses ordinary Unicode Latin
+  // diacritics for a distinct, locally generated typing surface.
+  static let sanskritRomanWords = [
+    "namaḥ", "dhanyavādaḥ", "kṛpayā", "asti", "nāsti", "aham", "tvam", "vayam", "gṛham", "jalam",
+    "pustakam", "bhāṣā", "śabdaḥ", "lekhanam", "paṭhanam", "śikṣā", "kālaḥ", "dinam", "rātriḥ", "mārgaḥ",
+    "mitram", "karma", "nagaram", "grāmaḥ", "śāntiḥ", "kramaḥ", "praśnaḥ", "uttaram",
   ]
 
   // Typebar-authored Sinhala starter words exercise normal macOS composed-text
@@ -4167,6 +4204,14 @@ enum StarterLexicon {
     "ясно", "езеро", "улица", "маса", "светлина", "път", "търпение", "миг",
     "град", "дъжд", "тишина", "посока", "звезда", "бележка", "градина", "дъх",
     "река", "чай", "ключ", "стол", "задача", "кора",
+  ]
+
+  // Typebar-authored Bulgarian Latin practice follows a readable Latin
+  // training convention without importing the fixed source's word list.
+  static let bulgarianLatinWords = [
+    "zdravey", "blagodarya", "molya", "dobre", "da", "ne", "az", "ti", "den", "nosht",
+    "voda", "dom", "kniga", "ucha", "pisha", "cheta", "vreme", "rabota", "grad", "selo",
+    "hora", "priyatel", "svetlina", "pat", "stapka", "vapros", "otgovor", "spokoyno",
   ]
 
   // Typebar-authored Romanian starter words exercise the language's comma
@@ -4485,9 +4530,17 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: persianWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .persianRomanized:
+      return prompt(
+        tokens: count, lexicon: persianRomanizedWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .urdu:
       return prompt(
         tokens: count, lexicon: urduWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .urduRoman:
+      return prompt(
+        tokens: count, lexicon: urduRomanWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tamil:
       return prompt(
@@ -4513,6 +4566,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: nepaliWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .nepaliRomanized:
+      return prompt(
+        tokens: count, lexicon: nepaliRomanizedWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kannada:
       return prompt(
         tokens: count, lexicon: kannadaWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -4528,6 +4585,10 @@ enum StarterLexicon {
     case .sanskrit:
       return prompt(
         tokens: count, lexicon: sanskritWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .sanskritRoman:
+      return prompt(
+        tokens: count, lexicon: sanskritRomanWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .sinhala:
       return prompt(
@@ -4676,6 +4737,10 @@ enum StarterLexicon {
     case .bulgarian:
       return prompt(
         tokens: count, lexicon: bulgarianWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .bulgarianLatin:
+      return prompt(
+        tokens: count, lexicon: bulgarianLatinWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian:
       return prompt(
@@ -4855,17 +4920,21 @@ enum StarterLexicon {
     case .sindhi: (sindhiWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
+    case .persianRomanized: (persianRomanizedWords, [",", ".", "!", "?"])
     case .urdu: (urduWords, ["،", "؛", "؟", "."])
+    case .urduRoman: (urduRomanWords, [",", ".", "!", "?"])
     case .tamil: (tamilWords, [",", ".", "!", "?"])
     case .hindi: (hindiWords, [",", ".", "!", "?"])
     case .gujarati: (gujaratiWords, [",", ".", "!", "?"])
     case .bangla: (banglaWords, [",", ".", "!", "?"])
     case .thai: (thaiWords, [",", ".", "!", "?"])
     case .nepali: (nepaliWords, [",", ".", "!", "?"])
+    case .nepaliRomanized: (nepaliRomanizedWords, [",", ".", "!", "?"])
     case .kannada: (kannadaWords, [",", ".", "!", "?"])
     case .telugu: (teluguWords, [",", ".", "!", "?"])
     case .malayalam: (malayalamWords, [",", ".", "!", "?"])
     case .sanskrit: (sanskritWords, [",", ".", "!", "?"])
+    case .sanskritRoman: (sanskritRomanWords, [",", ".", "!", "?"])
     case .sinhala: (sinhalaWords, [",", ".", "!", "?"])
     case .khmer: (khmerWords, [",", ".", "!", "?"])
     case .myanmarBurmese: (myanmarBurmeseWords, [",", ".", "!", "?"])
@@ -4903,6 +4972,7 @@ enum StarterLexicon {
     case .serbian: (serbianWords, [".", ",", "!", "?"])
     case .serbianLatin: (serbianLatinWords, [",", ".", "!", "?"])
     case .bulgarian: (bulgarianWords, [".", ",", "!", "?"])
+    case .bulgarianLatin: (bulgarianLatinWords, [".", ",", "!", "?"])
     case .romanian: (romanianWords, [",", ".", "!", "?"])
     case .finnish: (finnishWords, [",", ".", "!", "?"])
     case .estonian: (estonianWords, [",", ".", "!", "?"])
@@ -5047,17 +5117,21 @@ extension TypingLanguage {
     case .sindhi: StarterLexicon.sindhiWords
     case .hebrew: StarterLexicon.hebrewWords
     case .persian: StarterLexicon.persianWords
+    case .persianRomanized: StarterLexicon.persianRomanizedWords
     case .urdu: StarterLexicon.urduWords
+    case .urduRoman: StarterLexicon.urduRomanWords
     case .tamil: StarterLexicon.tamilWords
     case .hindi: StarterLexicon.hindiWords
     case .gujarati: StarterLexicon.gujaratiWords
     case .bangla: StarterLexicon.banglaWords
     case .thai: StarterLexicon.thaiWords
     case .nepali: StarterLexicon.nepaliWords
+    case .nepaliRomanized: StarterLexicon.nepaliRomanizedWords
     case .kannada: StarterLexicon.kannadaWords
     case .telugu: StarterLexicon.teluguWords
     case .malayalam: StarterLexicon.malayalamWords
     case .sanskrit: StarterLexicon.sanskritWords
+    case .sanskritRoman: StarterLexicon.sanskritRomanWords
     case .sinhala: StarterLexicon.sinhalaWords
     case .khmer: StarterLexicon.khmerWords
     case .myanmarBurmese: StarterLexicon.myanmarBurmeseWords
@@ -5095,6 +5169,7 @@ extension TypingLanguage {
     case .serbian: StarterLexicon.serbianWords
     case .serbianLatin: StarterLexicon.serbianLatinWords
     case .bulgarian: StarterLexicon.bulgarianWords
+    case .bulgarianLatin: StarterLexicon.bulgarianLatinWords
     case .romanian: StarterLexicon.romanianWords
     case .finnish: StarterLexicon.finnishWords
     case .estonian: StarterLexicon.estonianWords
@@ -5120,7 +5195,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam, .sanskrit, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -5171,9 +5246,10 @@ extension TypingLanguage {
   var supportsLazyLatinInput: Bool {
     guard !isCodeLanguage else { return false }
     return switch self {
-    case .english, .pashto, .hebrew, .persian, .urdu,
+    case .english, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
       .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
+      .bulgarianLatin,
       .khmer,
       .myanmarBurmese,
       .armenian,
@@ -5227,7 +5303,7 @@ extension TypingLanguage {
     case .english, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
-    case .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .hungarian, .lao, .kabyle,
+    case .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
     default:
@@ -5297,17 +5373,21 @@ extension TypingLanguage {
     case .sindhi: "سنڌي"
     case .hebrew: "עברית"
     case .persian: "فارسی"
+    case .persianRomanized: "Fârsi (Romanized)"
     case .urdu: "اردو"
+    case .urduRoman: "Urdu (Roman)"
     case .tamil: "தமிழ்"
     case .hindi: "हिन्दी"
     case .gujarati: "ગુજરાતી"
     case .bangla: "বাংলা"
     case .thai: "ไทย"
     case .nepali: "नेपाली"
+    case .nepaliRomanized: "Nepali (Romanized)"
     case .kannada: "ಕನ್ನಡ"
     case .telugu: "తెలుగు"
     case .malayalam: "മലയാളം"
     case .sanskrit: "संस्कृतम्"
+    case .sanskritRoman: "Saṃskṛtam (Roman)"
     case .sinhala: "සිංහල"
     case .khmer: "ខ្មែរ"
     case .myanmarBurmese: "မြန်မာ"
@@ -5345,6 +5425,7 @@ extension TypingLanguage {
     case .serbian: "Српски"
     case .serbianLatin: "Srpski (Latin)"
     case .bulgarian: "Български"
+    case .bulgarianLatin: "Balgarski (Latin)"
     case .romanian: "Română"
     case .finnish: "Suomi"
     case .estonian: "Eesti"

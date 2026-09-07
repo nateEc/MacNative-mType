@@ -299,7 +299,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 ## 2026-09-05 兼容性审计更正
 
-- `TypingLanguage` 当前有一百二十五种 Typebar 自有单语；默认与自选多语混排使用一百一十五种 LTR 单语。新增 `ᱥᱟᱱᱛᱟᱲᱤ`（Santali）对应固定源码的 `santali`；仅使用 Unicode Ol Chiki 的 Typebar 自有词流与四档练习文本。固定配置只定义 `bcp47: sat-IN`，故走 LTR 空格分词、`sat` 在线入口、`sat-IN` 系统朗读、显式简化输入与 Zipf 未知提示，并覆盖投稿、撤回、成绩和排行榜。
+- `TypingLanguage` 当前有一百三十种 Typebar 自有单语；默认与自选多语混排使用一百二十种 LTR 单语。最新增加 Bulgarian Latin、Nepali Romanized、Persian Romanized、Sanskrit Roman 与 Urdu Roman，均使用独立自写的练习词流和四档文本，不导入参考内容，也不宣称可逆转写。五者按固定元数据分别执行 `bg`、缺省 `en`／`en-US`、`fa`、`sa` 与 `ur-Latn` 路径；Bulgarian Latin 和 Persian Romanized 禁用简化输入，Bulgarian Latin 和 Urdu Roman 明示 Zipf 不支持，其余为未知，并全部覆盖投稿、撤回、成绩和排行榜。
 
 - `TypingLanguage` 当前有一百二十二种 Typebar 自有单语；默认与自选多语混排使用一百一十二种 LTR 单语。新增 `Te reo Māori` 只对应固定源码的 `maori_1k` 映射；该配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，因此以保留 macron 的原创 LTR 词流及四档引语、`en`／`en-US` 缺省在线/朗读路径、显式简化输入和 Zipf 未知提示实现，并覆盖投稿、撤回、成绩和排行榜。
 

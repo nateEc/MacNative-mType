@@ -2164,6 +2164,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "persian-romanized-aram-ghadam",
+      title: "Aram ghadam",
+      text: "Yek ghadam aram, rah-e baadi ra roshan mikonad.",
+      language: .persianRomanized,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "persian-romanized-daftar-baz",
+      title: "Daftar baz",
+      text: "Daftar-e baz hame soalha ra hal nemikonad, amma baraye har soal va javab ja misazad.",
+      language: .persianRomanized,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "persian-romanized-kar-e-kuchak",
+      title: "Kar-e kuchak",
+      text: "Pishraft hamishe dar yek lahze-ye bozorg dida nemishavad. Ketab ra baz kon, yek soal ra bekhan, javab ra benevis va ba aramesh ghadam-e baadi ra entekhab kon.",
+      language: .persianRomanized,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "persian-romanized-miz-e-deraz",
+      title: "Miz-e deraz",
+      text: "Miz-e deraz baraye karhaye gonagun ja darad. Yek taraf daftar-e aval ast, taraf-e digar jomle-i ke hanooz niyaz be tavajoh darad, va miyane anha yek entekhab-e kuchak montazer mimanad. Tamrin ham hamin tor pish miravad: lazem nist hame chiz ra yekbare hal konim. Ja-ye bazgasht, ghadam-e roshan va sabr-e kafi komak mikonad ta ba chand bar talash, rah asantar shavad.",
+      language: .persianRomanized,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "urdu-calm-step",
       title: "پرسکون قدم",
       text: "ایک پرسکون قدم اگلا کام واضح کر دیتا ہے۔",
@@ -2189,6 +2217,34 @@ enum OfflineContent {
       title: "لمبی میز",
       text: "ایک لمبی میز مختلف کاموں کے لیے جگہ بناتی ہے۔ اس کے ایک سرے پر پہلا مسودہ ہو سکتا ہے اور دوسرے سرے پر وہ جملہ جسے ابھی توجہ چاہیے؛ ان دونوں کے درمیان ایک چھوٹا فیصلہ منتظر رہتا ہے۔ مشق بھی اسی طرح آگے بڑھتی ہے: ہمیں ہر مشکل حصے کو ایک ہی بار میں حل کرنے کی ضرورت نہیں۔ بس واپس آنے کی جگہ، اگلا واضح قدم اور اتنا صبر چاہیے کہ چند کوششوں کے بعد نظر آ سکے کہ کیا آسان ہو گیا ہے۔",
       language: .urdu,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "urdu-roman-aahista-qadam",
+      title: "Aahista qadam",
+      text: "Ek aahista qadam agla kaam zyada saaf kar deta hai.",
+      language: .urduRoman,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "urdu-roman-khuli-kitab",
+      title: "Khuli kitab",
+      text: "Khuli kitab har mushkil sawal hal nahin karti, magar sawal ko chhote hisson mein dekhne ki jagah deti hai.",
+      language: .urduRoman,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "urdu-roman-chhota-kaam",
+      title: "Chhota kaam",
+      text: "Taraqqi hamesha ek bade lamhe mein nazar nahin aati. Wohi safha kholo, ek jumla saaf karo, chhoti ghalti dur karo aur agli koshish ke liye ek kaam ka note rakho.",
+      language: .urduRoman,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "urdu-roman-lambi-mez",
+      title: "Lambi mez",
+      text: "Lambi mez par mukhtalif kaamon ke liye jagah hoti hai. Ek taraf pehla khaka ho sakta hai, dusri taraf woh jumla jo abhi tawajjoh chahta hai, aur darmiyan ek chhota faisla intezar karta hai. Mashq bhi isi tarah aage barhti hai: har mushkil hissa ek hi baar mein hal karna zaruri nahin. Wapas aane ki jagah, agla saaf qadam aur chand koshishon ka sabr ho to rasta aahista aahista asaan hota hai.",
+      language: .urduRoman,
       length: .extended
     ),
     OfflineQuote(
@@ -2360,6 +2416,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "nepali-romanized-shanta-kadam",
+      title: "Shanta kadam",
+      text: "Euta shanta kadamle arko kaam spasta banauchha.",
+      language: .nepaliRomanized,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "nepali-romanized-khula-kapi",
+      title: "Khula kapi",
+      text: "Khula kapile harek gahro prasnako uttar didaina, tara prasnalai sano bhagma herna thau dinchha.",
+      language: .nepaliRomanized,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "nepali-romanized-sano-kaam",
+      title: "Sano kaam",
+      text: "Pragati sadhai thulo kshanma dekhinna. Uhi panna kholnu, euta wakya spasta garnu, sano galti sachyaunu ra arko prayasko lagi upayogi tipot rakhnu le biswas badhaunchha.",
+      language: .nepaliRomanized,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "nepali-romanized-lamo-tebal",
+      title: "Lamo tebal",
+      text: "Lamo tebalma adhura bicharka lagi pani thau hunchha. Ek chheuma pahilo khaka huna sakchha, arko chheuma ajhai dhyan chahine wakya, ra bichma sano nirnaya parkhirahanchha. Abhyas pani yasari nai aghi badchha: harek gahro bhag eutai prayasma samadhan garnu pardaina. Farkera aaune thau, arko spasta kadam ra ke sajilo bhayo bhanera herne dhairya bhaye, gati bistari badchha.",
+      language: .nepaliRomanized,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kannada-calm-step",
       title: "ಶಾಂತ ಹೆಜ್ಜೆ",
       text: "ಶಾಂತ ಹೆಜ್ಜೆ ಮುಂದಿನ ಕೆಲಸವನ್ನು ಸ್ಪಷ್ಟಗೊಳಿಸುತ್ತದೆ.",
@@ -2469,6 +2553,34 @@ enum OfflineContent {
       title: "दीर्घम् आसनम्",
       text: "दीर्घे पीठे अपूर्णविचारेभ्यः अपि स्थानम् अस्ति। एकस्मिन् पार्श्वे प्रथमः आलेखः भवेत्, अन्यस्मिन् अधिकं ध्यानं याचमानं वाक्यम्, मध्ये च लघु निर्णयः प्रतीक्षते। अभ्यासः अपि एवं प्रवर्तते: प्रत्येकं कठिनभागं एकेनैव प्रयत्नेन समाधातुं न आवश्यकम्। पुनरागमनाय स्थानम्, अग्रिमं स्पष्टं पदम्, बहुषु प्रयत्नेषु किं सुकरम् अभवत् इति द्रष्टुं धैर्यं च यदि स्यात्, तर्हि वेगः स्वयमेव वर्धते।",
       language: .sanskrit,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "sanskrit-roman-shanta-padam",
+      title: "Śāntaṃ padam",
+      text: "Śāntaṃ padam agrimaṃ kāryaṃ spaṣṭaṃ karoti.",
+      language: .sanskritRoman,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "sanskrit-roman-udghatita-pustakam",
+      title: "Udghāṭitaṃ pustakam",
+      text: "Udghāṭitaṃ pustakaṃ sarvasya kaṭhina-praśnasya uttaraṃ na dadāti, kintu laghu-bhāgān draṣṭuṃ sthānaṃ dadāti.",
+      language: .sanskritRoman,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "sanskrit-roman-laghu-karyam",
+      title: "Laghu kāryam",
+      text: "Pragatiḥ sarvadā mahati kṣaṇe na dṛśyate. Punaḥ patraṃ udghāṭaya, ekaṃ vākyaṃ spaṣṭaṃ kuru, laghu-doṣaṃ śodhaya, agrima-prayatnāya upayoginīṃ ṭippaṇīṃ likha.",
+      language: .sanskritRoman,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "sanskrit-roman-dirgha-pitham",
+      title: "Dīrghaṃ pīṭham",
+      text: "Dīrghe pīṭhe apūrṇa-vicārebhyaḥ api sthānam asti. Ekasmin pārśve prathamaḥ ālekhaḥ bhavet, anyasmin adhikaṃ dhyānaṃ yācamānaṃ vākyam, madhye ca laghu-nirṇayaḥ pratīkṣate. Abhyāsaḥ api evaṃ pravartate: pratyekaṃ kaṭhina-bhāgaṃ ekenaiva prayatnena samādhātuṃ na āvaśyakam. Punarāgamanāya sthānam, agrimaṃ spaṣṭaṃ padam, bahu-prayatneṣu kiṃ sukaram abhavat iti draṣṭuṃ dhairyaṃ ca vegam vardhayataḥ.",
+      language: .sanskritRoman,
       length: .extended
     ),
     OfflineQuote(
@@ -3421,6 +3533,34 @@ enum OfflineContent {
       title: "Дългата маса",
       text: "Дългата маса е полезна, защото оставя място за различни видове работа. В единия край може да лежи първата скица, в другия изречение, което още иска грижа, а по средата остава свободно място за следващото малко решение. Упражнението работи по същия начин. То не изисква да решим всичко наведнъж, а да имаме къде да се върнем, да видим следващата стъпка и да намерим достатъчно търпение, за да забележим какво става по-лесно след няколко опита.",
       language: .bulgarian,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "bulgarian-latin-malka-krachka",
+      title: "Malka krachka",
+      text: "Edna spokoyna krachka pravi sledvashtata zadacha po-yasna.",
+      language: .bulgarianLatin,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "bulgarian-latin-otvorena-tetradka",
+      title: "Otvorena tetradka",
+      text: "Otvorenata tetradka ne reshava trudniya vapros sama, no pomaga na mislite da nameryat red i posoka.",
+      language: .bulgarianLatin,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "bulgarian-latin-tihata-rabota",
+      title: "Tihata rabota",
+      text: "Napredakat ryadko pristiga v edin shumen mig. Toy raste, kogato otvorim sashtata stranitsa, popravim edna greshka, prochetem belezhka i izberem sledvashtata malka zadacha.",
+      language: .bulgarianLatin,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "bulgarian-latin-dalgata-masa",
+      title: "Dalgata masa",
+      text: "Dalgata masa ostavya myasto za razlichni vidove rabota. V ediniya kray mozhe da lezhi parvata skitsa, v drugiya izrechenie, koeto oshte iska grizha, a po sredata ostava svobodno myasto za sledvashtoto malko reshenie. Uprazhnenieto raboti po sashtiya nachin: ne iziskva da reshim vsichko navednazh. Tryabva ni myasto, kam koeto da se varnem, yasna sledvashta stapka i dostatachno tarpenie, za da vidim kakvo stava po-lesno sled nyakolko opita.",
+      language: .bulgarianLatin,
       length: .extended
     ),
     OfflineQuote(

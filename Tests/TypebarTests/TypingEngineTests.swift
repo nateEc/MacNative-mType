@@ -4350,16 +4350,20 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.kinyarwandaWords,
       StarterLexicon.shonaWords,
       StarterLexicon.santaliWords,
+      StarterLexicon.persianRomanizedWords,
+      StarterLexicon.urduRomanWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
       StarterLexicon.banglaWords,
       StarterLexicon.thaiWords,
       StarterLexicon.nepaliWords,
+      StarterLexicon.nepaliRomanizedWords,
       StarterLexicon.kannadaWords,
       StarterLexicon.teluguWords,
       StarterLexicon.malayalamWords,
       StarterLexicon.sanskritWords,
+      StarterLexicon.sanskritRomanWords,
       StarterLexicon.sinhalaWords,
       StarterLexicon.khmerWords,
       StarterLexicon.myanmarBurmeseWords,
@@ -4383,7 +4387,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.norwegianBokmalWords,
       StarterLexicon.norwegianNynorskWords,
       StarterLexicon.swedishWords,
-      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
+      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.bulgarianLatinWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
@@ -4393,7 +4397,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 115)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 120)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -4682,6 +4686,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .santali).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .santali), "sat")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .persianRomanized), "fa")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .urduRoman), "ur")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .nepaliRomanized), "en")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .sanskritRoman), "sa")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .bulgarianLatin), "bg")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .yiddish).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .yiddish), "yi")
@@ -6117,6 +6126,8 @@ final class TypingEngineTests: XCTestCase {
       (.kinyarwanda, StarterLexicon.kinyarwandaWords),
       (.shona, StarterLexicon.shonaWords),
       (.santali, StarterLexicon.santaliWords),
+      (.persianRomanized, StarterLexicon.persianRomanizedWords),
+      (.urduRoman, StarterLexicon.urduRomanWords),
       (.yiddish, StarterLexicon.yiddishWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
@@ -6133,10 +6144,12 @@ final class TypingEngineTests: XCTestCase {
       (.bangla, StarterLexicon.banglaWords),
       (.thai, StarterLexicon.thaiWords),
       (.nepali, StarterLexicon.nepaliWords),
+      (.nepaliRomanized, StarterLexicon.nepaliRomanizedWords),
       (.kannada, StarterLexicon.kannadaWords),
       (.telugu, StarterLexicon.teluguWords),
       (.malayalam, StarterLexicon.malayalamWords),
       (.sanskrit, StarterLexicon.sanskritWords),
+      (.sanskritRoman, StarterLexicon.sanskritRomanWords),
       (.sinhala, StarterLexicon.sinhalaWords),
       (.khmer, StarterLexicon.khmerWords),
       (.myanmarBurmese, StarterLexicon.myanmarBurmeseWords),
@@ -6172,6 +6185,7 @@ final class TypingEngineTests: XCTestCase {
       (.serbian, StarterLexicon.serbianWords),
       (.serbianLatin, StarterLexicon.serbianLatinWords),
       (.bulgarian, StarterLexicon.bulgarianWords),
+      (.bulgarianLatin, StarterLexicon.bulgarianLatinWords),
       (.romanian, StarterLexicon.romanianWords),
       (.finnish, StarterLexicon.finnishWords),
       (.estonian, StarterLexicon.estonianWords),
@@ -6616,6 +6630,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.santali.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.santali))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.santali))
+    let romanizedLanguages: [
+      (TypingLanguage, [String], String, Bool, ZipfFrequencySupport)
+    ] = [
+      (.persianRomanized, StarterLexicon.persianRomanizedWords, "dorud", false, .unknown),
+      (.urduRoman, StarterLexicon.urduRomanWords, "adaab", true, .unsupported),
+      (.nepaliRomanized, StarterLexicon.nepaliRomanizedWords, "namaste", true, .unknown),
+      (.sanskritRoman, StarterLexicon.sanskritRomanWords, "namaḥ", true, .unknown),
+      (.bulgarianLatin, StarterLexicon.bulgarianLatinWords, "zdravey", false, .unsupported),
+    ]
+    for (language, words, sample, supportsLazyInput, zipfSupport) in romanizedLanguages {
+      XCTAssertTrue(words.contains(sample))
+      XCTAssertFalse(language.usesRightToLeftPrompt)
+      XCTAssertFalse(language.usesJoiningScriptPrompt)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertEqual(language.supportsLazyLatinInput, supportsLazyInput)
+      XCTAssertTrue(language.supportsQuotes)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission)
+      XCTAssertEqual(language.zipfFrequencySupport, zipfSupport)
+      XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    }
     XCTAssertTrue(StarterLexicon.yiddishWords.contains("בוך"))
     XCTAssertTrue(TypingLanguage.yiddish.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.yiddish.usesJoiningScriptPrompt)
@@ -7114,6 +7149,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.kinyarwanda.speechLocaleIdentifier, "rw-RW")
     XCTAssertEqual(TypingLanguage.shona.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.santali.speechLocaleIdentifier, "sat-IN")
+    XCTAssertEqual(TypingLanguage.persianRomanized.speechLocaleIdentifier, "fa")
+    XCTAssertEqual(TypingLanguage.urduRoman.speechLocaleIdentifier, "ur-Latn")
+    XCTAssertEqual(TypingLanguage.nepaliRomanized.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.sanskritRoman.speechLocaleIdentifier, "sa")
+    XCTAssertEqual(TypingLanguage.bulgarianLatin.speechLocaleIdentifier, "bg")
     XCTAssertEqual(TypingLanguage.yiddish.speechLocaleIdentifier, "yi")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
