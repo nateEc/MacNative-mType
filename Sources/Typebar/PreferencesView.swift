@@ -98,6 +98,14 @@ struct PreferencesView: View {
         TextField("搜索设置…", text: $searchQuery)
       }
 
+      if searchIsActive, !searchResults.isEmpty {
+        Section("最佳匹配 · \(searchResults.count)") {
+          ForEach(searchResults) { result in
+            LabeledContent(result.title, value: result.section.displayName)
+          }
+        }
+      }
+
       if testSectionVisible {
         Section("测试") {
           Picker("难度", selection: $settings.difficulty) {
@@ -1887,40 +1895,31 @@ struct PreferencesView: View {
   }
 
   private var testSectionVisible: Bool {
-    matches(
-      "测试", "难度", "输入", "strict space", "严格空格", "stop error", "遇错停下", "delete error", "遇错删除", "盲打",
-      "blind", "焦点", "focus", "大写锁定", "caps lock", "快捷键", "key tips", "命令", "command", "面板", "palette", "错误提示音", "键击", "音量", "声音", "sound", "beep", "自由",
-      "freedom", "回退", "最低速度", "单词速度", "burst", "wpm", "修饰器", "modifier", "无空格", "下划线", "全大写",
-      "uppercase", "rot13", "反写", "额外字符", "quick end", "快速结束", "字数")
+    sectionIsVisible(.test)
   }
 
   private var displaySectionVisible: Bool {
-    matches(
-      "显示", "主题", "theme", "随机", "random", "系统", "system", "翻转", "flip", "彩色", "colorful", "颜色", "背景", "图片", "image", "url", "模糊", "blur", "亮度", "brightness", "饱和度", "saturation", "不透明度", "opacity", "伙伴", "companion", "手部", "hand", "字体", "font", "等宽", "圆角", "衬线", "行宽",
-      "width", "光标", "caret", "平滑", "smooth", "关闭", "条形", "轮廓", "outline", "下划线", "块状", "胡萝卜", "香蕉", "小猴", "节奏", "pace", "速度", "wpm", "个人最佳", "平均", "键盘",
-      "keyboard", "布局", "layout", "下一键", "连续", "streak", "统计日", "日分界", "活动", "activity")
+    sectionIsVisible(.display)
   }
 
   private var customThemeSectionVisible: Bool {
-    matches("自定义主题", "主题", "theme", "颜色", "背景", "面板", "强调色", "深色")
+    sectionIsVisible(.customTheme)
   }
 
   private var systemSectionVisible: Bool {
-    matches("系统", "全局", "唤起", "热键", "hotkey", "快捷键", "辅助功能", "accessibility")
+    sectionIsVisible(.system)
   }
 
   private var accountSectionVisible: Bool {
-    matches(
-      "自建账户", "账户", "account", "服务", "server", "登录", "login", "注册", "邮箱", "email", "密码", "password",
-      "GitHub", "Google", "Discord", "OAuth", "第三方", "关联", "资料", "profile", "排行榜", "榜单", "leaderboard", "成绩", "results", "XP", "开发者", "密钥", "key", "自动化", "清除", "删除", "注销")
+    sectionIsVisible(.account)
   }
 
   private var moderationSectionVisible: Bool {
-    matches("审核", "审核员", "moderation", "公告", "announcement", "投稿", "引语", "队列", "密钥", "key")
+    sectionIsVisible(.moderation)
   }
 
   private var defaultsSectionVisible: Bool {
-    matches("恢复默认设置", "恢复", "默认", "reset")
+    sectionIsVisible(.defaults)
   }
 
   private var hasVisibleSettings: Bool {
@@ -1928,8 +1927,16 @@ struct PreferencesView: View {
       || accountSectionVisible || moderationSectionVisible || defaultsSectionVisible
   }
 
-  private func matches(_ terms: String...) -> Bool {
-    SettingsSearch.matches(query: searchQuery, terms: terms)
+  private var searchIsActive: Bool {
+    !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  private var searchResults: [SettingsSearch.Entry] {
+    SettingsSearch.results(query: searchQuery)
+  }
+
+  private func sectionIsVisible(_ section: SettingsSearch.Section) -> Bool {
+    !searchIsActive || searchResults.contains { $0.section == section }
   }
 
   private func modifierBinding(_ modifier: TestModifier, settings: AppSettings) -> Binding<Bool> {

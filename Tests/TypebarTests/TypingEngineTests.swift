@@ -3659,6 +3659,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(SettingsSearch.matches(query: "   ", terms: ["任意设置"]))
   }
 
+  func testSettingsSearchReturnsOnlyTheGlobalBestMatchingSettings() {
+    let entries = [
+      SettingsSearch.Entry("layout", "键盘布局", section: .display, keywords: "keyboard layout"),
+      SettingsSearch.Entry("guide", "键盘提示", section: .display, keywords: "keyboard guide"),
+      SettingsSearch.Entry("theme", "主题", section: .customTheme, keywords: "theme"),
+    ]
+
+    XCTAssertEqual(SettingsSearch.results(query: "keyboard layout", entries: entries).map(\.id), ["layout"])
+    XCTAssertEqual(
+      SettingsSearch.results(query: "keyboard missing", entries: entries).map(\.id),
+      ["layout", "guide"])
+    XCTAssertTrue(SettingsSearch.results(query: "not-found", entries: entries).isEmpty)
+    XCTAssertTrue(SettingsSearch.results(query: "   ", entries: entries).isEmpty)
+  }
+
+  func testSettingsSearchCatalogHasUniqueStableIdentifiersAndCoversEverySection() {
+    let catalog = SettingsSearch.preferenceCatalog
+    XCTAssertEqual(Set(catalog.map(\.id)).count, catalog.count)
+    XCTAssertEqual(Set(catalog.map(\.section)), Set(SettingsSearch.Section.allCases))
+  }
+
   func testTestConfigurationShareRoundTripsAndRejectsInvalidLinks() throws {
     let custom = SavedTestPreset(
       configuration: .init(

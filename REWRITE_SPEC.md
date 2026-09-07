@@ -261,14 +261,14 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 | 结果存储 | `Tests/TypebarTests/TypingEngineTests.swift` | 内存 SwiftData 容器中的结果与配置往返 |
 | 闲置保护 | `Tests/TypebarTests/TypingEngineTests.swift` | 一秒活动区间、结束前五秒闲置无效、有效键入时长、旧归档默认值与 SwiftData 往返 |
 | 结果稳定度 | `Tests/TypebarTests/TypingEngineTests.swift` | 根据 Typebar 自有回放重建均匀节奏的速度/按键稳定度，并在没有有效回放时安全回退为零 |
-| 偏好设置 | `Tests/TypebarTests/TypingEngineTests.swift`、打包应用的设置窗口 | 难度、输入规则、字体、主题、练习背景、键盘图和输入布局模拟可持久化；设置 UI 可实际切换三种原生背景，且光晕模式显示减少动态效果开关。恢复默认会要求确认、完整复位设置并移除本地背景图片；本地字体文件与练习历史保留在当前 Mac |
+| 偏好设置 | `Tests/TypebarTests/TypingEngineTests.swift`、打包应用的设置窗口 | 难度、输入规则、字体、主题、练习背景、键盘图和输入布局模拟可持久化；设置 UI 可实际切换三种原生背景，且光晕模式显示减少动态效果开关。细粒度搜索按独立设置条目计算多词最高匹配并标明所属区域。恢复默认会要求确认、完整复位设置并移除本地背景图片；本地字体文件与练习历史保留在当前 Mac |
 | 活动标签 | `Tests/TypebarTests/TypingEngineTests.swift` | 本机持久化、归档、预设往返、完成成绩注入、重复测试保留、当前统计/历史筛选、活动标签个人最佳节奏引导、完成页标签 PB 反馈及可开关图表水平线 |
 | 结果图 PB 标线 | `Tests/TypebarTests/TypingEngineTests.swift` | 同配置本机 PB 比较、首次/新增/已有边界、引语排除与新旧图表开关设置兼容 |
 | 测试预设 | `Tests/TypebarTests/TypingEngineTests.swift`、打包应用的预设库 | 配置、规则、引语/自定义文本能作为一个完整预设往返存储 |
 | 数据迁移 | `Tests/TypebarTests/TypingEngineTests.swift`、打包应用的“数据迁移”界面 | 版本化设置、成绩、预设和自定义文本归档往返；导入去重合并；v1 归档兼容；导入/导出文件选择器已人工验收（已取消，未写入真实文件） |
 | 本地统计 | `Tests/TypebarTests/TypingEngineTests.swift` | 完成次数、均速、最佳、准确率、累计时长，以及 WPM 固定区间分布（包括空档区间）聚合 |
 | 挑战验收 | `Tests/TypebarTests/TypingEngineTests.swift` | 原创离线挑战的通过与全部未满足条件都可被独立验证；挑战标记可随测试配置编码，并与历史配置兼容 |
-| 构建 | `swift test`、`swift build` | macOS Swift 包能编译且 301 项客户端测试通过；独立 Vapor 服务的 66 项自动化测试通过 |
+| 构建 | `swift test`、`swift build` | macOS Swift 包能编译且 303 项客户端测试通过；独立 Vapor 服务的 66 项自动化测试通过 |
 | 运行时 UI | 打包的 `Typebar.app` 辅助功能树与截图 | 焦点输入、时间/字数模式、实时指标、可滚动长文本区，以及正确输入/错误/退格/Esc 重开；2026-09-02 已人工切换“光晕”背景，确认减少动态效果开关状态和练习页主题色光晕绘制，检查后恢复为纯色 |
 
 ## 2026-09-03 审计更正
