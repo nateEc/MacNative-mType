@@ -60,6 +60,18 @@ enum KeyboardLayoutEmulator {
     return modifierFlags.contains(.shift) ? layers.shifted : layers.normal
   }
 
+  static func performsBackwardDelete(
+    forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags,
+    mapping: KeyboardInputMapping
+  ) -> Bool {
+    guard keyCode == 11,
+      !modifierFlags.contains(.command),
+      !modifierFlags.contains(.control),
+      case .builtIn(.optimot) = mapping
+    else { return false }
+    return true
+  }
+
   static func character(
     forKeyCode keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, layout: KeyboardLayout?
   ) -> Character? {
@@ -1180,6 +1192,26 @@ enum KeyboardLayoutEmulator {
           normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "xmcvqpk.-/"],
           shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "XMCVQPK>\"<"]
         ), overrides: [:])
+    case .optimot:
+      withOptionLayers(
+        isoBaseShiftMap(
+          normal: ["$«»\"-+*/=()@#", "àjoébfdl'qxz", "aieu,ptsrnôç", "kyè.w⌫gcmhv"],
+          shifted: ["€1234567890_%", "ÀJOÉBFDL?QXZ", "AIEU;PTSRN!Ç", "KYÈ:W⌫GCMHV"]
+        ).filter { $0.key != 11 },
+        options: [
+          50: ("£", "©"), 18: ("“", "¼"), 19: ("”", "½"), 20: ("„", "¾"),
+          21: ("‑", "⅓"), 23: ("±", "⅔"), 22: ("×", nil), 26: ("\\", "÷"),
+          28: ("≠", "≈"), 25: ("[", "′"), 29: ("]", "″"), 27: ("−", "‒"),
+          24: ("°", "º"), 12: ("<", "⩽"), 13: (">", "⩾"), 14: ("œ", "Œ"),
+          15: ("ó", "Ж"), 17: ("—", nil), 16: ("‘", nil), 32: ("{", "†"),
+          34: ("}", "‡"), 31: ("’", "¿"), 35: ("å", "⸮"), 33: ("|", "®"),
+          30: ("➜", "™"), 0: ("æ", "Æ"), 1: ("ᵢ", "§"), 2: ("ᵉ", "¶"),
+          3: ("ù", "Ù"), 5: ("–", nil), 4: ("`", nil), 38: ("&", nil),
+          40: ("∞", nil), 37: ("ℓ", nil), 41: ("õ", nil), 39: ("ö", "¡"),
+          42: ("ơ", nil), 10: ("ø", nil), 6: ("ȯ", nil), 7: ("ò", nil),
+          8: ("…", "·"), 45: ("Ω", nil), 46: ("ǫ", nil), 43: ("ō", nil),
+          47: ("ŏ", nil), 44: ("ǒ", nil),
+        ])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "

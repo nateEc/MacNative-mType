@@ -140,6 +140,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case minimak8K = "minimak_8k"
   case minimak12K = "minimak_12k"
   case graphiteAngle = "graphite_angle"
+  case optimot
   case real
   case sertain
   case ctgap
@@ -348,6 +349,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .minimak8K: "Minimak 8-key"
     case .minimak12K: "Minimak 12-key"
     case .graphiteAngle: "Graphite Angle"
+    case .optimot: "Optimot"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -561,6 +563,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case minimak8K = "minimak_8k"
   case minimak12K = "minimak_12k"
   case graphiteAngle = "graphite_angle"
+  case optimot
   case real
   case sertain
   case ctgap
@@ -2477,6 +2480,38 @@ enum KeyboardGuideModel {
         normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "xmcvqpk.-/"],
         shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "XMCVQPK>\"<"]
       )
+    case .optimot:
+      [
+        layeredRow(
+          "number",
+          labels: ["$", "«", "»", "\"", "-", "+", "*", "/", "=", "(", ")", "@", "#"],
+          shiftedLabels: ["€", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "_", "%"],
+          optionLabels: ["£", "“", "”", "„", "‑", "±", "×", "\\", "≠", "[", "]", "−", "°"],
+          shiftedOptionLabels: ["©", "¼", "½", "¾", "⅓", "⅔", nil, "÷", "≈", "′", "″", "‒", "º"]
+        ),
+        layeredRow(
+          "top",
+          labels: ["à", "j", "o", "é", "b", "f", "d", "l", "'", "q", "x", "z"],
+          shiftedLabels: ["À", "J", "O", "É", "B", "F", "D", "L", "?", "Q", "X", "Z"],
+          optionLabels: ["<", ">", "œ", "ó", "—", "‘", "{", "}", "’", "å", "|", "➜"],
+          shiftedOptionLabels: ["⩽", "⩾", "Œ", "Ж", nil, nil, "†", "‡", "¿", "⸮", "®", "™"]
+        ),
+        layeredRow(
+          "home",
+          labels: ["a", "i", "e", "u", ",", "p", "t", "s", "r", "n", "ô", "ç"],
+          shiftedLabels: ["A", "I", "E", "U", ";", "P", "T", "S", "R", "N", "!", "Ç"],
+          optionLabels: ["æ", "ᵢ", "ᵉ", "ù", "–", "`", "&", "∞", "ℓ", "õ", "ö", "ơ"],
+          shiftedOptionLabels: ["Æ", "§", "¶", "Ù", nil, nil, nil, nil, nil, nil, "¡", nil]
+        ),
+        layeredRow(
+          "bottom",
+          labels: ["k", "y", "è", ".", "w", "⌫", "g", "c", "m", "h", "v"],
+          shiftedLabels: ["K", "Y", "È", ":", "W", "⌫", "G", "C", "M", "H", "V"],
+          optionLabels: ["ø", "ȯ", "ò", "…", nil, "⌫", "Ω", "ǫ", "ō", "ŏ", "ǒ"],
+          shiftedOptionLabels: [nil, nil, nil, "·", nil, "⌫", nil, nil, nil, nil, nil],
+          nonTypingIndex: 5
+        ),
+      ]
     case .real:
       [
         row("number", "`1234567890[]"),
@@ -3857,10 +3892,12 @@ enum KeyboardGuideModel {
     labels: [String],
     shiftedLabels: [String?],
     optionLabels: [String?],
-    shiftedOptionLabels: [String?]
+    shiftedOptionLabels: [String?],
+    nonTypingIndex: Int? = nil
   ) -> [KeyboardGuideKey] {
     let characters = labels.indices.map { index in
-      [labels[index], shiftedLabels[index], optionLabels[index], shiftedOptionLabels[index]]
+      if index == nonTypingIndex { return "" }
+      return [labels[index], shiftedLabels[index], optionLabels[index], shiftedOptionLabels[index]]
         .compactMap { $0 }
         .joined()
     }

@@ -4667,6 +4667,103 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testOptimotPreservesFourLayersAndRoutesItsMappedDeleteAsEditing() throws {
+    let ansiRows = SystemKeyboardGuide.physicalRows
+    let isoRows = [
+      ansiRows[0], Array(ansiRows[1].dropLast()), ansiRows[2] + [42], [10] + ansiRows[3],
+    ]
+    func labels(_ rows: [String]) -> [[String]] { rows.map { $0.map(String.init) } }
+    let normal = labels(["$«»\"-+*/=()@#", "àjoébfdl'qxz", "aieu,ptsrnôç", "kyè.w⌫gcmhv"])
+    let shifted = labels(["€1234567890_%", "ÀJOÉBFDL?QXZ", "AIEU;PTSRN!Ç", "KYÈ:W⌫GCMHV"])
+    let option: [[String?]] = [
+      ["£", "“", "”", "„", "‑", "±", "×", "\\", "≠", "[", "]", "−", "°"],
+      ["<", ">", "œ", "ó", "—", "‘", "{", "}", "’", "å", "|", "➜"],
+      ["æ", "ᵢ", "ᵉ", "ù", "–", "`", "&", "∞", "ℓ", "õ", "ö", "ơ"],
+      ["ø", "ȯ", "ò", "…", nil, "⌫", "Ω", "ǫ", "ō", "ŏ", "ǒ"],
+    ]
+    let shiftedOption: [[String?]] = [
+      ["©", "¼", "½", "¾", "⅓", "⅔", nil, "÷", "≈", "′", "″", "‒", "º"],
+      ["⩽", "⩾", "Œ", "Ж", nil, nil, "†", "‡", "¿", "⸮", "®", "™"],
+      ["Æ", "§", "¶", "Ù", nil, nil, nil, nil, nil, nil, "¡", nil],
+      [nil, nil, nil, "·", nil, "⌫", nil, nil, nil, nil, nil],
+    ]
+
+    let layout = try XCTUnwrap(KeyboardLayout(rawValue: "optimot"))
+    let guideRows = KeyboardGuideModel.rows(for: layout)
+    XCTAssertEqual(guideRows.map(\.count), [13, 12, 12, 11])
+    let layers: [(NSEvent.ModifierFlags, [[String?]])] = [
+      ([], normal.map { $0.map(Optional.some) }),
+      ([.shift], shifted.map { $0.map(Optional.some) }),
+      ([.option], option),
+      ([.option, .shift], shiftedOption),
+    ]
+    for rowIndex in isoRows.indices {
+      for keyIndex in isoRows[rowIndex].indices {
+        let keyCode = isoRows[rowIndex][keyIndex]
+        let guide = guideRows[rowIndex][keyIndex]
+        XCTAssertEqual(guide.label, normal[rowIndex][keyIndex])
+        XCTAssertEqual(guide.shiftedLabel, shifted[rowIndex][keyIndex])
+        XCTAssertEqual(guide.optionLabel, option[rowIndex][keyIndex])
+        XCTAssertEqual(guide.shiftedOptionLabel, shiftedOption[rowIndex][keyIndex])
+        for (flags, expected) in layers {
+          let output = KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: flags, layout: layout)
+          if keyCode == 11 {
+            XCTAssertNil(output)
+            XCTAssertTrue(guide.characters.isEmpty)
+          } else {
+            XCTAssertEqual(output, expected[rowIndex][keyIndex])
+          }
+        }
+      }
+    }
+
+    var inserted = [String]()
+    var deleteCount = 0
+    let input = TypingInputView()
+    input.keyboardInputMapping = .builtIn(layout)
+    input.onInsert = { text, _ in inserted.append(text) }
+    input.onDelete = { deleteCount += 1 }
+    for flags: NSEvent.ModifierFlags in [[], [.shift], [.option], [.option, .shift]] {
+      let event = try XCTUnwrap(
+        NSEvent.keyEvent(
+          with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+          windowNumber: 0, context: nil, characters: "b", charactersIgnoringModifiers: "b",
+          isARepeat: false, keyCode: 11))
+      input.keyDown(with: event)
+    }
+    XCTAssertEqual(deleteCount, 4)
+    XCTAssertTrue(inserted.isEmpty)
+    XCTAssertFalse(
+      KeyboardLayoutEmulator.performsBackwardDelete(
+        forKeyCode: 11, modifierFlags: [], mapping: .system))
+    XCTAssertFalse(
+      KeyboardLayoutEmulator.performsBackwardDelete(
+        forKeyCode: 45, modifierFlags: [], mapping: .builtIn(layout)))
+    XCTAssertFalse(
+      KeyboardLayoutEmulator.performsBackwardDelete(
+        forKeyCode: 11, modifierFlags: [.command], mapping: .builtIn(layout)))
+    XCTAssertFalse(
+      KeyboardLayoutEmulator.performsBackwardDelete(
+        forKeyCode: 11, modifierFlags: [.control], mapping: .builtIn(layout)))
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = layout
+    settings.keyboardInputLayout = .init(emulating: layout)
+    settings.layoutFluidLayouts = [layout, .ansiQwerty]
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, layout)
+    XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+    XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    XCTAssertFalse(
+      KeyboardGuideKeysMode.minimal.showsNumberRow(
+        for: layout, mode: .staticGuide, nextCharacter: nil))
+  }
+
+  @MainActor
   func testGallayaMatrixMinimakStagesAndGraphiteAnglePreservePhysicalKeys() throws {
     let ansiRows = SystemKeyboardGuide.physicalRows
     func labels(_ rows: [String]) -> [[String]] { rows.map { $0.map(String.init) } }
@@ -9087,7 +9184,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 203)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 204)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
