@@ -44,6 +44,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case thaiPattachote
   case hindiInscript
   case armenianHMQwerty
+  case mongolianCyrillic
   case hebrew
   case serbianCyrillic
 
@@ -93,6 +94,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .thaiPattachote: "Thai Pattachote"
     case .hindiInscript: "Hindi – InScript (macOS)"
     case .armenianHMQwerty: "Armenian – HM QWERTY"
+    case .mongolianCyrillic: "Mongolian Cyrillic"
     case .hebrew: "Hebrew"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
@@ -147,6 +149,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case thaiPattachote
   case hindiInscript
   case armenianHMQwerty
+  case mongolianCyrillic
   case hebrew
   case serbianCyrillic
 
@@ -1402,6 +1405,37 @@ enum KeyboardGuideModel {
           shiftedLabels: ["Զ", "Խ", "Ծ", "Վ", "Բ", "Ն", "Մ", "<", ">", "?"],
           optionLabels: ["ժ", nil, "ց", "և", nil, nil, nil, "՝", "։", "՞"],
           shiftedOptionLabels: ["Ժ", nil, "Ց", nil, nil, nil, nil, "≤", "≥", "՞"]
+        ),
+      ]
+    case .mongolianCyrillic:
+      [
+        row(
+          "number", labels: ["=", "№", "-", "\"", "₮", ":", ".", "_", ",", "%", "?", "е", "щ"],
+          characters: ["=+~≈", "№1!", "-2@—", "\"3#§", "₮4$€", ":5;", ".6^…", "_7&", ",8*", "%9({", "?0)}", "еЕ[—", "щЩ]≈"],
+          shiftedLabels: ["+", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Е", "Щ"],
+          optionLabels: ["~", "!", "@", "#", "$", ";", "^", "&", "*", "(", ")", "[", "]"],
+          shiftedOptionLabels: ["≈", nil, "—", "§", "€", nil, "…", nil, nil, "{", "}", "—", "≈"]
+        ),
+        row(
+          "top", labels: ["ф", "ц", "у", "ж", "э", "н", "г", "ш", "ү", "з", "к", "ъ", "¥"],
+          characters: ["фФјЈ", "цЦџЏ", "уУўЎ", "жЖєЄ", "эЭ", "нНњЊ", "гГѓЃ", "шШѕЅ", "үҮ'„", "зЗ‘’", "кК“”", "ъЪ«»", "¥|\\"],
+          shiftedLabels: ["Ф", "Ц", "У", "Ж", "Э", "Н", "Г", "Ш", "Ү", "З", "К", "Ъ", "|"],
+          optionLabels: ["ј", "џ", "ў", "є", nil, "њ", "ѓ", "ѕ", "'", "‘", "“", "«", "\\"],
+          shiftedOptionLabels: ["Ј", "Џ", "Ў", "Є", nil, "Њ", "Ѓ", "Ѕ", "„", "’", "”", "»", "|"]
+        ),
+        row(
+          "home", labels: ["й", "ы", "б", "ө", "а", "х", "р", "о", "л", "д", "п"],
+          characters: ["йЙ", "ыЫ", "бБћЋ", "өӨ", "аА", "хХ", "рР₽", "оО", "лЛљЉ", "дД", "пП"],
+          shiftedLabels: ["Й", "Ы", "Б", "Ө", "А", "Х", "Р", "О", "Л", "Д", "П"],
+          optionLabels: [nil, nil, "ћ", nil, nil, nil, "₽", nil, "љ", nil, nil],
+          shiftedOptionLabels: [nil, nil, "Ћ", nil, nil, nil, nil, nil, "Љ", nil, nil]
+        ),
+        row(
+          "bottom", labels: ["я", "ч", "ё", "с", "м", "и", "т", "ь", "в", "ю"],
+          characters: ["яЯђЂ", "чЧ", "ёЁ", "сС", "мМ", "иИіІ", "тТїЇ", "ьЬ<≤", "вВ>≥", "юЮ/"],
+          shiftedLabels: ["Я", "Ч", "Ё", "С", "М", "И", "Т", "Ь", "В", "Ю"],
+          optionLabels: ["ђ", nil, nil, nil, nil, "і", "ї", "<", ">", "/"],
+          shiftedOptionLabels: ["Ђ", nil, nil, nil, nil, "І", "Ї", "≤", "≥", nil]
         ),
       ]
     case .hebrew:

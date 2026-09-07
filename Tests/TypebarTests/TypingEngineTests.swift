@@ -2705,6 +2705,45 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testMongolianCyrillicMapsAllMacSystemLayersAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .mongolianCyrillic)
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ү", layout: .mongolianCyrillic), "top-8")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ө", layout: .mongolianCyrillic), "home-3")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "₮", layout: .mongolianCyrillic), "number-4")
+
+    for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
+      for (keyCode, key) in zip(keyCodes, guideRow) {
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: .mongolianCyrillic), key.label)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .mongolianCyrillic), key.shiftedLabel)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .mongolianCyrillic), key.optionLabel)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .mongolianCyrillic), key.shiftedOptionLabel)
+      }
+    }
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "ө", layout: .mongolianCyrillic), 3)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "љ", layout: .mongolianCyrillic), 37)
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [], layout: .mongolianCyrillic), "№")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [.shift], layout: .mongolianCyrillic), "1")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 21, modifierFlags: [], layout: .mongolianCyrillic), "₮")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [], layout: .mongolianCyrillic), "¥")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.shift], layout: .mongolianCyrillic), "|")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.option], layout: .mongolianCyrillic), "\\")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 42, modifierFlags: [.option, .shift], layout: .mongolianCyrillic), "|")
+    XCTAssertEqual(KeyboardInputLayout.mongolianCyrillic.emulatedLayout, .mongolianCyrillic)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .mongolianCyrillic
+    settings.keyboardInputLayout = .mongolianCyrillic
+    settings.layoutFluidLayouts = [.mongolianCyrillic, .ansiQwerty]
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .mongolianCyrillic)
+    XCTAssertEqual(restored.keyboardInputLayout, .mongolianCyrillic)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.mongolianCyrillic, .ansiQwerty])
+  }
+
+  @MainActor
   func testHebrewMapsStandardLettersShiftLayerAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .hebrew)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .hebrew), "number-0")
@@ -5628,7 +5667,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 44)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 45)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
