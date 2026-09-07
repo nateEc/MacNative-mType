@@ -66,6 +66,8 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 2026-09-07 当前状态更正：内置键盘图现为四十三种，新增 `Hindi – InScript (macOS)`。固定参考源码只用于确认 `hindi_inscript` 功能名；键位依据 macOS `com.apple.keylayout.Devanagari` 的 `UCKeyTranslate` 结果独立实现，覆盖数字、元音、辅音、组合符、`ज्ञ/त्र/क्ष/श्र` 多码点输出及明确无输出的普通/Shift 键。BIS IS 13194/16350 与 Microsoft Hindi Traditional 资料只用于交叉确认 InScript 标准家族和主体键位，Windows 与 Apple 扩展键差异不被隐藏。本文较早的四十二种计数及 37/3/199 矩阵均由此当前数值取代：38 项精确原生、3 项相关替代、198 项系统输入或自定义回退；Option 与复杂组合输入继续交给 macOS，不读取或导入 Monkeytype 布局 JSON、代码或资产。
 
+2026-09-07 当前状态更正：内置键盘图现为四十四种，新增 `Armenian – HM QWERTY`。固定参考源码只用于确认 `armenian_hm_qwerty` 功能名；四个字符层均依据 macOS `com.apple.keylayout.Armenian-HMQWERTY` 的 `UCKeyTranslate` 结果独立实现和逐键验证。本文较早的四十三种计数及 38/3/198 矩阵均由此当前数值取代：39 项精确原生、3 项相关替代、197 项系统输入或自定义回退；不读取或导入 Monkeytype 布局 JSON、代码或资产。
+
 | 域 | 必须覆盖的能力 | 状态 |
 | --- | --- | --- |
 | 核心测试 | time、words、quote、zen、custom 五种测试；自定义时长/字数/文本；开始、重启、结束和放弃 | 部分实现：五种离线模式可在 UI 配置；计时可设为 5–3600 秒、字数可设为 1–1000 词；开始后可从原生控制栏明确放弃，放弃与失败不会写入完成成绩；自定义保存文本可选长文本恢复：以完整词边界的原始字符偏移保留进度，选择时固定为完成全文，中止时保存剩余位置、完成时复位，旧归档兼容为普通文本；保存长文本、时长至少 1 小时或禅模式进行中时，命令面板也会提供需确认的中止入口；计时、字数和引语模式支持原创 English/Español/Deutsch/Français/Italiano/Português/简体中文内容；禅模式不生成提示，呈现用户本机自由输入，空格/换行提交词、Tab 保留为文本，Shift+Enter 明确结束；模式终止、放弃与内容工厂已测试 |

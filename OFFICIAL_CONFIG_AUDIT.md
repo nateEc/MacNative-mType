@@ -109,7 +109,7 @@
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。依据固定参考版本的 `noLazyMode`，非自定义模式会禁用 English、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Greeklish、Dutch、Filipino、Indonesian、Serbian Cyrillic、Bulgarian、Macedonian、Kazakh、中日韩／日语罗马字、Ukrainian 与 Ukrainian Latin，以及所有代码练习的该修饰器；自定义文本仍可使用。可配置多语练习只有至少一个选择的组成语言允许时才保留它。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
-| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，43 种原生物理布局和用户自写四行布局（可选等长 Shift 图例）的基础映射可显式模拟；Hindi InScript、Arabic (101)/(102) 与 Persian (Farsi) 可保留单键完整文本输出，Polish (Programmers)、Arabic (macOS) 与 Urdu Phonetic 有独立 Option 层，官方全部命名布局尚未覆盖。 |
+| `layout` | `KeyboardInputLayout` | 部分；系统输入源为默认，44 种原生物理布局和用户自写四行布局可显式模拟；Hindi InScript 等布局保留完整文本输出，Armenian HM QWERTY、Polish (Programmers)、Arabic (macOS) 与 Urdu Phonetic 有独立 Option 层，官方全部命名布局尚未覆盖。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
@@ -194,6 +194,7 @@
 - Thai Kedmanee 自动化测试覆盖 [Microsoft KLID `0000041E` 键位表](https://learn.microsoft.com/en-us/msdn-files/resources/msdn/goglobal/keyboards/kbdth0.html) 与 [NECTEC TIS 820 说明](https://www.nectec.or.th/it-standards/keyboard_layout/thai-key.html) 所定义的泰文字母、元音、声调、数字及标点普通/Shift 键位，并以 macOS `com.apple.keylayout.Thai` 的系统翻译结果交叉核对；测试包含提示图例、高亮、物理 keycode、反查、输入模拟和 Layout Fluid 持久化。Option 与组合输入继续由 macOS 处理；固定参考源码只用于确认 `thai_kedmanee` 功能名，不读取或导入布局 JSON、代码或资产。
 - Thai Pattachote 自动化测试覆盖 [Microsoft KLID `0001041E`](https://learn.microsoft.com/en-us/globalization/keyboards/kbdth1)、[公开 Windows 驱动表](https://kbdlayout.info/KBDTH1) 与 [NECTEC 布局说明](https://www.nectec.or.th/it-standards/keyboard_layout/thai-key.html) 所定义的完整标准数字行及泰文字母、元音、声调和标点普通/Shift 键位，并以 macOS `com.apple.keylayout.Thai-PattaChote` 系统翻译结果交叉核对主体字母层。测试逐键覆盖图例与模拟器，还验证高亮、反查、Option 回退和 Layout Fluid 持久化；固定参考源码只用于确认 `thai_pattachote` 功能名，不读取或导入布局 JSON、代码或资产。
 - Hindi – InScript (macOS) 自动化测试覆盖 macOS `com.apple.keylayout.Devanagari` 的数字、元音、辅音、组合符、`ज्ञ/त्र/क्ष/श्र` 多码点输出和无输出普通/Shift 键，并逐键核对图例与输入模拟，另验证高亮、完整输出反查、Option 回退及 Layout Fluid 持久化。[BIS InScript 公告](https://www.bis.gov.in/other/Keyboards_14062016.pdf) 与 [Microsoft Hindi Traditional 键位表](https://learn.microsoft.com/en-us/msdn-files/resources/msdn/goglobal/keyboards/kbdinhin.html) 用于确认标准家族和主体键位；扩展键采用并明确标注 macOS 行为。固定参考源码只用于确认 `hindi_inscript` 功能名，不读取或导入布局 JSON、代码或资产。
+- Armenian – HM QWERTY 自动化测试逐键覆盖 macOS `com.apple.keylayout.Armenian-HMQWERTY` 的 Base、Shift、Option 与 Shift+Option 四层，并验证 Armenian 字母、标点、提示高亮、反查和 Layout Fluid 持久化；[Unicode CLDR](https://unicode.org/cldr/charts/43/keyboards/layouts/hy.html) 也将该 macOS 布局标识为 Armenian-HM QWERTY。固定参考源码只用于确认 `armenian_hm_qwerty` 功能名，不读取或导入布局 JSON、代码或资产。
 - Serbian Cyrillic · Typebar 自动化测试覆盖 Typebar 自写的 `љ`、`ђ`、`ћ`、`ж`、`џ` 与 ISO `< >` 提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化；它不是官方或系统塞尔维亚语布局资产的导入，用户可继续选择 macOS 当前输入源取得系统布局。
 - Hungarian QWERTZ · Typebar 自动化测试覆盖 Typebar 自写的 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`、QWERTZ Y/Z 与练习标点的提示高亮、普通/Shift 物理 keycode、反查 keycode，以及键盘图、输入模拟和 Layout Fluid 持久化；它不导入官方或系统匈牙利语布局资产，未收录的死键和 Option 层继续交给 macOS 当前输入源。
 - Greek Alphabetic · Typebar 自动化测试覆盖 Typebar 自写的二十四个基本 Greek 字母、七个重音元音、词末 `ς` 与练习标点的提示高亮、普通/Shift 物理 keycode、反查 keycode、原创词库字符覆盖，以及键盘图、输入模拟和 Layout Fluid 持久化；它不导入官方或系统希腊语布局资产，未收录字符、死键和 Option 层继续交给 macOS 当前输入源。
@@ -227,8 +228,8 @@
 - Croatian 自动化测试覆盖自创词流（含 `č`、`ć`、`đ`、`š` 与 `ž`）、四档原创引语、完整多语混排轮转、弱项复练、`hr-HR` 朗读 locale 与 `hr` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Serbian 自动化测试覆盖自创西里尔词流（含 `љ`、`њ`、`ђ`、`ћ`、`џ`、`ч`、`ш` 与 `ж`）、四档原创引语、完整多语混排轮转、弱项复练、`sr-RS` 朗读 locale 与 `sr` 百科入口；Serbian Latin 同样覆盖四档原创离线拉丁引语、混排、弱项复练与 `sr-RS`，并拒绝百科替换以保持当前书写形式；服务端测试覆盖两者的投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 - Hungarian 自动化测试覆盖自创词流（含 `á`、`é`、`í`、`ó`、`ö`、`ő`、`ú`、`ü`、`ű`）、四档原创引语、完整多语混排轮转、弱项复练、`hu-HU` 朗读 locale 与 `hu` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
-- 完整客户端 `swift test` 通过 294 项、独立 Vapor 服务 `swift test` 通过 66 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
-- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、38/3/198 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
+- 完整客户端 `swift test` 通过 295 项、独立 Vapor 服务 `swift test` 通过 66 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、39/3/197 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退；macOS `UCKeyTranslate` 返回的多字符或多码点图例会完整保留，不再截断为首字符。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
