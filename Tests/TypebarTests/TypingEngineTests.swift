@@ -3057,6 +3057,64 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testJapaneseHiraganaMapsKanaShiftLayersAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .japaneseHiragana)
+    XCTAssertEqual(rows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ろ", layout: .japaneseHiragana), "number-0")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "ぁ", layout: .japaneseHiragana), "number-3")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "「", layout: .japaneseHiragana), "top-10")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "っ", layout: .japaneseHiragana), "bottom-0")
+    XCTAssertEqual(
+      KeyboardGuideModel.highlightedKey(for: "。", layout: .japaneseHiragana), "bottom-8")
+
+    for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
+      for (keyCode, key) in zip(keyCodes, guideRow) {
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: [], layout: .japaneseHiragana),
+          key.label)
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(
+            forKeyCode: keyCode, modifierFlags: [.shift], layout: .japaneseHiragana),
+          key.shiftedLabel)
+      }
+    }
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 20, modifierFlags: [.shift], layout: .japaneseHiragana), "ぁ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 29, modifierFlags: [.shift], layout: .japaneseHiragana), "を")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 33, modifierFlags: [.shift], layout: .japaneseHiragana), "「")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 12, modifierFlags: [.option], layout: .japaneseHiragana))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "む", layout: .japaneseHiragana), 42)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "・", layout: .japaneseHiragana), 44)
+    XCTAssertEqual(KeyboardInputLayout.japaneseHiragana.emulatedLayout, .japaneseHiragana)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .japaneseHiragana
+    settings.keyboardInputLayout = .japaneseHiragana
+    settings.layoutFluidLayouts = [.japaneseHiragana, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .japaneseHiragana)
+    XCTAssertEqual(restored.keyboardInputLayout, .japaneseHiragana)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.japaneseHiragana, .ansiQwerty])
+  }
+
+  @MainActor
   func testHindiInscriptMapsMacSystemLayersSuppressesEmptyKeysAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .hindiInscript)
     XCTAssertEqual(rows[0][0].label, "₹")
@@ -6252,7 +6310,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 55)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 56)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

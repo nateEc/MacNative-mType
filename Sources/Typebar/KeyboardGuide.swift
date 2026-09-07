@@ -51,6 +51,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case urduPhonetic
   case thaiKedmanee
   case thaiPattachote
+  case japaneseHiragana
   case hindiInscript
   case tamil99
   case armenianHMQwerty
@@ -111,6 +112,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .urduPhonetic: "Urdu Phonetic (CRULP)"
     case .thaiKedmanee: "Thai Kedmanee"
     case .thaiPattachote: "Thai Pattachote"
+    case .japaneseHiragana: "Japanese Hiragana"
     case .hindiInscript: "Hindi – InScript (macOS)"
     case .tamil99: "Tamil99 (macOS)"
     case .armenianHMQwerty: "Armenian – HM QWERTY"
@@ -176,6 +178,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case urduPhonetic
   case thaiKedmanee
   case thaiPattachote
+  case japaneseHiragana
   case hindiInscript
   case tamil99
   case armenianHMQwerty
@@ -1500,6 +1503,39 @@ enum KeyboardGuideModel {
           labels: ["บ", "ป", "ล", "ห", "ิ", "ค", "ส", "ะ", "จ", "พ"],
           characters: ["บฎ", "ปฏ", "ลฐ", "หภ", "ิั", "คศ", "สฮ", "ะฟ", "จฉ", "พฬ"],
           shiftedLabels: ["ฎ", "ฏ", "ฐ", "ภ", "ั", "ศ", "ฮ", "ฟ", "ฉ", "ฬ"]
+        ),
+      ]
+    case .japaneseHiragana:
+      [
+        row(
+          "number", "ろぬふあうえおやゆよわほへ",
+          characters: [
+            "ろろ", "ぬぬ", "ふふ", "あぁ", "うぅ", "えぇ", "おぉ", "やゃ", "ゆゅ", "よょ", "わを", "ほほ", "へへ",
+          ],
+          shiftedLabels: [
+            "ろ", "ぬ", "ふ", "ぁ", "ぅ", "ぇ", "ぉ", "ゃ", "ゅ", "ょ", "を", "ほ", "へ",
+          ]
+        ),
+        row(
+          "top", "たていすかんなにらせ゛゜む",
+          characters: [
+            "たた", "てて", "いぃ", "すす", "かか", "んん", "なな", "にに", "らら", "せせ", "゛「", "゜」", "むむ",
+          ],
+          shiftedLabels: [
+            "た", "て", "ぃ", "す", "か", "ん", "な", "に", "ら", "せ", "「", "」", "む",
+          ]
+        ),
+        row(
+          "home", "ちとしはきくまのりれけ",
+          characters: [
+            "ちち", "とと", "しし", "はは", "きき", "くく", "まま", "のの", "りり", "れれ", "けけ",
+          ],
+          shiftedLabels: ["ち", "と", "し", "は", "き", "く", "ま", "の", "り", "れ", "け"]
+        ),
+        row(
+          "bottom", "つさそひこみもねるめ",
+          characters: ["つっ", "ささ", "そそ", "ひひ", "ここ", "みみ", "もも", "ね、", "る。", "め・"],
+          shiftedLabels: ["っ", "さ", "そ", "ひ", "こ", "み", "も", "、", "。", "・"]
         ),
       ]
     case .hindiInscript:
