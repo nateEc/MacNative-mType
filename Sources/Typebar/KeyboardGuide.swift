@@ -135,6 +135,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case maya
   case gallayaAngleANSI = "gallaya_angle_ansi"
   case gallayaAngleISO = "gallaya_angle_iso"
+  case gallayaMatrix = "gallaya_matrix"
+  case minimak4K = "minimak_4k"
+  case minimak8K = "minimak_8k"
+  case minimak12K = "minimak_12k"
+  case graphiteAngle = "graphite_angle"
   case real
   case sertain
   case ctgap
@@ -338,6 +343,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .maya: "Maya"
     case .gallayaAngleANSI: "Gallaya Angle ANSI"
     case .gallayaAngleISO: "Gallaya Angle ISO"
+    case .gallayaMatrix: "Gallaya Matrix"
+    case .minimak4K: "Minimak 4-key"
+    case .minimak8K: "Minimak 8-key"
+    case .minimak12K: "Minimak 12-key"
+    case .graphiteAngle: "Graphite Angle"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -546,6 +556,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case maya
   case gallayaAngleANSI = "gallaya_angle_ansi"
   case gallayaAngleISO = "gallaya_angle_iso"
+  case gallayaMatrix = "gallaya_matrix"
+  case minimak4K = "minimak_4k"
+  case minimak8K = "minimak_8k"
+  case minimak12K = "minimak_12k"
+  case graphiteAngle = "graphite_angle"
   case real
   case sertain
   case ctgap
@@ -2436,6 +2451,31 @@ enum KeyboardGuideModel {
       baseShiftRows(
         normal: ["`1234567890-=", "bldczjfou,[]", "nrtsgphaei/#", "qxmwv\\ky';."],
         shifted: ["¬!\"£$%^&*()_+", "BLDCZJFOU<{}", "NRTSGPHAEI?~", "QXMWV|KY@:>"]
+      )
+    case .gallayaMatrix:
+      baseShiftRows(
+        normal: ["`1234567890-=", "bldczjfou,[]\\", "nrtsgphaei/", "qxmwvky';."],
+        shifted: ["~!@#$%^&*()_+", "BLDCZJFOU<{}|", "NRTSGPHAEI?", "QXMWVKY\":>"]
+      )
+    case .minimak4K:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qwdrkyuiop[]\\", "astfghjel;'", "zxcvbnm,./"],
+        shifted: ["~!@£$%^&*()_+", "QWDRKYUIOP{}|", "ASTFGHJEL:\"", "ZXCVBNM<>?"]
+      )
+    case .minimak8K:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qwdrkyuilp[]\\", "astfghneo;'", "zxcvbjm,./"],
+        shifted: ["~!@£$%^&*()_+", "QWDRKYUILP{}|", "ASTFGHNEO:\"", "ZXCVBJM<>?"]
+      )
+    case .minimak12K:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qwdfkyuil;[]\\", "astrghneop'", "zxcvbjm,./"],
+        shifted: ["~!@£$%^&*()_+", "QWDFKYUIL:{}|", "ASTRGHNEOP\"", "ZXCVBJM<>?"]
+      )
+    case .graphiteAngle:
+      baseShiftRows(
+        normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "xmcvqpk.-/"],
+        shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "XMCVQPK>\"<"]
       )
     case .real:
       [

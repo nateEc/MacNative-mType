@@ -1150,6 +1150,36 @@ enum KeyboardLayoutEmulator {
           normal: ["`1234567890-=", "bldczjfou,[]", "nrtsgphaei/#", "qxmwv\\ky';."],
           shifted: ["¬!\"£$%^&*()_+", "BLDCZJFOU<{}", "NRTSGPHAEI?~", "QXMWV|KY@:>"]
         ), overrides: [:])
+    case .gallayaMatrix:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "bldczjfou,[]\\", "nrtsgphaei/", "qxmwvky';."],
+          shifted: ["~!@#$%^&*()_+", "BLDCZJFOU<{}|", "NRTSGPHAEI?", "QXMWVKY\":>"]
+        ), overrides: [:])
+    case .minimak4K:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "qwdrkyuiop[]\\", "astfghjel;'", "zxcvbnm,./"],
+          shifted: ["~!@£$%^&*()_+", "QWDRKYUIOP{}|", "ASTFGHJEL:\"", "ZXCVBNM<>?"]
+        ), overrides: [:])
+    case .minimak8K:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "qwdrkyuilp[]\\", "astfghneo;'", "zxcvbjm,./"],
+          shifted: ["~!@£$%^&*()_+", "QWDRKYUILP{}|", "ASTFGHNEO:\"", "ZXCVBJM<>?"]
+        ), overrides: [:])
+    case .minimak12K:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "qwdfkyuil;[]\\", "astrghneop'", "zxcvbjm,./"],
+          shifted: ["~!@£$%^&*()_+", "QWDFKYUIL:{}|", "ASTRGHNEOP\"", "ZXCVBJM<>?"]
+        ), overrides: [:])
+    case .graphiteAngle:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "xmcvqpk.-/"],
+          shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "XMCVQPK>\"<"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
