@@ -20,6 +20,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiNorman
   case ansiWorkman
   case programmerWorkman
+  case mtgapASRT
+  case halmak
+  case qgmlwb
+  case qgmlwy
+  case qwpr
   case germanQwertz
   case swissGerman
   case swissFrench
@@ -87,6 +92,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ansiNorman: "ANSI Norman"
     case .ansiWorkman: "ANSI Workman"
     case .programmerWorkman: "Programmer Workman"
+    case .mtgapASRT: "MTGAP ASRT"
+    case .halmak: "Halmak"
+    case .qgmlwb: "QGMLWB"
+    case .qgmlwy: "QGMLWY"
+    case .qwpr: "QWPR"
     case .germanQwertz: "German QWERTZ"
     case .swissGerman: "Swiss German"
     case .swissFrench: "Swiss French"
@@ -159,6 +169,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ansiNorman
   case ansiWorkman
   case programmerWorkman
+  case mtgapASRT
+  case halmak
+  case qgmlwb
+  case qgmlwy
+  case qwpr
   case germanQwertz
   case swissGerman
   case swissFrench
@@ -804,6 +819,49 @@ enum KeyboardGuideModel {
         ),
         row("home", "ASHTGYNEOI'"),
         row("bottom", "ZXMCVKL,./"),
+      ]
+    case .mtgapASRT:
+      [
+        row("number", "1234567890-="),
+        row("top", "QWLDBJFUKP[]"),
+        row("home", "ASRTGHNEOI/"),
+        row("bottom", "ZXCV;YM,.'"),
+      ]
+    case .halmak:
+      [
+        row(
+          "number", "1234567890-=",
+          characters: ["1!", "2@", "3#", "4$", "5%", "6^", "7&", "8*", "9<", "0>", "-_", "=+"],
+          shiftedLabels: ["!", "@", "#", "$", "%", "^", "&", "*", "<", ">", "_", "+"]
+        ),
+        row("top", "WLRBZ;QUDJ[]"),
+        row(
+          "home", "SHNT,.AEOI'",
+          characters: ["sS", "hH", "nN", "tT", ",(", ".)", "aA", "eE", "oO", "iI", "'\""],
+          shiftedLabels: ["S", "H", "N", "T", "(", ")", "A", "E", "O", "I", "\""]
+        ),
+        row("bottom", "FMVC/GPXKY"),
+      ]
+    case .qgmlwb:
+      [
+        row("number", "1234567890-="),
+        row("top", "QGMLWBYUV;[]"),
+        row("home", "DSTNRIAEOH'"),
+        row("bottom", "ZXCFJKP,./"),
+      ]
+    case .qgmlwy:
+      [
+        row("number", "1234567890-="),
+        row("top", "QGMLWYFUB;[]"),
+        row("home", "DSTNRIAEOH'"),
+        row("bottom", "ZXCVJKP,./"),
+      ]
+    case .qwpr:
+      [
+        row("number", "1234567890-="),
+        row("top", "QWPRFYUKL;[]"),
+        row("home", "ASDTGHNIOE'"),
+        row("bottom", "ZXCVBJM,./"),
       ]
     case .germanQwertz:
       [
