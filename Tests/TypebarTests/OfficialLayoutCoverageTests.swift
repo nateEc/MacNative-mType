@@ -31,14 +31,14 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 239)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(officialNames.count, fixture.officialCount)
-    XCTAssertEqual(fixture.nativeExact.count, 78)
+    XCTAssertEqual(fixture.nativeExact.count, 83)
     XCTAssertEqual(fixture.nativeRelated.count, 3)
     XCTAssertTrue(exactNames.isSubset(of: officialNames))
     XCTAssertTrue(relatedNames.isSubset(of: officialNames))
     XCTAssertTrue(exactNames.isDisjoint(with: relatedNames))
     XCTAssertEqual(
       fixture.officialCount - exactNames.count - relatedNames.count,
-      158)
+      153)
     XCTAssertEqual(fixture.unlistedPolicy, "systemInputOrCustom")
 
     for rawValue in Array(fixture.nativeExact.values) + Array(fixture.nativeRelated.values) {

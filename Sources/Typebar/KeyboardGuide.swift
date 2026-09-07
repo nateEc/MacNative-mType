@@ -29,6 +29,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiWorkman
   case programmerWorkman
   case mtgapASRT
+  case mtgap
+  case mtgapFull
+  case ina
+  case soul
+  case niro
   case halmak
   case qgmlwb
   case qgmlwy
@@ -117,6 +122,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ansiWorkman: "ANSI Workman"
     case .programmerWorkman: "Programmer Workman"
     case .mtgapASRT: "MTGAP ASRT"
+    case .mtgap: "MTGAP"
+    case .mtgapFull: "MTGAP Full"
+    case .ina: "Ina"
+    case .soul: "Soul"
+    case .niro: "Niro"
     case .halmak: "Halmak"
     case .qgmlwb: "QGMLWB"
     case .qgmlwy: "QGMLWY"
@@ -210,6 +220,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ansiWorkman
   case programmerWorkman
   case mtgapASRT
+  case mtgap
+  case mtgapFull
+  case ina
+  case soul
+  case niro
   case halmak
   case qgmlwb
   case qgmlwy
@@ -1069,6 +1084,81 @@ enum KeyboardGuideModel {
           characters: ["wW", "fF", "mM", "pP", "vV", "/*", ".:", "qQ", "\"[", "']"],
           shiftedLabels: ["W", "F", "M", "P", "V", "*", ":", "Q", "[", "]"]
         ),
+      ]
+    case .mtgap:
+      [
+        row("number", "`1234567890-="),
+        row("top", "YPOUJKDLCW[]\\"),
+        row(
+          "home", labels: ["i", "n", "e", "a", ",", "m", "h", "t", "s", "r", "'"],
+          characters: ["iI", "nN", "eE", "aA", ",;", "mM", "hH", "tT", "sS", "rR", "'\""],
+          shiftedLabels: ["I", "N", "E", "A", ";", "M", "H", "T", "S", "R", "\""]
+        ),
+        row(
+          "bottom", labels: ["q", "z", "/", ".", ":", "b", "f", "g", "v", "x"],
+          characters: ["qQ", "zZ", "/<", ".>", ":?", "bB", "fF", "gG", "vV", "xX"],
+          shiftedLabels: ["Q", "Z", "<", ">", "?", "B", "F", "G", "V", "X"]
+        ),
+      ]
+    case .mtgapFull:
+      [
+        row(
+          "number", labels: ["\\", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "q", "z"],
+          characters: ["\\^", "1~", "2[", "3{", "4<", "5|", "6#", "7>", "8}", "9]", "0%", "qQ", "zZ"],
+          shiftedLabels: ["^", "~", "[", "{", "<", "|", "#", ">", "}", "]", "%", "Q", "Z"]
+        ),
+        row(
+          "top", labels: ["y", "p", "o", "u", "-", "k", "d", "l", "c", "w", "x", "/", "$"],
+          characters: ["yY", "pP", "oO", "uU", "-=", "kK", "dD", "lL", "cC", "wW", "xX", "/+", "$@"],
+          shiftedLabels: ["Y", "P", "O", "U", "=", "K", "D", "L", "C", "W", "X", "+", "@"]
+        ),
+        row(
+          "home", labels: ["i", "n", "e", "a", ",", "m", "h", "t", "s", "r", "\""],
+          characters: ["iI", "nN", "eE", "aA", ",:", "mM", "hH", "tT", "sS", "rR", "\"!"],
+          shiftedLabels: ["I", "N", "E", "A", ":", "M", "H", "T", "S", "R", "!"]
+        ),
+        row(
+          "bottom", labels: ["(", ")", "'", ".", "_", "b", "f", "g", "v", "j"],
+          characters: ["(`", ")?", "'*", ".;", "_&", "bB", "fF", "gG", "vV", "jJ"],
+          shiftedLabels: ["`", "?", "*", ";", "&", "B", "F", "G", "V", "J"]
+        ),
+      ]
+    case .ina:
+      [
+        row(
+          "number", labels: ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "q", "x"],
+          characters: ["`~", "1[", "2]", "3#", "4$", "5%", "6^", "7&", "8*", "9{", "0}", "qQ", "xX"],
+          shiftedLabels: ["~", "[", "]", "#", "$", "%", "^", "&", "*", "{", "}", "Q", "X"]
+        ),
+        row(
+          "top", labels: ["!", "p", "u", "o", "-", "j", "b", "l", "m", "y", "z", "v", "\\"],
+          characters: ["!+", "pP", "uU", "oO", "-_", "jJ", "bB", "lL", "mM", "yY", "zZ", "vV", "\\|"],
+          shiftedLabels: ["+", "P", "U", "O", "_", "J", "B", "L", "M", "Y", "Z", "V", "|"]
+        ),
+        row(
+          "home", labels: ["i", "n", "e", "a", ",", "d", "t", "k", "r", "s", "'"],
+          characters: ["iI", "nN", "eE", "aA", ",;", "dD", "tT", "kK", "rR", "sS", "'\""],
+          shiftedLabels: ["I", "N", "E", "A", ";", "D", "T", "K", "R", "S", "\""]
+        ),
+        row(
+          "bottom", labels: ["=", "@", ":", ".", "?", "g", "h", "c", "w", "f"],
+          characters: ["=(", "@)", ":<", ".>", "?/", "gG", "hH", "cC", "wW", "fF"],
+          shiftedLabels: ["(", ")", "<", ">", "/", "G", "H", "C", "W", "F"]
+        ),
+      ]
+    case .soul:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QWLDPKMUY;[]\\"),
+        row("home", "ASRTGFNEIO'"),
+        row("bottom", "ZXCVJBH,./"),
+      ]
+    case .niro:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QWUDPJFYL;[]\\"),
+        row("home", "ASETGHNIRO'"),
+        row("bottom", "ZXCVBKM,./"),
       ]
     case .ansiColemak:
       [
@@ -2414,7 +2504,7 @@ enum KeyboardGuideModel {
 
 private extension KeyboardLayout {
   var showsNumberRowInMinimalGuide: Bool {
-    self == .frenchAzerty
+    self == .frenchAzerty || self == .mtgapFull
   }
 }
 
