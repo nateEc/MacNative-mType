@@ -426,6 +426,19 @@ enum KeyboardLayoutEmulator {
           + "0:้|๋ 1:ท|ธ 2:ง|ำ 3:ก|ณ 5:ั|์ 4:ี|ื 38:า|ผ 40:น|ช 37:เ|โ 41:ไ|ฆ 39:ข|ฑ "
           + "6:บ|ฎ 7:ป|ฏ 8:ล|ฐ 9:ห|ภ 11:ิ|ั 45:ค|ศ 46:ส|ฮ 43:ะ|ฟ 47:จ|ฉ 44:พ|ฬ"
       )
+    case .hindiInscript:
+      withSuppressedShift(
+        withSuppressedBase(
+          map(
+            "50:₹|~ 18:१|ऍ 19:२|ॅ 20:३|्र 21:४|र् 23:५|ज्ञ 22:६|त्र 26:७|क्ष 28:८|श्र 25:९|( 29:०|) 27:-|ः 24:ृ|ऋ "
+              + "12:ौ|औ 13:ै|ऐ 14:ा|आ 15:ी|ई 17:ू|ऊ 16:ब|भ 32:ह|ङ 34:ग|घ 31:द|ध 35:ज|झ 33:ड|ढ 30:़|ञ 42:ॉ|ऑ "
+              + "0:ो|ओ 1:े|ए 2:्|अ 3:ि|इ 5:ु|उ 4:प|फ 38:र|ऱ 40:क|ख 37:त|थ 41:च|छ 39:ट|ठ "
+              + "6:z|Z 7:ं|ँ 8:म|ण 9:न|N 11:व|V 45:ल|L 46:स|श 43:,|ष 47:.|। 44:य|?"
+          ),
+          keyCodes: [6]
+        ),
+        keyCodes: [6, 9, 11, 45]
+      )
     case .hebrew:
       map(
         "50:;~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9) 29:0( 27:-_ 24:=+ "
@@ -475,6 +488,19 @@ enum KeyboardLayoutEmulator {
       guard let existing = layeredKeys[keyCode] else { continue }
       layeredKeys[keyCode] = .init(
         normal: existing.normal, shifted: "", option: existing.option,
+        shiftedOption: existing.shiftedOption)
+    }
+    return layeredKeys
+  }
+
+  private static func withSuppressedBase(
+    _ keys: [UInt16: KeyLayers], keyCodes: Set<UInt16>
+  ) -> [UInt16: KeyLayers] {
+    var layeredKeys = keys
+    for keyCode in keyCodes {
+      guard let existing = layeredKeys[keyCode] else { continue }
+      layeredKeys[keyCode] = .init(
+        normal: "", shifted: existing.shifted, option: existing.option,
         shiftedOption: existing.shiftedOption)
     }
     return layeredKeys
