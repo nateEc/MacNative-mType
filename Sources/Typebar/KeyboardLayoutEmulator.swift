@@ -1390,6 +1390,58 @@ enum KeyboardLayoutEmulator {
           normal: ["`1234567890-=", "tkvumiajbr[]\\", "wx/fpdgq,s;", "h.'colnzye"],
           shifted: ["~!@#$%^&*()_+", "TKVUMIAJBR{}|", "WX?FPDGQ<S:", "H>\"COLNZYE"]
         ), overrides: [:])
+    case .persianFarsiColemak:
+      withBaseFallbackOptionLayers(
+        baseShiftMap(
+          keyRows: physicalRows,
+          normalRows: [
+            ["÷", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+            ["ض", "ص", "ب", "ح", "ل", "ت", "م", "ع", "غ", "ک", "ج", "چ", "پ"],
+            ["ش", "ق", "س", "ف", "ی", "ا", "د", "ث", "ه", "خ", "گ"],
+            ["ظ", "ط", "ز", "ر", "ذ", "ن", "ئ", "و", ".", "/"],
+          ],
+          shiftedRows: [
+            ["×", "!", "@", "#", "$", "%", "^", "&", "*", ")", "(", "_", "+"],
+            ["ً", "ٌ", "ّ", "\\", "ۀ", "ـ", "»", ",", "؛", ":", "}", "{", "|"],
+            ["َ", "ق", "ُ", "،", "ِ", "آ", "أ", "ٍ", "]", "[", "\""],
+            ["ة", "ي", "ژ", "ؤ", "إ", "«", "ء", "<", ">", "؟"],
+          ]),
+        overrides: [:])
+    case .persianStandardColemak:
+      withBaseFallbackOptionLayers(
+        baseShiftMap(
+          keyRows: physicalRows,
+          normalRows: [
+            ["گ", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۰", "-", "="],
+            ["ض", "ص", "ب", "ح", "ل", "ت", "م", "ع", "غ", "ک", "\\", "ج", "چ"],
+            ["ش", "ق", "س", "ف", "ی", "ا", "د", "ث", "ه", "خ", "گ"],
+            ["ظ", "ط", "ز", "ر", "ذ", "ن", "پ", "و", ".", "/"],
+          ],
+          shiftedRows: [
+            ["؛", "!", "٬", "٫", "۴", "٪", "×", "،", "*", ")", ")", "ـ", "+"],
+            ["ْ", "ٌ", "إ", "[", "أ", "ة", "«", "َ", "ِ", ":", "|", "}", "{"],
+            ["ؤ", "ً", "ئ", "ُ", "ي", "آ", "ٔ", "ٍ", "ّ", "]", "؛"],
+            ["ك", "ط", "ژ", "ٰ", "‌", "»", "ء", ">", "<", "؟"],
+          ]),
+        overrides: [:])
+    case .miligram:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["`1234567890^]", "bwlu[]ofgyk=", "dats;:eirnq'", "zxcv,.hmjp@"],
+          shifted: ["~!\"#$%&'()~~}", "BWLU{}OFGYK+", "DATS+*EIRNQ\"", "ZXCV<>HMJP`"]
+        ), overrides: [:])
+    case .nokwts:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890[]", "zmrlfjyou'-=\\", "nthsbcdeia,", "xqwkvpg/.;"],
+          shifted: ["~!@#$%^&*(){}", "ZMRLFJYOU<:>|", "NTHSBCDEIA\"", "XQWKVPG+_?"]
+        ), overrides: [:])
+    case .vyletV4:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890[]", "wcmpkxlouj-=\\", "rsthf'naei/", "qgvdbzy.;,"],
+          shifted: ["~!@#$%^&*(){}", "WCMPKXLOUJ_+|", "RSTHF\"NAEI?", "QGVDBZY<:>"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "

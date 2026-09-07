@@ -5159,6 +5159,119 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testPersianColemakMiligramNokwtsAndVyletPreservePhysicalKeys() throws {
+    let ansiRows = SystemKeyboardGuide.physicalRows
+    let isoRows = [
+      ansiRows[0], Array(ansiRows[1].dropLast()), ansiRows[2] + [42], [10] + ansiRows[3],
+    ]
+    func labels(_ rows: [String]) -> [[String]] { rows.map { $0.map(String.init) } }
+    let expected: [(String, [[UInt16]], [[String]], [[String]], Bool)] = [
+      (
+        "persian_farsi_colemak", ansiRows,
+        [
+          ["÷", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          ["ض", "ص", "ب", "ح", "ل", "ت", "م", "ع", "غ", "ک", "ج", "چ", "پ"],
+          ["ش", "ق", "س", "ف", "ی", "ا", "د", "ث", "ه", "خ", "گ"],
+          ["ظ", "ط", "ز", "ر", "ذ", "ن", "ئ", "و", ".", "/"],
+        ],
+        [
+          ["×", "!", "@", "#", "$", "%", "^", "&", "*", ")", "(", "_", "+"],
+          ["ً", "ٌ", "ّ", "\\", "ۀ", "ـ", "»", ",", "؛", ":", "}", "{", "|"],
+          ["َ", "ق", "ُ", "،", "ِ", "آ", "أ", "ٍ", "]", "[", "\""],
+          ["ة", "ي", "ژ", "ؤ", "إ", "«", "ء", "<", ">", "؟"],
+        ], false
+      ),
+      (
+        "persian_standard_colemak", ansiRows,
+        [
+          ["گ", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۰", "-", "="],
+          ["ض", "ص", "ب", "ح", "ل", "ت", "م", "ع", "غ", "ک", "\\", "ج", "چ"],
+          ["ش", "ق", "س", "ف", "ی", "ا", "د", "ث", "ه", "خ", "گ"],
+          ["ظ", "ط", "ز", "ر", "ذ", "ن", "پ", "و", ".", "/"],
+        ],
+        [
+          ["؛", "!", "٬", "٫", "۴", "٪", "×", "،", "*", ")", ")", "ـ", "+"],
+          ["ْ", "ٌ", "إ", "[", "أ", "ة", "«", "َ", "ِ", ":", "|", "}", "{"],
+          ["ؤ", "ً", "ئ", "ُ", "ي", "آ", "ٔ", "ٍ", "ّ", "]", "؛"],
+          ["ك", "ط", "ژ", "ٰ", "‌", "»", "ء", ">", "<", "؟"],
+        ], true
+      ),
+      (
+        "miligram", isoRows,
+        labels(["`1234567890^]", "bwlu[]ofgyk=", "dats;:eirnq'", "zxcv,.hmjp@"]),
+        labels(["~!\"#$%&'()~~}", "BWLU{}OFGYK+", "DATS+*EIRNQ\"", "ZXCV<>HMJP`"]),
+        true
+      ),
+      (
+        "nokwts", ansiRows,
+        labels(["`1234567890[]", "zmrlfjyou'-=\\", "nthsbcdeia,", "xqwkvpg/.;"]),
+        labels(["~!@#$%^&*(){}", "ZMRLFJYOU<:>|", "NTHSBCDEIA\"", "XQWKVPG+_?"]),
+        false
+      ),
+      (
+        "vylet_v4", ansiRows,
+        labels(["`1234567890[]", "wcmpkxlouj-=\\", "rsthf'naei/", "qgvdbzy.;,"]),
+        labels(["~!@#$%^&*(){}", "WCMPKXLOUJ_+|", "RSTHF\"NAEI?", "QGVDBZY<:>"]),
+        false
+      ),
+    ]
+
+    for (rawValue, keyRows, normalRows, shiftedRows, showsTopRow) in expected {
+      let layout = try XCTUnwrap(KeyboardLayout(rawValue: rawValue), rawValue)
+      let guideRows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(guideRows.map(\.count), keyRows.map(\.count))
+      for rowIndex in keyRows.indices {
+        for keyIndex in keyRows[rowIndex].indices {
+          let keyCode = keyRows[rowIndex][keyIndex]
+          XCTAssertEqual(
+            KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: layout),
+            normalRows[rowIndex][keyIndex])
+          XCTAssertEqual(
+            KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: layout),
+            shiftedRows[rowIndex][keyIndex])
+          XCTAssertEqual(guideRows[rowIndex][keyIndex].label, normalRows[rowIndex][keyIndex])
+          XCTAssertEqual(guideRows[rowIndex][keyIndex].shiftedLabel, shiftedRows[rowIndex][keyIndex])
+        }
+      }
+      XCTAssertEqual(
+        KeyboardLayoutEmulator.text(
+          forKeyCode: keyRows[1][0], modifierFlags: [.option], layout: layout),
+        normalRows[1][0])
+      XCTAssertEqual(
+        KeyboardLayoutEmulator.text(
+          forKeyCode: keyRows[1][0], modifierFlags: [.option, .shift], layout: layout),
+        shiftedRows[1][0])
+      XCTAssertEqual(
+        KeyboardGuideKeysMode.minimal.showsNumberRow(
+          for: layout, mode: .staticGuide, nextCharacter: nil),
+        showsTopRow)
+
+      for output in normalRows.flatMap({ $0 }) + shiftedRows.flatMap({ $0 }) {
+        let keyCode = try XCTUnwrap(
+          KeyboardLayoutEmulator.keyCode(forOutput: output, layout: layout),
+          "Missing reverse lookup for \(rawValue): \(output)")
+        let candidates = [
+          KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: layout),
+          KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: layout),
+        ]
+        XCTAssertTrue(candidates.contains(output))
+      }
+
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+  }
+
+  @MainActor
   func testOptimotPreservesFourLayersAndRoutesItsMappedDeleteAsEditing() throws {
     let ansiRows = SystemKeyboardGuide.physicalRows
     let isoRows = [
@@ -9676,7 +9789,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 233)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 238)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

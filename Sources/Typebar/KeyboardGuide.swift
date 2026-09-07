@@ -170,6 +170,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ergoSplit46 = "ergo_split46"
   case gralmak = "Gralmak"
   case vitrimak
+  case persianFarsiColemak = "persian_farsi_colemak"
+  case persianStandardColemak = "persian_standard_colemak"
+  case miligram
+  case nokwts
+  case vyletV4 = "vylet_v4"
   case real
   case sertain
   case ctgap
@@ -408,6 +413,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ergoSplit46: "Ergo Split 46"
     case .gralmak: "Gralmak"
     case .vitrimak: "Vitrimak"
+    case .persianFarsiColemak: "Persian Farsi Colemak"
+    case .persianStandardColemak: "Persian Standard Colemak"
+    case .miligram: "Miligram"
+    case .nokwts: "Nokwts"
+    case .vyletV4: "Vylet v4"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -651,6 +661,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ergoSplit46 = "ergo_split46"
   case gralmak = "Gralmak"
   case vitrimak
+  case persianFarsiColemak = "persian_farsi_colemak"
+  case persianStandardColemak = "persian_standard_colemak"
+  case miligram
+  case nokwts
+  case vyletV4 = "vylet_v4"
   case real
   case sertain
   case ctgap
@@ -2744,6 +2759,51 @@ enum KeyboardGuideModel {
         normal: ["`1234567890-=", "tkvumiajbr[]\\", "wx/fpdgq,s;", "h.'colnzye"],
         shifted: ["~!@#$%^&*()_+", "TKVUMIAJBR{}|", "WX?FPDGQ<S:", "H>\"COLNZYE"]
       )
+    case .persianFarsiColemak:
+      baseShiftRows(
+        normalLabels: [
+          ["÷", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          ["ض", "ص", "ب", "ح", "ل", "ت", "م", "ع", "غ", "ک", "ج", "چ", "پ"],
+          ["ش", "ق", "س", "ف", "ی", "ا", "د", "ث", "ه", "خ", "گ"],
+          ["ظ", "ط", "ز", "ر", "ذ", "ن", "ئ", "و", ".", "/"],
+        ],
+        shiftedLabels: [
+          ["×", "!", "@", "#", "$", "%", "^", "&", "*", ")", "(", "_", "+"],
+          ["ً", "ٌ", "ّ", "\\", "ۀ", "ـ", "»", ",", "؛", ":", "}", "{", "|"],
+          ["َ", "ق", "ُ", "،", "ِ", "آ", "أ", "ٍ", "]", "[", "\""],
+          ["ة", "ي", "ژ", "ؤ", "إ", "«", "ء", "<", ">", "؟"],
+        ]
+      )
+    case .persianStandardColemak:
+      baseShiftRows(
+        normalLabels: [
+          ["گ", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۰", "-", "="],
+          ["ض", "ص", "ب", "ح", "ل", "ت", "م", "ع", "غ", "ک", "\\", "ج", "چ"],
+          ["ش", "ق", "س", "ف", "ی", "ا", "د", "ث", "ه", "خ", "گ"],
+          ["ظ", "ط", "ز", "ر", "ذ", "ن", "پ", "و", ".", "/"],
+        ],
+        shiftedLabels: [
+          ["؛", "!", "٬", "٫", "۴", "٪", "×", "،", "*", ")", ")", "ـ", "+"],
+          ["ْ", "ٌ", "إ", "[", "أ", "ة", "«", "َ", "ِ", ":", "|", "}", "{"],
+          ["ؤ", "ً", "ئ", "ُ", "ي", "آ", "ٔ", "ٍ", "ّ", "]", "؛"],
+          ["ك", "ط", "ژ", "ٰ", "‌", "»", "ء", ">", "<", "؟"],
+        ]
+      )
+    case .miligram:
+      baseShiftRows(
+        normal: ["`1234567890^]", "bwlu[]ofgyk=", "dats;:eirnq'", "zxcv,.hmjp@"],
+        shifted: ["~!\"#$%&'()~~}", "BWLU{}OFGYK+", "DATS+*EIRNQ\"", "ZXCV<>HMJP`"]
+      )
+    case .nokwts:
+      baseShiftRows(
+        normal: ["`1234567890[]", "zmrlfjyou'-=\\", "nthsbcdeia,", "xqwkvpg/.;"],
+        shifted: ["~!@#$%^&*(){}", "ZMRLFJYOU<:>|", "NTHSBCDEIA\"", "XQWKVPG+_?"]
+      )
+    case .vyletV4:
+      baseShiftRows(
+        normal: ["`1234567890[]", "wcmpkxlouj-=\\", "rsthf'naei/", "qgvdbzy.;,"],
+        shifted: ["~!@#$%^&*(){}", "WCMPKXLOUJ_+|", "RSTHF\"NAEI?", "QGVDBZY<:>"]
+      )
     case .real:
       [
         row("number", "`1234567890[]"),
@@ -4218,7 +4278,8 @@ private extension KeyboardLayout {
       || self == .stndc || self == .uciea || self == .diktor || self == .diktorVoronovMod
       || self == .redaktor || self == .juiyaf || self == .zubachev
       || self == .colemakQix || self == .colemakQi || self == .colemaQ
-      || self == .thaiManoonchai || self == .burmese
+      || self == .thaiManoonchai || self == .burmese || self == .persianStandardColemak
+      || self == .miligram
   }
 }
 
