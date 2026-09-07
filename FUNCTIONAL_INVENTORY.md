@@ -4,7 +4,7 @@
 
 官方 48 项 funbox 的逐项来源、映射与未实现缺口见 `OFFICIAL_FUNBOX_AUDIT.md`；该审计是本表 FUN-01/FUN-02 的细化证据。
 
-官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 168 项精确原生、3 项相关替代、68 项系统输入或自定义回退均由自动化测试守恒校验。
+官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 173 项精确原生、3 项相关替代、63 项系统输入或自定义回退均由自动化测试守恒校验。
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -333,6 +333,8 @@
 2026-09-07 补充：当前内置键盘图更新为一百六十八种，新增 `Redaktor`、`JUIYAF`、`Zubachev`、`Colemak Qi;x` 与 `Colemak Qi`。五项覆盖 47 个 ANSI Base/Shift 位置，保留重排数字符号层、AltGr 基础层回退和精简提示数字行；反查新增精确大小写输出优先级，以正确区分 JUIYAF/Zubachev 的非标准 Cyrillic Shift 配对及重复字符。全部进入提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 163 项精确原生、3 项相关替代、73 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
 
 2026-09-07 补充：当前内置键盘图更新为一百七十三种，新增 `ColemaQ`、`ColemaQ F`、`Thai Manoonchai`、`Brasileiro Nativo` 与 `BEAKL 15`。Brasileiro Nativo 按 13/12/12/11 的 ISO 物理行实现，其余四项按 ANSI 实现；泰文组合符以独立键层字符串保存，避免 Unicode 字素聚合改变实体键数量。五项均覆盖 Base/Shift、AltGr 基础层回退、提示、模拟、反查、设置归档与 Layout Fluid，并保持各自精简数字行策略。官方矩阵同步更新为 168 项精确原生、3 项相关替代、68 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
+
+2026-09-07 补充：当前内置键盘图更新为一百七十八种，新增 `BEAKL 19`、`BEAKL 19 Bis`、`Rolll`、`Whorfmax Ortho` 与 `Neo`。前四项完整落在 ANSI 47 个位置，Neo 保留 13/12/12/11 ISO 行与两个单层空格实体键；单层键在 Shift/Option/Shift+Option 下按可观察规则回退首层。五项均进入提示、模拟、反查、设置归档与 Layout Fluid，并在精简提示中隐藏数字行。官方矩阵同步更新为 173 项精确原生、3 项相关替代、63 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
 
 2026-09-04 补充：当时 `CFG-02`、`VIS-02` 与 `VIS-05` 的非拉丁布局覆盖新增 `Bulgarian Cyrillic · Typebar`。它是 Typebar 自写的第 19 个内置物理键位映射，覆盖 `я/ъ/щ/ч/ь` 与 ISO `< >`，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；这不是官方或系统 BDS 布局的复制，需精确系统布局时用户仍可选择 macOS 当前输入源。
 | INP-01 | 输入、逐字符状态、退格、长词 | `input/handlers/*` | TypingEngine | 部分实现 |

@@ -967,6 +967,58 @@ enum KeyboardLayoutEmulator {
             + "0:yY 1:iI 2:eE 3:aA 5:.> 4:dD 38:sS 40:tT 37:nN 41:bB 39:;: "
             + "6:jJ 7:/? 8:,< 9:kK 11:'\" 45:wW 46:mM 43:lL 47:pP 44:vV"
         ), overrides: [:])
+    case .beakl19:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:qQ 13:.> 14:oO 15:uU 17:jJ 16:wW 32:dD 34:nN 31:mM 35:,< 33:[{ 30:]} 42:\\| "
+            + "0:hH 1:aA 2:eE 3:iI 5:kK 4:gG 38:sS 40:rR 37:tT 41:pP 39:;: "
+            + "6:zZ 7:'\" 8:/? 9:yY 11:xX 45:bB 46:cC 43:lL 47:fF 44:vV"
+        ), overrides: [:])
+    case .beakl19Bis:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:qQ 13:yY 14:oO 15:uU 17:zZ 16:wW 32:dD 34:nN 31:cC 35:kK 33:[{ 30:]} 42:\\| "
+            + "0:hH 1:iI 2:eE 3:aA 5:,< 4:gG 38:tT 40:rR 37:sS 41:pP 39:;: "
+            + "6:jJ 7:'\" 8:/? 9:.> 11:xX 45:vV 46:mM 43:lL 47:fF 44:bB"
+        ), overrides: [:])
+    case .rolll:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:yY 13:oO 14:uU 15:wW 17:bB 16:xX 32:kK 34:cC 31:lL 35:vV 33:[{ 30:]} 42:\\| "
+            + "0:iI 1:aA 2:eE 3:nN 5:pP 4:dD 38:hH 40:sS 37:rR 41:tT 39:'\" "
+            + "6:jJ 7:/? 8:,< 9:.> 11:qQ 45:fF 46:mM 43:gG 47:'\" 44:zZ"
+        ), overrides: [:])
+    case .whorfmaxOrtho:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
+            + "12:fF 13:lL 14:hH 15:yY 17:zZ 16:qQ 32:wW 34:oO 31:uU 35:,< 33:-_ 30:=+ 42:\\| "
+            + "0:sS 1:rR 2:nN 3:tT 5:pP 4:cC 38:dD 40:aA 37:eE 41:iI 39:/? "
+            + "6:xX 7:jJ 8:bB 9:vV 11:kK 45:mM 46:gG 43:'\" 47:;: 44:.>"
+        ), overrides: [:])
+    case .neo:
+      withBaseFallbackOptionLayers(
+        baseShiftMap(
+          keyRows: [
+            physicalRows[0], Array(physicalRows[1].dropLast()), physicalRows[2] + [42],
+            [10] + physicalRows[3],
+          ],
+          normalRows: [
+            ["^", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "`"],
+            ["x", "v", "l", "c", "w", "k", "h", "g", "f", "q", "ß", "'"],
+            ["u", "i", "a", "e", "o", "s", "n", "r", "t", "d", "y", " "],
+            [" ", "ü", "ö", "ä", "p", "z", "b", "m", ",", ".", "j"],
+          ],
+          shiftedRows: [
+            ["ˇ", "°", "§", "ℓ", "»", "«", "$", "€", "„", "“", "”", "—", "¸"],
+            ["X", "V", "L", "C", "W", "K", "H", "G", "F", "Q", "ẞ", "~"],
+            ["U", "I", "A", "E", "O", "S", "N", "R", "T", "D", "Y", " "],
+            [" ", "Ü", "Ö", "Ä", "P", "Z", "B", "M", "–", "•", "J"],
+          ]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "

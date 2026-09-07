@@ -110,6 +110,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case thaiManoonchai = "thai_manoonchai"
   case brasileiroNativo = "brasileiro_nativo"
   case beakl15 = "beakl_15"
+  case beakl19 = "beakl_19"
+  case beakl19Bis = "beakl_19_bis"
+  case rolll
+  case whorfmaxOrtho = "whorfmax_ortho"
+  case neo
   case real
   case sertain
   case ctgap
@@ -288,6 +293,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .thaiManoonchai: "Thai Manoonchai"
     case .brasileiroNativo: "Brasileiro Nativo"
     case .beakl15: "BEAKL 15"
+    case .beakl19: "BEAKL 19"
+    case .beakl19Bis: "BEAKL 19 Bis"
+    case .rolll: "Rolll"
+    case .whorfmaxOrtho: "Whorfmax Ortho"
+    case .neo: "Neo"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -471,6 +481,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case thaiManoonchai = "thai_manoonchai"
   case brasileiroNativo = "brasileiro_nativo"
   case beakl15 = "beakl_15"
+  case beakl19 = "beakl_19"
+  case beakl19Bis = "beakl_19_bis"
+  case rolll
+  case whorfmaxOrtho = "whorfmax_ortho"
+  case neo
   case real
   case sertain
   case ctgap
@@ -2226,6 +2241,31 @@ enum KeyboardGuideModel {
       baseShiftRows(
         normal: ["`1234567890-=", "qhouxgcrfz[]\\", "yiea.dstnb;", "j/,k'wmlpv"],
         shifted: ["~!@#$%^&*()_+", "QHOUXGCRFZ{}|", "YIEA>DSTNB:", "J?<K\"WMLPV"]
+      )
+    case .beakl19:
+      baseShiftRows(
+        normal: ["`1234567890-=", "q.oujwdnm,[]\\", "haeikgsrtp;", "z'/yxbclfv"],
+        shifted: ["~!@#$%^&*()_+", "Q>OUJWDNM<{}|", "HAEIKGSRTP:", "Z\"?YXBCLFV"]
+      )
+    case .beakl19Bis:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qyouzwdnck[]\\", "hiea,gtrsp;", "j'/.xvmlfb"],
+        shifted: ["~!@#$%^&*()_+", "QYOUZWDNCK{}|", "HIEA<GTRSP:", "J\"?>XVMLFB"]
+      )
+    case .rolll:
+      baseShiftRows(
+        normal: ["`1234567890-=", "youwbxkclv[]\\", "iaenpdhsrt'", "j/,.qfmg'z"],
+        shifted: ["~!@#$%^&*()_+", "YOUWBXKCLV{}|", "IAENPDHSRT\"", "J?<>QFMG\"Z"]
+      )
+    case .whorfmaxOrtho:
+      baseShiftRows(
+        normal: ["`1234567890[]", "flhyzqwou,-=\\", "srntpcdaei/", "xjbvkmg';."],
+        shifted: ["~!@#$%^&*(){}", "FLHYZQWOU<_+|", "SRNTPCDAEI?", "XJBVKMG\":>"]
+      )
+    case .neo:
+      baseShiftRows(
+        normal: ["^1234567890-`", "xvlcwkhgfqß'", "uiaeosnrtdy ", " üöäpzbm,.j"],
+        shifted: ["ˇ°§ℓ»«$€„“”—¸", "XVLCWKHGFQẞ~", "UIAEOSNRTDY ", " ÜÖÄPZBM–•J"]
       )
     case .real:
       [
