@@ -1750,6 +1750,25 @@ struct ResultCharacterStats: Codable, Equatable {
   }
 }
 
+struct ResultKeyDurationStats: Equatable {
+  let averageMilliseconds: Double
+  let standardDeviationMilliseconds: Double
+  let sampleCount: Int
+
+  static func make(samples: [TimeInterval]) -> Self? {
+    let milliseconds = samples.filter { $0.isFinite && $0 >= 0 }.map { $0 * 1_000 }
+    guard !milliseconds.isEmpty else { return nil }
+    let average = milliseconds.reduce(0, +) / Double(milliseconds.count)
+    let variance = milliseconds.reduce(0) { total, value in
+      total + pow(value - average, 2)
+    } / Double(milliseconds.count)
+    return .init(
+      averageMilliseconds: average,
+      standardDeviationMilliseconds: sqrt(variance),
+      sampleCount: milliseconds.count)
+  }
+}
+
 struct CompletedTestResult: Codable, Equatable, Identifiable {
   let id: UUID
   let configuration: TestConfiguration
@@ -1764,6 +1783,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let rawWpm: Int
   let accuracy: Int
   let characterStats: ResultCharacterStats
+  let keyDurationSamples: [TimeInterval]
   let tags: [String]
   let prompt: String
   let replayEvents: [TypingReplayEvent]
@@ -1782,6 +1802,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     rawWpm: Int,
     accuracy: Int,
     characterStats: ResultCharacterStats? = nil,
+    keyDurationSamples: [TimeInterval] = [],
     tags: [String] = [],
     prompt: String = "",
     replayEvents: [TypingReplayEvent] = []
@@ -1801,6 +1822,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.characterStats = characterStats ?? .legacy(
       typedCharacterCount: typedCharacterCount,
       correctCharacterCount: correctCharacterCount)
+    self.keyDurationSamples = keyDurationSamples.filter { $0.isFinite && $0 >= 0 }
     self.tags = tags
     self.prompt = prompt
     self.replayEvents = replayEvents
@@ -1819,10 +1841,14 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     return afkDuration / elapsedDuration * 100
   }
 
+  var keyDurationStats: ResultKeyDurationStats? {
+    ResultKeyDurationStats.make(samples: keyDurationSamples)
+  }
+
   private enum CodingKeys: String, CodingKey {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
-      tags, prompt, replayEvents
+      keyDurationSamples, tags, prompt, replayEvents
   }
 
   init(from decoder: Decoder) throws {
@@ -1843,6 +1869,9 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       ?? .legacy(
         typedCharacterCount: typedCharacterCount,
         correctCharacterCount: correctCharacterCount)
+    keyDurationSamples = try values.decodeIfPresent(
+      [TimeInterval].self, forKey: .keyDurationSamples
+    )?.filter { $0.isFinite && $0 >= 0 } ?? []
     tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
     prompt = try values.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     replayEvents = try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? []
@@ -1919,6 +1948,8 @@ struct TypingSession {
   private var attemptedErrorCounts = [Int: Int]()
   private var committedWordBursts: [Int] = []
   private var replayEvents: [TypingReplayEvent] = []
+  private var activePhysicalKeyDownDates: [UInt16: Date] = [:]
+  private var completedPhysicalKeyDurations: [TimeInterval] = []
   private(set) var startedAt: Date?
   private(set) var finishedAt: Date?
   private(set) var outcome: TestOutcome = .active
@@ -1967,6 +1998,23 @@ struct TypingSession {
   mutating func recordKeyboardActivity(at date: Date = .now) {
     guard !isFinished, startedAt != nil else { return }
     keyboardActivityDates.append(date)
+  }
+
+  /// Records anonymous key hold durations from native keyDown/keyUp pairs.
+  /// Auto-repeat does not begin a second press, and unmatched releases are ignored.
+  mutating func recordPhysicalKeyEvent(
+    keyCode: UInt16, isKeyDown: Bool, isRepeat: Bool, at date: Date = .now
+  ) {
+    guard !isFinished else { return }
+    if isKeyDown {
+      guard !isRepeat, activePhysicalKeyDownDates[keyCode] == nil else { return }
+      activePhysicalKeyDownDates[keyCode] = date
+      return
+    }
+    guard startedAt != nil, let keyDownDate = activePhysicalKeyDownDates.removeValue(forKey: keyCode)
+    else { return }
+    let duration = date.timeIntervalSince(keyDownDate)
+    if duration.isFinite, duration >= 0 { completedPhysicalKeyDurations.append(duration) }
   }
 
   var sectionProgress: (completed: Int, total: Int)? {
@@ -2299,6 +2347,7 @@ struct TypingSession {
       rawWpm: rawWpm(at: date),
       accuracy: accuracy,
       characterStats: characterStats,
+      keyDurationSamples: completedPhysicalKeyDurations,
       tags: ResultTagPolicy.normalized(tags),
       prompt: prompt,
       replayEvents: replayEvents

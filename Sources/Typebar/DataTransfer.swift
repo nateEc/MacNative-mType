@@ -24,6 +24,9 @@ enum ResultCSVExport {
         "incorrect_characters",
         "extra_characters",
         "missed_characters",
+        "key_duration_average_ms",
+        "key_duration_sd_ms",
+        "key_duration_samples",
         "mode",
         "duration_seconds",
         "word_limit",
@@ -58,6 +61,7 @@ enum ResultCSVExport {
         let consistency = ResultConsistencyPolicy.metrics(
             events: result.replayEvents, duration: result.elapsedDuration)
         let configuration = result.configuration
+        let keyDurationStats = result.keyDurationStats
         return [
             result.id.uuidString.lowercased(),
             result.outcome.rawValue,
@@ -73,6 +77,9 @@ enum ResultCSVExport {
             String(result.characterStats.incorrect),
             String(result.characterStats.extra),
             String(result.characterStats.missed),
+            keyDurationStats.map { decimal($0.averageMilliseconds) } ?? "",
+            keyDurationStats.map { decimal($0.standardDeviationMilliseconds) } ?? "",
+            keyDurationStats.map { String($0.sampleCount) } ?? "0",
             configuration.mode.rawValue,
             configuration.duration.map(decimal) ?? "",
             configuration.wordLimit.map(String.init) ?? "",

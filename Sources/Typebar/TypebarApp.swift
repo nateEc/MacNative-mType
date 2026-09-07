@@ -1366,6 +1366,8 @@ private struct ContentView: View {
         onCompositionChanged: { compositionText = $0 },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
         onPhysicalKey: { keyCode, isKeyDown, isRepeat in
+          session.recordPhysicalKeyEvent(
+            keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
           if isKeyDown { session.recordKeyboardActivity() }
           guard settings.showTypingCompanion else { return }
           typingCompanionHands.handle(keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
@@ -3044,6 +3046,14 @@ private struct CompletedResultView: View {
             metric("有效键入", "\(Int(result.engagedDuration)) 秒")
           }
         }
+        if let keyDurationStats = result.keyDurationStats {
+          GridRow {
+            metric("平均按键时长", keyDurationText(keyDurationStats.averageMilliseconds))
+            metric(
+              "按键时长波动",
+              "\(keyDurationText(keyDurationStats.standardDeviationMilliseconds)) · \(keyDurationStats.sampleCount) 次")
+          }
+        }
       }
 
       Label(
@@ -3175,6 +3185,10 @@ private struct CompletedResultView: View {
   private var characterStatsText: String {
     let stats = result.characterStats
     return "\(stats.matched)/\(stats.incorrect)/\(stats.extra)/\(stats.missed)"
+  }
+
+  private func keyDurationText(_ milliseconds: Double) -> String {
+    "\(milliseconds.formatted(.number.precision(.fractionLength(0...1)))) ms"
   }
 
   @ViewBuilder
@@ -4922,6 +4936,14 @@ private struct ResultDetailView: View {
             )
           }
         }
+        if let keyDurationStats = result.portableResult?.keyDurationStats {
+          GridRow {
+            Text("按键时长（平均 / 波动）")
+            Text(
+              "\(keyDurationText(keyDurationStats.averageMilliseconds)) / \(keyDurationText(keyDurationStats.standardDeviationMilliseconds)) · \(keyDurationStats.sampleCount) 次"
+            )
+          }
+        }
       }
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
         ReplayTimelineView(prompt: result.prompt, events: result.replayEvents)
@@ -4951,6 +4973,10 @@ private struct ResultDetailView: View {
   private var characterStatsText: String {
     let stats = result.characterStats
     return "\(stats.matched)/\(stats.incorrect)/\(stats.extra)/\(stats.missed)"
+  }
+
+  private func keyDurationText(_ milliseconds: Double) -> String {
+    "\(milliseconds.formatted(.number.precision(.fractionLength(0...1)))) ms"
   }
 
 }

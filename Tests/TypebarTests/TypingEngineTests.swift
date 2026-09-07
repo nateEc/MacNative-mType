@@ -199,6 +199,40 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(unavailable, .init(typing: 0, key: 0))
   }
 
+  func testPhysicalKeyDurationsUseOnlyClosedNonRepeatPairs() throws {
+    var session = TypingSession(configuration: .timed(seconds: 1), prompt: "amber")
+    session.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
+    session.insert("a", at: start.addingTimeInterval(0.01))
+    session.recordPhysicalKeyEvent(
+      keyCode: 0, isKeyDown: true, isRepeat: true, at: start.addingTimeInterval(0.03))
+    session.recordPhysicalKeyEvent(
+      keyCode: 0, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.1))
+    session.recordPhysicalKeyEvent(
+      keyCode: 9, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.15))
+    session.recordPhysicalKeyEvent(
+      keyCode: 1, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(0.2))
+    session.recordPhysicalKeyEvent(
+      keyCode: 1, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.4))
+    session.recordPhysicalKeyEvent(
+      keyCode: 2, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(0.8))
+    session.tick(at: start.addingTimeInterval(1.01))
+
+    let result = try XCTUnwrap(session.result(at: start.addingTimeInterval(1.01)))
+    XCTAssertEqual(result.keyDurationSamples.count, 2)
+    XCTAssertEqual(result.keyDurationSamples[0], 0.1, accuracy: 0.000_001)
+    XCTAssertEqual(result.keyDurationSamples[1], 0.2, accuracy: 0.000_001)
+    let stats = try XCTUnwrap(result.keyDurationStats)
+    XCTAssertEqual(stats.averageMilliseconds, 150, accuracy: 0.000_001)
+    XCTAssertEqual(stats.standardDeviationMilliseconds, 50, accuracy: 0.000_001)
+    XCTAssertEqual(stats.sampleCount, 2)
+
+    session.recordPhysicalKeyEvent(
+      keyCode: 2, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(1.1))
+    XCTAssertEqual(
+      try XCTUnwrap(session.result(at: start.addingTimeInterval(1.01))).keyDurationSamples.count,
+      2)
+  }
+
   func testLegacyLeaderboardResponseDefaultsMissingConsistencyToZero() throws {
     let id = UUID()
     let finishedAt = Date(timeIntervalSinceReferenceDate: 1_000)
@@ -748,6 +782,8 @@ final class TypingEngineTests: XCTestCase {
       restored.characterStats.matched + restored.characterStats.incorrect
         + restored.characterStats.extra,
       restored.typedCharacterCount)
+    XCTAssertTrue(restored.keyDurationSamples.isEmpty)
+    XCTAssertNil(restored.keyDurationStats)
   }
 
   func testSpaceDelimitedWordInputCapsExtrasButStillAcceptsTheCommitSeparator() {
@@ -4111,6 +4147,7 @@ final class TypingEngineTests: XCTestCase {
       finishedAt: Date(timeIntervalSince1970: 2.5), afkDuration: 0.5,
       typedCharacterCount: 12, correctCharacterCount: 11, errorCount: 1, wpm: 60, rawWpm: 66,
       accuracy: 92, characterStats: .init(matched: 9, incorrect: 1, extra: 2, missed: 3),
+      keyDurationSamples: [0.08, 0.12],
       tags: ["focus, \"deep\"", "café"], prompt: "private prompt",
       replayEvents: [.init(offset: 0.5, kind: .insert, text: "bonjour")]
     )
@@ -4118,7 +4155,7 @@ final class TypingEngineTests: XCTestCase {
     let csv = ResultCSVExport.csvString(for: [result])
     XCTAssertTrue(csv.hasPrefix(ResultCSVExport.columns.joined(separator: ",") + "\r\n"))
     XCTAssertTrue(csv.contains("00000000-0000-0000-0000-000000000007,completed,60,66,92,"))
-    XCTAssertTrue(csv.contains(",11,12,1,9,1,2,3,time,"))
+    XCTAssertTrue(csv.contains(",11,12,1,9,1,2,3,100.00,20.00,2,time,"))
     XCTAssertTrue(csv.contains(",true,true,expert,uppercase;rot13,\"focus, \"\"deep\"\";café\","))
     XCTAssertTrue(csv.contains("1970-01-01T00:00:00"))
     XCTAssertFalse(csv.contains("private prompt"))
@@ -5614,6 +5651,36 @@ final class TypingEngineTests: XCTestCase {
     view.mapsArrowKeysToInput = false
     view.keyDown(with: up)
     XCTAssertTrue(accepted.isEmpty)
+  }
+
+  @MainActor
+  func testNativeInputBridgeReportsPhysicalKeyDownRepeatAndKeyUp() throws {
+    var events = [String]()
+    let view = TypingInputView()
+    view.onPhysicalKey = { keyCode, isKeyDown, isRepeat in
+      events.append("\(keyCode):\(isKeyDown):\(isRepeat)")
+    }
+    let keyDown = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "a", charactersIgnoringModifiers: "a", isARepeat: false,
+        keyCode: 0))
+    let repeatKeyDown = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0.1, windowNumber: 0,
+        context: nil, characters: "a", charactersIgnoringModifiers: "a", isARepeat: true,
+        keyCode: 0))
+    let keyUp = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyUp, location: .zero, modifierFlags: [], timestamp: 0.2, windowNumber: 0,
+        context: nil, characters: "a", charactersIgnoringModifiers: "a", isARepeat: false,
+        keyCode: 0))
+
+    view.keyDown(with: keyDown)
+    view.keyDown(with: repeatKeyDown)
+    view.keyUp(with: keyUp)
+
+    XCTAssertEqual(events, ["0:true:false", "0:true:true", "0:false:false"])
   }
 
   @MainActor
@@ -9840,7 +9907,10 @@ final class TypingEngineTests: XCTestCase {
       configuration: .init(
         mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
       prompt: "amber")
+    session.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
     session.insert("a", at: start)
+    session.recordPhysicalKeyEvent(
+      keyCode: 0, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.1))
     session.insert("mber", at: start.addingTimeInterval(6))
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.afkDuration, 4)
@@ -9856,6 +9926,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(stored.wpm, result.wpm)
     XCTAssertEqual(stored.accuracy, 100)
     XCTAssertEqual(stored.afkDuration, 4)
+    XCTAssertEqual(stored.keyDurationSamples.count, 1)
+    XCTAssertEqual(stored.keyDurationSamples[0], 0.1, accuracy: 0.000_001)
+    XCTAssertEqual(
+      try XCTUnwrap(stored.portableResult?.keyDurationStats).averageMilliseconds,
+      100, accuracy: 0.000_001)
     XCTAssertEqual(stored.afkPercentage, 66.666_666_666_7, accuracy: 0.000_001)
     XCTAssertEqual(stored.portableResult, result)
 
