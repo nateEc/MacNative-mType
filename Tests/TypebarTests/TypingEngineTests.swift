@@ -2713,6 +2713,42 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testTamil99MapsMacLayersMultiScalarOutputAndSuppressedKeys() {
+    let rows = KeyboardGuideModel.rows(for: .tamil99)
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ஆ", layout: .tamil99), "top-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "க", layout: .tamil99), "home-5")
+    XCTAssertEqual(rows[1][5].shiftedLabel, "ஸ்ரீ")
+
+    for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
+      for (keyCode, key) in zip(keyCodes, guideRow) {
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: .tamil99), key.label)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: .tamil99), key.shiftedLabel ?? "")
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: .tamil99), key.optionLabel)
+        XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: .tamil99), key.shiftedOptionLabel)
+      }
+    }
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 16, modifierFlags: [.shift], layout: .tamil99), "ஸ்ரீ")
+    XCTAssertNil(KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [.shift], layout: .tamil99))
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 4, modifierFlags: [.shift], layout: .tamil99), "")
+    XCTAssertNil(KeyboardLayoutEmulator.text(forKeyCode: 22, modifierFlags: [.option], layout: .tamil99))
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 22, modifierFlags: [.option, .shift], layout: .tamil99), "&")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(forOutput: "ஸ்ரீ", layout: .tamil99), 16)
+    XCTAssertEqual(KeyboardInputLayout.tamil99.emulatedLayout, .tamil99)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .tamil99
+    settings.keyboardInputLayout = .tamil99
+    settings.layoutFluidLayouts = [.tamil99, .ansiQwerty]
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .tamil99)
+    XCTAssertEqual(restored.keyboardInputLayout, .tamil99)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.tamil99, .ansiQwerty])
+  }
+
+  @MainActor
   func testArmenianHMQwertyMapsAllMacSystemLayersAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .armenianHMQwerty)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ճ", layout: .armenianHMQwerty), "top-0")
@@ -5747,7 +5783,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 48)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 49)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

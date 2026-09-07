@@ -46,6 +46,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case thaiKedmanee
   case thaiPattachote
   case hindiInscript
+  case tamil99
   case armenianHMQwerty
   case mongolianCyrillic
   case hebrew
@@ -99,6 +100,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .thaiKedmanee: "Thai Kedmanee"
     case .thaiPattachote: "Thai Pattachote"
     case .hindiInscript: "Hindi – InScript (macOS)"
+    case .tamil99: "Tamil99 (macOS)"
     case .armenianHMQwerty: "Armenian – HM QWERTY"
     case .mongolianCyrillic: "Mongolian Cyrillic"
     case .hebrew: "Hebrew"
@@ -157,6 +159,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case thaiKedmanee
   case thaiPattachote
   case hindiInscript
+  case tamil99
   case armenianHMQwerty
   case mongolianCyrillic
   case hebrew
@@ -1464,6 +1467,33 @@ enum KeyboardGuideModel {
           labels: ["", "ं", "म", "न", "व", "ल", "स", ",", ".", "य"],
           characters: ["", "ंँ", "मण", "न", "व", "ल", "सश", ",ष", ".।", "य?"],
           shiftedLabels: [nil, "ँ", "ण", nil, nil, nil, "श", "ष", "।", "?"]
+        ),
+      ]
+    case .tamil99:
+      [
+        layeredRow(
+          "number", labels: ["₹", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"],
+          optionLabels: ["`", "¡", "™", "£", "¢", "§", nil, "‘", "’", "“", "”", "–", "≠"],
+          shiftedOptionLabels: [nil, "⁄", "❊", "#", "€", "٪", "&", "^", "*", ")", "(", "_", "+"]
+        ),
+        layeredRow(
+          "top", labels: ["ஆ", "ஈ", "ஊ", "ஐ", "ஏ", "ள", "ற", "ன", "ட", "ண", "ச", "ஞ", "\\"],
+          shiftedLabels: ["ஸ", "ஷ", "ஜ", "ஹ", "X", "ஸ்ரீ", "ஶ", "ஈ", "[", "]", "{", "}", "|"],
+          optionLabels: ["ா", "ீ", "ூ", "ை", "ே", nil, nil, nil, nil, nil, "“", "‘", "«"],
+          shiftedOptionLabels: [nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "”", "’", "»"]
+        ),
+        layeredRow(
+          "home", labels: ["அ", "இ", "உ", "்", "எ", "க", "ப", "ம", "த", "ந", "ய"],
+          shiftedLabels: ["௹", "௺", "௸", "ஃ", nil, nil, nil, "\"", ":", ";", "'"],
+          optionLabels: [nil, "ி", "ு", "்", "ெ", nil, nil, nil, nil, nil, "æ"],
+          shiftedOptionLabels: [nil, nil, nil, nil, "ஃ", nil, nil, nil, nil, nil, nil]
+        ),
+        layeredRow(
+          "bottom", labels: ["ஔ", "ஓ", "ஒ", "வ", "ங", "ல", "ர", ",", ".", "ழ"],
+          shiftedLabels: ["௳", "௴", "௵", "௶", "௷", nil, "/", "<", ">", "?"],
+          optionLabels: ["ௌ", "ோ", "ொ", nil, nil, nil, nil, "௹", "।", "/"],
+          shiftedOptionLabels: [nil, nil, "©", nil, nil, nil, nil, "„", nil, "¿"]
         ),
       ]
     case .armenianHMQwerty:
