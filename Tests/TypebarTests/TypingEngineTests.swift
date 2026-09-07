@@ -7289,12 +7289,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(report.language, .english)
     XCTAssertEqual(report.analyzedResultCount, 2)
     XCTAssertEqual(report.totalMistakeCount, 3)
-    XCTAssertEqual(
-      report.characters,
-      [
-        .init(character: "a", mistakeCount: 2),
-        .init(character: "m", mistakeCount: 1),
-      ])
+    XCTAssertEqual(report.characters.map(\.character), ["a", "m"])
+    XCTAssertEqual(report.characters.map(\.mistakeCount), [2, 1])
+    XCTAssertEqual(report.characters.map(\.attemptCount), [3, 2])
+    XCTAssertEqual(report.characters.map(\.averageIntervalMilliseconds), [1_000, nil])
     XCTAssertEqual(report.suggestedWords.count, 3)
     XCTAssertTrue(report.suggestedWords.allSatisfy(StarterLexicon.words.contains))
     XCTAssertTrue(report.suggestedWords[0].contains("a"))
@@ -7307,6 +7305,46 @@ final class TypingEngineTests: XCTestCase {
       WeakSpotPractice.report(
         results: results, language: .spanish, englishVariant: .american)?.totalMistakeCount,
       1)
+  }
+
+  func testWeakSpotReportFindsSlowCorrectCharactersAndIgnoresAutomaticReplay() throws {
+    let slowCorrect = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .english), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 5,
+      correctCharacterCount: 5, errorCount: 0, wpm: 30, rawWpm: 30, accuracy: 100,
+      prompt: "amber",
+      replayEvents: [
+        .init(offset: 0.1, kind: .insert, text: "a"),
+        .init(offset: 0.2, kind: .insert, text: "m"),
+        .init(offset: 0.3, kind: .insert, text: "b"),
+        .init(offset: 1.3, kind: .insert, text: "e"),
+        .init(offset: 1.4, kind: .insert, text: "r"),
+      ])
+    let forcedError = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .english), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(1), typedCharacterCount: 2,
+      correctCharacterCount: 1, errorCount: 1, wpm: 24, rawWpm: 24, accuracy: 50,
+      prompt: "am",
+      replayEvents: [
+        .init(offset: 0.1, kind: .insert, text: "x", automatic: true),
+        .init(offset: 0.2, kind: .insert, text: "a", forceError: true),
+        .init(offset: 0.3, kind: .insert, text: "m"),
+      ])
+
+    let slowReport = try XCTUnwrap(
+      WeakSpotPractice.report(
+        results: [slowCorrect], language: .english, englishVariant: .american))
+    XCTAssertEqual(slowReport.totalMistakeCount, 0)
+    XCTAssertEqual(slowReport.characters.first?.character, "e")
+    XCTAssertEqual(slowReport.characters.first?.averageIntervalMilliseconds, 1_000)
+    XCTAssertTrue(slowReport.suggestedWords.first?.contains("e") ?? false)
+
+    let forcedReport = try XCTUnwrap(
+      WeakSpotPractice.report(
+        results: [forcedError], language: .english, englishVariant: .american))
+    XCTAssertEqual(forcedReport.totalMistakeCount, 1)
+    XCTAssertEqual(WeakSpotPractice.characterScores(results: [forcedError], language: .english), ["a": 1])
+    XCTAssertFalse(forcedReport.characters.contains(where: { $0.character == "x" }))
   }
 
   func testLocalWordFilterUsesOnlyRequestedCharactersLengthsAndRegularExpressions() throws {
