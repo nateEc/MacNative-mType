@@ -100,6 +100,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case vestnik = "Vestnik"
   case diktor = "Diktor"
   case diktorVoronovMod = "Diktor_VoronovMod"
+  case redaktor = "Redaktor"
+  case juiyaf = "JUIYAF"
+  case zubachev = "Zubachev"
+  case colemakQix = "colemak_Qix"
+  case colemakQi = "colemak_Qi"
   case real
   case sertain
   case ctgap
@@ -268,6 +273,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .vestnik: "Vestnik"
     case .diktor: "Diktor"
     case .diktorVoronovMod: "Diktor Voronov Mod"
+    case .redaktor: "Redaktor"
+    case .juiyaf: "JUIYAF"
+    case .zubachev: "Zubachev"
+    case .colemakQix: "Colemak Qi;x"
+    case .colemakQi: "Colemak Qi"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -441,6 +451,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case vestnik = "Vestnik"
   case diktor = "Diktor"
   case diktorVoronovMod = "Diktor_VoronovMod"
+  case redaktor = "Redaktor"
+  case juiyaf = "JUIYAF"
+  case zubachev = "Zubachev"
+  case colemakQix = "colemak_Qix"
+  case colemakQi = "colemak_Qi"
   case real
   case sertain
   case ctgap
@@ -895,6 +910,15 @@ struct KeyboardGuideKey: Identifiable, Equatable {
       .contains { output in
         let characters = Array(output.lowercased())
         return characters.count == 1 && characters[0] == target
+      }
+  }
+
+  func exactlyProducesCaseSensitive(_ character: Character) -> Bool {
+    [label, shiftedLabel, optionLabel, shiftedOptionLabel]
+      .compactMap { $0 }
+      .contains { output in
+        let characters = Array(output)
+        return characters.count == 1 && characters[0] == character
       }
   }
 
@@ -2014,6 +2038,141 @@ enum KeyboardGuideModel {
         layeredRow(
           "bottom", labels: ["?", "ъ", "э", "ю", "ц", "б", "м", "п", "г", "ж"],
           shiftedLabels: ["!", "Ъ", "Э", "Ю", "Ц", "Б", "М", "П", "Г", "Ж"],
+          optionLabels: Array(repeating: nil, count: 10),
+          shiftedOptionLabels: Array(repeating: nil, count: 10)
+        ),
+      ]
+    case .redaktor:
+      [
+        layeredRow(
+          "number", labels: ["ё", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Ъ", "="],
+          shiftedLabels: ["Ё", "№", ":", ";", "/", "₽", "@", "ё", "?", "!", "%", "Ь", "+"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: ["ц", "ы", "я", "й", "ь", "з", "д", "в", "к", "г", "ш", "щ", "\\"],
+          shiftedLabels: ["Ц", "Ы", "Я", "Й", "ъ", "З", "Д", "В", "К", "Г", "Ш", "Щ", "/"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "home", labels: ["у", "и", "о", "е", "а", "л", "р", "т", "н", "с", "х"],
+          shiftedLabels: ["У", "И", "О", "Е", "А", "Л", "Р", "Т", "Н", "С", "Х"],
+          optionLabels: Array(repeating: nil, count: 11),
+          shiftedOptionLabels: Array(repeating: nil, count: 11)
+        ),
+        layeredRow(
+          "bottom", labels: ["ф", "ю", "э", ",", ".", "ч", "м", "п", "б", "ж"],
+          shiftedLabels: ["Ф", "Ю", "Э", "-", "\"", "Ч", "М", "П", "Б", "Ж"],
+          optionLabels: Array(repeating: nil, count: 10),
+          shiftedOptionLabels: Array(repeating: nil, count: 10)
+        ),
+      ]
+    case .juiyaf:
+      [
+        layeredRow(
+          "number", labels: ["ё", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          shiftedLabels: ["Ё", "!", "\"", "№", ";", "%", ":", "?", "*", "(", ")", "_", "+"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: ["й", "у", "и", "я", "ф", "х", "ж", "р", ".", "ш", "ц", "Ь", "\\"],
+          shiftedLabels: ["Й", "У", "И", "Я", "Ф", "Х", "Ж", "Р", ",", "Ш", "Ц", "Ъ", "/"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "home", labels: ["в", "е", "а", "о", "ч", "г", "т", "н", "с", "д", "б"],
+          shiftedLabels: ["В", "Е", "А", "О", "Ч", "Г", "Т", "Н", "С", "Д", "Б"],
+          optionLabels: Array(repeating: nil, count: 11),
+          shiftedOptionLabels: Array(repeating: nil, count: 11)
+        ),
+        layeredRow(
+          "bottom", labels: ["ь", "э", "ю", "ы", "щ", "п", "к", "л", "з", "м"],
+          shiftedLabels: ["ъ", "Э", "Ю", "Ы", "Щ", "П", "К", "Л", "З", "М"],
+          optionLabels: Array(repeating: nil, count: 10),
+          shiftedOptionLabels: Array(repeating: nil, count: 10)
+        ),
+      ]
+    case .zubachev:
+      [
+        layeredRow(
+          "number", labels: ["ё", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          shiftedLabels: ["Ё", "!", "\"", "№", ";", "%", ":", "?", "*", "(", ")", "_", "+"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: ["ф", "ы", "а", "я", ",", "й", "м", "р", "п", "х", "ц", "щ", "\\"],
+          shiftedLabels: ["Ф", "Ы", "А", "Я", "Ъ", "Й", "М", "Р", "П", "Х", "Ц", "Щ", "/"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "home", labels: ["г", "и", "е", "о", "у", "л", "т", "с", "н", "з", "ж"],
+          shiftedLabels: ["Г", "И", "Е", "О", "У", "Л", "Т", "С", "Н", "З", "Ж"],
+          optionLabels: Array(repeating: nil, count: 11),
+          shiftedOptionLabels: Array(repeating: nil, count: 11)
+        ),
+        layeredRow(
+          "bottom", labels: ["ш", "ь", "ю", ".", "э", "б", "д", "в", "к", "ч"],
+          shiftedLabels: ["Ш", "ъ", "Ю", "Ь", "Э", "Б", "Д", "В", "К", "Ч"],
+          optionLabels: Array(repeating: nil, count: 10),
+          shiftedOptionLabels: Array(repeating: nil, count: 10)
+        ),
+      ]
+    case .colemakQix:
+      [
+        layeredRow(
+          "number", labels: ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "=", "["],
+          shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "+", "{"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: [";", "l", "c", "m", "k", "j", "f", "u", "y", "q", "-", "]", "\\"],
+          shiftedLabels: [":", "L", "C", "M", "K", "J", "F", "U", "Y", "Q", "_", "}", "|"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "home", labels: ["a", "r", "s", "t", "g", "p", "n", "e", "i", "o", "'"],
+          shiftedLabels: ["A", "R", "S", "T", "G", "P", "N", "E", "I", "O", "\""],
+          optionLabels: Array(repeating: nil, count: 11),
+          shiftedOptionLabels: Array(repeating: nil, count: 11)
+        ),
+        layeredRow(
+          "bottom", labels: ["x", "w", "d", "v", "z", "b", "h", "/", ".", ","],
+          shiftedLabels: ["X", "W", "D", "V", "Z", "B", "H", "?", ">", "<"],
+          optionLabels: Array(repeating: nil, count: 10),
+          shiftedOptionLabels: Array(repeating: nil, count: 10)
+        ),
+      ]
+    case .colemakQi:
+      [
+        layeredRow(
+          "number", labels: ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "=", "["],
+          shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "+", "{"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: ["q", "l", "w", "m", "k", "j", "f", "u", "y", "'", "-", "]", "\\"],
+          shiftedLabels: ["Q", "L", "W", "M", "K", "J", "F", "U", "Y", "\"", "_", "}", "|"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "home", labels: ["a", "r", "s", "t", "g", "p", "n", "e", "i", "o", ";"],
+          shiftedLabels: ["A", "R", "S", "T", "G", "P", "N", "E", "I", "O", ":"],
+          optionLabels: Array(repeating: nil, count: 11),
+          shiftedOptionLabels: Array(repeating: nil, count: 11)
+        ),
+        layeredRow(
+          "bottom", labels: ["z", "x", "c", "d", "v", "b", "h", ",", ".", "/"],
+          shiftedLabels: ["Z", "X", "C", "D", "V", "B", "H", "<", ">", "?"],
           optionLabels: Array(repeating: nil, count: 10),
           shiftedOptionLabels: Array(repeating: nil, count: 10)
         ),
@@ -3236,7 +3395,8 @@ enum KeyboardGuideModel {
       ? stenoRows().flatMap { $0 }
       : rows(for: layout).flatMap { $0 } + typingThumbKeys(for: layout)
     let normalized = Character(String(character).lowercased())
-    return keys.first(where: { $0.exactlyProduces(normalized) })?.id
+    return keys.first(where: { $0.exactlyProducesCaseSensitive(character) })?.id
+      ?? keys.first(where: { $0.exactlyProduces(normalized) })?.id
       ?? keys.first(where: { $0.characters.contains(normalized) })?.id
   }
 
@@ -3249,7 +3409,8 @@ enum KeyboardGuideModel {
     if character == " " { return style.isSteno ? "steno-space" : "space" }
     let keys = style.isSteno ? stenoRows().flatMap { $0 } : rows.flatMap { $0 }
     let normalized = Character(String(character).lowercased())
-    return keys.first(where: { $0.exactlyProduces(normalized) })?.id
+    return keys.first(where: { $0.exactlyProducesCaseSensitive(character) })?.id
+      ?? keys.first(where: { $0.exactlyProduces(normalized) })?.id
       ?? keys.first(where: { $0.characters.contains(normalized) })?.id
   }
 
@@ -3460,6 +3621,8 @@ private extension KeyboardLayout {
     self == .frenchAzerty || self == .mtgapFull || self == .engram || self == .engrammer
       || self == .booMangle || self == .quartz || self == .capewellDvorak || self == .real
       || self == .stndc || self == .uciea || self == .diktor || self == .diktorVoronovMod
+      || self == .redaktor || self == .juiyaf || self == .zubachev
+      || self == .colemakQix || self == .colemakQi
   }
 }
 

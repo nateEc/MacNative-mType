@@ -13,9 +13,9 @@
 
 | 状态 | 数量 | 验收含义 |
 | --- | ---: | --- |
-| `nativeExact` | 158 | 同名语义已有原生提示、显式输入模拟、反查和持久化测试 |
+| `nativeExact` | 163 | 同名语义已有原生提示、显式输入模拟、反查和持久化测试 |
 | `nativeRelated` | 3 | 仅提供相关 Typebar 原生布局，不宣称精确兼容 |
-| `systemInputOrCustom` | 78 | 当前通过系统输入源或用户自定义入口处理 |
+| `systemInputOrCustom` | 73 | 当前通过系统输入源或用户自定义入口处理 |
 | 总计 | 239 | 与固定参考源码名称集合一一对应 |
 
 精确覆盖名称：`qwerty`、`dvorak`、`dvorak_L`、`dvorak_R`、`prog_dvorak`、`prog_dvorak_prime`、`german_dvorak`、`german_dvorak_imp`、`spanish_dvorak`、`swedish_colemak`、`swedish_dvorak`、`dvorak_fr`、`colemak`、`colemak_angle`、`colemak_wide`、`colemak_dh`、`colemak_dhv`、`colemak_dh_iso`、`colemak_dh_wide`、`colemak_dh_iso_wide`、`colemak_dh_matrix`、`colemak_dhk`、`colemak_dhk_iso`、`MTGAP_ASRT`、`MTGAP`、`MTGAP_full`、`halmak`、`QGMLWB`、`QGMLWY`、`qwpr`、`ina`、`soul`、`niro`、`typehack`、`ISRT`、`ISRT_Angle`、`engram`、`engrammer`、`semimak`、`semimak_jq`、`semimak_jqc`、`canary`、`canary_matrix`、`boo`、`boo_mangle`、`APT`、`APT_angle`、`middlemak`、`middlemak-nh`、`Foalmak`、`quartz`、`arensito`、`ARTS`、`capewell_dvorak`、`colman`、`heart`、`klauser`、`oneproduct`、`pine`、`pine_v4`、`three`、`asset`、`dwarf`、`flaw`、`stndc`、`uciea`、`whorf`、`whorf6`、`whorfmax`、`octa8`、`nerps`、`gallium`、`gallium_angle`、`gallium_v2`、`nila`、`noctum`、`cascade`、`vylet`、`romak`、`real`、`sertain`、`ctgap`、`graphite`、`focal`、`zenith`、`dhorf`、`gust`、`recurva`、`qwertz`、`swiss_german`、`swiss_french`、`workman`、`prog_workman`、`norman`、`turkish_q`、`turkish_f`、`turkish_e`、`uk_qwerty`、`spanish_qwerty`、`italian_qwerty`、`latam_qwerty`、`azerty`、`azerty_AFNOR`、`bepo`、`bepo_AFNOR`、`alpha`、`handsdown`、`handsdown_alt`、`handsdown_neu`、`handsdown_neu_inverted`、`persian_standard`、`persian_farsi`、`arabic_101`、`arabic_102`、`arabic_mac`、`hebrew`、`urdu_phonetic`、`thai_kedmanee`、`thai_pattachote`、`japanese_hiragana`、`hindi_inscript`、`tamil99`、`armenian_hm_qwerty`、`mongolian`、`polish_programmers`、`bulgarian_phonetic_traditional`、`belarusian`、`ukrainian`、`russian`、`norwegian_qwerty`、`portuguese_pt_qwerty_iso`、`portuguese_pt_qwerty_ansi`、`ABNT2`、`swedish_qwerty`、`danish_qwerty`、`macedonian`、`pashto`、`estonian`。
@@ -30,6 +30,8 @@
 
 本批继续加入精确覆盖名称：`handsdown_promethium`、`statica_3x5`、`Vestnik`、`Diktor`、`Diktor_VoronovMod`；它们与此前清单共同构成当前 158 项 `nativeExact`。Promethium 使用双拇指提示；Statica/Vestnik 保留特殊 AltGr 字母层；Diktor 两项保留重排数字符号层。
 
+本批继续加入精确覆盖名称：`Redaktor`、`JUIYAF`、`Zubachev`、`colemak_Qix`、`colemak_Qi`；它们与此前清单共同构成当前 163 项 `nativeExact`。五项保留完整 ANSI Base/Shift、数字行与 AltGr 基础层回退，非标准 Cyrillic Shift 配对按精确大小写优先反查。
+
 相关但不等价的名称：
 
 - `hungarian` → `Hungarian QWERTZ · Typebar`：Typebar 自写映射，不导入官方布局资产。
@@ -38,4 +40,4 @@
 
 ## 自动化门槛
 
-`OfficialLayoutCoverageTests` 会验证：固定提交标识、239 个名称完整且唯一、158/3/78 三类数量守恒、每个映射名称都存在于官方集合，以及每个目标 raw value 都能解析为当前 `KeyboardLayout`。新增或重命名布局必须同步更新机器清单、该测试和本文件。
+`OfficialLayoutCoverageTests` 会验证：固定提交标识、239 个名称完整且唯一、163/3/73 三类数量守恒、每个映射名称都存在于官方集合，以及每个目标 raw value 都能解析为当前 `KeyboardLayout`。新增或重命名布局必须同步更新机器清单、该测试和本文件。
