@@ -1242,6 +1242,30 @@ enum KeyboardLayoutEmulator {
           normal: ["`1234567890-=", ",wlmk;fuyq\"[\\", "asrtgpneio'", "zcdb/vh.jx"],
           shifted: ["~!@#$%^&*()_+", "<WLMK:FUYA{]|", "ASRTGPNEIO}", "ZCDB?VH>JX"]
         ), overrides: [:])
+    case .tarmak1:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "qwjrtyuiop[]\\", "asdfghnel;'", "zxcvbkm,./"],
+          shifted: ["~!@#$%^&*()_+", "QWJRTYUIOP{}|", "ASDFGHNEL:\"", "ZXCVBKM<>?"]
+        ), overrides: [:])
+    case .tarmak2:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "qwfrgyuiop[]\\", "asdtjhnel;'", "zxcvbkm,./"],
+          shifted: ["~!@#$%^&*()_+", "QWFRGYUIOP{}|", "ASDTJHNEL:\"", "ZXCVBKM<>?"]
+        ), overrides: [:])
+    case .tarmak3:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "qwfjgyuiop[]\\", "arstdhnel;'", "zxcvbkm,./"],
+          shifted: ["~!@#$%^&*()_+", "QWFJGYUIOP{}|", "ARSTDHNEL:\"", "ZXCVBKM<>?"]
+        ), overrides: [:])
+    case .tarmak4:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "qwfpgjuiy;[]\\", "arstdhnelo'", "zxcvbkm,./"],
+          shifted: ["~!@#$%^&*()_+", "QWFPGJUIY:{}|", "ARSTDHNELO\"", "ZXCVBKM<>?"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "

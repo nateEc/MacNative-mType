@@ -248,11 +248,12 @@
 - Gallaya Matrix、Minimak 4/8/12-key 与 Graphite Angle 自动化测试覆盖全部 ANSI Base/Shift 物理键、AltGr 基础层回退、Minimak 阶段差异、英式 `£` Shift 符号、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
 - Optimot 自动化测试覆盖 48 个 ISO 物理位置、Base/Shift/Option/Shift+Option 四层、缺失层、字母区向后删除动作、非文本提示集合、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
 - Graphite Angle VC/KP、Graphite Matrix、UGJRMV 与 ORNATE 自动化测试覆盖全部 ANSI Base/Shift 物理键、AltGr 基础层回退、三个 Graphite 底行差异、UGJRMV 特殊字符、ORNATE 非对称 Shift 配对、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
-- 完整客户端 `swift test` 通过 348 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- Tarmak 1–4 自动化测试覆盖全部 ANSI Base/Shift 物理键、AltGr 基础层回退、四阶段迁移差异、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
+- 完整客户端 `swift test` 通过 349 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
 - 无限测试自动化覆盖 time、words 与自定义循环的 0 值配置、正向秒数/词数、提示扩展、无自动终止、Bail Out、长测试快捷键、预设/分享往返、旧配置冲突迁移及固定参考八项 `noInfiniteDuration` 修饰器；无限结果不保存、不上传，服务端继续拒绝 0 值正式成绩。
 - 结果字符分类自动化覆盖提前提交造成的跳过、词尾额外输入、强制物理键位错误、禅模式、旧归档保守回退、SwiftData 往返与 CSV 四列导出；实现从 Typebar 原生最终输入映射派生，不读取或导入参考结果逻辑、代码或资产。
 - 原生按键时序自动化覆盖 AppKit keyDown/repeat/keyUp 通路、闭合按住样本、连续按下间隔、多键重叠总时长、均值/总体标准差、未配对与结束边界、SwiftData/归档兼容和 CSV 导出；仅保存匿名时序，不复制参考事件代码或上传键码。
-- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、204/3/32 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
+- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、208/3/28 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退；macOS `UCKeyTranslate` 返回的多字符或多码点图例会完整保留，不再截断为首字符。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。

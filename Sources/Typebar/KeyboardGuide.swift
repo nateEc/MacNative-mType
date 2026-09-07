@@ -146,6 +146,10 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case graphiteMatrix = "graphite_matrix"
   case ugjrmv = "UGJRMV"
   case ornate = "ORNATE"
+  case tarmak1 = "tarmak_1"
+  case tarmak2 = "tarmak_2"
+  case tarmak3 = "tarmak_3"
+  case tarmak4 = "tarmak_4"
   case real
   case sertain
   case ctgap
@@ -360,6 +364,10 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .graphiteMatrix: "Graphite Matrix"
     case .ugjrmv: "UGJRMV"
     case .ornate: "ORNATE"
+    case .tarmak1: "Tarmak 1"
+    case .tarmak2: "Tarmak 2"
+    case .tarmak3: "Tarmak 3"
+    case .tarmak4: "Tarmak 4"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -579,6 +587,10 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case graphiteMatrix = "graphite_matrix"
   case ugjrmv = "UGJRMV"
   case ornate = "ORNATE"
+  case tarmak1 = "tarmak_1"
+  case tarmak2 = "tarmak_2"
+  case tarmak3 = "tarmak_3"
+  case tarmak4 = "tarmak_4"
   case real
   case sertain
   case ctgap
@@ -2551,6 +2563,26 @@ enum KeyboardGuideModel {
       baseShiftRows(
         normal: ["`1234567890-=", ",wlmk;fuyq\"[\\", "asrtgpneio'", "zcdb/vh.jx"],
         shifted: ["~!@#$%^&*()_+", "<WLMK:FUYA{]|", "ASRTGPNEIO}", "ZCDB?VH>JX"]
+      )
+    case .tarmak1:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qwjrtyuiop[]\\", "asdfghnel;'", "zxcvbkm,./"],
+        shifted: ["~!@#$%^&*()_+", "QWJRTYUIOP{}|", "ASDFGHNEL:\"", "ZXCVBKM<>?"]
+      )
+    case .tarmak2:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qwfrgyuiop[]\\", "asdtjhnel;'", "zxcvbkm,./"],
+        shifted: ["~!@#$%^&*()_+", "QWFRGYUIOP{}|", "ASDTJHNEL:\"", "ZXCVBKM<>?"]
+      )
+    case .tarmak3:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qwfjgyuiop[]\\", "arstdhnel;'", "zxcvbkm,./"],
+        shifted: ["~!@#$%^&*()_+", "QWFJGYUIOP{}|", "ARSTDHNEL:\"", "ZXCVBKM<>?"]
+      )
+    case .tarmak4:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qwfpgjuiy;[]\\", "arstdhnelo'", "zxcvbkm,./"],
+        shifted: ["~!@#$%^&*()_+", "QWFPGJUIY:{}|", "ARSTDHNELO\"", "ZXCVBKM<>?"]
       )
     case .real:
       [
