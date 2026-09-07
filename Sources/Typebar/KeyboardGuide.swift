@@ -75,6 +75,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case gallium
   case galliumAngle = "gallium_angle"
   case galliumV2 = "gallium_v2"
+  case nila
+  case noctum
+  case cascade
+  case vylet
+  case romak
   case real
   case sertain
   case ctgap
@@ -218,6 +223,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .gallium: "Gallium"
     case .galliumAngle: "Gallium Angle"
     case .galliumV2: "Gallium v2"
+    case .nila: "Nila"
+    case .noctum: "Noctum"
+    case .cascade: "Cascade"
+    case .vylet: "Vylet"
+    case .romak: "Romak"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -366,6 +376,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case gallium
   case galliumAngle = "gallium_angle"
   case galliumV2 = "gallium_v2"
+  case nila
+  case noctum
+  case cascade
+  case vylet
+  case romak
   case real
   case sertain
   case ctgap
@@ -1656,6 +1671,57 @@ enum KeyboardGuideModel {
         row("top", "BLDCVJFOU,[]\\"),
         row("home", "NRTSGYHAEI/"),
         row("bottom", "XQMWZKP';.")
+      ]
+    case .nila:
+      [
+        row("number", "`1234567890[]"),
+        row("top", "XDLGVJFOU,;=\\"),
+        row("home", "RTNSBQHAEI-"),
+        row("bottom", "KMCWZPY'/.")
+      ]
+    case .noctum:
+      [
+        row("number", "`1234567890-="),
+        row("top", "BGDLQJFOU,[]\\"),
+        row("home", "NSTRKYCAEI/"),
+        row("bottom", "VMHXZPW';.")
+      ]
+    case .cascade:
+      [
+        row("number", "`1234567890[]"),
+        row("top", "WCDLKJ/UOY;=\\"),
+        row(
+          "home", "RSTHVBNEAI.",
+          characters: ["rR", "sS", "tT", "hH", "vV", "bB", "nN", "eE", "aA", "iI", ".<"],
+          shiftedLabels: ["R", "S", "T", "H", "V", "B", "N", "E", "A", "I", "<"]
+        ),
+        row(
+          "bottom", "QZGMXPF',-",
+          characters: ["qQ", "zZ", "gG", "mM", "xX", "pP", "fF", "'\"", ",>", "-_"],
+          shiftedLabels: ["Q", "Z", "G", "M", "X", "P", "F", "\"", ">", "_"]
+        )
+      ]
+    case .vylet:
+      [
+        row("number", "`1234567890[]"),
+        row("top", "WCMPBXLOUJ-=\\"),
+        row(
+          "home", "RSTHFYNAEI,",
+          characters: ["rR", "sS", "tT", "hH", "fF", "yY", "nN", "aA", "eE", "iI", ",>"],
+          shiftedLabels: ["R", "S", "T", "H", "F", "Y", "N", "A", "E", "I", ">"]
+        ),
+        row(
+          "bottom", "QVGDKZ/';.",
+          characters: ["qQ", "vV", "gG", "dD", "kK", "zZ", "/?", "'\"", ";:", ".<"],
+          shiftedLabels: ["Q", "V", "G", "D", "K", "Z", "?", "\"", ":", "<"]
+        )
+      ]
+    case .romak:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QBMGKXLOU;[]\\"),
+        row("home", "DNSTWZRAEI'"),
+        row("bottom", "YFCPVJH,./")
       ]
     case .real:
       [

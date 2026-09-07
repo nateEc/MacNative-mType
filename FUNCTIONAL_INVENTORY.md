@@ -4,7 +4,7 @@
 
 官方 48 项 funbox 的逐项来源、映射与未实现缺口见 `OFFICIAL_FUNBOX_AUDIT.md`；该审计是本表 FUN-01/FUN-02 的细化证据。
 
-官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 133 项精确原生、3 项相关替代、103 项系统输入或自定义回退均由自动化测试守恒校验。
+官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 138 项精确原生、3 项相关替代、98 项系统输入或自定义回退均由自动化测试守恒校验。
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -319,6 +319,8 @@
 2026-09-07 补充：当前内置键盘图更新为一百三十三种，新增 `STNDC`、`UCIEA`、`Whorf`、`Whorf 6` 与 `Whorfmax`。五项均完整覆盖 47 个 ANSI Base/Shift 位置；STNDC 与 UCIEA 显式保留重排数字行和多组非标准 Shift 配对，并按固定公开元数据在精简模式显示数字行。全部进入提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 128 项精确原生、3 项相关替代、108 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
 
 2026-09-07 补充：当前内置键盘图更新为一百三十八种，新增 `Octa8`、`Nerps`、`Gallium`、`Gallium Angle` 与 `Gallium v2`。五项均完整覆盖 47 个 ANSI Base/Shift 位置，三种 Gallium 保持独立的 V/J/G/Z 实体位置。全部进入提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 133 项精确原生、3 项相关替代、103 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
+
+2026-09-07 补充：当前内置键盘图更新为一百四十三种，新增 `Nila`、`Noctum`、`Cascade`、`Vylet` 与 `Romak`。五项均完整覆盖 47 个 ANSI Base/Shift 位置，Cascade 与 Vylet 的逗号/句点非标准 Shift 配对由逐键映射显式保留。全部进入提示、模拟、反查、设置归档与 Layout Fluid。官方矩阵同步更新为 138 项精确原生、3 项相关替代、98 项系统输入或自定义回退；不复制、打包或运行参考布局资产。
 
 2026-09-04 补充：当时 `CFG-02`、`VIS-02` 与 `VIS-05` 的非拉丁布局覆盖新增 `Bulgarian Cyrillic · Typebar`。它是 Typebar 自写的第 19 个内置物理键位映射，覆盖 `я/ъ/щ/ч/ь` 与 ISO `< >`，可在键盘提示、显式输入模拟、归档和 Layout Fluid 中使用；这不是官方或系统 BDS 布局的复制，需精确系统布局时用户仍可选择 macOS 当前输入源。
 | INP-01 | 输入、逐字符状态、退格、长词 | `input/handlers/*` | TypingEngine | 部分实现 |
