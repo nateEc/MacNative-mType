@@ -2263,12 +2263,43 @@ final class HealthRouteTests: XCTestCase {
       bobNotifications.notifications[0].id, accessToken: bob.accessToken,
       now: now.addingTimeInterval(5))
     XCTAssertEqual(read.readAt, now.addingTimeInterval(5))
+
+    do {
+      _ = try await store.deleteNotification(
+        read.id, accessToken: charlie.accessToken, now: now.addingTimeInterval(6))
+      XCTFail("Only a notification recipient may delete it")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .notificationNotFound)
+    }
+    let deleted = try await store.deleteNotification(
+      read.id, accessToken: bob.accessToken, now: now.addingTimeInterval(6))
+    XCTAssertEqual(deleted.deletedCount, 1)
+    let bobAfterSingleDelete = try await store.notifications(accessToken: bob.accessToken)
+    XCTAssertTrue(bobAfterSingleDelete.notifications.isEmpty)
+
     _ = try await store.acceptConnection(
       requesterID: alice.user.id, accessToken: bob.accessToken, now: now.addingTimeInterval(10))
+    _ = try await store.sendDirectMessage(
+      .init(recipientID: alice.user.id, body: "hello"), accessToken: bob.accessToken,
+      now: now.addingTimeInterval(11))
+    _ = try await store.sendDirectMessage(
+      .init(recipientID: bob.user.id, body: "hello back"), accessToken: alice.accessToken,
+      now: now.addingTimeInterval(12))
     let aliceNotifications = try await store.notifications(
-      accessToken: alice.accessToken, now: now.addingTimeInterval(10))
-    XCTAssertEqual(aliceNotifications.notifications.map(\.kind), [.connectionAccepted])
-    XCTAssertEqual(aliceNotifications.notifications[0].actor.id, bob.user.id)
+      accessToken: alice.accessToken, now: now.addingTimeInterval(12))
+    XCTAssertEqual(
+      Set(aliceNotifications.notifications.map(\.kind)), [.connectionAccepted, .directMessage])
+    XCTAssertTrue(aliceNotifications.notifications.allSatisfy { $0.actor.id == bob.user.id })
+
+    let deletedAll = try await store.deleteAllNotifications(
+      accessToken: alice.accessToken, now: now.addingTimeInterval(13))
+    XCTAssertEqual(deletedAll.deletedCount, 2)
+    let aliceAfterDeleteAll = try await store.notifications(accessToken: alice.accessToken)
+    let bobAfterAliceDeleteAll = try await store.notifications(accessToken: bob.accessToken)
+    let repeatedDeleteAll = try await store.deleteAllNotifications(accessToken: alice.accessToken)
+    XCTAssertTrue(aliceAfterDeleteAll.notifications.isEmpty)
+    XCTAssertEqual(bobAfterAliceDeleteAll.notifications.count, 1)
+    XCTAssertEqual(repeatedDeleteAll.deletedCount, 0)
   }
 
   func testNotificationRoutesRequireAuthentication() async throws {
@@ -2280,6 +2311,12 @@ final class HealthRouteTests: XCTestCase {
       }
       try await app.test(.POST, "v1/notifications/not-a-uuid/read") { response async in
         XCTAssertEqual(response.status, .badRequest)
+      }
+      try await app.test(.DELETE, "v1/notifications/not-a-uuid") { response async in
+        XCTAssertEqual(response.status, .badRequest)
+      }
+      try await app.test(.DELETE, "v1/notifications") { response async in
+        XCTAssertEqual(response.status, .unauthorized)
       }
       try await app.asyncShutdown()
     } catch {

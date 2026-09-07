@@ -459,6 +459,19 @@ public func configure(
         catch let error as AuthStoreError { throw error.abort }
     }
 
+    app.delete("v1", "notifications", ":id") { request async throws -> TypebarNotificationDeletionResponse in
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The notification identifier was invalid.")
+        }
+        do { return try await authStore.deleteNotification(id, accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
+    app.delete("v1", "notifications") { request async throws -> TypebarNotificationDeletionResponse in
+        do { return try await authStore.deleteAllNotifications(accessToken: try request.accessToken()) }
+        catch let error as AuthStoreError { throw error.abort }
+    }
+
     app.post("v1", "reports", "profiles") { request async throws -> ProfileReportResponse in
         do {
             return try await authStore.submitProfileReport(

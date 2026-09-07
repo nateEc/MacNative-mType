@@ -6,6 +6,7 @@ struct NotificationsView: View {
     @State private var notifications: [RemoteNotification] = []
     @State private var isLoading = false
     @State private var message: String?
+    @State private var confirmingDeleteAll = false
 
     var body: some View {
         NavigationStack {
@@ -32,6 +33,12 @@ struct NotificationsView: View {
                                 Button("标为已读") { markRead(notification) }
                                     .buttonStyle(.borderless)
                             }
+                            Button("删除", systemImage: "trash", role: .destructive) {
+                                delete(notification)
+                            }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.borderless)
+                            .help("删除这条通知")
                         }
                     }
                 }
@@ -41,6 +48,12 @@ struct NotificationsView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button("刷新", action: load)
                         .disabled(account.currentUser == nil || isLoading)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("全部删除", systemImage: "trash", role: .destructive) {
+                        confirmingDeleteAll = true
+                    }
+                    .disabled(notifications.isEmpty || isLoading)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("完成") { dismiss() }
@@ -53,6 +66,14 @@ struct NotificationsView: View {
         }
         .frame(minWidth: 430, minHeight: 320)
         .task { if account.currentUser != nil { await loadAsync() } }
+        .confirmationDialog(
+            "删除全部通知？", isPresented: $confirmingDeleteAll, titleVisibility: .visible
+        ) {
+            Button("删除全部通知", role: .destructive) { deleteAll() }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("只会清空当前账户的通知，不会删除好友关系或私信。")
+        }
     }
 
     private func title(for notification: RemoteNotification) -> String {
@@ -88,6 +109,26 @@ struct NotificationsView: View {
                 let updated = try await account.markNotificationRead(notification.id)
                 guard let index = notifications.firstIndex(where: { $0.id == updated.id }) else { return }
                 notifications[index] = updated
+            } catch { message = error.localizedDescription }
+        }
+    }
+
+    private func delete(_ notification: RemoteNotification) {
+        Task {
+            do {
+                try await account.deleteNotification(notification.id)
+                notifications.removeAll { $0.id == notification.id }
+                message = "通知已删除。"
+            } catch { message = error.localizedDescription }
+        }
+    }
+
+    private func deleteAll() {
+        Task {
+            do {
+                let deletedCount = try await account.deleteAllNotifications()
+                notifications.removeAll()
+                message = "已删除 \(deletedCount) 条通知。"
             } catch { message = error.localizedDescription }
         }
     }

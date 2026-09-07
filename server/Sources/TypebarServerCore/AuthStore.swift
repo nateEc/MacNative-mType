@@ -1808,6 +1808,33 @@ public actor AuthStore {
       createdAt: notification.createdAt, readAt: notification.readAt)
   }
 
+  public func deleteNotification(_ id: UUID, accessToken: String, now: Date = .now) throws
+    -> TypebarNotificationDeletionResponse
+  {
+    let current = try authenticatedUser(for: accessToken, now: now)
+    guard
+      let index = state.notifications.firstIndex(where: {
+        $0.id == id && $0.recipientID == current.id
+      })
+    else {
+      throw AuthStoreError.notificationNotFound
+    }
+    state.notifications.remove(at: index)
+    try persist()
+    return .init(deletedCount: 1)
+  }
+
+  public func deleteAllNotifications(accessToken: String, now: Date = .now) throws
+    -> TypebarNotificationDeletionResponse
+  {
+    let current = try authenticatedUser(for: accessToken, now: now)
+    let previousCount = state.notifications.count
+    state.notifications.removeAll { $0.recipientID == current.id }
+    let deletedCount = previousCount - state.notifications.count
+    if deletedCount > 0 { try persist() }
+    return .init(deletedCount: deletedCount)
+  }
+
   /// Stores an account-scoped report for a private moderation workflow. The
   /// reported profile is neither notified nor changed by this operation.
   public func submitProfileReport(

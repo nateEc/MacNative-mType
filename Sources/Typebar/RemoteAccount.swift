@@ -833,6 +833,8 @@ struct RemoteNotification: Codable, Identifiable, Sendable {
 
 private struct RemoteNotificationsResponse: Codable, Sendable { let notifications: [RemoteNotification] }
 
+private struct RemoteNotificationDeletionResponse: Codable, Sendable { let deletedCount: Int }
+
 enum RemoteLeaderboardPeriod: String, CaseIterable {
     case all
     case day
@@ -1897,6 +1899,24 @@ final class AccountSession {
             path: "v1/notifications/\(id.uuidString)/read", method: "POST", token: token,
             body: Optional<String>.none, response: RemoteNotification.self
         )
+    }
+
+    func deleteNotification(_ id: UUID) async throws {
+        let token = try accessToken()
+        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/notifications/\(id.uuidString)", method: "DELETE", token: token,
+            body: Optional<String>.none, response: RemoteNotificationDeletionResponse.self
+        )
+        guard response.deletedCount == 1 else { throw RemoteAccountError.unexpectedResponse }
+    }
+
+    @discardableResult
+    func deleteAllNotifications() async throws -> Int {
+        let token = try accessToken()
+        return try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/notifications", method: "DELETE", token: token,
+            body: Optional<String>.none, response: RemoteNotificationDeletionResponse.self
+        ).deletedCount
     }
 
     func directConversation(with otherUserID: UUID) async throws -> [RemoteDirectMessage] {

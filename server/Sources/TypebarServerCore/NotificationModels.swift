@@ -18,3 +18,7 @@ public struct TypebarNotificationResponse: Content, Equatable, Identifiable {
 public struct TypebarNotificationsResponse: Content, Equatable {
     public let notifications: [TypebarNotificationResponse]
 }
+
+public struct TypebarNotificationDeletionResponse: Content, Equatable {
+    public let deletedCount: Int
+}
