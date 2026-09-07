@@ -80,6 +80,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case cascade
   case vylet
   case romak
+  case scythe
+  case inqwerted
+  case rain
+  case night
+  case nightSTIC = "night_stic"
   case real
   case sertain
   case ctgap
@@ -228,6 +233,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .cascade: "Cascade"
     case .vylet: "Vylet"
     case .romak: "Romak"
+    case .scythe: "Scythe"
+    case .inqwerted: "Inqwerted"
+    case .rain: "Rain"
+    case .night: "Night"
+    case .nightSTIC: "Night STIC"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -381,6 +391,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case cascade
   case vylet
   case romak
+  case scythe
+  case inqwerted
+  case rain
+  case night
+  case nightSTIC = "night_stic"
   case real
   case sertain
   case ctgap
@@ -1722,6 +1737,41 @@ enum KeyboardGuideModel {
         row("top", "QBMGKXLOU;[]\\"),
         row("home", "DNSTWZRAEI'"),
         row("bottom", "YFCPVJH,./")
+      ]
+    case .scythe:
+      [
+        row("number", "`1234567890-="),
+        row("top", "BUARJGWDY'[]\\"),
+        row("home", "SIONLCMTHE;"),
+        row("bottom", "Q,.XZVFPK/")
+      ]
+    case .inqwerted:
+      [
+        row("number", "`1234567890-="),
+        row("top", "TREWQPOIUY[]\\"),
+        row("home", "GFDSA;LKJH'"),
+        row("bottom", "BVCXZ/.,MN")
+      ]
+    case .rain:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FDLGVQRUO,[]\\"),
+        row("home", "STHCYJNEAI/"),
+        row("bottom", "ZKMPWXB;'.")
+      ]
+    case .night:
+      [
+        row("number", "`1234567890=\\"),
+        row("top", "BFLKQ'GOU.;[]"),
+        row("home", "NSHTMYCAEI/"),
+        row("bottom", "VJDRZPWX-,")
+      ]
+    case .nightSTIC:
+      [
+        row("number", "`1234567890-="),
+        row("top", "BFLDVYPOU/[]\\"),
+        row("home", "NSHTMGCAEI-"),
+        row("bottom", "QXJKZ'W,;.")
       ]
     case .real:
       [
