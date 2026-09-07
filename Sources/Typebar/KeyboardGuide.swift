@@ -6,6 +6,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiDvorak
   case dvorakLeft
   case dvorakRight
+  case programmerDvorak
+  case programmerDvorakPrime
+  case germanDvorak
+  case germanDvorakImproved
+  case spanishDvorak
   case ansiColemak
   case ansiColemakAngle
   case ansiColemakWide
@@ -78,6 +83,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ansiDvorak: "ANSI Dvorak"
     case .dvorakLeft: "Dvorak – Left-Handed"
     case .dvorakRight: "Dvorak – Right-Handed"
+    case .programmerDvorak: "Programmer Dvorak"
+    case .programmerDvorakPrime: "Programmer Dvorak Prime"
+    case .germanDvorak: "German Dvorak"
+    case .germanDvorakImproved: "German Dvorak Improved"
+    case .spanishDvorak: "Spanish Dvorak"
     case .ansiColemak: "ANSI Colemak"
     case .ansiColemakAngle: "ANSI Colemak Angle"
     case .ansiColemakWide: "ANSI Colemak Wide"
@@ -155,6 +165,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ansiDvorak
   case dvorakLeft
   case dvorakRight
+  case programmerDvorak
+  case programmerDvorakPrime
+  case germanDvorak
+  case germanDvorakImproved
+  case spanishDvorak
   case ansiColemak
   case ansiColemakAngle
   case ansiColemakWide
@@ -713,6 +728,93 @@ enum KeyboardGuideModel {
           optionLabels: ["ª", "º", "≈", "≤", "ˆ", "˜", "∑", "√", "©", "æ"],
           shiftedOptionLabels: ["·", "‚", "˛", "¯", "ˆ", "˜", "„", "◊", "˝", "Æ"]
         ),
+      ]
+    case .programmerDvorak:
+      [
+        row(
+          "number", "$&[{}(=*)+]!#",
+          characters: ["$~", "&%", "[7", "{5", "}3", "(1", "=9", "*0", ")2", "+4", "]6", "!8", "#`"],
+          shiftedLabels: ["~", "%", "7", "5", "3", "1", "9", "0", "2", "4", "6", "8", "`"]
+        ),
+        row(
+          "top", ";,.PYFGCRL/@\\",
+          characters: [";:", ",<", ".>", "pP", "yY", "fF", "gG", "cC", "rR", "lL", "/?", "@^", "\\|"],
+          shiftedLabels: [":", "<", ">", "P", "Y", "F", "G", "C", "R", "L", "?", "^", "|"]
+        ),
+        row("home", "AOEUIDHTNS-"),
+        row("bottom", "'QJKXBMWVZ"),
+      ]
+    case .programmerDvorakPrime:
+      [
+        row(
+          "number", "$+[{(&=)}]*!|",
+          characters: ["$~", "+1", "[2", "{3", "(4", "&5", "=6", ")7", "}8", "]9", "*0", "!%", "|`"],
+          shiftedLabels: ["~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "%", "`"]
+        ),
+        row(
+          "top", ";,.PYFGCRL/@\\",
+          characters: [";:", ",<", ".>", "pP", "yY", "fF", "gG", "cC", "rR", "lL", "/?", "@^", "\\#"],
+          shiftedLabels: [":", "<", ">", "P", "Y", "F", "G", "C", "R", "L", "?", "^", "#"]
+        ),
+        row("home", "AOEUIDHTNS-"),
+        row("bottom", "'QJKXBMWVZ"),
+      ]
+    case .germanDvorak:
+      [
+        row(
+          "number", "^1234567890+<",
+          characters: ["^°", "1!", "2\"", "3§", "4$", "5%", "6&", "7/", "8(", "9)", "0=", "+*", "<>"],
+          shiftedLabels: ["°", "!", "\"", "§", "$", "%", "&", "/", "(", ")", "=", "*", ">"]
+        ),
+        row(
+          "top", "Ü,.PYFGCTZß\\",
+          characters: ["üÜ", ",;", ".:", "pP", "yY", "fF", "gG", "cC", "tT", "zZ", "ß?", "\\/"],
+          shiftedLabels: ["Ü", ";", ":", "P", "Y", "F", "G", "C", "T", "Z", "?", "/"]
+        ),
+        row("home", "AOEIUHDRNSL-"),
+        row(
+          "bottom", "ÄÖQJKXBMWV#",
+          characters: ["äÄ", "öÖ", "qQ", "jJ", "kK", "xX", "bB", "mM", "wW", "vV", "#'"],
+          shiftedLabels: ["Ä", "Ö", "Q", "J", "K", "X", "B", "M", "W", "V", "'"]
+        ),
+      ]
+    case .germanDvorakImproved:
+      [
+        row(
+          "number", "^1234567890+=",
+          characters: ["^°", "1§", "2²", "3³", "4#", "5@", "6&", "7~", "8\\", "9(", "0)", "+*", "=%"],
+          shiftedLabels: ["°", "§", "²", "³", "#", "@", "&", "~", "\\", "(", ")", "*", "%"]
+        ),
+        row(
+          "top", "Ü,.PYFGCRL/'",
+          characters: ["üÜ", ",;", ".:", "pP", "yY", "fF", "gG", "cC", "rR", "lL", "/?", "'\""],
+          shiftedLabels: ["Ü", ";", ":", "P", "Y", "F", "G", "C", "R", "L", "?", "\""]
+        ),
+        row(
+          "home", "AOEUIDHTNSß-",
+          characters: ["aA", "oO", "eE", "uU", "iI", "dD", "hH", "tT", "nN", "sS", "ß!", "-_"],
+          shiftedLabels: ["A", "O", "E", "U", "I", "D", "H", "T", "N", "S", "!", "_"]
+        ),
+        row("bottom", "ÄÖQJKXBMWVZ"),
+      ]
+    case .spanishDvorak:
+      [
+        row(
+          "number", "º1234567890'¡",
+          characters: ["ºª", "1!", "2\"", "3·", "4$", "5%", "6&", "7/", "8(", "9)", "0=", "'?", "¡¿"],
+          shiftedLabels: ["ª", "!", "\"", "·", "$", "%", "&", "/", "(", ")", "=", "?", "¿"]
+        ),
+        row(
+          "top", ".,ÑPYFGCHL`+",
+          characters: [".:", ",;", "ñÑ", "pP", "yY", "fF", "gG", "cC", "hH", "lL", "`^", "+*"],
+          shiftedLabels: [":", ";", "Ñ", "P", "Y", "F", "G", "C", "H", "L", "^", "*"]
+        ),
+        row(
+          "home", "AOEUIDRTNS´Ç",
+          characters: ["aA", "oO", "eE", "uU", "iI", "dD", "rR", "tT", "nN", "sS", "´¨", "çÇ"],
+          shiftedLabels: ["A", "O", "E", "U", "I", "D", "R", "T", "N", "S", "¨", "Ç"]
+        ),
+        row("bottom", "<-QJKXBMWVZ"),
       ]
     case .ansiColemak:
       [
