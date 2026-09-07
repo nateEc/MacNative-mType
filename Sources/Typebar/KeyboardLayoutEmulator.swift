@@ -1326,6 +1326,40 @@ enum KeyboardLayoutEmulator {
           normal: ["`1234567890/=", "qcopwjmd’y[]\\", "asenflrtiu'", "zx-vb.hg,k"],
           shifted: ["~€«»$%^&*#@_+", "QCOPWJMD!Y{}|", "ASENFLRTIU\"", "ZX?VB:HG;K"]
         ), overrides: [:])
+    case .hyperroll:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "pclmvxuoyf[]\\", "nsrtd.aeih;", "bg'wz/,qjk"],
+          shifted: ["~!@#$%^&*()_+", "PCLMVXUOYF{}|", "NSRTD>AEIH:", "BG\"WZ?<QJK"]
+        ), overrides: [:])
+    case .anishtro:
+      withBaseFallbackOptionLayers(
+        withThumbKey(
+          ansiBaseShiftMap(
+            normal: ["`1234567890-=", "qlucjkpmw;[]\\", "anisvbhtro'", ",.ygxzfd'-"],
+            shifted: ["~!@#$%^&*()_+", "QLUCJKPMW:{}|", "ANISVBHTRO\"", "<>YGXZFD\"_"]
+          ), normal: "e", shifted: "E"),
+        overrides: [:])
+    case .dusk:
+      withBaseFallbackOptionLayers(
+        withThumbKey(
+          ansiBaseShiftMap(
+            normal: ["`1234567890-=", "xfdpqj'ou.[]\\", "nstcymhaei;", "bvkgwzl-/,"],
+            shifted: ["~!@#$%^&*()_+", "XFDPQJ\"OU>{}|", "NSTCYMHAEI:", "BVKGWZL_?<"]
+          ), normal: "r", shifted: "R"),
+        overrides: [:])
+    case .panini:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "vwlykjfou.,[]", "crstpbnaei/", "zxdgqmh';\\"],
+          shifted: ["~!@#$%^&*()_+", "VWLYKJFOU><{}", "CRSTPBNAEI?", "ZXDGQMH\":|"]
+        ), overrides: [:])
+    case .paniniWide:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "vwlyk[jfou.,\\", "crstp]bnaei", "zxdgq/mh';"],
+          shifted: ["~!@#$%^&*()_+", "VWLYK{JFOU><|", "CRSTP}BNAEI", "ZXDGQ?MH\":"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "

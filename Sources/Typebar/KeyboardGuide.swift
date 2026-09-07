@@ -160,6 +160,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case krai
   case mir
   case ergol
+  case hyperroll
+  case anishtro
+  case dusk
+  case panini
+  case paniniWide = "panini_wide"
   case real
   case sertain
   case ctgap
@@ -388,6 +393,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .krai: "Krai"
     case .mir: "Mir"
     case .ergol: "Ergol"
+    case .hyperroll: "Hyperroll"
+    case .anishtro: "Anishtro"
+    case .dusk: "Dusk"
+    case .panini: "Panini"
+    case .paniniWide: "Panini Wide"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -621,6 +631,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case krai
   case mir
   case ergol
+  case hyperroll
+  case anishtro
+  case dusk
+  case panini
+  case paniniWide = "panini_wide"
   case real
   case sertain
   case ctgap
@@ -2664,6 +2679,31 @@ enum KeyboardGuideModel {
         normal: ["`1234567890/=", "qcopwjmd’y[]\\", "asenflrtiu'", "zx-vb.hg,k"],
         shifted: ["~€«»$%^&*#@_+", "QCOPWJMD!Y{}|", "ASENFLRTIU\"", "ZX?VB:HG;K"]
       )
+    case .hyperroll:
+      baseShiftRows(
+        normal: ["`1234567890-=", "pclmvxuoyf[]\\", "nsrtd.aeih;", "bg'wz/,qjk"],
+        shifted: ["~!@#$%^&*()_+", "PCLMVXUOYF{}|", "NSRTD>AEIH:", "BG\"WZ?<QJK"]
+      )
+    case .anishtro:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qlucjkpmw;[]\\", "anisvbhtro'", ",.ygxzfd'-"],
+        shifted: ["~!@#$%^&*()_+", "QLUCJKPMW:{}|", "ANISVBHTRO\"", "<>YGXZFD\"_"]
+      )
+    case .dusk:
+      baseShiftRows(
+        normal: ["`1234567890-=", "xfdpqj'ou.[]\\", "nstcymhaei;", "bvkgwzl-/,"],
+        shifted: ["~!@#$%^&*()_+", "XFDPQJ\"OU>{}|", "NSTCYMHAEI:", "BVKGWZL_?<"]
+      )
+    case .panini:
+      baseShiftRows(
+        normal: ["`1234567890-=", "vwlykjfou.,[]", "crstpbnaei/", "zxdgqmh';\\"],
+        shifted: ["~!@#$%^&*()_+", "VWLYKJFOU><{}", "CRSTPBNAEI?", "ZXDGQMH\":|"]
+      )
+    case .paniniWide:
+      baseShiftRows(
+        normal: ["`1234567890-=", "vwlyk[jfou.,\\", "crstp]bnaei", "zxdgq/mh';"],
+        shifted: ["~!@#$%^&*()_+", "VWLYK{JFOU><|", "CRSTP}BNAEI", "ZXDGQ?MH\":"]
+      )
     case .real:
       [
         row("number", "`1234567890[]"),
@@ -3982,6 +4022,10 @@ enum KeyboardGuideModel {
     case .prsten:
       return [space, KeyboardGuideKey("thumb-1", label: "E", characters: "eE", width: 70)]
     case .handsDownPromethium:
+      return [KeyboardGuideKey("thumb-0", label: "R", characters: "rR", width: 70), space]
+    case .anishtro:
+      return [KeyboardGuideKey("thumb-0", label: "E", characters: "eE", width: 70), space]
+    case .dusk:
       return [KeyboardGuideKey("thumb-0", label: "R", characters: "rR", width: 70), space]
     default:
       return [KeyboardGuideKey("space", label: "空格", characters: " ", width: 170)]
