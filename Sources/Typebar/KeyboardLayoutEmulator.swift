@@ -1120,6 +1120,36 @@ enum KeyboardLayoutEmulator {
             ["ဇ", "ဌ", "ဃ", "ဠ", "ယ", "ဉ", "ဦ", "၊", "။", "?"],
           ]
         ), overrides: [:])
+    case .galliumV2Matrix:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "bldcvjyou,[]\\", "nrtsgphaei/", "xqmwzkf';."],
+          shifted: ["~!@#$%^&*()_+", "BLDCVJYOU<{}|", "NRTSGPHAEI?", "XQMWZKF\":>"]
+        ), overrides: [:])
+    case .galliumNL:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "bldcvypuo,[]\\", "nrtswfheai/", "xqmgjzk';."],
+          shifted: ["~!@#$%^&*()_+", "BLDCVYPUO<{}|", "NRTSWFHEAI?", "XQMGJZK\":>"]
+        ), overrides: [:])
+    case .maya:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890[]", "bldgqjfou,;=\\", "nrtsvkhaei-", "xmcwzpy'/."],
+          shifted: ["~!@#$%^&*(){}", "BLDGQJFOU<:+|", "NRTSVKHAEI_", "XMCWZPY\"?>"]
+        ), overrides: [:])
+    case .gallayaAngleANSI:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "bldcqjfou,[]\\", "nrtsgphaei/", "xmwvzky';."],
+          shifted: ["~!@#$%^&*()_+", "BLDCQJFOU<{}|", "NRTSGPHAEI?", "XMWVZKY\":>"]
+        ), overrides: [:])
+    case .gallayaAngleISO:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["`1234567890-=", "bldczjfou,[]", "nrtsgphaei/#", "qxmwv\\ky';."],
+          shifted: ["¬!\"£$%^&*()_+", "BLDCZJFOU<{}", "NRTSGPHAEI?~", "QXMWV|KY@:>"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "

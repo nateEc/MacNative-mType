@@ -130,6 +130,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case xenia
   case xeniaAlt = "xenia_alt"
   case burmese
+  case galliumV2Matrix = "gallium_v2_matrix"
+  case galliumNL = "gallium_nl"
+  case maya
+  case gallayaAngleANSI = "gallaya_angle_ansi"
+  case gallayaAngleISO = "gallaya_angle_iso"
   case real
   case sertain
   case ctgap
@@ -328,6 +333,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .xenia: "Xenia"
     case .xeniaAlt: "Xenia Alt"
     case .burmese: "Burmese"
+    case .galliumV2Matrix: "Gallium v2 Matrix"
+    case .galliumNL: "Gallium NL"
+    case .maya: "Maya"
+    case .gallayaAngleANSI: "Gallaya Angle ANSI"
+    case .gallayaAngleISO: "Gallaya Angle ISO"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -531,6 +541,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case xenia
   case xeniaAlt = "xenia_alt"
   case burmese
+  case galliumV2Matrix = "gallium_v2_matrix"
+  case galliumNL = "gallium_nl"
+  case maya
+  case gallayaAngleANSI = "gallaya_angle_ansi"
+  case gallayaAngleISO = "gallaya_angle_iso"
   case real
   case sertain
   case ctgap
@@ -2396,6 +2411,31 @@ enum KeyboardGuideModel {
           ["ဗ", "ှ", "ီ", "္", "ွ", "ံ", "ဲ", "ဒ", "ဓ", "ဂ", "\""],
           ["ဇ", "ဌ", "ဃ", "ဠ", "ယ", "ဉ", "ဦ", "၊", "။", "?"],
         ]
+      )
+    case .galliumV2Matrix:
+      baseShiftRows(
+        normal: ["`1234567890-=", "bldcvjyou,[]\\", "nrtsgphaei/", "xqmwzkf';."],
+        shifted: ["~!@#$%^&*()_+", "BLDCVJYOU<{}|", "NRTSGPHAEI?", "XQMWZKF\":>"]
+      )
+    case .galliumNL:
+      baseShiftRows(
+        normal: ["`1234567890-=", "bldcvypuo,[]\\", "nrtswfheai/", "xqmgjzk';."],
+        shifted: ["~!@#$%^&*()_+", "BLDCVYPUO<{}|", "NRTSWFHEAI?", "XQMGJZK\":>"]
+      )
+    case .maya:
+      baseShiftRows(
+        normal: ["`1234567890[]", "bldgqjfou,;=\\", "nrtsvkhaei-", "xmcwzpy'/."],
+        shifted: ["~!@#$%^&*(){}", "BLDGQJFOU<:+|", "NRTSVKHAEI_", "XMCWZPY\"?>"]
+      )
+    case .gallayaAngleANSI:
+      baseShiftRows(
+        normal: ["`1234567890-=", "bldcqjfou,[]\\", "nrtsgphaei/", "xmwvzky';."],
+        shifted: ["~!@#$%^&*()_+", "BLDCQJFOU<{}|", "NRTSGPHAEI?", "XMWVZKY\":>"]
+      )
+    case .gallayaAngleISO:
+      baseShiftRows(
+        normal: ["`1234567890-=", "bldczjfou,[]", "nrtsgphaei/#", "qxmwv\\ky';."],
+        shifted: ["¬!\"£$%^&*()_+", "BLDCZJFOU<{}", "NRTSGPHAEI?~", "QXMWV|KY@:>"]
       )
     case .real:
       [
