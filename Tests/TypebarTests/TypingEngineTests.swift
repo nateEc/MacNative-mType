@@ -1903,6 +1903,35 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testColemakDHMatrixKeepsTheOrtholinearBottomRowAndPersists() {
+    let bottomRow = KeyboardGuideModel.rows(for: .colemakDHMatrix)[3]
+    XCTAssertEqual(bottomRow.map(\.label).joined(), "ZXCDVKH,./")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "z", layout: .colemakDHMatrix), "bottom-0")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "d", layout: .colemakDHMatrix), "bottom-3")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 6, modifierFlags: [], layout: .colemakDHMatrix), "z")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 9, modifierFlags: [.shift], layout: .colemakDHMatrix), "D")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [], layout: .colemakDHMatrix), "v")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "H", layout: .colemakDHMatrix), 46)
+    XCTAssertEqual(KeyboardInputLayout.colemakDHMatrix.emulatedLayout, .colemakDHMatrix)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .colemakDHMatrix
+    settings.keyboardInputLayout = .colemakDHMatrix
+    settings.layoutFluidLayouts = [.colemakDHMatrix, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .colemakDHMatrix)
+    XCTAssertEqual(restored.keyboardInputLayout, .colemakDHMatrix)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.colemakDHMatrix, .ansiQwerty])
+  }
+
+  @MainActor
   func testNorwegianQwertyExposesTheCompatibleNordicMappingAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "å", layout: .norwegianQwerty), "top-10")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ø", layout: .norwegianQwerty), "home-9")
@@ -5870,7 +5899,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 50)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 51)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

@@ -76,7 +76,9 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 2026-09-07 当前状态更正：内置键盘图现为四十九种，新增 `Tamil99 (macOS)`。固定参考源码只用于确认 `tamil99` 功能名；四个字符层均依据 macOS `com.apple.keylayout.Tamil99` 的 `UCKeyTranslate` 结果独立实现和逐键验证，完整保留 Tamil 组合符、`ஸ்ரீ` 多码点输出及明确空输出的 Shift/Option 层。Microsoft Tamil 99 标识与 Unicode CLDR Tamil 键盘资料用于标准家族交叉核对。本文较早的四十八种计数及 43/3/193 矩阵均由此当前数值取代：44 项精确原生、3 项相关替代、192 项系统输入或自定义回退；不读取或导入 Monkeytype 布局 JSON、代码或资产。
 
-2026-09-07 当前状态更正：内置键盘图现为五十种，新增 `Colemak-DH ISO`。固定参考源码只用于确认 `colemak_dh_iso` 功能名；依据 Colemak-DH 官方公开说明与 CC0 macOS 基础层独立实现 ISO Angle Mod，显式保留额外 `Z` 实体键、`X C D V`、中央反引号和 `K H , . /` 的普通/Shift 映射。本文较早的四十九种计数及 44/3/192 矩阵均由此当前数值取代：45 项精确原生、3 项相关替代、191 项系统输入或自定义回退；wide、matrix 等其他变体继续使用系统输入或原创自定义布局，不读取或导入 Monkeytype 布局 JSON、代码或资产。
+2026-09-07 阶段状态：内置键盘图当时为五十种，新增 `Colemak-DH ISO`。固定参考源码只用于确认 `colemak_dh_iso` 功能名；依据 Colemak-DH 官方公开说明与 CC0 macOS 基础层独立实现 ISO Angle Mod，显式保留额外 `Z` 实体键、`X C D V`、中央反引号和 `K H , . /` 的普通/Shift 映射。当时矩阵为 45 项精确原生、3 项相关替代、191 项系统输入或自定义回退；下一条已补齐 Matrix，wide 等其他变体继续使用系统输入或原创自定义布局，不读取或导入 Monkeytype 布局 JSON、代码或资产。
+
+2026-09-07 当前状态更正：内置键盘图现为五十一种，新增 `Colemak-DH Matrix`。固定参考源码只用于确认 `colemak_dh_matrix` 功能名；依据 Colemak-DH 官方 CC0 macOS 基础层独立实现正交底行 `Z X C D V K H , . /`，并与 ANSI 和 ISO 变体保持独立 raw value、提示、模拟、反查和持久化。本文较早的五十种计数及 45/3/191 矩阵均由此当前数值取代：46 项精确原生、3 项相关替代、190 项系统输入或自定义回退；wide 等其他变体继续使用系统输入或原创自定义布局，不读取或导入 Monkeytype 布局 JSON、代码或资产。
 
 | 域 | 必须覆盖的能力 | 状态 |
 | --- | --- | --- |
@@ -270,7 +272,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 | 数据迁移 | `Tests/TypebarTests/TypingEngineTests.swift`、打包应用的“数据迁移”界面 | 版本化设置、成绩、预设和自定义文本归档往返；导入去重合并；v1 归档兼容；导入/导出文件选择器已人工验收（已取消，未写入真实文件） |
 | 本地统计 | `Tests/TypebarTests/TypingEngineTests.swift` | 完成次数、均速、最佳、准确率、累计时长，以及 WPM 固定区间分布（包括空档区间）聚合 |
 | 挑战验收 | `Tests/TypebarTests/TypingEngineTests.swift` | 原创离线挑战的通过与全部未满足条件都可被独立验证；挑战标记可随测试配置编码，并与历史配置兼容 |
-| 构建 | `swift test`、`swift build` | macOS Swift 包能编译且 305 项客户端测试通过；独立 Vapor 服务的 67 项自动化测试通过 |
+| 构建 | `swift test`、`swift build` | macOS Swift 包能编译且 306 项客户端测试通过；独立 Vapor 服务的 67 项自动化测试通过 |
 | 运行时 UI | 打包的 `Typebar.app` 辅助功能树与截图 | 焦点输入、时间/字数模式、实时指标、可滚动长文本区，以及正确输入/错误/退格/Esc 重开；2026-09-02 已人工切换“光晕”背景，确认减少动态效果开关状态和练习页主题色光晕绘制，检查后恢复为纯色 |
 
 ## 2026-09-03 审计更正

@@ -83,7 +83,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 可选择当前词、当前词加 1/2/3 个预读词四档可见范围；它只影响提示显示，不改变输入、成绩或回放
 - 原生 AppKit 键盘输入（文字提交、退格、Esc / ⌘R 重开与 IME 组合输入协议）
 - 快速重开键可设为关闭、Esc、Tab 或 Enter；⌘R 始终可用
-- 可选原创键盘提示：五十种内置布局（含 Colemak-DH ISO、Typebar 自写的希腊字母、匈牙利语 QWERTZ、保加利亚语与塞尔维亚语西里尔图，以及 Tamil99、Brazilian ABNT2、Dvorak Left/Right-Handed、Mongolian Cyrillic、Armenian HM QWERTY、Hindi InScript、Thai Kedmanee/Pattachote、Polish (Programmers)、Urdu Phonetic 和 Arabic macOS 的 Option 字符层、Swedish QWERTY、Macedonian、Pashto、Estonian、Persian Standard/Farsi、Arabic 101/102 与 Hebrew）、跟随 macOS 当前输入源的动态物理键位图，以及最多二十种用户自写的 Unicode 四行键盘图；七种原生几何样式、关闭/静态/按键反馈/下一键模式、精简/数字行/完整按键集、0.5–3.5 倍大小及小写/大写/空白/动态图例均可持久化。视觉键盘图不改变输入，输入默认始终交给 macOS 当前输入法，只有明确开启内置布局模拟时才接管物理键。Layout Fluid 会按阶段同时切换内置键盘图与模拟布局（每轮最多选择十五种）；多字符快捷键会完整输出，但下一键提示优先选择能精确输出目标字符的单字符键；动态图例随 Shift、Caps Lock 以及支持的 Option/Shift+Option 层更新，其余死键与 Option 输入仍由 macOS 处理
+- 可选原创键盘提示：五十一种内置布局（含相互独立的 Colemak-DH ANSI/ISO/Matrix、Typebar 自写的希腊字母、匈牙利语 QWERTZ、保加利亚语与塞尔维亚语西里尔图，以及 Tamil99、Brazilian ABNT2、Dvorak Left/Right-Handed、Mongolian Cyrillic、Armenian HM QWERTY、Hindi InScript、Thai Kedmanee/Pattachote、Polish (Programmers)、Urdu Phonetic 和 Arabic macOS 的 Option 字符层、Swedish QWERTY、Macedonian、Pashto、Estonian、Persian Standard/Farsi、Arabic 101/102 与 Hebrew）、跟随 macOS 当前输入源的动态物理键位图，以及最多二十种用户自写的 Unicode 四行键盘图；七种原生几何样式、关闭/静态/按键反馈/下一键模式、精简/数字行/完整按键集、0.5–3.5 倍大小及小写/大写/空白/动态图例均可持久化。视觉键盘图不改变输入，输入默认始终交给 macOS 当前输入法，只有明确开启内置布局模拟时才接管物理键。Layout Fluid 会按阶段同时切换内置键盘图与模拟布局（每轮最多选择十五种）；多字符快捷键会完整输出，但下一键提示优先选择能精确输出目标字符的单字符键；动态图例随 Shift、Caps Lock 以及支持的 Option/Shift+Option 层更新，其余死键与 Option 输入仍由 macOS 处理
 - 当前内置键盘图为二十五种：新增 Danish QWERTY，独立模拟 `å`、`æ`、`ø`、`§` 与其普通/Shift 实体键位；该项取代上条的“二十四种”计数。死键和 Option/AltGr 层继续保持 macOS 原生输入路径，不导入 Monkeytype 布局资产
 - 当前内置键盘图为二十六种：新增 Norwegian QWERTY，公开现有 Nordic 键位对应的 `å`、`ø`、`æ` 实体映射，保留 Nordic 作为已有设置的兼容选项；该项取代上条的“二十五种”计数。死键和 Option/AltGr 层仍保持 macOS 原生输入路径，不导入 Monkeytype 布局资产
 - 当前内置键盘图为二十七种：新增 ANSI Colemak-DH，独立模拟与标准 Colemak 不同的 `B/G`、`D/V`、`H/M` 位置；该项取代上条的“二十六种”计数。ISO、wide 与其他 Colemak-DH 变体仍由系统输入或自定义布局处理，不导入 Monkeytype 布局资产
@@ -108,7 +108,8 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 当前内置键盘图为四十七种：新增 Dvorak – Left-Handed 与 Dvorak – Right-Handed，依据 macOS `com.apple.keylayout.Dvorak-Left` / `Dvorak-Right` 独立实现四个修饰层，并与 Apple 对左右手布局的定义及 Unicode CLDR 标识交叉核对；不读取或导入 Monkeytype 布局 JSON
 - 当前内置键盘图为四十八种：新增 Brazilian – ABNT2，依据 macOS `com.apple.keylayout.Brazilian-ABNT2` 独立实现四个修饰层，并显式支持 ISO 键 keyCode 10 与右 Shift 附近的 ABNT2 专用键 keyCode 94；Unicode CLDR 用于交叉核对 103 键 ABNT2 几何和主体层，不读取或导入 Monkeytype 布局 JSON
 - 当前内置键盘图为四十九种：新增 Tamil99 (macOS)，依据 macOS `com.apple.keylayout.Tamil99` 独立实现四个修饰层，完整保留 Tamil 组合符、`ஸ்ரீ` 多码点输出和明确空输出的 Shift/Option 层；Microsoft Tamil 99 标识与 Unicode CLDR Tamil 键盘资料用于交叉核对，不读取或导入 Monkeytype 布局 JSON
-- 当前内置键盘图为五十种：新增 Colemak-DH ISO，依据 Colemak-DH 官方公开说明与 CC0 macOS 基础层独立实现 ISO Angle Mod 的额外 `Z` 键、左侧 `X C D V`、中央反引号及右侧 `K H , . /`；wide、matrix 等其他变体继续由 macOS 输入源或自定义布局处理，不读取或导入 Monkeytype 布局 JSON、代码或资产
+- 当前内置键盘图为五十种：新增 Colemak-DH ISO，依据 Colemak-DH 官方公开说明与 CC0 macOS 基础层独立实现 ISO Angle Mod 的额外 `Z` 键、左侧 `X C D V`、中央反引号及右侧 `K H , . /`；该时点的 Matrix 与 wide 等其他变体由 macOS 输入源或自定义布局处理，下一条已补齐 Matrix，不读取或导入 Monkeytype 布局 JSON、代码或资产
+- 当前内置键盘图为五十一种：新增 Colemak-DH Matrix，依据 Colemak-DH 官方 CC0 macOS 基础层独立实现正交底行 `Z X C D V K H , . /`，与 ANSI 的中央 `Z` 重定位及 ISO 的额外实体键保持独立；wide 等其他变体继续由 macOS 输入源或自定义布局处理，不读取或导入 Monkeytype 布局 JSON、代码或资产
 - 原生设置窗口：难度、输入规则与字体大小会保存到本机
 - 可选 macOS 系统键击音、错误提示音及 0–100% 音量；默认关闭，不携带音频资产
 - 原生设置窗口支持中英文关键词搜索，可过滤测试、显示、主题、账户和恢复默认设置分组

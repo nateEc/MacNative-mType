@@ -251,6 +251,7 @@
     "colemak": "ansiColemak",
     "colemak_dh": "ansiColemakDH",
     "colemak_dh_iso": "colemakDHISO",
+    "colemak_dh_matrix": "colemakDHMatrix",
     "qwertz": "germanQwertz",
     "swiss_german": "swissGerman",
     "swiss_french": "swissFrench",
