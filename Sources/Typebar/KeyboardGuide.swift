@@ -39,6 +39,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case arabic101
   case arabic102
   case arabicMac
+  case urduPhonetic
   case hebrew
   case serbianCyrillic
 
@@ -83,6 +84,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .arabic101: "Arabic (101)"
     case .arabic102: "Arabic (102)"
     case .arabicMac: "Arabic (macOS)"
+    case .urduPhonetic: "Urdu Phonetic (CRULP)"
     case .hebrew: "Hebrew"
     case .serbianCyrillic: "Serbian Cyrillic · Typebar"
     }
@@ -132,6 +134,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case arabic101
   case arabic102
   case arabicMac
+  case urduPhonetic
   case hebrew
   case serbianCyrillic
 
@@ -1247,6 +1250,34 @@ enum KeyboardGuideModel {
           shiftedLabels: ["'", nil, "ئ", "ء", "أ", "إ", "ؤ", ">", "<", "؟"],
           optionLabels: [nil, nil, "ڈ", "ڑ", "ژ", nil, nil, ",", nil, "÷"],
           shiftedOptionLabels: [nil, nil, "ڈ", "ڑ", "ژ", nil, nil, ",", nil, "÷"]
+        ),
+      ]
+    case .urduPhonetic:
+      [
+        row(
+          "number",
+          labels: ["ٍ", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۰", "-", "="],
+          characters: ["ًٍ", "۱1!", "۲2@", "۳3#", "۴4", "۵5٪", "۶6", "۷7&", "۸8*", "۹9)", "۰0(", "-_", "=+"],
+          shiftedLabels: ["ً", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "_", "+"],
+          optionLabels: [nil, "!", "@", "#", nil, "٪", nil, "&", "*", ")", "(", nil, nil]
+        ),
+        row(
+          "top", "قوعرتےءیہپ][\\",
+          characters: ["قْٓ", "وّ؂", "عٰٖ", "رڑؓ", "تٹؔ", "ےَ؁", "ءئٔ", "یِؑ", "ہۃٕ", "پُٗ", "]}", "[{", "\\|"],
+          shiftedLabels: ["ْ", "ّ", "ٰ", "ڑ", "ٹ", "َ", "ئ", "ِ", "ۃ", "ُ", "}", "{", "|"],
+          optionLabels: ["ٓ", "؂", "ٖ", "ؓ", "ؔ", "؁", "ٔ", "ؑ", "ٕ", "ٗ", nil, nil, nil]
+        ),
+        row(
+          "home", "اسدفگحجکل؛'",
+          characters: ["اآﷲ", "سصؐ", "دڈﷺ", "ف", "گغٛ", "حھؒ", "جضﷻ", "کخ", "لࣇ", "؛:", "'\""],
+          shiftedLabels: ["آ", "ص", "ڈ", nil, "غ", "ھ", "ض", "خ", "ࣇ", ":", "\""],
+          optionLabels: ["ﷲ", "ؐ", "ﷺ", nil, "ٛ", "ؒ", "ﷻ", nil, nil, nil, nil]
+        ),
+        row(
+          "bottom", "زشچطبنم،۔/",
+          characters: ["زذ؏", "شژ؎", "چث؃", "طظؕ", "بݨ﷽", "نں؀", "م٘", "،ٌ>", "۔٫<", "/؟"],
+          shiftedLabels: ["ذ", "ژ", "ث", "ظ", "ݨ", "ں", "٘", "ٌ", "٫", "؟"],
+          optionLabels: ["؏", "؎", "؃", "ؕ", "﷽", "؀", nil, ">", "<", nil]
         ),
       ]
     case .hebrew:

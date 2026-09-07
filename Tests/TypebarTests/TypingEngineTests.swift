@@ -2489,6 +2489,45 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testUrduPhoneticMapsCRULPLayersSuppressesNullAndPersists() {
+    let rows = KeyboardGuideModel.rows(for: .urduPhonetic)
+    XCTAssertEqual(rows[0][0].label, "ٍ")
+    XCTAssertEqual(rows[0][1].label, "۱")
+    XCTAssertEqual(rows[1][0].optionLabel, "ٓ")
+    XCTAssertNil(rows[2][3].shiftedLabel)
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ے", layout: .urduPhonetic), "top-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ھ", layout: .urduPhonetic), "home-5")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "۔", layout: .urduPhonetic), "bottom-8")
+
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 16, modifierFlags: [], layout: .urduPhonetic), "ے")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 4, modifierFlags: [.shift], layout: .urduPhonetic), "ھ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 11, modifierFlags: [.option], layout: .urduPhonetic), "﷽")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 3, modifierFlags: [.shift], layout: .urduPhonetic), "")
+    XCTAssertNil(
+      KeyboardLayoutEmulator.text(forKeyCode: 3, modifierFlags: [.option], layout: .urduPhonetic))
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "گ", layout: .urduPhonetic), 5)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "؏", layout: .urduPhonetic), 6)
+    XCTAssertEqual(KeyboardInputLayout.urduPhonetic.emulatedLayout, .urduPhonetic)
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .urduPhonetic
+    settings.keyboardInputLayout = .urduPhonetic
+    settings.layoutFluidLayouts = [.urduPhonetic, .ansiQwerty]
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .urduPhonetic)
+    XCTAssertEqual(restored.keyboardInputLayout, .urduPhonetic)
+    XCTAssertEqual(restored.layoutFluidLayouts, [.urduPhonetic, .ansiQwerty])
+  }
+
+  @MainActor
   func testHebrewMapsStandardLettersShiftLayerAndPersists() {
     let rows = KeyboardGuideModel.rows(for: .hebrew)
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: ";", layout: .hebrew), "number-0")
@@ -5412,7 +5451,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 39)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 40)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
