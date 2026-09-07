@@ -64,6 +64,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case sertain
   case ctgap
   case graphite
+  case focal
+  case zenith
+  case dhorf
+  case gust
+  case recurva
   case halmak
   case qgmlwb
   case qgmlwy
@@ -187,6 +192,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
     case .graphite: "Graphite"
+    case .focal: "Focal"
+    case .zenith: "Zenith"
+    case .dhorf: "Dhorf"
+    case .gust: "Gust"
+    case .recurva: "Recurva"
     case .halmak: "Halmak"
     case .qgmlwb: "QGMLWB"
     case .qgmlwy: "QGMLWY"
@@ -315,6 +325,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case sertain
   case ctgap
   case graphite
+  case focal
+  case zenith
+  case dhorf
+  case gust
+  case recurva
   case halmak
   case qgmlwb
   case qgmlwy
@@ -1507,6 +1522,41 @@ enum KeyboardGuideModel {
           characters: ["qQ", "xX", "mM", "cC", "vV", "kK", "pP", ".>", "-\"", "/<"],
           shiftedLabels: ["Q", "X", "M", "C", "V", "K", "P", ">", "\"", "<"]
         ),
+      ]
+    case .focal:
+      [
+        row("number", "`1234567890-="),
+        row("top", "VLHGKQFOUJ[]\\"),
+        row("home", "SRNTBYCAEI/"),
+        row("bottom", "ZXMDP'W.;,"),
+      ]
+    case .zenith:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FOURZWVJLD[]\\"),
+        row("home", "YAINCGSEHT/"),
+        row("bottom", "'.,BXMPQK;"),
+      ]
+    case .dhorf:
+      [
+        row("number", "`1234567890-="),
+        row("top", "VLHKQJFOU,[]\\"),
+        row("home", "SRNTWYCAEI/"),
+        row("bottom", "ZXMDBPG';."),
+      ]
+    case .gust:
+      [
+        row("number", "`1234567890[]"),
+        row("top", ";UOFJQKLRV/=\\"),
+        row("home", "EIACYDHTNS-"),
+        row("bottom", ",.PG'BMWXZ"),
+      ]
+    case .recurva:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FRDPVQJUOY[]\\"),
+        row("home", "SNTCB.HEAI/"),
+        row("bottom", "ZXKGWML;',"),
       ]
     case .ansiColemak:
       [
