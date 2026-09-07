@@ -59,6 +59,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case heart
   case klauser
   case oneproduct
+  case pine
+  case real
+  case sertain
+  case ctgap
+  case graphite
   case halmak
   case qgmlwb
   case qgmlwy
@@ -177,6 +182,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .heart: "Heart"
     case .klauser: "Klauser"
     case .oneproduct: "Oneproduct"
+    case .pine: "Pine"
+    case .real: "Real"
+    case .sertain: "Sertain"
+    case .ctgap: "CTGAP"
+    case .graphite: "Graphite"
     case .halmak: "Halmak"
     case .qgmlwb: "QGMLWB"
     case .qgmlwy: "QGMLWY"
@@ -300,6 +310,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case heart
   case klauser
   case oneproduct
+  case pine
+  case real
+  case sertain
+  case ctgap
+  case graphite
   case halmak
   case qgmlwb
   case qgmlwy
@@ -1444,6 +1459,53 @@ enum KeyboardGuideModel {
           "bottom", "ZCFVB,.?;K",
           characters: ["zZ", "cC", "fF", "vV", "bB", ",<", ".>", "?/", ";:", "kK"],
           shiftedLabels: ["Z", "C", "F", "V", "B", "<", ">", "/", ":", "K"]
+        ),
+      ]
+    case .pine:
+      [
+        row("number", "`1234567890-="),
+        row("top", "YLRDWJMOU,[]\\"),
+        row("home", "CSNTGPHAEI;"),
+        row("bottom", "XZQVKBF'/."),
+      ]
+    case .real:
+      [
+        row("number", "`1234567890[]"),
+        row("top", "YLUO.ZFHCW/=\\"),
+        row("home", "IREA,DTNSM-"),
+        row("bottom", ";J'QXPKBGV"),
+      ]
+    case .sertain:
+      [
+        row("number", "`1234567890-="),
+        row("top", "XLDKVZWOU;[]\\"),
+        row("home", "SRTNFGYEIA/"),
+        row("bottom", "QJMHBPC',."),
+      ]
+    case .ctgap:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QPLCJXFOU/[]\\"),
+        row("home", "RNTSGYHEIA;"),
+        row("bottom", "ZBMWVKD',."),
+      ]
+    case .graphite:
+      [
+        row("number", "`1234567890[]"),
+        row(
+          "top", "BLDWZ'FOUJ;=\\",
+          characters: ["bB", "lL", "dD", "wW", "zZ", "'_", "fF", "oO", "uU", "jJ", ";:", "=+", "\\|"],
+          shiftedLabels: ["B", "L", "D", "W", "Z", "_", "F", "O", "U", "J", ":", "+", "|"]
+        ),
+        row(
+          "home", "NRTSGYHAEI,",
+          characters: ["nN", "rR", "tT", "sS", "gG", "yY", "hH", "aA", "eE", "iI", ",?"],
+          shiftedLabels: ["N", "R", "T", "S", "G", "Y", "H", "A", "E", "I", "?"]
+        ),
+        row(
+          "bottom", "QXMCVKP.-/",
+          characters: ["qQ", "xX", "mM", "cC", "vV", "kK", "pP", ".>", "-\"", "/<"],
+          shiftedLabels: ["Q", "X", "M", "C", "V", "K", "P", ">", "\"", "<"]
         ),
       ]
     case .ansiColemak:
@@ -2791,7 +2853,7 @@ enum KeyboardGuideModel {
 private extension KeyboardLayout {
   var showsNumberRowInMinimalGuide: Bool {
     self == .frenchAzerty || self == .mtgapFull || self == .engram || self == .engrammer
-      || self == .booMangle || self == .quartz || self == .capewellDvorak
+      || self == .booMangle || self == .quartz || self == .capewellDvorak || self == .real
   }
 }
 
