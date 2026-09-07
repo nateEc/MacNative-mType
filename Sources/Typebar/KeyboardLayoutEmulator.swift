@@ -216,6 +216,18 @@ enum KeyboardLayoutEmulator {
         "12:qQ 13:wW 14:fF 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "
           + "0:aA 1:rR 2:sS 3:tT 5:gG 4:mM 38:nN 40:eE 37:iI 41:oO 39:'\" "
           + "6:zZ 7:xX 8:cC 9:dD 11:vV 45:kK 46:hH 43:,< 47:.> 44:/?")
+    case .colemakDHWideANSI:
+      map(
+        "18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:=+ 28:7& 25:8* 29:9( 27:0) 24:-_ "
+          + "12:qQ 13:wW 14:fF 15:pP 17:bB 16:[{ 32:jJ 34:lL 31:uU 35:yY 33:;: 30:'\" 42:\\| "
+          + "0:aA 1:rR 2:sS 3:tT 5:gG 4:]} 38:mM 40:nN 37:eE 41:iI 39:oO "
+          + "6:xX 7:cC 8:dD 9:vV 11:zZ 45:/? 46:kK 43:hH 47:,< 44:.>")
+    case .colemakDHWideISO:
+      map(
+        "18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:=+ 28:7& 25:8* 29:9( 27:0) 24:-_ "
+          + "12:qQ 13:wW 14:fF 15:pP 17:bB 16:[{ 32:jJ 34:lL 31:uU 35:yY 33:;: 30:/? "
+          + "0:aA 1:rR 2:sS 3:tT 5:gG 4:]} 38:mM 40:nN 37:eE 41:iI 39:oO 42:'\" "
+          + "10:zZ 6:xX 7:cC 8:dD 9:vV 11:\\| 45:#~ 46:kK 43:hH 47:,< 44:.>")
     case .colemakDHKANSI:
       map(
         "12:qQ 13:wW 14:fF 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "

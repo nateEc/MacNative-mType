@@ -13,12 +13,12 @@
 
 | 状态 | 数量 | 验收含义 |
 | --- | ---: | --- |
-| `nativeExact` | 48 | 同名语义已有原生提示、显式输入模拟、反查和持久化测试 |
+| `nativeExact` | 50 | 同名语义已有原生提示、显式输入模拟、反查和持久化测试 |
 | `nativeRelated` | 3 | 仅提供相关 Typebar 原生布局，不宣称精确兼容 |
-| `systemInputOrCustom` | 188 | 当前通过系统输入源或用户自定义入口处理 |
+| `systemInputOrCustom` | 186 | 当前通过系统输入源或用户自定义入口处理 |
 | 总计 | 239 | 与固定参考源码名称集合一一对应 |
 
-精确覆盖名称：`qwerty`、`dvorak`、`dvorak_L`、`dvorak_R`、`colemak`、`colemak_dh`、`colemak_dh_iso`、`colemak_dh_matrix`、`colemak_dhk`、`colemak_dhk_iso`、`qwertz`、`swiss_german`、`swiss_french`、`workman`、`turkish_q`、`turkish_f`、`uk_qwerty`、`spanish_qwerty`、`italian_qwerty`、`latam_qwerty`、`azerty`、`persian_standard`、`persian_farsi`、`arabic_101`、`arabic_102`、`arabic_mac`、`hebrew`、`urdu_phonetic`、`thai_kedmanee`、`thai_pattachote`、`hindi_inscript`、`tamil99`、`armenian_hm_qwerty`、`mongolian`、`polish_programmers`、`bulgarian_phonetic_traditional`、`belarusian`、`ukrainian`、`russian`、`norwegian_qwerty`、`portuguese_pt_qwerty_iso`、`portuguese_pt_qwerty_ansi`、`ABNT2`、`swedish_qwerty`、`danish_qwerty`、`macedonian`、`pashto`、`estonian`。
+精确覆盖名称：`qwerty`、`dvorak`、`dvorak_L`、`dvorak_R`、`colemak`、`colemak_dh`、`colemak_dh_iso`、`colemak_dh_wide`、`colemak_dh_iso_wide`、`colemak_dh_matrix`、`colemak_dhk`、`colemak_dhk_iso`、`qwertz`、`swiss_german`、`swiss_french`、`workman`、`turkish_q`、`turkish_f`、`uk_qwerty`、`spanish_qwerty`、`italian_qwerty`、`latam_qwerty`、`azerty`、`persian_standard`、`persian_farsi`、`arabic_101`、`arabic_102`、`arabic_mac`、`hebrew`、`urdu_phonetic`、`thai_kedmanee`、`thai_pattachote`、`hindi_inscript`、`tamil99`、`armenian_hm_qwerty`、`mongolian`、`polish_programmers`、`bulgarian_phonetic_traditional`、`belarusian`、`ukrainian`、`russian`、`norwegian_qwerty`、`portuguese_pt_qwerty_iso`、`portuguese_pt_qwerty_ansi`、`ABNT2`、`swedish_qwerty`、`danish_qwerty`、`macedonian`、`pashto`、`estonian`。
 
 相关但不等价的名称：
 
@@ -28,4 +28,4 @@
 
 ## 自动化门槛
 
-`OfficialLayoutCoverageTests` 会验证：固定提交标识、239 个名称完整且唯一、48/3/188 三类数量守恒、每个映射名称都存在于官方集合，以及每个目标 raw value 都能解析为当前 `KeyboardLayout`。新增或重命名布局必须同步更新机器清单、该测试和本文件。
+`OfficialLayoutCoverageTests` 会验证：固定提交标识、239 个名称完整且唯一、50/3/186 三类数量守恒、每个映射名称都存在于官方集合，以及每个目标 raw value 都能解析为当前 `KeyboardLayout`。新增或重命名布局必须同步更新机器清单、该测试和本文件。

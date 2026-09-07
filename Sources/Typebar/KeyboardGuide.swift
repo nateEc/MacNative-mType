@@ -10,6 +10,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiColemakDH
   case colemakDHISO
   case colemakDHMatrix
+  case colemakDHWideANSI
+  case colemakDHWideISO
   case colemakDHKANSI
   case colemakDHKISO
   case ansiWorkman
@@ -68,6 +70,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ansiColemakDH: "ANSI Colemak-DH"
     case .colemakDHISO: "Colemak-DH ISO"
     case .colemakDHMatrix: "Colemak-DH Matrix"
+    case .colemakDHWideANSI: "Colemak-DH Wide ANSI"
+    case .colemakDHWideISO: "Colemak-DH Wide ISO"
     case .colemakDHKANSI: "Colemak-DHk ANSI"
     case .colemakDHKISO: "Colemak-DHk ISO"
     case .ansiWorkman: "ANSI Workman"
@@ -131,6 +135,8 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ansiColemakDH
   case colemakDHISO
   case colemakDHMatrix
+  case colemakDHWideANSI
+  case colemakDHWideISO
   case colemakDHKANSI
   case colemakDHKISO
   case ansiWorkman
@@ -699,6 +705,20 @@ enum KeyboardGuideModel {
         row("top", "QWFPBJLUY;[]"),
         row("home", "ARSTGMNEIO'"),
         row("bottom", "ZXCDVKH,./"),
+      ]
+    case .colemakDHWideANSI:
+      [
+        row("number", "123456=7890-"),
+        row("top", "QWFPB[JLUY;'\\"),
+        row("home", "ARSTG]MNEIO"),
+        row("bottom", "XCDVZ/KH,."),
+      ]
+    case .colemakDHWideISO:
+      [
+        row("number", "123456=7890-"),
+        row("top", "QWFPB[JLUY;/"),
+        row("home", "ARSTG]MNEIO'"),
+        row("bottom", "ZXCDV\\#KH,."),
       ]
     case .colemakDHKANSI:
       [
