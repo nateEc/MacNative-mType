@@ -176,6 +176,7 @@ enum LivePracticeContentService {
     case .kyrgyz: return "ky"
     case .kinyarwanda: return "rw"
     case .shona: return "en"
+    case .santali: return "sat"
     case .yiddish: return "yi"
     case .friulian: return "fur"
     case .bemba: return "bem"

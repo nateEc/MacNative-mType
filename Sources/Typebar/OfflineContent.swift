@@ -2052,6 +2052,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "santali-ol-chiki",
+      title: "ᱚᱞ ᱪᱤᱠᱤ",
+      text: "ᱡᱚᱦᱟᱨ ᱾ ᱚᱞ ᱪᱤᱠᱤ ᱛᱮ ᱥᱟᱱᱛᱟᱲᱤ ᱯᱟᱹᱨᱥᱤ ᱚᱞᱚᱜ ᱢᱮ ᱾",
+      language: .santali,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "santali-counting",
+      title: "ᱮᱠᱚ ᱠᱷᱚᱱ ᱜᱮᱞ",
+      text: "ᱮᱠᱚ ᱵᱟᱨ ᱯᱮ ᱯᱳᱱ ᱢᱚᱬᱮ ᱾ ᱛᱩᱨᱩᱭ ᱮᱭᱟᱭ ᱤᱨᱟᱹᱞ ᱟᱨᱮ ᱜᱮᱞ ᱾ ᱚᱞ ᱪᱤᱠᱤ ᱛᱮ ᱟᱹᱲᱟᱹ ᱠᱚ ᱫᱚᱦᱚᱭ ᱢᱮ ᱾",
+      language: .santali,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "santali-practice-line",
+      title: "ᱚᱞᱚᱜ ᱢᱮ",
+      text: "ᱡᱚᱦᱟᱨ ᱠᱷᱚᱱ ᱮᱛᱦᱚᱵ ᱢᱮ ᱾ ᱥᱟᱱᱛᱟᱲᱤ ᱯᱟᱹᱨᱥᱤ ᱨᱮ ᱚᱞ ᱪᱤᱠᱤ ᱟᱹᱲᱟᱹ ᱠᱚ ᱫᱷᱤᱨᱤ ᱫᱷᱤᱨᱤ ᱚᱞᱚᱜ ᱢᱮ ᱾ ᱮᱠᱚ ᱵᱟᱨ ᱯᱮ ᱯᱳᱱ ᱢᱚᱬᱮ ᱢᱮᱱ ᱠᱟᱛᱮ ᱫᱟᱜ ᱟᱨ ᱚᱲᱟᱜ ᱞᱮᱠᱟ ᱠᱷᱟᱴᱚ ᱟᱹᱲᱟᱹ ᱚᱞᱚᱜ ᱢᱮ ᱾",
+      language: .santali,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "santali-steady-practice",
+      title: "ᱫᱷᱤᱨᱤ ᱫᱷᱤᱨᱤ",
+      text: "ᱚᱞ ᱪᱤᱠᱤ ᱛᱮ ᱚᱞᱚᱜ ᱡᱷᱚᱜ ᱫᱷᱤᱨᱤ ᱫᱷᱤᱨᱤ ᱞᱟᱦᱟ ᱤᱫᱤ ᱢᱮ ᱾ ᱯᱩᱭᱞᱩ ᱡᱚᱦᱟᱨ ᱚᱞᱚᱜ ᱢᱮ, ᱛᱟᱭᱚᱢ ᱥᱟᱱᱛᱟᱲᱤ ᱯᱟᱹᱨᱥᱤ ᱟᱨ ᱧᱩᱛᱩᱢ ᱚᱞᱚᱜ ᱢᱮ ᱾ ᱮᱠᱚ ᱵᱟᱨ ᱯᱮ ᱯᱳᱱ ᱢᱚᱬᱮ, ᱛᱩᱨᱩᱭ ᱮᱭᱟᱭ ᱤᱨᱟᱹᱞ ᱟᱨᱮ ᱜᱮᱞ ᱫᱚ ᱢᱤᱫ ᱥᱟᱶ ᱚᱞᱚᱜ ᱢᱮ ᱾ ᱟᱢ, ᱤᱧ, ᱫᱟᱜ, ᱚᱲᱟᱜ, ᱚᱠᱟ, ᱪᱮᱫ ᱟᱨ ᱞᱮᱠᱟ ᱫᱚᱦᱲᱟ ᱚᱞᱚᱜ ᱢᱮ ᱾ ᱢᱤᱫ ᱟᱹᱲᱟᱹ ᱛᱟᱭᱚᱢ ᱮᱴᱟᱜ ᱟᱹᱲᱟᱹ ᱵᱟᱹᱭ ᱵᱟᱹᱭ ᱚᱞᱚᱜ ᱞᱮᱠᱷᱟᱱ ᱛᱤ ᱟᱨ ᱢᱮᱫ ᱢᱤᱫ ᱛᱟᱞ ᱨᱮ ᱛᱟᱦᱮᱱᱟ ᱾",
+      language: .santali,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "yiddish-clear-step",
       title: "אַ קלאָרער שריט",
       text: "אַ קליינער שריט מאַכט דעם אָנהייב קלאָר.",

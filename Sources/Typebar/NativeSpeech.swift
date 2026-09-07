@@ -51,6 +51,7 @@ extension TypingLanguage {
     case .kyrgyz: "ky-KY"
     case .kinyarwanda: "rw-RW"
     case .shona: "en-US"
+    case .santali: "sat-IN"
     case .yiddish: "yi"
     case .friulian: "fur"
     case .bemba: "bem"

@@ -4349,6 +4349,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.swahiliWords,
       StarterLexicon.kinyarwandaWords,
       StarterLexicon.shonaWords,
+      StarterLexicon.santaliWords,
       StarterLexicon.tamilWords,
       StarterLexicon.hindiWords,
       StarterLexicon.gujaratiWords,
@@ -4392,7 +4393,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 114)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 115)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -4678,6 +4679,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .shona).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .shona), "en")
+    XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
+      5, language: .santali).with(modifiers: [.referenceStream])), .encyclopedia)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .santali), "sat")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .yiddish).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .yiddish), "yi")
@@ -6112,6 +6116,7 @@ final class TypingEngineTests: XCTestCase {
       (.swahili, StarterLexicon.swahiliWords),
       (.kinyarwanda, StarterLexicon.kinyarwandaWords),
       (.shona, StarterLexicon.shonaWords),
+      (.santali, StarterLexicon.santaliWords),
       (.yiddish, StarterLexicon.yiddishWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
@@ -6601,6 +6606,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.shona.zipfFrequencySupport, .unknown)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.shona))
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.shona))
+    XCTAssertTrue(StarterLexicon.santaliWords.contains("ᱡᱚᱦᱟᱨ"))
+    XCTAssertFalse(TypingLanguage.santali.usesRightToLeftPrompt)
+    XCTAssertFalse(TypingLanguage.santali.usesJoiningScriptPrompt)
+    XCTAssertTrue(TypingLanguage.santali.usesSpaceDelimitedWords)
+    XCTAssertTrue(TypingLanguage.santali.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.santali.supportsQuotes)
+    XCTAssertTrue(TypingLanguage.santali.supportsCommunityQuoteSubmission)
+    XCTAssertEqual(TypingLanguage.santali.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.santali))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.santali))
     XCTAssertTrue(StarterLexicon.yiddishWords.contains("בוך"))
     XCTAssertTrue(TypingLanguage.yiddish.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.yiddish.usesJoiningScriptPrompt)
@@ -7098,6 +7113,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.swahili.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.kinyarwanda.speechLocaleIdentifier, "rw-RW")
     XCTAssertEqual(TypingLanguage.shona.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.santali.speechLocaleIdentifier, "sat-IN")
     XCTAssertEqual(TypingLanguage.yiddish.speechLocaleIdentifier, "yi")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")

@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 111 个可单独练习并支持 Typebar 自有引语的语言／书写方式：English、Español、Deutsch、Swiss German、Afrikaans、Shqip、Ichibemba、Bosanski、Esperanto、Esperanto · X-sistemo、Esperanto · H-sistemo、Latina、Friulian、Malagasy、Cymraeg、Hausa、Татарча、Oʻzbekcha、Occitan、Oromo、Македонски、Қазақша、Tiếng Việt、Jyutping、Pinyin、Башҡортса、Euskara、Frysk、isiZulu、ʻŌlelo Hawaiʻi、Taqbaylit、Malti、toki pona、isiXhosa、བོད་སྐད་、Кыргызча、Удмурт кыл、Yorùbá、ייִדיש、Azərbaycanca、Беларуская、Lietuvių、Latviešu、Монгол、Gaeilge、Galego、मराठी、کوردی ناوەندی、العربية、العربية المصرية、العربية المغربية、پښتو、سنڌي、עברית、فارسی、اردو、தமிழ்、हिन्दी、ગુજરાતી、বাংলা、ไทย、नेपाली、ಕನ್ನಡ、తెలుగు、മലയാളം、संस्कृतम्、සිංහල、ខ្មែរ、မြန်မာ、ລາວ、አማርኛ、Հայերեն、Հայերէն (Արեւմտեան)、ქართული、Ελληνικά、Greeklish、Nederlands、Filipino、Català、Bahasa Indonesia、Bahasa Melayu、Dansk、Norsk Bokmål、Norsk Nynorsk、Svenska、Magyar、Čeština、Slovenčina、Slovenščina、Hrvatski、Српски、Srpski Latin、Български、Română、Suomi、Eesti、Íslenska、Français、Italiano、Português、简体中文、繁體中文、Русский、Українська、Ukrainian Latin、日本語・ひらがな、日本語・カタカナ、日本語・ローマ字、한국어、Türkçe、Polski。另有中英混合与可配置的多语混合练习。
+Typebar 现有 125 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 `ᱥᱟᱱᱛᱟᱲᱤ`（Santali / Ol Chiki）。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -83,6 +83,7 @@ Typebar 现有 111 个可单独练习并支持 Typebar 自有引语的语言／�
 - 2026-09-05 更正：当前单语总数为一百二十一种、默认／自选 LTR 多语候选为一百一十一种。Viossa 与 Viossa · Njutro 审计分别只读取 `viossa.json` 与 `viossa_njutro.json` 的元数据，不读取词表或引语文本；两者均未定义 BCP-47、RTL 或连写，均定义 `orderedByFrequency: false`。Typebar 以彼此独立、明示为原创练习 idiolect 的词流和各自四档引语处理 LTR 空格分词，在线知识短文和朗读严格使用 `en`／`en-US` 缺省路径；两者 Zipf 走不支持提示。Viossa 保留简化输入；Njutro 定义 `noLazyMode: true`，普通练习禁用简化输入而自定义文本保留例外，并已覆盖多语轮转、社区投稿、成绩和排行榜。
 - 2026-09-05 更正：当前单语总数为一百二十二种、默认／自选 LTR 多语候选为一百一十二种。Māori 审计只读取 `maori_1k.json` 的元数据，不读取词表或引语文本；它未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序。Typebar 以保留长元音 macron 的原创词流和四档引语处理 LTR 空格分词，在线知识短文和朗读严格使用 `en`／`en-US` 缺省路径；保留简化输入，Zipf 走未知提示，并已覆盖多语轮转、社区投稿、成绩和排行榜。
 - 2026-09-05 更正：当前单语总数为一百二十四种、默认／自选 LTR 多语候选为一百一十四种。Lojban 审计只读取 `lojban_gismu.json` 与 `lojban_cmavo.json` 的元数据，不读取词表或引语文本；两个配置均定义 `noLazyMode: true`，不定义 BCP-47、RTL、连写或词频排序。Typebar 以彼此独立的原创根词和结构词词流、各自四档引语处理 LTR 空格分词，cmavo 保留 `.` 与 `'` 的输入语义；在线知识短文和朗读严格使用 `en`／`en-US` 缺省路径，普通练习禁用简化输入而自定义文本保留例外，Zipf 走未知提示，并已覆盖多语轮转、社区投稿、成绩和排行榜。
+- 2026-09-07 更正：当前单语总数为一百二十五种、默认／自选 LTR 多语候选为一百一十五种。Santali 审计只读取 `santali.json` 的名称与可选元数据字段，不读取词表或引语文本；固定配置仅定义 `bcp47: sat-IN`，未定义 RTL、连写、`noLazyMode` 或词频排序。Typebar 使用 Unicode Ol Chiki 的独立练习词流与四档自有文本，走 LTR 空格分词、`sat` 百科入口、`sat-IN` 系统朗读、显式简化输入和 Zipf 未知提示，并已覆盖多语轮转、社区投稿、撤回、成绩及排行榜。
 
 ## 后续候选与准入条件
 
