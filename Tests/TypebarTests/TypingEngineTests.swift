@@ -1788,6 +1788,45 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testDvorakSingleHandedLayoutsMapAllMacSystemLayersAndPersist() {
+    for layout in [KeyboardLayout.dvorakLeft, .dvorakRight] {
+      let rows = KeyboardGuideModel.rows(for: layout)
+      for (keyCodes, guideRow) in zip(SystemKeyboardGuide.physicalRows, rows) {
+        for (keyCode, key) in zip(keyCodes, guideRow) {
+          XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [], layout: layout), key.label)
+          XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.shift], layout: layout), key.shiftedLabel)
+          XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option], layout: layout), key.optionLabel)
+          XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: [.option, .shift], layout: layout), key.shiftedOptionLabel)
+        }
+      }
+
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "p", layout: .dvorakLeft), "number-4")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "p", layout: .dvorakRight), "number-9")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [], layout: .dvorakLeft), "[")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [.option], layout: .dvorakLeft), "“")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 18, modifierFlags: [], layout: .dvorakRight), "1")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 41, modifierFlags: [], layout: .dvorakLeft), "8")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 41, modifierFlags: [], layout: .dvorakRight), "k")
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "p", layout: .dvorakLeft), 21)
+    XCTAssertEqual(KeyboardLayoutEmulator.keyCode(for: "p", layout: .dvorakRight), 25)
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 1, modifierFlags: [.option, .shift], layout: .dvorakLeft), "")
+    XCTAssertEqual(KeyboardLayoutEmulator.text(forKeyCode: 41, modifierFlags: [.option, .shift], layout: .dvorakRight), "")
+  }
+
+  @MainActor
   func testAnsiColemakDHMapsItsDistinctCoreKeysAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "b", layout: .ansiColemakDH), "top-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "g", layout: .ansiColemakDH), "home-4")
@@ -5667,7 +5706,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 45)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 47)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

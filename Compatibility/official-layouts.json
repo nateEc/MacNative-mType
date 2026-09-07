@@ -246,6 +246,8 @@
   "nativeExact": {
     "qwerty": "ansiQwerty",
     "dvorak": "ansiDvorak",
+    "dvorak_L": "dvorakLeft",
+    "dvorak_R": "dvorakRight",
     "colemak": "ansiColemak",
     "colemak_dh": "ansiColemakDH",
     "qwertz": "germanQwertz",

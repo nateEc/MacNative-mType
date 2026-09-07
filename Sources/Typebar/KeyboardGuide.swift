@@ -4,6 +4,8 @@ import SwiftUI
 enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiQwerty
   case ansiDvorak
+  case dvorakLeft
+  case dvorakRight
   case ansiColemak
   case ansiColemakDH
   case ansiWorkman
@@ -54,6 +56,8 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     switch self {
     case .ansiQwerty: "ANSI QWERTY"
     case .ansiDvorak: "ANSI Dvorak"
+    case .dvorakLeft: "Dvorak – Left-Handed"
+    case .dvorakRight: "Dvorak – Right-Handed"
     case .ansiColemak: "ANSI Colemak"
     case .ansiColemakDH: "ANSI Colemak-DH"
     case .ansiWorkman: "ANSI Workman"
@@ -109,6 +113,8 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case custom
   case ansiQwerty
   case ansiDvorak
+  case dvorakLeft
+  case dvorakRight
   case ansiColemak
   case ansiColemakDH
   case ansiWorkman
@@ -593,6 +599,60 @@ enum KeyboardGuideModel {
         row("top", "',.PYFGCRL/="),
         row("home", "AOEUIDHTNS-"),
         row("bottom", ";QJKXBMWVZ"),
+      ]
+    case .dvorakLeft:
+      [
+        layeredRow(
+          "number", labels: ["`", "[", "]", "/", "p", "f", "m", "l", "j", "4", "3", "2", "1"],
+          shiftedLabels: ["~", "{", "}", "?", "P", "F", "M", "L", "J", "$", "#", "@", "!"],
+          optionLabels: ["`", "“", "‘", "÷", "π", "ƒ", "µ", "¬", "∆", "¢", "£", "™", "¡"],
+          shiftedOptionLabels: ["`", "”", "’", "¿", "∏", "Ï", "Â", "Ò", "Ô", "›", "‹", "€", "⁄"]
+        ),
+        layeredRow(
+          "top", labels: [";", "q", "b", "y", "u", "r", "s", "o", ".", "6", "5", "=", "\\"],
+          shiftedLabels: [":", "Q", "B", "Y", "U", "R", "S", "O", ">", "^", "%", "+", "|"],
+          optionLabels: ["…", "œ", "∫", "¥", "¨", "®", "ß", "ø", "≥", "§", "∞", "≠", "«"],
+          shiftedOptionLabels: ["Ú", "Œ", "ı", "Á", "¨", "‰", "Í", "Ø", "˘", "ﬂ", "ﬁ", "±", "»"]
+        ),
+        layeredRow(
+          "home", labels: ["-", "k", "c", "d", "t", "h", "e", "a", "z", "8", "7"],
+          shiftedLabels: ["_", "K", "C", "D", "T", "H", "E", "A", "Z", "*", "&"],
+          optionLabels: ["–", "˚", "ç", "∂", "†", "˙", "´", "å", "Ω", "•", "¶"],
+          shiftedOptionLabels: ["—", "", "Ç", "Î", "ˇ", "Ó", "´", "Å", "¸", "°", "‡"]
+        ),
+        layeredRow(
+          "bottom", labels: ["'", "x", "g", "v", "w", "n", "i", ",", "0", "9"],
+          shiftedLabels: ["\"", "X", "G", "V", "W", "N", "I", "<", ")", "("],
+          optionLabels: ["æ", "≈", "©", "√", "∑", "˜", "ˆ", "≤", "º", "ª"],
+          shiftedOptionLabels: ["Æ", "˛", "˝", "◊", "„", "˜", "ˆ", "¯", "‚", "·"]
+        ),
+      ]
+    case .dvorakRight:
+      [
+        layeredRow(
+          "number", labels: ["`", "1", "2", "3", "4", "j", "l", "m", "f", "p", "/", "[", "]"],
+          shiftedLabels: ["~", "!", "@", "#", "$", "J", "L", "M", "F", "P", "?", "{", "}"],
+          optionLabels: ["`", "¡", "™", "£", "¢", "∆", "¬", "µ", "ƒ", "π", "÷", "“", "‘"],
+          shiftedOptionLabels: ["`", "⁄", "€", "‹", "›", "Ô", "Ò", "Â", "Ï", "∏", "¿", "”", "’"]
+        ),
+        layeredRow(
+          "top", labels: ["5", "6", "q", ".", "o", "r", "s", "u", "y", "b", ";", "=", "\\"],
+          shiftedLabels: ["%", "^", "Q", ">", "O", "R", "S", "U", "Y", "B", ":", "+", "|"],
+          optionLabels: ["∞", "§", "œ", "≥", "ø", "®", "ß", "¨", "¥", "∫", "…", "≠", "«"],
+          shiftedOptionLabels: ["ﬁ", "ﬂ", "Œ", "˘", "Ø", "‰", "Í", "¨", "Á", "ı", "Ú", "±", "»"]
+        ),
+        layeredRow(
+          "home", labels: ["7", "8", "z", "a", "e", "h", "t", "d", "c", "k", "-"],
+          shiftedLabels: ["&", "*", "Z", "A", "E", "H", "T", "D", "C", "K", "_"],
+          optionLabels: ["¶", "•", "Ω", "å", "´", "˙", "†", "∂", "ç", "˚", "–"],
+          shiftedOptionLabels: ["‡", "°", "¸", "Å", "´", "Ó", "ˇ", "Î", "Ç", "", "—"]
+        ),
+        layeredRow(
+          "bottom", labels: ["9", "0", "x", ",", "i", "n", "w", "v", "g", "'"],
+          shiftedLabels: ["(", ")", "X", "<", "I", "N", "W", "V", "G", "\""],
+          optionLabels: ["ª", "º", "≈", "≤", "ˆ", "˜", "∑", "√", "©", "æ"],
+          shiftedOptionLabels: ["·", "‚", "˛", "¯", "ˆ", "˜", "„", "◊", "˝", "Æ"]
+        ),
       ]
     case .ansiColemak:
       [
@@ -1633,6 +1693,23 @@ enum KeyboardGuideModel {
         }
       )
     }
+  }
+
+  private static func layeredRow(
+    _ prefix: String,
+    labels: [String],
+    shiftedLabels: [String?],
+    optionLabels: [String?],
+    shiftedOptionLabels: [String?]
+  ) -> [KeyboardGuideKey] {
+    let characters = labels.indices.map { index in
+      [labels[index], shiftedLabels[index], optionLabels[index], shiftedOptionLabels[index]]
+        .compactMap { $0 }
+        .joined()
+    }
+    return row(
+      prefix, labels: labels, characters: characters, shiftedLabels: shiftedLabels,
+      optionLabels: optionLabels, shiftedOptionLabels: shiftedOptionLabels)
   }
 
   private static func swissQwertzRows(
