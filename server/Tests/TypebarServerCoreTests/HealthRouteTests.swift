@@ -2245,6 +2245,7 @@ final class HealthRouteTests: XCTestCase {
     let bobNotifications = try await store.notifications(accessToken: bob.accessToken, now: now)
     XCTAssertEqual(bobNotifications.notifications.count, 1)
     XCTAssertEqual(bobNotifications.unreadCount, 1)
+    XCTAssertEqual(bobNotifications.maxCount, 100)
     XCTAssertEqual(bobNotifications.notifications[0].kind, .connectionRequest)
     XCTAssertEqual(bobNotifications.notifications[0].actor.id, alice.user.id)
     XCTAssertNil(bobNotifications.notifications[0].readAt)
@@ -2307,6 +2308,42 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(bobAfterAliceDeleteAll.notifications.count, 1)
     XCTAssertEqual(bobAfterAliceDeleteAll.unreadCount, 1)
     XCTAssertEqual(repeatedDeleteAll.deletedCount, 0)
+  }
+
+  func testNotificationInboxRetainsNewestHundredPerRecipient() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let alice = try await store.register(
+      .init(
+        email: "capacity-alice@example.com", password: "a secure password",
+        displayName: "Capacity Alice"))
+    let bob = try await store.register(
+      .init(
+        email: "capacity-bob@example.com", password: "a secure password",
+        displayName: "Capacity Bob"))
+    let start = Date(timeIntervalSince1970: 1_700_100_000)
+    _ = try await store.sendConnection(
+      .init(recipientID: bob.user.id), accessToken: alice.accessToken, now: start)
+    _ = try await store.acceptConnection(
+      requesterID: alice.user.id, accessToken: bob.accessToken,
+      now: start.addingTimeInterval(1))
+
+    for offset in 0..<105 {
+      _ = try await store.sendDirectMessage(
+        .init(recipientID: bob.user.id, body: "message \(offset)"),
+        accessToken: alice.accessToken, now: start.addingTimeInterval(Double(offset + 2)))
+    }
+
+    let bobInbox = try await store.notifications(accessToken: bob.accessToken)
+    XCTAssertEqual(bobInbox.maxCount, 100)
+    XCTAssertEqual(bobInbox.notifications.count, 100)
+    XCTAssertEqual(bobInbox.unreadCount, 100)
+    XCTAssertTrue(bobInbox.notifications.allSatisfy { $0.kind == .directMessage })
+    XCTAssertEqual(bobInbox.notifications.first?.createdAt, start.addingTimeInterval(106))
+    XCTAssertEqual(bobInbox.notifications.last?.createdAt, start.addingTimeInterval(7))
+
+    let aliceInbox = try await store.notifications(accessToken: alice.accessToken)
+    XCTAssertEqual(aliceInbox.notifications.count, 1)
+    XCTAssertEqual(aliceInbox.notifications.first?.kind, .connectionAccepted)
   }
 
   func testNotificationRoutesRequireAuthentication() async throws {

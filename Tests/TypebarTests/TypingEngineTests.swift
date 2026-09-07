@@ -28,11 +28,14 @@ final class TypingEngineTests: XCTestCase {
       from: Data("{\"notifications\":[\(notification)]}".utf8))
     XCTAssertEqual(legacy.notifications.count, 1)
     XCTAssertEqual(legacy.unreadCount, 1)
+    XCTAssertNil(legacy.maxCount)
 
     let current = try JSONDecoder().decode(
       RemoteNotificationsResponse.self,
-      from: Data("{\"notifications\":[\(notification)],\"unreadCount\":1}".utf8))
+      from: Data(
+        "{\"notifications\":[\(notification)],\"unreadCount\":1,\"maxCount\":100}".utf8))
     XCTAssertEqual(current.unreadCount, 1)
+    XCTAssertEqual(current.maxCount, 100)
   }
 
   func testRemoteAccountUserDefaultsLegacyServersToPasswordAndDecodesOAuthMethods() throws {

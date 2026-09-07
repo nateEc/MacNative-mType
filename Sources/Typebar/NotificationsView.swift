@@ -5,6 +5,7 @@ struct NotificationsView: View {
     let account: AccountSession
     let onUnreadCountChange: (Int) -> Void
     @State private var notifications: [RemoteNotification] = []
+    @State private var maxCount: Int?
     @State private var isLoading = false
     @State private var message: String?
     @State private var confirmingDeleteAll = false
@@ -14,32 +15,46 @@ struct NotificationsView: View {
             Group {
                 if account.currentUser == nil {
                     ContentUnavailableView("请先登录", systemImage: "bell.slash", description: Text("登录自建 Typebar 服务后可查看好友和私信通知。"))
-                } else if notifications.isEmpty, !isLoading {
-                    ContentUnavailableView("还没有通知", systemImage: "bell", description: Text("好友关系和新私信会显示在这里。"))
                 } else {
-                    List(notifications) { notification in
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: icon(for: notification.kind))
-                                .foregroundStyle(notification.readAt == nil ? Color.accentColor : Color.secondary)
-                                .frame(width: 22)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(title(for: notification))
-                                    .font(notification.readAt == nil ? .body.weight(.semibold) : .body)
-                                Text(notification.createdAt, format: .dateTime.year().month().day().hour().minute())
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                    VStack(spacing: 0) {
+                        HStack {
+                            Text(inboxCountText)
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
                             Spacer()
-                            if notification.readAt == nil {
-                                Button("标为已读") { markRead(notification) }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        if notifications.isEmpty, !isLoading {
+                            ContentUnavailableView(
+                                "还没有通知", systemImage: "bell",
+                                description: Text("好友关系和新私信会显示在这里。"))
+                        } else {
+                            List(notifications) { notification in
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: icon(for: notification.kind))
+                                        .foregroundStyle(notification.readAt == nil ? Color.accentColor : Color.secondary)
+                                        .frame(width: 22)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(title(for: notification))
+                                            .font(notification.readAt == nil ? .body.weight(.semibold) : .body)
+                                        Text(notification.createdAt, format: .dateTime.year().month().day().hour().minute())
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if notification.readAt == nil {
+                                        Button("标为已读") { markRead(notification) }
+                                            .buttonStyle(.borderless)
+                                    }
+                                    Button("删除", systemImage: "trash", role: .destructive) {
+                                        delete(notification)
+                                    }
+                                    .labelStyle(.iconOnly)
                                     .buttonStyle(.borderless)
+                                    .help("删除这条通知")
+                                }
                             }
-                            Button("删除", systemImage: "trash", role: .destructive) {
-                                delete(notification)
-                            }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.borderless)
-                            .help("删除这条通知")
                         }
                     }
                 }
@@ -101,6 +116,7 @@ struct NotificationsView: View {
         do {
             let inbox = try await account.notificationInbox()
             notifications = inbox.notifications
+            maxCount = inbox.maxCount
             onUnreadCountChange(inbox.unreadCount)
             message = notifications.isEmpty ? "没有新通知。" : "已加载 \(notifications.count) 条通知。"
         } catch { message = error.localizedDescription }
@@ -141,5 +157,10 @@ struct NotificationsView: View {
 
     private func publishUnreadCount() {
         onUnreadCountChange(notifications.lazy.filter { $0.readAt == nil }.count)
+    }
+
+    private var inboxCountText: String {
+        guard let maxCount else { return "共 \(notifications.count) 条" }
+        return "收件箱 \(notifications.count) / \(maxCount)"
     }
 }

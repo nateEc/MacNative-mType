@@ -18,6 +18,7 @@ public struct TypebarNotificationResponse: Content, Equatable, Identifiable {
 public struct TypebarNotificationsResponse: Content, Equatable {
     public let notifications: [TypebarNotificationResponse]
     public let unreadCount: Int
+    public let maxCount: Int
 }
 
 public struct TypebarNotificationDeletionResponse: Content, Equatable {

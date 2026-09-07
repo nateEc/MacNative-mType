@@ -834,20 +834,23 @@ struct RemoteNotification: Codable, Identifiable, Sendable {
 struct RemoteNotificationsResponse: Codable, Sendable {
     let notifications: [RemoteNotification]
     let unreadCount: Int
+    let maxCount: Int?
 
-    private enum CodingKeys: String, CodingKey { case notifications, unreadCount }
+    private enum CodingKeys: String, CodingKey { case notifications, unreadCount, maxCount }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         notifications = try values.decode([RemoteNotification].self, forKey: .notifications)
         unreadCount = try values.decodeIfPresent(Int.self, forKey: .unreadCount)
             ?? notifications.lazy.filter { $0.readAt == nil }.count
+        maxCount = try values.decodeIfPresent(Int.self, forKey: .maxCount)
     }
 }
 
 struct RemoteNotificationInbox: Sendable {
     let notifications: [RemoteNotification]
     let unreadCount: Int
+    let maxCount: Int?
 }
 
 private struct RemoteNotificationDeletionResponse: Codable, Sendable { let deletedCount: Int }
@@ -1885,7 +1888,9 @@ final class AccountSession {
             path: "v1/notifications", method: "GET", token: token,
             body: Optional<String>.none, response: RemoteNotificationsResponse.self
         )
-        return .init(notifications: response.notifications, unreadCount: response.unreadCount)
+        return .init(
+            notifications: response.notifications, unreadCount: response.unreadCount,
+            maxCount: response.maxCount)
     }
 
     func publicAnnouncements() async throws -> [RemoteAnnouncement] {

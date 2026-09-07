@@ -440,6 +440,8 @@ public enum AuthStoreError: Error, Equatable {
 }
 
 public actor AuthStore {
+  private static let maxNotificationsPerUser = 100
+
   /// The server accepts exactly the client-facing, single-language choices
   /// for community quotes. Result and leaderboard requests add the two
   /// native mixed-language choices below, so these surfaces cannot drift.
@@ -852,6 +854,35 @@ public actor AuthStore {
       return
     }
     state = try JSONDecoder.server.decode(PersistedState.self, from: Data(contentsOf: fileURL))
+    state.notifications = Self.cappedNotifications(state.notifications)
+  }
+
+  private static func cappedNotifications(_ notifications: [StoredNotification])
+    -> [StoredNotification]
+  {
+    var retainedCounts: [UUID: Int] = [:]
+    var retained: [StoredNotification] = []
+    for notification in notifications.reversed() {
+      guard retainedCounts[notification.recipientID, default: 0] < maxNotificationsPerUser else {
+        continue
+      }
+      retainedCounts[notification.recipientID, default: 0] += 1
+      retained.append(notification)
+    }
+    return Array(retained.reversed())
+  }
+
+  private func appendNotification(_ notification: StoredNotification) {
+    state.notifications.append(notification)
+    var excess =
+      state.notifications.lazy.filter { $0.recipientID == notification.recipientID }.count
+      - Self.maxNotificationsPerUser
+    guard excess > 0 else { return }
+    state.notifications.removeAll {
+      guard excess > 0, $0.recipientID == notification.recipientID else { return false }
+      excess -= 1
+      return true
+    }
   }
 
   public func register(_ request: RegisterRequest, now: Date = .now) throws -> AuthSessionResponse {
@@ -1680,7 +1711,7 @@ public actor AuthStore {
     }
     state.connections.append(
       .init(requesterID: current.id, recipientID: recipient.id, status: "pending", updatedAt: now))
-    state.notifications.append(
+    appendNotification(
       .init(
         id: UUID(), recipientID: recipient.id, actorID: current.id, kind: .connectionRequest,
         createdAt: now, readAt: nil))
@@ -1707,7 +1738,7 @@ public actor AuthStore {
     guard let requester = state.users.first(where: { $0.id == requesterID }) else {
       throw AuthStoreError.profileNotFound
     }
-    state.notifications.append(
+    appendNotification(
       .init(
         id: UUID(), recipientID: requester.id, actorID: current.id, kind: .connectionAccepted,
         createdAt: now, readAt: nil))
@@ -1783,7 +1814,8 @@ public actor AuthStore {
     .sorted { $0.createdAt > $1.createdAt }
     return .init(
       notifications: notifications,
-      unreadCount: notifications.lazy.filter { $0.readAt == nil }.count)
+      unreadCount: notifications.lazy.filter { $0.readAt == nil }.count,
+      maxCount: Self.maxNotificationsPerUser)
   }
 
   public func markNotificationRead(_ id: UUID, accessToken: String, now: Date = .now) throws
@@ -2002,7 +2034,7 @@ public actor AuthStore {
       id: UUID(), senderID: current.id, recipientID: request.recipientID, body: body,
       createdAt: now, readAt: nil)
     state.directMessages.append(message)
-    state.notifications.append(
+    appendNotification(
       .init(
         id: UUID(), recipientID: request.recipientID, actorID: current.id, kind: .directMessage,
         createdAt: now, readAt: nil))
