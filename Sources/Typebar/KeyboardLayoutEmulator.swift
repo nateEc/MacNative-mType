@@ -335,6 +335,34 @@ enum KeyboardLayoutEmulator {
           + "0:kK 1:lL 2:mM 3:nN 5:oO 4:pP 38:qQ 40:rR 37:sS 41:;: 39:'\" "
           + "6:tT 7:uU 8:vV 9:wW 11:xX 45:yY 46:zZ 43:,< 47:.> 44:/?"
       )
+    case .ansiHandsDown:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:qQ 13:cC 14:hH 15:pP 17:vV 16:kK 32:yY 34:oO 31:jJ 35:/? 33:[{ 30:]} 42:\\| "
+          + "0:rR 1:sS 2:nN 3:tT 5:gG 4:wW 38:uU 40:eE 37:iI 41:aA 39:;: "
+          + "6:xX 7:mM 8:lL 9:dD 11:bB 45:zZ 46:fF 43:'\" 47:,< 44:.>"
+      )
+    case .ansiHandsDownAlt:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:wW 13:gG 14:hH 15:mM 17:kK 16:qQ 32:cC 34:uU 31:jJ 35:'\" 33:[{ 30:]} 42:\\| "
+          + "0:rR 1:sS 2:nN 3:tT 5:fF 4:yY 38:aA 40:eE 37:oO 41:iI 39:;: "
+          + "6:xX 7:bB 8:lL 9:dD 11:vV 45:zZ 46:pP 43:,< 47:.> 44:/?"
+      )
+    case .ansiHandsDownNeu:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8? 25:9< 29:0> 27:=_ 24:\\| "
+          + "12:wW 13:fF 14:mM 15:pP 17:vV 16:/* 32:.: 34:qQ 31:\"[ 35:'] 33:zZ 30:({ 42:)} "
+          + "0:rR 1:sS 2:nN 3:tT 5:bB 4:,; 38:aA 40:eE 37:iI 41:hH 39:jJ "
+          + "6:xX 7:cC 8:lL 9:dD 11:gG 45:-+ 46:uU 43:oO 47:yY 44:kK"
+      )
+    case .ansiHandsDownNeuInverted:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8? 25:9< 29:0> 27:=_ 24:\\| "
+          + "12:xX 13:cC 14:lL 15:dD 17:gG 16:-+ 32:uU 34:oO 31:yY 35:kK 33:zZ 30:({ 42:)} "
+          + "0:rR 1:sS 2:nN 3:tT 5:bB 4:,; 38:aA 40:eE 37:iI 41:hH 39:jJ "
+          + "6:wW 7:fF 8:mM 9:pP 11:vV 45:/* 46:.: 43:qQ 47:\"[ 44:']"
+      )
     case .ansiColemak:
       map(
         "12:qQ 13:wW 14:fF 15:pP 17:gG 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "

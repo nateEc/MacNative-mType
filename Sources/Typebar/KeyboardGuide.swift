@@ -53,6 +53,10 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case frenchBepo
   case frenchBepoAFNOR
   case ansiAlpha
+  case ansiHandsDown
+  case ansiHandsDownAlt
+  case ansiHandsDownNeu
+  case ansiHandsDownNeuInverted
   case turkishQ
   case turkishF
   case turkishE
@@ -137,6 +141,10 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .frenchBepo: "French Bépo"
     case .frenchBepoAFNOR: "French Bépo (AFNOR)"
     case .ansiAlpha: "ANSI Alpha"
+    case .ansiHandsDown: "ANSI Hands Down"
+    case .ansiHandsDownAlt: "ANSI Hands Down Alt"
+    case .ansiHandsDownNeu: "ANSI Hands Down Neu"
+    case .ansiHandsDownNeuInverted: "ANSI Hands Down Neu Inverted"
     case .turkishQ: "Turkish Q"
     case .turkishF: "Turkish F"
     case .turkishE: "Turkish E"
@@ -226,6 +234,10 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case frenchBepo
   case frenchBepoAFNOR
   case ansiAlpha
+  case ansiHandsDown
+  case ansiHandsDownAlt
+  case ansiHandsDownNeu
+  case ansiHandsDownNeuInverted
   case turkishQ
   case turkishF
   case turkishE
@@ -997,6 +1009,66 @@ enum KeyboardGuideModel {
         row("top", "ABCDEFGHIJ[]\\"),
         row("home", "KLMNOPQRS;'"),
         row("bottom", "TUVWXYZ,./"),
+      ]
+    case .ansiHandsDown:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QCHPVKYOJ/[]\\"),
+        row("home", "RSNTGWUEIA;"),
+        row("bottom", "XMLDBZF',."),
+      ]
+    case .ansiHandsDownAlt:
+      [
+        row("number", "`1234567890-="),
+        row("top", "WGHMKQCUJ'[]\\"),
+        row("home", "RSNTFYAEOI;"),
+        row("bottom", "XBLDVZP,./"),
+      ]
+    case .ansiHandsDownNeu:
+      [
+        row(
+          "number", labels: ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "=", "\\"],
+          characters: ["`~", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8?", "9<", "0>", "=_", "\\|"],
+          shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "?", "<", ">", "_", "|"]
+        ),
+        row(
+          "top", labels: ["w", "f", "m", "p", "v", "/", ".", "q", "\"", "'", "z", "(", ")"],
+          characters: ["wW", "fF", "mM", "pP", "vV", "/*", ".:", "qQ", "\"[", "']", "zZ", "({", ")}"],
+          shiftedLabels: ["W", "F", "M", "P", "V", "*", ":", "Q", "[", "]", "Z", "{", "}"]
+        ),
+        row(
+          "home", labels: ["r", "s", "n", "t", "b", ",", "a", "e", "i", "h", "j"],
+          characters: ["rR", "sS", "nN", "tT", "bB", ",;", "aA", "eE", "iI", "hH", "jJ"],
+          shiftedLabels: ["R", "S", "N", "T", "B", ";", "A", "E", "I", "H", "J"]
+        ),
+        row(
+          "bottom", labels: ["x", "c", "l", "d", "g", "-", "u", "o", "y", "k"],
+          characters: ["xX", "cC", "lL", "dD", "gG", "-+", "uU", "oO", "yY", "kK"],
+          shiftedLabels: ["X", "C", "L", "D", "G", "+", "U", "O", "Y", "K"]
+        ),
+      ]
+    case .ansiHandsDownNeuInverted:
+      [
+        row(
+          "number", labels: ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "=", "\\"],
+          characters: ["`~", "1!", "2@", "3#", "4$", "5%", "6^", "7&", "8?", "9<", "0>", "=_", "\\|"],
+          shiftedLabels: ["~", "!", "@", "#", "$", "%", "^", "&", "?", "<", ">", "_", "|"]
+        ),
+        row(
+          "top", labels: ["x", "c", "l", "d", "g", "-", "u", "o", "y", "k", "z", "(", ")"],
+          characters: ["xX", "cC", "lL", "dD", "gG", "-+", "uU", "oO", "yY", "kK", "zZ", "({", ")}"],
+          shiftedLabels: ["X", "C", "L", "D", "G", "+", "U", "O", "Y", "K", "Z", "{", "}"]
+        ),
+        row(
+          "home", labels: ["r", "s", "n", "t", "b", ",", "a", "e", "i", "h", "j"],
+          characters: ["rR", "sS", "nN", "tT", "bB", ",;", "aA", "eE", "iI", "hH", "jJ"],
+          shiftedLabels: ["R", "S", "N", "T", "B", ";", "A", "E", "I", "H", "J"]
+        ),
+        row(
+          "bottom", labels: ["w", "f", "m", "p", "v", "/", ".", "q", "\"", "'"],
+          characters: ["wW", "fF", "mM", "pP", "vV", "/*", ".:", "qQ", "\"[", "']"],
+          shiftedLabels: ["W", "F", "M", "P", "V", "*", ":", "Q", "[", "]"]
+        ),
       ]
     case .ansiColemak:
       [
