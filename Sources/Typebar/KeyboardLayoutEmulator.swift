@@ -1079,6 +1079,47 @@ enum KeyboardLayoutEmulator {
           normal: ["`1234567890-=", "vmlcpxfouj[]", "strdy.naei/\\", "zkqgw!bh';,"],
           shifted: ["~!@#$%^&*<>_+", "VMLCPXFOUJ{}", "STRDY(NAEI?|", "ZKQGW?BH\":)"]
         ), overrides: [:])
+    case .sturdyOrtho:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "vmlcpxfouj[]\\", "strdy.naei/", "zkqgwbh';,"],
+          shifted: ["~!@#$%^&*()_+", "VMLCPXFOUJ{}|", "STRDY>NAEI?", "ZKQGWBH\":<"]
+        ), overrides: [:])
+    case .hiYou:
+      withBaseFallbackOptionLayers(
+        isoBaseShiftMap(
+          normal: ["`1234567890[]", "kyou'vdlpw/|", "hiea-cstnrx\\", "qj,.;fgmbz="],
+          shifted: ["~!@#$%¨&*(){}", "KYOU\"VDLPW?|", "HIEA_CSTNRX\\", "QJ<>:FGMBZ+"]
+        ), overrides: [:])
+    case .xenia:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", ",ourqjfdvg[]\\", "iaenxyhtsc/", ".';lzkpmbw"],
+          shifted: ["~!@#$%^&*()_+", "<OURQJFDVG{}|", "IAENXYHTSC?", ">\":LZKPMBW"]
+        ), overrides: [:])
+    case .xeniaAlt:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "gvdfjqruo'[]\\", "csthylneai;", "wbmpkzx,./"],
+          shifted: ["~!@#$%^&*()_+", "GVDFJQRUO\"{}|", "CSTHYLNEAI:", "WBMPKZX<>?"]
+        ), overrides: [:])
+    case .burmese:
+      withBaseFallbackOptionLayers(
+        baseShiftMap(
+          keyRows: physicalRows,
+          normalRows: [
+            ["ၐ", "၁", "၂", "၃", "၄", "၅", "၆", "၇", "၈", "၉", "၀", "-", "="],
+            ["ဆ", "တ", "န", "မ", "အ", "ပ", "က", "င", "သ", "စ", "ဟ", "ဩ", "\\"],
+            ["ေ", "ျ", "ိ", "်", "ါ", "့", "ြ", "ု", "ူ", "း", "'"],
+            ["ဖ", "ထ", "ခ", "လ", "ဘ", "ည", "ာ", ",", ".", "/"],
+          ],
+          shiftedRows: [
+            ["ဎ", "ဍ", "ၒ", "ဋ", "ၓ", "ၔ", "ၕ", "ရ", "*", "(", ")", "_", "+"],
+            ["ဈ", "ဝ", "ဣ", "၎", "ဤ", "၌", "ဥ", "၍", "ဿ", "ဏ", "ဧ", "ဪ", "|"],
+            ["ဗ", "ှ", "ီ", "္", "ွ", "ံ", "ဲ", "ဒ", "ဓ", "ဂ", "\""],
+            ["ဇ", "ဌ", "ဃ", "ဠ", "ယ", "ဉ", "ဦ", "၊", "။", "?"],
+          ]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "

@@ -125,6 +125,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ekvertoB = "ekverto_b"
   case sturdyAngleANSI = "sturdy_angle_ansi"
   case sturdyAngleISO = "sturdy_angle_iso"
+  case sturdyOrtho = "sturdy_ortho"
+  case hiYou = "HiYou"
+  case xenia
+  case xeniaAlt = "xenia_alt"
+  case burmese
   case real
   case sertain
   case ctgap
@@ -318,6 +323,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ekvertoB: "Ekverto B"
     case .sturdyAngleANSI: "Sturdy Angle ANSI"
     case .sturdyAngleISO: "Sturdy Angle ISO"
+    case .sturdyOrtho: "Sturdy Ortho"
+    case .hiYou: "HiYou"
+    case .xenia: "Xenia"
+    case .xeniaAlt: "Xenia Alt"
+    case .burmese: "Burmese"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -516,6 +526,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ekvertoB = "ekverto_b"
   case sturdyAngleANSI = "sturdy_angle_ansi"
   case sturdyAngleISO = "sturdy_angle_iso"
+  case sturdyOrtho = "sturdy_ortho"
+  case hiYou = "HiYou"
+  case xenia
+  case xeniaAlt = "xenia_alt"
+  case burmese
   case real
   case sertain
   case ctgap
@@ -2347,6 +2362,41 @@ enum KeyboardGuideModel {
         normal: ["`1234567890-=", "vmlcpxfouj[]", "strdy.naei/\\", "zkqgw!bh';,"],
         shifted: ["~!@#$%^&*<>_+", "VMLCPXFOUJ{}", "STRDY(NAEI?|", "ZKQGW?BH\":)"]
       )
+    case .sturdyOrtho:
+      baseShiftRows(
+        normal: ["`1234567890-=", "vmlcpxfouj[]\\", "strdy.naei/", "zkqgwbh';,"],
+        shifted: ["~!@#$%^&*()_+", "VMLCPXFOUJ{}|", "STRDY>NAEI?", "ZKQGWBH\":<"]
+      )
+    case .hiYou:
+      baseShiftRows(
+        normal: ["`1234567890[]", "kyou'vdlpw/|", "hiea-cstnrx\\", "qj,.;fgmbz="],
+        shifted: ["~!@#$%¨&*(){}", "KYOU\"VDLPW?|", "HIEA_CSTNRX\\", "QJ<>:FGMBZ+"]
+      )
+    case .xenia:
+      baseShiftRows(
+        normal: ["`1234567890-=", ",ourqjfdvg[]\\", "iaenxyhtsc/", ".';lzkpmbw"],
+        shifted: ["~!@#$%^&*()_+", "<OURQJFDVG{}|", "IAENXYHTSC?", ">\":LZKPMBW"]
+      )
+    case .xeniaAlt:
+      baseShiftRows(
+        normal: ["`1234567890-=", "gvdfjqruo'[]\\", "csthylneai;", "wbmpkzx,./"],
+        shifted: ["~!@#$%^&*()_+", "GVDFJQRUO\"{}|", "CSTHYLNEAI:", "WBMPKZX<>?"]
+      )
+    case .burmese:
+      baseShiftRows(
+        normalLabels: [
+          ["ၐ", "၁", "၂", "၃", "၄", "၅", "၆", "၇", "၈", "၉", "၀", "-", "="],
+          ["ဆ", "တ", "န", "မ", "အ", "ပ", "က", "င", "သ", "စ", "ဟ", "ဩ", "\\"],
+          ["ေ", "ျ", "ိ", "်", "ါ", "့", "ြ", "ု", "ူ", "း", "'"],
+          ["ဖ", "ထ", "ခ", "လ", "ဘ", "ည", "ာ", ",", ".", "/"],
+        ],
+        shiftedLabels: [
+          ["ဎ", "ဍ", "ၒ", "ဋ", "ၓ", "ၔ", "ၕ", "ရ", "*", "(", ")", "_", "+"],
+          ["ဈ", "ဝ", "ဣ", "၎", "ဤ", "၌", "ဥ", "၍", "ဿ", "ဏ", "ဧ", "ဪ", "|"],
+          ["ဗ", "ှ", "ီ", "္", "ွ", "ံ", "ဲ", "ဒ", "ဓ", "ဂ", "\""],
+          ["ဇ", "ဌ", "ဃ", "ဠ", "ယ", "ဉ", "ဦ", "၊", "။", "?"],
+        ]
+      )
     case .real:
       [
         row("number", "`1234567890[]"),
@@ -3815,7 +3865,7 @@ private extension KeyboardLayout {
       || self == .stndc || self == .uciea || self == .diktor || self == .diktorVoronovMod
       || self == .redaktor || self == .juiyaf || self == .zubachev
       || self == .colemakQix || self == .colemakQi || self == .colemaQ
-      || self == .thaiManoonchai
+      || self == .thaiManoonchai || self == .burmese
   }
 }
 
