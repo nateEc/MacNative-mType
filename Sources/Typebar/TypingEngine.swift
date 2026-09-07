@@ -1727,6 +1727,29 @@ enum TypingReplay {
   }
 }
 
+/// Classifies the final accepted text without changing Typebar's scoring.
+/// `missed` counts target positions skipped by an early word commit, so it is
+/// intentionally separate from the accepted-character conservation total.
+struct ResultCharacterStats: Codable, Equatable {
+  let matched: Int
+  let incorrect: Int
+  let extra: Int
+  let missed: Int
+
+  init(matched: Int, incorrect: Int, extra: Int, missed: Int) {
+    self.matched = max(0, matched)
+    self.incorrect = max(0, incorrect)
+    self.extra = max(0, extra)
+    self.missed = max(0, missed)
+  }
+
+  static func legacy(typedCharacterCount: Int, correctCharacterCount: Int) -> Self {
+    let typed = max(0, typedCharacterCount)
+    let matched = min(typed, max(0, correctCharacterCount))
+    return .init(matched: matched, incorrect: typed - matched, extra: 0, missed: 0)
+  }
+}
+
 struct CompletedTestResult: Codable, Equatable, Identifiable {
   let id: UUID
   let configuration: TestConfiguration
@@ -1740,6 +1763,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let wpm: Int
   let rawWpm: Int
   let accuracy: Int
+  let characterStats: ResultCharacterStats
   let tags: [String]
   let prompt: String
   let replayEvents: [TypingReplayEvent]
@@ -1757,6 +1781,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     wpm: Int,
     rawWpm: Int,
     accuracy: Int,
+    characterStats: ResultCharacterStats? = nil,
     tags: [String] = [],
     prompt: String = "",
     replayEvents: [TypingReplayEvent] = []
@@ -1773,6 +1798,9 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.wpm = wpm
     self.rawWpm = rawWpm
     self.accuracy = accuracy
+    self.characterStats = characterStats ?? .legacy(
+      typedCharacterCount: typedCharacterCount,
+      correctCharacterCount: correctCharacterCount)
     self.tags = tags
     self.prompt = prompt
     self.replayEvents = replayEvents
@@ -1793,7 +1821,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
 
   private enum CodingKeys: String, CodingKey {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
-      afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, tags, prompt, replayEvents
+      afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
+      tags, prompt, replayEvents
   }
 
   init(from decoder: Decoder) throws {
@@ -1810,6 +1839,10 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     wpm = try values.decode(Int.self, forKey: .wpm)
     rawWpm = try values.decode(Int.self, forKey: .rawWpm)
     accuracy = try values.decode(Int.self, forKey: .accuracy)
+    characterStats = try values.decodeIfPresent(ResultCharacterStats.self, forKey: .characterStats)
+      ?? .legacy(
+        typedCharacterCount: typedCharacterCount,
+        correctCharacterCount: correctCharacterCount)
     tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
     prompt = try values.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     replayEvents = try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? []
@@ -1992,6 +2025,44 @@ struct TypingSession {
   }
 
   var correctCharacters: Int { max(0, typed.count - errors) }
+
+  /// A native final-state classification derived from the accepted input's
+  /// exact target mapping. It is descriptive only and never feeds scoring.
+  var characterStats: ResultCharacterStats {
+    if configuration.mode == .zen {
+      return .init(matched: typed.count, incorrect: 0, extra: 0, missed: 0)
+    }
+
+    let typedCharacters = Array(typed)
+    let targetCharacters = Array(prompt)
+    var matched = 0
+    var incorrect = 0
+    var extra = 0
+    var missed = 0
+    var previousTargetIndex = -1
+
+    for typedIndex in typedCharacters.indices {
+      guard typedTargetIndices.indices.contains(typedIndex),
+        let targetIndex = typedTargetIndices[typedIndex],
+        targetCharacters.indices.contains(targetIndex)
+      else {
+        extra += 1
+        continue
+      }
+      if targetIndex > previousTargetIndex + 1 {
+        missed += targetIndex - previousTargetIndex - 1
+      }
+      previousTargetIndex = max(previousTargetIndex, targetIndex)
+      if typedCharacters[typedIndex] == targetCharacters[targetIndex]
+        && !forcedErrorIndices.contains(targetIndex)
+      {
+        matched += 1
+      } else {
+        incorrect += 1
+      }
+    }
+    return .init(matched: matched, incorrect: incorrect, extra: extra, missed: missed)
+  }
 
   var accuracy: Int {
     guard !typed.isEmpty else { return 100 }
@@ -2227,6 +2298,7 @@ struct TypingSession {
       wpm: wpm(at: date),
       rawWpm: rawWpm(at: date),
       accuracy: accuracy,
+      characterStats: characterStats,
       tags: ResultTagPolicy.normalized(tags),
       prompt: prompt,
       replayEvents: replayEvents

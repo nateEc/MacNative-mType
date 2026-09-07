@@ -689,6 +689,67 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.wordReviews, [.init(index: 0, target: "amber", typed: "amberx")])
   }
 
+  func testResultCharacterStatsClassifyFinalAcceptedInputWithoutChangingScoring() throws {
+    var earlyCommit = TypingSession(configuration: .timed(seconds: 1), prompt: "cat dog")
+    earlyCommit.insert("ca ", at: start)
+    earlyCommit.tick(at: start.addingTimeInterval(1))
+    let earlyResult = try XCTUnwrap(earlyCommit.result(at: start.addingTimeInterval(1)))
+    XCTAssertEqual(
+      earlyResult.characterStats,
+      .init(matched: 2, incorrect: 1, extra: 0, missed: 1))
+    XCTAssertEqual(earlyResult.typedCharacterCount, 3)
+    XCTAssertEqual(earlyResult.correctCharacterCount, 2)
+    XCTAssertEqual(earlyResult.errorCount, 1)
+
+    var extraInput = TypingSession(configuration: .timed(seconds: 1), prompt: "cat dog")
+    extraInput.insert("cats ", at: start)
+    extraInput.tick(at: start.addingTimeInterval(1))
+    XCTAssertEqual(
+      try XCTUnwrap(extraInput.result(at: start.addingTimeInterval(1))).characterStats,
+      .init(matched: 4, incorrect: 0, extra: 1, missed: 0))
+
+    var forcedError = TypingSession(configuration: .timed(seconds: 1), prompt: "cat dog")
+    forcedError.insert("c", forceError: true, at: start)
+    forcedError.insert("at ", at: start)
+    forcedError.tick(at: start.addingTimeInterval(1))
+    XCTAssertEqual(
+      try XCTUnwrap(forcedError.result(at: start.addingTimeInterval(1))).characterStats,
+      .init(matched: 3, incorrect: 1, extra: 0, missed: 0))
+
+    var zen = TypingSession(
+      configuration: .init(
+        mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      prompt: "")
+    zen.insert("hello", forceError: true, at: start)
+    zen.finishZen(at: start.addingTimeInterval(1))
+    XCTAssertEqual(
+      try XCTUnwrap(zen.result(at: start.addingTimeInterval(1))).characterStats,
+      .init(matched: 5, incorrect: 0, extra: 0, missed: 0))
+  }
+
+  func testCompletedResultDecodesLegacyCharacterStatsConservatively() throws {
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(1),
+      typedCharacterCount: 8, correctCharacterCount: 5, errorCount: 4,
+      wpm: 60, rawWpm: 72, accuracy: 63,
+      characterStats: .init(matched: 4, incorrect: 2, extra: 2, missed: 1))
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any])
+    object.removeValue(forKey: "characterStats")
+
+    let restored = try JSONDecoder().decode(
+      CompletedTestResult.self, from: JSONSerialization.data(withJSONObject: object))
+
+    XCTAssertEqual(
+      restored.characterStats,
+      .init(matched: 5, incorrect: 3, extra: 0, missed: 0))
+    XCTAssertEqual(
+      restored.characterStats.matched + restored.characterStats.incorrect
+        + restored.characterStats.extra,
+      restored.typedCharacterCount)
+  }
+
   func testSpaceDelimitedWordInputCapsExtrasButStillAcceptsTheCommitSeparator() {
     var session = TypingSession(
       configuration: .words(2), prompt: "a b")
@@ -4049,13 +4110,15 @@ final class TypingEngineTests: XCTestCase {
       startedAt: Date(timeIntervalSince1970: 0),
       finishedAt: Date(timeIntervalSince1970: 2.5), afkDuration: 0.5,
       typedCharacterCount: 12, correctCharacterCount: 11, errorCount: 1, wpm: 60, rawWpm: 66,
-      accuracy: 92, tags: ["focus, \"deep\"", "café"], prompt: "private prompt",
+      accuracy: 92, characterStats: .init(matched: 9, incorrect: 1, extra: 2, missed: 3),
+      tags: ["focus, \"deep\"", "café"], prompt: "private prompt",
       replayEvents: [.init(offset: 0.5, kind: .insert, text: "bonjour")]
     )
 
     let csv = ResultCSVExport.csvString(for: [result])
     XCTAssertTrue(csv.hasPrefix(ResultCSVExport.columns.joined(separator: ",") + "\r\n"))
     XCTAssertTrue(csv.contains("00000000-0000-0000-0000-000000000007,completed,60,66,92,"))
+    XCTAssertTrue(csv.contains(",11,12,1,9,1,2,3,time,"))
     XCTAssertTrue(csv.contains(",true,true,expert,uppercase;rot13,\"focus, \"\"deep\"\";café\","))
     XCTAssertTrue(csv.contains("1970-01-01T00:00:00"))
     XCTAssertFalse(csv.contains("private prompt"))

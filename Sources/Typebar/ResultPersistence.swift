@@ -21,6 +21,7 @@ final class TestResultRecord {
   var wpm: Int
   var rawWpm: Int
   var accuracy: Int
+  var characterStatsData: Data?
   var tagsData: Data
   var prompt: String
   var replayEventsData: Data?
@@ -38,6 +39,7 @@ final class TestResultRecord {
     wpm = result.wpm
     rawWpm = result.rawWpm
     accuracy = result.accuracy
+    characterStatsData = try? JSONEncoder().encode(result.characterStats)
     tagsData = (try? JSONEncoder().encode(ResultTagPolicy.normalized(result.tags))) ?? Data()
     prompt = result.prompt
     replayEventsData = try? JSONEncoder().encode(result.replayEvents)
@@ -55,6 +57,13 @@ final class TestResultRecord {
   var replayEvents: [TypingReplayEvent] {
     (replayEventsData.flatMap { try? JSONDecoder().decode([TypingReplayEvent].self, from: $0) })
       ?? []
+  }
+
+  var characterStats: ResultCharacterStats {
+    characterStatsData.flatMap { try? JSONDecoder().decode(ResultCharacterStats.self, from: $0) }
+      ?? .legacy(
+        typedCharacterCount: typedCharacterCount,
+        correctCharacterCount: correctCharacterCount)
   }
 
   var engagedDuration: TimeInterval {
@@ -90,6 +99,7 @@ final class TestResultRecord {
       wpm: wpm,
       rawWpm: rawWpm,
       accuracy: accuracy,
+      characterStats: characterStats,
       tags: tags,
       prompt: prompt,
       replayEvents: replayEvents

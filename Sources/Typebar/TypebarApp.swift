@@ -3031,6 +3031,10 @@ private struct CompletedResultView: View {
           metric("总用时", "\(Int(result.elapsedDuration)) 秒")
         }
         GridRow {
+          metric("字符（匹配/错位/额外/跳过）", characterStatsText)
+          metric("输入字符", "\(result.typedCharacterCount)")
+        }
+        GridRow {
           metric("稳定度", "\(consistencyText(consistency.typing))%")
           metric("按键稳定度", "\(consistencyText(consistency.key))%")
         }
@@ -3166,6 +3170,11 @@ private struct CompletedResultView: View {
     .onAppear {
       communityRating = initialCommunityRating
     }
+  }
+
+  private var characterStatsText: String {
+    let stats = result.characterStats
+    return "\(stats.matched)/\(stats.incorrect)/\(stats.extra)/\(stats.missed)"
   }
 
   @ViewBuilder
@@ -4894,6 +4903,10 @@ private struct ResultDetailView: View {
           Text("\(result.correctCharacterCount)")
         }
         GridRow {
+          Text("字符（匹配/错位/额外/跳过）")
+          Text(characterStatsText)
+        }
+        GridRow {
           Text("总用时")
           Text("\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
         }
@@ -4933,6 +4946,11 @@ private struct ResultDetailView: View {
 
   private func consistencyText(_ value: Double) -> String {
     value.formatted(.number.precision(.fractionLength(0...2)))
+  }
+
+  private var characterStatsText: String {
+    let stats = result.characterStats
+    return "\(stats.matched)/\(stats.incorrect)/\(stats.extra)/\(stats.missed)"
   }
 
 }
