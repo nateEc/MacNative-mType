@@ -150,6 +150,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case tarmak2 = "tarmak_2"
   case tarmak3 = "tarmak_3"
   case tarmak4 = "tarmak_4"
+  case stronk
+  case sehtDrai = "seht-drai"
+  case ints
+  case rollla
+  case wreathy
   case real
   case sertain
   case ctgap
@@ -368,6 +373,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .tarmak2: "Tarmak 2"
     case .tarmak3: "Tarmak 3"
     case .tarmak4: "Tarmak 4"
+    case .stronk: "Stronk"
+    case .sehtDrai: "Seht Drai"
+    case .ints: "Ints"
+    case .rollla: "Rollla"
+    case .wreathy: "Wreathy"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -591,6 +601,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case tarmak2 = "tarmak_2"
   case tarmak3 = "tarmak_3"
   case tarmak4 = "tarmak_4"
+  case stronk
+  case sehtDrai = "seht-drai"
+  case ints
+  case rollla
+  case wreathy
   case real
   case sertain
   case ctgap
@@ -2583,6 +2598,31 @@ enum KeyboardGuideModel {
       baseShiftRows(
         normal: ["`1234567890-=", "qwfpgjuiy;[]\\", "arstdhnelo'", "zxcvbkm,./"],
         shifted: ["~!@#$%^&*()_+", "QWFPGJUIY:{}|", "ARSTDHNELO\"", "ZXCVBKM<>?"]
+      )
+    case .stronk:
+      baseShiftRows(
+        normal: ["`1234567890-=", "fdlbvjgou,[]\\", "strnkymaei/", "zqxhpwc';."],
+        shifted: ["~!@#$%^&*()_+", "FDLBVJGOU<{}|", "STRNKYMAEI?", "ZQXHPWC\":>"]
+      )
+    case .sehtDrai:
+      baseShiftRows(
+        normal: ["`1234567890-=", "fulvbqgnoj[]\\", "sehtk'drai.", ";mpwzycx/,"],
+        shifted: ["~!@#$%^&*()_+", "FULVBQGNOJ{}|", "SEHTK\"DRAI>", ":MPWZYCX?<"]
+      )
+    case .ints:
+      baseShiftRows(
+        normal: ["`1234567890-=", "foumjqgdp,[]\\", "haerxvstni;", "'/lwzyckb."],
+        shifted: ["~!@#$%^&*()_+", "FOUMJQGDP<{}|", "HAERXVSTNI:", "\"?LWZYCKB>"]
+      )
+    case .rollla:
+      baseShiftRows(
+        normal: ["`1234567890-=", "youb.xkclv[]\\", "iaen,mhsrt;", "'/pwzfdgjq"],
+        shifted: ["~!@#$%^&*()_+", "YOUB>XKCLV{}|", "IAEN<MHSRT:", "\"?PWZFDGJQ"]
+      )
+    case .wreathy:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qgdfvjluo,[]\\", "nsthywreai;", "bcmpkzx/'."],
+        shifted: ["~!@#$%^&*()_+", "QGDFVJLUO<{}|", "NSTHYWREAI:", "BCMPKZX?\">"]
       )
     case .real:
       [

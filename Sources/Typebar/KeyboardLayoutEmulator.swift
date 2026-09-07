@@ -1266,6 +1266,36 @@ enum KeyboardLayoutEmulator {
           normal: ["`1234567890-=", "qwfpgjuiy;[]\\", "arstdhnelo'", "zxcvbkm,./"],
           shifted: ["~!@#$%^&*()_+", "QWFPGJUIY:{}|", "ARSTDHNELO\"", "ZXCVBKM<>?"]
         ), overrides: [:])
+    case .stronk:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "fdlbvjgou,[]\\", "strnkymaei/", "zqxhpwc';."],
+          shifted: ["~!@#$%^&*()_+", "FDLBVJGOU<{}|", "STRNKYMAEI?", "ZQXHPWC\":>"]
+        ), overrides: [:])
+    case .sehtDrai:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "fulvbqgnoj[]\\", "sehtk'drai.", ";mpwzycx/,"],
+          shifted: ["~!@#$%^&*()_+", "FULVBQGNOJ{}|", "SEHTK\"DRAI>", ":MPWZYCX?<"]
+        ), overrides: [:])
+    case .ints:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "foumjqgdp,[]\\", "haerxvstni;", "'/lwzyckb."],
+          shifted: ["~!@#$%^&*()_+", "FOUMJQGDP<{}|", "HAERXVSTNI:", "\"?LWZYCKB>"]
+        ), overrides: [:])
+    case .rollla:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "youb.xkclv[]\\", "iaen,mhsrt;", "'/pwzfdgjq"],
+          shifted: ["~!@#$%^&*()_+", "YOUB>XKCLV{}|", "IAEN<MHSRT:", "\"?PWZFDGJQ"]
+        ), overrides: [:])
+    case .wreathy:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", "qgdfvjluo,[]\\", "nsthywreai;", "bcmpkzx/'."],
+          shifted: ["~!@#$%^&*()_+", "QGDFVJLUO<{}|", "NSTHYWREAI:", "BCMPKZX?\">"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
