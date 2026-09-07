@@ -165,6 +165,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case dusk
   case panini
   case paniniWide = "panini_wide"
+  case sword
+  case opy
+  case ergoSplit46 = "ergo_split46"
+  case gralmak = "Gralmak"
+  case vitrimak
   case real
   case sertain
   case ctgap
@@ -398,6 +403,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .dusk: "Dusk"
     case .panini: "Panini"
     case .paniniWide: "Panini Wide"
+    case .sword: "Sword"
+    case .opy: "OPY"
+    case .ergoSplit46: "Ergo Split 46"
+    case .gralmak: "Gralmak"
+    case .vitrimak: "Vitrimak"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -636,6 +646,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case dusk
   case panini
   case paniniWide = "panini_wide"
+  case sword
+  case opy
+  case ergoSplit46 = "ergo_split46"
+  case gralmak = "Gralmak"
+  case vitrimak
   case real
   case sertain
   case ctgap
@@ -2703,6 +2718,31 @@ enum KeyboardGuideModel {
       baseShiftRows(
         normal: ["`1234567890-=", "vwlyk[jfou.,\\", "crstp]bnaei", "zxdgq/mh';"],
         shifted: ["~!@#$%^&*()_+", "VWLYK{JFOU><|", "CRSTP}BNAEI", "ZXDGQ?MH\":"]
+      )
+    case .sword:
+      baseShiftRows(
+        normal: ["`1234567890-=", "qjourympwv[]\\", "zeaincltsk;", ";x,.fghdb'"],
+        shifted: ["~!@#$%^&*()_+", "QJOURYMPWV{}|", "ZEAINCLTSK:", ":X<>FGHDB\""]
+      )
+    case .opy:
+      baseShiftRows(
+        normal: ["`1234567890ß=", "qzopywcmvß[]\\", "haeiudtnsr'", "jöäkübglfx"],
+        shifted: ["~!\"§$%&/()=?+", "QZOPYWCMV§{}|", "HAEIUDTNSR\"", "JÖÄKÜBGLFX"]
+      )
+    case .ergoSplit46:
+      baseShiftRows(
+        normal: ["`1234567890/=", "qwop`?mdjk[]\\", "asenflrtiu'", "zxcv,.hbgy"],
+        shifted: ["~€«»$%^&*#@_+", "QWOP˜!MDJK{}|", "ASENFLRTIU\"", "ZXCV;:HBGY"]
+      )
+    case .gralmak:
+      baseShiftRows(
+        normal: ["`1234567890-=", "bldwqjfou'[]\\", "nrtsgyhaei;", "zxmcvkp,./"],
+        shifted: ["~!@#$%^&*()_+", "BLDWQJFOU\"{}|", "NRTSGYHAEI:", "ZXMCVKP<>?"]
+      )
+    case .vitrimak:
+      baseShiftRows(
+        normal: ["`1234567890-=", "tkvumiajbr[]\\", "wx/fpdgq,s;", "h.'colnzye"],
+        shifted: ["~!@#$%^&*()_+", "TKVUMIAJBR{}|", "WX?FPDGQ<S:", "H>\"COLNZYE"]
       )
     case .real:
       [
