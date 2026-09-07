@@ -2248,6 +2248,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "urdish-aaj-ka-step",
+      title: "Aaj ka step",
+      text: "Aaj ek aahista step lo aur next kaam clear rakho.",
+      language: .urdish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "urdish-khuli-notebook",
+      title: "Khuli notebook",
+      text: "Khuli notebook har mushkil sawal solve nahin karti, lekin thoughts ko small parts mein arrange karne ki jagah deti hai.",
+      language: .urdish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "urdish-chhota-progress",
+      title: "Chhota progress",
+      text: "Progress hamesha ek big moment mein nazar nahin aati. Wohi page kholo, ek sentence clear karo, chhoti mistake fix karo aur next try ke liye useful note rakh do.",
+      language: .urdish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "urdish-lambi-table",
+      title: "Lambi table",
+      text: "Lambi table par different kaamon ke liye jagah hoti hai. Ek side par first draft ho sakta hai, dusri side par woh sentence jo abhi attention chahta hai, aur beech mein ek small decision wait karta hai. Practice bhi isi tarah aage barhti hai: har difficult hissa ek hi baar mein solve karna zaruri nahin. Wapas aane ki jagah, next clear step aur chand tries ka sabr ho to rasta aahista aahista easy hota hai.",
+      language: .urdish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "tamil-calm-step",
       title: "அமைதியான அடி",
       text: "ஒரு அமைதியான அடி அடுத்த வேலையைத் தெளிவாக்கும்.",
@@ -2276,6 +2304,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "tanglish-inniku-step",
+      title: "Inniku step",
+      text: "Inniku oru small step eduthu next task-ai clear pannalaam.",
+      language: .tanglish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "tanglish-open-notebook",
+      title: "Open notebook",
+      text: "Open notebook ellaa hard question-um solve pannaathu, aana idea-vai small parts-aa paarka space kudukkum.",
+      language: .tanglish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "tanglish-chinna-work",
+      title: "Chinna work",
+      text: "Progress eppavum oru big moment-la theriyathu. Same page-ai open pannu, oru sentence-ai clear pannu, chinna mistake-ai fix pannu, next try-kku useful note ezhuthu.",
+      language: .tanglish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "tanglish-neenda-table",
+      title: "Neenda table",
+      text: "Neenda table-la different work-kku space irukkum. Oru side-la first draft irukkalaam, innoru side-la innum attention venum sentence irukkalaam, middle-la oru small decision wait pannum. Practice-um ippadi dhaan move aagum: ellaa hard part-aiyum ore try-la solve panna vendam. Thirumbi vara space, next clear step, konjam patience irundhaal pala tries-kku appuram enna easy aagudhu-nu paarkalaam.",
+      language: .tanglish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hindi-calm-step",
       title: "शांत कदम",
       text: "एक शांत कदम अगले काम को स्पष्ट बनाता है।",
@@ -2301,6 +2357,34 @@ enum OfflineContent {
       title: "लंबी मेज़",
       text: "लंबी मेज़ अलग-अलग कामों के लिए जगह बनाती है। उसके एक सिरे पर पहला मसौदा हो सकता है और दूसरे सिरे पर वह वाक्य जिसे अभी ध्यान चाहिए; इन दोनों के बीच एक छोटा निर्णय प्रतीक्षा करता है। अभ्यास भी इसी तरह आगे बढ़ता है: हर कठिन हिस्से को एक ही बार में हल करना आवश्यक नहीं है। वापस आने की जगह, अगला स्पष्ट कदम और इतना धैर्य पर्याप्त है कि कुछ प्रयासों के बाद दिख सके कि क्या आसान हो गया है।",
       language: .hindi,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "hinglish-aaj-ka-step",
+      title: "Aaj ka step",
+      text: "Aaj ek calm step lo aur next task ko clear rakho.",
+      language: .hinglish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "hinglish-open-notebook",
+      title: "Open notebook",
+      text: "Open notebook har difficult sawaal solve nahi karti, lekin thoughts ko small parts mein dekhne ki jagah deti hai.",
+      language: .hinglish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "hinglish-chhota-work",
+      title: "Chhota work",
+      text: "Progress hamesha ek big moment mein nahi dikhti. Same page kholo, ek sentence clear karo, chhoti mistake fix karo aur next try ke liye useful note rakh do.",
+      language: .hinglish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "hinglish-lambi-table",
+      title: "Lambi table",
+      text: "Lambi table par different work ke liye space hoti hai. Ek side par first draft ho sakta hai, doosri side par woh sentence jo abhi attention maangta hai, aur beech mein ek small decision wait karta hai. Practice bhi isi tarah aage badhti hai: har difficult part ko ek hi try mein solve karna zaruri nahi. Wapas aane ki jagah, next clear step aur thoda patience ho to kuch tries ke baad rasta easy lagne lagta hai.",
+      language: .hinglish,
       length: .extended
     ),
     OfflineQuote(

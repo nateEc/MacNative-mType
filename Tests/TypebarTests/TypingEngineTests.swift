@@ -4352,8 +4352,11 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.santaliWords,
       StarterLexicon.persianRomanizedWords,
       StarterLexicon.urduRomanWords,
+      StarterLexicon.urdishWords,
       StarterLexicon.tamilWords,
+      StarterLexicon.tanglishWords,
       StarterLexicon.hindiWords,
+      StarterLexicon.hinglishWords,
       StarterLexicon.gujaratiWords,
       StarterLexicon.banglaWords,
       StarterLexicon.thaiWords,
@@ -4397,7 +4400,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 120)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 123)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -4691,6 +4694,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .nepaliRomanized), "en")
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .sanskritRoman), "sa")
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .bulgarianLatin), "bg")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .urdish), "en")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .tanglish), "en")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .hinglish), "en")
     XCTAssertEqual(LivePracticeContentSource.selected(for: .words(
       5, language: .yiddish).with(modifiers: [.referenceStream])), .encyclopedia)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .yiddish), "yi")
@@ -6128,6 +6134,7 @@ final class TypingEngineTests: XCTestCase {
       (.santali, StarterLexicon.santaliWords),
       (.persianRomanized, StarterLexicon.persianRomanizedWords),
       (.urduRoman, StarterLexicon.urduRomanWords),
+      (.urdish, StarterLexicon.urdishWords),
       (.yiddish, StarterLexicon.yiddishWords),
       (.arabic, StarterLexicon.arabicWords),
       (.arabicEgypt, StarterLexicon.arabicEgyptWords),
@@ -6139,7 +6146,9 @@ final class TypingEngineTests: XCTestCase {
       (.urdu, StarterLexicon.urduWords),
       (.kurdishCentral, StarterLexicon.kurdishCentralWords),
       (.tamil, StarterLexicon.tamilWords),
+      (.tanglish, StarterLexicon.tanglishWords),
       (.hindi, StarterLexicon.hindiWords),
+      (.hinglish, StarterLexicon.hinglishWords),
       (.gujarati, StarterLexicon.gujaratiWords),
       (.bangla, StarterLexicon.banglaWords),
       (.thai, StarterLexicon.thaiWords),
@@ -6651,6 +6660,22 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
       XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
     }
+    for (language, words, sample) in [
+      (TypingLanguage.urdish, StarterLexicon.urdishWords, "hello"),
+      (.tanglish, StarterLexicon.tanglishWords, "vanakkam"),
+      (.hinglish, StarterLexicon.hinglishWords, "namaste"),
+    ] {
+      XCTAssertTrue(words.contains(sample))
+      XCTAssertFalse(language.usesRightToLeftPrompt)
+      XCTAssertFalse(language.usesJoiningScriptPrompt)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertTrue(language.supportsLazyLatinInput)
+      XCTAssertTrue(language.supportsQuotes)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    }
     XCTAssertTrue(StarterLexicon.yiddishWords.contains("בוך"))
     XCTAssertTrue(TypingLanguage.yiddish.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.yiddish.usesJoiningScriptPrompt)
@@ -7154,6 +7179,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.nepaliRomanized.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.sanskritRoman.speechLocaleIdentifier, "sa")
     XCTAssertEqual(TypingLanguage.bulgarianLatin.speechLocaleIdentifier, "bg")
+    XCTAssertEqual(TypingLanguage.urdish.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.tanglish.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(TypingLanguage.hinglish.speechLocaleIdentifier, "en-US")
     XCTAssertEqual(TypingLanguage.yiddish.speechLocaleIdentifier, "yi")
     XCTAssertEqual(TypingLanguage.arabic.speechLocaleIdentifier, "ar-SA")
     XCTAssertEqual(TypingLanguage.arabicEgypt.speechLocaleIdentifier, "ar-EG")
