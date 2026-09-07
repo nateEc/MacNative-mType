@@ -220,6 +220,13 @@ enum KeyboardLayoutEmulator {
         "12:qQ 13:wW 14:fF 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "
           + "0:aA 1:rR 2:sS 3:tT 5:gG 4:mM 38:nN 40:eE 37:iI 41:oO 39:'\" "
           + "6:xX 7:cC 8:dD 9:vV 11:zZ 45:kK 46:hH 43:,< 47:.> 44:/?")
+    case .ansiColemakDHV:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:=+ 24:[{ "
+          + "12:qQ 13:wW 14:cC 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:;: 33:-_ 30:]} 42:\\| "
+          + "0:aA 1:rR 2:sS 3:tT 5:gG 4:mM 38:nN 40:eE 37:iI 41:oO 39:'\" "
+          + "6:zZ 7:xX 8:fF 9:dD 11:kK 45:vV 46:hH 43:/? 47:.> 44:,<"
+      )
     case .colemakDHISO:
       map(
         "12:qQ 13:wW 14:fF 15:pP 17:bB 16:jJ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} "
@@ -264,6 +271,13 @@ enum KeyboardLayoutEmulator {
         "12:qQ 13:dD 14:rR 15:wW 17:bB 16:jJ 32:fF 34:uU 31:pP 35:;: 33:[{ 30:]} "
           + "0:aA 1:sS 2:hH 3:tT 5:gG 4:yY 38:nN 40:eE 37:oO 41:iI 39:'\" "
           + "6:zZ 7:xX 8:mM 9:cC 11:vV 45:kK 46:lL 43:,< 47:.> 44:/?")
+    case .programmerWorkman:
+      map(
+        "50:`~ 18:!1 19:@2 20:#3 21:$4 23:%5 22:^6 26:&7 28:*8 25:(9 29:)0 27:-_ 24:=+ "
+          + "12:qQ 13:dD 14:rR 15:wW 17:bB 16:jJ 32:fF 34:uU 31:pP 35:;: 33:{[ 30:}] 42:\\| "
+          + "0:aA 1:sS 2:hH 3:tT 5:gG 4:yY 38:nN 40:eE 37:oO 41:iI 39:'\" "
+          + "6:zZ 7:xX 8:mM 9:cC 11:vV 45:kK 46:lL 43:,< 47:.> 44:/?"
+      )
     case .germanQwertz:
       map(
         "50:^° 18:1! 19:2\" 20:3§ 21:4$ 23:5% 22:6& 26:7/ 28:8( 25:9) 29:0= 27:ß? 24:´` "
@@ -386,6 +400,13 @@ enum KeyboardLayoutEmulator {
           + "12:fF 13:gG 14:ğĞ 15:ıI 17:oO 16:dD 32:rR 34:nN 31:hH 35:pP 33:qQ 30:wW "
           + "0:uU 1:iİ 2:eE 3:aA 5:üÜ 4:tT 38:kK 40:mM 37:lL 41:yY 39:şŞ 42:xX "
           + "10:<> 6:jJ 7:öÖ 8:vV 9:cC 11:çÇ 45:zZ 46:sS 43:bB 47:.: 44:,;"
+      )
+    case .turkishE:
+      map(
+        "50:*+ 18:1! 19:2\" 20:3^ 21:4$ 23:5% 22:6& 26:7' 28:8( 25:9) 29:0= 27:/? 24:-_ "
+          + "12:qQ 13:jJ 14:üÜ 15:oO 17:fF 16:cC 32:tT 34:mM 31:kK 35:bB 33:sS 30:pP "
+          + "0:eE 1:aA 2:iİ 3:ıI 5:gG 4:ğĞ 38:lL 40:nN 37:rR 41:dD 39:vV 42:,; "
+          + "10:<> 6:xX 7:wW 8:öÖ 9:uU 11:hH 45:zZ 46:çÇ 43:yY 47:şŞ 44:.:"
       )
     case .hungarianQwertz:
       map(

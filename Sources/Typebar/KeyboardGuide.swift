@@ -10,6 +10,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case ansiColemakAngle
   case ansiColemakWide
   case ansiColemakDH
+  case ansiColemakDHV
   case colemakDHISO
   case colemakDHMatrix
   case colemakDHWideANSI
@@ -18,6 +19,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case colemakDHKISO
   case ansiNorman
   case ansiWorkman
+  case programmerWorkman
   case germanQwertz
   case swissGerman
   case swissFrench
@@ -36,6 +38,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case frenchAzerty
   case turkishQ
   case turkishF
+  case turkishE
   case hungarianQwertz
   case greekAlphabetic
   case russianJcuken
@@ -74,6 +77,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .ansiColemakAngle: "ANSI Colemak Angle"
     case .ansiColemakWide: "ANSI Colemak Wide"
     case .ansiColemakDH: "ANSI Colemak-DH"
+    case .ansiColemakDHV: "ANSI Colemak-DHv"
     case .colemakDHISO: "Colemak-DH ISO"
     case .colemakDHMatrix: "Colemak-DH Matrix"
     case .colemakDHWideANSI: "Colemak-DH Wide ANSI"
@@ -82,6 +86,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .colemakDHKISO: "Colemak-DHk ISO"
     case .ansiNorman: "ANSI Norman"
     case .ansiWorkman: "ANSI Workman"
+    case .programmerWorkman: "Programmer Workman"
     case .germanQwertz: "German QWERTZ"
     case .swissGerman: "Swiss German"
     case .swissFrench: "Swiss French"
@@ -100,6 +105,7 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .frenchAzerty: "French AZERTY"
     case .turkishQ: "Turkish Q"
     case .turkishF: "Turkish F"
+    case .turkishE: "Turkish E"
     case .hungarianQwertz: "Hungarian QWERTZ · Typebar"
     case .greekAlphabetic: "Greek Alphabetic · Typebar"
     case .russianJcuken: "Russian JCUKEN"
@@ -143,6 +149,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case ansiColemakAngle
   case ansiColemakWide
   case ansiColemakDH
+  case ansiColemakDHV
   case colemakDHISO
   case colemakDHMatrix
   case colemakDHWideANSI
@@ -151,6 +158,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case colemakDHKISO
   case ansiNorman
   case ansiWorkman
+  case programmerWorkman
   case germanQwertz
   case swissGerman
   case swissFrench
@@ -169,6 +177,7 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case frenchAzerty
   case turkishQ
   case turkishF
+  case turkishE
   case hungarianQwertz
   case greekAlphabetic
   case russianJcuken
@@ -718,6 +727,13 @@ enum KeyboardGuideModel {
         row("home", "ARSTGMNEIO'"),
         row("bottom", "XCDVZKH,./"),
       ]
+    case .ansiColemakDHV:
+      [
+        row("number", "1234567890=["),
+        row("top", "QWCPBJLUY;-]\\"),
+        row("home", "ARSTGMNEIO'"),
+        row("bottom", "ZXFDKVH/.,"),
+      ]
     case .colemakDHISO:
       [
         row("number", "1234567890-="),
@@ -771,6 +787,21 @@ enum KeyboardGuideModel {
       [
         row("number", "1234567890-="),
         row("top", "QDRWBJFUP;[]"),
+        row("home", "ASHTGYNEOI'"),
+        row("bottom", "ZXMCVKL,./"),
+      ]
+    case .programmerWorkman:
+      [
+        row(
+          "number", "!@#$%^&*()-=",
+          characters: ["!1", "@2", "#3", "$4", "%5", "^6", "&7", "*8", "(9", ")0", "-_", "=+"],
+          shiftedLabels: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "_", "+"]
+        ),
+        row(
+          "top", "QDRWBJFUP;{}\\",
+          characters: ["qQ", "dD", "rR", "wW", "bB", "jJ", "fF", "uU", "pP", ";:", "{[", "}]", "\\|"],
+          shiftedLabels: ["Q", "D", "R", "W", "B", "J", "F", "U", "P", ":", "[", "]", "|"]
+        ),
         row("home", "ASHTGYNEOI'"),
         row("bottom", "ZXMCVKL,./"),
       ]
@@ -1098,6 +1129,28 @@ enum KeyboardGuideModel {
           "bottom", "<JÖVCÇZSB.,",
           characters: ["<>", "jJ", "öÖ", "vV", "cC", "çÇ", "zZ", "sS", "bB", ".:", ",;"],
           shiftedLabels: [">", "J", "Ö", "V", "C", "Ç", "Z", "S", "B", ":", ";"]
+        ),
+      ]
+    case .turkishE:
+      [
+        row(
+          "number", "*1234567890/-",
+          characters: ["*+", "1!", "2\"", "3^", "4$", "5%", "6&", "7'", "8(", "9)", "0=", "/?", "-_"],
+          shiftedLabels: ["+", "!", "\"", "^", "$", "%", "&", "'", "(", ")", "=", "?", "_"]
+        ),
+        row(
+          "top", "QJÜOFCTMKBSP",
+          characters: ["qQ", "jJ", "üÜ", "oO", "fF", "cC", "tT", "mM", "kK", "bB", "sS", "pP"]
+        ),
+        row(
+          "home", "EAİIGĞLNRDV,",
+          characters: ["eE", "aA", "iİ", "ıI", "gG", "ğĞ", "lL", "nN", "rR", "dD", "vV", ",;"],
+          shiftedLabels: ["E", "A", "İ", "I", "G", "Ğ", "L", "N", "R", "D", "V", ";"]
+        ),
+        row(
+          "bottom", "<XWÖUHZÇYŞ.",
+          characters: ["<>", "xX", "wW", "öÖ", "uU", "hH", "zZ", "çÇ", "yY", "şŞ", ".:"],
+          shiftedLabels: [">", "X", "W", "Ö", "U", "H", "Z", "Ç", "Y", "Ş", ":"]
         ),
       ]
     case .hungarianQwertz:
