@@ -49,6 +49,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case apt
   case aptAngle
   case middlemak
+  case middlemakNH
+  case foalmak
+  case quartz
+  case arensito
+  case arts
   case halmak
   case qgmlwb
   case qgmlwy
@@ -157,6 +162,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .apt: "APT"
     case .aptAngle: "APT Angle"
     case .middlemak: "Middlemak"
+    case .middlemakNH: "Middlemak-NH"
+    case .foalmak: "Foalmak"
+    case .quartz: "Quartz"
+    case .arensito: "Arensito"
+    case .arts: "ARTS"
     case .halmak: "Halmak"
     case .qgmlwb: "QGMLWB"
     case .qgmlwy: "QGMLWY"
@@ -270,6 +280,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case apt
   case aptAngle
   case middlemak
+  case middlemakNH
+  case foalmak
+  case quartz
+  case arensito
+  case arts
   case halmak
   case qgmlwb
   case qgmlwy
@@ -1341,6 +1356,41 @@ enum KeyboardGuideModel {
         row("top", "QWLDGJFOU;[]\\"),
         row("home", "ASRTPYNEIH'"),
         row("bottom", "ZXCVBKM,./"),
+      ]
+    case .middlemakNH:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QWLDGJFOU;[]\\"),
+        row("home", "NSRTPYHEIA'"),
+        row("bottom", "ZXCVBKM,./"),
+      ]
+    case .foalmak:
+      [
+        row("number", "`1234567890-="),
+        row("top", "BX.WVZ/UTK[]\\"),
+        row("home", "FOALSNEIGH;"),
+        row("bottom", "P'.MCQJYDR"),
+      ]
+    case .quartz:
+      [
+        row("number", "`12345=67890-"),
+        row("top", "QUARTZ/GLYPH\\"),
+        row("home", "[JOB];VEX'D"),
+        row("bottom", "CWM,FINKS."),
+      ]
+    case .arensito:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QL.P';FUDK[]\\"),
+        row("home", "ARENBGSITO/"),
+        row("bottom", "ZW,HJVCYMX"),
+      ]
+    case .arts:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QLDYGJMOU;[]\\"),
+        row("home", "ARTSCPNEIH/"),
+        row("bottom", "ZXKWVBF',."),
       ]
     case .ansiColemak:
       [
@@ -2687,7 +2737,7 @@ enum KeyboardGuideModel {
 private extension KeyboardLayout {
   var showsNumberRowInMinimalGuide: Bool {
     self == .frenchAzerty || self == .mtgapFull || self == .engram || self == .engrammer
-      || self == .booMangle
+      || self == .booMangle || self == .quartz
   }
 }
 
