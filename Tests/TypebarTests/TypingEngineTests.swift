@@ -1584,7 +1584,7 @@ final class TypingEngineTests: XCTestCase {
     let rows = try XCTUnwrap(SystemKeyboardGuide.rows { keyCode, shift in
       switch keyCode {
       case 10: nil
-      case 12: shift ? "Q" : "q"
+      case 12: shift ? "لا" : "q"
       case 18: shift ? "!" : "1"
       default: shift ? "*" : "a"
       }
@@ -1596,7 +1596,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(rows[0][1].characters.contains("!"))
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "!", rows: rows), "system-18")
     XCTAssertEqual(rows[1][0].label, "q")
-    XCTAssertEqual(rows[1][0].shiftedLabel, "Q")
+    XCTAssertEqual(rows[1][0].shiftedLabel, "لا")
+    XCTAssertTrue(rows[1][0].characters.contains("ل"))
+    XCTAssertTrue(rows[1][0].characters.contains("ا"))
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ا", rows: rows), "system-12")
     XCTAssertNil(SystemKeyboardGuide.rows(translate: { keyCode, _ in keyCode == 12 ? nil : "a" }))
     let optionRows = try XCTUnwrap(SystemKeyboardGuide.rows(translateLayer: { keyCode, layer in
       guard keyCode != 10 else { return nil }

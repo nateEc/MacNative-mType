@@ -102,9 +102,13 @@ enum SystemKeyboardGuide {
   }
 
   private static func normalizedLabel(_ value: String?) -> String? {
-    guard let value, let character = value.first, !character.isWhitespace, !character.isNewline else {
+    guard
+      let value,
+      !value.isEmpty,
+      value.contains(where: { !$0.isWhitespace && !$0.isNewline })
+    else {
       return nil
     }
-    return String(character)
+    return value
   }
 }
