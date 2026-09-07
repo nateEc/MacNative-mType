@@ -1212,6 +1212,36 @@ enum KeyboardLayoutEmulator {
           8: ("…", "·"), 45: ("Ω", nil), 46: ("ǫ", nil), 43: ("ō", nil),
           47: ("ŏ", nil), 44: ("ǒ", nil),
         ])
+    case .graphiteAngleVC:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "qmvcxpk.-/"],
+          shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "QMVCXPK>\"<"]
+        ), overrides: [:])
+    case .graphiteAngleKP:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "xmcvqkp.-/"],
+          shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "XMCVQKP>\"<"]
+        ), overrides: [:])
+    case .graphiteMatrix:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "qxmcvkp.-/"],
+          shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "QXMCVKP>\"<"]
+        ), overrides: [:])
+    case .ugjrmv:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["?1234567890-f", "ūgjrmvnzēčžhķ", "šusildatec'", "ņbīkpoā,.ļ"],
+          shifted: ["?!«»$%/&×()_F", "ŪGJRMVNZĒČŽHĶ", "ŠUSILDATEC°", "ŅBĪKPOĀ;:Ļ"]
+        ), overrides: [:])
+    case .ornate:
+      withBaseFallbackOptionLayers(
+        ansiBaseShiftMap(
+          normal: ["`1234567890-=", ",wlmk;fuyq\"[\\", "asrtgpneio'", "zcdb/vh.jx"],
+          shifted: ["~!@#$%^&*()_+", "<WLMK:FUYA{]|", "ASRTGPNEIO}", "ZCDB?VH>JX"]
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "

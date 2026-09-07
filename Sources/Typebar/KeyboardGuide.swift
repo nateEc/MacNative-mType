@@ -141,6 +141,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case minimak12K = "minimak_12k"
   case graphiteAngle = "graphite_angle"
   case optimot
+  case graphiteAngleVC = "graphite_angle_vc"
+  case graphiteAngleKP = "graphite_angle_kp"
+  case graphiteMatrix = "graphite_matrix"
+  case ugjrmv = "UGJRMV"
+  case ornate = "ORNATE"
   case real
   case sertain
   case ctgap
@@ -350,6 +355,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .minimak12K: "Minimak 12-key"
     case .graphiteAngle: "Graphite Angle"
     case .optimot: "Optimot"
+    case .graphiteAngleVC: "Graphite Angle VC"
+    case .graphiteAngleKP: "Graphite Angle KP"
+    case .graphiteMatrix: "Graphite Matrix"
+    case .ugjrmv: "UGJRMV"
+    case .ornate: "ORNATE"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -564,6 +574,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case minimak12K = "minimak_12k"
   case graphiteAngle = "graphite_angle"
   case optimot
+  case graphiteAngleVC = "graphite_angle_vc"
+  case graphiteAngleKP = "graphite_angle_kp"
+  case graphiteMatrix = "graphite_matrix"
+  case ugjrmv = "UGJRMV"
+  case ornate = "ORNATE"
   case real
   case sertain
   case ctgap
@@ -2512,6 +2527,31 @@ enum KeyboardGuideModel {
           nonTypingIndex: 5
         ),
       ]
+    case .graphiteAngleVC:
+      baseShiftRows(
+        normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "qmvcxpk.-/"],
+        shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "QMVCXPK>\"<"]
+      )
+    case .graphiteAngleKP:
+      baseShiftRows(
+        normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "xmcvqkp.-/"],
+        shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "XMCVQKP>\"<"]
+      )
+    case .graphiteMatrix:
+      baseShiftRows(
+        normal: ["`1234567890[]", "bldwz'fouj;=\\", "nrtsgyhaei,", "qxmcvkp.-/"],
+        shifted: ["~!@#$%^&*(){}", "BLDWZ_FOUJ:+|", "NRTSGYHAEI?", "QXMCVKP>\"<"]
+      )
+    case .ugjrmv:
+      baseShiftRows(
+        normal: ["?1234567890-f", "ūgjrmvnzēčžhķ", "šusildatec'", "ņbīkpoā,.ļ"],
+        shifted: ["?!«»$%/&×()_F", "ŪGJRMVNZĒČŽHĶ", "ŠUSILDATEC°", "ŅBĪKPOĀ;:Ļ"]
+      )
+    case .ornate:
+      baseShiftRows(
+        normal: ["`1234567890-=", ",wlmk;fuyq\"[\\", "asrtgpneio'", "zcdb/vh.jx"],
+        shifted: ["~!@#$%^&*()_+", "<WLMK:FUYA{]|", "ASRTGPNEIO}", "ZCDB?VH>JX"]
+      )
     case .real:
       [
         row("number", "`1234567890[]"),
