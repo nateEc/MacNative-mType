@@ -4137,14 +4137,16 @@ struct TestSessionFactory {
       switch configuration.mode {
       case .time:
         prompt = OfflineContent.timedPrompt(
-          seconds: configuration.duration ?? 30, language: configuration.language,
+          seconds: configuration.isInfinite ? 30 : configuration.duration ?? 30,
+          language: configuration.language,
           englishVariant: configuration.englishVariant,
           mixedLanguageComponents: configuration.mixedLanguageComponents,
           contentOptions: configuration.contentOptions,
           usesZipfFrequency: configuration.modifiers.contains(.zipf))
       case .words:
         prompt = OfflineContent.generatedPrompt(
-          wordCount: configuration.wordLimit ?? 25, language: configuration.language,
+          wordCount: configuration.isInfinite ? 100 : configuration.wordLimit ?? 25,
+          language: configuration.language,
           englishVariant: configuration.englishVariant,
           mixedLanguageComponents: configuration.mixedLanguageComponents,
           contentOptions: configuration.contentOptions,
@@ -4197,8 +4199,9 @@ struct TestSessionFactory {
       transformedPrompt: transformedPrompt)
     let noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
       for: noSpaceWordLengths, in: transformedPrompt)
-    let repeats =
-      configuration.mode == .custom && [.time, .words].contains(configuration.customTextCompletion)
+    let repeats = configuration.isInfinite
+      || (configuration.mode == .custom
+        && [.time, .words].contains(configuration.customTextCompletion))
     let initialPrompt: String
     let initialNoSpaceWordEndIndices: [Int]
     let initialNoSpaceTargetWords: [String]
@@ -4228,7 +4231,7 @@ enum TypebarStreamContent {
     let count: Int
     switch configuration.mode {
     case .time: count = max(300, Int(ceil((configuration.duration ?? 30) / 60 * 240)))
-    case .words: count = configuration.wordLimit ?? 25
+    case .words: count = configuration.isInfinite ? 100 : configuration.wordLimit ?? 25
     case .quote: count = 60
     case .zen: count = 10_000
     case .custom: return nil

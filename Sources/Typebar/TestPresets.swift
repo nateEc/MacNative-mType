@@ -12,15 +12,21 @@ struct SavedTestPreset: Codable, Equatable {
 
     var summaryDescription: String {
         switch configuration.mode {
-        case .time: "时间 · \(Int(configuration.duration ?? 0)) 秒"
-        case .words: "字数 · \(configuration.wordLimit ?? 0) 词"
+        case .time: configuration.isInfinite ? "时间 · 无限" : "时间 · \(Int(configuration.duration ?? 0)) 秒"
+        case .words: configuration.isInfinite ? "字数 · 无限" : "字数 · \(configuration.wordLimit ?? 0) 词"
         case .quote: "引语"
         case .zen: "禅"
         case .custom:
             switch configuration.customTextCompletion {
             case .finish: "自定义文本 · 输入完成"
-            case .time: "自定义文本 · 循环 \(Int(configuration.duration ?? 0)) 秒"
-            case .words: "自定义文本 · 循环 \(configuration.wordLimit ?? 0) 词"
+            case .time:
+                configuration.isInfinite
+                    ? "自定义文本 · 无限循环计时"
+                    : "自定义文本 · 循环 \(Int(configuration.duration ?? 0)) 秒"
+            case .words:
+                configuration.isInfinite
+                    ? "自定义文本 · 无限循环字数"
+                    : "自定义文本 · 循环 \(configuration.wordLimit ?? 0) 词"
             case .sections: "自定义文本 · \(configuration.customTextSectionLimit ?? 0) 段"
             }
         }

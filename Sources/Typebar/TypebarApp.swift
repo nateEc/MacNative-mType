@@ -989,6 +989,21 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
         }
+        if configuration.isInfinite, !infiniteIncompatibleModifiers.isEmpty {
+          Label(
+            "无限测试已停用以下修饰器：\(infiniteIncompatibleModifiers.map(\.displayName).joined(separator: "、"))",
+            systemImage: "exclamationmark.triangle"
+          )
+          .font(.caption)
+          .foregroundStyle(.orange)
+        } else if offersInfiniteSelection, !infiniteIncompatibleModifiers.isEmpty {
+          Label(
+            "先关闭这些有限长度修饰器才能启用无限测试：\(infiniteIncompatibleModifiers.map(\.displayName).joined(separator: "、"))",
+            systemImage: "info.circle"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
 
         activeResultTagControls
 
@@ -1003,15 +1018,29 @@ private struct ContentView: View {
 
         switch mode {
         case .time:
-          Stepper(value: $duration, in: 5...3600, step: 5) {
-            LabeledContent("时长", value: "\(duration) 秒")
+          Toggle("无限计时", isOn: infiniteBinding($duration, fallback: 30))
+            .disabled(duration != 0 && !infiniteIncompatibleModifiers.isEmpty)
+          if duration == 0 {
+            Text("计时器正向累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
+              .font(.caption).foregroundStyle(.secondary)
+          } else {
+            Stepper(value: $duration, in: 5...3600, step: 5) {
+              LabeledContent("时长", value: "\(duration) 秒")
+            }
+            .onChange(of: duration) { _, _ in reset() }
           }
-          .onChange(of: duration) { _, _ in reset() }
         case .words:
-          Stepper(value: $wordLimit, in: 1...1000) {
-            LabeledContent("字数", value: "\(wordLimit) 词")
+          Toggle("无限字数", isOn: infiniteBinding($wordLimit, fallback: 25))
+            .disabled(wordLimit != 0 && !infiniteIncompatibleModifiers.isEmpty)
+          if wordLimit == 0 {
+            Text("词数持续累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
+              .font(.caption).foregroundStyle(.secondary)
+          } else {
+            Stepper(value: $wordLimit, in: 1...1000) {
+              LabeledContent("字数", value: "\(wordLimit) 词")
+            }
+            .onChange(of: wordLimit) { _, _ in reset() }
           }
-          .onChange(of: wordLimit) { _, _ in reset() }
         case .quote:
           Picker("内容来源", selection: $quoteSource) {
             ForEach(availableQuoteSources) { source in Text(source.title).tag(source) }
@@ -1146,18 +1175,36 @@ private struct ContentView: View {
             .disabled(activeLongSavedText != nil)
             .onChange(of: customTextCompletion) { _, _ in reset() }
             if customTextCompletion == .time {
-              Stepper(value: $customTextDuration, in: 5...3600, step: 5) {
-                LabeledContent("循环时长", value: "\(customTextDuration) 秒")
+              Toggle("无限循环计时", isOn: infiniteBinding($customTextDuration, fallback: 30))
+                .disabled(
+                  activeLongSavedText != nil
+                    || (customTextDuration != 0 && !infiniteIncompatibleModifiers.isEmpty))
+              if customTextDuration == 0 {
+                Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
+                  .font(.caption).foregroundStyle(.secondary)
+              } else {
+                Stepper(value: $customTextDuration, in: 5...3600, step: 5) {
+                  LabeledContent("循环时长", value: "\(customTextDuration) 秒")
+                }
+                .disabled(activeLongSavedText != nil)
+                .onChange(of: customTextDuration) { _, _ in reset() }
               }
-              .disabled(activeLongSavedText != nil)
-              .onChange(of: customTextDuration) { _, _ in reset() }
             }
             if customTextCompletion == .words {
-              Stepper(value: $customTextWordLimit, in: 1...1000) {
-                LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
+              Toggle("无限循环字数", isOn: infiniteBinding($customTextWordLimit, fallback: 25))
+                .disabled(
+                  activeLongSavedText != nil
+                    || (customTextWordLimit != 0 && !infiniteIncompatibleModifiers.isEmpty))
+              if customTextWordLimit == 0 {
+                Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
+                  .font(.caption).foregroundStyle(.secondary)
+              } else {
+                Stepper(value: $customTextWordLimit, in: 1...1000) {
+                  LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
+                }
+                .disabled(activeLongSavedText != nil)
+                .onChange(of: customTextWordLimit) { _, _ in reset() }
               }
-              .disabled(activeLongSavedText != nil)
-              .onChange(of: customTextWordLimit) { _, _ in reset() }
             }
             if customTextCompletion == .sections {
               Stepper(value: $customTextSectionLimit, in: 1...max(1, customTextSections.count)) {
@@ -1943,13 +1990,13 @@ private struct ContentView: View {
       Spacer()
       if session.hasStarted && !session.isFinished {
         Button(
-          activeLongSavedText == nil ? "放弃本次测试" : "保存并中止长文本",
+          shouldBailOutFromControls ? "中止并显示未保存结果" : "放弃本次测试",
           role: .destructive
         ) {
-          if activeLongSavedText == nil {
-            session.abandon()
-          } else {
+          if shouldBailOutFromControls {
             session.bailOut()
+          } else {
+            session.abandon()
           }
         }
       }
@@ -2177,6 +2224,29 @@ private struct ContentView: View {
   private var commandBailoutAvailable: Bool {
     CommandBailoutPolicy.isAvailable(
       for: session.configuration, savedLongText: activeLongSavedText != nil)
+  }
+
+  private var shouldBailOutFromControls: Bool {
+    activeLongSavedText != nil || session.configuration.isInfinite
+  }
+
+  private var infiniteIncompatibleModifiers: [TestModifier] {
+    settings.testModifiers.filter(TestModifierPolicy.finiteDurationOnly.contains)
+  }
+
+  private var offersInfiniteSelection: Bool {
+    mode == .time || mode == .words
+      || (mode == .custom && [.time, .words].contains(customTextCompletion))
+  }
+
+  private func infiniteBinding(_ value: Binding<Int>, fallback: Int) -> Binding<Bool> {
+    Binding(
+      get: { value.wrappedValue == 0 },
+      set: { enabled in
+        guard !enabled || infiniteIncompatibleModifiers.isEmpty else { return }
+        value.wrappedValue = enabled ? 0 : fallback
+        reset()
+      })
   }
 
   private func loadSavedCustomText(_ selection: SavedCustomTextSelection) {

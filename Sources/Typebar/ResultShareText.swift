@@ -5,8 +5,10 @@ enum ResultShareText {
         let configuration = result.configuration
         let detail: String
         switch configuration.mode {
-        case .time: detail = "\(Int(configuration.duration ?? 0)) 秒"
-        case .words: detail = "\(configuration.wordLimit ?? 0) 词"
+        case .time:
+            detail = configuration.isInfinite ? "无限计时" : "\(Int(configuration.duration ?? 0)) 秒"
+        case .words:
+            detail = configuration.isInfinite ? "无限字数" : "\(configuration.wordLimit ?? 0) 词"
         case .quote: detail = "引语"
         case .zen: detail = "禅模式"
         case .custom: detail = "自定义文本"

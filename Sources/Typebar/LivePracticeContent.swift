@@ -64,7 +64,7 @@ struct LivePracticeContent: Equatable {
     case .time:
       targetCount = max(300, Int(ceil((configuration.duration ?? 30) / 60 * 240)))
     case .words:
-      targetCount = configuration.wordLimit ?? 25
+      targetCount = configuration.isInfinite ? 100 : configuration.wordLimit ?? 25
     case .quote, .zen, .custom:
       targetCount = tokens.count
     }

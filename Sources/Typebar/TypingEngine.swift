@@ -564,6 +564,15 @@ enum TestModifier: String, CaseIterable, Codable, Equatable, Identifiable {
 }
 
 enum TestModifierPolicy {
+  static let finiteDurationOnly: Set<TestModifier> = [
+    .layoutFluid, .focusCurrentWord, .focusNextWord, .focusTwoWords, .focusThreeWords,
+    .memory, .poetryStream, .referenceStream,
+  ]
+
+  static func compatibleWithInfiniteTest(_ modifiers: [TestModifier]) -> [TestModifier] {
+    normalized(modifiers).filter { !finiteDurationOnly.contains($0) }
+  }
+
   static func normalized(_ modifiers: [TestModifier]) -> [TestModifier] {
     let boundaryModifier: TestModifier? =
       modifiers.contains(.noSpaces)
@@ -1198,6 +1207,12 @@ struct TestConfiguration: Codable, Equatable {
   var contentOptions: ContentOptions
   var challengeID: String?
 
+  var isInfinite: Bool {
+    Self.usesInfiniteLimit(
+      mode: mode, duration: duration, wordLimit: wordLimit,
+      customTextCompletion: customTextCompletion)
+  }
+
   /// Mirrors reference `joiningScript` metadata for native prompt shaping.
   /// A mixed prompt needs this behavior when any selected component needs it.
   var usesJoiningScriptPrompt: Bool {
@@ -1233,9 +1248,13 @@ struct TestConfiguration: Codable, Equatable {
     self.customTextSectionLimit = customTextSectionLimit
     self.customTextOrdering = customTextOrdering
     self.mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(mixedLanguageComponents)
-    self.modifiers = TestModifierPolicy.normalized(modifiers).filter {
+    let normalizedModifiers = TestModifierPolicy.normalized(modifiers).filter {
       mode != .zen || $0 != .memory
     }
+    self.modifiers = Self.usesInfiniteLimit(
+      mode: mode, duration: duration, wordLimit: wordLimit,
+      customTextCompletion: customTextCompletion)
+      ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
     self.contentOptions = contentOptions
     self.challengeID = challengeID
   }
@@ -1266,9 +1285,11 @@ struct TestConfiguration: Codable, Equatable {
 
   func with(modifiers: [TestModifier]) -> Self {
     var copy = self
-    copy.modifiers = TestModifierPolicy.normalized(modifiers).filter {
+    let normalizedModifiers = TestModifierPolicy.normalized(modifiers).filter {
       copy.mode != .zen || $0 != .memory
     }
+    copy.modifiers = copy.isInfinite
+      ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
     return copy
   }
 
@@ -1327,12 +1348,30 @@ struct TestConfiguration: Codable, Equatable {
     mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
       try values.decodeIfPresent([TypingLanguage].self, forKey: .mixedLanguageComponents)
         ?? TypingLanguage.defaultMixedComponents)
-    modifiers = TestModifierPolicy.normalized(
+    let normalizedModifiers = TestModifierPolicy.normalized(
       try values.decodeIfPresent([TestModifier].self, forKey: .modifiers) ?? []
     ).filter { decodedMode != .zen || $0 != .memory }
+    modifiers = Self.usesInfiniteLimit(
+      mode: decodedMode, duration: duration, wordLimit: wordLimit,
+      customTextCompletion: customTextCompletion)
+      ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
     contentOptions =
       try values.decodeIfPresent(ContentOptions.self, forKey: .contentOptions) ?? .init()
     challengeID = try values.decodeIfPresent(String.self, forKey: .challengeID)
+  }
+
+  private static func usesInfiniteLimit(
+    mode: TestMode, duration: TimeInterval?, wordLimit: Int?,
+    customTextCompletion: CustomTextCompletion
+  ) -> Bool {
+    switch mode {
+    case .time: duration == 0
+    case .words: wordLimit == 0
+    case .custom:
+      (customTextCompletion == .time && duration == 0)
+        || (customTextCompletion == .words && wordLimit == 0)
+    case .quote, .zen: false
+    }
   }
 }
 
@@ -1610,15 +1649,15 @@ enum QuickRestartSafetyPolicy {
     if configuration.mode == .custom, savedLongText { return true }
     switch configuration.mode {
     case .words:
-      return (configuration.wordLimit ?? 0) >= longWordLimit
+      return configuration.wordLimit == 0 || (configuration.wordLimit ?? 0) >= longWordLimit
     case .time:
-      return (configuration.duration ?? 0) >= longDuration
+      return configuration.duration == 0 || (configuration.duration ?? 0) >= longDuration
     case .custom:
       switch configuration.customTextCompletion {
       case .time:
-        return (configuration.duration ?? 0) >= longDuration
+        return configuration.duration == 0 || (configuration.duration ?? 0) >= longDuration
       case .words:
-        return (configuration.wordLimit ?? 0) >= longWordLimit
+        return configuration.wordLimit == 0 || (configuration.wordLimit ?? 0) >= longWordLimit
       case .sections:
         return (configuration.customTextSectionLimit ?? 0) >= longWordLimit
       case .finish:
@@ -1639,13 +1678,13 @@ enum CommandBailoutPolicy {
     case .zen:
       return true
     case .time:
-      return (configuration.duration ?? 0) >= 3_600
+      return configuration.duration == 0 || (configuration.duration ?? 0) >= 3_600
     case .words:
-      return (configuration.wordLimit ?? 0) >= 5_000
+      return configuration.wordLimit == 0 || (configuration.wordLimit ?? 0) >= 5_000
     case .custom:
       switch configuration.customTextCompletion {
-      case .time: return (configuration.duration ?? 0) >= 3_600
-      case .words: return (configuration.wordLimit ?? 0) >= 5_000
+      case .time: return configuration.duration == 0 || (configuration.duration ?? 0) >= 3_600
+      case .words: return configuration.wordLimit == 0 || (configuration.wordLimit ?? 0) >= 5_000
       case .sections: return (configuration.customTextSectionLimit ?? 0) >= 5_000
       case .finish: return false
       }
@@ -2318,6 +2357,7 @@ struct TypingSession {
   }
 
   func remainingSeconds(at date: Date) -> Int? {
+    guard configuration.duration != 0 else { return nil }
     guard let duration = configuration.duration, let startedAt else {
       return configuration.duration.map { Int($0) }
     }
@@ -2329,6 +2369,11 @@ struct TypingSession {
   /// including no-space prompts whose commits happen on a word's final
   /// character. This presentation does not derive any scoring state.
   func progressText(at date: Date = .now) -> String? {
+    if configuration.duration == 0 {
+      guard let startedAt else { return "0s" }
+      return "\(max(0, Int(date.timeIntervalSince(startedAt).rounded(.down))))s"
+    }
+    if configuration.wordLimit == 0 { return "\(completedWordCount)" }
     if let remaining = remainingSeconds(at: date) { return "\(remaining)s" }
     guard let wordLimit = configuration.wordLimit,
       (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts)
@@ -2337,17 +2382,21 @@ struct TypingSession {
   }
 
   var progressLabel: String {
-    configuration.duration == nil && configuration.wordLimit != nil ? "进度" : "剩余"
+    if configuration.duration == 0 { return "用时" }
+    if configuration.wordLimit == 0 { return "词数" }
+    return configuration.duration == nil && configuration.wordLimit != nil ? "进度" : "剩余"
   }
 
   func progressFraction(at date: Date = .now) -> Double? {
     if let duration = configuration.duration {
+      if duration == 0 { return 1 }
       guard let startedAt else { return 0 }
       return (date.timeIntervalSince(startedAt) / duration).clamped(to: 0...1)
     }
     guard let wordLimit = configuration.wordLimit,
       (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts)
     else { return nil }
+    if wordLimit == 0 { return 0 }
     return Double(min(wordLimit, completedWordCount)) / Double(wordLimit)
   }
 
@@ -2511,6 +2560,7 @@ struct TypingSession {
 
   mutating func tick(at date: Date = .now) {
     guard !isFinished, let duration = configuration.duration, let startedAt else { return }
+    guard duration > 0 else { return }
     if date.timeIntervalSince(startedAt) >= duration { complete(at: date) }
   }
 
@@ -3276,7 +3326,7 @@ struct TypingSession {
   }
 
   private var shouldFinishEnglishWordsTest: Bool {
-    guard let wordLimit = configuration.wordLimit else { return false }
+    guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
     let targetWords = Array(
       splitPromptWords(prompt, omittingEmptySubsequences: true).prefix(wordLimit))
     let typedWords = splitPromptWords(typed, omittingEmptySubsequences: true)

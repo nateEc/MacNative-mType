@@ -346,6 +346,83 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(words.progressFraction(at: start), 1)
   }
 
+  func testInfiniteTimeAndWordTestsCountUpRepeatAndRequireBailout() throws {
+    var timed = TestSessionFactory.make(configuration: .timed(seconds: 0))
+    XCTAssertTrue(timed.configuration.isInfinite)
+    XCTAssertEqual(timed.progressLabel, "用时")
+    XCTAssertEqual(timed.progressText(at: start), "0s")
+    XCTAssertNil(timed.remainingSeconds(at: start))
+    XCTAssertEqual(timed.progressFraction(at: start), 1)
+    timed.insert("a", at: start)
+    timed.tick(at: start.addingTimeInterval(3.8))
+    XCTAssertFalse(timed.isFinished)
+    XCTAssertEqual(timed.progressText(at: start.addingTimeInterval(3.8)), "3s")
+    XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: timed.configuration))
+    XCTAssertTrue(CommandBailoutPolicy.isAvailable(for: timed.configuration))
+    timed.bailOut(at: start.addingTimeInterval(4))
+    XCTAssertEqual(try XCTUnwrap(timed.result()).outcome, .bailedOut)
+
+    var words = TestSessionFactory.make(configuration: .words(0))
+    let initialWordsPrompt = words.prompt
+    XCTAssertTrue(words.configuration.isInfinite)
+    XCTAssertEqual(initialWordsPrompt.split(separator: " ").count, 200)
+    XCTAssertEqual(words.progressLabel, "词数")
+    XCTAssertEqual(words.progressText(at: start), "0")
+    XCTAssertEqual(words.progressFraction(at: start), 0)
+    let firstWord = String(try XCTUnwrap(initialWordsPrompt.split(separator: " ").first))
+    words.insert(firstWord + " ", at: start)
+    XCTAssertFalse(words.isFinished)
+    XCTAssertEqual(words.progressText(at: start), "1")
+    words.bailOut(at: start.addingTimeInterval(5))
+    XCTAssertEqual(try XCTUnwrap(words.result()).outcome, .bailedOut)
+
+    var repeating = TypingSession(
+      configuration: .words(0), prompt: "amber harbor", repeatingPrompt: "amber harbor")
+    repeating.insert("amber harbor ", at: start)
+    XCTAssertGreaterThan(repeating.prompt.count, "amber harbor".count)
+    XCTAssertFalse(repeating.isFinished)
+
+    var custom = TestSessionFactory.make(
+      configuration: .init(
+        mode: .custom, duration: 0, wordLimit: nil, difficulty: .normal, rules: .init(),
+        customTextCompletion: .time),
+      customText: "amber harbor")
+    custom.insert("amber ", at: start)
+    custom.tick(at: start.addingTimeInterval(60))
+    XCTAssertFalse(custom.isFinished)
+    XCTAssertEqual(custom.progressText(at: start.addingTimeInterval(60)), "60s")
+  }
+
+  func testInfiniteTestsDropOnlyFiniteDurationModifiersAndRoundTripSharing() throws {
+    let finiteOnly = Array(TestModifierPolicy.finiteDurationOnly)
+    let infinite = TestConfiguration.timed(seconds: 0).with(
+      modifiers: finiteOnly + [.uppercase, .noSpaces])
+    XCTAssertEqual(Set(infinite.modifiers), [.uppercase, .noSpaces])
+    XCTAssertTrue(TestConfiguration.timed(seconds: 30).with(modifiers: finiteOnly).modifiers.count > 0)
+
+    let custom = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 0, difficulty: .normal, rules: .init(),
+      customTextCompletion: .words, modifiers: [.memory, .rot13])
+    XCTAssertTrue(custom.isInfinite)
+    XCTAssertEqual(custom.modifiers, [.rot13])
+    XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: custom))
+    XCTAssertTrue(CommandBailoutPolicy.isAvailable(for: custom))
+
+    let preset = SavedTestPreset(configuration: infinite, quoteID: nil, customText: nil)
+    let restored = try TestConfigurationShare.preset(
+      from: TestConfigurationShare.link(for: preset))
+    XCTAssertEqual(restored, preset)
+    XCTAssertEqual(preset.summaryDescription, "时间 · 无限")
+
+    let legacyConflict = """
+      {"mode":"time","duration":0,"wordLimit":null,"difficulty":"normal","rules":{},"modifiers":["layoutFluid","uppercase"]}
+      """
+    let migrated = try JSONDecoder().decode(
+      TestConfiguration.self, from: Data(legacyConflict.utf8))
+    XCTAssertTrue(migrated.isInfinite)
+    XCTAssertEqual(migrated.modifiers, [.uppercase])
+  }
+
   func testFlashProgressStylesMatchReferenceTimerVisibility() {
     XCTAssertEqual(LiveProgressStyle.flashText.metricStyle, .text)
     XCTAssertEqual(LiveProgressStyle.flashMini.metricStyle, .mini)

@@ -71,6 +71,8 @@
 
 48 项官方 funbox 均已有用户可见的功能等价实现，0 项部分覆盖、0 项未实现。ASL 指语提示以原创原生矢量而非官方专用字体呈现；其他涉及视觉细节、互动、外部内容源或本地替代策略的实现也会持续审计，不能据此宣称逐像素或逐数据源复刻。Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi 与 Yiddish 的固定参考元数据均为 RTL／连写，因而和其余五个 RTL 单语一样刻意排除在 101 种 LTR 多语混排候选之外；Occitan、Oromo、Macedonian、Kazakh、Vietnamese、Jyutping、Pinyin、Western Armenian、Bashkir、Euskera、Frisian、Zulu、Hawaiian、Kabyle、Maltese、toki pona、Xhosa、Tibetan、Kyrgyz、Udmurt 与 Yoruba 的 LTR 路径均已由混排轮转测试覆盖。
 
+无限测试冲突按固定参考的 `noInfiniteDuration` 元数据独立建模：布局流动、专注当前词、预读下一/后二/后三词、记忆模式、诗性散文和知识短文共八项只允许有限长度。原生配置存在这些修饰器时会禁用无限开关并解释原因；旧预设或归档若同时包含无限值与冲突项，则保留无限测试并在解码时安全移除冲突修饰器。其余 funbox 可随 Typebar 自有提示批次循环，不导入参考词表或实现。
+
 2026-09-05 更正：LTR 多语混排候选现为 102 种；Swahili 作为 `noLazyMode: true` 的 LTR 语言已纳入轮转覆盖，普通练习禁用简化输入而自定义文本保留例外。
 
 2026-09-05 更正：LTR 多语混排候选现为 103 种；Kinyarwanda 作为 `noLazyMode: true` 且 `orderedByFrequency: true` 的 LTR 语言已纳入轮转覆盖，普通练习禁用简化输入而自定义文本保留例外，Zipf 使用 Typebar 自有高频词。
