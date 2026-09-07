@@ -124,7 +124,8 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 上一阶段内置键盘图增至九十三种：新增 TypeHack、ISRT、ISRT Angle、Engram 与 Engrammer。五项均完整覆盖 47 个 ANSI Base/Shift 位置，TypeHack 与 Engram 保留非标准符号层，Engram 两项在精简提示中仍显示数字行；不复制、打包或运行参考布局资产
 - 上一阶段内置键盘图增至九十八种：新增 Semimak、Semimak JQ、Semimak JQC、Canary 与 Canary Matrix。五项均完整覆盖 47 个 ANSI Base/Shift 位置，并保留三种 Semimak 的 J/Q/C 差异和两种 Canary 的独立排列；不复制、打包或运行参考布局资产
 - 上一阶段内置键盘图增至一百零三种：新增 Boo、Boo Mangle、APT、APT Angle 与 Middlemak。五项均完整覆盖 47 个 ANSI Base/Shift 位置；Boo 两项保留非标准符号层，Boo Mangle 在精简提示中仍显示数字行，APT Angle 保留独立底行；不复制、打包或运行参考布局资产
-- 当前内置键盘图为一百五十三种：新增 Whix2、Haruka、Kuntum、Kuntem 与 Kuntem-JQ。Haruka 与三个 Kuntum/Kuntem 变体完整覆盖 47 个 ANSI Base/Shift 位置；Whix2 精确保留 40 个赋值位置和 7 个空位，不复制、打包或运行参考布局资产
+- 上一阶段内置键盘图增至一百五十三种：新增 Whix2、Haruka、Kuntum、Kuntem 与 Kuntem-JQ。Haruka 与三个 Kuntum/Kuntem 变体完整覆盖 47 个 ANSI Base/Shift 位置；Whix2 精确保留 40 个赋值位置和 7 个空位，不复制、打包或运行参考布局资产
+- 当前内置键盘图为一百五十八种：新增 BEAKL Zi、Snorkle、MALTRON、PRSTEN 与 RSTHD。五项完整覆盖 47 个 ANSI Base/Shift 位置；其中四项原生显示双拇指行，普通 Mac 的唯一物理 Space 按固定参考可观察语义映射到第五行首项，第二项仅作为布局提示，不复制、打包或运行参考布局资产
 - 原生设置窗口：难度、输入规则与字体大小会保存到本机
 - 可选 macOS 系统键击音、错误提示音及 0–100% 音量；默认关闭，不携带音频资产
 - 原生设置窗口支持中英文关键词搜索，可过滤测试、显示、主题、账户和恢复默认设置分组
@@ -209,7 +210,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 - 新增 Unicode Ol Chiki 的 `ᱥᱟᱱᱛᱟᱲᱤ`（Santali）离线词流及四档 Typebar 自有练习文本，作为 LTR 空格分词选择加入默认和自选多语混排。固定参考只定义 `bcp47: sat-IN`，因此知识短文使用 `sat`、系统朗读使用 `sat-IN`，保留显式简化输入并在 Zipf 启用时显示未知支持提示；它已接入预设、归档、社区投稿、撤回、成绩和排行榜，且不导入参考词表或引语。
 - 新增 Bulgarian Latin、Nepali Romanized、Persian Romanized、Sanskrit Roman 与 Urdu Roman 五种独立的 LTR 空格分词练习；每种都有 Typebar 自写词流和四档文本，不导入参考内容，也不宣称运行时可逆转写。它们按固定元数据分别处理简化输入、Zipf、百科和系统朗读，并全部进入默认／自选多语混排、预设、归档、社区投稿、撤回、成绩和排行榜。
 - 新增 Hinglish、Tanglish 与 Urdish 三种独立的拉丁字母代码混合练习；每项均使用 Typebar 自写词流和四档文本，不导入参考或网络语料，也不把自然拼写变体伪装成统一标准。固定配置均未提供 BCP-47、`noLazyMode` 或词频排序，因此三者使用 LTR 空格词界、`en`／`en-US` 在线与朗读回退、可选简化输入和 Zipf 未知提示，并接入多语混排、预设、归档、社区投稿、撤回、成绩和排行榜。
-- 336 个引擎、内容、存储、偏好设置、预设、统计、归档、CSV 导出、账户响应及官方布局矩阵单元测试
+- 337 个引擎、内容、存储、偏好设置、预设、统计、归档、CSV 导出、账户响应及官方布局矩阵单元测试
 - 67 个自建服务自动化测试，覆盖账号、密码重置与邮箱验证、一次性重新验证与会话撤销、OAuth 授权码/PKCE/一次性状态、第三方与密码身份关联保护、Discord 头像公开隐私、服务端公开徽章、公开资料 UTC 连续练习/活动隐私/开始次数与搜索、通知容量与隔离、开发者密钥与私有远端成绩及标签管理、排行榜隐身、好友关系、同步、成绩、WPM/XP 排行榜、审核引语/资料举报、社区评分、服务公告、请求限速与维护模式
 
 ## 后续范围（尚未完成）

@@ -793,6 +793,45 @@ enum KeyboardLayoutEmulator {
           + "0:tT 1:sS 2:rR 3:hH 5:fF 4:gG 38:cC 40:aA 37:iI 41:eE 39:;: "
           + "6:zZ 7:xX 8:pP 9:bB 11:'\" 45:mM 46:yY 43:.> 47:,< 44:/?"
       )
+    case .beaklZi:
+      withThumbKey(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:zZ 13:yY 14:oO 15:uU 17:;: 16:gG 32:dD 34:nN 31:mM 35:xX 33:[{ 30:]} 42:\\| "
+            + "0:qQ 1:hH 2:eE 3:aA 5:.> 4:cC 38:tT 40:rR 37:sS 41:wW 39:'\" "
+            + "6:jJ 7:-_ 8:'\" 9:kK 11:,< 45:bB 46:pP 43:lL 47:fF 44:vV"
+        ), normal: "i", shifted: "I")
+    case .snorkle:
+      map(
+        "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+          + "12:,< 13:aA 14:yY 15:cC 17:vV 16:qQ 32:dD 34:lL 31:uU 35:xX 33:[{ 30:]} 42:\\| "
+          + "0:iI 1:oO 2:nN 3:sS 5:bB 4:pP 38:tT 40:hH 37:eE 41:rR 39:;: "
+          + "6:.> 7:'\" 8:fF 9:gG 11:jJ 45:kK 46:wW 43:mM 47:;: 44:zZ"
+      )
+    case .maltron:
+      withThumbKey(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:qQ 13:pP 14:yY 15:cC 17:bB 16:vV 32:mM 34:uU 31:zZ 35:lL 33:[{ 30:]} 42:\\| "
+            + "0:aA 1:nN 2:iI 3:sS 5:fF 4:dD 38:tT 40:hH 37:oO 41:rR 39:'\" "
+            + "6:,< 7:.> 8:jJ 9:gG 11:'\" 45:/? 46:wW 43:kK 47:-_ 44:xX"
+        ), normal: "e", shifted: "E")
+    case .prsten:
+      withThumbKey(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:`~ 13:wW 14:cC 15:dD 17:fF 16:qQ 32:lL 34:uU 31:yY 35:;: 33:[{ 30:]} 42:\\| "
+            + "0:pP 1:rR 2:sS 3:tT 5:gG 4:mM 38:nN 40:aA 37:iI 41:oO 39:'\" "
+            + "6:xX 7:hH 8:vV 9:bB 11:[{ 45:,< 46:jJ 43:kK 47:zZ 44:.>"
+        ), normal: " ", shifted: " ")
+    case .rsthd:
+      withThumbKey(
+        map(
+          "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:jJ 13:cC 14:yY 15:fF 17:kK 16:zZ 32:lL 34:,< 31:uU 35:qQ 33:[{ 30:]} 42:\\| "
+            + "0:rR 1:sS 2:tT 3:hH 5:dD 4:mM 38:nN 40:aA 37:iI 41:oO 39:'\" "
+            + "6:/? 7:vV 8:gG 9:pP 11:bB 45:xX 46:wW 43:.> 47:;: 44:-_"
+        ), normal: "e", shifted: "E")
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
@@ -1432,6 +1471,14 @@ enum KeyboardLayoutEmulator {
     for keyCode in keyCodes {
       layeredKeys[keyCode] = .init(normal: "", shifted: "")
     }
+    return layeredKeys
+  }
+
+  private static func withThumbKey(
+    _ keys: [UInt16: KeyLayers], normal: String, shifted: String
+  ) -> [UInt16: KeyLayers] {
+    var layeredKeys = keys
+    layeredKeys[49] = .init(normal: normal, shifted: shifted)
     return layeredKeys
   }
 

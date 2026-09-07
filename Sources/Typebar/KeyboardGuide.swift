@@ -90,6 +90,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case kuntum
   case kuntem = "Kuntem"
   case kuntemJQ = "kuntem-jq"
+  case beaklZi = "BEAKL_Zi"
+  case snorkle
+  case maltron = "MALTRON"
+  case prsten = "PRSTEN"
+  case rsthd = "RSTHD"
   case real
   case sertain
   case ctgap
@@ -248,6 +253,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .kuntum: "Kuntum"
     case .kuntem: "Kuntem"
     case .kuntemJQ: "Kuntem-JQ"
+    case .beaklZi: "BEAKL Zi"
+    case .snorkle: "Snorkle"
+    case .maltron: "MALTRON"
+    case .prsten: "PRSTEN"
+    case .rsthd: "RSTHD"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -411,6 +421,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case kuntum
   case kuntem = "Kuntem"
   case kuntemJQ = "kuntem-jq"
+  case beaklZi = "BEAKL_Zi"
+  case snorkle
+  case maltron = "MALTRON"
+  case prsten = "PRSTEN"
+  case rsthd = "RSTHD"
   case real
   case sertain
   case ctgap
@@ -1838,6 +1853,41 @@ enum KeyboardGuideModel {
         row("home", "TSRHFGCAIE;"),
         row("bottom", "ZXPB'MY.,/")
       ]
+    case .beaklZi:
+      [
+        row("number", "`1234567890-="),
+        row("top", "ZYOU;GDNMX[]\\"),
+        row("home", "QHEA.CTRSW'"),
+        row("bottom", "J-'K,BPLFV")
+      ]
+    case .snorkle:
+      [
+        row("number", "`1234567890-="),
+        row("top", ",AYCVQDLUX[]\\"),
+        row("home", "IONSBPTHER;"),
+        row("bottom", ".'FGJKWM;Z")
+      ]
+    case .maltron:
+      [
+        row("number", "`1234567890-="),
+        row("top", "QPYCBVMUZL[]\\"),
+        row("home", "ANISFDTHOR'"),
+        row("bottom", ",.JG'/WK-X")
+      ]
+    case .prsten:
+      [
+        row("number", "`1234567890-="),
+        row("top", "`WCDFQLUY;[]\\"),
+        row("home", "PRSTGMNAIO'"),
+        row("bottom", "XHVB[,JKZ.")
+      ]
+    case .rsthd:
+      [
+        row("number", "`1234567890-="),
+        row("top", "JCYFKZL,UQ[]\\"),
+        row("home", "RSTHDMNAIO'"),
+        row("bottom", "/VGPBXW.;-")
+      ]
     case .real:
       [
         row("number", "`1234567890[]"),
@@ -3052,7 +3102,9 @@ enum KeyboardGuideModel {
   {
     guard let character else { return nil }
     if character == " " { return style.isSteno ? "steno-space" : "space" }
-    let keys = style.isSteno ? stenoRows().flatMap { $0 } : rows(for: layout).flatMap { $0 }
+    let keys = style.isSteno
+      ? stenoRows().flatMap { $0 }
+      : rows(for: layout).flatMap { $0 } + typingThumbKeys(for: layout)
     let normalized = Character(String(character).lowercased())
     return keys.first(where: { $0.exactlyProduces(normalized) })?.id
       ?? keys.first(where: { $0.characters.contains(normalized) })?.id
@@ -3123,21 +3175,37 @@ enum KeyboardGuideModel {
 
   static func bottomRow(
     for keysMode: KeyboardGuideKeysMode,
+    layout: KeyboardLayout? = nil,
     style: KeyboardGuideStyle = .staggered
   ) -> [KeyboardGuideKey] {
     if style.isSteno { return [] }
+    let thumbKeys = typingThumbKeys(for: layout)
     if keysMode == .full {
       return [
         nonTypingKey("left-control", label: "⌃", width: 34),
         nonTypingKey("left-option", label: "⌥", width: 34),
         nonTypingKey("left-command", label: "⌘", width: 38),
-        KeyboardGuideKey("space", label: "空格", characters: " ", width: 170),
+      ] + thumbKeys + [
         nonTypingKey("right-command", label: "⌘", width: 38),
         nonTypingKey("right-option", label: "⌥", width: 34),
         nonTypingKey("right-control", label: "⌃", width: 34),
       ]
     }
-    return [KeyboardGuideKey("space", label: "空格", characters: " ", width: 170)]
+    return thumbKeys
+  }
+
+  private static func typingThumbKeys(for layout: KeyboardLayout?) -> [KeyboardGuideKey] {
+    let space = KeyboardGuideKey("space", label: "空格", characters: " ", width: 120)
+    switch layout {
+    case .beaklZi:
+      return [KeyboardGuideKey("thumb-0", label: "I", characters: "iI", width: 70), space]
+    case .maltron, .rsthd:
+      return [KeyboardGuideKey("thumb-0", label: "E", characters: "eE", width: 70), space]
+    case .prsten:
+      return [space, KeyboardGuideKey("thumb-1", label: "E", characters: "eE", width: 70)]
+    default:
+      return [KeyboardGuideKey("space", label: "空格", characters: " ", width: 170)]
+    }
   }
 
   static func stenoRows() -> [[KeyboardGuideKey]] {
@@ -3319,7 +3387,8 @@ struct KeyboardGuide: View {
       }
       if !style.isSteno {
         keyRow(
-          KeyboardGuideModel.bottomRow(for: keysMode, style: style), rowIndex: guideRows.count)
+          KeyboardGuideModel.bottomRow(for: keysMode, layout: layout, style: style),
+          rowIndex: guideRows.count)
       }
     }
     .padding(10 * scale)
