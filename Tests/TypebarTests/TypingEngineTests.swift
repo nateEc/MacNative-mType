@@ -3926,6 +3926,150 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testPromethiumStaticaVestnikAndDiktorLayoutsPreserveSpecialLayers() throws {
+    let ansiRows = SystemKeyboardGuide.physicalRows
+    func outputs(
+      _ layout: KeyboardLayout, flags: NSEvent.ModifierFlags = []
+    ) -> [String] {
+      ansiRows.map { row in
+        row.compactMap {
+          KeyboardLayoutEmulator.text(
+            forKeyCode: $0, modifierFlags: flags, layout: layout)
+        }.joined()
+      }
+    }
+
+    let expected: [(String, [String], [String])] = [
+      (
+        "handsdown_promethium",
+        ["`1234567890-=", "fpdlx;uoybz]\\", "snthk,aeicq", "vwgmj-.'=/"],
+        ["~!@#$%^&*()_+", "FPDLX:UOYBZ}|", "SNTHK<AEICQ", "VWGMJ_>\"+?"]
+      ),
+      (
+        "statica_3x5",
+        ["\"1234567890-=", "ьуажюгбрлх,.\\", "иеокямтснз.", "фэыпйдвчшц"],
+        ["'!@#$%^&*()_+", "ЬУАЖЮГБРЛХ;:|", "ИЕОКЯМТСНЗ:", "ФЭЫПЙДВЧШЦ"]
+      ),
+      (
+        "Vestnik",
+        ["\"1234567890-=", "цдргхфпаяэ,.\\", "стнкбьвоеи.", "шзлмчжйыую"],
+        ["'!@#$%^&*()_+", "ЦДРГХФПАЯЭ;:|", "СТНКБЬВОЕИ:", "ШЗЛМЧЖЙЫУЮ"]
+      ),
+      (
+        "Diktor",
+        ["ё1234567890*=", "цья,.звкдчшщ\\", "уиеоалнтсрй", "фэхыюбмпгж"],
+        ["ЁЪЬ№%:;-\"()_+", "ЦъЯ?!ЗВКДЧШЩ/", "УИЕОАЛНТСРЙ", "ФЭХЫЮБМПГЖ"]
+      ),
+      (
+        "Diktor_VoronovMod",
+        ["ё1234567890*=", "фьхяызвкдчшщ\\", "уиеоалнтсрй", "?ъэюцбмпгж"],
+        ["Ё%№\".:;-,()_+", "ФЬХЯЫЗВКДЧШЩ/", "УИЕОАЛНТСРЙ", "!ЪЭЮЦБМПГЖ"]
+      ),
+    ]
+
+    for (rawValue, normal, shifted) in expected {
+      let layout = try XCTUnwrap(KeyboardLayout(rawValue: rawValue), rawValue)
+      XCTAssertEqual(outputs(layout), normal, layout.displayName)
+      XCTAssertEqual(outputs(layout, flags: [.shift]), shifted, layout.displayName)
+      let guideRows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(guideRows.map(\.count), [13, 13, 11, 10])
+      for (keyCodes, guideRow) in zip(ansiRows, guideRows) {
+        for (keyCode, key) in zip(keyCodes, guideRow) {
+          for flags in [NSEvent.ModifierFlags(), .shift] {
+            let output = KeyboardLayoutEmulator.character(
+              forKeyCode: keyCode, modifierFlags: flags, layout: layout)
+            XCTAssertEqual(
+              output.map {
+                key.characters.contains(Character(String($0).lowercased()))
+              }, true,
+              "\(layout.displayName) keyCode \(keyCode) flags \(flags) output \(String(describing: output))")
+          }
+        }
+      }
+
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+
+    let promethium = try XCTUnwrap(KeyboardLayout(rawValue: "handsdown_promethium"))
+    XCTAssertEqual(
+      KeyboardGuideModel.bottomRow(for: .minimal, layout: promethium).map(\.label),
+      ["R", "空格"])
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: [], layout: promethium), "r")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: [.option], layout: promethium), "r")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "r", layout: promethium), "thumb-0")
+    var inserted = [String]()
+    let inputView = TypingInputView()
+    inputView.keyboardInputMapping = .builtIn(promethium)
+    inputView.onInsert = { text, _ in inserted.append(text) }
+    let physicalSpace = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+        context: nil, characters: " ", charactersIgnoringModifiers: " ", isARepeat: false,
+        keyCode: 49))
+    inputView.keyDown(with: physicalSpace)
+    XCTAssertEqual(inserted, ["r"])
+
+    let statica = try XCTUnwrap(KeyboardLayout(rawValue: "statica_3x5"))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 12, modifierFlags: [.option], layout: statica), "ъ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(
+        forKeyCode: 12, modifierFlags: [.option, .shift], layout: statica), "Ъ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 1, modifierFlags: [.option], layout: statica), "ё")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 47, modifierFlags: [.option], layout: statica), "щ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 13, modifierFlags: [.option], layout: statica), "у")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(
+        forKeyCode: 13, modifierFlags: [.option, .shift], layout: statica), "У")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ё", layout: statica), "home-1")
+
+    let vestnik = try XCTUnwrap(KeyboardLayout(rawValue: "Vestnik"))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 4, modifierFlags: [.option], layout: vestnik), "ъ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 37, modifierFlags: [.option], layout: vestnik), "ё")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 6, modifierFlags: [.option], layout: vestnik), "щ")
+    XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "щ", layout: vestnik), "bottom-0")
+
+    let diktor = try XCTUnwrap(KeyboardLayout(rawValue: "Diktor"))
+    let diktorVoronov = try XCTUnwrap(KeyboardLayout(rawValue: "Diktor_VoronovMod"))
+    XCTAssertTrue(
+      KeyboardGuideKeysMode.minimal.showsNumberRow(
+        for: diktor, mode: .staticGuide, nextCharacter: nil))
+    XCTAssertTrue(
+      KeyboardGuideKeysMode.minimal.showsNumberRow(
+        for: diktorVoronov, mode: .staticGuide, nextCharacter: nil))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 12, modifierFlags: [.option], layout: diktor), "ц")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(
+        forKeyCode: 12, modifierFlags: [.option, .shift], layout: diktor), "Ц")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(forKeyCode: 6, modifierFlags: [.option], layout: diktorVoronov),
+      "?")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.text(
+        forKeyCode: 6, modifierFlags: [.option, .shift], layout: diktorVoronov), "!")
+  }
+
+  @MainActor
   func testAnsiColemakDHMapsItsDistinctCoreKeysAndPersists() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "b", layout: .ansiColemakDH), "top-4")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "g", layout: .ansiColemakDH), "home-4")
@@ -8185,7 +8329,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 158)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 163)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))

@@ -95,6 +95,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case maltron = "MALTRON"
   case prsten = "PRSTEN"
   case rsthd = "RSTHD"
+  case handsDownPromethium = "handsdown_promethium"
+  case statica3x5 = "statica_3x5"
+  case vestnik = "Vestnik"
+  case diktor = "Diktor"
+  case diktorVoronovMod = "Diktor_VoronovMod"
   case real
   case sertain
   case ctgap
@@ -258,6 +263,11 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .maltron: "MALTRON"
     case .prsten: "PRSTEN"
     case .rsthd: "RSTHD"
+    case .handsDownPromethium: "Hands Down Promethium"
+    case .statica3x5: "Statica 3×5"
+    case .vestnik: "Vestnik"
+    case .diktor: "Diktor"
+    case .diktorVoronovMod: "Diktor Voronov Mod"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -426,6 +436,11 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case maltron = "MALTRON"
   case prsten = "PRSTEN"
   case rsthd = "RSTHD"
+  case handsDownPromethium = "handsdown_promethium"
+  case statica3x5 = "statica_3x5"
+  case vestnik = "Vestnik"
+  case diktor = "Diktor"
+  case diktorVoronovMod = "Diktor_VoronovMod"
   case real
   case sertain
   case ctgap
@@ -1888,6 +1903,121 @@ enum KeyboardGuideModel {
         row("home", "RSTHDMNAIO'"),
         row("bottom", "/VGPBXW.;-")
       ]
+    case .handsDownPromethium:
+      [
+        row("number", "`1234567890-="),
+        row("top", "FPDLX;UOYBZ]\\"),
+        row("home", "SNTHK,AEICQ"),
+        row("bottom", "VWGMJ-.'=/")
+      ]
+    case .statica3x5:
+      [
+        layeredRow(
+          "number", labels: ["\"", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          shiftedLabels: ["'", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: ["ь", "у", "а", "ж", "ю", "г", "б", "р", "л", "х", ",", ".", "\\"],
+          shiftedLabels: ["Ь", "У", "А", "Ж", "Ю", "Г", "Б", "Р", "Л", "Х", ";", ":", "|"],
+          optionLabels: ["ъ", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil],
+          shiftedOptionLabels: ["Ъ", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil]
+        ),
+        layeredRow(
+          "home", labels: ["и", "е", "о", "к", "я", "м", "т", "с", "н", "з", "."],
+          shiftedLabels: ["И", "Е", "О", "К", "Я", "М", "Т", "С", "Н", "З", ":"],
+          optionLabels: [nil, "ё", nil, nil, nil, nil, nil, nil, nil, nil, nil],
+          shiftedOptionLabels: [nil, "Ё", nil, nil, nil, nil, nil, nil, nil, nil, nil]
+        ),
+        layeredRow(
+          "bottom", labels: ["ф", "э", "ы", "п", "й", "д", "в", "ч", "ш", "ц"],
+          shiftedLabels: ["Ф", "Э", "Ы", "П", "Й", "Д", "В", "Ч", "Ш", "Ц"],
+          optionLabels: [nil, nil, nil, nil, nil, nil, nil, nil, "щ", nil],
+          shiftedOptionLabels: [nil, nil, nil, nil, nil, nil, nil, nil, "Щ", nil]
+        ),
+      ]
+    case .vestnik:
+      [
+        layeredRow(
+          "number", labels: ["\"", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+          shiftedLabels: ["'", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: ["ц", "д", "р", "г", "х", "ф", "п", "а", "я", "э", ",", ".", "\\"],
+          shiftedLabels: ["Ц", "Д", "Р", "Г", "Х", "Ф", "П", "А", "Я", "Э", ";", ":", "|"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "home", labels: ["с", "т", "н", "к", "б", "ь", "в", "о", "е", "и", "."],
+          shiftedLabels: ["С", "Т", "Н", "К", "Б", "Ь", "В", "О", "Е", "И", ":"],
+          optionLabels: [nil, nil, nil, nil, nil, "ъ", nil, nil, "ё", nil, nil],
+          shiftedOptionLabels: [nil, nil, nil, nil, nil, "Ъ", nil, nil, "Ё", nil, nil]
+        ),
+        layeredRow(
+          "bottom", labels: ["ш", "з", "л", "м", "ч", "ж", "й", "ы", "у", "ю"],
+          shiftedLabels: ["Ш", "З", "Л", "М", "Ч", "Ж", "Й", "Ы", "У", "Ю"],
+          optionLabels: ["щ", nil, nil, nil, nil, nil, nil, nil, nil, nil],
+          shiftedOptionLabels: ["Щ", nil, nil, nil, nil, nil, nil, nil, nil, nil]
+        ),
+      ]
+    case .diktor:
+      [
+        layeredRow(
+          "number", labels: ["ё", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*", "="],
+          shiftedLabels: ["Ё", "Ъ", "Ь", "№", "%", ":", ";", "-", "\"", "(", ")", "_", "+"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: ["ц", "ь", "я", ",", ".", "з", "в", "к", "д", "ч", "ш", "щ", "\\"],
+          shiftedLabels: ["Ц", "ъ", "Я", "?", "!", "З", "В", "К", "Д", "Ч", "Ш", "Щ", "/"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "home", labels: ["у", "и", "е", "о", "а", "л", "н", "т", "с", "р", "й"],
+          shiftedLabels: ["У", "И", "Е", "О", "А", "Л", "Н", "Т", "С", "Р", "Й"],
+          optionLabels: Array(repeating: nil, count: 11),
+          shiftedOptionLabels: Array(repeating: nil, count: 11)
+        ),
+        layeredRow(
+          "bottom", labels: ["ф", "э", "х", "ы", "ю", "б", "м", "п", "г", "ж"],
+          shiftedLabels: ["Ф", "Э", "Х", "Ы", "Ю", "Б", "М", "П", "Г", "Ж"],
+          optionLabels: Array(repeating: nil, count: 10),
+          shiftedOptionLabels: Array(repeating: nil, count: 10)
+        ),
+      ]
+    case .diktorVoronovMod:
+      [
+        layeredRow(
+          "number", labels: ["ё", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*", "="],
+          shiftedLabels: ["Ё", "%", "№", "\"", ".", ":", ";", "-", ",", "(", ")", "_", "+"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "top", labels: ["ф", "ь", "х", "я", "ы", "з", "в", "к", "д", "ч", "ш", "щ", "\\"],
+          shiftedLabels: ["Ф", "Ь", "Х", "Я", "Ы", "З", "В", "К", "Д", "Ч", "Ш", "Щ", "/"],
+          optionLabels: Array(repeating: nil, count: 13),
+          shiftedOptionLabels: Array(repeating: nil, count: 13)
+        ),
+        layeredRow(
+          "home", labels: ["у", "и", "е", "о", "а", "л", "н", "т", "с", "р", "й"],
+          shiftedLabels: ["У", "И", "Е", "О", "А", "Л", "Н", "Т", "С", "Р", "Й"],
+          optionLabels: Array(repeating: nil, count: 11),
+          shiftedOptionLabels: Array(repeating: nil, count: 11)
+        ),
+        layeredRow(
+          "bottom", labels: ["?", "ъ", "э", "ю", "ц", "б", "м", "п", "г", "ж"],
+          shiftedLabels: ["!", "Ъ", "Э", "Ю", "Ц", "Б", "М", "П", "Г", "Ж"],
+          optionLabels: Array(repeating: nil, count: 10),
+          shiftedOptionLabels: Array(repeating: nil, count: 10)
+        ),
+      ]
     case .real:
       [
         row("number", "`1234567890[]"),
@@ -3203,6 +3333,8 @@ enum KeyboardGuideModel {
       return [KeyboardGuideKey("thumb-0", label: "E", characters: "eE", width: 70), space]
     case .prsten:
       return [space, KeyboardGuideKey("thumb-1", label: "E", characters: "eE", width: 70)]
+    case .handsDownPromethium:
+      return [KeyboardGuideKey("thumb-0", label: "R", characters: "rR", width: 70), space]
     default:
       return [KeyboardGuideKey("space", label: "空格", characters: " ", width: 170)]
     }
@@ -3327,7 +3459,7 @@ private extension KeyboardLayout {
   var showsNumberRowInMinimalGuide: Bool {
     self == .frenchAzerty || self == .mtgapFull || self == .engram || self == .engrammer
       || self == .booMangle || self == .quartz || self == .capewellDvorak || self == .real
-      || self == .stndc || self == .uciea
+      || self == .stndc || self == .uciea || self == .diktor || self == .diktorVoronovMod
   }
 }
 

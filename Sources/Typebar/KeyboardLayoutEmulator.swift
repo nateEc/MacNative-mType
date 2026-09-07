@@ -832,6 +832,52 @@ enum KeyboardLayoutEmulator {
             + "0:rR 1:sS 2:tT 3:hH 5:dD 4:mM 38:nN 40:aA 37:iI 41:oO 39:'\" "
             + "6:/? 7:vV 8:gG 9:pP 11:bB 45:xX 46:wW 43:.> 47:;: 44:-_"
         ), normal: "e", shifted: "E")
+    case .handsDownPromethium:
+      withBaseFallbackOptionLayers(
+        withThumbKey(
+          map(
+            "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+              + "12:fF 13:pP 14:dD 15:lL 17:xX 16:;: 32:uU 34:oO 31:yY 35:bB 33:zZ 30:]} 42:\\| "
+              + "0:sS 1:nN 2:tT 3:hH 5:kK 4:,< 38:aA 40:eE 37:iI 41:cC 39:qQ "
+              + "6:vV 7:wW 8:gG 9:mM 11:jJ 45:-_ 46:.> 43:'\" 47:=+ 44:/?"
+          ), normal: "r", shifted: "R"),
+        overrides: [:])
+    case .statica3x5:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:\"' 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:ьЬ 13:уУ 14:аА 15:жЖ 17:юЮ 16:гГ 32:бБ 34:рР 31:лЛ 35:хХ 33:,; 30:.: 42:\\| "
+            + "0:иИ 1:еЕ 2:оО 3:кК 5:яЯ 4:мМ 38:тТ 40:сС 37:нН 41:зЗ 39:.: "
+            + "6:фФ 7:эЭ 8:ыЫ 9:пП 11:йЙ 45:дД 46:вВ 43:чЧ 47:шШ 44:цЦ"
+        ),
+        overrides: [12: ("ъ", "Ъ"), 1: ("ё", "Ё"), 47: ("щ", "Щ")]
+      )
+    case .vestnik:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:\"' 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:-_ 24:=+ "
+            + "12:цЦ 13:дД 14:рР 15:гГ 17:хХ 16:фФ 32:пП 34:аА 31:яЯ 35:эЭ 33:,; 30:.: 42:\\| "
+            + "0:сС 1:тТ 2:нН 3:кК 5:бБ 4:ьЬ 38:вВ 40:оО 37:еЕ 41:иИ 39:.: "
+            + "6:шШ 7:зЗ 8:лЛ 9:мМ 11:чЧ 45:жЖ 46:йЙ 43:ыЫ 47:уУ 44:юЮ"
+        ),
+        overrides: [4: ("ъ", "Ъ"), 37: ("ё", "Ё"), 6: ("щ", "Щ")]
+      )
+    case .diktor:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:ёЁ 18:1Ъ 19:2Ь 20:3№ 21:4% 23:5: 22:6; 26:7- 28:8\" 25:9( 29:0) 27:*_ 24:=+ "
+            + "12:цЦ 13:ьъ 14:яЯ 15:,? 17:.! 16:зЗ 32:вВ 34:кК 31:дД 35:чЧ 33:шШ 30:щЩ 42:\\/ "
+            + "0:уУ 1:иИ 2:еЕ 3:оО 5:аА 4:лЛ 38:нН 40:тТ 37:сС 41:рР 39:йЙ "
+            + "6:фФ 7:эЭ 8:хХ 9:ыЫ 11:юЮ 45:бБ 46:мМ 43:пП 47:гГ 44:жЖ"
+        ), overrides: [:])
+    case .diktorVoronovMod:
+      withBaseFallbackOptionLayers(
+        map(
+          "50:ёЁ 18:1% 19:2№ 20:3\" 21:4. 23:5: 22:6; 26:7- 28:8, 25:9( 29:0) 27:*_ 24:=+ "
+            + "12:фФ 13:ьЬ 14:хХ 15:яЯ 17:ыЫ 16:зЗ 32:вВ 34:кК 31:дД 35:чЧ 33:шШ 30:щЩ 42:\\/ "
+            + "0:уУ 1:иИ 2:еЕ 3:оО 5:аА 4:лЛ 38:нН 40:тТ 37:сС 41:рР 39:йЙ "
+            + "6:?! 7:ъЪ 8:эЭ 9:юЮ 11:цЦ 45:бБ 46:мМ 43:пП 47:гГ 44:жЖ"
+        ), overrides: [:])
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
@@ -1420,6 +1466,21 @@ enum KeyboardLayoutEmulator {
       layeredKeys[keyCode] = .init(
         normal: existing.normal, shifted: existing.shifted, option: option.normal,
         shiftedOption: option.shifted)
+    }
+    return layeredKeys
+  }
+
+  private static func withBaseFallbackOptionLayers(
+    _ keys: [UInt16: KeyLayers], overrides: [UInt16: OptionPair]
+  ) -> [UInt16: KeyLayers] {
+    var layeredKeys = keys
+    for (keyCode, layers) in keys {
+      let override = overrides[keyCode]
+      layeredKeys[keyCode] = .init(
+        normal: layers.normal,
+        shifted: layers.shifted,
+        option: override?.normal ?? layers.normal,
+        shiftedOption: override?.shifted ?? layers.shifted)
     }
     return layeredKeys
   }
