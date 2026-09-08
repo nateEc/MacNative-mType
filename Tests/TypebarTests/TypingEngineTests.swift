@@ -8249,7 +8249,7 @@ final class TypingEngineTests: XCTestCase {
       wordCount: 25, language: .spanish650k, contentOptions: ContentOptions())
     XCTAssertGreaterThanOrEqual(largestSpanishScalePrompt.split(separator: " ").count, 25)
     let largestFrenchScalePrompt = StarterLexicon.prompt(
-      wordCount: 25, language: .french10k, contentOptions: ContentOptions())
+      wordCount: 25, language: .french600k, contentOptions: ContentOptions())
     XCTAssertGreaterThanOrEqual(largestFrenchScalePrompt.split(separator: " ").count, 25)
     let largestGermanScalePrompt = StarterLexicon.prompt(
       wordCount: 25, language: .german250k, contentOptions: ContentOptions())
@@ -8337,6 +8337,7 @@ final class TypingEngineTests: XCTestCase {
       ("french1k", 1_394, 1, 14, 0, 12, 6, 6, 257),
       ("french2k", 2_041, 1, 14, 3, 21, 10, 11, 503),
       ("french10k", 10_251, 1, 15, 4, 131, 73, 60, 3_224),
+      ("french600k", 633_941, 1, 33, 0, 34, 34, 0, 282_793),
     ]
 
     for (rawValue, count, minimum, maximum, uppercase, nonLetters, punctuation, spaces, nonASCII) in cases {

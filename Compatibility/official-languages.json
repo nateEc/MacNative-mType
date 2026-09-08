@@ -471,6 +471,7 @@
     "french_1k": "french1k",
     "french_2k": "french2k",
     "french_10k": "french10k",
+    "french_600k": "french600k",
     "french_bitoduc": "frenchBitoduc",
     "nepali": "nepali",
     "nepali_romanized": "nepaliRomanized",
@@ -730,7 +731,6 @@
     "sindhi": "sindhi"
   },
   "nativeRelatedChoice": {
-    "french_600k": "french",
     "nepali_1k": "nepali",
     "azerbaijani_1k": "azerbaijani",
     "arabic_10k": "arabic",

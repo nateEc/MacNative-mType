@@ -123,7 +123,7 @@ extension TypingLanguage {
     case .finnish: "fi-FI"
     case .estonian: "et-EE"
     case .icelandic: "is-IS"
-    case .french, .french1k, .french2k, .french10k: "fr-FR"
+    case .french, .french1k, .french2k, .french10k, .french600k: "fr-FR"
     case .frenchBitoduc: "fr-fr"
     case .italian: "it-IT"
     case .portuguese, .portuguese3k, .portugueseAccents: "pt-PT"

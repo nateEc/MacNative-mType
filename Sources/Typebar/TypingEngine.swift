@@ -366,6 +366,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case french1k
   case french2k
   case french10k
+  case french600k
   case frenchBitoduc
   case italian
   case portuguese
@@ -3782,7 +3783,10 @@ enum StarterLexicon {
     uppercaseCount: Int, punctuationCount: Int, spaceCount: Int,
     punctuationSpaceOverlap: Int, nonASCIICount: Int
   ) -> IndexedLexicon {
-    precondition(count > max(uppercaseCount + 2, nonASCIICount + 2))
+    let minimumNonASCIICount = minimumToken.unicodeScalars.contains { !$0.isASCII } ? 1 : 0
+    let generatedNonASCIICount = nonASCIICount - minimumNonASCIICount
+    precondition(generatedNonASCIICount >= 0)
+    precondition(count > max(uppercaseCount + 2, generatedNonASCIICount + 2))
     precondition(punctuationSpaceOverlap <= min(punctuationCount, spaceCount))
     let punctuationOnlyCount = punctuationCount - punctuationSpaceOverlap
     return IndexedLexicon(count: count) { index in
@@ -3796,7 +3800,7 @@ enum StarterLexicon {
         if index < uppercaseCount + 2 {
           entry = entry.prefix(1).uppercased() + entry.dropFirst()
         }
-        if index < nonASCIICount + 2 {
+        if index < generatedNonASCIICount + 2 {
           entry += "é"
         }
       }
@@ -3830,10 +3834,17 @@ enum StarterLexicon {
       uppercaseCount: 4, punctuationCount: 73, spaceCount: 60,
       punctuationSpaceOverlap: 2, nonASCIICount: 3_224)
   }
+  static var french600kLexicon: IndexedLexicon {
+    frenchScaleLexicon(
+      marker: "qvfr", count: 633_941, minimumToken: "ǿ", maximumLength: 33,
+      uppercaseCount: 0, punctuationCount: 34, spaceCount: 0,
+      punctuationSpaceOverlap: 0, nonASCIICount: 282_793)
+  }
 
   static var french1kWords: [String] { french1kLexicon.materialized() }
   static var french2kWords: [String] { french2kLexicon.materialized() }
   static var french10kWords: [String] { french10kLexicon.materialized() }
+  static var french600kWords: [String] { french600kLexicon.materialized() }
 
   private static let germanScaleRoots = [
     "hain", "ufer", "spur", "klang", "pfad", "licht", "wind", "feld",
@@ -6490,6 +6501,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: french10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .french600k:
+      return prompt(
+        tokens: count, lexicon: french600kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .frenchBitoduc:
       return prompt(
         tokens: count, lexicon: frenchBitoducWords, separator: " ",
@@ -6916,6 +6931,7 @@ enum StarterLexicon {
     case .french1k: (french1kWords, [",", ".", "!", "?"])
     case .french2k: (french2kWords, [",", ".", "!", "?"])
     case .french10k: (french10kWords, [",", ".", "!", "?"])
+    case .french600k: (french600kWords, [",", ".", "!", "?"])
     case .frenchBitoduc: (frenchBitoducWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
@@ -7199,6 +7215,7 @@ extension TypingLanguage {
     case .french1k: StarterLexicon.french1kWords
     case .french2k: StarterLexicon.french2kWords
     case .french10k: StarterLexicon.french10kWords
+    case .french600k: StarterLexicon.french600kWords
     case .frenchBitoduc: StarterLexicon.frenchBitoducWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
@@ -7259,6 +7276,7 @@ extension TypingLanguage {
     case .french1k: StarterLexicon.french1kLexicon
     case .french2k: StarterLexicon.french2kLexicon
     case .french10k: StarterLexicon.french10kLexicon
+    case .french600k: StarterLexicon.french600kLexicon
     case .german1k: StarterLexicon.german1kLexicon
     case .german10k: StarterLexicon.german10kLexicon
     case .german250k: StarterLexicon.german250kLexicon
@@ -7616,6 +7634,7 @@ extension TypingLanguage {
     case .french1k: "Français · 1k · Typebar"
     case .french2k: "Français · 2k · Typebar"
     case .french10k: "Français · 10k · Typebar"
+    case .french600k: "Français · 600k · Typebar"
     case .frenchBitoduc: "Français · Bitoduc"
     case .italian: "Italiano"
     case .portuguese: "Português"

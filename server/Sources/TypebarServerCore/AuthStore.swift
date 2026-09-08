@@ -492,7 +492,7 @@ public actor AuthStore {
     "tamilOld",
     "english1k", "english5k", "english10k", "english25k", "english450k",
     "spanish1k", "spanish10k", "spanish650k",
-    "french1k", "french2k", "french10k",
+    "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",
     "romanian50k", "romanian100k", "romanian200k",
