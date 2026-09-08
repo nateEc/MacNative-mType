@@ -8196,6 +8196,61 @@ final class TypingEngineTests: XCTestCase {
       "typebar-results-19700101-000000.csv")
   }
 
+  func testRemoteResultCSVExportLoadsEveryStablePageAndRejectsAChangingSnapshot() async throws {
+    let payload = #"""
+      [
+        {"id":"00000000-0000-0000-0000-000000000001","mode":"time","language":"english","durationSeconds":30,"wordLimit":null,"wpm":61,"rawWpm":66,"accuracy":97,"consistency":88.5,"errorCount":2,"eventCount":140,"tags":["focus, \"steady\""],"startedAt":"1970-01-01T00:00:00Z","finishedAt":"1970-01-01T00:00:30Z"},
+        {"id":"00000000-0000-0000-0000-000000000002","mode":"words","language":"french","durationSeconds":null,"wordLimit":25,"wpm":54,"rawWpm":58,"accuracy":95,"consistency":80,"errorCount":3,"eventCount":125,"tags":[],"startedAt":"1970-01-02T00:00:00Z","finishedAt":"1970-01-02T00:00:40Z"},
+        {"id":"00000000-0000-0000-0000-000000000003","mode":"quote","language":"german","durationSeconds":null,"wordLimit":null,"wpm":49,"rawWpm":52,"accuracy":94,"consistency":76.25,"errorCount":4,"eventCount":180,"tags":["café"],"startedAt":"1970-01-03T00:00:00Z","finishedAt":"1970-01-03T00:01:00Z"}
+      ]
+      """#
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let results = try decoder.decode([RemoteAccountResult].self, from: Data(payload.utf8))
+    var requests: [(offset: Int, limit: Int)] = []
+
+    let loaded = try await RemoteResultCSVExport.loadAll(pageSize: 2) { offset, limit in
+      requests.append((offset, limit))
+      return RemoteAccountResultPage(
+        results: Array(results.dropFirst(offset).prefix(limit)), total: results.count)
+    }
+
+    XCTAssertEqual(requests.map(\.offset), [0, 2])
+    XCTAssertEqual(requests.map(\.limit), [2, 2])
+    XCTAssertEqual(loaded.map(\.id), results.map(\.id))
+    let csv = RemoteResultCSVExport.csvString(for: loaded)
+    XCTAssertTrue(csv.hasPrefix(RemoteResultCSVExport.columns.joined(separator: ",") + "\r\n"))
+    XCTAssertTrue(csv.contains("00000000-0000-0000-0000-000000000001,time,30,,english,61,66,97,88.50,2,140"))
+    XCTAssertTrue(csv.contains("\"focus, \"\"steady\"\"\""))
+    XCTAssertFalse(csv.localizedCaseInsensitiveContains("prompt"))
+    XCTAssertFalse(csv.localizedCaseInsensitiveContains("replay"))
+    XCTAssertEqual(
+      RemoteResultCSVExport.filename(for: Date(timeIntervalSince1970: 0)),
+      "typebar-server-results-19700101-000000.csv")
+
+    do {
+      _ = try await RemoteResultCSVExport.loadAll(pageSize: 2) { offset, _ in
+        offset == 0
+          ? RemoteAccountResultPage(results: Array(results.prefix(2)), total: 3)
+          : RemoteAccountResultPage(results: [results[2]], total: 4)
+      }
+      XCTFail("A changing server result set must not produce a partial export")
+    } catch let error as RemoteResultCSVExportError {
+      XCTAssertEqual(error, .changedDuringExport)
+    }
+
+    do {
+      _ = try await RemoteResultCSVExport.loadAll(pageSize: 2) { offset, _ in
+        offset == 0
+          ? RemoteAccountResultPage(results: Array(results.prefix(2)), total: 3)
+          : RemoteAccountResultPage(results: [results[1]], total: 3)
+      }
+      XCTFail("A duplicate page must not produce a partial export")
+    } catch let error as RemoteResultCSVExportError {
+      XCTAssertEqual(error, .changedDuringExport)
+    }
+  }
+
   func testSlowWordPracticeUsesReferenceTwentyPercentSelectionAndWeightsTheSlowest() throws {
     let reviews = [
       TypedWordReview(index: 0, target: "ember", typed: "ember"),

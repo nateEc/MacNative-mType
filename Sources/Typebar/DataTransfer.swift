@@ -134,6 +134,120 @@ enum ResultCSVExport {
     }
 }
 
+enum RemoteResultCSVExportError: Error, Equatable {
+    case invalidPageSize
+    case changedDuringExport
+}
+
+/// Exports only the result metadata already exposed by the self-hosted service.
+/// Prompt text and replay events are absent from `RemoteAccountResult`, so they
+/// cannot accidentally enter this CSV path.
+enum RemoteResultCSVExport {
+    static let columns = [
+        "id", "mode", "duration_seconds", "word_limit", "language", "wpm", "raw_wpm",
+        "accuracy_percent", "consistency_percent", "errors", "event_count", "tags",
+        "started_at", "finished_at",
+    ]
+
+    @MainActor
+    static func loadAll(
+        pageSize: Int = 1_000,
+        loadPage: (_ offset: Int, _ limit: Int) async throws -> RemoteAccountResultPage
+    ) async throws -> [RemoteAccountResult] {
+        guard (1...1_000).contains(pageSize) else {
+            throw RemoteResultCSVExportError.invalidPageSize
+        }
+        var offset = 0
+        var expectedTotal: Int?
+        var loaded: [RemoteAccountResult] = []
+        var loadedIDs: Set<UUID> = []
+
+        repeat {
+            let page = try await loadPage(offset, pageSize)
+            guard page.total >= 0, page.results.count <= pageSize else {
+                throw RemoteResultCSVExportError.changedDuringExport
+            }
+            if let expectedTotal {
+                guard page.total == expectedTotal else {
+                    throw RemoteResultCSVExportError.changedDuringExport
+                }
+            } else {
+                expectedTotal = page.total
+            }
+            guard !page.results.isEmpty || offset == page.total else {
+                throw RemoteResultCSVExportError.changedDuringExport
+            }
+            for result in page.results {
+                guard loadedIDs.insert(result.id).inserted else {
+                    throw RemoteResultCSVExportError.changedDuringExport
+                }
+                loaded.append(result)
+            }
+            offset += page.results.count
+            guard offset <= page.total else {
+                throw RemoteResultCSVExportError.changedDuringExport
+            }
+        } while offset < (expectedTotal ?? 0)
+
+        guard loaded.count == expectedTotal else {
+            throw RemoteResultCSVExportError.changedDuringExport
+        }
+        return loaded
+    }
+
+    static func data(for results: [RemoteAccountResult]) -> Data {
+        Data(csvString(for: results).utf8)
+    }
+
+    static func csvString(for results: [RemoteAccountResult]) -> String {
+        ([columns] + results.map(row(for:)))
+            .map { $0.map(escaped).joined(separator: ",") }
+            .joined(separator: "\r\n") + "\r\n"
+    }
+
+    static func filename(for date: Date) -> String {
+        "typebar-server-results-\(filenameFormatter.string(from: date)).csv"
+    }
+
+    private static func row(for result: RemoteAccountResult) -> [String] {
+        [
+            result.id.uuidString.lowercased(), result.mode,
+            result.durationSeconds.map(String.init) ?? "", result.wordLimit.map(String.init) ?? "",
+            result.language, String(result.wpm), String(result.rawWpm), String(result.accuracy),
+            decimal(result.consistency), String(result.errorCount), String(result.eventCount),
+            result.tags.joined(separator: ";"), iso8601Date(result.startedAt),
+            iso8601Date(result.finishedAt),
+        ]
+    }
+
+    private static func escaped(_ value: String) -> String {
+        guard value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r") else {
+            return value
+        }
+        return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+    }
+
+    private static func decimal(_ value: Double) -> String {
+        String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+
+    private static let filenameFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter
+    }()
+
+    private static func iso8601Date(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter.string(from: date)
+    }
+}
+
 struct TypebarArchive: Codable, Equatable {
     static let currentVersion = 2
     let version: Int

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -1180,6 +1181,8 @@ struct PreferencesView: View {
               HStack {
                 Text("服务端近期成绩").font(.headline)
                 Spacer()
+                Button("导出全部 CSV…") { exportRemoteResultsCSV() }
+                  .disabled(account.isWorking)
                 Button("刷新") { Task { await account.refreshRemoteResults() } }
                   .disabled(account.isWorking)
               }
@@ -1845,6 +1848,27 @@ struct PreferencesView: View {
     profileShowsActivity = details.showActivity
     profileShowsDiscordAvatar = details.showDiscordAvatar
     profileSelectedBadgeID = account.currentUser?.selectedBadgeID ?? ""
+  }
+
+  private func exportRemoteResultsCSV() {
+    Task {
+      guard let results = await account.remoteResultsForExport() else { return }
+      guard !results.isEmpty else {
+        account.statusMessage = "没有可导出的服务端成绩。"
+        return
+      }
+      let panel = NSSavePanel()
+      panel.allowedContentTypes = [.commaSeparatedText]
+      panel.nameFieldStringValue = RemoteResultCSVExport.filename(for: .now)
+      panel.canCreateDirectories = true
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      do {
+        try RemoteResultCSVExport.data(for: results).write(to: url, options: .atomic)
+        account.statusMessage = "已导出 \(results.count) 条服务端成绩；不含提示或输入回放。"
+      } catch {
+        account.statusMessage = "无法保存服务端成绩 CSV 文件。"
+      }
+    }
   }
 
   private func streakDayBoundaryLabel(for offset: Double) -> String {

@@ -336,7 +336,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-private struct RemoteAccountResultListResponse: Codable, Sendable {
+struct RemoteAccountResultPage: Codable, Sendable {
     let results: [RemoteAccountResult]
     let total: Int
 }
@@ -1582,10 +1582,37 @@ final class AccountSession {
                 path: "v1/results", method: "GET", token: token,
                 body: Optional<String>.none,
                 queryItems: [URLQueryItem(name: "limit", value: "\(min(max(limit, 1), 100))")],
-                response: RemoteAccountResultListResponse.self
+                response: RemoteAccountResultPage.self
             ).results
         } catch {
             statusMessage = error.localizedDescription
+        }
+    }
+
+    func remoteResultsForExport() async -> [RemoteAccountResult]? {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return nil
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            return try await RemoteResultCSVExport.loadAll { offset, limit in
+                try await RemoteAccountAPI(endpoint: endpoint).request(
+                    path: "v1/results", method: "GET", token: token,
+                    body: Optional<String>.none,
+                    queryItems: [
+                        URLQueryItem(name: "offset", value: "\(offset)"),
+                        URLQueryItem(name: "limit", value: "\(limit)"),
+                    ],
+                    response: RemoteAccountResultPage.self)
+            }
+        } catch let error as RemoteResultCSVExportError where error == .changedDuringExport {
+            statusMessage = "导出期间服务端成绩发生变化，请稍后重试。"
+            return nil
+        } catch {
+            statusMessage = error.localizedDescription
+            return nil
         }
     }
 
