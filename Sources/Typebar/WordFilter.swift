@@ -27,7 +27,9 @@ struct LocalWordFilter {
     }
   }
 
-  static func words(in lexicon: [String], matching criteria: Criteria) -> Result<[String], Error> {
+  static func words<Lexicon: Collection>(
+    in lexicon: Lexicon, matching criteria: Criteria
+  ) -> Result<[String], Error> where Lexicon.Element == String {
     let included = characterSet(from: criteria.includeCharacters)
     let excluded = characterSet(from: criteria.excludeCharacters)
     if criteria.exactCharactersOnly && included.isEmpty {
@@ -82,17 +84,12 @@ struct WordFilterView: View {
   @State private var exactCharactersOnly = false
 
   init(language: TypingLanguage, onApply: @escaping (String, Bool) -> Void) {
-    let supportsFiltering = !language.isCodeLanguage && language != .mixedEnglishChinese
-      && language != .mixedLanguages && !language.ownedPracticeWords().isEmpty
-    _language = State(initialValue: supportsFiltering ? language : .english)
+    _language = State(initialValue: language.supportsLocalWordFilter ? language : .english)
     self.onApply = onApply
   }
 
   private var selectableLanguages: [TypingLanguage] {
-    TypingLanguage.allCases.filter {
-      !$0.isCodeLanguage && $0 != .mixedEnglishChinese && $0 != .mixedLanguages
-        && !$0.ownedPracticeWords().isEmpty
-    }
+    TypingLanguage.allCases.filter(\.supportsLocalWordFilter)
   }
 
   private var criteria: LocalWordFilter.Criteria {
@@ -103,7 +100,7 @@ struct WordFilterView: View {
   }
 
   private var filteredResult: Result<[String], LocalWordFilter.Error> {
-    LocalWordFilter.words(in: language.ownedPracticeWords(), matching: criteria)
+    LocalWordFilter.words(in: language.ownedPracticeLexicon(), matching: criteria)
   }
 
   private var filteredWords: [String] {

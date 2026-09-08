@@ -70,14 +70,9 @@ enum WeakSpotPractice {
       return String($0.character) < String($1.character)
     }
     let priorities = Dictionary(uniqueKeysWithValues: characters.map { ($0.character, $0.priority) })
-    let rankedWords = language.ownedPracticeWords(englishVariant: englishVariant).enumerated()
-      .map {
-        (index: $0.offset, word: $0.element, score: score(word: $0.element, priorities: priorities))
-      }
-      .sorted {
-        if $0.score != $1.score { return $0.score > $1.score }
-        return $0.index < $1.index
-      }
+    let rankedWords = topRankedWords(
+      in: language.ownedPracticeLexicon(englishVariant: englishVariant),
+      priorities: priorities, limit: max(1, suggestionLimit))
     guard rankedWords.first?.score ?? 0 > 0 else { return nil }
 
     return .init(
@@ -85,8 +80,23 @@ enum WeakSpotPractice {
       analyzedResultCount: eligibleResults.count,
       totalMistakeCount: samples.values.map(\.mistakeCount).reduce(0, +),
       characters: characters,
-      suggestedWords: rankedWords.prefix(max(1, suggestionLimit)).map(\.word)
+      suggestedWords: rankedWords.map(\.word)
     )
+  }
+
+  private static func topRankedWords(
+    in lexicon: IndexedLexicon, priorities: [Character: Double], limit: Int
+  ) -> [(word: String, score: Double)] {
+    var ranked: [(word: String, score: Double)] = []
+    ranked.reserveCapacity(limit)
+    for word in lexicon {
+      let candidate = (word: word, score: score(word: word, priorities: priorities))
+      let insertionIndex = ranked.firstIndex { candidate.score > $0.score } ?? ranked.endIndex
+      guard insertionIndex < limit || ranked.count < limit else { continue }
+      ranked.insert(candidate, at: insertionIndex)
+      if ranked.count > limit { ranked.removeLast() }
+    }
+    return ranked
   }
 
   static func prompt(

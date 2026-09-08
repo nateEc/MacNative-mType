@@ -8222,6 +8222,50 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testIndexedLexiconPromptReadsOnlyTheRequestedNumberOfWords() {
+    XCTAssertTrue(IndexedLexicon([]).isEmpty)
+    XCTAssertTrue(TypingLanguage.english450k.supportsLocalWordFilter)
+    XCTAssertFalse(TypingLanguage.mixedLanguages.supportsLocalWordFilter)
+    XCTAssertFalse(TypingLanguage.codeSwift.supportsLocalWordFilter)
+
+    var requestedIndices: [Int] = []
+    let lexicon = IndexedLexicon(count: 450_029) { index in
+      requestedIndices.append(index)
+      return "typebar\(index)"
+    }
+
+    let prompt = StarterLexicon.prompt(
+      tokens: 25, lexicon: lexicon, separator: " ", punctuation: ["."],
+      contentOptions: ContentOptions(), usesZipfFrequency: false)
+
+    XCTAssertEqual(prompt.split(separator: " ").count, 25)
+    XCTAssertEqual(requestedIndices.count, 25)
+    XCTAssertTrue(requestedIndices.allSatisfy { (0..<lexicon.count).contains($0) })
+
+    let largestScalePrompt = StarterLexicon.prompt(
+      wordCount: 25, language: .english450k, contentOptions: ContentOptions())
+    XCTAssertEqual(largestScalePrompt.split(separator: " ").count, 25)
+  }
+
+  func testEnglish450kWeakSpotUsesTheIndexedCorpus() throws {
+    let target = StarterLexicon.english450kLexicon[2]
+    let mistyped = "x" + target.dropFirst()
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .words(1, language: .english450k), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(2),
+      typedCharacterCount: target.count, correctCharacterCount: target.count - 1,
+      errorCount: 1, wpm: 12, rawWpm: 12, accuracy: 90, prompt: target,
+      replayEvents: [.init(offset: 1, kind: .insert, text: mistyped)])
+
+    let report = try XCTUnwrap(
+      WeakSpotPractice.report(
+        results: [result], language: .english450k, englishVariant: .american,
+        suggestionLimit: 8))
+
+    XCTAssertEqual(report.suggestedWords.count, 8)
+    XCTAssertTrue(report.suggestedWords.allSatisfy { $0.first == target.first })
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -12652,6 +12696,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       try LocalWordFilter.words(in: ["amber", "atlas", "bar", "baker"], matching: criteria).get(),
       ["atlas"])
+    let indexed = IndexedLexicon(count: 4) { ["amber", "atlas", "bar", "baker"][$0] }
+    XCTAssertEqual(try LocalWordFilter.words(in: indexed, matching: criteria).get(), ["atlas"])
 
     let exact = LocalWordFilter.Criteria(
       includeCharacters: "a b", excludeCharacters: "ignored", minimumLength: nil,

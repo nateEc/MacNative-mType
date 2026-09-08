@@ -3562,6 +3562,35 @@ enum LikanuPolicy {
   }
 }
 
+struct IndexedLexicon: RandomAccessCollection {
+  typealias Index = Int
+
+  let count: Int
+  private let wordAt: (Int) -> String
+
+  var startIndex: Int { 0 }
+  var endIndex: Int { count }
+
+  init(count: Int, wordAt: @escaping (Int) -> String) {
+    precondition(count >= 0)
+    self.count = count
+    self.wordAt = wordAt
+  }
+
+  init(_ words: [String]) {
+    self.init(count: words.count) { words[$0] }
+  }
+
+  subscript(position: Int) -> String {
+    precondition(indices.contains(position))
+    return wordAt(position)
+  }
+
+  func materialized() -> [String] {
+    indices.map { self[$0] }
+  }
+}
+
 enum StarterLexicon {
   private static let englishScaleRoots = [
     "amber", "birch", "cairn", "delta", "ember", "field", "grove", "harbor",
@@ -3579,42 +3608,61 @@ enum StarterLexicon {
     return String(String.UnicodeScalarView(scalars.reversed()))
   }
 
-  private static func englishScaleWords(
+  private static func englishScaleLexicon(
     marker: String, count: Int, minimumToken: String, maximumLength: Int,
     uppercaseCount: Int, punctuationCount: Int
-  ) -> [String] {
+  ) -> IndexedLexicon {
     precondition(count > max(uppercaseCount + 2, punctuationCount + 2))
-    var entries = (0..<count).map { index in
-      marker + englishScaleRoots[index % englishScaleRoots.count] + alphabeticIndex(index)
+    return IndexedLexicon(count: count) { index in
+      var entry = marker + englishScaleRoots[index % englishScaleRoots.count]
+        + alphabeticIndex(index)
+      if index == 0 {
+        entry = minimumToken
+      } else if index == 1 {
+        entry = String(repeating: marker.last!, count: maximumLength)
+      } else if index < uppercaseCount + 2 {
+        entry = entry.prefix(1).uppercased() + entry.dropFirst()
+      }
+      if index >= count - punctuationCount {
+        entry += "-"
+      }
+      return entry
     }
-    entries[0] = minimumToken
-    entries[1] = String(repeating: marker.last!, count: maximumLength)
-    for index in 2..<(uppercaseCount + 2) {
-      entries[index] = entries[index].prefix(1).uppercased() + entries[index].dropFirst()
-    }
-    for offset in 0..<punctuationCount {
-      entries[count - 1 - offset] += "-"
-    }
-    return entries
   }
 
   // Typebar-authored deterministic scale corpora. They preserve the pinned
   // choice sizes and aggregate input shapes without importing reference words.
-  static let english1kWords = englishScaleWords(
-    marker: "q", count: 1_000, minimumToken: "q", maximumLength: 11,
-    uppercaseCount: 1, punctuationCount: 0)
-  static let english5kWords = englishScaleWords(
-    marker: "ve", count: 5_000, minimumToken: "v", maximumLength: 18,
-    uppercaseCount: 216, punctuationCount: 0)
-  static let english10kWords = englishScaleWords(
-    marker: "wi", count: 9_944, minimumToken: "w", maximumLength: 18,
-    uppercaseCount: 403, punctuationCount: 0)
-  static let english25kWords = englishScaleWords(
-    marker: "xo", count: 24_141, minimumToken: "qxqz", maximumLength: 27,
-    uppercaseCount: 946, punctuationCount: 0)
-  static let english450kWords = englishScaleWords(
-    marker: "yu", count: 450_029, minimumToken: "b", maximumLength: 31,
-    uppercaseCount: 33_021, punctuationCount: 176)
+  static var english1kLexicon: IndexedLexicon {
+    englishScaleLexicon(
+      marker: "q", count: 1_000, minimumToken: "q", maximumLength: 11,
+      uppercaseCount: 1, punctuationCount: 0)
+  }
+  static var english5kLexicon: IndexedLexicon {
+    englishScaleLexicon(
+      marker: "ve", count: 5_000, minimumToken: "v", maximumLength: 18,
+      uppercaseCount: 216, punctuationCount: 0)
+  }
+  static var english10kLexicon: IndexedLexicon {
+    englishScaleLexicon(
+      marker: "wi", count: 9_944, minimumToken: "w", maximumLength: 18,
+      uppercaseCount: 403, punctuationCount: 0)
+  }
+  static var english25kLexicon: IndexedLexicon {
+    englishScaleLexicon(
+      marker: "xo", count: 24_141, minimumToken: "qxqz", maximumLength: 27,
+      uppercaseCount: 946, punctuationCount: 0)
+  }
+  static var english450kLexicon: IndexedLexicon {
+    englishScaleLexicon(
+      marker: "yu", count: 450_029, minimumToken: "b", maximumLength: 31,
+      uppercaseCount: 33_021, punctuationCount: 176)
+  }
+
+  static var english1kWords: [String] { english1kLexicon.materialized() }
+  static var english5kWords: [String] { english5kLexicon.materialized() }
+  static var english10kWords: [String] { english10kLexicon.materialized() }
+  static var english25kWords: [String] { english25kLexicon.materialized() }
+  static var english450kWords: [String] { english450kLexicon.materialized() }
 
   // This small starter corpus is original project content, not imported from Monkeytype.
   static let words = [
@@ -5196,23 +5244,23 @@ enum StarterLexicon {
         usesZipfFrequency: usesZipfFrequency)
     case .english1k:
       return prompt(
-        tokens: count, lexicon: english1kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: english1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .english5k:
       return prompt(
-        tokens: count, lexicon: english5kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: english5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .english10k:
       return prompt(
-        tokens: count, lexicon: english10kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: english10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .english25k:
       return prompt(
-        tokens: count, lexicon: english25kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: english25kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .english450k:
       return prompt(
-        tokens: count, lexicon: english450kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: english450kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .englishFiveLetter:
       return prompt(
@@ -5905,6 +5953,16 @@ enum StarterLexicon {
     tokens: Int, lexicon: [String], separator: String, punctuation: [String],
     contentOptions: ContentOptions, usesZipfFrequency: Bool
   ) -> String {
+    prompt(
+      tokens: tokens, lexicon: IndexedLexicon(lexicon), separator: separator,
+      punctuation: punctuation, contentOptions: contentOptions,
+      usesZipfFrequency: usesZipfFrequency)
+  }
+
+  static func prompt(
+    tokens: Int, lexicon: IndexedLexicon, separator: String, punctuation: [String],
+    contentOptions: ContentOptions, usesZipfFrequency: Bool
+  ) -> String {
     (0..<tokens).map { index in
       decoratedToken(
         from: lexicon, punctuation: punctuation, index: index, contentOptions: contentOptions,
@@ -6140,7 +6198,16 @@ enum StarterLexicon {
   }
 
   private static func decoratedToken(
-    from lexicon: [String], punctuation: [String], index: Int, contentOptions: ContentOptions,
+    from lexicon: [String], punctuation: [String], index: Int,
+    contentOptions: ContentOptions, usesZipfFrequency: Bool
+  ) -> String {
+    decoratedToken(
+      from: IndexedLexicon(lexicon), punctuation: punctuation, index: index,
+      contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+  }
+
+  private static func decoratedToken(
+    from lexicon: IndexedLexicon, punctuation: [String], index: Int, contentOptions: ContentOptions,
     usesZipfFrequency: Bool
   ) -> String {
     let tokenIndex = usesZipfFrequency
@@ -6372,6 +6439,21 @@ extension TypingLanguage {
     case .mixedEnglishChinese: StarterLexicon.words
     case .mixedLanguages: []
     default: []
+    }
+  }
+
+  var supportsLocalWordFilter: Bool {
+    supportsQuotes
+  }
+
+  func ownedPracticeLexicon(englishVariant: EnglishVariant = .american) -> IndexedLexicon {
+    switch self {
+    case .english1k: StarterLexicon.english1kLexicon
+    case .english5k: StarterLexicon.english5kLexicon
+    case .english10k: StarterLexicon.english10kLexicon
+    case .english25k: StarterLexicon.english25kLexicon
+    case .english450k: StarterLexicon.english450kLexicon
+    default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
 
