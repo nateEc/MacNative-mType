@@ -8873,6 +8873,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.esperantoHSystemWords,
       StarterLexicon.latinWords,
       StarterLexicon.loremIpsumWords,
+      StarterLexicon.gitWords,
       StarterLexicon.friulianWords,
       StarterLexicon.malagasyWords,
       StarterLexicon.welshWords,
@@ -8966,7 +8967,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 141)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 142)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -10689,6 +10690,7 @@ final class TypingEngineTests: XCTestCase {
       (.esperantoXSystem, StarterLexicon.esperantoXSystemWords),
       (.esperantoHSystem, StarterLexicon.esperantoHSystemWords),
       (.latin, StarterLexicon.latinWords),
+      (.git, StarterLexicon.gitWords),
       (.friulian, StarterLexicon.friulianWords),
       (.malagasy, StarterLexicon.malagasyWords),
       (.welsh, StarterLexicon.welshWords),
@@ -12638,6 +12640,43 @@ final class TypingEngineTests: XCTestCase {
       TestConfiguration.words(
         2, language: .mixedLanguages, mixedLanguageComponents: [.english, language]
       ).usesJoiningScriptPrompt)
+  }
+
+  func testGitPracticeUsesIndependentCommandVocabularyAndPinnedMetadata() {
+    let language = TypingLanguage.git
+    let words = StarterLexicon.gitWords
+    XCTAssertEqual(language.displayName, "Git")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertFalse(language.usesRightToLeftPrompt)
+    XCTAssertFalse(language.usesJoiningScriptPrompt)
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertEqual(language.ownedPracticeWords(), words)
+    XCTAssertEqual(words.count, 52)
+    XCTAssertEqual(Set(words).count, words.count)
+    XCTAssertEqual(
+      Dictionary(grouping: words, by: \String.count).mapValues(\.count),
+      [1: 1, 2: 5, 3: 5, 4: 9, 5: 9, 6: 12, 7: 3, 8: 3, 9: 2, 10: 1, 18: 1, 19: 1])
+    XCTAssertTrue(words.allSatisfy { word in
+      word == word.lowercased()
+        && word.unicodeScalars.allSatisfy(\.isASCII)
+        && word.allSatisfy { !$0.isWhitespace && !$0.isNumber }
+    })
+    let punctuated = words.filter { word in
+      word.contains { !$0.isLetter }
+    }
+    XCTAssertEqual(punctuated.count, 4)
+    let punctuation = Set(punctuated.joined().filter { !$0.isLetter })
+    XCTAssertEqual(punctuation, Set<Character>(["-", "@"]))
+    XCTAssertEqual(
+      words.joined(separator: " ").split(separator: " ").map(String.init),
+      words)
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+    }
   }
 
   func testQuoteSearchMatchesAllTermsWithoutSendingOrMutatingContent() {

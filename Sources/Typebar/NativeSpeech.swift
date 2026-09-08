@@ -28,7 +28,7 @@ extension TypingLanguage {
       .ukrainianEndings, .ukrainianLatynkaEndings: "en-US"
     case .kokanu: "xxs-Lat"
     case .likanu: "xxs-Uixs"
-    case .pigLatin, .loremIpsum: "en-US"
+    case .pigLatin, .loremIpsum, .git: "en-US"
     case .spanish: "es-ES"
     case .german: "de-DE"
     case .swissGerman: "de-CH"

@@ -219,6 +219,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case esperantoHSystem
   case latin
   case loremIpsum
+  case git
   case friulian
   case malagasy
   case welsh
@@ -3839,6 +3840,24 @@ enum StarterLexicon {
     "linea", "lectio", "calamus", "umbra", "via", "initium",
   ]
 
+  // Independently selected from the user-facing command surface reported by
+  // Git 2.50.1 and ordinary Git concepts; no reference word values are used.
+  static let gitWords = [
+    "@",
+    "am", "gc", "mv", "rm", "id",
+    "add", "log", "tag", "ref", "sha",
+    "init", "diff", "show", "grep", "pull", "push", "head", "tree", "work",
+    "clone", "fetch", "merge", "stash", "reset", "clean", "notes", "blame", "index",
+    "branch", "commit", "rebase", "revert", "status", "remote", "switch", "config",
+    "object", "origin", "author",
+    "restore", "archive", "reflog",
+    "tracked", "checkout", "worktree", "upstream",
+    "submodule", "three-way",
+    "repository",
+    "upstream-reference",
+    "remote-tracking-ref",
+  ]
+
   // Typebar-authored Friulian starter words provide a compact local practice
   // vocabulary without importing the reference dictionary or word list.
   static let friulianWords = [
@@ -4926,6 +4945,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: loremIpsumWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .git:
+      return prompt(
+        tokens: count, lexicon: gitWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .friulian:
       return prompt(
         tokens: count, lexicon: friulianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5508,6 +5531,7 @@ enum StarterLexicon {
     case .esperantoHSystem: (esperantoHSystemWords, [",", ".", "!", "?"])
     case .latin: (latinWords, [",", ".", "!", "?"])
     case .loremIpsum: (loremIpsumWords, [",", ".", "!", "?"])
+    case .git: (gitWords, [",", ".", "!", "?"])
     case .friulian: (friulianWords, [",", ".", "!", "?"])
     case .malagasy: (malagasyWords, [",", ".", "!", "?"])
     case .welsh: (welshWords, [",", ".", "!", "?"])
@@ -5726,6 +5750,7 @@ extension TypingLanguage {
     case .esperantoHSystem: StarterLexicon.esperantoHSystemWords
     case .latin: StarterLexicon.latinWords
     case .loremIpsum: StarterLexicon.loremIpsumWords
+    case .git: StarterLexicon.gitWords
     case .friulian: StarterLexicon.friulianWords
     case .malagasy: StarterLexicon.malagasyWords
     case .welsh: StarterLexicon.welshWords
@@ -5870,7 +5895,7 @@ extension TypingLanguage {
     .englishShakespearean,
     .kokanu,
     .likanu,
-    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
     .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianEndings,
@@ -5933,7 +5958,7 @@ extension TypingLanguage {
     case .english, .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical,
       .englishShakespearean,
-      .pigLatin, .loremIpsum, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
+      .pigLatin, .loremIpsum, .git, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
       .tamil, .hindi, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .bulgarianLatin,
@@ -6027,6 +6052,7 @@ extension TypingLanguage {
     case .esperantoHSystem: "Esperanto · H-sistemo"
     case .latin: "Latina"
     case .loremIpsum: "Lorem Ipsum · Typebar"
+    case .git: "Git"
     case .friulian: "Friulian"
     case .malagasy: "Malagasy"
     case .welsh: "Cymraeg"

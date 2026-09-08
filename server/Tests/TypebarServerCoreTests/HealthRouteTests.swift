@@ -4029,6 +4029,7 @@ final class HealthRouteTests: XCTestCase {
       ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),
       ("pigLatin", "Eadystray acticepray akesmay ethay extnay epstay earclay."),
       ("loremIpsum", "Clara verba leniter ordinata novum iter aperiunt."),
+      ("git", "A focused commit records one coherent change."),
     ]
 
     for (offset, item) in languages.enumerated() {

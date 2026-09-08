@@ -4371,6 +4371,34 @@ enum OfflineContent {
       language: .loremIpsum,
       length: .extended
     ),
+    OfflineQuote(
+      id: "git-clean-snapshot",
+      title: "Clean snapshot",
+      text: "A focused commit records one coherent change and leaves a message that explains why it belongs.",
+      language: .git,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "git-review-the-diff",
+      title: "Review the diff",
+      text: "Before switching branches, inspect the working tree and stage only the files that belong together. A small diff is easier to review, revert, and understand later.",
+      language: .git,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "git-history-with-intent",
+      title: "History with intent",
+      text: "A useful repository tells a sequence of understandable stories. Fetch before integrating remote work, resolve each conflict with care, and read the resulting diff before committing. When every snapshot has one purpose, reviewers can follow the change and future maintainers can recover the reasoning behind it.",
+      language: .git,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "git-collaboration-map",
+      title: "A map for collaboration",
+      text: "Version control is most valuable when it preserves choices, not merely files. Begin with a clean working tree, create a branch for a focused task, and commit related changes in reviewable steps. Before sharing the branch, fetch the remote state and inspect how the histories meet. If a conflict appears, understand both intentions before editing the resolution. Then run the relevant checks, review the final diff, and write a message that gives the next reader useful context. A careful history becomes a map: it shows what changed, why the decision was made, and where a safe reversal can begin.",
+      language: .git,
+      length: .extended
+    ),
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
