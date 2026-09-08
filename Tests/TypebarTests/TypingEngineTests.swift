@@ -13781,6 +13781,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(best, [second, third])
   }
 
+  func testResultHistoryRowSummaryExposesModeCharactersAndNormalizedTags() {
+    let stats = ResultCharacterStats(matched: 42, incorrect: 2, extra: 1, missed: 3)
+    let timed = ResultHistoryRowSummaryPolicy.summary(
+      configuration: .timed(seconds: 30), characterStats: stats,
+      tags: [" Focus ", "focus", "review"])
+
+    XCTAssertEqual(timed.modeAndParameter, "时间 30 秒")
+    XCTAssertEqual(timed.characterStats, "字符 42/2/1/3")
+    XCTAssertEqual(timed.tags, ["Focus", "review"])
+    XCTAssertEqual(timed.metadata, "字符 42/2/1/3 · Focus、review")
+    XCTAssertEqual(
+      timed.accessibilityMetadata,
+      "字符：匹配 42，错位 2，额外 1，跳过 3；标签：Focus、review")
+    XCTAssertEqual(
+      ResultHistoryRowSummaryPolicy.summary(
+        configuration: .words(0), characterStats: stats, tags: []).modeAndParameter,
+      "字数 无限")
+    XCTAssertEqual(
+      ResultHistoryRowSummaryPolicy.summary(
+        configuration: nil, characterStats: stats, tags: []).modeAndParameter,
+      "未知")
+  }
+
   func testLocalPersonalBestTableKeepsTheBestComparableTimeAndWordResults() {
     func result(
       id: UUID = UUID(), configuration: TestConfiguration, wpm: Int, finishedAt: Date,

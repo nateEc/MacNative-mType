@@ -112,6 +112,66 @@ enum ResultHistoryPagePolicy {
     }
 }
 
+struct ResultHistoryRowSummary: Equatable {
+  let modeAndParameter: String
+  let characterStats: String
+  let tags: [String]
+  let accessibilityMetadata: String
+
+  var metadata: String {
+    tags.isEmpty ? characterStats : "\(characterStats) · \(tags.joined(separator: "、"))"
+  }
+}
+
+enum ResultHistoryRowSummaryPolicy {
+  static func summary(
+    configuration: TestConfiguration?, characterStats: ResultCharacterStats, tags: [String]
+  ) -> ResultHistoryRowSummary {
+    let normalizedTags = ResultTagPolicy.normalized(tags)
+    let spokenCharacters =
+      "字符：匹配 \(characterStats.matched)，错位 \(characterStats.incorrect)，额外 \(characterStats.extra)，跳过 \(characterStats.missed)"
+    return .init(
+      modeAndParameter: modeAndParameter(configuration),
+      characterStats:
+        "字符 \(characterStats.matched)/\(characterStats.incorrect)/\(characterStats.extra)/\(characterStats.missed)",
+      tags: normalizedTags,
+      accessibilityMetadata: normalizedTags.isEmpty
+        ? spokenCharacters : "\(spokenCharacters)；标签：\(normalizedTags.joined(separator: "、"))")
+  }
+
+  private static func modeAndParameter(_ configuration: TestConfiguration?) -> String {
+    guard let configuration else { return "未知" }
+    let mode = configuration.mode.displayName
+    switch configuration.mode {
+    case .time:
+      guard let duration = configuration.duration else { return "\(mode) 无限" }
+      guard duration.isFinite, duration > 0 else {
+        return duration == 0 ? "\(mode) 无限" : mode
+      }
+      return "\(mode) \(formatted(duration)) 秒"
+    case .words:
+      guard let wordLimit = configuration.wordLimit else { return mode }
+      guard wordLimit >= 0 else { return mode }
+      return wordLimit == 0 ? "\(mode) 无限" : "\(mode) \(wordLimit) 词"
+    case .quote, .zen:
+      return mode
+    case .custom:
+      if let duration = configuration.duration, duration.isFinite, duration > 0 {
+        return "\(mode) \(formatted(duration)) 秒"
+      }
+      if let wordLimit = configuration.wordLimit {
+        guard wordLimit >= 0 else { return mode }
+        return wordLimit == 0 ? "\(mode) 无限" : "\(mode) \(wordLimit) 词"
+      }
+      return mode
+    }
+  }
+
+  private static func formatted(_ duration: TimeInterval) -> String {
+    String(format: "%.0f", locale: Locale(identifier: "en_US_POSIX"), duration)
+  }
+}
+
 /// Controls the four independently visible traces in the local history view.
 /// The defaults mirror the reference account history's initially enabled set,
 /// while the native chart keeps its data entirely on this Mac.

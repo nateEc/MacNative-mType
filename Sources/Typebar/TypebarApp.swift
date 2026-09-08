@@ -4458,6 +4458,9 @@ private struct ResultsHistoryView: View {
                   description: Text("调整筛选条件以查看其他本地练习记录。"))
               }
               ForEach(visibleResults) { result in
+                let rowSummary = ResultHistoryRowSummaryPolicy.summary(
+                  configuration: result.configuration, characterStats: result.characterStats,
+                  tags: result.tags)
                 Button {
                   selectedResult = result
                 } label: {
@@ -4466,12 +4469,19 @@ private struct ResultsHistoryView: View {
                       .font(.system(size: 30, weight: .bold, design: .rounded))
                       .frame(width: 56, alignment: .trailing)
                     VStack(alignment: .leading, spacing: 3) {
-                      Text("\(modeName(result.configuration?.mode)) · \(result.accuracy)% 准确率")
+                      Text("\(rowSummary.modeAndParameter) · \(result.accuracy)% 准确率")
+                        .lineLimit(1)
                       Text(
                         result.finishedAt, format: .dateTime.year().month().day().hour().minute()
                       )
                       .font(.caption)
                       .foregroundStyle(.secondary)
+                      Text(rowSummary.metadata)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .help(rowSummary.metadata)
+                        .accessibilityLabel(rowSummary.accessibilityMetadata)
                     }
                     if personalBestIDs.contains(result.id) {
                       Label("个人最佳", systemImage: "trophy.fill")
