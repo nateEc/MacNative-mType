@@ -489,7 +489,7 @@ public actor AuthStore {
     "swedish", "swedishDiacritics", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian",
     "serbianLatin", "bulgarian", "bulgarianLatin", "romanian", "finnish", "estonian", "icelandic", "french",
     "italian", "portuguese", "portugueseAccents", "simplifiedChinese", "traditionalChinese", "russian", "russianAbbreviations", "ukrainian",
-    "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
+    "ukrainianEndings", "ukrainianLatin", "ukrainianLatynkaEndings", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
     "turkish", "polish",
   ]
   private static let supportedResultLanguageIDs = supportedSingleLanguageIDs.union([

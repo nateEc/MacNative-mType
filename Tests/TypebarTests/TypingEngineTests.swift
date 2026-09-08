@@ -8958,14 +8958,15 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.portugueseAccentsWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.russianAbbreviationWords,
-      StarterLexicon.ukrainianWords,
-      StarterLexicon.ukrainianLatinWords, StarterLexicon.japaneseHiraganaWords,
+      StarterLexicon.ukrainianWords, StarterLexicon.ukrainianEndingWords,
+      StarterLexicon.ukrainianLatinWords, StarterLexicon.ukrainianLatynkaEndingWords,
+      StarterLexicon.japaneseHiraganaWords,
       StarterLexicon.japaneseKatakanaWords, StarterLexicon.japaneseRomajiWords,
       StarterLexicon.koreanWords, StarterLexicon.turkishWords, StarterLexicon.polishWords,
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 138)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 140)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -10801,7 +10802,9 @@ final class TypingEngineTests: XCTestCase {
       (.russian, StarterLexicon.russianWords),
       (.russianAbbreviations, StarterLexicon.russianAbbreviationWords),
       (.ukrainian, StarterLexicon.ukrainianWords),
+      (.ukrainianEndings, StarterLexicon.ukrainianEndingWords),
       (.ukrainianLatin, StarterLexicon.ukrainianLatinWords),
+      (.ukrainianLatynkaEndings, StarterLexicon.ukrainianLatynkaEndingWords),
       (.japaneseRomaji, StarterLexicon.japaneseRomajiWords),
       (.korean, StarterLexicon.koreanWords), (.turkish, StarterLexicon.turkishWords),
       (.polish, StarterLexicon.polishWords),
@@ -12556,6 +12559,39 @@ final class TypingEngineTests: XCTestCase {
     for length in [QuoteLength.short, .medium, .long, .extended] {
       XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
     }
+  }
+
+  func testUkrainianEndingsKeepNativeAndLatynkaTokenBoundaries() {
+    let cases: [(TypingLanguage, [String], String, Int, String)] = [
+      (.ukrainianEndings, StarterLexicon.ukrainianEndingWords, "Українська · Закінчення", 4,
+        "^[А-Яа-яІіЇїЄєҐґЬь]+$"),
+      (.ukrainianLatynkaEndings, StarterLexicon.ukrainianLatynkaEndingWords,
+        "Українська (Latynka) · Закінчення", 5, "^[a-zïğš]+$"),
+    ]
+
+    for (language, words, displayName, maximumLength, pattern) in cases {
+      XCTAssertEqual(language.displayName, displayName)
+      XCTAssertFalse(language.supportsLazyLatinInput)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+      XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+      XCTAssertEqual(language.ownedPracticeWords(), words)
+      XCTAssertFalse(words.isEmpty)
+      XCTAssertTrue(
+        words.allSatisfy {
+          $0.count <= maximumLength
+            && $0.range(of: pattern, options: .regularExpression) != nil
+        })
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+      }
+    }
+
+    let latynkaCharacters = StarterLexicon.ukrainianLatynkaEndingWords.joined()
+    XCTAssertTrue(latynkaCharacters.contains("ï"))
+    XCTAssertTrue(latynkaCharacters.contains("ğ"))
+    XCTAssertTrue(latynkaCharacters.contains("š"))
   }
 
   func testQuoteSearchMatchesAllTermsWithoutSendingOrMutatingContent() {

@@ -879,6 +879,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "ukrainian-endings-small-change",
+      title: "Коротке закінчення",
+      text: "Коротке закінчення змінює форму слова і вимагає уважного набору.",
+      language: .ukrainianEndings,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "ukrainian-endings-word-link",
+      title: "Зв’язок слів",
+      text: "Закінчення показує зв’язок слова з реченням. Читайте основу й останні літери окремо, а потім друкуйте їх одним спокійним рухом.",
+      language: .ukrainianEndings,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "ukrainian-endings-careful-forms",
+      title: "Уважні форми",
+      text: "Українські закінчення бувають короткими, але кожна літера має значення. Повільно порівнюйте форми, стежте за літерами і, ї, є та ґ і виправляйте помилку до переходу до наступного слова.",
+      language: .ukrainianEndings,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "ukrainian-endings-reference-page",
+      title: "Аркуш форм",
+      text: "На столі лежить аркуш із кількома формами одного слова. Основа повторюється, а закінчення щоразу змінює його роль у реченні. Спочатку прочитайте останні літери, потім знайдіть їх на клавіатурі й надрукуйте без поспіху. Якщо дві форми здаються схожими, зупиніться та порівняйте їх ще раз. Така уважна практика допомагає помічати дрібні відмінності й зберігати рівний ритм.",
+      language: .ukrainianEndings,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "ukrainian-latin-small-note",
       title: "Mala notatka",
       text: "Mala notatka pro zroblene dopomahaie pobachyty nastupnyi krok yasnishe.",
@@ -904,6 +932,34 @@ enum OfflineContent {
       title: "Krai stolu",
       text: "U maisterni korysno maty vilnyi krai stolu. Tudy mozhna poklasty pershyi eskiz, spysok zapytan i korotkyi zapys pro te, shcho vzhe perevireno. Koly uvaha rozsiiuietsia, tsei krai ne vymahaie shvydkoi vidpovidi: vin nahaduie pro malenku diiu, yaku mozhna zavershyty zaraz. Tak postupovo ziavliaietsia poriadok ne z idealnoho planu, a z pomitnykh krokiv, do yakykh lehko povertatysia nastupnoho dnia.",
       language: .ukrainianLatin,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "ukrainian-latynka-endings-small-change",
+      title: "Korotke zakinchennia",
+      text: "Korotke zakinchennia zminiuie formu slova i potrebuie uvahy.",
+      language: .ukrainianLatynkaEndings,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "ukrainian-latynka-endings-letter-flow",
+      title: "Rukh liter",
+      text: "Latynka zalyshaie ukrainsku movu v inshomu pysmi. Chytajte osnovu ta zakinchennia okremo, a potim drukujte yikh razom.",
+      language: .ukrainianLatynkaEndings,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "ukrainian-latynka-endings-careful-forms",
+      title: "Uvazhni formy",
+      text: "U korotkomu zakinchenni kozhna litera maie znachennia. Porivniujte formy povilno, pomichajte ï, ğ ta š i vypravliajte pomylku do nastupnoho slova.",
+      language: .ukrainianLatynkaEndings,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "ukrainian-latynka-endings-reference-page",
+      title: "Arkush form",
+      text: "Na stoli lezhyt arkush iz kilkoma formamy odnoho slova. Osnova povtoriuietsia, a zakinchennia shchorazu zminiuie yoho rol u rechenni. Spershu prochytajte ostanni litery, potim znaidit yikh na klaviaturi ta drukujte bez pospikhu. Yakshcho dvi formy skhozhi, zupynitsia i porivniaite yikh shche raz. Taka uvazhna praktyka dopomahaie bachyty mali vidminnosti ta zberihaty rivnyi rytm.",
+      language: .ukrainianLatynkaEndings,
       length: .extended
     ),
     OfflineQuote(

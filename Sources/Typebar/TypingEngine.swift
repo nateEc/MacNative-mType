@@ -337,7 +337,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case russian
   case russianAbbreviations
   case ukrainian
+  case ukrainianEndings
   case ukrainianLatin
+  case ukrainianLatynkaEndings
   case japaneseHiragana
   case japaneseKatakana
   case japaneseRomaji
@@ -3666,6 +3668,14 @@ enum StarterLexicon {
     "їжа", "єдність", "ґрунт",
   ]
 
+  // Typebar-authored Ukrainian suffix practice stays intentionally compact so
+  // each generated token exercises an inflectional ending rather than a word.
+  static let ukrainianEndingWords = [
+    "а", "я", "и", "і", "у", "ю", "е", "є", "о", "ї",
+    "ий", "ій", "ої", "ою", "ею", "ами", "ями", "ах", "ях",
+    "ові", "еві", "ого", "ому", "ими", "ів", "їв", "ення", "ання",
+  ]
+
   // Typebar-authored ASCII prompts for Ukrainian Latin keyboard practice.
   // This is a native learning mode, not a copied word list or an automatic
   // transliteration service.
@@ -3674,6 +3684,15 @@ enum StarterLexicon {
     "yasno", "ozero", "vulytsia", "stil", "svitlo", "doroha", "terpinnia", "khvylyna",
     "misto", "doshch", "tysha", "napriamok", "zirka", "notatka", "sad", "podikh",
     "yizha", "yednist", "grunt",
+  ]
+
+  // Independent Latynka ending prompts preserve the reference character and
+  // token-length boundaries without transliterating or importing its values.
+  static let ukrainianLatynkaEndingWords = [
+    "a", "ia", "y", "i", "u", "iu", "e", "ie", "o", "ï",
+    "ij", "yj", "oiu", "eiu", "amy", "iamy", "ax", "iax",
+    "ovi", "evi", "oğo", "omu", "ymy", "iv", "ïv", "ennia",
+    "annia", "šyj", "ğo", "ska",
   ]
 
   // Hiragana-only prompts keep the selected input mode faithful to its label.
@@ -5367,9 +5386,17 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: ukrainianWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainianEndings:
+      return prompt(
+        tokens: count, lexicon: ukrainianEndingWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatin:
       return prompt(
         tokens: count, lexicon: ukrainianLatinWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainianLatynkaEndings:
+      return prompt(
+        tokens: count, lexicon: ukrainianLatynkaEndingWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseHiragana:
       return prompt(
@@ -5581,7 +5608,9 @@ enum StarterLexicon {
     case .russian: (russianWords, [".", ",", "!", "?"])
     case .russianAbbreviations: (russianAbbreviationWords, [".", ",", "!", "?"])
     case .ukrainian: (ukrainianWords, [".", ",", "!", "?"])
+    case .ukrainianEndings: (ukrainianEndingWords, [".", ",", "!", "?"])
     case .ukrainianLatin: (ukrainianLatinWords, [".", ",", "!", "?"])
+    case .ukrainianLatynkaEndings: (ukrainianLatynkaEndingWords, [".", ",", "!", "?"])
     case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
     case .japaneseKatakana: (japaneseKatakanaWords, ["、", "。", "！", "？"])
     case .japaneseRomaji: (japaneseRomajiWords, [".", ",", "!", "?"])
@@ -5796,7 +5825,9 @@ extension TypingLanguage {
     case .russian: StarterLexicon.russianWords
     case .russianAbbreviations: StarterLexicon.russianAbbreviationWords
     case .ukrainian: StarterLexicon.ukrainianWords
+    case .ukrainianEndings: StarterLexicon.ukrainianEndingWords
     case .ukrainianLatin: StarterLexicon.ukrainianLatinWords
+    case .ukrainianLatynkaEndings: StarterLexicon.ukrainianLatynkaEndingWords
     case .japaneseHiragana: StarterLexicon.japaneseHiraganaWords
     case .japaneseKatakana: StarterLexicon.japaneseKatakanaWords
     case .japaneseRomaji: StarterLexicon.japaneseRomajiWords
@@ -5822,7 +5853,8 @@ extension TypingLanguage {
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
-    .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
+    .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianEndings,
+    .ukrainianLatin, .ukrainianLatynkaEndings, .japaneseHiragana, .japaneseKatakana,
     .japaneseRomaji,
     .korean, .turkish, .polish,
   ]
@@ -5897,7 +5929,8 @@ extension TypingLanguage {
       .lojbanGismu,
       .lojbanCmavo,
       .esperantoXSystem, .esperantoHSystem,
-      .simplifiedChinese, .traditionalChinese, .russianAbbreviations, .ukrainian, .ukrainianLatin,
+      .simplifiedChinese, .traditionalChinese, .russianAbbreviations, .ukrainian, .ukrainianEndings,
+      .ukrainianLatin, .ukrainianLatynkaEndings,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
       .mixedEnglishChinese, .mixedLanguages:
       false
@@ -6084,7 +6117,9 @@ extension TypingLanguage {
     case .russian: "Русский"
     case .russianAbbreviations: "Русский · Аббревиатуры"
     case .ukrainian: "Українська"
+    case .ukrainianEndings: "Українська · Закінчення"
     case .ukrainianLatin: "Українська (Latin)"
+    case .ukrainianLatynkaEndings: "Українська (Latynka) · Закінчення"
     case .japaneseHiragana: "日本語（ひらがな）"
     case .japaneseKatakana: "日本語（カタカナ）"
     case .japaneseRomaji: "日本語（ローマ字）"

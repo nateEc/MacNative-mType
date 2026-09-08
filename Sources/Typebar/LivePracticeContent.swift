@@ -150,7 +150,7 @@ enum LivePracticeContentService {
     switch language {
     case .english, .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
       .englishDoubleLetter, .englishLegal, .englishMedical, .englishShakespearean,
-      .pigLatin, .loremIpsum,
+      .pigLatin, .loremIpsum, .ukrainianEndings, .ukrainianLatynkaEndings,
       .mixedEnglishChinese, .mixedLanguages:
       return "en"
     case .kokanu: return "xxs"
