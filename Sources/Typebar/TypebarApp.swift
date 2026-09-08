@@ -4261,8 +4261,8 @@ private struct ResultsHistoryView: View {
       activity: activity, dayBoundaryOffsetHours: settings.streakDayBoundaryOffsetHours)
   }
 
-  private var wpmHistogram: [WPMHistogramBucket] {
-    WPMHistogram.buckets(metrics: metrics)
+  private var speedHistogram: [SpeedHistogramBucket] {
+    SpeedHistogram.buckets(metrics: metrics, unit: settings.typingSpeedUnit)
   }
 
   private var personalBestIDs: Set<UUID> {
@@ -4285,7 +4285,7 @@ private struct ResultsHistoryView: View {
             .padding(.bottom, 8)
             historyChart
 
-            WPMHistogramView(buckets: wpmHistogram)
+            SpeedHistogramView(buckets: speedHistogram, unit: settings.typingSpeedUnit)
               .padding(.horizontal)
               .padding(.top, 8)
 
@@ -4914,15 +4914,18 @@ private struct AchievementStrip: View {
   }
 }
 
-private struct WPMHistogramView: View {
-  let buckets: [WPMHistogramBucket]
+private struct SpeedHistogramView: View {
+  let buckets: [SpeedHistogramBucket]
+  let unit: TypingSpeedUnit
 
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
       HStack {
         Text("速度分布").font(.caption.weight(.medium))
         Spacer()
-        Text("每档 10 WPM").font(.caption2).foregroundStyle(.secondary)
+        Text("每档 \(buckets.first?.bucketSizeLabel ?? SpeedHistogram.formattedBound(unit.histogramBucketSize)) \(unit.displayName)")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
       }
       Chart(buckets) { bucket in
         BarMark(
@@ -4930,7 +4933,7 @@ private struct WPMHistogramView: View {
           y: .value("完成次数", bucket.count)
         )
         .foregroundStyle(Color.accentColor.gradient)
-        .accessibilityLabel("\(bucket.label) WPM")
+        .accessibilityLabel("\(bucket.label) \(unit.displayName)")
         .accessibilityValue("\(bucket.count) 次完成")
       }
       .chartXAxis {

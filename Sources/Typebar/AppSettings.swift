@@ -231,6 +231,16 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
     }
   }
 
+  var histogramBucketSize: Double {
+    switch self {
+    case .wpm: 10
+    case .cpm: 50
+    case .wps: 0.5
+    case .cps: 5
+    case .wph: 250
+    }
+  }
+
   func formatted(wpm: Int, alwaysShowDecimalPlaces: Bool = false) -> String {
     switch self {
     case .wpm:

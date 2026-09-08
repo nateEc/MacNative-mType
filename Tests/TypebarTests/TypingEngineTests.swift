@@ -13232,7 +13232,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertGreaterThan(repeated.prompt.count, "ember pilot ember pilot".count)
   }
 
-  func testWPMHistogramKeepsEmptyIntervalsBetweenSelectedResults() {
+  func testSpeedHistogramUsesCurrentUnitAndKeepsEveryZeroBasedInterval() {
+    XCTAssertEqual(
+      TypingSpeedUnit.allCases.map(\.histogramBucketSize), [10, 50, 0.5, 5, 250])
     let metrics = [
       ResultMetric(finishedAt: start, wpm: 11, accuracy: 95, typingSeconds: 30),
       ResultMetric(finishedAt: start, wpm: 19, accuracy: 95, typingSeconds: 30),
@@ -13241,10 +13243,39 @@ final class TypingEngineTests: XCTestCase {
       ResultMetric(finishedAt: start, wpm: 41, accuracy: 95, typingSeconds: 30),
     ]
 
-    let buckets = WPMHistogram.buckets(metrics: metrics)
+    let wpmBuckets = SpeedHistogram.buckets(metrics: metrics, unit: .wpm)
+    XCTAssertEqual(
+      wpmBuckets.map(\.label), ["0–<10", "10–<20", "20–<30", "30–<40", "40–<50"])
+    XCTAssertEqual(wpmBuckets.map(\.count), [0, 2, 2, 0, 1])
 
-    XCTAssertEqual(buckets.map(\.label), ["10–19", "20–29", "30–39", "40–49"])
-    XCTAssertEqual(buckets.map(\.count), [2, 2, 0, 1])
+    let cpmBuckets = SpeedHistogram.buckets(metrics: metrics, unit: .cpm)
+    XCTAssertEqual(cpmBuckets.map(\.bucketSize), Array(repeating: 50, count: 5))
+    XCTAssertEqual(cpmBuckets.map(\.count), [0, 2, 2, 0, 1])
+
+    let wpsBuckets = SpeedHistogram.buckets(metrics: metrics, unit: .wps)
+    XCTAssertEqual(wpsBuckets.map(\.label), ["0–<0.5", "0.5–<1"])
+    XCTAssertEqual(wpsBuckets.map(\.count), [4, 1])
+    let boundaryBuckets = SpeedHistogram.buckets(
+      metrics: [
+        ResultMetric(finishedAt: start, wpm: 0, accuracy: 100, typingSeconds: 1),
+        ResultMetric(finishedAt: start, wpm: 10, accuracy: 100, typingSeconds: 1),
+      ], unit: .wpm)
+    XCTAssertEqual(boundaryBuckets.map(\.count), [1, 1])
+
+    for unit in TypingSpeedUnit.allCases {
+      XCTAssertEqual(
+        SpeedHistogram.buckets(metrics: metrics, unit: unit).map(\.count).reduce(0, +),
+        metrics.count, unit.displayName)
+    }
+
+    let anomalous = [
+      ResultMetric(finishedAt: start, wpm: Int.max, accuracy: 100, typingSeconds: 1)
+    ]
+    let bounded = SpeedHistogram.buckets(metrics: anomalous, unit: .wph)
+    XCTAssertLessThanOrEqual(bounded.count, 512)
+    XCTAssertEqual(bounded.map(\.count).reduce(0, +), 1)
+    XCTAssertTrue(bounded.last?.isOverflow == true)
+    XCTAssertTrue(bounded.last?.label.hasPrefix("≥") == true)
   }
 
   func testResultHistoryFilterCombinesModeLanguageTagContentOptionsAndPersonalBest() {

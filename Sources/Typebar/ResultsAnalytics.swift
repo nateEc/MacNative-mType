@@ -1661,38 +1661,52 @@ struct ResultStatistics: Equatable {
     }
 }
 
-struct WPMHistogramBucket: Equatable, Identifiable {
-    let lowerBound: Int
-    let upperBound: Int
+struct SpeedHistogramBucket: Equatable, Identifiable {
+    let lowerBound: Double
+    let bucketSize: Double
     let count: Int
+    let isOverflow: Bool
 
-    var id: Int { lowerBound }
-    var label: String { "\(lowerBound)–\(upperBound)" }
+    var id: Double { lowerBound }
+    var label: String {
+        if isOverflow { return "≥\(SpeedHistogram.formattedBound(lowerBound))" }
+        return "\(SpeedHistogram.formattedBound(lowerBound))–<\(SpeedHistogram.formattedBound(lowerBound + bucketSize))"
+    }
+    var bucketSizeLabel: String { SpeedHistogram.formattedBound(bucketSize) }
 }
 
 /// Groups the selected local results into stable speed intervals. Keeping empty intervals
 /// makes a genuine gap in the distribution visible instead of implying a continuous run.
-enum WPMHistogram {
-    static func buckets(metrics: [ResultMetric], interval: Int = 10) -> [WPMHistogramBucket] {
-        guard let lowestWPM = metrics.map(\.wpm).min(), let highestWPM = metrics.map(\.wpm).max() else {
-            return []
-        }
+enum SpeedHistogram {
+    private static let maximumBucketCount = 512
 
-        let interval = max(interval, 1)
-        let firstLowerBound = max(0, (lowestWPM / interval) * interval)
-        let finalExclusiveBound = max(
-            firstLowerBound + interval,
-            ((highestWPM / interval) + 1) * interval
-        )
-
-        return stride(from: firstLowerBound, to: finalExclusiveBound, by: interval).map { lowerBound in
-            let upperBound = lowerBound + interval - 1
-            return WPMHistogramBucket(
-                lowerBound: lowerBound,
-                upperBound: upperBound,
-                count: metrics.filter { lowerBound...upperBound ~= $0.wpm }.count
-            )
+    static func buckets(
+        metrics: [ResultMetric], unit: TypingSpeedUnit
+    ) -> [SpeedHistogramBucket] {
+        guard !metrics.isEmpty else { return [] }
+        let bucketSize = unit.histogramBucketSize
+        let speeds = metrics.map { max(0, unit.converted(wpm: $0.wpm)) }
+        let naturalFinalIndex = floor((speeds.max() ?? 0) / bucketSize)
+        let finalIndex = Int(min(Double(maximumBucketCount - 1), naturalFinalIndex))
+        var counts = Array(repeating: 0, count: finalIndex + 1)
+        for speed in speeds {
+            let naturalIndex = floor(speed / bucketSize)
+            let index = Int(min(Double(finalIndex), max(0, naturalIndex)))
+            counts[index] += 1
         }
+        return counts.indices.map { index in
+            SpeedHistogramBucket(
+                lowerBound: Double(index) * bucketSize, bucketSize: bucketSize,
+                count: counts[index],
+                isOverflow: index == finalIndex && naturalFinalIndex > Double(finalIndex))
+        }
+    }
+
+    static func formattedBound(_ value: Double) -> String {
+        if value.rounded() == value { return String(Int(value)) }
+        return String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), value)
+            .replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\.$"#, with: "", options: .regularExpression)
     }
 }
 
