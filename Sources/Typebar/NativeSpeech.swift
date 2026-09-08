@@ -23,7 +23,7 @@ extension TypingLanguage {
   var speechLocaleIdentifier: String {
     if isCodeLanguage { return "en-US" }
     return switch self {
-    case .english: "en-US"
+    case .english, .englishFiveLetter: "en-US"
     case .pigLatin, .loremIpsum: "en-US"
     case .spanish: "es-ES"
     case .german: "de-DE"

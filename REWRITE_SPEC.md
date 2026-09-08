@@ -395,7 +395,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 ## 2026-09-05 兼容性审计更正
 
-- `TypingLanguage` 当前有一百三十六种 Typebar 自有单语；默认与自选多语混排使用一百二十六种 LTR 单语。最新增加 Ἑλληνιστικὴ Κοινή、Pig Latin 与 Lorem Ipsum · Typebar：Koine Greek 使用独立自写的多调希腊语内容、`el` 百科入口和 `el-GR` 朗读；Pig Latin 以 Typebar 自有英语内容执行确定性首辅音簇转换；Lorem Ipsum 使用独立自写的伪拉丁内容。三者均提供四档文本并覆盖投稿、撤回、成绩和排行榜；后两项按固定 `noLazyMode: true` 禁用普通练习简化输入。实现不读取或导入参考词表、引语、转换代码或资产。
+- `TypingLanguage` 当前有一百三十七种 Typebar 自有单语；默认与自选多语混排使用一百二十七种 LTR 单语。最新增加 English · Five Letter：使用独立自写的五字母英语词流和四档全五字母文本，重建固定 `wordle` 目录的长度语义；知识短文与朗读走缺省 `en`／`en-US`，保留简化输入和 Zipf 未知提示。实现仅审计参考目录的元数据和词长，不读取或导入其词值、引语、代码或资产。
 
 - `TypingLanguage` 当前有一百二十二种 Typebar 自有单语；默认与自选多语混排使用一百一十二种 LTR 单语。新增 `Te reo Māori` 只对应固定源码的 `maori_1k` 映射；该配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，因此以保留 macron 的原创 LTR 词流及四档引语、`en`／`en-US` 缺省在线/朗读路径、显式简化输入和 Zipf 未知提示实现，并覆盖投稿、撤回、成绩和排行榜。
 

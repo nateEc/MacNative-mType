@@ -8853,6 +8853,7 @@ final class TypingEngineTests: XCTestCase {
     var session = TestSessionFactory.make(configuration: configuration)
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
+      StarterLexicon.englishFiveLetterWords,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.swissGermanWords,
       StarterLexicon.afrikaansWords,
@@ -8953,7 +8954,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 126)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 127)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -12345,6 +12346,24 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(PigLatinPolicy.transform("apple"), "appleway")
     XCTAssertEqual(PigLatinPolicy.transform("typing"), "ingtypay")
     XCTAssertEqual(PigLatinPolicy.transform("quiet"), "uietqay")
+  }
+
+  func testFiveLetterEnglishUsesOnlyTypebarOwnedFiveCharacterWords() {
+    let language = TypingLanguage.englishFiveLetter
+    XCTAssertEqual(language.displayName, "English · Five Letter")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertTrue(language.ownedPracticeWords().allSatisfy { $0.count == 5 })
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let quotes = OfflineContent.quotes(for: language, length: length)
+      XCTAssertFalse(quotes.isEmpty)
+      XCTAssertTrue(
+        quotes.flatMap { $0.text.split(whereSeparator: { !$0.isLetter }) }
+          .allSatisfy { $0.count == 5 })
+    }
   }
 
   func testQuoteSearchMatchesAllTermsWithoutSendingOrMutatingContent() {

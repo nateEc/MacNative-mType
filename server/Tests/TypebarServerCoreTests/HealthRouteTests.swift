@@ -4003,7 +4003,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(leaderboard.entries.map(\.wpm), [72])
   }
 
-  func testKoineGreekPigLatinAndLoremIpsumCrossQuoteAndResultDataPlanes() async throws {
+  func testRecentLanguagesCrossQuoteAndResultDataPlanes() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let session = try await store.register(
       .init(
@@ -4011,6 +4011,7 @@ final class HealthRouteTests: XCTestCase {
         displayName: "Language Plane User"))
     let now = Date(timeIntervalSince1970: 1_735_689_600)
     let languages = [
+      ("englishFiveLetter", "Small steps shape clear paths."),
       ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),
       ("pigLatin", "Eadystray acticepray akesmay ethay extnay epstay earclay."),
       ("loremIpsum", "Clara verba leniter ordinata novum iter aperiunt."),

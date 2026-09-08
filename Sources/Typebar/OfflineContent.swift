@@ -156,6 +156,34 @@ enum OfflineContent {
       length: .long
     ),
     OfflineQuote(
+      id: "five-small-steps",
+      title: "Small Steps",
+      text: "Small steps shape clear paths.",
+      language: .englishFiveLetter,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "five-quiet-hands",
+      title: "Quiet Hands",
+      text: "Quiet hands write clean lines while sharp focus stays.",
+      language: .englishFiveLetter,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "five-every-trail",
+      title: "Every Trail",
+      text: "Every small trail grows clear. Quiet hands shape fresh paths. Learn, write, focus, dream; swift steps build sound skill.",
+      language: .englishFiveLetter,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "five-steady-craft",
+      title: "Steady Craft",
+      text: "Every small habit helps shape clear skill. Quiet hands write clean lines while sharp focus keeps fresh point close. Wrong marks teach where paths might curve. Pause, learn, trace right route again. Swift steps build sound craft. Every later trial feels light.",
+      language: .englishFiveLetter,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "paso-claro",
       title: "Paso claro",
       text: "Un paso pequeño y bien elegido puede abrir una mañana entera de trabajo tranquilo.",

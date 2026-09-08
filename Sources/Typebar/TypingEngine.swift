@@ -197,6 +197,7 @@ extension Difficulty {
 
 enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
+  case englishFiveLetter
   case pigLatin
   case spanish
   case german
@@ -3454,6 +3455,16 @@ enum StarterLexicon {
     "ripple", "thunder", "willow", "tangent", "pocket", "marble", "voyage", "bright",
   ]
 
+  // This Typebar-authored selection contains only five-letter English words.
+  // It recreates the visible length constraint without importing a Wordle list.
+  static let englishFiveLetterWords = [
+    "amber", "quiet", "paper", "drift", "cabin", "cedar", "flint", "glass",
+    "grain", "shore", "trail", "bloom", "crane", "field", "light", "ocean",
+    "river", "stone", "cloud", "maple", "wheat", "slope", "spark", "frame",
+    "brush", "clock", "prism", "sound", "green", "dream", "swift", "focus",
+    "learn", "write", "clear", "paths", "hands", "lines", "shape", "steps",
+  ]
+
   // Pig Latin is deterministically derived from Typebar's own English starter
   // corpus, never from a reference dictionary or word list.
   static let pigLatinWords = words.map(PigLatinPolicy.transform)
@@ -4599,6 +4610,11 @@ enum StarterLexicon {
         tokens: count, lexicon: englishVariant == .british ? britishWords : words, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .englishFiveLetter:
+      return prompt(
+        tokens: count, lexicon: englishFiveLetterWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .pigLatin:
       return prompt(
         tokens: count, lexicon: pigLatinWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5187,6 +5203,7 @@ enum StarterLexicon {
   ) {
     switch language {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
+    case .englishFiveLetter: (englishFiveLetterWords, [",", ".", "!", "?"])
     case .pigLatin: (pigLatinWords, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
@@ -5390,6 +5407,7 @@ extension TypingLanguage {
     guard !isCodeLanguage else { return [] }
     return switch self {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
+    case .englishFiveLetter: StarterLexicon.englishFiveLetterWords
     case .pigLatin: StarterLexicon.pigLatinWords
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
@@ -5532,6 +5550,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
+    .englishFiveLetter,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
@@ -5652,6 +5671,7 @@ extension TypingLanguage {
     if let codeName = CodeLanguageCatalog.displayNames[self] { return "Code · \(codeName)" }
     return switch self {
     case .english: "English"
+    case .englishFiveLetter: "English · Five Letter"
     case .pigLatin: "Pig Latin"
     case .spanish: "Español"
     case .german: "Deutsch"
