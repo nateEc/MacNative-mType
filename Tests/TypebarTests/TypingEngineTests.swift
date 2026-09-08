@@ -12768,15 +12768,24 @@ final class TypingEngineTests: XCTestCase {
   func testResultStatisticsAggregateCompletedTests() {
     let day = Date(timeIntervalSinceReferenceDate: 1_000)
     let statistics = ResultStatistics(metrics: [
-      .init(finishedAt: day, wpm: 60, accuracy: 95, typingSeconds: 30, consistency: 80),
       .init(
-        finishedAt: day.addingTimeInterval(60), wpm: 90, accuracy: 85, typingSeconds: 60,
-        consistency: 92),
+        finishedAt: day, wpm: 60, rawWpm: 72, accuracy: 95, typingSeconds: 30,
+        consistency: 80),
+      .init(
+        finishedAt: day.addingTimeInterval(60), wpm: 90, rawWpm: 108, accuracy: 85,
+        typingSeconds: 60, consistency: 92),
     ])
     XCTAssertEqual(statistics.completedTests, 2)
+    XCTAssertEqual(statistics.estimatedWordsTyped, 120)
     XCTAssertEqual(statistics.averageWPM, 75)
     XCTAssertEqual(statistics.bestWPM, 90)
+    XCTAssertEqual(statistics.averageWPMLast10, 75)
+    XCTAssertEqual(statistics.averageRawWPM, 90)
+    XCTAssertEqual(statistics.bestRawWPM, 108)
+    XCTAssertEqual(statistics.averageRawWPMLast10, 90)
     XCTAssertEqual(statistics.averageAccuracy, 90)
+    XCTAssertEqual(statistics.bestAccuracy, 95)
+    XCTAssertEqual(statistics.averageAccuracyLast10, 90)
     XCTAssertEqual(statistics.totalTypingSeconds, 90)
     XCTAssertEqual(statistics.highestConsistency, 92)
     XCTAssertEqual(statistics.averageConsistency, 86)
@@ -12784,12 +12793,29 @@ final class TypingEngineTests: XCTestCase {
 
     let newestFirst = (0...10).map { offset in
       ResultMetric(
-        finishedAt: day.addingTimeInterval(Double(-offset)), wpm: 60, accuracy: 95,
-        typingSeconds: 30, consistency: Double(100 - offset * 10))
+        finishedAt: day.addingTimeInterval(Double(-offset)), wpm: 50 + offset,
+        rawWpm: 70 + offset, accuracy: 80 + offset, typingSeconds: 30,
+        consistency: Double(100 - offset * 10))
     }
     let recentStatistics = ResultStatistics(metrics: newestFirst)
+    XCTAssertEqual(recentStatistics.estimatedWordsTyped, 305)
+    XCTAssertEqual(recentStatistics.averageWPM, 55)
+    XCTAssertEqual(recentStatistics.averageWPMLast10, 55)
+    XCTAssertEqual(recentStatistics.averageRawWPM, 75)
+    XCTAssertEqual(recentStatistics.averageRawWPMLast10, 75)
+    XCTAssertEqual(recentStatistics.averageAccuracy, 85)
+    XCTAssertEqual(recentStatistics.averageAccuracyLast10, 85)
     XCTAssertEqual(recentStatistics.averageConsistency, 50)
     XCTAssertEqual(recentStatistics.averageConsistencyLast10, 55)
+
+    let afkStatistics = ResultStatistics(metrics: [
+      .init(
+        finishedAt: day, wpm: 20, rawWpm: 22, accuracy: 90, typingSeconds: 23,
+        elapsedSeconds: 30)
+    ])
+    XCTAssertEqual(afkStatistics.estimatedWordsTyped, 10)
+    XCTAssertEqual(afkStatistics.totalTypingSeconds, 23)
+    XCTAssertEqual(ResultStatistics(metrics: []).estimatedWordsTyped, 0)
   }
 
   func testRecentTestAverageUsesTheLatestTenMatchingCurrentSettings() {

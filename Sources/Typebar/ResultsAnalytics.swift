@@ -4,19 +4,24 @@ struct ResultMetric: Equatable, Identifiable {
     let id: UUID
     let finishedAt: Date
     let wpm: Int
+    let rawWpm: Int
     let accuracy: Int
     let typingSeconds: TimeInterval
+    let elapsedSeconds: TimeInterval
     let consistency: Double
 
     init(
-        id: UUID = UUID(), finishedAt: Date, wpm: Int, accuracy: Int, typingSeconds: TimeInterval,
+        id: UUID = UUID(), finishedAt: Date, wpm: Int, rawWpm: Int? = nil, accuracy: Int,
+        typingSeconds: TimeInterval, elapsedSeconds: TimeInterval? = nil,
         consistency: Double = 0
     ) {
         self.id = id
         self.finishedAt = finishedAt
         self.wpm = wpm
+        self.rawWpm = rawWpm ?? wpm
         self.accuracy = accuracy
         self.typingSeconds = typingSeconds
+        self.elapsedSeconds = max(0, elapsedSeconds ?? typingSeconds)
         self.consistency = consistency.isFinite ? min(100, max(0, consistency)) : 0
     }
 
@@ -25,8 +30,10 @@ struct ResultMetric: Equatable, Identifiable {
             id: record.id,
             finishedAt: record.finishedAt,
             wpm: record.wpm,
+            rawWpm: record.rawWpm,
             accuracy: record.accuracy,
             typingSeconds: record.engagedDuration,
+            elapsedSeconds: max(0, record.finishedAt.timeIntervalSince(record.startedAt)),
             consistency: ResultConsistencyPolicy.metrics(
                 events: record.replayEvents,
                 duration: record.finishedAt.timeIntervalSince(record.startedAt)
@@ -1524,9 +1531,16 @@ struct ResultHistoryFilter: Codable, Equatable {
 
 struct ResultStatistics: Equatable {
     let completedTests: Int
+    let estimatedWordsTyped: Int
     let averageWPM: Int
     let bestWPM: Int
+    let averageWPMLast10: Int
+    let averageRawWPM: Int
+    let bestRawWPM: Int
+    let averageRawWPMLast10: Int
     let averageAccuracy: Int
+    let bestAccuracy: Int
+    let averageAccuracyLast10: Int
     let totalTypingSeconds: TimeInterval
     let highestConsistency: Double
     let averageConsistency: Double
@@ -1534,9 +1548,18 @@ struct ResultStatistics: Equatable {
 
     init(metrics: [ResultMetric]) {
         completedTests = metrics.count
-        averageWPM = metrics.isEmpty ? 0 : Int((Double(metrics.map(\.wpm).reduce(0, +)) / Double(metrics.count)).rounded())
+        estimatedWordsTyped = metrics.map {
+          Int((Double($0.wpm) / 60 * $0.elapsedSeconds).rounded(.toNearestOrAwayFromZero))
+        }.reduce(0, +)
+        averageWPM = Self.average(metrics.map(\.wpm))
         bestWPM = metrics.map(\.wpm).max() ?? 0
-        averageAccuracy = metrics.isEmpty ? 0 : Int((Double(metrics.map(\.accuracy).reduce(0, +)) / Double(metrics.count)).rounded())
+        averageWPMLast10 = Self.average(metrics.prefix(10).map(\.wpm))
+        averageRawWPM = Self.average(metrics.map(\.rawWpm))
+        bestRawWPM = metrics.map(\.rawWpm).max() ?? 0
+        averageRawWPMLast10 = Self.average(metrics.prefix(10).map(\.rawWpm))
+        averageAccuracy = Self.average(metrics.map(\.accuracy))
+        bestAccuracy = metrics.map(\.accuracy).max() ?? 0
+        averageAccuracyLast10 = Self.average(metrics.prefix(10).map(\.accuracy))
         totalTypingSeconds = metrics.map(\.typingSeconds).reduce(0, +)
         highestConsistency = metrics.map(\.consistency).max() ?? 0
         averageConsistency = Self.averageConsistency(metrics)
@@ -1546,6 +1569,11 @@ struct ResultStatistics: Equatable {
     private static func averageConsistency(_ metrics: [ResultMetric]) -> Double {
         guard !metrics.isEmpty else { return 0 }
         return metrics.map(\.consistency).reduce(0, +) / Double(metrics.count)
+    }
+
+    private static func average(_ values: [Int]) -> Int {
+        guard !values.isEmpty else { return 0 }
+        return Int((Double(values.reduce(0, +)) / Double(values.count)).rounded())
     }
 
     static func personalBestIDs(metrics: [ResultMetric]) -> Set<UUID> {

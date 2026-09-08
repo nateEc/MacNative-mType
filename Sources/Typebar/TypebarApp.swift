@@ -4603,11 +4603,25 @@ private struct ResultsHistoryView: View {
     return LazyVGrid(
       columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 10
     ) {
+      statistic("估算词数", "\(summary.estimatedWordsTyped)")
       statistic("完成", "\(summary.completedTests)")
-      statistic("均速", "\(summary.averageWPM)")
-      statistic("最佳", "\(summary.bestWPM)")
-      statistic("准确率", "\(summary.averageAccuracy)%")
+      statistic("键入时长", formattedTypingDuration(summary.totalTypingSeconds))
       statistic("连续", "\(streak) 天")
+      statistic(
+        "平均 \(settings.typingSpeedUnit.displayName)",
+        settings.typingSpeedUnit.formatted(wpm: summary.averageWPM))
+      statistic(
+        "最高 \(settings.typingSpeedUnit.displayName)",
+        settings.typingSpeedUnit.formatted(wpm: summary.bestWPM))
+      statistic(
+        "近 10 \(settings.typingSpeedUnit.displayName)",
+        settings.typingSpeedUnit.formatted(wpm: summary.averageWPMLast10))
+      statistic("平均 Raw", settings.typingSpeedUnit.formatted(wpm: summary.averageRawWPM))
+      statistic("最高 Raw", settings.typingSpeedUnit.formatted(wpm: summary.bestRawWPM))
+      statistic("近 10 Raw", settings.typingSpeedUnit.formatted(wpm: summary.averageRawWPMLast10))
+      statistic("平均准确率", "\(summary.averageAccuracy)%")
+      statistic("最高准确率", "\(summary.bestAccuracy)%")
+      statistic("近 10 准确率", "\(summary.averageAccuracyLast10)%")
       statistic("最高稳定度", "\(formattedConsistency(summary.highestConsistency))%")
       statistic("平均稳定度", "\(formattedConsistency(summary.averageConsistency))%")
       statistic("近 10 稳定度", "\(formattedConsistency(summary.averageConsistencyLast10))%")
@@ -4621,6 +4635,15 @@ private struct ResultsHistoryView: View {
 
   private func formattedConsistency(_ value: Double) -> String {
     value.formatted(.number.precision(.fractionLength(0...2)))
+  }
+
+  private func formattedTypingDuration(_ value: TimeInterval) -> String {
+    let seconds = max(0, Int(value.rounded()))
+    let hours = seconds / 3_600
+    let minutes = seconds % 3_600 / 60
+    if hours > 0 { return "\(hours) 小时 \(minutes) 分" }
+    if minutes > 0 { return "\(minutes) 分 \(seconds % 60) 秒" }
+    return "\(seconds) 秒"
   }
 
   private func statistic(_ title: String, _ value: String) -> some View {
