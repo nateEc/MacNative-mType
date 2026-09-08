@@ -279,6 +279,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case urduRoman
   case urdish
   case tamil
+  case tamilOld
   case tanglish
   case hindi
   case hinglish
@@ -4599,6 +4600,32 @@ enum StarterLexicon {
     "தூரம்", "அடி", "பொறுமை", "சமநிலை",
   ]
 
+  // Typebar-authored Tamil joining-script drills for the independent legacy
+  // catalog choice. The combinations reproduce only aggregate shape metadata;
+  // no reference words or external dictionary values are included.
+  static let tamilOldWords: [String] = {
+    let stems = [
+      "அக", "இச", "உர", "எழ", "ஒல", "கட", "சர", "தள", "நட", "பட", "மல", "வழ",
+      "விட", "திற", "நில", "புத", "மொழ", "வின", "கர", "சுட", "தொட", "பய", "மன",
+    ]
+    let endings = [
+      "ம்", "ல்", "ன்", "டு", "தி", "வு", "மை", "கம்", "நம்", "ரம்",
+      "சல்", "பு", "கு", "டை", "வி", "து", "யல்", "றம்", "ஞ்சி", "ட்டி",
+    ]
+    var entries = stems.flatMap { stem in endings.map { stem + $0 } }
+    entries[0] = "அகா"
+    entries[1] = "நீளமானபயிற்சி"
+    entries[2] = "இசை நடை"
+    for index in [101, 114, 192, 280] {
+      entries[index] += "ஃ"
+    }
+    return entries
+  }()
+
+  static let tamilOldTokens: [String] = {
+    Array(Set(tamilOldWords.flatMap { $0.split(whereSeparator: \.isWhitespace).map(String.init) })).sorted()
+  }()
+
   // Typebar-authored Tanglish practice combines Roman Tamil and English in a
   // small, deterministic local corpus rather than copied online comments.
   static let tanglishWords = [
@@ -5445,6 +5472,8 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tamilWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tamilOld:
+      return entryPrompt(tokens: count, entries: tamilOldWords, contentOptions: contentOptions)
     case .tanglish:
       return prompt(
         tokens: count, lexicon: tanglishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5942,6 +5971,7 @@ enum StarterLexicon {
     case .urduRoman: (urduRomanWords, [",", ".", "!", "?"])
     case .urdish: (urdishWords, [",", ".", "!", "?"])
     case .tamil: (tamilWords, [",", ".", "!", "?"])
+    case .tamilOld: (tamilOldTokens, [",", ".", "!", "?"])
     case .tanglish: (tanglishWords, [",", ".", "!", "?"])
     case .hindi: (hindiWords, [",", ".", "!", "?"])
     case .hinglish: (hinglishWords, [",", ".", "!", "?"])
@@ -6171,6 +6201,7 @@ extension TypingLanguage {
     case .urduRoman: StarterLexicon.urduRomanWords
     case .urdish: StarterLexicon.urdishWords
     case .tamil: StarterLexicon.tamilWords
+    case .tamilOld: StarterLexicon.tamilOldWords
     case .tanglish: StarterLexicon.tanglishWords
     case .hindi: StarterLexicon.hindiWords
     case .hinglish: StarterLexicon.hinglishWords
@@ -6269,7 +6300,7 @@ extension TypingLanguage {
     .likanu,
     .pokemon1k,
     .arenaStrategy,
-    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tamilOld, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .frenchBitoduc, .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
     .russianContractions, .russianContractions1k,
@@ -6307,7 +6338,7 @@ extension TypingLanguage {
     case .arabic, .arabicEgypt, .arabicMorocco, .bangla, .banglaLetters, .gujarati, .hebrew,
       .hindi, .kannada, .khmer, .korean, .kurdishCentral, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
-      .tamil, .telugu, .tibetan, .urdu, .yiddish:
+      .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish:
       true
     default:
       false
@@ -6487,6 +6518,7 @@ extension TypingLanguage {
     case .urduRoman: "Urdu (Roman)"
     case .urdish: "Urdish"
     case .tamil: "தமிழ்"
+    case .tamilOld: "தமிழ் · பழைய தொகுப்பு · Typebar"
     case .tanglish: "Tanglish"
     case .hindi: "हिन्दी"
     case .hinglish: "Hinglish"

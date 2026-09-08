@@ -4633,6 +4633,13 @@ enum OfflineContent {
           language: .russianContractions1k, length: quote.length)
       }
     }
+    if language == .tamilOld {
+      return quotes(for: .tamil, length: length).map { quote in
+        .init(
+          id: "tamil-old-\(quote.id)", title: quote.title, text: quote.text,
+          language: .tamilOld, length: quote.length)
+      }
+    }
     return quotes.filter { $0.language == language && (length == .all || $0.length == length) }
   }
 

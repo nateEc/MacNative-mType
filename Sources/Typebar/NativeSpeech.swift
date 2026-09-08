@@ -79,7 +79,7 @@ extension TypingLanguage {
     case .urdu: "ur-PK"
     case .urduRoman: "ur-Latn"
     case .urdish: "en-US"
-    case .tamil: "ta-IN"
+    case .tamil, .tamilOld: "ta-IN"
     case .tanglish: "en-US"
     case .hindi: "hi-IN"
     case .hinglish: "en-US"

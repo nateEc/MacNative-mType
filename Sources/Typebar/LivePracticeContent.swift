@@ -199,7 +199,7 @@ enum LivePracticeContentService {
     case .persian, .persianRomanized: return "fa"
     case .urdu, .urduRoman: return "ur"
     case .urdish: return "en"
-    case .tamil: return "ta"
+    case .tamil, .tamilOld: return "ta"
     case .tanglish: return "en"
     case .hindi: return "hi"
     case .hinglish: return "en"

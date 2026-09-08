@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 161)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 162)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4202,6 +4202,7 @@ final class HealthRouteTests: XCTestCase {
       ("arenaStrategy", "The amber vanguard guarded the river path at dusk."),
       ("russianContractions", "Краткая форма помогает тренировать точный ритм."),
       ("russianContractions1k", "Расширенный набор добавляет больше кратких форм."),
+      ("tamilOld", "பழைய தொகுப்பில் ஒவ்வொரு வடிவமும் தெளிவாகப் பயிலப்படுகிறது."),
       ("swedishDiacritics", "Öva på å, ä och ö med lugn rytm."),
       ("portugueseAccents", "A manhã começa com atenção à próxima página."),
       ("russianAbbreviations", "МГУ и РАН используют короткие заглавные формы."),

@@ -8148,6 +8148,38 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testTamilLegacyPreservesPinnedJoiningScriptShapeAndIndependentIdentity() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "tamilOld"))
+    let entries = language.ownedPracticeWords()
+    let scalarLengths = entries.map { $0.unicodeScalars.count }
+
+    XCTAssertEqual(language.displayName, "தமிழ் · பழைய தொகுப்பு · Typebar")
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ta")
+    XCTAssertEqual(language.speechLocaleIdentifier, "ta-IN")
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertEqual(entries.count, 460)
+    XCTAssertEqual(Set(entries).count, entries.count)
+    XCTAssertEqual(scalarLengths.min(), 3)
+    XCTAssertEqual(scalarLengths.max(), 13)
+    XCTAssertEqual(entries.filter { $0.contains(" ") }.count, 1)
+    XCTAssertTrue(entries.allSatisfy { entry in
+      entry.unicodeScalars.allSatisfy { scalar in
+        scalar.value == 0x20 || (0x0B80...0x0BFF).contains(scalar.value)
+      }
+    })
+
+    let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+    XCTAssertEqual(prompt.split(separator: " ").count, 25)
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let quotes = OfflineContent.quotes(for: language, length: length)
+      XCTAssertEqual(quotes.count, 1)
+      XCTAssertEqual(quotes.first?.language, language)
+    }
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9412,7 +9444,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.persianRomanizedWords,
       StarterLexicon.urduRomanWords,
       StarterLexicon.urdishWords,
-      StarterLexicon.tamilWords,
+      StarterLexicon.tamilWords, StarterLexicon.tamilOldTokens,
       StarterLexicon.tanglishWords,
       StarterLexicon.hindiWords,
       StarterLexicon.hinglishWords,
@@ -9465,7 +9497,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 152)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 153)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(
@@ -13133,7 +13165,7 @@ final class TypingEngineTests: XCTestCase {
       .arabic, .arabicEgypt, .arabicMorocco, .bangla, .banglaLetters, .gujarati, .hebrew,
       .hindi, .kannada, .khmer, .korean, .kurdishCentral, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
-      .tamil, .telugu, .tibetan, .urdu, .yiddish,
+      .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish,
     ]
     XCTAssertEqual(
       Set(TypingLanguage.allCases.filter(\.usesJoiningScriptPrompt)), joiningLanguages)

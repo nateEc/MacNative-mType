@@ -496,6 +496,7 @@
     "georgian": "georgian",
     "tamil": "tamil",
     "tanglish": "tanglish",
+    "tamil_old": "tamilOld",
     "telugu": "telugu",
     "greek": "greek",
     "greek_koine": "greekKoine",
@@ -900,7 +901,7 @@
     "tibetan_1k": "tibetan"
   },
   "unmappedOfficialIDs": [
-    "tamil_old"
+
   ],
   "sourceFiles": [
     "packages/schemas/src/languages.ts",
