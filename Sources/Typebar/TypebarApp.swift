@@ -4275,6 +4275,10 @@ private struct ResultsHistoryView: View {
     SpeedHistogram.buckets(metrics: metrics, unit: settings.typingSpeedUnit)
   }
 
+  private var filterSummaryItems: [ResultHistoryFilterSummaryItem] {
+    ResultHistoryFilterSummaryPolicy.items(for: activeFilter)
+  }
+
   private var personalBestIDs: Set<UUID> {
     Set(LocalPersonalBestTablePolicy.rows(results: results.compactMap(\.portableResult)).map(\.id))
   }
@@ -4293,6 +4297,9 @@ private struct ResultsHistoryView: View {
             )
             .padding(.horizontal)
             .padding(.bottom, 8)
+            ResultHistoryFilterSummaryView(items: filterSummaryItems)
+              .padding(.horizontal)
+              .padding(.bottom, 6)
             historyChart
 
             SpeedHistogramView(buckets: speedHistogram, unit: settings.typingSpeedUnit)
@@ -4942,6 +4949,30 @@ private struct ResultsHistoryView: View {
     case .zen: "禅"
     case .custom: "自定义"
     case nil: "未知"
+    }
+  }
+}
+
+private struct ResultHistoryFilterSummaryView: View {
+  let items: [ResultHistoryFilterSummaryItem]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Label("当前筛选", systemImage: "line.3.horizontal.decrease.circle")
+        .font(.caption.weight(.medium))
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          ForEach(items) { item in
+            Text(item.label)
+              .font(.caption2)
+              .lineLimit(1)
+              .padding(.horizontal, 8)
+              .padding(.vertical, 5)
+              .background(.secondary.opacity(0.09), in: Capsule())
+              .accessibilityLabel(item.label)
+          }
+        }
+      }
     }
   }
 }

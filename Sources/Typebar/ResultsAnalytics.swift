@@ -1611,6 +1611,69 @@ struct ResultHistoryFilter: Codable, Equatable {
     }
 }
 
+struct ResultHistoryFilterSummaryItem: Equatable, Identifiable {
+    let category: String
+    let value: String
+
+    var id: String { category }
+    var label: String { "\(category)：\(value)" }
+}
+
+enum ResultHistoryFilterSummaryPolicy {
+    static func items(for filter: ResultHistoryFilter) -> [ResultHistoryFilterSummaryItem] {
+        var items: [ResultHistoryFilterSummaryItem] = []
+        if filter.dateRange != .all {
+            items.append(.init(category: "时间", value: filter.dateRange.displayName))
+        }
+        if filter.modeSelections != Set(TestMode.allCases) {
+            items.append(.init(
+                category: "模式",
+                value: ResultHistoryFilter.modeSelectionSummary(filter.modeSelections)))
+        }
+        if filter.timeLimits != Set(ResultHistoryTimeLimit.allCases) {
+            items.append(.init(
+                category: "时长", value: ResultHistoryTimeLimit.selectionSummary(filter.timeLimits)))
+        }
+        if filter.wordLimits != Set(ResultHistoryWordLimit.allCases) {
+            items.append(.init(
+                category: "字数", value: ResultHistoryWordLimit.selectionSummary(filter.wordLimits)))
+        }
+        if filter.difficultySelections != Set(Difficulty.allCases) {
+            items.append(.init(
+                category: "难度",
+                value: ResultHistoryFilter.difficultySelectionSummary(filter.difficultySelections)))
+        }
+        if filter.punctuation != .all {
+            items.append(.init(category: "标点", value: filter.punctuation.displayName))
+        }
+        if filter.numbers != .all {
+            items.append(.init(category: "数字", value: filter.numbers.displayName))
+        }
+        if filter.languageSelections != Set(TypingLanguage.allCases) {
+            items.append(.init(
+                category: "语言",
+                value: ResultHistoryFilter.languageSelectionSummary(filter.languageSelections)))
+        }
+        if filter.quoteLengthSelections != ResultHistoryFilter.filterableQuoteLengths {
+            items.append(.init(
+                category: "引语长度",
+                value: ResultHistoryFilter.quoteLengthSelectionSummary(filter.quoteLengthSelections)))
+        }
+        if !filter.modifierFilter.isUnfiltered {
+            items.append(.init(category: "修饰器", value: filter.modifierFilter.selectionSummary))
+        }
+        let tagFilter = filter.effectiveTagFilter
+        if !tagFilter.isUnrestricted {
+            items.append(.init(category: "标签", value: tagFilter.selectionSummary))
+        }
+        let personalBestFilter = filter.effectivePersonalBestFilter
+        if personalBestFilter != .all {
+            items.append(.init(category: "个人最佳", value: personalBestFilter.displayName))
+        }
+        return items.isEmpty ? [.init(category: "筛选", value: "全部成绩")] : items
+    }
+}
+
 struct ResultStatistics: Equatable {
     let completedTests: Int
     let startedTests: Int

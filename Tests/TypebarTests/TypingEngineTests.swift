@@ -13343,6 +13343,41 @@ final class TypingEngineTests: XCTestCase {
       Set([timeEnglish, wordsEnglish, wordsChinese]))
   }
 
+  func testResultHistoryFilterSummaryShowsOnlyActiveConstraintsInStableOrder() throws {
+    XCTAssertEqual(
+      ResultHistoryFilterSummaryPolicy.items(for: .init()),
+      [.init(category: "筛选", value: "全部成绩")])
+
+    let filter = ResultHistoryFilter(
+      modes: [.time, .words], languages: [.english, .spanish],
+      tagFilter: .init(isUnrestricted: false, includesNoTags: false, tags: ["focus"]),
+      personalBestFilter: .excluded, difficulties: [.expert], dateRange: .lastMonth,
+      punctuation: .included, numbers: .noMatches, quoteLengths: [.short, .long],
+      timeLimits: [.seconds15, .custom], wordLimits: [],
+      modifierFilter: .init(includesNoModifiers: false, modifiers: [.zipf]))
+    let items = ResultHistoryFilterSummaryPolicy.items(for: filter)
+
+    XCTAssertEqual(
+      items.map(\.category),
+      ["时间", "模式", "时长", "字数", "难度", "标点", "数字", "语言", "引语长度", "修饰器", "标签", "个人最佳"])
+    XCTAssertEqual(items.first(where: { $0.category == "时间" })?.value, "最近 30 天")
+    XCTAssertEqual(items.first(where: { $0.category == "模式" })?.value, "时间、字数")
+    XCTAssertEqual(items.first(where: { $0.category == "字数" })?.value, "无匹配档位")
+    XCTAssertEqual(items.first(where: { $0.category == "标签" })?.value, "focus")
+    XCTAssertEqual(items.first(where: { $0.category == "个人最佳" })?.value, "排除个人最佳")
+
+    let legacy = try JSONDecoder().decode(
+      ResultHistoryFilter.self,
+      from: Data(
+        #"{"mode":"words","language":"spanish","difficulty":"master","tag":"legacy","personalBestOnly":true}"#.utf8))
+    let legacyItems = ResultHistoryFilterSummaryPolicy.items(for: legacy)
+    XCTAssertEqual(
+      legacyItems.map(\.category), ["模式", "难度", "语言", "标签", "个人最佳"])
+    XCTAssertEqual(legacyItems.first(where: { $0.category == "模式" })?.value, "字数")
+    XCTAssertEqual(legacyItems.first(where: { $0.category == "标签" })?.value, "legacy")
+    XCTAssertEqual(legacyItems.first(where: { $0.category == "个人最佳" })?.value, "仅个人最佳")
+  }
+
   func testResultHistoryBinaryFiltersSupportEveryReferenceToggleCombination() {
     let withBoth = ResultHistoryEntry(
       id: UUID(), mode: .words, language: .english, tags: [],
