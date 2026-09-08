@@ -347,6 +347,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case estonian
   case icelandic
   case french
+  case french1k
+  case french2k
+  case french10k
   case frenchBitoduc
   case italian
   case portuguese
@@ -3724,6 +3727,68 @@ enum StarterLexicon {
   static var spanish10kWords: [String] { spanish10kLexicon.materialized() }
   static var spanish650kWords: [String] { spanish650kLexicon.materialized() }
 
+  private static let frenchScaleRoots = [
+    "arc", "bois", "ciel", "dune", "fil", "lac", "rive", "vent",
+  ]
+
+  private static func frenchScaleLexicon(
+    marker: String, count: Int, minimumToken: String, maximumLength: Int,
+    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int,
+    punctuationSpaceOverlap: Int, nonASCIICount: Int
+  ) -> IndexedLexicon {
+    precondition(count > max(uppercaseCount + 2, nonASCIICount + 2))
+    precondition(punctuationSpaceOverlap <= min(punctuationCount, spaceCount))
+    let punctuationOnlyCount = punctuationCount - punctuationSpaceOverlap
+    return IndexedLexicon(count: count) { index in
+      var entry = marker + frenchScaleRoots[index % frenchScaleRoots.count]
+        + alphabeticIndex(index)
+      if index == 0 {
+        entry = minimumToken
+      } else if index == 1 {
+        entry = String(repeating: marker.first!, count: maximumLength)
+      } else {
+        if index < uppercaseCount + 2 {
+          entry = entry.prefix(1).uppercased() + entry.dropFirst()
+        }
+        if index < nonASCIICount + 2 {
+          entry += "é"
+        }
+      }
+      if index >= count - spaceCount {
+        entry += " x"
+        if index >= count - punctuationSpaceOverlap {
+          entry += "-"
+        }
+      } else if index >= count - spaceCount - punctuationOnlyCount {
+        entry += "-"
+      }
+      return entry
+    }
+  }
+
+  static var french1kLexicon: IndexedLexicon {
+    frenchScaleLexicon(
+      marker: "qfr", count: 1_394, minimumToken: "q", maximumLength: 14,
+      uppercaseCount: 0, punctuationCount: 6, spaceCount: 6,
+      punctuationSpaceOverlap: 0, nonASCIICount: 257)
+  }
+  static var french2kLexicon: IndexedLexicon {
+    frenchScaleLexicon(
+      marker: "wfr", count: 2_041, minimumToken: "w", maximumLength: 14,
+      uppercaseCount: 3, punctuationCount: 10, spaceCount: 11,
+      punctuationSpaceOverlap: 0, nonASCIICount: 503)
+  }
+  static var french10kLexicon: IndexedLexicon {
+    frenchScaleLexicon(
+      marker: "xfr", count: 10_251, minimumToken: "x", maximumLength: 15,
+      uppercaseCount: 4, punctuationCount: 73, spaceCount: 60,
+      punctuationSpaceOverlap: 2, nonASCIICount: 3_224)
+  }
+
+  static var french1kWords: [String] { french1kLexicon.materialized() }
+  static var french2kWords: [String] { french2kLexicon.materialized() }
+  static var french10kWords: [String] { french10kLexicon.materialized() }
+
   // This small starter corpus is original project content, not imported from Monkeytype.
   static let words = [
     "amber", "harbor", "quiet", "copper", "lantern", "paper", "window", "drift",
@@ -5908,6 +5973,18 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: frenchWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .french1k:
+      return prompt(
+        tokens: count, lexicon: french1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .french2k:
+      return prompt(
+        tokens: count, lexicon: french2kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .french10k:
+      return prompt(
+        tokens: count, lexicon: french10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .frenchBitoduc:
       return prompt(
         tokens: count, lexicon: frenchBitoducWords, separator: " ",
@@ -6247,6 +6324,9 @@ enum StarterLexicon {
     case .estonian: (estonianWords, [",", ".", "!", "?"])
     case .icelandic: (icelandicWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
+    case .french1k: (french1kWords, [",", ".", "!", "?"])
+    case .french2k: (french2kWords, [",", ".", "!", "?"])
+    case .french10k: (french10kWords, [",", ".", "!", "?"])
     case .frenchBitoduc: (frenchBitoducWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
@@ -6494,6 +6574,9 @@ extension TypingLanguage {
     case .estonian: StarterLexicon.estonianWords
     case .icelandic: StarterLexicon.icelandicWords
     case .french: StarterLexicon.frenchWords
+    case .french1k: StarterLexicon.french1kWords
+    case .french2k: StarterLexicon.french2kWords
+    case .french10k: StarterLexicon.french10kWords
     case .frenchBitoduc: StarterLexicon.frenchBitoducWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
@@ -6534,6 +6617,9 @@ extension TypingLanguage {
     case .spanish1k: StarterLexicon.spanish1kLexicon
     case .spanish10k: StarterLexicon.spanish10kLexicon
     case .spanish650k: StarterLexicon.spanish650kLexicon
+    case .french1k: StarterLexicon.french1kLexicon
+    case .french2k: StarterLexicon.french2kLexicon
+    case .french10k: StarterLexicon.french10kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -6838,6 +6924,9 @@ extension TypingLanguage {
     case .estonian: "Eesti"
     case .icelandic: "Íslenska"
     case .french: "Français"
+    case .french1k: "Français · 1k · Typebar"
+    case .french2k: "Français · 2k · Typebar"
+    case .french10k: "Français · 10k · Typebar"
     case .frenchBitoduc: "Français · Bitoduc"
     case .italian: "Italiano"
     case .portuguese: "Português"
