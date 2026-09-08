@@ -85,7 +85,7 @@
 | `resultSaving` | `saveCompletedResults` | 已映射。 |
 | `blindMode` | `blindMode` | 已映射。 |
 | `alwaysShowWordsHistory` | `alwaysShowWordsHistory` | 已映射。 |
-| `singleListCommandLine` | `commandPaletteListMode` | 部分；原生命令面板使用单列表/分组导航而非网页命令行。 |
+| `singleListCommandLine` | `commandPaletteListMode` | 已映射；`on` 对应打开即展示全部命令的单列表，`manual` 对应分组导航并可输入 `>` 展开全部命令。 |
 | `minWpm` | `minimumWpm` | 已映射。 |
 | `minWpmCustomSpeed` | `minimumWpm` | 已映射；零值关闭。 |
 | `minAcc` | `minimumAccuracy` | 已映射。 |

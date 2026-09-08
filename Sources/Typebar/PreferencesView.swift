@@ -157,7 +157,7 @@ struct PreferencesView: View {
               Text(mode.displayName).tag(mode)
             }
           }
-          Text("单列表需先输入关键词搜索全部命令；分组导航可逐层浏览，输入 > 可随时搜索全部命令。")
+          Text("单列表打开时显示全部命令并可直接筛选；分组导航可逐层浏览，输入 > 可随时搜索全部命令。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("保存完成成绩", isOn: $settings.saveCompletedResults)

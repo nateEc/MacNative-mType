@@ -10,7 +10,7 @@ enum CommandPaletteListMode: String, CaseIterable, Codable, Equatable, Identifia
 
     var displayName: String {
         switch self {
-        case .singleList: "单列表搜索"
+        case .singleList: "单列表"
         case .grouped: "分组导航"
         }
     }
@@ -262,7 +262,6 @@ enum CommandPaletteSearch {
 }
 
 enum CommandPaletteBrowseDestination: Equatable {
-    case searchHint
     case groups([CommandPaletteGroup])
     case items([CommandPaletteItem])
 }
@@ -279,7 +278,6 @@ enum CommandPaletteBrowsePolicy {
     ) -> CommandPaletteBrowseDestination {
         switch listMode {
         case .singleList:
-            guard !query.isEmpty else { return .searchHint }
             return .items(CommandPaletteSearch.results(items: items, query: query))
         case .grouped:
             if isGlobalSearch(query) {
@@ -364,11 +362,6 @@ struct CommandPaletteView: View {
             Divider()
 
             switch destination {
-            case .searchHint:
-                ContentUnavailableView(
-                    "搜索全部命令", systemImage: "command",
-                    description: Text("输入“历史”、“模式”或“设置”。"))
-                    .frame(maxHeight: .infinity)
             case .groups(let groups):
                 if groups.isEmpty {
                     ContentUnavailableView(

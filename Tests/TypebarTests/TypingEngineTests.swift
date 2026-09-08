@@ -7824,7 +7824,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       CommandPaletteBrowsePolicy.destination(
         items: items, listMode: .singleList, selectedGroup: nil, query: ""),
-      .searchHint)
+      .items(items))
     XCTAssertEqual(
       CommandPaletteBrowsePolicy.destination(
         items: items, listMode: .singleList, selectedGroup: nil, query: "主题"),
