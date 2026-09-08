@@ -204,6 +204,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case englishLegal
   case englishMedical
   case englishShakespearean
+  case oldEnglish
   case kokanu
   case likanu
   case pigLatin
@@ -3618,6 +3619,21 @@ enum StarterLexicon {
     "verily", "whence", "wherefore", "wherein", "whereupon", "wilt", "wouldst", "yonder",
   ]
 
+  // Typebar-authored Old English starter words use the unmarked spelling
+  // boundary observed in the pinned configuration: ASCII letters plus ash
+  // and thorn. No reference word value is read or imported.
+  static let oldEnglishWords = [
+    "ic", "þu", "he", "heo", "hit", "we", "ge", "hie", "me", "þe",
+    "and", "ac", "oþþe", "ne", "nu", "þa", "þær", "her", "swa", "hwæt",
+    "se", "seo", "þæt", "þes", "þeos", "þis", "eom", "is", "sind", "wæs", "beoþ",
+    "wesan", "habban", "don", "gan", "cuman", "seon", "secgan", "sprecan", "wyrcan",
+    "writan", "læran", "leornian", "lufian", "þencan", "findan", "bringan",
+    "mann", "wif", "cild", "cyning", "cwene", "freond", "hus", "ham", "tun", "burg",
+    "weg", "sæ", "scip", "land", "feld", "wudu", "stan", "boc", "word", "hand",
+    "heorte", "dæg", "niht", "morgen", "sunne", "mona", "steorra", "wind", "regn",
+    "fyr", "wæter", "eorþe",
+  ]
+
   // Selected from the public Kokanu vocabulary and arranged independently for
   // Typebar practice; no reference-project word list is read or imported.
   static let kokanuWords = [
@@ -4907,6 +4923,11 @@ enum StarterLexicon {
         tokens: count, lexicon: englishShakespeareanWords, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .oldEnglish:
+      return prompt(
+        tokens: count, lexicon: oldEnglishWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .kokanu:
       return prompt(
         tokens: count, lexicon: kokanuWords, separator: " ",
@@ -5548,6 +5569,7 @@ enum StarterLexicon {
     case .englishLegal: (englishLegalWords, [",", ".", "!", "?"])
     case .englishMedical: (englishMedicalWords, [",", ".", "!", "?"])
     case .englishShakespearean: (englishShakespeareanWords, [",", ".", "!", "?"])
+    case .oldEnglish: (oldEnglishWords, [",", ".", "!", "?"])
     case .kokanu: (kokanuWords, [",", ".", "!", "?"])
     case .likanu: (likanuWords, ["､", ":", "ʭ", "≈"])
     case .pigLatin: (pigLatinWords, [",", ".", "!", "?"])
@@ -5769,6 +5791,7 @@ extension TypingLanguage {
     case .englishLegal: StarterLexicon.englishLegalWords
     case .englishMedical: StarterLexicon.englishMedicalWords
     case .englishShakespearean: StarterLexicon.englishShakespeareanWords
+    case .oldEnglish: StarterLexicon.oldEnglishWords
     case .kokanu: StarterLexicon.kokanuWords
     case .likanu: StarterLexicon.likanuWords
     case .pigLatin: StarterLexicon.pigLatinWords
@@ -5929,6 +5952,7 @@ extension TypingLanguage {
     .englishLegal,
     .englishMedical,
     .englishShakespearean,
+    .oldEnglish,
     .kokanu,
     .likanu,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
@@ -6073,6 +6097,7 @@ extension TypingLanguage {
     case .englishLegal: "English · Legal"
     case .englishMedical: "English · Medical"
     case .englishShakespearean: "English · Shakespearean"
+    case .oldEnglish: "Old English"
     case .kokanu: "Kokanu"
     case .likanu: "Likanu"
     case .pigLatin: "Pig Latin"

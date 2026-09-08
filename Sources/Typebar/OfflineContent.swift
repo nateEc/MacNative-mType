@@ -352,6 +352,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "old-english-wind",
+      title: "Wind ofer feld",
+      text: "Se mann gæþ on weg, and se wind blæwþ ofer feld.",
+      language: .oldEnglish,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "old-english-morgen",
+      title: "Morgenleoht",
+      text: "Seo sunne cymþ on morgen, and þæt cild geseoþ leoht ofer sæ and land.",
+      language: .oldEnglish,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "old-english-boc",
+      title: "Boc and word",
+      text: "Se freond sitteþ æt ham and writ þa word on boc. He leorniaþ mid geþylde, findeþ þæt he ær ne geseah, and bringþ þæt leoht to oþrum mannum.",
+      language: .oldEnglish,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "old-english-farweg",
+      title: "Se langa weg",
+      text: "On morgen gangeþ se mann fram tune to sæ, and his freond gangeþ mid him. Hie geseoþ sunne ofer wæter, wind þurh wudu, and fuglas ofer feld. Þonne niht cymþ, hie findeþ hus and fyr, sprecaþ be þæm dæge, and writaþ þa word þe hie gemunaþ. Swa biþ se langa weg læsse, forþan þe freondscipe and leornung bringaþ leoht to heortan.",
+      language: .oldEnglish,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kokanu-kota-wiki",
       title: "kota wiki",
       text: "mi le kota wiki ki tu. tu le wisan in mi un ja.",

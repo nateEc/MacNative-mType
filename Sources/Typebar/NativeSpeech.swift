@@ -25,7 +25,7 @@ extension TypingLanguage {
     return switch self {
     case .english, .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
       .englishDoubleLetter, .englishLegal, .englishMedical, .englishShakespearean,
-      .ukrainianEndings, .ukrainianLatynkaEndings: "en-US"
+      .oldEnglish, .ukrainianEndings, .ukrainianLatynkaEndings: "en-US"
     case .kokanu: "xxs-Lat"
     case .likanu: "xxs-Uixs"
     case .pigLatin, .loremIpsum, .git: "en-US"

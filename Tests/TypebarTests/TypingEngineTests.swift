@@ -7809,6 +7809,40 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testOldEnglishUsesOriginalLatinThornAndAshContentWithPinnedDefaults() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "oldEnglish"))
+    let words = language.ownedPracticeWords()
+    let permitted = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzæþ")
+
+    XCTAssertEqual(language.displayName, "Old English")
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertEqual(words.count, 79)
+    XCTAssertEqual(Set(words).count, words.count)
+    XCTAssertTrue(words.contains { $0.contains("æ") })
+    XCTAssertTrue(words.contains { $0.contains("þ") })
+    XCTAssertTrue(
+      words.allSatisfy {
+        $0.unicodeScalars.allSatisfy(permitted.contains)
+          && (2...11).contains($0.count)
+      })
+
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let quotes = OfflineContent.quotes(for: language, length: length)
+      XCTAssertEqual(quotes.count, 1)
+      XCTAssertEqual(quotes.first?.language, language)
+    }
+
+    let promptWords = Set(
+      OfflineContent.generatedPrompt(wordCount: 80, language: language).split(separator: " ")
+        .map(String.init))
+    XCTAssertTrue(promptWords.isSubset(of: Set(words)))
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9010,6 +9044,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.englishLegalWords,
       StarterLexicon.englishMedicalWords,
       StarterLexicon.englishShakespeareanWords,
+      StarterLexicon.oldEnglishWords,
       StarterLexicon.kokanuWords,
       StarterLexicon.likanuWords,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
@@ -9119,7 +9154,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 144)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 145)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(

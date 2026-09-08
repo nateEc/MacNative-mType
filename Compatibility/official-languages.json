@@ -456,6 +456,7 @@
     "english_contractions": "englishContractions",
     "english_doubleletter": "englishDoubleLetter",
     "english_shakespearean": "englishShakespearean",
+    "english_old": "oldEnglish",
     "english_medical": "englishMedical",
     "spanish": "spanish",
     "french": "french",
@@ -892,7 +893,6 @@
     "tibetan_1k": "tibetan"
   },
   "unmappedOfficialIDs": [
-    "english_old",
     "french_bitoduc",
     "russian_contractions",
     "russian_contractions_1k",

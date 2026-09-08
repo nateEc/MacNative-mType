@@ -11,11 +11,11 @@
 
 `Compatibility/official-languages.json` 由 `Scripts/generate-official-language-audit.rb` 从固定提交的 schema ID 与 Typebar 本地枚举重新生成。生成器只读取 `packages/schemas/src/languages.ts` 和 `Sources/Typebar/TypingEngine.swift`，不读取 `frontend/static/languages/*.json`，因此清单只含标识和映射元数据，不含官方词表、引语、字体或标点内容。
 
-446 个官方 ID 当前严格分区为：224 个 Typebar 独立原生选择、213 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项），以及 9 个尚无原生选择的配置。9 个缺口是 `english_old`、`french_bitoduc`、`russian_contractions`、`russian_contractions_1k`、`tamil_old`、`twitch_emotes`、`league_of_legends`、`typing_of_the_dead` 和 `pokemon_1k`。因此当前语言面很广，但尚不能宣称官方配置选择完全等价。
+446 个官方 ID 当前严格分区为：225 个 Typebar 独立原生选择、213 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项），以及 8 个尚无原生选择的配置。8 个缺口是 `french_bitoduc`、`russian_contractions`、`russian_contractions_1k`、`tamil_old`、`twitch_emotes`、`league_of_legends`、`typing_of_the_dead` 和 `pokemon_1k`。因此当前语言面很广，但尚不能宣称官方配置选择完全等价。
 
 ## 已覆盖的原生语言面
 
-当前语言目录：154 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。154 个单语入口均支持 Typebar 自有引语；最新增加 toki pona 的 ku suli 与 ku lili 独立选择。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
+当前语言目录：155 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。155 个单语入口均支持 Typebar 自有引语；最新增加 Old English 独立选择。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -46,13 +46,13 @@
 | `_1k`、`_5k`、`_10k` 等词表规模 | 不作为独立语言选择；以原创小型词流和可重复生成策略练习。 | 导入同规模词表会复制参考数据，且规模不是新的输入语义。 |
 | `*_romanized`、音译或脚本变体 | 仅在能提供清晰、稳定、原创的独立练习承诺时实现。 | 显示名称相近不代表同一内容、输入法或在线来源可安全共用。 |
 | 官方语言 JSON 的 `words`、字体和标点数据 | 不导入。 | 保持纯重写与许可边界清晰。 |
-| 9 个尚无原生选择的配置 | 不先占位；准确清单由机器总账固定。 | 每项要先确认可见语义、输入法、内容来源和服务端数据面；不能仅凭 ID 猜测实现。 |
+| 8 个尚无原生选择的配置 | 不先占位；准确清单由机器总账固定。 | 每项要先确认可见语义、输入法、内容来源和服务端数据面；不能仅凭 ID 猜测实现。 |
 
 ## 自动化守卫
 
-- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／224／213／9 守恒关系、分区互斥、9 个明确缺口、每个映射可解析以及 224 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
+- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／225／213／8 守恒关系、分区互斥、8 个明确缺口、每个映射可解析以及 225 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
-- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 141 个候选，并明确覆盖各专项语言与书写变体。
+- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 145 个候选，并明确覆盖各专项语言与书写变体。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜；Swiss German 以固定源码要求的“投稿拒绝、成绩接受”边界替代一般投稿路径。
 - Egyptian Arabic 审计读取 `arabic_egypt.json` 与 `arabic_egypt_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 RTL、连写和 `bcp47: ar-EG`，不定义 `noLazyMode` 或词频排序；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-EG` 朗读、手动可选简化输入和 Zipf 未知提示，并进入社区投稿、成绩及排行榜。
 - Moroccan Arabic 审计读取 `arabic_morocco.json` 的元数据，不读取其中词表或引语文本。它定义 RTL、连写、`orderedByFrequency: false` 和 `bcp47: ar-MA`，不定义 `noLazyMode`；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-MA` 朗读、手动可选简化输入和明确的 Zipf 不支持提示，并进入社区投稿、成绩及排行榜。
@@ -108,7 +108,7 @@
 
 每个新候选都必须先确认 RTL、连写、词界、BCP-47、输入法和服务端数据面；不得仅因名称或书写习惯相似而复用既有路径。
 
-`english_old` 当前仅能确认是 200 词、无附加元数据且与现行 `english` 仅少量重合的独立目录；固定源码没有说明它表示旧版默认词表还是历史英语。取得项目一手定义前保持候选状态，不以猜测赋予用户可见名称或内容。
+`english_old` 的固定配置只定义名称；结构审计确认 200 个唯一、2–11 字符、无空格 token，扩展字符仅为 `æ/þ`，且不读取词值。官方引入提交 `7b6ed784813b4ad64941f8033df6a5dc5b070d52` 明确称其为 Old English，因此 Typebar 已以独立编写的基础词和四档文本实现该语义，而不是将它误作旧版现代英语词表。
 
 `russian_contractions` 定义 `bcp47: ru-RU`、`noLazyMode: true` 与 `orderedByFrequency: false`；结构审计只确认 200 个短 token 中多数是小写西里尔形式，少量包含标点。固定源码没有解释这里的 “contractions” 是口语缩约、带标点结构还是其他专项语义，因此暂不创建会误导用户的练习模式，也不读取或复制参考词值。
 
@@ -118,3 +118,4 @@
 - 2026-09-08 更正：当前单语总数为一百五十一种、默认／自选 LTR 多语候选为一百四十一种。新增 বাংলা · অক্ষর；固定 `bangla_letters` 定义 `joiningScript: true`、`noLazyMode: true` 与 `bcp47: bn-BD`，结构审计仅确认其 62 个 token 的 56/3/2/1 标量长度分布和 Bengali Unicode 区块边界，不读取词值。Typebar 根据 [Unicode 17.0 Bengali 区块](https://www.unicode.org/charts/PDF/U0980.pdf) 独立编排字母、符号和组合序列及四档原创文本，使用 LTR 空格词界、`bn`／`bn-BD`、禁用简化输入和 Zipf 未知提示，并贯通混排与全部数据面。同时将原生连写保护从 3 项纠正为固定元数据要求的 26 项，覆盖已支持的 Arabic、Indic、RTL、Korean、Likanu、Tibetan 与 Yiddish 语言；不读取参考词值或复用实现。
 - 2026-09-08 更正：当前单语总数为一百五十二种、默认／自选 LTR 多语候选为一百四十二种。新增 Git 专项；固定 `git` 配置仅定义 `noLazyMode: true`，结构审计只确认 52 个唯一 token、1–19 字符长度分布、全小写 ASCII、4 个含符号 token 及仅 `-`／`@` 的符号集合，不读取词值。Typebar 依据本机 Git 2.50.1 `git help -a` 的公开命令面和通用版本控制概念独立编排词流及四档原创文本，使用 LTR 空格词界、缺省 `en`／`en-US`、禁用简化输入和 Zipf 未知提示，并贯通混排与全部数据面。
 - 2026-09-08 更正：当前单语总数为一百五十四种、默认／自选 LTR 多语候选为一百四十四种。新增 toki pona · ku suli 与 ku lili 独立选择；前者在 Typebar 自有基础集合上增加 15 个独立整理的核心词，后者使用 20 个与前者互斥的扩展词。四档文本只从 Typebar 自有 toki pona 文本派生独立身份；两项均保持固定 `noLazyMode`、缺省 `en`／`en-US`、LTR 空格词界和 Zipf 未知语义，并贯通混排与客户端／服务端数据面。未读取官方 ku 词值。
+- 2026-09-08 更正：当前单语总数为一百五十五种、默认／自选 LTR 多语候选为一百四十五种。官方引入提交 `7b6ed784813b4ad64941f8033df6a5dc5b070d52` 明确固定 `english_old` 配置表示 Old English；结构审计只读取名称、词数、唯一性、长度和字符集合，不读取词值。Typebar 使用 79 个独立编写、仅含 ASCII 小写字母与 `æ/þ` 的基础词及四档原创文本，按固定缺省元数据走 LTR 空格词界、`en`／`en-US`、可选简化输入和 Zipf 未知语义，并贯通混排、社区投稿、撤回、成绩和排行榜。
