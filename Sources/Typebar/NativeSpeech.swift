@@ -107,7 +107,9 @@ extension TypingLanguage {
     case .indonesian: "id-ID"
     case .malay: "ms-MY"
     case .danish: "da-DK"
-    case .norwegianBokmal: "nb-NO"
+    case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
+      .norwegianBokmal10k, .norwegianBokmal150k, .norwegianBokmal600k:
+      "nb-NO"
     case .norwegianNynorsk: "nn-NO"
     case .swedish, .swedishDiacritics: "sv-SE"
     case .hungarian: "hu-HU"

@@ -11,11 +11,11 @@
 
 `Compatibility/official-languages.json` 由 `Scripts/generate-official-language-audit.rb` 从固定提交的 schema ID 与 Typebar 本地枚举重新生成。生成器只读取 `packages/schemas/src/languages.ts` 和 `Sources/Typebar/TypingEngine.swift`，不读取 `frontend/static/languages/*.json`，因此清单只含标识和映射元数据，不含官方词表、引语、字体或标点内容。
 
-446 个官方 ID 当前严格分区为：288 个 Typebar 独立原生选择，以及 158 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项）。当前没有未映射 ID；由于 158 个规模变体仍非独立入口，不能宣称官方配置选择一一等价。
+446 个官方 ID 当前严格分区为：293 个 Typebar 独立原生选择，以及 153 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项）。当前没有未映射 ID；由于 153 个规模变体仍非独立入口，不能宣称官方配置选择一一等价。
 
 ## 已覆盖的原生语言面
 
-当前语言目录：218 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。218 个单语入口均支持 Typebar 自有引语；最新增加 Thai 六个数字规模入口。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
+当前语言目录：223 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。223 个单语入口均支持 Typebar 自有引语；最新增加 Norsk bokmål 五个数字规模入口。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -49,7 +49,7 @@
 
 ## 自动化守卫
 
-- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／288／158／0 守恒关系、分区互斥、每个映射可解析以及 288 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
+- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／293／153／0 守恒关系、分区互斥、每个映射可解析以及 293 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
 - 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 148 个候选，并明确覆盖各专项语言与书写变体。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜；Swiss German 以固定源码要求的“投稿拒绝、成绩接受”边界替代一般投稿路径。
@@ -142,3 +142,4 @@
 - 2026-09-09 更正：当前单语总数为二百一十二种，默认／自选 LTR 多语候选仍为一百五十三种。固定 `korean_1k` 与 `korean_5k` 以聚合方式确认 975／4,201 个唯一项、1–5／1–6 字符、全量纯 Hangul、普通空格词界、joining-script、`ko-KR`、禁用简化输入与未声明频率排序的元数据。Typebar 以两套原创确定性按需索引词流提供独立入口，贯通四档自有引语及全部数据面；与固定词表逐档精确交集为零。机器总账现为 446／282／164／0。
 
 - 2026-09-09 更正：当前单语总数为二百一十八种，默认／自选 LTR 多语候选仍为一百五十三种。固定 `thai_1k`／`thai_5k`／`thai_10k`／`thai_20k`／`thai_50k`／`thai_60k` 以聚合方式确认 1,000／5,000／10,000／18,737／50,000／60,000 个唯一项，以及逐档 Unicode 标量与可见字符长度、组合标记、标点、空格、数字、非字母和 Thai 区段项数量；元数据为普通空格词界、`th-TH`、禁用简化输入、未声明频率排序且不标记 joining-script。Typebar 以六套原创确定性按需索引词流提供独立入口，贯通四档自有引语及全部数据面；与固定词表逐档精确交集为零。机器总账现为 446／288／158／0。
+- 2026-09-09 更正：当前单语总数为二百二十三种，默认／自选 LTR 多语候选仍为一百五十三种。固定 `norwegian_bokmal_1k`／`norwegian_bokmal_5k`／`norwegian_bokmal_10k`／`norwegian_bokmal_150k`／`norwegian_bokmal_600k` 以聚合方式确认 1,000／5,000／10,000／142,938／614,970 个唯一项，以及逐档长度、大小写、标点、数字、非字母和非 ASCII 数量；元数据为普通空格词界、`nb-NO`、可选简化输入，前三档声明按频率排序，后两档未声明。Typebar 以五套原创确定性按需索引词流提供独立入口，贯通四档自有引语及全部数据面；与固定词表逐档精确交集为零。机器总账现为 446／293／153／0。

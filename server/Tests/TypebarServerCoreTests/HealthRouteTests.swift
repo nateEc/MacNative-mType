@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 217)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 222)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4206,6 +4206,11 @@ final class HealthRouteTests: XCTestCase {
       ("thai20k", "ช่วงฝึกภาษาไทยขนาดใหญ่ยังมีเอกลักษณ์แยกกัน"),
       ("thai50k", "ตัวสร้างภาษาไทยผลิตเฉพาะรายการที่ขอเท่านั้น"),
       ("thai60k", "ดัชนีภาษาไทยชุดใหญ่สุดยังทำงานอย่างมีประสิทธิภาพ"),
+      ("norwegianBokmal1k", "En liten norsk skala gir en tydelig øvelse."),
+      ("norwegianBokmal5k", "Den lokale indeksen utvider øvelsen steg for steg."),
+      ("norwegianBokmal10k", "Ti tusen plasser trenger ingen importert ordliste."),
+      ("norwegianBokmal150k", "Den brede skalaen beholder sin egen norske identitet."),
+      ("norwegianBokmal600k", "Den største indeksen forblir lokal og effektiv."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

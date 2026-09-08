@@ -73,8 +73,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let code = languages.filter(\.isCodeLanguage)
     let mixed: Set<TypingLanguage> = [.mixedEnglishChinese, .mixedLanguages]
 
-    XCTAssertEqual(languages.count, 290)
-    XCTAssertEqual(standalone.count, 218)
+    XCTAssertEqual(languages.count, 295)
+    XCTAssertEqual(standalone.count, 223)
     XCTAssertEqual(code.count, 70)
     XCTAssertEqual(Set(languages), Set(standalone).union(code).union(mixed))
 
@@ -82,7 +82,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let currentSummary = "当前语言目录：218 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。"
+    let currentSummary = "当前语言目录：223 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。"
     for name in [
       "README.md", "FUNCTIONAL_INVENTORY.md", "REWRITE_SPEC.md",
       "OFFICIAL_CONFIG_AUDIT.md", "OFFICIAL_LANGUAGE_AUDIT.md",
@@ -112,8 +112,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 446)
     XCTAssertEqual(fixture.officialIDs.count, fixture.officialCount)
     XCTAssertEqual(officialIDs.count, fixture.officialCount)
-    XCTAssertEqual(fixture.nativeIndependent.count, 288)
-    XCTAssertEqual(fixture.nativeRelatedChoice.count, 158)
+    XCTAssertEqual(fixture.nativeIndependent.count, 293)
+    XCTAssertEqual(fixture.nativeRelatedChoice.count, 153)
     XCTAssertEqual(unmappedIDs.count, 0)
     XCTAssertEqual(unmappedIDs, expectedUnmappedIDs)
     XCTAssertTrue(independentIDs.isDisjoint(with: relatedIDs))
