@@ -331,6 +331,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case french
   case italian
   case portuguese
+  case portugueseAccents
   case simplifiedChinese
   case traditionalChinese
   case russian
@@ -4743,6 +4744,19 @@ enum StarterLexicon {
     "montanha", "semente", "ritmo", "janela", "margem", "memória", "lápis", "atenção",
   ]
 
+  // Typebar-authored Portuguese accents practice keeps every word focused on
+  // an accented vowel or cedilla without importing the reference word list.
+  static let portugueseAccentsWords = [
+    "ação", "açúcar", "água", "álbum", "árvore", "avó", "avô", "atenção", "avião", "bênção",
+    "canção", "coração", "criança", "decisão", "direção", "educação", "estação", "fácil",
+    "família", "francês", "história", "informação", "irmã", "irmão", "lâmpada", "manhã", "mão",
+    "memória", "música", "nação", "não", "número", "oração", "pássaro", "pão", "possível",
+    "português", "razão", "relação", "saúde", "silêncio", "situação", "solução", "também",
+    "trânsito", "último", "verão", "vocês", "maçã", "lição", "serviço", "comércio", "ciência",
+    "experiência", "exercício", "próximo", "público", "rápido", "início", "período", "língua",
+    "técnico", "máquina", "país", "juízo", "órgão", "questão",
+  ]
+
   static func noSpaceWords(for language: TypingLanguage) -> [String]? {
     switch language {
     case .simplifiedChinese: simplifiedChineseWords
@@ -5314,6 +5328,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: portugueseWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .portugueseAccents:
+      return prompt(
+        tokens: count, lexicon: portugueseAccentsWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese:
       return prompt(
         tokens: count, lexicon: simplifiedChineseWords, separator: "",
@@ -5540,6 +5558,7 @@ enum StarterLexicon {
     case .french: (frenchWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
+    case .portugueseAccents: (portugueseAccentsWords, [",", ".", "!", "?"])
     case .simplifiedChinese: (simplifiedChineseWords, ["，", "。", "！", "？"])
     case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
     case .russian: (russianWords, [".", ",", "!", "?"])
@@ -5753,6 +5772,7 @@ extension TypingLanguage {
     case .french: StarterLexicon.frenchWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
+    case .portugueseAccents: StarterLexicon.portugueseAccentsWords
     case .simplifiedChinese: StarterLexicon.simplifiedChineseWords
     case .traditionalChinese: StarterLexicon.traditionalChineseWords
     case .russian: StarterLexicon.russianWords
@@ -5781,7 +5801,7 @@ extension TypingLanguage {
     .kokanu,
     .likanu,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
-    .italian, .portuguese,
+    .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
     .japaneseRomaji,
@@ -6039,6 +6059,7 @@ extension TypingLanguage {
     case .french: "Français"
     case .italian: "Italiano"
     case .portuguese: "Português"
+    case .portugueseAccents: "Português · Acentos e cedilha"
     case .simplifiedChinese: "简体中文"
     case .traditionalChinese: "繁體中文"
     case .russian: "Русский"

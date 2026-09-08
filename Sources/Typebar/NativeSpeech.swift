@@ -120,7 +120,7 @@ extension TypingLanguage {
     case .icelandic: "is-IS"
     case .french: "fr-FR"
     case .italian: "it-IT"
-    case .portuguese: "pt-PT"
+    case .portuguese, .portugueseAccents: "pt-PT"
     case .simplifiedChinese, .mixedEnglishChinese: "zh-CN"
     case .traditionalChinese: "zh-TW"
     case .russian: "ru-RU"

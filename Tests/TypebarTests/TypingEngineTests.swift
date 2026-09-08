@@ -8955,6 +8955,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.swedishDiacriticsWords,
       StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.bulgarianLatinWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
+      StarterLexicon.portugueseAccentsWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
       StarterLexicon.ukrainianLatinWords, StarterLexicon.japaneseHiraganaWords,
@@ -8963,7 +8964,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 136)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 137)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -10794,7 +10795,9 @@ final class TypingEngineTests: XCTestCase {
       (.estonian, StarterLexicon.estonianWords),
       (.icelandic, StarterLexicon.icelandicWords),
       (TypingLanguage.french, StarterLexicon.frenchWords), (.italian, StarterLexicon.italianWords),
-      (.portuguese, StarterLexicon.portugueseWords), (.russian, StarterLexicon.russianWords),
+      (.portuguese, StarterLexicon.portugueseWords),
+      (.portugueseAccents, StarterLexicon.portugueseAccentsWords),
+      (.russian, StarterLexicon.russianWords),
       (.ukrainian, StarterLexicon.ukrainianWords),
       (.ukrainianLatin, StarterLexicon.ukrainianLatinWords),
       (.japaneseRomaji, StarterLexicon.japaneseRomajiWords),
@@ -12504,6 +12507,27 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.swedishDiacriticsWords.allSatisfy {
         (4...6).contains($0.count)
           && $0.range(of: "[åäöÅÄÖ]", options: .regularExpression) != nil
+      })
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+    }
+  }
+
+  func testPortugueseAccentsKeepsEveryPracticeWordAccentedAndPinnedMetadata() {
+    let language = TypingLanguage.portugueseAccents
+    XCTAssertEqual(language.displayName, "Português · Acentos e cedilha")
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "pt")
+    XCTAssertEqual(language.speechLocaleIdentifier, "pt-PT")
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertFalse(StarterLexicon.portugueseAccentsWords.isEmpty)
+    XCTAssertEqual(language.ownedPracticeWords(), StarterLexicon.portugueseAccentsWords)
+    XCTAssertTrue(
+      StarterLexicon.portugueseAccentsWords.allSatisfy {
+        $0.range(
+          of: "[áàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ]",
+          options: .regularExpression) != nil
       })
     for length in [QuoteLength.short, .medium, .long, .extended] {
       XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)

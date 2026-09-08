@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 146 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 Svenska · Å Ä Ö。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
+Typebar 现有 147 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 Português · Acentos e cedilha。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ Typebar 现有 146 个可单独练习并支持 Typebar 自有引语的语言／�
 ## 自动化守卫
 
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
-- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 136 个候选，并明确覆盖各专项语言与书写变体。
+- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 137 个候选，并明确覆盖各专项语言与书写变体。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜；Swiss German 以固定源码要求的“投稿拒绝、成绩接受”边界替代一般投稿路径。
 - Egyptian Arabic 审计读取 `arabic_egypt.json` 与 `arabic_egypt_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 RTL、连写和 `bcp47: ar-EG`，不定义 `noLazyMode` 或词频排序；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-EG` 朗读、手动可选简化输入和 Zipf 未知提示，并进入社区投稿、成绩及排行榜。
 - Moroccan Arabic 审计读取 `arabic_morocco.json` 的元数据，不读取其中词表或引语文本。它定义 RTL、连写、`orderedByFrequency: false` 和 `bcp47: ar-MA`，不定义 `noLazyMode`；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-MA` 朗读、手动可选简化输入和明确的 Zipf 不支持提示，并进入社区投稿、成绩及排行榜。
@@ -94,6 +94,7 @@ Typebar 现有 146 个可单独练习并支持 Typebar 自有引语的语言／�
 - 2026-09-08 更正：当前单语总数为一百四十四种、默认／自选 LTR 多语候选为一百三十四种。新增 English · Legal 与 English · Medical。Legal 固定配置未定义 RTL、连写、BCP-47、`noLazyMode` 或词频排序，因此使用 LTR、`en`／`en-US`、可选简化输入和 Zipf 未知提示；Medical 定义 `rightToLeft: false`、`bcp47: en-US`、`noLazyMode: true` 与 `orderedByFrequency: false`，因此禁用简化输入并显示 Zipf 不支持。审计不读取参考词值；两项均使用 Typebar 自写领域词流和四档文本，并贯通混排与全部客户端／服务端数据面。
 - 2026-09-08 更正：当前单语总数为一百四十五种、默认／自选 LTR 多语候选为一百三十五种。新增 English · Shakespearean；固定配置仅定义 `noLazyMode: true`，未定义 RTL、连写、BCP-47 或词频排序，因此使用 LTR、`en`／`en-US`、禁用简化输入和 Zipf 未知提示。Typebar 使用自写古体代词、动词和副词词流以及四档仿古文本，不复制莎士比亚作品或参考词值，并贯通混排与全部客户端／服务端数据面。
 - 2026-09-08 更正：当前单语总数为一百四十六种、默认／自选 LTR 多语候选为一百三十六种。新增 Svenska · Å Ä Ö；固定 `swedish_diacritics` 配置只定义 `bcp47: sv-SE`。结构审计只确认参考词数、4–6 字符长度范围及每词均含 `å/ä/ö`，不读取词值；Typebar 使用 58 个独立自写且满足同一约束的词和四档原创瑞典语文本，走 LTR 空格词界、`sv` 百科入口、`sv-SE` 朗读、可选简化输入和 Zipf 未知提示，并贯通混排与全部客户端／服务端数据面。
+- 2026-09-08 更正：当前单语总数为一百四十七种、默认／自选 LTR 多语候选为一百三十七种。新增 Português · Acentos e cedilha；固定 `portuguese_acentos_e_cedilha` 配置只定义 `bcp47: pt-PT`。结构审计只确认参考词数、长度范围及每词均含葡萄牙语重音字母或 `ç`，不读取词值；Typebar 使用独立自写的专项词流与四档原创葡萄牙语文本，走 LTR 空格词界、`pt` 百科入口、`pt-PT` 朗读、可选简化输入和 Zipf 未知提示，并贯通混排与全部客户端／服务端数据面。
 
 ## 后续候选与准入条件
 

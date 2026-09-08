@@ -606,6 +606,34 @@ enum OfflineContent {
       length: .long
     ),
     OfflineQuote(
+      id: "portuguese-accents-morning",
+      title: "Manhã atenta",
+      text: "A manhã começa com música suave e atenção à primeira página.",
+      language: .portugueseAccents,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "portuguese-accents-square",
+      title: "Praça tranquila",
+      text: "Na praça, uma criança lê uma história enquanto o avô observa as árvores e escuta uma canção ao longe.",
+      language: .portugueseAccents,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "portuguese-accents-practice",
+      title: "Prática diária",
+      text: "Uma prática diária não exige pressa. Dê atenção a cada acento, reconheça a posição da cedilha e mantenha as mãos leves. A precisão cresce quando cada correção é feita com calma e propósito.",
+      language: .portugueseAccents,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "portuguese-accents-reading-room",
+      title: "Sala de leitura",
+      text: "À tarde, a sala de leitura recebe uma luz tranquila através das janelas. Há música baixa, páginas abertas e uma chávena de café próxima do caderno. A prática começa devagar: primeiro uma frase, depois outra, sempre com atenção aos acentos e à cedilha. Quando surge uma dúvida, vale a pena respirar, corrigir a posição das mãos e continuar. Assim, a precisão deixa de parecer uma obrigação e torna-se parte natural do ritmo.",
+      language: .portugueseAccents,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "morning",
       title: "清晨",
       text: "清晨留出一段安静的时间，手边的一小步也会慢慢变得清晰。",

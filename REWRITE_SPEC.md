@@ -395,7 +395,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 ## 2026-09-05 兼容性审计更正
 
-- `TypingLanguage` 当前有一百四十六种 Typebar 自有单语；默认与自选多语混排使用一百三十六种 LTR 单语。最新增加 Svenska · Å Ä Ö：固定 `swedish_diacritics` 仅定义 `bcp47: sv-SE`，结构审计确认其词流专注于 4–6 字符且每词含 `å/ä/ö`。Typebar 以 58 个自写词和四档原创瑞典语文本重建该可见约束，使用 `sv`／`sv-SE`、保留简化输入并显示 Zipf 未知；不读取或复制参考词值。`english_old` 的固定源码缺少用户可见语义说明，在取得一手定义前不猜测实现。
+- `TypingLanguage` 当前有一百四十七种 Typebar 自有单语；默认与自选多语混排使用一百三十七种 LTR 单语。最新增加 Português · Acentos e cedilha：固定 `portuguese_acentos_e_cedilha` 仅定义 `bcp47: pt-PT`，结构审计确认每个参考词均含葡萄牙语重音字母或 `ç`。Typebar 以自写专项词流和四档原创葡萄牙语文本重建该可见约束，使用 `pt`／`pt-PT`、保留简化输入并显示 Zipf 未知；不读取或复制参考词值。`english_old` 的固定源码缺少用户可见语义说明，在取得一手定义前不猜测实现。
 
 - `TypingLanguage` 当前有一百二十二种 Typebar 自有单语；默认与自选多语混排使用一百一十二种 LTR 单语。新增 `Te reo Māori` 只对应固定源码的 `maori_1k` 映射；该配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，因此以保留 macron 的原创 LTR 词流及四档引语、`en`／`en-US` 缺省在线/朗读路径、显式简化输入和 Zipf 未知提示实现，并覆盖投稿、撤回、成绩和排行榜。
 

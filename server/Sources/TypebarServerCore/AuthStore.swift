@@ -488,7 +488,7 @@ public actor AuthStore {
     "catalan", "indonesian", "malay", "danish", "norwegianBokmal", "norwegianNynorsk",
     "swedish", "swedishDiacritics", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian",
     "serbianLatin", "bulgarian", "bulgarianLatin", "romanian", "finnish", "estonian", "icelandic", "french",
-    "italian", "portuguese", "simplifiedChinese", "traditionalChinese", "russian", "ukrainian",
+    "italian", "portuguese", "portugueseAccents", "simplifiedChinese", "traditionalChinese", "russian", "ukrainian",
     "ukrainianLatin", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
     "turkish", "polish",
   ]

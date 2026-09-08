@@ -241,7 +241,7 @@ enum LivePracticeContentService {
     case .icelandic: return "is"
     case .french: return "fr"
     case .italian: return "it"
-    case .portuguese: return "pt"
+    case .portuguese, .portugueseAccents: return "pt"
     case .simplifiedChinese, .traditionalChinese: return "zh"
     case .russian: return "ru"
     case .ukrainian, .ukrainianLatin: return "uk"
