@@ -8180,6 +8180,48 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testEnglishScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int, Int, Int, ZipfFrequencySupport)] = [
+      ("english1k", 1_000, 1, 11, 1, 0, .supported),
+      ("english5k", 5_000, 1, 18, 216, 0, .supported),
+      ("english10k", 9_944, 1, 18, 403, 0, .supported),
+      ("english25k", 24_141, 4, 27, 946, 0, .unsupported),
+      ("english450k", 450_029, 1, 31, 33_021, 176, .unsupported),
+    ]
+
+    for (rawValue, count, minimum, maximum, uppercase, punctuation, zipf) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeWords()
+      XCTAssertEqual(language.displayName, "English · \(rawValue.dropFirst("english".count)) · Typebar")
+      XCTAssertFalse(language.supportsLazyLatinInput)
+      XCTAssertEqual(language.zipfFrequencySupport, zipf)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+      XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.map(\.count).min(), minimum)
+      XCTAssertEqual(words.map(\.count).max(), maximum)
+      XCTAssertEqual(words.filter { $0.range(of: "[A-Z]", options: .regularExpression) != nil }.count, uppercase)
+      XCTAssertEqual(words.filter { $0.range(of: "[^A-Za-z]", options: .regularExpression) != nil }.count, punctuation)
+      XCTAssertFalse(words.contains { $0.contains(" ") })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+
+      let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+      XCTAssertEqual(prompt.split(separator: " ").count, 25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)

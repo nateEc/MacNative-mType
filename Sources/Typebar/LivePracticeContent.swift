@@ -148,7 +148,8 @@ enum LivePracticeContentService {
 
   static func wikipediaLanguageCode(for language: TypingLanguage) -> String {
     switch language {
-    case .english, .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
+    case .english, .english1k, .english5k, .english10k, .english25k, .english450k,
+      .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
       .englishDoubleLetter, .englishLegal, .englishMedical, .englishShakespearean,
       .oldEnglish, .pigLatin, .loremIpsum, .git, .ukrainianEndings, .ukrainianLatynkaEndings,
       .pokemon1k, .arenaStrategy, .mixedEnglishChinese, .mixedLanguages:

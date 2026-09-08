@@ -23,7 +23,8 @@ extension TypingLanguage {
   var speechLocaleIdentifier: String {
     if isCodeLanguage { return "en-US" }
     return switch self {
-    case .english, .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
+    case .english, .english1k, .english5k, .english10k, .english25k, .english450k,
+      .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
       .englishDoubleLetter, .englishLegal, .englishMedical, .englishShakespearean,
       .oldEnglish, .ukrainianEndings, .ukrainianLatynkaEndings: "en-US"
     case .kokanu: "xxs-Lat"

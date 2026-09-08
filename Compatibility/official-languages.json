@@ -452,6 +452,11 @@
   ],
   "nativeIndependent": {
     "english": "english",
+    "english_1k": "english1k",
+    "english_5k": "english5k",
+    "english_10k": "english10k",
+    "english_25k": "english25k",
+    "english_450k": "english450k",
     "english_commonly_misspelled": "englishCommonlyMisspelled",
     "english_contractions": "englishContractions",
     "english_doubleletter": "englishDoubleLetter",
@@ -686,11 +691,6 @@
     "sindhi": "sindhi"
   },
   "nativeRelatedChoice": {
-    "english_1k": "english",
-    "english_5k": "english",
-    "english_10k": "english",
-    "english_25k": "english",
-    "english_450k": "english",
     "spanish_1k": "spanish",
     "spanish_10k": "spanish",
     "spanish_650k": "spanish",

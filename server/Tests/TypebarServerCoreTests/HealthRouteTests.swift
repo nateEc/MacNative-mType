@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 162)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 167)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4188,6 +4188,11 @@ final class HealthRouteTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_735_689_600)
     let languages = [
       ("englishFiveLetter", "Small steps shape clear paths."),
+      ("english1k", "A compact scale keeps each original drill easy to identify."),
+      ("english5k", "A broader scale adds more Typebar-authored combinations."),
+      ("english10k", "Ten thousand slots support a wider deterministic practice range."),
+      ("english25k", "The twenty-five-thousand scale preserves its own result identity."),
+      ("english450k", "The largest English scale remains locally generated and independently selectable."),
       ("englishCommonlyMisspelled", "Careful writers accommodate every necessary letter."),
       ("englishContractions", "Don't hurry; you'll type clearly."),
       ("englishDoubleLetter", "Small letters still need smooth pressure."),

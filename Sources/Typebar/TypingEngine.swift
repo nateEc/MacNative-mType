@@ -197,6 +197,11 @@ extension Difficulty {
 
 enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
+  case english1k
+  case english5k
+  case english10k
+  case english25k
+  case english450k
   case englishFiveLetter
   case englishCommonlyMisspelled
   case englishContractions
@@ -3558,6 +3563,59 @@ enum LikanuPolicy {
 }
 
 enum StarterLexicon {
+  private static let englishScaleRoots = [
+    "amber", "birch", "cairn", "delta", "ember", "field", "grove", "harbor",
+    "islet", "juniper", "keel", "lumen", "meadow", "north", "orbit", "pebble",
+    "quill", "river", "solar", "trail", "upland", "vivid", "willow", "zephyr",
+  ]
+
+  private static func alphabeticIndex(_ index: Int) -> String {
+    var value = index
+    var scalars: [UnicodeScalar] = []
+    repeat {
+      scalars.append(UnicodeScalar(97 + value % 26)!)
+      value /= 26
+    } while value > 0
+    return String(String.UnicodeScalarView(scalars.reversed()))
+  }
+
+  private static func englishScaleWords(
+    marker: String, count: Int, minimumToken: String, maximumLength: Int,
+    uppercaseCount: Int, punctuationCount: Int
+  ) -> [String] {
+    precondition(count > max(uppercaseCount + 2, punctuationCount + 2))
+    var entries = (0..<count).map { index in
+      marker + englishScaleRoots[index % englishScaleRoots.count] + alphabeticIndex(index)
+    }
+    entries[0] = minimumToken
+    entries[1] = String(repeating: marker.last!, count: maximumLength)
+    for index in 2..<(uppercaseCount + 2) {
+      entries[index] = entries[index].prefix(1).uppercased() + entries[index].dropFirst()
+    }
+    for offset in 0..<punctuationCount {
+      entries[count - 1 - offset] += "-"
+    }
+    return entries
+  }
+
+  // Typebar-authored deterministic scale corpora. They preserve the pinned
+  // choice sizes and aggregate input shapes without importing reference words.
+  static let english1kWords = englishScaleWords(
+    marker: "q", count: 1_000, minimumToken: "q", maximumLength: 11,
+    uppercaseCount: 1, punctuationCount: 0)
+  static let english5kWords = englishScaleWords(
+    marker: "ve", count: 5_000, minimumToken: "v", maximumLength: 18,
+    uppercaseCount: 216, punctuationCount: 0)
+  static let english10kWords = englishScaleWords(
+    marker: "wi", count: 9_944, minimumToken: "w", maximumLength: 18,
+    uppercaseCount: 403, punctuationCount: 0)
+  static let english25kWords = englishScaleWords(
+    marker: "xo", count: 24_141, minimumToken: "qxqz", maximumLength: 27,
+    uppercaseCount: 946, punctuationCount: 0)
+  static let english450kWords = englishScaleWords(
+    marker: "yu", count: 450_029, minimumToken: "b", maximumLength: 31,
+    uppercaseCount: 33_021, punctuationCount: 176)
+
   // This small starter corpus is original project content, not imported from Monkeytype.
   static let words = [
     "amber", "harbor", "quiet", "copper", "lantern", "paper", "window", "drift",
@@ -5136,6 +5194,26 @@ enum StarterLexicon {
         tokens: count, lexicon: englishVariant == .british ? britishWords : words, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .english1k:
+      return prompt(
+        tokens: count, lexicon: english1kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .english5k:
+      return prompt(
+        tokens: count, lexicon: english5kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .english10k:
+      return prompt(
+        tokens: count, lexicon: english10kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .english25k:
+      return prompt(
+        tokens: count, lexicon: english25kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .english450k:
+      return prompt(
+        tokens: count, lexicon: english450kWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .englishFiveLetter:
       return prompt(
         tokens: count, lexicon: englishFiveLetterWords, separator: " ",
@@ -5889,6 +5967,11 @@ enum StarterLexicon {
   ) {
     switch language {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
+    case .english1k: (english1kWords, [",", ".", "!", "?"])
+    case .english5k: (english5kWords, [",", ".", "!", "?"])
+    case .english10k: (english10kWords, [",", ".", "!", "?"])
+    case .english25k: (english25kWords, [",", ".", "!", "?"])
+    case .english450k: (english450kWords, [",", ".", "!", "?"])
     case .englishFiveLetter: (englishFiveLetterWords, [",", ".", "!", "?"])
     case .englishCommonlyMisspelled: (englishCommonlyMisspelledWords, [",", ".", "!", "?"])
     case .englishContractions: (englishContractionWords, [",", ".", "!", "?"])
@@ -6119,6 +6202,11 @@ extension TypingLanguage {
     guard !isCodeLanguage else { return [] }
     return switch self {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
+    case .english1k: StarterLexicon.english1kWords
+    case .english5k: StarterLexicon.english5kWords
+    case .english10k: StarterLexicon.english10kWords
+    case .english25k: StarterLexicon.english25kWords
+    case .english450k: StarterLexicon.english450kWords
     case .englishFiveLetter: StarterLexicon.englishFiveLetterWords
     case .englishCommonlyMisspelled: StarterLexicon.englishCommonlyMisspelledWords
     case .englishContractions: StarterLexicon.englishContractionWords
@@ -6361,7 +6449,8 @@ extension TypingLanguage {
   var supportsLazyLatinInput: Bool {
     guard !isCodeLanguage else { return false }
     return switch self {
-    case .english, .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
+    case .english, .english1k, .english5k, .english10k, .english25k, .english450k,
+      .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical,
       .englishShakespearean,
       .pigLatin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
@@ -6419,11 +6508,11 @@ extension TypingLanguage {
   /// wordsets. Dictionaries without that field intentionally remain unknown.
   var zipfFrequencySupport: ZipfFrequencySupport {
     switch self {
-    case .english, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
+    case .english, .english1k, .english5k, .english10k, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
-      .englishMedical, .kokanu, .likanu, .russianAbbreviations, .russianContractions, .russianContractions1k, .typingOfTheDead, .pokemon1k, .arabicMorocco, .sindhi, .armenian, .bemba,
+      .englishMedical, .english25k, .english450k, .kokanu, .likanu, .russianAbbreviations, .russianContractions, .russianContractions1k, .typingOfTheDead, .pokemon1k, .arabicMorocco, .sindhi, .armenian, .bemba,
       .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
@@ -6436,6 +6525,11 @@ extension TypingLanguage {
     if let codeName = CodeLanguageCatalog.displayNames[self] { return "Code · \(codeName)" }
     return switch self {
     case .english: "English"
+    case .english1k: "English · 1k · Typebar"
+    case .english5k: "English · 5k · Typebar"
+    case .english10k: "English · 10k · Typebar"
+    case .english25k: "English · 25k · Typebar"
+    case .english450k: "English · 450k · Typebar"
     case .englishFiveLetter: "English · Five Letter"
     case .englishCommonlyMisspelled: "English · Commonly Misspelled"
     case .englishContractions: "English · Contractions"
