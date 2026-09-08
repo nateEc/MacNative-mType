@@ -300,6 +300,12 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case bangla
   case banglaLetters
   case thai
+  case thai1k
+  case thai5k
+  case thai10k
+  case thai20k
+  case thai50k
+  case thai60k
   case nepali
   case nepaliRomanized
   case kannada
@@ -5328,6 +5334,129 @@ enum StarterLexicon {
     "กล้า", "อดทน", "จังหวะ", "เดินทาง",
   ]
 
+  private struct ThaiScaleSpecification {
+    let count: Int
+    let markedEntries: Int
+    let minimumScalarCount: Int
+    let maximumScalarCount: Int
+    let maximumCharacterCount: Int
+    let punctuationEntries: Int
+    let spaceEntries: Int
+    let digitEntries: Int
+    let punctuationSpaceOverlaps: Int
+    let punctuationDigitOverlaps: Int
+    let marker: String
+  }
+
+  private static let thaiScaleAlphabet = Array(
+    "กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮ")
+
+  private static let thaiScaleRoots = ["แสง", "ทาง", "ฝน", "ลม", "ดาว", "ใจ"]
+
+  private static func thaiScaleIndex(_ index: Int) -> String {
+    var value = index
+    var characters: [Character] = []
+    repeat {
+      characters.append(thaiScaleAlphabet[value % thaiScaleAlphabet.count])
+      value /= thaiScaleAlphabet.count
+    } while value > 0
+    return String(characters.reversed())
+  }
+
+  private static func thaiScaleLexicon(_ specification: ThaiScaleSpecification) -> IndexedLexicon {
+    let punctuationStart = specification.count - specification.punctuationEntries
+    let standaloneSpaceEntries = specification.spaceEntries - specification.punctuationSpaceOverlaps
+    let spaceStart = punctuationStart - standaloneSpaceEntries
+    let standaloneDigitEntries = specification.digitEntries - specification.punctuationDigitOverlaps
+    let digitStart = spaceStart - standaloneDigitEntries
+
+    return IndexedLexicon(count: specification.count) { index in
+      let isMarked = specification.minimumScalarCount == 2
+        ? index < specification.markedEntries
+        : index > 0 && index <= specification.markedEntries
+      var entry: String
+      if index == 0 {
+        entry = specification.minimumScalarCount == 2 ? "กั" : "ฮ"
+      } else if index == 1 {
+        entry = String(repeating: "ก", count: specification.maximumCharacterCount)
+          + String(
+            repeating: "ั",
+            count: specification.maximumScalarCount - specification.maximumCharacterCount)
+      } else {
+        entry = specification.marker + thaiScaleRoots[index % thaiScaleRoots.count]
+          + thaiScaleIndex(index) + (isMarked ? "ั" : "")
+      }
+
+      let hasPunctuation = index >= punctuationStart
+      let hasSpace = (index >= spaceStart && index < punctuationStart)
+        || (index >= punctuationStart
+          && index < punctuationStart + specification.punctuationSpaceOverlaps)
+      let hasDigit = (index >= digitStart && index < spaceStart)
+        || (index >= punctuationStart + specification.punctuationSpaceOverlaps
+          && index < punctuationStart + specification.punctuationSpaceOverlaps
+            + specification.punctuationDigitOverlaps)
+      if hasPunctuation { entry += "!" }
+      if hasSpace { entry += " ก" }
+      if hasDigit { entry += "1" }
+      return entry
+    }
+  }
+
+  static var thai1kLexicon: IndexedLexicon {
+    thaiScaleLexicon(.init(
+      count: 1_000, markedEntries: 844, minimumScalarCount: 2,
+      maximumScalarCount: 36, maximumCharacterCount: 29,
+      punctuationEntries: 14, spaceEntries: 9, digitEntries: 0,
+      punctuationSpaceOverlaps: 0, punctuationDigitOverlaps: 0, marker: "ฮกฮ"))
+  }
+
+  static var thai5kLexicon: IndexedLexicon {
+    thaiScaleLexicon(.init(
+      count: 5_000, markedEntries: 4_093, minimumScalarCount: 2,
+      maximumScalarCount: 52, maximumCharacterCount: 46,
+      punctuationEntries: 48, spaceEntries: 53, digitEntries: 0,
+      punctuationSpaceOverlaps: 0, punctuationDigitOverlaps: 0, marker: "ฮขฮ"))
+  }
+
+  static var thai10kLexicon: IndexedLexicon {
+    thaiScaleLexicon(.init(
+      count: 10_000, markedEntries: 8_193, minimumScalarCount: 2,
+      maximumScalarCount: 68, maximumCharacterCount: 56,
+      punctuationEntries: 91, spaceEntries: 97, digitEntries: 1,
+      punctuationSpaceOverlaps: 0, punctuationDigitOverlaps: 1, marker: "ฮฃฮ"))
+  }
+
+  static var thai20kLexicon: IndexedLexicon {
+    thaiScaleLexicon(.init(
+      count: 18_737, markedEntries: 13_543, minimumScalarCount: 1,
+      maximumScalarCount: 30, maximumCharacterCount: 21,
+      punctuationEntries: 2, spaceEntries: 39, digitEntries: 0,
+      punctuationSpaceOverlaps: 0, punctuationDigitOverlaps: 0, marker: "ฮคฮ"))
+  }
+
+  static var thai50kLexicon: IndexedLexicon {
+    thaiScaleLexicon(.init(
+      count: 50_000, markedEntries: 40_861, minimumScalarCount: 1,
+      maximumScalarCount: 81, maximumCharacterCount: 64,
+      punctuationEntries: 428, spaceEntries: 476, digitEntries: 7,
+      punctuationSpaceOverlaps: 1, punctuationDigitOverlaps: 6, marker: "ฮฅฮ"))
+  }
+
+  static var thai60kLexicon: IndexedLexicon {
+    thaiScaleLexicon(.init(
+      count: 60_000, markedEntries: 49_086, minimumScalarCount: 1,
+      maximumScalarCount: 81, maximumCharacterCount: 64,
+      punctuationEntries: 522, spaceEntries: 589, digitEntries: 7,
+      punctuationSpaceOverlaps: 2, punctuationDigitOverlaps: 6, marker: "ฮฆฮ"))
+  }
+
+  static var thai1kWords: [String] { thai1kLexicon.materialized() }
+  static var thai5kWords: [String] { thai5kLexicon.materialized() }
+  static var thai10kWords: [String] { thai10kLexicon.materialized() }
+  static var thai20kWords: [String] { thai20kLexicon.materialized() }
+  static var thai50kWords: [String] { thai50kLexicon.materialized() }
+  static var thai60kWords: [String] { thai60kLexicon.materialized() }
+
   // Typebar-authored Nepali starter words exercise normal macOS composed-text
   // input without importing a third-party or reference word list.
   static let nepaliWords = [
@@ -6332,6 +6461,30 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: thaiWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .thai1k:
+      return prompt(
+        tokens: count, lexicon: thai1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .thai5k:
+      return prompt(
+        tokens: count, lexicon: thai5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .thai10k:
+      return prompt(
+        tokens: count, lexicon: thai10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .thai20k:
+      return prompt(
+        tokens: count, lexicon: thai20kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .thai50k:
+      return prompt(
+        tokens: count, lexicon: thai50kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .thai60k:
+      return prompt(
+        tokens: count, lexicon: thai60kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .nepali:
       return prompt(
         tokens: count, lexicon: nepaliWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -6976,6 +7129,12 @@ enum StarterLexicon {
     case .bangla: (banglaWords, [",", ".", "!", "?"])
     case .banglaLetters: (banglaLetterWords, ["।", ",", "!", "?"])
     case .thai: (thaiWords, [",", ".", "!", "?"])
+    case .thai1k: (thai1kWords, [",", ".", "!", "?"])
+    case .thai5k: (thai5kWords, [",", ".", "!", "?"])
+    case .thai10k: (thai10kWords, [",", ".", "!", "?"])
+    case .thai20k: (thai20kWords, [",", ".", "!", "?"])
+    case .thai50k: (thai50kWords, [",", ".", "!", "?"])
+    case .thai60k: (thai60kWords, [",", ".", "!", "?"])
     case .nepali: (nepaliWords, [",", ".", "!", "?"])
     case .nepaliRomanized: (nepaliRomanizedWords, [",", ".", "!", "?"])
     case .kannada: (kannadaWords, [",", ".", "!", "?"])
@@ -7264,6 +7423,12 @@ extension TypingLanguage {
     case .bangla: StarterLexicon.banglaWords
     case .banglaLetters: StarterLexicon.banglaLetterWords
     case .thai: StarterLexicon.thaiWords
+    case .thai1k: StarterLexicon.thai1kWords
+    case .thai5k: StarterLexicon.thai5kWords
+    case .thai10k: StarterLexicon.thai10kWords
+    case .thai20k: StarterLexicon.thai20kWords
+    case .thai50k: StarterLexicon.thai50kWords
+    case .thai60k: StarterLexicon.thai60kWords
     case .nepali: StarterLexicon.nepaliWords
     case .nepaliRomanized: StarterLexicon.nepaliRomanizedWords
     case .kannada: StarterLexicon.kannadaWords
@@ -7388,6 +7553,12 @@ extension TypingLanguage {
     case .arabicEgypt1k: StarterLexicon.arabicEgypt1kLexicon
     case .korean1k: StarterLexicon.korean1kLexicon
     case .korean5k: StarterLexicon.korean5kLexicon
+    case .thai1k: StarterLexicon.thai1kLexicon
+    case .thai5k: StarterLexicon.thai5kLexicon
+    case .thai10k: StarterLexicon.thai10kLexicon
+    case .thai20k: StarterLexicon.thai20kLexicon
+    case .thai50k: StarterLexicon.thai50kLexicon
+    case .thai60k: StarterLexicon.thai60kLexicon
     case .english1k: StarterLexicon.english1kLexicon
     case .english5k: StarterLexicon.english5kLexicon
     case .english10k: StarterLexicon.english10kLexicon
@@ -7517,7 +7688,9 @@ extension TypingLanguage {
       .englishMedical,
       .englishShakespearean,
       .pigLatin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
-      .tamil, .hindi, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .kannada, .telugu, .malayalam,
+      .tamil, .hindi, .gujarati, .bangla, .banglaLetters,
+      .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k,
+      .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .bulgarianLatin,
       .khmer,
@@ -7693,6 +7866,12 @@ extension TypingLanguage {
     case .bangla: "বাংলা"
     case .banglaLetters: "বাংলা · অক্ষর"
     case .thai: "ไทย"
+    case .thai1k: "ไทย · 1k · Typebar"
+    case .thai5k: "ไทย · 5k · Typebar"
+    case .thai10k: "ไทย · 10k · Typebar"
+    case .thai20k: "ไทย · 20k · Typebar"
+    case .thai50k: "ไทย · 50k · Typebar"
+    case .thai60k: "ไทย · 60k · Typebar"
     case .nepali: "नेपाली"
     case .nepaliRomanized: "Nepali (Romanized)"
     case .kannada: "ಕನ್ನಡ"

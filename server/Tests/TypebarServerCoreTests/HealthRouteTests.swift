@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 211)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 217)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4200,6 +4200,12 @@ final class HealthRouteTests: XCTestCase {
       ("arabicEgypt1k", "التمرين المصري المحلي بيوسع الاختيارات بهدوء."),
       ("korean1k", "작은 한글 단계는 차분한 연습 흐름을 만든다."),
       ("korean5k", "넓은 한글 단계도 요청한 항목만 지역에서 만든다."),
+      ("thai1k", "ช่วงฝึกภาษาไทยขนาดเล็กมีจังหวะชัดเจน"),
+      ("thai5k", "ดัชนีภาษาไทยชุดที่สองขยายการฝึกอย่างสงบ"),
+      ("thai10k", "ชุดภาษาไทยหนึ่งหมื่นตำแหน่งสร้างเนื้อหาในเครื่อง"),
+      ("thai20k", "ช่วงฝึกภาษาไทยขนาดใหญ่ยังมีเอกลักษณ์แยกกัน"),
+      ("thai50k", "ตัวสร้างภาษาไทยผลิตเฉพาะรายการที่ขอเท่านั้น"),
+      ("thai60k", "ดัชนีภาษาไทยชุดใหญ่สุดยังทำงานอย่างมีประสิทธิภาพ"),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

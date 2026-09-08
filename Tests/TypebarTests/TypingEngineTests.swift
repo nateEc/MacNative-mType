@@ -8483,6 +8483,69 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testThaiScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)] = [
+      ("thai1k", 1_000, 2, 36, 1, 29, 844, 14, 9, 0, 23, 977),
+      ("thai5k", 5_000, 2, 52, 1, 46, 4_093, 48, 53, 0, 101, 4_899),
+      ("thai10k", 10_000, 2, 68, 1, 56, 8_193, 91, 97, 1, 188, 9_812),
+      ("thai20k", 18_737, 1, 30, 1, 21, 13_543, 2, 39, 0, 41, 18_696),
+      ("thai50k", 50_000, 1, 81, 1, 64, 40_861, 428, 476, 7, 904, 49_096),
+      ("thai60k", 60_000, 1, 81, 1, 64, 49_086, 522, 589, 7, 1_110, 58_890),
+    ]
+
+    for (
+      rawValue, count, minimumScalars, maximumScalars, minimumCharacters,
+      maximumCharacters, marked, punctuation, spaces, digits, nonLetters, thaiOnly
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertFalse(language.usesRightToLeftPrompt)
+      XCTAssertFalse(language.usesJoiningScriptPrompt)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertFalse(language.supportsLazyLatinInput)
+      XCTAssertTrue(language.supportsCapsLockWarning)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "th")
+      XCTAssertEqual(language.speechLocaleIdentifier, "th-TH")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.unicodeScalars.count).min(), minimumScalars)
+      XCTAssertEqual(words.lazy.map(\.unicodeScalars.count).max(), maximumScalars)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimumCharacters)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximumCharacters)
+      XCTAssertEqual(words.filter { word in
+        word.unicodeScalars.contains { scalar in
+          scalar.value == 0x0E31 || (0x0E34...0x0E3A).contains(scalar.value)
+            || (0x0E47...0x0E4E).contains(scalar.value)
+        }
+      }.count, marked)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isNumber) }.count, digits)
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, nonLetters)
+      XCTAssertEqual(words.filter { word in
+        word.unicodeScalars.allSatisfy { (0x0E00...0x0E7F).contains($0.value) }
+      }.count, thaiOnly)
+      XCTAssertTrue(words.allSatisfy { $0.unicodeScalars.contains(where: { !$0.isASCII }) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+      XCTAssertGreaterThanOrEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ").count,
+        25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
   func testGermanScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("german1k", 988, 2, 17, 415, 11, 3, 8, 109),
