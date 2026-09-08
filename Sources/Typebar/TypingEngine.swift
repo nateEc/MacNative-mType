@@ -221,6 +221,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case latin
   case loremIpsum
   case git
+  case twitchEmotes
   case friulian
   case malagasy
   case welsh
@@ -3886,6 +3887,20 @@ enum StarterLexicon {
     "remote-tracking-ref",
   ]
 
+  // Fictional streaming emote names authored for Typebar. They preserve the
+  // case-sensitive, single-token typing shape without importing platform
+  // emote names, chat data, images, or reference word values.
+  static let twitchEmoteWords = [
+    "TypeHype", "KeyJam", "WpmWave", "SwiftSmile", "CocoaClap", "MacMirth", "PixelParty", "CursorDance", "SpaceSpark", "EnterRoar",
+    "TabTada", "ShiftShine", "CapsCalm", "OptionOrbit", "CommandComet", "DeleteDodge", "EscapeEcho", "ReturnRush", "FocusFox", "RhythmRay",
+    "AccuracyAce", "StreakStar", "SpeedSprout", "QuietQuokka", "HappyHeron", "CozyKoala", "BrightBadger", "NimbleNewt", "JollyJay", "LaughingLynx",
+    "GiddyGecko", "ChillChamois", "BravoBear", "HoorayHare", "WowWalrus", "NeatNarwhal", "ReadyRobin", "ZippyZebra", "MightyMoth", "SunnySeal",
+    "TinyTiger", "CalmCrab", "BoldBee", "FreshFrog", "QuickQuail", "CleverCrow", "LuckyLlama", "GrandGoat", "ProudPanda", "MerryMouse",
+    "KeyGlow", "TypeDash", "WpmZoom", "SwiftSip", "CocoaWave", "MacBounce", "PixelPop", "CursorHop", "SpaceSpin", "EnterDash",
+    "Key_Hype", "Type_Tada", "WPM_Wave", "Swift_Smile", "Cocoa_Clap", "Mac_Mirth", "WPM100", "Key2Win", "Type4Joy", "GG2026",
+    "Type:)", "Key:D", "Wpm<3", "Chat:)", "Focus:D", "Speed<3", "HypeMode", "CheerLoop", "StreamGlow", "RaidReady",
+  ]
+
   // Typebar-authored Friulian starter words provide a compact local practice
   // vocabulary without importing the reference dictionary or word list.
   static let friulianWords = [
@@ -5013,6 +5028,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: gitWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .twitchEmotes:
+      return prompt(
+        tokens: count, lexicon: twitchEmoteWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .friulian:
       return prompt(
         tokens: count, lexicon: friulianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5610,6 +5629,7 @@ enum StarterLexicon {
     case .latin: (latinWords, [",", ".", "!", "?"])
     case .loremIpsum: (loremIpsumWords, [",", ".", "!", "?"])
     case .git: (gitWords, [",", ".", "!", "?"])
+    case .twitchEmotes: (twitchEmoteWords, [",", ".", "!", "?"])
     case .friulian: (friulianWords, [",", ".", "!", "?"])
     case .malagasy: (malagasyWords, [",", ".", "!", "?"])
     case .welsh: (welshWords, [",", ".", "!", "?"])
@@ -5833,6 +5853,7 @@ extension TypingLanguage {
     case .latin: StarterLexicon.latinWords
     case .loremIpsum: StarterLexicon.loremIpsumWords
     case .git: StarterLexicon.gitWords
+    case .twitchEmotes: StarterLexicon.twitchEmoteWords
     case .friulian: StarterLexicon.friulianWords
     case .malagasy: StarterLexicon.malagasyWords
     case .welsh: StarterLexicon.welshWords
@@ -5981,7 +6002,7 @@ extension TypingLanguage {
     .oldEnglish,
     .kokanu,
     .likanu,
-    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .twitchEmotes, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .frenchBitoduc, .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
     .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianEndings,
@@ -6044,7 +6065,7 @@ extension TypingLanguage {
     case .english, .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical,
       .englishShakespearean,
-      .pigLatin, .loremIpsum, .git, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
+      .pigLatin, .loremIpsum, .git, .twitchEmotes, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
       .tamil, .hindi, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .bulgarianLatin,
@@ -6140,6 +6161,7 @@ extension TypingLanguage {
     case .latin: "Latina"
     case .loremIpsum: "Lorem Ipsum · Typebar"
     case .git: "Git"
+    case .twitchEmotes: "Streaming Emotes · Typebar"
     case .friulian: "Friulian"
     case .malagasy: "Malagasy"
     case .welsh: "Cymraeg"

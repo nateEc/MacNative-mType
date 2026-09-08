@@ -4455,6 +4455,34 @@ enum OfflineContent {
       language: .git,
       length: .extended
     ),
+    OfflineQuote(
+      id: "stream-emotes-ready",
+      title: "Ready signal",
+      text: "TypeHype KeyJam WpmWave SwiftSmile CocoaClap MacMirth",
+      language: .twitchEmotes,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "stream-emotes-cheer",
+      title: "Cheer loop",
+      text: "PixelParty CursorDance SpaceSpark EnterRoar TabTada ShiftShine CapsCalm OptionOrbit CommandComet DeleteDodge",
+      language: .twitchEmotes,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "stream-emotes-rhythm",
+      title: "Chat rhythm",
+      text: "FocusFox RhythmRay AccuracyAce StreakStar SpeedSprout QuietQuokka HappyHeron CozyKoala BrightBadger NimbleNewt JollyJay LaughingLynx GiddyGecko ChillChamois",
+      language: .twitchEmotes,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "stream-emotes-finale",
+      title: "Finale wave",
+      text: "BravoBear HoorayHare WowWalrus NeatNarwhal ReadyRobin ZippyZebra MightyMoth SunnySeal TinyTiger CalmCrab BoldBee FreshFrog QuickQuail CleverCrow LuckyLlama GrandGoat ProudPanda MerryMouse KeyGlow TypeDash WpmZoom SwiftSip CocoaWave MacBounce PixelPop CursorHop SpaceSpin EnterDash StreamGlow RaidReady",
+      language: .twitchEmotes,
+      length: .extended
+    ),
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {

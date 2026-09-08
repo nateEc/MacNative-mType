@@ -570,6 +570,7 @@
     "sinhala": "sinhala",
     "latvian": "latvian",
     "maltese": "maltese",
+    "twitch_emotes": "twitchEmotes",
     "git": "git",
     "pig_latin": "pigLatin",
     "hindi": "hindi",
@@ -897,7 +898,6 @@
     "russian_contractions",
     "russian_contractions_1k",
     "tamil_old",
-    "twitch_emotes",
     "league_of_legends",
     "typing_of_the_dead",
     "pokemon_1k"

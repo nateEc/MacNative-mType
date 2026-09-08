@@ -7878,6 +7878,50 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(promptWords.isSubset(of: Set(words)))
   }
 
+  func testTwitchEmotesUsesOriginalCaseSensitiveStreamingTokens() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "twitchEmotes"))
+    let words = language.ownedPracticeWords()
+
+    XCTAssertEqual(language.displayName, "Streaming Emotes · Typebar")
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertEqual(words.count, 80)
+    XCTAssertEqual(Set(words).count, words.count)
+    XCTAssertGreaterThanOrEqual(words.filter { $0.range(of: "[A-Z]", options: .regularExpression) != nil }.count, 70)
+    XCTAssertGreaterThanOrEqual(words.filter { $0.range(of: "[0-9]", options: .regularExpression) != nil }.count, 4)
+    XCTAssertGreaterThanOrEqual(words.filter { $0.contains("_") }.count, 6)
+    XCTAssertGreaterThanOrEqual(words.filter { $0.range(of: "[:()<>]", options: .regularExpression) != nil }.count, 6)
+    XCTAssertTrue(
+      words.allSatisfy {
+        (2...15).contains($0.count)
+          && !$0.contains(where: \.isWhitespace)
+          && $0.range(of: "^[A-Za-z0-9_:()<>]+$", options: .regularExpression) != nil
+      })
+
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let quotes = OfflineContent.quotes(for: language, length: length)
+      XCTAssertEqual(quotes.count, 1)
+      XCTAssertEqual(quotes.first?.language, language)
+    }
+
+    let promptWords = Set(
+      OfflineContent.generatedPrompt(wordCount: 80, language: language).split(separator: " ")
+        .map(String.init))
+    XCTAssertTrue(promptWords.isSubset(of: Set(words)))
+
+    let punctuatedWords = OfflineContent.generatedPrompt(
+      wordCount: 15, language: language,
+      contentOptions: ContentOptions(includePunctuation: true)
+    ).split(separator: " ")
+    XCTAssertEqual(punctuatedWords.count, 15)
+    XCTAssertTrue(punctuatedWords[0].hasSuffix(","))
+    XCTAssertTrue(punctuatedWords[7].hasSuffix("."))
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9094,6 +9138,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.latinWords,
       StarterLexicon.loremIpsumWords,
       StarterLexicon.gitWords,
+      StarterLexicon.twitchEmoteWords,
       StarterLexicon.friulianWords,
       StarterLexicon.malagasyWords,
       StarterLexicon.welshWords,
@@ -9189,7 +9234,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 146)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 147)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(

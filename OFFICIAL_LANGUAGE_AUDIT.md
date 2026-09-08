@@ -11,11 +11,11 @@
 
 `Compatibility/official-languages.json` 由 `Scripts/generate-official-language-audit.rb` 从固定提交的 schema ID 与 Typebar 本地枚举重新生成。生成器只读取 `packages/schemas/src/languages.ts` 和 `Sources/Typebar/TypingEngine.swift`，不读取 `frontend/static/languages/*.json`，因此清单只含标识和映射元数据，不含官方词表、引语、字体或标点内容。
 
-446 个官方 ID 当前严格分区为：226 个 Typebar 独立原生选择、213 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项），以及 7 个尚无原生选择的配置。7 个缺口是 `russian_contractions`、`russian_contractions_1k`、`tamil_old`、`twitch_emotes`、`league_of_legends`、`typing_of_the_dead` 和 `pokemon_1k`。因此当前语言面很广，但尚不能宣称官方配置选择完全等价。
+446 个官方 ID 当前严格分区为：227 个 Typebar 独立原生选择、213 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项），以及 6 个尚无原生选择的配置。6 个缺口是 `russian_contractions`、`russian_contractions_1k`、`tamil_old`、`league_of_legends`、`typing_of_the_dead` 和 `pokemon_1k`。因此当前语言面很广，但尚不能宣称官方配置选择完全等价。
 
 ## 已覆盖的原生语言面
 
-当前语言目录：156 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。156 个单语入口均支持 Typebar 自有引语；最新增加 Français · Bitoduc 独立选择。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
+当前语言目录：157 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。157 个单语入口均支持 Typebar 自有引语；最新增加 Streaming Emotes · Typebar 独立选择。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -46,13 +46,13 @@
 | `_1k`、`_5k`、`_10k` 等词表规模 | 不作为独立语言选择；以原创小型词流和可重复生成策略练习。 | 导入同规模词表会复制参考数据，且规模不是新的输入语义。 |
 | `*_romanized`、音译或脚本变体 | 仅在能提供清晰、稳定、原创的独立练习承诺时实现。 | 显示名称相近不代表同一内容、输入法或在线来源可安全共用。 |
 | 官方语言 JSON 的 `words`、字体和标点数据 | 不导入。 | 保持纯重写与许可边界清晰。 |
-| 7 个尚无原生选择的配置 | 不先占位；准确清单由机器总账固定。 | 每项要先确认可见语义、输入法、内容来源和服务端数据面；不能仅凭 ID 猜测实现。 |
+| 6 个尚无原生选择的配置 | 不先占位；准确清单由机器总账固定。 | 每项要先确认可见语义、输入法、内容来源和服务端数据面；不能仅凭 ID 猜测实现。 |
 
 ## 自动化守卫
 
-- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／226／213／7 守恒关系、分区互斥、7 个明确缺口、每个映射可解析以及 226 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
+- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／227／213／6 守恒关系、分区互斥、6 个明确缺口、每个映射可解析以及 227 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
-- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 146 个候选，并明确覆盖各专项语言与书写变体。
+- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 147 个候选，并明确覆盖各专项语言与书写变体。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜；Swiss German 以固定源码要求的“投稿拒绝、成绩接受”边界替代一般投稿路径。
 - Egyptian Arabic 审计读取 `arabic_egypt.json` 与 `arabic_egypt_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 RTL、连写和 `bcp47: ar-EG`，不定义 `noLazyMode` 或词频排序；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-EG` 朗读、手动可选简化输入和 Zipf 未知提示，并进入社区投稿、成绩及排行榜。
 - Moroccan Arabic 审计读取 `arabic_morocco.json` 的元数据，不读取其中词表或引语文本。它定义 RTL、连写、`orderedByFrequency: false` 和 `bcp47: ar-MA`，不定义 `noLazyMode`；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-MA` 朗读、手动可选简化输入和明确的 Zipf 不支持提示，并进入社区投稿、成绩及排行榜。
@@ -120,3 +120,4 @@
 - 2026-09-08 更正：当前单语总数为一百五十四种、默认／自选 LTR 多语候选为一百四十四种。新增 toki pona · ku suli 与 ku lili 独立选择；前者在 Typebar 自有基础集合上增加 15 个独立整理的核心词，后者使用 20 个与前者互斥的扩展词。四档文本只从 Typebar 自有 toki pona 文本派生独立身份；两项均保持固定 `noLazyMode`、缺省 `en`／`en-US`、LTR 空格词界和 Zipf 未知语义，并贯通混排与客户端／服务端数据面。未读取官方 ku 词值。
 - 2026-09-08 更正：当前单语总数为一百五十五种、默认／自选 LTR 多语候选为一百四十五种。官方引入提交 `7b6ed784813b4ad64941f8033df6a5dc5b070d52` 明确固定 `english_old` 配置表示 Old English；结构审计只读取名称、词数、唯一性、长度和字符集合，不读取词值。Typebar 使用 79 个独立编写、仅含 ASCII 小写字母与 `æ/þ` 的基础词及四档原创文本，按固定缺省元数据走 LTR 空格词界、`en`／`en-US`、可选简化输入和 Zipf 未知语义，并贯通混排、社区投稿、撤回、成绩和排行榜。
 - 2026-09-08 更正：当前单语总数为一百五十六种、默认／自选 LTR 多语候选为一百四十六种。官方 PR `#6400` 明确 `french_bitoduc` 是把英语科技词幽默改写为法语替代词的变体；固定配置只定义 `bcp47: fr-fr`，结构审计仅确认 138 个唯一单 token、4–16 字符、14 个连字符词及 `çèéêîô` 扩展字符，不读取词值。Typebar 使用 72 个独立编写的科技法语与趣味复合词及四档原创文本，走 LTR 空格词界、`fr`／`fr-fr`、可选简化输入与 Zipf 未知语义，并贯通混排、社区投稿、撤回、成绩和排行榜；不读取 bitoduc.fr 内容。
+- 2026-09-08 更正：当前单语总数为一百五十七种、默认／自选 LTR 多语候选为一百四十七种。固定 `twitch_emotes` 配置只定义 `noLazyMode: true`；结构审计仅确认 201 个唯一、2–15 字符、无空格 token，其中 194 个含大写、8 个含数字、10 个含符号，不读取名称值。Typebar 使用 80 个完全虚构的流媒体表情 token 与四档自有 token 流，保留大小写、数字、下划线及轻量表情符号练习，按缺省 `en`／`en-US`、禁用简化输入和 Zipf 未知语义贯通混排与全部数据面；不复制 Twitch 名称、聊天数据或资产。
