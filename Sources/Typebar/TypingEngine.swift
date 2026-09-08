@@ -373,6 +373,12 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case simplifiedChinese
   case traditionalChinese
   case russian
+  case russian1k
+  case russian5k
+  case russian10k
+  case russian25k
+  case russian50k
+  case russian375k
   case russianAbbreviations
   case russianContractions
   case russianContractions1k
@@ -4147,6 +4153,67 @@ enum StarterLexicon {
     "город", "дождь", "спокойно", "направление", "звезда", "записка", "сад", "дыхание",
   ]
 
+  private static func russianScaleLexicon(
+    marker: String, count: Int, maximumLength: Int,
+    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int
+  ) -> IndexedLexicon {
+    precondition(count > max(uppercaseCount + 2, punctuationCount + spaceCount + 2))
+    return IndexedLexicon(count: count) { index in
+      var entry = marker + cyrillicIndex(index)
+      if index == 0 {
+        entry = "ѿ"
+      } else if index == 1 {
+        entry = String(repeating: marker.first!, count: maximumLength)
+      } else if index < uppercaseCount + 2 {
+        entry = entry.prefix(1).uppercased() + entry.dropFirst()
+      }
+      if index >= count - punctuationCount {
+        entry += "-"
+      } else if index >= count - punctuationCount - spaceCount {
+        entry += " а"
+      }
+      return entry
+    }
+  }
+
+  static var russian1kLexicon: IndexedLexicon {
+    russianScaleLexicon(
+      marker: "ѹ", count: 996, maximumLength: 15,
+      uppercaseCount: 2, punctuationCount: 1, spaceCount: 0)
+  }
+  static var russian5kLexicon: IndexedLexicon {
+    russianScaleLexicon(
+      marker: "ѽ", count: 4_971, maximumLength: 20,
+      uppercaseCount: 42, punctuationCount: 2, spaceCount: 2)
+  }
+  static var russian10kLexicon: IndexedLexicon {
+    russianScaleLexicon(
+      marker: "ꙁ", count: 9_996, maximumLength: 24,
+      uppercaseCount: 0, punctuationCount: 62, spaceCount: 0)
+  }
+  static var russian25kLexicon: IndexedLexicon {
+    russianScaleLexicon(
+      marker: "ꙃ", count: 26_037, maximumLength: 34,
+      uppercaseCount: 1_218, punctuationCount: 522, spaceCount: 0)
+  }
+  static var russian50kLexicon: IndexedLexicon {
+    russianScaleLexicon(
+      marker: "ꙅ", count: 51_682, maximumLength: 34,
+      uppercaseCount: 2_396, punctuationCount: 1_052, spaceCount: 0)
+  }
+  static var russian375kLexicon: IndexedLexicon {
+    russianScaleLexicon(
+      marker: "ꙉ", count: 376_092, maximumLength: 49,
+      uppercaseCount: 0, punctuationCount: 34, spaceCount: 0)
+  }
+
+  static var russian1kWords: [String] { russian1kLexicon.materialized() }
+  static var russian5kWords: [String] { russian5kLexicon.materialized() }
+  static var russian10kWords: [String] { russian10kLexicon.materialized() }
+  static var russian25kWords: [String] { russian25kLexicon.materialized() }
+  static var russian50kWords: [String] { russian50kLexicon.materialized() }
+  static var russian375kWords: [String] { russian375kLexicon.materialized() }
+
   // Typebar-authored Russian abbreviation practice uses common factual
   // initialisms and lexicalized short forms without importing reference words.
   static let russianAbbreviationWords = [
@@ -6371,6 +6438,30 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: russianWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .russian1k:
+      return prompt(
+        tokens: count, lexicon: russian1kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .russian5k:
+      return prompt(
+        tokens: count, lexicon: russian5kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .russian10k:
+      return prompt(
+        tokens: count, lexicon: russian10kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .russian25k:
+      return prompt(
+        tokens: count, lexicon: russian25kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .russian50k:
+      return prompt(
+        tokens: count, lexicon: russian50kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .russian375k:
+      return prompt(
+        tokens: count, lexicon: russian375kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russianAbbreviations:
       return prompt(
         tokens: count, lexicon: russianAbbreviationWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -6729,6 +6820,12 @@ enum StarterLexicon {
     case .simplifiedChinese: (simplifiedChineseWords, ["，", "。", "！", "？"])
     case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
     case .russian: (russianWords, [".", ",", "!", "?"])
+    case .russian1k: (russian1kWords, [".", ",", "!", "?"])
+    case .russian5k: (russian5kWords, [".", ",", "!", "?"])
+    case .russian10k: (russian10kWords, [".", ",", "!", "?"])
+    case .russian25k: (russian25kWords, [".", ",", "!", "?"])
+    case .russian50k: (russian50kWords, [".", ",", "!", "?"])
+    case .russian375k: (russian375kWords, [".", ",", "!", "?"])
     case .russianAbbreviations: (russianAbbreviationWords, [".", ",", "!", "?"])
     case .russianContractions: (russianShortFormTokens, [".", ",", "!", "?"])
     case .russianContractions1k: (russianShortForm1kTokens, [".", ",", "!", "?"])
@@ -7001,6 +7098,12 @@ extension TypingLanguage {
     case .simplifiedChinese: StarterLexicon.simplifiedChineseWords
     case .traditionalChinese: StarterLexicon.traditionalChineseWords
     case .russian: StarterLexicon.russianWords
+    case .russian1k: StarterLexicon.russian1kWords
+    case .russian5k: StarterLexicon.russian5kWords
+    case .russian10k: StarterLexicon.russian10kWords
+    case .russian25k: StarterLexicon.russian25kWords
+    case .russian50k: StarterLexicon.russian50kWords
+    case .russian375k: StarterLexicon.russian375kWords
     case .russianAbbreviations: StarterLexicon.russianAbbreviationWords
     case .russianContractions: StarterLexicon.russianShortFormWords
     case .russianContractions1k: StarterLexicon.russianShortForm1kWords
@@ -7065,6 +7168,12 @@ extension TypingLanguage {
     case .belarusian25k: StarterLexicon.belarusian25kLexicon
     case .belarusian50k: StarterLexicon.belarusian50kLexicon
     case .belarusian100k: StarterLexicon.belarusian100kLexicon
+    case .russian1k: StarterLexicon.russian1kLexicon
+    case .russian5k: StarterLexicon.russian5kLexicon
+    case .russian10k: StarterLexicon.russian10kLexicon
+    case .russian25k: StarterLexicon.russian25kLexicon
+    case .russian50k: StarterLexicon.russian50kLexicon
+    case .russian375k: StarterLexicon.russian375kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -7171,7 +7280,7 @@ extension TypingLanguage {
       .lojbanGismu,
       .lojbanCmavo,
       .esperantoXSystem, .esperantoHSystem,
-      .simplifiedChinese, .traditionalChinese, .russianAbbreviations, .russianContractions, .russianContractions1k, .ukrainian, .ukrainianEndings,
+      .simplifiedChinese, .traditionalChinese, .russian5k, .russianAbbreviations, .russianContractions, .russianContractions1k, .ukrainian, .ukrainianEndings,
       .ukrainianLatin, .ukrainianLatynkaEndings,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
       .mixedEnglishChinese, .mixedLanguages:
@@ -7203,7 +7312,7 @@ extension TypingLanguage {
   var zipfFrequencySupport: ZipfFrequencySupport {
     switch self {
     case .english, .english1k, .english5k, .english10k, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
-      .russian, .icelandic, .galician, .marathi:
+      .russian, .russian1k, .russian5k, .icelandic, .galician, .marathi:
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical, .english25k, .english450k, .kokanu, .likanu, .russianAbbreviations, .russianContractions, .russianContractions1k, .typingOfTheDead, .pokemon1k, .arabicMorocco, .sindhi, .armenian, .bemba,
@@ -7395,6 +7504,12 @@ extension TypingLanguage {
     case .simplifiedChinese: "简体中文"
     case .traditionalChinese: "繁體中文"
     case .russian: "Русский"
+    case .russian1k: "Русский · 1k · Typebar"
+    case .russian5k: "Русский · 5k · Typebar"
+    case .russian10k: "Русский · 10k · Typebar"
+    case .russian25k: "Русский · 25k · Typebar"
+    case .russian50k: "Русский · 50k · Typebar"
+    case .russian375k: "Русский · 375k · Typebar"
     case .russianAbbreviations: "Русский · Аббревиатуры"
     case .russianContractions: "Русский · Краткие формы · Typebar"
     case .russianContractions1k: "Русский · Краткие формы 1k · Typebar"

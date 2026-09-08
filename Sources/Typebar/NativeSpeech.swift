@@ -129,7 +129,8 @@ extension TypingLanguage {
     case .portuguese, .portugueseAccents: "pt-PT"
     case .simplifiedChinese, .mixedEnglishChinese: "zh-CN"
     case .traditionalChinese: "zh-TW"
-    case .russian, .russianAbbreviations, .russianContractions, .russianContractions1k: "ru-RU"
+    case .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k,
+      .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k: "ru-RU"
     case .ukrainian, .ukrainianLatin: "uk-UA"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: "ja-JP"
     case .korean: "ko-KR"

@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 195)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 201)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4221,6 +4221,12 @@ final class HealthRouteTests: XCTestCase {
       ("belarusian25k", "Большая шкала захоўвае асобную беларускую тоеснасць."),
       ("belarusian50k", "Лакальны генератар стварае толькі патрэбныя элементы."),
       ("belarusian100k", "Найбольшы індэкс застаецца лакальным і эфектыўным."),
+      ("russian1k", "Каждый масштаб сохраняет собственную локальную идентичность."),
+      ("russian5k", "Локальный индекс постепенно расширяет диапазон упражнения."),
+      ("russian10k", "Десять тысяч позиций обходятся без импортированного списка."),
+      ("russian25k", "Большой масштаб сохраняет отдельную русскую идентичность."),
+      ("russian50k", "Локальный генератор создаёт только нужные элементы."),
+      ("russian375k", "Самый крупный индекс остаётся локальным и эффективным."),
       ("englishCommonlyMisspelled", "Careful writers accommodate every necessary letter."),
       ("englishContractions", "Don't hurry; you'll type clearly."),
       ("englishDoubleLetter", "Small letters still need smooth pressure."),

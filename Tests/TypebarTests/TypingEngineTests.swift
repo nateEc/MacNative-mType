@@ -8263,6 +8263,9 @@ final class TypingEngineTests: XCTestCase {
     let largestBelarusianScalePrompt = StarterLexicon.prompt(
       wordCount: 25, language: .belarusian100k, contentOptions: ContentOptions())
     XCTAssertEqual(largestBelarusianScalePrompt.split(separator: " ").count, 25)
+    let largestRussianScalePrompt = StarterLexicon.prompt(
+      wordCount: 25, language: .russian375k, contentOptions: ContentOptions())
+    XCTAssertGreaterThanOrEqual(largestRussianScalePrompt.split(separator: " ").count, 25)
   }
 
   func testEnglish450kWeakSpotUsesTheIndexedCorpus() throws {
@@ -8544,6 +8547,52 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
       XCTAssertEqual(prompt.split(separator: " ").count, 25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
+  func testRussianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int, Int, Int, Int, Bool, ZipfFrequencySupport)] = [
+      ("russian1k", 996, 1, 15, 2, 1, 0, true, .supported),
+      ("russian5k", 4_971, 1, 20, 42, 2, 2, false, .supported),
+      ("russian10k", 9_996, 1, 24, 0, 62, 0, true, .unknown),
+      ("russian25k", 26_037, 1, 34, 1_218, 522, 0, true, .unknown),
+      ("russian50k", 51_682, 1, 34, 2_396, 1_052, 0, true, .unknown),
+      ("russian375k", 376_092, 1, 49, 0, 34, 0, true, .unknown),
+    ]
+
+    for (rawValue, count, minimum, maximum, uppercase, punctuation, spaces, supportsLazyInput, zipf) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertEqual(language.displayName, "Русский · \(rawValue.dropFirst("russian".count)) · Typebar")
+      XCTAssertEqual(language.supportsLazyLatinInput, supportsLazyInput)
+      XCTAssertEqual(language.zipfFrequencySupport, zipf)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ru")
+      XCTAssertEqual(language.speechLocaleIdentifier, "ru-RU")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercase)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, punctuation + spaces)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, count)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+
+      let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+      XCTAssertGreaterThanOrEqual(prompt.split(separator: " ").count, 25)
       for length in [QuoteLength.short, .medium, .long, .extended] {
         XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
       }
