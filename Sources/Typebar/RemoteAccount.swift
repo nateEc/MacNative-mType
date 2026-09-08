@@ -908,14 +908,47 @@ enum RemoteNotificationKind: String, Codable, Sendable {
     case connectionRequest
     case connectionAccepted
     case directMessage
+    case badgeUnlocked
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.singleValueContainer()
+        self = Self(rawValue: try values.decode(String.self)) ?? .unknown
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.singleValueContainer()
+        try values.encode(rawValue)
+    }
 }
 
 struct RemoteNotification: Codable, Identifiable, Sendable {
     let id: UUID
     let kind: RemoteNotificationKind
     let actor: RemotePublicProfile
+    let badge: RemotePublicProfileBadge?
     let createdAt: Date
     let readAt: Date?
+
+    var presentationTitle: String {
+        switch kind {
+        case .connectionRequest: "\(actor.displayName) 想与你成为好友"
+        case .connectionAccepted: "\(actor.displayName) 接受了你的好友请求"
+        case .directMessage: "\(actor.displayName) 发来了一条新消息"
+        case .badgeUnlocked: badge.map { "已解锁徽章：\($0.title)" } ?? "已解锁一枚新徽章"
+        case .unknown: "收到一条新通知"
+        }
+    }
+
+    var presentationSystemImage: String {
+        switch kind {
+        case .connectionRequest: "person.badge.plus"
+        case .connectionAccepted: "person.2.fill"
+        case .directMessage: "bubble.left.fill"
+        case .badgeUnlocked: badge?.systemImage ?? "medal.fill"
+        case .unknown: "bell.fill"
+        }
+    }
 }
 
 struct RemoteNotificationsResponse: Codable, Sendable {

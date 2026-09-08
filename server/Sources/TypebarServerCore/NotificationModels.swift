@@ -5,12 +5,14 @@ public enum TypebarNotificationKind: String, Content, Equatable, Hashable {
     case connectionRequest
     case connectionAccepted
     case directMessage
+    case badgeUnlocked
 }
 
 public struct TypebarNotificationResponse: Content, Equatable, Identifiable {
     public let id: UUID
     public let kind: TypebarNotificationKind
     public let actor: PublicProfileResponse
+    public let badge: PublicProfileBadge?
     public let createdAt: Date
     public let readAt: Date?
 }

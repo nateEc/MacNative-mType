@@ -254,7 +254,7 @@
 - Hyperroll、Anishtro、Dusk、Panini 与 Panini Wide 自动化测试覆盖全部 ANSI Base/Shift 物理键、AltGr 基础层回退、双拇指提示、物理 Space 字母输出、Panini 宽位差异、反查、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
 - Sword、OPY、Ergo Split 46、Gralmak 与 Vitrimak 自动化测试覆盖全部 ANSI Base/Shift 物理键、AltGr 基础层回退、特殊字母与符号、可用反查、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
 - Persian Farsi/Standard Colemak、Miligram、Nokwts 与 Vylet v4 自动化测试覆盖全部 ANSI/ISO Base/Shift 物理键、组合音标、ZWNJ、数字行策略、AltGr 基础层回退、可用反查、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
-- 完整客户端 `swift test` 通过 370 项、独立 Vapor 服务 `swift test` 通过 70 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 完整客户端 `swift test` 通过 371 项、独立 Vapor 服务 `swift test` 通过 71 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
 - 无限测试自动化覆盖 time、words 与自定义循环的 0 值配置、正向秒数/词数、提示扩展、无自动终止、Bail Out、长测试快捷键、预设/分享往返、旧配置冲突迁移及固定参考八项 `noInfiniteDuration` 修饰器；无限结果不保存、不上传，服务端继续拒绝 0 值正式成绩。
 - 结果字符分类自动化覆盖提前提交造成的跳过、词尾额外输入、强制物理键位错误、禅模式、旧归档保守回退、SwiftData 往返与 CSV 四列导出；实现从 Typebar 原生最终输入映射派生，不读取或导入参考结果逻辑、代码或资产。
 - 原生按键时序自动化覆盖 AppKit keyDown/repeat/keyUp 通路、闭合按住样本、连续按下间隔、多键重叠总时长、均值/总体标准差、未配对与结束边界、SwiftData/归档兼容和 CSV 导出；仅保存匿名时序，不复制参考事件代码或上传键码。

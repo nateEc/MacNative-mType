@@ -785,8 +785,37 @@ public actor AuthStore {
     let recipientID: UUID
     let actorID: UUID
     let kind: TypebarNotificationKind
+    let badgeID: String?
     let createdAt: Date
     var readAt: Date?
+
+    private enum CodingKeys: String, CodingKey {
+      case id, recipientID, actorID, kind, badgeID, createdAt, readAt
+    }
+
+    init(
+      id: UUID, recipientID: UUID, actorID: UUID, kind: TypebarNotificationKind,
+      badgeID: String? = nil, createdAt: Date, readAt: Date?
+    ) {
+      self.id = id
+      self.recipientID = recipientID
+      self.actorID = actorID
+      self.kind = kind
+      self.badgeID = badgeID
+      self.createdAt = createdAt
+      self.readAt = readAt
+    }
+
+    init(from decoder: Decoder) throws {
+      let values = try decoder.container(keyedBy: CodingKeys.self)
+      id = try values.decode(UUID.self, forKey: .id)
+      recipientID = try values.decode(UUID.self, forKey: .recipientID)
+      actorID = try values.decode(UUID.self, forKey: .actorID)
+      kind = try values.decode(TypebarNotificationKind.self, forKey: .kind)
+      badgeID = try values.decodeIfPresent(String.self, forKey: .badgeID)
+      createdAt = try values.decode(Date.self, forKey: .createdAt)
+      readAt = try values.decodeIfPresent(Date.self, forKey: .readAt)
+    }
   }
 
   private struct StoredProfileReport: Codable {
@@ -1844,6 +1873,7 @@ public actor AuthStore {
       else { return nil }
       return .init(
         id: notification.id, kind: notification.kind, actor: publicProfile(for: actor),
+        badge: notification.badgeID.flatMap(Self.publicBadge),
         createdAt: notification.createdAt, readAt: notification.readAt)
     }
     .sorted { $0.createdAt > $1.createdAt }
@@ -1874,6 +1904,7 @@ public actor AuthStore {
     }
     return .init(
       id: notification.id, kind: notification.kind, actor: publicProfile(for: actor),
+      badge: notification.badgeID.flatMap(Self.publicBadge),
       createdAt: notification.createdAt, readAt: notification.readAt)
   }
 
@@ -2314,20 +2345,30 @@ public actor AuthStore {
     let totalTypingSeconds = results.reduce(0.0) { partial, result in
       partial + max(0, result.finishedAt.timeIntervalSince(result.startedAt))
     }
-    var badges: [PublicProfileBadge] = []
+    var badgeIDs: [String] = []
     if !results.isEmpty {
-      badges.append(.init(id: "first-finish", title: "起步", systemImage: "flag.checkered"))
+      badgeIDs.append("first-finish")
     }
     if accurateRunExists {
-      badges.append(.init(id: "clear-key", title: "清晰按键", systemImage: "checkmark.seal"))
+      badgeIDs.append("clear-key")
     }
     if bestWPM >= 80 {
-      badges.append(.init(id: "swift-line", title: "迅捷一行", systemImage: "bolt"))
+      badgeIDs.append("swift-line")
     }
     if totalTypingSeconds >= 15 * 60 {
-      badges.append(.init(id: "steady-room", title: "稳定练习", systemImage: "timer"))
+      badgeIDs.append("steady-room")
     }
-    return badges
+    return badgeIDs.compactMap(Self.publicBadge)
+  }
+
+  private static func publicBadge(id: String) -> PublicProfileBadge? {
+    switch id {
+    case "first-finish": .init(id: id, title: "起步", systemImage: "flag.checkered")
+    case "clear-key": .init(id: id, title: "清晰按键", systemImage: "checkmark.seal")
+    case "swift-line": .init(id: id, title: "迅捷一行", systemImage: "bolt")
+    case "steady-room": .init(id: id, title: "稳定练习", systemImage: "timer")
+    default: nil
+    }
   }
 
   private func selectedPublicBadge(for user: StoredUser) -> PublicProfileBadge? {
@@ -2575,6 +2616,7 @@ public actor AuthStore {
     if state.results.contains(where: { $0.userID == user.id && $0.id == request.id }) {
       return resultSubmissionResponse(for: request, userID: user.id, now: now)
     }
+    let existingBadgeIDs = Set(availablePublicBadges(for: user.id).map(\.id))
     state.results.append(
       .init(
         id: request.id, userID: user.id, mode: request.mode, language: request.language,
@@ -2588,6 +2630,12 @@ public actor AuthStore {
       throw AuthStoreError.invalidAccessToken
     }
     state.users[userIndex].startedTestCount += request.restartCount + 1
+    for badge in availablePublicBadges(for: user.id) where !existingBadgeIDs.contains(badge.id) {
+      appendNotification(
+        .init(
+          id: UUID(), recipientID: user.id, actorID: user.id, kind: .badgeUnlocked,
+          badgeID: badge.id, createdAt: now, readAt: nil))
+    }
     try persist()
     return resultSubmissionResponse(for: request, userID: user.id, now: now)
   }

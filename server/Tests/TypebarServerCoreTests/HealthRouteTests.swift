@@ -2274,6 +2274,44 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertNil(deletedPublicProfile.selectedBadge)
   }
 
+  func testNewlyEarnedBadgesCreatePrivateIdempotentRewardNotifications() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 38_500)
+    let owner = try await store.register(
+      .init(email: "badge-owner@example.com", password: "a secure password", displayName: "Badge Owner"),
+      now: now)
+    let observer = try await store.register(
+      .init(email: "badge-observer@example.com", password: "a secure password", displayName: "Observer"),
+      now: now)
+    let firstResult = result(
+      id: UUID(), wpm: 40, accuracy: 100, durationSeconds: 10, finishedAt: now)
+
+    _ = try await store.submitResult(firstResult, accessToken: owner.accessToken, now: now)
+    var inbox = try await store.notifications(accessToken: owner.accessToken, now: now)
+    XCTAssertEqual(inbox.notifications.map(\.kind), [.badgeUnlocked])
+    XCTAssertEqual(inbox.notifications.compactMap(\.badge?.id), ["first-finish"])
+    XCTAssertEqual(inbox.notifications.first?.actor.id, owner.user.id)
+    XCTAssertEqual(inbox.unreadCount, 1)
+    let observerInbox = try await store.notifications(accessToken: observer.accessToken, now: now)
+    XCTAssertTrue(observerInbox.notifications.isEmpty)
+
+    _ = try await store.submitResult(firstResult, accessToken: owner.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 42, accuracy: 100, durationSeconds: 10, finishedAt: now),
+      accessToken: owner.accessToken, now: now)
+    inbox = try await store.notifications(accessToken: owner.accessToken, now: now)
+    XCTAssertEqual(inbox.notifications.compactMap(\.badge?.id), ["first-finish"])
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 98, durationSeconds: 15 * 60, finishedAt: now),
+      accessToken: owner.accessToken, now: now)
+    inbox = try await store.notifications(accessToken: owner.accessToken, now: now)
+    XCTAssertEqual(
+      Set(inbox.notifications.compactMap(\.badge?.id)),
+      Set(["first-finish", "clear-key", "swift-line", "steady-room"]))
+    XCTAssertEqual(inbox.notifications.count, 4)
+  }
+
   func testConnectionsSupportRequestsAcceptanceAndUserScopedLists() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let alice = try await store.register(

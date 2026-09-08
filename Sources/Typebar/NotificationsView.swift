@@ -14,7 +14,7 @@ struct NotificationsView: View {
         NavigationStack {
             Group {
                 if account.currentUser == nil {
-                    ContentUnavailableView("请先登录", systemImage: "bell.slash", description: Text("登录自建 Typebar 服务后可查看好友和私信通知。"))
+                    ContentUnavailableView("请先登录", systemImage: "bell.slash", description: Text("登录自建 Typebar 服务后可查看好友、私信和徽章奖励通知。"))
                 } else {
                     VStack(spacing: 0) {
                         HStack {
@@ -28,15 +28,15 @@ struct NotificationsView: View {
                         if notifications.isEmpty, !isLoading {
                             ContentUnavailableView(
                                 "还没有通知", systemImage: "bell",
-                                description: Text("好友关系和新私信会显示在这里。"))
+                                description: Text("好友关系、新私信和徽章奖励会显示在这里。"))
                         } else {
                             List(notifications) { notification in
                                 HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: icon(for: notification.kind))
+                                    Image(systemName: notification.presentationSystemImage)
                                         .foregroundStyle(notification.readAt == nil ? Color.accentColor : Color.secondary)
                                         .frame(width: 22)
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(title(for: notification))
+                                        Text(notification.presentationTitle)
                                             .font(notification.readAt == nil ? .body.weight(.semibold) : .body)
                                         Text(notification.createdAt, format: .dateTime.year().month().day().hour().minute())
                                             .font(.caption)
@@ -88,23 +88,7 @@ struct NotificationsView: View {
             Button("删除全部通知", role: .destructive) { deleteAll() }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("只会清空当前账户的通知，不会删除好友关系或私信。")
-        }
-    }
-
-    private func title(for notification: RemoteNotification) -> String {
-        switch notification.kind {
-        case .connectionRequest: "\(notification.actor.displayName) 想与你成为好友"
-        case .connectionAccepted: "\(notification.actor.displayName) 接受了你的好友请求"
-        case .directMessage: "\(notification.actor.displayName) 发来了一条新消息"
-        }
-    }
-
-    private func icon(for kind: RemoteNotificationKind) -> String {
-        switch kind {
-        case .connectionRequest: "person.badge.plus"
-        case .connectionAccepted: "person.2.fill"
-        case .directMessage: "bubble.left.fill"
+            Text("只会清空当前账户的通知，不会删除好友关系、私信或已解锁徽章。")
         }
     }
 

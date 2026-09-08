@@ -201,6 +201,32 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(current.maxCount, 100)
   }
 
+  func testBadgeRewardNotificationDecodesConcretePresentationWithoutBreakingLegacyKinds() throws {
+    let data = Data(
+      #"{"id":"00000000-0000-0000-0000-000000000012","kind":"badgeUnlocked","actor":{"id":"00000000-0000-0000-0000-000000000013","displayName":"Owner","joinedAt":0,"completedResultCount":1,"bestWPM":80},"badge":{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"},"createdAt":0,"readAt":null}"#.utf8)
+    let notification = try JSONDecoder().decode(RemoteNotification.self, from: data)
+
+    XCTAssertEqual(notification.kind, .badgeUnlocked)
+    XCTAssertEqual(notification.badge?.id, "swift-line")
+    XCTAssertEqual(notification.presentationTitle, "已解锁徽章：迅捷一行")
+    XCTAssertEqual(notification.presentationSystemImage, "bolt")
+
+    let legacy = try JSONDecoder().decode(
+      RemoteNotification.self,
+      from: Data(
+        #"{"id":"00000000-0000-0000-0000-000000000014","kind":"connectionRequest","actor":{"id":"00000000-0000-0000-0000-000000000015","displayName":"Friend","joinedAt":0,"completedResultCount":0,"bestWPM":0},"createdAt":0,"readAt":null}"#.utf8))
+    XCTAssertEqual(legacy.presentationTitle, "Friend 想与你成为好友")
+    XCTAssertEqual(legacy.presentationSystemImage, "person.badge.plus")
+
+    let future = try JSONDecoder().decode(
+      RemoteNotification.self,
+      from: Data(
+        #"{"id":"00000000-0000-0000-0000-000000000016","kind":"futureReward","actor":{"id":"00000000-0000-0000-0000-000000000017","displayName":"Future","joinedAt":0,"completedResultCount":0,"bestWPM":0},"createdAt":0,"readAt":null}"#.utf8))
+    XCTAssertEqual(future.kind, .unknown)
+    XCTAssertEqual(future.presentationTitle, "收到一条新通知")
+    XCTAssertEqual(future.presentationSystemImage, "bell.fill")
+  }
+
   func testRemoteAccountUserDefaultsLegacyServersToPasswordAndDecodesOAuthMethods() throws {
     let legacy = try JSONDecoder().decode(
       RemoteAccountUser.self,
