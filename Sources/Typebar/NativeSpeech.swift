@@ -24,6 +24,7 @@ extension TypingLanguage {
     if isCodeLanguage { return "en-US" }
     return switch self {
     case .english, .englishFiveLetter: "en-US"
+    case .kokanu: "xxs-Lat"
     case .pigLatin, .loremIpsum: "en-US"
     case .spanish: "es-ES"
     case .german: "de-DE"

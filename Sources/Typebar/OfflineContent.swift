@@ -184,6 +184,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "kokanu-kota-wiki",
+      title: "kota wiki",
+      text: "mi le kota wiki ki tu. tu le wisan in mi un ja.",
+      language: .kokanu,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "kokanu-pata-jan",
+      title: "pata jan",
+      text: "men mi le pata in pata jan. ja le teka in kuwosi sepo un pawo hunsi.",
+      language: .kokanu,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "kokanu-wisan-tope",
+      title: "wisan tope",
+      text: "mi le lo pi tope jan un tu le kota ki mi. men ja le wisan in pawo kusa, un mi le teka in kuwosi wanku. usen le kanisa wiki in konen.",
+      language: .kokanu,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "kokanu-pumi-patun",
+      title: "pumi patun",
+      text: "men mi le lo pi pumi patun wija pata jan. tu le kota wiki ki mi, un ja le wisan in konen sikin. men usen le teka in kuwosi sepo un ukama. mi le no makan wiki; mi le pata in pata, le kanisa in tope jan, un le lo pi pawo hunsi. ja le kota ki tu un mi, un usen le wisan in usen.",
+      language: .kokanu,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "paso-claro",
       title: "Paso claro",
       text: "Un paso pequeño y bien elegido puede abrir una mañana entera de trabajo tranquilo.",

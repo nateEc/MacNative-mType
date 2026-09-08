@@ -198,6 +198,7 @@ extension Difficulty {
 enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
   case englishFiveLetter
+  case kokanu
   case pigLatin
   case spanish
   case german
@@ -3465,6 +3466,15 @@ enum StarterLexicon {
     "learn", "write", "clear", "paths", "hands", "lines", "shape", "steps",
   ]
 
+  // Selected from the public Kokanu vocabulary and arranged independently for
+  // Typebar practice; no reference-project word list is read or imported.
+  static let kokanuWords = [
+    "mi", "tu", "ja", "sa", "usen", "le", "o", "men", "in", "ki", "wija", "no",
+    "un", "he", "lo", "makan", "kota", "kuwosi", "ukama", "moto", "lun", "tajali",
+    "wiki", "nin", "tope", "pawo", "kusa", "patun", "pumi", "sepo", "wanku", "wisan",
+    "teka", "kumi", "pulusi", "pansin", "sikin", "konen", "wi", "mu", "kanisa", "tiku",
+  ]
+
   // Pig Latin is deterministically derived from Typebar's own English starter
   // corpus, never from a reference dictionary or word list.
   static let pigLatinWords = words.map(PigLatinPolicy.transform)
@@ -4615,6 +4625,11 @@ enum StarterLexicon {
         tokens: count, lexicon: englishFiveLetterWords, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .kokanu:
+      return prompt(
+        tokens: count, lexicon: kokanuWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .pigLatin:
       return prompt(
         tokens: count, lexicon: pigLatinWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5204,6 +5219,7 @@ enum StarterLexicon {
     switch language {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
     case .englishFiveLetter: (englishFiveLetterWords, [",", ".", "!", "?"])
+    case .kokanu: (kokanuWords, [",", ".", "!", "?"])
     case .pigLatin: (pigLatinWords, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
@@ -5408,6 +5424,7 @@ extension TypingLanguage {
     return switch self {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
     case .englishFiveLetter: StarterLexicon.englishFiveLetterWords
+    case .kokanu: StarterLexicon.kokanuWords
     case .pigLatin: StarterLexicon.pigLatinWords
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
@@ -5551,6 +5568,7 @@ extension TypingLanguage {
 
   static let defaultMixedComponents: [TypingLanguage] = [
     .englishFiveLetter,
+    .kokanu,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
@@ -5659,7 +5677,7 @@ extension TypingLanguage {
     case .english, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
-    case .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
+    case .kokanu, .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
     default:
@@ -5672,6 +5690,7 @@ extension TypingLanguage {
     return switch self {
     case .english: "English"
     case .englishFiveLetter: "English · Five Letter"
+    case .kokanu: "Kokanu"
     case .pigLatin: "Pig Latin"
     case .spanish: "Español"
     case .german: "Deutsch"

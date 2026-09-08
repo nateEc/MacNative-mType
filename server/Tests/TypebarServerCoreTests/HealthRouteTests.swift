@@ -4012,6 +4012,7 @@ final class HealthRouteTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_735_689_600)
     let languages = [
       ("englishFiveLetter", "Small steps shape clear paths."),
+      ("kokanu", "mi le kota wiki ki tu. tu le wisan in mi un ja."),
       ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),
       ("pigLatin", "Eadystray acticepray akesmay ethay extnay epstay earclay."),
       ("loremIpsum", "Clara verba leniter ordinata novum iter aperiunt."),

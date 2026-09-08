@@ -8854,6 +8854,7 @@ final class TypingEngineTests: XCTestCase {
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.englishFiveLetterWords,
+      StarterLexicon.kokanuWords,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.swissGermanWords,
       StarterLexicon.afrikaansWords,
@@ -8954,7 +8955,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 127)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 128)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -12363,6 +12364,23 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertTrue(
         quotes.flatMap { $0.text.split(whereSeparator: { !$0.isLetter }) }
           .allSatisfy { $0.count == 5 })
+    }
+  }
+
+  func testKokanuCoversPinnedLatinMetadataWithIndependentPracticeText() {
+    let language = TypingLanguage.kokanu
+    XCTAssertEqual(language.displayName, "Kokanu")
+    XCTAssertEqual(language.speechLocaleIdentifier, "xxs-Lat")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "xxs")
+    XCTAssertEqual(language.zipfFrequencySupport, .unsupported)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertFalse(language.usesRightToLeftPrompt)
+    XCTAssertFalse(language.usesJoiningScriptPrompt)
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertFalse(language.ownedPracticeWords().isEmpty)
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
     }
   }
 
