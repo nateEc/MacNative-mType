@@ -4013,6 +4013,7 @@ final class HealthRouteTests: XCTestCase {
     let languages = [
       ("englishFiveLetter", "Small steps shape clear paths."),
       ("kokanu", "mi le kota wiki ki tu. tu le wisan in mi un ja."),
+      ("likanu", "ɞı ʋȷ xʃʌ ɕıxı xı ʌſ: ʌſ ʋȷ ɕıɤ̄ ōı ɞı ōſ ɂ:"),
       ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),
       ("pigLatin", "Eadystray acticepray akesmay ethay extnay epstay earclay."),
       ("loremIpsum", "Clara verba leniter ordinata novum iter aperiunt."),

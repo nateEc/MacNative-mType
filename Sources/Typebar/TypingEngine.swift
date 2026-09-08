@@ -199,6 +199,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
   case englishFiveLetter
   case kokanu
+  case likanu
   case pigLatin
   case spanish
   case german
@@ -3448,6 +3449,81 @@ enum PigLatinPolicy {
   }
 }
 
+/// Converts Typebar-owned Latin Kokanu text with the public Likanu character
+/// rules. This is an independent syllable parser, not imported dictionary data
+/// or conversion code from the reference project.
+enum LikanuPolicy {
+  private static let consonants: [Character: String] = [
+    "p": "ʜ", "t": "ʌ", "k": "x", "w": "ɕ", "l": "ʋ", "j": "ɂ",
+    "m": "ɞ", "n": "ƨ", "s": "ɤ", "c": "ɛ", "h": "ɵ",
+  ]
+  private static let vowels: [Character: String] = [
+    "a": "", "e": "ȷ", "i": "ı", "o": "ʃ", "u": "ſ",
+  ]
+  private static let punctuation: [Character: Character] = [
+    ".": ":", ",": "､", ";": "､", "!": "ʭ", "?": "≈", ":": "–",
+  ]
+
+  static func transform(_ text: String) -> String {
+    var output = ""
+    var word = ""
+    func flushWord() {
+      guard !word.isEmpty else { return }
+      output += transformWord(word)
+      word = ""
+    }
+
+    for character in text.lowercased() {
+      if character.isASCII, character.isLetter {
+        word.append(character)
+      } else {
+        flushWord()
+        output.append(punctuation[character] ?? character)
+      }
+    }
+    flushWord()
+    return output
+  }
+
+  private static func transformWord(_ word: String) -> String {
+    let characters = Array(word)
+    var index = 0
+    var output = ""
+    while index < characters.count {
+      let onset: String
+      if let consonant = consonants[characters[index]],
+         index + 1 < characters.count,
+         vowels[characters[index + 1]] != nil
+      {
+        onset = consonant
+        index += 1
+      } else if vowels[characters[index]] != nil {
+        onset = "o"
+      } else {
+        output.append(characters[index])
+        index += 1
+        continue
+      }
+
+      guard index < characters.count, let vowel = vowels[characters[index]] else {
+        output += onset
+        continue
+      }
+      index += 1
+      let hasFinalN = index < characters.count
+        && characters[index] == "n"
+        && (index + 1 == characters.count || vowels[characters[index + 1]] == nil)
+      output += onset
+      if hasFinalN {
+        output.append("\u{0304}")
+        index += 1
+      }
+      output += vowel
+    }
+    return output
+  }
+}
+
 enum StarterLexicon {
   // This small starter corpus is original project content, not imported from Monkeytype.
   static let words = [
@@ -3474,6 +3550,8 @@ enum StarterLexicon {
     "wiki", "nin", "tope", "pawo", "kusa", "patun", "pumi", "sepo", "wanku", "wisan",
     "teka", "kumi", "pulusi", "pansin", "sikin", "konen", "wi", "mu", "kanisa", "tiku",
   ]
+
+  static let likanuWords = kokanuWords.map { LikanuPolicy.transform($0) }
 
   // Pig Latin is deterministically derived from Typebar's own English starter
   // corpus, never from a reference dictionary or word list.
@@ -4630,6 +4708,11 @@ enum StarterLexicon {
         tokens: count, lexicon: kokanuWords, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .likanu:
+      return prompt(
+        tokens: count, lexicon: likanuWords, separator: " ",
+        punctuation: ["､", ":", "ʭ", "≈"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .pigLatin:
       return prompt(
         tokens: count, lexicon: pigLatinWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5220,6 +5303,7 @@ enum StarterLexicon {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
     case .englishFiveLetter: (englishFiveLetterWords, [",", ".", "!", "?"])
     case .kokanu: (kokanuWords, [",", ".", "!", "?"])
+    case .likanu: (likanuWords, ["､", ":", "ʭ", "≈"])
     case .pigLatin: (pigLatinWords, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
@@ -5425,6 +5509,7 @@ extension TypingLanguage {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
     case .englishFiveLetter: StarterLexicon.englishFiveLetterWords
     case .kokanu: StarterLexicon.kokanuWords
+    case .likanu: StarterLexicon.likanuWords
     case .pigLatin: StarterLexicon.pigLatinWords
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
@@ -5569,6 +5654,7 @@ extension TypingLanguage {
   static let defaultMixedComponents: [TypingLanguage] = [
     .englishFiveLetter,
     .kokanu,
+    .likanu,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
@@ -5601,7 +5687,7 @@ extension TypingLanguage {
 
   /// Preserve native shaping for source-pinned joining scripts.
   var usesJoiningScriptPrompt: Bool {
-    self == .tibetan || self == .yiddish
+    self == .likanu || self == .tibetan || self == .yiddish
   }
 
   var isNoSpaceLanguage: Bool {
@@ -5677,7 +5763,7 @@ extension TypingLanguage {
     case .english, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
-    case .kokanu, .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
+    case .kokanu, .likanu, .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
     default:
@@ -5691,6 +5777,7 @@ extension TypingLanguage {
     case .english: "English"
     case .englishFiveLetter: "English · Five Letter"
     case .kokanu: "Kokanu"
+    case .likanu: "Likanu"
     case .pigLatin: "Pig Latin"
     case .spanish: "Español"
     case .german: "Deutsch"

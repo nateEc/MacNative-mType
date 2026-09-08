@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 138 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 Kokanu。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
+Typebar 现有 139 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 Likanu。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -89,6 +89,7 @@ Typebar 现有 138 个可单独练习并支持 Typebar 自有引语的语言／�
 - 2026-09-08 更正：当前单语总数为一百三十六种、默认／自选 LTR 多语候选为一百二十六种。Ἑλληνιστικὴ Κοινή按固定 `bcp47: el-GR` 使用 LTR 空格词界、`el` 百科入口、`el-GR` 朗读、可选简化输入与 Zipf 未知提示；Typebar 为其提供独立自写的多调希腊语词流和四档文本。Pig Latin 与 Lorem Ipsum 的固定配置均定义 `noLazyMode: true`；前者只对 Typebar 自有英语词流和引语做确定性首辅音簇转换，后者只使用 Typebar 自写的伪拉丁词流与文本，二者均禁用普通练习简化输入、使用 `en`／`en-US` 路径且显示 Zipf 未知提示。三者均进入多语轮转、社区投稿、撤回、成绩和排行榜；未读取或导入参考词表、引语、转换实现或资产。
 - 2026-09-08 更正：当前单语总数为一百三十七种、默认／自选 LTR 多语候选为一百二十七种。新增 English · Five Letter，对应固定 `wordle` 目录的可见“五字符英语词”约束。审计只读取名称、可选元数据、词数和各词长度，不读取任何词值；固定配置没有 BCP-47、RTL、连写、`noLazyMode` 或词频排序。Typebar 使用独立自写的五字母英语词流与四档全五字母文本，按缺省 `en`／`en-US` 路径处理知识短文与朗读，保留简化输入并显示 Zipf 未知提示；它已进入多语轮转、社区投稿、撤回、成绩和排行榜。
 - 2026-09-08 更正：当前单语总数为一百三十八种、默认／自选 LTR 多语候选为一百二十八种。新增 Kokanu；固定配置定义 `rightToLeft: false`、`bcp47: xxs-Lat` 与 `orderedByFrequency: false`，未定义连写或 `noLazyMode`。审计不读取参考词值或引语；拉丁转写词汇和 `le/o` 动词标记等语法边界来自 [Kokanu 官方语法](https://en.kokanu.com/reference/basic-grammar.html) 与 [官方词典](https://dictionary.kokanu.com/)，四档练习句由 Typebar 独立编写。实现使用 LTR 空格词界、`xxs` 知识短文路径、`xxs-Lat` 朗读标识、可选简化输入和 Zipf 不支持提示，并贯通多语轮转、社区投稿、撤回、成绩与排行榜。
+- 2026-09-08 更正：当前单语总数为一百三十九种、默认／自选 LTR 多语候选为一百二十九种。新增 Likanu；固定配置定义 `rightToLeft: false`、`joiningScript: true`、`bcp47: xxs-Uixs` 与 `orderedByFrequency: false`，未定义 `noLazyMode`。字符、元音修饰、尾音 `n` 组合上划线及标点规则来自 [Kokanu 官方发音与书写说明](https://en.kokanu.com/reference/pronunciation.html)；Typebar 以独立音节解析器确定性转换自有 Kokanu 词流和四档文本，不读取参考词值、引语或转换代码。实现保留整段 Unicode 连写、LTR 空格词界、`xxs`／`xxs-Uixs` 在线与朗读路径、可选简化输入和 Zipf 不支持提示，并贯通多语轮转、社区投稿、撤回、成绩与排行榜。
 
 ## 后续候选与准入条件
 

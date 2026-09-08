@@ -8855,6 +8855,7 @@ final class TypingEngineTests: XCTestCase {
     let corpora = [
       StarterLexicon.englishFiveLetterWords,
       StarterLexicon.kokanuWords,
+      StarterLexicon.likanuWords,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.swissGermanWords,
       StarterLexicon.afrikaansWords,
@@ -8955,7 +8956,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 128)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 129)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -12381,6 +12382,38 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(language.ownedPracticeWords().isEmpty)
     for length in [QuoteLength.short, .medium, .long, .extended] {
       XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+    }
+  }
+
+  func testLikanuDerivesNativeScriptFromOwnedKokanuContent() {
+    XCTAssertEqual(
+      LikanuPolicy.transform("pa te ki wo lu je mi ne so ca hu"),
+      "ʜ ʌȷ xı ɕʃ ʋſ ɂȷ ɞı ƨȷ ɤʃ ɛ ɵſ")
+    XCTAssertEqual(LikanuPolicy.transform("a en in on un"), "o ōȷ ōı ōʃ ōſ")
+    XCTAssertEqual(LikanuPolicy.transform("mi le makan."), "ɞı ʋȷ ɞx̄:")
+    XCTAssertEqual(LikanuPolicy.transform("un mi?"), "ōſ ɞı≈")
+    XCTAssertEqual(LikanuPolicy.transform("a: a, a! a?"), "o– o､ oʭ o≈")
+
+    let language = TypingLanguage.likanu
+    XCTAssertEqual(language.displayName, "Likanu")
+    XCTAssertEqual(language.speechLocaleIdentifier, "xxs-Uixs")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "xxs")
+    XCTAssertEqual(language.zipfFrequencySupport, .unsupported)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertFalse(language.usesRightToLeftPrompt)
+    XCTAssertTrue(language.usesJoiningScriptPrompt)
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertEqual(
+      language.ownedPracticeWords(), StarterLexicon.kokanuWords.map { LikanuPolicy.transform($0) })
+    let residualLatin = zip(StarterLexicon.kokanuWords, StarterLexicon.likanuWords).filter {
+      $0.1.contains { !["o", "x"].contains($0) && $0.isASCII && $0.isLetter }
+    }
+    XCTAssertTrue(residualLatin.isEmpty, "Unconverted Kokanu: \(residualLatin)")
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let kokanuText = OfflineContent.quotes(for: .kokanu, length: length).first?.text
+      let likanuText = OfflineContent.quotes(for: language, length: length).first?.text
+      XCTAssertEqual(kokanuText.map { LikanuPolicy.transform($0) }, likanuText)
     }
   }
 
