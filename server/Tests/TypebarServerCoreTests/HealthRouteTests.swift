@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 176)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 183)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4202,6 +4202,13 @@ final class HealthRouteTests: XCTestCase {
       ("german1k", "Jede Größenstufe behält eine eigene lokale Identität."),
       ("german10k", "Der größere Index erweitert die Übung ohne fremde Wortliste."),
       ("german250k", "Der größte Index erzeugt nur die angeforderten Einträge."),
+      ("romanian1k", "Fiecare scară păstrează o identitate locală distinctă."),
+      ("romanian5k", "Indicele local extinde treptat exercițiul."),
+      ("romanian10k", "Zece mii de poziții rămân disponibile fără liste importate."),
+      ("romanian25k", "Scara mai largă păstrează aceeași identitate română."),
+      ("romanian50k", "Generatorul local produce numai intrările cerute."),
+      ("romanian100k", "O sută de mii de poziții folosesc conținut original."),
+      ("romanian200k", "Cel mai mare indice rămâne local și eficient."),
       ("englishCommonlyMisspelled", "Careful writers accommodate every necessary letter."),
       ("englishContractions", "Don't hurry; you'll type clearly."),
       ("englishDoubleLetter", "Small letters still need smooth pressure."),

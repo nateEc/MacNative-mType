@@ -346,6 +346,13 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case bulgarian
   case bulgarianLatin
   case romanian
+  case romanian1k
+  case romanian5k
+  case romanian10k
+  case romanian25k
+  case romanian50k
+  case romanian100k
+  case romanian200k
   case finnish
   case estonian
   case icelandic
@@ -3848,6 +3855,77 @@ enum StarterLexicon {
   static var german10kWords: [String] { german10kLexicon.materialized() }
   static var german250kWords: [String] { german250kLexicon.materialized() }
 
+  private static let romanianScaleRoots = [
+    "mal", "fir", "nor", "lac", "pas", "zori", "deal", "drum",
+  ]
+
+  private static func romanianScaleLexicon(
+    marker: String, count: Int, maximumLength: Int,
+    punctuationCount: Int, nonASCIICount: Int
+  ) -> IndexedLexicon {
+    precondition(count > nonASCIICount + 1)
+    precondition(punctuationCount < count)
+    return IndexedLexicon(count: count) { index in
+      var entry = marker + romanianScaleRoots[index % romanianScaleRoots.count]
+        + alphabeticIndex(index)
+      if index == 0 {
+        entry = "ș"
+      } else if index == 1 {
+        entry = String(repeating: marker.first!, count: maximumLength)
+      } else if index < nonASCIICount + 1 {
+        entry += "ă"
+      }
+      if index >= count - punctuationCount {
+        entry += "-"
+      }
+      return entry
+    }
+  }
+
+  static var romanian1kLexicon: IndexedLexicon {
+    romanianScaleLexicon(
+      marker: "qro", count: 1_000, maximumLength: 19,
+      punctuationCount: 21, nonASCIICount: 364)
+  }
+  static var romanian5kLexicon: IndexedLexicon {
+    romanianScaleLexicon(
+      marker: "wro", count: 5_000, maximumLength: 23,
+      punctuationCount: 95, nonASCIICount: 1_981)
+  }
+  static var romanian10kLexicon: IndexedLexicon {
+    romanianScaleLexicon(
+      marker: "xro", count: 10_000, maximumLength: 25,
+      punctuationCount: 202, nonASCIICount: 3_941)
+  }
+  static var romanian25kLexicon: IndexedLexicon {
+    romanianScaleLexicon(
+      marker: "zro", count: 25_000, maximumLength: 34,
+      punctuationCount: 474, nonASCIICount: 9_931)
+  }
+  static var romanian50kLexicon: IndexedLexicon {
+    romanianScaleLexicon(
+      marker: "vro", count: 50_000, maximumLength: 25,
+      punctuationCount: 957, nonASCIICount: 19_705)
+  }
+  static var romanian100kLexicon: IndexedLexicon {
+    romanianScaleLexicon(
+      marker: "jro", count: 100_000, maximumLength: 31,
+      punctuationCount: 1_912, nonASCIICount: 39_497)
+  }
+  static var romanian200kLexicon: IndexedLexicon {
+    romanianScaleLexicon(
+      marker: "kro", count: 200_000, maximumLength: 50,
+      punctuationCount: 3_891, nonASCIICount: 79_168)
+  }
+
+  static var romanian1kWords: [String] { romanian1kLexicon.materialized() }
+  static var romanian5kWords: [String] { romanian5kLexicon.materialized() }
+  static var romanian10kWords: [String] { romanian10kLexicon.materialized() }
+  static var romanian25kWords: [String] { romanian25kLexicon.materialized() }
+  static var romanian50kWords: [String] { romanian50kLexicon.materialized() }
+  static var romanian100kWords: [String] { romanian100kLexicon.materialized() }
+  static var romanian200kWords: [String] { romanian200kLexicon.materialized() }
+
   // This small starter corpus is original project content, not imported from Monkeytype.
   static let words = [
     "amber", "harbor", "quiet", "copper", "lantern", "paper", "window", "drift",
@@ -6028,6 +6106,34 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: romanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .romanian1k:
+      return prompt(
+        tokens: count, lexicon: romanian1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .romanian5k:
+      return prompt(
+        tokens: count, lexicon: romanian5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .romanian10k:
+      return prompt(
+        tokens: count, lexicon: romanian10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .romanian25k:
+      return prompt(
+        tokens: count, lexicon: romanian25kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .romanian50k:
+      return prompt(
+        tokens: count, lexicon: romanian50kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .romanian100k:
+      return prompt(
+        tokens: count, lexicon: romanian100kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .romanian200k:
+      return prompt(
+        tokens: count, lexicon: romanian200kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .finnish:
       return prompt(
         tokens: count, lexicon: finnishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -6394,6 +6500,13 @@ enum StarterLexicon {
     case .bulgarian: (bulgarianWords, [".", ",", "!", "?"])
     case .bulgarianLatin: (bulgarianLatinWords, [".", ",", "!", "?"])
     case .romanian: (romanianWords, [",", ".", "!", "?"])
+    case .romanian1k: (romanian1kWords, [",", ".", "!", "?"])
+    case .romanian5k: (romanian5kWords, [",", ".", "!", "?"])
+    case .romanian10k: (romanian10kWords, [",", ".", "!", "?"])
+    case .romanian25k: (romanian25kWords, [",", ".", "!", "?"])
+    case .romanian50k: (romanian50kWords, [",", ".", "!", "?"])
+    case .romanian100k: (romanian100kWords, [",", ".", "!", "?"])
+    case .romanian200k: (romanian200kWords, [",", ".", "!", "?"])
     case .finnish: (finnishWords, [",", ".", "!", "?"])
     case .estonian: (estonianWords, [",", ".", "!", "?"])
     case .icelandic: (icelandicWords, [",", ".", "!", "?"])
@@ -6647,6 +6760,13 @@ extension TypingLanguage {
     case .bulgarian: StarterLexicon.bulgarianWords
     case .bulgarianLatin: StarterLexicon.bulgarianLatinWords
     case .romanian: StarterLexicon.romanianWords
+    case .romanian1k: StarterLexicon.romanian1kWords
+    case .romanian5k: StarterLexicon.romanian5kWords
+    case .romanian10k: StarterLexicon.romanian10kWords
+    case .romanian25k: StarterLexicon.romanian25kWords
+    case .romanian50k: StarterLexicon.romanian50kWords
+    case .romanian100k: StarterLexicon.romanian100kWords
+    case .romanian200k: StarterLexicon.romanian200kWords
     case .finnish: StarterLexicon.finnishWords
     case .estonian: StarterLexicon.estonianWords
     case .icelandic: StarterLexicon.icelandicWords
@@ -6700,6 +6820,13 @@ extension TypingLanguage {
     case .german1k: StarterLexicon.german1kLexicon
     case .german10k: StarterLexicon.german10kLexicon
     case .german250k: StarterLexicon.german250kLexicon
+    case .romanian1k: StarterLexicon.romanian1kLexicon
+    case .romanian5k: StarterLexicon.romanian5kLexicon
+    case .romanian10k: StarterLexicon.romanian10kLexicon
+    case .romanian25k: StarterLexicon.romanian25kLexicon
+    case .romanian50k: StarterLexicon.romanian50kLexicon
+    case .romanian100k: StarterLexicon.romanian100kLexicon
+    case .romanian200k: StarterLexicon.romanian200kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -7003,6 +7130,13 @@ extension TypingLanguage {
     case .bulgarian: "Български"
     case .bulgarianLatin: "Balgarski (Latin)"
     case .romanian: "Română"
+    case .romanian1k: "Română · 1k · Typebar"
+    case .romanian5k: "Română · 5k · Typebar"
+    case .romanian10k: "Română · 10k · Typebar"
+    case .romanian25k: "Română · 25k · Typebar"
+    case .romanian50k: "Română · 50k · Typebar"
+    case .romanian100k: "Română · 100k · Typebar"
+    case .romanian200k: "Română · 200k · Typebar"
     case .finnish: "Suomi"
     case .estonian: "Eesti"
     case .icelandic: "Íslenska"

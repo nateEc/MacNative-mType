@@ -6,7 +6,7 @@ require "open3"
 require "pathname"
 
 PINNED_COMMIT = "91bd24bb8513785c7364cbea29296ff7adafac41"
-EXPECTED_COUNTS = { official: 446, independent: 247, related: 199, unmapped: 0 }.freeze
+EXPECTED_COUNTS = { official: 446, independent: 254, related: 192, unmapped: 0 }.freeze
 MIXED_TYPEBAR_CASES = %w[mixedEnglishChinese mixedLanguages].freeze
 ALIASES = {
   "englishFiveLetter" => "wordle",
@@ -24,6 +24,13 @@ ALIASES = {
   "german1k" => "german_1k",
   "german10k" => "german_10k",
   "german250k" => "german_250k",
+  "romanian1k" => "romanian_1k",
+  "romanian5k" => "romanian_5k",
+  "romanian10k" => "romanian_10k",
+  "romanian25k" => "romanian_25k",
+  "romanian50k" => "romanian_50k",
+  "romanian100k" => "romanian_100k",
+  "romanian200k" => "romanian_200k",
   "oldEnglish" => "english_old",
   "pokemon1k" => "pokemon_1k",
   "arenaStrategy" => "league_of_legends",

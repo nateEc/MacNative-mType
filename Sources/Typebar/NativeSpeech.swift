@@ -117,7 +117,8 @@ extension TypingLanguage {
     case .serbian, .serbianLatin: "sr-RS"
     case .bulgarian: "bg-BG"
     case .bulgarianLatin: "bg"
-    case .romanian: "ro-RO"
+    case .romanian, .romanian1k, .romanian5k, .romanian10k, .romanian25k,
+      .romanian50k, .romanian100k, .romanian200k: "ro-RO"
     case .finnish: "fi-FI"
     case .estonian: "et-EE"
     case .icelandic: "is-IS"

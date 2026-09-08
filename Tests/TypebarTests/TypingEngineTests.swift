@@ -8254,6 +8254,9 @@ final class TypingEngineTests: XCTestCase {
     let largestGermanScalePrompt = StarterLexicon.prompt(
       wordCount: 25, language: .german250k, contentOptions: ContentOptions())
     XCTAssertEqual(largestGermanScalePrompt.split(separator: " ").count, 25)
+    let largestRomanianScalePrompt = StarterLexicon.prompt(
+      wordCount: 25, language: .romanian200k, contentOptions: ContentOptions())
+    XCTAssertEqual(largestRomanianScalePrompt.split(separator: " ").count, 25)
   }
 
   func testEnglish450kWeakSpotUsesTheIndexedCorpus() throws {
@@ -8397,6 +8400,52 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
       XCTAssertGreaterThanOrEqual(prompt.split(separator: " ").count, 25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
+  func testRomanianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int, Int, Int)] = [
+      ("romanian1k", 1_000, 1, 19, 21, 364),
+      ("romanian5k", 5_000, 1, 23, 95, 1_981),
+      ("romanian10k", 10_000, 1, 25, 202, 3_941),
+      ("romanian25k", 25_000, 1, 34, 474, 9_931),
+      ("romanian50k", 50_000, 1, 25, 957, 19_705),
+      ("romanian100k", 100_000, 1, 31, 1_912, 39_497),
+      ("romanian200k", 200_000, 1, 50, 3_891, 79_168),
+    ]
+
+    for (rawValue, count, minimum, maximum, punctuation, nonASCII) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertEqual(language.displayName, "Română · \(rawValue.dropFirst("romanian".count)) · Typebar")
+      XCTAssertTrue(language.supportsLazyLatinInput)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ro")
+      XCTAssertEqual(language.speechLocaleIdentifier, "ro-RO")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isUppercase) })
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCII)
+      XCTAssertFalse(words.contains { $0.contains(" ") })
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+
+      let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+      XCTAssertEqual(prompt.split(separator: " ").count, 25)
       for length in [QuoteLength.short, .medium, .long, .extended] {
         XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
       }
