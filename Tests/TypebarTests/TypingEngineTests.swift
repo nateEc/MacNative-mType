@@ -8437,6 +8437,52 @@ final class TypingEngineTests: XCTestCase {
       [])
   }
 
+  func testKoreanScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int)] = [
+      ("korean1k", 975, 1, 5),
+      ("korean5k", 4_201, 1, 6),
+    ]
+
+    for (rawValue, count, minimum, maximum) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertEqual(language.displayName, "한국어 · \(rawValue.dropFirst("korean".count)) · Typebar")
+      XCTAssertFalse(language.usesRightToLeftPrompt)
+      XCTAssertTrue(language.usesJoiningScriptPrompt)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertFalse(language.supportsLazyLatinInput)
+      XCTAssertFalse(language.supportsCapsLockWarning)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ko")
+      XCTAssertEqual(language.speechLocaleIdentifier, "ko-KR")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
+      XCTAssertTrue(words.allSatisfy { word in
+        word.unicodeScalars.allSatisfy { (0xAC00...0xD7A3).contains(Int($0.value)) }
+      })
+      XCTAssertFalse(words.contains { $0.contains(where: { !$0.isLetter }) })
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+      XCTAssertEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ").count,
+        25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
   func testGermanScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("german1k", 988, 2, 17, 415, 11, 3, 8, 109),
@@ -13697,7 +13743,7 @@ final class TypingEngineTests: XCTestCase {
     let joiningLanguages: Set<TypingLanguage> = [
       .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
       .bangla, .banglaLetters, .gujarati, .hebrew,
-      .hindi, .kannada, .khmer, .korean, .kurdishCentral, .likanu, .malayalam,
+      .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k, .kurdishCentral, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
       .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish,
     ]

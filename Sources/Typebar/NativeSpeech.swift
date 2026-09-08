@@ -135,7 +135,7 @@ extension TypingLanguage {
       .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k: "ru-RU"
     case .ukrainian, .ukrainianLatin: "uk-UA"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: "ja-JP"
-    case .korean: "ko-KR"
+    case .korean, .korean1k, .korean5k: "ko-KR"
     case .turkish: "tr-TR"
     case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,
       .polish200k: "pl-PL"

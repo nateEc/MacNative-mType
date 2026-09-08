@@ -398,6 +398,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case japaneseKatakana
   case japaneseRomaji
   case korean
+  case korean1k
+  case korean5k
   case turkish
   case polish
   case polish2k
@@ -4380,6 +4382,45 @@ enum StarterLexicon {
     "별빛", "쪽지", "정원", "호흡",
   ]
 
+  private static let koreanScaleAlphabet = Array(
+    "가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허")
+
+  private static func koreanScaleIndex(_ index: Int) -> String {
+    var value = index
+    var characters: [Character] = []
+    repeat {
+      characters.append(koreanScaleAlphabet[value % koreanScaleAlphabet.count])
+      value /= koreanScaleAlphabet.count
+    } while value > 0
+    return String(characters.reversed())
+  }
+
+  private static let koreanScaleRoots = [
+    "빛", "길", "숲", "별", "물", "꿈", "결", "봄",
+  ]
+
+  static var korean1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 975) { index in
+      if index == 0 { return "힣" }
+      if index == 1 { return String(repeating: "훠", count: 5) }
+      return "쟈" + koreanScaleRoots[index % koreanScaleRoots.count]
+        + koreanScaleIndex(index)
+    }
+  }
+
+  static var korean1kWords: [String] { korean1kLexicon.materialized() }
+
+  static var korean5kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 4_201) { index in
+      if index == 0 { return "힣" }
+      if index == 1 { return String(repeating: "훠", count: 6) }
+      return "쟈쵸" + koreanScaleRoots[index % koreanScaleRoots.count]
+        + koreanScaleIndex(index)
+    }
+  }
+
+  static var korean5kWords: [String] { korean5kLexicon.materialized() }
+
   // Original Typebar content for Turkish practice, including dotted and
   // dotless i plus commonly used Turkish diacritics.
   static let turkishWords = [
@@ -6689,6 +6730,14 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: koreanWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .korean1k:
+      return prompt(
+        tokens: count, lexicon: korean1kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .korean5k:
+      return prompt(
+        tokens: count, lexicon: korean5kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .turkish:
       return prompt(
         tokens: count, lexicon: turkishWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -7025,6 +7074,8 @@ enum StarterLexicon {
     case .japaneseKatakana: (japaneseKatakanaWords, ["、", "。", "！", "？"])
     case .japaneseRomaji: (japaneseRomajiWords, [".", ",", "!", "?"])
     case .korean: (koreanWords, [".", ",", "!", "?"])
+    case .korean1k: (korean1kWords, [".", ",", "!", "?"])
+    case .korean5k: (korean5kWords, [".", ",", "!", "?"])
     case .turkish: (turkishWords, [".", ",", "!", "?"])
     case .polish: (polishWords, [".", ",", "!", "?"])
     case .polish2k: (polish2kWords, [".", ",", "!", "?"])
@@ -7311,6 +7362,8 @@ extension TypingLanguage {
     case .japaneseKatakana: StarterLexicon.japaneseKatakanaWords
     case .japaneseRomaji: StarterLexicon.japaneseRomajiWords
     case .korean: StarterLexicon.koreanWords
+    case .korean1k: StarterLexicon.korean1kWords
+    case .korean5k: StarterLexicon.korean5kWords
     case .turkish: StarterLexicon.turkishWords
     case .polish: StarterLexicon.polishWords
     case .polish2k: StarterLexicon.polish2kWords
@@ -7333,6 +7386,8 @@ extension TypingLanguage {
     switch self {
     case .arabic10k: StarterLexicon.arabic10kLexicon
     case .arabicEgypt1k: StarterLexicon.arabicEgypt1kLexicon
+    case .korean1k: StarterLexicon.korean1kLexicon
+    case .korean5k: StarterLexicon.korean5kLexicon
     case .english1k: StarterLexicon.english1kLexicon
     case .english5k: StarterLexicon.english5kLexicon
     case .english10k: StarterLexicon.english10kLexicon
@@ -7432,7 +7487,7 @@ extension TypingLanguage {
     switch self {
     case .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
       .bangla, .banglaLetters, .gujarati, .hebrew,
-      .hindi, .kannada, .khmer, .korean, .kurdishCentral, .likanu, .malayalam,
+      .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k, .kurdishCentral, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
       .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish:
       true
@@ -7488,7 +7543,7 @@ extension TypingLanguage {
       .simplifiedChinese, .traditionalChinese, .portuguese5k, .portuguese320k, .portuguese550k,
       .russian5k, .russianAbbreviations, .russianContractions, .russianContractions1k, .ukrainian, .ukrainianEndings,
       .ukrainianLatin, .ukrainianLatynkaEndings,
-      .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
+      .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean, .korean1k, .korean5k,
       .mixedEnglishChinese, .mixedLanguages:
       false
     default:
@@ -7498,7 +7553,8 @@ extension TypingLanguage {
 
   var supportsCapsLockWarning: Bool {
     switch self {
-    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana, .japaneseKatakana, .korean: false
+    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana, .japaneseKatakana,
+      .korean, .korean1k, .korean5k: false
     default: !isCodeLanguage
     }
   }
@@ -7735,6 +7791,8 @@ extension TypingLanguage {
     case .japaneseKatakana: "日本語（カタカナ）"
     case .japaneseRomaji: "日本語（ローマ字）"
     case .korean: "한국어"
+    case .korean1k: "한국어 · 1k · Typebar"
+    case .korean5k: "한국어 · 5k · Typebar"
     case .turkish: "Türkçe"
     case .polish: "Polski"
     case .polish2k: "Polski · 2k · Typebar"

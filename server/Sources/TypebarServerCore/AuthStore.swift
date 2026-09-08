@@ -493,6 +493,7 @@ public actor AuthStore {
     "english1k", "english5k", "english10k", "english25k", "english450k",
     "spanish1k", "spanish10k", "spanish650k",
     "arabic10k", "arabicEgypt1k",
+    "korean1k", "korean5k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",

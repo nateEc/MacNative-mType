@@ -252,7 +252,7 @@ enum LivePracticeContentService {
       .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k: return "ru"
     case .ukrainian, .ukrainianLatin: return "uk"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: return "ja"
-    case .korean: return "ko"
+    case .korean, .korean1k, .korean5k: return "ko"
     case .turkish: return "tr"
     case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,
       .polish200k: return "pl"
