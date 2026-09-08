@@ -4599,6 +4599,16 @@ enum OfflineContent {
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
     if [
+      .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
+      .norwegianNynorsk100k, .norwegianNynorsk400k,
+    ].contains(language) {
+      return quotes(for: .norwegianNynorsk, length: length).map { quote in
+        .init(
+          id: "\(language.rawValue)-\(quote.id)", title: quote.title, text: quote.text,
+          language: language, length: quote.length)
+      }
+    }
+    if [
       .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k,
       .norwegianBokmal150k, .norwegianBokmal600k,
     ].contains(language) {

@@ -110,7 +110,9 @@ extension TypingLanguage {
     case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
       .norwegianBokmal10k, .norwegianBokmal150k, .norwegianBokmal600k:
       "nb-NO"
-    case .norwegianNynorsk: "nn-NO"
+    case .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k,
+      .norwegianNynorsk10k, .norwegianNynorsk100k, .norwegianNynorsk400k:
+      "nn-NO"
     case .swedish, .swedishDiacritics: "sv-SE"
     case .hungarian: "hu-HU"
     case .czech: "cs-CZ"

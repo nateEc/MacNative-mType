@@ -497,6 +497,8 @@ public actor AuthStore {
     "thai1k", "thai5k", "thai10k", "thai20k", "thai50k", "thai60k",
     "norwegianBokmal1k", "norwegianBokmal5k", "norwegianBokmal10k",
     "norwegianBokmal150k", "norwegianBokmal600k",
+    "norwegianNynorsk1k", "norwegianNynorsk5k", "norwegianNynorsk10k",
+    "norwegianNynorsk100k", "norwegianNynorsk400k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",

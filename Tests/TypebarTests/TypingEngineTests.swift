@@ -8541,6 +8541,64 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testNorwegianNynorskScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(
+      String, Int, Int, Int, Int, Int, Int, Int, Int, Int, ZipfFrequencySupport
+    )] = [
+      ("norwegianNynorsk1k", 1_000, 1, 18, 0, 0, 0, 0, 0, 132, .supported),
+      ("norwegianNynorsk5k", 5_000, 1, 27, 0, 0, 0, 0, 0, 714, .supported),
+      ("norwegianNynorsk10k", 9_939, 1, 27, 0, 0, 0, 0, 0, 1_492, .supported),
+      ("norwegianNynorsk100k", 104_745, 1, 29, 28, 676, 676, 0, 1, 21_255, .unknown),
+      ("norwegianNynorsk400k", 410_719, 1, 31, 6_774, 4_061, 4_040, 19, 143, 82_101, .unknown),
+    ]
+
+    for (
+      rawValue, count, minimum, maximum, uppercase, nonLetters, punctuation, spaces,
+      digits, nonASCII, zipf
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertEqual(
+        language.displayName,
+        "Norsk nynorsk · \(rawValue.dropFirst("norwegianNynorsk".count)) · Typebar")
+      XCTAssertFalse(language.usesRightToLeftPrompt)
+      XCTAssertFalse(language.usesJoiningScriptPrompt)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertTrue(language.supportsLazyLatinInput)
+      XCTAssertTrue(language.supportsCapsLockWarning)
+      XCTAssertEqual(language.zipfFrequencySupport, zipf)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "nn")
+      XCTAssertEqual(language.speechLocaleIdentifier, "nn-NO")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercase)
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, nonLetters)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isNumber) }.count, digits)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCII)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+      XCTAssertEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ").count,
+        25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
   func testThaiScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("thai1k", 1_000, 2, 36, 1, 29, 844, 14, 9, 0, 23, 977),

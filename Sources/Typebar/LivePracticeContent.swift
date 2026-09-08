@@ -230,7 +230,9 @@ enum LivePracticeContentService {
     case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
       .norwegianBokmal10k, .norwegianBokmal150k, .norwegianBokmal600k:
       return "no"
-    case .norwegianNynorsk: return "nn"
+    case .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k,
+      .norwegianNynorsk10k, .norwegianNynorsk100k, .norwegianNynorsk400k:
+      return "nn"
     case .swedish, .swedishDiacritics: return "sv"
     case .hungarian: return "hu"
     case .czech: return "cs"

@@ -353,6 +353,11 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case norwegianBokmal150k
   case norwegianBokmal600k
   case norwegianNynorsk
+  case norwegianNynorsk1k
+  case norwegianNynorsk5k
+  case norwegianNynorsk10k
+  case norwegianNynorsk100k
+  case norwegianNynorsk400k
   case swedish
   case swedishDiacritics
   case hungarian
@@ -5845,6 +5850,110 @@ enum StarterLexicon {
     "liten", "tid", "vår", "øy", "ven", "ikkje", "kvar", "noko",
   ]
 
+  private struct NorwegianNynorskScaleSpecification {
+    let marker: String
+    let count: Int
+    let maximumLength: Int
+    let uppercaseCount: Int
+    let punctuationCount: Int
+    let spaceCount: Int
+    let digitCount: Int
+    let punctuationSpaceOverlap: Int
+    let punctuationDigitOverlap: Int
+    let nonASCIICount: Int
+  }
+
+  private static let norwegianNynorskScaleRoots = [
+    "nord", "skog", "vind", "spor", "lykt", "havn",
+  ]
+
+  private static func norwegianNynorskScaleLexicon(
+    _ specification: NorwegianNynorskScaleSpecification
+  ) -> IndexedLexicon {
+    let punctuationStart = specification.count - specification.punctuationCount
+    let standaloneSpaces = specification.spaceCount - specification.punctuationSpaceOverlap
+    let spaceStart = punctuationStart - standaloneSpaces
+    let standaloneDigits = specification.digitCount - specification.punctuationDigitOverlap
+    let digitStart = spaceStart - standaloneDigits
+    precondition(specification.punctuationSpaceOverlap <= specification.punctuationCount)
+    precondition(
+      specification.punctuationSpaceOverlap + specification.punctuationDigitOverlap
+        <= specification.punctuationCount)
+    precondition(standaloneSpaces >= 0 && standaloneDigits >= 0)
+
+    return IndexedLexicon(count: specification.count) { index in
+      var entry: String
+      if index == 0 {
+        entry = "ǿ"
+      } else if index == 1 {
+        entry = String(repeating: specification.marker.last!, count: specification.maximumLength)
+      } else {
+        entry = specification.marker
+          + norwegianNynorskScaleRoots[index % norwegianNynorskScaleRoots.count]
+          + norwegianBokmalScaleIndex(index)
+        if index < specification.uppercaseCount + 2 {
+          entry = entry.prefix(1).uppercased() + entry.dropFirst()
+        }
+        if index < specification.nonASCIICount + 1 {
+          entry += "ø"
+        }
+      }
+
+      let hasPunctuation = index >= punctuationStart
+      let hasSpace = (index >= spaceStart && index < punctuationStart)
+        || (index >= punctuationStart
+          && index < punctuationStart + specification.punctuationSpaceOverlap)
+      let digitOverlapStart = punctuationStart + specification.punctuationSpaceOverlap
+      let hasDigit = (index >= digitStart && index < spaceStart)
+        || (index >= digitOverlapStart
+          && index < digitOverlapStart + specification.punctuationDigitOverlap)
+      if hasPunctuation { entry += "-" }
+      if hasSpace { entry += " a" }
+      if hasDigit { entry += "7" }
+      return entry
+    }
+  }
+
+  // Typebar-authored deterministic Nynorsk scale corpora preserve the pinned
+  // aggregate input shapes without importing any reference words.
+  static var norwegianNynorsk1kLexicon: IndexedLexicon {
+    norwegianNynorskScaleLexicon(.init(
+      marker: "qnn", count: 1_000, maximumLength: 18, uppercaseCount: 0,
+      punctuationCount: 0, spaceCount: 0, digitCount: 0,
+      punctuationSpaceOverlap: 0, punctuationDigitOverlap: 0, nonASCIICount: 132))
+  }
+  static var norwegianNynorsk5kLexicon: IndexedLexicon {
+    norwegianNynorskScaleLexicon(.init(
+      marker: "vnn", count: 5_000, maximumLength: 27, uppercaseCount: 0,
+      punctuationCount: 0, spaceCount: 0, digitCount: 0,
+      punctuationSpaceOverlap: 0, punctuationDigitOverlap: 0, nonASCIICount: 714))
+  }
+  static var norwegianNynorsk10kLexicon: IndexedLexicon {
+    norwegianNynorskScaleLexicon(.init(
+      marker: "xnn", count: 9_939, maximumLength: 27, uppercaseCount: 0,
+      punctuationCount: 0, spaceCount: 0, digitCount: 0,
+      punctuationSpaceOverlap: 0, punctuationDigitOverlap: 0, nonASCIICount: 1_492))
+  }
+  static var norwegianNynorsk100kLexicon: IndexedLexicon {
+    norwegianNynorskScaleLexicon(.init(
+      marker: "znn", count: 104_745, maximumLength: 29, uppercaseCount: 28,
+      punctuationCount: 676, spaceCount: 0, digitCount: 1,
+      punctuationSpaceOverlap: 0, punctuationDigitOverlap: 1, nonASCIICount: 21_255))
+  }
+  static var norwegianNynorsk400kLexicon: IndexedLexicon {
+    norwegianNynorskScaleLexicon(.init(
+      marker: "ynn", count: 410_719, maximumLength: 31, uppercaseCount: 6_774,
+      punctuationCount: 4_040, spaceCount: 19, digitCount: 143,
+      punctuationSpaceOverlap: 14, punctuationDigitOverlap: 127,
+      nonASCIICount: 82_101))
+  }
+
+  static var norwegianNynorsk1kWords: [String] { norwegianNynorsk1kLexicon.materialized() }
+  static var norwegianNynorsk5kWords: [String] { norwegianNynorsk5kLexicon.materialized() }
+  static var norwegianNynorsk10kWords: [String] { norwegianNynorsk10kLexicon.materialized() }
+  static var norwegianNynorsk100kWords: [String] { norwegianNynorsk100kLexicon.materialized() }
+  static var norwegianNynorsk400kWords: [String] { norwegianNynorsk400kLexicon.materialized() }
+
   // Typebar-authored Swedish starter words. The corpus deliberately includes
   // å, ä and ö for normal macOS composed-text input practice.
   static let swedishWords = [
@@ -6775,6 +6884,26 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: norwegianNynorskWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .norwegianNynorsk1k:
+      return prompt(
+        tokens: count, lexicon: norwegianNynorsk1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .norwegianNynorsk5k:
+      return prompt(
+        tokens: count, lexicon: norwegianNynorsk5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .norwegianNynorsk10k:
+      return prompt(
+        tokens: count, lexicon: norwegianNynorsk10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .norwegianNynorsk100k:
+      return prompt(
+        tokens: count, lexicon: norwegianNynorsk100kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .norwegianNynorsk400k:
+      return prompt(
+        tokens: count, lexicon: norwegianNynorsk400kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .swedish:
       return prompt(
         tokens: count, lexicon: swedishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7304,6 +7433,11 @@ enum StarterLexicon {
     case .norwegianBokmal150k: (norwegianBokmal150kWords, [",", ".", "!", "?"])
     case .norwegianBokmal600k: (norwegianBokmal600kWords, [",", ".", "!", "?"])
     case .norwegianNynorsk: (norwegianNynorskWords, [",", ".", "!", "?"])
+    case .norwegianNynorsk1k: (norwegianNynorsk1kWords, [",", ".", "!", "?"])
+    case .norwegianNynorsk5k: (norwegianNynorsk5kWords, [",", ".", "!", "?"])
+    case .norwegianNynorsk10k: (norwegianNynorsk10kWords, [",", ".", "!", "?"])
+    case .norwegianNynorsk100k: (norwegianNynorsk100kWords, [",", ".", "!", "?"])
+    case .norwegianNynorsk400k: (norwegianNynorsk400kWords, [",", ".", "!", "?"])
     case .swedish: (swedishWords, [",", ".", "!", "?"])
     case .swedishDiacritics: (swedishDiacriticsWords, [",", ".", "!", "?"])
     case .hungarian: (hungarianWords, [",", ".", "!", "?"])
@@ -7603,6 +7737,11 @@ extension TypingLanguage {
     case .norwegianBokmal150k: StarterLexicon.norwegianBokmal150kWords
     case .norwegianBokmal600k: StarterLexicon.norwegianBokmal600kWords
     case .norwegianNynorsk: StarterLexicon.norwegianNynorskWords
+    case .norwegianNynorsk1k: StarterLexicon.norwegianNynorsk1kWords
+    case .norwegianNynorsk5k: StarterLexicon.norwegianNynorsk5kWords
+    case .norwegianNynorsk10k: StarterLexicon.norwegianNynorsk10kWords
+    case .norwegianNynorsk100k: StarterLexicon.norwegianNynorsk100kWords
+    case .norwegianNynorsk400k: StarterLexicon.norwegianNynorsk400kWords
     case .swedish: StarterLexicon.swedishWords
     case .swedishDiacritics: StarterLexicon.swedishDiacriticsWords
     case .hungarian: StarterLexicon.hungarianWords
@@ -7696,6 +7835,11 @@ extension TypingLanguage {
     case .norwegianBokmal10k: StarterLexicon.norwegianBokmal10kLexicon
     case .norwegianBokmal150k: StarterLexicon.norwegianBokmal150kLexicon
     case .norwegianBokmal600k: StarterLexicon.norwegianBokmal600kLexicon
+    case .norwegianNynorsk1k: StarterLexicon.norwegianNynorsk1kLexicon
+    case .norwegianNynorsk5k: StarterLexicon.norwegianNynorsk5kLexicon
+    case .norwegianNynorsk10k: StarterLexicon.norwegianNynorsk10kLexicon
+    case .norwegianNynorsk100k: StarterLexicon.norwegianNynorsk100kLexicon
+    case .norwegianNynorsk400k: StarterLexicon.norwegianNynorsk400kLexicon
     case .english1k: StarterLexicon.english1kLexicon
     case .english5k: StarterLexicon.english5kLexicon
     case .english10k: StarterLexicon.english10kLexicon
@@ -7883,7 +8027,7 @@ extension TypingLanguage {
   /// wordsets. Dictionaries without that field intentionally remain unknown.
   var zipfFrequencySupport: ZipfFrequencySupport {
     switch self {
-    case .english, .english1k, .english5k, .english10k, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k, .norwegianNynorsk,
+    case .english, .english1k, .english5k, .english10k, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k, .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
       .russian, .russian1k, .russian5k, .icelandic, .galician, .marathi:
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
@@ -8056,6 +8200,11 @@ extension TypingLanguage {
     case .norwegianBokmal150k: "Norsk bokmål · 150k · Typebar"
     case .norwegianBokmal600k: "Norsk bokmål · 600k · Typebar"
     case .norwegianNynorsk: "Norsk nynorsk"
+    case .norwegianNynorsk1k: "Norsk nynorsk · 1k · Typebar"
+    case .norwegianNynorsk5k: "Norsk nynorsk · 5k · Typebar"
+    case .norwegianNynorsk10k: "Norsk nynorsk · 10k · Typebar"
+    case .norwegianNynorsk100k: "Norsk nynorsk · 100k · Typebar"
+    case .norwegianNynorsk400k: "Norsk nynorsk · 400k · Typebar"
     case .swedish: "Svenska"
     case .swedishDiacritics: "Svenska · Å Ä Ö"
     case .hungarian: "Magyar"
