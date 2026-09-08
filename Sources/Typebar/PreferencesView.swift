@@ -436,8 +436,12 @@ struct PreferencesView: View {
           Text("未设置自定义图片时，背景由 Typebar 的原生矢量绘制；光晕会遵从 macOS“减少动态效果”辅助功能设置。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Toggle("显示节奏伙伴", isOn: $settings.showTypingCompanion)
-          Text("练习开始后以原创矢量显示左右手按键状态；速度越高，视觉反馈越明显。")
+          Toggle(
+            "显示节奏伙伴",
+            isOn: Binding(
+              get: { settings.showTypingCompanion },
+              set: { settings.setTypingCompanionEnabled($0) }))
+          Text("练习开始后以原创矢量显示左右手按键状态；速度越高，视觉反馈越明显。开启时，文字式实时速度和准确率会收为迷你显示。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("键入能量效果", selection: $settings.typingPowerMode) {

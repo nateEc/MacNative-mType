@@ -164,7 +164,7 @@
 | `showAverage` | `showAverage` | 已映射。 |
 | `showPb` | `showPersonalBest` | 已映射。 |
 | `accountChart` | `historyChartVisibility` | 已映射；本机历史提供速度、准确率、10/100 次均值四个开关，速度与准确率至少保留一个，关闭最后一条主线时自动恢复另一条。数据仅来自本机历史，不复制网页图表实现。 |
-| `monkey` | `showTypingCompanion` | 部分；原创手部提示，不复制网页猴子形象或资产。 |
+| `monkey` | `showTypingCompanion` | 部分；以原创手部提示替代网页猴子形象且不复制资产。用户开启时，文字式实时速度与准确率自动收为迷你显示；关闭、已是迷你及关闭伴随提示时不改动显示选择。 |
 | `monkeyPowerLevel` | `typingPowerMode` | 部分；原创粒子能量效果，档位与形象不同。 |
 | `ads` | 无 | 不适用；Typebar 的产品约束是无广告。 |
 

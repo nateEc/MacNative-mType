@@ -7913,6 +7913,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingPowerPolicy.shakeOffset(xRandomUnit: 1, yRandomUnit: 0), .init(width: 5, height: -5))
   }
 
+  @MainActor
+  func testEnablingTypingCompanionCompactsOnlyTextLiveMetrics() {
+    let suiteName = "TypebarTests.companion-live-metrics-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.liveSpeedStyle = .text
+    settings.liveAccuracyStyle = .off
+    settings.setTypingCompanionEnabled(true)
+    XCTAssertTrue(settings.showTypingCompanion)
+    XCTAssertEqual(settings.liveSpeedStyle, .mini)
+    XCTAssertEqual(settings.liveAccuracyStyle, .off)
+
+    settings.liveAccuracyStyle = .text
+    settings.setTypingCompanionEnabled(false)
+    XCTAssertFalse(settings.showTypingCompanion)
+    XCTAssertEqual(settings.liveSpeedStyle, .mini)
+    XCTAssertEqual(settings.liveAccuracyStyle, .text)
+  }
+
   func testHistoryChartPolicyMatchesLocalHistoryTracesAndTypingTimeTrend() throws {
     XCTAssertEqual(HistoryChartVisibility(), .init())
     let accuracyOnly = HistoryChartVisibility(

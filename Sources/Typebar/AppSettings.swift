@@ -1487,6 +1487,13 @@ final class AppSettings {
     showKeyboardGuide ? keyboardGuideMode : .off
   }
 
+  func setTypingCompanionEnabled(_ enabled: Bool) {
+    showTypingCompanion = enabled
+    guard enabled else { return }
+    if liveSpeedStyle == .text { liveSpeedStyle = .mini }
+    if liveAccuracyStyle == .text { liveAccuracyStyle = .mini }
+  }
+
   func mutateHistoryChartVisibility(_ update: (inout HistoryChartVisibility) -> Void) {
     historyChartVisibility = historyChartVisibility.applying(update)
   }
