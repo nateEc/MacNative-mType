@@ -7,6 +7,12 @@
 - 446 不是 446 种独立自然语言：其中包含同语言的词表规模（如 `_1k` / `_10k`）、书写或罗马化变体，以及代码练习标识。本审计以用户可见的语言、书写方式和输入排版语义为单位。
 - Typebar 不复制参考项目的代码、JSON、词表、引语、字体、布局或主题资产。此处的“已覆盖”仅表示已用原创内容和原生功能重建可见意图，绝不表示数据一对一迁移或全面同质化。
 
+## 机器可读总账
+
+`Compatibility/official-languages.json` 由 `Scripts/generate-official-language-audit.rb` 从固定提交的 schema ID 与 Typebar 本地枚举重新生成。生成器只读取 `packages/schemas/src/languages.ts` 和 `Sources/Typebar/TypingEngine.swift`，不读取 `frontend/static/languages/*.json`，因此清单只含标识和映射元数据，不含官方词表、引语、字体或标点内容。
+
+446 个官方 ID 当前严格分区为：221 个 Typebar 独立原生选择、213 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项），以及 12 个尚无原生选择的配置。12 个缺口是 `english_old`、`french_bitoduc`、`russian_contractions`、`russian_contractions_1k`、`tamil_old`、`toki_pona_ku_suli`、`toki_pona_ku_lili`、`twitch_emotes`、`league_of_legends`、`typing_of_the_dead`、`docker_file` 和 `pokemon_1k`。因此当前语言面很广，但尚不能宣称官方配置选择完全等价。
+
 ## 已覆盖的原生语言面
 
 当前语言目录：152 个可单独练习的语言或书写方式、69 个代码选择和 2 个混合入口。152 个单语入口均支持 Typebar 自有引语；最新增加 Git 专项。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
@@ -40,10 +46,11 @@
 | `_1k`、`_5k`、`_10k` 等词表规模 | 不作为独立语言选择；以原创小型词流和可重复生成策略练习。 | 导入同规模词表会复制参考数据，且规模不是新的输入语义。 |
 | `*_romanized`、音译或脚本变体 | 仅在能提供清晰、稳定、原创的独立练习承诺时实现。 | 显示名称相近不代表同一内容、输入法或在线来源可安全共用。 |
 | 官方语言 JSON 的 `words`、字体和标点数据 | 不导入。 | 保持纯重写与许可边界清晰。 |
-| 尚未研究的语言 ID | 不先占位。 | 每个语言要先确认 RTL、连写、无空格、BCP-47、输入法和服务端数据面。 |
+| 12 个尚无原生选择的配置 | 不先占位；准确清单由机器总账固定。 | 每项要先确认可见语义、输入法、内容来源和服务端数据面；不能仅凭 ID 猜测实现。 |
 
 ## 自动化守卫
 
+- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／221／213／12 守恒关系、分区互斥、12 个明确缺口、每个映射可解析以及 221 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
 - 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 141 个候选，并明确覆盖各专项语言与书写变体。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜；Swiss German 以固定源码要求的“投稿拒绝、成绩接受”边界替代一般投稿路径。

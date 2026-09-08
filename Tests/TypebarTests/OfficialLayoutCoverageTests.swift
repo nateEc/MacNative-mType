@@ -14,6 +14,18 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let unlistedPolicy: String
   }
 
+  private struct LanguageFixture: Decodable {
+    let referenceRepository: String
+    let referenceCommit: String
+    let officialCount: Int
+    let officialIDs: [String]
+    let nativeIndependent: [String: String]
+    let nativeRelatedChoice: [String: String]
+    let unmappedOfficialIDs: [String]
+    let sourceFiles: [String]
+    let method: String
+  }
+
   func testPinnedOfficialLayoutCoverageIsCompleteUniqueAndResolvable() throws {
     let repositoryRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
@@ -79,5 +91,55 @@ final class OfficialLayoutCoverageTests: XCTestCase {
         contentsOf: repositoryRoot.appendingPathComponent(name), encoding: .utf8)
       XCTAssertTrue(document.contains(currentSummary), "\(name) 缺少当前语言目录摘要")
     }
+  }
+
+  func testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable() throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fixtureURL = repositoryRoot.appendingPathComponent("Compatibility/official-languages.json")
+    let data = try Data(contentsOf: fixtureURL)
+    let fixture = try JSONDecoder().decode(LanguageFixture.self, from: data)
+    let officialIDs = Set(fixture.officialIDs)
+    let independentIDs = Set(fixture.nativeIndependent.keys)
+    let relatedIDs = Set(fixture.nativeRelatedChoice.keys)
+    let unmappedIDs = Set(fixture.unmappedOfficialIDs)
+    let expectedUnmappedIDs: Set<String> = [
+      "docker_file", "english_old", "french_bitoduc", "league_of_legends", "pokemon_1k",
+      "russian_contractions", "russian_contractions_1k", "tamil_old", "toki_pona_ku_lili",
+      "toki_pona_ku_suli", "twitch_emotes", "typing_of_the_dead",
+    ]
+
+    XCTAssertEqual(fixture.referenceRepository, "monkeytypegame/monkeytype")
+    XCTAssertEqual(fixture.referenceCommit, "91bd24bb8513785c7364cbea29296ff7adafac41")
+    XCTAssertEqual(fixture.officialCount, 446)
+    XCTAssertEqual(fixture.officialIDs.count, fixture.officialCount)
+    XCTAssertEqual(officialIDs.count, fixture.officialCount)
+    XCTAssertEqual(fixture.nativeIndependent.count, 221)
+    XCTAssertEqual(fixture.nativeRelatedChoice.count, 213)
+    XCTAssertEqual(unmappedIDs, expectedUnmappedIDs)
+    XCTAssertTrue(independentIDs.isDisjoint(with: relatedIDs))
+    XCTAssertTrue(independentIDs.isDisjoint(with: unmappedIDs))
+    XCTAssertTrue(relatedIDs.isDisjoint(with: unmappedIDs))
+    XCTAssertEqual(independentIDs.union(relatedIDs).union(unmappedIDs), officialIDs)
+
+    let independentlyCoveredLanguages = Set(fixture.nativeIndependent.values)
+    let nativeNonMixedLanguages = Set(
+      TypingLanguage.allCases.filter { language in
+        language != .mixedEnglishChinese && language != .mixedLanguages
+      }.map(\.rawValue))
+    XCTAssertEqual(independentlyCoveredLanguages.count, fixture.nativeIndependent.count)
+    XCTAssertEqual(independentlyCoveredLanguages, nativeNonMixedLanguages)
+
+    for rawValue in Array(fixture.nativeIndependent.values) + Array(fixture.nativeRelatedChoice.values) {
+      XCTAssertNotNil(TypingLanguage(rawValue: rawValue), "Unknown Typebar language: \(rawValue)")
+    }
+
+    XCTAssertEqual(
+      fixture.sourceFiles,
+      ["packages/schemas/src/languages.ts", "Sources/Typebar/TypingEngine.swift"])
+    XCTAssertTrue(fixture.method.contains("metadata only"))
+    XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("\"words\""))
   }
 }
