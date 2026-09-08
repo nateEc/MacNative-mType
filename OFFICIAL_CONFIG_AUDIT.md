@@ -106,7 +106,7 @@
 | `indicateTypos` | `typoIndicatorStyle` | 已映射。 |
 | `compositionDisplay` | `compositionDisplayStyle` | 已映射。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |
-| `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。依据固定参考版本的 `noLazyMode`，非自定义模式会禁用 English、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Greeklish、Dutch、Filipino、Indonesian、Serbian Cyrillic、Bulgarian、Macedonian、Kazakh、中日韩／日语罗马字、Ukrainian 与 Ukrainian Latin，以及所有代码练习的该修饰器；自定义文本仍可使用。可配置多语练习只有至少一个选择的组成语言允许时才保留它。 |
+| `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 已映射；设置页以独立“简化输入”开关呈现并持久保存，不再混入趣味修饰器列表。它用现有 Unicode 归一化简化重音、变音、常见连字和可省略的阿拉伯语标记；遇到固定参考标记 `noLazyMode` 的非自定义语言时只在当前练习临时过滤，切回支持语言会恢复用户选择，自定义文本保持可用。多语练习在至少一个组成语言支持时启用；Arabic 另保留默认开启、可持久化关闭的快捷偏好。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
 | `layout` | `KeyboardInputLayout` | 已映射；系统输入源为默认，固定参考的 239 个官方名称全部解析到独立编写的原生物理布局，另支持用户自写四行布局。机器清单 `Compatibility/official-layouts.json` 固定 239 项精确映射与 0 项兼容映射；覆盖测试验证名称唯一、目标存在且无未列项目。Typebar 不读取、打包或运行官方布局 JSON、代码或资产。 |

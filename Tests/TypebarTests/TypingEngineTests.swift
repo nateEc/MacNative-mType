@@ -11494,6 +11494,14 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testLazyLatinModifierNormalizesAccentsLigaturesAndGeneratedPrompts() {
+    XCTAssertEqual(TestModifier.inputPreferenceCases, [.lazyLatin])
+    XCTAssertFalse(TestModifier.funboxPreferenceCases.contains(.lazyLatin))
+    XCTAssertEqual(
+      Set(TestModifier.inputPreferenceCases + TestModifier.funboxPreferenceCases),
+      Set(TestModifier.allCases))
+    XCTAssertEqual(
+      SettingsSearch.preferenceCatalog.first(where: { $0.id == "lazyMode" })?.section,
+      .test)
     XCTAssertEqual(TypingTextNormalizer.lazyLatin("árvore Straße cœur Łódź"), "arvore Strasse coeur Lodz")
     XCTAssertEqual(
       TypingTextNormalizer.lazyLatin("أَإِآ كِتابٌ مُدَرِّسْ"), "ااا كتاب مدرس")
@@ -13606,7 +13614,7 @@ final class TypingEngineTests: XCTestCase {
     settings.liveStatsColor = .black
     settings.liveStatsOpacity = .half
     settings.promptHighlightMode = .nextTwoWords
-    settings.testModifiers = [.noSpaces, .uppercase]
+    settings.testModifiers = [.noSpaces, .uppercase, .lazyLatin]
     settings.favoriteQuoteIDs = ["craft"]
     settings.repeatQuotes = true
     settings.showKeyboardGuide = true
@@ -13745,7 +13753,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(restored.liveStatsColor, .black)
     XCTAssertEqual(restored.liveStatsOpacity, .half)
     XCTAssertEqual(restored.promptHighlightMode, .nextTwoWords)
-    XCTAssertEqual(restored.testModifiers, [.noSpaces, .uppercase])
+    XCTAssertEqual(restored.testModifiers, [.noSpaces, .uppercase, .lazyLatin])
     XCTAssertTrue(restored.isFavoriteQuote("craft"))
     XCTAssertTrue(restored.repeatQuotes)
     XCTAssertEqual(restored.resolvedTheme(for: .dark).colorScheme, .dark)

@@ -510,6 +510,9 @@ enum TestModifier: String, CaseIterable, Codable, Equatable, Identifiable {
 
   var id: Self { self }
 
+  static let inputPreferenceCases: [Self] = [.lazyLatin]
+  static let funboxPreferenceCases: [Self] = allCases.filter { $0 != .lazyLatin }
+
   var displayName: String {
     switch self {
     case .noSpaces: "无空格"

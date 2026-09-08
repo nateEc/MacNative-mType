@@ -284,8 +284,15 @@ struct PreferencesView: View {
               Text(variant.displayName).tag(variant)
             }
           }
+          Toggle(
+            "简化输入",
+            isOn: modifierBinding(.lazyLatin, settings: settings)
+          )
+          Text("将重音、变音、常见连字和阿拉伯语可省略标记转换为简化输入；不支持的语言会在当前练习中临时关闭，切换回来后保留你的选择。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Section("趣味修饰器") {
-            ForEach(TestModifier.allCases) { modifier in
+            ForEach(TestModifier.funboxPreferenceCases) { modifier in
               Toggle(modifier.displayName, isOn: modifierBinding(modifier, settings: settings))
             }
             Text("边界、大小写和字符流各自互斥；记忆模式与听写/预读模式互斥。其余可兼容修饰器可以组合。")

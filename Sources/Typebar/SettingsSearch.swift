@@ -65,6 +65,7 @@ enum SettingsSearch {
         Entry("minimumBurst", "最低单词速度", section: .test, keywords: "minimum word burst"),
         Entry("quickEnd", "最后一词快速结束", section: .test, keywords: "quick end"),
         Entry("englishVariant", "英文拼写", section: .test, keywords: "english variant"),
+        Entry("lazyMode", "简化输入", section: .test, keywords: "lazy mode|重音|变音|连字"),
         Entry("modifiers", "趣味修饰器", section: .test, keywords: "funbox|modifier"),
 
         Entry("theme", "主题", section: .display, keywords: "theme"),
