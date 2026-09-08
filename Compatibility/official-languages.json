@@ -587,6 +587,7 @@
     "amharic": "amharic",
     "oromo": "oromo",
     "wordle": "englishFiveLetter",
+    "typing_of_the_dead": "typingOfTheDead",
     "yiddish": "yiddish",
     "frisian": "frisian",
     "pashto": "pashto",
@@ -899,7 +900,6 @@
     "russian_contractions_1k",
     "tamil_old",
     "league_of_legends",
-    "typing_of_the_dead",
     "pokemon_1k"
   ],
   "sourceFiles": [

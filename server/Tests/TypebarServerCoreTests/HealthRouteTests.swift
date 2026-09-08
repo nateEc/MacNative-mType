@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 156)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 157)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4197,6 +4197,7 @@ final class HealthRouteTests: XCTestCase {
       ("oldEnglish", "Se mann gæþ on weg, and se wind blæwþ ofer feld."),
       ("frenchBitoduc", "Le souriclic réveille le codimoulin, puis la boguette disparaît."),
       ("twitchEmotes", "TypeHype KeyJam WpmWave SwiftSmile CocoaClap MacMirth"),
+      ("typingOfTheDead", "The hallway is breathing, but the exit sign points downward."),
       ("swedishDiacritics", "Öva på å, ä och ö med lugn rytm."),
       ("portugueseAccents", "A manhã começa com atenção à próxima página."),
       ("russianAbbreviations", "МГУ и РАН используют короткие заглавные формы."),

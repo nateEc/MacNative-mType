@@ -4483,6 +4483,34 @@ enum OfflineContent {
       language: .twitchEmotes,
       length: .extended
     ),
+    OfflineQuote(
+      id: "arcade-horror-hallway",
+      title: "The breathing hallway",
+      text: "The hallway is breathing! Keep typing, the door is near.",
+      language: .typingOfTheDead,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "arcade-horror-exit",
+      title: "The downward exit",
+      text: "The exit sign points downward. A pale cursor crossed the wall, and the basement bell rang twice.",
+      language: .typingOfTheDead,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "arcade-horror-high-score",
+      title: "The changing score",
+      text: "An old high score changed itself while the speaker counted backward. The keyboard grew warm, a second heartbeat joined yours, and a blank screen watched from the corner. Finish the next line before the cabinet asks for another coin.",
+      language: .typingOfTheDead,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "arcade-horror-last-round",
+      title: "One last round",
+      text: "The arcade locked its doors at midnight, but one cabinet remained awake. Static crawled across its glass while the score spelled a name nobody had entered. Each correct word moved the loading bar backward; each pause brought the hidden footsteps closer. A cold hand pressed Return, the coin slot began to breathe, and the dark screen offered one final rule: finish the line before the hallway learns your voice.",
+      language: .typingOfTheDead,
+      length: .extended
+    ),
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {

@@ -7922,6 +7922,55 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(punctuatedWords[7].hasSuffix("."))
   }
 
+  func testTypingOfTheDeadUsesOriginalPhraseSectionsAndOriginalPunctuation() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "typingOfTheDead"))
+    let words = language.ownedPracticeWords()
+    let sections = StarterLexicon.typingOfTheDeadSections
+
+    XCTAssertEqual(language.displayName, "Arcade Horror Phrases · Typebar")
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unsupported)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertEqual(sections.count, 64)
+    XCTAssertEqual(Set(sections).count, sections.count)
+    XCTAssertTrue(sections.allSatisfy { (3...41).contains($0.count) && $0.contains(" ") })
+    XCTAssertTrue(sections.allSatisfy { $0.range(of: "[A-Z]", options: .regularExpression) != nil })
+    XCTAssertTrue(sections.allSatisfy { $0.range(of: "[,.!?]", options: .regularExpression) != nil })
+    XCTAssertGreaterThan(words.count, 100)
+    XCTAssertEqual(Set(words).count, words.count)
+    XCTAssertTrue(words.allSatisfy { $0.range(of: "^[a-z]+$", options: .regularExpression) != nil })
+
+    let plain = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+    let plainWords = plain.split(separator: " ").map(String.init)
+    XCTAssertEqual(plainWords.count, 25)
+    XCTAssertTrue(plainWords.allSatisfy { $0.range(of: "^[a-z]+$", options: .regularExpression) != nil })
+
+    let punctuated = OfflineContent.generatedPrompt(
+      wordCount: 25, language: language,
+      contentOptions: ContentOptions(includePunctuation: true))
+    XCTAssertEqual(punctuated.split(separator: " ").count, 25)
+    XCTAssertNotNil(punctuated.range(of: "[A-Z]", options: .regularExpression))
+    XCTAssertNotNil(punctuated.range(of: "[,.!?]", options: .regularExpression))
+
+    let numbered = OfflineContent.generatedPrompt(
+      wordCount: 25, language: language,
+      contentOptions: ContentOptions(includeNumbers: true))
+      .split(separator: " ").map(String.init)
+    XCTAssertEqual(numbered.count, 25)
+    XCTAssertEqual(numbered[0], "1")
+    XCTAssertEqual(numbered[9], "2")
+    XCTAssertEqual(numbered[18], "3")
+
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let quotes = OfflineContent.quotes(for: language, length: length)
+      XCTAssertEqual(quotes.count, 1)
+      XCTAssertEqual(quotes.first?.language, language)
+    }
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9139,6 +9188,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.loremIpsumWords,
       StarterLexicon.gitWords,
       StarterLexicon.twitchEmoteWords,
+      StarterLexicon.typingOfTheDeadWords,
       StarterLexicon.friulianWords,
       StarterLexicon.malagasyWords,
       StarterLexicon.welshWords,
@@ -9234,7 +9284,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 147)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 148)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(

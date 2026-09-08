@@ -222,6 +222,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case loremIpsum
   case git
   case twitchEmotes
+  case typingOfTheDead
   case friulian
   case malagasy
   case welsh
@@ -3901,6 +3902,41 @@ enum StarterLexicon {
     "Type:)", "Key:D", "Wpm<3", "Chat:)", "Focus:D", "Speed<3", "HypeMode", "CheerLoop", "StreamGlow", "RaidReady",
   ]
 
+  // Original campy arcade-horror sections. The pinned generator treats a
+  // multi-word entry as one section, then emits its words individually; no
+  // phrase, title, or other content is imported from the reference project.
+  static let typingOfTheDeadSections = [
+    "The hallway is breathing!", "Do not wake the arcade.", "A red moon found us.",
+    "The elevator knows your name.", "Keep typing, the door is near.", "Static crawls across the glass.",
+    "That shadow has too many hands.", "The basement bell rang twice.", "Someone moved behind the score.",
+    "Your last token was not alone.", "The exit sign points downward.", "Never trust a smiling portrait.",
+    "The keyboard is warm again.", "Three footsteps, then silence.", "The cabinet wants another coin.",
+    "Fog is waiting in the lobby.", "A pale cursor crossed the wall.", "The clock forgot midnight.",
+    "No reflection follows you.", "The machine whispered, Continue?", "One chair is facing the corner.",
+    "The power failed, but it blinked.", "Do you hear the empty channel?", "A cold hand pressed Return.",
+    "Every window shows the same room.", "The stairs added one more step.", "Something laughed under the desk.",
+    "The final key is still missing.", "An old high score changed itself.", "The speaker counted backward.",
+    "A second heartbeat joined yours.", "The map ends at this hallway.", "Do not answer the ringing phone.",
+    "The floor remembers every name.", "A tiny light moved in the vent.", "The lock opened from inside.",
+    "Someone saved over your shadow.", "The rain is falling upward.", "A blank screen watched us leave.",
+    "The next room has no ceiling.", "The walls repeat your mistakes.", "Your chair moved one inch closer.",
+    "The mirror loaded too slowly.", "A black key appeared at dawn.", "The hallway copied your voice.",
+    "No one entered, yet it waved.", "The old printer asked for blood.", "A quiet laugh hid in the fan.",
+    "The cursor refuses to go home.", "That window was not there before.", "The score keeps spelling HELP.",
+    "A soft knock came from the screen.", "The lights blink in perfect rhythm.", "The game paused by itself.",
+    "A new player has no face.", "The cabinet door is unlocked.", "Do not follow the blue cable.",
+    "The loading bar moved backward.", "Your name appeared in the static.", "One more round, said the dark.",
+    "The final room is already open.", "The coin slot is breathing.", "A whisper lives between the keys.",
+    "Finish the line before it sees us.",
+  ]
+
+  static let typingOfTheDeadWords: [String] = {
+    let words = typingOfTheDeadSections.flatMap { section in
+      section.lowercased().split { !$0.isLetter }.map(String.init)
+    }
+    return Array(Set(words)).sorted()
+  }()
+
   // Typebar-authored Friulian starter words provide a compact local practice
   // vocabulary without importing the reference dictionary or word list.
   static let friulianWords = [
@@ -5032,6 +5068,9 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: twitchEmoteWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .typingOfTheDead:
+      return sectionPrompt(
+        tokens: count, sections: typingOfTheDeadSections, contentOptions: contentOptions)
     case .friulian:
       return prompt(
         tokens: count, lexicon: friulianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5600,6 +5639,28 @@ enum StarterLexicon {
     }.joined(separator: separator)
   }
 
+  private static func sectionPrompt(
+    tokens: Int, sections: [String], contentOptions: ContentOptions
+  ) -> String {
+    precondition(!sections.isEmpty)
+    var words: [String] = []
+    while words.count < tokens {
+      let section = sections[Int.random(in: sections.indices)]
+      if contentOptions.includePunctuation {
+        words.append(contentsOf: section.split(whereSeparator: \.isWhitespace).map(String.init))
+      } else {
+        words.append(contentsOf: section.lowercased().split { !$0.isLetter }.map(String.init))
+      }
+    }
+    words = Array(words.prefix(tokens))
+    if contentOptions.includeNumbers {
+      for index in words.indices where index.isMultiple(of: 9) {
+        words[index] = String(index / 9 + 1)
+      }
+    }
+    return words.joined(separator: " ")
+  }
+
   private static func source(for language: TypingLanguage, englishVariant: EnglishVariant) -> (
     [String], [String]
   ) {
@@ -5630,6 +5691,7 @@ enum StarterLexicon {
     case .loremIpsum: (loremIpsumWords, [",", ".", "!", "?"])
     case .git: (gitWords, [",", ".", "!", "?"])
     case .twitchEmotes: (twitchEmoteWords, [",", ".", "!", "?"])
+    case .typingOfTheDead: (typingOfTheDeadWords, [",", ".", "!", "?"])
     case .friulian: (friulianWords, [",", ".", "!", "?"])
     case .malagasy: (malagasyWords, [",", ".", "!", "?"])
     case .welsh: (welshWords, [",", ".", "!", "?"])
@@ -5854,6 +5916,7 @@ extension TypingLanguage {
     case .loremIpsum: StarterLexicon.loremIpsumWords
     case .git: StarterLexicon.gitWords
     case .twitchEmotes: StarterLexicon.twitchEmoteWords
+    case .typingOfTheDead: StarterLexicon.typingOfTheDeadWords
     case .friulian: StarterLexicon.friulianWords
     case .malagasy: StarterLexicon.malagasyWords
     case .welsh: StarterLexicon.welshWords
@@ -6002,7 +6065,7 @@ extension TypingLanguage {
     .oldEnglish,
     .kokanu,
     .likanu,
-    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .twitchEmotes, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .frenchBitoduc, .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
     .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianEndings,
@@ -6065,7 +6128,7 @@ extension TypingLanguage {
     case .english, .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical,
       .englishShakespearean,
-      .pigLatin, .loremIpsum, .git, .twitchEmotes, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
+      .pigLatin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
       .tamil, .hindi, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .bulgarianLatin,
@@ -6124,7 +6187,7 @@ extension TypingLanguage {
       .russian, .icelandic, .galician, .marathi:
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
-      .englishMedical, .kokanu, .likanu, .russianAbbreviations, .arabicMorocco, .sindhi, .armenian, .bemba,
+      .englishMedical, .kokanu, .likanu, .russianAbbreviations, .typingOfTheDead, .arabicMorocco, .sindhi, .armenian, .bemba,
       .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
@@ -6162,6 +6225,7 @@ extension TypingLanguage {
     case .loremIpsum: "Lorem Ipsum · Typebar"
     case .git: "Git"
     case .twitchEmotes: "Streaming Emotes · Typebar"
+    case .typingOfTheDead: "Arcade Horror Phrases · Typebar"
     case .friulian: "Friulian"
     case .malagasy: "Malagasy"
     case .welsh: "Cymraeg"
