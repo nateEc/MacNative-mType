@@ -10826,6 +10826,8 @@ final class TypingEngineTests: XCTestCase {
           ? CharacterSet(charactersIn: "།")
           : language == .banglaLetters
             ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "।"))
+          : language == .git
+            ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "@-"))
           : language == .klingon
             ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "'"))
             : language == .lojbanCmavo
@@ -13851,10 +13853,10 @@ final class TypingEngineTests: XCTestCase {
     let metrics = [
       ResultMetric(
         finishedAt: Date(timeIntervalSince1970: 86_400 + 60), wpm: 40, accuracy: 90,
-        typingSeconds: 30, consistency: 70),
+        typingSeconds: 30, consistency: 70, restartCount: 2),
       ResultMetric(
-        finishedAt: Date(timeIntervalSince1970: 86_400 + 3_600), wpm: 50, accuracy: 90,
-        typingSeconds: 45, consistency: 90),
+        finishedAt: Date(timeIntervalSince1970: 86_400 + 3_600), wpm: 51, accuracy: 81,
+        typingSeconds: 45, consistency: 90, restartCount: 1),
       ResultMetric(
         finishedAt: Date(timeIntervalSince1970: 172_800 + 60), wpm: 60, accuracy: 90,
         typingSeconds: 15, consistency: 50),
@@ -13862,7 +13864,11 @@ final class TypingEngineTests: XCTestCase {
     let activity = ActivityAggregation.daily(metrics: metrics, calendar: calendar)
     XCTAssertEqual(activity.map(\.completedTests), [2, 1])
     XCTAssertEqual(activity.map(\.typingSeconds), [75, 15])
+    XCTAssertEqual(activity.map(\.averageWPM), [45.5, 60])
+    XCTAssertEqual(activity.map(\.highestWPM), [51, 60])
+    XCTAssertEqual(activity.map(\.averageAccuracy), [85.5, 90])
     XCTAssertEqual(activity.map(\.averageConsistency), [80, 50])
+    XCTAssertEqual(activity.map(\.restartsPerCompletedTest), [1.5, 0])
   }
 
   func testRecentActivityBarsFillEveryRequestedDayWithoutCollapsingGaps() {
@@ -13872,8 +13878,11 @@ final class TypingEngineTests: XCTestCase {
     let activity = [
       DailyActivity(
         day: end.addingTimeInterval(-172_800), completedTests: 2, typingSeconds: 75,
-        averageConsistency: 80),
-      DailyActivity(day: end, completedTests: 1, typingSeconds: 30, averageConsistency: 50),
+        averageWPM: 45.5, highestWPM: 51, averageAccuracy: 85.5, averageConsistency: 80,
+        restartsPerCompletedTest: 1.5),
+      DailyActivity(
+        day: end, completedTests: 1, typingSeconds: 30, averageWPM: 60, highestWPM: 60,
+        averageAccuracy: 90, averageConsistency: 50, restartsPerCompletedTest: 0),
     ]
 
     let points = ActivityAggregation.recentDays(
@@ -13881,7 +13890,11 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(points.map(\.completedTests), [0, 2, 0, 1])
     XCTAssertEqual(points.map(\.typingSeconds), [0, 75, 0, 30])
+    XCTAssertEqual(points.map(\.averageWPM), [0, 45.5, 0, 60])
+    XCTAssertEqual(points.map(\.highestWPM), [0, 51, 0, 60])
+    XCTAssertEqual(points.map(\.averageAccuracy), [0, 85.5, 0, 90])
     XCTAssertEqual(points.map(\.averageConsistency), [0, 80, 0, 50])
+    XCTAssertEqual(points.map(\.restartsPerCompletedTest), [0, 1.5, 0, 0])
     XCTAssertEqual(
       points.map(\.day),
       [

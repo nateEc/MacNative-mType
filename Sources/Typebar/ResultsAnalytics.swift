@@ -1633,15 +1633,26 @@ struct DailyActivity: Equatable, Identifiable {
     let day: Date
     let completedTests: Int
     let typingSeconds: TimeInterval
+    let averageWPM: Double
+    let highestWPM: Int
+    let averageAccuracy: Double
     let averageConsistency: Double
+    let restartsPerCompletedTest: Double
 
     init(
-        day: Date, completedTests: Int, typingSeconds: TimeInterval, averageConsistency: Double = 0
+        day: Date, completedTests: Int, typingSeconds: TimeInterval, averageWPM: Double = 0,
+        highestWPM: Int = 0, averageAccuracy: Double = 0, averageConsistency: Double = 0,
+        restartsPerCompletedTest: Double = 0
     ) {
         self.day = day
         self.completedTests = completedTests
         self.typingSeconds = typingSeconds
+        self.averageWPM = max(0, averageWPM)
+        self.highestWPM = max(0, highestWPM)
+        self.averageAccuracy = min(100, max(0, averageAccuracy))
         self.averageConsistency = averageConsistency.isFinite ? min(100, max(0, averageConsistency)) : 0
+        self.restartsPerCompletedTest = restartsPerCompletedTest.isFinite
+          ? max(0, restartsPerCompletedTest) : 0
     }
 
     var id: Date { day }
@@ -1653,15 +1664,26 @@ struct ActivityBarPoint: Equatable, Identifiable {
     let day: Date
     let completedTests: Int
     let typingSeconds: TimeInterval
+    let averageWPM: Double
+    let highestWPM: Int
+    let averageAccuracy: Double
     let averageConsistency: Double
+    let restartsPerCompletedTest: Double
 
     init(
-        day: Date, completedTests: Int, typingSeconds: TimeInterval, averageConsistency: Double = 0
+        day: Date, completedTests: Int, typingSeconds: TimeInterval, averageWPM: Double = 0,
+        highestWPM: Int = 0, averageAccuracy: Double = 0, averageConsistency: Double = 0,
+        restartsPerCompletedTest: Double = 0
     ) {
         self.day = day
         self.completedTests = completedTests
         self.typingSeconds = typingSeconds
+        self.averageWPM = max(0, averageWPM)
+        self.highestWPM = max(0, highestWPM)
+        self.averageAccuracy = min(100, max(0, averageAccuracy))
         self.averageConsistency = averageConsistency.isFinite ? min(100, max(0, averageConsistency)) : 0
+        self.restartsPerCompletedTest = restartsPerCompletedTest.isFinite
+          ? max(0, restartsPerCompletedTest) : 0
     }
 
     var id: Date { day }
@@ -1691,11 +1713,17 @@ enum ActivityAggregation {
             practiceDay(for: $0.finishedAt, dayBoundaryOffsetHours: dayBoundaryOffsetHours, calendar: calendar)
         }
         return grouped.map { day, values in
-            DailyActivity(
+            let completedTests = values.count
+            let totalRestarts = values.map(\.restartCount).reduce(0, +)
+            return DailyActivity(
                 day: day,
-                completedTests: values.count,
+                completedTests: completedTests,
                 typingSeconds: values.map(\.typingSeconds).reduce(0, +),
-                averageConsistency: values.map(\.consistency).reduce(0, +) / Double(values.count)
+                averageWPM: average(values.map(\.wpm)),
+                highestWPM: values.map(\.wpm).max() ?? 0,
+                averageAccuracy: average(values.map(\.accuracy)),
+                averageConsistency: values.map(\.consistency).reduce(0, +) / Double(completedTests),
+                restartsPerCompletedTest: Double(totalRestarts) / Double(completedTests)
             )
         }
         .sorted { $0.day < $1.day }
@@ -1736,9 +1764,18 @@ enum ActivityAggregation {
                 day: day,
                 completedTests: value?.completedTests ?? 0,
                 typingSeconds: value?.typingSeconds ?? 0,
-                averageConsistency: value?.averageConsistency ?? 0
+                averageWPM: value?.averageWPM ?? 0,
+                highestWPM: value?.highestWPM ?? 0,
+                averageAccuracy: value?.averageAccuracy ?? 0,
+                averageConsistency: value?.averageConsistency ?? 0,
+                restartsPerCompletedTest: value?.restartsPerCompletedTest ?? 0
             )
         }
+    }
+
+    private static func average(_ values: [Int]) -> Double {
+        guard !values.isEmpty else { return 0 }
+        return Double(values.reduce(0, +)) / Double(values.count)
     }
 
     static func practiceDay(

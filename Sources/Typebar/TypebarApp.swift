@@ -4128,7 +4128,11 @@ private struct ResultsHistoryView: View {
   fileprivate enum ActivityChartMeasure: String, CaseIterable, Identifiable {
     case completedTests
     case typingMinutes
+    case averageSpeed
+    case highestSpeed
+    case averageAccuracy
     case averageConsistency
+    case restartsPerCompletedTest
 
     var id: Self { self }
 
@@ -4136,7 +4140,11 @@ private struct ResultsHistoryView: View {
       switch self {
       case .completedTests: "完成次数"
       case .typingMinutes: "练习分钟"
+      case .averageSpeed: "平均速度"
+      case .highestSpeed: "最高速度"
+      case .averageAccuracy: "平均准确率"
       case .averageConsistency: "平均稳定度"
+      case .restartsPerCompletedTest: "每次完成重开"
       }
     }
   }
@@ -4264,7 +4272,9 @@ private struct ResultsHistoryView: View {
               .padding(.horizontal)
               .padding(.top, 8)
 
-            ActivityBarChartView(points: recentActivity, measure: $activityChartMeasure)
+            ActivityBarChartView(
+              points: recentActivity, measure: $activityChartMeasure,
+              speedUnit: settings.typingSpeedUnit, startsAtZero: settings.startGraphsAtZero)
               .padding(.horizontal)
               .padding(.top, 8)
 
@@ -4899,8 +4909,15 @@ private struct WPMHistogramView: View {
 private struct ActivityBarChartView: View {
   let points: [ActivityBarPoint]
   @Binding var measure: ResultsHistoryView.ActivityChartMeasure
+  let speedUnit: TypingSpeedUnit
+  let startsAtZero: Bool
 
-  private var yTitle: String { measure.title }
+  private var yTitle: String {
+    switch measure {
+    case .averageSpeed, .highestSpeed: speedUnit.displayName
+    default: measure.title
+    }
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
@@ -4912,17 +4929,19 @@ private struct ActivityBarChartView: View {
             Text(measure.title).tag(measure)
           }
         }
-        .pickerStyle(.segmented)
-        .frame(width: 270)
+        .pickerStyle(.menu)
+        .frame(width: 180)
       }
       Chart(points) { point in
-        BarMark(
-          x: .value("日期", point.day, unit: .day),
-          y: .value(yTitle, value(for: point))
-        )
-        .foregroundStyle(Color.accentColor.gradient)
-        .accessibilityLabel(point.day.formatted(date: .abbreviated, time: .omitted))
-        .accessibilityValue(accessibilityValue(for: point))
+        if let value = value(for: point) {
+          BarMark(
+            x: .value("日期", point.day, unit: .day),
+            y: .value(yTitle, value)
+          )
+          .foregroundStyle(Color.accentColor.gradient)
+          .accessibilityLabel(point.day.formatted(date: .abbreviated, time: .omitted))
+          .accessibilityValue(accessibilityValue(for: point))
+        }
       }
       .chartXAxis {
         AxisMarks(values: .stride(by: .weekOfYear)) { _ in
@@ -4930,16 +4949,31 @@ private struct ActivityBarChartView: View {
           AxisValueLabel(format: .dateTime.month().day())
         }
       }
-      .chartYScale(domain: .automatic(includesZero: true))
+      .chartYScale(domain: .automatic(includesZero: includesZero))
       .frame(height: 110)
     }
   }
 
-  private func value(for point: ActivityBarPoint) -> Double {
+  private var includesZero: Bool {
+    switch measure {
+    case .completedTests, .typingMinutes, .restartsPerCompletedTest: true
+    case .averageSpeed, .highestSpeed, .averageAccuracy, .averageConsistency: startsAtZero
+    }
+  }
+
+  private func value(for point: ActivityBarPoint) -> Double? {
     switch measure {
     case .completedTests: Double(point.completedTests)
     case .typingMinutes: point.typingSeconds / 60
-    case .averageConsistency: point.averageConsistency
+    case .averageSpeed:
+      point.completedTests > 0 ? speedUnit.converted(wpm: point.averageWPM) : nil
+    case .highestSpeed:
+      point.completedTests > 0 ? speedUnit.converted(wpm: Double(point.highestWPM)) : nil
+    case .averageAccuracy:
+      point.completedTests > 0 ? point.averageAccuracy : nil
+    case .averageConsistency:
+      point.completedTests > 0 ? point.averageConsistency : nil
+    case .restartsPerCompletedTest: point.restartsPerCompletedTest
     }
   }
 
@@ -4947,9 +4981,22 @@ private struct ActivityBarChartView: View {
     switch measure {
     case .completedTests: "\(point.completedTests) 次完成"
     case .typingMinutes: "\(Int((point.typingSeconds / 60).rounded())) 分钟练习"
+    case .averageSpeed:
+      "平均 \(formattedSpeed(point.averageWPM)) \(speedUnit.displayName)"
+    case .highestSpeed:
+      "最高 \(speedUnit.formatted(wpm: point.highestWPM)) \(speedUnit.displayName)"
+    case .averageAccuracy:
+      "\(point.averageAccuracy.formatted(.number.precision(.fractionLength(0...2))))% 平均准确率"
     case .averageConsistency:
       "\(point.averageConsistency.formatted(.number.precision(.fractionLength(0...2))))% 平均稳定度"
+    case .restartsPerCompletedTest:
+      "每次完成重开 \(point.restartsPerCompletedTest.formatted(.number.precision(.fractionLength(1)))) 次"
     }
+  }
+
+  private func formattedSpeed(_ wpm: Double) -> String {
+    speedUnit.converted(wpm: wpm).formatted(
+      .number.precision(.fractionLength(0...2)))
   }
 }
 
