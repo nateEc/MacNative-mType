@@ -7971,6 +7971,47 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testCreatureIndex1kPreservesLargeEntryAndTokenShapes() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "pokemon1k"))
+    let entries = language.ownedPracticeWords()
+
+    XCTAssertEqual(language.displayName, "Creature Index 1k · Typebar")
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unsupported)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en")
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertEqual(entries.count, 1_025)
+    XCTAssertEqual(Set(entries).count, entries.count)
+    XCTAssertTrue(entries.allSatisfy { (3...12).contains($0.count) })
+    XCTAssertEqual(entries.filter { $0.contains(" ") }.count, 28)
+    XCTAssertEqual(
+      entries.filter { $0.range(of: "[^[:alnum:] ]", options: .regularExpression) != nil }.count,
+      17)
+    XCTAssertEqual(
+      entries.filter { $0.range(of: "[0-9]", options: .regularExpression) != nil }.count,
+      1)
+    XCTAssertTrue(entries.allSatisfy {
+      !($0.range(of: "[0-9]", options: .regularExpression) != nil
+        && $0.range(of: "[^[:alnum:] ]", options: .regularExpression) != nil)
+    })
+
+    let plain = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+    XCTAssertEqual(plain.split(separator: " ").count, 25)
+
+    let punctuated = OfflineContent.generatedPrompt(
+      wordCount: 25, language: language,
+      contentOptions: ContentOptions(includePunctuation: true))
+    XCTAssertEqual(punctuated.split(separator: " ").count, 25)
+
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let quotes = OfflineContent.quotes(for: language, length: length)
+      XCTAssertEqual(quotes.count, 1)
+      XCTAssertEqual(quotes.first?.language, language)
+    }
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9175,6 +9216,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.oldEnglishWords,
       StarterLexicon.kokanuWords,
       StarterLexicon.likanuWords,
+      StarterLexicon.creatureIndexTokens,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.swissGermanWords,
       StarterLexicon.afrikaansWords,
@@ -9284,7 +9326,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 148)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 149)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(

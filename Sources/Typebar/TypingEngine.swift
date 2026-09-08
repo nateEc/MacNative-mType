@@ -223,6 +223,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case git
   case twitchEmotes
   case typingOfTheDead
+  case pokemon1k
   case friulian
   case malagasy
   case welsh
@@ -3937,6 +3938,41 @@ enum StarterLexicon {
     return Array(Set(words)).sorted()
   }()
 
+  // A Typebar-authored field guide of fictional creature names. The Cartesian
+  // base keeps the 1k-scale catalog compact and auditable; the replacements
+  // preserve multi-word, symbol, and digit practice without importing any
+  // franchise names, lore, images, or reference word values.
+  static let creatureIndexEntries: [String] = {
+    let prefixes = [
+      "ash", "ember", "aqua", "mist", "frost", "storm", "spark", "volt", "moss", "fern",
+      "root", "bloom", "thorn", "dune", "sand", "rock", "iron", "copper", "silver", "lunar",
+      "solar", "star", "void", "dusk", "dawn", "cloud", "rain", "wind", "flare", "glow",
+      "echo", "rune", "prism", "coral", "shell", "fin", "wing", "claw", "fang", "tail", "shade",
+    ]
+    let suffixes = [
+      "ling", "pup", "cub", "kit", "mote", "bug", "bat", "owl", "fox", "lynx",
+      "hare", "ram", "yak", "ray", "eel", "koi", "frog", "newt", "crab", "moth",
+      "bird", "horn", "leaf", "bloom", "wisp",
+    ]
+    let shapedEntries = [
+      "ash cub", "aqua ray", "mist fox", "frost owl", "storm ram", "spark eel", "volt koi",
+      "moss hare", "fern moth", "root newt", "bloom bug", "thorn bat", "dune yak", "sand crab",
+      "rock frog", "iron bird", "copper fin", "silver fox", "lunar lynx", "solar wisp", "star pup",
+      "void kit", "dusk cub", "dawn ray", "cloud eel", "rain koi", "wind fox", "flare owl",
+      "ash-kit", "mist.wisp", "rock:ling", "dawn'cub", "voltfox♂", "voltfox♀", "moss-ray",
+      "sand.kit", "iron:owl", "star'fin", "cloud-bat", "rain.newt", "dusk:ram", "coral'koi",
+      "wing-moth", "shade:bug", "unit2", "echo-frog",
+    ]
+    var entries = prefixes.flatMap { prefix in suffixes.map { prefix + $0 } }
+    entries.replaceSubrange(0..<shapedEntries.count, with: shapedEntries)
+    return entries
+  }()
+
+  static let creatureIndexTokens: [String] = {
+    Array(Set(creatureIndexEntries.flatMap { $0.split(whereSeparator: \.isWhitespace).map(String.init) }))
+      .sorted()
+  }()
+
   // Typebar-authored Friulian starter words provide a compact local practice
   // vocabulary without importing the reference dictionary or word list.
   static let friulianWords = [
@@ -5071,6 +5107,9 @@ enum StarterLexicon {
     case .typingOfTheDead:
       return sectionPrompt(
         tokens: count, sections: typingOfTheDeadSections, contentOptions: contentOptions)
+    case .pokemon1k:
+      return entryPrompt(
+        tokens: count, entries: creatureIndexEntries, contentOptions: contentOptions)
     case .friulian:
       return prompt(
         tokens: count, lexicon: friulianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5661,6 +5700,30 @@ enum StarterLexicon {
     return words.joined(separator: " ")
   }
 
+  private static func entryPrompt(
+    tokens: Int, entries: [String], contentOptions: ContentOptions
+  ) -> String {
+    let eligibleEntries = contentOptions.includePunctuation
+      ? entries
+      : entries.filter { entry in entry.allSatisfy { $0.isLetter || $0.isNumber || $0.isWhitespace } }
+    precondition(!eligibleEntries.isEmpty)
+    var words: [String] = []
+    while words.count < tokens {
+      let entry = eligibleEntries[Int.random(in: eligibleEntries.indices)]
+      words.append(contentsOf: entry.split(whereSeparator: \.isWhitespace).map(String.init))
+    }
+    words = Array(words.prefix(tokens))
+    for index in words.indices {
+      if contentOptions.includeNumbers, index.isMultiple(of: 9) {
+        words[index] = String(index / 9 + 1)
+      } else if contentOptions.includePunctuation, index.isMultiple(of: 7) {
+        let punctuation = [",", ".", "!", "?"]
+        words[index] += punctuation[index / 7 % punctuation.count]
+      }
+    }
+    return words.joined(separator: " ")
+  }
+
   private static func source(for language: TypingLanguage, englishVariant: EnglishVariant) -> (
     [String], [String]
   ) {
@@ -5692,6 +5755,7 @@ enum StarterLexicon {
     case .git: (gitWords, [",", ".", "!", "?"])
     case .twitchEmotes: (twitchEmoteWords, [",", ".", "!", "?"])
     case .typingOfTheDead: (typingOfTheDeadWords, [",", ".", "!", "?"])
+    case .pokemon1k: (creatureIndexTokens, [",", ".", "!", "?"])
     case .friulian: (friulianWords, [",", ".", "!", "?"])
     case .malagasy: (malagasyWords, [",", ".", "!", "?"])
     case .welsh: (welshWords, [",", ".", "!", "?"])
@@ -5917,6 +5981,7 @@ extension TypingLanguage {
     case .git: StarterLexicon.gitWords
     case .twitchEmotes: StarterLexicon.twitchEmoteWords
     case .typingOfTheDead: StarterLexicon.typingOfTheDeadWords
+    case .pokemon1k: StarterLexicon.creatureIndexEntries
     case .friulian: StarterLexicon.friulianWords
     case .malagasy: StarterLexicon.malagasyWords
     case .welsh: StarterLexicon.welshWords
@@ -6065,6 +6130,7 @@ extension TypingLanguage {
     .oldEnglish,
     .kokanu,
     .likanu,
+    .pokemon1k,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .frenchBitoduc, .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
@@ -6187,7 +6253,7 @@ extension TypingLanguage {
       .russian, .icelandic, .galician, .marathi:
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
-      .englishMedical, .kokanu, .likanu, .russianAbbreviations, .typingOfTheDead, .arabicMorocco, .sindhi, .armenian, .bemba,
+      .englishMedical, .kokanu, .likanu, .russianAbbreviations, .typingOfTheDead, .pokemon1k, .arabicMorocco, .sindhi, .armenian, .bemba,
       .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
@@ -6226,6 +6292,7 @@ extension TypingLanguage {
     case .git: "Git"
     case .twitchEmotes: "Streaming Emotes · Typebar"
     case .typingOfTheDead: "Arcade Horror Phrases · Typebar"
+    case .pokemon1k: "Creature Index 1k · Typebar"
     case .friulian: "Friulian"
     case .malagasy: "Malagasy"
     case .welsh: "Cymraeg"

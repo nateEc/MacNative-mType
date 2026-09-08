@@ -4511,6 +4511,34 @@ enum OfflineContent {
       language: .typingOfTheDead,
       length: .extended
     ),
+    OfflineQuote(
+      id: "creature-index-trail",
+      title: "Trail note",
+      text: "An emberling crossed the quiet marsh before dawn.",
+      language: .pokemon1k,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "creature-index-river",
+      title: "River survey",
+      text: "The field guide marks a mossray beside the northern pool, where two cloudnewts surface after rain.",
+      language: .pokemon1k,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "creature-index-ridge",
+      title: "Ridge journal",
+      text: "At first light, our survey team followed silver tracks from the reed beds to the ridge. A shy lunarcub watched from the stones while three prismwings circled above the old weather mast, each flashing a different color before the valley fog returned.",
+      language: .pokemon1k,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "creature-index-expedition",
+      title: "Expedition log",
+      text: "The expedition began with an empty map and a patient rule: observe before naming. By noon we had recorded an aquaray under the bridge, a pair of frostowls in the cedar shade, and a tiny echofrog answering every tap on the compass case. None behaved like the sketches in older journals. We measured their tracks, noted the wind, and left each habitat exactly as we found it. Back at camp, the new field guide felt less like a list of trophies and more like an invitation to pay closer attention tomorrow.",
+      language: .pokemon1k,
+      length: .extended
+    ),
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {

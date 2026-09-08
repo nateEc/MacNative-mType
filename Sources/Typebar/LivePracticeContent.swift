@@ -151,7 +151,7 @@ enum LivePracticeContentService {
     case .english, .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
       .englishDoubleLetter, .englishLegal, .englishMedical, .englishShakespearean,
       .oldEnglish, .pigLatin, .loremIpsum, .git, .ukrainianEndings, .ukrainianLatynkaEndings,
-      .mixedEnglishChinese, .mixedLanguages:
+      .pokemon1k, .mixedEnglishChinese, .mixedLanguages:
       return "en"
     case .kokanu: return "xxs"
     case .likanu: return "xxs"

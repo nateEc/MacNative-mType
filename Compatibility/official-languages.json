@@ -672,6 +672,7 @@
     "code_yoptascript": "codeYoptaScript",
     "code_cuda": "codeCUDA",
     "kinyarwanda": "kinyarwanda",
+    "pokemon_1k": "pokemon1k",
     "kokanu": "kokanu",
     "likanu": "likanu",
     "code_vhdl": "codeVHDL",
@@ -899,8 +900,7 @@
     "russian_contractions",
     "russian_contractions_1k",
     "tamil_old",
-    "league_of_legends",
-    "pokemon_1k"
+    "league_of_legends"
   ],
   "sourceFiles": [
     "packages/schemas/src/languages.ts",
