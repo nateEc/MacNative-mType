@@ -365,6 +365,17 @@ public func configure(
         }
     }
 
+    app.patch("v1", "profiles", "me", "streak-day-boundary") { request async throws -> AuthUserResponse in
+        do {
+            return try await authStore.setStreakDayBoundary(
+                request.content.decode(SetStreakDayBoundaryRequest.self),
+                accessToken: try request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.get("v1", "profiles") { request async throws -> PublicProfileSearchResponse in
         do {
             let query = try request.query.decode(ProfileSearchQuery.self)
@@ -868,7 +879,7 @@ public enum ServiceCapabilityStatus: String, Content, Equatable {
 private extension AuthStoreError {
     var abort: Abort {
         switch self {
-        case .invalidEmail, .invalidDisplayName, .weakPassword, .invalidOAuthIdentity, .invalidQuoteSubmission, .cannotReportSelf, .invalidProfileReport, .invalidDirectMessage:
+        case .invalidEmail, .invalidDisplayName, .weakPassword, .invalidOAuthIdentity, .invalidQuoteSubmission, .cannotReportSelf, .invalidProfileReport, .invalidDirectMessage, .invalidStreakDayBoundary:
             Abort(.badRequest, reason: "The request did not meet Typebar account requirements.")
         case .emailAlreadyRegistered:
             Abort(.conflict, reason: "An account already exists for this email address.")
@@ -876,6 +887,8 @@ private extension AuthStoreError {
             Abort(.conflict, reason: "That OAuth identity is already linked to a Typebar account.")
         case .passwordAuthenticationAlreadyLinked:
             Abort(.conflict, reason: "Password authentication is already linked to this Typebar account.")
+        case .streakDayBoundaryAlreadySet:
+            Abort(.conflict, reason: "The public streak day boundary has already been set for this account.")
         case .cannotRemoveLastAuthentication:
             Abort(.conflict, reason: "A Typebar account must retain at least one authentication method.")
         case .oauthRegistrationNotRequired:

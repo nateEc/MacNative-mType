@@ -254,7 +254,7 @@
 - Hyperroll、Anishtro、Dusk、Panini 与 Panini Wide 自动化测试覆盖全部 ANSI Base/Shift 物理键、AltGr 基础层回退、双拇指提示、物理 Space 字母输出、Panini 宽位差异、反查、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
 - Sword、OPY、Ergo Split 46、Gralmak 与 Vitrimak 自动化测试覆盖全部 ANSI Base/Shift 物理键、AltGr 基础层回退、特殊字母与符号、可用反查、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
 - Persian Farsi/Standard Colemak、Miligram、Nokwts 与 Vylet v4 自动化测试覆盖全部 ANSI/ISO Base/Shift 物理键、组合音标、ZWNJ、数字行策略、AltGr 基础层回退、可用反查、设置归档及 Layout Fluid。实现不复制、打包或运行参考布局资产。
-- 完整客户端 `swift test` 通过 364 项、独立 Vapor 服务 `swift test` 通过 67 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
+- 完整客户端 `swift test` 通过 365 项、独立 Vapor 服务 `swift test` 通过 69 项；测试前后 `pgrep -ax Typebar` 均无输出，未启动图形应用。
 - 无限测试自动化覆盖 time、words 与自定义循环的 0 值配置、正向秒数/词数、提示扩展、无自动终止、Bail Out、长测试快捷键、预设/分享往返、旧配置冲突迁移及固定参考八项 `noInfiniteDuration` 修饰器；无限结果不保存、不上传，服务端继续拒绝 0 值正式成绩。
 - 结果字符分类自动化覆盖提前提交造成的跳过、词尾额外输入、强制物理键位错误、禅模式、旧归档保守回退、SwiftData 往返与 CSV 四列导出；实现从 Typebar 原生最终输入映射派生，不读取或导入参考结果逻辑、代码或资产。
 - 原生按键时序自动化覆盖 AppKit keyDown/repeat/keyUp 通路、闭合按住样本、连续按下间隔、多键重叠总时长、均值/总体标准差、未配对与结束边界、SwiftData/归档兼容和 CSV 导出；仅保存匿名时序，不复制参考事件代码或上传键码。
@@ -264,12 +264,12 @@
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
 - Discord 头像隐私测试覆盖默认不公开、显式开启、资料卡与 WPM/XP 榜显示、关闭后立即隐藏与非法哈希拒绝；客户端同时拒绝非 ASCII 标识与异常 CDN URL。
 - 原创公开徽章测试覆盖服务端成绩派生、未解锁拒绝、显式选择/清除、公开资料与 WPM/XP 榜显示、旧字段省略及删除服务端成绩后的即时隐藏。
-- 公开资料连续练习测试覆盖服务端 UTC 日界下的当前/最长连续派生、活动隐私开关联动隐藏，以及客户端对新旧资料响应的解码。
+- 公开资料连续练习测试覆盖默认 UTC、账户一次性半小时日界、跨 UTC 午夜的当前/最长连续与 365 天活动派生、重启持久化、非法/重复设置拒绝、认证路由、活动隐私联动隐藏，以及客户端对新旧日界字段的安全解码。
 - 公开资料练习统计测试覆盖服务端从已接受成绩起止时间聚合累计时长，以及按随完成提交的重开次数派生开始次数；重复提交同一成绩 ID 不会重复累加，客户端对新旧资料响应安全解码。未完成且未提交练习与本机历史不进入该值。
 - 引语长度与队列测试覆盖多选长度通过预设和 Typebar 配置链接保存、旧单长度配置迁移，以及同一候选集每轮不重复且避免立即重复当前引语；队列仅存于当前进程，不引入参考内容或实现。
 - 服务公告测试覆盖公开读取、部署审核密钥发布/删除、计划日期往返、空白公告拒绝、原生完整日期/日期/相对时间占位符替换，以及本机普通公告关闭、置顶公告保留和服务端移除后的本机确认清理；不复制参考文案、样式或实现。
 - 完整客户端 `swift test` 已通过 261 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
-- 独立 Vapor 服务的 `swift test` 已通过 67 项测试，其中覆盖 GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除、Discord 头像公开隐私、原创公开徽章、公开连续练习/开始次数隐私及服务公告；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
+- 独立 Vapor 服务的 `swift test` 已通过 69 项测试，其中覆盖 GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除、Discord 头像公开隐私、原创公开徽章、公开连续练习/账户日界/开始次数隐私及服务公告；测试前后 `pgrep -ax Typebar` 无输出，未启动图形应用。
 - Maltese 审计只读取 `maltese.json` 与 `maltese_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 `bcp47: mt`，不定义 RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的 Maltese 内容与 LTR 空格分词，知识短文和朗读均精确使用 `mt`。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - toki pona 审计只读取 `toki_pona.json`、`toki_pona_ku_suli.json` 与 `toki_pona_ku_lili.json` 的元数据，不读取其中词表或引语文本。三者定义 `noLazyMode: true`，不定义 BCP-47、RTL、连写或词频排序；实现因此使用独立自写的 toki pona 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。普通练习移除简化输入，自定义文本保留例外；Zipf 走未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - Xhosa 审计只读取 `xhosa.json` 与 `xhosa_3k.json` 的元数据，不读取其中词表或引语文本。主 `xhosa` 定义 `rightToLeft: false` 与 `bcp47: xh`，而 `xhosa_3k` 不定义这些可选字段；参考的在线与朗读代码按当前词组读取，因此前者使用 `xh`、后者回退 `en`／`en-US`。Typebar 使用独立自写的 isiXhosa 内容和 LTR 空格分词；其用户可见主选择精确使用 `xh`，不导入任一参考词表或引语。保留手动简化输入与 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。

@@ -23,6 +23,8 @@ struct PreferencesView: View {
   @State private var profileShowsActivity = true
   @State private var profileShowsDiscordAvatar = false
   @State private var profileSelectedBadgeID = ""
+  @State private var publicStreakDayBoundaryOffsetHours = 0.0
+  @State private var showingPublicStreakDayBoundaryConfirmation = false
   @State private var developerAccessKeyName = ""
   @State private var newlyCreatedDeveloperAccessKey: String?
   @State private var remoteResultsDeletionPassword = ""
@@ -1007,6 +1009,45 @@ struct PreferencesView: View {
             Text("隐藏后不会出现在全局或好友排行榜；已保存的服务端成绩、XP、本机历史与同步不受影响。")
               .font(.caption)
               .foregroundStyle(.secondary)
+            Divider()
+            VStack(alignment: .leading, spacing: 9) {
+              Text("公开连续练习日界").font(.headline)
+              Picker("日界相对 UTC", selection: $publicStreakDayBoundaryOffsetHours) {
+                ForEach(StreakDayBoundaryPolicy.supportedOffsets, id: \.self) { offset in
+                  Text(streakDayBoundaryLabel(for: offset)).tag(offset)
+                }
+              }
+              .disabled(user.streakDayBoundaryOffsetHours != nil || account.isWorking)
+              Button("固定公开日界") {
+                showingPublicStreakDayBoundaryConfirmation = true
+              }
+              .disabled(user.streakDayBoundaryOffsetHours != nil || account.isWorking)
+              Text(
+                user.streakDayBoundaryOffsetHours.map {
+                  "此账户已固定为 \(streakDayBoundaryLabel(for: $0))；公开活动日历与当前/最长连续天数使用该分界。"
+                }
+                  ?? "默认按 UTC 00:00 分日。可在 −11 至 +12 小时之间选择 30 分钟档位；确认后此账户不能再次更改。"
+              )
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            }
+            .onAppear {
+              publicStreakDayBoundaryOffsetHours = user.streakDayBoundaryOffsetHours ?? 0
+            }
+            .onChange(of: user.streakDayBoundaryOffsetHours) { _, offset in
+              publicStreakDayBoundaryOffsetHours = offset ?? 0
+            }
+            .alert("固定公开连续练习日界？", isPresented: $showingPublicStreakDayBoundaryConfirmation) {
+              Button("取消", role: .cancel) {}
+              Button("固定") {
+                Task {
+                  _ = await account.setPublicStreakDayBoundary(
+                    offsetHours: publicStreakDayBoundaryOffsetHours)
+                }
+              }
+            } message: {
+              Text("将固定为 \(streakDayBoundaryLabel(for: publicStreakDayBoundaryOffsetHours))。这个账户之后不能再次更改，但不会修改既有成绩时间。")
+            }
             Divider()
             VStack(alignment: .leading, spacing: 9) {
               Text("公开资料").font(.headline)

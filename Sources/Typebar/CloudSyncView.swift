@@ -569,7 +569,7 @@ private struct PublicProfileActivityCalendar: View {
                 Text("近 12 个月公开活动")
                     .font(.headline)
                 Spacer()
-                Text("按 UTC 日聚合")
+                Text(dayBoundaryLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -596,6 +596,13 @@ private struct PublicProfileActivityCalendar: View {
     private func opacity(for count: Int) -> Double {
         guard count > 0 else { return 0.1 }
         return 0.25 + 0.75 * min(1, Double(count) / Double(maximum))
+    }
+
+    private var dayBoundaryLabel: String {
+        let offset = activity.dayBoundaryOffsetHours
+        guard offset != 0 else { return "按 UTC 日聚合" }
+        let magnitude = offset.magnitude.formatted(.number.precision(.fractionLength(0...1)))
+        return "按账户日界 UTC\(offset > 0 ? "+" : "−")\(magnitude)"
     }
 
     private func dayLabel(offset: Int) -> String {

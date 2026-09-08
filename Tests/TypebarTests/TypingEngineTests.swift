@@ -439,6 +439,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(modern.totalTypingSeconds, 135.5)
   }
 
+  func testRemoteAccountAndActivityDecodeStreakDayBoundaryCompatibly() throws {
+    let id = UUID()
+    let legacyUser = try JSONDecoder().decode(
+      RemoteAccountUser.self,
+      from: Data(
+        """
+        {"id":"\(id.uuidString)","email":"local@example.com","displayName":"Local","totalExperience":0}
+        """.utf8))
+    XCTAssertNil(legacyUser.streakDayBoundaryOffsetHours)
+
+    let currentUser = try JSONDecoder().decode(
+      RemoteAccountUser.self,
+      from: Data(
+        """
+        {"id":"\(id.uuidString)","email":"local@example.com","displayName":"Local","totalExperience":0,"streakDayBoundaryOffsetHours":-3.5}
+        """.utf8))
+    XCTAssertEqual(currentUser.streakDayBoundaryOffsetHours, -3.5)
+
+    let legacyActivity = try JSONDecoder().decode(
+      RemotePublicProfileActivity.self,
+      from: Data(#"{"lastDay":1000,"testsByDays":[1,0]}"#.utf8))
+    XCTAssertEqual(legacyActivity.dayBoundaryOffsetHours, 0)
+    let shiftedActivity = try JSONDecoder().decode(
+      RemotePublicProfileActivity.self,
+      from: Data(#"{"lastDay":1000,"testsByDays":[1,1],"dayBoundaryOffsetHours":5.5}"#.utf8))
+    XCTAssertEqual(shiftedActivity.dayBoundaryOffsetHours, 5.5)
+  }
+
   func testWordsTestCompletesAtWordLimit() {
     var session = TypingSession(configuration: .words(2), prompt: "amber harbor quiet")
     session.insert("amber harbor", at: start)

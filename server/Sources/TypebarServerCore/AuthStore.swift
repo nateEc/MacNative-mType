@@ -172,6 +172,14 @@ public struct UpdateProfileRequest: Content, Equatable {
   }
 }
 
+public struct SetStreakDayBoundaryRequest: Content, Equatable {
+  public let offsetHours: Double
+
+  public init(offsetHours: Double) {
+    self.offsetHours = offsetHours
+  }
+}
+
 /// A scoped credential for automation clients. It deliberately has no account
 /// management authority: Typebar only accepts it when receiving a result.
 public struct DeveloperAccessKey: Content, Equatable, Identifiable, Sendable {
@@ -329,6 +337,9 @@ public struct AuthUserResponse: Content, Equatable {
   public let authenticationMethods: [AuthenticationMethod]
   public let availableBadges: [PublicProfileBadge]
   public let selectedBadgeID: String?
+  /// Nil until the account makes its one permitted explicit choice. Zero is
+  /// therefore distinct from an older account that still uses the default.
+  public let streakDayBoundaryOffsetHours: Double?
 }
 
 public struct PublicProfileResponse: Content, Equatable {
@@ -378,15 +389,18 @@ public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
   public let finishedAt: Date
 }
 
-/// A UTC 12-month activity timeline. The detail endpoint returns this compact
-/// aggregate only; nested profiles in lists intentionally omit it.
+/// A 12-month activity timeline grouped by the account's fixed day boundary.
+/// The detail endpoint returns this compact aggregate only; nested profiles in
+/// lists intentionally omit it.
 public struct PublicProfileActivityResponse: Content, Equatable {
   public let lastDay: Date
   public let testsByDays: [Int]
+  public let dayBoundaryOffsetHours: Double
 }
 
-/// A UTC-derived public streak summary. It shares the activity visibility
-/// preference and never includes individual result timestamps.
+/// A public streak summary derived using the same fixed boundary as activity.
+/// It shares the activity visibility preference and never includes individual
+/// result timestamps.
 public struct PublicProfileStreakResponse: Content, Equatable {
   public let currentDays: Int
   public let longestDays: Int
@@ -413,6 +427,8 @@ public enum AuthStoreError: Error, Equatable {
   case cannotRemoveLastAuthentication
   case invalidReauthenticationToken
   case invalidProfileDetails
+  case invalidStreakDayBoundary
+  case streakDayBoundaryAlreadySet
   case invalidOAuthTransaction
   case oauthRegistrationNotRequired
   case profileNotFound
@@ -471,6 +487,7 @@ public actor AuthStore {
     var results: [StoredResult] = []
     var connections: [StoredConnection] = []
     var blockedUserIDs: [UUID: [UUID]] = [:]
+    var streakDayBoundaryOffsets: [UUID: Double] = [:]
     var quoteSubmissions: [StoredQuoteSubmission] = []
     var quoteRatings: [StoredQuoteRating] = []
     var notifications: [StoredNotification] = []
@@ -481,7 +498,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, quoteSubmissions,
+      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, streakDayBoundaryOffsets, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
         nextSyncCursor
     }
@@ -509,6 +526,8 @@ public actor AuthStore {
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
       blockedUserIDs =
         try values.decodeIfPresent([UUID: [UUID]].self, forKey: .blockedUserIDs) ?? [:]
+      streakDayBoundaryOffsets =
+        try values.decodeIfPresent([UUID: Double].self, forKey: .streakDayBoundaryOffsets) ?? [:]
       quoteSubmissions =
         try values.decodeIfPresent([StoredQuoteSubmission].self, forKey: .quoteSubmissions) ?? []
       quoteRatings =
@@ -1639,6 +1658,7 @@ public actor AuthStore {
       guard pair.key != userID else { return }
       filtered[pair.key] = pair.value.filter { $0 != userID }
     }
+    state.streakDayBoundaryOffsets.removeValue(forKey: userID)
     try persist()
   }
 
@@ -1663,6 +1683,21 @@ public actor AuthStore {
     state.users[index] = updatedUser
     try persist()
     return userResponse(for: updatedUser)
+  }
+
+  public func setStreakDayBoundary(
+    _ request: SetStreakDayBoundaryRequest, accessToken: String, now: Date = .now
+  ) throws -> AuthUserResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    let offset = request.offsetHours
+    guard offset.isFinite, (-11...12).contains(offset), offset * 2 == (offset * 2).rounded()
+    else { throw AuthStoreError.invalidStreakDayBoundary }
+    guard state.streakDayBoundaryOffsets[user.id] == nil else {
+      throw AuthStoreError.streakDayBoundaryAlreadySet
+    }
+    state.streakDayBoundaryOffsets[user.id] = offset == 0 ? 0 : offset
+    try persist()
+    return try userResponse(for: user.id)
   }
 
   public func publicProfile(id: UUID, now: Date = .now) throws -> PublicProfileResponse {
@@ -2234,10 +2269,17 @@ public actor AuthStore {
   private func detailedPublicProfile(for user: StoredUser, now: Date) -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
     let shouldShowActivity = user.profileDetails.showActivity
+    let dayBoundaryOffsetHours = state.streakDayBoundaryOffsets[user.id] ?? 0
     return publicProfile(
       for: user, results: results,
-      activity: shouldShowActivity ? publicActivity(from: results, endingAt: now) : nil,
-      streak: shouldShowActivity ? publicStreak(from: results, endingAt: now) : nil)
+      activity: shouldShowActivity
+        ? publicActivity(
+          from: results, endingAt: now, dayBoundaryOffsetHours: dayBoundaryOffsetHours)
+        : nil,
+      streak: shouldShowActivity
+        ? publicStreak(
+          from: results, endingAt: now, dayBoundaryOffsetHours: dayBoundaryOffsetHours)
+        : nil)
   }
 
   private func publicProfile(
@@ -2302,17 +2344,20 @@ public actor AuthStore {
     return .init(subject: identity.subject, avatarHash: avatarHash)
   }
 
-  private func publicActivity(from results: [StoredResult], endingAt now: Date)
+  private func publicActivity(
+    from results: [StoredResult], endingAt now: Date, dayBoundaryOffsetHours: Double
+  )
     -> PublicProfileActivityResponse?
   {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let lastDay = calendar.startOfDay(for: now)
+    let lastDay = logicalPracticeDay(for: now, offsetHours: dayBoundaryOffsetHours, calendar: calendar)
     guard let firstDay = calendar.date(byAdding: .day, value: -364, to: lastDay) else { return nil }
     var testsByDays = Array(repeating: 0, count: 365)
 
     for result in results {
-      let resultDay = calendar.startOfDay(for: result.finishedAt)
+      let resultDay = logicalPracticeDay(
+        for: result.finishedAt, offsetHours: dayBoundaryOffsetHours, calendar: calendar)
       guard resultDay >= firstDay, resultDay <= lastDay else { continue }
       let offset = calendar.dateComponents([.day], from: firstDay, to: resultDay).day ?? -1
       guard testsByDays.indices.contains(offset) else { continue }
@@ -2320,7 +2365,9 @@ public actor AuthStore {
     }
 
     guard testsByDays.contains(where: { $0 > 0 }) else { return nil }
-    return .init(lastDay: lastDay, testsByDays: testsByDays)
+    return .init(
+      lastDay: lastDay, testsByDays: testsByDays,
+      dayBoundaryOffsetHours: dayBoundaryOffsetHours)
   }
 
   private func totalTypingSeconds(from results: [StoredResult]) -> Double {
@@ -2329,14 +2376,19 @@ public actor AuthStore {
     }
   }
 
-  private func publicStreak(from results: [StoredResult], endingAt now: Date)
+  private func publicStreak(
+    from results: [StoredResult], endingAt now: Date, dayBoundaryOffsetHours: Double
+  )
     -> PublicProfileStreakResponse?
   {
     guard !results.isEmpty else { return nil }
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let days = Set(results.map { calendar.startOfDay(for: $0.finishedAt) })
-    let currentDay = calendar.startOfDay(for: now)
+    let days = Set(results.map {
+      logicalPracticeDay(for: $0.finishedAt, offsetHours: dayBoundaryOffsetHours, calendar: calendar)
+    })
+    let currentDay = logicalPracticeDay(
+      for: now, offsetHours: dayBoundaryOffsetHours, calendar: calendar)
     var currentDays = 0
     var cursor = currentDay
     while days.contains(cursor) {
@@ -2361,6 +2413,12 @@ public actor AuthStore {
       previousDay = day
     }
     return .init(currentDays: currentDays, longestDays: longestDays)
+  }
+
+  private func logicalPracticeDay(
+    for date: Date, offsetHours: Double, calendar: Calendar
+  ) -> Date {
+    calendar.startOfDay(for: date.addingTimeInterval(-offsetHours * 3_600))
   }
 
   private func publicPersonalBests(from results: [StoredResult]) -> [PublicProfileBestResponse] {
@@ -2861,7 +2919,8 @@ public actor AuthStore {
       totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut,
       profileDetails: user.profileDetails,
       authenticationMethods: authenticationMethods(for: user.id), availableBadges: availableBadges,
-      selectedBadgeID: selectedBadgeID)
+      selectedBadgeID: selectedBadgeID,
+      streakDayBoundaryOffsetHours: state.streakDayBoundaryOffsets[user.id])
   }
 
   private func authenticationMethods(for userID: UUID) -> [AuthenticationMethod] {

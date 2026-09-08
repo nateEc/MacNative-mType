@@ -2021,6 +2021,92 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertNil(hidden.streak)
   }
 
+  func testAccountStreakDayBoundaryCanBeSetOnceAndShiftsPublicDays() async throws {
+    let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("typebar-streak-boundary-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let store = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 4 * 86_400 + 15 * 60)
+    let session = try await store.register(
+      .init(email: "boundary@example.com", password: "a secure password", displayName: "Boundary User"),
+      now: now)
+    for finishedAt in [now.addingTimeInterval(-30 * 60), now.addingTimeInterval(-86_400 - 30 * 60)] {
+      _ = try await store.submitResult(
+        result(id: UUID(), wpm: 72, accuracy: 98, finishedAt: finishedAt),
+        accessToken: session.accessToken, now: now)
+    }
+
+    let utcProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(utcProfile.streak, .init(currentDays: 0, longestDays: 2))
+    XCTAssertEqual(utcProfile.activity?.testsByDays.suffix(3), [1, 1, 0])
+
+    let updated = try await store.setStreakDayBoundary(
+      .init(offsetHours: 1), accessToken: session.accessToken, now: now)
+    XCTAssertEqual(updated.streakDayBoundaryOffsetHours, 1)
+    let shiftedProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(shiftedProfile.streak, .init(currentDays: 2, longestDays: 2))
+    XCTAssertEqual(shiftedProfile.activity?.testsByDays.suffix(2), [1, 1])
+    XCTAssertEqual(shiftedProfile.activity?.dayBoundaryOffsetHours, 1)
+
+    let reloadedStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let reloadedUser = try await reloadedStore.authenticatedUser(
+      for: session.accessToken, now: now)
+    XCTAssertEqual(reloadedUser.streakDayBoundaryOffsetHours, 1)
+    do {
+      _ = try await reloadedStore.setStreakDayBoundary(
+        .init(offsetHours: 2), accessToken: session.accessToken, now: now)
+      XCTFail("A public streak boundary must be immutable after its first explicit setting")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .streakDayBoundaryAlreadySet)
+    }
+
+    let other = try await store.register(
+      .init(email: "invalid-boundary@example.com", password: "a secure password", displayName: "Other User"),
+      now: now)
+    do {
+      _ = try await store.setStreakDayBoundary(
+        .init(offsetHours: 1.25), accessToken: other.accessToken, now: now)
+      XCTFail("Only half-hour boundaries in the supported range must be accepted")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidStreakDayBoundary)
+    }
+  }
+
+  func testStreakDayBoundaryRouteRequiresAuthentication() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "route-boundary@example.com", password: "a secure password", displayName: "Route User"))
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(
+        .PATCH, "v1/profiles/me/streak-day-boundary",
+        beforeRequest: { request async throws in
+          try request.content.encode(SetStreakDayBoundaryRequest(offsetHours: -3.5))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unauthorized)
+        })
+      try await app.test(
+        .PATCH, "v1/profiles/me/streak-day-boundary",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(SetStreakDayBoundaryRequest(offsetHours: -3.5))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            (try? response.content.decode(AuthUserResponse.self))?.streakDayBoundaryOffsetHours,
+            -3.5)
+        })
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testPublicProfileHidesEmailAndIncludesAggregateResults() async throws {
     let app = try await Application.make(.testing)
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)

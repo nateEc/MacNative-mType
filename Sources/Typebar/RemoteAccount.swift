@@ -102,10 +102,11 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     let authenticationMethods: [RemoteAuthenticationMethod]
     let availableBadges: [RemotePublicProfileBadge]
     let selectedBadgeID: String?
+    let streakDayBoundaryOffsetHours: Double?
 
     private enum CodingKeys: String, CodingKey {
         case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut, profileDetails,
-            authenticationMethods, availableBadges, selectedBadgeID
+            authenticationMethods, availableBadges, selectedBadgeID, streakDayBoundaryOffsetHours
     }
 
     init(
@@ -117,7 +118,8 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         leaderboardOptedOut: Bool = false,
         profileDetails: RemoteProfileDetails = .init(),
         authenticationMethods: [RemoteAuthenticationMethod] = [.password],
-        availableBadges: [RemotePublicProfileBadge] = [], selectedBadgeID: String? = nil
+        availableBadges: [RemotePublicProfileBadge] = [], selectedBadgeID: String? = nil,
+        streakDayBoundaryOffsetHours: Double? = nil
     ) {
         self.id = id
         self.email = email
@@ -129,6 +131,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         self.authenticationMethods = authenticationMethods
         self.availableBadges = availableBadges
         self.selectedBadgeID = selectedBadgeID
+        self.streakDayBoundaryOffsetHours = streakDayBoundaryOffsetHours
     }
 
     init(from decoder: Decoder) throws {
@@ -143,6 +146,8 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         authenticationMethods = try values.decodeIfPresent([RemoteAuthenticationMethod].self, forKey: .authenticationMethods) ?? [.password]
         availableBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .availableBadges) ?? []
         selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
+        streakDayBoundaryOffsetHours = try values.decodeIfPresent(
+            Double.self, forKey: .streakDayBoundaryOffsetHours)
     }
 }
 
@@ -250,6 +255,10 @@ private struct RemoteUpdateProfileRequest: Codable, Sendable {
     let leaderboardOptedOut: Bool?
     let profileDetails: RemoteProfileDetails?
     let selectedBadgeID: String?
+}
+
+private struct RemoteSetStreakDayBoundaryRequest: Codable, Sendable {
+    let offsetHours: Double
 }
 
 struct RemoteDeveloperAccessKey: Codable, Equatable, Identifiable, Sendable {
@@ -768,6 +777,19 @@ struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
 struct RemotePublicProfileActivity: Codable, Sendable {
     let lastDay: Date
     let testsByDays: [Int]
+    let dayBoundaryOffsetHours: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case lastDay, testsByDays, dayBoundaryOffsetHours
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        lastDay = try values.decode(Date.self, forKey: .lastDay)
+        testsByDays = try values.decode([Int].self, forKey: .testsByDays)
+        dayBoundaryOffsetHours = try values.decodeIfPresent(
+            Double.self, forKey: .dayBoundaryOffsetHours) ?? 0
+    }
 }
 
 struct RemotePublicProfileStreak: Codable, Equatable, Sendable {
@@ -1452,6 +1474,33 @@ final class AccountSession {
                 response: RemoteAccountUser.self
             )
             statusMessage = "公开资料已更新。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func setPublicStreakDayBoundary(offsetHours: Double) async -> Bool {
+        guard StreakDayBoundaryPolicy.isSupported(offsetHours) else {
+            statusMessage = "公开连续练习日界必须在 −11 至 +12 小时之间，并使用 30 分钟档位。"
+            return false
+        }
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/profiles/me/streak-day-boundary",
+                method: "PATCH",
+                token: token,
+                body: RemoteSetStreakDayBoundaryRequest(offsetHours: offsetHours),
+                response: RemoteAccountUser.self
+            )
+            statusMessage = "公开连续练习日界已固定。"
             return true
         } catch {
             statusMessage = error.localizedDescription
