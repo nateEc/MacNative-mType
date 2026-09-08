@@ -1845,6 +1845,50 @@ struct ActivityBarPoint: Equatable, Identifiable {
     var id: Date { day }
 }
 
+struct ActivityTypingMinutesTrendPoint: Equatable, Identifiable {
+    let day: Date
+    let minutes: Double
+    var id: Date { day }
+}
+
+enum ActivityTypingMinutesTrendPolicy {
+    static func points(for points: [ActivityBarPoint]) -> [ActivityTypingMinutesTrendPoint] {
+        let observed = points
+            .filter {
+                $0.completedTests > 0 && $0.typingSeconds.isFinite
+                    && $0.day.timeIntervalSinceReferenceDate.isFinite
+            }
+            .sorted { $0.day < $1.day }
+        guard observed.count >= 2, let first = observed.first, let last = observed.last else {
+            return []
+        }
+
+        let xValues = observed.map { $0.day.timeIntervalSince(first.day) / 86_400 }
+        let yValues = observed.map { $0.typingSeconds / 60 }
+        guard xValues.allSatisfy(\.isFinite), yValues.allSatisfy(\.isFinite) else { return [] }
+        let count = Double(observed.count)
+        let meanX = xValues.reduce(0, +) / count
+        let meanY = yValues.reduce(0, +) / count
+        let denominator = xValues.reduce(0) { partial, value in
+            partial + pow(value - meanX, 2)
+        }
+        guard denominator.isFinite, denominator > 0 else { return [] }
+        let numerator = zip(xValues, yValues).reduce(0) { partial, pair in
+            partial + (pair.0 - meanX) * (pair.1 - meanY)
+        }
+        guard numerator.isFinite else { return [] }
+        let slope = numerator / denominator
+        let intercept = meanY - slope * meanX
+        guard slope.isFinite, intercept.isFinite else { return [] }
+        let fitted: (Double) -> Double = { max(0, intercept + slope * $0) }
+
+        return [
+            .init(day: first.day, minutes: fitted(xValues[0])),
+            .init(day: last.day, minutes: fitted(xValues[xValues.count - 1])),
+        ]
+    }
+}
+
 struct ActivityHeatmapCell: Equatable, Identifiable {
     let day: Date
     let completedTests: Int

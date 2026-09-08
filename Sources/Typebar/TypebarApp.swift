@@ -5072,6 +5072,10 @@ private struct ActivityBarChartView: View {
     }
   }
 
+  private var typingMinutesTrend: [ActivityTypingMinutesTrendPoint] {
+    measure == .typingMinutes ? ActivityTypingMinutesTrendPolicy.points(for: points) : []
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
       HStack {
@@ -5085,15 +5089,28 @@ private struct ActivityBarChartView: View {
         .pickerStyle(.menu)
         .frame(width: 180)
       }
-      Chart(points) { point in
-        if let value = value(for: point) {
-          BarMark(
+      Chart {
+        ForEach(points) { point in
+          if let value = value(for: point) {
+            BarMark(
+              x: .value("日期", point.day, unit: .day),
+              y: .value(yTitle, value)
+            )
+            .foregroundStyle(Color.accentColor.gradient)
+            .accessibilityLabel(point.day.formatted(date: .abbreviated, time: .omitted))
+            .accessibilityValue(accessibilityValue(for: point))
+          }
+        }
+        ForEach(typingMinutesTrend) { point in
+          LineMark(
             x: .value("日期", point.day, unit: .day),
-            y: .value(yTitle, value)
+            y: .value("练习分钟趋势", point.minutes)
           )
-          .foregroundStyle(Color.accentColor.gradient)
-          .accessibilityLabel(point.day.formatted(date: .abbreviated, time: .omitted))
-          .accessibilityValue(accessibilityValue(for: point))
+          .foregroundStyle(.secondary)
+          .lineStyle(.init(lineWidth: 2, dash: [4, 3]))
+          .accessibilityLabel("练习分钟趋势")
+          .accessibilityValue(
+            "\(point.day.formatted(date: .abbreviated, time: .omitted))，\(point.minutes.formatted(.number.precision(.fractionLength(0...2)))) 分钟")
         }
       }
       .chartXAxis {

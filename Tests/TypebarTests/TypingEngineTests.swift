@@ -14058,6 +14058,34 @@ final class TypingEngineTests: XCTestCase {
       ])
   }
 
+  func testTypingMinutesTrendUsesOnlyObservedDaysAndTheirCalendarSpacing() throws {
+    let start = Date(timeIntervalSince1970: 86_400)
+    let points = [
+      ActivityBarPoint(day: start, completedTests: 1, typingSeconds: 60),
+      ActivityBarPoint(
+        day: start.addingTimeInterval(86_400), completedTests: 1, typingSeconds: 120),
+      ActivityBarPoint(
+        day: start.addingTimeInterval(172_800), completedTests: 0, typingSeconds: 0),
+      ActivityBarPoint(
+        day: start.addingTimeInterval(259_200), completedTests: 1, typingSeconds: 240),
+      ActivityBarPoint(
+        day: start.addingTimeInterval(345_600), completedTests: 1, typingSeconds: .infinity),
+    ].reversed()
+
+    let trend = ActivityTypingMinutesTrendPolicy.points(for: Array(points))
+
+    XCTAssertEqual(trend.map(\.day), [start, start.addingTimeInterval(259_200)])
+    XCTAssertEqual(try XCTUnwrap(trend.first).minutes, 1, accuracy: 0.000_001)
+    XCTAssertEqual(try XCTUnwrap(trend.last).minutes, 4, accuracy: 0.000_001)
+    XCTAssertTrue(ActivityTypingMinutesTrendPolicy.points(for: []).isEmpty)
+    XCTAssertTrue(ActivityTypingMinutesTrendPolicy.points(for: [points.last!]).isEmpty)
+    XCTAssertTrue(
+      ActivityTypingMinutesTrendPolicy.points(for: [
+        ActivityBarPoint(day: start, completedTests: 1, typingSeconds: 60),
+        ActivityBarPoint(day: start, completedTests: 1, typingSeconds: 120),
+      ]).isEmpty)
+  }
+
   func testCurrentStreakOnlyCountsConsecutiveDaysEndingToday() {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
