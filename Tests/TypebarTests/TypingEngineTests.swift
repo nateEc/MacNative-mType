@@ -7966,6 +7966,59 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingSpeedUnit.cps.converted(wpm: 12.5), 1.041_666_666_7, accuracy: 0.000_001)
   }
 
+  func testResultHistorySortingCoversEverySortableColumnWithStableTies() {
+    let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    let secondID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    let thirdID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+    let metrics = [
+      ResultMetric(
+        id: firstID, finishedAt: .init(timeIntervalSince1970: 10), wpm: 80, rawWpm: 90,
+        accuracy: 95, typingSeconds: 30, consistency: 70),
+      ResultMetric(
+        id: secondID, finishedAt: .init(timeIntervalSince1970: 30), wpm: 80, rawWpm: 85,
+        accuracy: 90, typingSeconds: 30, consistency: 80),
+      ResultMetric(
+        id: thirdID, finishedAt: .init(timeIntervalSince1970: 20), wpm: 60, rawWpm: 95,
+        accuracy: 100, typingSeconds: 30, consistency: 60),
+    ]
+
+    XCTAssertEqual(
+      ResultHistorySortPolicy.sorted(metrics, by: .finishedAt, direction: .descending).map(\.id),
+      [secondID, thirdID, firstID])
+    XCTAssertEqual(
+      ResultHistorySortPolicy.sorted(metrics, by: .wpm, direction: .descending).map(\.id),
+      [secondID, firstID, thirdID])
+    XCTAssertEqual(
+      ResultHistorySortPolicy.sorted(metrics, by: .rawWpm, direction: .ascending).map(\.id),
+      [secondID, firstID, thirdID])
+    XCTAssertEqual(
+      ResultHistorySortPolicy.sorted(metrics, by: .accuracy, direction: .descending).map(\.id),
+      [thirdID, firstID, secondID])
+    XCTAssertEqual(
+      ResultHistorySortPolicy.sorted(metrics, by: .consistency, direction: .ascending).map(\.id),
+      [thirdID, firstID, secondID])
+    let identicalValues = [
+      ResultMetric(
+        id: secondID, finishedAt: .init(timeIntervalSince1970: 10), wpm: 80, accuracy: 95,
+        typingSeconds: 30),
+      ResultMetric(
+        id: firstID, finishedAt: .init(timeIntervalSince1970: 10), wpm: 80, accuracy: 95,
+        typingSeconds: 30),
+    ]
+    XCTAssertEqual(
+      ResultHistorySortPolicy.sorted(identicalValues, by: .wpm, direction: .descending).map(\.id),
+      [firstID, secondID])
+  }
+
+  func testResultHistoryPaginationAdvancesByTenAndClampsToFilteredTotal() {
+    XCTAssertEqual(ResultHistoryPagePolicy.visibleCount(requested: 10, total: 0), 0)
+    XCTAssertEqual(ResultHistoryPagePolicy.visibleCount(requested: 10, total: 25), 10)
+    XCTAssertEqual(ResultHistoryPagePolicy.nextLimit(current: 10, total: 25), 20)
+    XCTAssertEqual(ResultHistoryPagePolicy.nextLimit(current: 20, total: 25), 25)
+    XCTAssertEqual(ResultHistoryPagePolicy.nextLimit(current: 25, total: 25), 25)
+    XCTAssertEqual(ResultHistoryPagePolicy.visibleCount(requested: 20, total: 7), 7)
+  }
+
   func testIndependentCaretLayoutTracksGlyphsWrapsAndMotionSettings() throws {
     let text = AttributedString("amber harbor willow")
     let font = PracticeFont.monospaced.nsFont(size: 28)

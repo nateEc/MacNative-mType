@@ -4182,6 +4182,9 @@ private struct ResultsHistoryView: View {
   @State private var modifierFilter = Set(TestModifier.allCases)
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
+  @State private var historySortField: ResultHistorySortField = .finishedAt
+  @State private var historySortDirection: ResultHistorySortDirection = .descending
+  @State private var visibleResultLimit = ResultHistoryPagePolicy.pageSize
   @State private var csvExportStatus: String?
   @State private var showingPersonalBestTable = false
 
@@ -4224,6 +4227,20 @@ private struct ResultsHistoryView: View {
     Array(Set(results.flatMap(\.tags))).sorted {
       $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
     }
+  }
+
+  private var sortedFilteredResults: [TestResultRecord] {
+    let recordsByID = Dictionary(uniqueKeysWithValues: filteredResults.map { ($0.id, $0) })
+    return ResultHistorySortPolicy.sorted(
+      filteredResults.map(ResultMetric.init(record:)), by: historySortField,
+      direction: historySortDirection
+    ).compactMap { recordsByID[$0.id] }
+  }
+
+  private var visibleResults: [TestResultRecord] {
+    let count = ResultHistoryPagePolicy.visibleCount(
+      requested: visibleResultLimit, total: sortedFilteredResults.count)
+    return Array(sortedFilteredResults.prefix(count))
   }
 
   private var metrics: [ResultMetric] {
@@ -4289,9 +4306,21 @@ private struct ResultsHistoryView: View {
                   Button("全部", action: resetFilters)
                   Button("当前测试设置", action: applyCurrentSettingsFilter)
                   Spacer()
-                  Text("\(filteredResults.count) 条")
+                  Text("显示 \(visibleResults.count) / \(filteredResults.count) 条")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+                HStack {
+                  Picker("排序", selection: $historySortField) {
+                    ForEach(ResultHistorySortField.allCases) { field in
+                      Text(field.displayName).tag(field)
+                    }
+                  }
+                  Picker("方向", selection: $historySortDirection) {
+                    ForEach(ResultHistorySortDirection.allCases) { direction in
+                      Text(direction.displayName).tag(direction)
+                    }
+                  }
                 }
                 if let csvExportStatus {
                   Text(csvExportStatus)
@@ -4411,7 +4440,7 @@ private struct ResultsHistoryView: View {
                   "没有匹配的成绩", systemImage: "line.3.horizontal.decrease.circle",
                   description: Text("调整筛选条件以查看其他本地练习记录。"))
               }
-              ForEach(filteredResults) { result in
+              ForEach(visibleResults) { result in
                 Button {
                   selectedResult = result
                 } label: {
@@ -4441,6 +4470,13 @@ private struct ResultsHistoryView: View {
                 .buttonStyle(.plain)
               }
               .onDelete(perform: delete)
+              if visibleResults.count < sortedFilteredResults.count {
+                Button("再显示 \(min(ResultHistoryPagePolicy.pageSize, sortedFilteredResults.count - visibleResults.count)) 条") {
+                  visibleResultLimit = ResultHistoryPagePolicy.nextLimit(
+                    current: visibleResultLimit, total: sortedFilteredResults.count)
+                }
+                .frame(maxWidth: .infinity)
+              }
             }
           }
         }
@@ -4468,6 +4504,9 @@ private struct ResultsHistoryView: View {
     .sheet(isPresented: $showingPersonalBestTable) {
       LocalPersonalBestTableView(speedUnit: settings.typingSpeedUnit)
     }
+    .onChange(of: activeFilter) { visibleResultLimit = ResultHistoryPagePolicy.pageSize }
+    .onChange(of: historySortField) { visibleResultLimit = ResultHistoryPagePolicy.pageSize }
+    .onChange(of: historySortDirection) { visibleResultLimit = ResultHistoryPagePolicy.pageSize }
   }
 
   private var historyChartPoints: [HistoryChartPoint] {
@@ -4671,11 +4710,11 @@ private struct ResultsHistoryView: View {
   }
 
   private func delete(at offsets: IndexSet) {
-    for index in offsets { modelContext.delete(filteredResults[index]) }
+    for index in offsets { modelContext.delete(visibleResults[index]) }
   }
 
   private func exportFilteredResultsCSV() {
-    let portableResults = filteredResults.compactMap(\.portableResult)
+    let portableResults = sortedFilteredResults.compactMap(\.portableResult)
     guard !portableResults.isEmpty else {
       csvExportStatus = "没有可导出的本机成绩。"
       return

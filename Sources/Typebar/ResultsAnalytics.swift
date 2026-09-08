@@ -45,6 +45,73 @@ struct ResultMetric: Equatable, Identifiable {
     }
 }
 
+enum ResultHistorySortField: String, CaseIterable, Equatable, Identifiable {
+    case finishedAt
+    case wpm
+    case rawWpm
+    case accuracy
+    case consistency
+
+    var id: Self { self }
+
+    var displayName: String {
+        switch self {
+        case .finishedAt: "日期"
+        case .wpm: "速度"
+        case .rawWpm: "Raw"
+        case .accuracy: "准确率"
+        case .consistency: "稳定度"
+        }
+    }
+}
+
+enum ResultHistorySortDirection: String, CaseIterable, Equatable, Identifiable {
+    case ascending
+    case descending
+
+    var id: Self { self }
+    var displayName: String { self == .ascending ? "升序" : "降序" }
+}
+
+enum ResultHistorySortPolicy {
+    static func sorted(
+        _ metrics: [ResultMetric], by field: ResultHistorySortField,
+        direction: ResultHistorySortDirection
+    ) -> [ResultMetric] {
+        metrics.sorted { lhs, rhs in
+            let left = value(for: lhs, field: field)
+            let right = value(for: rhs, field: field)
+            if left != right {
+                return direction == .ascending ? left < right : left > right
+            }
+            if lhs.finishedAt != rhs.finishedAt { return lhs.finishedAt > rhs.finishedAt }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
+    private static func value(for metric: ResultMetric, field: ResultHistorySortField) -> Double {
+        switch field {
+        case .finishedAt: metric.finishedAt.timeIntervalSinceReferenceDate
+        case .wpm: Double(metric.wpm)
+        case .rawWpm: Double(metric.rawWpm)
+        case .accuracy: Double(metric.accuracy)
+        case .consistency: metric.consistency
+        }
+    }
+}
+
+enum ResultHistoryPagePolicy {
+    static let pageSize = 10
+
+    static func visibleCount(requested: Int, total: Int) -> Int {
+        min(max(0, requested), max(0, total))
+    }
+
+    static func nextLimit(current: Int, total: Int) -> Int {
+        visibleCount(requested: max(0, current) + pageSize, total: total)
+    }
+}
+
 /// Controls the four independently visible traces in the local history view.
 /// The defaults mirror the reference account history's initially enabled set,
 /// while the native chart keeps its data entirely on this Mac.
