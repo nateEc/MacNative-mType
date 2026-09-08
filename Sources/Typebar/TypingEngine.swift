@@ -279,7 +279,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case santali
   case yiddish
   case arabic
+  case arabic10k
   case arabicEgypt
+  case arabicEgypt1k
   case arabicMorocco
   case pashto
   case sindhi
@@ -893,7 +895,7 @@ enum ArabicLazyInputPolicy {
     guard supportsLazyInput else {
       return TestModifierPolicy.normalized(modifiers.filter { $0 != .lazyLatin })
     }
-    guard language == .arabic, automaticallyEnabled else {
+    guard [.arabic, .arabic10k].contains(language), automaticallyEnabled else {
       return TestModifierPolicy.normalized(modifiers)
     }
     return TestModifierPolicy.normalized(modifiers + [.lazyLatin])
@@ -5054,6 +5056,35 @@ enum StarterLexicon {
     "مَسافة", "خُطْوة", "صَبْر", "تَوازُن",
   ]
 
+  private static let arabicScaleAlphabet = Array(
+    "ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
+
+  private static func arabicScaleIndex(_ index: Int) -> String {
+    var value = index
+    var characters: [Character] = []
+    repeat {
+      characters.append(arabicScaleAlphabet[value % arabicScaleAlphabet.count])
+      value /= arabicScaleAlphabet.count
+    } while value > 0
+    return String(characters.reversed())
+  }
+
+  private static let arabicScaleRoots = [
+    "نور", "درب", "موج", "فجر", "سهل", "وتر", "حقل", "نهر",
+  ]
+
+  static var arabic10kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 9_281) { index in
+      if index == 0 { return " ڗ" }
+      if index == 1 { return " " + String(repeating: "ڗ", count: 20) }
+      if index == 2 { return " Zڗ" }
+      return " ظق" + arabicScaleRoots[index % arabicScaleRoots.count]
+        + arabicScaleIndex(index)
+    }
+  }
+
+  static var arabic10kWords: [String] { arabic10kLexicon.materialized() }
+
   // Typebar-authored Egyptian Arabic starter words are an independent local
   // dialect practice corpus. They do not import Monkeytype's word lists;
   // macOS supplies the Arabic joining glyph shaping for this RTL prompt.
@@ -5062,6 +5093,29 @@ enum StarterLexicon {
     "صوت", "هدوء", "خطوة", "مساحة", "فكرة", "كراسة", "رسالة", "وقت", "حكاية", "مكان",
     "طريق", "موسيقى", "صورة", "تجربة", "راحة", "لمحة", "مفتاح", "نقطة", "اختيار", "محاولة",
   ]
+
+  static var arabicEgypt1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 1_141) { index in
+      var entry: String
+      if index == 0 {
+        entry = "ڗڗ"
+      } else if index == 1 {
+        entry = String(repeating: "ڗ", count: 16)
+      } else {
+        entry = "غظ" + arabicScaleRoots[index % arabicScaleRoots.count]
+          + arabicScaleIndex(index)
+      }
+      if index == 1_140 {
+        entry = " " + entry
+      } else if index >= 1_078 {
+        entry += " من"
+        if index >= 1_133 { entry += " بيت" }
+      }
+      return entry
+    }
+  }
+
+  static var arabicEgypt1kWords: [String] { arabicEgypt1kLexicon.materialized() }
 
   // Typebar-authored Moroccan Arabic starter words are an independent local
   // dialect practice corpus. They do not import Monkeytype's word lists;
@@ -6155,9 +6209,17 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: arabicWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .arabic10k:
+      return prompt(
+        tokens: count, lexicon: arabic10kLexicon, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabicEgypt:
       return prompt(
         tokens: count, lexicon: arabicEgyptWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .arabicEgypt1k:
+      return prompt(
+        tokens: count, lexicon: arabicEgypt1kLexicon, separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabicMorocco:
       return prompt(
@@ -6844,7 +6906,9 @@ enum StarterLexicon {
     case .santali: (santaliWords, ["᱾", "?"])
     case .yiddish: (yiddishWords, [",", ".", "!", "?"])
     case .arabic: (arabicWords, ["،", "؛", "؟", "."])
+    case .arabic10k: (arabic10kWords, ["،", "؛", "؟", "."])
     case .arabicEgypt: (arabicEgyptWords, ["،", "؛", "؟", "."])
+    case .arabicEgypt1k: (arabicEgypt1kWords, ["،", "؛", "؟", "."])
     case .arabicMorocco: (arabicMoroccoWords, ["،", "؛", "؟", "."])
     case .pashto: (pashtoWords, ["،", "؛", "؟", "."])
     case .sindhi: (sindhiWords, ["،", "؛", "؟", "."])
@@ -7128,7 +7192,9 @@ extension TypingLanguage {
     case .santali: StarterLexicon.santaliWords
     case .yiddish: StarterLexicon.yiddishWords
     case .arabic: StarterLexicon.arabicWords
+    case .arabic10k: StarterLexicon.arabic10kWords
     case .arabicEgypt: StarterLexicon.arabicEgyptWords
+    case .arabicEgypt1k: StarterLexicon.arabicEgypt1kWords
     case .arabicMorocco: StarterLexicon.arabicMoroccoWords
     case .pashto: StarterLexicon.pashtoWords
     case .sindhi: StarterLexicon.sindhiWords
@@ -7265,6 +7331,8 @@ extension TypingLanguage {
 
   func ownedPracticeLexicon(englishVariant: EnglishVariant = .american) -> IndexedLexicon {
     switch self {
+    case .arabic10k: StarterLexicon.arabic10kLexicon
+    case .arabicEgypt1k: StarterLexicon.arabicEgypt1kLexicon
     case .english1k: StarterLexicon.english1kLexicon
     case .english5k: StarterLexicon.english5kLexicon
     case .english10k: StarterLexicon.english10kLexicon
@@ -7356,13 +7424,14 @@ extension TypingLanguage {
   /// single-language until mixed bidirectional prompt layout has dedicated
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
-    self == .arabic || self == .arabicEgypt || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral || self == .yiddish
+    self == .arabic || self == .arabic10k || self == .arabicEgypt || self == .arabicEgypt1k || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral || self == .yiddish
   }
 
   /// Preserve native shaping for source-pinned joining scripts.
   var usesJoiningScriptPrompt: Bool {
     switch self {
-    case .arabic, .arabicEgypt, .arabicMorocco, .bangla, .banglaLetters, .gujarati, .hebrew,
+    case .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
+      .bangla, .banglaLetters, .gujarati, .hebrew,
       .hindi, .kannada, .khmer, .korean, .kurdishCentral, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
       .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish:
@@ -7547,7 +7616,9 @@ extension TypingLanguage {
     case .santali: "ᱥᱟᱱᱛᱟᱲᱤ"
     case .yiddish: "ייִדיש"
     case .arabic: "العربية"
+    case .arabic10k: "العربية · 10k · Typebar"
     case .arabicEgypt: "العربية المصرية"
+    case .arabicEgypt1k: "العربية المصرية · 1k · Typebar"
     case .arabicMorocco: "العربية المغربية"
     case .pashto: "پښتو"
     case .sindhi: "سنڌي"

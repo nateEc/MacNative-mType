@@ -8376,6 +8376,67 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testArabicScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, String)] = [
+      ("arabic10k", 9_281, 2, 21, 1, 9_281, 0, 9_281, 9_281, 0, 9_281, "ar-SA"),
+      ("arabicEgypt1k", 1_141, 2, 16, 0, 63, 0, 63, 1, 7, 1_141, "ar-EG"),
+    ]
+
+    for (
+      rawValue, count, minimum, maximum, uppercase, nonLetters, punctuation, spaces,
+      leadingSpaces, multipleSpaces, nonASCII, speechLocale
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertTrue(language.usesRightToLeftPrompt)
+      XCTAssertTrue(language.usesJoiningScriptPrompt)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertTrue(language.supportsLazyLatinInput)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ar")
+      XCTAssertEqual(language.speechLocaleIdentifier, speechLocale)
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
+      XCTAssertEqual(words.filter { $0.range(of: "[A-Z]", options: .regularExpression) != nil }.count, uppercase)
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, nonLetters)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)
+      XCTAssertEqual(words.filter { $0.hasPrefix(" ") }.count, leadingSpaces)
+      XCTAssertEqual(words.filter { $0.filter { $0 == " " }.count > 1 }.count, multipleSpaces)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCII)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+      XCTAssertGreaterThanOrEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ").count,
+        25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [], language: try XCTUnwrap(TypingLanguage(rawValue: "arabic10k")),
+        automaticallyEnabled: true),
+      [.lazyLatin])
+    XCTAssertEqual(
+      ArabicLazyInputPolicy.effectiveModifiers(
+        [], language: try XCTUnwrap(TypingLanguage(rawValue: "arabicEgypt1k")),
+        automaticallyEnabled: true),
+      [])
+  }
+
   func testGermanScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("german1k", 988, 2, 17, 415, 11, 3, 8, 109),
@@ -13634,7 +13695,8 @@ final class TypingEngineTests: XCTestCase {
     }
 
     let joiningLanguages: Set<TypingLanguage> = [
-      .arabic, .arabicEgypt, .arabicMorocco, .bangla, .banglaLetters, .gujarati, .hebrew,
+      .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
+      .bangla, .banglaLetters, .gujarati, .hebrew,
       .hindi, .kannada, .khmer, .korean, .kurdishCentral, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
       .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish,

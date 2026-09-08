@@ -480,7 +480,9 @@
     "santali": "santali",
     "azerbaijani": "azerbaijani",
     "arabic": "arabic",
+    "arabic_10k": "arabic10k",
     "arabic_egypt": "arabicEgypt",
+    "arabic_egypt_1k": "arabicEgypt1k",
     "arabic_morocco": "arabicMorocco",
     "malagasy": "malagasy",
     "malay": "malay",
@@ -733,8 +735,6 @@
   "nativeRelatedChoice": {
     "nepali_1k": "nepali",
     "azerbaijani_1k": "azerbaijani",
-    "arabic_10k": "arabic",
-    "arabic_egypt_1k": "arabicEgypt",
     "malagasy_1k": "malagasy",
     "malay_1k": "malay",
     "mongolian_10k": "mongolian",

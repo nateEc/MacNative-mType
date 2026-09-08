@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 207)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 209)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4196,6 +4196,8 @@ final class HealthRouteTests: XCTestCase {
       ("spanish1k", "Cada escala conserva una identidad propia."),
       ("spanish10k", "La práctica local amplía su rango sin importar listas externas."),
       ("spanish650k", "El índice mayor genera solamente las entradas solicitadas."),
+      ("arabic10k", " المسار العربي الكبير يبقى محليا وواضحا."),
+      ("arabicEgypt1k", "التمرين المصري المحلي بيوسع الاختيارات بهدوء."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),
