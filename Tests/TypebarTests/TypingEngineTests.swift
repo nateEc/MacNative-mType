@@ -7843,6 +7843,41 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(promptWords.isSubset(of: Set(words)))
   }
 
+  func testFrenchBitoducUsesOriginalSingleTokenTechWordplayAndPinnedMetadata() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "frenchBitoduc"))
+    let words = language.ownedPracticeWords()
+
+    XCTAssertEqual(language.displayName, "Français · Bitoduc")
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "fr")
+    XCTAssertEqual(language.speechLocaleIdentifier, "fr-fr")
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertEqual(words.count, 72)
+    XCTAssertEqual(Set(words).count, words.count)
+    XCTAssertTrue(words.contains { $0.contains("-") })
+    for character in "çèéêîô" {
+      XCTAssertTrue(words.contains { $0.contains(character) }, String(character))
+    }
+    XCTAssertTrue(
+      words.allSatisfy {
+        (4...16).contains($0.count)
+          && $0.range(of: "^[a-zçèéêîô-]+$", options: .regularExpression) != nil
+      })
+
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let quotes = OfflineContent.quotes(for: language, length: length)
+      XCTAssertEqual(quotes.count, 1)
+      XCTAssertEqual(quotes.first?.language, language)
+    }
+
+    let promptWords = Set(
+      OfflineContent.generatedPrompt(wordCount: 80, language: language).split(separator: " ")
+        .map(String.init))
+    XCTAssertTrue(promptWords.isSubset(of: Set(words)))
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9141,7 +9176,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.norwegianNynorskWords,
       StarterLexicon.swedishWords,
       StarterLexicon.swedishDiacriticsWords,
-      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.bulgarianLatinWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
+      StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.bulgarianLatinWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.frenchBitoducWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.portugueseAccentsWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
@@ -9154,7 +9189,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 145)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 146)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(

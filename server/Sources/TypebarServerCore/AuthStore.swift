@@ -490,6 +490,7 @@ public actor AuthStore {
     "swedish", "swedishDiacritics", "hungarian", "czech", "slovak", "slovenian", "croatian", "serbian",
     "serbianLatin", "bulgarian", "bulgarianLatin", "romanian", "finnish", "estonian", "icelandic", "french",
     "italian", "portuguese", "portugueseAccents", "simplifiedChinese", "traditionalChinese", "russian", "russianAbbreviations", "ukrainian",
+    "frenchBitoduc",
     "ukrainianEndings", "ukrainianLatin", "ukrainianLatynkaEndings", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
     "turkish", "polish",
   ]

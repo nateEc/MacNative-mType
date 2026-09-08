@@ -120,6 +120,7 @@ extension TypingLanguage {
     case .estonian: "et-EE"
     case .icelandic: "is-IS"
     case .french: "fr-FR"
+    case .frenchBitoduc: "fr-fr"
     case .italian: "it-IT"
     case .portuguese, .portugueseAccents: "pt-PT"
     case .simplifiedChinese, .mixedEnglishChinese: "zh-CN"

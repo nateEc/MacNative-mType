@@ -587,6 +587,34 @@ enum OfflineContent {
       length: .long
     ),
     OfflineQuote(
+      id: "bitoduc-souriclic",
+      title: "Le souriclic",
+      text: "Le souriclic réveille le codimoulin et chasse une petite boguette.",
+      language: .frenchBitoduc,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "bitoduc-programmerie",
+      title: "La programmerie",
+      text: "Dans la programmerie, le débogueur ouvre son fichotron, consulte le journaliseur et range chaque idée dans un dossier-nuage.",
+      language: .frenchBitoduc,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "bitoduc-nuagiciel",
+      title: "Le nuagiciel patient",
+      text: "Le nuagiciel patient reçoit un courriel, appelle le chiffreur et confie le paquet au routeur. Pendant ce temps, le robot-conseil observe le cliquetis du clavier et propose un redémarrage sans panique.",
+      language: .frenchBitoduc,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "bitoduc-atelier",
+      title: "L'atelier des mots techniques",
+      text: "Dans cet atelier, chaque terme technique reçoit un manteau français cousu sur place. Le souriclic traverse la pixellerie, le codimoulin transforme une boucle en logiciel, et la boîte-courriel garde les messages loin du pourriel. Si une boguette se cache dans le micrologiciel, le débogueur suit le filobogue, consulte le journaliseur et prépare une sauvegarde. Aucun mot ne prétend devenir officiel: le jeu consiste seulement à inventer une image claire, amusante et facile à taper.",
+      language: .frenchBitoduc,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "passo-lento",
       title: "Passo lento",
       text: "Un passo scelto con cura può rendere più chiaro il lavoro che aspetta domani.",

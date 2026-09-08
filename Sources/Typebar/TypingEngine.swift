@@ -334,6 +334,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case estonian
   case icelandic
   case french
+  case frenchBitoduc
   case italian
   case portuguese
   case portugueseAccents
@@ -4835,6 +4836,24 @@ enum StarterLexicon {
     "montagne", "graine", "rythme", "fenêtre", "rive", "mémoire", "crayon", "écoute",
   ]
 
+  // Typebar-authored French technology wordplay. This preserves Bitoduc's
+  // visible single-token and hyphenated-word practice without importing any
+  // term from the reference project or bitoduc.fr.
+  static let frenchBitoducWords = [
+    "boguette", "clicodrome", "nuagiciel", "pixellerie", "octetterie", "clavibulle",
+    "souriclic", "codimoulin", "filobogue", "écranette", "cachette-web", "robot-conseil",
+    "touche-éclair", "mot-de-passe", "pare-feu", "dossier-nuage", "boîte-courriel",
+    "fichotron", "copicolle", "fenêtrage", "appliquette", "programmerie", "binairerie",
+    "journaliseur", "cliquetis", "débogueur", "débogage", "clavardage", "courriel",
+    "pourriel", "logiciel", "micrologiciel", "téléverser", "télécharger", "navigateur",
+    "fureteur", "répertoire", "bibliothèque", "ordonnanceur", "conteneur", "serveur",
+    "routeur", "paqueterie", "chiffrement", "processeur", "compilateur", "interpréteur",
+    "sauvegarde", "redémarrage", "branchage", "fusionnage", "calculateur", "réseau",
+    "mémoire", "curseur", "clavier", "fenêtre", "pixel", "octet", "toile", "balise",
+    "requête", "réponse", "chiffreur", "traceur", "lanceur", "greffon", "extension",
+    "interface", "françoclic", "boucle", "contrôleur",
+  ]
+
   static let italianWords = [
     "albero", "strada", "luce", "ponte", "mattina", "cielo", "carta", "brezza",
     "porto", "inchiostro", "giardino", "viaggio", "musica", "nuvola", "calma", "faro",
@@ -5446,6 +5465,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: frenchWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .frenchBitoduc:
+      return prompt(
+        tokens: count, lexicon: frenchBitoducWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .italian:
       return prompt(
         tokens: count, lexicon: italianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5699,6 +5723,7 @@ enum StarterLexicon {
     case .estonian: (estonianWords, [",", ".", "!", "?"])
     case .icelandic: (icelandicWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
+    case .frenchBitoduc: (frenchBitoducWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
     case .portugueseAccents: (portugueseAccentsWords, [",", ".", "!", "?"])
@@ -5921,6 +5946,7 @@ extension TypingLanguage {
     case .estonian: StarterLexicon.estonianWords
     case .icelandic: StarterLexicon.icelandicWords
     case .french: StarterLexicon.frenchWords
+    case .frenchBitoduc: StarterLexicon.frenchBitoducWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
     case .portugueseAccents: StarterLexicon.portugueseAccentsWords
@@ -5956,7 +5982,7 @@ extension TypingLanguage {
     .kokanu,
     .likanu,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
-    .italian, .portuguese, .portugueseAccents,
+    .frenchBitoduc, .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
     .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianEndings,
     .ukrainianLatin, .ukrainianLatynkaEndings, .japaneseHiragana, .japaneseKatakana,
@@ -6227,6 +6253,7 @@ extension TypingLanguage {
     case .estonian: "Eesti"
     case .icelandic: "Íslenska"
     case .french: "Français"
+    case .frenchBitoduc: "Français · Bitoduc"
     case .italian: "Italiano"
     case .portuguese: "Português"
     case .portugueseAccents: "Português · Acentos e cedilha"

@@ -460,6 +460,7 @@
     "english_medical": "englishMedical",
     "spanish": "spanish",
     "french": "french",
+    "french_bitoduc": "frenchBitoduc",
     "nepali": "nepali",
     "nepali_romanized": "nepaliRomanized",
     "sanskrit": "sanskrit",
@@ -893,7 +894,6 @@
     "tibetan_1k": "tibetan"
   },
   "unmappedOfficialIDs": [
-    "french_bitoduc",
     "russian_contractions",
     "russian_contractions_1k",
     "tamil_old",
