@@ -8,6 +8,28 @@ import XCTest
 final class TypingEngineTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 10_000)
 
+  func testAboutMetadataUsesBundleVersionAndSafeDevelopmentFallbacks() {
+    XCTAssertEqual(
+      TypebarAboutMetadata(info: [
+        "CFBundleShortVersionString": "1.2.3",
+        "CFBundleVersion": "42",
+      ]).versionLabel,
+      "版本 1.2.3 · 构建 42")
+    XCTAssertEqual(
+      TypebarAboutMetadata(info: ["CFBundleShortVersionString": "1.2.3"]).versionLabel,
+      "版本 1.2.3")
+    XCTAssertEqual(TypebarAboutMetadata(info: ["CFBundleVersion": "42"]).versionLabel, "构建 42")
+    XCTAssertEqual(TypebarAboutMetadata(info: [:]).versionLabel, "开发构建")
+  }
+
+  func testAboutCommandIsDiscoverableByProductAndPrivacyTerms() {
+    for query in ["about", "关于", "隐私", "version"] {
+      XCTAssertEqual(
+        CommandPaletteSearch.results(items: [AboutCommand.item], query: query).map(\.id),
+        [AboutCommand.identifier])
+    }
+  }
+
   func testDataStoreStartupPreservesThePersistentStoreWhenOpeningFails() throws {
     struct TestFailure: LocalizedError {
       var errorDescription: String? { "schema mismatch" }

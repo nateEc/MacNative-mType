@@ -17,10 +17,16 @@ struct TypebarApp: App {
       dataStoreContent
     }
     .windowResizability(.contentMinSize)
+    .commands { TypebarAboutCommands() }
 
     Settings {
       PreferencesView(settings: settings, account: account, hotkey: hotkey)
     }
+
+    Window("关于 Typebar", id: "about") {
+      AboutTypebarView(metadata: .current)
+    }
+    .windowResizability(.contentSize)
 
     MenuBarExtra("Typebar", systemImage: "keyboard") {
       Button("打开 Typebar") {
@@ -500,6 +506,7 @@ private struct ContentView: View {
   let systemKeyboardGuide: SystemKeyboardGuideMonitor
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
+  @Environment(\.openWindow) private var openWindow
   @Environment(\.colorScheme) private var systemColorScheme
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var savedResults:
@@ -2599,6 +2606,7 @@ private struct ContentView: View {
       .init(
         id: "settings", title: "打开设置", subtitle: "修改输入规则、显示和账户选项", systemImage: "gearshape",
         keywords: ["settings", "设置", "主题", "键盘"], group: .settings),
+      AboutCommand.item,
       .init(
         id: "share", title: "分享当前测试", subtitle: "复制或导入 Typebar 测试配置链接",
         systemImage: "square.and.arrow.up", keywords: ["share", "分享", "链接", "配置"], group: .data),
@@ -2673,6 +2681,7 @@ private struct ContentView: View {
     case "friends": showingConnections = true
     case "notifications": showingNotifications = true
     case "settings": openSettings()
+    case AboutCommand.identifier: openWindow(id: "about")
     case "share": showingTestShare = true
     case "bailout": showingCommandBailoutConfirmation = true
     case QuoteFavoriteCommand.identifier:
