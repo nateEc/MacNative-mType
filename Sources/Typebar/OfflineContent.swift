@@ -823,6 +823,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "russian-abbreviations-short-list",
+      title: "Короткий список",
+      text: "МГУ, РАН и НИИ легко различить по коротким заглавным формам.",
+      language: .russianAbbreviations,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "russian-abbreviations-city-note",
+      title: "Городская заметка",
+      text: "В короткой заметке могут встретиться МФЦ, ЖКХ, ГИБДД и РЖД; точный набор букв помогает не смешивать разные названия.",
+      language: .russianAbbreviations,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "russian-abbreviations-clear-reading",
+      title: "Ясное чтение",
+      text: "Аббревиатуры требуют внимания к каждой букве. Сначала прочитайте форму целиком, затем заметьте порядок символов и только после этого печатайте. Так МВД не превращается в МЧС, а НДС не смешивается с ИНН.",
+      language: .russianAbbreviations,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "russian-abbreviations-reference-sheet",
+      title: "Лист сокращений",
+      text: "На рабочем столе лежит небольшой лист сокращений. В одной строке записаны МГУ и РАН, в другой — МФЦ, ЖКХ и РЖД, а ниже оставлено место для новых форм. Такая запись полезна не потому, что заменяет полные названия, а потому, что тренирует точный порядок букв. Печатайте каждую группу спокойно, проверяйте регистр и не угадывайте окончание. После нескольких повторов даже похожие сочетания становятся заметно яснее.",
+      language: .russianAbbreviations,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "ukrainian-small-note",
       title: "Мала нотатка",
       text: "Невеликий запис про зроблене допомагає побачити наступний крок ясніше.",

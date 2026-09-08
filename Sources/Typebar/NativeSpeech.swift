@@ -123,7 +123,7 @@ extension TypingLanguage {
     case .portuguese, .portugueseAccents: "pt-PT"
     case .simplifiedChinese, .mixedEnglishChinese: "zh-CN"
     case .traditionalChinese: "zh-TW"
-    case .russian: "ru-RU"
+    case .russian, .russianAbbreviations: "ru-RU"
     case .ukrainian, .ukrainianLatin: "uk-UA"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: "ja-JP"
     case .korean: "ko-KR"

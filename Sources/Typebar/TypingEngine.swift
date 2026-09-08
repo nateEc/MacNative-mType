@@ -335,6 +335,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case simplifiedChinese
   case traditionalChinese
   case russian
+  case russianAbbreviations
   case ukrainian
   case ukrainianLatin
   case japaneseHiragana
@@ -3644,6 +3645,18 @@ enum StarterLexicon {
     "город", "дождь", "спокойно", "направление", "звезда", "записка", "сад", "дыхание",
   ]
 
+  // Typebar-authored Russian abbreviation practice uses common factual
+  // initialisms and lexicalized short forms without importing reference words.
+  static let russianAbbreviationWords = [
+    "МГУ", "РАН", "МВД", "МЧС", "ФСБ", "ГИБДД", "СМИ", "ЖКХ", "ЗАГС", "ВУЗ",
+    "НИИ", "ООО", "ОАО", "ПАО", "ИП", "НДС", "ИНН", "СНИЛС", "ОМС", "ДМС",
+    "РФ", "СССР", "СНГ", "ООН", "НАТО", "ЕАЭС", "ЕС", "ВВП", "ЦБ", "ГЭС",
+    "АЭС", "ТЭЦ", "РЖД", "ГАИ", "ДТП", "ПДД", "АЗС", "КПП", "ТСЖ", "БТИ",
+    "ЗАО", "ВКС", "ВМФ", "ВВС", "ПВО", "ПТУ", "ЕГЭ", "ОГЭ", "МФЦ", "МРОТ",
+    "ПМЖ", "ФИФА", "УЕФА", "ЖК", "ТВ", "ЭВМ", "ПК", "ИИ", "вуз", "загс",
+    "нэп", "спид", "радар", "лазер",
+  ]
+
   // Original Typebar content for Ukrainian Cyrillic practice. The final
   // entries deliberately cover Ukrainian-specific ї, є, and ґ.
   static let ukrainianWords = [
@@ -5346,6 +5359,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: russianWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .russianAbbreviations:
+      return prompt(
+        tokens: count, lexicon: russianAbbreviationWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainian:
       return prompt(
         tokens: count, lexicon: ukrainianWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -5562,6 +5579,7 @@ enum StarterLexicon {
     case .simplifiedChinese: (simplifiedChineseWords, ["，", "。", "！", "？"])
     case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
     case .russian: (russianWords, [".", ",", "!", "?"])
+    case .russianAbbreviations: (russianAbbreviationWords, [".", ",", "!", "?"])
     case .ukrainian: (ukrainianWords, [".", ",", "!", "?"])
     case .ukrainianLatin: (ukrainianLatinWords, [".", ",", "!", "?"])
     case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
@@ -5776,6 +5794,7 @@ extension TypingLanguage {
     case .simplifiedChinese: StarterLexicon.simplifiedChineseWords
     case .traditionalChinese: StarterLexicon.traditionalChineseWords
     case .russian: StarterLexicon.russianWords
+    case .russianAbbreviations: StarterLexicon.russianAbbreviationWords
     case .ukrainian: StarterLexicon.ukrainianWords
     case .ukrainianLatin: StarterLexicon.ukrainianLatinWords
     case .japaneseHiragana: StarterLexicon.japaneseHiraganaWords
@@ -5803,7 +5822,7 @@ extension TypingLanguage {
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
-    .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
+    .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
     .japaneseRomaji,
     .korean, .turkish, .polish,
   ]
@@ -5878,7 +5897,7 @@ extension TypingLanguage {
       .lojbanGismu,
       .lojbanCmavo,
       .esperantoXSystem, .esperantoHSystem,
-      .simplifiedChinese, .traditionalChinese, .ukrainian, .ukrainianLatin,
+      .simplifiedChinese, .traditionalChinese, .russianAbbreviations, .ukrainian, .ukrainianLatin,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
       .mixedEnglishChinese, .mixedLanguages:
       false
@@ -5912,7 +5931,7 @@ extension TypingLanguage {
       .russian, .icelandic, .galician, .marathi:
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
-      .englishMedical, .kokanu, .likanu, .arabicMorocco, .sindhi, .armenian, .bemba,
+      .englishMedical, .kokanu, .likanu, .russianAbbreviations, .arabicMorocco, .sindhi, .armenian, .bemba,
       .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
@@ -6063,6 +6082,7 @@ extension TypingLanguage {
     case .simplifiedChinese: "简体中文"
     case .traditionalChinese: "繁體中文"
     case .russian: "Русский"
+    case .russianAbbreviations: "Русский · Аббревиатуры"
     case .ukrainian: "Українська"
     case .ukrainianLatin: "Українська (Latin)"
     case .japaneseHiragana: "日本語（ひらがな）"

@@ -4020,6 +4020,7 @@ final class HealthRouteTests: XCTestCase {
       ("englishShakespearean", "Prithee, tell me wherefore thou dost wait."),
       ("swedishDiacritics", "Öva på å, ä och ö med lugn rytm."),
       ("portugueseAccents", "A manhã começa com atenção à próxima página."),
+      ("russianAbbreviations", "МГУ и РАН используют короткие заглавные формы."),
       ("kokanu", "mi le kota wiki ki tu. tu le wisan in mi un ja."),
       ("likanu", "ɞı ʋȷ xʃʌ ɕıxı xı ʌſ: ʌſ ʋȷ ɕıɤ̄ ōı ɞı ōſ ɂ:"),
       ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),

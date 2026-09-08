@@ -8957,14 +8957,15 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.portugueseWords,
       StarterLexicon.portugueseAccentsWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
-      StarterLexicon.russianWords, StarterLexicon.ukrainianWords,
+      StarterLexicon.russianWords, StarterLexicon.russianAbbreviationWords,
+      StarterLexicon.ukrainianWords,
       StarterLexicon.ukrainianLatinWords, StarterLexicon.japaneseHiraganaWords,
       StarterLexicon.japaneseKatakanaWords, StarterLexicon.japaneseRomajiWords,
       StarterLexicon.koreanWords, StarterLexicon.turkishWords, StarterLexicon.polishWords,
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 137)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 138)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -10798,6 +10799,7 @@ final class TypingEngineTests: XCTestCase {
       (.portuguese, StarterLexicon.portugueseWords),
       (.portugueseAccents, StarterLexicon.portugueseAccentsWords),
       (.russian, StarterLexicon.russianWords),
+      (.russianAbbreviations, StarterLexicon.russianAbbreviationWords),
       (.ukrainian, StarterLexicon.ukrainianWords),
       (.ukrainianLatin, StarterLexicon.ukrainianLatinWords),
       (.japaneseRomaji, StarterLexicon.japaneseRomajiWords),
@@ -12529,6 +12531,28 @@ final class TypingEngineTests: XCTestCase {
           of: "[áàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ]",
           options: .regularExpression) != nil
       })
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+    }
+  }
+
+  func testRussianAbbreviationsUsesShortCyrillicTokensAndPinnedMetadata() {
+    let language = TypingLanguage.russianAbbreviations
+    let words = StarterLexicon.russianAbbreviationWords
+    XCTAssertEqual(language.displayName, "Русский · Аббревиатуры")
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unsupported)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ru")
+    XCTAssertEqual(language.speechLocaleIdentifier, "ru-RU")
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertEqual(language.ownedPracticeWords(), words)
+    XCTAssertFalse(words.isEmpty)
+    XCTAssertTrue(
+      words.allSatisfy {
+        $0.count <= 6 && $0.range(of: "^[А-Яа-яЁё]+$", options: .regularExpression) != nil
+      })
+    XCTAssertGreaterThan(words.filter { $0 == $0.uppercased() }.count, words.count * 3 / 4)
+    XCTAssertTrue(words.contains { $0 == $0.lowercased() })
     for length in [QuoteLength.short, .medium, .long, .extended] {
       XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
     }

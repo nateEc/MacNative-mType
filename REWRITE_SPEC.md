@@ -395,7 +395,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 ## 2026-09-05 兼容性审计更正
 
-- `TypingLanguage` 当前有一百四十七种 Typebar 自有单语；默认与自选多语混排使用一百三十七种 LTR 单语。最新增加 Português · Acentos e cedilha：固定 `portuguese_acentos_e_cedilha` 仅定义 `bcp47: pt-PT`，结构审计确认每个参考词均含葡萄牙语重音字母或 `ç`。Typebar 以自写专项词流和四档原创葡萄牙语文本重建该可见约束，使用 `pt`／`pt-PT`、保留简化输入并显示 Zipf 未知；不读取或复制参考词值。`english_old` 的固定源码缺少用户可见语义说明，在取得一手定义前不猜测实现。
+- `TypingLanguage` 当前有一百四十八种 Typebar 自有单语；默认与自选多语混排使用一百三十八种 LTR 单语。最新增加 Русский · Аббревиатуры：固定 `russian_abbreviations` 定义 `bcp47: ru-RU`、`noLazyMode: true` 与 `orderedByFrequency: false`，结构审计确认其主要为不超过 6 字符的全大写西里尔 token。Typebar 以 64 个自写短缩略词和四档原创俄语文本重建该可见约束，使用 `ru`／`ru-RU`、禁用简化输入并显示 Zipf 不支持；不读取或复制参考词值。`english_old` 的固定源码缺少用户可见语义说明，在取得一手定义前不猜测实现。
 
 - `TypingLanguage` 当前有一百二十二种 Typebar 自有单语；默认与自选多语混排使用一百一十二种 LTR 单语。新增 `Te reo Māori` 只对应固定源码的 `maori_1k` 映射；该配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，因此以保留 macron 的原创 LTR 词流及四档引语、`en`／`en-US` 缺省在线/朗读路径、显式简化输入和 Zipf 未知提示实现，并覆盖投稿、撤回、成绩和排行榜。
 
