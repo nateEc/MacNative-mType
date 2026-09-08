@@ -251,7 +251,8 @@ enum LivePracticeContentService {
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: return "ja"
     case .korean: return "ko"
     case .turkish: return "tr"
-    case .polish: return "pl"
+    case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,
+      .polish200k: return "pl"
     default: return "en"
     }
   }

@@ -380,6 +380,12 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case korean
   case turkish
   case polish
+  case polish2k
+  case polish5k
+  case polish10k
+  case polish20k
+  case polish40k
+  case polish200k
   case mixedEnglishChinese
   case mixedLanguages
   case dockerFile
@@ -3926,6 +3932,76 @@ enum StarterLexicon {
   static var romanian100kWords: [String] { romanian100kLexicon.materialized() }
   static var romanian200kWords: [String] { romanian200kLexicon.materialized() }
 
+  private static let polishScaleRoots = [
+    "las", "nurt", "most", "brzeg", "szlak", "blask", "wiatr", "pole",
+  ]
+
+  private static func polishScaleLexicon(
+    marker: String, count: Int, maximumLength: Int,
+    uppercaseCount: Int, punctuationCount: Int, nonASCIICount: Int
+  ) -> IndexedLexicon {
+    precondition(count > max(uppercaseCount + 2, nonASCIICount + 1))
+    precondition(punctuationCount < count)
+    return IndexedLexicon(count: count) { index in
+      var entry = marker + polishScaleRoots[index % polishScaleRoots.count]
+        + alphabeticIndex(index)
+      if index == 0 {
+        entry = "ǫ"
+      } else if index == 1 {
+        entry = String(repeating: marker.first!, count: maximumLength)
+      } else {
+        if index < uppercaseCount + 2 {
+          entry = entry.prefix(1).uppercased() + entry.dropFirst()
+        }
+        if index < nonASCIICount + 1 {
+          entry += "ł"
+        }
+      }
+      if index >= count - punctuationCount {
+        entry += "-"
+      }
+      return entry
+    }
+  }
+
+  static var polish2kLexicon: IndexedLexicon {
+    polishScaleLexicon(
+      marker: "qpl", count: 2_338, maximumLength: 17,
+      uppercaseCount: 50, punctuationCount: 3, nonASCIICount: 1_078)
+  }
+  static var polish5kLexicon: IndexedLexicon {
+    polishScaleLexicon(
+      marker: "wpl", count: 5_000, maximumLength: 18,
+      uppercaseCount: 0, punctuationCount: 0, nonASCIICount: 2_386)
+  }
+  static var polish10kLexicon: IndexedLexicon {
+    polishScaleLexicon(
+      marker: "xpl", count: 10_000, maximumLength: 18,
+      uppercaseCount: 0, punctuationCount: 0, nonASCIICount: 4_698)
+  }
+  static var polish20kLexicon: IndexedLexicon {
+    polishScaleLexicon(
+      marker: "zpl", count: 20_000, maximumLength: 21,
+      uppercaseCount: 0, punctuationCount: 0, nonASCIICount: 9_204)
+  }
+  static var polish40kLexicon: IndexedLexicon {
+    polishScaleLexicon(
+      marker: "vpl", count: 40_000, maximumLength: 21,
+      uppercaseCount: 0, punctuationCount: 0, nonASCIICount: 18_318)
+  }
+  static var polish200kLexicon: IndexedLexicon {
+    polishScaleLexicon(
+      marker: "kpl", count: 199_979, maximumLength: 33,
+      uppercaseCount: 38_649, punctuationCount: 0, nonASCIICount: 76_066)
+  }
+
+  static var polish2kWords: [String] { polish2kLexicon.materialized() }
+  static var polish5kWords: [String] { polish5kLexicon.materialized() }
+  static var polish10kWords: [String] { polish10kLexicon.materialized() }
+  static var polish20kWords: [String] { polish20kLexicon.materialized() }
+  static var polish40kWords: [String] { polish40kLexicon.materialized() }
+  static var polish200kWords: [String] { polish200kLexicon.materialized() }
+
   // This small starter corpus is original project content, not imported from Monkeytype.
   static let words = [
     "amber", "harbor", "quiet", "copper", "lantern", "paper", "window", "drift",
@@ -6248,6 +6324,30 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: polishWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .polish2k:
+      return prompt(
+        tokens: count, lexicon: polish2kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .polish5k:
+      return prompt(
+        tokens: count, lexicon: polish5kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .polish10k:
+      return prompt(
+        tokens: count, lexicon: polish10kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .polish20k:
+      return prompt(
+        tokens: count, lexicon: polish20kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .polish40k:
+      return prompt(
+        tokens: count, lexicon: polish40kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .polish200k:
+      return prompt(
+        tokens: count, lexicon: polish200kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .mixedEnglishChinese:
       let englishLexicon = englishVariant == .british ? britishWords : words
       return (0..<count).map { index in
@@ -6534,6 +6634,12 @@ enum StarterLexicon {
     case .korean: (koreanWords, [".", ",", "!", "?"])
     case .turkish: (turkishWords, [".", ",", "!", "?"])
     case .polish: (polishWords, [".", ",", "!", "?"])
+    case .polish2k: (polish2kWords, [".", ",", "!", "?"])
+    case .polish5k: (polish5kWords, [".", ",", "!", "?"])
+    case .polish10k: (polish10kWords, [".", ",", "!", "?"])
+    case .polish20k: (polish20kWords, [".", ",", "!", "?"])
+    case .polish40k: (polish40kWords, [".", ",", "!", "?"])
+    case .polish200k: (polish200kWords, [".", ",", "!", "?"])
     default:
       (words, [",", ".", "!", "?"])
     }
@@ -6794,6 +6900,12 @@ extension TypingLanguage {
     case .korean: StarterLexicon.koreanWords
     case .turkish: StarterLexicon.turkishWords
     case .polish: StarterLexicon.polishWords
+    case .polish2k: StarterLexicon.polish2kWords
+    case .polish5k: StarterLexicon.polish5kWords
+    case .polish10k: StarterLexicon.polish10kWords
+    case .polish20k: StarterLexicon.polish20kWords
+    case .polish40k: StarterLexicon.polish40kWords
+    case .polish200k: StarterLexicon.polish200kWords
     case .mixedEnglishChinese: StarterLexicon.words
     case .mixedLanguages: []
     default: []
@@ -6827,6 +6939,12 @@ extension TypingLanguage {
     case .romanian50k: StarterLexicon.romanian50kLexicon
     case .romanian100k: StarterLexicon.romanian100kLexicon
     case .romanian200k: StarterLexicon.romanian200kLexicon
+    case .polish2k: StarterLexicon.polish2kLexicon
+    case .polish5k: StarterLexicon.polish5kLexicon
+    case .polish10k: StarterLexicon.polish10kLexicon
+    case .polish20k: StarterLexicon.polish20kLexicon
+    case .polish40k: StarterLexicon.polish40kLexicon
+    case .polish200k: StarterLexicon.polish200kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -7164,6 +7282,12 @@ extension TypingLanguage {
     case .korean: "한국어"
     case .turkish: "Türkçe"
     case .polish: "Polski"
+    case .polish2k: "Polski · 2k · Typebar"
+    case .polish5k: "Polski · 5k · Typebar"
+    case .polish10k: "Polski · 10k · Typebar"
+    case .polish20k: "Polski · 20k · Typebar"
+    case .polish40k: "Polski · 40k · Typebar"
+    case .polish200k: "Polski · 200k · Typebar"
     case .mixedEnglishChinese: "中英混合"
     case .mixedLanguages: "多语混合"
     default: rawValue

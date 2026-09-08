@@ -133,7 +133,8 @@ extension TypingLanguage {
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: "ja-JP"
     case .korean: "ko-KR"
     case .turkish: "tr-TR"
-    case .polish: "pl-PL"
+    case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,
+      .polish200k: "pl-PL"
     case .mixedLanguages: "en-US"
     default: "en-US"
     }
