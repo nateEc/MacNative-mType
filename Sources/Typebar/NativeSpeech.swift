@@ -24,6 +24,7 @@ extension TypingLanguage {
     if isCodeLanguage { return "en-US" }
     return switch self {
     case .english: "en-US"
+    case .pigLatin, .loremIpsum: "en-US"
     case .spanish: "es-ES"
     case .german: "de-DE"
     case .swissGerman: "de-CH"
@@ -92,7 +93,7 @@ extension TypingLanguage {
     case .lao: "lo"
     case .amharic: "am-ET"
     case .armenianWestern: "hyw"
-    case .greek, .greeklish: "el-GR"
+    case .greek, .greekKoine, .greeklish: "el-GR"
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"
     case .catalan: "ca-ES"

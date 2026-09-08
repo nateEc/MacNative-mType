@@ -197,6 +197,7 @@ extension Difficulty {
 
 enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
+  case pigLatin
   case spanish
   case german
   case swissGerman
@@ -208,6 +209,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case esperantoXSystem
   case esperantoHSystem
   case latin
+  case loremIpsum
   case friulian
   case malagasy
   case welsh
@@ -292,6 +294,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case marathi
   case kurdishCentral
   case greek
+  case greekKoine
   case greeklish
   case dutch
   case filipino
@@ -3406,6 +3409,40 @@ struct TypingSession {
   }
 }
 
+enum PigLatinPolicy {
+  static func transform(_ text: String) -> String {
+    var output = ""
+    var word = ""
+    for character in text {
+      if character.isLetter || character == "'" {
+        word.append(character)
+      } else {
+        output += transformedWord(word)
+        word = ""
+        output.append(character)
+      }
+    }
+    return output + transformedWord(word)
+  }
+
+  private static func transformedWord(_ word: String) -> String {
+    guard !word.isEmpty else { return "" }
+    let wasCapitalized = word.first?.isUppercase == true
+    let normalized = word.lowercased()
+    let vowels = Set("aeiou")
+    let transformed: String
+    if let first = normalized.first, vowels.contains(first) {
+      transformed = normalized + "way"
+    } else if let vowelIndex = normalized.firstIndex(where: vowels.contains) {
+      transformed = String(normalized[vowelIndex...]) + String(normalized[..<vowelIndex]) + "ay"
+    } else {
+      transformed = normalized + "ay"
+    }
+    guard wasCapitalized, let first = transformed.first else { return transformed }
+    return String(first).uppercased() + transformed.dropFirst()
+  }
+}
+
 enum StarterLexicon {
   // This small starter corpus is original project content, not imported from Monkeytype.
   static let words = [
@@ -3413,6 +3450,10 @@ enum StarterLexicon {
     "meadow", "signal", "summer", "orchard", "canyon", "violet", "planet", "moss",
     "ripple", "thunder", "willow", "tangent", "pocket", "marble", "voyage", "bright",
   ]
+
+  // Pig Latin is deterministically derived from Typebar's own English starter
+  // corpus, never from a reference dictionary or word list.
+  static let pigLatinWords = words.map(PigLatinPolicy.transform)
 
   // Authored for Typebar; these spellings are not imported from Monkeytype.
   static let britishWords = [
@@ -3592,6 +3633,15 @@ enum StarterLexicon {
     "lumen", "fenestra", "charta", "aura", "exercitium", "cura", "tranquillus", "clarus", "lacus", "via",
     "mensa", "iter", "patientia", "tempus", "urbs", "pluvia", "silentium", "stella", "nota", "hortus",
     "spiritus", "parvus", "amicus", "liber", "quaestio", "responsum", "hora", "aurora", "navis", "consilium",
+  ]
+
+  // Typebar-authored pseudo-Latin keeps this visible practice mode distinct
+  // from the separate Latin language without copying a lorem corpus.
+  static let loremIpsumWords = [
+    "clarum", "verbum", "leniter", "ordinat", "novum", "iter", "aperit", "pagina",
+    "quietum", "lumen", "parva", "nota", "mensam", "cura", "ritmus", "gradus",
+    "aurora", "fenestra", "scriptum", "spatium", "memoria", "patientia", "manus", "tempus",
+    "linea", "lectio", "calamus", "umbra", "via", "initium",
   ]
 
   // Typebar-authored Friulian starter words provide a compact local practice
@@ -3924,6 +3974,15 @@ enum StarterLexicon {
     "καθαρός", "λίμνη", "δρόμος", "τραπέζι", "φως", "ταξίδι", "υπομονή", "στιγμή",
     "πόλη", "βροχή", "σιωπή", "κατεύθυνση", "αστέρι", "σημείωση", "κήπος", "ανάσα",
     "μικρός", "χρόνος", "άνοιξη", "νησί", "φίλος", "βιβλίο",
+  ]
+
+  // Typebar-authored Koine Greek starter words preserve polytonic Greek
+  // input independently of the reference word list.
+  static let greekKoineWords = [
+    "λόγος", "φῶς", "ὁδός", "καρδία", "ἡμέρα", "νύξ", "οἶκος", "βίβλος",
+    "φωνή", "ἀλήθεια", "χρόνος", "ἔργον", "ἀρχή", "τέλος", "μικρός", "μέγας",
+    "καλός", "καινός", "εἰρήνη", "χαρά", "ζωή", "ὕδωρ", "ἄρτος", "κόσμος",
+    "γράφω", "λέγω", "ἀκούω", "βλέπω", "μένω", "πορεύομαι",
   ]
 
   // Typebar-authored Greeklish starter words remain ASCII so users can
@@ -4537,6 +4596,10 @@ enum StarterLexicon {
         tokens: count, lexicon: englishVariant == .british ? britishWords : words, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .pigLatin:
+      return prompt(
+        tokens: count, lexicon: pigLatinWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .spanish:
       return prompt(
         tokens: count, lexicon: spanishWords, separator: " ", punctuation: [",", ".", "¡", "¿"],
@@ -4580,6 +4643,10 @@ enum StarterLexicon {
     case .latin:
       return prompt(
         tokens: count, lexicon: latinWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .loremIpsum:
+      return prompt(
+        tokens: count, lexicon: loremIpsumWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .friulian:
       return prompt(
@@ -4917,6 +4984,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .greekKoine:
+      return prompt(
+        tokens: count, lexicon: greekKoineWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .greeklish:
       return prompt(
         tokens: count, lexicon: greeklishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5113,6 +5184,7 @@ enum StarterLexicon {
   ) {
     switch language {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
+    case .pigLatin: (pigLatinWords, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
     case .swissGerman: (swissGermanWords, [",", ".", "!", "?"])
@@ -5124,6 +5196,7 @@ enum StarterLexicon {
     case .esperantoXSystem: (esperantoXSystemWords, [",", ".", "!", "?"])
     case .esperantoHSystem: (esperantoHSystemWords, [",", ".", "!", "?"])
     case .latin: (latinWords, [",", ".", "!", "?"])
+    case .loremIpsum: (loremIpsumWords, [",", ".", "!", "?"])
     case .friulian: (friulianWords, [",", ".", "!", "?"])
     case .malagasy: (malagasyWords, [",", ".", "!", "?"])
     case .welsh: (welshWords, [",", ".", "!", "?"])
@@ -5208,6 +5281,7 @@ enum StarterLexicon {
     case .marathi: (marathiWords, [",", ".", "!", "?"])
     case .kurdishCentral: (kurdishCentralWords, ["،", "؛", "؟", "."])
     case .greek: (greekWords, [",", ".", "!", "?"])
+    case .greekKoine: (greekKoineWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
     case .filipino: (filipinoWords, [",", ".", "!", "?"])
@@ -5313,6 +5387,7 @@ extension TypingLanguage {
     guard !isCodeLanguage else { return [] }
     return switch self {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
+    case .pigLatin: StarterLexicon.pigLatinWords
     case .spanish: StarterLexicon.spanishWords
     case .german: StarterLexicon.germanWords
     case .swissGerman: StarterLexicon.swissGermanWords
@@ -5324,6 +5399,7 @@ extension TypingLanguage {
     case .esperantoXSystem: StarterLexicon.esperantoXSystemWords
     case .esperantoHSystem: StarterLexicon.esperantoHSystemWords
     case .latin: StarterLexicon.latinWords
+    case .loremIpsum: StarterLexicon.loremIpsumWords
     case .friulian: StarterLexicon.friulianWords
     case .malagasy: StarterLexicon.malagasyWords
     case .welsh: StarterLexicon.welshWords
@@ -5408,6 +5484,7 @@ extension TypingLanguage {
     case .marathi: StarterLexicon.marathiWords
     case .kurdishCentral: StarterLexicon.kurdishCentralWords
     case .greek: StarterLexicon.greekWords
+    case .greekKoine: StarterLexicon.greekKoineWords
     case .greeklish: StarterLexicon.greeklishWords
     case .dutch: StarterLexicon.dutchWords
     case .filipino: StarterLexicon.filipinoWords
@@ -5452,7 +5529,7 @@ extension TypingLanguage {
   }
 
   static let defaultMixedComponents: [TypingLanguage] = [
-    .english, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -5503,7 +5580,7 @@ extension TypingLanguage {
   var supportsLazyLatinInput: Bool {
     guard !isCodeLanguage else { return false }
     return switch self {
-    case .english, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
+    case .english, .pigLatin, .loremIpsum, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
       .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .bulgarianLatin,
@@ -5572,6 +5649,7 @@ extension TypingLanguage {
     if let codeName = CodeLanguageCatalog.displayNames[self] { return "Code · \(codeName)" }
     return switch self {
     case .english: "English"
+    case .pigLatin: "Pig Latin"
     case .spanish: "Español"
     case .german: "Deutsch"
     case .swissGerman: "Swiss German"
@@ -5583,6 +5661,7 @@ extension TypingLanguage {
     case .esperantoXSystem: "Esperanto · X-sistemo"
     case .esperantoHSystem: "Esperanto · H-sistemo"
     case .latin: "Latina"
+    case .loremIpsum: "Lorem Ipsum · Typebar"
     case .friulian: "Friulian"
     case .malagasy: "Malagasy"
     case .welsh: "Cymraeg"
@@ -5667,6 +5746,7 @@ extension TypingLanguage {
     case .marathi: "मराठी"
     case .kurdishCentral: "کوردی ناوەندی"
     case .greek: "Ελληνικά"
+    case .greekKoine: "Ἑλληνιστικὴ Κοινή"
     case .greeklish: "Greeklish"
     case .dutch: "Nederlands"
     case .filipino: "Filipino"

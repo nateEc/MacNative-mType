@@ -394,7 +394,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 ## 2026-09-05 兼容性审计更正
 
-- `TypingLanguage` 当前有一百三十三种 Typebar 自有单语；默认与自选多语混排使用一百二十三种 LTR 单语。最新增加 Hinglish、Tanglish 与 Urdish，均为独立自写的拉丁字母代码混合词流和四档文本，不导入参考或网络语料，也不宣称统一拼写。固定配置均未定义 BCP-47、`noLazyMode` 或词频排序，因此三者走 LTR 空格词界、`en`／`en-US` 在线与朗读回退、可选简化输入和 Zipf 未知提示，并全部覆盖投稿、撤回、成绩和排行榜。
+- `TypingLanguage` 当前有一百三十六种 Typebar 自有单语；默认与自选多语混排使用一百二十六种 LTR 单语。最新增加 Ἑλληνιστικὴ Κοινή、Pig Latin 与 Lorem Ipsum · Typebar：Koine Greek 使用独立自写的多调希腊语内容、`el` 百科入口和 `el-GR` 朗读；Pig Latin 以 Typebar 自有英语内容执行确定性首辅音簇转换；Lorem Ipsum 使用独立自写的伪拉丁内容。三者均提供四档文本并覆盖投稿、撤回、成绩和排行榜；后两项按固定 `noLazyMode: true` 禁用普通练习简化输入。实现不读取或导入参考词表、引语、转换代码或资产。
 
 - `TypingLanguage` 当前有一百二十二种 Typebar 自有单语；默认与自选多语混排使用一百一十二种 LTR 单语。新增 `Te reo Māori` 只对应固定源码的 `maori_1k` 映射；该配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，因此以保留 macron 的原创 LTR 词流及四档引语、`en`／`en-US` 缺省在线/朗读路径、显式简化输入和 Zipf 未知提示实现，并覆盖投稿、撤回、成绩和排行榜。
 

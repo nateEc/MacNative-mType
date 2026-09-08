@@ -3892,6 +3892,62 @@ enum OfflineContent {
       language: .simplifiedChinese,
       length: .extended
     ),
+    OfflineQuote(
+      id: "koine-mikron-bema",
+      title: "Μικρὸν βῆμα",
+      text: "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ.",
+      language: .greekKoine,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "koine-phos-en-oiko",
+      title: "Φῶς ἐν οἴκῳ",
+      text: "Τὸ φῶς διὰ τῆς θυρίδος εἰσέρχεται, καὶ ἡ ἡσύχιος χεὶρ γράφει ἕνα λόγον μετὰ τὸν ἄλλον.",
+      language: .greekKoine,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "koine-hodos-matheos",
+      title: "Ὁδὸς μαθήσεως",
+      text: "Ἡ μάθησις οὐκ ἐν μιᾷ μεγάλῃ ἡμέρᾳ τελειοῦται. Ὁ μαθητὴς πάλιν ἀνοίγει τὴν βίβλον, βλέπει τὸ δυσχερὲς σημεῖον, διορθοῖ τὸ μικρὸν σφάλμα, καὶ φυλάσσει σαφῆ μνήμην πρὸς τὸ ἑξῆς ἔργον.",
+      language: .greekKoine,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "koine-trapeza-makra",
+      title: "Τράπεζα μακρά",
+      text: "Τράπεζα μακρὰ χώραν παρέχει πολλοῖς ἔργοις. Ἐν τῷ ἑνὶ μέρει κεῖται ἡ πρώτη γραφή, ἐν δὲ τῷ ἑτέρῳ ὁ λόγος ὁ ἔτι φροντίδος δεόμενος, καὶ ἐν μέσῳ μένει τόπος πρὸς τὴν ἑξῆς μικρὰν κρίσιν. Οὕτως καὶ ἡ μελέτη προχωρεῖ· οὐ πάντα τὰ δυσχερῆ ἅμα λύει, ἀλλὰ τόπον ἐπιστροφῆς, βῆμα φανερὸν καὶ ὑπομονὴν παρέχει, ἵνα μετὰ πλείονας πείρας τὸ πρότερον βαρὺ κουφότερον γένηται.",
+      language: .greekKoine,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "lorem-clara-verba",
+      title: "Clara verba",
+      text: "Clara verba leniter ordinata novum iter aperiunt.",
+      language: .loremIpsum,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "lorem-pagina-quieta",
+      title: "Pagina quieta",
+      text: "Pagina quieta responsum non fingit; spatium tamen praebet ut parva nota iuxta alteram ponatur.",
+      language: .loremIpsum,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "lorem-iter-leniter",
+      title: "Iter leniter",
+      text: "Novum iter non uno impetu perficitur. Fenestra aperitur, linea legitur, verbum incertum cura mutatur, atque brevis memoria servatur ut manus postea ad initium clarum redeat.",
+      language: .loremIpsum,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "lorem-mensa-spatiosa",
+      title: "Mensa spatiosa",
+      text: "Mensa spatiosa pluribus operibus locum dat. In uno margine scriptum primum iacet, in altero linea quae adhuc curam poscit, medio autem spatium proximi consilii manet. Exercitatio simili ordine crescit: non omnia difficilia eodem tempore solvere conatur, sed locum reditus, gradum visibilem et patientiam parat. Post multas parvas probationes manus firmior fit, ritmus quietior manet, et quod ante grave videbatur paulatim apertum atque tractabile apparet.",
+      language: .loremIpsum,
+      length: .extended
+    ),
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
@@ -3902,6 +3958,16 @@ enum OfflineContent {
           title: quote.title.replacingOccurrences(of: "ß", with: "ss"),
           text: quote.text.replacingOccurrences(of: "ß", with: "ss"),
           language: .swissGerman,
+          length: quote.length)
+      }
+    }
+    if language == .pigLatin {
+      return quotes(for: .english, length: length).map { quote in
+        .init(
+          id: "pig-latin-\(quote.id)",
+          title: PigLatinPolicy.transform(quote.title),
+          text: PigLatinPolicy.transform(quote.text),
+          language: .pigLatin,
           length: quote.length)
       }
     }

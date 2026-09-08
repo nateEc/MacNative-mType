@@ -3688,6 +3688,39 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(leaderboard.entries.map(\.wpm), [72])
   }
 
+  func testKoineGreekPigLatinAndLoremIpsumCrossQuoteAndResultDataPlanes() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(
+        email: "new-language-plane@example.com", password: "a secure password",
+        displayName: "Language Plane User"))
+    let now = Date(timeIntervalSince1970: 1_735_689_600)
+    let languages = [
+      ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),
+      ("pigLatin", "Eadystray acticepray akesmay ethay extnay epstay earclay."),
+      ("loremIpsum", "Clara verba leniter ordinata novum iter aperiunt."),
+    ]
+
+    for (offset, item) in languages.enumerated() {
+      let quote = try await store.submitQuote(
+        .init(language: item.0, text: item.1, attribution: nil),
+        accessToken: session.accessToken)
+      XCTAssertEqual(quote.status, "pending")
+      try await store.withdrawQuoteSubmission(quote.id, accessToken: session.accessToken)
+
+      let wpm = 71 + offset
+      let accepted = try await store.submitResult(
+        result(
+          id: UUID(), wpm: wpm, accuracy: 100, language: item.0,
+          finishedAt: now.addingTimeInterval(Double(offset))),
+        accessToken: session.accessToken, now: now)
+      XCTAssertTrue(accepted.accepted)
+      let leaderboard = try await store.leaderboard(
+        .init(mode: "time", language: item.0, period: "all", limit: 10), now: now)
+      XCTAssertEqual(leaderboard.entries.map(\.wpm), [wpm])
+    }
+  }
+
   func testLeaderboardPeriodsUseTodayYesterdayAndISOWeekBoundaries() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let session = try await store.register(

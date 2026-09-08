@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 133 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 Hinglish、Tanglish 与 Urdish。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
+Typebar 现有 136 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 Ἑλληνιστικὴ Κοινή、Pig Latin 与 Lorem Ipsum · Typebar。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ Typebar 现有 133 个可单独练习并支持 Typebar 自有引语的语言／�
 ## 自动化守卫
 
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
-- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，Swiss German、Albanian、Bemba、Bosnian、Esperanto、Esperanto X、Esperanto H、Latin、Friulian、Malagasy、Welsh、Hausa、Tatar、Uzbek、Occitan、Oromo、Macedonian、Kazakh、Vietnamese、Jyutping、Pinyin、Bashkir、Euskera、Frisian、Zulu、Hawaiian、Kabyle、Maltese、toki pona、Xhosa、Tibetan、Kyrgyz、Udmurt、Yoruba、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Sinhala、Khmer、Burmese、Lao、Amharic、Armenian、Western Armenian、Georgian、Azerbaijani、Belarusian、Lithuanian、Latvian、Mongolian、Irish、Galician 与 Marathi 明确被包含。
+- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；最新守卫明确覆盖 Ἑλληνιστικὴ Κοινή、Pig Latin 与 Lorem Ipsum · Typebar，使当前候选数固定为 126。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜；Swiss German 以固定源码要求的“投稿拒绝、成绩接受”边界替代一般投稿路径。
 - Egyptian Arabic 审计读取 `arabic_egypt.json` 与 `arabic_egypt_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 RTL、连写和 `bcp47: ar-EG`，不定义 `noLazyMode` 或词频排序；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-EG` 朗读、手动可选简化输入和 Zipf 未知提示，并进入社区投稿、成绩及排行榜。
 - Moroccan Arabic 审计读取 `arabic_morocco.json` 的元数据，不读取其中词表或引语文本。它定义 RTL、连写、`orderedByFrequency: false` 和 `bcp47: ar-MA`，不定义 `noLazyMode`；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-MA` 朗读、手动可选简化输入和明确的 Zipf 不支持提示，并进入社区投稿、成绩及排行榜。
@@ -86,6 +86,7 @@ Typebar 现有 133 个可单独练习并支持 Typebar 自有引语的语言／�
 - 2026-09-07 更正：当前单语总数为一百二十五种、默认／自选 LTR 多语候选为一百一十五种。Santali 审计只读取 `santali.json` 的名称与可选元数据字段，不读取词表或引语文本；固定配置仅定义 `bcp47: sat-IN`，未定义 RTL、连写、`noLazyMode` 或词频排序。Typebar 使用 Unicode Ol Chiki 的独立练习词流与四档自有文本，走 LTR 空格分词、`sat` 百科入口、`sat-IN` 系统朗读、显式简化输入和 Zipf 未知提示，并已覆盖多语轮转、社区投稿、撤回、成绩及排行榜。
 - 2026-09-07 更正：当前单语总数为一百三十种、默认／自选 LTR 多语候选为一百二十种。新增 Bulgarian Latin、Nepali Romanized、Persian Romanized、Sanskrit Roman 与 Urdu Roman；审计只读取对应五个固定 JSON 的名称和元数据，不读取词表或引语。五者均为 LTR 空格词界并使用彼此独立的 Typebar 自写词流与四档文本，不宣称运行时可逆转写。Bulgarian Latin（`bg`）与 Persian Romanized（`fa`）按 `noLazyMode: true` 禁用简化输入；Nepali Romanized 未定义 BCP-47，严格回退 `en`／`en-US`；Sanskrit Roman 使用 `sa`；Urdu Roman 使用 `ur-Latn`，百科按基础语言请求 `ur`。Bulgarian Latin 与 Urdu Roman 的 `orderedByFrequency: false` 显示 Zipf 不支持，其余三项显示未知；五者均已覆盖多语轮转、社区投稿、撤回、成绩和排行榜。
 - 2026-09-07 更正：当前单语总数为一百三十三种、默认／自选 LTR 多语候选为一百二十三种。Hinglish、Tanglish 与 Urdish 的固定配置均未定义 BCP-47、连写、`noLazyMode` 或词频排序，Tanglish 额外显式定义 `rightToLeft: false`；其余两项未定义方向，因此三者均按 LTR 空格词界实现。Typebar 为每项提供独立自写的拉丁字母代码混合词流和四档文本，不导入参考或网络语料，也不宣称拼写规范化；知识短文与系统朗读严格回退 `en`／`en-US`，保留简化输入并显示 Zipf 未知提示，且已覆盖多语轮转、社区投稿、撤回、成绩和排行榜。
+- 2026-09-08 更正：当前单语总数为一百三十六种、默认／自选 LTR 多语候选为一百二十六种。Ἑλληνιστικὴ Κοινή按固定 `bcp47: el-GR` 使用 LTR 空格词界、`el` 百科入口、`el-GR` 朗读、可选简化输入与 Zipf 未知提示；Typebar 为其提供独立自写的多调希腊语词流和四档文本。Pig Latin 与 Lorem Ipsum 的固定配置均定义 `noLazyMode: true`；前者只对 Typebar 自有英语词流和引语做确定性首辅音簇转换，后者只使用 Typebar 自写的伪拉丁词流与文本，二者均禁用普通练习简化输入、使用 `en`／`en-US` 路径且显示 Zipf 未知提示。三者均进入多语轮转、社区投稿、撤回、成绩和排行榜；未读取或导入参考词表、引语、转换实现或资产。
 
 ## 后续候选与准入条件
 

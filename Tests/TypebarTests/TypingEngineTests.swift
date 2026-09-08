@@ -8590,7 +8590,7 @@ final class TypingEngineTests: XCTestCase {
     var session = TestSessionFactory.make(configuration: configuration)
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
-      StarterLexicon.britishWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
+      StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.swissGermanWords,
       StarterLexicon.afrikaansWords,
       StarterLexicon.albanianWords,
@@ -8600,6 +8600,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.esperantoXSystemWords,
       StarterLexicon.esperantoHSystemWords,
       StarterLexicon.latinWords,
+      StarterLexicon.loremIpsumWords,
       StarterLexicon.friulianWords,
       StarterLexicon.malagasyWords,
       StarterLexicon.welshWords,
@@ -8673,7 +8674,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.irishWords,
       StarterLexicon.galicianWords,
       StarterLexicon.marathiWords,
-      StarterLexicon.greekWords, StarterLexicon.greeklishWords,
+      StarterLexicon.greekWords, StarterLexicon.greekKoineWords, StarterLexicon.greeklishWords,
       StarterLexicon.dutchWords, StarterLexicon.filipinoWords, StarterLexicon.catalanWords,
       StarterLexicon.indonesianWords, StarterLexicon.malayWords, StarterLexicon.danishWords,
       StarterLexicon.norwegianBokmalWords,
@@ -8689,7 +8690,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 123)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 126)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -12051,6 +12052,28 @@ final class TypingEngineTests: XCTestCase {
         quote: quote)
       XCTAssertEqual(session.prompt, quote.text)
     }
+  }
+
+  func testKoineGreekPigLatinAndLoremIpsumCoverTheirPinnedLanguageSemantics() throws {
+    let languages: [TypingLanguage] = [.greekKoine, .pigLatin, .loremIpsum]
+    for language in languages {
+      XCTAssertFalse(language.ownedPracticeWords().isEmpty, language.displayName)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), language.displayName)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+      }
+    }
+
+    XCTAssertEqual(TypingLanguage.greekKoine.displayName, "Ἑλληνιστικὴ Κοινή")
+    XCTAssertEqual(TypingLanguage.greekKoine.speechLocaleIdentifier, "el-GR")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: .greekKoine), "el")
+    XCTAssertTrue(TypingLanguage.greekKoine.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.pigLatin.supportsLazyLatinInput)
+    XCTAssertFalse(TypingLanguage.loremIpsum.supportsLazyLatinInput)
+    XCTAssertEqual(PigLatinPolicy.transform("apple"), "appleway")
+    XCTAssertEqual(PigLatinPolicy.transform("typing"), "ingtypay")
+    XCTAssertEqual(PigLatinPolicy.transform("quiet"), "uietqay")
   }
 
   func testQuoteSearchMatchesAllTermsWithoutSendingOrMutatingContent() {
