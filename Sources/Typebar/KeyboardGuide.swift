@@ -175,6 +175,9 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case miligram
   case nokwts
   case vyletV4 = "vylet_v4"
+  case ergopti
+  case rulemak
+  case gralmakS = "GralmakS"
   case real
   case sertain
   case ctgap
@@ -418,6 +421,9 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .miligram: "Miligram"
     case .nokwts: "Nokwts"
     case .vyletV4: "Vylet v4"
+    case .ergopti: "ErgolPT"
+    case .rulemak: "Rulemak"
+    case .gralmakS: "Gralmak S"
     case .real: "Real"
     case .sertain: "Sertain"
     case .ctgap: "CTGAP"
@@ -666,6 +672,9 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case miligram
   case nokwts
   case vyletV4 = "vylet_v4"
+  case ergopti
+  case rulemak
+  case gralmakS = "GralmakS"
   case real
   case sertain
   case ctgap
@@ -2804,6 +2813,27 @@ enum KeyboardGuideModel {
         normal: ["`1234567890[]", "wcmpkxlouj-=\\", "rsthf'naei/", "qgvdbzy.;,"],
         shifted: ["~!@#$%^&*(){}", "WCMPKXLOUJ_+|", "RSTHF\"NAEI?", "QGVDBZY<:>"]
       )
+    case .ergopti:
+      variableLayerRows([
+        [["=", "+", "}"], ["1", "1", "1", "1"], ["2", "2", "2", "2"], ["3", "3", "3", "3"], ["4", "4", "4", "4"], ["5", "5", "5", "5"], ["6", "6", "6", "6"], ["7", "7", "7", "7"], ["8", "8", "8", "8"], ["9", "9", "9", "9"], ["0", "º", "°", "ª"], ["€", "€", "£", "¤"], ["%", "%", "‰", "‱"]],
+        [["è", "È", "`", "„"], ["y", "Y", "@"], ["o", "O", "œ", "Œ"], ["w", "W", "ù", "Ù"], ["b", "B", "«", "“"], ["f", "F", "»", "”"], ["g", "G", "~", "≈"], ["h", "H", "#", "%"], ["c", "C"], ["x", "X", "*", "×"], ["z", "Z"], ["ç", "Ç"]],
+        [["a", "A", "<", "⩽"], ["i", "I", ">", "⩾"], ["e", "E", "{", "ᵉ"], ["u", "U", "}"], [".", ":", ":", "·"], ["v", "V", "|", "¦"], ["s", "S", "(", "—"], ["n", "N", ")", "–"], ["t", "T", "["], ["r", "R", "["], ["q", "Q", "’"], ["^", "!", "!", "¡"]],
+        [["ê", "Ê"], ["é", "É", "/", "÷"], ["à", "À", "\\", "ᵢ"], ["j", "J", "\""], [",", ";", ";"], ["k", "K", "…"], ["m", "M", "&", "−"], ["d", "D", "$", "§"], ["l", "L", "=", "≠"], ["p", "P", "+", "±"], ["'", "?", "?", "¿"]],
+      ])
+    case .rulemak:
+      variableLayerRows([
+        [["ё", "Ё"], ["1", "!"], ["2", "\""], ["3", "№", "#", "³"], ["4", ";", "$", "£"], ["5", "%", "€", "%"], ["6", ":"], ["7", "?", "&"], ["8", "*", "₽", "₴"], ["9", "(", "[", "{"], ["0", ")", "]", "}"], ["-", "_", "–", "—"], ["=", "+", "×", "÷"]],
+        [["я", "Я", "ѣ", "Ѣ"], ["ж", "Ж", "ѵ", "Ѵ"], ["ф", "Ф", "ѳ", "Ѳ"], ["п", "П", "п", "П"], ["г", "Г", "ґ", "Ґ"], ["й", "Й", "ј", "Ј"], ["л", "Л", "љ", "Љ"], ["у", "У", "ў", "Ў"], ["ы", "Ы", "ї", "Ї"], ["ю", "Ю", ";", ":"], ["ш", "Ш", "«", "„"], ["щ", "Щ", "»", "“"], ["э", "Э", "’", "”"]],
+        [["а", "А", "'", "ʼ"], ["р", "Р", "®"], ["с", "С", "@"], ["т", "Т", "ћ", "Ћ"], ["д", "Д", "ђ", "Ђ"], ["ч", "Ч", "џ", "Џ"], ["н", "Н", "њ", "Њ"], ["е", "Е", "є", "Є"], ["и", "И", "і", "І"], ["о", "О", "о", "О"], ["ь", "Ь", "ъ", "Ъ"]],
+        [["з", "З", "ѕ", "Ѕ"], ["х", "Х", "х", "Х"], ["ц", "Ц", "©"], ["в", "В", "в", "В"], ["б", "Б", "ѓ", "Ѓ"], ["к", "К", "ќ", "Ќ"], ["м", "М", "м", "М"], [",", ";", "<"], [".", ":", ">"], ["/", "?", "\\", "|"]],
+      ])
+    case .gralmakS:
+      variableLayerRows([
+        [["`", "~", "~", "≈"], ["1", "!", "̣", "¡"], ["2", "@", "̉", "²"], ["3", "#", "̛", "³"], ["4", "$", "¤", "£"], ["5", "%", "µ", "‰"], ["6", "^", "^", "∂"], ["7", "&", "ˇ", "¬"], ["8", "*", "˛", "∞"], ["9", "(", "˘", "·"], ["0", ")", "°", "°"], ["[", "{", "å", "Å"], ["]", "}", "æ", "Æ"]],
+        [["b", "B", "•", "↑"], ["l", "L", "ł", "Ł"], ["d", "D", "ð", "Ð"], ["w", "W", "‘", "“"], ["q", "Q", "‚", "„"], ["j", "J", "ʃ", "Ʃ"], ["f", "F", "’", "”"], ["o", "O", "‹", "«"], ["u", "U", "›", "»"], ["'", "\"", "´", "′"], ["-", "_", "¯", "±"], ["=", "+", "˝", "≠"], ["\\", "|", "`", "¦"]],
+        [["n", "N", "–", "↑"], ["r", "R", "®", "™"], ["t", "T", "þ", "Þ"], ["s", "S", "ß", "§"], ["g", "G", "ŋ", "Ŋ"], ["y", "Y", "º", "ª"], ["h", "H", "ħ", "Ħ"], ["a", "A", "đ", "α"], ["e", "E", "€", "←"], ["i", "I", "—", "→"], [";", ":", "¨", "…"]],
+        [["z", "Z", "ʒ", "Ʒ"], ["x", "X", "†", "‡"], ["m", "M", "×", "↓"], ["c", "C", "©", "¢"], ["v", "V", "÷", "γ"], ["k", "K", "ç", "Ç"], ["p", "P", "π", "¶"], [".", ">", "˙", "≥"], ["/", "?", "/", "¿"], [",", "<", "¸", "≤"]],
+      ])
     case .real:
       [
         row("number", "`1234567890[]"),
@@ -4127,6 +4157,12 @@ enum KeyboardGuideModel {
       return [KeyboardGuideKey("thumb-0", label: "E", characters: "eE", width: 70), space]
     case .dusk:
       return [KeyboardGuideKey("thumb-0", label: "R", characters: "rR", width: 70), space]
+    case .ergopti:
+      return [
+        KeyboardGuideKey(
+          "space", label: "空格", characters: " -", width: 170,
+          shiftedLabel: "-", optionLabel: " ", shiftedOptionLabel: "-")
+      ]
     default:
       return [KeyboardGuideKey("space", label: "空格", characters: " ", width: 170)]
     }
@@ -4253,6 +4289,18 @@ enum KeyboardGuideModel {
         optionLabels: Array(repeating: nil, count: labels.0.count),
         shiftedOptionLabels: Array(repeating: nil, count: labels.0.count)
       )
+    }
+  }
+
+  private static func variableLayerRows(_ rows: [[[String]]]) -> [[KeyboardGuideKey]] {
+    zip(["number", "top", "home", "bottom"], rows).map { rowID, entries in
+      entries.enumerated().map { offset, layers in
+        KeyboardGuideKey(
+          "\(rowID)-\(offset)", label: layers[0], characters: layers.joined(),
+          shiftedLabel: layers.indices.contains(1) ? layers[1] : nil,
+          optionLabel: layers.indices.contains(2) ? layers[2] : nil,
+          shiftedOptionLabel: layers.indices.contains(3) ? layers[3] : nil)
+      }
     }
   }
 

@@ -1442,6 +1442,42 @@ enum KeyboardLayoutEmulator {
           normal: ["`1234567890[]", "wcmpkxlouj-=\\", "rsthf'naei/", "qgvdbzy.;,"],
           shifted: ["~!@#$%^&*(){}", "WCMPKXLOUJ_+|", "RSTHF\"NAEI?", "QGVDBZY<:>"]
         ), overrides: [:])
+    case .ergopti:
+      withThumbKey(
+        variableLayerMap(
+          keyRows: [
+            physicalRows[0], Array(physicalRows[1].dropLast()), physicalRows[2] + [42],
+            [10] + physicalRows[3],
+          ],
+          rows: [
+            [["=", "+", "}"], ["1", "1", "1", "1"], ["2", "2", "2", "2"], ["3", "3", "3", "3"], ["4", "4", "4", "4"], ["5", "5", "5", "5"], ["6", "6", "6", "6"], ["7", "7", "7", "7"], ["8", "8", "8", "8"], ["9", "9", "9", "9"], ["0", "º", "°", "ª"], ["€", "€", "£", "¤"], ["%", "%", "‰", "‱"]],
+            [["è", "È", "`", "„"], ["y", "Y", "@"], ["o", "O", "œ", "Œ"], ["w", "W", "ù", "Ù"], ["b", "B", "«", "“"], ["f", "F", "»", "”"], ["g", "G", "~", "≈"], ["h", "H", "#", "%"], ["c", "C"], ["x", "X", "*", "×"], ["z", "Z"], ["ç", "Ç"]],
+            [["a", "A", "<", "⩽"], ["i", "I", ">", "⩾"], ["e", "E", "{", "ᵉ"], ["u", "U", "}"], [".", ":", ":", "·"], ["v", "V", "|", "¦"], ["s", "S", "(", "—"], ["n", "N", ")", "–"], ["t", "T", "["], ["r", "R", "["], ["q", "Q", "’"], ["^", "!", "!", "¡"]],
+            [["ê", "Ê"], ["é", "É", "/", "÷"], ["à", "À", "\\", "ᵢ"], ["j", "J", "\""], [",", ";", ";"], ["k", "K", "…"], ["m", "M", "&", "−"], ["d", "D", "$", "§"], ["l", "L", "=", "≠"], ["p", "P", "+", "±"], ["'", "?", "?", "¿"]],
+          ]),
+        normal: " ", shifted: "-", option: " ", shiftedOption: "-")
+    case .rulemak:
+      withThumbKey(
+        variableLayerMap(
+          keyRows: physicalRows,
+          rows: [
+            [["ё", "Ё"], ["1", "!"], ["2", "\""], ["3", "№", "#", "³"], ["4", ";", "$", "£"], ["5", "%", "€", "%"], ["6", ":"], ["7", "?", "&"], ["8", "*", "₽", "₴"], ["9", "(", "[", "{"], ["0", ")", "]", "}"], ["-", "_", "–", "—"], ["=", "+", "×", "÷"]],
+            [["я", "Я", "ѣ", "Ѣ"], ["ж", "Ж", "ѵ", "Ѵ"], ["ф", "Ф", "ѳ", "Ѳ"], ["п", "П", "п", "П"], ["г", "Г", "ґ", "Ґ"], ["й", "Й", "ј", "Ј"], ["л", "Л", "љ", "Љ"], ["у", "У", "ў", "Ў"], ["ы", "Ы", "ї", "Ї"], ["ю", "Ю", ";", ":"], ["ш", "Ш", "«", "„"], ["щ", "Щ", "»", "“"], ["э", "Э", "’", "”"]],
+            [["а", "А", "'", "ʼ"], ["р", "Р", "®"], ["с", "С", "@"], ["т", "Т", "ћ", "Ћ"], ["д", "Д", "ђ", "Ђ"], ["ч", "Ч", "џ", "Џ"], ["н", "Н", "њ", "Њ"], ["е", "Е", "є", "Є"], ["и", "И", "і", "І"], ["о", "О", "о", "О"], ["ь", "Ь", "ъ", "Ъ"]],
+            [["з", "З", "ѕ", "Ѕ"], ["х", "Х", "х", "Х"], ["ц", "Ц", "©"], ["в", "В", "в", "В"], ["б", "Б", "ѓ", "Ѓ"], ["к", "К", "ќ", "Ќ"], ["м", "М", "м", "М"], [",", ";", "<"], [".", ":", ">"], ["/", "?", "\\", "|"]],
+          ]),
+        normal: " ", shifted: " ", option: " ", shiftedOption: " ")
+    case .gralmakS:
+      withThumbKey(
+        variableLayerMap(
+          keyRows: physicalRows,
+          rows: [
+            [["`", "~", "~", "≈"], ["1", "!", "̣", "¡"], ["2", "@", "̉", "²"], ["3", "#", "̛", "³"], ["4", "$", "¤", "£"], ["5", "%", "µ", "‰"], ["6", "^", "^", "∂"], ["7", "&", "ˇ", "¬"], ["8", "*", "˛", "∞"], ["9", "(", "˘", "·"], ["0", ")", "°", "°"], ["[", "{", "å", "Å"], ["]", "}", "æ", "Æ"]],
+            [["b", "B", "•", "↑"], ["l", "L", "ł", "Ł"], ["d", "D", "ð", "Ð"], ["w", "W", "‘", "“"], ["q", "Q", "‚", "„"], ["j", "J", "ʃ", "Ʃ"], ["f", "F", "’", "”"], ["o", "O", "‹", "«"], ["u", "U", "›", "»"], ["'", "\"", "´", "′"], ["-", "_", "¯", "±"], ["=", "+", "˝", "≠"], ["\\", "|", "`", "¦"]],
+            [["n", "N", "–", "↑"], ["r", "R", "®", "™"], ["t", "T", "þ", "Þ"], ["s", "S", "ß", "§"], ["g", "G", "ŋ", "Ŋ"], ["y", "Y", "º", "ª"], ["h", "H", "ħ", "Ħ"], ["a", "A", "đ", "α"], ["e", "E", "€", "←"], ["i", "I", "—", "→"], [";", ":", "¨", "…"]],
+            [["z", "Z", "ʒ", "Ʒ"], ["x", "X", "†", "‡"], ["m", "M", "×", "↓"], ["c", "C", "©", "¢"], ["v", "V", "÷", "γ"], ["k", "K", "ç", "Ç"], ["p", "P", "π", "¶"], [".", ">", "˙", "≥"], ["/", "?", "/", "¿"], [",", "<", "¸", "≤"]],
+          ]),
+        normal: " ", shifted: " ", option: " ", shiftedOption: " ")
     case .real:
       map(
         "50:`~ 18:1! 19:2@ 20:3# 21:4$ 23:5% 22:6^ 26:7& 28:8* 25:9( 29:0) 27:[{ 24:]} "
@@ -2061,6 +2097,24 @@ enum KeyboardLayoutEmulator {
     })
   }
 
+  private static func variableLayerMap(
+    keyRows: [[UInt16]], rows: [[[String]]]
+  ) -> [UInt16: KeyLayers] {
+    Dictionary(uniqueKeysWithValues: zip(keyRows, rows).flatMap { keyCodes, entries in
+      zip(keyCodes, entries).map { keyCode, layers in
+        let normal = layers[0]
+        let shifted = layers.indices.contains(1) ? layers[1] : normal
+        return (
+          keyCode,
+          KeyLayers(
+            normal: normal,
+            shifted: shifted,
+            option: layers.indices.contains(2) ? layers[2] : normal,
+            shiftedOption: layers.indices.contains(3) ? layers[3] : shifted))
+      }
+    })
+  }
+
   private static func isoBaseShiftMap(normal: [String], shifted: [String]) -> [UInt16: KeyLayers] {
     baseShiftMap(
       keyRows: [
@@ -2131,10 +2185,12 @@ enum KeyboardLayoutEmulator {
   }
 
   private static func withThumbKey(
-    _ keys: [UInt16: KeyLayers], normal: String, shifted: String
+    _ keys: [UInt16: KeyLayers], normal: String, shifted: String,
+    option: String? = nil, shiftedOption: String? = nil
   ) -> [UInt16: KeyLayers] {
     var layeredKeys = keys
-    layeredKeys[49] = .init(normal: normal, shifted: shifted)
+    layeredKeys[49] = .init(
+      normal: normal, shifted: shifted, option: option, shiftedOption: shiftedOption)
     return layeredKeys
   }
 

@@ -5272,6 +5272,168 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testErgoptiRulemakAndGralmakSPreserveAllFourLayersAndSpace() throws {
+    struct ExpectedLayout {
+      let rawValue: String
+      let keyRows: [[UInt16]]
+      let entries: [[[[String]]]]
+      let space: [String]
+    }
+
+    let ansiRows = SystemKeyboardGuide.physicalRows
+    let isoRows = [
+      ansiRows[0], Array(ansiRows[1].dropLast()), ansiRows[2] + [42], [10] + ansiRows[3],
+    ]
+    let expected = [
+      ExpectedLayout(
+        rawValue: "ergopti", keyRows: isoRows,
+        entries: [[
+          [["=", "+", "}"]], [["1", "1", "1", "1"]], [["2", "2", "2", "2"]],
+          [["3", "3", "3", "3"]], [["4", "4", "4", "4"]], [["5", "5", "5", "5"]],
+          [["6", "6", "6", "6"]], [["7", "7", "7", "7"]], [["8", "8", "8", "8"]],
+          [["9", "9", "9", "9"]], [["0", "º", "°", "ª"]], [["€", "€", "£", "¤"]],
+          [["%", "%", "‰", "‱"]],
+        ], [
+          [["è", "È", "`", "„"]], [["y", "Y", "@"]], [["o", "O", "œ", "Œ"]],
+          [["w", "W", "ù", "Ù"]], [["b", "B", "«", "“"]], [["f", "F", "»", "”"]],
+          [["g", "G", "~", "≈"]], [["h", "H", "#", "%"]], [["c", "C"]],
+          [["x", "X", "*", "×"]], [["z", "Z"]], [["ç", "Ç"]],
+        ], [
+          [["a", "A", "<", "⩽"]], [["i", "I", ">", "⩾"]], [["e", "E", "{", "ᵉ"]],
+          [["u", "U", "}"]], [[".", ":", ":", "·"]], [["v", "V", "|", "¦"]],
+          [["s", "S", "(", "—"]], [["n", "N", ")", "–"]], [["t", "T", "["]],
+          [["r", "R", "["]], [["q", "Q", "’"]], [["^", "!", "!", "¡"]],
+        ], [
+          [["ê", "Ê"]], [["é", "É", "/", "÷"]], [["à", "À", "\\", "ᵢ"]],
+          [["j", "J", "\""]], [[",", ";", ";"]], [["k", "K", "…"]],
+          [["m", "M", "&", "−"]], [["d", "D", "$", "§"]], [["l", "L", "=", "≠"]],
+          [["p", "P", "+", "±"]], [["'", "?", "?", "¿"]],
+        ]], space: [" ", "-", " ", "-"]
+      ),
+      ExpectedLayout(
+        rawValue: "rulemak", keyRows: ansiRows,
+        entries: [[
+          [["ё", "Ё"]], [["1", "!"]], [["2", "\""]], [["3", "№", "#", "³"]],
+          [["4", ";", "$", "£"]], [["5", "%", "€", "%"]], [["6", ":"]],
+          [["7", "?", "&"]], [["8", "*", "₽", "₴"]], [["9", "(", "[", "{"]],
+          [["0", ")", "]", "}"]], [["-", "_", "–", "—"]], [["=", "+", "×", "÷"]],
+        ], [
+          [["я", "Я", "ѣ", "Ѣ"]], [["ж", "Ж", "ѵ", "Ѵ"]], [["ф", "Ф", "ѳ", "Ѳ"]],
+          [["п", "П", "п", "П"]], [["г", "Г", "ґ", "Ґ"]], [["й", "Й", "ј", "Ј"]],
+          [["л", "Л", "љ", "Љ"]], [["у", "У", "ў", "Ў"]], [["ы", "Ы", "ї", "Ї"]],
+          [["ю", "Ю", ";", ":"]], [["ш", "Ш", "«", "„"]], [["щ", "Щ", "»", "“"]],
+          [["э", "Э", "’", "”"]],
+        ], [
+          [["а", "А", "'", "ʼ"]], [["р", "Р", "®"]], [["с", "С", "@"]],
+          [["т", "Т", "ћ", "Ћ"]], [["д", "Д", "ђ", "Ђ"]], [["ч", "Ч", "џ", "Џ"]],
+          [["н", "Н", "њ", "Њ"]], [["е", "Е", "є", "Є"]], [["и", "И", "і", "І"]],
+          [["о", "О", "о", "О"]], [["ь", "Ь", "ъ", "Ъ"]],
+        ], [
+          [["з", "З", "ѕ", "Ѕ"]], [["х", "Х", "х", "Х"]], [["ц", "Ц", "©"]],
+          [["в", "В", "в", "В"]], [["б", "Б", "ѓ", "Ѓ"]], [["к", "К", "ќ", "Ќ"]],
+          [["м", "М", "м", "М"]], [[",", ";", "<"]], [[".", ":", ">"]],
+          [["/", "?", "\\", "|"]],
+        ]], space: [" ", " ", " ", " "]
+      ),
+      ExpectedLayout(
+        rawValue: "GralmakS", keyRows: ansiRows,
+        entries: [[
+          [["`", "~", "~", "≈"]], [["1", "!", "̣", "¡"]], [["2", "@", "̉", "²"]],
+          [["3", "#", "̛", "³"]], [["4", "$", "¤", "£"]], [["5", "%", "µ", "‰"]],
+          [["6", "^", "^", "∂"]], [["7", "&", "ˇ", "¬"]], [["8", "*", "˛", "∞"]],
+          [["9", "(", "˘", "·"]], [["0", ")", "°", "°"]], [["[", "{", "å", "Å"]],
+          [["]", "}", "æ", "Æ"]],
+        ], [
+          [["b", "B", "•", "↑"]], [["l", "L", "ł", "Ł"]], [["d", "D", "ð", "Ð"]],
+          [["w", "W", "‘", "“"]], [["q", "Q", "‚", "„"]], [["j", "J", "ʃ", "Ʃ"]],
+          [["f", "F", "’", "”"]], [["o", "O", "‹", "«"]], [["u", "U", "›", "»"]],
+          [["'", "\"", "´", "′"]], [["-", "_", "¯", "±"]], [["=", "+", "˝", "≠"]],
+          [["\\", "|", "`", "¦"]],
+        ], [
+          [["n", "N", "–", "↑"]], [["r", "R", "®", "™"]], [["t", "T", "þ", "Þ"]],
+          [["s", "S", "ß", "§"]], [["g", "G", "ŋ", "Ŋ"]], [["y", "Y", "º", "ª"]],
+          [["h", "H", "ħ", "Ħ"]], [["a", "A", "đ", "α"]], [["e", "E", "€", "←"]],
+          [["i", "I", "—", "→"]], [[";", ":", "¨", "…"]],
+        ], [
+          [["z", "Z", "ʒ", "Ʒ"]], [["x", "X", "†", "‡"]], [["m", "M", "×", "↓"]],
+          [["c", "C", "©", "¢"]], [["v", "V", "÷", "γ"]], [["k", "K", "ç", "Ç"]],
+          [["p", "P", "π", "¶"]], [[".", ">", "˙", "≥"]], [["/", "?", "/", "¿"]],
+          [[",", "<", "¸", "≤"]],
+        ]], space: [" ", " ", " ", " "]
+      ),
+    ]
+
+    let modifierLayers: [NSEvent.ModifierFlags] = [[], [.shift], [.option], [.option, .shift]]
+    for item in expected {
+      let layout = try XCTUnwrap(KeyboardLayout(rawValue: item.rawValue), item.rawValue)
+      let guideRows = KeyboardGuideModel.rows(for: layout)
+      XCTAssertEqual(guideRows.map(\.count), item.keyRows.map(\.count))
+      for rowIndex in item.keyRows.indices {
+        for keyIndex in item.keyRows[rowIndex].indices {
+          let entry = item.entries[rowIndex][keyIndex][0]
+          let normal = entry[0]
+          let shifted = entry.count > 1 ? entry[1] : normal
+          let option = entry.count > 2 ? entry[2] : normal
+          let shiftedOption = entry.count > 3 ? entry[3] : shifted
+          let resolved = [normal, shifted, option, shiftedOption]
+          let keyCode = item.keyRows[rowIndex][keyIndex]
+          let guide = guideRows[rowIndex][keyIndex]
+          XCTAssertEqual(guide.label, normal)
+          XCTAssertEqual(guide.shiftedLabel, entry.count > 1 ? shifted : nil)
+          XCTAssertEqual(guide.optionLabel, entry.count > 2 ? option : nil)
+          XCTAssertEqual(guide.shiftedOptionLabel, entry.count > 3 ? shiftedOption : nil)
+          for layerIndex in modifierLayers.indices {
+            XCTAssertEqual(
+              KeyboardLayoutEmulator.text(
+                forKeyCode: keyCode, modifierFlags: modifierLayers[layerIndex], layout: layout),
+              resolved[layerIndex], "\(item.rawValue) key \(keyCode) layer \(layerIndex)")
+          }
+        }
+      }
+
+      for (layerIndex, flags) in modifierLayers.enumerated() {
+        XCTAssertEqual(
+          KeyboardLayoutEmulator.text(forKeyCode: 49, modifierFlags: flags, layout: layout),
+          item.space[layerIndex])
+      }
+      XCTAssertFalse(
+        KeyboardGuideKeysMode.minimal.showsNumberRow(
+          for: layout, mode: .staticGuide, nextCharacter: nil))
+
+      let outputs = item.entries.flatMap { $0 }.flatMap { $0 }.flatMap { $0 }
+      for output in Set(outputs + item.space) {
+        let keyCode = try XCTUnwrap(
+          KeyboardLayoutEmulator.keyCode(forOutput: output, layout: layout),
+          "Missing reverse lookup for \(item.rawValue): \(output)")
+        XCTAssertTrue(
+          modifierLayers.contains { flags in
+            KeyboardLayoutEmulator.text(forKeyCode: keyCode, modifierFlags: flags, layout: layout)
+              == output
+          })
+      }
+
+      let suiteName = "TypebarTests.\(UUID().uuidString)"
+      let defaults = UserDefaults(suiteName: suiteName)!
+      defer { defaults.removePersistentDomain(forName: suiteName) }
+      let settings = AppSettings(defaults: defaults)
+      settings.keyboardLayout = layout
+      settings.keyboardInputLayout = .init(emulating: layout)
+      settings.layoutFluidLayouts = [layout, .ansiQwerty]
+      let restored = AppSettings(defaults: defaults)
+      XCTAssertEqual(restored.keyboardLayout, layout)
+      XCTAssertEqual(restored.keyboardInputLayout.emulatedLayout, layout)
+      XCTAssertEqual(restored.layoutFluidLayouts, [layout, .ansiQwerty])
+    }
+
+    let ergopti = try XCTUnwrap(KeyboardLayout(rawValue: "ergopti"))
+    let space = try XCTUnwrap(
+      KeyboardGuideModel.bottomRow(for: .minimal, layout: ergopti).first)
+    XCTAssertEqual(space.id, "space")
+    XCTAssertEqual(
+      space.legend(style: .dynamic, modifierFlags: [.shift], capsLockEnabled: false), "-")
+  }
+
+  @MainActor
   func testOptimotPreservesFourLayersAndRoutesItsMappedDeleteAsEditing() throws {
     let ansiRows = SystemKeyboardGuide.physicalRows
     let isoRows = [
@@ -9789,7 +9951,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 238)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 241)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
