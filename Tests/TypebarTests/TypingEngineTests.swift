@@ -7966,6 +7966,40 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingSpeedUnit.cps.converted(wpm: 12.5), 1.041_666_666_7, accuracy: 0.000_001)
   }
 
+  func testHistoryChartSelectionChoosesNearestResultAndNewerResultOnEqualDistance() {
+    let older = ResultMetric(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+      finishedAt: .init(timeIntervalSince1970: 10), wpm: 60, accuracy: 95,
+      typingSeconds: 30)
+    let newer = ResultMetric(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+      finishedAt: .init(timeIntervalSince1970: 30), wpm: 90, accuracy: 98,
+      typingSeconds: 30)
+
+    XCTAssertEqual(
+      HistoryChartSelectionPolicy.nearestMetric(
+        to: .init(timeIntervalSince1970: 11), in: [newer, older])?.id,
+      older.id)
+    XCTAssertEqual(
+      HistoryChartSelectionPolicy.nearestMetric(
+        to: .init(timeIntervalSince1970: 20), in: [older, newer])?.id,
+      newer.id)
+    XCTAssertEqual(
+      HistoryChartSelectionPolicy.nearestMetric(
+        to: .init(timeIntervalSince1970: 100), in: [older, newer])?.id,
+      newer.id)
+    XCTAssertNil(
+      HistoryChartSelectionPolicy.nearestMetric(
+        to: .init(timeIntervalSince1970: 20), in: []))
+    let sameDate = ResultMetric(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
+      finishedAt: newer.finishedAt, wpm: 70, accuracy: 96, typingSeconds: 30)
+    XCTAssertEqual(
+      HistoryChartSelectionPolicy.nearestMetric(
+        to: newer.finishedAt, in: [sameDate, newer])?.id,
+      newer.id)
+  }
+
   func testResultHistorySortingCoversEverySortableColumnWithStableTies() {
     let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     let secondID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!

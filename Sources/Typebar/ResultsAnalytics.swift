@@ -186,6 +186,18 @@ enum HistoryChartPolicy {
   }
 }
 
+enum HistoryChartSelectionPolicy {
+  static func nearestMetric(to selectedDate: Date, in metrics: [ResultMetric]) -> ResultMetric? {
+    metrics.min { lhs, rhs in
+      let leftDistance = abs(lhs.finishedAt.timeIntervalSince(selectedDate))
+      let rightDistance = abs(rhs.finishedAt.timeIntervalSince(selectedDate))
+      if leftDistance != rightDistance { return leftDistance < rightDistance }
+      if lhs.finishedAt != rhs.finishedAt { return lhs.finishedAt > rhs.finishedAt }
+      return lhs.id.uuidString < rhs.id.uuidString
+    }
+  }
+}
+
 /// Completed practice that belongs to the current running app process. It
 /// keeps the daily result summary truthful even when the user opted out of
 /// persisting a completed test to SwiftData.

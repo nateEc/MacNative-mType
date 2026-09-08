@@ -4182,6 +4182,7 @@ private struct ResultsHistoryView: View {
   @State private var modifierFilter = Set(TestModifier.allCases)
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
+  @State private var selectedHistoryDate: Date?
   @State private var historySortField: ResultHistorySortField = .finishedAt
   @State private var historySortDirection: ResultHistorySortDirection = .descending
   @State private var visibleResultLimit = ResultHistoryPagePolicy.pageSize
@@ -4249,6 +4250,15 @@ private struct ResultsHistoryView: View {
 
   private var allMetrics: [ResultMetric] {
     results.map { ResultMetric(record: $0) }
+  }
+
+  private var selectedHistoryMetric: ResultMetric? {
+    selectedHistoryDate.flatMap { HistoryChartSelectionPolicy.nearestMetric(to: $0, in: metrics) }
+  }
+
+  private var selectedHistoryRecord: TestResultRecord? {
+    guard let id = selectedHistoryMetric?.id else { return nil }
+    return filteredResults.first { $0.id == id }
   }
 
   private var activity: [DailyActivity] {
@@ -4504,7 +4514,10 @@ private struct ResultsHistoryView: View {
     .sheet(isPresented: $showingPersonalBestTable) {
       LocalPersonalBestTableView(speedUnit: settings.typingSpeedUnit)
     }
-    .onChange(of: activeFilter) { visibleResultLimit = ResultHistoryPagePolicy.pageSize }
+    .onChange(of: activeFilter) {
+      visibleResultLimit = ResultHistoryPagePolicy.pageSize
+      selectedHistoryDate = nil
+    }
     .onChange(of: historySortField) { visibleResultLimit = ResultHistoryPagePolicy.pageSize }
     .onChange(of: historySortDirection) { visibleResultLimit = ResultHistoryPagePolicy.pageSize }
   }
@@ -4556,6 +4569,37 @@ private struct ResultsHistoryView: View {
         if visibility.speed { speedHistoryChart }
         if visibility.accuracy { accuracyHistoryChart }
       }
+      if let metric = selectedHistoryMetric, let result = selectedHistoryRecord {
+        HStack(alignment: .top, spacing: 12) {
+          VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+              Text(metric.finishedAt, format: .dateTime.year().month().day().hour().minute())
+                .font(.caption.weight(.medium))
+              if personalBestIDs.contains(result.id) {
+                Label("个人最佳", systemImage: "trophy.fill")
+                  .font(.caption2)
+                  .foregroundStyle(.orange)
+              }
+            }
+            Text(
+              "\(settings.typingSpeedUnit.formatted(wpm: metric.wpm)) \(settings.typingSpeedUnit.displayName) · Raw \(settings.typingSpeedUnit.formatted(wpm: metric.rawWpm)) · \(metric.accuracy)% 准确率 · \(formattedConsistency(metric.consistency))% 稳定度"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            Text(historyConfigurationText(result.configuration))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+          }
+          Spacer()
+          VStack(alignment: .trailing, spacing: 6) {
+            Button("查看成绩") { selectedResult = result }
+            Button("清除选择", systemImage: "xmark.circle") { selectedHistoryDate = nil }
+              .labelStyle(.iconOnly)
+          }
+        }
+        .padding(8)
+        .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+      }
       if let trend = HistoryChartPolicy.speedChangePerTypingHour(metrics: metrics) {
         let converted = settings.typingSpeedUnit.converted(wpm: trend)
         let sign = converted >= 0 ? "+" : ""
@@ -4572,6 +4616,12 @@ private struct ResultsHistoryView: View {
   private var speedHistoryChart: some View {
     let visibility = settings.historyChartVisibility
     return Chart(historyChartPoints) { point in
+      if selectedHistoryMetric?.id == point.id {
+        RuleMark(x: .value("所选成绩", point.metric.finishedAt))
+          .foregroundStyle(.secondary.opacity(0.6))
+          .lineStyle(.init(lineWidth: 1, dash: [3, 2]))
+          .accessibilityHidden(true)
+      }
       LineMark(
         x: .value("日期", point.metric.finishedAt),
         y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: point.personalBestSpeed)))
@@ -4601,14 +4651,22 @@ private struct ResultsHistoryView: View {
         .foregroundStyle(.tint)
     }
     .chartYScale(domain: .automatic(includesZero: settings.startGraphsAtZero))
+    .chartXSelection(value: $selectedHistoryDate)
     .chartYAxisLabel(settings.typingSpeedUnit.displayName)
     .frame(height: 120)
     .accessibilityLabel("本机速度历史趋势")
+    .accessibilityHint("在图表中拖动以选择最近的成绩")
   }
 
   private var accuracyHistoryChart: some View {
     let visibility = settings.historyChartVisibility
     return Chart(historyChartPoints) { point in
+      if selectedHistoryMetric?.id == point.id {
+        RuleMark(x: .value("所选成绩", point.metric.finishedAt))
+          .foregroundStyle(.secondary.opacity(0.6))
+          .lineStyle(.init(lineWidth: 1, dash: [3, 2]))
+          .accessibilityHidden(true)
+      }
       if visibility.average100 {
         LineMark(
           x: .value("日期", point.metric.finishedAt), y: .value("准确率", point.accuracyAverage100))
@@ -4630,9 +4688,11 @@ private struct ResultsHistoryView: View {
         .symbol(.triangle)
     }
     .chartYScale(domain: .automatic(includesZero: settings.startGraphsAtZero))
+    .chartXSelection(value: $selectedHistoryDate)
     .chartYAxisLabel("准确率 (%)")
     .frame(height: 120)
     .accessibilityLabel("本机准确率历史趋势")
+    .accessibilityHint("在图表中拖动以选择最近的成绩")
   }
 
   private func historyChartToggle(
@@ -4692,6 +4752,22 @@ private struct ResultsHistoryView: View {
     value.formatted(.number.precision(.fractionLength(0...2)))
   }
 
+  private func historyConfigurationText(_ configuration: TestConfiguration?) -> String {
+    guard let configuration else { return "未知配置" }
+    var pieces = [modeName(configuration.mode)]
+    if configuration.mode == .time, let duration = configuration.duration, duration.isFinite {
+      pieces.append(
+        "\(max(0, duration).formatted(.number.precision(.fractionLength(0)))) 秒")
+    } else if configuration.mode == .words, let wordLimit = configuration.wordLimit {
+      pieces.append("\(wordLimit) 词")
+    }
+    pieces.append(configuration.language.displayName)
+    pieces.append(configuration.difficulty.displayName)
+    if configuration.contentOptions.includePunctuation { pieces.append("标点") }
+    if configuration.contentOptions.includeNumbers { pieces.append("数字") }
+    return pieces.joined(separator: " · ")
+  }
+
   private func formattedTypingDuration(_ value: TimeInterval) -> String {
     let seconds = max(0, Int(value.rounded()))
     let hours = seconds / 3_600
@@ -4710,6 +4786,10 @@ private struct ResultsHistoryView: View {
   }
 
   private func delete(at offsets: IndexSet) {
+    let deletedIDs = Set(offsets.map { visibleResults[$0].id })
+    if let selectedID = selectedHistoryMetric?.id, deletedIDs.contains(selectedID) {
+      selectedHistoryDate = nil
+    }
     for index in offsets { modelContext.delete(visibleResults[index]) }
   }
 
