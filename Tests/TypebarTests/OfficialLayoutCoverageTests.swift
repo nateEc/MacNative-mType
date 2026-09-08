@@ -73,16 +73,16 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let code = languages.filter(\.isCodeLanguage)
     let mixed: Set<TypingLanguage> = [.mixedEnglishChinese, .mixedLanguages]
 
-    XCTAssertEqual(languages.count, 223)
+    XCTAssertEqual(languages.count, 224)
     XCTAssertEqual(standalone.count, 152)
-    XCTAssertEqual(code.count, 69)
+    XCTAssertEqual(code.count, 70)
     XCTAssertEqual(Set(languages), Set(standalone).union(code).union(mixed))
 
     let repositoryRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let currentSummary = "当前语言目录：152 个可单独练习的语言或书写方式、69 个代码选择和 2 个混合入口。"
+    let currentSummary = "当前语言目录：152 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。"
     for name in [
       "README.md", "FUNCTIONAL_INVENTORY.md", "REWRITE_SPEC.md",
       "OFFICIAL_CONFIG_AUDIT.md", "OFFICIAL_LANGUAGE_AUDIT.md",
@@ -106,7 +106,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let relatedIDs = Set(fixture.nativeRelatedChoice.keys)
     let unmappedIDs = Set(fixture.unmappedOfficialIDs)
     let expectedUnmappedIDs: Set<String> = [
-      "docker_file", "english_old", "french_bitoduc", "league_of_legends", "pokemon_1k",
+      "english_old", "french_bitoduc", "league_of_legends", "pokemon_1k",
       "russian_contractions", "russian_contractions_1k", "tamil_old", "toki_pona_ku_lili",
       "toki_pona_ku_suli", "twitch_emotes", "typing_of_the_dead",
     ]
@@ -116,8 +116,9 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 446)
     XCTAssertEqual(fixture.officialIDs.count, fixture.officialCount)
     XCTAssertEqual(officialIDs.count, fixture.officialCount)
-    XCTAssertEqual(fixture.nativeIndependent.count, 221)
+    XCTAssertEqual(fixture.nativeIndependent.count, 222)
     XCTAssertEqual(fixture.nativeRelatedChoice.count, 213)
+    XCTAssertEqual(unmappedIDs.count, 11)
     XCTAssertEqual(unmappedIDs, expectedUnmappedIDs)
     XCTAssertTrue(independentIDs.isDisjoint(with: relatedIDs))
     XCTAssertTrue(independentIDs.isDisjoint(with: unmappedIDs))

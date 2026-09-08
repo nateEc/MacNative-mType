@@ -657,6 +657,7 @@
     "code_clojure": "codeClojure",
     "code_common_lisp": "codeCommonLisp",
     "code_erlang": "codeErlang",
+    "docker_file": "dockerFile",
     "code_fortran": "codeFortran",
     "viossa": "viossa",
     "viossa_njutro": "viossaNjutro",
@@ -899,7 +900,6 @@
     "twitch_emotes",
     "league_of_legends",
     "typing_of_the_dead",
-    "docker_file",
     "pokemon_1k"
   ],
   "sourceFiles": [

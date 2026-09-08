@@ -350,6 +350,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case polish
   case mixedEnglishChinese
   case mixedLanguages
+  case dockerFile
   case codeSwift
   case codeJavaScript
   case codePython
@@ -5955,7 +5956,7 @@ extension TypingLanguage {
   }
 
   var isCodeLanguage: Bool {
-    rawValue.hasPrefix("code")
+    self == .dockerFile || rawValue.hasPrefix("code")
   }
 
   /// Mirrors Monkeytype's `noLazyMode` language metadata for every Typebar

@@ -20,6 +20,10 @@ private actor EmailVerificationDeliveryRecorder {
 }
 
 final class HealthRouteTests: XCTestCase {
+  private struct OfficialLanguageFixture: Decodable {
+    let nativeIndependent: [String: String]
+  }
+
   func testHealthRouteReturnsServiceIdentity() async throws {
     let app = try await Application.make(.testing)
 
@@ -3794,6 +3798,68 @@ final class HealthRouteTests: XCTestCase {
         .init(mode: "time", language: language, period: "all", limit: 10), now: now)
       XCTAssertEqual(leaderboard.entries.map(\.wpm), [81 + offset])
     }
+  }
+
+  func testEveryCodeResultCanBeSubmittedAndFilteredWithoutEnablingQuoteSubmission() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "docker@example.com", password: "a secure password", displayName: "Docker User"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let codeLanguageIDs = [
+      "dockerFile", "codeSwift", "codeJavaScript", "codePython", "codePython1k",
+      "codePython2k", "codePython5k", "codeFSharp", "codeC", "codeCSharp", "codeCSS",
+      "codeCPP", "codeDart", "codeBrainfck", "codeJavaScript1k", "codeJavaScriptReact",
+      "codeJule", "codeJulia", "codeHaskell", "codeHTML", "codeNim", "codeNix",
+      "codePascal", "codeJava", "codeKotlin", "codeGo", "codeRockstar", "codeRust",
+      "codeRuby", "codeR", "codeR2k", "codeScala", "codeBash", "codePowerShell",
+      "codeLua", "codeLuau", "codeLaTeX", "codeTypst", "codeMATLAB", "codeSQL",
+      "codePerl", "codePHP", "codeVim", "codeVimscript", "codeOpenCL", "codeVisualBasic",
+      "codeArduino", "codeSystemVerilog", "codeElixir", "codeGleam", "codeZig",
+      "codeGDScript", "codeGDScript2", "codeAssembly", "codeV", "codeOok",
+      "codeTypeScript", "codeCOBOL", "codeClojure", "codeCommonLisp", "codeErlang",
+      "codeOCaml", "codeOdin", "codeFortran", "codeABAP", "codeABAP1k",
+      "codeYoptaScript", "codeCUDA", "codeVHDL", "code6502Assembly",
+    ]
+
+    for (offset, language) in codeLanguageIDs.enumerated() {
+      let wpm = 72 + offset
+      let accepted = try await store.submitResult(
+        result(
+          id: UUID(), wpm: wpm, accuracy: 100, language: language,
+          finishedAt: now.addingTimeInterval(Double(offset))),
+        accessToken: session.accessToken, now: now)
+      let leaderboard = try await store.leaderboard(
+        .init(mode: "time", language: language, period: "all", limit: 10), now: now)
+      XCTAssertTrue(accepted.leaderboardEligible, language)
+      XCTAssertEqual(leaderboard.entries.map(\.wpm), [wpm], language)
+    }
+
+    do {
+      _ = try await store.submitQuote(
+        .init(language: "dockerFile", text: "FROM local-runtime", attribution: "Local test"),
+        accessToken: session.accessToken, now: now)
+      XCTFail("Code practice must not enter community quote submission")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidQuoteSubmission)
+    }
+  }
+
+  func testCodeResultWhitelistMatchesThePinnedClientLanguageAudit() throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let data = try Data(
+      contentsOf: repositoryRoot.appendingPathComponent("Compatibility/official-languages.json"))
+    let fixture = try JSONDecoder().decode(OfficialLanguageFixture.self, from: data)
+    let auditedCodeLanguageIDs = Set(
+      fixture.nativeIndependent.compactMap { officialID, typebarID in
+        officialID.hasPrefix("code_") || officialID == "docker_file" ? typebarID : nil
+      })
+
+    XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
+    XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
   }
 
   func testResultRoutesRequireAuthenticationAndReturnLeaderboard() async throws {

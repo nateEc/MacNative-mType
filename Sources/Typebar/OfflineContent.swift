@@ -4470,6 +4470,7 @@ enum OfflineContent {
 /// Typebar-authored; no upstream corpus, source code or asset is imported.
 enum CodeLanguageCatalog {
   static let displayNames: [TypingLanguage: String] = [
+    .dockerFile: "Dockerfile",
     .codePython: "Python", .codePython1k: "Python 1k", .codePython2k: "Python 2k",
     .codePython5k: "Python 5k", .codeFSharp: "F#", .codeC: "C", .codeCSharp: "C#",
     .codeCSS: "CSS", .codeCPP: "C++", .codeDart: "Dart", .codeBrainfck: "Brainf*ck",
@@ -4504,6 +4505,12 @@ enum CodePracticeContent {
 
   private static func blocks(for language: TypingLanguage) -> [String] {
     switch language {
+    case .dockerFile:
+      [
+        "FROM typebar-runtime:latest\nWORKDIR /practice",
+        "COPY Sources ./Sources\nRUN swift build --configuration release",
+        "ENTRYPOINT [\"./typebar-practice\"]",
+      ]
     case .codeSwift:
       ["let total = values.reduce(0, +)", "for item in items {\n\tprint(item)\n}", "if total > limit {\n\treturn total\n}"]
     case .codeJavaScript, .codeJavaScript1k, .codeJavaScriptReact, .codeTypeScript:

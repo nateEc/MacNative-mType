@@ -492,9 +492,24 @@ public actor AuthStore {
     "ukrainianEndings", "ukrainianLatin", "ukrainianLatynkaEndings", "japaneseHiragana", "japaneseKatakana", "japaneseRomaji", "korean",
     "turkish", "polish",
   ]
-  private static let supportedResultLanguageIDs = supportedSingleLanguageIDs.union([
-    "swissGerman", "mixedEnglishChinese", "mixedLanguages",
-  ])
+  static let supportedCodeLanguageIDs: Set<String> = [
+    "dockerFile", "codeSwift", "codeJavaScript", "codePython", "codePython1k",
+    "codePython2k", "codePython5k", "codeFSharp", "codeC", "codeCSharp", "codeCSS",
+    "codeCPP", "codeDart", "codeBrainfck", "codeJavaScript1k", "codeJavaScriptReact",
+    "codeJule", "codeJulia", "codeHaskell", "codeHTML", "codeNim", "codeNix",
+    "codePascal", "codeJava", "codeKotlin", "codeGo", "codeRockstar", "codeRust",
+    "codeRuby", "codeR", "codeR2k", "codeScala", "codeBash", "codePowerShell",
+    "codeLua", "codeLuau", "codeLaTeX", "codeTypst", "codeMATLAB", "codeSQL",
+    "codePerl", "codePHP", "codeVim", "codeVimscript", "codeOpenCL", "codeVisualBasic",
+    "codeArduino", "codeSystemVerilog", "codeElixir", "codeGleam", "codeZig",
+    "codeGDScript", "codeGDScript2", "codeAssembly", "codeV", "codeOok",
+    "codeTypeScript", "codeCOBOL", "codeClojure", "codeCommonLisp", "codeErlang",
+    "codeOCaml", "codeOdin", "codeFortran", "codeABAP", "codeABAP1k",
+    "codeYoptaScript", "codeCUDA", "codeVHDL", "code6502Assembly",
+  ]
+  private static let supportedResultLanguageIDs = supportedSingleLanguageIDs
+    .union(supportedCodeLanguageIDs)
+    .union(["swissGerman", "mixedEnglishChinese", "mixedLanguages"])
 
   private struct PersistedState: Codable {
     var users: [StoredUser] = []

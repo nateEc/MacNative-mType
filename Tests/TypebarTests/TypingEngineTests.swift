@@ -7721,14 +7721,14 @@ final class TypingEngineTests: XCTestCase {
     let expectedDisplayNames: Set<String> = [
       "ABAP", "ABAP 1k", "Arduino", "Assembly", "Bash", "Brainf*ck", "C", "C#", "C++",
       "COBOL", "CSS", "CUDA", "Clojure", "Common Lisp", "Dart", "Elixir", "Erlang", "F#",
-      "Fortran", "GDScript", "GDScript 2", "Gleam", "Go", "Haskell", "HTML", "Java",
+      "Dockerfile", "Fortran", "GDScript", "GDScript 2", "Gleam", "Go", "Haskell", "HTML", "Java",
       "JavaScript", "JavaScript 1k", "JavaScript React", "Julia", "Jule", "Kotlin", "LaTeX", "Lua", "Luau",
       "MATLAB", "Nim", "Nix", "OCaml", "Odin", "Ook!", "OpenCL", "PHP", "Pascal", "Perl",
       "PowerShell", "Python", "Python 1k", "Python 2k", "Python 5k", "R", "R 2k", "Rockstar",
       "Ruby", "Rust", "SQL", "Scala", "Swift", "SystemVerilog", "TypeScript", "Typst", "V",
       "VHDL", "Vim", "Vimscript", "Visual Basic", "YoptaScript", "Zig", "6502 Assembly",
     ]
-    XCTAssertEqual(languages.count, 69)
+    XCTAssertEqual(languages.count, 70)
     XCTAssertEqual(Set(languages), Set(CodeLanguageCatalog.displayNames.keys))
     XCTAssertEqual(Set(languages.map(\.displayName)), Set(expectedDisplayNames.map { "Code · \($0)" }))
 
@@ -7749,6 +7749,30 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(session.typed, prompt, language.displayName)
       XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
     }
+  }
+
+  func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
+    guard let language = TypingLanguage(rawValue: "dockerFile") else {
+      XCTFail("Dockerfile must be a selectable typing language")
+      return
+    }
+
+    let prompt = OfflineContent.generatedPrompt(wordCount: 9, language: language)
+    XCTAssertEqual(language.displayName, "Code · Dockerfile")
+    XCTAssertTrue(language.isCodeLanguage)
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertFalse(language.supportsQuotes)
+    XCTAssertTrue(language.ownedPracticeWords().isEmpty)
+    XCTAssertTrue(prompt.contains("FROM typebar-runtime:latest"))
+    XCTAssertTrue(prompt.contains("WORKDIR /practice"))
+    XCTAssertTrue(prompt.contains("\n"))
+
+    var session = TypingSession(configuration: .words(9, language: language), prompt: prompt)
+    for character in prompt {
+      session.insert(String(character), at: Date(timeIntervalSince1970: 4_000))
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
   }
 
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
