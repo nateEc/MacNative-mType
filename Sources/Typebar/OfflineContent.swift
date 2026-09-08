@@ -4539,6 +4539,34 @@ enum OfflineContent {
       language: .pokemon1k,
       length: .extended
     ),
+    OfflineQuote(
+      id: "arena-strategy-river",
+      title: "River watch",
+      text: "The amber vanguard guarded the river path at dusk.",
+      language: .arenaStrategy,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "arena-strategy-signal",
+      title: "Signal rotation",
+      text: "A bronze scout marked the northern trail while the solar warden held the center gate and waited for the retreat signal.",
+      language: .arenaStrategy,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "arena-strategy-crossing",
+      title: "The second crossing",
+      text: "Our first advance drew every defender toward the stone bridge, so the dusk ranger quietly crossed the lower ford. When the beacon changed color, the center line stepped back together, the hidden flank moved forward, and the open path became safer than any direct charge.",
+      language: .arenaStrategy,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "arena-strategy-final-bell",
+      title: "Before the final bell",
+      text: "The arena looked chaotic from the stands, but every movement followed a shared plan. The frost keeper counted the opposing patrols, the ember scout watched the eastern passage, and the prism captain saved the last signal until the center lane was clear. No one chased a fading target beyond the agreed boundary. Instead, the team rotated through the quiet river path, protected the slower vanguard, and reached the final gate with enough strength to hold it. The victory came from timing, information, and restraint rather than a single spectacular attack.",
+      language: .arenaStrategy,
+      length: .extended
+    ),
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {

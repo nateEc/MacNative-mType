@@ -8012,6 +8012,65 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testArenaStrategyTermsPreserveTitleCaseSectionsAndDefaultPunctuation() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "arenaStrategy"))
+    let entries = language.ownedPracticeWords()
+
+    XCTAssertEqual(language.displayName, "Arena Strategy Terms · Typebar")
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en")
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertEqual(entries.count, 442)
+    XCTAssertEqual(Set(entries).count, entries.count)
+    XCTAssertEqual(entries.map(\.count).min(), 3)
+    XCTAssertEqual(entries.map(\.count).max(), 25)
+    XCTAssertEqual(entries.filter { $0.count == 3 }.count, 5)
+    XCTAssertTrue(entries.allSatisfy { $0.range(of: "[A-Z]", options: .regularExpression) != nil })
+    XCTAssertEqual(entries.filter { $0.contains(" ") }.count, 229)
+    XCTAssertEqual(entries.filter { $0.split(separator: " ").count == 2 }.count, 200)
+    XCTAssertEqual(entries.filter { $0.split(separator: " ").count >= 3 }.count, 29)
+    XCTAssertEqual(
+      entries.filter { $0.range(of: "[^[:alnum:] ]", options: .regularExpression) != nil }.count,
+      61)
+    XCTAssertEqual(entries.filter {
+      $0.contains(" ")
+        && $0.range(of: "[^[:alnum:] ]", options: .regularExpression) != nil
+    }.count, 53)
+    XCTAssertEqual(entries.filter { $0.range(of: "[0-9]", options: .regularExpression) != nil }.count, 2)
+    XCTAssertTrue(entries.filter { $0.range(of: "[0-9]", options: .regularExpression) != nil }
+      .allSatisfy { $0.range(of: "[^[:alnum:] ]", options: .regularExpression) != nil })
+
+    let plain = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+      .split(separator: " ").map(String.init)
+    XCTAssertEqual(plain.count, 25)
+    XCTAssertTrue(plain.allSatisfy { $0.range(of: "^[a-z]+$", options: .regularExpression) != nil })
+
+    let punctuated = OfflineContent.generatedPrompt(
+      wordCount: 25, language: language,
+      contentOptions: ContentOptions(includePunctuation: true))
+    XCTAssertEqual(punctuated.split(separator: " ").count, 25)
+    XCTAssertNotNil(punctuated.range(of: "[A-Z]", options: .regularExpression))
+    XCTAssertNotNil(punctuated.range(of: "[^[:alnum:] ]", options: .regularExpression))
+
+    let numbered = OfflineContent.generatedPrompt(
+      wordCount: 25, language: language,
+      contentOptions: ContentOptions(includeNumbers: true))
+      .split(separator: " ").map(String.init)
+    XCTAssertEqual(numbered.count, 25)
+    XCTAssertEqual(numbered[0], "1")
+    XCTAssertEqual(numbered[9], "2")
+    XCTAssertEqual(numbered[18], "3")
+
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      let quotes = OfflineContent.quotes(for: language, length: length)
+      XCTAssertEqual(quotes.count, 1)
+      XCTAssertEqual(quotes.first?.language, language)
+    }
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9217,6 +9276,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.kokanuWords,
       StarterLexicon.likanuWords,
       StarterLexicon.creatureIndexTokens,
+      StarterLexicon.arenaStrategyTokens,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.swissGermanWords,
       StarterLexicon.afrikaansWords,
@@ -9326,7 +9386,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 149)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 150)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(

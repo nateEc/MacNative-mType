@@ -6,8 +6,8 @@
 - 权威入口：`packages/schemas/src/configs.ts` 中的 `ConfigSchema`；它列出当前网页端所有可保存配置键。
 - 本审计只记录用户可见设置的代码级映射。`已映射` 不代替真实设备验收；`部分` 和`未实现`不能在其他文档中表述为已完成。
 - Typebar 的实现、文案、数据模型和测试均为原创；该表不复制参考实现的代码、资产、词表、布局定义或主题数据。
-- 当前语言目录：159 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
-- `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：229 个独立原生选择、213 个由同语言选择表达的数字规模变体、4 个尚无原生选择的配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界及缺口见 `OFFICIAL_LANGUAGE_AUDIT.md`。
+- 当前语言目录：160 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
+- `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：230 个独立原生选择、213 个由同语言选择表达的数字规模变体、3 个尚无原生选择的配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界及缺口见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 
 - Catalan、Indonesian 与 Malay 的自动化测试覆盖各自的自创词流、四档原创引语、完整多语混排轮转、`ca-ES` / `id-ID` / `ms-MY` 朗读 locale 与仅在明示启用时使用的 `ca` / `id` / `ms` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 
@@ -25,7 +25,7 @@
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
 | `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；一百五十八种 Typebar 自有单语（最新增加 Français · Bitoduc、Streaming Emotes · Typebar 与 Arcade Horror Phrases · Typebar）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版；固定元数据中的全部 26 个 `joiningScript` 语言使用系统原生塑形、连写行距与逐字隐藏保护，九种 RTL 语言仍暂不进入双向多语混排；经配置验证的 LTR 语言可进入混排，Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文、朗读、Zipf 与简化输入严格按每项固定配置或其缺省分支处理，完整映射记录在后续审计条目与自动化测试中。Swiss German 复用 Typebar 自有 German 内容并把可见 `ß` 变为 `ss`，可进入成绩和排行榜但不能投稿或选择社区引语。乌克兰语 Latin、日语罗马字、Greeklish 与 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们；Pig Latin、Lorem Ipsum 和五字母英语的离线内容分别保持原创变换、原创伪拉丁与严格五字母边界；Kokanu 仅从其官方语言资料取词汇与语法边界，练习文本独立编写；Likanu 由自写音节解析器按官方字符规则从这些自有内容确定性派生；专项词流分别保留英语、瑞典语、葡萄牙语、俄语缩略词、两种乌克兰语词尾、Bangla 字符、Git 小写 ASCII 命令／概念、两个独立 toki pona ku 集合、Old English、Bitoduc 科技法语、虚构流媒体表情 token 和原创街机恐怖多词 section 的可见输入约束，均不导入参考词值。 |
 
-2026-09-09 当前更正：上表 `language` 行的数量快照由 159 种单语和 149 个 LTR 多语候选取代；最新增加 Creature Index 1k · Typebar，以 1,025 个规则生成的原创虚构生物条目覆盖大词表、多词、符号和数字结构，不导入宝可梦名称、设定、代码或资产。
+2026-09-09 当前更正：上表 `language` 行的数量快照由 160 种单语和 150 个 LTR 多语候选取代；最新增加 Arena Strategy Terms · Typebar，以 442 个规则生成的原创竞技场术语覆盖题名大小写、多词、符号、数字和默认标点结构，不导入英雄、装备、技能名称、代码或资产。
 
 2026-09-04 更新：单语数量增至五十八种，新增 Burmese（`myanmarBurmese`）：参考配置为 `joiningScript: true`、`noLazyMode: true`、LTR、`my-MM`。Typebar 使用原创词流、四档引语、macOS 组合输入和空格提交，并以 `my` 访问知识短文、`my-MM` 调用系统朗读；该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。
 

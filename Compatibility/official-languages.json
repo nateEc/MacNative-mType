@@ -587,6 +587,7 @@
     "amharic": "amharic",
     "oromo": "oromo",
     "wordle": "englishFiveLetter",
+    "league_of_legends": "arenaStrategy",
     "typing_of_the_dead": "typingOfTheDead",
     "yiddish": "yiddish",
     "frisian": "frisian",
@@ -899,8 +900,7 @@
   "unmappedOfficialIDs": [
     "russian_contractions",
     "russian_contractions_1k",
-    "tamil_old",
-    "league_of_legends"
+    "tamil_old"
   ],
   "sourceFiles": [
     "packages/schemas/src/languages.ts",

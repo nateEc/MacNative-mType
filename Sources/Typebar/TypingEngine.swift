@@ -224,6 +224,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case twitchEmotes
   case typingOfTheDead
   case pokemon1k
+  case arenaStrategy
   case friulian
   case malagasy
   case welsh
@@ -3973,6 +3974,49 @@ enum StarterLexicon {
       .sorted()
   }()
 
+  // Original fantasy-arena terminology with the same observable entry-shape
+  // boundaries as the pinned themed list, but no names, lore, or assets from
+  // that game or from the reference repository.
+  static let arenaStrategyEntries: [String] = {
+    let prefixes = [
+      "Amber", "Ashen", "Azure", "Bronze", "Cinder", "Coral", "Crystal", "Dusk", "Ember",
+      "Frost", "Gale", "Iron", "Lunar", "Moss", "Prism", "Solar", "Storm",
+    ]
+    let suffixes = [
+      "Adept", "Archer", "Beacon", "Blade", "Caller", "Captain", "Crest", "Drake", "Falcon",
+      "Forge", "Giant", "Guard", "Hawk", "Herald", "Keeper", "Knight", "Mage", "Oracle",
+      "Ranger", "Rider", "Sage", "Scout", "Sentinel", "Smith", "Warden", "Weaver",
+    ]
+    let pairs = prefixes.flatMap { prefix in suffixes.map { (prefix, $0) } }
+    var entries = pairs.map { $0.0 + $0.1 }
+    for index in 0..<200 {
+      let pair = pairs[index]
+      entries[index] = index < 53
+        ? "\(pair.0)'s \(pair.1)"
+        : "\(pair.0) \(pair.1)"
+    }
+    for index in 200..<229 {
+      let pair = pairs[index]
+      entries[index] = "\(pair.0) \(pair.1) Mark"
+    }
+    entries[0] = "Tier-2 Sentinel"
+    entries[1] = "Tier-3 Warden"
+    entries[200] = "Crystalline Vanguard Mark"
+    for index in 229..<237 {
+      let pair = pairs[index]
+      entries[index] = "\(pair.0)-\(pair.1)"
+    }
+    entries.replaceSubrange(237..<242, with: ["Axo", "Bex", "Cyr", "Dov", "Eon"])
+    return entries
+  }()
+
+  static let arenaStrategyTokens: [String] = {
+    let tokens = arenaStrategyEntries.flatMap { entry in
+      entry.lowercased().split { !$0.isLetter }.map(String.init)
+    }
+    return Array(Set(tokens)).sorted()
+  }()
+
   // Typebar-authored Friulian starter words provide a compact local practice
   // vocabulary without importing the reference dictionary or word list.
   static let friulianWords = [
@@ -5110,6 +5154,10 @@ enum StarterLexicon {
     case .pokemon1k:
       return entryPrompt(
         tokens: count, entries: creatureIndexEntries, contentOptions: contentOptions)
+    case .arenaStrategy:
+      return entryPrompt(
+        tokens: count, entries: arenaStrategyEntries, contentOptions: contentOptions,
+        lowercasesWithoutPunctuation: true)
     case .friulian:
       return prompt(
         tokens: count, lexicon: friulianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5701,7 +5749,8 @@ enum StarterLexicon {
   }
 
   private static func entryPrompt(
-    tokens: Int, entries: [String], contentOptions: ContentOptions
+    tokens: Int, entries: [String], contentOptions: ContentOptions,
+    lowercasesWithoutPunctuation: Bool = false
   ) -> String {
     let eligibleEntries = contentOptions.includePunctuation
       ? entries
@@ -5710,7 +5759,10 @@ enum StarterLexicon {
     var words: [String] = []
     while words.count < tokens {
       let entry = eligibleEntries[Int.random(in: eligibleEntries.indices)]
-      words.append(contentsOf: entry.split(whereSeparator: \.isWhitespace).map(String.init))
+      let entryWords = entry.split(whereSeparator: \.isWhitespace).map(String.init)
+      words.append(contentsOf: lowercasesWithoutPunctuation && !contentOptions.includePunctuation
+        ? entryWords.map { $0.lowercased() }
+        : entryWords)
     }
     words = Array(words.prefix(tokens))
     for index in words.indices {
@@ -5756,6 +5808,7 @@ enum StarterLexicon {
     case .twitchEmotes: (twitchEmoteWords, [",", ".", "!", "?"])
     case .typingOfTheDead: (typingOfTheDeadWords, [",", ".", "!", "?"])
     case .pokemon1k: (creatureIndexTokens, [",", ".", "!", "?"])
+    case .arenaStrategy: (arenaStrategyTokens, [",", ".", "!", "?"])
     case .friulian: (friulianWords, [",", ".", "!", "?"])
     case .malagasy: (malagasyWords, [",", ".", "!", "?"])
     case .welsh: (welshWords, [",", ".", "!", "?"])
@@ -5982,6 +6035,7 @@ extension TypingLanguage {
     case .twitchEmotes: StarterLexicon.twitchEmoteWords
     case .typingOfTheDead: StarterLexicon.typingOfTheDeadWords
     case .pokemon1k: StarterLexicon.creatureIndexEntries
+    case .arenaStrategy: StarterLexicon.arenaStrategyEntries
     case .friulian: StarterLexicon.friulianWords
     case .malagasy: StarterLexicon.malagasyWords
     case .welsh: StarterLexicon.welshWords
@@ -6131,6 +6185,7 @@ extension TypingLanguage {
     .kokanu,
     .likanu,
     .pokemon1k,
+    .arenaStrategy,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .frenchBitoduc, .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
@@ -6293,6 +6348,7 @@ extension TypingLanguage {
     case .twitchEmotes: "Streaming Emotes · Typebar"
     case .typingOfTheDead: "Arcade Horror Phrases · Typebar"
     case .pokemon1k: "Creature Index 1k · Typebar"
+    case .arenaStrategy: "Arena Strategy Terms · Typebar"
     case .friulian: "Friulian"
     case .malagasy: "Malagasy"
     case .welsh: "Cymraeg"
