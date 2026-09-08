@@ -46,12 +46,15 @@ struct TypebarAboutCommands: Commands {
   var body: some Commands {
     CommandGroup(replacing: .appInfo) {
       Button("关于 Typebar") { openWindow(id: "about") }
+      Button("版本历史") { openWindow(id: "release-history") }
     }
   }
 }
 
 struct AboutTypebarView: View {
   let metadata: TypebarAboutMetadata
+
+  @Environment(\.openWindow) private var openWindow
 
   private let sourceURL = URL(string: "https://github.com/nateEc/MacNative-mType")!
   private let issuesURL = URL(string: "https://github.com/nateEc/MacNative-mType/issues")!
@@ -130,6 +133,8 @@ struct AboutTypebarView: View {
     VStack(alignment: .leading, spacing: 10) {
       sectionTitle("项目", systemImage: "chevron.left.forwardslash.chevron.right")
       HStack(spacing: 18) {
+        Button("查看版本历史") { openWindow(id: "release-history") }
+          .buttonStyle(.link)
         Link("查看 Typebar 源码", destination: sourceURL)
         Link("报告问题或建议功能", destination: issuesURL)
       }

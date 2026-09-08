@@ -28,6 +28,11 @@ struct TypebarApp: App {
     }
     .windowResizability(.contentSize)
 
+    Window("Typebar 版本历史", id: "release-history") {
+      ReleaseHistoryView()
+    }
+    .windowResizability(.contentSize)
+
     MenuBarExtra("Typebar", systemImage: "keyboard") {
       Button("打开 Typebar") {
         NSApp.activate(ignoringOtherApps: true)
@@ -2607,6 +2612,7 @@ private struct ContentView: View {
         id: "settings", title: "打开设置", subtitle: "修改输入规则、显示和账户选项", systemImage: "gearshape",
         keywords: ["settings", "设置", "主题", "键盘"], group: .settings),
       AboutCommand.item,
+      ReleaseHistoryCommand.item,
       .init(
         id: "share", title: "分享当前测试", subtitle: "复制或导入 Typebar 测试配置链接",
         systemImage: "square.and.arrow.up", keywords: ["share", "分享", "链接", "配置"], group: .data),
@@ -2682,6 +2688,7 @@ private struct ContentView: View {
     case "notifications": showingNotifications = true
     case "settings": openSettings()
     case AboutCommand.identifier: openWindow(id: "about")
+    case ReleaseHistoryCommand.identifier: openWindow(id: "release-history")
     case "share": showingTestShare = true
     case "bailout": showingCommandBailoutConfirmation = true
     case QuoteFavoriteCommand.identifier:

@@ -30,6 +30,46 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testReleaseHistoryDecodesOnlyPublishedStableReleasesAndFallsBackToTag() throws {
+    let payload = Data(
+      #"[{"name":"Typebar 1.2","tag_name":"v1.2.0","body":"New practice modes.","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.2.0","draft":false,"prerelease":false,"published_at":"2026-09-06T08:30:00Z"},{"name":"","tag_name":"v1.1.0","body":null,"html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.1.0","draft":false,"prerelease":false,"published_at":"2026-09-05T08:30:00Z"},{"name":"Draft","tag_name":"v2.0.0","body":"hidden","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v2.0.0","draft":true,"prerelease":false,"published_at":null},{"name":"Beta","tag_name":"v1.3.0-beta","body":"hidden","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.3.0-beta","draft":false,"prerelease":true,"published_at":"2026-09-07T08:30:00Z"}]"#.utf8)
+
+    let page = try ReleaseHistoryCatalog.decode(payload, pageSize: 4)
+
+    XCTAssertEqual(page.releases.map(\.title), ["Typebar 1.2", "v1.1.0"])
+    XCTAssertEqual(page.releases.map(\.tag), ["v1.2.0", "v1.1.0"])
+    XCTAssertEqual(page.releases.map(\.notes), ["New practice modes.", "没有提供发布说明。"])
+    XCTAssertNotNil(page.releases.first?.publishedAt)
+    XCTAssertTrue(page.hasMore)
+  }
+
+  func testReleaseHistoryEndpointIsPinnedToTypebarRepositoryAndRequestedPage() throws {
+    let url = try XCTUnwrap(ReleaseHistoryCatalog.endpoint(page: 3, pageSize: 20))
+    let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+
+    XCTAssertEqual(components.scheme, "https")
+    XCTAssertEqual(components.host, "api.github.com")
+    XCTAssertEqual(components.path, "/repos/nateEc/MacNative-mType/releases")
+    XCTAssertEqual(
+      Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value) }),
+      ["page": "3", "per_page": "20"])
+  }
+
+  func testReleaseHistoryRejectsLinksOutsideTheTypebarReleasePath() throws {
+    let payload = Data(
+      #"[{"name":"Unexpected","tag_name":"v9.9.9","body":"Do not open this.","html_url":"https://example.com/releases/tag/v9.9.9","draft":false,"prerelease":false,"published_at":"2026-09-06T08:30:00Z"}]"#.utf8)
+
+    XCTAssertTrue(try ReleaseHistoryCatalog.decode(payload, pageSize: 20).releases.isEmpty)
+  }
+
+  func testReleaseHistoryCommandIsDiscoverableInChineseAndEnglish() {
+    for query in ["版本历史", "更新日志", "release", "changelog"] {
+      XCTAssertEqual(
+        CommandPaletteSearch.results(items: [ReleaseHistoryCommand.item], query: query).map(\.id),
+        [ReleaseHistoryCommand.identifier])
+    }
+  }
+
   func testDataStoreStartupPreservesThePersistentStoreWhenOpeningFails() throws {
     struct TestFailure: LocalizedError {
       var errorDescription: String? { "schema mismatch" }
