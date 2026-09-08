@@ -8251,6 +8251,9 @@ final class TypingEngineTests: XCTestCase {
     let largestFrenchScalePrompt = StarterLexicon.prompt(
       wordCount: 25, language: .french10k, contentOptions: ContentOptions())
     XCTAssertGreaterThanOrEqual(largestFrenchScalePrompt.split(separator: " ").count, 25)
+    let largestGermanScalePrompt = StarterLexicon.prompt(
+      wordCount: 25, language: .german250k, contentOptions: ContentOptions())
+    XCTAssertEqual(largestGermanScalePrompt.split(separator: " ").count, 25)
   }
 
   func testEnglish450kWeakSpotUsesTheIndexedCorpus() throws {
@@ -8335,6 +8338,49 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
       XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
       XCTAssertEqual(words.filter { $0.range(of: "[A-Z]", options: .regularExpression) != nil }.count, uppercase)
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, nonLetters)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCII)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+
+      let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+      XCTAssertGreaterThanOrEqual(prompt.split(separator: " ").count, 25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
+  func testGermanScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
+      ("german1k", 988, 2, 17, 415, 11, 3, 8, 109),
+      ("german10k", 9_994, 2, 27, 5_447, 65, 25, 40, 1_599),
+      ("german250k", 239_243, 2, 35, 181_917, 0, 0, 0, 45_170),
+    ]
+
+    for (rawValue, count, minimum, maximum, uppercase, nonLetters, punctuation, spaces, nonASCII) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertEqual(language.displayName, "Deutsch · \(rawValue.dropFirst("german".count)) · Typebar")
+      XCTAssertTrue(language.supportsLazyLatinInput)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "de")
+      XCTAssertEqual(language.speechLocaleIdentifier, "de-DE")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercase)
       XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, nonLetters)
       XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
       XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)

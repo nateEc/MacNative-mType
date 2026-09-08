@@ -32,7 +32,7 @@ extension TypingLanguage {
     case .pokemon1k, .arenaStrategy: "en"
     case .pigLatin, .loremIpsum, .git: "en-US"
     case .spanish, .spanish1k, .spanish10k, .spanish650k: "es-ES"
-    case .german: "de-DE"
+    case .german, .german1k, .german10k, .german250k: "de-DE"
     case .swissGerman: "de-CH"
     case .afrikaans: "af-ZA"
     case .hausa: "ha"

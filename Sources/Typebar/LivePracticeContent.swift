@@ -157,7 +157,7 @@ enum LivePracticeContentService {
     case .kokanu: return "xxs"
     case .likanu: return "xxs"
     case .spanish, .spanish1k, .spanish10k, .spanish650k: return "es"
-    case .german, .swissGerman: return "de"
+    case .german, .german1k, .german10k, .german250k, .swissGerman: return "de"
     case .afrikaans: return "af"
     case .hausa: return "ha"
     case .tatar: return "tt"
