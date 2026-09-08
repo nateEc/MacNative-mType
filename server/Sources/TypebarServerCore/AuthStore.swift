@@ -110,6 +110,14 @@ public struct ResultDeletionResponse: Content, Equatable {
   public let removedCount: Int
 }
 
+public struct ResetPersonalBestsRequest: Content, Equatable {
+  public let currentPassword: String?
+}
+
+public struct PersonalBestResetResponse: Content, Equatable {
+  public let resetAt: Date
+}
+
 public struct RevokeSessionsRequest: Content, Equatable {
   public let currentPassword: String?
 }
@@ -340,6 +348,7 @@ public struct AuthUserResponse: Content, Equatable {
   /// Nil until the account makes its one permitted explicit choice. Zero is
   /// therefore distinct from an older account that still uses the default.
   public let streakDayBoundaryOffsetHours: Double?
+  public let personalBestResetAt: Date?
 }
 
 public struct PublicProfileResponse: Content, Equatable {
@@ -488,6 +497,7 @@ public actor AuthStore {
     var connections: [StoredConnection] = []
     var blockedUserIDs: [UUID: [UUID]] = [:]
     var streakDayBoundaryOffsets: [UUID: Double] = [:]
+    var personalBestResetDates: [UUID: Date] = [:]
     var quoteSubmissions: [StoredQuoteSubmission] = []
     var quoteRatings: [StoredQuoteRating] = []
     var notifications: [StoredNotification] = []
@@ -498,7 +508,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, streakDayBoundaryOffsets, quoteSubmissions,
+      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
         nextSyncCursor
     }
@@ -528,6 +538,8 @@ public actor AuthStore {
         try values.decodeIfPresent([UUID: [UUID]].self, forKey: .blockedUserIDs) ?? [:]
       streakDayBoundaryOffsets =
         try values.decodeIfPresent([UUID: Double].self, forKey: .streakDayBoundaryOffsets) ?? [:]
+      personalBestResetDates =
+        try values.decodeIfPresent([UUID: Date].self, forKey: .personalBestResetDates) ?? [:]
       quoteSubmissions =
         try values.decodeIfPresent([StoredQuoteSubmission].self, forKey: .quoteSubmissions) ?? []
       quoteRatings =
@@ -695,17 +707,18 @@ public actor AuthStore {
     var tags: [String]
     let startedAt: Date
     let finishedAt: Date
+    let acceptedAt: Date?
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, tags, startedAt, finishedAt
+        errorCount, eventCount, tags, startedAt, finishedAt, acceptedAt
     }
 
     init(
       id: UUID, userID: UUID, mode: String, language: String, durationSeconds: Int?,
       wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, consistency: Double,
       errorCount: Int, eventCount: Int, tags: [String],
-      startedAt: Date, finishedAt: Date
+      startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil
     ) {
       self.id = id
       self.userID = userID
@@ -722,6 +735,7 @@ public actor AuthStore {
       self.tags = tags
       self.startedAt = startedAt
       self.finishedAt = finishedAt
+      self.acceptedAt = acceptedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -746,6 +760,7 @@ public actor AuthStore {
       startedAt =
         try values.decodeIfPresent(Date.self, forKey: .startedAt)
         ?? finishedAt.addingTimeInterval(-legacyDuration)
+      acceptedAt = try values.decodeIfPresent(Date.self, forKey: .acceptedAt)
     }
 
     func response() -> AccountResultResponse {
@@ -1688,6 +1703,7 @@ public actor AuthStore {
       filtered[pair.key] = pair.value.filter { $0 != userID }
     }
     state.streakDayBoundaryOffsets.removeValue(forKey: userID)
+    state.personalBestResetDates.removeValue(forKey: userID)
     try persist()
   }
 
@@ -2317,6 +2333,7 @@ public actor AuthStore {
     for user: StoredUser, results: [StoredResult], activity: PublicProfileActivityResponse?,
     streak: PublicProfileStreakResponse?
   ) -> PublicProfileResponse {
+    let personalBestResults = personalBestResults(for: user.id, from: results)
     return .init(
       id: user.id,
       displayName: user.displayName,
@@ -2324,9 +2341,9 @@ public actor AuthStore {
       completedResultCount: results.count,
       startedTestCount: user.startedTestCount,
       totalTypingSeconds: totalTypingSeconds(from: results),
-      bestWPM: results.map(\.wpm).max() ?? 0,
-      highestConsistency: results.map(\.consistency).max() ?? 0,
-      personalBests: publicPersonalBests(from: results),
+      bestWPM: personalBestResults.map(\.wpm).max() ?? 0,
+      highestConsistency: personalBestResults.map(\.consistency).max() ?? 0,
+      personalBests: publicPersonalBests(from: personalBestResults),
       activity: activity,
       streak: streak,
       totalExperience: experience(for: user.id),
@@ -2334,6 +2351,14 @@ public actor AuthStore {
       discordAvatar: publicDiscordAvatar(for: user),
       selectedBadge: selectedPublicBadge(for: user)
     )
+  }
+
+  private func personalBestResults(for userID: UUID, from results: [StoredResult]) -> [StoredResult] {
+    guard let resetAt = state.personalBestResetDates[userID] else { return results }
+    return results.filter { result in
+      guard let acceptedAt = result.acceptedAt else { return false }
+      return acceptedAt > resetAt
+    }
   }
 
   private func availablePublicBadges(for userID: UUID) -> [PublicProfileBadge] {
@@ -2624,7 +2649,7 @@ public actor AuthStore {
         wpm: request.wpm, rawWpm: request.rawWpm, accuracy: request.accuracy,
         consistency: request.consistency, errorCount: request.errorCount, eventCount: request.eventCount,
         tags: tags,
-        startedAt: request.startedAt, finishedAt: request.finishedAt
+        startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
       ))
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
       throw AuthStoreError.invalidAccessToken
@@ -2672,6 +2697,29 @@ public actor AuthStore {
     let removedCount = countBeforeDeletion - state.results.count
     try persist()
     return .init(deleted: true, removedCount: removedCount)
+  }
+
+  /// Starts a new public personal-best epoch without deleting account results,
+  /// experience, badges, or leaderboard entries.
+  public func resetPersonalBests(
+    _ request: ResetPersonalBestsRequest, accessToken: String,
+    reauthenticationToken: String? = nil, now: Date = .now
+  ) throws -> PersonalBestResetResponse {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard let user = state.users.first(where: { $0.id == currentUser.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    if let currentPassword = request.currentPassword {
+      guard let passwordHash = user.passwordHash,
+        try Bcrypt.verify(currentPassword, created: passwordHash)
+      else { throw AuthStoreError.invalidCredentials }
+    } else {
+      guard let reauthenticationToken else { throw AuthStoreError.invalidReauthenticationToken }
+      try consumeReauthenticationToken(reauthenticationToken, for: user.id, now: now)
+    }
+    state.personalBestResetDates[user.id] = now
+    try persist()
+    return .init(resetAt: now)
   }
 
   public func updateResultTags(
@@ -2968,7 +3016,8 @@ public actor AuthStore {
       profileDetails: user.profileDetails,
       authenticationMethods: authenticationMethods(for: user.id), availableBadges: availableBadges,
       selectedBadgeID: selectedBadgeID,
-      streakDayBoundaryOffsetHours: state.streakDayBoundaryOffsets[user.id])
+      streakDayBoundaryOffsetHours: state.streakDayBoundaryOffsets[user.id],
+      personalBestResetAt: state.personalBestResetDates[user.id])
   }
 
   private func authenticationMethods(for userID: UUID) -> [AuthenticationMethod] {

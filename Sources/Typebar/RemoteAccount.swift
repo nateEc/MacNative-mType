@@ -103,10 +103,12 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     let availableBadges: [RemotePublicProfileBadge]
     let selectedBadgeID: String?
     let streakDayBoundaryOffsetHours: Double?
+    let personalBestResetAt: Date?
 
     private enum CodingKeys: String, CodingKey {
         case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut, profileDetails,
-            authenticationMethods, availableBadges, selectedBadgeID, streakDayBoundaryOffsetHours
+            authenticationMethods, availableBadges, selectedBadgeID, streakDayBoundaryOffsetHours,
+            personalBestResetAt
     }
 
     init(
@@ -119,7 +121,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         profileDetails: RemoteProfileDetails = .init(),
         authenticationMethods: [RemoteAuthenticationMethod] = [.password],
         availableBadges: [RemotePublicProfileBadge] = [], selectedBadgeID: String? = nil,
-        streakDayBoundaryOffsetHours: Double? = nil
+        streakDayBoundaryOffsetHours: Double? = nil, personalBestResetAt: Date? = nil
     ) {
         self.id = id
         self.email = email
@@ -132,6 +134,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         self.availableBadges = availableBadges
         self.selectedBadgeID = selectedBadgeID
         self.streakDayBoundaryOffsetHours = streakDayBoundaryOffsetHours
+        self.personalBestResetAt = personalBestResetAt
     }
 
     init(from decoder: Decoder) throws {
@@ -148,6 +151,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
         streakDayBoundaryOffsetHours = try values.decodeIfPresent(
             Double.self, forKey: .streakDayBoundaryOffsetHours)
+        personalBestResetAt = try values.decodeIfPresent(Date.self, forKey: .personalBestResetAt)
     }
 }
 
@@ -344,6 +348,14 @@ private struct RemoteResultDeletionRequest: Codable, Sendable {
 private struct RemoteResultDeletionResponse: Codable, Sendable {
     let deleted: Bool
     let removedCount: Int
+}
+
+private struct RemotePersonalBestResetRequest: Codable, Sendable {
+    let currentPassword: String?
+}
+
+private struct RemotePersonalBestResetResponse: Codable, Sendable {
+    let resetAt: Date
 }
 
 private struct RemoteUpdateResultTagsRequest: Codable, Sendable {
@@ -1605,8 +1617,48 @@ final class AccountSession {
                 displayName: user.displayName, totalExperience: 0,
                 leaderboardOptedOut: user.leaderboardOptedOut,
                 profileDetails: user.profileDetails,
-                authenticationMethods: user.authenticationMethods)
+                authenticationMethods: user.authenticationMethods,
+                streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
+                personalBestResetAt: user.personalBestResetAt)
             statusMessage = "已清除 (response.removedCount) 条服务端成绩；本机练习历史未受影响。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func resetRemotePersonalBests(currentPassword: String?) async -> Bool {
+        guard let token = tokenStore.load(), let user = currentUser else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let usesPassword = user.authenticationMethods.contains(.password)
+            let freshReauthenticationToken = usesPassword
+                ? nil
+                : try await reauthenticationToken(
+                    for: user, accessToken: token, excluding: nil, currentPassword: nil)
+            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/personal-bests",
+                method: "DELETE",
+                token: token,
+                body: RemotePersonalBestResetRequest(currentPassword: currentPassword),
+                headers: freshReauthenticationToken.map { ["X-Typebar-Reauthentication": $0] } ?? [:],
+                response: RemotePersonalBestResetResponse.self
+            )
+            currentUser = .init(
+                id: user.id, email: user.email, emailVerified: user.emailVerified,
+                displayName: user.displayName, totalExperience: user.totalExperience,
+                leaderboardOptedOut: user.leaderboardOptedOut,
+                profileDetails: user.profileDetails,
+                authenticationMethods: user.authenticationMethods,
+                availableBadges: user.availableBadges, selectedBadgeID: user.selectedBadgeID,
+                streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
+                personalBestResetAt: response.resetAt)
+            statusMessage = "服务端公开个人最佳已重置；成绩、XP、徽章和本机历史未受影响。"
             return true
         } catch {
             statusMessage = error.localizedDescription

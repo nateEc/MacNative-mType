@@ -237,11 +237,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(legacy.profileDetails, .init())
     XCTAssertTrue(legacy.availableBadges.isEmpty)
     XCTAssertNil(legacy.selectedBadgeID)
+    XCTAssertNil(legacy.personalBestResetAt)
 
     let modern = try JSONDecoder().decode(
       RemoteAccountUser.self,
       from: Data(
-        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
+        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","personalBestResetAt":100,"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
           .utf8))
     XCTAssertTrue(modern.emailVerified)
     XCTAssertEqual(modern.authenticationMethods, [.google, .password, .discord])
@@ -252,6 +253,7 @@ final class TypingEngineTests: XCTestCase {
         websiteURL: "https://example.com", showActivity: false))
     XCTAssertEqual(modern.availableBadges.map(\.id), ["swift-line"])
     XCTAssertEqual(modern.selectedBadgeID, "swift-line")
+    XCTAssertEqual(modern.personalBestResetAt, Date(timeIntervalSinceReferenceDate: 100))
 
     let leaderboardEntry = try JSONDecoder().decode(
       RemoteLeaderboardEntry.self,

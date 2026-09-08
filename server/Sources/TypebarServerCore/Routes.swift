@@ -691,6 +691,20 @@ public func configure(
         }
     }
 
+    app.delete("v1", "personal-bests") { request async throws -> PersonalBestResetResponse in
+        do {
+            let accessToken = try request.accessToken()
+            let reset = try request.content.decode(ResetPersonalBestsRequest.self)
+            return try await authStore.resetPersonalBests(
+                reset,
+                accessToken: accessToken,
+                reauthenticationToken: request.headers.first(name: "X-Typebar-Reauthentication")
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.patch("v1", "results", ":id", "tags") { request async throws -> AccountResultResponse in
         guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
             throw Abort(.badRequest, reason: "The result identifier was invalid.")

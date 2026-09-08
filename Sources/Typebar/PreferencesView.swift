@@ -28,6 +28,7 @@ struct PreferencesView: View {
   @State private var developerAccessKeyName = ""
   @State private var newlyCreatedDeveloperAccessKey: String?
   @State private var remoteResultsDeletionPassword = ""
+  @State private var remotePersonalBestResetPassword = ""
   @State private var updatedEmail = ""
   @State private var emailChangePassword = ""
   @State private var currentPassword = ""
@@ -41,6 +42,7 @@ struct PreferencesView: View {
   @State private var accountDeletionPassword = ""
   @State private var showingAccountDeletionConfirmation = false
   @State private var showingRemoteResultsDeletionConfirmation = false
+  @State private var showingRemotePersonalBestResetConfirmation = false
   @State private var showingSessionRevocationConfirmation = false
   @State private var showingRestoreDefaultsConfirmation = false
   @State private var submittedQuoteText = ""
@@ -1193,6 +1195,24 @@ struct PreferencesView: View {
                   RemoteAccountResultRow(result: result, account: account)
                 }
               }
+              if let resetAt = user.personalBestResetAt {
+                Text("公开个人最佳上次重置：\(resetAt.formatted(date: .abbreviated, time: .shortened))")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              if user.authenticationMethods.contains(.password) {
+                SecureField("输入当前密码以重置服务端个人最佳", text: $remotePersonalBestResetPassword)
+                  .textContentType(.password)
+              }
+              Button("重置服务端个人最佳…", role: .destructive) {
+                showingRemotePersonalBestResetConfirmation = true
+              }
+              .disabled(
+                account.isWorking || (user.authenticationMethods.contains(.password)
+                  && remotePersonalBestResetPassword.isEmpty))
+              Text("只清空服务端公开资料中的个人最佳纪元；服务端成绩、XP、徽章、排行榜以及本机历史和本机个人最佳都会保留。下一条新接收成绩会建立新的公开个人最佳。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
               if user.authenticationMethods.contains(.password) {
                 SecureField("输入当前密码以清除服务端成绩", text: $remoteResultsDeletionPassword)
                   .textContentType(.password)
@@ -1734,6 +1754,23 @@ struct PreferencesView: View {
       Button("恢复默认", role: .destructive) { settings.restoreDefaults() }
     } message: {
       Text("练习与外观设置将恢复默认，本地背景图片会移除；本地字体文件和练习历史会保留。")
+    }
+    .confirmationDialog(
+      "重置服务端个人最佳？", isPresented: $showingRemotePersonalBestResetConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("重置个人最佳", role: .destructive) {
+        Task {
+          if await account.resetRemotePersonalBests(
+            currentPassword: remotePersonalBestResetPassword.isEmpty
+              ? nil : remotePersonalBestResetPassword)
+          {
+            remotePersonalBestResetPassword = ""
+          }
+        }
+      }
+    } message: {
+      Text("旧成绩仍保留，但不再参与服务端公开个人最佳；此纪元不能撤销。本机历史和个人最佳不受影响。")
     }
     .confirmationDialog(
       "清除所有服务端成绩？", isPresented: $showingRemoteResultsDeletionConfirmation,

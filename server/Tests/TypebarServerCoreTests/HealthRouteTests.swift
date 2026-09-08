@@ -3030,6 +3030,107 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(currentOwner.id, owner.user.id)
   }
 
+  func testResettingPersonalBestsStartsANewEpochWithoutDeletingResultsOrRewards() async throws {
+    let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("typebar-personal-best-reset-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let store = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let firstAcceptedAt = Date(timeIntervalSince1970: 1_700_100_000)
+    let resetAt = firstAcceptedAt.addingTimeInterval(10)
+    let reauthenticatedResetAt = resetAt.addingTimeInterval(2)
+    let nextAcceptedAt = resetAt.addingTimeInterval(10)
+    let owner = try await store.register(
+      .init(email: "pb-owner@example.com", password: "a secure password", displayName: "PB Owner"),
+      now: firstAcceptedAt)
+    let other = try await store.register(
+      .init(email: "pb-other@example.com", password: "a secure password", displayName: "PB Other"),
+      now: firstAcceptedAt)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 90, accuracy: 100, finishedAt: firstAcceptedAt),
+      accessToken: owner.accessToken, now: firstAcceptedAt)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 100, accuracy: 100, finishedAt: firstAcceptedAt),
+      accessToken: other.accessToken, now: firstAcceptedAt)
+    let beforeReset = try await store.authenticatedUser(for: owner.accessToken, now: resetAt)
+    let beforeProfile = try await store.publicProfile(id: owner.user.id, now: resetAt)
+
+    do {
+      _ = try await store.resetPersonalBests(
+        .init(currentPassword: nil), accessToken: owner.accessToken, now: resetAt)
+      XCTFail("Resetting personal bests must require a fresh account confirmation")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidReauthenticationToken)
+    }
+    do {
+      _ = try await store.resetPersonalBests(
+        .init(currentPassword: "wrong password"), accessToken: owner.accessToken, now: resetAt)
+      XCTFail("Resetting personal bests must reject an incorrect password")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidCredentials)
+    }
+
+    let reset = try await store.resetPersonalBests(
+      .init(currentPassword: "a secure password"), accessToken: owner.accessToken, now: resetAt)
+    let ownerResults = try await store.results(
+      .init(), credential: .accessToken(owner.accessToken), now: resetAt)
+    let afterReset = try await store.authenticatedUser(for: owner.accessToken, now: resetAt)
+    let resetProfile = try await store.publicProfile(id: owner.user.id, now: resetAt)
+    let otherProfile = try await store.publicProfile(id: other.user.id, now: resetAt)
+    let leaderboard = try await store.leaderboard(
+      .init(mode: nil, language: nil, period: "all", limit: 25), now: resetAt)
+
+    XCTAssertEqual(reset.resetAt, resetAt)
+    XCTAssertEqual(afterReset.personalBestResetAt, resetAt)
+    XCTAssertEqual(ownerResults.results.count, 1)
+    XCTAssertEqual(afterReset.totalExperience, beforeReset.totalExperience)
+    XCTAssertEqual(afterReset.availableBadges, beforeReset.availableBadges)
+    XCTAssertEqual(resetProfile.completedResultCount, beforeProfile.completedResultCount)
+    XCTAssertEqual(resetProfile.startedTestCount, beforeProfile.startedTestCount)
+    XCTAssertEqual(resetProfile.totalTypingSeconds, beforeProfile.totalTypingSeconds)
+    XCTAssertEqual(resetProfile.activity, beforeProfile.activity)
+    XCTAssertEqual(resetProfile.streak, beforeProfile.streak)
+    XCTAssertEqual(resetProfile.bestWPM, 0)
+    XCTAssertEqual(resetProfile.highestConsistency, 0)
+    XCTAssertTrue(resetProfile.personalBests.isEmpty)
+    XCTAssertEqual(otherProfile.bestWPM, 100)
+    XCTAssertTrue(leaderboard.entries.contains { $0.userID == owner.user.id && $0.wpm == 90 })
+
+    let passwordReauthentication = try await store.reauthenticateWithPassword(
+      .init(currentPassword: "a secure password"), accessToken: owner.accessToken,
+      now: resetAt.addingTimeInterval(1))
+    let reauthenticatedReset = try await store.resetPersonalBests(
+      .init(currentPassword: nil), accessToken: owner.accessToken,
+      reauthenticationToken: passwordReauthentication.reauthenticationToken,
+      now: reauthenticatedResetAt)
+    XCTAssertEqual(reauthenticatedReset.resetAt, reauthenticatedResetAt)
+    do {
+      _ = try await store.resetPersonalBests(
+        .init(currentPassword: nil), accessToken: owner.accessToken,
+        reauthenticationToken: passwordReauthentication.reauthenticationToken,
+        now: reauthenticatedResetAt.addingTimeInterval(1))
+      XCTFail("Resetting personal bests must not reuse a consumed reauthentication token")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidReauthenticationToken)
+    }
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 45, accuracy: 100, finishedAt: nextAcceptedAt),
+      accessToken: owner.accessToken, now: nextAcceptedAt)
+    let rebuiltProfile = try await store.publicProfile(id: owner.user.id, now: nextAcceptedAt)
+    XCTAssertEqual(rebuiltProfile.completedResultCount, 2)
+    XCTAssertEqual(rebuiltProfile.bestWPM, 45)
+    XCTAssertEqual(rebuiltProfile.personalBests.map(\.wpm), [45])
+
+    let reloadedStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let reloadedUser = try await reloadedStore.authenticatedUser(
+      for: owner.accessToken, now: nextAcceptedAt)
+    let reloadedProfile = try await reloadedStore.publicProfile(
+      id: owner.user.id, now: nextAcceptedAt)
+    XCTAssertEqual(reloadedUser.personalBestResetAt, reauthenticatedResetAt)
+    XCTAssertEqual(reloadedProfile.completedResultCount, 2)
+    XCTAssertEqual(reloadedProfile.bestWPM, 45)
+  }
+
   func testOAuthIdentitiesSupportPasswordlessLoginLinkingAndSafeUnlinking() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let github = OAuthProviderIdentity(
@@ -3468,6 +3569,9 @@ final class HealthRouteTests: XCTestCase {
       try await app.test(.DELETE, "v1/results") { response async in
         XCTAssertEqual(response.status, .unauthorized)
       }
+      try await app.test(.DELETE, "v1/personal-bests") { response async in
+        XCTAssertEqual(response.status, .unauthorized)
+      }
       try await app.test(
         .POST, "v1/results",
         beforeRequest: { request async throws in
@@ -3538,6 +3642,17 @@ final class HealthRouteTests: XCTestCase {
       try await app.test(.GET, "v1/leaderboards/experience/friends") { response async in
         XCTAssertEqual(response.status, .unauthorized)
       }
+      try await app.test(
+        .DELETE, "v1/personal-bests",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(
+            ResetPersonalBestsRequest(currentPassword: "a secure password"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertNotNil((try? response.content.decode(PersonalBestResetResponse.self))?.resetAt)
+        })
       try await app.test(
         .DELETE, "v1/results",
         beforeRequest: { request async throws in
