@@ -44,5 +44,14 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     for rawValue in Array(fixture.nativeExact.values) + Array(fixture.nativeRelated.values) {
       XCTAssertNotNil(KeyboardLayout(rawValue: rawValue), "Unknown Typebar layout: \(rawValue)")
     }
+
+    let configAudit = try String(
+      contentsOf: repositoryRoot.appendingPathComponent("OFFICIAL_CONFIG_AUDIT.md"),
+      encoding: .utf8)
+    XCTAssertTrue(
+      configAudit.contains("当前 \(KeyboardLayout.allCases.count) 个原生内置布局"))
+    XCTAssertTrue(
+      configAudit.contains(
+        "\(fixture.nativeExact.count) 项精确映射与 \(fixture.nativeRelated.count) 项兼容映射"))
   }
 }

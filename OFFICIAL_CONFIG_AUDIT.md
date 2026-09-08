@@ -94,7 +94,7 @@
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
-| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 193 个原生内置布局可任选至多 15 个进入原生序列。 |
+| `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 部分；自选组合已实现，候选语言仅限 Typebar 原创语言集。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
@@ -109,7 +109,7 @@
 | `lazyMode` | `TestModifier.lazyLatin`、Arabic 快速输入偏好 | 部分；语义为提示文本简化重音/连字，当前以显式练习修饰器而非全局开关呈现。Arabic 另有默认开启、可持久化关闭的快速输入偏好，进入 Arabic 时自动加入该修饰器，并以独立 Unicode 归一化省略短元音、tanwin、shadda、sukun 与常见 alef 变体；该自动行为不影响其他语言。依据固定参考版本的 `noLazyMode`，非自定义模式会禁用 English、Hebrew、Persian、Urdu、Tamil、Hindi、Gujarati、Bangla、Thai、Nepali、Kannada、Telugu、Malayalam、Sanskrit、Greeklish、Dutch、Filipino、Indonesian、Serbian Cyrillic、Bulgarian、Macedonian、Kazakh、中日韩／日语罗马字、Ukrainian 与 Ukrainian Latin，以及所有代码练习的该修饰器；自定义文本仍可使用。可配置多语练习只有至少一个选择的组成语言允许时才保留它。 |
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
-| `layout` | `KeyboardInputLayout` | 已映射；系统输入源为默认，固定参考的 239 个官方名称全部解析到独立编写的原生物理布局或三个明确兼容别名，另支持用户自写四行布局。机器清单 `Compatibility/official-layouts.json` 固定 236 项精确映射与 3 项兼容映射；覆盖测试验证名称唯一、目标存在且无未列项目。Typebar 不读取、打包或运行官方布局 JSON、代码或资产。 |
+| `layout` | `KeyboardInputLayout` | 已映射；系统输入源为默认，固定参考的 239 个官方名称全部解析到独立编写的原生物理布局，另支持用户自写四行布局。机器清单 `Compatibility/official-layouts.json` 固定 239 项精确映射与 0 项兼容映射；覆盖测试验证名称唯一、目标存在且无未列项目。Typebar 不读取、打包或运行官方布局 JSON、代码或资产。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
@@ -258,7 +258,7 @@
 - 无限测试自动化覆盖 time、words 与自定义循环的 0 值配置、正向秒数/词数、提示扩展、无自动终止、Bail Out、长测试快捷键、预设/分享往返、旧配置冲突迁移及固定参考八项 `noInfiniteDuration` 修饰器；无限结果不保存、不上传，服务端继续拒绝 0 值正式成绩。
 - 结果字符分类自动化覆盖提前提交造成的跳过、词尾额外输入、强制物理键位错误、禅模式、旧归档保守回退、SwiftData 往返与 CSV 四列导出；实现从 Typebar 原生最终输入映射派生，不读取或导入参考结果逻辑、代码或资产。
 - 原生按键时序自动化覆盖 AppKit keyDown/repeat/keyUp 通路、闭合按住样本、连续按下间隔、多键重叠总时长、均值/总体标准差、未配对与结束边界、SwiftData/归档兼容和 CSV 导出；仅保存匿名时序，不复制参考事件代码或上传键码。
-- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、236/3/0 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`。
+- 官方布局矩阵测试验证固定源码 239 个名称完整且唯一、239/0/0 三类状态数量守恒、官方名称引用有效，并确保每个原生目标都能解析为当前 `KeyboardLayout`；同时守卫本文件的当前内置布局数与精确／兼容映射摘要。
 - `SystemKeyboardGuide` 的注入式测试验证四行 ANSI 物理键位、Shift 图例、下一键匹配字符及缺失键位的安全回退；macOS `UCKeyTranslate` 返回的多字符或多码点图例会完整保留，不再截断为首字符。
 - 设置快照测试覆盖键盘图来源的持久化、恢复与旧归档默认回退。
 - 自定义键盘输入映射测试覆盖 Unicode 字母普通/Shift 映射、用户定义的符号 Shift 图例、旧归档默认、Option 的系统回退、归档恢复和删除选中图后的安全回退。
