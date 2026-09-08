@@ -3844,7 +3844,7 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
-  func testCodeResultWhitelistMatchesThePinnedClientLanguageAudit() throws {
+  func testResultAndQuoteWhitelistsMatchThePinnedClientLanguageAudit() throws {
     let repositoryRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -3857,9 +3857,38 @@ final class HealthRouteTests: XCTestCase {
       fixture.nativeIndependent.compactMap { officialID, typebarID in
         officialID.hasPrefix("code_") || officialID == "docker_file" ? typebarID : nil
       })
+    let auditedQuoteLanguageIDs = Set(fixture.nativeIndependent.values)
+      .subtracting(auditedCodeLanguageIDs)
+      .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 153)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
+    XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
+  }
+
+  func testTokiPonaKuChoicesCrossQuoteAndResultDataPlanes() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "ku@example.com", password: "a secure password", displayName: "Ku User"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+
+    for (offset, language) in ["tokiPonaKuSuli", "tokiPonaKuLili"].enumerated() {
+      let submission = try await store.submitQuote(
+        .init(language: language, text: "tenpo lili la, o pali e nasin pona.", attribution: nil),
+        accessToken: session.accessToken, now: now)
+      let result = try await store.submitResult(
+        self.result(
+          id: UUID(), wpm: 70 + offset, accuracy: 100, language: language,
+          finishedAt: now.addingTimeInterval(Double(offset))),
+        accessToken: session.accessToken, now: now)
+      let leaderboard = try await store.leaderboard(
+        .init(mode: "time", language: language, period: "all", limit: 10), now: now)
+
+      XCTAssertEqual(submission.status, "pending")
+      XCTAssertTrue(result.leaderboardEligible)
+      XCTAssertEqual(leaderboard.entries.map(\.wpm), [70 + offset])
+    }
   }
 
   func testResultRoutesRequireAuthenticationAndReturnLeaderboard() async throws {

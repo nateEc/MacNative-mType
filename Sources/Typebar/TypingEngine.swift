@@ -250,6 +250,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case kabyle
   case maltese
   case tokiPona
+  case tokiPonaKuSuli
+  case tokiPonaKuLili
   case xhosa
   case tibetan
   case kyrgyz
@@ -4110,6 +4112,19 @@ enum StarterLexicon {
     "open", "pini", "kama", "tawa", "lukin", "kalama", "nimi", "wawa",
   ]
 
+  // The independently curated ku suli choice extends the local base set with
+  // common grammar and core vocabulary while remaining separate from ku lili.
+  static let tokiPonaKuSuliWords = tokiPonaWords + [
+    "ale", "ala", "anu", "e", "en", "kin", "la", "li", "lon", "mute", "o", "pi", "seme", "taso", "wan",
+  ]
+
+  // Typebar-curated ku lili practice is intentionally disjoint from the
+  // local base set and does not import the reference dictionary.
+  static let tokiPonaKuLiliWords = [
+    "akesi", "alasa", "ante", "awen", "esun", "jaki", "jasima", "leko", "meso", "misikeke",
+    "monsuta", "namako", "oko", "soko", "tonsi", "lanpan", "kipisi", "kokosila", "n", "kijetesantakalu",
+  ]
+
   // Typebar-authored Xhosa starter words keep the selected `xh` path
   // without importing either reference wordset.
   static let xhosaWords = [
@@ -5078,6 +5093,14 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tokiPonaWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tokiPonaKuSuli:
+      return prompt(
+        tokens: count, lexicon: tokiPonaKuSuliWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tokiPonaKuLili:
+      return prompt(
+        tokens: count, lexicon: tokiPonaKuLiliWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .xhosa:
       return prompt(
         tokens: count, lexicon: xhosaWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5571,6 +5594,8 @@ enum StarterLexicon {
     case .kabyle: (kabyleWords, [",", ".", "!", "?"])
     case .maltese: (malteseWords, [",", ".", "!", "?"])
     case .tokiPona: (tokiPonaWords, [",", ".", "!", "?"])
+    case .tokiPonaKuSuli: (tokiPonaKuSuliWords, [",", ".", "!", "?"])
+    case .tokiPonaKuLili: (tokiPonaKuLiliWords, [",", ".", "!", "?"])
     case .xhosa: (xhosaWords, [",", ".", "!", "?"])
     case .tibetan: (tibetanWords, ["།"])
     case .kyrgyz: (kyrgyzWords, [",", ".", "!", "?"])
@@ -5790,6 +5815,8 @@ extension TypingLanguage {
     case .kabyle: StarterLexicon.kabyleWords
     case .maltese: StarterLexicon.malteseWords
     case .tokiPona: StarterLexicon.tokiPonaWords
+    case .tokiPonaKuSuli: StarterLexicon.tokiPonaKuSuliWords
+    case .tokiPonaKuLili: StarterLexicon.tokiPonaKuLiliWords
     case .xhosa: StarterLexicon.xhosaWords
     case .tibetan: StarterLexicon.tibetanWords
     case .kyrgyz: StarterLexicon.kyrgyzWords
@@ -5904,7 +5931,7 @@ extension TypingLanguage {
     .englishShakespearean,
     .kokanu,
     .likanu,
-    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .git, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
     .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianEndings,
@@ -5981,7 +6008,7 @@ extension TypingLanguage {
       .mongolian,
       .marathi,
       .malagasy,
-      .tokiPona,
+      .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili,
       .tibetan,
       .swahili,
       .kinyarwanda,
@@ -6092,6 +6119,8 @@ extension TypingLanguage {
     case .kabyle: "Taqbaylit"
     case .maltese: "Malti"
     case .tokiPona: "toki pona"
+    case .tokiPonaKuSuli: "toki pona · ku suli"
+    case .tokiPonaKuLili: "toki pona · ku lili"
     case .xhosa: "isiXhosa"
     case .tibetan: "བོད་སྐད་"
     case .kyrgyz: "Кыргызча"

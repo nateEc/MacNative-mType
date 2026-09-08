@@ -7775,6 +7775,40 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.typed, prompt)
   }
 
+  func testTokiPonaKuChoicesUseDistinctTypebarOwnedLiteralWordsets() throws {
+    let suli = try XCTUnwrap(TypingLanguage(rawValue: "tokiPonaKuSuli"))
+    let lili = try XCTUnwrap(TypingLanguage(rawValue: "tokiPonaKuLili"))
+    let baseWords = Set(TypingLanguage.tokiPona.ownedPracticeWords())
+    let suliWords = Set(suli.ownedPracticeWords())
+    let liliWords = Set(lili.ownedPracticeWords())
+
+    XCTAssertEqual(suli.displayName, "toki pona · ku suli")
+    XCTAssertEqual(lili.displayName, "toki pona · ku lili")
+    XCTAssertGreaterThanOrEqual(suliWords.count, 20)
+    XCTAssertGreaterThanOrEqual(liliWords.count, 20)
+    XCTAssertTrue(baseWords.isStrictSubset(of: suliWords))
+    XCTAssertTrue(suliWords.isDisjoint(with: liliWords))
+
+    for language in [suli, lili] {
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertFalse(language.supportsLazyLatinInput)
+      XCTAssertTrue(language.supportsQuotes)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+      XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+
+      let promptWords = Set(
+        OfflineContent.generatedPrompt(wordCount: 80, language: language).split(separator: " ")
+          .map(String.init))
+      XCTAssertTrue(promptWords.isSubset(of: Set(language.ownedPracticeWords())))
+    }
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9020,6 +9054,8 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.kabyleWords,
       StarterLexicon.malteseWords,
       StarterLexicon.tokiPonaWords,
+      StarterLexicon.tokiPonaKuSuliWords,
+      StarterLexicon.tokiPonaKuLiliWords,
       StarterLexicon.xhosaWords,
       StarterLexicon.tibetanWords,
       StarterLexicon.kyrgyzWords,
@@ -9083,7 +9119,9 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 142)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 144)
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
+    XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)

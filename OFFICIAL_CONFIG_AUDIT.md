@@ -6,8 +6,8 @@
 - 权威入口：`packages/schemas/src/configs.ts` 中的 `ConfigSchema`；它列出当前网页端所有可保存配置键。
 - 本审计只记录用户可见设置的代码级映射。`已映射` 不代替真实设备验收；`部分` 和`未实现`不能在其他文档中表述为已完成。
 - Typebar 的实现、文案、数据模型和测试均为原创；该表不复制参考实现的代码、资产、词表、布局定义或主题数据。
-- 当前语言目录：152 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
-- `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：222 个独立原生选择、213 个由同语言选择表达的数字规模变体、11 个尚无原生选择的配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言 JSON 内容；完整边界及缺口见 `OFFICIAL_LANGUAGE_AUDIT.md`。
+- 当前语言目录：154 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
+- `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：224 个独立原生选择、213 个由同语言选择表达的数字规模变体、9 个尚无原生选择的配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言 JSON 内容；完整边界及缺口见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 
 - Catalan、Indonesian 与 Malay 的自动化测试覆盖各自的自创词流、四档原创引语、完整多语混排轮转、`ca-ES` / `id-ID` / `ms-MY` 朗读 locale 与仅在明示启用时使用的 `ca` / `id` / `ms` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 
@@ -23,7 +23,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `QuoteLength`、收藏和本机搜索 | 部分；已覆盖短/中/长/超长与收藏/搜索，内容规模保持原创。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；一百五十二种 Typebar 自有单语（最新增加 Git 专项）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版；固定元数据中的全部 26 个 `joiningScript` 语言使用系统原生塑形、连写行距与逐字隐藏保护，九种 RTL 语言仍暂不进入双向多语混排；经配置验证的 LTR 语言可进入混排，Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文、朗读、Zipf 与简化输入严格按每项固定配置或其缺省分支处理，完整映射记录在后续审计条目与自动化测试中。Swiss German 复用 Typebar 自有 German 内容并把可见 `ß` 变为 `ss`，可进入成绩和排行榜但不能投稿或选择社区引语。乌克兰语 Latin、日语罗马字、Greeklish 与 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们；Pig Latin、Lorem Ipsum 和五字母英语的离线内容分别保持原创变换、原创伪拉丁与严格五字母边界；Kokanu 仅从其官方语言资料取词汇与语法边界，练习文本独立编写；Likanu 由自写音节解析器按官方字符规则从这些自有内容确定性派生；专项词流分别保留英语、瑞典语、葡萄牙语、俄语缩略词、两种乌克兰语词尾、Bangla 字符及 Git 小写 ASCII 命令／概念的可见输入约束，均不导入参考词值。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；一百五十四种 Typebar 自有单语（最新增加 toki pona · ku suli 与 ku lili）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版；固定元数据中的全部 26 个 `joiningScript` 语言使用系统原生塑形、连写行距与逐字隐藏保护，九种 RTL 语言仍暂不进入双向多语混排；经配置验证的 LTR 语言可进入混排，Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文、朗读、Zipf 与简化输入严格按每项固定配置或其缺省分支处理，完整映射记录在后续审计条目与自动化测试中。Swiss German 复用 Typebar 自有 German 内容并把可见 `ß` 变为 `ss`，可进入成绩和排行榜但不能投稿或选择社区引语。乌克兰语 Latin、日语罗马字、Greeklish 与 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们；Pig Latin、Lorem Ipsum 和五字母英语的离线内容分别保持原创变换、原创伪拉丁与严格五字母边界；Kokanu 仅从其官方语言资料取词汇与语法边界，练习文本独立编写；Likanu 由自写音节解析器按官方字符规则从这些自有内容确定性派生；专项词流分别保留英语、瑞典语、葡萄牙语、俄语缩略词、两种乌克兰语词尾、Bangla 字符、Git 小写 ASCII 命令／概念及两个独立 toki pona ku 集合的可见输入约束，均不导入参考词值。 |
 
 2026-09-04 更新：单语数量增至五十八种，新增 Burmese（`myanmarBurmese`）：参考配置为 `joiningScript: true`、`noLazyMode: true`、LTR、`my-MM`。Typebar 使用原创词流、四档引语、macOS 组合输入和空格提交，并以 `my` 访问知识短文、`my-MM` 调用系统朗读；该语言进入混排、预设、归档、社区投稿及服务端排行榜全路径。
 
@@ -272,7 +272,7 @@
 - 引语长度与队列测试覆盖多选长度通过预设和 Typebar 配置链接保存、旧单长度配置迁移，以及同一候选集每轮不重复且避免立即重复当前引语；队列仅存于当前进程，不引入参考内容或实现。
 - 服务公告测试覆盖公开读取、部署审核密钥发布/删除、计划日期往返、空白公告拒绝、原生完整日期/日期/相对时间占位符替换，以及本机普通公告关闭、置顶公告保留和服务端移除后的本机确认清理；不复制参考文案、样式或实现。
 - 完整客户端 `swift test` 已通过 261 项测试；测试前 `pgrep -x Typebar` 无输出，未启动图形应用。
-- 独立 Vapor 服务的 `swift test` 已通过 76 项测试，其中覆盖 70 个代码语言的成绩／排行榜准入与引语投稿隔离、机器总账跨 package 一致性、GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除、Discord 头像公开隐私、原创公开徽章、公开连续练习/账户日界/开始次数隐私及服务公告；测试前后 `pgrep -ax Typebar` 无输出，未启动图形应用。
+- 独立 Vapor 服务的 `swift test` 已通过 77 项测试，其中覆盖 70 个代码语言和 153 个可投稿单语的机器总账跨 package 一致性、代码成绩／排行榜准入与引语投稿隔离、GitHub/Google/Discord OAuth 的 PKCE 授权 URL、一次性 state、原生回调、注册/关联、提供商匹配重新验证、安全移除、Discord 头像公开隐私、原创公开徽章、公开连续练习/账户日界/开始次数隐私及服务公告；测试前后 `pgrep -ax Typebar` 无输出，未启动图形应用。
 - Maltese 审计只读取 `maltese.json` 与 `maltese_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 `bcp47: mt`，不定义 RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的 Maltese 内容与 LTR 空格分词，知识短文和朗读均精确使用 `mt`。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - toki pona 审计只读取 `toki_pona.json`、`toki_pona_ku_suli.json` 与 `toki_pona_ku_lili.json` 的元数据，不读取其中词表或引语文本。三者定义 `noLazyMode: true`，不定义 BCP-47、RTL、连写或词频排序；实现因此使用独立自写的 toki pona 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。普通练习移除简化输入，自定义文本保留例外；Zipf 走未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - Xhosa 审计只读取 `xhosa.json` 与 `xhosa_3k.json` 的元数据，不读取其中词表或引语文本。主 `xhosa` 定义 `rightToLeft: false` 与 `bcp47: xh`，而 `xhosa_3k` 不定义这些可选字段；参考的在线与朗读代码按当前词组读取，因此前者使用 `xh`、后者回退 `en`／`en-US`。Typebar 使用独立自写的 isiXhosa 内容和 LTR 空格分词；其用户可见主选择精确使用 `xh`，不导入任一参考词表或引语。保留手动简化输入与 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。

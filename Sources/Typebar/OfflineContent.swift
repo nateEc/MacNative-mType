@@ -4422,6 +4422,14 @@ enum OfflineContent {
           length: quote.length)
       }
     }
+    if language == .tokiPonaKuSuli || language == .tokiPonaKuLili {
+      let prefix = language == .tokiPonaKuSuli ? "toki-pona-ku-suli" : "toki-pona-ku-lili"
+      return quotes(for: .tokiPona, length: length).map { quote in
+        .init(
+          id: "\(prefix)-\(quote.id)", title: quote.title, text: quote.text,
+          language: language, length: quote.length)
+      }
+    }
     return quotes.filter { $0.language == language && (length == .all || $0.length == length) }
   }
 
