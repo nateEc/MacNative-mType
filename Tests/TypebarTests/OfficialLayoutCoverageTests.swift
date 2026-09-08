@@ -54,4 +54,30 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       configAudit.contains(
         "\(fixture.nativeExact.count) 项精确映射与 \(fixture.nativeRelated.count) 项兼容映射"))
   }
+
+  func testCurrentLanguageCatalogCountsMatchCompatibilityDocuments() throws {
+    let languages = TypingLanguage.allCases
+    let standalone = languages.filter(\.supportsQuotes)
+    let code = languages.filter(\.isCodeLanguage)
+    let mixed: Set<TypingLanguage> = [.mixedEnglishChinese, .mixedLanguages]
+
+    XCTAssertEqual(languages.count, 223)
+    XCTAssertEqual(standalone.count, 152)
+    XCTAssertEqual(code.count, 69)
+    XCTAssertEqual(Set(languages), Set(standalone).union(code).union(mixed))
+
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let currentSummary = "当前语言目录：152 个可单独练习的语言或书写方式、69 个代码选择和 2 个混合入口。"
+    for name in [
+      "README.md", "FUNCTIONAL_INVENTORY.md", "REWRITE_SPEC.md",
+      "OFFICIAL_CONFIG_AUDIT.md", "OFFICIAL_LANGUAGE_AUDIT.md",
+    ] {
+      let document = try String(
+        contentsOf: repositoryRoot.appendingPathComponent(name), encoding: .utf8)
+      XCTAssertTrue(document.contains(currentSummary), "\(name) 缺少当前语言目录摘要")
+    }
+  }
 }
