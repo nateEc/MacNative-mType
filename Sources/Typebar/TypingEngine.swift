@@ -314,6 +314,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case norwegianBokmal
   case norwegianNynorsk
   case swedish
+  case swedishDiacritics
   case hungarian
   case czech
   case slovak
@@ -4586,6 +4587,18 @@ enum StarterLexicon {
     "liten", "tid", "vår", "äng", "båt", "vän",
   ]
 
+  // Typebar-authored Swedish diacritics practice keeps every word focused on
+  // å, ä or ö without importing the reference word list.
+  static let swedishDiacriticsWords = [
+    "ålder", "ånga", "åska", "åker", "åtta", "årlig", "årets", "åtgärd", "åsikt",
+    "ändå", "ängel", "ängar", "ärlig", "ämne", "äpple", "äldre", "öppen", "öppet",
+    "öster", "övning", "önska", "övrig", "ögon", "öken", "ökar", "ödet", "öarna",
+    "bröd", "grön", "höst", "högre", "hörna", "söker", "möter", "färsk", "värme",
+    "värld", "bättre", "större", "kärna", "nästa", "fråga", "många", "måste", "rådet",
+    "låter", "gården", "sådan", "säger", "vägen", "växer", "länge", "tänka", "känna",
+    "lärde", "nära", "säkra", "träd",
+  ]
+
   // Typebar-authored Hungarian starter words. The corpus deliberately
   // includes the language's short and long accented vowels for macOS input.
   static let hungarianWords = [
@@ -5233,6 +5246,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: swedishWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .swedishDiacritics:
+      return prompt(
+        tokens: count, lexicon: swedishDiacriticsWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hungarian:
       return prompt(
         tokens: count, lexicon: hungarianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5506,6 +5523,7 @@ enum StarterLexicon {
     case .norwegianBokmal: (norwegianBokmalWords, [",", ".", "!", "?"])
     case .norwegianNynorsk: (norwegianNynorskWords, [",", ".", "!", "?"])
     case .swedish: (swedishWords, [",", ".", "!", "?"])
+    case .swedishDiacritics: (swedishDiacriticsWords, [",", ".", "!", "?"])
     case .hungarian: (hungarianWords, [",", ".", "!", "?"])
     case .czech: (czechWords, [",", ".", "!", "?"])
     case .slovak: (slovakWords, [",", ".", "!", "?"])
@@ -5718,6 +5736,7 @@ extension TypingLanguage {
     case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
     case .norwegianNynorsk: StarterLexicon.norwegianNynorskWords
     case .swedish: StarterLexicon.swedishWords
+    case .swedishDiacritics: StarterLexicon.swedishDiacriticsWords
     case .hungarian: StarterLexicon.hungarianWords
     case .czech: StarterLexicon.czechWords
     case .slovak: StarterLexicon.slovakWords
@@ -5761,7 +5780,7 @@ extension TypingLanguage {
     .englishShakespearean,
     .kokanu,
     .likanu,
-    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese,
     .simplifiedChinese,
     .traditionalChinese, .russian, .ukrainian, .ukrainianLatin, .japaneseHiragana, .japaneseKatakana,
@@ -6003,6 +6022,7 @@ extension TypingLanguage {
     case .norwegianBokmal: "Norsk bokmål"
     case .norwegianNynorsk: "Norsk nynorsk"
     case .swedish: "Svenska"
+    case .swedishDiacritics: "Svenska · Å Ä Ö"
     case .hungarian: "Magyar"
     case .czech: "Čeština"
     case .slovak: "Slovenčina"

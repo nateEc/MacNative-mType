@@ -3651,6 +3651,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "swedish-diacritics-three-letters",
+      title: "Tre bokstäver",
+      text: "Öva lugnt när å, ä och ö dyker upp.",
+      language: .swedishDiacritics,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "swedish-diacritics-autumn-yard",
+      title: "Höst på gården",
+      text: "På den öppna gården står ett äppelträd, och höstens löv rör sig mjukt i kvällsvinden.",
+      language: .swedishDiacritics,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "swedish-diacritics-steady-practice",
+      title: "Stadig övning",
+      text: "När du möter å, ä och ö i samma övning behöver du inte skynda. Håll händerna avslappnade, läs nästa ord tydligt och låt säkerheten växa före farten.",
+      language: .swedishDiacritics,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "swedish-diacritics-evening-room",
+      title: "Ett rum på kvällen",
+      text: "I det öppna rummet står en låg lampa nära fönstret. Utanför blir höstens väg mörk, men här inne går övningen vidare i en jämn rytm. Läs varje ord, lägg märke till å, ä och ö och rätta en osäker rörelse utan brådska. När händerna känner igen bokstävernas platser blir nästa rad lättare, och en liten förbättring får vara tillräcklig för kvällen.",
+      language: .swedishDiacritics,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "hungarian-kis-lepes",
       title: "Kis lépés",
       text: "Egy kis, nyugodt lépés tisztábbá teszi a következő feladatot.",

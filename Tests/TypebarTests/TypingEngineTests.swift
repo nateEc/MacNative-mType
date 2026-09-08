@@ -8952,6 +8952,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.norwegianBokmalWords,
       StarterLexicon.norwegianNynorskWords,
       StarterLexicon.swedishWords,
+      StarterLexicon.swedishDiacriticsWords,
       StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.bulgarianLatinWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
@@ -8962,7 +8963,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 135)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 136)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -10778,6 +10779,7 @@ final class TypingEngineTests: XCTestCase {
       (.norwegianBokmal, StarterLexicon.norwegianBokmalWords),
       (.norwegianNynorsk, StarterLexicon.norwegianNynorskWords),
       (.swedish, StarterLexicon.swedishWords),
+      (.swedishDiacritics, StarterLexicon.swedishDiacriticsWords),
       (.hungarian, StarterLexicon.hungarianWords),
       (.czech, StarterLexicon.czechWords),
       (.slovak, StarterLexicon.slovakWords),
@@ -12094,6 +12096,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.estonian.ownedPracticeWords(), StarterLexicon.estonianWords)
     XCTAssertEqual(TypingLanguage.icelandic.ownedPracticeWords(), StarterLexicon.icelandicWords)
     XCTAssertEqual(TypingLanguage.swedish.ownedPracticeWords(), StarterLexicon.swedishWords)
+    XCTAssertEqual(
+      TypingLanguage.swedishDiacritics.ownedPracticeWords(),
+      StarterLexicon.swedishDiacriticsWords)
     XCTAssertEqual(TypingLanguage.greek.ownedPracticeWords(), StarterLexicon.greekWords)
     XCTAssertEqual(TypingLanguage.greeklish.ownedPracticeWords(), StarterLexicon.greeklishWords)
     XCTAssertEqual(TypingLanguage.japaneseKatakana.ownedPracticeWords(), StarterLexicon.japaneseKatakanaWords)
@@ -12481,6 +12486,25 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
     XCTAssertTrue(StarterLexicon.englishShakespeareanWords.contains("thou"))
     XCTAssertTrue(StarterLexicon.englishShakespeareanWords.contains("wherefore"))
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+    }
+  }
+
+  func testSwedishDiacriticsKeepsEveryPracticeWordAccentedAndPinnedMetadata() {
+    let language = TypingLanguage.swedishDiacritics
+    XCTAssertEqual(language.displayName, "Svenska · Å Ä Ö")
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "sv")
+    XCTAssertEqual(language.speechLocaleIdentifier, "sv-SE")
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertFalse(StarterLexicon.swedishDiacriticsWords.isEmpty)
+    XCTAssertTrue(
+      StarterLexicon.swedishDiacriticsWords.allSatisfy {
+        (4...6).contains($0.count)
+          && $0.range(of: "[åäöÅÄÖ]", options: .regularExpression) != nil
+      })
     for length in [QuoteLength.short, .medium, .long, .extended] {
       XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
     }

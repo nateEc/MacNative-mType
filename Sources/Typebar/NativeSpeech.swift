@@ -105,7 +105,7 @@ extension TypingLanguage {
     case .danish: "da-DK"
     case .norwegianBokmal: "nb-NO"
     case .norwegianNynorsk: "nn-NO"
-    case .swedish: "sv-SE"
+    case .swedish, .swedishDiacritics: "sv-SE"
     case .hungarian: "hu-HU"
     case .czech: "cs-CZ"
     case .slovak: "sk-SK"
