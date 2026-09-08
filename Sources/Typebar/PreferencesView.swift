@@ -947,8 +947,16 @@ struct PreferencesView: View {
 
       if accountSectionVisible {
         Section("自建账户") {
-          TextField("服务地址", text: $account.endpoint)
+          TextField(
+            "服务地址",
+            text: Binding(
+              get: { account.endpoint },
+              set: { account.updateEndpoint($0) }))
             .textContentType(.URL)
+            .disabled(account.isWorking)
+          Text("账户令牌按服务地址分别保存在钥匙串；更换服务器会退出当前显示的账户，但不会把其令牌发送到新服务器。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           if let user = account.currentUser {
             LabeledContent("已登录", value: user.displayName)
             Text(user.email).font(.caption).foregroundStyle(.secondary)
@@ -1407,6 +1415,16 @@ struct PreferencesView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             } else {
+            if account.hasStoredSession {
+              Button("恢复此服务器会话") {
+                Task { await account.restoreSession() }
+              }
+              .disabled(account.isWorking)
+              Text("只读取当前服务地址对应的钥匙串令牌。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Divider()
+            }
             Picker("操作", selection: $accountMode) {
               Text("登录").tag(AccountMode.login)
               Text("注册").tag(AccountMode.register)

@@ -8,6 +8,70 @@ import XCTest
 final class TypingEngineTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 10_000)
 
+  func testRemoteSyncStateIsScopedByCanonicalServerAndAccountWithoutConsumingLegacyCursor() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(91, forKey: "remoteAccount.syncCursor.v1")
+    defaults.set(12, forKey: "remoteAccount.archiveSyncVersion.v1")
+    let firstUser = UUID(uuidString: "00000000-0000-0000-0000-000000000201")!
+    let secondUser = UUID(uuidString: "00000000-0000-0000-0000-000000000202")!
+    let primary = RemoteSyncStateScope(endpoint: "HTTPS://Example.COM:443/api/", userID: firstUser)
+    let equivalent = RemoteSyncStateScope(endpoint: "https://example.com/api", userID: firstUser)
+    let otherUser = RemoteSyncStateScope(endpoint: "https://example.com/api", userID: secondUser)
+    let otherServer = RemoteSyncStateScope(endpoint: "https://sync.example.com/api", userID: firstUser)
+
+    XCTAssertEqual(primary.cursor(in: defaults), 0)
+    XCTAssertEqual(primary.version(in: defaults), 0)
+    primary.setCursor(7, in: defaults)
+    primary.setVersion(3, in: defaults)
+
+    XCTAssertEqual(equivalent.cursor(in: defaults), 7)
+    XCTAssertEqual(equivalent.version(in: defaults), 3)
+    XCTAssertEqual(otherUser.cursor(in: defaults), 0)
+    XCTAssertEqual(otherUser.version(in: defaults), 0)
+    XCTAssertEqual(otherServer.cursor(in: defaults), 0)
+    XCTAssertEqual(otherServer.version(in: defaults), 0)
+    XCTAssertEqual(defaults.integer(forKey: "remoteAccount.syncCursor.v1"), 91)
+    XCTAssertEqual(defaults.integer(forKey: "remoteAccount.archiveSyncVersion.v1"), 12)
+  }
+
+  func testRemoteAccessTokenKeyIsCanonicalAndServerScoped() {
+    XCTAssertEqual(
+      AccountTokenStore.accountName(for: "HTTPS://Example.COM:443/api/"),
+      AccountTokenStore.accountName(for: "https://example.com/api"))
+    XCTAssertNotEqual(
+      AccountTokenStore.accountName(for: "https://example.com/api"),
+      AccountTokenStore.accountName(for: "https://other.example.com/api"))
+    XCTAssertNotEqual(
+      AccountTokenStore.accountName(for: "https://example.com/api"),
+      "remote-access-token")
+  }
+
+  @MainActor
+  func testRemoteEndpointChangesClearIdentityAndCannotCrossAnActiveRequest() {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set("https://example.com/api", forKey: "remoteAccount.endpoint.v1")
+    let account = AccountSession(defaults: defaults)
+    let user = RemoteAccountUser(
+      id: UUID(), email: "person@example.com", displayName: "Person", totalExperience: 0)
+    account.currentUser = user
+
+    XCTAssertTrue(account.updateEndpoint("HTTPS://EXAMPLE.COM:443/api/"))
+    XCTAssertEqual(account.currentUser, user)
+
+    account.isWorking = true
+    XCTAssertFalse(account.updateEndpoint("https://other.example.com/api"))
+    XCTAssertEqual(account.endpoint, "HTTPS://EXAMPLE.COM:443/api/")
+    XCTAssertEqual(account.currentUser, user)
+
+    account.isWorking = false
+    XCTAssertTrue(account.updateEndpoint("https://other.example.com/api"))
+    XCTAssertNil(account.currentUser)
+  }
+
   func testLegacySyncPullResponseDefaultsMissingPaginationFlagToFinalPage() throws {
     let legacy = try JSONDecoder().decode(
       RemoteSyncPullResponse.self,

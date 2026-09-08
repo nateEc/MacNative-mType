@@ -486,10 +486,75 @@ struct RemoteSyncPullResponse: Codable, Sendable {
     }
 }
 
+/// Sync cursors and versions belong to one account on one server. Legacy v1
+/// keys remain untouched for rollback, but are intentionally not copied: a
+/// cursor cannot be safely attributed to an account after an older app has
+/// switched users or endpoints. Starting at zero replays remote changes
+/// idempotently and lets the archive conflict path establish a safe baseline.
+struct RemoteServerScope: Equatable, Sendable {
+    let storageSuffix: String
+
+    init(endpoint: String) {
+        storageSuffix = Data(Self.canonicalEndpoint(endpoint).utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func canonicalEndpoint(_ endpoint: String) -> String {
+        let trimmed = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var components = URLComponents(string: trimmed),
+            let scheme = components.scheme?.lowercased(),
+            let host = components.host?.lowercased()
+        else { return trimmed }
+        components.scheme = scheme
+        components.host = host
+        if (scheme == "https" && components.port == 443)
+            || (scheme == "http" && components.port == 80)
+        {
+            components.port = nil
+        }
+        while components.path.hasSuffix("/") { components.path.removeLast() }
+        components.query = nil
+        components.fragment = nil
+        return components.string ?? trimmed
+    }
+}
+
+struct RemoteSyncStateScope: Equatable, Sendable {
+    private let storageSuffix: String
+
+    init(endpoint: String, userID: UUID) {
+        storageSuffix = RemoteServerScope(endpoint: endpoint).storageSuffix
+            + "." + userID.uuidString.lowercased()
+    }
+
+    func cursor(in defaults: UserDefaults) -> Int {
+        max(0, defaults.integer(forKey: key("syncCursor")))
+    }
+
+    func version(in defaults: UserDefaults) -> Int {
+        max(0, defaults.integer(forKey: key("archiveSyncVersion")))
+    }
+
+    func setCursor(_ value: Int, in defaults: UserDefaults) {
+        defaults.set(max(0, value), forKey: key("syncCursor"))
+    }
+
+    func setVersion(_ value: Int, in defaults: UserDefaults) {
+        defaults.set(max(0, value), forKey: key("archiveSyncVersion"))
+    }
+
+    private func key(_ component: String) -> String {
+        "remoteAccount.\(component).v2.\(storageSuffix)"
+    }
+}
+
 struct RemoteArchivePull {
     let archive: TypebarArchive?
     let nextCursor: Int
     let archiveVersion: Int?
+    let syncScope: RemoteSyncStateScope
 }
 
 private struct RemoteResultSubmission: Codable, Sendable {
@@ -925,14 +990,24 @@ enum RemoteAccountError: LocalizedError {
 @Observable
 final class AccountSession {
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let legacyTokenEndpoint: String
     @ObservationIgnored private let endpointKey = "remoteAccount.endpoint.v1"
     @ObservationIgnored private let syncIDKey = "remoteAccount.archiveSyncID.v1"
-    @ObservationIgnored private let syncVersionKey = "remoteAccount.archiveSyncVersion.v1"
-    @ObservationIgnored private let syncCursorKey = "remoteAccount.syncCursor.v1"
     @ObservationIgnored private let tokenStore = AccountTokenStore()
     @ObservationIgnored private let oauthBrowser = OAuthWebAuthenticationSession()
 
-    var endpoint = "http://127.0.0.1:8080" { didSet { defaults.set(endpoint, forKey: endpointKey) } }
+    private(set) var endpoint = "http://127.0.0.1:8080" {
+        didSet {
+            let changedServer = RemoteServerScope(endpoint: oldValue)
+                != RemoteServerScope(endpoint: endpoint)
+            defaults.set(endpoint, forKey: endpointKey)
+            tokenStore.setEndpoint(endpoint)
+            guard changedServer else { return }
+            currentUser = nil
+            pendingOAuthRegistration = nil
+            statusMessage = nil
+        }
+    }
     var currentUser: RemoteAccountUser? {
         didSet {
             if currentUser == nil {
@@ -949,11 +1024,30 @@ final class AccountSession {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        endpoint = defaults.string(forKey: endpointKey) ?? "http://127.0.0.1:8080"
+        let storedEndpoint = defaults.string(forKey: endpointKey) ?? "http://127.0.0.1:8080"
+        legacyTokenEndpoint = storedEndpoint
+        endpoint = storedEndpoint
+        tokenStore.setEndpoint(storedEndpoint)
+    }
+
+    @discardableResult
+    func updateEndpoint(_ value: String) -> Bool {
+        guard !isWorking else {
+            statusMessage = "请等待当前服务请求完成后再更改地址。"
+            return false
+        }
+        endpoint = value
+        return true
+    }
+
+    var hasStoredSession: Bool {
+        tokenStore.load() != nil
     }
 
     func restoreSession() async {
-        guard tokenStore.load() != nil else { return }
+        guard tokenStore.load(for: endpoint, migratingLegacyFor: legacyTokenEndpoint) != nil else {
+            return
+        }
         await refreshProfile()
     }
 
@@ -1644,10 +1738,13 @@ final class AccountSession {
     func pushArchive(_ archive: TypebarArchive) async throws -> Int {
         isWorking = true
         defer { isWorking = false }
-        guard let token = tokenStore.load() else { throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。") }
+        guard let token = tokenStore.load(), let user = currentUser else {
+            throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
+        }
+        let syncScope = RemoteSyncStateScope(endpoint: endpoint, userID: user.id)
         let payload = try String(decoding: JSONEncoder.remote.encode(archive), as: UTF8.self)
         let id = archiveSyncID()
-        let nextVersion = defaults.integer(forKey: syncVersionKey) + 1
+        let nextVersion = syncScope.version(in: defaults) + 1
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: "v1/sync",
             method: "POST",
@@ -1659,15 +1756,18 @@ final class AccountSession {
         guard result.status == "accepted" else {
             throw RemoteAccountError.archiveSyncConflict(serverVersion: result.serverVersion)
         }
-        defaults.set(nextVersion, forKey: syncVersionKey)
+        syncScope.setVersion(nextVersion, in: defaults)
         return response.nextCursor
     }
 
     func pullArchive(fromBeginning: Bool = false) async throws -> RemoteArchivePull {
         isWorking = true
         defer { isWorking = false }
-        guard let token = tokenStore.load() else { throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。") }
-        var cursor = fromBeginning ? 0 : defaults.integer(forKey: syncCursorKey)
+        guard let token = tokenStore.load(), let user = currentUser else {
+            throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
+        }
+        let syncScope = RemoteSyncStateScope(endpoint: endpoint, userID: user.id)
+        var cursor = fromBeginning ? 0 : syncScope.cursor(in: defaults)
         var latestArchiveChange: RemoteSyncPullChange?
 
         while true {
@@ -1697,7 +1797,7 @@ final class AccountSession {
                 }
                 return .init(
                     archive: archive, nextCursor: response.nextCursor,
-                    archiveVersion: latestArchiveChange?.version)
+                    archiveVersion: latestArchiveChange?.version, syncScope: syncScope)
             }
             guard response.nextCursor > cursor else { throw RemoteAccountError.unexpectedResponse }
             cursor = response.nextCursor
@@ -1705,9 +1805,10 @@ final class AccountSession {
     }
 
     func confirmPulledArchive(_ pull: RemoteArchivePull) {
-        defaults.set(pull.nextCursor, forKey: syncCursorKey)
+        pull.syncScope.setCursor(pull.nextCursor, in: defaults)
         if let version = pull.archiveVersion {
-            defaults.set(max(defaults.integer(forKey: syncVersionKey), version), forKey: syncVersionKey)
+            pull.syncScope.setVersion(
+                max(pull.syncScope.version(in: defaults), version), in: defaults)
         }
     }
 
@@ -2199,12 +2300,34 @@ private struct RemoteAccountAPI {
     }
 }
 
-private final class AccountTokenStore {
+final class AccountTokenStore {
     private let service = "app.typebar.desktop"
-    private let account = "remote-access-token"
+    private static let legacyAccount = "remote-access-token"
+    private var activeEndpoint = "http://127.0.0.1:8080"
+
+    static func accountName(for endpoint: String) -> String {
+        "remote-access-token.v2.\(RemoteServerScope(endpoint: endpoint).storageSuffix)"
+    }
+
+    func setEndpoint(_ endpoint: String) {
+        activeEndpoint = endpoint
+    }
 
     func save(_ token: String) throws {
-        clear()
+        try save(token, for: activeEndpoint)
+    }
+
+    func load() -> String? {
+        load(for: activeEndpoint)
+    }
+
+    func clear() {
+        clear(for: activeEndpoint)
+    }
+
+    func save(_ token: String, for endpoint: String) throws {
+        let account = Self.accountName(for: endpoint)
+        clear(account: account)
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -2216,7 +2339,33 @@ private final class AccountTokenStore {
         guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
     }
 
-    func load() -> String? {
+    func load(for endpoint: String, migratingLegacyFor legacyEndpoint: String? = nil) -> String? {
+        let account = Self.accountName(for: endpoint)
+        if let token = load(account: account) {
+            if let legacyEndpoint, Self.accountName(for: legacyEndpoint) == account {
+                clear(account: Self.legacyAccount)
+            }
+            return token
+        }
+        guard let legacyEndpoint,
+            Self.accountName(for: legacyEndpoint) == account,
+            let legacyToken = load(account: Self.legacyAccount)
+        else { return nil }
+        do {
+            try save(legacyToken, for: endpoint)
+            clear(account: Self.legacyAccount)
+        } catch {
+            // The legacy token is still restricted to its recorded endpoint;
+            // a later launch can retry the non-destructive copy.
+        }
+        return legacyToken
+    }
+
+    func clear(for endpoint: String) {
+        clear(account: Self.accountName(for: endpoint))
+    }
+
+    private func load(account: String) -> String? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -2229,7 +2378,7 @@ private final class AccountTokenStore {
         return String(data: data, encoding: .utf8)
     }
 
-    func clear() {
+    private func clear(account: String) {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
