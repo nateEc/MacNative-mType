@@ -8071,6 +8071,83 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testRussianShortFormsPreserveBaseAndExpandedEntryShapes() throws {
+    let baseLanguage = try XCTUnwrap(TypingLanguage(rawValue: "russianContractions"))
+    let expandedLanguage = try XCTUnwrap(TypingLanguage(rawValue: "russianContractions1k"))
+    let base = baseLanguage.ownedPracticeWords()
+    let expanded = expandedLanguage.ownedPracticeWords()
+
+    XCTAssertEqual(baseLanguage.displayName, "Русский · Краткие формы · Typebar")
+    XCTAssertEqual(expandedLanguage.displayName, "Русский · Краткие формы 1k · Typebar")
+    for language in [baseLanguage, expandedLanguage] {
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertFalse(language.supportsLazyLatinInput)
+      XCTAssertEqual(language.zipfFrequencySupport, .unsupported)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ru")
+      XCTAssertEqual(language.speechLocaleIdentifier, "ru-RU")
+      XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(language))
+    }
+
+    XCTAssertEqual(base.count, 200)
+    XCTAssertEqual(Set(base).count, base.count)
+    XCTAssertEqual(base.map(\.count).min(), 2)
+    XCTAssertEqual(base.map(\.count).max(), 17)
+    XCTAssertFalse(base.contains { $0.contains(" ") })
+    XCTAssertEqual(base.filter {
+      $0.range(of: "[^[:alnum:]А-Яа-яЁё ]", options: .regularExpression) != nil
+    }.count, 17)
+    XCTAssertEqual(base.filter { $0.range(of: "[0-9]", options: .regularExpression) != nil }.count, 1)
+    XCTAssertEqual(base.filter { $0.range(of: "[А-ЯЁ]", options: .regularExpression) != nil }.count, 5)
+    XCTAssertEqual(base.filter {
+      $0.range(of: "^[А-Яа-яЁё]+$", options: .regularExpression) != nil
+    }.count, 183)
+
+    XCTAssertEqual(expanded.count, 880)
+    XCTAssertEqual(Set(expanded).count, expanded.count)
+    XCTAssertTrue(Set(base).isSubset(of: Set(expanded)))
+    XCTAssertEqual(expanded.map(\.count).min(), 1)
+    XCTAssertEqual(expanded.map(\.count).max(), 18)
+    XCTAssertEqual(expanded.filter { $0.contains(" ") }.count, 6)
+    XCTAssertEqual(expanded.filter {
+      $0.range(of: "[^[:alnum:]А-Яа-яЁё ]", options: .regularExpression) != nil
+    }.count, 378)
+    XCTAssertEqual(expanded.filter { $0.range(of: "[0-9]", options: .regularExpression) != nil }.count, 11)
+    XCTAssertEqual(expanded.filter { $0.range(of: "[А-ЯЁ]", options: .regularExpression) != nil }.count, 75)
+    XCTAssertEqual(expanded.filter {
+      $0.range(of: "^[А-Яа-яЁё]+$", options: .regularExpression) != nil
+    }.count, 497)
+
+    for language in [baseLanguage, expandedLanguage] {
+      let plain = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+        .split(separator: " ").map(String.init)
+      XCTAssertEqual(plain.count, 25)
+      XCTAssertTrue(plain.allSatisfy {
+        $0.range(of: "^[а-яё]+$", options: .regularExpression) != nil
+      })
+
+      let punctuated = OfflineContent.generatedPrompt(
+        wordCount: 25, language: language,
+        contentOptions: ContentOptions(includePunctuation: true))
+      XCTAssertEqual(punctuated.split(separator: " ").count, 25)
+      XCTAssertNotNil(punctuated.range(of: "[^[:alnum:]А-Яа-яЁё ]", options: .regularExpression))
+
+      let numbered = OfflineContent.generatedPrompt(
+        wordCount: 25, language: language,
+        contentOptions: ContentOptions(includeNumbers: true))
+        .split(separator: " ").map(String.init)
+      XCTAssertEqual(numbered.count, 25)
+      XCTAssertEqual(numbered[0], "1")
+      XCTAssertEqual(numbered[9], "2")
+      XCTAssertEqual(numbered[18], "3")
+
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quotes = OfflineContent.quotes(for: language, length: length)
+        XCTAssertEqual(quotes.count, 1)
+        XCTAssertEqual(quotes.first?.language, language)
+      }
+    }
+  }
+
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
     let typed = "alpha beta"
     XCTAssertEqual(PracticeTapePolicy.anchorCharacterIndex(typed: typed, mode: .off), 0)
@@ -9376,7 +9453,9 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.hungarianWords, StarterLexicon.czechWords, StarterLexicon.slovakWords, StarterLexicon.slovenianWords, StarterLexicon.croatianWords, StarterLexicon.serbianWords, StarterLexicon.serbianLatinWords, StarterLexicon.bulgarianWords, StarterLexicon.bulgarianLatinWords, StarterLexicon.romanianWords, StarterLexicon.finnishWords, StarterLexicon.estonianWords, StarterLexicon.icelandicWords, StarterLexicon.frenchWords, StarterLexicon.frenchBitoducWords, StarterLexicon.italianWords,
       StarterLexicon.portugueseWords,
       StarterLexicon.portugueseAccentsWords,
-      StarterLexicon.simplifiedChineseWords, StarterLexicon.traditionalChineseWords,
+      StarterLexicon.simplifiedChineseWords,
+      StarterLexicon.russianShortFormTokens, StarterLexicon.russianShortForm1kTokens,
+      StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.russianAbbreviationWords,
       StarterLexicon.ukrainianWords, StarterLexicon.ukrainianEndingWords,
       StarterLexicon.ukrainianLatinWords, StarterLexicon.ukrainianLatynkaEndingWords,
@@ -9386,7 +9465,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 150)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 152)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
     XCTAssertTrue(

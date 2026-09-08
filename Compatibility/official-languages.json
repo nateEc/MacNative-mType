@@ -479,6 +479,8 @@
     "chinese_simplified": "simplifiedChinese",
     "chinese_traditional": "traditionalChinese",
     "russian": "russian",
+    "russian_contractions": "russianContractions",
+    "russian_contractions_1k": "russianContractions1k",
     "russian_abbreviations": "russianAbbreviations",
     "ukrainian": "ukrainian",
     "ukrainian_endings": "ukrainianEndings",
@@ -898,8 +900,6 @@
     "tibetan_1k": "tibetan"
   },
   "unmappedOfficialIDs": [
-    "russian_contractions",
-    "russian_contractions_1k",
     "tamil_old"
   ],
   "sourceFiles": [

@@ -907,6 +907,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "russian-short-forms-note",
+      title: "Краткая форма",
+      text: "Краткая форма помогает тренировать точный ритм.",
+      language: .russianContractions,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "russian-short-forms-margin",
+      title: "Пометка на полях",
+      text: "Короткая пометка экономит место, если её значение понятно, а точки, дефисы и буквы стоят в правильном порядке.",
+      language: .russianContractions,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "russian-short-forms-index",
+      title: "Рабочий указатель",
+      text: "В рабочем указателе длинные названия получают ясные краткие формы. Сначала автор записывает полную фразу, затем выбирает устойчивую основу и проверяет каждый знак. Читатель должен без догадки восстановить смысл, поэтому скорость никогда не важнее точности.",
+      language: .russianContractions,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "russian-short-forms-guide",
+      title: "Спокойная проверка",
+      text: "Краткие формы полезны только тогда, когда они остаются понятными. Перед публикацией редактор собирает их в отдельный список, сравнивает похожие записи и отмечает, где нужна точка или дефис. Затем он читает исходный текст ещё раз и проверяет, что каждая сокращённая запись ведёт к одному значению. Такая спокойная работа занимает немного времени, зато избавляет читателя от лишних догадок. В тренировке действует тот же принцип: сначала точный знак, потом следующий, и лишь после этого скорость.",
+      language: .russianContractions,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "ukrainian-small-note",
       title: "Мала нотатка",
       text: "Невеликий запис про зроблене допомагає побачити наступний крок ясніше.",
@@ -4596,6 +4624,13 @@ enum OfflineContent {
         .init(
           id: "\(prefix)-\(quote.id)", title: quote.title, text: quote.text,
           language: language, length: quote.length)
+      }
+    }
+    if language == .russianContractions1k {
+      return quotes(for: .russianContractions, length: length).map { quote in
+        .init(
+          id: "russian-short-forms-1k-\(quote.id)", title: quote.title, text: quote.text,
+          language: .russianContractions1k, length: quote.length)
       }
     }
     return quotes.filter { $0.language == language && (length == .all || $0.length == length) }
