@@ -184,6 +184,90 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "spelling-steady",
+      title: "Steady spelling",
+      text: "Careful writers separate each syllable and accommodate every necessary letter.",
+      language: .englishCommonlyMisspelled,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "spelling-patterns",
+      title: "Notice the pattern",
+      text: "A reliable calendar and a clear pronunciation guide make unusual spelling noticeable.",
+      language: .englishCommonlyMisspelled,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "spelling-patience",
+      title: "Patient recall",
+      text: "Tomorrow's questionnaire may look intimidating, yet patient recall can prevent an embarrassing occurrence and preserve a confident rhythm.",
+      language: .englishCommonlyMisspelled,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "spelling-proofread",
+      title: "Proofread with purpose",
+      text: "Independent writers know that spelling improves through deliberate attention. They check whether a restaurant can accommodate a reservation, whether a recommendation is relevant, and whether maintenance, privilege, perseverance, and possession contain every necessary letter before they publish.",
+      language: .englishCommonlyMisspelled,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "contractions-clear",
+      title: "Keep it clear",
+      text: "Don't hurry; you'll type more clearly when you're calm.",
+      language: .englishContractions,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "contractions-apostrophe",
+      title: "Mind the apostrophe",
+      text: "We're watching each apostrophe, so it won't vanish when the sentence isn't simple.",
+      language: .englishContractions,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "contractions-rhythm",
+      title: "Natural rhythm",
+      text: "You've learned that contractions aren't shortcuts for careless writing; they're compact forms that shouldn't interrupt a steady typing rhythm.",
+      language: .englishContractions,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "contractions-dialogue",
+      title: "A compact dialogue",
+      text: "I'll begin when you're ready, and we'll pause if there's a difficult phrase. You shouldn't guess where an apostrophe belongs, because it doesn't replace the same letters in every word. Once you've noticed the pattern, you'll type what you've intended without breaking the conversation's pace.",
+      language: .englishContractions,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "double-letter-small",
+      title: "Double letter",
+      text: "Small letters still need smooth, correct pressure.",
+      language: .englishDoubleLetter,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "double-letter-coffee",
+      title: "Coffee room",
+      text: "Coffee cools while a happy committee collects yellow letters in the school room.",
+      language: .englishDoubleLetter,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "double-letter-pattern",
+      title: "Repeated patterns",
+      text: "A double letter can appear at the middle of a common word, and careful practice helps the correct pattern feel effortless rather than different.",
+      language: .englishDoubleLetter,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "double-letter-success",
+      title: "Repeated success",
+      text: "A successful session does not depend on speed alone. Slow down when a repeated letter appears, allow both key presses to settle, and continue with the same smooth rhythm. With enough deliberate effort, words such as address, committee, opportunity, and parallel become familiar instead of surprising.",
+      language: .englishDoubleLetter,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kokanu-kota-wiki",
       title: "kota wiki",
       text: "mi le kota wiki ki tu. tu le wisan in mi un ja.",

@@ -8854,6 +8854,9 @@ final class TypingEngineTests: XCTestCase {
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
       StarterLexicon.englishFiveLetterWords,
+      StarterLexicon.englishCommonlyMisspelledWords,
+      StarterLexicon.englishContractionWords,
+      StarterLexicon.englishDoubleLetterWords,
       StarterLexicon.kokanuWords,
       StarterLexicon.likanuWords,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
@@ -8956,7 +8959,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 129)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 132)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -12415,6 +12418,31 @@ final class TypingEngineTests: XCTestCase {
       let likanuText = OfflineContent.quotes(for: language, length: length).first?.text
       XCTAssertEqual(kokanuText.map { LikanuPolicy.transform($0) }, likanuText)
     }
+  }
+
+  func testEnglishSpecialtySetsKeepTheirVisibleWordConstraints() {
+    let specialtyLanguages: [TypingLanguage] = [
+      .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
+    ]
+    for language in specialtyLanguages {
+      XCTAssertFalse(language.supportsLazyLatinInput)
+      XCTAssertEqual(language.zipfFrequencySupport, .unsupported)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+      XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+      XCTAssertFalse(language.ownedPracticeWords().isEmpty)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+      }
+    }
+
+    XCTAssertTrue(StarterLexicon.englishContractionWords.allSatisfy { $0.contains("'") })
+    XCTAssertTrue(StarterLexicon.englishDoubleLetterWords.allSatisfy { word in
+      zip(word, word.dropFirst()).contains { $0 == $1 }
+    })
+    XCTAssertTrue(StarterLexicon.englishCommonlyMisspelledWords.contains("accommodate"))
+    XCTAssertTrue(StarterLexicon.englishCommonlyMisspelledWords.contains("separate"))
   }
 
   func testQuoteSearchMatchesAllTermsWithoutSendingOrMutatingContent() {

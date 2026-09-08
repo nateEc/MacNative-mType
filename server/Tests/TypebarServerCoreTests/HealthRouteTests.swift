@@ -4012,6 +4012,9 @@ final class HealthRouteTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_735_689_600)
     let languages = [
       ("englishFiveLetter", "Small steps shape clear paths."),
+      ("englishCommonlyMisspelled", "Careful writers accommodate every necessary letter."),
+      ("englishContractions", "Don't hurry; you'll type clearly."),
+      ("englishDoubleLetter", "Small letters still need smooth pressure."),
       ("kokanu", "mi le kota wiki ki tu. tu le wisan in mi un ja."),
       ("likanu", "ɞı ʋȷ xʃʌ ɕıxı xı ʌſ: ʌſ ʋȷ ɕıɤ̄ ōı ɞı ōſ ɂ:"),
       ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),

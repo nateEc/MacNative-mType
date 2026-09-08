@@ -198,6 +198,9 @@ extension Difficulty {
 enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english
   case englishFiveLetter
+  case englishCommonlyMisspelled
+  case englishContractions
+  case englishDoubleLetter
   case kokanu
   case likanu
   case pigLatin
@@ -3542,6 +3545,35 @@ enum StarterLexicon {
     "learn", "write", "clear", "paths", "hands", "lines", "shape", "steps",
   ]
 
+  // Typebar-authored compact specialty sets. They reproduce the visible
+  // practice constraints without reading the reference-project word values.
+  static let englishCommonlyMisspelledWords = [
+    "accommodate", "believe", "calendar", "cemetery", "conscience", "conscious",
+    "definitely", "embarrass", "guarantee", "government", "harass", "independent",
+    "irresistible", "knowledge", "liaison", "maintenance", "millennium", "mischievous",
+    "necessary", "noticeable", "occasion", "occurrence", "parallel", "perseverance",
+    "possession", "preferred", "privilege", "pronunciation", "publicly", "questionnaire",
+    "receive", "recommend", "relevant", "restaurant", "rhythm", "separate", "supersede",
+    "tomorrow", "until", "vacuum", "weird",
+  ]
+
+  static let englishContractionWords = [
+    "aren't", "can't", "couldn't", "didn't", "doesn't", "don't", "hadn't", "hasn't",
+    "haven't", "he'd", "he'll", "he's", "here's", "how's", "i'd", "i'll", "i'm", "i've",
+    "isn't", "it'd", "it'll", "it's", "let's", "mightn't", "mustn't", "she'd", "she'll",
+    "she's", "shouldn't", "that's", "they'd", "they'll", "they're", "they've", "wasn't",
+    "we'd", "we'll", "we're", "we've", "weren't", "what's", "where's", "who's", "won't",
+    "wouldn't", "you'd", "you'll", "you're", "you've",
+  ]
+
+  static let englishDoubleLetterWords = [
+    "address", "balloon", "coffee", "collection", "committee", "common", "connect", "cool",
+    "correct", "different", "dinner", "effect", "effort", "fall", "feel", "good", "happy",
+    "letter", "little", "million", "moon", "necessary", "office", "opportunity", "parallel",
+    "press", "really", "room", "school", "see", "small", "smooth", "still", "success",
+    "summer", "support", "tree", "wheel", "yellow",
+  ]
+
   // Selected from the public Kokanu vocabulary and arranged independently for
   // Typebar practice; no reference-project word list is read or imported.
   static let kokanuWords = [
@@ -4703,6 +4735,21 @@ enum StarterLexicon {
         tokens: count, lexicon: englishFiveLetterWords, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .englishCommonlyMisspelled:
+      return prompt(
+        tokens: count, lexicon: englishCommonlyMisspelledWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .englishContractions:
+      return prompt(
+        tokens: count, lexicon: englishContractionWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .englishDoubleLetter:
+      return prompt(
+        tokens: count, lexicon: englishDoubleLetterWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .kokanu:
       return prompt(
         tokens: count, lexicon: kokanuWords, separator: " ",
@@ -5302,6 +5349,9 @@ enum StarterLexicon {
     switch language {
     case .english: (englishVariant == .british ? britishWords : words, [",", ".", "!", "?"])
     case .englishFiveLetter: (englishFiveLetterWords, [",", ".", "!", "?"])
+    case .englishCommonlyMisspelled: (englishCommonlyMisspelledWords, [",", ".", "!", "?"])
+    case .englishContractions: (englishContractionWords, [",", ".", "!", "?"])
+    case .englishDoubleLetter: (englishDoubleLetterWords, [",", ".", "!", "?"])
     case .kokanu: (kokanuWords, [",", ".", "!", "?"])
     case .likanu: (likanuWords, ["､", ":", "ʭ", "≈"])
     case .pigLatin: (pigLatinWords, [",", ".", "!", "?"])
@@ -5508,6 +5558,9 @@ extension TypingLanguage {
     return switch self {
     case .english: englishVariant == .british ? StarterLexicon.britishWords : StarterLexicon.words
     case .englishFiveLetter: StarterLexicon.englishFiveLetterWords
+    case .englishCommonlyMisspelled: StarterLexicon.englishCommonlyMisspelledWords
+    case .englishContractions: StarterLexicon.englishContractionWords
+    case .englishDoubleLetter: StarterLexicon.englishDoubleLetterWords
     case .kokanu: StarterLexicon.kokanuWords
     case .likanu: StarterLexicon.likanuWords
     case .pigLatin: StarterLexicon.pigLatinWords
@@ -5653,6 +5706,9 @@ extension TypingLanguage {
 
   static let defaultMixedComponents: [TypingLanguage] = [
     .englishFiveLetter,
+    .englishCommonlyMisspelled,
+    .englishContractions,
+    .englishDoubleLetter,
     .kokanu,
     .likanu,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
@@ -5706,7 +5762,8 @@ extension TypingLanguage {
   var supportsLazyLatinInput: Bool {
     guard !isCodeLanguage else { return false }
     return switch self {
-    case .english, .pigLatin, .loremIpsum, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
+    case .english, .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
+      .pigLatin, .loremIpsum, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
       .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .bulgarianLatin,
@@ -5763,7 +5820,8 @@ extension TypingLanguage {
     case .english, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianNynorsk,
       .russian, .icelandic, .galician, .marathi:
       return .supported
-    case .kokanu, .likanu, .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
+    case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
+      .kokanu, .likanu, .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
     default:
@@ -5776,6 +5834,9 @@ extension TypingLanguage {
     return switch self {
     case .english: "English"
     case .englishFiveLetter: "English · Five Letter"
+    case .englishCommonlyMisspelled: "English · Commonly Misspelled"
+    case .englishContractions: "English · Contractions"
+    case .englishDoubleLetter: "English · Double Letter"
     case .kokanu: "Kokanu"
     case .likanu: "Likanu"
     case .pigLatin: "Pig Latin"
