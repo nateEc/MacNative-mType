@@ -12886,6 +12886,69 @@ final class TypingEngineTests: XCTestCase {
       TypebarArchiveMerge.savedTextsToInsert(from: archive, existing: [existingText]), [newText])
   }
 
+  func testArchiveConflictMergePreservesBothUserAuthoredCopiesAndLocalSettings() throws {
+    let sharedThemeID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+    let clonedThemeID = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
+    let localTheme = CustomThemeDefinition(
+      id: sharedThemeID, name: "Focus", background: .init(red: 0.1, green: 0.1, blue: 0.1),
+      panel: .init(red: 0.2, green: 0.2, blue: 0.2),
+      accent: .init(red: 0.9, green: 0.6, blue: 0.1), prefersDark: true)
+    let remoteTheme = CustomThemeDefinition(
+      id: sharedThemeID, name: "Focus", background: .init(red: 0.9, green: 0.9, blue: 0.9),
+      panel: .init(red: 0.8, green: 0.8, blue: 0.8),
+      accent: .init(red: 0.1, green: 0.4, blue: 0.9), prefersDark: false)
+    let localPreset = NamedPreset(
+      name: "Daily", definition: .init(configuration: .words(25), quoteID: nil, customText: nil))
+    let remotePreset = NamedPreset(
+      name: "Daily", definition: .init(configuration: .timed(seconds: 60), quoteID: nil, customText: nil))
+    let localText = NamedSavedText(title: "Drill", text: "local words")
+    let remoteText = NamedSavedText(title: "Drill", text: "remote words")
+    let local = TypebarArchive(
+      exportedAt: start,
+      settings: .init(
+        fontSize: 31, customThemes: [localTheme], activeCustomThemeID: sharedThemeID,
+        favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: sharedThemeID)]),
+      results: [], presets: [localPreset], savedTexts: [localText])
+    let remote = TypebarArchive(
+      exportedAt: start.addingTimeInterval(1),
+      settings: .init(
+        fontSize: 46, customThemes: [remoteTheme], activeCustomThemeID: sharedThemeID,
+        favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: sharedThemeID)]),
+      results: [], presets: [remotePreset], savedTexts: [remoteText])
+
+    let merged = TypebarArchiveConflictMerge.merge(
+      local: local, remote: remote, makeID: { clonedThemeID })
+
+    XCTAssertEqual(merged.settings.fontSize, 31)
+    XCTAssertEqual(merged.settings.activeCustomThemeID, sharedThemeID)
+    XCTAssertEqual(merged.settings.customThemes.first, localTheme)
+    XCTAssertEqual(merged.settings.customThemes.last?.id, clonedThemeID)
+    XCTAssertEqual(merged.settings.customThemes.last?.name, "Focus（同步冲突）")
+    XCTAssertTrue(
+      merged.settings.favoriteThemeIDs.contains(ThemeFavoritePolicy.customID(for: clonedThemeID)))
+    XCTAssertEqual(merged.presets.map(\.name), ["Daily", "Daily（同步冲突）"])
+    XCTAssertEqual(merged.presets.last?.definition, remotePreset.definition)
+    XCTAssertEqual(merged.savedTexts.map(\.title), ["Drill", "Drill（同步冲突）"])
+    XCTAssertEqual(merged.savedTexts.last?.text, remoteText.text)
+  }
+
+  func testArchiveConflictLabelsStayWithinSavedTextTitleLimit() throws {
+    let title = String(repeating: "a", count: CustomTextPolicy.maximumTitleLength)
+    let local = TypebarArchive(
+      exportedAt: start, settings: .init(), results: [], presets: [],
+      savedTexts: [.init(title: title, text: "local")])
+    let remote = TypebarArchive(
+      exportedAt: start, settings: .init(), results: [], presets: [],
+      savedTexts: [.init(title: title, text: "remote")])
+
+    let merged = TypebarArchiveConflictMerge.merge(local: local, remote: remote)
+    let conflict = try XCTUnwrap(merged.savedTexts.last)
+
+    XCTAssertLessThanOrEqual(conflict.title.count, CustomTextPolicy.maximumTitleLength)
+    XCTAssertTrue(conflict.title.hasSuffix("（同步冲突）"))
+    XCTAssertTrue(CustomTextPolicy.isValidSavedText(title: conflict.title, text: conflict.text))
+  }
+
   func testVersionOneArchiveImportsWithoutSavedTexts() throws {
     let oldArchive = """
       {"version":1,"exportedAt":"2001-01-01T02:46:40Z","settings":{"difficulty":"normal","strictSpace":false,"stopOnError":false,"deleteOnError":false,"hideExtraLetters":false,"fontSize":28},"results":[],"presets":[]}

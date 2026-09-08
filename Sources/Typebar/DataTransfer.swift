@@ -234,6 +234,150 @@ enum TypebarArchiveMerge {
     }
 }
 
+/// Resolves an archive version race without discarding either device's
+/// user-authored content. Scalar settings remain local; remote collections are
+/// added, and colliding identities receive a new identity and a visible label.
+enum TypebarArchiveConflictMerge {
+    private static let conflictSuffix = "（同步冲突）"
+
+    static func merge(
+        local: TypebarArchive,
+        remote: TypebarArchive,
+        makeID: () -> UUID = UUID.init
+    ) -> TypebarArchive {
+        var settings = local.settings
+        var occupiedIDs = Set(settings.customThemes.map(\.id))
+        occupiedIDs.formUnion(settings.customKeyboardLayouts.map(\.id))
+        var remappedThemeIDs: [UUID: UUID] = [:]
+
+        for remoteTheme in remote.settings.customThemes {
+            if let localTheme = settings.customThemes.first(where: { $0.id == remoteTheme.id }) {
+                guard localTheme != remoteTheme else { continue }
+                let copy = copyTheme(
+                    remoteTheme,
+                    id: freshID(occupied: &occupiedIDs, makeID: makeID),
+                    name: conflictName(
+                        for: remoteTheme.name, occupied: Set(settings.customThemes.map(\.name)),
+                        maximumLength: 40))
+                remappedThemeIDs[remoteTheme.id] = copy.id
+                settings.customThemes.append(copy)
+            } else {
+                var copy = remoteTheme
+                occupiedIDs.insert(copy.id)
+                if settings.customThemes.contains(where: { $0.name == copy.name }) {
+                    copy.name = conflictName(
+                        for: copy.name, occupied: Set(settings.customThemes.map(\.name)),
+                        maximumLength: 40)
+                }
+                settings.customThemes.append(copy)
+            }
+        }
+
+        for remoteLayout in remote.settings.customKeyboardLayouts {
+            if let localLayout = settings.customKeyboardLayouts.first(where: { $0.id == remoteLayout.id }) {
+                guard localLayout != remoteLayout else { continue }
+                var copy = remoteLayout
+                copy.id = freshID(occupied: &occupiedIDs, makeID: makeID)
+                copy.name = conflictName(
+                    for: copy.name, occupied: Set(settings.customKeyboardLayouts.map(\.name)),
+                    maximumLength: 40)
+                settings.customKeyboardLayouts.append(copy)
+            } else {
+                var copy = remoteLayout
+                occupiedIDs.insert(copy.id)
+                if settings.customKeyboardLayouts.contains(where: { $0.name == copy.name }) {
+                    copy.name = conflictName(
+                        for: copy.name, occupied: Set(settings.customKeyboardLayouts.map(\.name)),
+                        maximumLength: 40)
+                }
+                settings.customKeyboardLayouts.append(copy)
+            }
+        }
+
+        let remoteFavorites = remote.settings.favoriteThemeIDs.map { identifier in
+            guard identifier.hasPrefix("custom:") else { return identifier }
+            let rawID = String(identifier.dropFirst("custom:".count))
+            guard let id = UUID(uuidString: rawID), let remapped = remappedThemeIDs[id] else {
+                return identifier
+            }
+            return ThemeFavoritePolicy.customID(for: remapped)
+        }
+        settings.favoriteThemeIDs = ThemeFavoritePolicy.normalized(
+            settings.favoriteThemeIDs + remoteFavorites,
+            customThemes: settings.customThemes)
+
+        var presets = local.presets
+        for remotePreset in remote.presets where !presets.contains(remotePreset) {
+            if presets.contains(where: { $0.name == remotePreset.name }) {
+                presets.append(.init(
+                    name: conflictName(for: remotePreset.name, occupied: Set(presets.map(\.name))),
+                    definition: remotePreset.definition))
+            } else {
+                presets.append(remotePreset)
+            }
+        }
+
+        var savedTexts = local.savedTexts
+        for remoteText in remote.savedTexts
+        where CustomTextPolicy.isValidSavedText(title: remoteText.title, text: remoteText.text)
+            && !savedTexts.contains(remoteText)
+        {
+            if savedTexts.contains(where: { $0.title == remoteText.title }) {
+                savedTexts.append(.init(
+                    title: conflictName(
+                        for: remoteText.title, occupied: Set(savedTexts.map(\.title)),
+                        maximumLength: CustomTextPolicy.maximumTitleLength),
+                    text: remoteText.text,
+                    longProgress: remoteText.longProgress))
+            } else {
+                savedTexts.append(remoteText)
+            }
+        }
+
+        return .init(
+            version: max(local.version, remote.version),
+            exportedAt: max(local.exportedAt, remote.exportedAt),
+            settings: settings,
+            results: local.results + remote.results.filter { remoteResult in
+                !local.results.contains(where: { $0.id == remoteResult.id })
+            },
+            presets: presets,
+            savedTexts: savedTexts)
+    }
+
+    private static func freshID(occupied: inout Set<UUID>, makeID: () -> UUID) -> UUID {
+        var candidate = makeID()
+        while occupied.contains(candidate) { candidate = makeID() }
+        occupied.insert(candidate)
+        return candidate
+    }
+
+    private static func copyTheme(
+        _ theme: CustomThemeDefinition, id: UUID, name: String
+    ) -> CustomThemeDefinition {
+        .init(
+            id: id, name: name, background: theme.background, panel: theme.panel,
+            accent: theme.accent, text: theme.text, secondaryText: theme.secondaryText,
+            error: theme.error, extraInput: theme.extraInput, caret: theme.caret,
+            fadedText: theme.fadedText, colorfulError: theme.colorfulError,
+            colorfulExtraInput: theme.colorfulExtraInput, prefersDark: theme.prefersDark)
+    }
+
+    private static func conflictName(
+        for name: String, occupied: Set<String>, maximumLength: Int? = nil
+    ) -> String {
+        func candidate(index: Int) -> String {
+            let suffix = index == 1 ? conflictSuffix : "（同步冲突 \(index)）"
+            guard let maximumLength else { return name + suffix }
+            return String(name.prefix(max(0, maximumLength - suffix.count))) + suffix
+        }
+
+        var index = 1
+        while occupied.contains(candidate(index: index)) { index += 1 }
+        return candidate(index: index)
+    }
+}
+
 struct ArchiveImportSummary: Equatable {
     let insertedResults: Int
     let insertedPresets: Int

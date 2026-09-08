@@ -47,7 +47,7 @@ struct CloudSyncView: View {
                     LabeledContent("成绩", value: "\(results.count) 条")
                     LabeledContent("预设", value: "\(presets.count) 个")
                     LabeledContent("自定义文本", value: "\(savedTexts.count) 篇")
-                    Text("上传会创建版本化归档变更；下载会按成绩 ID 和内容去重合并，并应用远端归档中的设置。")
+                    Text("上传会创建版本化归档变更；普通下载会去重合并并应用远端设置。若上传发现并发冲突，则保留本机设置，并将双方不同的内容另存为带标记副本后重试。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -211,10 +211,31 @@ struct CloudSyncView: View {
     }
 
     private func push() {
+        let archive = localArchive
         Task {
             do {
-                let cursor = try await account.pushArchive(localArchive)
+                let cursor = try await account.pushArchive(archive)
                 message = "上传完成，服务端游标为 \(cursor)。"
+            } catch let RemoteAccountError.archiveSyncConflict(serverVersion) {
+                do {
+                    let pulled = try await account.pullArchive(fromBeginning: true)
+                    guard let remoteArchive = pulled.archive,
+                        let archiveVersion = pulled.archiveVersion,
+                        archiveVersion >= serverVersion
+                    else {
+                        throw RemoteAccountError.serverMessage("无法取得服务器最新归档，未自动覆盖本机内容。")
+                    }
+                    let merged = TypebarArchiveConflictMerge.merge(
+                        local: archive, remote: remoteArchive)
+                    let summary = try LocalArchiveImport.apply(
+                        merged, settings: settings, results: results, presets: presets,
+                        savedTexts: savedTexts, modelContext: modelContext)
+                    account.confirmPulledArchive(pulled)
+                    let cursor = try await account.pushArchive(merged)
+                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本；冲突主题已另存并标记。"
+                } catch {
+                    message = "已停止冲突覆盖：\(error.localizedDescription)"
+                }
             } catch {
                 message = error.localizedDescription
             }

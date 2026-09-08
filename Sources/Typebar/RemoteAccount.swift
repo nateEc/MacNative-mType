@@ -904,6 +904,7 @@ enum RemoteAccountError: LocalizedError {
     case invalidOAuthCallback
     case oauthAuthorizationCancelled
     case oauthAuthorizationInProgress
+    case archiveSyncConflict(serverVersion: Int)
     case serverMessage(String)
     case unexpectedResponse
 
@@ -913,6 +914,7 @@ enum RemoteAccountError: LocalizedError {
         case .invalidOAuthCallback: "第三方登录返回了无法识别的回调。"
         case .oauthAuthorizationCancelled: "第三方登录已取消。"
         case .oauthAuthorizationInProgress: "已有一个第三方登录正在进行。"
+        case .archiveSyncConflict: "服务器存在更新冲突；正在保留双方内容并重新合并。"
         case .serverMessage(let message): message
         case .unexpectedResponse: "服务返回了无法识别的响应。"
         }
@@ -1654,16 +1656,18 @@ final class AccountSession {
             response: RemoteSyncPushResponse.self
         )
         guard let result = response.results.first(where: { $0.id == id }) else { throw RemoteAccountError.unexpectedResponse }
-        guard result.status == "accepted" else { throw RemoteAccountError.serverMessage("服务器存在更新冲突；请先拉取同步数据。") }
+        guard result.status == "accepted" else {
+            throw RemoteAccountError.archiveSyncConflict(serverVersion: result.serverVersion)
+        }
         defaults.set(nextVersion, forKey: syncVersionKey)
         return response.nextCursor
     }
 
-    func pullArchive() async throws -> RemoteArchivePull {
+    func pullArchive(fromBeginning: Bool = false) async throws -> RemoteArchivePull {
         isWorking = true
         defer { isWorking = false }
         guard let token = tokenStore.load() else { throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。") }
-        var cursor = defaults.integer(forKey: syncCursorKey)
+        var cursor = fromBeginning ? 0 : defaults.integer(forKey: syncCursorKey)
         var latestArchiveChange: RemoteSyncPullChange?
 
         while true {
