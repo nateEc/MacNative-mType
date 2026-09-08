@@ -83,7 +83,7 @@ extension TypingLanguage {
     case .hindi: "hi-IN"
     case .hinglish: "en-US"
     case .gujarati: "gu-IN"
-    case .bangla: "bn-BD"
+    case .bangla, .banglaLetters: "bn-BD"
     case .thai: "th-TH"
     case .nepali: "ne-NP"
     case .nepaliRomanized: "en-US"

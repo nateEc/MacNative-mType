@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 150 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 Українська · Закінчення 与 Українська (Latynka) · Закінчення。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
+Typebar 现有 151 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 বাংলা · অক্ষর。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ Typebar 现有 150 个可单独练习并支持 Typebar 自有引语的语言／�
 ## 自动化守卫
 
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
-- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 140 个候选，并明确覆盖各专项语言与书写变体。
+- 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 141 个候选，并明确覆盖各专项语言与书写变体。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜；Swiss German 以固定源码要求的“投稿拒绝、成绩接受”边界替代一般投稿路径。
 - Egyptian Arabic 审计读取 `arabic_egypt.json` 与 `arabic_egypt_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 RTL、连写和 `bcp47: ar-EG`，不定义 `noLazyMode` 或词频排序；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-EG` 朗读、手动可选简化输入和 Zipf 未知提示，并进入社区投稿、成绩及排行榜。
 - Moroccan Arabic 审计读取 `arabic_morocco.json` 的元数据，不读取其中词表或引语文本。它定义 RTL、连写、`orderedByFrequency: false` 和 `bcp47: ar-MA`，不定义 `noLazyMode`；实现因此使用自有内容、原生 RTL/连写排版、`ar` 百科入口、`ar-MA` 朗读、手动可选简化输入和明确的 Zipf 不支持提示，并进入社区投稿、成绩及排行榜。
@@ -108,3 +108,4 @@ Typebar 现有 150 个可单独练习并支持 Typebar 自有引语的语言／�
 任何候选只有在完成上述语义核对、原创内容、跨客户端与服务端测试及文档记录后，才会从“候选”变为“已覆盖”。
 
 - 2026-09-08 更正：当前单语总数为一百五十种、默认／自选 LTR 多语候选为一百四十种。新增 Українська · Закінчення 与 Українська (Latynka) · Закінчення；两个固定配置均定义 `noLazyMode: true`，不定义 BCP-47 或词频排序。结构审计仅确认原生组为 118 个、1–4 字符的乌克兰西里尔 token，Latynka 组为 117 个、1–5 字符且字符集限于 `a-zïğš` 的 token，不读取词值。Typebar 以两套独立自写词流和各四档原创文本重建这些边界，禁用简化输入、使用 `en`／`en-US` 缺省路径、显示 Zipf 未知提示，并贯通混排与全部客户端／服务端数据面。
+- 2026-09-08 更正：当前单语总数为一百五十一种、默认／自选 LTR 多语候选为一百四十一种。新增 বাংলা · অক্ষর；固定 `bangla_letters` 定义 `joiningScript: true`、`noLazyMode: true` 与 `bcp47: bn-BD`，结构审计仅确认其 62 个 token 的 56/3/2/1 标量长度分布和 Bengali Unicode 区块边界，不读取词值。Typebar 根据 [Unicode 17.0 Bengali 区块](https://www.unicode.org/charts/PDF/U0980.pdf) 独立编排字母、符号和组合序列及四档原创文本，使用 LTR 空格词界、`bn`／`bn-BD`、禁用简化输入和 Zipf 未知提示，并贯通混排与全部数据面。同时将原生连写保护从 3 项纠正为固定元数据要求的 26 项，覆盖已支持的 Arabic、Indic、RTL、Korean、Likanu、Tibetan 与 Yiddish 语言；不读取参考词值或复用实现。

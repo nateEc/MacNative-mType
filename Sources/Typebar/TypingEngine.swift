@@ -276,6 +276,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case hinglish
   case gujarati
   case bangla
+  case banglaLetters
   case thai
   case nepali
   case nepaliRomanized
@@ -4376,6 +4377,19 @@ enum StarterLexicon {
     "সাহস", "ধৈর্য", "ছন্দ", "যাত্রা",
   ]
 
+  // Typebar-authored Bengali character practice is derived from the Unicode
+  // Bengali block, not from a reference word list. It includes independent
+  // letters and signs plus a small set of composed keyboard sequences.
+  static let banglaLetterWords = [
+    "অ", "আ", "ই", "ঈ", "উ", "ঊ", "ঋ", "এ", "ঐ", "ও", "ঔ",
+    "ক", "খ", "গ", "ঘ", "ঙ", "চ", "ছ", "জ", "ঝ", "ঞ",
+    "ট", "ঠ", "ড", "ঢ", "ণ", "ত", "থ", "দ", "ধ", "ন",
+    "প", "ফ", "ব", "ভ", "ম", "য", "র", "ল", "শ", "ষ", "স", "হ", "ৎ",
+    "ঌ", "\u{09DC}", "\u{09DD}", "\u{09DF}", "\u{09E0}", "\u{09E1}",
+    "০", "১", "২", "৩", "৳", "।",
+    "কা", "গি", "সু", "ক্ষ", "ক্র", "ক্ষা",
+  ]
+
   // Typebar-authored Thai starter words use the reference-compatible space
   // commit path with normal macOS input, not an imported word list.
   static let thaiWords = [
@@ -5140,6 +5154,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: banglaWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .banglaLetters:
+      return prompt(
+        tokens: count, lexicon: banglaLetterWords, separator: " ", punctuation: ["।", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai:
       return prompt(
         tokens: count, lexicon: thaiWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -5547,6 +5565,7 @@ enum StarterLexicon {
     case .hinglish: (hinglishWords, [",", ".", "!", "?"])
     case .gujarati: (gujaratiWords, [",", ".", "!", "?"])
     case .bangla: (banglaWords, [",", ".", "!", "?"])
+    case .banglaLetters: (banglaLetterWords, ["।", ",", "!", "?"])
     case .thai: (thaiWords, [",", ".", "!", "?"])
     case .nepali: (nepaliWords, [",", ".", "!", "?"])
     case .nepaliRomanized: (nepaliRomanizedWords, [",", ".", "!", "?"])
@@ -5764,6 +5783,7 @@ extension TypingLanguage {
     case .hinglish: StarterLexicon.hinglishWords
     case .gujarati: StarterLexicon.gujaratiWords
     case .bangla: StarterLexicon.banglaWords
+    case .banglaLetters: StarterLexicon.banglaLetterWords
     case .thai: StarterLexicon.thaiWords
     case .nepali: StarterLexicon.nepaliWords
     case .nepaliRomanized: StarterLexicon.nepaliRomanizedWords
@@ -5850,7 +5870,7 @@ extension TypingLanguage {
     .englishShakespearean,
     .kokanu,
     .likanu,
-    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
+    .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .swedishDiacritics, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
     .italian, .portuguese, .portugueseAccents,
     .simplifiedChinese,
     .traditionalChinese, .russian, .russianAbbreviations, .ukrainian, .ukrainianEndings,
@@ -5883,7 +5903,15 @@ extension TypingLanguage {
 
   /// Preserve native shaping for source-pinned joining scripts.
   var usesJoiningScriptPrompt: Bool {
-    self == .likanu || self == .tibetan || self == .yiddish
+    switch self {
+    case .arabic, .arabicEgypt, .arabicMorocco, .bangla, .banglaLetters, .gujarati, .hebrew,
+      .hindi, .kannada, .khmer, .korean, .kurdishCentral, .likanu, .malayalam,
+      .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
+      .tamil, .telugu, .tibetan, .urdu, .yiddish:
+      true
+    default:
+      false
+    }
   }
 
   var isNoSpaceLanguage: Bool {
@@ -5906,7 +5934,7 @@ extension TypingLanguage {
       .englishMedical,
       .englishShakespearean,
       .pigLatin, .loremIpsum, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
-      .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam,
+      .tamil, .hindi, .gujarati, .bangla, .banglaLetters, .thai, .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .bulgarianLatin,
       .khmer,
@@ -6056,6 +6084,7 @@ extension TypingLanguage {
     case .hinglish: "Hinglish"
     case .gujarati: "ગુજરાતી"
     case .bangla: "বাংলা"
+    case .banglaLetters: "বাংলা · অক্ষর"
     case .thai: "ไทย"
     case .nepali: "नेपाली"
     case .nepaliRomanized: "Nepali (Romanized)"

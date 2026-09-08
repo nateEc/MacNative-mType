@@ -4023,6 +4023,7 @@ final class HealthRouteTests: XCTestCase {
       ("russianAbbreviations", "МГУ и РАН используют короткие заглавные формы."),
       ("ukrainianEndings", "Коротке закінчення змінює форму слова."),
       ("ukrainianLatynkaEndings", "Korotke zakinchennia potrebuie uvahy."),
+      ("banglaLetters", "একটি অক্ষর মন দিয়ে দেখে তারপর টাইপ করুন।"),
       ("kokanu", "mi le kota wiki ki tu. tu le wisan in mi un ja."),
       ("likanu", "ɞı ʋȷ xʃʌ ɕıxı xı ʌſ: ʌſ ʋȷ ɕıɤ̄ ōı ɞı ōſ ɂ:"),
       ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),

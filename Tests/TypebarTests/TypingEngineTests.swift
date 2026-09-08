@@ -8920,7 +8920,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.hindiWords,
       StarterLexicon.hinglishWords,
       StarterLexicon.gujaratiWords,
-      StarterLexicon.banglaWords,
+      StarterLexicon.banglaWords, StarterLexicon.banglaLetterWords,
       StarterLexicon.thaiWords,
       StarterLexicon.nepaliWords,
       StarterLexicon.nepaliRomanizedWords,
@@ -8966,7 +8966,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 140)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 141)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -10747,6 +10747,7 @@ final class TypingEngineTests: XCTestCase {
       (.hinglish, StarterLexicon.hinglishWords),
       (.gujarati, StarterLexicon.gujaratiWords),
       (.bangla, StarterLexicon.banglaWords),
+      (.banglaLetters, StarterLexicon.banglaLetterWords),
       (.thai, StarterLexicon.thaiWords),
       (.nepali, StarterLexicon.nepaliWords),
       (.nepaliRomanized, StarterLexicon.nepaliRomanizedWords),
@@ -10812,20 +10813,24 @@ final class TypingEngineTests: XCTestCase {
       let prompt = OfflineContent.generatedPrompt(
         wordCount: 12, language: language,
         contentOptions: .init(includePunctuation: true, includeNumbers: true))
+      let invalidTokens = prompt.split(separator: " ").compactMap { token -> String? in
+        if token.allSatisfy(\.isNumber) { return nil }
+        let punctuation = language == .tibetan
+          ? CharacterSet(charactersIn: "།")
+          : language == .banglaLetters
+            ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "।"))
+          : language == .klingon
+            ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "'"))
+            : language == .lojbanCmavo
+              ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: ".'"))
+              : CharacterSet.punctuationCharacters
+        let normalized = token.trimmingCharacters(
+          in: punctuation)
+        return lexicon.contains(normalized) ? nil : "\(token) → \(normalized)"
+      }
       XCTAssertTrue(
-        prompt.split(separator: " ").allSatisfy { token in
-          if token.allSatisfy(\.isNumber) { return true }
-          let punctuation = language == .tibetan
-            ? CharacterSet(charactersIn: "།")
-            : language == .klingon
-              ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "'"))
-              : language == .lojbanCmavo
-                ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: ".'"))
-                : CharacterSet.punctuationCharacters
-          let normalized = token.trimmingCharacters(
-            in: punctuation)
-          return lexicon.contains(normalized)
-        }, "\(language.rawValue): \(prompt)")
+        invalidTokens.isEmpty,
+        "\(language.rawValue): \(prompt); invalid: \(invalidTokens.joined(separator: ", "))")
       XCTAssertEqual(OfflineContent.quotes(for: language, length: .short).count, 1)
       XCTAssertEqual(OfflineContent.quotes(for: language, length: .medium).count, 1)
       XCTAssertEqual(OfflineContent.quotes(for: language, length: .long).count, 1)
@@ -12592,6 +12597,47 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(latynkaCharacters.contains("ï"))
     XCTAssertTrue(latynkaCharacters.contains("ğ"))
     XCTAssertTrue(latynkaCharacters.contains("š"))
+  }
+
+  func testBanglaLettersAndJoiningScriptsMirrorPinnedMetadata() {
+    let language = TypingLanguage.banglaLetters
+    let words = StarterLexicon.banglaLetterWords
+    XCTAssertEqual(language.displayName, "বাংলা · অক্ষর")
+    XCTAssertEqual(language.speechLocaleIdentifier, "bn-BD")
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "bn")
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertFalse(language.usesRightToLeftPrompt)
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertEqual(language.ownedPracticeWords(), words)
+    XCTAssertEqual(words.count, 62)
+    XCTAssertEqual(Set(words).count, words.count)
+    XCTAssertEqual(
+      Dictionary(grouping: words, by: { $0.unicodeScalars.count }).mapValues(\.count),
+      [1: 56, 2: 3, 3: 2, 4: 1])
+    XCTAssertEqual(words.joined(separator: " ").split(separator: " ").map(String.init), words)
+    XCTAssertTrue(
+      words.flatMap { $0.unicodeScalars }.allSatisfy {
+        (0x0980...0x09FF).contains(Int($0.value)) || $0.value == 0x0964
+      })
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+    }
+
+    let joiningLanguages: Set<TypingLanguage> = [
+      .arabic, .arabicEgypt, .arabicMorocco, .bangla, .banglaLetters, .gujarati, .hebrew,
+      .hindi, .kannada, .khmer, .korean, .kurdishCentral, .likanu, .malayalam,
+      .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
+      .tamil, .telugu, .tibetan, .urdu, .yiddish,
+    ]
+    XCTAssertEqual(
+      Set(TypingLanguage.allCases.filter(\.usesJoiningScriptPrompt)), joiningLanguages)
+    XCTAssertTrue(TestConfiguration.words(2, language: language).usesJoiningScriptPrompt)
+    XCTAssertTrue(
+      TestConfiguration.words(
+        2, language: .mixedLanguages, mixedLanguageComponents: [.english, language]
+      ).usesJoiningScriptPrompt)
   }
 
   func testQuoteSearchMatchesAllTermsWithoutSendingOrMutatingContent() {
