@@ -577,7 +577,7 @@ private struct ContentView: View {
   @State private var capsLockEnabled = false
   @State private var lastTimeWarningSecond: Int?
   @State private var restartLockMessage: String?
-  @State private var remoteRestartCount = 0
+  @State private var currentRestartCount = 0
   @State private var lastCompletedWpm: Int?
   @State private var currentProcessPractice: [CurrentProcessPractice] = []
   @State private var repeatedPaceArmed = false
@@ -671,9 +671,11 @@ private struct ContentView: View {
     .onChange(of: session.outcome) { _, outcome in
       switch outcome {
       case .completed, .bailedOut, .invalidAFK:
-        guard let result = session.result(tags: activeSessionTags) else { return }
-        let restartCount = remoteRestartCount
-        remoteRestartCount = 0
+        let restartCount = currentRestartCount
+        guard let result = session.result(
+          tags: activeSessionTags, restartCount: restartCount
+        ) else { return }
+        currentRestartCount = 0
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
         lastCompletedWpm = result.wpm
         repeatedPaceArmed = settings.repeatedPace
@@ -731,7 +733,7 @@ private struct ContentView: View {
             : nil
         )
         if savesResult {
-          publishIfEnabled(result, restartCount: restartCount)
+          publishIfEnabled(result)
         } else if result.outcome == .bailedOut {
           publicationMessage = updatedLongTextProgress
             ? "长文本进度已保存；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
@@ -2219,7 +2221,7 @@ private struct ContentView: View {
   }
 
   private func reset(restarting: Bool = false) {
-    let shouldCountRemoteRestart = session.hasStarted && !session.isFinished
+    let shouldCountRestart = session.hasStarted && !session.isFinished
     restartLockMessage = nil
     bailoutConfirmationMessage = nil
     compositionText = ""
@@ -2250,7 +2252,7 @@ private struct ContentView: View {
       customText: customText,
       quote: selectedQuote
     )
-    if shouldCountRemoteRestart { remoteRestartCount += 1 }
+    if shouldCountRestart { currentRestartCount += 1 }
     let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
       usingRepeatedPace: shouldUseRepeatedPace ? lastCompletedWpm : nil)
@@ -3027,12 +3029,12 @@ private struct ContentView: View {
     return true
   }
 
-  private func publishIfEnabled(_ result: CompletedTestResult, restartCount: Int) {
+  private func publishIfEnabled(_ result: CompletedTestResult) {
     publicationMessage = nil
     guard settings.publishCompletedResults, account.currentUser != nil else { return }
     Task {
       do {
-        let response = try await account.submitCompletedResult(result, restartCount: restartCount)
+        let response = try await account.submitCompletedResult(result)
         let rank = response.weeklyExperienceRank.map { " · 本周 XP #\($0)" } ?? ""
         publicationMessage =
           response.leaderboardEligible
@@ -4601,10 +4603,14 @@ private struct ResultsHistoryView: View {
     let streak = ActivityAggregation.currentStreak(
       activity: activity, dayBoundaryOffsetHours: settings.streakDayBoundaryOffsetHours)
     return LazyVGrid(
-      columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 10
+      columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 10
     ) {
       statistic("估算词数", "\(summary.estimatedWordsTyped)")
-      statistic("完成", "\(summary.completedTests)")
+      statistic("开始", "\(summary.startedTests)")
+      statistic("完成", "\(summary.completedTests)（\(summary.completionPercentage)%）")
+      statistic(
+        "每次完成重开",
+        summary.restartsPerCompletedTest.formatted(.number.precision(.fractionLength(1))))
       statistic("键入时长", formattedTypingDuration(summary.totalTypingSeconds))
       statistic("连续", "\(streak) 天")
       statistic(

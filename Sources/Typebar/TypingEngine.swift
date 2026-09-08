@@ -1843,6 +1843,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let wpm: Int
   let rawWpm: Int
   let accuracy: Int
+  let restartCount: Int
   let characterStats: ResultCharacterStats
   let keyDurationSamples: [TimeInterval]
   let keySpacingSamples: [TimeInterval]
@@ -1864,6 +1865,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     wpm: Int,
     rawWpm: Int,
     accuracy: Int,
+    restartCount: Int = 0,
     characterStats: ResultCharacterStats? = nil,
     keyDurationSamples: [TimeInterval] = [],
     keySpacingSamples: [TimeInterval] = [],
@@ -1884,6 +1886,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.wpm = wpm
     self.rawWpm = rawWpm
     self.accuracy = accuracy
+    self.restartCount = max(0, restartCount)
     self.characterStats = characterStats ?? .legacy(
       typedCharacterCount: typedCharacterCount,
       correctCharacterCount: correctCharacterCount)
@@ -1919,7 +1922,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   private enum CodingKeys: String, CodingKey {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
-      keyDurationSamples, keySpacingSamples, keyOverlapDuration, tags, prompt, replayEvents
+      restartCount, keyDurationSamples, keySpacingSamples, keyOverlapDuration, tags, prompt,
+      replayEvents
   }
 
   init(from decoder: Decoder) throws {
@@ -1936,6 +1940,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     wpm = try values.decode(Int.self, forKey: .wpm)
     rawWpm = try values.decode(Int.self, forKey: .rawWpm)
     accuracy = try values.decode(Int.self, forKey: .accuracy)
+    restartCount = max(0, try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0)
     characterStats = try values.decodeIfPresent(ResultCharacterStats.self, forKey: .characterStats)
       ?? .legacy(
         typedCharacterCount: typedCharacterCount,
@@ -2438,7 +2443,9 @@ struct TypingSession {
     return committed + 1
   }
 
-  func result(at date: Date = .now, tags: [String] = []) -> CompletedTestResult? {
+  func result(
+    at date: Date = .now, tags: [String] = [], restartCount: Int = 0
+  ) -> CompletedTestResult? {
     guard let startedAt, let finishedAt else { return nil }
     return .init(
       id: UUID(),
@@ -2453,6 +2460,7 @@ struct TypingSession {
       wpm: wpm(at: date),
       rawWpm: rawWpm(at: date),
       accuracy: accuracy,
+      restartCount: restartCount,
       characterStats: characterStats,
       keyDurationSamples: completedPhysicalKeyDurations,
       keySpacingSamples: physicalKeySpacingSamples,

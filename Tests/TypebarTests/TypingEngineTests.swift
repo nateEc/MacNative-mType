@@ -360,8 +360,10 @@ final class TypingEngineTests: XCTestCase {
     let result = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 30), outcome: .completed, startedAt: start,
       finishedAt: start.addingTimeInterval(30), afkDuration: 7, typedCharacterCount: 50,
-      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96)
+      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96,
+      restartCount: 3)
     XCTAssertEqual(result.afkPercentage, 23.333_333_333_3, accuracy: 0.000_001)
+    XCTAssertEqual(result.restartCount, 3)
 
     let instant = CompletedTestResult(
       id: UUID(), configuration: .words(10), outcome: .completed, startedAt: start,
@@ -8354,7 +8356,8 @@ final class TypingEngineTests: XCTestCase {
       startedAt: Date(timeIntervalSince1970: 0),
       finishedAt: Date(timeIntervalSince1970: 2.5), afkDuration: 0.5,
       typedCharacterCount: 12, correctCharacterCount: 11, errorCount: 1, wpm: 60, rawWpm: 66,
-      accuracy: 92, characterStats: .init(matched: 9, incorrect: 1, extra: 2, missed: 3),
+      accuracy: 92, restartCount: 3,
+      characterStats: .init(matched: 9, incorrect: 1, extra: 2, missed: 3),
       keyDurationSamples: [0.08, 0.12],
       keySpacingSamples: [0.1, 0.2], keyOverlapDuration: 0.03,
       tags: ["focus, \"deep\"", "café"], prompt: "private prompt",
@@ -8363,11 +8366,13 @@ final class TypingEngineTests: XCTestCase {
 
     let csv = ResultCSVExport.csvString(for: [result])
     XCTAssertTrue(csv.hasPrefix(ResultCSVExport.columns.joined(separator: ",") + "\r\n"))
+    XCTAssertTrue(ResultCSVExport.columns.contains("restart_count"))
     XCTAssertTrue(csv.contains("00000000-0000-0000-0000-000000000007,completed,60,66,92,"))
     XCTAssertTrue(
       csv.contains(",11,12,1,9,1,2,3,100.00,20.00,2,150.00,50.00,2,30.00,time,"))
     XCTAssertTrue(csv.contains(",true,true,expert,uppercase;rot13,\"focus, \"\"deep\"\";café\","))
     XCTAssertTrue(csv.contains("1970-01-01T00:00:00"))
+    XCTAssertTrue(csv.hasSuffix("2.50,0.50,2.00,3\r\n"))
     XCTAssertFalse(csv.contains("private prompt"))
     XCTAssertTrue(csv.hasSuffix("\r\n"))
     XCTAssertEqual(ResultCSVExport.csvString(for: []), ResultCSVExport.columns.joined(separator: ",") + "\r\n")
@@ -12770,12 +12775,15 @@ final class TypingEngineTests: XCTestCase {
     let statistics = ResultStatistics(metrics: [
       .init(
         finishedAt: day, wpm: 60, rawWpm: 72, accuracy: 95, typingSeconds: 30,
-        consistency: 80),
+        consistency: 80, restartCount: 2),
       .init(
         finishedAt: day.addingTimeInterval(60), wpm: 90, rawWpm: 108, accuracy: 85,
-        typingSeconds: 60, consistency: 92),
+        typingSeconds: 60, consistency: 92, restartCount: 1),
     ])
     XCTAssertEqual(statistics.completedTests, 2)
+    XCTAssertEqual(statistics.startedTests, 5)
+    XCTAssertEqual(statistics.completionPercentage, 40)
+    XCTAssertEqual(statistics.restartsPerCompletedTest, 1.5)
     XCTAssertEqual(statistics.estimatedWordsTyped, 120)
     XCTAssertEqual(statistics.averageWPM, 75)
     XCTAssertEqual(statistics.bestWPM, 90)
@@ -12815,7 +12823,11 @@ final class TypingEngineTests: XCTestCase {
     ])
     XCTAssertEqual(afkStatistics.estimatedWordsTyped, 10)
     XCTAssertEqual(afkStatistics.totalTypingSeconds, 23)
-    XCTAssertEqual(ResultStatistics(metrics: []).estimatedWordsTyped, 0)
+    let emptyStatistics = ResultStatistics(metrics: [])
+    XCTAssertEqual(emptyStatistics.estimatedWordsTyped, 0)
+    XCTAssertEqual(emptyStatistics.startedTests, 0)
+    XCTAssertEqual(emptyStatistics.completionPercentage, 0)
+    XCTAssertEqual(emptyStatistics.restartsPerCompletedTest, 0)
   }
 
   func testRecentTestAverageUsesTheLatestTenMatchingCurrentSettings() {
@@ -13668,7 +13680,8 @@ final class TypingEngineTests: XCTestCase {
     let result = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 30), outcome: .completed, startedAt: start,
       finishedAt: start.addingTimeInterval(30), afkDuration: 7, typedCharacterCount: 50,
-      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96)
+      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96,
+      restartCount: 3)
     let preset = NamedPreset(
       name: "Short", definition: .init(configuration: .words(10), quoteID: nil, customText: nil))
     let savedTexts = [
@@ -13678,10 +13691,28 @@ final class TypingEngineTests: XCTestCase {
     let data = try TypebarDataTransfer.exportArchive(
       settings: settings, results: [result], presets: [preset], savedTexts: savedTexts, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
+    XCTAssertEqual(archive.version, 3)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
     XCTAssertEqual(archive.savedTexts, savedTexts)
+
+    var versionTwoPayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
+    versionTwoPayload["version"] = 2
+    var versionTwoResults = try XCTUnwrap(versionTwoPayload["results"] as? [[String: Any]])
+    versionTwoResults[0].removeValue(forKey: "restartCount")
+    versionTwoPayload["results"] = versionTwoResults
+    let versionTwoData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
+    let versionTwoArchive = try TypebarDataTransfer.importArchive(from: versionTwoData)
+    XCTAssertEqual(versionTwoArchive.version, 2)
+    XCTAssertEqual(versionTwoArchive.results.first?.restartCount, 0)
+
+    versionTwoPayload["version"] = 4
+    let futureData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
+    XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: futureData)) { error in
+      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(4))
+    }
   }
 
   func testCompletedResultDecodesArchivesWrittenBeforeInactivityTracking() throws {
@@ -13692,12 +13723,19 @@ final class TypingEngineTests: XCTestCase {
     let encoded = try JSONEncoder().encode(result)
     var legacyPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     legacyPayload.removeValue(forKey: "afkDuration")
+    legacyPayload.removeValue(forKey: "restartCount")
     let legacyData = try JSONSerialization.data(withJSONObject: legacyPayload)
 
     let restored = try JSONDecoder().decode(CompletedTestResult.self, from: legacyData)
     XCTAssertEqual(restored.afkDuration, 0)
+    XCTAssertEqual(restored.restartCount, 0)
     XCTAssertEqual(restored.engagedDuration, 30)
     XCTAssertEqual(restored.afkPercentage, 0)
+
+    legacyPayload["restartCount"] = -2
+    let invalidRestartData = try JSONSerialization.data(withJSONObject: legacyPayload)
+    XCTAssertEqual(
+      try JSONDecoder().decode(CompletedTestResult.self, from: invalidRestartData).restartCount, 0)
   }
 
   func testArchiveMergeSkipsExistingResultsAndPresets() {
@@ -14633,9 +14671,10 @@ final class TypingEngineTests: XCTestCase {
     session.recordPhysicalKeyEvent(
       keyCode: 1, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.15))
     session.insert("mber", at: start.addingTimeInterval(6))
-    let result = try XCTUnwrap(session.result())
+    let result = try XCTUnwrap(session.result(restartCount: 4))
     XCTAssertEqual(result.afkDuration, 4)
     XCTAssertEqual(result.engagedDuration, 2)
+    XCTAssertEqual(result.restartCount, 4)
     XCTAssertEqual(CurrentProcessPractice(result: result).typingSeconds, 2)
     container.mainContext.insert(TestResultRecord(result: result))
     try container.mainContext.save()
@@ -14647,6 +14686,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(stored.wpm, result.wpm)
     XCTAssertEqual(stored.accuracy, 100)
     XCTAssertEqual(stored.afkDuration, 4)
+    XCTAssertEqual(stored.restartCount, 4)
     XCTAssertEqual(stored.keyDurationSamples.count, 2)
     XCTAssertEqual(stored.keyDurationSamples[0], 0.1, accuracy: 0.000_001)
     XCTAssertEqual(

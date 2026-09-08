@@ -9,11 +9,12 @@ struct ResultMetric: Equatable, Identifiable {
     let typingSeconds: TimeInterval
     let elapsedSeconds: TimeInterval
     let consistency: Double
+    let restartCount: Int
 
     init(
         id: UUID = UUID(), finishedAt: Date, wpm: Int, rawWpm: Int? = nil, accuracy: Int,
         typingSeconds: TimeInterval, elapsedSeconds: TimeInterval? = nil,
-        consistency: Double = 0
+        consistency: Double = 0, restartCount: Int = 0
     ) {
         self.id = id
         self.finishedAt = finishedAt
@@ -23,6 +24,7 @@ struct ResultMetric: Equatable, Identifiable {
         self.typingSeconds = typingSeconds
         self.elapsedSeconds = max(0, elapsedSeconds ?? typingSeconds)
         self.consistency = consistency.isFinite ? min(100, max(0, consistency)) : 0
+        self.restartCount = max(0, restartCount)
     }
 
     init(record: TestResultRecord) {
@@ -37,7 +39,8 @@ struct ResultMetric: Equatable, Identifiable {
             consistency: ResultConsistencyPolicy.metrics(
                 events: record.replayEvents,
                 duration: record.finishedAt.timeIntervalSince(record.startedAt)
-            ).typing
+            ).typing,
+            restartCount: record.restartCount
         )
     }
 }
@@ -1531,6 +1534,9 @@ struct ResultHistoryFilter: Codable, Equatable {
 
 struct ResultStatistics: Equatable {
     let completedTests: Int
+    let startedTests: Int
+    let completionPercentage: Int
+    let restartsPerCompletedTest: Double
     let estimatedWordsTyped: Int
     let averageWPM: Int
     let bestWPM: Int
@@ -1548,6 +1554,12 @@ struct ResultStatistics: Equatable {
 
     init(metrics: [ResultMetric]) {
         completedTests = metrics.count
+        let totalRestarts = metrics.map(\.restartCount).reduce(0, +)
+        startedTests = completedTests + totalRestarts
+        completionPercentage = startedTests == 0
+          ? 0 : Int((Double(completedTests) / Double(startedTests) * 100).rounded(.down))
+        restartsPerCompletedTest = completedTests == 0
+          ? 0 : Double(totalRestarts) / Double(completedTests)
         estimatedWordsTyped = metrics.map {
           Int((Double($0.wpm) / 60 * $0.elapsedSeconds).rounded(.toNearestOrAwayFromZero))
         }.reduce(0, +)

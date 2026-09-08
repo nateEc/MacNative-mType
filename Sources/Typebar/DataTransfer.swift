@@ -45,6 +45,7 @@ enum ResultCSVExport {
         "elapsed_seconds",
         "afk_seconds",
         "engaged_seconds",
+        "restart_count",
     ]
 
     static func data(for results: [CompletedTestResult]) -> Data {
@@ -103,6 +104,7 @@ enum ResultCSVExport {
             decimal(result.elapsedDuration),
             decimal(result.afkDuration),
             decimal(result.engagedDuration),
+            String(result.restartCount),
         ]
     }
 
@@ -249,7 +251,7 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    static let currentVersion = 2
+    static let currentVersion = 3
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot

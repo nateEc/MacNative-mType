@@ -601,7 +601,7 @@ private struct RemoteResultSubmission: Codable, Sendable {
     let startedAt: Date
     let finishedAt: Date
 
-    init(result: CompletedTestResult, restartCount: Int) {
+    init(result: CompletedTestResult) {
         id = result.id
         mode = result.configuration.mode.rawValue
         language = result.configuration.language.rawValue
@@ -615,7 +615,7 @@ private struct RemoteResultSubmission: Codable, Sendable {
         ).typing
         errorCount = result.errorCount
         eventCount = result.typedCharacterCount
-        self.restartCount = max(0, restartCount)
+        restartCount = result.restartCount
         tags = result.tags
         startedAt = result.startedAt
         finishedAt = result.finishedAt
@@ -2015,7 +2015,7 @@ final class AccountSession {
     }
 
     func submitCompletedResult(
-        _ result: CompletedTestResult, restartCount: Int = 0
+        _ result: CompletedTestResult
     ) async throws -> RemoteResultSubmissionResponse {
         guard let token = tokenStore.load(), currentUser != nil else {
             throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
@@ -2024,7 +2024,7 @@ final class AccountSession {
             path: "v1/results",
             method: "POST",
             token: token,
-            body: RemoteResultSubmission(result: result, restartCount: restartCount),
+            body: RemoteResultSubmission(result: result),
             response: RemoteResultSubmissionResponse.self
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }

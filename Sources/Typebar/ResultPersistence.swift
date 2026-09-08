@@ -21,6 +21,7 @@ final class TestResultRecord {
   var wpm: Int
   var rawWpm: Int
   var accuracy: Int
+  var storedRestartCount: Int?
   var characterStatsData: Data?
   var keyDurationSamplesData: Data?
   var keySpacingSamplesData: Data?
@@ -42,6 +43,7 @@ final class TestResultRecord {
     wpm = result.wpm
     rawWpm = result.rawWpm
     accuracy = result.accuracy
+    storedRestartCount = result.restartCount
     characterStatsData = try? JSONEncoder().encode(result.characterStats)
     keyDurationSamplesData = try? JSONEncoder().encode(result.keyDurationSamples)
     keySpacingSamplesData = try? JSONEncoder().encode(result.keySpacingSamples)
@@ -63,6 +65,10 @@ final class TestResultRecord {
   var replayEvents: [TypingReplayEvent] {
     (replayEventsData.flatMap { try? JSONDecoder().decode([TypingReplayEvent].self, from: $0) })
       ?? []
+  }
+
+  var restartCount: Int {
+    max(0, storedRestartCount ?? 0)
   }
 
   var characterStats: ResultCharacterStats {
@@ -115,6 +121,7 @@ final class TestResultRecord {
       wpm: wpm,
       rawWpm: rawWpm,
       accuracy: accuracy,
+      restartCount: restartCount,
       characterStats: characterStats,
       keyDurationSamples: keyDurationSamples,
       keySpacingSamples: keySpacingSamples,
