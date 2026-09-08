@@ -214,6 +214,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case likanu
   case pigLatin
   case spanish
+  case spanish1k
+  case spanish10k
+  case spanish650k
   case german
   case swissGerman
   case afrikaans
@@ -3664,6 +3667,63 @@ enum StarterLexicon {
   static var english25kWords: [String] { english25kLexicon.materialized() }
   static var english450kWords: [String] { english450kLexicon.materialized() }
 
+  private static let spanishScaleRoots = [
+    "brisa", "claro", "faro", "jardin", "luna", "mar",
+    "nube", "papel", "puente", "ruta", "sendero", "sol",
+  ]
+
+  private static func spanishScaleLexicon(
+    marker: String, count: Int, minimumToken: String, maximumLength: Int,
+    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int, nonASCIICount: Int
+  ) -> IndexedLexicon {
+    let minimumUsesNonASCII = minimumToken.unicodeScalars.contains { !$0.isASCII }
+    let generatedNonASCIICount = nonASCIICount - (minimumUsesNonASCII ? 1 : 0)
+    precondition(count > max(uppercaseCount + 2, generatedNonASCIICount + 2))
+    precondition((0...punctuationCount).contains(spaceCount))
+    return IndexedLexicon(count: count) { index in
+      var entry = marker + spanishScaleRoots[index % spanishScaleRoots.count]
+        + alphabeticIndex(index)
+      if index == 0 {
+        entry = minimumToken
+      } else if index == 1 {
+        entry = String(repeating: marker.last!, count: maximumLength)
+      } else {
+        if index < uppercaseCount + 2 {
+          entry = entry.prefix(1).uppercased() + entry.dropFirst()
+        }
+        if index < generatedNonASCIICount + 2 {
+          entry += "ñ"
+        }
+      }
+      if index >= count - spaceCount {
+        entry += " roca"
+      } else if index >= count - punctuationCount {
+        entry += "-"
+      }
+      return entry
+    }
+  }
+
+  static var spanish1kLexicon: IndexedLexicon {
+    spanishScaleLexicon(
+      marker: "zq", count: 998, minimumToken: "q", maximumLength: 15,
+      uppercaseCount: 10, punctuationCount: 0, spaceCount: 0, nonASCIICount: 179)
+  }
+  static var spanish10kLexicon: IndexedLexicon {
+    spanishScaleLexicon(
+      marker: "wx", count: 9_990, minimumToken: "w", maximumLength: 20,
+      uppercaseCount: 433, punctuationCount: 1, spaceCount: 0, nonASCIICount: 2_062)
+  }
+  static var spanish650kLexicon: IndexedLexicon {
+    spanishScaleLexicon(
+      marker: "qzv", count: 646_579, minimumToken: "á", maximumLength: 26,
+      uppercaseCount: 3, punctuationCount: 239, spaceCount: 162, nonASCIICount: 247_122)
+  }
+
+  static var spanish1kWords: [String] { spanish1kLexicon.materialized() }
+  static var spanish10kWords: [String] { spanish10kLexicon.materialized() }
+  static var spanish650kWords: [String] { spanish650kLexicon.materialized() }
+
   // This small starter corpus is original project content, not imported from Monkeytype.
   static let words = [
     "amber", "harbor", "quiet", "copper", "lantern", "paper", "window", "drift",
@@ -5320,6 +5380,18 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: spanishWords, separator: " ", punctuation: [",", ".", "¡", "¿"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .spanish1k:
+      return prompt(
+        tokens: count, lexicon: spanish1kLexicon, separator: " ", punctuation: [",", ".", "¡", "¿"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .spanish10k:
+      return prompt(
+        tokens: count, lexicon: spanish10kLexicon, separator: " ", punctuation: [",", ".", "¡", "¿"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .spanish650k:
+      return prompt(
+        tokens: count, lexicon: spanish650kLexicon, separator: " ", punctuation: [",", ".", "¡", "¿"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .german:
       return prompt(
         tokens: count, lexicon: germanWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -6042,6 +6114,9 @@ enum StarterLexicon {
     case .likanu: (likanuWords, ["､", ":", "ʭ", "≈"])
     case .pigLatin: (pigLatinWords, [",", ".", "!", "?"])
     case .spanish: (spanishWords, [",", ".", "¡", "¿"])
+    case .spanish1k: (spanish1kWords, [",", ".", "¡", "¿"])
+    case .spanish10k: (spanish10kWords, [",", ".", "¡", "¿"])
+    case .spanish650k: (spanish650kWords, [",", ".", "¡", "¿"])
     case .german: (germanWords, [",", ".", "!", "?"])
     case .swissGerman: (swissGermanWords, [",", ".", "!", "?"])
     case .afrikaans: (afrikaansWords, [",", ".", "!", "?"])
@@ -6286,6 +6361,9 @@ extension TypingLanguage {
     case .likanu: StarterLexicon.likanuWords
     case .pigLatin: StarterLexicon.pigLatinWords
     case .spanish: StarterLexicon.spanishWords
+    case .spanish1k: StarterLexicon.spanish1kWords
+    case .spanish10k: StarterLexicon.spanish10kWords
+    case .spanish650k: StarterLexicon.spanish650kWords
     case .german: StarterLexicon.germanWords
     case .swissGerman: StarterLexicon.swissGermanWords
     case .afrikaans: StarterLexicon.afrikaansWords
@@ -6453,6 +6531,9 @@ extension TypingLanguage {
     case .english10k: StarterLexicon.english10kLexicon
     case .english25k: StarterLexicon.english25kLexicon
     case .english450k: StarterLexicon.english450kLexicon
+    case .spanish1k: StarterLexicon.spanish1kLexicon
+    case .spanish10k: StarterLexicon.spanish10kLexicon
+    case .spanish650k: StarterLexicon.spanish650kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -6624,6 +6705,9 @@ extension TypingLanguage {
     case .likanu: "Likanu"
     case .pigLatin: "Pig Latin"
     case .spanish: "Español"
+    case .spanish1k: "Español · 1k · Typebar"
+    case .spanish10k: "Español · 10k · Typebar"
+    case .spanish650k: "Español · 650k · Typebar"
     case .german: "Deutsch"
     case .swissGerman: "Swiss German"
     case .afrikaans: "Afrikaans"

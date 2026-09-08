@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 167)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 170)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4193,6 +4193,9 @@ final class HealthRouteTests: XCTestCase {
       ("english10k", "Ten thousand slots support a wider deterministic practice range."),
       ("english25k", "The twenty-five-thousand scale preserves its own result identity."),
       ("english450k", "The largest English scale remains locally generated and independently selectable."),
+      ("spanish1k", "Cada escala conserva una identidad propia."),
+      ("spanish10k", "La práctica local amplía su rango sin importar listas externas."),
+      ("spanish650k", "El índice mayor genera solamente las entradas solicitadas."),
       ("englishCommonlyMisspelled", "Careful writers accommodate every necessary letter."),
       ("englishContractions", "Don't hurry; you'll type clearly."),
       ("englishDoubleLetter", "Small letters still need smooth pressure."),

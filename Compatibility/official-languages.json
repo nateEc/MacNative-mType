@@ -464,6 +464,9 @@
     "english_old": "oldEnglish",
     "english_medical": "englishMedical",
     "spanish": "spanish",
+    "spanish_1k": "spanish1k",
+    "spanish_10k": "spanish10k",
+    "spanish_650k": "spanish650k",
     "french": "french",
     "french_bitoduc": "frenchBitoduc",
     "nepali": "nepali",
@@ -691,9 +694,6 @@
     "sindhi": "sindhi"
   },
   "nativeRelatedChoice": {
-    "spanish_1k": "spanish",
-    "spanish_10k": "spanish",
-    "spanish_650k": "spanish",
     "french_1k": "french",
     "french_2k": "french",
     "french_10k": "french",

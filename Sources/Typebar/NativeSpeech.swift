@@ -31,7 +31,7 @@ extension TypingLanguage {
     case .likanu: "xxs-Uixs"
     case .pokemon1k, .arenaStrategy: "en"
     case .pigLatin, .loremIpsum, .git: "en-US"
-    case .spanish: "es-ES"
+    case .spanish, .spanish1k, .spanish10k, .spanish650k: "es-ES"
     case .german: "de-DE"
     case .swissGerman: "de-CH"
     case .afrikaans: "af-ZA"

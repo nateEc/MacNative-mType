@@ -4598,6 +4598,13 @@ enum OfflineContent {
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
+    if [.spanish1k, .spanish10k, .spanish650k].contains(language) {
+      return quotes(for: .spanish, length: length).map { quote in
+        .init(
+          id: "\(language.rawValue)-\(quote.id)", title: quote.title, text: quote.text,
+          language: language, length: quote.length)
+      }
+    }
     if [.english1k, .english5k, .english10k, .english25k, .english450k].contains(language) {
       return quotes(for: .english, length: length).map { quote in
         .init(

@@ -8245,6 +8245,9 @@ final class TypingEngineTests: XCTestCase {
     let largestScalePrompt = StarterLexicon.prompt(
       wordCount: 25, language: .english450k, contentOptions: ContentOptions())
     XCTAssertEqual(largestScalePrompt.split(separator: " ").count, 25)
+    let largestSpanishScalePrompt = StarterLexicon.prompt(
+      wordCount: 25, language: .spanish650k, contentOptions: ContentOptions())
+    XCTAssertGreaterThanOrEqual(largestSpanishScalePrompt.split(separator: " ").count, 25)
   }
 
   func testEnglish450kWeakSpotUsesTheIndexedCorpus() throws {
@@ -8264,6 +8267,48 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(report.suggestedWords.count, 8)
     XCTAssertTrue(report.suggestedWords.allSatisfy { $0.first == target.first })
+  }
+
+  func testSpanishScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int, Int, Int, Int, Int)] = [
+      ("spanish1k", 998, 1, 15, 10, 0, 0, 179),
+      ("spanish10k", 9_990, 1, 20, 433, 1, 0, 2_062),
+      ("spanish650k", 646_579, 1, 26, 3, 239, 162, 247_122),
+    ]
+
+    for (rawValue, count, minimum, maximum, uppercase, punctuation, spaces, nonASCII) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertEqual(language.displayName, "Español · \(rawValue.dropFirst("spanish".count)) · Typebar")
+      XCTAssertTrue(language.supportsLazyLatinInput)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "es")
+      XCTAssertEqual(language.speechLocaleIdentifier, "es-ES")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
+      XCTAssertEqual(words.filter { $0.range(of: "[A-Z]", options: .regularExpression) != nil }.count, uppercase)
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaces)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCII)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+
+      let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+      XCTAssertGreaterThanOrEqual(prompt.split(separator: " ").count, 25)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
   }
 
   func testPracticeTapePolicyAnchorsByWordOrCharacterWithoutChangingInput() {
@@ -12962,7 +13007,7 @@ final class TypingEngineTests: XCTestCase {
     let languages = TypingLanguage.allCases.filter(\.supportsQuotes)
     XCTAssertFalse(languages.isEmpty)
     for language in languages {
-      XCTAssertFalse(language.ownedPracticeWords().isEmpty, language.displayName)
+      XCTAssertFalse(language.ownedPracticeLexicon().isEmpty, language.displayName)
       let quote = try! XCTUnwrap(OfflineContent.quotes(for: language, length: .extended).first)
       XCTAssertEqual(quote.language, language)
       XCTAssertEqual(quote.length, .extended)
