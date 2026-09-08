@@ -8,6 +8,43 @@ import XCTest
 final class TypingEngineTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 10_000)
 
+  func testDataStoreStartupPreservesThePersistentStoreWhenOpeningFails() throws {
+    struct TestFailure: LocalizedError {
+      var errorDescription: String? { "schema mismatch" }
+    }
+    let storeURL = URL(fileURLWithPath: "/tmp/typebar-test/default.store")
+    var attempts = 0
+
+    let result: Result<String, DataStoreStartupRecovery> = DataStoreStartupPolicy.attempt(
+      storeURL: storeURL
+    ) {
+      attempts += 1
+      throw TestFailure()
+    }
+
+    XCTAssertEqual(attempts, 1)
+    switch result {
+    case .success:
+      XCTFail("A failed persistent open must enter recovery instead of returning a container.")
+    case .failure(let recovery):
+      XCTAssertEqual(recovery.storeURL, storeURL)
+      XCTAssertEqual(recovery.technicalDetails, "schema mismatch")
+      XCTAssertTrue(recovery.diagnosticText.contains(storeURL.path))
+      XCTAssertTrue(recovery.diagnosticText.contains("schema mismatch"))
+    }
+  }
+
+  func testDataStoreStartupReturnsThePersistentContainerWhenOpeningSucceeds() throws {
+    let storeURL = URL(fileURLWithPath: "/tmp/typebar-test/default.store")
+    let result: Result<String, DataStoreStartupRecovery> = DataStoreStartupPolicy.attempt(
+      storeURL: storeURL
+    ) {
+      "persistent-container"
+    }
+
+    XCTAssertEqual(try result.get(), "persistent-container")
+  }
+
   func testRemoteSyncStateIsScopedByCanonicalServerAndAccountWithoutConsumingLegacyCursor() {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!

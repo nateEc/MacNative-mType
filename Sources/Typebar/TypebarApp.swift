@@ -14,10 +14,9 @@ struct TypebarApp: App {
 
   var body: some Scene {
     WindowGroup("Typebar") {
-      rootContent
+      dataStoreContent
     }
     .windowResizability(.contentMinSize)
-    .modelContainer(Self.modelContainer)
 
     Settings {
       PreferencesView(settings: settings, account: account, hotkey: hotkey)
@@ -30,6 +29,17 @@ struct TypebarApp: App {
       }
       Divider()
       Button("退出") { NSApp.terminate(nil) }
+    }
+  }
+
+  @ViewBuilder
+  private var dataStoreContent: some View {
+    switch Self.dataStore {
+    case .success(let container):
+      rootContent.modelContainer(container)
+    case .failure(let recovery):
+      DataStoreRecoveryView(recovery: recovery)
+        .frame(minWidth: 760, minHeight: 480)
     }
   }
 
@@ -48,18 +58,71 @@ struct TypebarApp: App {
       }
   }
 
-  private static let modelContainer: ModelContainer = {
-    do {
-      return try ModelContainer(
+  private static let modelConfiguration = ModelConfiguration(
+    isStoredInMemoryOnly: QAStoreMode.usesInMemoryStore(
+      info: Bundle.main.infoDictionary ?? [:]))
+
+  private static let dataStore: Result<ModelContainer, DataStoreStartupRecovery> =
+    DataStoreStartupPolicy.attempt(storeURL: modelConfiguration.url) {
+      try ModelContainer(
         for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
         ResultFilterPresetRecord.self,
-        configurations: ModelConfiguration(
-          isStoredInMemoryOnly: QAStoreMode.usesInMemoryStore(
-            info: Bundle.main.infoDictionary ?? [:])))
-    } catch {
-      fatalError("Unable to create the Typebar data store: \(error)")
+        configurations: modelConfiguration)
     }
-  }()
+}
+
+struct DataStoreStartupRecovery: Error, Equatable, Sendable {
+  let storeURL: URL
+  let technicalDetails: String
+
+  var diagnosticText: String {
+    "Typebar 数据文件：\(storeURL.path)\n启动错误：\(technicalDetails)"
+  }
+}
+
+enum DataStoreStartupPolicy {
+  static func attempt<Container>(
+    storeURL: URL, create: () throws -> Container
+  ) -> Result<Container, DataStoreStartupRecovery> {
+    do {
+      return .success(try create())
+    } catch {
+      return .failure(
+        DataStoreStartupRecovery(
+          storeURL: storeURL, technicalDetails: error.localizedDescription))
+    }
+  }
+}
+
+private struct DataStoreRecoveryView: View {
+  let recovery: DataStoreStartupRecovery
+
+  var body: some View {
+    ContentUnavailableView {
+      Label("无法打开本机数据", systemImage: "externaldrive.badge.exclamationmark")
+    } description: {
+      VStack(spacing: 8) {
+        Text("Typebar 没有删除或替换原数据文件。请先保留该文件并检查磁盘权限或可用空间，然后重新打开应用。")
+        Text(recovery.storeURL.path)
+          .font(.caption.monospaced())
+          .textSelection(.enabled)
+        Text(recovery.technicalDetails)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+      }
+    } actions: {
+      Button("在 Finder 中显示") {
+        let selectedURL = FileManager.default.fileExists(atPath: recovery.storeURL.path)
+          ? recovery.storeURL : recovery.storeURL.deletingLastPathComponent()
+        NSWorkspace.shared.activateFileViewerSelecting([selectedURL])
+      }
+      Button("复制诊断信息") {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(recovery.diagnosticText, forType: .string)
+      }
+    }
+  }
 }
 
 private enum QuoteSource: String, CaseIterable, Identifiable {
