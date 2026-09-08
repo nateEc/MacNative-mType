@@ -2411,7 +2411,7 @@ public actor AuthStore {
   }
 
   private func availablePublicBadges(for userID: UUID) -> [PublicProfileBadge] {
-    let results = state.results.filter { $0.userID == userID }
+    let results = state.results.filter { $0.userID == userID && $0.eventCount > 0 }
     let accurateRunExists = results.contains {
       $0.accuracy >= 98 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 15
     }
@@ -2419,18 +2419,41 @@ public actor AuthStore {
     let totalTypingSeconds = results.reduce(0.0) { partial, result in
       partial + max(0, result.finishedAt.timeIntervalSince(result.startedAt))
     }
+    let perfectMinuteExists = results.contains {
+      $0.accuracy == 100 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 60
+    }
+    let practicedLanguages = Set(results.map(\.language)).count
+    let practicedModes = Set(results.map(\.mode)).count
     var badgeIDs: [String] = []
     if !results.isEmpty {
       badgeIDs.append("first-finish")
     }
+    if results.count >= 10 {
+      badgeIDs.append("ten-finishes")
+    }
     if accurateRunExists {
       badgeIDs.append("clear-key")
+    }
+    if perfectMinuteExists {
+      badgeIDs.append("perfect-minute")
     }
     if bestWPM >= 80 {
       badgeIDs.append("swift-line")
     }
+    if bestWPM >= 100 {
+      badgeIDs.append("century-line")
+    }
     if totalTypingSeconds >= 15 * 60 {
       badgeIDs.append("steady-room")
+    }
+    if totalTypingSeconds >= 60 * 60 {
+      badgeIDs.append("hour-craft")
+    }
+    if practicedLanguages >= 5 {
+      badgeIDs.append("language-rover")
+    }
+    if practicedModes >= 4 {
+      badgeIDs.append("mode-explorer")
     }
     return badgeIDs.compactMap(Self.publicBadge)
   }
@@ -2438,9 +2461,15 @@ public actor AuthStore {
   private static func publicBadge(id: String) -> PublicProfileBadge? {
     switch id {
     case "first-finish": .init(id: id, title: "起步", systemImage: "flag.checkered")
+    case "ten-finishes": .init(id: id, title: "十次成行", systemImage: "10.circle")
     case "clear-key": .init(id: id, title: "清晰按键", systemImage: "checkmark.seal")
+    case "perfect-minute": .init(id: id, title: "无误一分钟", systemImage: "scope")
     case "swift-line": .init(id: id, title: "迅捷一行", systemImage: "bolt")
+    case "century-line": .init(id: id, title: "百速刻度", systemImage: "speedometer")
     case "steady-room": .init(id: id, title: "稳定练习", systemImage: "timer")
+    case "hour-craft": .init(id: id, title: "一小时手感", systemImage: "hourglass")
+    case "language-rover": .init(id: id, title: "五语行者", systemImage: "globe")
+    case "mode-explorer": .init(id: id, title: "模式巡游", systemImage: "square.grid.2x2")
     default: nil
     }
   }

@@ -2312,6 +2312,87 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(inbox.notifications.count, 4)
   }
 
+  func testExpandedPublicBadgeMilestonesAreDerivedSelectableAndRevoked() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 39_000)
+    let emptySession = try await store.register(
+      .init(
+        email: "empty-badge@example.com", password: "a secure password",
+        displayName: "Empty Badge"),
+      now: now)
+    _ = try await store.submitResult(
+      .init(
+        id: UUID(), mode: "time", language: "english", durationSeconds: 60, wordLimit: nil,
+        wpm: 0, rawWpm: 0, accuracy: 100, errorCount: 0, eventCount: 0,
+        startedAt: now.addingTimeInterval(-60), finishedAt: now),
+      accessToken: emptySession.accessToken, now: now)
+    let emptyUser = try await store.authenticatedUser(
+      for: emptySession.accessToken, now: now)
+    XCTAssertTrue(emptyUser.availableBadges.isEmpty)
+
+    let session = try await store.register(
+      .init(
+        email: "badge-milestones@example.com", password: "a secure password",
+        displayName: "Badge Milestones"),
+      now: now)
+    let modes = ["time", "words", "quote", "custom"]
+    let languages = ["english", "spanish", "german", "french", "italian"]
+    for index in 0..<9 {
+      let request = result(
+        id: UUID(), wpm: index == 0 ? 99 : 70, accuracy: index == 0 ? 100 : 97,
+        mode: modes[index % modes.count], durationSeconds: 59,
+        language: languages[index % languages.count], finishedAt: now)
+      _ = try await store.submitResult(request, accessToken: session.accessToken, now: now)
+    }
+
+    var user = try await store.authenticatedUser(for: session.accessToken, now: now)
+    XCTAssertEqual(
+      user.availableBadges.map(\.id),
+      ["first-finish", "clear-key", "swift-line", "language-rover", "mode-explorer"])
+
+    let tenth = result(
+      id: UUID(), wpm: 100, accuracy: 100, durationSeconds: 60,
+      language: "english", finishedAt: now)
+    _ = try await store.submitResult(tenth, accessToken: session.accessToken, now: now)
+    user = try await store.authenticatedUser(for: session.accessToken, now: now)
+    XCTAssertEqual(
+      user.availableBadges.map(\.id),
+      [
+        "first-finish", "ten-finishes", "clear-key", "perfect-minute", "swift-line",
+        "century-line", "language-rover", "mode-explorer",
+      ])
+
+    let hourBoundary = result(
+      id: UUID(), wpm: 10, accuracy: 100, durationSeconds: 3_009,
+      language: "english", finishedAt: now)
+    _ = try await store.submitResult(hourBoundary, accessToken: session.accessToken, now: now)
+    user = try await store.authenticatedUser(for: session.accessToken, now: now)
+    XCTAssertEqual(
+      user.availableBadges.map(\.id),
+      [
+        "first-finish", "ten-finishes", "clear-key", "perfect-minute", "swift-line",
+        "century-line", "steady-room", "hour-craft", "language-rover", "mode-explorer",
+      ])
+
+    let selected = try await store.updateProfile(
+      .init(selectedBadgeID: "mode-explorer"), accessToken: session.accessToken, now: now)
+    XCTAssertEqual(selected.selectedBadgeID, "mode-explorer")
+    var inbox = try await store.notifications(accessToken: session.accessToken, now: now)
+    XCTAssertEqual(Set(inbox.notifications.compactMap(\.badge?.id)), Set(user.availableBadges.map(\.id)))
+    XCTAssertEqual(inbox.notifications.count, user.availableBadges.count)
+
+    _ = try await store.submitResult(
+      hourBoundary, accessToken: session.accessToken, now: now)
+    inbox = try await store.notifications(accessToken: session.accessToken, now: now)
+    XCTAssertEqual(inbox.notifications.count, user.availableBadges.count)
+
+    _ = try await store.deleteResults(
+      .init(currentPassword: "a secure password"), accessToken: session.accessToken, now: now)
+    user = try await store.authenticatedUser(for: session.accessToken, now: now)
+    XCTAssertTrue(user.availableBadges.isEmpty)
+    XCTAssertNil(user.selectedBadgeID)
+  }
+
   func testConnectionsSupportRequestsAcceptanceAndUserScopedLists() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let alice = try await store.register(
