@@ -479,6 +479,8 @@ public actor AuthStore {
     "englishCommonlyMisspelled",
     "englishContractions",
     "englishDoubleLetter",
+    "englishLegal",
+    "englishMedical",
     "kokanu",
     "likanu",
     "english", "pigLatin", "spanish", "german", "afrikaans", "albanian", "bemba", "bosnian", "esperanto", "esperantoXSystem", "esperantoHSystem", "latin", "loremIpsum", "friulian", "malagasy", "welsh", "hausa", "tatar", "tatarCrimean", "tatarCrimeanCyrillic", "klingon", "quenya", "viossa", "viossaNjutro", "maori", "lojbanGismu", "lojbanCmavo", "uzbek", "occitan", "oromo", "macedonian", "kazakh", "vietnamese", "jyutping", "pinyin", "bashkir", "basque", "frisian", "zulu", "hawaiian", "kabyle", "maltese", "tokiPona", "xhosa", "tibetan", "kyrgyz", "udmurt", "yoruba", "swahili", "kinyarwanda", "shona", "santali", "yiddish", "azerbaijani", "belarusian", "belarusianLacinka", "lithuanian", "latvian", "mongolian", "irish", "galician", "marathi", "kurdishCentral", "arabic", "arabicEgypt", "arabicMorocco", "pashto", "sindhi", "hebrew", "persian", "persianRomanized", "urdu", "urduRoman", "urdish", "tamil", "tanglish", "hindi", "hinglish", "gujarati", "bangla", "thai", "nepali", "nepaliRomanized", "kannada", "telugu", "malayalam", "sanskrit", "sanskritRoman", "sinhala", "khmer", "myanmarBurmese", "lao", "amharic", "armenian", "armenianWestern", "georgian", "greek", "greekKoine", "greeklish", "dutch", "filipino",

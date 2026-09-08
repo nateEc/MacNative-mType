@@ -522,6 +522,7 @@ INP-04 的“按键位图”档用所选 Typebar 布局的原创映射，将 QMK
 2026-09-08 `TST-02` 更正：当前单语数为一百三十八种，默认／自选 LTR 多语候选为一百二十八种。新增 Kokanu，以其官方语法和词典确认 LTR 拉丁转写、基础词汇与结构，四档练习文本均由 Typebar 独立编写；不读取参考词值或引语。固定 `xxs-Lat`、`orderedByFrequency: false` 与未设置 `noLazyMode` 分别映射到 `xxs`／`xxs-Lat` 在线和朗读路径、Zipf 不支持提示及可选简化输入，并贯通配置、预设、分享、结果、归档、混排、社区投稿、撤回、成绩与排行榜。
 2026-09-08 `TST-02` 更正：当前单语数为一百三十九种，默认／自选 LTR 多语候选为一百二十九种。新增 Likanu；按固定元数据使用 LTR、连写提示、`xxs-Uixs`、Zipf 不支持和可选简化输入。字符与音节边界取自 Kokanu 官方书写说明，Typebar 以自写解析器确定性转换自有 Kokanu 词流和四档文本，不读取参考词值、引语或转换实现；配置、预设、分享、结果、归档、混排、社区投稿、撤回、成绩与排行榜均接受 `likanu`。
 2026-09-08 `TST-02` 更正：当前单语数为一百四十二种，默认／自选 LTR 多语候选为一百三十二种。新增 English · Commonly Misspelled、English · Contractions 与 English · Double Letter；三者分别提供 Typebar 自写的正确拼写、全撇号缩写和相邻双字母词流及四档原创文本。固定 `noLazyMode: true` 与 `orderedByFrequency: false` 映射为禁用简化输入及 Zipf 不支持提示，并使用 `en`／`en-US` 在线和朗读路径；不读取参考词值，完整贯通客户端与服务端数据面。
+2026-09-08 `TST-02` 更正：当前单语数为一百四十四种，默认／自选 LTR 多语候选为一百三十四种。新增 English · Legal 与 English · Medical，均提供 Typebar 自写领域词流和四档文本。Legal 使用缺省可选简化输入与 Zipf 未知提示；Medical 按固定配置禁用简化输入并显示 Zipf 不支持；两者均走 `en`／`en-US`，不读取参考词值，并完整贯通客户端与服务端数据面。
 
 参考实现约有 197 个前端组件，并有独立的前端、后端、共享契约和趣味模式包。因此客户端“像 Monkeytype”并不能构成完整重写；`ACC`、`SYN`、`SOC`、`RANK`、`CONT` 和 `OPS` 都必须拥有我们自己的服务实现与端到端验收。
 

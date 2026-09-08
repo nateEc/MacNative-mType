@@ -201,6 +201,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case englishCommonlyMisspelled
   case englishContractions
   case englishDoubleLetter
+  case englishLegal
+  case englishMedical
   case kokanu
   case likanu
   case pigLatin
@@ -3574,6 +3576,22 @@ enum StarterLexicon {
     "summer", "support", "tree", "wheel", "yellow",
   ]
 
+  static let englishLegalWords = [
+    "affidavit", "appeal", "arbitration", "attorney", "breach", "claimant", "clause",
+    "consent", "contract", "covenant", "damages", "defendant", "deposition", "evidence",
+    "hearing", "injunction", "jurisdiction", "liability", "litigation", "motion",
+    "negligence", "notice", "obligation", "plaintiff", "precedent", "provision", "remedy",
+    "statute", "testimony", "tort", "tribunal", "verdict", "waiver", "warranty", "witness",
+  ]
+
+  static let englishMedicalWords = [
+    "anatomy", "antibody", "artery", "benign", "biopsy", "cardiac", "chronic", "clinical",
+    "diagnosis", "dosage", "edema", "fracture", "genetic", "immune", "infection",
+    "inflammation", "lesion", "malignant", "metabolism", "neuron", "pathology", "patient",
+    "prognosis", "pulse", "renal", "respiratory", "symptom", "therapy", "tissue", "trauma",
+    "vaccine", "vascular", "viral",
+  ]
+
   // Selected from the public Kokanu vocabulary and arranged independently for
   // Typebar practice; no reference-project word list is read or imported.
   static let kokanuWords = [
@@ -4750,6 +4768,16 @@ enum StarterLexicon {
         tokens: count, lexicon: englishDoubleLetterWords, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .englishLegal:
+      return prompt(
+        tokens: count, lexicon: englishLegalWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .englishMedical:
+      return prompt(
+        tokens: count, lexicon: englishMedicalWords, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .kokanu:
       return prompt(
         tokens: count, lexicon: kokanuWords, separator: " ",
@@ -5352,6 +5380,8 @@ enum StarterLexicon {
     case .englishCommonlyMisspelled: (englishCommonlyMisspelledWords, [",", ".", "!", "?"])
     case .englishContractions: (englishContractionWords, [",", ".", "!", "?"])
     case .englishDoubleLetter: (englishDoubleLetterWords, [",", ".", "!", "?"])
+    case .englishLegal: (englishLegalWords, [",", ".", "!", "?"])
+    case .englishMedical: (englishMedicalWords, [",", ".", "!", "?"])
     case .kokanu: (kokanuWords, [",", ".", "!", "?"])
     case .likanu: (likanuWords, ["､", ":", "ʭ", "≈"])
     case .pigLatin: (pigLatinWords, [",", ".", "!", "?"])
@@ -5561,6 +5591,8 @@ extension TypingLanguage {
     case .englishCommonlyMisspelled: StarterLexicon.englishCommonlyMisspelledWords
     case .englishContractions: StarterLexicon.englishContractionWords
     case .englishDoubleLetter: StarterLexicon.englishDoubleLetterWords
+    case .englishLegal: StarterLexicon.englishLegalWords
+    case .englishMedical: StarterLexicon.englishMedicalWords
     case .kokanu: StarterLexicon.kokanuWords
     case .likanu: StarterLexicon.likanuWords
     case .pigLatin: StarterLexicon.pigLatinWords
@@ -5709,6 +5741,8 @@ extension TypingLanguage {
     .englishCommonlyMisspelled,
     .englishContractions,
     .englishDoubleLetter,
+    .englishLegal,
+    .englishMedical,
     .kokanu,
     .likanu,
     .english, .pigLatin, .spanish, .german, .swissGerman, .afrikaans, .albanian, .bemba, .bosnian, .esperanto, .esperantoXSystem, .esperantoHSystem, .latin, .loremIpsum, .friulian, .malagasy, .welsh, .hausa, .tatar, .tatarCrimean, .tatarCrimeanCyrillic, .klingon, .quenya, .viossa, .viossaNjutro, .maori, .lojbanGismu, .lojbanCmavo, .uzbek, .occitan, .oromo, .macedonian, .kazakh, .vietnamese, .jyutping, .pinyin, .bashkir, .basque, .frisian, .zulu, .hawaiian, .kabyle, .maltese, .tokiPona, .xhosa, .tibetan, .kyrgyz, .udmurt, .yoruba, .swahili, .kinyarwanda, .shona, .santali, .persianRomanized, .urduRoman, .urdish, .tamil, .tanglish, .hindi, .hinglish, .gujarati, .bangla, .thai, .nepali, .nepaliRomanized, .kannada, .telugu, .malayalam, .sanskrit, .sanskritRoman, .sinhala, .khmer, .myanmarBurmese, .lao, .amharic, .armenian, .armenianWestern, .georgian, .azerbaijani, .belarusian, .belarusianLacinka, .lithuanian, .latvian, .mongolian, .irish, .galician, .marathi, .greek, .greekKoine, .greeklish, .dutch, .filipino, .catalan, .indonesian, .malay, .danish, .norwegianBokmal, .norwegianNynorsk, .swedish, .hungarian, .czech, .slovak, .slovenian, .croatian, .serbian, .serbianLatin, .bulgarian, .bulgarianLatin, .romanian, .finnish, .estonian, .icelandic, .french,
@@ -5763,6 +5797,7 @@ extension TypingLanguage {
     guard !isCodeLanguage else { return false }
     return switch self {
     case .english, .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
+      .englishMedical,
       .pigLatin, .loremIpsum, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
       .tamil, .hindi, .gujarati, .bangla, .thai, .nepali, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
@@ -5821,7 +5856,8 @@ extension TypingLanguage {
       .russian, .icelandic, .galician, .marathi:
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
-      .kokanu, .likanu, .arabicMorocco, .sindhi, .armenian, .bemba, .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
+      .englishMedical, .kokanu, .likanu, .arabicMorocco, .sindhi, .armenian, .bemba,
+      .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
       .viossa, .viossaNjutro:
       return .unsupported
     default:
@@ -5837,6 +5873,8 @@ extension TypingLanguage {
     case .englishCommonlyMisspelled: "English · Commonly Misspelled"
     case .englishContractions: "English · Contractions"
     case .englishDoubleLetter: "English · Double Letter"
+    case .englishLegal: "English · Legal"
+    case .englishMedical: "English · Medical"
     case .kokanu: "Kokanu"
     case .likanu: "Likanu"
     case .pigLatin: "Pig Latin"

@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 142 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 English · Commonly Misspelled、English · Contractions 与 English · Double Letter。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
+Typebar 现有 144 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 English · Legal 与 English · Medical。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -91,6 +91,7 @@ Typebar 现有 142 个可单独练习并支持 Typebar 自有引语的语言／�
 - 2026-09-08 更正：当前单语总数为一百三十八种、默认／自选 LTR 多语候选为一百二十八种。新增 Kokanu；固定配置定义 `rightToLeft: false`、`bcp47: xxs-Lat` 与 `orderedByFrequency: false`，未定义连写或 `noLazyMode`。审计不读取参考词值或引语；拉丁转写词汇和 `le/o` 动词标记等语法边界来自 [Kokanu 官方语法](https://en.kokanu.com/reference/basic-grammar.html) 与 [官方词典](https://dictionary.kokanu.com/)，四档练习句由 Typebar 独立编写。实现使用 LTR 空格词界、`xxs` 知识短文路径、`xxs-Lat` 朗读标识、可选简化输入和 Zipf 不支持提示，并贯通多语轮转、社区投稿、撤回、成绩与排行榜。
 - 2026-09-08 更正：当前单语总数为一百三十九种、默认／自选 LTR 多语候选为一百二十九种。新增 Likanu；固定配置定义 `rightToLeft: false`、`joiningScript: true`、`bcp47: xxs-Uixs` 与 `orderedByFrequency: false`，未定义 `noLazyMode`。字符、元音修饰、尾音 `n` 组合上划线及标点规则来自 [Kokanu 官方发音与书写说明](https://en.kokanu.com/reference/pronunciation.html)；Typebar 以独立音节解析器确定性转换自有 Kokanu 词流和四档文本，不读取参考词值、引语或转换代码。实现保留整段 Unicode 连写、LTR 空格词界、`xxs`／`xxs-Uixs` 在线与朗读路径、可选简化输入和 Zipf 不支持提示，并贯通多语轮转、社区投稿、撤回、成绩与排行榜。
 - 2026-09-08 更正：当前单语总数为一百四十二种、默认／自选 LTR 多语候选为一百三十二种。新增 English · Commonly Misspelled、English · Contractions 与 English · Double Letter。固定配置均定义 `noLazyMode: true`、`orderedByFrequency: false`，未定义 RTL 或连写；Double Letter 额外定义 `bcp47: en-US`，其余两项走缺省 `en`／`en-US`。审计只读取名称、元数据、词数和长度范围，不读取任何参考词值；Typebar 分别以自写正确拼写词、全撇号缩写词和含相邻重复字符的词流及各自四档原创文本实现，并贯通混排、配置、预设、分享、归档、社区投稿、撤回、成绩与排行榜。
+- 2026-09-08 更正：当前单语总数为一百四十四种、默认／自选 LTR 多语候选为一百三十四种。新增 English · Legal 与 English · Medical。Legal 固定配置未定义 RTL、连写、BCP-47、`noLazyMode` 或词频排序，因此使用 LTR、`en`／`en-US`、可选简化输入和 Zipf 未知提示；Medical 定义 `rightToLeft: false`、`bcp47: en-US`、`noLazyMode: true` 与 `orderedByFrequency: false`，因此禁用简化输入并显示 Zipf 不支持。审计不读取参考词值；两项均使用 Typebar 自写领域词流和四档文本，并贯通混排与全部客户端／服务端数据面。
 
 ## 后续候选与准入条件
 

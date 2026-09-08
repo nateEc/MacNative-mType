@@ -4015,6 +4015,8 @@ final class HealthRouteTests: XCTestCase {
       ("englishCommonlyMisspelled", "Careful writers accommodate every necessary letter."),
       ("englishContractions", "Don't hurry; you'll type clearly."),
       ("englishDoubleLetter", "Small letters still need smooth pressure."),
+      ("englishLegal", "A witness gives testimony before the tribunal."),
+      ("englishMedical", "A clinical diagnosis guides therapy."),
       ("kokanu", "mi le kota wiki ki tu. tu le wisan in mi un ja."),
       ("likanu", "ɞı ʋȷ xʃʌ ɕıxı xı ʌſ: ʌſ ʋȷ ɕıɤ̄ ōı ɞı ōſ ɂ:"),
       ("greekKoine", "Μικρὸν βῆμα τὴν ἑξῆς ὁδὸν σαφεστέραν ποιεῖ."),

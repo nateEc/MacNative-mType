@@ -8857,6 +8857,8 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.englishCommonlyMisspelledWords,
       StarterLexicon.englishContractionWords,
       StarterLexicon.englishDoubleLetterWords,
+      StarterLexicon.englishLegalWords,
+      StarterLexicon.englishMedicalWords,
       StarterLexicon.kokanuWords,
       StarterLexicon.likanuWords,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
@@ -8959,7 +8961,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 132)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 134)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -12443,6 +12445,29 @@ final class TypingEngineTests: XCTestCase {
     })
     XCTAssertTrue(StarterLexicon.englishCommonlyMisspelledWords.contains("accommodate"))
     XCTAssertTrue(StarterLexicon.englishCommonlyMisspelledWords.contains("separate"))
+  }
+
+  func testEnglishLegalAndMedicalKeepDistinctPinnedMetadata() {
+    XCTAssertEqual(TypingLanguage.englishLegal.displayName, "English · Legal")
+    XCTAssertTrue(TypingLanguage.englishLegal.supportsLazyLatinInput)
+    XCTAssertEqual(TypingLanguage.englishLegal.zipfFrequencySupport, .unknown)
+
+    XCTAssertEqual(TypingLanguage.englishMedical.displayName, "English · Medical")
+    XCTAssertFalse(TypingLanguage.englishMedical.supportsLazyLatinInput)
+    XCTAssertEqual(TypingLanguage.englishMedical.zipfFrequencySupport, .unsupported)
+
+    for language in [TypingLanguage.englishLegal, .englishMedical] {
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+      XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+      XCTAssertFalse(language.ownedPracticeWords().isEmpty)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+      }
+    }
+
+    XCTAssertTrue(StarterLexicon.englishLegalWords.contains("affidavit"))
+    XCTAssertTrue(StarterLexicon.englishMedicalWords.contains("diagnosis"))
   }
 
   func testQuoteSearchMatchesAllTermsWithoutSendingOrMutatingContent() {

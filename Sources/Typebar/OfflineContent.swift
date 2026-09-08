@@ -268,6 +268,62 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "legal-clear-clause",
+      title: "Clear clause",
+      text: "A clear clause states each obligation and remedy.",
+      language: .englishLegal,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "legal-evidence",
+      title: "Evidence and process",
+      text: "The attorney reviews the evidence before the witness gives testimony at the hearing.",
+      language: .englishLegal,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "legal-reasoning",
+      title: "Reasoned decision",
+      text: "A tribunal considers jurisdiction, precedent, and the language of the statute before it reaches a verdict or grants a requested remedy.",
+      language: .englishLegal,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "legal-record",
+      title: "The complete record",
+      text: "Careful legal work begins with an accurate record. The claimant describes the alleged breach, the defendant answers each material point, and both sides preserve relevant evidence. Before ruling on a motion, the tribunal examines the contract, applicable statute, prior precedent, witness testimony, and any waiver that could change the available remedy.",
+      language: .englishLegal,
+      length: .extended
+    ),
+    OfflineQuote(
+      id: "medical-calm-pulse",
+      title: "Calm observation",
+      text: "A steady pulse is one useful clinical observation.",
+      language: .englishMedical,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "medical-diagnosis",
+      title: "From symptom to diagnosis",
+      text: "A clinician compares each symptom with the patient's history before proposing a diagnosis.",
+      language: .englishMedical,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "medical-context",
+      title: "Clinical context",
+      text: "A laboratory result gains meaning only in context: anatomy, medication, immune response, and the course of an infection can all shape a prognosis.",
+      language: .englishMedical,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "medical-careful-language",
+      title: "Careful clinical language",
+      text: "Precise medical language supports careful decisions. A symptom is not automatically a diagnosis, and a test result must be interpreted with the patient's history and examination. Clinicians distinguish benign from malignant findings, compare dosage and response, and explain why a therapy, biopsy, vaccine, or period of observation may be appropriate.",
+      language: .englishMedical,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kokanu-kota-wiki",
       title: "kota wiki",
       text: "mi le kota wiki ki tu. tu le wisan in mi un ja.",
