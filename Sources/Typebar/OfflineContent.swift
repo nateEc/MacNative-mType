@@ -324,6 +324,34 @@ enum OfflineContent {
       length: .extended
     ),
     OfflineQuote(
+      id: "shakespearean-yonder-bell",
+      title: "The yonder bell",
+      text: "Prithee, wait anon; the bell doth sound beyond yonder wall.",
+      language: .englishShakespearean,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "shakespearean-hither",
+      title: "Come hither",
+      text: "Come hither, friend, for thou hast carried the lantern bravely through the rain.",
+      language: .englishShakespearean,
+      length: .medium
+    ),
+    OfflineQuote(
+      id: "shakespearean-counsel",
+      title: "Counsel at dusk",
+      text: "Methinks thy counsel hath a steady heart: speak plainly, and we shall discover whence this quarrel came ere daylight leaves the hall.",
+      language: .englishShakespearean,
+      length: .long
+    ),
+    OfflineQuote(
+      id: "shakespearean-watch",
+      title: "The patient watch",
+      text: "Alas, the watch is long, yet thou need not surrender hope. Prithee, keep the lantern near and mark whereupon the distant rider turns. If fortune should delay our answer, we shall greet the morning with clear purpose; and when the gate doth open, thou wilt know that patient courage hath served us better than haste.",
+      language: .englishShakespearean,
+      length: .extended
+    ),
+    OfflineQuote(
       id: "kokanu-kota-wiki",
       title: "kota wiki",
       text: "mi le kota wiki ki tu. tu le wisan in mi un ja.",

@@ -8859,6 +8859,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.englishDoubleLetterWords,
       StarterLexicon.englishLegalWords,
       StarterLexicon.englishMedicalWords,
+      StarterLexicon.englishShakespeareanWords,
       StarterLexicon.kokanuWords,
       StarterLexicon.likanuWords,
       StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
@@ -8961,7 +8962,7 @@ final class TypingEngineTests: XCTestCase {
     ]
 
     XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
-    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 134)
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 135)
     XCTAssertTrue(
       tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
@@ -12468,6 +12469,21 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertTrue(StarterLexicon.englishLegalWords.contains("affidavit"))
     XCTAssertTrue(StarterLexicon.englishMedicalWords.contains("diagnosis"))
+  }
+
+  func testShakespeareanEnglishUsesIndependentArchaicFormsAndPinnedMetadata() {
+    let language = TypingLanguage.englishShakespearean
+    XCTAssertEqual(language.displayName, "English · Shakespearean")
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertTrue(StarterLexicon.englishShakespeareanWords.contains("thou"))
+    XCTAssertTrue(StarterLexicon.englishShakespeareanWords.contains("wherefore"))
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
+    }
   }
 
   func testQuoteSearchMatchesAllTermsWithoutSendingOrMutatingContent() {

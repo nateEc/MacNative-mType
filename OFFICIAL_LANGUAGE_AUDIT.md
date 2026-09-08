@@ -9,7 +9,7 @@
 
 ## 已覆盖的原生语言面
 
-Typebar 现有 144 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 English · Legal 与 English · Medical。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
+Typebar 现有 145 个可单独练习并支持 Typebar 自有引语的语言／书写方式；最新增加 English · Shakespearean。现有中英混合与可配置的多语混合练习。较早逐项补充中的历史数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -92,9 +92,12 @@ Typebar 现有 144 个可单独练习并支持 Typebar 自有引语的语言／�
 - 2026-09-08 更正：当前单语总数为一百三十九种、默认／自选 LTR 多语候选为一百二十九种。新增 Likanu；固定配置定义 `rightToLeft: false`、`joiningScript: true`、`bcp47: xxs-Uixs` 与 `orderedByFrequency: false`，未定义 `noLazyMode`。字符、元音修饰、尾音 `n` 组合上划线及标点规则来自 [Kokanu 官方发音与书写说明](https://en.kokanu.com/reference/pronunciation.html)；Typebar 以独立音节解析器确定性转换自有 Kokanu 词流和四档文本，不读取参考词值、引语或转换代码。实现保留整段 Unicode 连写、LTR 空格词界、`xxs`／`xxs-Uixs` 在线与朗读路径、可选简化输入和 Zipf 不支持提示，并贯通多语轮转、社区投稿、撤回、成绩与排行榜。
 - 2026-09-08 更正：当前单语总数为一百四十二种、默认／自选 LTR 多语候选为一百三十二种。新增 English · Commonly Misspelled、English · Contractions 与 English · Double Letter。固定配置均定义 `noLazyMode: true`、`orderedByFrequency: false`，未定义 RTL 或连写；Double Letter 额外定义 `bcp47: en-US`，其余两项走缺省 `en`／`en-US`。审计只读取名称、元数据、词数和长度范围，不读取任何参考词值；Typebar 分别以自写正确拼写词、全撇号缩写词和含相邻重复字符的词流及各自四档原创文本实现，并贯通混排、配置、预设、分享、归档、社区投稿、撤回、成绩与排行榜。
 - 2026-09-08 更正：当前单语总数为一百四十四种、默认／自选 LTR 多语候选为一百三十四种。新增 English · Legal 与 English · Medical。Legal 固定配置未定义 RTL、连写、BCP-47、`noLazyMode` 或词频排序，因此使用 LTR、`en`／`en-US`、可选简化输入和 Zipf 未知提示；Medical 定义 `rightToLeft: false`、`bcp47: en-US`、`noLazyMode: true` 与 `orderedByFrequency: false`，因此禁用简化输入并显示 Zipf 不支持。审计不读取参考词值；两项均使用 Typebar 自写领域词流和四档文本，并贯通混排与全部客户端／服务端数据面。
+- 2026-09-08 更正：当前单语总数为一百四十五种、默认／自选 LTR 多语候选为一百三十五种。新增 English · Shakespearean；固定配置仅定义 `noLazyMode: true`，未定义 RTL、连写、BCP-47 或词频排序，因此使用 LTR、`en`／`en-US`、禁用简化输入和 Zipf 未知提示。Typebar 使用自写古体代词、动词和副词词流以及四档仿古文本，不复制莎士比亚作品或参考词值，并贯通混排与全部客户端／服务端数据面。
 
 ## 后续候选与准入条件
 
-当前没有未经语义审核就进入实现队列的语言。每个新候选都必须先确认 RTL、连写、词界、BCP-47、输入法和服务端数据面；不得仅因名称或书写习惯相似而复用既有路径。
+每个新候选都必须先确认 RTL、连写、词界、BCP-47、输入法和服务端数据面；不得仅因名称或书写习惯相似而复用既有路径。
+
+`english_old` 当前仅能确认是 200 词、无附加元数据且与现行 `english` 仅少量重合的独立目录；固定源码没有说明它表示旧版默认词表还是历史英语。取得项目一手定义前保持候选状态，不以猜测赋予用户可见名称或内容。
 
 任何候选只有在完成上述语义核对、原创内容、跨客户端与服务端测试及文档记录后，才会从“候选”变为“已覆盖”。

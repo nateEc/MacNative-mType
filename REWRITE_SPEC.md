@@ -395,7 +395,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 ## 2026-09-05 兼容性审计更正
 
-- `TypingLanguage` 当前有一百四十四种 Typebar 自有单语；默认与自选多语混排使用一百三十四种 LTR 单语。最新增加 English · Legal 与 English · Medical，两项均使用自写领域词流和四档文本；Legal 按缺省元数据保留简化输入并显示 Zipf 未知，Medical 按固定 `noLazyMode: true`、`orderedByFrequency: false` 禁用简化输入并显示 Zipf 不支持。两者均使用 `en`／`en-US` 路径，不读取或导入参考词值、引语、代码或资产。
+- `TypingLanguage` 当前有一百四十五种 Typebar 自有单语；默认与自选多语混排使用一百三十五种 LTR 单语。最新增加 English · Shakespearean，使用自写古体词流和四档仿古文本，按固定 `noLazyMode: true` 禁用简化输入、显示 Zipf 未知提示并使用 `en`／`en-US`；不复制莎士比亚作品或参考词值。`english_old` 的固定源码缺少用户可见语义说明，在取得一手定义前不猜测实现。
 
 - `TypingLanguage` 当前有一百二十二种 Typebar 自有单语；默认与自选多语混排使用一百一十二种 LTR 单语。新增 `Te reo Māori` 只对应固定源码的 `maori_1k` 映射；该配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，因此以保留 macron 的原创 LTR 词流及四档引语、`en`／`en-US` 缺省在线/朗读路径、显式简化输入和 Zipf 未知提示实现，并覆盖投稿、撤回、成绩和排行榜。
 

@@ -24,7 +24,7 @@ extension TypingLanguage {
     if isCodeLanguage { return "en-US" }
     return switch self {
     case .english, .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
-      .englishDoubleLetter, .englishLegal, .englishMedical: "en-US"
+      .englishDoubleLetter, .englishLegal, .englishMedical, .englishShakespearean: "en-US"
     case .kokanu: "xxs-Lat"
     case .likanu: "xxs-Uixs"
     case .pigLatin, .loremIpsum: "en-US"
