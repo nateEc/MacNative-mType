@@ -4599,6 +4599,15 @@ enum OfflineContent {
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
     if [
+      .portuguese1k, .portuguese3k, .portuguese5k, .portuguese320k, .portuguese550k,
+    ].contains(language) {
+      return quotes(for: .portuguese, length: length).map { quote in
+        .init(
+          id: "\(language.rawValue)-\(quote.id)", title: quote.title, text: quote.text,
+          language: language, length: quote.length)
+      }
+    }
+    if [
       .russian1k, .russian5k, .russian10k, .russian25k, .russian50k, .russian375k,
     ].contains(language) {
       return quotes(for: .russian, length: length).map { quote in

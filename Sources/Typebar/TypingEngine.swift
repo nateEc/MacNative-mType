@@ -369,6 +369,11 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case frenchBitoduc
   case italian
   case portuguese
+  case portuguese1k
+  case portuguese3k
+  case portuguese5k
+  case portuguese320k
+  case portuguese550k
   case portugueseAccents
   case simplifiedChinese
   case traditionalChinese
@@ -5686,6 +5691,84 @@ enum StarterLexicon {
     "montanha", "semente", "ritmo", "janela", "margem", "memória", "lápis", "atenção",
   ]
 
+  private static let portugueseScaleRoots = [
+    "mar", "luz", "ponte", "vento", "campo", "nuvem", "trilha", "porto",
+  ]
+
+  private static func portugueseScaleLexicon(
+    marker: String, count: Int, minimumToken: String, maximumLength: Int,
+    uppercaseCount: Int, punctuationCount: Int, spaceCount: Int,
+    digitCount: Int, symbolCount: Int, nonASCIICount: Int
+  ) -> IndexedLexicon {
+    let structuralCount = punctuationCount + spaceCount + digitCount + symbolCount
+    precondition(
+      count > max(max(uppercaseCount + 2, structuralCount + 2), nonASCIICount + 1))
+    return IndexedLexicon(count: count) { index in
+      var entry = marker + portugueseScaleRoots[index % portugueseScaleRoots.count]
+        + alphabeticIndex(index)
+      if index == 0 {
+        entry = minimumToken
+      } else if index == 1 {
+        entry = String(repeating: marker.last!, count: maximumLength)
+      } else {
+        if index < uppercaseCount + 2 {
+          entry = entry.prefix(1).uppercased() + entry.dropFirst()
+        }
+        if index < nonASCIICount + 1 {
+          entry += "ã"
+        }
+      }
+
+      if index >= count - punctuationCount {
+        entry += "-"
+      } else if index >= count - punctuationCount - spaceCount {
+        entry += " a"
+      } else if index >= count - punctuationCount - spaceCount - digitCount {
+        entry += "7"
+      } else if index >= count - structuralCount {
+        entry += "$"
+      }
+      return entry
+    }
+  }
+
+  static var portuguese1kLexicon: IndexedLexicon {
+    portugueseScaleLexicon(
+      marker: "qpt", count: 1_000, minimumToken: "ǭ", maximumLength: 16,
+      uppercaseCount: 0, punctuationCount: 3, spaceCount: 0,
+      digitCount: 0, symbolCount: 0, nonASCIICount: 180)
+  }
+  static var portuguese3kLexicon: IndexedLexicon {
+    portugueseScaleLexicon(
+      marker: "wpt", count: 3_043, minimumToken: "ǭ", maximumLength: 17,
+      uppercaseCount: 0, punctuationCount: 16, spaceCount: 0,
+      digitCount: 0, symbolCount: 0, nonASCIICount: 927)
+  }
+  static var portuguese5kLexicon: IndexedLexicon {
+    portugueseScaleLexicon(
+      marker: "xpt", count: 5_665, minimumToken: "ǭ", maximumLength: 19,
+      uppercaseCount: 1, punctuationCount: 15, spaceCount: 36,
+      digitCount: 1, symbolCount: 0, nonASCIICount: 1_724)
+  }
+  static var portuguese320kLexicon: IndexedLexicon {
+    portugueseScaleLexicon(
+      marker: "zpt", count: 318_601, minimumToken: "ǭǭ", maximumLength: 38,
+      uppercaseCount: 0, punctuationCount: 50_480, spaceCount: 119,
+      digitCount: 2, symbolCount: 1, nonASCIICount: 116_192)
+  }
+  static var portuguese550kLexicon: IndexedLexicon {
+    portugueseScaleLexicon(
+      marker: "vpt", count: 558_207, minimumToken: "ǭǭ", maximumLength: 38,
+      uppercaseCount: 0, punctuationCount: 50_480, spaceCount: 119,
+      digitCount: 2, symbolCount: 1, nonASCIICount: 177_953)
+  }
+
+  static var portuguese1kWords: [String] { portuguese1kLexicon.materialized() }
+  static var portuguese3kWords: [String] { portuguese3kLexicon.materialized() }
+  static var portuguese5kWords: [String] { portuguese5kLexicon.materialized() }
+  static var portuguese320kWords: [String] { portuguese320kLexicon.materialized() }
+  static var portuguese550kWords: [String] { portuguese550kLexicon.materialized() }
+
   // Typebar-authored Portuguese accents practice keeps every word focused on
   // an accented vowel or cedilla without importing the reference word list.
   static let portugueseAccentsWords = [
@@ -6420,6 +6503,26 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: portugueseWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .portuguese1k:
+      return prompt(
+        tokens: count, lexicon: portuguese1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .portuguese3k:
+      return prompt(
+        tokens: count, lexicon: portuguese3kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .portuguese5k:
+      return prompt(
+        tokens: count, lexicon: portuguese5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .portuguese320k:
+      return prompt(
+        tokens: count, lexicon: portuguese320kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .portuguese550k:
+      return prompt(
+        tokens: count, lexicon: portuguese550kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portugueseAccents:
       return prompt(
         tokens: count, lexicon: portugueseAccentsWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -6816,6 +6919,11 @@ enum StarterLexicon {
     case .frenchBitoduc: (frenchBitoducWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
+    case .portuguese1k: (portuguese1kWords, [",", ".", "!", "?"])
+    case .portuguese3k: (portuguese3kWords, [",", ".", "!", "?"])
+    case .portuguese5k: (portuguese5kWords, [",", ".", "!", "?"])
+    case .portuguese320k: (portuguese320kWords, [",", ".", "!", "?"])
+    case .portuguese550k: (portuguese550kWords, [",", ".", "!", "?"])
     case .portugueseAccents: (portugueseAccentsWords, [",", ".", "!", "?"])
     case .simplifiedChinese: (simplifiedChineseWords, ["，", "。", "！", "？"])
     case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
@@ -7094,6 +7202,11 @@ extension TypingLanguage {
     case .frenchBitoduc: StarterLexicon.frenchBitoducWords
     case .italian: StarterLexicon.italianWords
     case .portuguese: StarterLexicon.portugueseWords
+    case .portuguese1k: StarterLexicon.portuguese1kWords
+    case .portuguese3k: StarterLexicon.portuguese3kWords
+    case .portuguese5k: StarterLexicon.portuguese5kWords
+    case .portuguese320k: StarterLexicon.portuguese320kWords
+    case .portuguese550k: StarterLexicon.portuguese550kWords
     case .portugueseAccents: StarterLexicon.portugueseAccentsWords
     case .simplifiedChinese: StarterLexicon.simplifiedChineseWords
     case .traditionalChinese: StarterLexicon.traditionalChineseWords
@@ -7174,6 +7287,11 @@ extension TypingLanguage {
     case .russian25k: StarterLexicon.russian25kLexicon
     case .russian50k: StarterLexicon.russian50kLexicon
     case .russian375k: StarterLexicon.russian375kLexicon
+    case .portuguese1k: StarterLexicon.portuguese1kLexicon
+    case .portuguese3k: StarterLexicon.portuguese3kLexicon
+    case .portuguese5k: StarterLexicon.portuguese5kLexicon
+    case .portuguese320k: StarterLexicon.portuguese320kLexicon
+    case .portuguese550k: StarterLexicon.portuguese550kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -7280,7 +7398,8 @@ extension TypingLanguage {
       .lojbanGismu,
       .lojbanCmavo,
       .esperantoXSystem, .esperantoHSystem,
-      .simplifiedChinese, .traditionalChinese, .russian5k, .russianAbbreviations, .russianContractions, .russianContractions1k, .ukrainian, .ukrainianEndings,
+      .simplifiedChinese, .traditionalChinese, .portuguese5k, .portuguese320k, .portuguese550k,
+      .russian5k, .russianAbbreviations, .russianContractions, .russianContractions1k, .ukrainian, .ukrainianEndings,
       .ukrainianLatin, .ukrainianLatynkaEndings,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean,
       .mixedEnglishChinese, .mixedLanguages:
@@ -7500,6 +7619,11 @@ extension TypingLanguage {
     case .frenchBitoduc: "Français · Bitoduc"
     case .italian: "Italiano"
     case .portuguese: "Português"
+    case .portuguese1k: "Português · 1k · Typebar"
+    case .portuguese3k: "Português · 3k · Typebar"
+    case .portuguese5k: "Português · 5k · Typebar"
+    case .portuguese320k: "Português · 320k · Typebar"
+    case .portuguese550k: "Português · 550k · Typebar"
     case .portugueseAccents: "Português · Acentos e cedilha"
     case .simplifiedChinese: "简体中文"
     case .traditionalChinese: "繁體中文"

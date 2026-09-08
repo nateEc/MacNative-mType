@@ -245,7 +245,8 @@ enum LivePracticeContentService {
     case .french, .french1k, .french2k, .french10k: return "fr"
     case .frenchBitoduc: return "fr"
     case .italian: return "it"
-    case .portuguese, .portugueseAccents: return "pt"
+    case .portuguese, .portuguese1k, .portuguese3k, .portuguese5k, .portuguese320k,
+      .portuguese550k, .portugueseAccents: return "pt"
     case .simplifiedChinese, .traditionalChinese: return "zh"
     case .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k,
       .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k: return "ru"

@@ -126,7 +126,9 @@ extension TypingLanguage {
     case .french, .french1k, .french2k, .french10k: "fr-FR"
     case .frenchBitoduc: "fr-fr"
     case .italian: "it-IT"
-    case .portuguese, .portugueseAccents: "pt-PT"
+    case .portuguese, .portuguese3k, .portugueseAccents: "pt-PT"
+    case .portuguese1k: "pt-BR"
+    case .portuguese5k, .portuguese320k, .portuguese550k: "pt"
     case .simplifiedChinese, .mixedEnglishChinese: "zh-CN"
     case .traditionalChinese: "zh-TW"
     case .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k,
