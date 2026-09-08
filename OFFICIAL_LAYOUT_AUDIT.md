@@ -13,8 +13,8 @@
 
 | 状态 | 数量 | 验收含义 |
 | --- | ---: | --- |
-| `nativeExact` | 236 | 同名语义已有原生提示、显式输入模拟、反查和持久化测试 |
-| `nativeRelated` | 3 | 仅提供相关 Typebar 原生布局，不宣称精确兼容 |
+| `nativeExact` | 239 | 同名语义已有原生提示、显式输入模拟、反查和持久化测试 |
+| `nativeRelated` | 0 | 固定名称集合已无近似替代项 |
 | `systemInputOrCustom` | 0 | 固定名称集合已无回退项 |
 | 总计 | 239 | 与固定参考源码名称集合一一对应 |
 
@@ -64,12 +64,8 @@
 
 本批继续加入精确覆盖名称：`ergopti`、`rulemak`、`GralmakS`；它们与此前清单共同构成当前 236 项 `nativeExact`，固定官方名称集合不再有 `systemInputOrCustom` 回退。ErgolPT 保留 ISO 行和 Space 的 `空格/-` 层，Rulemak 保留 Cyrillic 扩展层，Gralmak S 保留组合符与完整符号层；缺失的第三、第四层按固定可观察行为分别回退 Base、Shift。
 
-相关但不等价的名称：
-
-- `hungarian` → `Hungarian QWERTZ · Typebar`：Typebar 自写映射，不导入官方布局资产。
-- `JCUKEN` → `Russian JCUKEN`：只确认同属 JCUKEN 系列，未读取参考键位 JSON，故不与独立的 `russian` 条目重复计为精确覆盖。
-- `bulgarian` → `Bulgarian Cyrillic · Typebar`：Typebar 自写 Cyrillic 图，不冒充 BDS 或参考资产。
+本批继续加入精确覆盖名称：`hungarian`、`JCUKEN`、`bulgarian`；它们与此前清单共同构成当前 239 项 `nativeExact`。三项采用独立原生枚举，分别保留 Hungarian ISO 行与符号层、JCUKEN ANSI 行且不映射额外 ISO 键，以及 Bulgarian BDS ISO 排列和隐藏数字提示行策略，不再借用相关但不等价的既有布局。
 
 ## 自动化门槛
 
-`OfficialLayoutCoverageTests` 会验证：固定提交标识、239 个名称完整且唯一、236/3/0 三类数量守恒、每个映射名称都存在于官方集合，以及每个目标 raw value 都能解析为当前 `KeyboardLayout`。新增或重命名布局必须同步更新机器清单、该测试和本文件。
+`OfficialLayoutCoverageTests` 会验证：固定提交标识、239 个名称完整且唯一、239/0/0 三类数量守恒、每个映射名称都存在于官方集合，以及每个目标 raw value 都能解析为当前 `KeyboardLayout`。新增或重命名布局必须同步更新机器清单、该测试和本文件。

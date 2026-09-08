@@ -479,12 +479,11 @@
     "danish_qwerty": "danishQwerty",
     "macedonian": "macedonian",
     "pashto": "pashto",
-    "estonian": "estonian"
+    "estonian": "estonian",
+    "hungarian": "hungarianOfficial",
+    "JCUKEN": "jcuken",
+    "bulgarian": "bulgarianOfficial"
   },
-  "nativeRelated": {
-    "hungarian": "hungarianQwertz",
-    "JCUKEN": "russianJcuken",
-    "bulgarian": "bulgarianCyrillic"
-  },
+  "nativeRelated": {},
   "unlistedPolicy": "systemInputOrCustom"
 }

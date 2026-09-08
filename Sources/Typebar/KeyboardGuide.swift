@@ -219,10 +219,13 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
   case turkishF
   case turkishE
   case hungarianQwertz
+  case hungarianOfficial
   case greekAlphabetic
   case russianJcuken
+  case jcuken
   case ukrainianJcuken
   case bulgarianCyrillic
+  case bulgarianOfficial
   case bulgarianPhoneticTraditional
   case belarusian
   case macedonian
@@ -465,10 +468,13 @@ enum KeyboardLayout: String, Codable, CaseIterable, Identifiable {
     case .turkishF: "Turkish F"
     case .turkishE: "Turkish E"
     case .hungarianQwertz: "Hungarian QWERTZ · Typebar"
+    case .hungarianOfficial: "Hungarian (ISO)"
     case .greekAlphabetic: "Greek Alphabetic · Typebar"
     case .russianJcuken: "Russian JCUKEN"
+    case .jcuken: "JCUKEN (ANSI)"
     case .ukrainianJcuken: "Ukrainian JCUKEN"
     case .bulgarianCyrillic: "Bulgarian Cyrillic · Typebar"
+    case .bulgarianOfficial: "Bulgarian (BDS)"
     case .bulgarianPhoneticTraditional: "Bulgarian Phonetic Traditional"
     case .belarusian: "Belarusian"
     case .macedonian: "Macedonian"
@@ -716,10 +722,13 @@ enum KeyboardInputLayout: String, Codable, CaseIterable, Identifiable {
   case turkishF
   case turkishE
   case hungarianQwertz
+  case hungarianOfficial
   case greekAlphabetic
   case russianJcuken
+  case jcuken
   case ukrainianJcuken
   case bulgarianCyrillic
+  case bulgarianOfficial
   case bulgarianPhoneticTraditional
   case belarusian
   case macedonian
@@ -3429,6 +3438,27 @@ enum KeyboardGuideModel {
           shiftedLabels: [">", "Í", "Y", "X", "C", "V", "B", "N", "M", "Ö", "Ü"]
         ),
       ]
+    case .hungarianOfficial:
+      [
+        row(
+          "number", "0123456789ÖÜÓ",
+          characters: ["0§", "1'", "2\"", "3+", "4!", "5%", "6/", "7=", "8(", "9)", "öÖ", "üÜ", "óÓ"],
+          shiftedLabels: ["§", "'", "\"", "+", "!", "%", "/", "=", "(", ")", "Ö", "Ü", "Ó"]
+        ),
+        row(
+          "top", "QWERTZUIOPŐÚ",
+          characters: ["qQ", "wW", "eE", "rR", "tT", "zZ", "uU", "iI", "oO", "pP", "őŐ", "úÚ"]
+        ),
+        row(
+          "home", "ASDFGHJKLÉÁŰ",
+          characters: ["aA", "sS", "dD", "fF", "gG", "hH", "jJ", "kK", "lL", "éÉ", "áÁ", "űŰ"]
+        ),
+        row(
+          "bottom", "ÍYXCVBNM,.-",
+          characters: ["íÍ", "yY", "xX", "cC", "vV", "bB", "nN", "mM", ",?", ".:", "-_"],
+          shiftedLabels: ["Í", "Y", "X", "C", "V", "B", "N", "M", "?", ":", "_"]
+        ),
+      ]
     case .greekAlphabetic:
       [
         row(
@@ -3475,6 +3505,28 @@ enum KeyboardGuideModel {
           shiftedLabels: [">", "Я", "Ч", "С", "М", "И", "Т", "Ь", "Б", "Ю", ","]
         ),
       ]
+    case .jcuken:
+      [
+        row(
+          "number", "Ё1234567890-=",
+          characters: ["ёЁ", "1!", "2\"", "3№", "4;", "5%", "6:", "7?", "8*", "9(", "0)", "-_", "=+"],
+          shiftedLabels: ["Ё", "!", "\"", "№", ";", "%", ":", "?", "*", "(", ")", "_", "+"]
+        ),
+        row(
+          "top", "ЙЦУКЕНГШЩЗХЪ\\",
+          characters: ["йЙ", "цЦ", "уУ", "кК", "еЕ", "нН", "гГ", "шШ", "щЩ", "зЗ", "хХ", "ъЪ", "\\/"],
+          shiftedLabels: ["Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х", "Ъ", "/"]
+        ),
+        row(
+          "home", "ФЫВАПРОЛДЖЭ",
+          characters: ["фФ", "ыЫ", "вВ", "аА", "пП", "рР", "оО", "лЛ", "дД", "жЖ", "эЭ"]
+        ),
+        row(
+          "bottom", "ЯЧСМИТЬБЮ.",
+          characters: ["яЯ", "чЧ", "сС", "мМ", "иИ", "тТ", "ьЬ", "бБ", "юЮ", ".,"],
+          shiftedLabels: ["Я", "Ч", "С", "М", "И", "Т", "Ь", "Б", "Ю", ","]
+        ),
+      ]
     case .ukrainianJcuken:
       [
         row(
@@ -3519,6 +3571,28 @@ enum KeyboardGuideModel {
           "bottom", "<ЗЬЦВБНМ,./",
           characters: ["<>", "зЗ", "ьЬ", "цЦ", "вВ", "бБ", "нН", "мМ", ",<", ".>", "/?"],
           shiftedLabels: [">", "З", "Ь", "Ц", "В", "Б", "Н", "М", "<", ">", "?"]
+        ),
+      ]
+    case .bulgarianOfficial:
+      [
+        row(
+          "number", "(1234567890-.",
+          characters: ["()", "1!", "2?", "3+", "4\"", "5%", "6=", "7:", "8/", "9–", "0№", "-$", ".€"],
+          shiftedLabels: [")", "!", "?", "+", "\"", "%", "=", ":", "/", "–", "№", "$", "€"]
+        ),
+        row(
+          "top", ",УЕИШЩКСДЗЦ;",
+          characters: [",ы", "уУ", "еЕ", "иИ", "шШ", "щЩ", "кК", "сС", "дД", "зЗ", "цЦ", ";§"],
+          shiftedLabels: ["ы", "У", "Е", "И", "Ш", "Щ", "К", "С", "Д", "З", "Ц", "§"]
+        ),
+        row(
+          "home", "ЬЯАОЖГТНВМЧ„",
+          characters: ["ьѝ", "яЯ", "аА", "оО", "жЖ", "гГ", "тТ", "нН", "вВ", "мМ", "чЧ", "„“"],
+          shiftedLabels: ["ѝ", "Я", "А", "О", "Ж", "Г", "Т", "Н", "В", "М", "Ч", "“"]
+        ),
+        row(
+          "bottom", "ЍЮЙЪЭФХПРЛБ",
+          characters: ["ѝЍ", "юЮ", "йЙ", "ъЪ", "эЭ", "фФ", "хХ", "пП", "рР", "лЛ", "бБ"]
         ),
       ]
     case .bulgarianPhoneticTraditional:

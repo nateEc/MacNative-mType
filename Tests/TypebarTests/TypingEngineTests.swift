@@ -6328,6 +6328,86 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KeyboardInputLayout.russianJcuken.emulatedLayout, .russianJcuken)
   }
 
+  @MainActor
+  func testFixedReferenceHungarianJcukenAndBulgarianLayoutsRemainDistinctAndPersist() {
+    let hungarianRows = KeyboardGuideModel.rows(for: .hungarianOfficial)
+    XCTAssertEqual(hungarianRows.map { $0.map(\.label).joined() }, [
+      "0123456789ÖÜÓ", "QWERTZUIOPŐÚ", "ASDFGHJKLÉÁŰ", "ÍYXCVBNM,.-",
+    ])
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 50, modifierFlags: [.shift], layout: .hungarianOfficial), "§")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 24, modifierFlags: [], layout: .hungarianOfficial),
+      "ó")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [], layout: .hungarianOfficial),
+      "ű")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .hungarianOfficial),
+      "í")
+
+    let jcukenRows = KeyboardGuideModel.rows(for: .jcuken)
+    XCTAssertEqual(jcukenRows.map(\.count), [13, 13, 11, 10])
+    XCTAssertEqual(jcukenRows[3].map(\.label).joined(), "ЯЧСМИТЬБЮ.")
+    XCTAssertNil(KeyboardGuideModel.highlightedKey(for: ">", layout: .jcuken))
+    XCTAssertNil(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .jcuken))
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 42, modifierFlags: [.shift], layout: .jcuken),
+      "/")
+
+    let bulgarianRows = KeyboardGuideModel.rows(for: .bulgarianOfficial)
+    XCTAssertEqual(bulgarianRows.count, 4)
+    XCTAssertEqual(bulgarianRows.map { $0.map(\.label).joined() }, [
+      "(1234567890-.", ",УЕИШЩКСДЗЦ;", "ЬЯАОЖГТНВМЧ„", "ЍЮЙЪЭФХПРЛБ",
+    ])
+    XCTAssertEqual(
+      KeyboardGuideModel.displayRows(
+        for: .bulgarianOfficial, keysMode: .minimal, mode: .staticGuide,
+        nextCharacter: nil).count,
+      3)
+    XCTAssertEqual(
+      KeyboardGuideModel.displayRows(
+        for: .bulgarianOfficial, keysMode: .full, mode: .staticGuide,
+        nextCharacter: nil).count,
+      4)
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 18, modifierFlags: [.shift], layout: .bulgarianOfficial), "!")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 12, modifierFlags: [], layout: .bulgarianOfficial),
+      ",")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 12, modifierFlags: [.shift], layout: .bulgarianOfficial), "ы")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 16, modifierFlags: [], layout: .bulgarianOfficial), "щ")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 32, modifierFlags: [], layout: .bulgarianOfficial), "к")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(
+        forKeyCode: 42, modifierFlags: [.shift], layout: .bulgarianOfficial), "“")
+    XCTAssertEqual(
+      KeyboardLayoutEmulator.character(forKeyCode: 10, modifierFlags: [], layout: .bulgarianOfficial),
+      "ѝ")
+
+    let suiteName = "TypebarTests.fixed-reference-layouts.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardLayout = .hungarianOfficial
+    settings.keyboardInputLayout = .jcuken
+    settings.layoutFluidLayouts = [.hungarianOfficial, .jcuken, .bulgarianOfficial]
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardLayout, .hungarianOfficial)
+    XCTAssertEqual(restored.keyboardInputLayout, .jcuken)
+    XCTAssertEqual(
+      restored.layoutFluidLayouts, [.hungarianOfficial, .jcuken, .bulgarianOfficial])
+  }
+
   func testUkrainianJcukenMapsUkrainianLettersAndPhysicalKeyPositions() {
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ґ", layout: .ukrainianJcuken), "number-0")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: "ї", layout: .ukrainianJcuken), "top-11")
@@ -10292,7 +10372,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.layoutFluid]).contains(.layoutFluid))
     XCTAssertEqual(LayoutFluidPolicy.maximumLayouts, 15)
     XCTAssertEqual(LayoutFluidPolicy.maximumSupportedLayouts, 15)
-    XCTAssertEqual(KeyboardLayout.allCases.count, 241)
+    XCTAssertEqual(KeyboardLayout.allCases.count, 244)
     XCTAssertEqual(
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
