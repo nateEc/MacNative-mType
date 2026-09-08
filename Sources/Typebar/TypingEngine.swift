@@ -315,6 +315,12 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case georgian
   case azerbaijani
   case belarusian
+  case belarusian1k
+  case belarusian5k
+  case belarusian10k
+  case belarusian25k
+  case belarusian50k
+  case belarusian100k
   case belarusianLacinka
   case lithuanian
   case latvian
@@ -3630,6 +3636,19 @@ enum StarterLexicon {
     return String(String.UnicodeScalarView(scalars.reversed()))
   }
 
+  private static let cyrillicScaleAlphabet = Array(
+    "абвгдеёжзійклмнопрстуўфхцчшыьэюя")
+
+  private static func cyrillicIndex(_ index: Int) -> String {
+    var value = index
+    var characters: [Character] = []
+    repeat {
+      characters.append(cyrillicScaleAlphabet[value % cyrillicScaleAlphabet.count])
+      value /= cyrillicScaleAlphabet.count
+    } while value > 0
+    return String(characters.reversed())
+  }
+
   private static func englishScaleLexicon(
     marker: String, count: Int, minimumToken: String, maximumLength: Int,
     uppercaseCount: Int, punctuationCount: Int
@@ -5267,6 +5286,65 @@ enum StarterLexicon {
     "сябар", "горад", "рака", "вецер", "час", "голас", "пытанне", "адказ", "надзея", "будучыня",
   ]
 
+  private static func belarusianScaleLexicon(
+    marker: String, count: Int, maximumLength: Int,
+    uppercaseCount: Int, punctuationCount: Int
+  ) -> IndexedLexicon {
+    precondition(count > max(uppercaseCount + 2, punctuationCount + 2))
+    return IndexedLexicon(count: count) { index in
+      var entry = marker + cyrillicIndex(index)
+      if index == 0 {
+        entry = "ꙮ"
+      } else if index == 1 {
+        entry = String(repeating: marker.first!, count: maximumLength)
+      } else if index < uppercaseCount + 2 {
+        entry = entry.prefix(1).uppercased() + entry.dropFirst()
+      }
+      if index >= count - punctuationCount {
+        entry += "-"
+      }
+      return entry
+    }
+  }
+
+  static var belarusian1kLexicon: IndexedLexicon {
+    belarusianScaleLexicon(
+      marker: "ѳ", count: 997, maximumLength: 12,
+      uppercaseCount: 0, punctuationCount: 0)
+  }
+  static var belarusian5kLexicon: IndexedLexicon {
+    belarusianScaleLexicon(
+      marker: "ѵ", count: 5_044, maximumLength: 7,
+      uppercaseCount: 2, punctuationCount: 28)
+  }
+  static var belarusian10kLexicon: IndexedLexicon {
+    belarusianScaleLexicon(
+      marker: "ѯ", count: 10_725, maximumLength: 7,
+      uppercaseCount: 7, punctuationCount: 64)
+  }
+  static var belarusian25kLexicon: IndexedLexicon {
+    belarusianScaleLexicon(
+      marker: "ѱ", count: 24_133, maximumLength: 7,
+      uppercaseCount: 25, punctuationCount: 140)
+  }
+  static var belarusian50kLexicon: IndexedLexicon {
+    belarusianScaleLexicon(
+      marker: "ѡ", count: 52_817, maximumLength: 9,
+      uppercaseCount: 37, punctuationCount: 453)
+  }
+  static var belarusian100kLexicon: IndexedLexicon {
+    belarusianScaleLexicon(
+      marker: "ѧ", count: 106_381, maximumLength: 29,
+      uppercaseCount: 40, punctuationCount: 2_284)
+  }
+
+  static var belarusian1kWords: [String] { belarusian1kLexicon.materialized() }
+  static var belarusian5kWords: [String] { belarusian5kLexicon.materialized() }
+  static var belarusian10kWords: [String] { belarusian10kLexicon.materialized() }
+  static var belarusian25kWords: [String] { belarusian25kLexicon.materialized() }
+  static var belarusian50kWords: [String] { belarusian50kLexicon.materialized() }
+  static var belarusian100kWords: [String] { belarusian100kLexicon.materialized() }
+
   // Typebar-authored Belarusian Łacinka starter words keep the selected
   // transliteration path without importing a reference wordset.
   static let belarusianLacinkaWords = [
@@ -6058,6 +6136,30 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: belarusianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .belarusian1k:
+      return prompt(
+        tokens: count, lexicon: belarusian1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .belarusian5k:
+      return prompt(
+        tokens: count, lexicon: belarusian5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .belarusian10k:
+      return prompt(
+        tokens: count, lexicon: belarusian10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .belarusian25k:
+      return prompt(
+        tokens: count, lexicon: belarusian25kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .belarusian50k:
+      return prompt(
+        tokens: count, lexicon: belarusian50kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .belarusian100k:
+      return prompt(
+        tokens: count, lexicon: belarusian100kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusianLacinka:
       return prompt(
         tokens: count, lexicon: belarusianLacinkaWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -6569,6 +6671,12 @@ enum StarterLexicon {
     case .georgian: (georgianWords, [",", ".", "!", "?"])
     case .azerbaijani: (azerbaijaniWords, [",", ".", "!", "?"])
     case .belarusian: (belarusianWords, [",", ".", "!", "?"])
+    case .belarusian1k: (belarusian1kWords, [",", ".", "!", "?"])
+    case .belarusian5k: (belarusian5kWords, [",", ".", "!", "?"])
+    case .belarusian10k: (belarusian10kWords, [",", ".", "!", "?"])
+    case .belarusian25k: (belarusian25kWords, [",", ".", "!", "?"])
+    case .belarusian50k: (belarusian50kWords, [",", ".", "!", "?"])
+    case .belarusian100k: (belarusian100kWords, [",", ".", "!", "?"])
     case .belarusianLacinka: (belarusianLacinkaWords, [",", ".", "!", "?"])
     case .lithuanian: (lithuanianWords, [",", ".", "!", "?"])
     case .latvian: (latvianWords, [",", ".", "!", "?"])
@@ -6835,6 +6943,12 @@ extension TypingLanguage {
     case .georgian: StarterLexicon.georgianWords
     case .azerbaijani: StarterLexicon.azerbaijaniWords
     case .belarusian: StarterLexicon.belarusianWords
+    case .belarusian1k: StarterLexicon.belarusian1kWords
+    case .belarusian5k: StarterLexicon.belarusian5kWords
+    case .belarusian10k: StarterLexicon.belarusian10kWords
+    case .belarusian25k: StarterLexicon.belarusian25kWords
+    case .belarusian50k: StarterLexicon.belarusian50kWords
+    case .belarusian100k: StarterLexicon.belarusian100kWords
     case .belarusianLacinka: StarterLexicon.belarusianLacinkaWords
     case .lithuanian: StarterLexicon.lithuanianWords
     case .latvian: StarterLexicon.latvianWords
@@ -6945,6 +7059,12 @@ extension TypingLanguage {
     case .polish20k: StarterLexicon.polish20kLexicon
     case .polish40k: StarterLexicon.polish40kLexicon
     case .polish200k: StarterLexicon.polish200kLexicon
+    case .belarusian1k: StarterLexicon.belarusian1kLexicon
+    case .belarusian5k: StarterLexicon.belarusian5kLexicon
+    case .belarusian10k: StarterLexicon.belarusian10kLexicon
+    case .belarusian25k: StarterLexicon.belarusian25kLexicon
+    case .belarusian50k: StarterLexicon.belarusian50kLexicon
+    case .belarusian100k: StarterLexicon.belarusian100kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -7035,7 +7155,7 @@ extension TypingLanguage {
       .myanmarBurmese,
       .armenian,
       .georgian,
-      .belarusian,
+      .belarusian, .belarusian1k,
       .macedonian,
       .kazakh,
       .mongolian,
@@ -7217,6 +7337,12 @@ extension TypingLanguage {
     case .georgian: "ქართული"
     case .azerbaijani: "Azərbaycanca"
     case .belarusian: "Беларуская"
+    case .belarusian1k: "Беларуская · 1k · Typebar"
+    case .belarusian5k: "Беларуская · 5k · Typebar"
+    case .belarusian10k: "Беларуская · 10k · Typebar"
+    case .belarusian25k: "Беларуская · 25k · Typebar"
+    case .belarusian50k: "Беларуская · 50k · Typebar"
+    case .belarusian100k: "Беларуская · 100k · Typebar"
     case .belarusianLacinka: "Biełaruskaja łacinka"
     case .lithuanian: "Lietuvių"
     case .latvian: "Latviešu"

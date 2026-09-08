@@ -63,7 +63,8 @@ extension TypingLanguage {
     case .friulian: "fur"
     case .bemba: "bem"
     case .azerbaijani: "az-AZ"
-    case .belarusian: "be-BY"
+    case .belarusian, .belarusian1k, .belarusian5k, .belarusian10k, .belarusian25k,
+      .belarusian50k, .belarusian100k: "be-BY"
     case .belarusianLacinka: "en-US"
     case .latvian: "lv"
     case .irish: "ga-IE"
