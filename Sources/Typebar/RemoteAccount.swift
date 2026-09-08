@@ -248,6 +248,7 @@ private struct RemoteChangeEmailRequest: Codable, Sendable {
 }
 
 private struct RemoteDeleteAccountRequest: Codable, Sendable { let currentPassword: String? }
+private struct RemoteResetAccountRequest: Codable, Sendable { let currentPassword: String? }
 private struct RemoteAccountDeletionResponse: Codable, Sendable { let deleted: Bool }
 private struct RemoteRevokeSessionsRequest: Codable, Sendable { let currentPassword: String? }
 private struct RemoteSessionsRevocationResponse: Codable, Sendable { let revoked: Bool }
@@ -564,6 +565,11 @@ struct RemoteSyncStateScope: Equatable, Sendable {
 
     func setVersion(_ value: Int, in defaults: UserDefaults) {
         defaults.set(max(0, value), forKey: key("archiveSyncVersion"))
+    }
+
+    func clear(in defaults: UserDefaults) {
+        defaults.removeObject(forKey: key("syncCursor"))
+        defaults.removeObject(forKey: key("archiveSyncVersion"))
     }
 
     private func key(_ component: String) -> String {
@@ -1417,6 +1423,41 @@ final class AccountSession {
             statusMessage = "账户及其自建服务数据已删除；本机练习记录未受影响。"
         } catch {
             statusMessage = error.localizedDescription
+        }
+    }
+
+    func resetAccount(currentPassword: String?) async -> Bool {
+        guard let token = tokenStore.load(), let user = currentUser else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let usesPassword = user.authenticationMethods.contains(.password)
+            let freshReauthenticationToken = usesPassword
+                ? nil
+                : try await reauthenticationToken(
+                    for: user, accessToken: token, excluding: nil, currentPassword: nil)
+            let resetUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/auth/account/reset",
+                method: "PATCH",
+                token: token,
+                body: RemoteResetAccountRequest(currentPassword: currentPassword),
+                headers: freshReauthenticationToken.map {
+                    ["X-Typebar-Reauthentication": $0]
+                } ?? [:],
+                response: RemoteAccountUser.self
+            )
+            currentUser = resetUser
+            developerAccessKeys = []
+            remoteResults = []
+            RemoteSyncStateScope(endpoint: endpoint, userID: user.id).clear(in: defaults)
+            statusMessage = "服务端账户数据已重置，正在清理这台 Mac。"
+            return true
+        } catch {
+            statusMessage = error.localizedDescription
+            return false
         }
     }
 

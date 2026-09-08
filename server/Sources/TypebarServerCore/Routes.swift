@@ -333,6 +333,20 @@ public func configure(
         }
     }
 
+    app.patch("v1", "auth", "account", "reset") { request async throws -> AuthUserResponse in
+        do {
+            let accessToken = try request.accessToken()
+            let reset = try request.content.decode(ResetAccountRequest.self)
+            return try await authStore.resetAccount(
+                reset,
+                accessToken: accessToken,
+                reauthenticationToken: request.headers.first(name: "X-Typebar-Reauthentication")
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.post("v1", "auth", "sessions", "revoke") { request async throws -> SessionsRevocationResponse in
         do {
             try await authStore.revokeAllSessions(

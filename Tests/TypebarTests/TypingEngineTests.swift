@@ -133,6 +133,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(otherServer.version(in: defaults), 0)
     XCTAssertEqual(defaults.integer(forKey: "remoteAccount.syncCursor.v1"), 91)
     XCTAssertEqual(defaults.integer(forKey: "remoteAccount.archiveSyncVersion.v1"), 12)
+
+    equivalent.clear(in: defaults)
+    XCTAssertEqual(primary.cursor(in: defaults), 0)
+    XCTAssertEqual(primary.version(in: defaults), 0)
+    XCTAssertEqual(defaults.integer(forKey: "remoteAccount.syncCursor.v1"), 91)
+    XCTAssertEqual(defaults.integer(forKey: "remoteAccount.archiveSyncVersion.v1"), 12)
   }
 
   func testRemoteAccessTokenKeyIsCanonicalAndServerScoped() {
@@ -7908,6 +7914,66 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice.woff2"))
     XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice.ttc"))
     XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice"))
+  }
+
+  @MainActor
+  func testLocalAccountResetClearsAllPracticeDataAndRestoresSettings() throws {
+    let suiteName = "TypebarTests.account-reset.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.theme = .midnight
+    settings.difficulty = .master
+
+    let container = try ModelContainer(
+      for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
+      ResultFilterPresetRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let result = CompletedTestResult(
+      id: UUID(),
+      configuration: .init(
+        mode: .words, duration: nil, wordLimit: 1, difficulty: .normal, rules: .init()),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(1),
+      typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
+      wpm: 60, rawWpm: 60, accuracy: 100, prompt: "amber")
+    let preset = SavedTestPreset(
+      configuration: result.configuration, quoteID: nil, customText: nil)
+    container.mainContext.insert(TestResultRecord(result: result))
+    container.mainContext.insert(TestPresetRecord(name: "One word", definition: preset))
+    container.mainContext.insert(SavedCustomTextRecord(title: "Saved", text: "amber"))
+    container.mainContext.insert(
+      try XCTUnwrap(ResultFilterPresetRecord(name: "Recent", filter: .init())))
+    try container.mainContext.save()
+    var removedBackground = false
+    var removedPracticeFont = false
+
+    XCTAssertThrowsError(
+      try LocalAccountReset.eraseCurrentMacData(
+        modelContext: container.mainContext,
+        settings: settings,
+        removeBackground: {},
+        removePracticeFont: {
+          throw CocoaError(.fileWriteUnknown)
+        }))
+    XCTAssertEqual(
+      try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).count, 1)
+    XCTAssertEqual(settings.theme, .midnight)
+
+    try LocalAccountReset.eraseCurrentMacData(
+      modelContext: container.mainContext,
+      settings: settings,
+      removeBackground: { removedBackground = true },
+      removePracticeFont: { removedPracticeFont = true })
+
+    XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).isEmpty)
+    XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<TestPresetRecord>()).isEmpty)
+    XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<SavedCustomTextRecord>()).isEmpty)
+    XCTAssertTrue(
+      try container.mainContext.fetch(FetchDescriptor<ResultFilterPresetRecord>()).isEmpty)
+    XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
+    XCTAssertTrue(removedBackground)
+    XCTAssertTrue(removedPracticeFont)
   }
 
   @MainActor

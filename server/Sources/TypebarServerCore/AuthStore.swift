@@ -97,6 +97,10 @@ public struct DeleteAccountRequest: Content, Equatable {
   public let currentPassword: String?
 }
 
+public struct ResetAccountRequest: Content, Equatable {
+  public let currentPassword: String?
+}
+
 public struct AccountDeletionResponse: Content, Equatable {
   public let deleted: Bool
 }
@@ -1705,6 +1709,42 @@ public actor AuthStore {
     state.streakDayBoundaryOffsets.removeValue(forKey: userID)
     state.personalBestResetDates.removeValue(forKey: userID)
     try persist()
+  }
+
+  /// Clears mutable practice and profile data while preserving the account's
+  /// identity, authentication methods, sessions, relationships, submissions,
+  /// and explicitly chosen streak day boundary. The operation is idempotent so
+  /// a client can safely retry after incomplete local cleanup.
+  public func resetAccount(
+    _ request: ResetAccountRequest, accessToken: String, reauthenticationToken: String? = nil,
+    now: Date = .now
+  ) throws -> AuthUserResponse {
+    let currentUser = try authenticatedUser(for: accessToken, now: now)
+    guard let index = state.users.firstIndex(where: { $0.id == currentUser.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
+    let user = state.users[index]
+    if let currentPassword = request.currentPassword {
+      guard let passwordHash = user.passwordHash,
+        try Bcrypt.verify(currentPassword, created: passwordHash)
+      else { throw AuthStoreError.invalidCredentials }
+    } else {
+      guard let reauthenticationToken else { throw AuthStoreError.invalidReauthenticationToken }
+      try consumeReauthenticationToken(reauthenticationToken, for: user.id, now: now)
+    }
+
+    let resetUser = StoredUser(
+      id: user.id, email: user.email, displayName: user.displayName,
+      passwordHash: user.passwordHash, createdAt: user.createdAt,
+      emailVerified: user.emailVerified)
+    state.users[index] = resetUser
+    state.developerAccessKeys.removeAll { $0.userID == user.id }
+    state.syncRecords.removeAll { $0.userID == user.id }
+    state.results.removeAll { $0.userID == user.id }
+    state.notifications.removeAll { $0.recipientID == user.id }
+    state.personalBestResetDates.removeValue(forKey: user.id)
+    try persist()
+    return userResponse(for: resetUser)
   }
 
   public func updateProfile(_ request: UpdateProfileRequest, accessToken: String, now: Date = .now)

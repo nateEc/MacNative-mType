@@ -3131,6 +3131,168 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(reloadedProfile.bestWPM, 45)
   }
 
+  func testResettingAccountClearsMutableDataButPreservesIdentityAndRelationships() async throws {
+    let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("typebar-account-reset-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let store = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let now = Date()
+    let owner = try await store.register(
+      .init(email: "reset-owner@example.com", password: "a secure password", displayName: "Reset Owner"),
+      now: now)
+    let friend = try await store.register(
+      .init(email: "reset-friend@example.com", password: "a secure password", displayName: "Friend"),
+      now: now)
+    let blocked = try await store.register(
+      .init(email: "reset-blocked@example.com", password: "a secure password", displayName: "Blocked"),
+      now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 92, accuracy: 100, finishedAt: now),
+      accessToken: owner.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 70, accuracy: 98, finishedAt: now),
+      accessToken: friend.accessToken, now: now)
+    let ownerAfterResult = try await store.authenticatedUser(for: owner.accessToken, now: now)
+    let earnedBadge = try XCTUnwrap(ownerAfterResult.availableBadges.first)
+    _ = try await store.updateProfile(
+      .init(
+        leaderboardOptedOut: true,
+        profileDetails: .init(
+          bio: "Erase this bio", keyboard: "Erase this keyboard", github: "reset-owner",
+          socialHandle: "reset_owner", websiteURL: "https://example.com", showActivity: false),
+        selectedBadgeID: earnedBadge.id),
+      accessToken: owner.accessToken, now: now)
+    _ = try await store.createDeveloperAccessKey(
+      .init(name: "reset-key"), accessToken: owner.accessToken, now: now)
+    _ = try await store.pushSync(
+      .init(changes: [
+        .init(id: UUID(), type: "preset", version: 1, payload: "{}", isDeleted: false)
+      ]), accessToken: owner.accessToken, now: now)
+    _ = try await store.resetPersonalBests(
+      .init(currentPassword: "a secure password"), accessToken: owner.accessToken, now: now)
+    _ = try await store.setStreakDayBoundary(
+      .init(offsetHours: 1), accessToken: owner.accessToken, now: now)
+    _ = try await store.submitQuote(
+      .init(language: "english", text: "A reset should preserve this pending quote.", attribution: nil),
+      accessToken: owner.accessToken, now: now)
+    _ = try await store.sendConnection(
+      .init(recipientID: friend.user.id), accessToken: owner.accessToken, now: now)
+    _ = try await store.acceptConnection(
+      requesterID: owner.user.id, accessToken: friend.accessToken, now: now)
+    try await store.blockUser(blocked.user.id, accessToken: owner.accessToken, now: now)
+    let notificationsBeforeReset = try await store.notifications(
+      accessToken: owner.accessToken, now: now)
+    XCTAssertFalse(notificationsBeforeReset.notifications.isEmpty)
+
+    do {
+      _ = try await store.resetAccount(
+        .init(currentPassword: nil), accessToken: owner.accessToken, now: now)
+      XCTFail("Resetting an account must require a fresh confirmation")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidReauthenticationToken)
+    }
+    do {
+      _ = try await store.resetAccount(
+        .init(currentPassword: "wrong password"), accessToken: owner.accessToken, now: now)
+      XCTFail("Resetting an account must reject an incorrect password")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidCredentials)
+    }
+
+    let reauthentication = try await store.reauthenticateWithPassword(
+      .init(currentPassword: "a secure password"), accessToken: owner.accessToken, now: now)
+    let reauthenticatedReset = try await store.resetAccount(
+      .init(currentPassword: nil), accessToken: owner.accessToken,
+      reauthenticationToken: reauthentication.reauthenticationToken, now: now)
+    XCTAssertEqual(reauthenticatedReset.id, owner.user.id)
+    do {
+      _ = try await store.resetAccount(
+        .init(currentPassword: nil), accessToken: owner.accessToken,
+        reauthenticationToken: reauthentication.reauthenticationToken, now: now)
+      XCTFail("Resetting an account must not reuse a consumed reauthentication token")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidReauthenticationToken)
+    }
+
+    let resetUser = try await store.resetAccount(
+      .init(currentPassword: "a secure password"), accessToken: owner.accessToken, now: now)
+    let resetProfile = try await store.publicProfile(id: owner.user.id, now: now)
+    XCTAssertEqual(resetUser.id, owner.user.id)
+    XCTAssertEqual(resetUser.email, owner.user.email)
+    XCTAssertEqual(resetUser.displayName, owner.user.displayName)
+    XCTAssertEqual(resetUser.authenticationMethods, [.password])
+    XCTAssertFalse(resetUser.leaderboardOptedOut)
+    XCTAssertEqual(resetUser.profileDetails, .init())
+    XCTAssertNil(resetUser.selectedBadgeID)
+    XCTAssertTrue(resetUser.availableBadges.isEmpty)
+    XCTAssertEqual(resetUser.totalExperience, 0)
+    XCTAssertNil(resetUser.personalBestResetAt)
+    XCTAssertEqual(resetUser.streakDayBoundaryOffsetHours, 1)
+    XCTAssertEqual(resetProfile.completedResultCount, 0)
+    XCTAssertEqual(resetProfile.startedTestCount, 0)
+    XCTAssertEqual(resetProfile.totalTypingSeconds, 0)
+    XCTAssertEqual(resetProfile.bestWPM, 0)
+    XCTAssertTrue(resetProfile.personalBests.isEmpty)
+    let ownerResults = try await store.results(
+      .init(), credential: .accessToken(owner.accessToken), now: now)
+    let ownerKeys = try await store.developerAccessKeys(
+      accessToken: owner.accessToken, now: now)
+    let ownerSync = try await store.pullSync(after: 0, accessToken: owner.accessToken, now: now)
+    let ownerNotifications = try await store.notifications(
+      accessToken: owner.accessToken, now: now)
+    let ownerConnections = try await store.connections(
+      accessToken: owner.accessToken, now: now)
+    let ownerBlocks = try await store.blockedUsers(accessToken: owner.accessToken, now: now)
+    let ownerSubmissions = try await store.quoteSubmissions(
+      accessToken: owner.accessToken, now: now)
+    let friendResults = try await store.results(
+      .init(), credential: .accessToken(friend.accessToken), now: now)
+    XCTAssertTrue(ownerResults.results.isEmpty)
+    XCTAssertTrue(ownerKeys.keys.isEmpty)
+    XCTAssertTrue(ownerSync.changes.isEmpty)
+    XCTAssertTrue(ownerNotifications.notifications.isEmpty)
+    XCTAssertEqual(ownerConnections.connections.map(\.relation), [.friend])
+    XCTAssertEqual(ownerBlocks.profiles.map(\.id), [blocked.user.id])
+    XCTAssertEqual(ownerSubmissions.submissions.count, 1)
+    XCTAssertEqual(friendResults.results.count, 1)
+
+    let repeatedReset = try await store.resetAccount(
+      .init(currentPassword: "a secure password"), accessToken: owner.accessToken, now: now)
+    XCTAssertEqual(repeatedReset.id, owner.user.id)
+
+    let reloadedStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let reloadedUser = try await reloadedStore.authenticatedUser(
+      for: owner.accessToken, now: now)
+    XCTAssertEqual(reloadedUser, repeatedReset)
+
+    let app = try await Application.make(.testing)
+    do {
+      try configure(app, authStore: reloadedStore)
+      try await app.test(
+        .PATCH,
+        "v1/auth/account/reset",
+        beforeRequest: { request async throws in
+          try request.content.encode(ResetAccountRequest(currentPassword: "a secure password"))
+        },
+        afterResponse: { response async in XCTAssertEqual(response.status, .unauthorized) })
+      try await app.test(
+        .PATCH,
+        "v1/auth/account/reset",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(owner.accessToken)")
+          try request.content.encode(ResetAccountRequest(currentPassword: "a secure password"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(try? response.content.decode(AuthUserResponse.self).id, owner.user.id)
+        })
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testOAuthIdentitiesSupportPasswordlessLoginLinkingAndSafeUnlinking() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let github = OAuthProviderIdentity(

@@ -3,6 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct PreferencesView: View {
+  @Environment(\.modelContext) private var modelContext
   let settings: AppSettings
   let account: AccountSession
   let hotkey: GlobalHotkeyMonitor
@@ -41,7 +42,9 @@ struct PreferencesView: View {
   @State private var authenticationChangePassword = ""
   @State private var sessionRevocationPassword = ""
   @State private var accountDeletionPassword = ""
+  @State private var accountResetPassword = ""
   @State private var showingAccountDeletionConfirmation = false
+  @State private var showingAccountResetConfirmation = false
   @State private var showingRemoteResultsDeletionConfirmation = false
   @State private var showingRemotePersonalBestResetConfirmation = false
   @State private var showingSessionRevocationConfirmation = false
@@ -1399,6 +1402,21 @@ struct PreferencesView: View {
                 .foregroundStyle(.secondary)
             }
             Divider()
+            Text("重置账户数据").font(.headline)
+            if user.authenticationMethods.contains(.password) {
+              SecureField("输入当前密码以重置账户", text: $accountResetPassword)
+                .textContentType(.password)
+            }
+            Button("重置服务端与这台 Mac…", role: .destructive) {
+              showingAccountResetConfirmation = true
+            }
+            .disabled(
+              account.isWorking || (user.authenticationMethods.contains(.password)
+                && accountResetPassword.isEmpty))
+            Text("永久清除当前账户的成绩、XP、个人最佳、资料、开发者密钥、同步档案，以及这台 Mac 上的练习历史、预设、保存文本、设置、背景和字体。登录身份、会话、好友、屏蔽、投稿与统计日边界会保留。建议先导出数据。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Divider()
             Text("投稿引语").font(.headline)
             Picker("语言", selection: $submittedQuoteLanguage) {
               ForEach(TypingLanguage.allCases.filter(\.supportsCommunityQuoteSubmission), id: \.self) { language in
@@ -1790,6 +1808,28 @@ struct PreferencesView: View {
       }
     } message: {
       Text("当前账户的自建服务成绩与相应 XP 将永久移除。本机练习历史、设置及其他账户不受影响。")
+    }
+    .confirmationDialog(
+      "重置账户与这台 Mac？", isPresented: $showingAccountResetConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("永久重置", role: .destructive) {
+        Task {
+          guard await account.resetAccount(
+            currentPassword: accountResetPassword.isEmpty ? nil : accountResetPassword)
+          else { return }
+          do {
+            try LocalAccountReset.eraseCurrentMacData(
+              modelContext: modelContext, settings: settings)
+            accountResetPassword = ""
+            account.statusMessage = "账户数据与这台 Mac 的 Typebar 数据已重置。登录身份、关系和投稿已保留。"
+          } catch {
+            account.statusMessage = "服务端已重置，但这台 Mac 的清理未完成：\(error.localizedDescription)。请再次执行重置以重试。"
+          }
+        }
+      }
+    } message: {
+      Text("此操作无法撤销。服务端会先重置；若随后本机清理失败，可再次执行相同操作安全重试。请先导出需要保留的数据。")
     }
     .confirmationDialog(
       "删除此自建账户？", isPresented: $showingAccountDeletionConfirmation, titleVisibility: .visible
