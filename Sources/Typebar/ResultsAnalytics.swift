@@ -43,6 +43,21 @@ struct HistoryChartVisibility: Codable, Equatable {
   var accuracy = true
   var average10 = true
   var average100 = true
+
+  /// Applies a user-visible chart toggle while retaining at least one primary
+  /// trace. Moving-average traces remain independent presentation choices.
+  func applying(_ update: (inout HistoryChartVisibility) -> Void) -> HistoryChartVisibility {
+    var updated = self
+    update(&updated)
+    if !updated.speed && !updated.accuracy {
+      if updated.speed == speed {
+        updated.speed = true
+      } else {
+        updated.accuracy = true
+      }
+    }
+    return updated
+  }
 }
 
 /// Small, deterministic transforms for the local history chart. Inputs are

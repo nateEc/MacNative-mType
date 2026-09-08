@@ -1488,9 +1488,7 @@ final class AppSettings {
   }
 
   func mutateHistoryChartVisibility(_ update: (inout HistoryChartVisibility) -> Void) {
-    var updated = historyChartVisibility
-    update(&updated)
-    historyChartVisibility = updated
+    historyChartVisibility = historyChartVisibility.applying(update)
   }
 
   var snapshot: AppSettingsSnapshot {

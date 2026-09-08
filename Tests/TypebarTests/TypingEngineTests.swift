@@ -7915,6 +7915,19 @@ final class TypingEngineTests: XCTestCase {
 
   func testHistoryChartPolicyMatchesLocalHistoryTracesAndTypingTimeTrend() throws {
     XCTAssertEqual(HistoryChartVisibility(), .init())
+    let accuracyOnly = HistoryChartVisibility(
+      speed: false, accuracy: true, average10: false, average100: false)
+    XCTAssertEqual(
+      accuracyOnly.applying { $0.accuracy.toggle() },
+      .init(speed: true, accuracy: false, average10: false, average100: false))
+    let speedOnly = HistoryChartVisibility(
+      speed: true, accuracy: false, average10: true, average100: true)
+    XCTAssertEqual(
+      speedOnly.applying { $0.speed.toggle() },
+      .init(speed: false, accuracy: true, average10: true, average100: true))
+    XCTAssertEqual(
+      speedOnly.applying { $0.average10.toggle() },
+      .init(speed: true, accuracy: false, average10: false, average100: true))
     XCTAssertEqual(
       HistoryChartPolicy.movingAverage(values: [120, 100, 80], windowSize: 10), [100, 90, 80])
     XCTAssertEqual(
