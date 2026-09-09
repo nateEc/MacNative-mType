@@ -7,6 +7,32 @@ enum ResultSavingPolicy {
   }
 }
 
+enum ResultPublicationState: Equatable {
+  case idle
+  case sending
+  case sent(String)
+  case failed(String)
+  case notice(String)
+
+  var message: String? {
+    switch self {
+    case .idle: nil
+    case .sending: "正在发送至自建服务…"
+    case .sent(let message), .failed(let message), .notice(let message): message
+    }
+  }
+
+  var canRetry: Bool {
+    if case .failed = self { return true }
+    return false
+  }
+
+  var isSending: Bool {
+    if case .sending = self { return true }
+    return false
+  }
+}
+
 @Model
 final class TestResultRecord {
   @Attribute(.unique) var id: UUID

@@ -11902,6 +11902,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .invalidAFK, enabled: true))
   }
 
+  func testResultPublicationStateOnlyAllowsRetryAfterFailure() {
+    XCTAssertNil(ResultPublicationState.idle.message)
+    XCTAssertEqual(ResultPublicationState.sending.message, "正在发送至自建服务…")
+    XCTAssertFalse(ResultPublicationState.sending.canRetry)
+    XCTAssertFalse(ResultPublicationState.sent("已发送").canRetry)
+    XCTAssertFalse(ResultPublicationState.notice("仅本机").canRetry)
+    XCTAssertEqual(ResultPublicationState.failed("发送失败").message, "发送失败")
+    XCTAssertTrue(ResultPublicationState.failed("发送失败").canRetry)
+  }
+
   func testCompletedStatusTextReflectsWhetherResultWasSaved() {
     XCTAssertEqual(TestOutcome.completed.statusText(savesResult: true), "本次完成 · 已保存到本机")
     XCTAssertEqual(TestOutcome.completed.statusText(savesResult: false), "本次完成 · 未保存为完成成绩")

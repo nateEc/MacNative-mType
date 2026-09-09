@@ -559,7 +559,8 @@ private struct ContentView: View {
   @State private var showingWordFilter = false
   @State private var showingCustomTextGenerator = false
   @State private var completedResult: CompletedResultPresentation?
-  @State private var publicationMessage: String?
+  @State private var publicationState: ResultPublicationState = .idle
+  @State private var publicationResultID: UUID?
   @State private var terminalNotice: TestTerminalNotice?
   @State private var bailoutConfirmationMessage: String?
   @State private var showingSync = false
@@ -736,13 +737,18 @@ private struct ContentView: View {
         if savesResult {
           publishIfEnabled(result)
         } else if result.outcome == .bailedOut {
-          publicationMessage = updatedLongTextProgress
-            ? "长文本进度已保存；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
-            : "本次已中止：结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
+          publicationResultID = nil
+          publicationState = .notice(
+            updatedLongTextProgress
+              ? "长文本进度已保存；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
+              : "本次已中止：结果只在当前窗口显示，不会保存、本机统计、同步或发布。")
         } else if result.outcome == .invalidAFK {
-          publicationMessage = "检测到结束前持续闲置；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
+          publicationResultID = nil
+          publicationState = .notice(
+            "检测到结束前持续闲置；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。")
         } else {
-          publicationMessage = "练习模式：本次成绩不会保存、本机统计、同步或发布。"
+          publicationResultID = nil
+          publicationState = .notice("练习模式：本次成绩不会保存、本机统计、同步或发布。")
         }
       case .failed:
         terminalNotice = .failed(savedLongTextProgress: updateLongSavedTextProgress(for: outcome))
@@ -863,7 +869,7 @@ private struct ContentView: View {
         panel: activeTheme.panel,
         accent: activeTheme.accent,
         colorScheme: activeTheme.colorScheme,
-        publicationMessage: publicationMessage,
+        publicationState: publicationState,
         savedResultRecord: result.savedRecord,
         quoteFeedback: result.quoteFeedback,
         resultPersonalBestFeedback: result.resultPersonalBestFeedback,
@@ -906,6 +912,7 @@ private struct ContentView: View {
         },
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
+        onRetryPublication: { publishIfEnabled(result.result) },
         onPracticeMissedWords: {
           startWordPractice(
             result.missedWordPracticeWords, selectedTargetCount: result.missedWords.count)
@@ -3103,18 +3110,23 @@ private struct ContentView: View {
   }
 
   private func publishIfEnabled(_ result: CompletedTestResult) {
-    publicationMessage = nil
+    if publicationResultID == result.id, publicationState.isSending { return }
+    publicationResultID = result.id
+    publicationState = .idle
     guard settings.publishCompletedResults, account.currentUser != nil else { return }
+    publicationState = .sending
     Task {
       do {
         let response = try await account.submitCompletedResult(result)
         let rank = response.weeklyExperienceRank.map { " · 本周 XP #\($0)" } ?? ""
-        publicationMessage =
+        guard publicationResultID == result.id else { return }
+        publicationState = .sent(
           response.leaderboardEligible
-          ? "已发送至自建服务 · +\(response.experienceGained) XP · 总计 \(response.totalExperience) XP\(rank)"
-          : "已发送至自建服务 · +\(response.experienceGained) XP"
+            ? "已发送至自建服务 · +\(response.experienceGained) XP · 总计 \(response.totalExperience) XP\(rank)"
+            : "已发送至自建服务 · +\(response.experienceGained) XP")
       } catch {
-        publicationMessage = "本机成绩已保存；未能发送至服务：\(error.localizedDescription)"
+        guard publicationResultID == result.id else { return }
+        publicationState = .failed("本机成绩已保存；未能发送至服务：\(error.localizedDescription)")
       }
     }
   }
@@ -3192,7 +3204,7 @@ private struct CompletedResultView: View {
   let panel: Color
   let accent: Color
   let colorScheme: ColorScheme
-  let publicationMessage: String?
+  let publicationState: ResultPublicationState
   let savedResultRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
   let resultPersonalBestFeedback: ResultPersonalBestFeedback?
@@ -3217,6 +3229,7 @@ private struct CompletedResultView: View {
   let onRepeat: () -> Void
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
+  let onRetryPublication: () -> Void
   let onPracticeMissedWords: () -> Void
   let onPracticeContextualMissedWords: ([String], Int) -> Void
   let onPracticeSlowWords: ([String], Int) -> Void
@@ -3318,11 +3331,22 @@ private struct CompletedResultView: View {
         ChallengeResultView(evaluation: challengeEvaluation)
       }
 
-      if let publicationMessage {
-        Text(publicationMessage)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .multilineTextAlignment(.center)
+      if let publicationMessage = publicationState.message {
+        VStack(spacing: 8) {
+          HStack(spacing: 6) {
+            if publicationState.isSending {
+              ProgressView().controlSize(.small)
+            }
+            Text(publicationMessage)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .multilineTextAlignment(.center)
+          }
+          if publicationState.canRetry {
+            Button("重新发送成绩", action: onRetryPublication)
+              .buttonStyle(.bordered)
+          }
+        }
       }
 
       quoteFeedbackControls
