@@ -4649,6 +4649,12 @@ enum OfflineContent {
     case .lithuanian1k, .lithuanian3k: .lithuanian
     case .latvian1k: .latvian
     case .maltese1k: .maltese
+    case .vietnamese1k, .vietnamese5k: .vietnamese
+    case .pinyin1k, .pinyin10k: .pinyin
+    case .hausa1k: .hausa
+    case .bemba1k, .bemba10k: .bemba
+    case .catalan1k: .catalan
+    case .frisian1k: .frisian
     default: nil
     }
     if let source = inheritedScaleQuoteSource {

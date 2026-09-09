@@ -160,7 +160,7 @@ enum LivePracticeContentService {
     case .german, .german1k, .german10k, .german250k,
       .swissGerman, .swissGerman1k, .swissGerman2k: return "de"
     case .afrikaans, .afrikaans1k, .afrikaans10k: return "af"
-    case .hausa: return "ha"
+    case .hausa, .hausa1k: return "ha"
     case .tatar, .tatar1k, .tatar5k, .tatar9k: return "tt"
     case .tatarCrimean, .tatarCrimean1k, .tatarCrimean5k, .tatarCrimean10k,
       .tatarCrimean15k, .tatarCrimeanCyrillic, .tatarCrimeanCyrillic1k,
@@ -177,7 +177,7 @@ enum LivePracticeContentService {
     case .jyutping: return "zh"
     case .bashkir: return "ba"
     case .basque: return "eu"
-    case .frisian: return "fy"
+    case .frisian, .frisian1k: return "fy"
     case .hawaiian: return "haw"
     case .kabyle, .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k: return "kab"
     case .maltese, .maltese1k: return "mt"
@@ -189,7 +189,7 @@ enum LivePracticeContentService {
     case .santali: return "sat"
     case .yiddish: return "yi"
     case .friulian: return "fur"
-    case .bemba: return "bem"
+    case .bemba, .bemba1k, .bemba10k: return "bem"
     case .azerbaijani, .azerbaijani1k: return "az"
     case .belarusian, .belarusian1k, .belarusian5k, .belarusian10k, .belarusian25k,
       .belarusian50k, .belarusian100k: return "be"

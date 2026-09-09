@@ -35,7 +35,7 @@ extension TypingLanguage {
     case .german, .german1k, .german10k, .german250k: "de-DE"
     case .swissGerman, .swissGerman1k, .swissGerman2k: "de-CH"
     case .afrikaans, .afrikaans1k, .afrikaans10k: "af-ZA"
-    case .hausa: "ha"
+    case .hausa, .hausa1k: "ha"
     case .tatar, .tatar1k, .tatar5k, .tatar9k: "tt"
     case .tatarCrimean, .tatarCrimean1k, .tatarCrimean5k, .tatarCrimean10k,
       .tatarCrimean15k, .tatarCrimeanCyrillic, .tatarCrimeanCyrillic1k,
@@ -52,7 +52,7 @@ extension TypingLanguage {
     case .jyutping: "zh-Hant"
     case .bashkir: "ba"
     case .basque: "eu"
-    case .frisian: "fy-FY"
+    case .frisian, .frisian1k: "fy-FY"
     case .hawaiian: "haw"
     case .kabyle, .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k: "kab"
     case .maltese, .maltese1k: "mt"
@@ -64,7 +64,7 @@ extension TypingLanguage {
     case .santali: "sat-IN"
     case .yiddish: "yi"
     case .friulian: "fur"
-    case .bemba: "bem"
+    case .bemba, .bemba1k, .bemba10k: "bem"
     case .azerbaijani, .azerbaijani1k: "az-AZ"
     case .belarusian, .belarusian1k, .belarusian5k, .belarusian10k, .belarusian25k,
       .belarusian50k, .belarusian100k: "be-BY"

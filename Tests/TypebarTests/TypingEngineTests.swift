@@ -10064,6 +10064,143 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testLatinAndRomanizedScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    struct ExpectedScale {
+      let rawValue: String
+      let displayName: String
+      let count: Int
+      let minimumLength: Int
+      let maximumLength: Int
+      let categorySignatures: [String: Int]
+      var punctuationHistogram: [Int: Int] = [:]
+      var spaceHistogram: [Int: Int] = [:]
+      let supportsLazyInput: Bool
+      let zipfSupport: ZipfFrequencySupport
+      let quoteSourceRawValue: String
+      let wikipediaCode: String
+      let speechLocale: String
+    }
+
+    let cases = [
+      ExpectedScale(
+        rawValue: "vietnamese1k", displayName: "Tiếng Việt · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 7, categorySignatures: ["N": 870, "plain": 130],
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "vietnamese",
+        wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "vietnamese5k", displayName: "Tiếng Việt · 5k · Typebar", count: 5_000,
+        minimumLength: 1, maximumLength: 7, categorySignatures: ["N": 4_450, "plain": 550],
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "vietnamese",
+        wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "pinyin1k", displayName: "Pinyin · 1k · Typebar", count: 612,
+        minimumLength: 1, maximumLength: 6, categorySignatures: ["N": 601, "plain": 11],
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "pinyin",
+        wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "pinyin10k", displayName: "Pinyin · 10k · Typebar", count: 1_293,
+        minimumLength: 1, maximumLength: 6, categorySignatures: ["N": 1_223, "plain": 70],
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "pinyin",
+        wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "hausa1k", displayName: "Hausa · 1k · Typebar", count: 829,
+        minimumLength: 1, maximumLength: 19,
+        categorySignatures: [
+          "N": 20, "P": 2, "PN": 12, "PS": 1, "PSN": 2, "S": 125, "SN": 10,
+          "plain": 657,
+        ], punctuationHistogram: [1: 16, 2: 1], spaceHistogram: [1: 118, 2: 19, 3: 1],
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "hausa",
+        wikipediaCode: "ha", speechLocale: "ha"),
+      ExpectedScale(
+        rawValue: "bemba1k", displayName: "Ichibemba · 1k · Typebar", count: 1_001,
+        minimumLength: 1, maximumLength: 15, categorySignatures: ["plain": 1_001],
+        supportsLazyInput: true, zipfSupport: .unsupported, quoteSourceRawValue: "bemba",
+        wikipediaCode: "bem", speechLocale: "bem"),
+      ExpectedScale(
+        rawValue: "bemba10k", displayName: "Ichibemba · 10k · Typebar", count: 10_001,
+        minimumLength: 1, maximumLength: 19,
+        categorySignatures: ["N": 2, "plain": 9_999], supportsLazyInput: true,
+        zipfSupport: .unsupported, quoteSourceRawValue: "bemba",
+        wikipediaCode: "bem", speechLocale: "bem"),
+      ExpectedScale(
+        rawValue: "catalan1k", displayName: "Català · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 16,
+        categorySignatures: ["N": 163, "P": 6, "PN": 2, "U": 43, "UN": 17, "plain": 769],
+        punctuationHistogram: [1: 8], supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "catalan", wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "frisian1k", displayName: "Frysk · 1k · Typebar", count: 909,
+        minimumLength: 2, maximumLength: 13,
+        categorySignatures: ["N": 103, "P": 2, "plain": 804],
+        punctuationHistogram: [1: 2], supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "frisian", wikipediaCode: "fy", speechLocale: "fy-FY"),
+    ]
+
+    for expected in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: expected.rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: expected.quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+      var categorySignatures: [String: Int] = [:]
+      var punctuationHistogram: [Int: Int] = [:]
+      var spaceHistogram: [Int: Int] = [:]
+      for word in words {
+        var signature = ""
+        if word.contains(where: \.isUppercase) { signature += "U" }
+        if word.contains(where: \.isPunctuation) { signature += "P" }
+        if word.contains(where: \.isWhitespace) { signature += "S" }
+        if word.unicodeScalars.contains(where: { !$0.isASCII }) { signature += "N" }
+        categorySignatures[signature.isEmpty ? "plain" : signature, default: 0] += 1
+        let punctuationCount = word.filter(\.isPunctuation).count
+        if punctuationCount > 0 { punctuationHistogram[punctuationCount, default: 0] += 1 }
+        let spaceCount = word.filter(\.isWhitespace).count
+        if spaceCount > 0 { spaceHistogram[spaceCount, default: 0] += 1 }
+      }
+
+      XCTAssertEqual(language.displayName, expected.displayName, expected.rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, expected.rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, expected.rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, expected.rawValue)
+      XCTAssertEqual(language.supportsLazyLatinInput, expected.supportsLazyInput, expected.rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, expected.rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, expected.rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, expected.zipfSupport, expected.rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language),
+        expected.wikipediaCode, expected.rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertEqual(words.count, expected.count, expected.rawValue)
+      XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), expected.maximumLength, expected.rawValue)
+      XCTAssertEqual(categorySignatures, expected.categorySignatures, expected.rawValue)
+      XCTAssertEqual(punctuationHistogram, expected.punctuationHistogram, expected.rawValue)
+      XCTAssertEqual(spaceHistogram, expected.spaceHistogram, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, expected.rawValue)
+      XCTAssertFalse(
+        words.contains { $0.unicodeScalars.contains(where: \.properties.isJoinControl) },
+        expected.rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, expected.rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        expected.rawValue)
+      XCTAssertFalse(OfflineContent.generatedPrompt(wordCount: 25, language: language).isEmpty)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, expected.rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text,
+          expected.rawValue)
+      }
+    }
+  }
+
   func testAtlanticAndBalticScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     struct ExpectedScale {
       let rawValue: String
