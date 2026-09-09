@@ -503,6 +503,7 @@ public actor AuthStore {
     "simplifiedChinese50k",
     "traditionalChinese1k", "traditionalChinese5k", "traditionalChinese10k",
     "traditionalChinese50k",
+    "nepali1k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",

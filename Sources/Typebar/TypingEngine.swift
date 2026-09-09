@@ -307,6 +307,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case thai50k
   case thai60k
   case nepali
+  case nepali1k
   case nepaliRomanized
   case kannada
   case telugu
@@ -5719,6 +5720,30 @@ enum StarterLexicon {
     "दूरी", "कदम", "धैर्य", "सन्तुलन",
   ]
 
+  private static let nepali1kAlphabet =
+    Array("कखगघङचछजझञटठडढणतथदधनपफबभमयरऱलळवशषसह")
+
+  private static func nepali1kIndex(_ index: Int) -> String {
+    let radix = nepali1kAlphabet.count
+    precondition(index < radix * radix)
+    return String([
+      nepali1kAlphabet[index / radix],
+      nepali1kAlphabet[index % radix],
+    ])
+  }
+
+  static var nepali1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 1_000) { index in
+      if index == 0 { return "क" }
+      if index == 1 { return "काकाकाकाककक" }
+      let suffix = nepali1kIndex(index)
+      if index < 74 { return "ञ" + suffix }
+      return "ट" + suffix + "ा"
+    }
+  }
+
+  static var nepali1kWords: [String] { nepali1kLexicon.materialized() }
+
   // Typebar-authored Romanized Nepali practice is independent of the native
   // Devanagari corpus and does not imply a reversible transliteration scheme.
   static let nepaliRomanizedWords = [
@@ -6952,6 +6977,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: nepaliWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .nepali1k:
+      return prompt(
+        tokens: count, lexicon: nepali1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .nepaliRomanized:
       return prompt(
         tokens: count, lexicon: nepaliRomanizedWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7679,6 +7708,7 @@ enum StarterLexicon {
     case .thai50k: (thai50kWords, [",", ".", "!", "?"])
     case .thai60k: (thai60kWords, [",", ".", "!", "?"])
     case .nepali: (nepaliWords, [",", ".", "!", "?"])
+    case .nepali1k: (nepali1kWords, [",", ".", "!", "?"])
     case .nepaliRomanized: (nepaliRomanizedWords, [",", ".", "!", "?"])
     case .kannada: (kannadaWords, [",", ".", "!", "?"])
     case .telugu: (teluguWords, [",", ".", "!", "?"])
@@ -7991,6 +8021,7 @@ extension TypingLanguage {
     case .thai50k: StarterLexicon.thai50kWords
     case .thai60k: StarterLexicon.thai60kWords
     case .nepali: StarterLexicon.nepaliWords
+    case .nepali1k: StarterLexicon.nepali1kWords
     case .nepaliRomanized: StarterLexicon.nepaliRomanizedWords
     case .kannada: StarterLexicon.kannadaWords
     case .telugu: StarterLexicon.teluguWords
@@ -8131,6 +8162,7 @@ extension TypingLanguage {
     case .arabic10k: StarterLexicon.arabic10kLexicon
     case .arabicEgypt1k: StarterLexicon.arabicEgypt1kLexicon
     case .korean1k: StarterLexicon.korean1kLexicon
+    case .nepali1k: StarterLexicon.nepali1kLexicon
     case .korean5k: StarterLexicon.korean5kLexicon
     case .thai1k: StarterLexicon.thai1kLexicon
     case .thai5k: StarterLexicon.thai5kLexicon
@@ -8256,7 +8288,7 @@ extension TypingLanguage {
     case .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
       .bangla, .banglaLetters, .gujarati, .hebrew,
       .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k, .kurdishCentral, .likanu, .malayalam,
-      .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
+      .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
       .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish:
       true
     default:
@@ -8300,7 +8332,7 @@ extension TypingLanguage {
       .pigLatin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
       .tamil, .hindi, .gujarati, .bangla, .banglaLetters,
       .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k,
-      .nepali, .kannada, .telugu, .malayalam,
+      .nepali, .nepali1k, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
       .bulgarianLatin,
       .khmer,
@@ -8345,7 +8377,7 @@ extension TypingLanguage {
       .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
       .traditionalChinese50k,
       .japaneseHiragana, .japaneseKatakana,
-      .korean, .korean1k, .korean5k: false
+      .korean, .korean1k, .korean5k, .nepali1k: false
     default: !isCodeLanguage
     }
   }
@@ -8493,6 +8525,7 @@ extension TypingLanguage {
     case .thai50k: "ไทย · 50k · Typebar"
     case .thai60k: "ไทย · 60k · Typebar"
     case .nepali: "नेपाली"
+    case .nepali1k: "नेपाली · 1k · Typebar"
     case .nepaliRomanized: "Nepali (Romanized)"
     case .kannada: "ಕನ್ನಡ"
     case .telugu: "తెలుగు"

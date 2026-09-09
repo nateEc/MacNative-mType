@@ -88,7 +88,7 @@ extension TypingLanguage {
     case .gujarati: "gu-IN"
     case .bangla, .banglaLetters: "bn-BD"
     case .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k: "th-TH"
-    case .nepali: "ne-NP"
+    case .nepali, .nepali1k: "ne-NP"
     case .nepaliRomanized: "en-US"
     case .kannada: "kn-IN"
     case .telugu: "te-IN"

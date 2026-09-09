@@ -8670,6 +8670,65 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testNepali1kPreservesIndependentIDAndPinnedAggregateShape() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "nepali1k"))
+    let words = language.ownedPracticeLexicon()
+    let isMark: (Unicode.Scalar) -> Bool = { scalar in
+      return switch scalar.properties.generalCategory {
+      case .nonspacingMark, .spacingMark, .enclosingMark: true
+      default: false
+      }
+    }
+    let isLetterOrMark: (Unicode.Scalar) -> Bool = { scalar in
+      if isMark(scalar) { return true }
+      return switch scalar.properties.generalCategory {
+      case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter: true
+      default: false
+      }
+    }
+
+    XCTAssertEqual(language.displayName, "नेपाली · 1k · Typebar")
+    XCTAssertFalse(language.usesRightToLeftPrompt)
+    XCTAssertTrue(language.usesJoiningScriptPrompt)
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertFalse(language.supportsCapsLockWarning)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ne")
+    XCTAssertEqual(language.speechLocaleIdentifier, "ne-NP")
+    XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertEqual(words.count, 1_000)
+    XCTAssertEqual(Set(words).count, 1_000)
+    XCTAssertEqual(words.lazy.map(\.count).min(), 1)
+    XCTAssertEqual(words.lazy.map(\.count).max(), 7)
+    XCTAssertEqual(words.lazy.map { $0.unicodeScalars.count }.min(), 1)
+    XCTAssertEqual(words.lazy.map { $0.unicodeScalars.count }.max(), 11)
+    XCTAssertEqual(words.filter { word in
+      word.unicodeScalars.contains(where: isMark)
+    }.count, 927)
+    XCTAssertTrue(words.allSatisfy { word in
+      word.unicodeScalars.allSatisfy { (0x0900...0x097F).contains($0.value) }
+    })
+    XCTAssertFalse(words.contains { $0.contains(where: \.isUppercase) })
+    XCTAssertFalse(words.contains { $0.contains(" ") })
+    XCTAssertFalse(words.contains(where: { word in
+      word.unicodeScalars.contains(where: { !isLetterOrMark($0) })
+    }))
+
+    let configuration = TestConfiguration.words(25, language: language)
+    XCTAssertEqual(
+      try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+      configuration)
+    let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+    XCTAssertEqual(
+      try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+    XCTAssertEqual(OfflineContent.generatedPrompt(wordCount: 25, language: language).split(separator: " ").count, 25)
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),
@@ -14059,7 +14118,7 @@ final class TypingEngineTests: XCTestCase {
       .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
       .bangla, .banglaLetters, .gujarati, .hebrew,
       .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k, .kurdishCentral, .likanu, .malayalam,
-      .myanmarBurmese, .nepali, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
+      .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
       .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish,
     ]
     XCTAssertEqual(

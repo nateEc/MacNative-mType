@@ -208,7 +208,7 @@ enum LivePracticeContentService {
     case .gujarati: return "gu"
     case .bangla, .banglaLetters: return "bn"
     case .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k: return "th"
-    case .nepali: return "ne"
+    case .nepali, .nepali1k: return "ne"
     case .nepaliRomanized: return "en"
     case .kannada: return "kn"
     case .telugu: return "te"
