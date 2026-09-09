@@ -221,7 +221,7 @@
 | `startGraphsAtZero` | `startGraphsAtZero` | 已映射。 |
 | `maxLineWidth` | `practiceLineWidth`、`customPracticeLineColumns` | 已映射；以原生列宽/自适应表达。 |
 | `fontSize` | `fontSize` | 已映射。 |
-| `fontFamily` | `practiceFont`、可搜索的本机字体目录、名称/导入 | 部分；可浏览当前 macOS 已安装字体家族，也可手填 PostScript 名或导入 TTF/OTF，不复用网页字体资产；官方 Web 字体目录与 WOFF/WOFF2 仍不复制或解码。 |
+| `fontFamily` | `practiceFont`、可搜索的本机字体目录、名称/导入 | 部分；可浏览当前 macOS 已安装字体家族，也可手填 PostScript 名，或导入用户拥有的 TTF、OTF、WOFF、WOFF2。四种格式都经原生 Core Text 读取描述符并实际注册后才替换旧文件，不复用或打包网页字体资产；状态仍为部分，因为官方 Web 字体目录不会被复制进纯原生重写。 |
 | `keymapMode` | `keyboardGuideMode` | 已映射。 |
 | `keymapLayout` | `keyboardGuideLayoutSource`、`keyboardLayout`、自定义图 | 已映射；可选固定参考 239 个名称对应的原创原生键盘图、当前 macOS 输入源或用户自写 Unicode 图。官方命名资产不打包，逐项证据见 `OFFICIAL_LAYOUT_AUDIT.md` 与机器清单 `Compatibility/official-layouts.json`。 |
 | `keymapStyle` | `keyboardGuideStyle` | 已映射。 |

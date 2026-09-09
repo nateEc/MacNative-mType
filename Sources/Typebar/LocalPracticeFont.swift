@@ -9,9 +9,13 @@ struct LocalPracticeFontInfo: Equatable {
 }
 
 enum LocalPracticeFontFilePolicy {
-  private static let supportedExtensions = Set(["otf", "ttf"])
+  private static let supportedExtensions = Set(["otf", "ttf", "woff", "woff2"])
 
-  static let supportedContentTypes: [UTType] = [.font]
+  static let supportedContentTypes: [UTType] = [
+    .font,
+    UTType(filenameExtension: "woff", conformingTo: .data),
+    UTType(filenameExtension: "woff2", conformingTo: .data),
+  ].compactMap { $0 }
 
   static func supports(filename: String) -> Bool {
     supportedExtensions.contains(URL(fileURLWithPath: filename).pathExtension.lowercased())
@@ -124,7 +128,7 @@ enum LocalPracticeFontError: LocalizedError {
   var errorDescription: String? {
     switch self {
     case .unsupportedFormat:
-      "请选择 TTF 或 OTF 字体文件。"
+      "请选择 TTF、OTF、WOFF 或 WOFF2 字体文件。"
     case .invalidFont:
       "所选文件不是 macOS 可以读取的字体。"
     case .couldNotLoad:

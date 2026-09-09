@@ -504,7 +504,7 @@ struct PreferencesView: View {
           Text("Typebar 不会安装、上传或打包第三方字体文件。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Text("本地文件仅保存在当前 Mac 的应用支持目录，不随账户或设置归档迁移；支持 TTF、OTF。")
+          Text("本地文件仅保存在当前 Mac 的应用支持目录，不随账户或设置归档迁移；支持 TTF、OTF、WOFF、WOFF2。")
             .font(.caption)
             .foregroundStyle(.secondary)
           if let localPracticeFontMessage {
@@ -1975,7 +1975,7 @@ struct PreferencesView: View {
 
   private func importLocalPracticeFont(from url: URL) {
     guard LocalPracticeFontFilePolicy.supports(filename: url.lastPathComponent) else {
-      localPracticeFontMessage = "请选择 TTF 或 OTF 字体文件。"
+      localPracticeFontMessage = "请选择 TTF、OTF、WOFF 或 WOFF2 字体文件。"
       return
     }
     let canAccess = url.startAccessingSecurityScopedResource()

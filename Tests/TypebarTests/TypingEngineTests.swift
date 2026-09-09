@@ -11722,13 +11722,19 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(NativeFontCatalog.filteredFamilies(families, query: "missing"), [])
   }
 
-  func testLocalPracticeFontFilePolicyAcceptsNativeFormatsOnly() {
+  func testLocalPracticeFontFilePolicyAcceptsCoreTextFormatsOnly() {
     XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "practice.ttf"))
     XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "PRACTICE.OTF"))
-    XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice.woff"))
-    XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice.woff2"))
+    XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "practice.woff"))
+    XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "PRACTICE.WOFF2"))
     XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice.ttc"))
     XCTAssertFalse(LocalPracticeFontFilePolicy.supports(filename: "practice"))
+    XCTAssertTrue(LocalPracticeFontFilePolicy.supportedContentTypes.contains {
+      $0.preferredFilenameExtension == "woff"
+    })
+    XCTAssertTrue(LocalPracticeFontFilePolicy.supportedContentTypes.contains {
+      $0.preferredFilenameExtension == "woff2"
+    })
   }
 
   @MainActor
