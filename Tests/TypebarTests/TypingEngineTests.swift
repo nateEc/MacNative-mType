@@ -1492,12 +1492,57 @@ final class TypingEngineTests: XCTestCase {
       ["test.language.simplifiedChinese"])
   }
 
+  func testPracticePreferenceCommandsCoverReferenceChoicesAndRejectMalformedIDs() {
+    XCTAssertEqual(
+      PracticePreferenceCommandCatalog.items.map(\.id),
+      [
+        "test.difficulty.normal", "test.difficulty.expert", "test.difficulty.master",
+        "test.repeatQuotes.off", "test.repeatQuotes.typing",
+        "test.resultSaving.off", "test.resultSaving.on",
+        "test.englishVariant.american", "test.englishVariant.british",
+      ])
+    XCTAssertEqual(
+      PracticePreferenceCommandCatalog.target(for: "test.difficulty.expert"),
+      .difficulty(.expert))
+    XCTAssertEqual(
+      PracticePreferenceCommandCatalog.target(for: "test.repeatQuotes.typing"),
+      .repeatQuotes(true))
+    XCTAssertEqual(
+      PracticePreferenceCommandCatalog.target(for: "test.resultSaving.off"),
+      .saveCompletedResults(false))
+    XCTAssertEqual(
+      PracticePreferenceCommandCatalog.target(for: "test.englishVariant.british"),
+      .englishVariant(.british))
+    XCTAssertNil(PracticePreferenceCommandCatalog.target(for: "test.difficulty.easy"))
+    XCTAssertNil(PracticePreferenceCommandCatalog.target(for: "test.resultSaving.yes"))
+    XCTAssertNil(PracticePreferenceCommandCatalog.target(for: "test.repeatQuotes.off.extra"))
+  }
+
+  func testPracticePreferenceCommandsRestartAndExitChallengesOnlyWhenRequired() {
+    for target in [
+      PracticePreferenceCommandTarget.difficulty(.normal),
+      .difficulty(.expert), .difficulty(.master),
+      .englishVariant(.american), .englishVariant(.british),
+    ] {
+      XCTAssertTrue(target.requiresRestart)
+      XCTAssertTrue(target.exitsChallenge)
+    }
+    for target in [
+      PracticePreferenceCommandTarget.repeatQuotes(false), .repeatQuotes(true),
+      .saveCompletedResults(false), .saveCompletedResults(true),
+    ] {
+      XCTAssertFalse(target.requiresRestart)
+      XCTAssertFalse(target.exitsChallenge)
+    }
+  }
+
   func testConfigurationCommandsExitChallengesButUnrelatedCommandsDoNot() {
     for identifier in [
       "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
       "test.time.30", "test.words.25", "test.punctuation.on", "test.numbers.off",
       "test.quote.all", "test.quote.favorites", "test.quote.search",
       "test.language.english", "test.language.codeSwift",
+      "test.difficulty.expert", "test.englishVariant.british",
     ] {
       XCTAssertTrue(
         TestConfigurationCommandChallengePolicy.exitsChallenge(for: identifier), identifier)
@@ -1506,6 +1551,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: "theme.builtin.paper"))
     XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: "test.time.45"))
     XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: "mode.unknown"))
+    XCTAssertFalse(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(for: "test.repeatQuotes.typing"))
+    XCTAssertFalse(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(for: "test.resultSaving.off"))
   }
 
   func testChallengeCommandCatalogDescribesAndRoutesLibraryChallenges() throws {

@@ -296,6 +296,71 @@ enum LanguageCommandCatalog {
     }
 }
 
+enum PracticePreferenceCommandTarget: Equatable {
+    case difficulty(Difficulty)
+    case repeatQuotes(Bool)
+    case saveCompletedResults(Bool)
+    case englishVariant(EnglishVariant)
+
+    var requiresRestart: Bool {
+        switch self {
+        case .difficulty, .englishVariant: true
+        case .repeatQuotes, .saveCompletedResults: false
+        }
+    }
+
+    var exitsChallenge: Bool { requiresRestart }
+}
+
+enum PracticePreferenceCommandCatalog {
+    static let items: [CommandPaletteItem] = [
+        .init(
+            id: "test.difficulty.normal", title: "难度：普通", subtitle: "错误不会提前结束练习",
+            systemImage: "star", keywords: ["difficulty", "normal", "难度", "普通"], group: .practice),
+        .init(
+            id: "test.difficulty.expert", title: "难度：专家", subtitle: "提交错误单词时结束练习",
+            systemImage: "exclamationmark.triangle", keywords: ["difficulty", "expert", "难度", "专家"], group: .practice),
+        .init(
+            id: "test.difficulty.master", title: "难度：大师", subtitle: "首次错误按键时结束练习",
+            systemImage: "star.fill", keywords: ["difficulty", "master", "难度", "大师"], group: .practice),
+        .init(
+            id: "test.repeatQuotes.off", title: "引语重开：换一条", subtitle: "重开时继续引语随机队列",
+            systemImage: "shuffle", keywords: ["repeat", "quote", "引语", "重开", "换一条"], group: .practice),
+        .init(
+            id: "test.repeatQuotes.typing", title: "引语重开：重复当前", subtitle: "输入开始后重开仍使用当前引语",
+            systemImage: "repeat", keywords: ["repeat", "quote", "typing", "引语", "重复"], group: .practice),
+        .init(
+            id: "test.resultSaving.off", title: "保存完成成绩：关闭", subtitle: "结果仍显示，但不进入历史或同步",
+            systemImage: "archivebox", keywords: ["result", "saving", "incognito", "成绩", "保存", "关闭"], group: .practice),
+        .init(
+            id: "test.resultSaving.on", title: "保存完成成绩：开启", subtitle: "完成成绩写入本机历史",
+            systemImage: "archivebox.fill", keywords: ["result", "saving", "成绩", "保存", "开启"], group: .practice),
+        .init(
+            id: "test.englishVariant.american", title: "英文拼写：美式", subtitle: "English 基础词流使用美式拼写",
+            systemImage: "character.book.closed", keywords: ["english", "american", "英文", "美式", "拼写"], group: .practice),
+        .init(
+            id: "test.englishVariant.british", title: "英文拼写：英式", subtitle: "English 基础词流使用英式拼写",
+            systemImage: "character.book.closed", keywords: ["english", "british", "英文", "英式", "拼写"], group: .practice),
+    ]
+
+    static func target(for identifier: String) -> PracticePreferenceCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "test" else { return nil }
+        switch (parts[1], parts[2]) {
+        case ("difficulty", "normal"): return .difficulty(.normal)
+        case ("difficulty", "expert"): return .difficulty(.expert)
+        case ("difficulty", "master"): return .difficulty(.master)
+        case ("repeatQuotes", "off"): return .repeatQuotes(false)
+        case ("repeatQuotes", "typing"): return .repeatQuotes(true)
+        case ("resultSaving", "off"): return .saveCompletedResults(false)
+        case ("resultSaving", "on"): return .saveCompletedResults(true)
+        case ("englishVariant", "american"): return .englishVariant(.american)
+        case ("englishVariant", "british"): return .englishVariant(.british)
+        default: return nil
+        }
+    }
+}
+
 enum TestConfigurationCommandChallengePolicy {
     private static let modeIdentifiers: Set<String> = [
         "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
@@ -306,6 +371,7 @@ enum TestConfigurationCommandChallengePolicy {
             || QuickTestParameterCommandCatalog.target(for: identifier) != nil
             || QuoteCommandCatalog.target(for: identifier) != nil
             || LanguageCommandCatalog.target(for: identifier) != nil
+            || PracticePreferenceCommandCatalog.target(for: identifier)?.exitsChallenge == true
     }
 }
 

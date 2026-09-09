@@ -2804,6 +2804,7 @@ private struct ContentView: View {
     }
     items.append(contentsOf: QuickTestParameterCommandCatalog.items)
     items.append(contentsOf: QuoteCommandCatalog.items(hasFavorites: hasFavoriteQuotesInCurrentSource))
+    items.append(contentsOf: PracticePreferenceCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2823,6 +2824,17 @@ private struct ContentView: View {
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let target = PracticePreferenceCommandCatalog.target(for: item.id) {
+      if target.exitsChallenge { activeChallengeID = nil }
+      switch target {
+      case .difficulty(let difficulty): settings.difficulty = difficulty
+      case .repeatQuotes(let enabled): settings.repeatQuotes = enabled
+      case .saveCompletedResults(let enabled): settings.saveCompletedResults = enabled
+      case .englishVariant(let variant): settings.englishVariant = variant
+      }
+      if target.requiresRestart { reset() }
+      return
+    }
     if let selectedLanguage = LanguageCommandCatalog.target(for: item.id) {
       guard availableLanguages.contains(selectedLanguage) else { return }
       activeChallengeID = nil
