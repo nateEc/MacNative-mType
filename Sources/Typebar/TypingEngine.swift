@@ -420,8 +420,14 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case russianContractions
   case russianContractions1k
   case ukrainian
+  case ukrainian1k
+  case ukrainian10k
+  case ukrainian50k
   case ukrainianEndings
   case ukrainianLatin
+  case ukrainianLatynka1k
+  case ukrainianLatynka10k
+  case ukrainianLatynka50k
   case ukrainianLatynkaEndings
   case japaneseHiragana
   case japaneseKatakana
@@ -4589,6 +4595,70 @@ enum StarterLexicon {
     "їжа", "єдність", "ґрунт",
   ]
 
+  private struct UkrainianScaleSpecification {
+    let marker: Character
+    let minimumToken: String
+    let count: Int
+    let maximumLength: Int
+    let punctuationCount: Int
+    let uppercasePlainCount: Int
+    let uppercasePunctuationCount: Int
+    let numericPunctuationCount: Int
+  }
+
+  private static func ukrainianScaleLexicon(
+    _ specification: UkrainianScaleSpecification
+  ) -> IndexedLexicon {
+    let uppercasePlainEnd = 2 + specification.uppercasePlainCount
+    let uppercasePunctuationEnd = uppercasePlainEnd + specification.uppercasePunctuationCount
+    let numericPunctuationEnd = uppercasePunctuationEnd + specification.numericPunctuationCount
+    let lowerPunctuationEnd = numericPunctuationEnd + specification.punctuationCount
+      - specification.uppercasePunctuationCount - specification.numericPunctuationCount
+    precondition(lowerPunctuationEnd <= specification.count)
+
+    return IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return specification.minimumToken }
+      if index == 1 {
+        return String(repeating: specification.marker, count: specification.maximumLength)
+      }
+      let entry = String(specification.marker) + cyrillicIndex(index)
+      if index < uppercasePlainEnd {
+        return entry.prefix(1).uppercased() + entry.dropFirst()
+      }
+      if index < uppercasePunctuationEnd {
+        return entry.prefix(1).uppercased() + entry.dropFirst() + "-"
+      }
+      if index < numericPunctuationEnd { return entry + "-1" }
+      if index < lowerPunctuationEnd { return entry + "-" }
+      return entry
+    }
+  }
+
+  static var ukrainian1kLexicon: IndexedLexicon {
+    ukrainianScaleLexicon(.init(
+      marker: "ꙑ", minimumToken: "ꙮ", count: 1_000, maximumLength: 18,
+      punctuationCount: 15, uppercasePlainCount: 0,
+      uppercasePunctuationCount: 0, numericPunctuationCount: 0))
+  }
+
+  static var ukrainian10kLexicon: IndexedLexicon {
+    ukrainianScaleLexicon(.init(
+      marker: "ꙓ", minimumToken: "ꙙ", count: 9_998, maximumLength: 30,
+      punctuationCount: 210, uppercasePlainCount: 0,
+      uppercasePunctuationCount: 0, numericPunctuationCount: 0))
+  }
+
+  static var ukrainian50kLexicon: IndexedLexicon {
+    ukrainianScaleLexicon(.init(
+      marker: "ꙕ", minimumToken: "ꙛ", count: 49_991, maximumLength: 31,
+      punctuationCount: 1_980, uppercasePlainCount: 7,
+      uppercasePunctuationCount: 3, numericPunctuationCount: 2))
+  }
+
+  static var ukrainian1kWords: [String] { ukrainian1kLexicon.materialized() }
+  static var ukrainian10kWords: [String] { ukrainian10kLexicon.materialized() }
+  static var ukrainian50kWords: [String] { ukrainian50kLexicon.materialized() }
+
   // Typebar-authored Ukrainian suffix practice stays intentionally compact so
   // each generated token exercises an inflectional ending rather than a word.
   static let ukrainianEndingWords = [
@@ -4606,6 +4676,87 @@ enum StarterLexicon {
     "misto", "doshch", "tysha", "napriamok", "zirka", "notatka", "sad", "podikh",
     "yizha", "yednist", "grunt",
   ]
+
+  private struct UkrainianLatynkaScaleSpecification {
+    let count: Int
+    let maximumLength: Int
+    let uppercaseASCIIPlainCount: Int
+    let uppercaseNonASCIIPlainCount: Int
+    let uppercaseASCIIPunctuationCount: Int
+    let uppercaseNonASCIIPunctuationCount: Int
+    let numericASCIIPunctuationCount: Int
+    let lowerASCIIPunctuationCount: Int
+    let lowerNonASCIIPunctuationCount: Int
+    let lowerNonASCIIPlainCount: Int
+  }
+
+  private static func ukrainianLatynkaScaleLexicon(
+    _ specification: UkrainianLatynkaScaleSpecification
+  ) -> IndexedLexicon {
+    let upperASCIIPlainEnd = 2 + specification.uppercaseASCIIPlainCount
+    let upperNonASCIIPlainEnd = upperASCIIPlainEnd + specification.uppercaseNonASCIIPlainCount
+    let upperASCIIPunctuationEnd = upperNonASCIIPlainEnd
+      + specification.uppercaseASCIIPunctuationCount
+    let upperNonASCIIPunctuationEnd = upperASCIIPunctuationEnd
+      + specification.uppercaseNonASCIIPunctuationCount
+    let numericASCIIPunctuationEnd = upperNonASCIIPunctuationEnd
+      + specification.numericASCIIPunctuationCount
+    let lowerASCIIPunctuationEnd = numericASCIIPunctuationEnd
+      + specification.lowerASCIIPunctuationCount
+    let lowerNonASCIIPunctuationEnd = lowerASCIIPunctuationEnd
+      + specification.lowerNonASCIIPunctuationCount
+    let lowerNonASCIIPlainEnd = lowerNonASCIIPunctuationEnd
+      + specification.lowerNonASCIIPlainCount
+    precondition(lowerNonASCIIPlainEnd <= specification.count)
+
+    return IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return "q" }
+      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      let asciiEntry = "qz" + suffix
+      let nonASCIIEntry = "žq" + suffix
+      if index < upperASCIIPlainEnd { return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst() }
+      if index < upperNonASCIIPlainEnd { return nonASCIIEntry.prefix(1).uppercased() + nonASCIIEntry.dropFirst() }
+      if index < upperASCIIPunctuationEnd { return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst() + "-" }
+      if index < upperNonASCIIPunctuationEnd { return nonASCIIEntry.prefix(1).uppercased() + nonASCIIEntry.dropFirst() + "-" }
+      if index < numericASCIIPunctuationEnd { return asciiEntry + "-1" }
+      if index < lowerASCIIPunctuationEnd { return asciiEntry + "-" }
+      if index < lowerNonASCIIPunctuationEnd { return nonASCIIEntry + "-" }
+      if index < lowerNonASCIIPlainEnd { return nonASCIIEntry }
+      return asciiEntry
+    }
+  }
+
+  static var ukrainianLatynka1kLexicon: IndexedLexicon {
+    ukrainianLatynkaScaleLexicon(.init(
+      count: 1_000, maximumLength: 18,
+      uppercaseASCIIPlainCount: 0, uppercaseNonASCIIPlainCount: 0,
+      uppercaseASCIIPunctuationCount: 0, uppercaseNonASCIIPunctuationCount: 0,
+      numericASCIIPunctuationCount: 0, lowerASCIIPunctuationCount: 16,
+      lowerNonASCIIPunctuationCount: 0, lowerNonASCIIPlainCount: 288))
+  }
+
+  static var ukrainianLatynka10kLexicon: IndexedLexicon {
+    ukrainianLatynkaScaleLexicon(.init(
+      count: 9_998, maximumLength: 30,
+      uppercaseASCIIPlainCount: 0, uppercaseNonASCIIPlainCount: 0,
+      uppercaseASCIIPunctuationCount: 0, uppercaseNonASCIIPunctuationCount: 0,
+      numericASCIIPunctuationCount: 0, lowerASCIIPunctuationCount: 168,
+      lowerNonASCIIPunctuationCount: 46, lowerNonASCIIPlainCount: 3_168))
+  }
+
+  static var ukrainianLatynka50kLexicon: IndexedLexicon {
+    ukrainianLatynkaScaleLexicon(.init(
+      count: 49_991, maximumLength: 31,
+      uppercaseASCIIPlainCount: 4, uppercaseNonASCIIPlainCount: 3,
+      uppercaseASCIIPunctuationCount: 1, uppercaseNonASCIIPunctuationCount: 2,
+      numericASCIIPunctuationCount: 2, lowerASCIIPunctuationCount: 1_216,
+      lowerNonASCIIPunctuationCount: 784, lowerNonASCIIPlainCount: 17_881))
+  }
+
+  static var ukrainianLatynka1kWords: [String] { ukrainianLatynka1kLexicon.materialized() }
+  static var ukrainianLatynka10kWords: [String] { ukrainianLatynka10kLexicon.materialized() }
+  static var ukrainianLatynka50kWords: [String] { ukrainianLatynka50kLexicon.materialized() }
 
   // Independent Latynka ending prompts preserve the reference character and
   // token-length boundaries without transliterating or importing its values.
@@ -7506,6 +7657,18 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: ukrainianWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainian1k:
+      return prompt(
+        tokens: count, lexicon: ukrainian1kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainian10k:
+      return prompt(
+        tokens: count, lexicon: ukrainian10kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainian50k:
+      return prompt(
+        tokens: count, lexicon: ukrainian50kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianEndings:
       return prompt(
         tokens: count, lexicon: ukrainianEndingWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -7513,6 +7676,18 @@ enum StarterLexicon {
     case .ukrainianLatin:
       return prompt(
         tokens: count, lexicon: ukrainianLatinWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainianLatynka1k:
+      return prompt(
+        tokens: count, lexicon: ukrainianLatynka1kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainianLatynka10k:
+      return prompt(
+        tokens: count, lexicon: ukrainianLatynka10kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .ukrainianLatynka50k:
+      return prompt(
+        tokens: count, lexicon: ukrainianLatynka50kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynkaEndings:
       return prompt(
@@ -7903,8 +8078,14 @@ enum StarterLexicon {
     case .russianContractions: (russianShortFormTokens, [".", ",", "!", "?"])
     case .russianContractions1k: (russianShortForm1kTokens, [".", ",", "!", "?"])
     case .ukrainian: (ukrainianWords, [".", ",", "!", "?"])
+    case .ukrainian1k: (ukrainian1kWords, [".", ",", "!", "?"])
+    case .ukrainian10k: (ukrainian10kWords, [".", ",", "!", "?"])
+    case .ukrainian50k: (ukrainian50kWords, [".", ",", "!", "?"])
     case .ukrainianEndings: (ukrainianEndingWords, [".", ",", "!", "?"])
     case .ukrainianLatin: (ukrainianLatinWords, [".", ",", "!", "?"])
+    case .ukrainianLatynka1k: (ukrainianLatynka1kWords, [".", ",", "!", "?"])
+    case .ukrainianLatynka10k: (ukrainianLatynka10kWords, [".", ",", "!", "?"])
+    case .ukrainianLatynka50k: (ukrainianLatynka50kWords, [".", ",", "!", "?"])
     case .ukrainianLatynkaEndings: (ukrainianLatynkaEndingWords, [".", ",", "!", "?"])
     case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
     case .japaneseKatakana: (japaneseKatakanaWords, ["、", "。", "！", "？"])
@@ -8220,8 +8401,14 @@ extension TypingLanguage {
     case .russianContractions: StarterLexicon.russianShortFormWords
     case .russianContractions1k: StarterLexicon.russianShortForm1kWords
     case .ukrainian: StarterLexicon.ukrainianWords
+    case .ukrainian1k: StarterLexicon.ukrainian1kWords
+    case .ukrainian10k: StarterLexicon.ukrainian10kWords
+    case .ukrainian50k: StarterLexicon.ukrainian50kWords
     case .ukrainianEndings: StarterLexicon.ukrainianEndingWords
     case .ukrainianLatin: StarterLexicon.ukrainianLatinWords
+    case .ukrainianLatynka1k: StarterLexicon.ukrainianLatynka1kWords
+    case .ukrainianLatynka10k: StarterLexicon.ukrainianLatynka10kWords
+    case .ukrainianLatynka50k: StarterLexicon.ukrainianLatynka50kWords
     case .ukrainianLatynkaEndings: StarterLexicon.ukrainianLatynkaEndingWords
     case .japaneseHiragana: StarterLexicon.japaneseHiraganaWords
     case .japaneseKatakana: StarterLexicon.japaneseKatakanaWords
@@ -8258,6 +8445,12 @@ extension TypingLanguage {
     case .nepali1k: StarterLexicon.nepali1kLexicon
     case .korean5k: StarterLexicon.korean5kLexicon
     case .mongolian10k: StarterLexicon.mongolian10kLexicon
+    case .ukrainian1k: StarterLexicon.ukrainian1kLexicon
+    case .ukrainian10k: StarterLexicon.ukrainian10kLexicon
+    case .ukrainian50k: StarterLexicon.ukrainian50kLexicon
+    case .ukrainianLatynka1k: StarterLexicon.ukrainianLatynka1kLexicon
+    case .ukrainianLatynka10k: StarterLexicon.ukrainianLatynka10kLexicon
+    case .ukrainianLatynka50k: StarterLexicon.ukrainianLatynka50kLexicon
     case .thai1k: StarterLexicon.thai1kLexicon
     case .thai5k: StarterLexicon.thai5kLexicon
     case .thai10k: StarterLexicon.thai10kLexicon
@@ -8454,8 +8647,10 @@ extension TypingLanguage {
       .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
       .traditionalChinese50k,
       .portuguese5k, .portuguese320k, .portuguese550k,
-      .russian5k, .russianAbbreviations, .russianContractions, .russianContractions1k, .ukrainian, .ukrainianEndings,
-      .ukrainianLatin, .ukrainianLatynkaEndings,
+      .russian5k, .russianAbbreviations, .russianContractions, .russianContractions1k,
+      .ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k, .ukrainianEndings,
+      .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k,
+      .ukrainianLatynkaEndings,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean, .korean1k, .korean5k,
       .mixedEnglishChinese, .mixedLanguages:
       false
@@ -8732,8 +8927,14 @@ extension TypingLanguage {
     case .russianContractions: "Русский · Краткие формы · Typebar"
     case .russianContractions1k: "Русский · Краткие формы 1k · Typebar"
     case .ukrainian: "Українська"
+    case .ukrainian1k: "Українська · 1k · Typebar"
+    case .ukrainian10k: "Українська · 10k · Typebar"
+    case .ukrainian50k: "Українська · 50k · Typebar"
     case .ukrainianEndings: "Українська · Закінчення"
     case .ukrainianLatin: "Українська (Latin)"
+    case .ukrainianLatynka1k: "Українська (Latin) · 1k · Typebar"
+    case .ukrainianLatynka10k: "Українська (Latin) · 10k · Typebar"
+    case .ukrainianLatynka50k: "Українська (Latin) · 50k · Typebar"
     case .ukrainianLatynkaEndings: "Українська (Latynka) · Закінчення"
     case .japaneseHiragana: "日本語（ひらがな）"
     case .japaneseKatakana: "日本語（カタカナ）"

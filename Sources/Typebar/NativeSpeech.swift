@@ -139,7 +139,8 @@ extension TypingLanguage {
       .traditionalChinese10k, .traditionalChinese50k: "zh-TW"
     case .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k,
       .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k: "ru-RU"
-    case .ukrainian, .ukrainianLatin: "uk-UA"
+    case .ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k,
+      .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k: "uk-UA"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: "ja-JP"
     case .korean, .korean1k, .korean5k: "ko-KR"
     case .turkish: "tr-TR"

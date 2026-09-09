@@ -257,7 +257,9 @@ enum LivePracticeContentService {
       .traditionalChinese50k: return "zh"
     case .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k,
       .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k: return "ru"
-    case .ukrainian, .ukrainianLatin: return "uk"
+    case .ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k,
+      .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k:
+      return "uk"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: return "ja"
     case .korean, .korean1k, .korean5k: return "ko"
     case .turkish: return "tr"
@@ -313,7 +315,9 @@ private extension TypingLanguage {
   /// source text remains directly typeable through the selected macOS IME and
   /// is segmented by the system tokenizer above.
   var supportsLiveEncyclopedia: Bool {
-    self != .greeklish && self != .ukrainianLatin && self != .serbianLatin && self != .japaneseRomaji
+    self != .greeklish && self != .ukrainianLatin
+      && self != .ukrainianLatynka1k && self != .ukrainianLatynka10k
+      && self != .ukrainianLatynka50k && self != .serbianLatin && self != .japaneseRomaji
       && (usesSpaceDelimitedWords || self == .simplifiedChinese || self == .traditionalChinese)
   }
 }

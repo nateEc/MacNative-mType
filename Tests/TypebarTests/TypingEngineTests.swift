@@ -8891,6 +8891,84 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testUkrainianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, String, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)] = [
+      ("ukrainian1k", "Українська · 1k · Typebar", 1_000, 18, 0, 15, 0, 1_000, 0, 0, 15, 0),
+      ("ukrainian10k", "Українська · 10k · Typebar", 9_998, 30, 0, 210, 0, 9_998, 0, 0, 210, 0),
+      ("ukrainian50k", "Українська · 50k · Typebar", 49_991, 31, 10, 1_980, 2, 49_991, 3, 10, 1_980, 3),
+      ("ukrainianLatynka1k", "Українська (Latin) · 1k · Typebar", 1_000, 18, 0, 16, 0, 288, 0, 0, 0, 0),
+      ("ukrainianLatynka10k", "Українська (Latin) · 10k · Typebar", 9_998, 30, 0, 214, 0, 3_214, 0, 0, 46, 0),
+      ("ukrainianLatynka50k", "Українська (Latin) · 50k · Typebar", 49_991, 31, 10, 2_005, 2, 18_670, 3, 5, 786, 2),
+    ]
+
+    for (
+      rawValue, displayName, count, maximumLength, uppercaseCount, punctuationCount,
+      numberCount, nonASCIIcount, uppercasePunctuationCount, uppercaseNonASCIIcount,
+      punctuationNonASCIIcount, uppercasePunctuationNonASCIIcount
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+
+      XCTAssertEqual(language.displayName, displayName, rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, rawValue)
+      XCTAssertFalse(language.supportsLazyLatinInput, rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "uk", rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, "uk-UA", rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertEqual(words.count, count, rawValue)
+      XCTAssertEqual(Set(words).count, count, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), 1, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximumLength, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercaseCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuationCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isNumber) }.count, numberCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, punctuationCount, rawValue)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCIIcount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isUppercase) && $0.contains(where: \.isPunctuation)
+      }.count, uppercasePunctuationCount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isUppercase)
+          && $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, uppercaseNonASCIIcount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isPunctuation)
+          && $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, punctuationNonASCIIcount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isUppercase)
+          && $0.contains(where: \.isPunctuation)
+          && $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, uppercasePunctuationNonASCIIcount, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(" ") }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, rawValue)
+      XCTAssertFalse(words.contains {
+        $0.unicodeScalars.contains(where: \.properties.isDiacritic)
+      }, rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        rawValue)
+      XCTAssertEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language).split(separator: " ").count,
+        25, rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(
+          OfflineContent.quotes(for: language, length: length).first?.language, language,
+          "\(rawValue)-\(length)")
+      }
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),
