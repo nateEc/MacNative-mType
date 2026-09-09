@@ -193,7 +193,7 @@ enum LivePracticeContentService {
     case .latvian: return "lv"
     case .irish: return "ga"
     case .galician: return "gl"
-    case .kurdishCentral: return "ckb"
+    case .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k: return "ckb"
     case .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco: return "ar"
     case .pashto: return "ps"
     case .sindhi: return "sd"
@@ -225,6 +225,8 @@ enum LivePracticeContentService {
     case .filipino: return "tl"
     case .catalan: return "ca"
     case .indonesian: return "id"
+    case .indonesian1k: return "hu"
+    case .indonesian10k: return "id"
     case .malay, .malay1k: return "ms"
     case .danish: return "da"
     case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,

@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 246)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 250)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4235,6 +4235,10 @@ final class HealthRouteTests: XCTestCase {
       ("ukrainianLatynka1k", "Lokalna poslidovnist pidtrymuie chitke trenuvannia."),
       ("ukrainianLatynka10k", "Shyrshyi indeks zberihaie peredbachuvanyi poriadok vpravy."),
       ("ukrainianLatynka50k", "Velykyi lokalnyi indeks stvoriuie lyshe potribni elementy."),
+      ("indonesian1k", "Urutan lokal menjaga latihan bahasa Indonesia tetap jelas."),
+      ("indonesian10k", "Indeks yang lebih besar tetap menghasilkan bagian yang diperlukan."),
+      ("kurdishCentral2k", "ڕیزبەندیی ناوخۆیی ڕاهێنانی کوردی بە ڕوونی دەپارێزێت."),
+      ("kurdishCentral4k", "پێڕستی فراوان تەنها بەشە پێویستەکان دروست دەکات."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

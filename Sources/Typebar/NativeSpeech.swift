@@ -69,7 +69,7 @@ extension TypingLanguage {
     case .latvian: "lv"
     case .irish: "ga-IE"
     case .galician: "gl-ES"
-    case .kurdishCentral: "ckb"
+    case .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k: "ckb"
     case .arabic, .arabic10k: "ar-SA"
     case .arabicEgypt, .arabicEgypt1k: "ar-EG"
     case .arabicMorocco: "ar-MA"
@@ -105,6 +105,8 @@ extension TypingLanguage {
     case .filipino: "fil-PH"
     case .catalan: "ca-ES"
     case .indonesian: "id-ID"
+    case .indonesian1k: "hu-HU"
+    case .indonesian10k: "id-ID"
     case .malay, .malay1k: "ms-MY"
     case .danish: "da-DK"
     case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,

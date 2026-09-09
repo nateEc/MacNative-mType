@@ -4598,12 +4598,14 @@ enum OfflineContent {
   ]
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
-    let inheritedUkrainianQuoteSource: TypingLanguage? = switch language {
+    let inheritedScaleQuoteSource: TypingLanguage? = switch language {
     case .ukrainian1k, .ukrainian10k, .ukrainian50k: .ukrainian
     case .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k: .ukrainianLatin
+    case .indonesian1k, .indonesian10k: .indonesian
+    case .kurdishCentral2k, .kurdishCentral4k: .kurdishCentral
     default: nil
     }
-    if let source = inheritedUkrainianQuoteSource {
+    if let source = inheritedScaleQuoteSource {
       return quotes(for: source, length: length).map { quote in
         .init(
           id: "\(language.rawValue)-\(quote.id)", title: quote.title, text: quote.text,

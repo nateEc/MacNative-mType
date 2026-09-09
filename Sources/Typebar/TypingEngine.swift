@@ -341,6 +341,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case galician
   case marathi
   case kurdishCentral
+  case kurdishCentral2k
+  case kurdishCentral4k
   case greek
   case greekKoine
   case greeklish
@@ -348,6 +350,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case filipino
   case catalan
   case indonesian
+  case indonesian1k
+  case indonesian10k
   case malay
   case malay1k
   case danish
@@ -5509,6 +5513,33 @@ enum StarterLexicon {
     "kecil", "waktu", "musim", "perahu", "teman", "harapan",
   ]
 
+  private static func indonesianScaleLexicon(
+    count: Int, maximumLength: Int, uppercaseCount: Int, punctuationCount: Int
+  ) -> IndexedLexicon {
+    let uppercaseEnd = 2 + uppercaseCount
+    let punctuationEnd = uppercaseEnd + punctuationCount
+    precondition(punctuationEnd <= count)
+    return IndexedLexicon(count: count) { index in
+      if index == 0 { return "qx" }
+      if index == 1 { return String(repeating: "q", count: maximumLength) }
+      let entry = "qz" + alphabeticIndex(index + 676)
+      if index < uppercaseEnd { return entry.prefix(1).uppercased() + entry.dropFirst() }
+      if index < punctuationEnd { return entry + "-" }
+      return entry
+    }
+  }
+
+  static var indonesian1kLexicon: IndexedLexicon {
+    indonesianScaleLexicon(count: 1_020, maximumLength: 14, uppercaseCount: 2, punctuationCount: 2)
+  }
+
+  static var indonesian10kLexicon: IndexedLexicon {
+    indonesianScaleLexicon(count: 13_769, maximumLength: 13, uppercaseCount: 0, punctuationCount: 494)
+  }
+
+  static var indonesian1kWords: [String] { indonesian1kLexicon.materialized() }
+  static var indonesian10kWords: [String] { indonesian10kLexicon.materialized() }
+
   // Typebar-authored Malay starter words are compact local practice content,
   // not an imported word list or a transformed reference corpus.
   static let malayWords = [
@@ -6211,6 +6242,31 @@ enum StarterLexicon {
     "ئارامی", "چراغ", "چیا", "تۆو", "مۆسیقا", "مێز", "بیر", "تێبینی", "کار", "هەوڵ",
     "هاوڕێ", "شار", "دەریا", "گوند", "کات", "دەنگ", "پرسیار", "وەڵام", "هیوە", "داهاتوو",
   ]
+
+  private static func kurdishCentralScaleLexicon(
+    marker: Character, minimumToken: String, count: Int, spaceCount: Int
+  ) -> IndexedLexicon {
+    let spaceEnd = 2 + spaceCount
+    precondition(spaceEnd <= count)
+    return IndexedLexicon(count: count) { index in
+      if index == 0 { return minimumToken }
+      if index == 1 { return String(repeating: marker, count: 11) }
+      let entry = String(marker) + arabicScaleIndex(index)
+      if index < spaceEnd { return entry + " " + String(marker) }
+      return entry
+    }
+  }
+
+  static var kurdishCentral2kLexicon: IndexedLexicon {
+    kurdishCentralScaleLexicon(marker: "ڨ", minimumToken: "ڧ", count: 1_486, spaceCount: 4)
+  }
+
+  static var kurdishCentral4kLexicon: IndexedLexicon {
+    kurdishCentralScaleLexicon(marker: "ݐ", minimumToken: "ݙ", count: 4_256, spaceCount: 3)
+  }
+
+  static var kurdishCentral2kWords: [String] { kurdishCentral2kLexicon.materialized() }
+  static var kurdishCentral4kWords: [String] { kurdishCentral4kLexicon.materialized() }
 
   // Typebar-authored Danish starter words. The corpus deliberately includes
   // æ, ø and å for normal macOS composed-text input practice.
@@ -7330,6 +7386,14 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: kurdishCentralWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .kurdishCentral2k:
+      return prompt(
+        tokens: count, lexicon: kurdishCentral2kLexicon, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .kurdishCentral4k:
+      return prompt(
+        tokens: count, lexicon: kurdishCentral4kLexicon, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .greek:
       return prompt(
         tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7357,6 +7421,14 @@ enum StarterLexicon {
     case .indonesian:
       return prompt(
         tokens: count, lexicon: indonesianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .indonesian1k:
+      return prompt(
+        tokens: count, lexicon: indonesian1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .indonesian10k:
+      return prompt(
+        tokens: count, lexicon: indonesian10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .malay:
       return prompt(
@@ -7999,6 +8071,8 @@ enum StarterLexicon {
     case .galician: (galicianWords, [",", ".", "!", "?"])
     case .marathi: (marathiWords, [",", ".", "!", "?"])
     case .kurdishCentral: (kurdishCentralWords, ["،", "؛", "؟", "."])
+    case .kurdishCentral2k: (kurdishCentral2kWords, ["،", "؛", "؟", "."])
+    case .kurdishCentral4k: (kurdishCentral4kWords, ["،", "؛", "؟", "."])
     case .greek: (greekWords, [",", ".", "!", "?"])
     case .greekKoine: (greekKoineWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
@@ -8006,6 +8080,8 @@ enum StarterLexicon {
     case .filipino: (filipinoWords, [",", ".", "!", "?"])
     case .catalan: (catalanWords, [",", ".", "!", "?"])
     case .indonesian: (indonesianWords, [",", ".", "!", "?"])
+    case .indonesian1k: (indonesian1kWords, [",", ".", "!", "?"])
+    case .indonesian10k: (indonesian10kWords, [",", ".", "!", "?"])
     case .malay: (malayWords, [",", ".", "!", "?"])
     case .malay1k: (malay1kWords, [",", ".", "!", "?"])
     case .danish: (danishWords, [",", ".", "!", "?"])
@@ -8322,6 +8398,8 @@ extension TypingLanguage {
     case .galician: StarterLexicon.galicianWords
     case .marathi: StarterLexicon.marathiWords
     case .kurdishCentral: StarterLexicon.kurdishCentralWords
+    case .kurdishCentral2k: StarterLexicon.kurdishCentral2kWords
+    case .kurdishCentral4k: StarterLexicon.kurdishCentral4kWords
     case .greek: StarterLexicon.greekWords
     case .greekKoine: StarterLexicon.greekKoineWords
     case .greeklish: StarterLexicon.greeklishWords
@@ -8329,6 +8407,8 @@ extension TypingLanguage {
     case .filipino: StarterLexicon.filipinoWords
     case .catalan: StarterLexicon.catalanWords
     case .indonesian: StarterLexicon.indonesianWords
+    case .indonesian1k: StarterLexicon.indonesian1kWords
+    case .indonesian10k: StarterLexicon.indonesian10kWords
     case .malay: StarterLexicon.malayWords
     case .malay1k: StarterLexicon.malay1kWords
     case .danish: StarterLexicon.danishWords
@@ -8445,6 +8525,10 @@ extension TypingLanguage {
     case .nepali1k: StarterLexicon.nepali1kLexicon
     case .korean5k: StarterLexicon.korean5kLexicon
     case .mongolian10k: StarterLexicon.mongolian10kLexicon
+    case .indonesian1k: StarterLexicon.indonesian1kLexicon
+    case .indonesian10k: StarterLexicon.indonesian10kLexicon
+    case .kurdishCentral2k: StarterLexicon.kurdishCentral2kLexicon
+    case .kurdishCentral4k: StarterLexicon.kurdishCentral4kLexicon
     case .ukrainian1k: StarterLexicon.ukrainian1kLexicon
     case .ukrainian10k: StarterLexicon.ukrainian10kLexicon
     case .ukrainian50k: StarterLexicon.ukrainian50kLexicon
@@ -8566,7 +8650,7 @@ extension TypingLanguage {
   /// single-language until mixed bidirectional prompt layout has dedicated
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
-    self == .arabic || self == .arabic10k || self == .arabicEgypt || self == .arabicEgypt1k || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral || self == .yiddish
+    self == .arabic || self == .arabic10k || self == .arabicEgypt || self == .arabicEgypt1k || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral || self == .kurdishCentral2k || self == .kurdishCentral4k || self == .yiddish
   }
 
   /// Preserve native shaping for source-pinned joining scripts.
@@ -8574,7 +8658,8 @@ extension TypingLanguage {
     switch self {
     case .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
       .bangla, .banglaLetters, .gujarati, .hebrew,
-      .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k, .kurdishCentral, .likanu, .malayalam,
+      .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k,
+      .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
       .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish:
       true
@@ -8620,7 +8705,8 @@ extension TypingLanguage {
       .tamil, .hindi, .gujarati, .bangla, .banglaLetters,
       .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k,
       .nepali, .nepali1k, .kannada, .telugu, .malayalam,
-      .sanskrit, .greeklish, .dutch, .filipino, .indonesian, .serbian, .bulgarian,
+      .sanskrit, .greeklish, .dutch, .filipino,
+      .indonesian, .indonesian1k, .indonesian10k, .serbian, .bulgarian,
       .bulgarianLatin,
       .khmer,
       .myanmarBurmese,
@@ -8848,6 +8934,8 @@ extension TypingLanguage {
     case .galician: "Galego"
     case .marathi: "मराठी"
     case .kurdishCentral: "کوردی ناوەندی"
+    case .kurdishCentral2k: "کوردی ناوەندی · 2k · Typebar"
+    case .kurdishCentral4k: "کوردی ناوەندی · 4k · Typebar"
     case .greek: "Ελληνικά"
     case .greekKoine: "Ἑλληνιστικὴ Κοινή"
     case .greeklish: "Greeklish"
@@ -8855,6 +8943,8 @@ extension TypingLanguage {
     case .filipino: "Filipino"
     case .catalan: "Català"
     case .indonesian: "Bahasa Indonesia"
+    case .indonesian1k: "Bahasa Indonesia · 1k · Typebar"
+    case .indonesian10k: "Bahasa Indonesia · 10k · Typebar"
     case .malay: "Bahasa Melayu"
     case .malay1k: "Bahasa Melayu · 1k · Typebar"
     case .danish: "Dansk"
