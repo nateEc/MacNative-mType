@@ -2148,8 +2148,10 @@ enum TypingReplay {
     let promptCharacters = Array(prompt)
     let promptCoordinates = promptCharacterIndices(prompt: prompt)
     var typed: [Character] = []
+    var typedErrors: [Bool] = []
     var typedWord = 0
     var typedPosition = 0
+    var currentWordContainsError = false
     var cues: [TypingReplaySoundCue] = []
 
     for event in chronologicalEvents(events) {
@@ -2157,25 +2159,41 @@ enum TypingReplay {
       var cue: TypingReplaySoundCue?
       switch event.kind {
       case .insert:
-        var containsError = event.forceError
+        var eventContainsError = false
         for character in event.text {
           let coordinate = characterCoordinate(
             word: typedWord, position: typedPosition, character: character)
+          let characterIsIncorrect: Bool
           if let promptIndex = promptCoordinates[coordinate] {
-            containsError = containsError || promptCharacters[promptIndex] != character
+            characterIsIncorrect =
+              event.forceError || promptCharacters[promptIndex] != character
           } else {
-            containsError = true
+            characterIsIncorrect = true
           }
+          if isPromptWordSeparator(character), currentWordContainsError {
+            eventContainsError = true
+          }
+          eventContainsError = eventContainsError || characterIsIncorrect
           typed.append(character)
+          typedErrors.append(characterIsIncorrect)
           advanceCursor(for: character, word: &typedWord, position: &typedPosition)
+          if isPromptWordSeparator(character) {
+            currentWordContainsError = false
+          } else {
+            currentWordContainsError = currentWordContainsError || characterIsIncorrect
+          }
         }
         if !event.text.isEmpty {
-          cue = containsError ? .error : .click
+          cue = eventContainsError ? .error : .click
         }
       case .delete:
         if !typed.isEmpty {
           typed.removeLast()
+          typedErrors.removeLast()
           (typedWord, typedPosition) = cursorPosition(after: typed)
+          currentWordContainsError = zip(typed, typedErrors).reversed()
+            .prefix { !isPromptWordSeparator($0.0) }
+            .contains { $0.1 }
         }
         cue = .click
       }

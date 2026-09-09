@@ -12368,6 +12368,19 @@ final class TypingEngineTests: XCTestCase {
       [.click, .error])
   }
 
+  func testReplaySoundCueMarksAnIncorrectWordSubmissionAsAnError() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0.1, kind: .insert, text: "a"),
+      .init(offset: 0.2, kind: .insert, text: "x"),
+      .init(offset: 0.3, kind: .insert, text: " "),
+      .init(offset: 0.4, kind: .insert, text: "b"),
+    ]
+
+    XCTAssertEqual(
+      TypingReplay.soundCues(prompt: "am bay", events: events, after: 0.2, through: 0.4),
+      [.error, .click])
+  }
+
   func testReplaySoundRouteMatchesEnabledFeedbackSettings() {
     XCTAssertEqual(
       TypingReplaySoundRoute.resolve(cue: .error, playsClicks: true, playsErrors: true),
