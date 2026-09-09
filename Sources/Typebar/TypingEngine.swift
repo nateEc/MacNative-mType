@@ -256,6 +256,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case malagasy
   case malagasy1k
   case welsh
+  case welsh1k
   case hausa
   case tatar
   case tatar1k
@@ -304,6 +305,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case kabyle5k
   case kabyle10k
   case maltese
+  case maltese1k
   case tokiPona
   case tokiPonaKuSuli
   case tokiPonaKuLili
@@ -386,10 +388,14 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case belarusian100k
   case belarusianLacinka
   case lithuanian
+  case lithuanian1k
+  case lithuanian3k
   case latvian
+  case latvian1k
   case mongolian
   case mongolian10k
   case irish
+  case irish1k
   case galician
   case marathi
   case kurdishCentral
@@ -410,6 +416,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case dutch1k
   case dutch10k
   case filipino
+  case filipino1k
   case catalan
   case indonesian
   case indonesian1k
@@ -435,6 +442,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case swedish1k
   case swedishDiacritics
   case hungarian
+  case hungarian1k
+  case hungarian2k
   case czech
   case czech1k
   case czech10k
@@ -7679,6 +7688,92 @@ enum StarterLexicon {
       buckets: [.init(count: 461, nonASCII: true)]))
   }
 
+  static var irish1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "q́", prefix: "qga", nonASCIICharacter: "á", count: 1_000, maximumLength: 13,
+      buckets: [.init(count: 396, nonASCII: true)]))
+  }
+
+  static var filipino1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "q", prefix: "qfl", nonASCIICharacter: "ñ", count: 1_000, maximumLength: 11,
+      buckets: []))
+  }
+
+  static var hungarian1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƣ", prefix: "qhu", nonASCIICharacter: "ő", count: 1_000, maximumLength: 14,
+      buckets: [
+        .init(count: 519, nonASCII: true),
+        .init(count: 1, punctuationCharacters: 1),
+        .init(count: 3, uppercase: true),
+        .init(count: 4, uppercase: true, nonASCII: true),
+      ]))
+  }
+
+  static var hungarian2kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ʉ", prefix: "xhu", nonASCIICharacter: "ű", count: 2_452, maximumLength: 21,
+      buckets: [
+        .init(count: 1_474, nonASCII: true),
+        .init(count: 1, punctuationCharacters: 1),
+        .init(count: 3, uppercase: true),
+        .init(count: 4, uppercase: true, nonASCII: true),
+      ]))
+  }
+
+  static var welsh1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƿ", prefix: "qcy", nonASCIICharacter: "ŵ", count: 1_000, maximumLength: 14,
+      buckets: [
+        .init(count: 13, nonASCII: true),
+        .init(count: 45, punctuationCharacters: 1),
+        .init(count: 1, punctuationCharacters: 1, nonASCII: true),
+        .init(count: 13, uppercase: true),
+      ]))
+  }
+
+  static var lithuanian1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ɬ", prefix: "qlt", nonASCIICharacter: "ų", count: 990, maximumLength: 13,
+      buckets: [.init(count: 291, nonASCII: true)]))
+  }
+
+  static var lithuanian3kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ɫ", prefix: "xlt", nonASCIICharacter: "ė", count: 2_978, maximumLength: 17,
+      buckets: [.init(count: 981, nonASCII: true)]))
+  }
+
+  static var latvian1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƚ", prefix: "qlv", nonASCIICharacter: "ā", count: 930, maximumLength: 18,
+      minimumLength: 2, buckets: [
+        .init(count: 456, nonASCII: true),
+        .init(count: 1, punctuationCharacters: 1, nonASCII: true),
+        .init(count: 2, spaceCharacters: 1),
+        .init(count: 4, spaceCharacters: 1, nonASCII: true),
+        .init(count: 2, uppercase: true),
+        .init(count: 1, uppercase: true, nonASCII: true),
+      ]))
+  }
+
+  static var maltese1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ɦ", prefix: "qmt", nonASCIICharacter: "ħ", count: 927, maximumLength: 15,
+      buckets: [
+        .init(count: 279, nonASCII: true),
+        .init(count: 2, punctuationCharacters: 1),
+        .init(count: 4, punctuationCharacters: 1, nonASCII: true),
+        .init(count: 1, punctuationCharacters: 1, spaceCharacters: 1, nonASCII: true),
+        .init(count: 5, spaceCharacters: 1),
+        .init(count: 1, spaceCharacters: 1, nonASCII: true),
+        .init(count: 3, uppercase: true),
+        .init(count: 1, uppercase: true, nonASCII: true),
+        .init(count: 1, uppercase: true, punctuationCharacters: 1, nonASCII: true),
+      ]))
+  }
+
   static var czech1kWords: [String] { czech1kLexicon.materialized() }
   static var czech10kWords: [String] { czech10kLexicon.materialized() }
   static var slovak1kWords: [String] { slovak1kLexicon.materialized() }
@@ -7697,6 +7792,15 @@ enum StarterLexicon {
   static var estonian5kWords: [String] { estonian5kLexicon.materialized() }
   static var estonian10kWords: [String] { estonian10kLexicon.materialized() }
   static var icelandic1kWords: [String] { icelandic1kLexicon.materialized() }
+  static var irish1kWords: [String] { irish1kLexicon.materialized() }
+  static var filipino1kWords: [String] { filipino1kLexicon.materialized() }
+  static var hungarian1kWords: [String] { hungarian1kLexicon.materialized() }
+  static var hungarian2kWords: [String] { hungarian2kLexicon.materialized() }
+  static var welsh1kWords: [String] { welsh1kLexicon.materialized() }
+  static var lithuanian1kWords: [String] { lithuanian1kLexicon.materialized() }
+  static var lithuanian3kWords: [String] { lithuanian3kLexicon.materialized() }
+  static var latvian1kWords: [String] { latvian1kLexicon.materialized() }
+  static var maltese1kWords: [String] { maltese1kLexicon.materialized() }
 
   // Typebar-authored Serbian Cyrillic starter words cover the letters that
   // distinguish this alphabet without importing a third-party list.
@@ -9187,6 +9291,12 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: polish200kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .irish1k, .filipino1k, .hungarian1k, .hungarian2k, .welsh1k,
+      .lithuanian1k, .lithuanian3k, .latvian1k, .maltese1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .mixedEnglishChinese:
       let englishLexicon = englishVariant == .british ? britishWords : words
       return (0..<count).map { index in
@@ -10036,6 +10146,15 @@ extension TypingLanguage {
     case .polish20k: StarterLexicon.polish20kWords
     case .polish40k: StarterLexicon.polish40kWords
     case .polish200k: StarterLexicon.polish200kWords
+    case .irish1k: StarterLexicon.irish1kWords
+    case .filipino1k: StarterLexicon.filipino1kWords
+    case .hungarian1k: StarterLexicon.hungarian1kWords
+    case .hungarian2k: StarterLexicon.hungarian2kWords
+    case .welsh1k: StarterLexicon.welsh1kWords
+    case .lithuanian1k: StarterLexicon.lithuanian1kWords
+    case .lithuanian3k: StarterLexicon.lithuanian3kWords
+    case .latvian1k: StarterLexicon.latvian1kWords
+    case .maltese1k: StarterLexicon.maltese1kWords
     case .mixedEnglishChinese: StarterLexicon.words
     case .mixedLanguages: []
     default: []
@@ -10105,6 +10224,15 @@ extension TypingLanguage {
     case .estonian5k: StarterLexicon.estonian5kLexicon
     case .estonian10k: StarterLexicon.estonian10kLexicon
     case .icelandic1k: StarterLexicon.icelandic1kLexicon
+    case .irish1k: StarterLexicon.irish1kLexicon
+    case .filipino1k: StarterLexicon.filipino1kLexicon
+    case .hungarian1k: StarterLexicon.hungarian1kLexicon
+    case .hungarian2k: StarterLexicon.hungarian2kLexicon
+    case .welsh1k: StarterLexicon.welsh1kLexicon
+    case .lithuanian1k: StarterLexicon.lithuanian1kLexicon
+    case .lithuanian3k: StarterLexicon.lithuanian3kLexicon
+    case .latvian1k: StarterLexicon.latvian1kLexicon
+    case .maltese1k: StarterLexicon.maltese1kLexicon
     case .ukrainian1k: StarterLexicon.ukrainian1kLexicon
     case .ukrainian10k: StarterLexicon.ukrainian10kLexicon
     case .ukrainian50k: StarterLexicon.ukrainian50kLexicon
@@ -10328,7 +10456,7 @@ extension TypingLanguage {
       .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k,
       .nepali, .nepali1k, .kannada, .telugu, .telugu1k, .malayalam,
       .sanskrit, .greeklish, .greeklish1k, .greeklish5k, .greeklish10k,
-      .greeklish25k, .dutch, .dutch1k, .dutch10k, .filipino,
+      .greeklish25k, .dutch, .dutch1k, .dutch10k, .filipino, .filipino1k,
       .indonesian, .indonesian1k, .indonesian10k, .afrikaans1k, .serbian, .bulgarian,
       .bulgarianLatin,
       .khmer,
@@ -10417,7 +10545,7 @@ extension TypingLanguage {
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical, .english25k, .english450k, .kokanu, .likanu, .russianAbbreviations, .russianContractions, .russianContractions1k, .typingOfTheDead, .pokemon1k, .arabicMorocco, .sindhi, .armenian, .bemba,
-      .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao,
+      .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .hungarian1k, .lao,
       .kabyle, .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k,
       .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k,
       .viossa, .viossaNjutro:
@@ -10490,6 +10618,7 @@ extension TypingLanguage {
     case .malagasy: "Malagasy"
     case .malagasy1k: "Malagasy · 1k · Typebar"
     case .welsh: "Cymraeg"
+    case .welsh1k: "Cymraeg · 1k · Typebar"
     case .hausa: "Hausa"
     case .tatar: "Татарча"
     case .tatar1k: "Татарча · 1k · Typebar"
@@ -10538,6 +10667,7 @@ extension TypingLanguage {
     case .kabyle5k: "Taqbaylit · 5k · Typebar"
     case .kabyle10k: "Taqbaylit · 10k · Typebar"
     case .maltese: "Malti"
+    case .maltese1k: "Malti · 1k · Typebar"
     case .tokiPona: "toki pona"
     case .tokiPonaKuSuli: "toki pona · ku suli"
     case .tokiPonaKuLili: "toki pona · ku lili"
@@ -10620,10 +10750,14 @@ extension TypingLanguage {
     case .belarusian100k: "Беларуская · 100k · Typebar"
     case .belarusianLacinka: "Biełaruskaja łacinka"
     case .lithuanian: "Lietuvių"
+    case .lithuanian1k: "Lietuvių · 1k · Typebar"
+    case .lithuanian3k: "Lietuvių · 3k · Typebar"
     case .latvian: "Latviešu"
+    case .latvian1k: "Latviešu · 1k · Typebar"
     case .mongolian: "Монгол"
     case .mongolian10k: "Монгол · 10k · Typebar"
     case .irish: "Gaeilge"
+    case .irish1k: "Gaeilge · 1k · Typebar"
     case .galician: "Galego"
     case .marathi: "मराठी"
     case .kurdishCentral: "کوردی ناوەندی"
@@ -10644,6 +10778,7 @@ extension TypingLanguage {
     case .dutch1k: "Nederlands · 1k · Typebar"
     case .dutch10k: "Nederlands · 10k · Typebar"
     case .filipino: "Filipino"
+    case .filipino1k: "Filipino · 1k · Typebar"
     case .catalan: "Català"
     case .indonesian: "Bahasa Indonesia"
     case .indonesian1k: "Bahasa Indonesia · 1k · Typebar"
@@ -10669,6 +10804,8 @@ extension TypingLanguage {
     case .swedish1k: "Svenska · 1k · Typebar"
     case .swedishDiacritics: "Svenska · Å Ä Ö"
     case .hungarian: "Magyar"
+    case .hungarian1k: "Magyar · 1k · Typebar"
+    case .hungarian2k: "Magyar · 2k · Typebar"
     case .czech: "Čeština"
     case .czech1k: "Čeština · 1k · Typebar"
     case .czech10k: "Čeština · 10k · Typebar"

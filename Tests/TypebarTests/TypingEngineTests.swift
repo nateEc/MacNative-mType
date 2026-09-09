@@ -10064,6 +10064,148 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testAtlanticAndBalticScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    struct ExpectedScale {
+      let rawValue: String
+      let displayName: String
+      let count: Int
+      let minimumLength: Int
+      let maximumLength: Int
+      let categorySignatures: [String: Int]
+      let markCount: Int
+      let supportsLazyInput: Bool
+      let zipfSupport: ZipfFrequencySupport
+      let quoteSourceRawValue: String
+      let wikipediaCode: String
+      let speechLocale: String
+    }
+
+    let cases = [
+      ExpectedScale(
+        rawValue: "irish1k", displayName: "Gaeilge · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 13,
+        categorySignatures: ["N": 396, "NM": 1, "plain": 603], markCount: 1,
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "irish",
+        wikipediaCode: "ga", speechLocale: "ga-IE"),
+      ExpectedScale(
+        rawValue: "filipino1k", displayName: "Filipino · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 11, categorySignatures: ["plain": 1_000],
+        markCount: 0, supportsLazyInput: false, zipfSupport: .unknown,
+        quoteSourceRawValue: "filipino", wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "hungarian1k", displayName: "Magyar · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 14,
+        categorySignatures: ["N": 520, "P": 1, "U": 3, "UN": 4, "plain": 472],
+        markCount: 0, supportsLazyInput: true, zipfSupport: .unsupported,
+        quoteSourceRawValue: "hungarian", wikipediaCode: "hu", speechLocale: "hu-HU"),
+      ExpectedScale(
+        rawValue: "hungarian2k", displayName: "Magyar · 2k · Typebar", count: 2_452,
+        minimumLength: 1, maximumLength: 21,
+        categorySignatures: ["N": 1_475, "P": 1, "U": 3, "UN": 4, "plain": 969],
+        markCount: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "hungarian", wikipediaCode: "hu", speechLocale: "hu-HU"),
+      ExpectedScale(
+        rawValue: "welsh1k", displayName: "Cymraeg · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 14,
+        categorySignatures: ["N": 14, "P": 45, "PN": 1, "U": 13, "plain": 927],
+        markCount: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "welsh", wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "lithuanian1k", displayName: "Lietuvių · 1k · Typebar", count: 990,
+        minimumLength: 1, maximumLength: 13,
+        categorySignatures: ["N": 292, "plain": 698], markCount: 0,
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "lithuanian",
+        wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "lithuanian3k", displayName: "Lietuvių · 3k · Typebar", count: 2_978,
+        minimumLength: 1, maximumLength: 17,
+        categorySignatures: ["N": 982, "plain": 1_996], markCount: 0,
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "lithuanian",
+        wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "latvian1k", displayName: "Latviešu · 1k · Typebar", count: 930,
+        minimumLength: 2, maximumLength: 18,
+        categorySignatures: [
+          "N": 457, "PN": 1, "S": 2, "SN": 4, "U": 2, "UN": 1, "plain": 463,
+        ], markCount: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "latvian", wikipediaCode: "lv", speechLocale: "lv"),
+      ExpectedScale(
+        rawValue: "maltese1k", displayName: "Malti · 1k · Typebar", count: 927,
+        minimumLength: 1, maximumLength: 15,
+        categorySignatures: [
+          "N": 280, "P": 2, "PN": 4, "PSN": 1, "S": 5, "SN": 1, "U": 3,
+          "UN": 1, "UPN": 1, "plain": 629,
+        ], markCount: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "maltese", wikipediaCode: "mt", speechLocale: "mt"),
+    ]
+
+    for expected in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: expected.rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: expected.quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+      var categorySignatures: [String: Int] = [:]
+      var markCount = 0
+      for word in words {
+        var signature = ""
+        if word.contains(where: \.isUppercase) { signature += "U" }
+        if word.contains(where: \.isPunctuation) { signature += "P" }
+        if word.contains(where: \.isWhitespace) { signature += "S" }
+        if word.unicodeScalars.contains(where: { !$0.isASCII }) { signature += "N" }
+        if word.unicodeScalars.contains(where: {
+          [.nonspacingMark, .spacingMark, .enclosingMark].contains($0.properties.generalCategory)
+        }) {
+          signature += "M"
+          markCount += 1
+        }
+        categorySignatures[signature.isEmpty ? "plain" : signature, default: 0] += 1
+      }
+
+      XCTAssertEqual(language.displayName, expected.displayName, expected.rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, expected.rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, expected.rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, expected.rawValue)
+      XCTAssertEqual(language.supportsLazyLatinInput, expected.supportsLazyInput, expected.rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, expected.rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, expected.rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, expected.zipfSupport, expected.rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language),
+        expected.wikipediaCode, expected.rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertEqual(words.count, expected.count, expected.rawValue)
+      XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), expected.maximumLength, expected.rawValue)
+      XCTAssertEqual(categorySignatures, expected.categorySignatures, expected.rawValue)
+      XCTAssertEqual(markCount, expected.markCount, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, expected.rawValue)
+      XCTAssertFalse(
+        words.contains { $0.unicodeScalars.contains(where: \.properties.isJoinControl) },
+        expected.rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, expected.rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        expected.rawValue)
+      XCTAssertEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ", omittingEmptySubsequences: true).count,
+        25, expected.rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, expected.rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text,
+          expected.rawValue)
+      }
+    }
+  }
+
   func testNordicAndBalticScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     struct ExpectedScale {
       let rawValue: String

@@ -4642,6 +4642,13 @@ enum OfflineContent {
     case .finnish1k, .finnish10k: .finnish
     case .estonian1k, .estonian5k, .estonian10k: .estonian
     case .icelandic1k: .icelandic
+    case .irish1k: .irish
+    case .filipino1k: .filipino
+    case .hungarian1k, .hungarian2k: .hungarian
+    case .welsh1k: .welsh
+    case .lithuanian1k, .lithuanian3k: .lithuanian
+    case .latvian1k: .latvian
+    case .maltese1k: .maltese
     default: nil
     }
     if let source = inheritedScaleQuoteSource {

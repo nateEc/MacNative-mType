@@ -192,6 +192,15 @@
 | TST-255 | Estonian 5k 数字规模入口 | 选择「Eesti · 5k · Typebar」并重复 TST-254 流程 | 独立 ID 保持 5,000 项、2–23 字符、5 个标点项与 1,235 个非 ASCII 项 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
 | TST-256 | Estonian 10k 数字规模入口 | 选择「Eesti · 10k · Typebar」并重复 TST-254 流程 | 独立 ID 保持 10,000 项、2–23 字符、13 个标点项与 2,471 个非 ASCII 项 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
 | TST-257 | Icelandic 1k 数字规模入口 | 选择「Íslenska · 1k · Typebar」并重复 TST-249 流程 | 独立 ID 保持 1,000 项、1–12 字符与 462 个非 ASCII 项；按固定缺省使用 `en`／`en-US`，不继承基础 Icelandic 的区域路径 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-258 | Irish 1k 数字规模入口 | 选择「Gaeilge · 1k · Typebar」，完成普通、百科、四档引语、预设、分享、投稿与成绩流程 | 独立 ID 保持 1,000 项、1–13 字符、397 个非 ASCII 项与 1 个组合标记项；使用 `ga`／`ga-IE` | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-259 | Filipino 1k 数字规模入口 | 选择「Filipino · 1k · Typebar」并重复 TST-258 流程 | 独立 ID 保持 1,000 个 ASCII 项与 1–11 字符；禁用简化输入，按固定缺省使用 `en`／`en-US` | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-260 | Hungarian 1k 数字规模入口 | 选择「Magyar · 1k · Typebar」并重复 TST-258 流程 | 独立 ID 保持 1,000 项、1–14 字符、7 个大写项、1 个标点项与 524 个非 ASCII 项；使用 `hu`／`hu-HU` 并明确不支持 Zipf | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-261 | Hungarian 2k 数字规模入口 | 选择「Magyar · 2k · Typebar」并重复 TST-260 流程 | 独立 ID 保持 2,452 项、1–21 字符、7 个大写项、1 个标点项与 1,479 个非 ASCII 项；Zipf 保持未知 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-262 | Welsh 1k 数字规模入口 | 选择「Cymraeg · 1k · Typebar」并重复 TST-258 流程 | 独立 ID 保持 1,000 项、1–14 字符、13 个大写项、46 个标点项与 15 个非 ASCII 项；按固定缺省使用 `en`／`en-US` | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-263 | Lithuanian 1k 数字规模入口 | 选择「Lietuvių · 1k · Typebar」并重复 TST-258 流程 | 独立 ID 保持 990 项、1–13 字符与 292 个非 ASCII 项；按固定缺省使用 `en`／`en-US` | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-264 | Lithuanian 3k 数字规模入口 | 选择「Lietuvių · 3k · Typebar」并重复 TST-263 流程 | 独立 ID 保持 2,978 项、1–17 字符与 982 个非 ASCII 项 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-265 | Latvian 1k 数字规模入口 | 选择「Latviešu · 1k · Typebar」并重复 TST-258 流程 | 独立 ID 保持 930 项、2–18 字符、3 个大写项、1 个标点项、6 个多词项与 463 个非 ASCII 项；使用 `lv`／`lv` | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-266 | Maltese 1k 数字规模入口 | 选择「Malti · 1k · Typebar」并重复 TST-258 流程 | 独立 ID 保持 927 项、1–15 字符、5 个大写项、8 个标点项、7 个多词项与 288 个非 ASCII 项；使用 `mt`／`mt` | 待验收（自动化覆盖；依用户要求不启动 GUI） |
 | TST-34 | Greeklish 离线练习 | 在语言菜单选择「Greeklish」，分别开始字数与引语练习；用普通 ASCII 键盘输入 `kalimera charti`，再启用“知识短文”。 | 词流和四档引语均为 Typebar 原创 ASCII 内容、以空格提交；知识短文不会请求或应用希腊字母原文，保持 Latin 提示。混排、错词复练、结果、服务端投稿/排行榜和系统 `el-GR` 朗读维持同一语言设置。 | 待验收（客户端与服务端自动化覆盖；依用户要求，本轮不启动 GUI） |
 | TST-35 | Norwegian Nynorsk 离线与百科练习 | 在语言菜单选择「Norsk nynorsk」，分别开始字数、引语和“知识短文”练习；用 macOS 挪威语输入源输入 `vindauge`。 | 词流和四档引语均来自 Typebar 原创内容，以空格提交；知识短文仅在用户明确启用时请求 `nn` 页面。Nynorsk 拼写、错词复练和系统 `nn-NO` 朗读维持同一语言设置。 | 待验收（客户端与服务端自动化覆盖；依用户要求，本轮不启动 GUI） |
 | TST-36 | Afrikaans 离线与百科练习 | 在语言菜单选择「Afrikaans」，分别开始字数、引语和“知识短文”练习；用 macOS 输入源输入 `môre reën`。 | 词流和四档引语均来自 Typebar 原创内容，以空格提交；知识短文仅在用户明确启用时请求 `af` 页面。组合变音输入、错词复练和系统 `af-ZA` 朗读维持同一语言设置。 | 待验收（客户端与服务端自动化覆盖；依用户要求，本轮不启动 GUI） |

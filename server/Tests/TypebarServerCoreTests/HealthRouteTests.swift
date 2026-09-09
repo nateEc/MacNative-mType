@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 332)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 341)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4323,6 +4323,15 @@ final class HealthRouteTests: XCTestCase {
       ("estonian5k", "Suurem register loob ainult küsitud harjutused."),
       ("estonian10k", "Kõige laiem register jääb kohalikuks ja kontrollitavaks."),
       ("icelandic1k", "Hver staðbundinn listi varðveitir sína eigin æfingaleið."),
+      ("irish1k", "Coinníonn gach liosta áitiúil a chonair chleachtaidh féin."),
+      ("filipino1k", "Bawat lokal na talaan ay may sariling landas ng pagsasanay."),
+      ("hungarian1k", "Minden helyi lista megőrzi a saját gyakorlási útját."),
+      ("hungarian2k", "A nagyobb jegyzék csak a kért gyakorlatokat készíti el."),
+      ("welsh1k", "Mae pob rhestr leol yn cadw ei llwybr ymarfer ei hun."),
+      ("lithuanian1k", "Kiekvienas vietinis sąrašas išlaiko savo pratybų kelią."),
+      ("lithuanian3k", "Didesnė rodyklė kuria tik prašomas pratybas."),
+      ("latvian1k", "Katrs vietējais saraksts saglabā savu vingrinājumu ceļu."),
+      ("maltese1k", "Kull lista lokali żżomm it-triq tagħha għall-prattika."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

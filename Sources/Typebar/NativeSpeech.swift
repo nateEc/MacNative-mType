@@ -55,7 +55,7 @@ extension TypingLanguage {
     case .frisian: "fy-FY"
     case .hawaiian: "haw"
     case .kabyle, .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k: "kab"
-    case .maltese: "mt"
+    case .maltese, .maltese1k: "mt"
     case .xhosa: "xh"
     case .tibetan: "bo-TI"
     case .kyrgyz, .kyrgyz1k: "ky-KY"
@@ -69,8 +69,8 @@ extension TypingLanguage {
     case .belarusian, .belarusian1k, .belarusian5k, .belarusian10k, .belarusian25k,
       .belarusian50k, .belarusian100k: "be-BY"
     case .belarusianLacinka: "en-US"
-    case .latvian: "lv"
-    case .irish: "ga-IE"
+    case .latvian, .latvian1k: "lv"
+    case .irish, .irish1k: "ga-IE"
     case .galician: "gl-ES"
     case .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k: "ckb"
     case .arabic, .arabic10k: "ar-SA"
@@ -120,7 +120,7 @@ extension TypingLanguage {
       .norwegianNynorsk10k, .norwegianNynorsk100k, .norwegianNynorsk400k:
       "nn-NO"
     case .swedish, .swedish1k, .swedishDiacritics: "sv-SE"
-    case .hungarian: "hu-HU"
+    case .hungarian, .hungarian1k, .hungarian2k: "hu-HU"
     case .czech, .czech1k, .czech10k: "cs-CZ"
     case .slovak, .slovak1k, .slovak10k: "sk-SK"
     case .slovenian, .slovenian1k, .slovenian5k: "sl-SI"
