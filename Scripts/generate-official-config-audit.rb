@@ -8,8 +8,8 @@ require "pathname"
 PINNED_COMMIT = "91bd24bb8513785c7364cbea29296ff7adafac41"
 EXPECTED_COUNTS = {
   official: 94,
-  mapped: 90,
-  partial: 3,
+  mapped: 91,
+  partial: 2,
   not_applicable: 1,
   unimplemented: 0,
   untracked: 0,

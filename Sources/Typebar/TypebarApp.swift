@@ -522,6 +522,7 @@ private struct ContentView: View {
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
   @State private var mixedLanguageComponents = TypingLanguage.defaultMixedComponents
+  @State private var mixedLanguageSearch = ""
   @State private var contentOptions = ContentOptions()
   @State private var duration = 30
   @State private var wordLimit = 25
@@ -1036,16 +1037,28 @@ private struct ContentView: View {
           }
           if language == .mixedLanguages {
             VStack(alignment: .leading, spacing: 6) {
-              Text("多语组合（至少选择两种）").font(.caption).foregroundStyle(.secondary)
-              LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 105), spacing: 8)], alignment: .leading,
-                spacing: 6
-              ) {
-                ForEach(TypingLanguage.mixableLanguages, id: \.self) { component in
-                  Toggle(component.displayName, isOn: mixedLanguageBinding(for: component))
-                    .toggleStyle(.checkbox)
+              HStack {
+                Text("多语组合（至少选择两种）").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Text("已选 \(mixedLanguageComponents.count) / \(TypingLanguage.mixableLanguages.count)")
+                  .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+              }
+              TextField("搜索语言或代码词表", text: $mixedLanguageSearch)
+                .textFieldStyle(.roundedBorder)
+              ScrollView {
+                LazyVGrid(
+                  columns: [GridItem(.adaptive(minimum: 145), spacing: 8)], alignment: .leading,
+                  spacing: 6
+                ) {
+                  ForEach(
+                    TypingLanguage.filteredMixableLanguages(query: mixedLanguageSearch), id: \.self
+                  ) { component in
+                    Toggle(component.displayName, isOn: mixedLanguageBinding(for: component))
+                      .toggleStyle(.checkbox)
+                  }
                 }
               }
+              .frame(maxHeight: 220)
             }
           }
         }
@@ -1651,7 +1664,7 @@ private struct ContentView: View {
   private var practicePrompt: some View {
     let _ = settings.localPracticeFontRevision
     let rendering = renderedPrompt
-    let isRightToLeft = session.configuration.language.usesRightToLeftPrompt
+    let isRightToLeft = session.configuration.usesRightToLeftPrompt
     let usesJoiningScript = session.configuration.usesJoiningScriptPrompt
     return Group {
       if practiceVisualEffect.usesASL {
@@ -1785,7 +1798,7 @@ private struct ContentView: View {
 
   private var usesNativeCaretOverlay: Bool {
     guard settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker else { return false }
-    guard !session.configuration.language.usesRightToLeftPrompt, !usesTapePractice,
+    guard !session.configuration.containsRightToLeftPromptRun, !usesTapePractice,
       !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo
     else {
       return false
@@ -1929,7 +1942,7 @@ private struct ContentView: View {
 
   private var usesTapePractice: Bool {
     settings.practiceTapeMode != .off && !session.prompt.contains("\n")
-      && !session.configuration.language.usesRightToLeftPrompt
+      && !session.configuration.containsRightToLeftPromptRun
   }
 
   private var showsAllPracticeLines: Bool {

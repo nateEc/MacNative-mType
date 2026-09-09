@@ -5018,6 +5018,13 @@ enum CodePracticeContent {
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
 
+  static func polyglotTokens(for language: TypingLanguage) -> [String] {
+    let tokens = blocks(for: language).flatMap {
+      $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
+    }
+    return tokens.isEmpty ? [language.displayName] : tokens
+  }
+
   private static func blocks(for language: TypingLanguage) -> [String] {
     switch language {
     case .dockerFile:

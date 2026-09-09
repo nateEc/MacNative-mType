@@ -145,6 +145,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       }.map(\.rawValue))
     XCTAssertEqual(independentlyCoveredLanguages.count, fixture.nativeIndependent.count)
     XCTAssertEqual(independentlyCoveredLanguages, nativeNonMixedLanguages)
+    XCTAssertEqual(
+      Set(TypingLanguage.mixableLanguages.map(\.rawValue)), independentlyCoveredLanguages)
 
     for rawValue in Array(fixture.nativeIndependent.values) + Array(fixture.nativeRelatedChoice.values) {
       XCTAssertNotNil(TypingLanguage(rawValue: rawValue), "Unknown Typebar language: \(rawValue)")
@@ -177,8 +179,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 94)
     XCTAssertEqual(fixture.officialKeys.count, fixture.officialCount)
     XCTAssertEqual(officialKeys.count, fixture.officialCount)
-    XCTAssertEqual(fixture.mapped.count, 90)
-    XCTAssertEqual(fixture.partial.count, 3)
+    XCTAssertEqual(fixture.mapped.count, 91)
+    XCTAssertEqual(fixture.partial.count, 2)
     XCTAssertEqual(fixture.notApplicable.count, 1)
     XCTAssertEqual(fixture.notApplicable["ads"], "无")
     XCTAssertEqual(

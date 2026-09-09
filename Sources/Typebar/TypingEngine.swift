@@ -1498,6 +1498,23 @@ struct TestConfiguration: Codable, Equatable {
       || (language == .mixedLanguages && mixedLanguageComponents.contains { $0.usesJoiningScriptPrompt })
   }
 
+  /// A polyglot prompt uses an RTL paragraph base only when every selected
+  /// language is RTL. Mixed-direction prompts keep the native LTR base and
+  /// let macOS apply Unicode bidirectional layout to each run.
+  var usesRightToLeftPrompt: Bool {
+    guard language == .mixedLanguages else { return language.usesRightToLeftPrompt }
+    return !mixedLanguageComponents.isEmpty
+      && mixedLanguageComponents.allSatisfy(\.usesRightToLeftPrompt)
+  }
+
+  /// Character-position overlays stay off for any prompt containing an RTL
+  /// run, including a mixed-direction polyglot prompt.
+  var containsRightToLeftPromptRun: Bool {
+    language.usesRightToLeftPrompt
+      || (language == .mixedLanguages
+        && mixedLanguageComponents.contains(where: \.usesRightToLeftPrompt))
+  }
+
   init(
     mode: TestMode, duration: TimeInterval?, wordLimit: Int?, difficulty: Difficulty,
     rules: InputRules, language: TypingLanguage = .english,
@@ -9796,7 +9813,7 @@ enum StarterLexicon {
       }.joined(separator: " ")
     case .mixedLanguages:
       let sources = TypingLanguage.normalizedMixedComponents(mixedLanguageComponents).map {
-        source(for: $0, englishVariant: englishVariant)
+        polyglotSource(for: $0, englishVariant: englishVariant)
       }
       return (0..<count).map { index in
         let source = sources[index % sources.count]
@@ -9808,6 +9825,29 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: words, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    }
+  }
+
+  private static func polyglotSource(
+    for language: TypingLanguage, englishVariant: EnglishVariant
+  ) -> (IndexedLexicon, [String]) {
+    if language.isCodeLanguage {
+      return (
+        polyglotTokenLexicon(IndexedLexicon(CodePracticeContent.polyglotTokens(for: language))),
+        [".", ",", ";", ":"])
+    }
+    if TypingLanguage.defaultMixedComponents.contains(language) {
+      let existing = source(for: language, englishVariant: englishVariant)
+      return (polyglotTokenLexicon(IndexedLexicon(existing.0)), existing.1)
+    }
+    return (
+      polyglotTokenLexicon(language.ownedPracticeLexicon(englishVariant: englishVariant)),
+      language.polyglotPunctuation)
+  }
+
+  private static func polyglotTokenLexicon(_ lexicon: IndexedLexicon) -> IndexedLexicon {
+    IndexedLexicon(count: lexicon.count) { index in
+      PolyglotTokenPolicy.token(from: lexicon[index], selectionIndex: index)
     }
   }
 
@@ -10253,6 +10293,14 @@ enum StarterLexicon {
       token += punctuation[index / 7 % punctuation.count]
     }
     return token
+  }
+}
+
+enum PolyglotTokenPolicy {
+  static func token(from entry: String, selectionIndex: Int) -> String {
+    let tokens = entry.split(whereSeparator: \Character.isWhitespace)
+    guard !tokens.isEmpty else { return entry }
+    return String(tokens[abs(selectionIndex) % tokens.count])
   }
 }
 
@@ -10926,7 +10974,25 @@ extension TypingLanguage {
     .korean, .turkish, .polish,
   ]
 
-  static var mixableLanguages: [TypingLanguage] { defaultMixedComponents }
+  /// Every fixed-schema single-language choice is available to custom
+  /// polyglot practice. The two Typebar aggregate modes are not languages.
+  static var mixableLanguages: [TypingLanguage] {
+    allCases.filter { $0 != .mixedEnglishChinese && $0 != .mixedLanguages }
+  }
+
+  static func filteredMixableLanguages(query: String) -> [TypingLanguage] {
+    let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).folding(
+      options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    guard !normalized.isEmpty else { return mixableLanguages }
+    return mixableLanguages.filter {
+      $0.displayName.folding(
+        options: [.caseInsensitive, .diacriticInsensitive], locale: .current
+      ).contains(normalized)
+        || $0.rawValue.folding(
+          options: [.caseInsensitive, .diacriticInsensitive], locale: .current
+        ).contains(normalized)
+    }
+  }
 
   static func normalizedMixedComponents(_ languages: [TypingLanguage]) -> [TypingLanguage] {
     let selected = languages.filter { mixableLanguages.contains($0) }.reduce(
@@ -10941,9 +11007,14 @@ extension TypingLanguage {
     !isNoSpaceLanguage && !isCodeLanguage
   }
 
-  /// Right-to-left prompts use the native text system. They remain
-  /// single-language until mixed bidirectional prompt layout has dedicated
-  /// interaction coverage.
+  var polyglotPunctuation: [String] {
+    if isNoSpaceLanguage { return ["，", "。", "！", "？"] }
+    if usesRightToLeftPrompt { return ["،", "؛", "؟", "."] }
+    return [",", ".", "!", "?"]
+  }
+
+  /// Right-to-left scripts use the native text system. Polyglot paragraph
+  /// direction is derived by `TestConfiguration` from the complete selection.
   var usesRightToLeftPrompt: Bool {
     self == .arabic || self == .arabic10k || self == .arabicEgypt || self == .arabicEgypt1k || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .hebrew1k || self == .hebrew5k || self == .hebrew10k || self == .persian || self == .persian1k || self == .persian5k || self == .persian20k || self == .urdu || self == .urdu1k || self == .urdu5k || self == .kurdishCentral || self == .kurdishCentral2k || self == .kurdishCentral4k || self == .yiddish
   }

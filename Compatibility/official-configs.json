@@ -122,6 +122,7 @@
     "britishEnglish": "`englishVariant`",
     "funbox": "`TestModifier`",
     "customLayoutfluid": "`layoutFluidLayouts`",
+    "customPolyglot": "`mixedLanguageComponents`",
     "freedomMode": "`freedomMode`",
     "strictSpace": "`strictSpace`",
     "oppositeShiftMode": "`oppositeShiftMode`",
@@ -192,7 +193,6 @@
   },
   "partial": {
     "language": "`TypingLanguage`、`mixedLanguageComponents`",
-    "customPolyglot": "`mixedLanguageComponents`",
     "fontFamily": "`practiceFont`、可搜索的本机字体目录、名称/导入"
   },
   "notApplicable": {

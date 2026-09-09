@@ -8700,7 +8700,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ne")
     XCTAssertEqual(language.speechLocaleIdentifier, "ne-NP")
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
     XCTAssertEqual(words.count, 1_000)
     XCTAssertEqual(Set(words).count, 1_000)
     XCTAssertEqual(words.lazy.map(\.count).min(), 1)
@@ -8746,7 +8746,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "az")
     XCTAssertEqual(language.speechLocaleIdentifier, "az-AZ")
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
     XCTAssertEqual(words.count, 989)
     XCTAssertEqual(Set(words).count, 989)
     XCTAssertEqual(words.lazy.map(\.count).min(), 2)
@@ -8786,7 +8786,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(language.zipfFrequencySupport, .unknown)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
     XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
     XCTAssertEqual(words.count, 975)
     XCTAssertEqual(Set(words).count, 975)
     XCTAssertEqual(words.lazy.map(\.count).min(), 3)
@@ -8830,7 +8830,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(language.zipfFrequencySupport, .unknown)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ms")
     XCTAssertEqual(language.speechLocaleIdentifier, "ms-MY")
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
     XCTAssertEqual(words.count, 1_000)
     XCTAssertEqual(Set(words).count, 1_000)
     XCTAssertEqual(words.lazy.map(\.count).min(), 2)
@@ -8869,7 +8869,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(language.zipfFrequencySupport, .unknown)
     XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
     XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language))
     XCTAssertEqual(words.count, 9_219)
     XCTAssertEqual(Set(words).count, 9_219)
     XCTAssertEqual(words.lazy.map(\.count).min(), 1)
@@ -8921,7 +8921,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
       XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "uk", rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, "uk-UA", rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), 1, rawValue)
@@ -8991,7 +8991,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
       XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), wiki, rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, speech, rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), 2, rawValue)
@@ -9042,7 +9042,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
       XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ckb", rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, "ckb", rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), 1, rawValue)
@@ -9096,7 +9096,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
       XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "de", rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, "de-CH", rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(language.presentationText("groß"), "gross", rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
@@ -9160,7 +9160,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
       XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "af", rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, "af-ZA", rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), 2, rawValue)
@@ -9221,7 +9221,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
       XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "it", rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, "it-IT", rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), 1, rawValue)
@@ -9293,7 +9293,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(language.zipfFrequencySupport, zipfSupport, rawValue)
       XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en", rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, "en-US", rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), 1, rawValue)
@@ -9369,7 +9369,7 @@ final class TypingEngineTests: XCTestCase {
         LivePracticeContentSource.selected(for: .words(
           5, language: language).with(modifiers: [.referenceStream])),
         supportsLiveEncyclopedia ? .encyclopedia : nil, rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), 1, rawValue)
@@ -9446,7 +9446,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
       XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "crh", rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, "crh-CRH", rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), 1, rawValue)
@@ -9524,7 +9524,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(
         LivePracticeContentService.wikipediaLanguageCode(for: language), wikipediaCode, rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, speechLocale, rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), minimumLength, rawValue)
@@ -9614,7 +9614,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(
         LivePracticeContentService.wikipediaLanguageCode(for: language), wikipediaCode, rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, speechLocale, rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), minimumLength, rawValue)
@@ -9705,7 +9705,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(
         LivePracticeContentService.wikipediaLanguageCode(for: language), wikipediaCode, rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, speechLocale, rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertTrue(words.allSatisfy { $0.contains(originalMarker) }, rawValue)
@@ -9818,7 +9818,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(
         LivePracticeContentService.wikipediaLanguageCode(for: language), wikipediaCode, rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, speechLocale, rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), rawValue)
       XCTAssertEqual(words.count, count, rawValue)
       XCTAssertEqual(Set(words).count, count, rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), minimumLength, rawValue)
@@ -10003,7 +10003,7 @@ final class TypingEngineTests: XCTestCase {
         LivePracticeContentService.wikipediaLanguageCode(for: language),
         expected.wikipediaCode, expected.rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
       XCTAssertEqual(words.count, expected.count, expected.rawValue)
       XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
@@ -10192,7 +10192,7 @@ final class TypingEngineTests: XCTestCase {
         LivePracticeContentService.wikipediaLanguageCode(for: language),
         expected.wikipediaCode, expected.rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
       XCTAssertEqual(words.count, expected.count, expected.rawValue)
       XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
@@ -10420,7 +10420,7 @@ final class TypingEngineTests: XCTestCase {
         LivePracticeContentService.wikipediaLanguageCode(for: language),
         expected.wikipediaCode, expected.rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
       XCTAssertEqual(words.count, expected.count, expected.rawValue)
       XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
@@ -10567,7 +10567,7 @@ final class TypingEngineTests: XCTestCase {
         LivePracticeContentService.wikipediaLanguageCode(for: language),
         expected.wikipediaCode, expected.rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
       XCTAssertEqual(words.count, expected.count, expected.rawValue)
       XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
@@ -10708,7 +10708,7 @@ final class TypingEngineTests: XCTestCase {
         LivePracticeContentService.wikipediaLanguageCode(for: language),
         expected.wikipediaCode, expected.rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
       XCTAssertEqual(words.count, expected.count, expected.rawValue)
       XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
@@ -10853,7 +10853,7 @@ final class TypingEngineTests: XCTestCase {
         LivePracticeContentService.wikipediaLanguageCode(for: language),
         expected.wikipediaCode, expected.rawValue)
       XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
-      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertTrue(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
       XCTAssertEqual(words.count, expected.count, expected.rawValue)
       XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
       XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
@@ -12679,6 +12679,78 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(customConfiguration.mixedLanguageComponents, selected)
     XCTAssertEqual(
       TypingLanguage.normalizedMixedComponents([.english]), TypingLanguage.defaultMixedComponents)
+  }
+
+  func testCustomPolyglotOffersEveryNativeSingleLanguageAndHandlesScriptsAndCode() throws {
+    let singleLanguages = TypingLanguage.allCases.filter {
+      $0 != .mixedEnglishChinese && $0 != .mixedLanguages
+    }
+    XCTAssertEqual(singleLanguages.count, 446)
+    XCTAssertEqual(Set(TypingLanguage.mixableLanguages), Set(singleLanguages))
+
+    XCTAssertEqual(
+      TypingLanguage.normalizedMixedComponents([.arabic, .hebrew, .arabic]),
+      [.arabic, .hebrew])
+    let rtlConfiguration = TestConfiguration.words(
+      6, language: .mixedLanguages, mixedLanguageComponents: [.arabic, .hebrew])
+    XCTAssertTrue(rtlConfiguration.usesRightToLeftPrompt)
+    XCTAssertTrue(rtlConfiguration.containsRightToLeftPromptRun)
+    XCTAssertTrue(rtlConfiguration.usesJoiningScriptPrompt)
+    let rtlTokens = TestSessionFactory.make(configuration: rtlConfiguration).prompt
+      .split(separator: " ").map(String.init)
+    XCTAssertEqual(rtlTokens.count, 6)
+    XCTAssertTrue(
+      rtlTokens.enumerated().allSatisfy { index, token in
+        (index.isMultiple(of: 2) ? StarterLexicon.arabicWords : StarterLexicon.hebrewWords)
+          .contains(token)
+      })
+
+    let bidirectional = TestConfiguration.words(
+      4, language: .mixedLanguages, mixedLanguageComponents: [.english, .arabic])
+    XCTAssertFalse(bidirectional.usesRightToLeftPrompt)
+    XCTAssertTrue(bidirectional.containsRightToLeftPromptRun)
+    XCTAssertEqual(
+      TestSessionFactory.make(configuration: bidirectional).prompt.split(separator: " ").count, 4)
+
+    let noSpace = TestConfiguration.words(
+      4, language: .mixedLanguages,
+      mixedLanguageComponents: [.simplifiedChinese50k, .japaneseKatakana])
+    XCTAssertEqual(
+      TestSessionFactory.make(configuration: noSpace).prompt.split(separator: " ").count, 4)
+    XCTAssertFalse(noSpace.containsRightToLeftPromptRun)
+
+    let code = TestConfiguration.words(
+      4, language: .mixedLanguages, mixedLanguageComponents: [.codeSwift, .codePython])
+    let codeTokens = TestSessionFactory.make(configuration: code).prompt.split(separator: " ")
+    XCTAssertEqual(codeTokens.count, 4)
+    XCTAssertTrue(codeTokens.allSatisfy { !$0.isEmpty })
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        TestConfiguration.self, from: JSONEncoder().encode(code)
+      ).mixedLanguageComponents,
+      [.codeSwift, .codePython])
+
+    XCTAssertEqual(
+      TypingLanguage.filteredMixableLanguages(query: "python").first, .codePython)
+    XCTAssertTrue(TypingLanguage.filteredMixableLanguages(query: "العربية").contains(.arabic))
+    XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 153)
+    XCTAssertEqual(
+      TypingLanguage.normalizedMixedComponents([.codeSwift, .codeSwift]),
+      TypingLanguage.defaultMixedComponents)
+    XCTAssertEqual(
+      PolyglotTokenPolicy.token(from: "quiet   harbor", selectionIndex: 0), "quiet")
+    XCTAssertEqual(
+      PolyglotTokenPolicy.token(from: "quiet\tharbor", selectionIndex: 1), "harbor")
+
+    for language in TypingLanguage.mixableLanguages {
+      let partner: TypingLanguage = language == .english ? .spanish : .english
+      let configuration = TestConfiguration.words(
+        2, language: .mixedLanguages, mixedLanguageComponents: [language, partner])
+      XCTAssertEqual(
+        TestSessionFactory.make(configuration: configuration).prompt
+          .split(whereSeparator: \Character.isWhitespace).count,
+        2, "Custom polyglot failed for \(language.rawValue)")
+    }
   }
 
   func testContentOptionsGenerateAndPersistNumbersAndPunctuation() {
@@ -14988,7 +15060,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.yiddish.supportsCommunityQuoteSubmission)
     XCTAssertEqual(TypingLanguage.yiddish.zipfFrequencySupport, .unknown)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.yiddish))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.yiddish))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.yiddish))
     let yiddishConfiguration = TestConfiguration(
       mode: .words, duration: nil, wordLimit: 10, difficulty: .normal, rules: .init(), language: .yiddish)
     XCTAssertTrue(yiddishConfiguration.usesJoiningScriptPrompt)
@@ -15002,7 +15074,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(StarterLexicon.arabicWords.contains("نافِذة"))
     XCTAssertTrue(TypingLanguage.arabic.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabic))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.arabic))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.arabic))
     XCTAssertTrue(StarterLexicon.arabicEgyptWords.contains("دلوقتي"))
     XCTAssertTrue(TypingLanguage.arabicEgypt.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.arabicEgypt.usesSpaceDelimitedWords)
@@ -15010,7 +15082,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.arabicEgypt.supportsQuotes)
     XCTAssertTrue(TypingLanguage.arabicEgypt.supportsCommunityQuoteSubmission)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabicEgypt))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.arabicEgypt))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.arabicEgypt))
     XCTAssertTrue(StarterLexicon.arabicMoroccoWords.contains("شرجم"))
     XCTAssertTrue(TypingLanguage.arabicMorocco.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.arabicMorocco.usesSpaceDelimitedWords)
@@ -15019,7 +15091,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.arabicMorocco.supportsCommunityQuoteSubmission)
     XCTAssertEqual(TypingLanguage.arabicMorocco.zipfFrequencySupport, .unsupported)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.arabicMorocco))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.arabicMorocco))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.arabicMorocco))
     XCTAssertTrue(StarterLexicon.pashtoWords.contains("کړکۍ"))
     XCTAssertTrue(TypingLanguage.pashto.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.pashto.usesSpaceDelimitedWords)
@@ -15028,7 +15100,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.pashto.supportsCommunityQuoteSubmission)
     XCTAssertEqual(TypingLanguage.pashto.zipfFrequencySupport, .unknown)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.pashto))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.pashto))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.pashto))
     XCTAssertTrue(StarterLexicon.sindhiWords.contains("ڪتاب"))
     XCTAssertTrue(TypingLanguage.sindhi.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.sindhi.usesSpaceDelimitedWords)
@@ -15037,25 +15109,25 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.sindhi.supportsCommunityQuoteSubmission)
     XCTAssertEqual(TypingLanguage.sindhi.zipfFrequencySupport, .unsupported)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.sindhi))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.sindhi))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.sindhi))
     XCTAssertTrue(StarterLexicon.hebrewWords.contains("חלון"))
     XCTAssertTrue(TypingLanguage.hebrew.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.hebrew))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.hebrew))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.hebrew))
     XCTAssertTrue(StarterLexicon.persianWords.contains("پنجره"))
     XCTAssertTrue(TypingLanguage.persian.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.persian))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.persian))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.persian))
     XCTAssertTrue(StarterLexicon.urduWords.contains("کھڑکی"))
     XCTAssertTrue(TypingLanguage.urdu.usesRightToLeftPrompt)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.urdu))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.urdu))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.urdu))
     XCTAssertTrue(StarterLexicon.kurdishCentralWords.contains("پەنجەرە"))
     XCTAssertTrue(TypingLanguage.kurdishCentral.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.kurdishCentral.usesSpaceDelimitedWords)
     XCTAssertTrue(TypingLanguage.kurdishCentral.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(.kurdishCentral))
-    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(.kurdishCentral))
+    XCTAssertTrue(TypingLanguage.mixableLanguages.contains(.kurdishCentral))
     XCTAssertTrue(StarterLexicon.tamilWords.contains("சாளரம்"))
     XCTAssertFalse(TypingLanguage.tamil.usesRightToLeftPrompt)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tamil))
