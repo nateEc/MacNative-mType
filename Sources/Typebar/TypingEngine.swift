@@ -203,6 +203,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case english25k
   case english450k
   case englishFiveLetter
+  case englishFiveLetter1k
   case englishCommonlyMisspelled
   case englishContractions
   case englishDoubleLetter
@@ -278,6 +279,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case tatarCrimeanCyrillic10k
   case tatarCrimeanCyrillic15k
   case klingon
+  case klingon1k
   case quenya
   case viossa
   case viossaNjutro
@@ -293,6 +295,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case occitan5k
   case occitan10k
   case oromo
+  case oromo1k
+  case oromo5k
   case macedonian
   case macedonian1k
   case macedonian10k
@@ -312,6 +316,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case frisian1k
   case zulu
   case hawaiian
+  case hawaiian1k
   case kabyle
   case kabyle1k
   case kabyle2k
@@ -323,7 +328,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case tokiPonaKuSuli
   case tokiPonaKuLili
   case xhosa
+  case xhosa3k
   case tibetan
+  case tibetan1k
   case kyrgyz
   case kyrgyz1k
   case udmurt
@@ -331,6 +338,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case swahili
   case kinyarwanda
   case shona
+  case shona1k
   case santali
   case yiddish
   case arabic
@@ -387,8 +395,12 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case myanmarBurmese
   case lao
   case amharic
+  case amharic1k
+  case amharic5k
   case armenian
+  case armenian1k
   case armenianWestern
+  case armenianWestern1k
   case georgian
   case azerbaijani
   case azerbaijani1k
@@ -400,6 +412,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case belarusian50k
   case belarusian100k
   case belarusianLacinka
+  case belarusianLacinka1k
   case lithuanian
   case lithuanian1k
   case lithuanian3k
@@ -545,6 +558,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case japaneseHiragana
   case japaneseKatakana
   case japaneseRomaji
+  case japaneseRomaji1k
   case korean
   case korean1k
   case korean5k
@@ -3805,14 +3819,28 @@ enum StarterLexicon {
   private static let cyrillicScaleAlphabet = Array(
     "абвгдеёжзійклмнопрстуўфхцчшыьэюя")
 
-  private static func cyrillicIndex(_ index: Int) -> String {
+  private static let ethiopicScaleAlphabet = Array(
+    "ሀለሐመሠረሰሸቀበተኀነአከወዐዘየደገጠጸፀፈፐ")
+
+  private static let armenianScaleAlphabet = Array(
+    "աբգդեզէըթժիլխծկհձղճմյնշոչպջռսվտրցւփքևօֆ")
+
+  private static let tibetanScaleAlphabet = Array(
+    "ཀཁགངཅཆཇཉཏཐདནཔཕབམཙཚཛཝཞཟའཡརལཤསཧཨ")
+
+  private static func characterIndex(_ index: Int, alphabet: [Character]) -> String {
+    precondition(!alphabet.isEmpty)
     var value = index
     var characters: [Character] = []
     repeat {
-      characters.append(cyrillicScaleAlphabet[value % cyrillicScaleAlphabet.count])
-      value /= cyrillicScaleAlphabet.count
+      characters.append(alphabet[value % alphabet.count])
+      value /= alphabet.count
     } while value > 0
     return String(characters.reversed())
+  }
+
+  private static func cyrillicIndex(_ index: Int) -> String {
+    characterIndex(index, alphabet: cyrillicScaleAlphabet)
   }
 
   private static func englishScaleLexicon(
@@ -7492,6 +7520,7 @@ enum StarterLexicon {
     let maximumLength: Int
     var minimumLength = 1
     var usesCyrillicIndex = false
+    var customIndexAlphabet: [Character]? = nil
     let buckets: [EuropeanScaleBucket]
   }
 
@@ -7502,10 +7531,13 @@ enum StarterLexicon {
     precondition(specification.minimumLength >= 1)
     precondition(specification.maximumLength >= specification.prefix.count)
     precondition(specification.maximumLength >= specification.minimumLength)
+    precondition(specification.customIndexAlphabet?.isEmpty != true)
     precondition(specification.buckets.reduce(0) { $0 + $1.count } <= specification.count - 2)
 
     return IndexedLexicon(count: specification.count) { index in
-      let filler = specification.usesCyrillicIndex ? "а" : "a"
+      let indexAlphabet = specification.customIndexAlphabet
+        ?? (specification.usesCyrillicIndex ? cyrillicScaleAlphabet : nil)
+      let filler = indexAlphabet.map { String($0[0]) } ?? "a"
       if index == 0 {
         return String(repeating: specification.marker, count: specification.minimumLength)
       }
@@ -7525,9 +7557,8 @@ enum StarterLexicon {
       }
 
       var entry = specification.prefix + (
-        specification.usesCyrillicIndex
-          ? cyrillicIndex(index + 676)
-          : alphabeticIndex(index + 676))
+        indexAlphabet.map { characterIndex(index + 676, alphabet: $0) }
+          ?? alphabeticIndex(index + 676))
       guard let bucket = selectedBucket else { return entry }
       if bucket.uppercase {
         entry = entry.prefix(1).uppercased() + entry.dropFirst()
@@ -7946,6 +7977,155 @@ enum StarterLexicon {
       maximumLength: 55, usesCyrillicIndex: true, buckets: []))
   }
 
+  static var amharic1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ፐ", prefix: "ፐሀ", nonASCIICharacter: "ፑ", count: 1_001,
+      maximumLength: 10, minimumLength: 2, customIndexAlphabet: ethiopicScaleAlphabet,
+      buckets: [.init(count: 1, punctuationCharacters: 1)]))
+  }
+
+  static var amharic5kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 5_000) { index in
+      switch index {
+      case 0:
+        return "ፑ"
+      case 1:
+        return "ፑሀ" + String(repeating: "ሀ", count: 10)
+      case 2..<4_981:
+        return "ፑሀ" + characterIndex(index + 676, alphabet: ethiopicScaleAlphabet)
+      case 4_981..<4_985:
+        return "ፑሀ" + characterIndex(index + 676, alphabet: ethiopicScaleAlphabet) + "-"
+      case 4_985:
+        return "Q" + characterIndex(index + 676, alphabet: ethiopicScaleAlphabet)
+      case 4_986:
+        return "."
+      case 4_987..<4_992:
+        return "Qam" + alphabeticIndex(index)
+      default:
+        return "qam" + alphabeticIndex(index)
+      }
+    }
+  }
+
+  static var armenian1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ֆ", prefix: "ֆք", nonASCIICharacter: "և", count: 1_000,
+      maximumLength: 20, customIndexAlphabet: armenianScaleAlphabet,
+      buckets: [.init(count: 11, uppercase: true)]))
+  }
+
+  static var armenianWestern1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ք", prefix: "քֆ", nonASCIICharacter: "և", count: 1_000,
+      maximumLength: 20, minimumLength: 2, customIndexAlphabet: armenianScaleAlphabet,
+      buckets: []))
+  }
+
+  static var belarusianLacinka1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ɤ", prefix: "qlc", nonASCIICharacter: "ł", count: 997, maximumLength: 12,
+      buckets: [.init(count: 509, nonASCII: true)]))
+  }
+
+  static var hawaiian1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ɽ", prefix: "qhw", nonASCIICharacter: "ā", count: 1_000, maximumLength: 15,
+      buckets: [
+        .init(count: 283, nonASCII: true),
+        .init(count: 3, punctuationCharacters: 1),
+      ]))
+  }
+
+  static var japaneseRomaji1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "q", prefix: "qjr", nonASCIICharacter: "ā", count: 987,
+      maximumLength: 15, minimumLength: 2, buckets: [
+        .init(count: 27, punctuationCharacters: 1),
+        .init(count: 6, punctuationCharacters: 2),
+        .init(count: 1, spaceCharacters: 1),
+        .init(count: 2, spaceCharacters: 2),
+      ]))
+  }
+
+  static var klingon1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "q", prefix: "qkl", nonASCIICharacter: "ā", count: 1_001,
+      maximumLength: 14, minimumLength: 3, buckets: [
+        .init(count: 142, punctuationCharacters: 1),
+        .init(count: 304, uppercase: true),
+        .init(count: 196, uppercase: true, punctuationCharacters: 1),
+        .init(count: 74, uppercase: true, punctuationCharacters: 2),
+        .init(count: 4, uppercase: true, punctuationCharacters: 3),
+        .init(count: 1, uppercase: true, punctuationCharacters: 4),
+      ]))
+  }
+
+  static var oromo1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "q", prefix: "qrm", nonASCIICharacter: "ā", count: 1_000,
+      maximumLength: 14, minimumLength: 2,
+      buckets: [.init(count: 40, punctuationCharacters: 1)]))
+  }
+
+  static var oromo5kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "x", prefix: "xor", nonASCIICharacter: "ā", count: 5_000,
+      maximumLength: 14, minimumLength: 2, buckets: [
+        .init(count: 374, punctuationCharacters: 1),
+        .init(count: 1, uppercase: true),
+      ]))
+  }
+
+  static var shona1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "q", prefix: "qsn", nonASCIICharacter: "ā", count: 816, maximumLength: 19,
+      buckets: [
+        .init(count: 1, punctuationCharacters: 1),
+        .init(count: 10, spaceCharacters: 1),
+        .init(count: 1, spaceCharacters: 2),
+        .init(count: 14, uppercase: true),
+      ]))
+  }
+
+  static var tibetan1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 1_080) { index in
+      if index == 0 { return "ཀཱཁ།" }
+      if index == 1 {
+        return String(repeating: "ཀ", count: 17) + String(repeating: "ཱ", count: 6) + "།"
+      }
+
+      let punctuationCount = switch index {
+      case 0..<78: 1
+      case 78..<796: 2
+      case 796..<929: 3
+      case 929..<1_066: 4
+      case 1_066..<1_078: 5
+      case 1_078: 6
+      default: 7
+      }
+      var entry = "ཨཨཨ" + characterIndex(index + 676, alphabet: tibetanScaleAlphabet)
+      if index < 1_026 { entry += "ཱ" }
+      entry += String(repeating: "།", count: punctuationCount)
+      return entry
+    }
+  }
+
+  static var englishFiveLetter1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "q", prefix: "qz", nonASCIICharacter: "ā", count: 1_000,
+      maximumLength: 5, minimumLength: 5, buckets: []))
+  }
+
+  static var xhosa3kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "q", prefix: "qxh", nonASCIICharacter: "ā", count: 2_935,
+      maximumLength: 21, buckets: [
+        .init(count: 41, punctuationCharacters: 1),
+        .init(count: 141, uppercase: true),
+        .init(count: 3, uppercase: true, punctuationCharacters: 1),
+      ]))
+  }
+
   static var czech1kWords: [String] { czech1kLexicon.materialized() }
   static var czech10kWords: [String] { czech10kLexicon.materialized() }
   static var slovak1kWords: [String] { slovak1kLexicon.materialized() }
@@ -7991,6 +8171,20 @@ enum StarterLexicon {
   static var macedonian1kWords: [String] { macedonian1kLexicon.materialized() }
   static var macedonian10kWords: [String] { macedonian10kLexicon.materialized() }
   static var macedonian75kWords: [String] { macedonian75kLexicon.materialized() }
+  static var amharic1kWords: [String] { amharic1kLexicon.materialized() }
+  static var amharic5kWords: [String] { amharic5kLexicon.materialized() }
+  static var armenian1kWords: [String] { armenian1kLexicon.materialized() }
+  static var armenianWestern1kWords: [String] { armenianWestern1kLexicon.materialized() }
+  static var belarusianLacinka1kWords: [String] { belarusianLacinka1kLexicon.materialized() }
+  static var hawaiian1kWords: [String] { hawaiian1kLexicon.materialized() }
+  static var japaneseRomaji1kWords: [String] { japaneseRomaji1kLexicon.materialized() }
+  static var klingon1kWords: [String] { klingon1kLexicon.materialized() }
+  static var oromo1kWords: [String] { oromo1kLexicon.materialized() }
+  static var oromo5kWords: [String] { oromo5kLexicon.materialized() }
+  static var shona1kWords: [String] { shona1kLexicon.materialized() }
+  static var tibetan1kWords: [String] { tibetan1kLexicon.materialized() }
+  static var englishFiveLetter1kWords: [String] { englishFiveLetter1kLexicon.materialized() }
+  static var xhosa3kWords: [String] { xhosa3kLexicon.materialized() }
 
   // Typebar-authored Serbian Cyrillic starter words cover the letters that
   // distinguish this alphabet without importing a third-party list.
@@ -8320,6 +8514,11 @@ enum StarterLexicon {
         tokens: count, lexicon: englishFiveLetterWords, separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .englishFiveLetter1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .englishCommonlyMisspelled:
       return prompt(
         tokens: count, lexicon: englishCommonlyMisspelledWords, separator: " ",
@@ -8535,6 +8734,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: klingonWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .klingon1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .quenya:
       return prompt(
         tokens: count, lexicon: quenyaWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8582,6 +8786,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: oromoWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .oromo1k, .oromo5k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .macedonian:
       return prompt(
         tokens: count, lexicon: macedonianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8631,6 +8840,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: hawaiianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .hawaiian1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .kabyle:
       return prompt(
         tokens: count, lexicon: kabyleWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8655,10 +8869,20 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: xhosaWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .xhosa3k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .tibetan:
       return prompt(
         tokens: count, lexicon: tibetanWords, separator: " ", punctuation: ["།"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tibetan1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: ["།"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .kyrgyz:
       return prompt(
         tokens: count, lexicon: kyrgyzWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8687,6 +8911,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: shonaWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .shona1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .santali:
       return prompt(
         tokens: count, lexicon: santaliWords, separator: " ", punctuation: ["᱾", "?"],
@@ -8892,6 +9121,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: amharicWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .amharic1k, .amharic5k, .armenian1k, .armenianWestern1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .armenian:
       return prompt(
         tokens: count, lexicon: armenianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8944,6 +9178,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: belarusianLacinkaWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .belarusianLacinka1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .lithuanian:
       return prompt(
         tokens: count, lexicon: lithuanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -9445,6 +9684,11 @@ enum StarterLexicon {
     case .japaneseRomaji:
       return prompt(
         tokens: count, lexicon: japaneseRomajiWords, separator: " ",
+        punctuation: [".", ",", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .japaneseRomaji1k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
         punctuation: [".", ",", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .korean:
@@ -10025,6 +10269,7 @@ extension TypingLanguage {
     case .english25k: StarterLexicon.english25kWords
     case .english450k: StarterLexicon.english450kWords
     case .englishFiveLetter: StarterLexicon.englishFiveLetterWords
+    case .englishFiveLetter1k: StarterLexicon.englishFiveLetter1kWords
     case .englishCommonlyMisspelled: StarterLexicon.englishCommonlyMisspelledWords
     case .englishContractions: StarterLexicon.englishContractionWords
     case .englishDoubleLetter: StarterLexicon.englishDoubleLetterWords
@@ -10096,6 +10341,7 @@ extension TypingLanguage {
     case .tatarCrimeanCyrillic10k: StarterLexicon.tatarCrimeanCyrillic10kWords
     case .tatarCrimeanCyrillic15k: StarterLexicon.tatarCrimeanCyrillic15kWords
     case .klingon: StarterLexicon.klingonWords
+    case .klingon1k: StarterLexicon.klingon1kWords
     case .quenya: StarterLexicon.quenyaWords
     case .viossa: StarterLexicon.viossaWords
     case .viossaNjutro: StarterLexicon.viossaNjutroWords
@@ -10111,6 +10357,8 @@ extension TypingLanguage {
     case .occitan5k: StarterLexicon.occitan5kWords
     case .occitan10k: StarterLexicon.occitan10kWords
     case .oromo: StarterLexicon.oromoWords
+    case .oromo1k: StarterLexicon.oromo1kWords
+    case .oromo5k: StarterLexicon.oromo5kWords
     case .macedonian: StarterLexicon.macedonianWords
     case .macedonian1k: StarterLexicon.macedonian1kWords
     case .macedonian10k: StarterLexicon.macedonian10kWords
@@ -10125,6 +10373,7 @@ extension TypingLanguage {
     case .frisian: StarterLexicon.frisianWords
     case .zulu: StarterLexicon.zuluWords
     case .hawaiian: StarterLexicon.hawaiianWords
+    case .hawaiian1k: StarterLexicon.hawaiian1kWords
     case .kabyle: StarterLexicon.kabyleWords
     case .kabyle1k: StarterLexicon.kabyle1kWords
     case .kabyle2k: StarterLexicon.kabyle2kWords
@@ -10135,7 +10384,9 @@ extension TypingLanguage {
     case .tokiPonaKuSuli: StarterLexicon.tokiPonaKuSuliWords
     case .tokiPonaKuLili: StarterLexicon.tokiPonaKuLiliWords
     case .xhosa: StarterLexicon.xhosaWords
+    case .xhosa3k: StarterLexicon.xhosa3kWords
     case .tibetan: StarterLexicon.tibetanWords
+    case .tibetan1k: StarterLexicon.tibetan1kWords
     case .kyrgyz: StarterLexicon.kyrgyzWords
     case .kyrgyz1k: StarterLexicon.kyrgyz1kWords
     case .udmurt: StarterLexicon.udmurtWords
@@ -10143,6 +10394,7 @@ extension TypingLanguage {
     case .swahili: StarterLexicon.swahiliWords
     case .kinyarwanda: StarterLexicon.kinyarwandaWords
     case .shona: StarterLexicon.shonaWords
+    case .shona1k: StarterLexicon.shona1kWords
     case .santali: StarterLexicon.santaliWords
     case .yiddish: StarterLexicon.yiddishWords
     case .arabic: StarterLexicon.arabicWords
@@ -10199,8 +10451,12 @@ extension TypingLanguage {
     case .myanmarBurmese: StarterLexicon.myanmarBurmeseWords
     case .lao: StarterLexicon.laoWords
     case .amharic: StarterLexicon.amharicWords
+    case .amharic1k: StarterLexicon.amharic1kWords
+    case .amharic5k: StarterLexicon.amharic5kWords
     case .armenian: StarterLexicon.armenianWords
+    case .armenian1k: StarterLexicon.armenian1kWords
     case .armenianWestern: StarterLexicon.armenianWesternWords
+    case .armenianWestern1k: StarterLexicon.armenianWestern1kWords
     case .georgian: StarterLexicon.georgianWords
     case .azerbaijani: StarterLexicon.azerbaijaniWords
     case .azerbaijani1k: StarterLexicon.azerbaijani1kWords
@@ -10212,6 +10468,7 @@ extension TypingLanguage {
     case .belarusian50k: StarterLexicon.belarusian50kWords
     case .belarusian100k: StarterLexicon.belarusian100kWords
     case .belarusianLacinka: StarterLexicon.belarusianLacinkaWords
+    case .belarusianLacinka1k: StarterLexicon.belarusianLacinka1kWords
     case .lithuanian: StarterLexicon.lithuanianWords
     case .latvian: StarterLexicon.latvianWords
     case .mongolian: StarterLexicon.mongolianWords
@@ -10349,6 +10606,7 @@ extension TypingLanguage {
     case .japaneseHiragana: StarterLexicon.japaneseHiraganaWords
     case .japaneseKatakana: StarterLexicon.japaneseKatakanaWords
     case .japaneseRomaji: StarterLexicon.japaneseRomajiWords
+    case .japaneseRomaji1k: StarterLexicon.japaneseRomaji1kWords
     case .korean: StarterLexicon.koreanWords
     case .korean1k: StarterLexicon.korean1kWords
     case .korean5k: StarterLexicon.korean5kWords
@@ -10392,6 +10650,20 @@ extension TypingLanguage {
 
   func ownedPracticeLexicon(englishVariant: EnglishVariant = .american) -> IndexedLexicon {
     switch self {
+    case .amharic1k: StarterLexicon.amharic1kLexicon
+    case .amharic5k: StarterLexicon.amharic5kLexicon
+    case .armenian1k: StarterLexicon.armenian1kLexicon
+    case .armenianWestern1k: StarterLexicon.armenianWestern1kLexicon
+    case .belarusianLacinka1k: StarterLexicon.belarusianLacinka1kLexicon
+    case .hawaiian1k: StarterLexicon.hawaiian1kLexicon
+    case .japaneseRomaji1k: StarterLexicon.japaneseRomaji1kLexicon
+    case .klingon1k: StarterLexicon.klingon1kLexicon
+    case .oromo1k: StarterLexicon.oromo1kLexicon
+    case .oromo5k: StarterLexicon.oromo5kLexicon
+    case .shona1k: StarterLexicon.shona1kLexicon
+    case .tibetan1k: StarterLexicon.tibetan1kLexicon
+    case .englishFiveLetter1k: StarterLexicon.englishFiveLetter1kLexicon
+    case .xhosa3k: StarterLexicon.xhosa3kLexicon
     case .albanian1k: StarterLexicon.albanian1kLexicon
     case .bosnian4k: StarterLexicon.bosnian4kLexicon
     case .macedonian1k: StarterLexicon.macedonian1kLexicon
@@ -10650,7 +10922,7 @@ extension TypingLanguage {
       .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .persian1k, .persian5k,
       .persian20k, .sanskrit, .sindhi, .sinhala,
-      .tamil, .tamil1k, .tamilOld, .telugu, .telugu1k, .tibetan,
+      .tamil, .tamil1k, .tamilOld, .telugu, .telugu1k, .tibetan, .tibetan1k,
       .urdu, .urdu1k, .urdu5k, .yiddish:
       true
     default:
@@ -10688,6 +10960,7 @@ extension TypingLanguage {
     guard !isCodeLanguage else { return false }
     return switch self {
     case .english, .english1k, .english5k, .english10k, .english25k, .english450k,
+      .englishFiveLetter1k,
       .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical,
       .englishShakespearean,
@@ -10705,7 +10978,7 @@ extension TypingLanguage {
       .bulgarianLatin1k,
       .khmer,
       .myanmarBurmese,
-      .armenian,
+      .armenian, .armenian1k,
       .georgian,
       .belarusian, .belarusian1k,
       .macedonian, .macedonian1k, .macedonian10k, .macedonian75k,
@@ -10714,7 +10987,7 @@ extension TypingLanguage {
       .marathi,
       .malagasy, .malagasy1k,
       .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili,
-      .tibetan,
+      .tibetan, .tibetan1k,
       .swahili,
       .kinyarwanda,
       .tatarCrimean,
@@ -10738,7 +11011,8 @@ extension TypingLanguage {
       .ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k, .ukrainianEndings,
       .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k,
       .ukrainianLatynkaEndings,
-      .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean, .korean1k, .korean5k,
+      .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .japaneseRomaji1k,
+      .korean, .korean1k, .korean5k,
       .mixedEnglishChinese, .mixedLanguages:
       false
     default:
@@ -10777,7 +11051,8 @@ extension TypingLanguage {
       .esperantoXSystem1k,
       .esperantoHSystem, .esperantoHSystem1k, .esperantoHSystem10k,
       .esperantoHSystem25k, .esperantoHSystem36k,
-      .tatar, .tatar1k, .tatar5k, .tatar9k, .oromo, .bashkir, .hawaiian,
+      .tatar, .tatar1k, .tatar5k, .tatar9k, .oromo, .oromo1k, .oromo5k,
+      .bashkir, .hawaiian, .hawaiian1k,
       .slovenian1k, .slovenian5k,
       .kinyarwanda, .tamil, .tamil1k, .kannada, .greeklish,
       .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
@@ -10789,7 +11064,7 @@ extension TypingLanguage {
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical, .english25k, .english450k, .kokanu, .likanu, .russianAbbreviations, .russianContractions, .russianContractions1k, .typingOfTheDead, .pokemon1k, .arabicMorocco, .sindhi, .armenian, .bemba, .bemba1k, .bemba10k,
-      .bulgarian, .bulgarian1k, .bulgarianLatin, .bulgarianLatin1k,
+      .bulgarian, .bulgarian1k, .bulgarianLatin, .bulgarianLatin1k, .armenian1k,
       .urduRoman, .hungarian, .hungarian1k, .lao,
       .kabyle, .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k,
       .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k,
@@ -10810,6 +11085,7 @@ extension TypingLanguage {
     case .english25k: "English · 25k · Typebar"
     case .english450k: "English · 450k · Typebar"
     case .englishFiveLetter: "English · Five Letter"
+    case .englishFiveLetter1k: "English · Five Letter · 1k · Typebar"
     case .englishCommonlyMisspelled: "English · Commonly Misspelled"
     case .englishContractions: "English · Contractions"
     case .englishDoubleLetter: "English · Double Letter"
@@ -10885,6 +11161,7 @@ extension TypingLanguage {
     case .tatarCrimeanCyrillic10k: "Къырымтатарджа · 10k · Typebar"
     case .tatarCrimeanCyrillic15k: "Къырымтатарджа · 15k · Typebar"
     case .klingon: "tlhIngan Hol"
+    case .klingon1k: "tlhIngan Hol · 1k · Typebar"
     case .quenya: "Quenya"
     case .viossa: "Viossa"
     case .viossaNjutro: "Viossa · Njutro"
@@ -10900,6 +11177,8 @@ extension TypingLanguage {
     case .occitan5k: "Occitan · 5k · Typebar"
     case .occitan10k: "Occitan · 10k · Typebar"
     case .oromo: "Oromo"
+    case .oromo1k: "Oromo · 1k · Typebar"
+    case .oromo5k: "Oromo · 5k · Typebar"
     case .macedonian: "Македонски"
     case .macedonian1k: "Македонски · 1k · Typebar"
     case .macedonian10k: "Македонски · 10k · Typebar"
@@ -10919,6 +11198,7 @@ extension TypingLanguage {
     case .frisian1k: "Frysk · 1k · Typebar"
     case .zulu: "isiZulu"
     case .hawaiian: "ʻŌlelo Hawaiʻi"
+    case .hawaiian1k: "ʻŌlelo Hawaiʻi · 1k · Typebar"
     case .kabyle: "Taqbaylit"
     case .kabyle1k: "Taqbaylit · 1k · Typebar"
     case .kabyle2k: "Taqbaylit · 2k · Typebar"
@@ -10930,7 +11210,9 @@ extension TypingLanguage {
     case .tokiPonaKuSuli: "toki pona · ku suli"
     case .tokiPonaKuLili: "toki pona · ku lili"
     case .xhosa: "isiXhosa"
+    case .xhosa3k: "isiXhosa · 3k · Typebar"
     case .tibetan: "བོད་སྐད་"
+    case .tibetan1k: "བོད་སྐད་ · 1k · Typebar"
     case .kyrgyz: "Кыргызча"
     case .kyrgyz1k: "Кыргызча · 1k · Typebar"
     case .udmurt: "Удмурт кыл"
@@ -10938,6 +11220,7 @@ extension TypingLanguage {
     case .swahili: "Kiswahili"
     case .kinyarwanda: "Ikinyarwanda"
     case .shona: "chiShona"
+    case .shona1k: "chiShona · 1k · Typebar"
     case .santali: "ᱥᱟᱱᱛᱟᱲᱤ"
     case .yiddish: "ייִדיש"
     case .arabic: "العربية"
@@ -10994,8 +11277,12 @@ extension TypingLanguage {
     case .myanmarBurmese: "မြန်မာ"
     case .lao: "ລາວ"
     case .amharic: "አማርኛ"
+    case .amharic1k: "አማርኛ · 1k · Typebar"
+    case .amharic5k: "አማርኛ · 5k · Typebar"
     case .armenian: "Հայերեն"
+    case .armenian1k: "Հայերեն · 1k · Typebar"
     case .armenianWestern: "Հայերէն (Արեւմտեան)"
+    case .armenianWestern1k: "Հայերէն (Արեւմտեան) · 1k · Typebar"
     case .georgian: "ქართული"
     case .azerbaijani: "Azərbaycanca"
     case .azerbaijani1k: "Azərbaycanca · 1k · Typebar"
@@ -11007,6 +11294,7 @@ extension TypingLanguage {
     case .belarusian50k: "Беларуская · 50k · Typebar"
     case .belarusian100k: "Беларуская · 100k · Typebar"
     case .belarusianLacinka: "Biełaruskaja łacinka"
+    case .belarusianLacinka1k: "Biełaruskaja łacinka · 1k · Typebar"
     case .lithuanian: "Lietuvių"
     case .lithuanian1k: "Lietuvių · 1k · Typebar"
     case .lithuanian3k: "Lietuvių · 3k · Typebar"
@@ -11152,6 +11440,7 @@ extension TypingLanguage {
     case .japaneseHiragana: "日本語（ひらがな）"
     case .japaneseKatakana: "日本語（カタカナ）"
     case .japaneseRomaji: "日本語（ローマ字）"
+    case .japaneseRomaji1k: "日本語（ローマ字）· 1k · Typebar"
     case .korean: "한국어"
     case .korean1k: "한국어 · 1k · Typebar"
     case .korean5k: "한국어 · 5k · Typebar"

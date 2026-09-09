@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 359)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 373)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4350,6 +4350,20 @@ final class HealthRouteTests: XCTestCase {
       ("macedonian1k", "Секоја локална низа чува посебна патека за вежбање."),
       ("macedonian10k", "Поширокиот индекс ги создава само потребните вежби."),
       ("macedonian75k", "Најголемиот индекс останува локален и проверлив."),
+      ("amharic1k", "የአካባቢ ልምምድ ግልጽ እና የተረጋጋ መንገድ ይጠብቃል።"),
+      ("amharic5k", "ሰፊው መረጃ ጠቋሚ የሚፈለጉትን ልምምዶች ብቻ ይፈጥራል።"),
+      ("armenian1k", "Տեղային շարքը պահպանում է հստակ վարժության ուղին։"),
+      ("armenianWestern1k", "Տեղական շարքը յստակ վարժութեան ուղին կը պահէ։"),
+      ("belarusianLacinka1k", "Lakálnaja paśladoŭnaść zachoŭvaje jasny rytm pryktyki."),
+      ("hawaiian1k", "Mālama ke kaʻina kūloko i ke ala hoʻomaʻamaʻa maopopo."),
+      ("japaneseRomaji1k", "Chiisana renshuu wa akarui rizumu o tamotsu."),
+      ("klingon1k", "Qapla' ghajmeH mIw le' pol qeqvam."),
+      ("oromo1k", "Tarreen keessaa shaakala ifaa fi tasgabbaa'aa eega."),
+      ("oromo5k", "Kasaan bal'aan shaakala barbaachisu qofa uuma."),
+      ("shona1k", "Rondedzero yemuno inochengeta nzira yekudzidzira yakajeka."),
+      ("tibetan1k", "རང་སའི་སྦྱོང་བརྡར་གྱི་ལམ་ཁ་གསལ་པོ་ཡོད།"),
+      ("englishFiveLetter1k", "Small steps shape clear paths."),
+      ("xhosa3k", "Uluhlu lwasekhaya lugcina indlela yokuziqhelanisa icacile."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

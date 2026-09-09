@@ -149,7 +149,7 @@ enum LivePracticeContentService {
   static func wikipediaLanguageCode(for language: TypingLanguage) -> String {
     switch language {
     case .english, .english1k, .english5k, .english10k, .english25k, .english450k,
-      .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
+      .englishFiveLetter, .englishFiveLetter1k, .englishCommonlyMisspelled, .englishContractions,
       .englishDoubleLetter, .englishLegal, .englishMedical, .englishShakespearean,
       .oldEnglish, .pigLatin, .loremIpsum, .git, .ukrainianEndings, .ukrainianLatynkaEndings,
       .pokemon1k, .arenaStrategy, .mixedEnglishChinese, .mixedLanguages:
@@ -166,23 +166,23 @@ enum LivePracticeContentService {
       .tatarCrimean15k, .tatarCrimeanCyrillic, .tatarCrimeanCyrillic1k,
       .tatarCrimeanCyrillic5k, .tatarCrimeanCyrillic10k,
       .tatarCrimeanCyrillic15k: return "crh"
-    case .klingon: return "tlh"
+    case .klingon, .klingon1k: return "tlh"
     case .quenya: return "en"
     case .viossa, .viossaNjutro: return "en"
     case .maori: return "en"
     case .lojbanGismu, .lojbanCmavo: return "en"
     case .uzbek, .uzbek1k, .uzbek70k: return "uz"
     case .occitan, .occitan1k, .occitan2k, .occitan5k, .occitan10k: return "oc"
-    case .oromo: return "om"
+    case .oromo, .oromo1k, .oromo5k: return "om"
     case .jyutping: return "zh"
     case .bashkir: return "ba"
     case .basque: return "eu"
     case .frisian, .frisian1k: return "fy"
-    case .hawaiian: return "haw"
+    case .hawaiian, .hawaiian1k: return "haw"
     case .kabyle, .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k: return "kab"
     case .maltese, .maltese1k: return "mt"
-    case .xhosa: return "xh"
-    case .tibetan: return "bo"
+    case .xhosa, .xhosa3k: return "xh"
+    case .tibetan, .tibetan1k: return "bo"
     case .kyrgyz, .kyrgyz1k: return "ky"
     case .kinyarwanda: return "rw"
     case .shona: return "en"
@@ -222,8 +222,8 @@ enum LivePracticeContentService {
     case .khmer: return "km"
     case .myanmarBurmese: return "my"
     case .lao: return "lo"
-    case .amharic: return "am"
-    case .armenianWestern: return "hyw"
+    case .amharic, .amharic1k, .amharic5k: return "am"
+    case .armenianWestern, .armenianWestern1k: return "hyw"
     case .greek, .greek1k, .greek5k, .greek10k, .greek25k, .greekKoine,
       .greeklish, .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k: return "el"
     case .dutch, .dutch1k, .dutch10k: return "nl"
@@ -273,6 +273,7 @@ enum LivePracticeContentService {
       .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k:
       return "uk"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: return "ja"
+    case .japaneseRomaji1k: return "jp"
     case .korean, .korean1k, .korean5k: return "ko"
     case .turkish, .turkish1k, .turkish5k: return "tr"
     case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,
@@ -329,7 +330,8 @@ private extension TypingLanguage {
   var supportsLiveEncyclopedia: Bool {
     !rawValue.hasPrefix("greeklish") && self != .ukrainianLatin
       && self != .ukrainianLatynka1k && self != .ukrainianLatynka10k
-      && self != .ukrainianLatynka50k && self != .serbianLatin && self != .japaneseRomaji
+      && self != .ukrainianLatynka50k && self != .serbianLatin && self != .serbianLatin10k
+      && self != .japaneseRomaji && self != .japaneseRomaji1k
       && (usesSpaceDelimitedWords || self == .simplifiedChinese || self == .traditionalChinese)
   }
 }

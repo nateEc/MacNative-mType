@@ -10227,6 +10227,242 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testFinalScaleChoicesPreserveIndependentIDsScriptsAndPinnedAggregateShapes() throws {
+    struct ExpectedScale {
+      let rawValue: String
+      let displayName: String
+      let count: Int
+      let minimumLength: Int
+      let maximumLength: Int
+      let minimumScalarCount: Int
+      let maximumScalarCount: Int
+      let categorySignatures: [String: Int]
+      let alphabeticCount: Int
+      let nonASCIICount: Int
+      let markCount: Int
+      let scriptRange: ClosedRange<UInt32>?
+      let scriptCount: Int
+      let supportsLazyInput: Bool
+      let zipfSupport: ZipfFrequencySupport
+      let quoteSourceRawValue: String
+      let wikipediaCode: String
+      let speechLocale: String
+      let usesJoiningScript: Bool
+      var punctuationHistogram: [Int: Int] = [:]
+      var spaceHistogram: [Int: Int] = [:]
+    }
+
+    let cases = [
+      ExpectedScale(
+        rawValue: "amharic1k", displayName: "አማርኛ · 1k · Typebar", count: 1_001,
+        minimumLength: 2, maximumLength: 10, minimumScalarCount: 2, maximumScalarCount: 10,
+        categorySignatures: ["N": 1_000, "PN": 1], alphabeticCount: 1_001,
+        nonASCIICount: 1_001, markCount: 0, scriptRange: 0x1200...0x137F,
+        scriptCount: 1_001, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "amharic", wikipediaCode: "am", speechLocale: "am-ET",
+        usesJoiningScript: false, punctuationHistogram: [1: 1]),
+      ExpectedScale(
+        rawValue: "amharic5k", displayName: "አማርኛ · 5k · Typebar", count: 5_000,
+        minimumLength: 1, maximumLength: 12, minimumScalarCount: 1, maximumScalarCount: 12,
+        categorySignatures: [
+          "N": 4_981, "P": 1, "PN": 4, "U": 5, "UN": 1, "plain": 8,
+        ], alphabeticCount: 4_999, nonASCIICount: 4_986, markCount: 0,
+        scriptRange: 0x1200...0x137F, scriptCount: 4_986, supportsLazyInput: true,
+        zipfSupport: .unknown, quoteSourceRawValue: "amharic", wikipediaCode: "am",
+        speechLocale: "am-ET", usesJoiningScript: false, punctuationHistogram: [1: 5]),
+      ExpectedScale(
+        rawValue: "armenian1k", displayName: "Հայերեն · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 20, minimumScalarCount: 1, maximumScalarCount: 20,
+        categorySignatures: ["N": 989, "UN": 11], alphabeticCount: 1_000,
+        nonASCIICount: 1_000, markCount: 0, scriptRange: 0x0530...0x058F,
+        scriptCount: 1_000, supportsLazyInput: false, zipfSupport: .unsupported,
+        quoteSourceRawValue: "armenian", wikipediaCode: "en", speechLocale: "en-US",
+        usesJoiningScript: false),
+      ExpectedScale(
+        rawValue: "armenianWestern1k", displayName: "Հայերէն (Արեւմտեան) · 1k · Typebar",
+        count: 1_000, minimumLength: 2, maximumLength: 20, minimumScalarCount: 2,
+        maximumScalarCount: 20, categorySignatures: ["N": 1_000], alphabeticCount: 1_000,
+        nonASCIICount: 1_000, markCount: 0, scriptRange: 0x0530...0x058F,
+        scriptCount: 1_000, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "armenianWestern", wikipediaCode: "hyw", speechLocale: "hyw",
+        usesJoiningScript: false),
+      ExpectedScale(
+        rawValue: "belarusianLacinka1k", displayName: "Biełaruskaja łacinka · 1k · Typebar",
+        count: 997, minimumLength: 1, maximumLength: 12, minimumScalarCount: 1,
+        maximumScalarCount: 12, categorySignatures: ["N": 510, "plain": 487],
+        alphabeticCount: 997, nonASCIICount: 510, markCount: 0, scriptRange: nil,
+        scriptCount: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "belarusianLacinka", wikipediaCode: "en", speechLocale: "en-US",
+        usesJoiningScript: false),
+      ExpectedScale(
+        rawValue: "hawaiian1k", displayName: "ʻŌlelo Hawaiʻi · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 15, minimumScalarCount: 1, maximumScalarCount: 15,
+        categorySignatures: ["N": 284, "P": 3, "plain": 713], alphabeticCount: 1_000,
+        nonASCIICount: 284, markCount: 0, scriptRange: nil, scriptCount: 0,
+        supportsLazyInput: true, zipfSupport: .supported, quoteSourceRawValue: "hawaiian",
+        wikipediaCode: "haw", speechLocale: "haw", usesJoiningScript: false,
+        punctuationHistogram: [1: 3]),
+      ExpectedScale(
+        rawValue: "japaneseRomaji1k", displayName: "日本語（ローマ字）· 1k · Typebar",
+        count: 987, minimumLength: 2, maximumLength: 15, minimumScalarCount: 2,
+        maximumScalarCount: 15, categorySignatures: ["P": 33, "S": 3, "plain": 951],
+        alphabeticCount: 987, nonASCIICount: 0, markCount: 0, scriptRange: nil,
+        scriptCount: 0, supportsLazyInput: false, zipfSupport: .unknown,
+        quoteSourceRawValue: "japaneseRomaji", wikipediaCode: "jp", speechLocale: "jp-JP",
+        usesJoiningScript: false, punctuationHistogram: [1: 27, 2: 6],
+        spaceHistogram: [1: 1, 2: 2]),
+      ExpectedScale(
+        rawValue: "klingon1k", displayName: "tlhIngan Hol · 1k · Typebar", count: 1_001,
+        minimumLength: 3, maximumLength: 14, minimumScalarCount: 3, maximumScalarCount: 14,
+        categorySignatures: ["P": 142, "U": 304, "UP": 275, "plain": 280],
+        alphabeticCount: 1_001, nonASCIICount: 0, markCount: 0, scriptRange: nil,
+        scriptCount: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "klingon", wikipediaCode: "tlh", speechLocale: "tlh",
+        usesJoiningScript: false, punctuationHistogram: [1: 338, 2: 74, 3: 4, 4: 1]),
+      ExpectedScale(
+        rawValue: "oromo1k", displayName: "Oromo · 1k · Typebar", count: 1_000,
+        minimumLength: 2, maximumLength: 14, minimumScalarCount: 2, maximumScalarCount: 14,
+        categorySignatures: ["P": 40, "plain": 960], alphabeticCount: 1_000,
+        nonASCIICount: 0, markCount: 0, scriptRange: nil, scriptCount: 0,
+        supportsLazyInput: true, zipfSupport: .supported, quoteSourceRawValue: "oromo",
+        wikipediaCode: "om", speechLocale: "om", usesJoiningScript: false,
+        punctuationHistogram: [1: 40]),
+      ExpectedScale(
+        rawValue: "oromo5k", displayName: "Oromo · 5k · Typebar", count: 5_000,
+        minimumLength: 2, maximumLength: 14, minimumScalarCount: 2, maximumScalarCount: 14,
+        categorySignatures: ["P": 374, "U": 1, "plain": 4_625], alphabeticCount: 5_000,
+        nonASCIICount: 0, markCount: 0, scriptRange: nil, scriptCount: 0,
+        supportsLazyInput: true, zipfSupport: .supported, quoteSourceRawValue: "oromo",
+        wikipediaCode: "om", speechLocale: "om", usesJoiningScript: false,
+        punctuationHistogram: [1: 374]),
+      ExpectedScale(
+        rawValue: "shona1k", displayName: "chiShona · 1k · Typebar", count: 816,
+        minimumLength: 1, maximumLength: 19, minimumScalarCount: 1, maximumScalarCount: 19,
+        categorySignatures: ["P": 1, "S": 11, "U": 14, "plain": 790],
+        alphabeticCount: 816, nonASCIICount: 0, markCount: 0, scriptRange: nil,
+        scriptCount: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "shona", wikipediaCode: "en", speechLocale: "en-US",
+        usesJoiningScript: false, punctuationHistogram: [1: 1], spaceHistogram: [1: 10, 2: 1]),
+      ExpectedScale(
+        rawValue: "tibetan1k", displayName: "བོད་སྐད་ · 1k · Typebar", count: 1_080,
+        minimumLength: 3, maximumLength: 18, minimumScalarCount: 4, maximumScalarCount: 24,
+        categorySignatures: ["PN": 1_080], alphabeticCount: 1_080,
+        nonASCIICount: 1_080, markCount: 1_026, scriptRange: 0x0F00...0x0FFF,
+        scriptCount: 1_080, supportsLazyInput: false, zipfSupport: .unknown,
+        quoteSourceRawValue: "tibetan", wikipediaCode: "bo", speechLocale: "bo-TI",
+        usesJoiningScript: true,
+        punctuationHistogram: [1: 78, 2: 718, 3: 133, 4: 137, 5: 12, 6: 1, 7: 1]),
+      ExpectedScale(
+        rawValue: "englishFiveLetter1k", displayName: "English · Five Letter · 1k · Typebar",
+        count: 1_000, minimumLength: 5, maximumLength: 5, minimumScalarCount: 5,
+        maximumScalarCount: 5, categorySignatures: ["plain": 1_000], alphabeticCount: 1_000,
+        nonASCIICount: 0, markCount: 0, scriptRange: nil, scriptCount: 0,
+        supportsLazyInput: false, zipfSupport: .unknown,
+        quoteSourceRawValue: "englishFiveLetter", wikipediaCode: "en", speechLocale: "en-US",
+        usesJoiningScript: false),
+      ExpectedScale(
+        rawValue: "xhosa3k", displayName: "isiXhosa · 3k · Typebar", count: 2_935,
+        minimumLength: 1, maximumLength: 21, minimumScalarCount: 1, maximumScalarCount: 21,
+        categorySignatures: ["P": 41, "U": 141, "UP": 3, "plain": 2_750],
+        alphabeticCount: 2_935, nonASCIICount: 0, markCount: 0, scriptRange: nil,
+        scriptCount: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "xhosa", wikipediaCode: "xh", speechLocale: "xh",
+        usesJoiningScript: false, punctuationHistogram: [1: 44]),
+    ]
+
+    for expected in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: expected.rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: expected.quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+      var categorySignatures: [String: Int] = [:]
+      var punctuationHistogram: [Int: Int] = [:]
+      var spaceHistogram: [Int: Int] = [:]
+      var alphabeticCount = 0
+      var nonASCIICount = 0
+      var markCount = 0
+      var scriptCount = 0
+      for word in words {
+        var signature = ""
+        if word.contains(where: \.isUppercase) { signature += "U" }
+        if word.contains(where: \.isPunctuation) { signature += "P" }
+        if word.contains(where: \.isWhitespace) { signature += "S" }
+        if word.unicodeScalars.contains(where: { !$0.isASCII }) { signature += "N" }
+        categorySignatures[signature.isEmpty ? "plain" : signature, default: 0] += 1
+        let punctuationCount = word.filter(\.isPunctuation).count
+        if punctuationCount > 0 { punctuationHistogram[punctuationCount, default: 0] += 1 }
+        let spaceCount = word.filter(\.isWhitespace).count
+        if spaceCount > 0 { spaceHistogram[spaceCount, default: 0] += 1 }
+        if word.unicodeScalars.contains(where: { $0.properties.isAlphabetic }) {
+          alphabeticCount += 1
+        }
+        if word.unicodeScalars.contains(where: { !$0.isASCII }) { nonASCIICount += 1 }
+        if word.unicodeScalars.contains(where: {
+          [.nonspacingMark, .spacingMark, .enclosingMark].contains($0.properties.generalCategory)
+        }) {
+          markCount += 1
+        }
+        if let range = expected.scriptRange,
+          word.unicodeScalars.contains(where: { range.contains($0.value) })
+        {
+          scriptCount += 1
+        }
+      }
+
+      XCTAssertEqual(language.displayName, expected.displayName, expected.rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, expected.rawValue)
+      XCTAssertEqual(language.usesJoiningScriptPrompt, expected.usesJoiningScript, expected.rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, expected.rawValue)
+      XCTAssertEqual(language.supportsLazyLatinInput, expected.supportsLazyInput, expected.rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, expected.rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, expected.rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, expected.zipfSupport, expected.rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language),
+        expected.wikipediaCode, expected.rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertEqual(words.count, expected.count, expected.rawValue)
+      XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), expected.maximumLength, expected.rawValue)
+      XCTAssertEqual(
+        words.lazy.map { $0.unicodeScalars.count }.min(), expected.minimumScalarCount,
+        expected.rawValue)
+      XCTAssertEqual(
+        words.lazy.map { $0.unicodeScalars.count }.max(), expected.maximumScalarCount,
+        expected.rawValue)
+      XCTAssertEqual(categorySignatures, expected.categorySignatures, expected.rawValue)
+      XCTAssertEqual(punctuationHistogram, expected.punctuationHistogram, expected.rawValue)
+      XCTAssertEqual(spaceHistogram, expected.spaceHistogram, expected.rawValue)
+      XCTAssertEqual(alphabeticCount, expected.alphabeticCount, expected.rawValue)
+      XCTAssertEqual(nonASCIICount, expected.nonASCIICount, expected.rawValue)
+      XCTAssertEqual(markCount, expected.markCount, expected.rawValue)
+      XCTAssertEqual(scriptCount, expected.scriptCount, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, expected.rawValue)
+      XCTAssertFalse(
+        words.contains { $0.unicodeScalars.contains(where: \.properties.isJoinControl) },
+        expected.rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, expected.rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        expected.rawValue)
+      XCTAssertFalse(OfflineContent.generatedPrompt(wordCount: 25, language: language).isEmpty)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, expected.rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text,
+          expected.rawValue)
+      }
+    }
+  }
+
   func testLatinAndRomanizedScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     struct ExpectedScale {
       let rawValue: String
@@ -16055,7 +16291,7 @@ final class TypingEngineTests: XCTestCase {
       .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .persian1k, .persian5k,
       .persian20k, .sanskrit, .sindhi, .sinhala,
-      .tamil, .tamil1k, .tamilOld, .telugu, .telugu1k, .tibetan,
+      .tamil, .tamil1k, .tamilOld, .telugu, .telugu1k, .tibetan, .tibetan1k,
       .urdu, .urdu1k, .urdu5k, .yiddish,
     ]
     XCTAssertEqual(

@@ -24,7 +24,7 @@ extension TypingLanguage {
     if isCodeLanguage { return "en-US" }
     return switch self {
     case .english, .english1k, .english5k, .english10k, .english25k, .english450k,
-      .englishFiveLetter, .englishCommonlyMisspelled, .englishContractions,
+      .englishFiveLetter, .englishFiveLetter1k, .englishCommonlyMisspelled, .englishContractions,
       .englishDoubleLetter, .englishLegal, .englishMedical, .englishShakespearean,
       .oldEnglish, .ukrainianEndings, .ukrainianLatynkaEndings: "en-US"
     case .kokanu: "xxs-Lat"
@@ -41,23 +41,23 @@ extension TypingLanguage {
       .tatarCrimean15k, .tatarCrimeanCyrillic, .tatarCrimeanCyrillic1k,
       .tatarCrimeanCyrillic5k, .tatarCrimeanCyrillic10k,
       .tatarCrimeanCyrillic15k: "crh-CRH"
-    case .klingon: "tlh"
+    case .klingon, .klingon1k: "tlh"
     case .quenya: "en-US"
     case .viossa, .viossaNjutro: "en-US"
     case .maori: "en-US"
     case .lojbanGismu, .lojbanCmavo: "en-US"
     case .uzbek, .uzbek1k, .uzbek70k: "uz-UZ"
     case .occitan, .occitan1k, .occitan2k, .occitan5k, .occitan10k: "oc-FR"
-    case .oromo: "om"
+    case .oromo, .oromo1k, .oromo5k: "om"
     case .jyutping: "zh-Hant"
     case .bashkir: "ba"
     case .basque: "eu"
     case .frisian, .frisian1k: "fy-FY"
-    case .hawaiian: "haw"
+    case .hawaiian, .hawaiian1k: "haw"
     case .kabyle, .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k: "kab"
     case .maltese, .maltese1k: "mt"
-    case .xhosa: "xh"
-    case .tibetan: "bo-TI"
+    case .xhosa, .xhosa3k: "xh"
+    case .tibetan, .tibetan1k: "bo-TI"
     case .kyrgyz, .kyrgyz1k: "ky-KY"
     case .kinyarwanda: "rw-RW"
     case .shona: "en-US"
@@ -101,8 +101,8 @@ extension TypingLanguage {
     case .khmer: "km-KH"
     case .myanmarBurmese: "my-MM"
     case .lao: "lo"
-    case .amharic: "am-ET"
-    case .armenianWestern: "hyw"
+    case .amharic, .amharic1k, .amharic5k: "am-ET"
+    case .armenianWestern, .armenianWestern1k: "hyw"
     case .greek, .greek1k, .greek5k, .greek10k, .greek25k, .greekKoine,
       .greeklish, .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k: "el-GR"
     case .dutch, .dutch1k, .dutch10k: "nl-NL"
@@ -156,6 +156,7 @@ extension TypingLanguage {
     case .ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k,
       .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k: "uk-UA"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: "ja-JP"
+    case .japaneseRomaji1k: "jp-JP"
     case .korean, .korean1k, .korean5k: "ko-KR"
     case .turkish, .turkish1k, .turkish5k: "tr-TR"
     case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,

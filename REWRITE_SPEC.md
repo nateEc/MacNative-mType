@@ -189,9 +189,9 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 “反向 Shift”的“按键位图”档会用所选 Typebar 布局的原创键位表，将外设已重映射后的逻辑字符反查为 ANSI 物理位置，再执行同一左右手判定；这是对 QMK 等外部重映射的本机等价实现，仍须用真实设备验收左右 Shift 状态。
 
-当前语言目录：362 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
+当前语言目录：376 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
 
-固定参考版本的 446 个官方语言配置 ID 由 `Compatibility/official-languages.json` 守恒：432 个对应独立原生选择，14 个数字词表规模变体只对应同语言选择而没有独立规模入口，当前没有未映射配置。该差异属于 TST-02 未完成范围，不能以 434 个本地枚举入口宣称官方配置选择一一等价；生成器只读取 schema ID 和本地枚举，不读取官方语言内容。
+固定参考版本的 446 个官方语言配置 ID 由 `Compatibility/official-languages.json` 守恒：446 个均对应独立原生选择，没有兼容代指或未映射配置。448 个本地枚举入口还包含 2 个 Typebar 混合入口；生成器只读取 schema ID 和本地枚举，不读取官方语言内容。这里的一一对应仅指选择身份与行为边界，不代表复制官方词值，也不表示其余功能域已完成。
 
 代码语言选择集现覆盖官方当前目录的 70 项（含版本/方言项，例如 Python 1k、GDScript 2、CUDA、VHDL、6502 Assembly 与 Dockerfile）。每项都有 Typebar 原创的离线输入片段；Dockerfile 使用虚构镜像、练习目录及本地构建命令，不复制参考 token。代码练习支持换行、Tab、正确换行后的自动缩进、可选的退格反缩进、有限字数模式的完整提示结束，以及自动插入/删除也能重放的事件记录。自动化会逐一生成并完成 70 个选择；服务端成绩和排行榜也显式接受同一组代码语言，社区引语投稿仍排除代码。官方各语言的完整词表规模、原始代码语料与代码专属统计没有导入或复刻，因此仍不能标记为内容层面的功能完全等价。
 
@@ -498,3 +498,4 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 - 2026-09-09 `TST-258`–`TST-266`：新增 Irish 1k、Filipino 1k、Hungarian 1k／2k、Welsh 1k、Lithuanian 1k／3k、Latvian 1k 与 Maltese 1k 九个独立入口，以原创按需索引词流保持实际数量、长度、组合标记、大小写、标点、内部空格、非 ASCII 与交叠结构。Filipino 1k 禁用简化输入，Hungarian 1k 明确不支持 Zipf，其余档保留简化输入与 Zipf 未知语义；Irish、Hungarian、Latvian 与 Maltese 数字档接入固定本族在线／朗读路径，其余三族数字档按缺省元数据使用 `en`／`en-US`。九档继承各族四档自有引语、贯通全部数据面且不加入多语混排。普通出题不物化整表，与固定词表逐档精确交集为零；机器总账更新为 446／414／32／0。
 - 2026-09-09 `TST-267`–`TST-275`：新增 Vietnamese 1k／5k、Pinyin 1k／10k、Hausa 1k、Bemba 1k／10k、Catalan 1k 与 Frisian 1k 九个独立入口，以原创按需索引词流保持实际数量、长度、大小写、标点、多级内部空格、非 ASCII 与交叠结构。九档保留简化输入，Bemba 两档明确不支持 Zipf，其余为未知；Hausa、Bemba 与 Frisian 数字档接入固定 BCP-47 在线／朗读路径，其余三族数字档按缺省元数据使用 `en`／`en-US`。九档继承各族四档自有引语、贯通全部数据面且不加入多语混排。普通出题不物化整表，与固定词表逐档精确交集为零；机器总账更新为 446／423／23／0。
 - 2026-09-09 `TST-276`–`TST-284`：新增 Serbian Latin 10k、Serbian 10k、Bulgarian 1k、Bulgarian Latin 1k、Bosnian 4k、Albanian 1k 与 Macedonian 1k／10k／75k 九个独立入口，以原创按需索引词流保持实际数量、长度、拉丁或西里尔脚本、大小写、标点、多级内部空格与交叠结构。Serbian、Bulgarian 和 Macedonian 指定规模禁用简化输入，Bulgarian 两档明确不支持 Zipf，其余保持未知；仅具 BCP-47 的 Serbian 与 Bulgarian 规模档接入对应在线／朗读路径，Bosnian、Albanian 和 Macedonian 数字档按缺省元数据使用 `en`／`en-US`。九档继承各族四档自有引语、贯通全部数据面且不加入多语混排。普通出题不物化整表，与固定词表逐档精确交集为零；机器总账更新为 446／432／14／0。
+- 2026-09-09 `TST-285`–`TST-298`：补齐 Amharic、Armenian、Western Armenian、Belarusian Lacinka、Hawaiian、Japanese Romaji、Klingon、Oromo、Shona、Tibetan、English Five-Letter 与 Xhosa 的十四个剩余规模入口。自写确定性生成器保持固定元数据和聚合形状，Romanized 入口不会被在线原文替换脚本，四档引语及客户端／服务端数据面均按独立 ID 贯通。机器总账更新为 446／446／0／0；纯重写边界仍禁止复制官方词值、引语、代码和资产。
