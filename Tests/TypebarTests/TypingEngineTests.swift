@@ -1536,6 +1536,107 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testInputRuleCommandsCoverReferenceChoicesAndRejectMalformedIDs() {
+    XCTAssertEqual(
+      InputRuleCommandCatalog.items.map(\.id),
+      [
+        "input.freedomMode.off", "input.freedomMode.on",
+        "input.strictSpace.off", "input.strictSpace.on",
+        "input.oppositeShiftMode.off", "input.oppositeShiftMode.on", "input.oppositeShiftMode.keymap",
+        "input.stopOnError.off", "input.stopOnError.word", "input.stopOnError.letter",
+        "input.deleteOnError.off", "input.deleteOnError.letter", "input.deleteOnError.letter_hard",
+        "input.deleteOnError.word", "input.deleteOnError.word_hard",
+        "input.confidenceMode.off", "input.confidenceMode.on", "input.confidenceMode.max",
+        "input.quickEnd.off", "input.quickEnd.on",
+        "input.indicateTypos.off", "input.indicateTypos.below", "input.indicateTypos.replace",
+        "input.indicateTypos.both",
+        "input.compositionDisplay.off", "input.compositionDisplay.below",
+        "input.compositionDisplay.replace",
+        "input.hideExtraLetters.off", "input.hideExtraLetters.on",
+        "input.lazyMode.off", "input.lazyMode.on",
+        "input.codeUnindentOnBackspace.off", "input.codeUnindentOnBackspace.on",
+      ])
+    XCTAssertEqual(InputRuleCommandCatalog.target(for: "input.freedomMode.on"), .freedomMode(true))
+    XCTAssertEqual(InputRuleCommandCatalog.target(for: "input.stopOnError.word"), .stopOnError(.word))
+    XCTAssertEqual(
+      InputRuleCommandCatalog.target(for: "input.deleteOnError.letter_hard"),
+      .deleteOnError(.letterHard))
+    XCTAssertEqual(InputRuleCommandCatalog.target(for: "input.confidenceMode.max"), .confidenceMode(.maximum))
+    XCTAssertEqual(
+      InputRuleCommandCatalog.target(for: "input.indicateTypos.both"),
+      .indicateTypos(.both))
+    XCTAssertEqual(
+      InputRuleCommandCatalog.target(for: "input.compositionDisplay.below"),
+      .compositionDisplay(.below))
+    XCTAssertNil(InputRuleCommandCatalog.target(for: "input.stopOnError.character"))
+    XCTAssertNil(InputRuleCommandCatalog.target(for: "input.deleteOnError.letterHard"))
+    XCTAssertNil(InputRuleCommandCatalog.target(for: "input.quickEnd.on.extra"))
+  }
+
+  func testInputRuleCommandsPreserveReferenceRestartAndChallengePolicies() {
+    for target in [
+      InputRuleCommandTarget.strictSpace(false), .strictSpace(true),
+      .stopOnError(.off), .stopOnError(.word), .stopOnError(.letter),
+      .lazyMode(false), .lazyMode(true),
+      .codeUnindentOnBackspace(false), .codeUnindentOnBackspace(true),
+    ] {
+      XCTAssertTrue(target.requiresRestart)
+      XCTAssertTrue(target.exitsChallenge)
+    }
+    for target in [
+      InputRuleCommandTarget.freedomMode(false), .freedomMode(true),
+      .oppositeShiftMode(.off), .oppositeShiftMode(.on), .oppositeShiftMode(.keymap),
+      .deleteOnError(.off), .deleteOnError(.letter), .deleteOnError(.letterHard),
+      .deleteOnError(.word), .deleteOnError(.wordHard),
+      .confidenceMode(.off), .confidenceMode(.on), .confidenceMode(.maximum),
+      .quickEnd(false), .quickEnd(true),
+      .indicateTypos(.off), .indicateTypos(.below), .indicateTypos(.replace), .indicateTypos(.both),
+      .compositionDisplay(.off), .compositionDisplay(.below), .compositionDisplay(.replace),
+      .hideExtraLetters(false), .hideExtraLetters(true),
+    ] {
+      XCTAssertFalse(target.requiresRestart)
+      XCTAssertFalse(target.exitsChallenge)
+    }
+  }
+
+  @MainActor
+  func testInputRuleCommandsApplyThroughNativeSettingsAndPreserveExclusions() throws {
+    let suiteName = "TypebarTests.InputRuleCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    InputRuleCommandTarget.freedomMode(true).apply(to: settings)
+    XCTAssertTrue(settings.freedomMode)
+    InputRuleCommandTarget.confidenceMode(.maximum).apply(to: settings)
+    XCTAssertEqual(settings.confidenceMode, .maximum)
+    XCTAssertFalse(settings.freedomMode)
+
+    InputRuleCommandTarget.stopOnError(.word).apply(to: settings)
+    XCTAssertEqual(settings.stopOnErrorMode, .word)
+    XCTAssertEqual(settings.confidenceMode, .off)
+    InputRuleCommandTarget.deleteOnError(.wordHard).apply(to: settings)
+    XCTAssertEqual(settings.deleteOnErrorMode, .wordHard)
+    XCTAssertEqual(settings.stopOnErrorMode, .off)
+
+    InputRuleCommandTarget.oppositeShiftMode(.keymap).apply(to: settings)
+    InputRuleCommandTarget.quickEnd(true).apply(to: settings)
+    InputRuleCommandTarget.indicateTypos(.both).apply(to: settings)
+    InputRuleCommandTarget.compositionDisplay(.below).apply(to: settings)
+    InputRuleCommandTarget.hideExtraLetters(true).apply(to: settings)
+    InputRuleCommandTarget.lazyMode(true).apply(to: settings)
+    InputRuleCommandTarget.codeUnindentOnBackspace(true).apply(to: settings)
+    XCTAssertEqual(settings.oppositeShiftMode, .keymap)
+    XCTAssertTrue(settings.quickEnd)
+    XCTAssertEqual(settings.typoIndicatorStyle, .both)
+    XCTAssertEqual(settings.compositionDisplayStyle, .below)
+    XCTAssertTrue(settings.hideExtraLetters)
+    XCTAssertTrue(settings.testModifiers.contains(.lazyLatin))
+    XCTAssertTrue(settings.codeUnindentOnBackspace)
+    InputRuleCommandTarget.lazyMode(false).apply(to: settings)
+    XCTAssertFalse(settings.testModifiers.contains(.lazyLatin))
+  }
+
   func testConfigurationCommandsExitChallengesButUnrelatedCommandsDoNot() {
     for identifier in [
       "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
@@ -1543,6 +1644,8 @@ final class TypingEngineTests: XCTestCase {
       "test.quote.all", "test.quote.favorites", "test.quote.search",
       "test.language.english", "test.language.codeSwift",
       "test.difficulty.expert", "test.englishVariant.british",
+      "input.strictSpace.on", "input.stopOnError.word", "input.lazyMode.on",
+      "input.codeUnindentOnBackspace.on",
     ] {
       XCTAssertTrue(
         TestConfigurationCommandChallengePolicy.exitsChallenge(for: identifier), identifier)
@@ -1555,6 +1658,8 @@ final class TypingEngineTests: XCTestCase {
       TestConfigurationCommandChallengePolicy.exitsChallenge(for: "test.repeatQuotes.typing"))
     XCTAssertFalse(
       TestConfigurationCommandChallengePolicy.exitsChallenge(for: "test.resultSaving.off"))
+    XCTAssertFalse(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(for: "input.quickEnd.on"))
   }
 
   func testChallengeCommandCatalogDescribesAndRoutesLibraryChallenges() throws {

@@ -310,6 +310,7 @@ enum PracticePreferenceCommandTarget: Equatable {
     }
 
     var exitsChallenge: Bool { requiresRestart }
+
 }
 
 enum PracticePreferenceCommandCatalog {
@@ -361,6 +362,147 @@ enum PracticePreferenceCommandCatalog {
     }
 }
 
+enum InputRuleCommandTarget: Equatable {
+    case freedomMode(Bool)
+    case strictSpace(Bool)
+    case oppositeShiftMode(OppositeShiftMode)
+    case stopOnError(StopOnErrorMode)
+    case deleteOnError(DeleteOnErrorMode)
+    case confidenceMode(ConfidenceMode)
+    case quickEnd(Bool)
+    case indicateTypos(TypoIndicatorStyle)
+    case compositionDisplay(CompositionDisplayStyle)
+    case hideExtraLetters(Bool)
+    case lazyMode(Bool)
+    case codeUnindentOnBackspace(Bool)
+
+    var requiresRestart: Bool {
+        switch self {
+        case .strictSpace, .stopOnError, .lazyMode, .codeUnindentOnBackspace: true
+        case .freedomMode, .oppositeShiftMode, .deleteOnError, .confidenceMode,
+             .quickEnd, .indicateTypos, .compositionDisplay, .hideExtraLetters: false
+        }
+    }
+
+    var exitsChallenge: Bool { requiresRestart }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        switch self {
+        case .freedomMode(let enabled): settings.freedomMode = enabled
+        case .strictSpace(let enabled): settings.strictSpace = enabled
+        case .oppositeShiftMode(let mode): settings.oppositeShiftMode = mode
+        case .stopOnError(let mode): settings.stopOnErrorMode = mode
+        case .deleteOnError(let mode): settings.deleteOnErrorMode = mode
+        case .confidenceMode(let mode): settings.confidenceMode = mode
+        case .quickEnd(let enabled): settings.quickEnd = enabled
+        case .indicateTypos(let style): settings.typoIndicatorStyle = style
+        case .compositionDisplay(let style): settings.compositionDisplayStyle = style
+        case .hideExtraLetters(let enabled): settings.hideExtraLetters = enabled
+        case .lazyMode(let enabled):
+            settings.testModifiers = TestModifierPolicy.normalized(
+                enabled
+                    ? settings.testModifiers + [.lazyLatin]
+                    : settings.testModifiers.filter { $0 != .lazyLatin })
+        case .codeUnindentOnBackspace(let enabled): settings.codeUnindentOnBackspace = enabled
+        }
+    }
+}
+
+/// Mirrors the fixed reference command metadata and schema values while
+/// routing every option to Typebar-owned native settings.
+enum InputRuleCommandCatalog {
+    static let items: [CommandPaletteItem] = [
+        toggle("freedomMode", false, "自由回退", "限制回退到已完成的正确单词", "arrow.uturn.backward"),
+        toggle("freedomMode", true, "自由回退", "允许删除任何已输入单词", "arrow.uturn.backward"),
+        toggle("strictSpace", false, "严格空格", "单词开头的空格不会作为输入", "space"),
+        toggle("strictSpace", true, "严格空格", "单词开头的空格也计入输入", "space"),
+        option("oppositeShiftMode", "off", "反向 Shift：关闭", "不检查左右 Shift", "shift"),
+        option("oppositeShiftMode", "on", "反向 Shift：开启", "强制使用另一只手的 Shift", "shift.fill"),
+        option("oppositeShiftMode", "keymap", "反向 Shift：按键位图", "按选定键位图判断左右手", "keyboard"),
+        option("stopOnError", "off", "遇错停下：关闭", "错误字符不会阻止继续输入", "hand.raised"),
+        option("stopOnError", "word", "遇错停下：单词", "修正当前单词后才能继续", "hand.raised.fill"),
+        option("stopOnError", "letter", "遇错停下：字符", "错误字符不会被接受", "hand.raised.fill"),
+        option("deleteOnError", "off", "遇错删除：关闭", "保留错误输入", "delete.left"),
+        option("deleteOnError", "letter", "遇错删除：字符", "删除错误字符及前一字符", "delete.left.fill"),
+        option("deleteOnError", "letter_hard", "遇错删除：字符（硬）", "首字符出错时退回上一词", "delete.left.fill"),
+        option("deleteOnError", "word", "遇错删除：单词", "错误时清空当前单词", "delete.backward"),
+        option("deleteOnError", "word_hard", "遇错删除：单词（硬）", "首字符出错时退回上一词", "delete.backward.fill"),
+        option("confidenceMode", "off", "信心模式：关闭", "允许正常回退修改", "arrow.backward"),
+        option("confidenceMode", "on", "信心模式：开启", "不能回到之前的单词", "arrow.backward.circle"),
+        option("confidenceMode", "max", "信心模式：最大", "完全禁用退格", "nosign"),
+        toggle("quickEnd", false, "最后一词快速结束", "错误的最后一词需要空格确认", "forward.end"),
+        toggle("quickEnd", true, "最后一词快速结束", "输入最后一词后立即结束", "forward.end.fill"),
+        option("indicateTypos", "off", "错字提示：关闭", "只使用默认错误样式", "exclamationmark"),
+        option("indicateTypos", "below", "错字提示：下方", "在目标字符下显示实际输入", "text.below.photo"),
+        option("indicateTypos", "replace", "错字提示：替换", "用实际输入替换目标字符", "rectangle.and.pencil.and.ellipsis"),
+        option("indicateTypos", "both", "错字提示：两者", "替换字符并在下方显示目标", "square.stack.3d.up"),
+        option("compositionDisplay", "off", "组合输入显示：关闭", "仅标记正在组合的位置", "character.cursor.ibeam"),
+        option("compositionDisplay", "below", "组合输入显示：下方", "在练习文本下显示组合字符", "text.below.photo"),
+        option("compositionDisplay", "replace", "组合输入显示：替换", "在当前位置显示组合字符", "character.cursor.ibeam"),
+        toggle("hideExtraLetters", false, "隐藏额外字符", "显示超出目标的输入", "eye"),
+        toggle("hideExtraLetters", true, "隐藏额外字符", "隐藏超出目标的输入", "eye.slash"),
+        toggle("lazyMode", false, "简化重音输入", "要求输入完整重音和变音字符", "textformat"),
+        toggle("lazyMode", true, "简化重音输入", "允许用基础拉丁字母输入重音字符", "textformat"),
+        toggle("codeUnindentOnBackspace", false, "代码退格反缩进", "按普通退格规则删除缩进", "decrease.indent"),
+        toggle("codeUnindentOnBackspace", true, "代码退格反缩进", "删除行首缩进时返回上一行", "decrease.indent"),
+    ]
+
+    static func target(for identifier: String) -> InputRuleCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "input" else { return nil }
+        let value = String(parts[2])
+        switch String(parts[1]) {
+        case "freedomMode": return boolean(value).map(InputRuleCommandTarget.freedomMode)
+        case "strictSpace": return boolean(value).map(InputRuleCommandTarget.strictSpace)
+        case "oppositeShiftMode": return OppositeShiftMode(rawValue: value).map(InputRuleCommandTarget.oppositeShiftMode)
+        case "stopOnError": return StopOnErrorMode(rawValue: value).map(InputRuleCommandTarget.stopOnError)
+        case "deleteOnError":
+            let values: [String: DeleteOnErrorMode] = [
+                "off": .off, "letter": .letter, "letter_hard": .letterHard,
+                "word": .word, "word_hard": .wordHard,
+            ]
+            return values[value].map(InputRuleCommandTarget.deleteOnError)
+        case "confidenceMode":
+            let values: [String: ConfidenceMode] = ["off": .off, "on": .on, "max": .maximum]
+            return values[value].map(InputRuleCommandTarget.confidenceMode)
+        case "quickEnd": return boolean(value).map(InputRuleCommandTarget.quickEnd)
+        case "indicateTypos": return TypoIndicatorStyle(rawValue: value).map(InputRuleCommandTarget.indicateTypos)
+        case "compositionDisplay":
+            return CompositionDisplayStyle(rawValue: value).map(InputRuleCommandTarget.compositionDisplay)
+        case "hideExtraLetters": return boolean(value).map(InputRuleCommandTarget.hideExtraLetters)
+        case "lazyMode": return boolean(value).map(InputRuleCommandTarget.lazyMode)
+        case "codeUnindentOnBackspace":
+            return boolean(value).map(InputRuleCommandTarget.codeUnindentOnBackspace)
+        default: return nil
+        }
+    }
+
+    private static func toggle(
+        _ key: String, _ enabled: Bool, _ title: String, _ subtitle: String, _ systemImage: String
+    ) -> CommandPaletteItem {
+        option(
+            key, enabled ? "on" : "off", "\(title)：\(enabled ? "开启" : "关闭")",
+            subtitle, systemImage)
+    }
+
+    private static func option(
+        _ key: String, _ value: String, _ title: String, _ subtitle: String, _ systemImage: String
+    ) -> CommandPaletteItem {
+        CommandPaletteItem(
+            id: "input.\(key).\(value)", title: title, subtitle: subtitle,
+            systemImage: systemImage, keywords: ["input", "输入", key, value, title], group: .settings)
+    }
+
+    private static func boolean(_ value: String) -> Bool? {
+        switch value {
+        case "on": true
+        case "off": false
+        default: nil
+        }
+    }
+}
+
 enum TestConfigurationCommandChallengePolicy {
     private static let modeIdentifiers: Set<String> = [
         "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
@@ -372,6 +514,7 @@ enum TestConfigurationCommandChallengePolicy {
             || QuoteCommandCatalog.target(for: identifier) != nil
             || LanguageCommandCatalog.target(for: identifier) != nil
             || PracticePreferenceCommandCatalog.target(for: identifier)?.exitsChallenge == true
+            || InputRuleCommandCatalog.target(for: identifier)?.exitsChallenge == true
     }
 }
 

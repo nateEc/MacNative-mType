@@ -2805,6 +2805,7 @@ private struct ContentView: View {
     items.append(contentsOf: QuickTestParameterCommandCatalog.items)
     items.append(contentsOf: QuoteCommandCatalog.items(hasFavorites: hasFavoriteQuotesInCurrentSource))
     items.append(contentsOf: PracticePreferenceCommandCatalog.items)
+    items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2824,6 +2825,12 @@ private struct ContentView: View {
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let target = InputRuleCommandCatalog.target(for: item.id) {
+      if target.exitsChallenge { activeChallengeID = nil }
+      target.apply(to: settings)
+      if target.requiresRestart { reset() }
+      return
+    }
     if let target = PracticePreferenceCommandCatalog.target(for: item.id) {
       if target.exitsChallenge { activeChallengeID = nil }
       switch target {
