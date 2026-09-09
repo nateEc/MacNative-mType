@@ -1456,11 +1456,48 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(QuoteCommandCatalog.target(for: "test.quote.short.extra"))
   }
 
+  func testLanguageCommandCatalogRoundTripsEveryAvailableLanguageAndFiltersQuoteMode() {
+    let allItems = LanguageCommandCatalog.items(languages: TypingLanguage.allCases)
+    XCTAssertEqual(allItems.count, TypingLanguage.allCases.count)
+    XCTAssertEqual(Set(allItems.map(\.id)).count, TypingLanguage.allCases.count)
+    XCTAssertEqual(
+      allItems.compactMap { LanguageCommandCatalog.target(for: $0.id) },
+      TypingLanguage.allCases)
+
+    let quoteLanguages = TypingLanguage.allCases.filter(\.supportsQuotes)
+    let quoteItems = LanguageCommandCatalog.items(languages: quoteLanguages)
+    XCTAssertEqual(quoteItems.count, quoteLanguages.count)
+    XCTAssertFalse(quoteItems.contains { $0.id == "test.language.codeSwift" })
+    XCTAssertFalse(quoteItems.contains { $0.id == "test.language.mixedLanguages" })
+    XCTAssertEqual(
+      LanguageCommandCatalog.target(for: "test.language.spanish"), .spanish)
+    XCTAssertEqual(
+      LanguageCommandCatalog.target(for: "test.language.codeJavaScriptReact"),
+      .codeJavaScriptReact)
+    XCTAssertNil(LanguageCommandCatalog.target(for: "test.language.unknown"))
+    XCTAssertNil(LanguageCommandCatalog.target(for: "test.language.english.extra"))
+  }
+
+  func testLanguageCommandsRemainSearchableByDisplayNameAndRawIdentifier() {
+    let items = LanguageCommandCatalog.items(
+      languages: [.spanish, .codeJavaScriptReact, .simplifiedChinese])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: items, query: "espanol").map(\.id),
+      ["test.language.spanish"])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: items, query: "javascript react").map(\.id),
+      ["test.language.codeJavaScriptReact"])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: items, query: "simplifiedChinese").map(\.id),
+      ["test.language.simplifiedChinese"])
+  }
+
   func testConfigurationCommandsExitChallengesButUnrelatedCommandsDoNot() {
     for identifier in [
       "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
       "test.time.30", "test.words.25", "test.punctuation.on", "test.numbers.off",
       "test.quote.all", "test.quote.favorites", "test.quote.search",
+      "test.language.english", "test.language.codeSwift",
     ] {
       XCTAssertTrue(
         TestConfigurationCommandChallengePolicy.exitsChallenge(for: identifier), identifier)

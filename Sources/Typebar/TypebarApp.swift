@@ -2812,6 +2812,7 @@ private struct ContentView: View {
         return .init(id: preset.id, name: preset.name, definition: definition)
       }))
     items.append(contentsOf: ChallengeCommandCatalog.items(challenges: TypebarChallengeLibrary.all))
+    items.append(contentsOf: LanguageCommandCatalog.items(languages: availableLanguages))
     if mode == .quote, let quote = availableQuotes.first(where: { $0.id == selectedQuoteID }),
       let favoriteCommand = QuoteFavoriteCommand.item(
         currentQuoteID: quote.id, isFavorite: settings.isFavoriteQuote(quote.id))
@@ -2822,6 +2823,17 @@ private struct ContentView: View {
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let selectedLanguage = LanguageCommandCatalog.target(for: item.id) {
+      guard availableLanguages.contains(selectedLanguage) else { return }
+      activeChallengeID = nil
+      let changed = language != selectedLanguage
+      language = selectedLanguage
+      if !changed {
+        languageChanged(to: selectedLanguage)
+        refreshZipfNotice()
+      }
+      return
+    }
     if let target = QuoteCommandCatalog.target(for: item.id) {
       if target == .favorites, !hasFavoriteQuotesInCurrentSource { return }
       activeChallengeID = nil

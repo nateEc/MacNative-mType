@@ -275,6 +275,27 @@ enum QuoteCommandCatalog {
     }
 }
 
+enum LanguageCommandCatalog {
+    static func items(languages: [TypingLanguage]) -> [CommandPaletteItem] {
+        languages.map { language in
+            CommandPaletteItem(
+                id: "test.language.\(language.rawValue)",
+                title: "切换语言：\(language.displayName)",
+                subtitle: language.isCodeLanguage ? "使用本机原创代码练习" : "使用本机原创词流",
+                systemImage: language.isCodeLanguage
+                    ? "chevron.left.forwardslash.chevron.right" : "character.book.closed",
+                keywords: ["language", "语言", "词表", language.displayName, language.rawValue],
+                group: .practice)
+        }
+    }
+
+    static func target(for identifier: String) -> TypingLanguage? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "test", parts[1] == "language" else { return nil }
+        return TypingLanguage(rawValue: String(parts[2]))
+    }
+}
+
 enum TestConfigurationCommandChallengePolicy {
     private static let modeIdentifiers: Set<String> = [
         "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
@@ -284,6 +305,7 @@ enum TestConfigurationCommandChallengePolicy {
         modeIdentifiers.contains(identifier)
             || QuickTestParameterCommandCatalog.target(for: identifier) != nil
             || QuoteCommandCatalog.target(for: identifier) != nil
+            || LanguageCommandCatalog.target(for: identifier) != nil
     }
 }
 
