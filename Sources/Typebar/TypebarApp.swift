@@ -998,6 +998,7 @@ private struct ContentView: View {
         },
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
+        onResultGraphScaleChange: { settings.startGraphsAtZero = $0 },
         onRetryPublication: { publishIfEnabled(result.result) },
         onOpenDailyLeaderboard: {
           completedResult = nil
@@ -3327,6 +3328,7 @@ private struct CompletedResultView: View {
   let onRepeat: () -> Void
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
+  let onResultGraphScaleChange: (Bool) -> Void
   let onRetryPublication: () -> Void
   let onOpenDailyLeaderboard: () -> Void
   let onPracticeMissedWords: () -> Void
@@ -3440,6 +3442,7 @@ private struct CompletedResultView: View {
         resultPersonalBestFeedback: resultPersonalBestFeedback,
         tagPersonalBestFeedback: tagPersonalBestFeedback,
         onVisibilityChange: onResultPerformanceVisibilityChange,
+        onScaleChange: onResultGraphScaleChange,
         accent: accent)
 
       if let challengeEvaluation {
@@ -4343,6 +4346,7 @@ private struct ResultPerformanceChart: View {
   let startsAtZero: Bool
   let accent: Color
   let onVisibilityChange: (ResultPerformanceVisibility) -> Void
+  let onScaleChange: (Bool) -> Void
   @State private var visibility: ResultPerformanceVisibility
   private let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   private let tagPersonalBestFeedback: [TagPersonalBestFeedback]
@@ -4357,12 +4361,14 @@ private struct ResultPerformanceChart: View {
     resultPersonalBestFeedback: ResultPersonalBestFeedback?,
     tagPersonalBestFeedback: [TagPersonalBestFeedback],
     onVisibilityChange: @escaping (ResultPerformanceVisibility) -> Void,
+    onScaleChange: @escaping (Bool) -> Void,
     accent: Color
   ) {
     points = ResultPerformanceTrace.points(prompt: prompt, events: events, duration: duration)
     self.typingSpeedUnit = typingSpeedUnit
     self.startsAtZero = startsAtZero
     self.onVisibilityChange = onVisibilityChange
+    self.onScaleChange = onScaleChange
     _visibility = State(initialValue: visibility)
     self.resultPersonalBestFeedback = resultPersonalBestFeedback?.showsPreviousBestLine == true
       ? resultPersonalBestFeedback : nil
@@ -4377,6 +4383,17 @@ private struct ResultPerformanceChart: View {
           Label("本次速度轨迹", systemImage: "chart.xyaxis.line")
             .font(.caption.weight(.medium))
           Spacer()
+          Button(startsAtZero ? "从零" : "自适应") {
+            onScaleChange(!startsAtZero)
+          }
+          .buttonStyle(.bordered)
+          .controlSize(.mini)
+          .tint(.secondary)
+          .accessibilityLabel("图表纵轴范围")
+          .accessibilityValue(startsAtZero ? "从零开始" : "按数据自适应")
+          .help(startsAtZero ? "切换为按数据自适应" : "切换为从零开始")
+        }
+        HStack(spacing: 6) {
           traceToggle("Raw", isOn: visibilityBinding(\.raw), color: .secondary)
           traceToggle("Burst", isOn: visibilityBinding(\.burst), color: .orange)
           traceToggle("错误", isOn: visibilityBinding(\.errors), color: .red)
@@ -4386,6 +4403,7 @@ private struct ResultPerformanceChart: View {
           if !tagPersonalBestFeedback.isEmpty {
             traceToggle("标签 PB", isOn: visibilityBinding(\.tagPersonalBestLine), color: .secondary)
           }
+          Spacer()
         }
         Chart(points) { point in
           LineMark(
