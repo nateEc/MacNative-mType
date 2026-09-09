@@ -8,8 +8,8 @@ require "pathname"
 PINNED_COMMIT = "91bd24bb8513785c7364cbea29296ff7adafac41"
 EXPECTED_COUNTS = {
   official: 94,
-  mapped: 89,
-  partial: 4,
+  mapped: 90,
+  partial: 3,
   not_applicable: 1,
   unimplemented: 0,
   untracked: 0,
@@ -58,6 +58,13 @@ official_choices = audited_enum_schema_names.to_h do |config_key, schema_name|
   fail_audit("#{schema_name}Schema choices are not unique") unless choices.uniq.length == choices.length
   [config_key, choices]
 end
+quote_length_match = schema_source.match(
+  /export const QuoteLengthSchema = z\.union\(\[(.*?)\]\);/m)
+fail_audit("could not locate QuoteLengthSchema union") unless quote_length_match
+quote_length_choices = quote_length_match[1].scan(/z\.literal\((-?\d+)\)/).flatten
+fail_audit("QuoteLengthSchema choices are not unique") unless
+  quote_length_choices.uniq.length == quote_length_choices.length
+official_choices["quoteLength"] = quote_length_choices
 official_choice_counts = official_choices.transform_values(&:length)
 
 official_boolean_keys = ["monkey"]

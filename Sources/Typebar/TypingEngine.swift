@@ -661,6 +661,34 @@ enum QuoteLength: String, CaseIterable, Codable, Equatable, Identifiable {
   case extended
 
   var id: Self { self }
+
+  var compatibilityValue: String? {
+    switch self {
+    case .all: nil
+    case .short: "0"
+    case .medium: "1"
+    case .long: "2"
+    case .extended: "3"
+    }
+  }
+}
+
+enum QuoteSelectionMode: String, CaseIterable, Codable, Equatable, Identifiable {
+  case lengths
+  case favorites
+  case search
+
+  var id: Self { self }
+
+  var advancesAutomatically: Bool { self != .search }
+
+  var displayName: String {
+    switch self {
+    case .lengths: "按长度"
+    case .favorites: "收藏"
+    case .search: "搜索"
+    }
+  }
 }
 
 enum CustomTextCompletion: String, CaseIterable, Codable, Equatable, Identifiable {
@@ -1446,6 +1474,9 @@ struct TestConfiguration: Codable, Equatable {
   /// Nil preserves single-length configurations written before quote length
   /// became a multi-selection. New quote presets encode the concrete set.
   var quoteLengths: Set<QuoteLength>?
+  /// Missing in older archives and links, which decode to the historical
+  /// length-filter behavior.
+  var quoteSelectionMode: QuoteSelectionMode
   var customTextCompletion: CustomTextCompletion
   var customTextSectionLimit: Int?
   var customTextOrdering: CustomTextOrdering
@@ -1472,6 +1503,7 @@ struct TestConfiguration: Codable, Equatable {
     rules: InputRules, language: TypingLanguage = .english,
     englishVariant: EnglishVariant = .american, quoteLength: QuoteLength = .all,
     quoteLengths: Set<QuoteLength>? = nil,
+    quoteSelectionMode: QuoteSelectionMode = .lengths,
     customTextCompletion: CustomTextCompletion = .finish, customTextSectionLimit: Int? = nil,
     customTextOrdering: CustomTextOrdering = .inOrder,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
@@ -1491,6 +1523,7 @@ struct TestConfiguration: Codable, Equatable {
     let normalizedQuoteLengths = quoteLengths.map(QuoteLengthSelection.normalized)
     self.quoteLength = normalizedQuoteLengths.map(QuoteLengthSelection.legacyValue) ?? quoteLength
     self.quoteLengths = normalizedQuoteLengths
+    self.quoteSelectionMode = quoteSelectionMode
     self.customTextCompletion = customTextCompletion
     self.customTextSectionLimit = customTextSectionLimit
     self.customTextOrdering = customTextOrdering
@@ -1567,7 +1600,8 @@ struct TestConfiguration: Codable, Equatable {
 
   private enum CodingKeys: String, CodingKey {
     case mode, duration, wordLimit, difficulty, rules, language, englishVariant, quoteLength,
-      quoteLengths, customTextCompletion, customTextSectionLimit, customTextOrdering, mixedLanguageComponents,
+      quoteLengths, quoteSelectionMode, customTextCompletion, customTextSectionLimit,
+      customTextOrdering, mixedLanguageComponents,
       modifiers, contentOptions, challengeID
   }
 
@@ -1586,6 +1620,8 @@ struct TestConfiguration: Codable, Equatable {
     quoteLengths = try values.decodeIfPresent(Set<QuoteLength>.self, forKey: .quoteLengths)
       .map(QuoteLengthSelection.normalized)
     quoteLength = quoteLengths.map(QuoteLengthSelection.legacyValue) ?? legacyQuoteLength
+    quoteSelectionMode =
+      try values.decodeIfPresent(QuoteSelectionMode.self, forKey: .quoteSelectionMode) ?? .lengths
     customTextCompletion =
       try values.decodeIfPresent(CustomTextCompletion.self, forKey: .customTextCompletion)
       ?? .finish

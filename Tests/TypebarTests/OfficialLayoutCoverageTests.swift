@@ -177,8 +177,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 94)
     XCTAssertEqual(fixture.officialKeys.count, fixture.officialCount)
     XCTAssertEqual(officialKeys.count, fixture.officialCount)
-    XCTAssertEqual(fixture.mapped.count, 89)
-    XCTAssertEqual(fixture.partial.count, 4)
+    XCTAssertEqual(fixture.mapped.count, 90)
+    XCTAssertEqual(fixture.partial.count, 3)
     XCTAssertEqual(fixture.notApplicable.count, 1)
     XCTAssertEqual(fixture.notApplicable["ads"], "无")
     XCTAssertEqual(
@@ -186,7 +186,9 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       [
         "playSoundOnClick": 27, "playSoundOnError": 5, "playTimeWarning": 5,
         "caretStyle": 8, "paceCaretStyle": 8, "timerColor": 4, "monkeyPowerLevel": 5,
+        "quoteLength": 6,
       ])
+    XCTAssertEqual(fixture.officialChoices["quoteLength"], ["-3", "-2", "0", "1", "2", "3"])
     XCTAssertEqual(
       fixture.officialChoices["playSoundOnError"], ["off", "1", "2", "3", "4"])
     XCTAssertEqual(
@@ -213,6 +215,11 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(
       Set(TypingPowerMode.allCases.map(\.compatibilityValue)),
       Set(fixture.officialChoices["monkeyPowerLevel"] ?? []))
+    XCTAssertEqual(
+      QuoteSelection.compatibilityValues(mode: .lengths)
+        .union(QuoteSelection.compatibilityValues(mode: .favorites))
+        .union(QuoteSelection.compatibilityValues(mode: .search)),
+      Set(fixture.officialChoices["quoteLength"] ?? []))
     XCTAssertEqual(
       TypingClickSoundStyle.allCases.count + 1,
       fixture.officialChoiceCounts["playSoundOnClick"])

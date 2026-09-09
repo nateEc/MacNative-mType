@@ -104,6 +104,7 @@
     "words": "`TestConfiguration.wordLimit`",
     "time": "`TestConfiguration.duration`",
     "mode": "`TestMode`",
+    "quoteLength": "`quoteLengths`、`quoteSelectionMode`、所选引语 ID",
     "burstHeatmap": "`showWordBurstHeatmap`",
     "difficulty": "`Difficulty`",
     "quickRestart": "`QuickRestartKey`",
@@ -190,7 +191,6 @@
     "monkeyPowerLevel": "`typingPowerMode`"
   },
   "partial": {
-    "quoteLength": "`QuoteLength`、收藏和本机搜索",
     "language": "`TypingLanguage`、`mixedLanguageComponents`",
     "customPolyglot": "`mixedLanguageComponents`",
     "fontFamily": "`practiceFont`、可搜索的本机字体目录、名称/导入"
@@ -279,6 +279,14 @@
       "2",
       "3",
       "4"
+    ],
+    "quoteLength": [
+      "-3",
+      "-2",
+      "0",
+      "1",
+      "2",
+      "3"
     ]
   },
   "officialChoiceCounts": {
@@ -288,7 +296,8 @@
     "caretStyle": 8,
     "paceCaretStyle": 8,
     "timerColor": 4,
-    "monkeyPowerLevel": 5
+    "monkeyPowerLevel": 5,
+    "quoteLength": 6
   },
   "officialBooleanKeys": [
     "monkey"

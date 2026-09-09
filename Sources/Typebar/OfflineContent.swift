@@ -51,6 +51,39 @@ enum QuoteLengthSelection {
   }
 }
 
+enum QuoteSelection {
+  static func compatibilityValues(
+    mode: QuoteSelectionMode, lengths: Set<QuoteLength> = QuoteLengthSelection.selectable
+  ) -> Set<String> {
+    switch mode {
+    case .lengths: Set(QuoteLengthSelection.normalized(lengths).compactMap(\.compatibilityValue))
+    case .favorites: ["-3"]
+    case .search: ["-2"]
+    }
+  }
+
+  static func resolvedMode(
+    _ requestedMode: QuoteSelectionMode, hasEligibleQuotes: Bool
+  ) -> QuoteSelectionMode {
+    requestedMode == .lengths || hasEligibleQuotes ? requestedMode : .lengths
+  }
+
+  static func filtered(
+    _ quotes: [OfflineQuote], mode: QuoteSelectionMode, lengths: Set<QuoteLength>,
+    searchQuery: String, isFavorite: (String) -> Bool
+  ) -> [OfflineQuote] {
+    switch mode {
+    case .lengths:
+      let lengths = QuoteLengthSelection.normalized(lengths)
+      return quotes.filter { lengths.contains($0.length) }
+    case .favorites:
+      return quotes.filter { isFavorite($0.id) }
+    case .search:
+      return QuoteSearch.filtered(quotes, query: searchQuery)
+    }
+  }
+}
+
 /// A process-local quote cycle. It produces every currently eligible quote
 /// once before reshuffling, and avoids showing the active quote again when an
 /// alternative exists. The queue intentionally is not stored in settings.

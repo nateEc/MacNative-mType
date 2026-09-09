@@ -10728,10 +10728,12 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(
         try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
         expected.rawValue)
-      XCTAssertEqual(
-        OfflineContent.generatedPrompt(wordCount: 25, language: language)
-          .split(separator: " ", omittingEmptySubsequences: true).count,
-        25, expected.rawValue)
+      let generatedWordCount = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+        .split(separator: " ", omittingEmptySubsequences: true).count
+      XCTAssertGreaterThanOrEqual(generatedWordCount, 25, expected.rawValue)
+      if words.allSatisfy({ !$0.contains(where: \.isWhitespace) }) {
+        XCTAssertEqual(generatedWordCount, 25, expected.rawValue)
+      }
       for length in [QuoteLength.short, .medium, .long, .extended] {
         let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
         XCTAssertEqual(quote.language, language, expected.rawValue)
@@ -15968,22 +15970,55 @@ final class TypingEngineTests: XCTestCase {
     let selection: Set<QuoteLength> = [.short, .long]
     let configuration = TestConfiguration(
       mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
-      quoteLengths: selection)
+      quoteLengths: selection, quoteSelectionMode: .favorites)
     let preset = SavedTestPreset(configuration: configuration, quoteID: "craft", customText: nil)
 
     XCTAssertEqual(configuration.effectiveQuoteLengths, selection)
     XCTAssertEqual(configuration.quoteLength, .all)
-    XCTAssertEqual(
-      try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset))
-        .configuration.effectiveQuoteLengths,
-      selection)
+    let shared = try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset))
+    XCTAssertEqual(shared.configuration.effectiveQuoteLengths, selection)
+    XCTAssertEqual(shared.configuration.quoteSelectionMode, .favorites)
 
     let legacy = """
       {"mode":"quote","duration":null,"wordLimit":null,"difficulty":"normal","rules":{},"quoteLength":"medium","customTextCompletion":"finish","customTextOrdering":"inOrder","mixedLanguageComponents":["english","spanish"],"modifiers":[],"contentOptions":{"includePunctuation":false,"includeNumbers":false}}
       """
+    let decodedLegacy = try JSONDecoder().decode(TestConfiguration.self, from: Data(legacy.utf8))
+    XCTAssertEqual(decodedLegacy.effectiveQuoteLengths, [.medium])
+    XCTAssertEqual(decodedLegacy.quoteSelectionMode, .lengths)
+  }
+
+  func testQuoteSelectionModesSeparateLengthsFavoritesAndLockedSearch() {
+    let quotes = [
+      OfflineQuote(id: "short-favorite", title: "Morning", text: "quiet dawn", language: .english, length: .short),
+      OfflineQuote(id: "long-favorite", title: "Harbor", text: "bright harbor", language: .english, length: .long),
+      OfflineQuote(id: "long-other", title: "Orchard", text: "quiet orchard", language: .english, length: .long),
+    ]
+    let favorites = Set(["short-favorite", "long-favorite"])
+
     XCTAssertEqual(
-      try JSONDecoder().decode(TestConfiguration.self, from: Data(legacy.utf8)).effectiveQuoteLengths,
-      [.medium])
+      QuoteSelection.filtered(
+        quotes, mode: .lengths, lengths: [.short], searchQuery: "harbor",
+        isFavorite: favorites.contains).map(\.id),
+      ["short-favorite"])
+    XCTAssertEqual(
+      QuoteSelection.filtered(
+        quotes, mode: .favorites, lengths: [.short], searchQuery: "orchard",
+        isFavorite: favorites.contains).map(\.id),
+      ["short-favorite", "long-favorite"])
+    XCTAssertEqual(
+      QuoteSelection.filtered(
+        quotes, mode: .search, lengths: [.short], searchQuery: "quiet orchard",
+        isFavorite: favorites.contains).map(\.id),
+      ["long-other"])
+    XCTAssertTrue(QuoteSelectionMode.lengths.advancesAutomatically)
+    XCTAssertTrue(QuoteSelectionMode.favorites.advancesAutomatically)
+    XCTAssertFalse(QuoteSelectionMode.search.advancesAutomatically)
+    XCTAssertEqual(
+      QuoteSelection.resolvedMode(.favorites, hasEligibleQuotes: false), .lengths)
+    XCTAssertEqual(
+      QuoteSelection.resolvedMode(.search, hasEligibleQuotes: false), .lengths)
+    XCTAssertEqual(
+      QuoteSelection.resolvedMode(.favorites, hasEligibleQuotes: true), .favorites)
   }
 
   @MainActor

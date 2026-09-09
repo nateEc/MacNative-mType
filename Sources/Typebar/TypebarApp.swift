@@ -527,6 +527,7 @@ private struct ContentView: View {
   @State private var wordLimit = 25
   @State private var selectedQuoteID = OfflineContent.quotes(for: .english)[0].id
   @State private var quoteLengths = QuoteLengthSelection.selectable
+  @State private var quoteSelectionMode: QuoteSelectionMode = .lengths
   @State private var quoteQueue = QuoteQueue()
   @State private var quoteSource: QuoteSource = .builtIn
   @State private var communityQuotes: [OfflineQuote] = []
@@ -535,7 +536,6 @@ private struct ContentView: View {
   @State private var isLoadingCommunityQuotes = false
   @State private var quoteReportReason: RemoteQuoteReportReason = .other
   @State private var quoteReportNote = ""
-  @State private var favoriteQuotesOnly = false
   @State private var quoteSearchQuery = ""
   @State private var quoteRatings = QuoteRatingStore()
   @State private var activeQuoteFeedback: QuoteResultFeedbackTarget?
@@ -1124,29 +1124,45 @@ private struct ContentView: View {
           }
           .pickerStyle(.segmented)
           .onChange(of: quoteSource) { _, source in
-            if source == .community { refreshCommunityQuotes() }
+            if source == .community {
+              refreshCommunityQuotes()
+              return
+            }
             quoteQueue.reset()
             ensureSelectedQuote()
             reset()
           }
-          DisclosureGroup("引语长度：\(QuoteLengthSelection.summary(quoteLengths))") {
-            ForEach(QuoteLength.allCases.filter { $0 != .all }) { length in
-              Toggle(length.displayName, isOn: quoteLengthSelectionBinding(for: length))
-                .toggleStyle(.checkbox)
+          Picker("引语选择", selection: $quoteSelectionMode) {
+            ForEach(QuoteSelectionMode.allCases) { selectionMode in
+              Text(selectionMode.displayName).tag(selectionMode)
             }
           }
-          Toggle("只显示收藏", isOn: $favoriteQuotesOnly)
-            .onChange(of: favoriteQuotesOnly) { _, _ in
-              quoteQueue.reset()
-              ensureSelectedQuote()
-              reset()
+          .pickerStyle(.segmented)
+          .onChange(of: quoteSelectionMode) { _, selectionMode in
+            quoteQueue.reset()
+            if selectionMode == .favorites, availableQuotes.isEmpty {
+              quoteSelectionMode = .lengths
+              return
             }
-          TextField("搜索当前引语（仅本机）", text: $quoteSearchQuery)
-            .onChange(of: quoteSearchQuery) { _, _ in
-              quoteQueue.reset()
-              ensureSelectedQuote()
-              reset()
+            ensureSelectedQuote()
+            reset()
+          }
+          if quoteSelectionMode == .lengths {
+            DisclosureGroup("引语长度：\(QuoteLengthSelection.summary(quoteLengths))") {
+              ForEach(QuoteLength.allCases.filter { $0 != .all }) { length in
+                Toggle(length.displayName, isOn: quoteLengthSelectionBinding(for: length))
+                  .toggleStyle(.checkbox)
+              }
             }
+          } else if quoteSelectionMode == .search {
+            TextField("搜索当前引语（仅本机）", text: $quoteSearchQuery)
+              .onChange(of: quoteSearchQuery) { _, _ in
+                quoteQueue.reset()
+                guard !availableQuotes.isEmpty else { return }
+                ensureSelectedQuote()
+                reset()
+              }
+          }
           if quoteSource == .community {
             HStack {
               Button("刷新社区引语") { refreshCommunityQuotes() }
@@ -1175,10 +1191,16 @@ private struct ContentView: View {
           }
           if availableQuotes.isEmpty {
             ContentUnavailableView(
-              quoteSource == .community ? "没有可用的社区引语" : "没有匹配的收藏引语",
-              systemImage: quoteSource == .community ? "quote.bubble" : "star.slash",
+              quoteSource == .community
+                ? "没有可用的社区引语"
+                : quoteSelectionMode == .favorites ? "没有收藏引语" : "没有匹配的引语",
+              systemImage: quoteSource == .community
+                ? "quote.bubble" : quoteSelectionMode == .favorites ? "star.slash" : "magnifyingglass",
               description: Text(
-                quoteSource == .community ? "刷新后仍为空，说明该语言尚无已审核内容。" : "关闭“只显示收藏”，或先收藏一条引语。"))
+                quoteSource == .community
+                  ? "刷新后仍为空，说明该语言尚无已审核内容。"
+                  : quoteSelectionMode == .favorites
+                    ? "先在长度或搜索模式中收藏一条引语。" : "更换搜索词后再试。"))
           } else {
             Picker("引语", selection: $selectedQuoteID) {
               ForEach(availableQuotes) { quote in
@@ -1188,12 +1210,17 @@ private struct ContentView: View {
             .onChange(of: selectedQuoteID) { _, _ in reset() }
             HStack {
               Button(settings.isFavoriteQuote(selectedQuoteID) ? "取消收藏" : "收藏引语") {
-                settings.toggleFavoriteQuote(selectedQuoteID)
-                ensureSelectedQuote()
+                toggleSelectedQuoteFavorite()
               }
-              Button("随机一条") {
-                chooseNextQuote()
-                reset()
+              if quoteSelectionMode.advancesAutomatically {
+                Button("随机一条") {
+                  chooseNextQuote()
+                  reset()
+                }
+              } else {
+                Text("搜索模式会锁定所选引语")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
               }
               Toggle("重开时重复当前引语", isOn: $settings.repeatQuotes)
             }
@@ -2701,8 +2728,7 @@ private struct ContentView: View {
     case "bailout": showingCommandBailoutConfirmation = true
     case QuoteFavoriteCommand.identifier:
       guard mode == .quote, availableQuotes.contains(where: { $0.id == selectedQuoteID }) else { return }
-      settings.toggleFavoriteQuote(selectedQuoteID)
-      ensureSelectedQuote()
+      toggleSelectedQuoteFavorite()
     default: break
     }
   }
@@ -2734,6 +2760,7 @@ private struct ContentView: View {
         mode: .quote, duration: nil, wordLimit: nil, difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         quoteLength: QuoteLengthSelection.legacyValue(for: quoteLengths), quoteLengths: quoteLengths,
+        quoteSelectionMode: quoteSelectionMode,
         mixedLanguageComponents: mixedLanguageComponents,
         modifiers: effectiveTestModifiers(for: language, mode: .quote), contentOptions: contentOptions)
     case .zen:
@@ -2807,7 +2834,8 @@ private struct ContentView: View {
     mode = configuration.mode
     if let duration = configuration.duration { self.duration = Int(duration) }
     if let wordLimit = configuration.wordLimit { self.wordLimit = wordLimit }
-    if let quoteID = preset.quoteID { selectedQuoteID = quoteID }
+    let requestedQuoteID = preset.quoteID
+    if let requestedQuoteID { selectedQuoteID = requestedQuoteID }
     if let customText = preset.customText { self.customText = customText }
     customTextCompletion = configuration.customTextCompletion
     if configuration.customTextCompletion == .time, let duration = configuration.duration {
@@ -2825,12 +2853,21 @@ private struct ContentView: View {
     language = configuration.language
     constrainQuoteSource(for: language)
     mixedLanguageComponents = configuration.mixedLanguageComponents
+    quoteSelectionMode = configuration.quoteSelectionMode
+    if quoteSelectionMode == .search { quoteSearchQuery = "" }
     quoteLengths = configuration.effectiveQuoteLengths
+    quoteSelectionMode = QuoteSelection.resolvedMode(
+      quoteSelectionMode, hasEligibleQuotes: !availableQuotes.isEmpty)
     quoteQueue.reset()
     contentOptions = configuration.contentOptions
     settings.apply(configuration)
     if let activeResultTags = preset.activeResultTags {
       settings.activeResultTags = activeResultTags
+    }
+    ensureSelectedQuote()
+    if quoteSelectionMode == .search, selectedQuoteID != requestedQuoteID {
+      quoteSelectionMode = .lengths
+      ensureSelectedQuote()
     }
     reset()
   }
@@ -2883,14 +2920,11 @@ private struct ContentView: View {
   private var availableQuotes: [OfflineQuote] {
     let sourceQuotes =
       quoteSource == .builtIn
-      ? OfflineContent.quotes(for: language).filter { quoteLengths.contains($0.length) }
-      : communityQuotes.filter {
-        $0.language == language && quoteLengths.contains($0.length)
-      }
-    let quotes = favoriteQuotesOnly
-      ? sourceQuotes.filter { settings.isFavoriteQuote($0.id) }
-      : sourceQuotes
-    return QuoteSearch.filtered(quotes, query: quoteSearchQuery)
+      ? OfflineContent.quotes(for: language)
+      : communityQuotes.filter { $0.language == language }
+    return QuoteSelection.filtered(
+      sourceQuotes, mode: quoteSelectionMode, lengths: quoteLengths,
+      searchQuery: quoteSearchQuery, isFavorite: settings.isFavoriteQuote)
   }
 
   private func refreshCommunityQuotes() {
@@ -2916,7 +2950,14 @@ private struct ContentView: View {
         }
         communityQuoteMessage =
           remoteQuotes.isEmpty ? "该语言还没有已审核内容。" : "已载入 \(remoteQuotes.count) 条已审核内容。"
+        if quoteSelectionMode == .favorites, availableQuotes.isEmpty {
+          quoteSelectionMode = .lengths
+        }
         quoteQueue.reset()
+        guard !availableQuotes.isEmpty else {
+          isLoadingCommunityQuotes = false
+          return
+        }
         ensureSelectedQuote()
         reset()
       } catch {
@@ -2990,7 +3031,20 @@ private struct ContentView: View {
     }
   }
 
+  private func toggleSelectedQuoteFavorite() {
+    settings.toggleFavoriteQuote(selectedQuoteID)
+    guard quoteSelectionMode == .favorites else {
+      ensureSelectedQuote()
+      return
+    }
+    if availableQuotes.isEmpty { quoteSelectionMode = .lengths }
+    quoteQueue.reset()
+    ensureSelectedQuote()
+    reset()
+  }
+
   private func chooseNextQuote() {
+    guard quoteSelectionMode.advancesAutomatically else { return }
     selectedQuoteID = quoteQueue.next(from: availableQuotes, avoiding: selectedQuoteID) ?? selectedQuoteID
   }
 
