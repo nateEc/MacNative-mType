@@ -297,6 +297,100 @@ enum QuoteFavoriteCommand {
     }
 }
 
+struct CompletedResultCommandAvailability: Equatable {
+    let hasCopyableWords: Bool
+    let hasWordHistory: Bool
+    let hasMissedWordPractice: Bool
+    let hasSlowWordPractice: Bool
+    let hasCombinedPractice: Bool
+}
+
+enum CompletedResultCommandAction: String, Equatable {
+    case next
+    case repeatTest = "repeat"
+    case practiceMissed
+    case practiceSlow
+    case practiceCombined
+    case toggleWordHistory
+    case copyWords
+    case copyImage
+    case saveImage
+
+    var identifier: String { "result.\(rawValue)" }
+}
+
+/// Exposes completed-result actions only when the current result has the data
+/// needed to perform them. The actions themselves stay owned by the result
+/// screen so toolbar buttons and command selection cannot diverge.
+enum CompletedResultCommandCatalog {
+    static func action(for identifier: String) -> CompletedResultCommandAction? {
+        let prefix = "result."
+        guard identifier.hasPrefix(prefix) else { return nil }
+        return CompletedResultCommandAction(rawValue: String(identifier.dropFirst(prefix.count)))
+    }
+
+    static func items(
+        availability: CompletedResultCommandAvailability
+    ) -> [CommandPaletteItem] {
+        var actions: [CompletedResultCommandAction] = [.next, .repeatTest]
+        if availability.hasMissedWordPractice { actions.append(.practiceMissed) }
+        if availability.hasSlowWordPractice { actions.append(.practiceSlow) }
+        if availability.hasCombinedPractice { actions.append(.practiceCombined) }
+        if availability.hasWordHistory { actions.append(.toggleWordHistory) }
+        if availability.hasCopyableWords { actions.append(.copyWords) }
+        actions.append(contentsOf: [.copyImage, .saveImage])
+        return actions.map(item(for:))
+    }
+
+    private static func item(for action: CompletedResultCommandAction) -> CommandPaletteItem {
+        switch action {
+        case .next:
+            CommandPaletteItem(
+                id: action.identifier, title: "再来一次", subtitle: "按当前选择生成新的练习",
+                systemImage: "chevron.right", keywords: ["next", "restart", "下一轮", "重开"],
+                group: .practice)
+        case .repeatTest:
+            CommandPaletteItem(
+                id: action.identifier, title: "重复本轮", subtitle: "保留本轮配置和提示重新练习",
+                systemImage: "arrow.triangle.2.circlepath", keywords: ["repeat", "重复", "同一提示"],
+                group: .practice)
+        case .practiceMissed:
+            CommandPaletteItem(
+                id: action.identifier, title: "练习错词", subtitle: "按本轮错误频次生成练习",
+                systemImage: "exclamationmark.triangle", keywords: ["missed", "wrong", "错词", "练习"],
+                group: .practice)
+        case .practiceSlow:
+            CommandPaletteItem(
+                id: action.identifier, title: "练习慢词", subtitle: "按本轮最慢的可测单词生成练习",
+                systemImage: "tortoise", keywords: ["slow", "慢词", "练习"], group: .practice)
+        case .practiceCombined:
+            CommandPaletteItem(
+                id: action.identifier, title: "练习错词与慢词", subtitle: "合并本轮两类弱项生成练习",
+                systemImage: "scope", keywords: ["both", "combined", "错词", "慢词", "练习"],
+                group: .practice)
+        case .toggleWordHistory:
+            CommandPaletteItem(
+                id: action.identifier, title: "展开或收起单词历史", subtitle: "切换本轮目标与实际输入对照",
+                systemImage: "text.alignleft", keywords: ["toggle", "history", "单词", "历史"],
+                group: .activity)
+        case .copyWords:
+            CommandPaletteItem(
+                id: action.identifier, title: "复制已练习词", subtitle: "复制本轮实际到达的目标内容",
+                systemImage: "doc.on.doc", keywords: ["copy", "words", "复制", "提示"], group: .data)
+        case .copyImage:
+            CommandPaletteItem(
+                id: action.identifier, title: "复制结果图片", subtitle: "将 Typebar 结果卡复制到剪贴板",
+                systemImage: "photo.on.rectangle", keywords: ["copy", "image", "截图", "图片"],
+                group: .data)
+        case .saveImage:
+            CommandPaletteItem(
+                id: action.identifier, title: "保存结果图片…", subtitle: "将 Typebar 结果卡导出为 PNG",
+                systemImage: "square.and.arrow.down", keywords: ["save", "download", "PNG", "保存", "图片"],
+                group: .data)
+        }
+    }
+}
+
 enum CommandPaletteSearch {
     static func results(items: [CommandPaletteItem], query: String) -> [CommandPaletteItem] {
         return items.filter { item in

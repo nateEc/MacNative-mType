@@ -3459,6 +3459,8 @@ private struct CompletedResultView: View {
   @State private var showingSlowWordCopy = false
   @State private var slowWordThresholdText = ""
   @State private var inspectedResultWordIndexes: Set<Int> = []
+  @State private var wordHistoryExpansionOverride: Bool?
+  @State private var showingCommandPalette = false
 
   var body: some View {
     VStack(spacing: 28) {
@@ -3634,7 +3636,7 @@ private struct CompletedResultView: View {
           typingSpeedUnit: typingSpeedUnit,
           accent: accent,
           highlightedWordIndexes: inspectedResultWordIndexes,
-          initiallyExpanded: alwaysShowWordsHistory)
+          isExpanded: wordHistoryExpansion)
       }
 
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
@@ -3648,6 +3650,8 @@ private struct CompletedResultView: View {
           if localResultSaveState.isSaved {
             Button("查看历史", action: onHistory)
           }
+          Button("命令", systemImage: "command") { showingCommandPalette = true }
+            .keyboardShortcut("p", modifiers: [.command, .shift])
           Menu("导出") {
             Button("复制结果文字", action: copyResultText)
             Button("复制练习提示", action: copyResultPrompt)
@@ -3711,8 +3715,15 @@ private struct CompletedResultView: View {
     }
     .padding(32)
     .frame(width: 390)
+    .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onAppear {
       communityRating = initialCommunityRating
+    }
+    .sheet(isPresented: $showingCommandPalette) {
+      CommandPaletteView(
+        items: resultCommandItems,
+        listMode: settings.commandPaletteListMode,
+        onSelect: runResultCommand)
     }
     .alert("复制慢词列表", isPresented: $showingSlowWordCopy) {
       TextField("WPM 阈值", text: $slowWordThresholdText)
@@ -3726,6 +3737,63 @@ private struct CompletedResultView: View {
   private var characterStatsText: String {
     let stats = result.characterStats
     return "\(stats.matched)/\(stats.incorrect)/\(stats.extra)/\(stats.missed)"
+  }
+
+  private var wordHistoryExpansion: Binding<Bool> {
+    Binding(
+      get: { wordHistoryExpansionOverride ?? alwaysShowWordsHistory },
+      set: { wordHistoryExpansionOverride = $0 })
+  }
+
+  private var resultCommandItems: [CommandPaletteItem] {
+    CompletedResultCommandCatalog.items(
+      availability: .init(
+        hasCopyableWords: ResultPromptText.make(for: result, reviews: wordReviews) != nil,
+        hasWordHistory: !wordReviews.isEmpty,
+        hasMissedWordPractice: !missedWords.isEmpty,
+        hasSlowWordPractice: slowWordPractice != nil,
+        hasCombinedPractice: missedAndSlowPractice != nil))
+  }
+
+  private func runResultCommand(_ item: CommandPaletteItem) {
+    guard let action = CompletedResultCommandCatalog.action(for: item.id) else { return }
+    switch action {
+    case .next:
+      leaveCommandPalette(then: onRestart)
+    case .repeatTest:
+      leaveCommandPalette(then: onRepeat)
+    case .practiceMissed:
+      guard !missedWords.isEmpty else { return }
+      leaveCommandPalette(then: onPracticeMissedWords)
+    case .practiceSlow:
+      guard let slowWordPractice else { return }
+      leaveCommandPalette {
+        onPracticeSlowWords(slowWordPractice.exerciseWords, slowWordPractice.selectedWords.count)
+      }
+    case .practiceCombined:
+      guard let missedAndSlowPractice else { return }
+      leaveCommandPalette {
+        onPracticeMissedAndSlowWords(
+          missedAndSlowPractice.exerciseWords, missedAndSlowPractice.selectedTargetCount)
+      }
+    case .toggleWordHistory:
+      guard !wordReviews.isEmpty else { return }
+      wordHistoryExpansion.wrappedValue.toggle()
+    case .copyWords:
+      copyResultPrompt()
+    case .copyImage:
+      copyResultImage()
+    case .saveImage:
+      leaveCommandPalette(then: saveResultImage)
+    }
+  }
+
+  private func leaveCommandPalette(then action: @escaping () -> Void) {
+    showingCommandPalette = false
+    Task { @MainActor in
+      await Task.yield()
+      action()
+    }
   }
 
   private func keyDurationText(_ milliseconds: Double) -> String {
@@ -4348,7 +4416,7 @@ private struct WordReviewHistoryView: View {
   let typingSpeedUnit: TypingSpeedUnit
   let accent: Color
   let highlightedWordIndexes: Set<Int>
-  @State private var isExpanded: Bool
+  @Binding var isExpanded: Bool
 
   private var heatmap: WordBurstHeatmap? {
     guard showsBurstHeatmap else { return nil }
@@ -4362,7 +4430,7 @@ private struct WordReviewHistoryView: View {
     typingSpeedUnit: TypingSpeedUnit,
     accent: Color,
     highlightedWordIndexes: Set<Int> = [],
-    initiallyExpanded: Bool
+    isExpanded: Binding<Bool>
   ) {
     self.reviews = reviews
     self.bursts = bursts
@@ -4370,7 +4438,7 @@ private struct WordReviewHistoryView: View {
     self.typingSpeedUnit = typingSpeedUnit
     self.accent = accent
     self.highlightedWordIndexes = highlightedWordIndexes
-    _isExpanded = State(initialValue: initiallyExpanded)
+    _isExpanded = isExpanded
   }
 
   var body: some View {

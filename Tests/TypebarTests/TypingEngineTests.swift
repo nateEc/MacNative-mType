@@ -11449,6 +11449,37 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CommandPaletteDynamicShortcut.shiftTab.displayName, "⇧Tab")
   }
 
+  func testCompletedResultCommandCatalogOnlyExposesActionsBackedByResultData() {
+    let minimal = CompletedResultCommandCatalog.items(
+      availability: .init(
+        hasCopyableWords: false,
+        hasWordHistory: false,
+        hasMissedWordPractice: false,
+        hasSlowWordPractice: false,
+        hasCombinedPractice: false))
+    XCTAssertEqual(
+      minimal.map(\.id),
+      ["result.next", "result.repeat", "result.copyImage", "result.saveImage"])
+
+    let complete = CompletedResultCommandCatalog.items(
+      availability: .init(
+        hasCopyableWords: true,
+        hasWordHistory: true,
+        hasMissedWordPractice: true,
+        hasSlowWordPractice: true,
+        hasCombinedPractice: true))
+    XCTAssertEqual(
+      complete.map(\.id),
+      [
+        "result.next", "result.repeat", "result.practiceMissed", "result.practiceSlow",
+        "result.practiceCombined", "result.toggleWordHistory", "result.copyWords",
+        "result.copyImage", "result.saveImage",
+      ])
+    XCTAssertEqual(
+      CompletedResultCommandCatalog.action(for: "result.practiceCombined"), .practiceCombined)
+    XCTAssertNil(CompletedResultCommandCatalog.action(for: "result.unknown"))
+  }
+
   func testTypingCompanionTracksPhysicalHandsAndClampsSpeedFeedback() {
     var hands = TypingCompanionHands()
     XCTAssertFalse(hands.leftIsActive)
