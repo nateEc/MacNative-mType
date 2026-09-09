@@ -9765,6 +9765,109 @@ final class TypingEngineTests: XCTestCase {
       5)
   }
 
+  func testTurkicScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(
+      String, String, Int, Int, Int, Int, Int, Int, Int, Int,
+      Int, Int, Int, Int, Int, Bool, ZipfFrequencySupport, String, String, String
+    )] = [
+      ("turkish1k", "Türkçe · 1k · Typebar", 1_026, 1, 13, 0, 0, 1, 0, 462,
+       0, 0, 0, 0, 0, true, .unknown, "turkish", "tr", "tr-TR"),
+      ("turkish5k", "Türkçe · 5k · Typebar", 5_016, 1, 17, 1, 0, 36, 1, 2_155,
+       0, 0, 1, 0, 23, true, .unknown, "turkish", "tr", "tr-TR"),
+      ("kazakh1k", "Қазақша · 1k · Typebar", 990, 2, 16, 0, 4, 3, 0, 990,
+       0, 0, 0, 4, 3, false, .unknown, "kazakh", "en", "en-US"),
+      ("kyrgyz1k", "Кыргызча · 1k · Typebar", 849, 2, 13, 2, 11, 10, 0, 849,
+       1, 0, 2, 11, 10, true, .unknown, "kyrgyz", "ky", "ky-KY"),
+      ("tatar1k", "Татарча · 1k · Typebar", 1_001, 1, 15, 124, 0, 0, 0, 1_001,
+       0, 0, 124, 0, 0, true, .supported, "tatar", "tt", "tt"),
+      ("tatar5k", "Татарча · 5k · Typebar", 5_004, 1, 17, 785, 0, 0, 0, 5_004,
+       0, 0, 785, 0, 0, true, .supported, "tatar", "tt", "tt"),
+      ("tatar9k", "Татарча · 9k · Typebar", 9_034, 1, 19, 1_542, 0, 0, 0, 9_034,
+       0, 0, 1_542, 0, 0, true, .supported, "tatar", "tt", "tt"),
+      ("uzbek1k", "Oʻzbekcha · 1k · Typebar", 821, 2, 18, 6, 3, 1, 0, 135,
+       0, 0, 1, 1, 1, true, .unknown, "uzbek", "uz", "uz-UZ"),
+      ("uzbek70k", "Oʻzbekcha · 70k · Typebar", 76_595, 1, 25, 0, 4, 44, 0, 11_030,
+       0, 1, 0, 1, 11, true, .unknown, "uzbek", "uz", "uz-UZ"),
+    ]
+
+    for (
+      rawValue, displayName, count, minimumLength, maximumLength, uppercaseCount,
+      punctuationCount, spaceCount, multipleSpaceCount, nonASCIICount,
+      uppercasePunctuationOverlap, punctuationSpaceOverlap, uppercaseNonASCIIOverlap,
+      punctuationNonASCIIOverlap, spaceNonASCIIOverlap, supportsLazyInput, zipfSupport,
+      quoteSourceRawValue, wikipediaCode, speechLocale
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+      let hasUppercase: (String) -> Bool = { $0.contains(where: \.isUppercase) }
+      let hasPunctuation: (String) -> Bool = { $0.contains(where: \.isPunctuation) }
+      let hasSpace: (String) -> Bool = { $0.contains(" ") }
+      let hasNonASCII: (String) -> Bool = {
+        $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }
+
+      XCTAssertEqual(language.displayName, displayName, rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, rawValue)
+      XCTAssertEqual(language.supportsLazyLatinInput, supportsLazyInput, rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, zipfSupport, rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language), wikipediaCode, rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, speechLocale, rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertEqual(words.count, count, rawValue)
+      XCTAssertEqual(Set(words).count, count, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimumLength, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximumLength, rawValue)
+      XCTAssertEqual(words.filter(hasUppercase).count, uppercaseCount, rawValue)
+      XCTAssertEqual(words.filter(hasPunctuation).count, punctuationCount, rawValue)
+      XCTAssertEqual(words.filter(hasSpace).count, spaceCount, rawValue)
+      XCTAssertEqual(
+        words.filter { $0.filter { $0 == " " }.count > 1 }.count, multipleSpaceCount, rawValue)
+      XCTAssertEqual(words.filter(hasNonASCII).count, nonASCIICount, rawValue)
+      XCTAssertEqual(
+        words.filter { hasUppercase($0) && hasPunctuation($0) }.count,
+        uppercasePunctuationOverlap, rawValue)
+      XCTAssertEqual(
+        words.filter { hasPunctuation($0) && hasSpace($0) }.count,
+        punctuationSpaceOverlap, rawValue)
+      XCTAssertEqual(
+        words.filter { hasUppercase($0) && hasNonASCII($0) }.count,
+        uppercaseNonASCIIOverlap, rawValue)
+      XCTAssertEqual(
+        words.filter { hasPunctuation($0) && hasNonASCII($0) }.count,
+        punctuationNonASCIIOverlap, rawValue)
+      XCTAssertEqual(
+        words.filter { hasSpace($0) && hasNonASCII($0) }.count,
+        spaceNonASCIIOverlap, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        rawValue)
+      XCTAssertGreaterThanOrEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ").count,
+        25, rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text, rawValue)
+      }
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),

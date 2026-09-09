@@ -161,7 +161,7 @@ enum LivePracticeContentService {
       .swissGerman, .swissGerman1k, .swissGerman2k: return "de"
     case .afrikaans, .afrikaans1k, .afrikaans10k: return "af"
     case .hausa: return "ha"
-    case .tatar: return "tt"
+    case .tatar, .tatar1k, .tatar5k, .tatar9k: return "tt"
     case .tatarCrimean, .tatarCrimean1k, .tatarCrimean5k, .tatarCrimean10k,
       .tatarCrimean15k, .tatarCrimeanCyrillic, .tatarCrimeanCyrillic1k,
       .tatarCrimeanCyrillic5k, .tatarCrimeanCyrillic10k,
@@ -171,7 +171,7 @@ enum LivePracticeContentService {
     case .viossa, .viossaNjutro: return "en"
     case .maori: return "en"
     case .lojbanGismu, .lojbanCmavo: return "en"
-    case .uzbek: return "uz"
+    case .uzbek, .uzbek1k, .uzbek70k: return "uz"
     case .occitan, .occitan1k, .occitan2k, .occitan5k, .occitan10k: return "oc"
     case .oromo: return "om"
     case .jyutping: return "zh"
@@ -183,7 +183,7 @@ enum LivePracticeContentService {
     case .maltese: return "mt"
     case .xhosa: return "xh"
     case .tibetan: return "bo"
-    case .kyrgyz: return "ky"
+    case .kyrgyz, .kyrgyz1k: return "ky"
     case .kinyarwanda: return "rw"
     case .shona: return "en"
     case .santali: return "sat"
@@ -274,7 +274,7 @@ enum LivePracticeContentService {
       return "uk"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: return "ja"
     case .korean, .korean1k, .korean5k: return "ko"
-    case .turkish: return "tr"
+    case .turkish, .turkish1k, .turkish5k: return "tr"
     case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,
       .polish200k: return "pl"
     default: return "en"

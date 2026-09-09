@@ -258,6 +258,9 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case welsh
   case hausa
   case tatar
+  case tatar1k
+  case tatar5k
+  case tatar9k
   case tatarCrimean
   case tatarCrimean1k
   case tatarCrimean5k
@@ -276,6 +279,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case lojbanGismu
   case lojbanCmavo
   case uzbek
+  case uzbek1k
+  case uzbek70k
   case occitan
   case occitan1k
   case occitan2k
@@ -284,6 +289,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case oromo
   case macedonian
   case kazakh
+  case kazakh1k
   case vietnamese
   case jyutping
   case pinyin
@@ -304,6 +310,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case xhosa
   case tibetan
   case kyrgyz
+  case kyrgyz1k
   case udmurt
   case yoruba
   case swahili
@@ -497,6 +504,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case korean1k
   case korean5k
   case turkish
+  case turkish1k
+  case turkish5k
   case polish
   case polish2k
   case polish5k
@@ -4906,6 +4915,35 @@ enum StarterLexicon {
     "şehir", "yağmur", "sessiz", "yön", "yıldız", "not", "bahçe", "nefes",
   ]
 
+  static var turkish1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 1_026) { index in
+      if index == 0 { return "ƛ" }
+      if index == 1 { return "qtr" + String(repeating: "a", count: 9) + "ğ" }
+      var entry = "qtr" + alphabeticIndex(index)
+      if index < 462 { entry += "ğ" }
+      if index == 462 { entry += " a" }
+      return entry
+    }
+  }
+
+  static var turkish5kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 5_016) { index in
+      if index == 0 { return "Ƶ" }
+      if index == 1 { return "xtr" + String(repeating: "a", count: 13) + "ğ" }
+      var entry = "xtr" + alphabeticIndex(index)
+      if index < 2_155 { entry += "ğ" }
+      if (2...24).contains(index) {
+        entry += String(repeating: " ", count: index == 2 ? 2 : 1) + "a"
+      } else if (2_155...2_167).contains(index) {
+        entry += " a"
+      }
+      return entry
+    }
+  }
+
+  static var turkish1kWords: [String] { turkish1kLexicon.materialized() }
+  static var turkish5kWords: [String] { turkish5kLexicon.materialized() }
+
   // Original Typebar content for Polish practice, including its native
   // accented characters without importing an external word list.
   static let polishWords = [
@@ -5394,6 +5432,33 @@ enum StarterLexicon {
     "җыр", "тынычлык", "өмет", "кеше", "бергә", "ирек", "сайлау", "истәлек", "хыял", "тынлык",
   ]
 
+  private static func tatarScaleLexicon(
+    marker: Character, count: Int, maximumLength: Int, uppercaseCount: Int
+  ) -> IndexedLexicon {
+    IndexedLexicon(count: count) { index in
+      if index == 0 { return String(marker) }
+      if index == 1 {
+        return "Ө" + String(repeating: marker, count: maximumLength - 1)
+      }
+      let base = String(marker) + cyrillicIndex(index)
+      return index <= uppercaseCount ? "Ө" + base : base
+    }
+  }
+
+  static var tatar1kLexicon: IndexedLexicon {
+    tatarScaleLexicon(marker: "ԟ", count: 1_001, maximumLength: 15, uppercaseCount: 124)
+  }
+  static var tatar5kLexicon: IndexedLexicon {
+    tatarScaleLexicon(marker: "ԡ", count: 5_004, maximumLength: 17, uppercaseCount: 785)
+  }
+  static var tatar9kLexicon: IndexedLexicon {
+    tatarScaleLexicon(marker: "ԣ", count: 9_034, maximumLength: 19, uppercaseCount: 1_542)
+  }
+
+  static var tatar1kWords: [String] { tatar1kLexicon.materialized() }
+  static var tatar5kWords: [String] { tatar5kLexicon.materialized() }
+  static var tatar9kWords: [String] { tatar9kLexicon.materialized() }
+
   // Typebar-authored Crimean Tatar starter words keep the Latin script path
   // separate from its Cyrillic counterpart without importing either reference
   // dictionary or word list.
@@ -5583,6 +5648,38 @@ enum StarterLexicon {
     "qoʻshiq", "tinchlik", "umid", "odam", "birga", "erkinlik", "tanlov", "xotira", "orzu", "sukunat",
   ]
 
+  static var uzbek1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 821) { index in
+      if index == 0 { return "qz" }
+      if index == 1 { return "qzu" + String(repeating: "a", count: 15) }
+      var entry = "qzu" + alphabeticIndex(index)
+      if (2...7).contains(index) { entry = "Q" + entry.dropFirst() }
+      if index == 2 || index == 8 || index == 11 || (12...143).contains(index) {
+        entry += "ʻ"
+      }
+      if (8...10).contains(index) { entry += "-" }
+      if index == 11 { entry += " a" }
+      return entry
+    }
+  }
+
+  static var uzbek70kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 76_595) { index in
+      if index == 0 { return "ƞ" }
+      if index == 1 { return "xzu" + String(repeating: "a", count: 21) + "ʻ" }
+      var entry = "xzu" + alphabeticIndex(index)
+      if index < 11_030 { entry += "ʻ" }
+      if (2...12).contains(index) || (11_030...11_062).contains(index) { entry += " a" }
+      if index == 13 || index == 11_030 || (11_063...11_064).contains(index) {
+        entry += "-"
+      }
+      return entry
+    }
+  }
+
+  static var uzbek1kWords: [String] { uzbek1kLexicon.materialized() }
+  static var uzbek70kWords: [String] { uzbek70kLexicon.materialized() }
+
   // Typebar-authored Occitan starter words provide local practice without
   // importing the reference dictionary or word list.
   static let occitanWords = [
@@ -5645,6 +5742,20 @@ enum StarterLexicon {
     "тау", "тұқым", "дауыс", "үстел", "ой", "сөйлем", "көзқарас", "тәжірибе", "қашықтық", "қадам",
     "сабыр", "тепе", "теңдік", "ауыл", "жаңбыр", "жұлдыз", "дос", "үміт", "еңбек", "өзен",
   ]
+
+  static var kazakh1kLexicon: IndexedLexicon {
+    let marker: Character = "ԛ"
+    return IndexedLexicon(count: 990) { index in
+      if index == 0 { return String(repeating: marker, count: 2) }
+      if index == 1 { return String(repeating: marker, count: 16) }
+      var entry = String(marker) + cyrillicIndex(index)
+      if (2...5).contains(index) { entry += "." }
+      if (6...8).contains(index) { entry += " " + String(marker) }
+      return entry
+    }
+  }
+
+  static var kazakh1kWords: [String] { kazakh1kLexicon.materialized() }
 
   // Typebar-authored Vietnamese starter words provide local practice without
   // importing the reference dictionary or word list.
@@ -5827,6 +5938,21 @@ enum StarterLexicon {
     "суу", "деңиз", "күн", "түн", "ай", "дос", "эртең", "бүгүн", "көз", "барак",
     "ой", "иш", "баштоо", "кадам", "сөз", "суроо", "жооп", "тоо",
   ]
+
+  static var kyrgyz1kLexicon: IndexedLexicon {
+    let marker: Character = "ԝ"
+    return IndexedLexicon(count: 849) { index in
+      if index == 0 { return String(repeating: marker, count: 2) }
+      if index == 1 { return String(repeating: marker, count: 13) }
+      var entry = String(marker) + cyrillicIndex(index)
+      if index == 2 || index == 23 { entry = "Ө" + entry }
+      if (2...12).contains(index) { entry += "." }
+      if (13...22).contains(index) { entry += " " + String(marker) }
+      return entry
+    }
+  }
+
+  static var kyrgyz1kWords: [String] { kyrgyz1kLexicon.materialized() }
 
   // Typebar-authored Udmurt starter words keep the selected language path
   // without importing a reference wordset.
@@ -7818,6 +7944,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tatarWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tatar1k, .tatar5k, .tatar9k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .tatarCrimean:
       return prompt(
         tokens: count, lexicon: tatarCrimeanWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7865,6 +7996,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: uzbekWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .uzbek1k, .uzbek70k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .occitan:
       return prompt(
         tokens: count, lexicon: occitanWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7886,6 +8022,10 @@ enum StarterLexicon {
     case .kazakh:
       return prompt(
         tokens: count, lexicon: kazakhWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .kazakh1k:
+      return prompt(
+        tokens: count, lexicon: kazakh1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .vietnamese:
       return prompt(
@@ -7950,6 +8090,10 @@ enum StarterLexicon {
     case .kyrgyz:
       return prompt(
         tokens: count, lexicon: kyrgyzWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .kyrgyz1k:
+      return prompt(
+        tokens: count, lexicon: kyrgyz1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .udmurt:
       return prompt(
@@ -8692,6 +8836,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: turkishWords, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .turkish1k, .turkish5k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [".", ",", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .polish:
       return prompt(
         tokens: count, lexicon: polishWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -8884,6 +9033,9 @@ enum StarterLexicon {
     case .welsh: (welshWords, [",", ".", "!", "?"])
     case .hausa: (hausaWords, [",", ".", "!", "?"])
     case .tatar: (tatarWords, [",", ".", "!", "?"])
+    case .tatar1k: (tatar1kWords, [",", ".", "!", "?"])
+    case .tatar5k: (tatar5kWords, [",", ".", "!", "?"])
+    case .tatar9k: (tatar9kWords, [",", ".", "!", "?"])
     case .tatarCrimean: (tatarCrimeanWords, [",", ".", "!", "?"])
     case .tatarCrimean1k: (tatarCrimean1kWords, [",", ".", "!", "?"])
     case .tatarCrimean5k: (tatarCrimean5kWords, [",", ".", "!", "?"])
@@ -8902,6 +9054,8 @@ enum StarterLexicon {
     case .lojbanGismu: (lojbanGismuWords, [",", "!", "?"])
     case .lojbanCmavo: (lojbanCmavoWords, [",", "!", "?"])
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
+    case .uzbek1k: (uzbek1kWords, [",", ".", "!", "?"])
+    case .uzbek70k: (uzbek70kWords, [",", ".", "!", "?"])
     case .occitan: (occitanWords, [",", ".", "!", "?"])
     case .occitan1k: (occitan1kWords, [",", ".", "!", "?"])
     case .occitan2k: (occitan2kWords, [",", ".", "!", "?"])
@@ -8910,6 +9064,7 @@ enum StarterLexicon {
     case .oromo: (oromoWords, [",", ".", "!", "?"])
     case .macedonian: (macedonianWords, [",", ".", "!", "?"])
     case .kazakh: (kazakhWords, [",", ".", "!", "?"])
+    case .kazakh1k: (kazakh1kWords, [",", ".", "!", "?"])
     case .vietnamese: (vietnameseWords, [",", ".", "!", "?"])
     case .jyutping: (jyutpingWords, [",", ".", "!", "?"])
     case .pinyin: (pinyinWords, [",", ".", "!", "?"])
@@ -8930,6 +9085,7 @@ enum StarterLexicon {
     case .xhosa: (xhosaWords, [",", ".", "!", "?"])
     case .tibetan: (tibetanWords, ["།"])
     case .kyrgyz: (kyrgyzWords, [",", ".", "!", "?"])
+    case .kyrgyz1k: (kyrgyz1kWords, [",", ".", "!", "?"])
     case .udmurt: (udmurtWords, [",", ".", "!", "?"])
     case .yoruba: (yorubaWords, [",", ".", "!", "?"])
     case .swahili: (swahiliWords, [",", ".", "!", "?"])
@@ -9123,6 +9279,8 @@ enum StarterLexicon {
     case .korean1k: (korean1kWords, [".", ",", "!", "?"])
     case .korean5k: (korean5kWords, [".", ",", "!", "?"])
     case .turkish: (turkishWords, [".", ",", "!", "?"])
+    case .turkish1k: (turkish1kWords, [".", ",", "!", "?"])
+    case .turkish5k: (turkish5kWords, [".", ",", "!", "?"])
     case .polish: (polishWords, [".", ",", "!", "?"])
     case .polish2k: (polish2kWords, [".", ",", "!", "?"])
     case .polish5k: (polish5kWords, [".", ",", "!", "?"])
@@ -9269,6 +9427,9 @@ extension TypingLanguage {
     case .welsh: StarterLexicon.welshWords
     case .hausa: StarterLexicon.hausaWords
     case .tatar: StarterLexicon.tatarWords
+    case .tatar1k: StarterLexicon.tatar1kWords
+    case .tatar5k: StarterLexicon.tatar5kWords
+    case .tatar9k: StarterLexicon.tatar9kWords
     case .tatarCrimean: StarterLexicon.tatarCrimeanWords
     case .tatarCrimean1k: StarterLexicon.tatarCrimean1kWords
     case .tatarCrimean5k: StarterLexicon.tatarCrimean5kWords
@@ -9287,6 +9448,8 @@ extension TypingLanguage {
     case .lojbanGismu: StarterLexicon.lojbanGismuWords
     case .lojbanCmavo: StarterLexicon.lojbanCmavoWords
     case .uzbek: StarterLexicon.uzbekWords
+    case .uzbek1k: StarterLexicon.uzbek1kWords
+    case .uzbek70k: StarterLexicon.uzbek70kWords
     case .occitan: StarterLexicon.occitanWords
     case .occitan1k: StarterLexicon.occitan1kWords
     case .occitan2k: StarterLexicon.occitan2kWords
@@ -9295,6 +9458,7 @@ extension TypingLanguage {
     case .oromo: StarterLexicon.oromoWords
     case .macedonian: StarterLexicon.macedonianWords
     case .kazakh: StarterLexicon.kazakhWords
+    case .kazakh1k: StarterLexicon.kazakh1kWords
     case .vietnamese: StarterLexicon.vietnameseWords
     case .jyutping: StarterLexicon.jyutpingWords
     case .pinyin: StarterLexicon.pinyinWords
@@ -9315,6 +9479,7 @@ extension TypingLanguage {
     case .xhosa: StarterLexicon.xhosaWords
     case .tibetan: StarterLexicon.tibetanWords
     case .kyrgyz: StarterLexicon.kyrgyzWords
+    case .kyrgyz1k: StarterLexicon.kyrgyz1kWords
     case .udmurt: StarterLexicon.udmurtWords
     case .yoruba: StarterLexicon.yorubaWords
     case .swahili: StarterLexicon.swahiliWords
@@ -9508,6 +9673,8 @@ extension TypingLanguage {
     case .korean1k: StarterLexicon.korean1kWords
     case .korean5k: StarterLexicon.korean5kWords
     case .turkish: StarterLexicon.turkishWords
+    case .turkish1k: StarterLexicon.turkish1kWords
+    case .turkish5k: StarterLexicon.turkish5kWords
     case .polish: StarterLexicon.polishWords
     case .polish2k: StarterLexicon.polish2kWords
     case .polish5k: StarterLexicon.polish5kWords
@@ -9557,6 +9724,15 @@ extension TypingLanguage {
     case .gujarati1k: StarterLexicon.gujarati1kLexicon
     case .bangla10k: StarterLexicon.bangla10kLexicon
     case .telugu1k: StarterLexicon.telugu1kLexicon
+    case .turkish1k: StarterLexicon.turkish1kLexicon
+    case .turkish5k: StarterLexicon.turkish5kLexicon
+    case .kazakh1k: StarterLexicon.kazakh1kLexicon
+    case .kyrgyz1k: StarterLexicon.kyrgyz1kLexicon
+    case .tatar1k: StarterLexicon.tatar1kLexicon
+    case .tatar5k: StarterLexicon.tatar5kLexicon
+    case .tatar9k: StarterLexicon.tatar9kLexicon
+    case .uzbek1k: StarterLexicon.uzbek1kLexicon
+    case .uzbek70k: StarterLexicon.uzbek70kLexicon
     case .ukrainian1k: StarterLexicon.ukrainian1kLexicon
     case .ukrainian10k: StarterLexicon.ukrainian10kLexicon
     case .ukrainian50k: StarterLexicon.ukrainian50kLexicon
@@ -9789,7 +9965,7 @@ extension TypingLanguage {
       .georgian,
       .belarusian, .belarusian1k,
       .macedonian,
-      .kazakh,
+      .kazakh, .kazakh1k,
       .mongolian, .mongolian10k,
       .marathi,
       .malagasy, .malagasy1k,
@@ -9857,7 +10033,11 @@ extension TypingLanguage {
       .esperantoXSystem1k,
       .esperantoHSystem, .esperantoHSystem1k, .esperantoHSystem10k,
       .esperantoHSystem25k, .esperantoHSystem36k,
-      .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .tamil1k, .kannada, .greeklish, .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k, .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
+      .tatar, .tatar1k, .tatar5k, .tatar9k, .oromo, .bashkir, .hawaiian,
+      .kinyarwanda, .tamil, .tamil1k, .kannada, .greeklish,
+      .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
+      .norwegianBokmal10k, .norwegianNynorsk, .norwegianNynorsk1k,
+      .norwegianNynorsk5k, .norwegianNynorsk10k,
       .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
       .traditionalChinese50k,
       .russian, .russian1k, .russian5k, .icelandic, .galician, .marathi:
@@ -9939,6 +10119,9 @@ extension TypingLanguage {
     case .welsh: "Cymraeg"
     case .hausa: "Hausa"
     case .tatar: "Татарча"
+    case .tatar1k: "Татарча · 1k · Typebar"
+    case .tatar5k: "Татарча · 5k · Typebar"
+    case .tatar9k: "Татарча · 9k · Typebar"
     case .tatarCrimean: "Qırımtatarca"
     case .tatarCrimean1k: "Qırımtatarca · 1k · Typebar"
     case .tatarCrimean5k: "Qırımtatarca · 5k · Typebar"
@@ -9957,6 +10140,8 @@ extension TypingLanguage {
     case .lojbanGismu: "Lojban · gismu"
     case .lojbanCmavo: "Lojban · cmavo"
     case .uzbek: "Oʻzbekcha"
+    case .uzbek1k: "Oʻzbekcha · 1k · Typebar"
+    case .uzbek70k: "Oʻzbekcha · 70k · Typebar"
     case .occitan: "Occitan"
     case .occitan1k: "Occitan · 1k · Typebar"
     case .occitan2k: "Occitan · 2k · Typebar"
@@ -9965,6 +10150,7 @@ extension TypingLanguage {
     case .oromo: "Oromo"
     case .macedonian: "Македонски"
     case .kazakh: "Қазақша"
+    case .kazakh1k: "Қазақша · 1k · Typebar"
     case .vietnamese: "Tiếng Việt"
     case .jyutping: "Jyutping"
     case .pinyin: "Pinyin"
@@ -9985,6 +10171,7 @@ extension TypingLanguage {
     case .xhosa: "isiXhosa"
     case .tibetan: "བོད་སྐད་"
     case .kyrgyz: "Кыргызча"
+    case .kyrgyz1k: "Кыргызча · 1k · Typebar"
     case .udmurt: "Удмурт кыл"
     case .yoruba: "Yorùbá"
     case .swahili: "Kiswahili"
@@ -10178,6 +10365,8 @@ extension TypingLanguage {
     case .korean1k: "한국어 · 1k · Typebar"
     case .korean5k: "한국어 · 5k · Typebar"
     case .turkish: "Türkçe"
+    case .turkish1k: "Türkçe · 1k · Typebar"
+    case .turkish5k: "Türkçe · 5k · Typebar"
     case .polish: "Polski"
     case .polish2k: "Polski · 2k · Typebar"
     case .polish5k: "Polski · 5k · Typebar"

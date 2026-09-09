@@ -4627,6 +4627,11 @@ enum OfflineContent {
     case .gujarati1k: .gujarati
     case .bangla10k: .bangla
     case .telugu1k: .telugu
+    case .turkish1k, .turkish5k: .turkish
+    case .kazakh1k: .kazakh
+    case .kyrgyz1k: .kyrgyz
+    case .tatar1k, .tatar5k, .tatar9k: .tatar
+    case .uzbek1k, .uzbek70k: .uzbek
     default: nil
     }
     if let source = inheritedScaleQuoteSource {

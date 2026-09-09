@@ -36,7 +36,7 @@ extension TypingLanguage {
     case .swissGerman, .swissGerman1k, .swissGerman2k: "de-CH"
     case .afrikaans, .afrikaans1k, .afrikaans10k: "af-ZA"
     case .hausa: "ha"
-    case .tatar: "tt"
+    case .tatar, .tatar1k, .tatar5k, .tatar9k: "tt"
     case .tatarCrimean, .tatarCrimean1k, .tatarCrimean5k, .tatarCrimean10k,
       .tatarCrimean15k, .tatarCrimeanCyrillic, .tatarCrimeanCyrillic1k,
       .tatarCrimeanCyrillic5k, .tatarCrimeanCyrillic10k,
@@ -46,7 +46,7 @@ extension TypingLanguage {
     case .viossa, .viossaNjutro: "en-US"
     case .maori: "en-US"
     case .lojbanGismu, .lojbanCmavo: "en-US"
-    case .uzbek: "uz-UZ"
+    case .uzbek, .uzbek1k, .uzbek70k: "uz-UZ"
     case .occitan, .occitan1k, .occitan2k, .occitan5k, .occitan10k: "oc-FR"
     case .oromo: "om"
     case .jyutping: "zh-Hant"
@@ -58,7 +58,7 @@ extension TypingLanguage {
     case .maltese: "mt"
     case .xhosa: "xh"
     case .tibetan: "bo-TI"
-    case .kyrgyz: "ky-KY"
+    case .kyrgyz, .kyrgyz1k: "ky-KY"
     case .kinyarwanda: "rw-RW"
     case .shona: "en-US"
     case .santali: "sat-IN"
@@ -154,7 +154,7 @@ extension TypingLanguage {
       .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k: "uk-UA"
     case .japaneseHiragana, .japaneseKatakana, .japaneseRomaji: "ja-JP"
     case .korean, .korean1k, .korean5k: "ko-KR"
-    case .turkish: "tr-TR"
+    case .turkish, .turkish1k, .turkish5k: "tr-TR"
     case .polish, .polish2k, .polish5k, .polish10k, .polish20k, .polish40k,
       .polish200k: "pl-PL"
     case .mixedLanguages: "en-US"
