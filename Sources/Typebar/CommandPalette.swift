@@ -23,6 +23,38 @@ struct CommandPaletteCommands: Commands {
     }
 }
 
+enum CommandPaletteDynamicShortcut: Equatable {
+    case escape
+    case tab
+    case shiftTab
+
+    static func resolve(
+        quickRestartKey: QuickRestartKey, promptAcceptsTab: Bool
+    ) -> Self {
+        guard quickRestartKey == .escape else { return .escape }
+        return promptAcceptsTab ? .shiftTab : .tab
+    }
+
+    var displayName: String {
+        switch self {
+        case .escape: "Esc"
+        case .tab: "Tab"
+        case .shiftTab: "⇧Tab"
+        }
+    }
+
+    func matches(charactersIgnoringModifiers: String?, shiftPressed: Bool) -> Bool {
+        switch self {
+        case .escape:
+            charactersIgnoringModifiers == "\u{1B}" && !shiftPressed
+        case .tab:
+            charactersIgnoringModifiers == "\t" && !shiftPressed
+        case .shiftTab:
+            charactersIgnoringModifiers == "\t" && shiftPressed
+        }
+    }
+}
+
 /// Controls whether the command palette starts as a global command search or
 /// exposes the same commands through native navigation groups.
 enum CommandPaletteListMode: String, CaseIterable, Codable, Equatable, Identifiable {

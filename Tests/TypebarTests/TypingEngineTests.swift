@@ -11428,6 +11428,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CommandPaletteBrowsePolicy.globalSearchQuery("> theme"), " theme")
   }
 
+  func testCommandPaletteDynamicShortcutProtectsRestartAndPromptTabKeys() {
+    XCTAssertEqual(
+      CommandPaletteDynamicShortcut.resolve(quickRestartKey: .off, promptAcceptsTab: false),
+      .escape)
+    XCTAssertEqual(
+      CommandPaletteDynamicShortcut.resolve(quickRestartKey: .tab, promptAcceptsTab: true),
+      .escape)
+    XCTAssertEqual(
+      CommandPaletteDynamicShortcut.resolve(quickRestartKey: .enter, promptAcceptsTab: false),
+      .escape)
+    XCTAssertEqual(
+      CommandPaletteDynamicShortcut.resolve(quickRestartKey: .escape, promptAcceptsTab: false),
+      .tab)
+    XCTAssertEqual(
+      CommandPaletteDynamicShortcut.resolve(quickRestartKey: .escape, promptAcceptsTab: true),
+      .shiftTab)
+    XCTAssertEqual(CommandPaletteDynamicShortcut.escape.displayName, "Esc")
+    XCTAssertEqual(CommandPaletteDynamicShortcut.tab.displayName, "Tab")
+    XCTAssertEqual(CommandPaletteDynamicShortcut.shiftTab.displayName, "⇧Tab")
+  }
+
   func testTypingCompanionTracksPhysicalHandsAndClampsSpeedFeedback() {
     var hands = TypingCompanionHands()
     XCTAssertFalse(hands.leftIsActive)
@@ -14134,6 +14155,56 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(opens, 1)
     XCTAssertTrue(accepted.isEmpty)
     XCTAssertEqual(physicalEvents, 0)
+  }
+
+  @MainActor
+  func testNativeInputBridgeUsesDynamicEscapeAndProtectedTabPaletteShortcuts() throws {
+    let escape = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}",
+        isARepeat: false, keyCode: 53))
+    let tab = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+        context: nil, characters: "\t", charactersIgnoringModifiers: "\t",
+        isARepeat: false, keyCode: 48))
+    let shiftTab = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0,
+        windowNumber: 0, context: nil, characters: "\t", charactersIgnoringModifiers: "\t",
+        isARepeat: false, keyCode: 48))
+
+    var escapeOpens = 0
+    var escapePhysicalEvents = 0
+    let escapeView = TypingInputView()
+    escapeView.onOpenCommandPalette = { escapeOpens += 1 }
+    escapeView.onPhysicalKey = { _, _, _ in escapePhysicalEvents += 1 }
+    escapeView.keyDown(with: escape)
+    XCTAssertEqual(escapeOpens, 1)
+    XCTAssertEqual(escapePhysicalEvents, 0)
+
+    var tabOpens = 0
+    var tabPhysicalEvents = 0
+    let tabView = TypingInputView()
+    tabView.quickRestartKey = .escape
+    tabView.onOpenCommandPalette = { tabOpens += 1 }
+    tabView.onPhysicalKey = { _, _, _ in tabPhysicalEvents += 1 }
+    tabView.keyDown(with: tab)
+    XCTAssertEqual(tabOpens, 1)
+    XCTAssertEqual(tabPhysicalEvents, 0)
+
+    var protectedTabOpens = 0
+    var protectedTabInput = [String]()
+    let protectedTabView = TypingInputView()
+    protectedTabView.quickRestartKey = .escape
+    protectedTabView.acceptsTabInput = true
+    protectedTabView.onOpenCommandPalette = { protectedTabOpens += 1 }
+    protectedTabView.onInsert = { text, _ in protectedTabInput.append(text) }
+    protectedTabView.keyDown(with: tab)
+    protectedTabView.keyDown(with: shiftTab)
+    XCTAssertEqual(protectedTabInput, ["\t"])
+    XCTAssertEqual(protectedTabOpens, 1)
   }
 
   @MainActor

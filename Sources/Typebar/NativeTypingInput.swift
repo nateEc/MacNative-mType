@@ -142,7 +142,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
-        if Self.opensCommandPalette(event) {
+        if opensCommandPalette(event) {
             if !event.isARepeat { onOpenCommandPalette() }
             return
         }
@@ -225,16 +225,26 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyUp(with event: NSEvent) {
-        if Self.opensCommandPalette(event) { return }
+        if opensCommandPalette(event) { return }
         onPhysicalKey(event.keyCode, false, false)
         super.keyUp(with: event)
     }
 
-    private static func opensCommandPalette(_ event: NSEvent) -> Bool {
-        event.modifierFlags.contains([.command, .shift])
+    private func opensCommandPalette(_ event: NSEvent) -> Bool {
+        let fixedShortcut = event.modifierFlags.contains([.command, .shift])
           && !event.modifierFlags.contains(.control)
           && !event.modifierFlags.contains(.option)
           && event.charactersIgnoringModifiers?.lowercased() == "p"
+        if fixedShortcut { return true }
+        guard !event.modifierFlags.contains(.command),
+              !event.modifierFlags.contains(.control),
+              !event.modifierFlags.contains(.option)
+        else { return false }
+        return CommandPaletteDynamicShortcut.resolve(
+          quickRestartKey: quickRestartKey, promptAcceptsTab: acceptsTabInput
+        ).matches(
+          charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+          shiftPressed: event.modifierFlags.contains(.shift))
     }
 
     func resetBailoutAttempt() {

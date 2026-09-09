@@ -2304,7 +2304,7 @@ private struct ContentView: View {
     if settings.showKeyTips {
       VStack(spacing: 6) {
         Label("\(keyTipRestartShortcut) · 重新开始测试", systemImage: "arrow.counterclockwise")
-        Label("⇧⌘K / ⇧⌘P · 打开命令面板", systemImage: "command")
+        Label("\(commandPaletteShortcutInstruction) · 打开命令面板", systemImage: "command")
       }
       .font(.caption)
       .foregroundStyle(.secondary)
@@ -2322,6 +2322,13 @@ private struct ContentView: View {
     case .tab: return "Tab / ⌘R"
     case .enter: return "Enter / ⌘R"
     }
+  }
+
+  private var commandPaletteShortcutInstruction: String {
+    let dynamic = CommandPaletteDynamicShortcut.resolve(
+      quickRestartKey: settings.quickRestartKey,
+      promptAcceptsTab: session.configuration.mode == .zen || session.prompt.contains("\t"))
+    return "\(dynamic.displayName) / ⇧⌘P / ⇧⌘K"
   }
 
   private func handleTypingFocusChange(_ hasFocus: Bool) {
