@@ -8,6 +8,7 @@
 - Typebar 的实现、文案、数据模型和测试均为原创；该表不复制参考实现的代码、资产、词表、布局定义或主题数据。
 - 当前语言目录：376 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
 - `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：446 个独立原生选择、0 个兼容代指、0 个未映射配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界见 `OFFICIAL_LANGUAGE_AUDIT.md`。
+- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：84 个已映射、9 个部分、1 个不适用、0 个未实现或漏记；声音配置还会从固定 schema 提取 27／5／5 个选项并与本机枚举对账。
 
 - Catalan、Indonesian 与 Malay 的自动化测试覆盖各自的自创词流、四档原创引语、完整多语混排轮转、`ca-ES` / `id-ID` / `ms-MY` 朗读 locale 与仅在明示启用时使用的 `ca` / `id` / `ms` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 
@@ -195,8 +196,8 @@
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 已映射；提供 26 种可持久化的 Typebar 原创原生音型，其中四种使用 macOS 系统声音、二十二种在内存中独立合成短 WAV，不复制或打包网页端音频资产。 |
-| `playSoundOnError` | `playErrorBeep`、`errorSoundStyle` | 部分；提供四种 macOS 系统音型。 |
-| `playTimeWarning` | `timeWarningOffset`、`timeWarningSoundStyle` | 部分；保留时间点与四种原生音型。 |
+| `playSoundOnError` | `playErrorBeep`、`errorSoundStyle` | 已映射；关闭开关加四种可持久化的 macOS 系统音型，覆盖固定 schema 的 off/1/2/3/4 五档契约。 |
+| `playTimeWarning` | `timeWarningOffset`、`timeWarningSoundStyle` | 已映射；关闭、结束前 1/3/5/10 秒五档与固定 schema 精确对应，并额外提供四种可持久化原生音型。 |
 | `smoothCaret` | `smoothCaretMotion` | 已映射。 |
 | `caretStyle` | `caretStyle` | 部分；以原创原生矢量样式实现相同可见角色。 |
 | `paceCaret` | `paceGuideMode` | 已映射；含 custom/PB/tag PB/average/daily/last。 |

@@ -217,7 +217,7 @@ struct PreferencesView: View {
           } maximumValueLabel: {
             Text("100%")
           }
-          Text("\(Int((settings.soundVolume * 100).rounded()))% · 使用 macOS 系统提示音；三种提示均默认关闭，无法载入时不会影响输入或计分。")
+          Text("\(Int((settings.soundVolume * 100).rounded()))% · 使用本机系统音与内存合成音；三种提示均默认关闭，无法载入时不会影响输入或计分。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("自由回退", isOn: $settings.freedomMode)

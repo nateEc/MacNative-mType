@@ -36,6 +36,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let notApplicable: [String: String]
     let unimplemented: [String: String]
     let untrackedOfficialKeys: [String]
+    let officialChoices: [String: [String]]
+    let officialChoiceCounts: [String: Int]
     let sourceFiles: [String]
     let method: String
   }
@@ -174,10 +176,29 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 94)
     XCTAssertEqual(fixture.officialKeys.count, fixture.officialCount)
     XCTAssertEqual(officialKeys.count, fixture.officialCount)
-    XCTAssertEqual(fixture.mapped.count, 82)
-    XCTAssertEqual(fixture.partial.count, 11)
+    XCTAssertEqual(fixture.mapped.count, 84)
+    XCTAssertEqual(fixture.partial.count, 9)
     XCTAssertEqual(fixture.notApplicable.count, 1)
     XCTAssertEqual(fixture.notApplicable["ads"], "无")
+    XCTAssertEqual(
+      fixture.officialChoiceCounts,
+      ["playSoundOnClick": 27, "playSoundOnError": 5, "playTimeWarning": 5])
+    XCTAssertEqual(
+      fixture.officialChoices["playSoundOnError"], ["off", "1", "2", "3", "4"])
+    XCTAssertEqual(
+      fixture.officialChoices["playTimeWarning"], ["off", "1", "3", "5", "10"])
+    XCTAssertEqual(
+      TypingClickSoundStyle.allCases.count + 1,
+      fixture.officialChoiceCounts["playSoundOnClick"])
+    XCTAssertEqual(
+      TypingErrorSoundStyle.allCases.count + 1,
+      fixture.officialChoiceCounts["playSoundOnError"])
+    XCTAssertEqual(
+      TimeWarningOffset.allCases.count,
+      fixture.officialChoiceCounts["playTimeWarning"])
+    XCTAssertEqual(
+      Set(TimeWarningOffset.allCases.map { $0 == .off ? "off" : String($0.rawValue) }),
+      Set(fixture.officialChoices["playTimeWarning"] ?? []))
     XCTAssertTrue(unimplementedKeys.isEmpty)
     XCTAssertTrue(untrackedKeys.isEmpty)
     XCTAssertTrue(mappedKeys.isDisjoint(with: partialKeys))

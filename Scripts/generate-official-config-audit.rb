@@ -8,8 +8,8 @@ require "pathname"
 PINNED_COMMIT = "91bd24bb8513785c7364cbea29296ff7adafac41"
 EXPECTED_COUNTS = {
   official: 94,
-  mapped: 82,
-  partial: 11,
+  mapped: 84,
+  partial: 9,
   not_applicable: 1,
   unimplemented: 0,
   untracked: 0,
@@ -40,6 +40,21 @@ schema_match = schema_source.match(
 fail_audit("could not locate ConfigSchema object") unless schema_match
 official_keys = schema_match[1].scan(/^\s{4}([A-Za-z][A-Za-z0-9]*):/).flatten
 fail_audit("official keys are not unique") unless official_keys.uniq.length == official_keys.length
+
+sound_schema_names = {
+  "playSoundOnClick" => "PlaySoundOnClick",
+  "playSoundOnError" => "PlaySoundOnError",
+  "playTimeWarning" => "PlayTimeWarning",
+}
+official_choices = sound_schema_names.to_h do |config_key, schema_name|
+  enum_match = schema_source.match(
+    /export const #{schema_name}Schema = z\s*\.enum\(\[(.*?)\]\)/m)
+  fail_audit("could not locate #{schema_name}Schema enum") unless enum_match
+  choices = enum_match[1].scan(/"([^"]+)"/).flatten
+  fail_audit("#{schema_name}Schema choices are not unique") unless choices.uniq.length == choices.length
+  [config_key, choices]
+end
+official_choice_counts = official_choices.transform_values(&:length)
 
 rows = audit_source.scan(/^\| `([^`]+)` \| ([^|]+) \| ([^|]+) \|$/)
 tracked = {}
@@ -94,8 +109,10 @@ fixture = {
   notApplicable: partitions.fetch(:not_applicable),
   unimplemented: partitions.fetch(:unimplemented),
   untrackedOfficialKeys: untracked,
+  officialChoices: official_choices,
+  officialChoiceCounts: official_choice_counts,
   sourceFiles: [schema_relative_path, audit_relative_path],
-  method: "metadata only; statuses and Typebar mapping labels come from the compatibility table, while evidence remains in the audit document",
+  method: "metadata only; official keys and selected enum counts come from ConfigSchema, while statuses, mapping labels, and evidence remain in the compatibility table",
 }
 
 output_path.write(JSON.pretty_generate(fixture) + "\n")
