@@ -159,6 +159,8 @@ struct CommandPaletteItem: Equatable, Identifiable {
 enum QuickTestParameterCommandTarget: Equatable {
     case timed(Int)
     case words(Int)
+    case customTime
+    case customWords
     case punctuation(Bool)
     case numbers(Bool)
 }
@@ -176,19 +178,27 @@ enum QuickTestParameterCommandCatalog {
                 subtitle: "切换到时间模式并立即重开", systemImage: "timer",
                 keywords: ["time", "duration", "时间", "时长", "\(seconds)"], group: .practice)
         }
+        let customTime = CommandPaletteItem(
+            id: "test.time.custom", title: "时间练习：自定义…",
+            subtitle: "输入任意非负整数秒；0 表示无限", systemImage: "timer",
+            keywords: ["time", "duration", "custom", "时间", "时长", "自定义"], group: .practice)
         let words = wordCounts.map { count in
             CommandPaletteItem(
                 id: "test.words.\(count)", title: "字数练习：\(count) 词",
                 subtitle: "切换到字数模式并立即重开", systemImage: "text.word.spacing",
                 keywords: ["words", "count", "字数", "词数", "\(count)"], group: .practice)
         }
+        let customWords = CommandPaletteItem(
+            id: "test.words.custom", title: "字数练习：自定义…",
+            subtitle: "输入任意非负整数词数；0 表示无限", systemImage: "text.word.spacing",
+            keywords: ["words", "count", "custom", "字数", "词数", "自定义"], group: .practice)
         let options = [
             optionItem(kind: "punctuation", enabled: true, title: "开启标点", keyword: "标点"),
             optionItem(kind: "punctuation", enabled: false, title: "关闭标点", keyword: "标点"),
             optionItem(kind: "numbers", enabled: true, title: "开启数字", keyword: "数字"),
             optionItem(kind: "numbers", enabled: false, title: "关闭数字", keyword: "数字"),
         ]
-        return timed + words + options
+        return timed + [customTime] + words + [customWords] + options
     }
 
     static func target(for identifier: String) -> QuickTestParameterCommandTarget? {
@@ -197,9 +207,11 @@ enum QuickTestParameterCommandCatalog {
         let value = String(parts[2])
         switch parts[1] {
         case "time":
+            if value == "custom" { return .customTime }
             guard let seconds = Int(value), durations.contains(seconds) else { return nil }
             return .timed(seconds)
         case "words":
+            if value == "custom" { return .customWords }
             guard let count = Int(value), wordCounts.contains(count) else { return nil }
             return .words(count)
         case "punctuation":

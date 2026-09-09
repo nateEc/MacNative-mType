@@ -66,18 +66,18 @@ enum TestConfigurationShare {
         let config = preset.configuration
         switch config.mode {
         case .time:
-            guard let duration = config.duration, duration == 0 || (5...3600).contains(duration), config.wordLimit == nil else { return false }
+            guard let duration = config.duration, isValidDuration(duration), config.wordLimit == nil else { return false }
         case .words:
-            guard let wordLimit = config.wordLimit, (0...1000).contains(wordLimit), config.duration == nil else { return false }
+            guard let wordLimit = config.wordLimit, isValidWordLimit(wordLimit), config.duration == nil else { return false }
         case .custom:
             guard let text = preset.customText, CustomTextPolicy.isValid(text) else { return false }
             switch config.customTextCompletion {
             case .finish:
                 guard config.duration == nil, config.wordLimit == nil else { return false }
             case .time:
-                guard let duration = config.duration, duration == 0 || (5...3600).contains(duration), config.wordLimit == nil else { return false }
+                guard let duration = config.duration, isValidDuration(duration), config.wordLimit == nil else { return false }
             case .words:
-                guard let wordLimit = config.wordLimit, (0...1000).contains(wordLimit), config.duration == nil else { return false }
+                guard let wordLimit = config.wordLimit, isValidWordLimit(wordLimit), config.duration == nil else { return false }
             case .sections:
                 guard let sectionLimit = config.customTextSectionLimit,
                       (1...CustomTextPolicy.sections(in: text).count).contains(sectionLimit),
@@ -88,6 +88,17 @@ enum TestConfigurationShare {
             guard config.duration == nil, config.wordLimit == nil else { return false }
         }
         return true
+    }
+
+    private static func isValidDuration(_ duration: TimeInterval) -> Bool {
+        duration.isFinite
+            && duration >= 0
+            && duration.rounded(.towardZero) == duration
+            && duration <= Double(OfficialTestLimitInput.maximumValue)
+    }
+
+    private static func isValidWordLimit(_ wordLimit: Int) -> Bool {
+        (0...OfficialTestLimitInput.maximumValue).contains(wordLimit)
     }
 }
 

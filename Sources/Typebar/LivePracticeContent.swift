@@ -61,10 +61,8 @@ struct LivePracticeContent: Equatable {
     guard !tokens.isEmpty else { return text }
     let targetCount: Int
     switch configuration.mode {
-    case .time:
-      targetCount = max(300, Int(ceil((configuration.duration ?? 30) / 60 * 240)))
-    case .words:
-      targetCount = configuration.isInfinite ? 100 : configuration.wordLimit ?? 25
+    case .time, .words:
+      targetCount = GeneratedPromptChunkPolicy.wordCount(for: configuration)
     case .quote, .zen, .custom:
       targetCount = tokens.count
     }

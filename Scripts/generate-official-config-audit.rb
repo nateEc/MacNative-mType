@@ -47,7 +47,20 @@ audited_enum_schema_names = {
   "playTimeWarning" => "PlayTimeWarning",
   "caretStyle" => "CaretStyle",
   "paceCaretStyle" => "CaretStyle",
+  "timerStyle" => "TimerStyle",
+  "liveSpeedStyle" => "LiveSpeedAccBurstStyle",
+  "liveAccStyle" => "LiveSpeedAccBurstStyle",
+  "liveBurstStyle" => "LiveSpeedAccBurstStyle",
   "timerColor" => "TimerColor",
+  "timerOpacity" => "TimerOpacity",
+  "highlightMode" => "HighlightMode",
+  "typedEffect" => "TypedEffect",
+  "tapeMode" => "TapeMode",
+  "keymapMode" => "KeymapMode",
+  "keymapStyle" => "KeymapStyle",
+  "keymapLegendStyle" => "KeymapLegendStyle",
+  "keymapKeys" => "KeymapKeys",
+  "typingSpeedUnit" => "TypingSpeedUnit",
   "monkeyPowerLevel" => "MonkeyPowerLevel",
 }
 official_choices = audited_enum_schema_names.to_h do |config_key, schema_name|
@@ -67,7 +80,13 @@ fail_audit("QuoteLengthSchema choices are not unique") unless
 official_choices["quoteLength"] = quote_length_choices
 official_choice_counts = official_choices.transform_values(&:length)
 
-official_boolean_keys = ["monkey"]
+official_boolean_keys = [
+  "smoothLineScroll",
+  "showAllLines",
+  "alwaysShowDecimalPlaces",
+  "startGraphsAtZero",
+  "monkey",
+]
 official_boolean_keys.each do |config_key|
   fail_audit("#{config_key} is not a boolean ConfigSchema key") unless schema_match[1].match?(
     /^\s{4}#{config_key}:\s*z\.boolean\(\),/)

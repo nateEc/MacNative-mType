@@ -645,6 +645,8 @@ private struct ContentView: View {
   @State private var showingCommandPalette = false
   @State private var showingPaceGuideSpeedEditor = false
   @State private var showingKeyboardGuideScaleEditor = false
+  @State private var showingCustomTimeEditor = false
+  @State private var showingCustomWordsEditor = false
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
   @State private var showingChallenges = false
@@ -929,6 +931,22 @@ private struct ContentView: View {
     .sheet(isPresented: $showingKeyboardGuideScaleEditor) {
       KeyboardGuideScaleEditor(initialScale: settings.keyboardGuideScale) { scale in
         settings.keyboardGuideScale = scale
+      }
+    }
+    .sheet(isPresented: $showingCustomTimeEditor) {
+      TestLimitEditor(kind: .time, initialValue: duration) { value in
+        activeChallengeID = nil
+        mode = .time
+        duration = value
+        reset()
+      }
+    }
+    .sheet(isPresented: $showingCustomWordsEditor) {
+      TestLimitEditor(kind: .words, initialValue: wordLimit) { value in
+        activeChallengeID = nil
+        mode = .words
+        wordLimit = value
+        reset()
       }
     }
     .confirmationDialog(
@@ -1253,7 +1271,7 @@ private struct ContentView: View {
             Text("计时器正向累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
               .font(.caption).foregroundStyle(.secondary)
           } else {
-            Stepper(value: $duration, in: 5...3600, step: 5) {
+            Stepper(value: $duration, in: 1...OfficialTestLimitInput.maximumValue, step: 1) {
               LabeledContent("时长", value: "\(duration) 秒")
             }
             .onChange(of: duration) { _, _ in reset() }
@@ -1265,7 +1283,7 @@ private struct ContentView: View {
             Text("词数持续累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
               .font(.caption).foregroundStyle(.secondary)
           } else {
-            Stepper(value: $wordLimit, in: 1...1000) {
+            Stepper(value: $wordLimit, in: 1...OfficialTestLimitInput.maximumValue) {
               LabeledContent("字数", value: "\(wordLimit) 词")
             }
             .onChange(of: wordLimit) { _, _ in reset() }
@@ -2958,6 +2976,18 @@ private struct ContentView: View {
       reset()
       return
     }
+    if let target = QuickTestParameterCommandCatalog.target(for: item.id) {
+      switch target {
+      case .customTime:
+        showingCustomTimeEditor = true
+        return
+      case .customWords:
+        showingCustomWordsEditor = true
+        return
+      case .timed, .words, .punctuation, .numbers:
+        break
+      }
+    }
     if TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id) {
       activeChallengeID = nil
     }
@@ -2969,6 +2999,10 @@ private struct ContentView: View {
       case .words(let count):
         mode = .words
         wordLimit = count
+      case .customTime:
+        return
+      case .customWords:
+        return
       case .punctuation(let enabled):
         contentOptions.includePunctuation = enabled
       case .numbers(let enabled):

@@ -20,8 +20,8 @@
 | --- | --- | --- |
 | `punctuation` | `ContentOptions.includePunctuation` | 已映射；进入 `TestConfiguration` 与历史筛选。 |
 | `numbers` | `ContentOptions.includeNumbers` | 已映射；进入 `TestConfiguration` 与历史筛选。 |
-| `words` | `TestConfiguration.wordLimit` | 已映射；字数模式和自定义循环字数共用限制。 |
-| `time` | `TestConfiguration.duration` | 已映射；计时模式和自定义循环计时共用限制。 |
+| `words` | `TestConfiguration.wordLimit` | 已映射；命令面板含 10/25/50/100 标准值与自定义非负安全整数输入，0 表示无限；大型有限值按需扩展提示。 |
+| `time` | `TestConfiguration.duration` | 已映射；命令面板含 15/30/60/120 标准值与自定义非负安全整数秒输入，0 表示无限；大型有限值按需扩展提示。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `quoteLengths`、`quoteSelectionMode`、所选引语 ID | 已映射；`0/1/2/3` 对应短/中/长/超长集合，`-3` 对应忽略长度的收藏模式，`-2` 对应锁定所选 ID 的本机搜索模式；六值由固定 schema 机器校验，不复制引语内容。 |
 | `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；一百五十八种 Typebar 自有单语（最新增加 Français · Bitoduc、Streaming Emotes · Typebar 与 Arcade Horror Phrases · Typebar）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版；固定元数据中的全部 26 个 `joiningScript` 语言使用系统原生塑形、连写行距与逐字隐藏保护，九种 RTL 语言仍暂不进入双向多语混排；经配置验证的 LTR 语言可进入混排，Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文、朗读、Zipf 与简化输入严格按每项固定配置或其缺省分支处理，完整映射记录在后续审计条目与自动化测试中。Swiss German 复用 Typebar 自有 German 内容并把可见 `ß` 变为 `ss`，可进入成绩和排行榜但不能投稿或选择社区引语。乌克兰语 Latin、日语罗马字、Greeklish 与 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们；Pig Latin、Lorem Ipsum 和五字母英语的离线内容分别保持原创变换、原创伪拉丁与严格五字母边界；Kokanu 仅从其官方语言资料取词汇与语法边界，练习文本独立编写；Likanu 由自写音节解析器按官方字符规则从这些自有内容确定性派生；专项词流分别保留英语、瑞典语、葡萄牙语、俄语缩略词、两种乌克兰语词尾、Bangla 字符、Git 小写 ASCII 命令／概念、两个独立 toki pona ku 集合、Old English、Bitoduc 科技法语、虚构流媒体表情 token 和原创街机恐怖多词 section 的可见输入约束，均不导入参考词值。 |

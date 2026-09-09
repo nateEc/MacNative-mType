@@ -2577,6 +2577,7 @@ struct TypingSession {
 
   var isFinished: Bool { outcome != .active }
   var hasStarted: Bool { startedAt != nil }
+  var usesIncrementalPromptExtension: Bool { repeatingPrompt?.isEmpty == false }
   var typedCharacterCount: Int { typed.count }
   var afkDuration: TimeInterval {
     guard let startedAt, let finishedAt else { return 0 }
@@ -3818,11 +3819,20 @@ struct TypingSession {
     switch configuration.mode {
     case .words:
       if configuration.language.isCodeLanguage {
-        if nextTargetIndex >= prompt.count { complete(at: date) }
+        if nextTargetIndex >= prompt.count,
+          !usesIncrementalPromptExtension
+            || reachesConfiguredWordLimitWithActiveWord
+        {
+          complete(at: date)
+        }
       } else if !configuration.language.usesSpaceDelimitedWords
         || configuration.modifiers.contains(.noSpaces)
       {
-        if nextTargetIndex >= prompt.count { complete(at: date) }
+        if reachedConfiguredWordLimit
+          || (!usesIncrementalPromptExtension && nextTargetIndex >= prompt.count)
+        {
+          complete(at: date)
+        }
       } else if shouldFinishEnglishWordsTest {
         complete(at: date)
       }
@@ -3846,7 +3856,8 @@ struct TypingSession {
 
   private mutating func extendPromptIfNeeded() {
     guard nextTargetIndex >= prompt.count, let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
-    let usesNoSpaceSeparator = configuration.modifiers.contains(.noSpaces)
+    let usesNoSpaceSeparator = !configuration.language.usesSpaceDelimitedWords
+      || configuration.modifiers.contains(.noSpaces)
     let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
     let previousEnd = prompt.count + separator.count
     prompt += separator + repeatingPrompt
@@ -3858,6 +3869,16 @@ struct TypingSession {
     }
     guard repeatingNoSpaceTargetWords.count == repeatingNoSpaceWordLengths.count else { return }
     noSpaceTargetWords += repeatingNoSpaceTargetWords
+  }
+
+  private var reachedConfiguredWordLimit: Bool {
+    guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
+    return completedWordCount >= wordLimit
+  }
+
+  private var reachesConfiguredWordLimitWithActiveWord: Bool {
+    guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
+    return completedWordCount + 1 >= wordLimit
   }
 
   private var shouldFinishEnglishWordsTest: Bool {

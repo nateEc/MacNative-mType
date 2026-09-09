@@ -4972,9 +4972,8 @@ enum OfflineContent {
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
     contentOptions: ContentOptions = .init(), usesZipfFrequency: Bool = false
   ) -> String {
-    // Enough text for a very fast two-minute practice without recycling the visible prompt.
     generatedPrompt(
-      wordCount: max(300, Int(ceil(seconds / 60 * 240))), language: language,
+      wordCount: GeneratedPromptChunkPolicy.wordCount(forTime: seconds), language: language,
       englishVariant: englishVariant, mixedLanguageComponents: mixedLanguageComponents,
       contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
   }
@@ -5166,6 +5165,43 @@ enum NoSpaceWordBoundaryPolicy {
   }
 }
 
+enum GeneratedPromptChunkPolicy {
+  static let maximumInitialWordCount = 500
+
+  static func wordCount(forTime seconds: TimeInterval) -> Int {
+    let words = seconds / 60 * 240
+    guard words.isFinite, words < Double(maximumInitialWordCount) else {
+      return maximumInitialWordCount
+    }
+    return min(maximumInitialWordCount, max(300, Int(ceil(words))))
+  }
+
+  static func wordCount(for configuration: TestConfiguration) -> Int {
+    switch configuration.mode {
+    case .time:
+      return wordCount(forTime: configuration.duration ?? 30)
+    case .words:
+      if configuration.isInfinite { return 100 }
+      return min(maximumInitialWordCount, max(1, configuration.wordLimit ?? 25))
+    case .quote: return 60
+    case .zen: return 10_000
+    case .custom: return 0
+    }
+  }
+
+  static func repeatsPrompt(for configuration: TestConfiguration) -> Bool {
+    switch configuration.mode {
+    case .time: return true
+    case .words:
+      return configuration.isInfinite
+        || (configuration.wordLimit ?? 0) > maximumInitialWordCount
+    case .custom:
+      return [.time, .words].contains(configuration.customTextCompletion)
+    case .quote, .zen: return false
+    }
+  }
+}
+
 struct TestSessionFactory {
   static func make(
     configuration: TestConfiguration,
@@ -5185,8 +5221,8 @@ struct TestSessionFactory {
     } else {
       switch configuration.mode {
       case .time:
-        prompt = OfflineContent.timedPrompt(
-          seconds: configuration.isInfinite ? 30 : configuration.duration ?? 30,
+        prompt = OfflineContent.generatedPrompt(
+          wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
           language: configuration.language,
           englishVariant: configuration.englishVariant,
           mixedLanguageComponents: configuration.mixedLanguageComponents,
@@ -5194,7 +5230,7 @@ struct TestSessionFactory {
           usesZipfFrequency: configuration.modifiers.contains(.zipf))
       case .words:
         prompt = OfflineContent.generatedPrompt(
-          wordCount: configuration.isInfinite ? 100 : configuration.wordLimit ?? 25,
+          wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
           language: configuration.language,
           englishVariant: configuration.englishVariant,
           mixedLanguageComponents: configuration.mixedLanguageComponents,
@@ -5248,13 +5284,14 @@ struct TestSessionFactory {
       transformedPrompt: transformedPrompt)
     let noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
       for: noSpaceWordLengths, in: transformedPrompt)
-    let repeats = configuration.isInfinite
+    let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
+    let primesRepeatedPrompt = configuration.isInfinite
       || (configuration.mode == .custom
         && [.time, .words].contains(configuration.customTextCompletion))
     let initialPrompt: String
     let initialNoSpaceWordEndIndices: [Int]
     let initialNoSpaceTargetWords: [String]
-    if repeats {
+    if primesRepeatedPrompt {
       let separator = configuration.modifiers.contains(.noSpaces) ? "" : " "
       initialPrompt = transformedPrompt + separator + transformedPrompt
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
@@ -5279,8 +5316,7 @@ enum TypebarStreamContent {
   static func prompt(configuration: TestConfiguration) -> String? {
     let count: Int
     switch configuration.mode {
-    case .time: count = max(300, Int(ceil((configuration.duration ?? 30) / 60 * 240)))
-    case .words: count = configuration.isInfinite ? 100 : configuration.wordLimit ?? 25
+    case .time, .words: count = GeneratedPromptChunkPolicy.wordCount(for: configuration)
     case .quote: count = 60
     case .zen: count = 10_000
     case .custom: return nil

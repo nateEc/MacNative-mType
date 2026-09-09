@@ -645,6 +645,56 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(custom.progressText(at: start.addingTimeInterval(60)), "60s")
   }
 
+  func testLargeFiniteTestsGenerateBoundedChunksAndExtendOnlyAtTheBoundary() {
+    let largeWordConfiguration = TestConfiguration.words(5_001)
+    let words = TestSessionFactory.make(configuration: largeWordConfiguration)
+    let initialPrompt = words.prompt
+    XCTAssertLessThanOrEqual(
+      initialPrompt.split(whereSeparator: \Character.isWhitespace).count,
+      GeneratedPromptChunkPolicy.maximumInitialWordCount * 2)
+    XCTAssertFalse(words.isFinished)
+    XCTAssertTrue(words.usesIncrementalPromptExtension)
+
+    let veryLongTime = TestSessionFactory.make(configuration: .timed(seconds: 1_000_000_000))
+    XCTAssertLessThanOrEqual(
+      veryLongTime.prompt.split(whereSeparator: \Character.isWhitespace).count,
+      GeneratedPromptChunkPolicy.maximumInitialWordCount * 2)
+    XCTAssertTrue(veryLongTime.usesIncrementalPromptExtension)
+
+    let live = LivePracticeContent(
+      source: .poetry, title: "Local fixture", byline: nil,
+      tokens: ["ember", "harbor"], separator: " ")
+    XCTAssertEqual(
+      live.prompt(for: largeWordConfiguration).split(separator: " ").count,
+      GeneratedPromptChunkPolicy.maximumInitialWordCount)
+  }
+
+  func testIncrementalNoSpaceWordTestStopsAtConfiguredLimitInsteadOfFirstChunk() {
+    var session = TypingSession(
+      configuration: .words(3, language: .simplifiedChinese), prompt: "甲乙",
+      repeatingPrompt: "甲乙", noSpaceWordEndIndices: [1, 2],
+      noSpaceTargetWords: ["甲", "乙"], repeatingNoSpaceWordLengths: [1, 1],
+      repeatingNoSpaceTargetWords: ["甲", "乙"])
+
+    session.insert("甲乙", at: start)
+    XCTAssertFalse(session.isFinished)
+    session.insert("甲", at: start.addingTimeInterval(1))
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.completedWordCount, 3)
+  }
+
+  func testInfiniteCodeWordTestExtendsInsteadOfFinishingAtTheChunkBoundary() {
+    var session = TypingSession(
+      configuration: .words(0, language: .codeSwift), prompt: "let value",
+      repeatingPrompt: "let value")
+
+    session.insert("let value", at: start)
+    XCTAssertFalse(session.isFinished)
+    session.insert(" ", at: start.addingTimeInterval(1))
+    XCTAssertFalse(session.isFinished)
+    XCTAssertGreaterThan(session.prompt.count, "let value".count)
+  }
+
   func testInfiniteTestsDropOnlyFiniteDurationModifiersAndRoundTripSharing() throws {
     let finiteOnly = Array(TestModifierPolicy.finiteDurationOnly)
     let infinite = TestConfiguration.timed(seconds: 0).with(
@@ -1411,7 +1461,9 @@ final class TypingEngineTests: XCTestCase {
       items.map(\.id),
       [
         "test.time.15", "test.time.30", "test.time.60", "test.time.120",
+        "test.time.custom",
         "test.words.10", "test.words.25", "test.words.50", "test.words.100",
+        "test.words.custom",
         "test.punctuation.on", "test.punctuation.off",
         "test.numbers.on", "test.numbers.off",
       ])
@@ -1420,6 +1472,10 @@ final class TypingEngineTests: XCTestCase {
       QuickTestParameterCommandCatalog.target(for: "test.time.60"), .timed(60))
     XCTAssertEqual(
       QuickTestParameterCommandCatalog.target(for: "test.words.25"), .words(25))
+    XCTAssertEqual(
+      QuickTestParameterCommandCatalog.target(for: "test.time.custom"), .customTime)
+    XCTAssertEqual(
+      QuickTestParameterCommandCatalog.target(for: "test.words.custom"), .customWords)
     XCTAssertEqual(
       QuickTestParameterCommandCatalog.target(for: "test.punctuation.on"), .punctuation(true))
     XCTAssertEqual(
@@ -12725,11 +12781,36 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(try TestConfigurationShare.preset(from: link), custom)
 
     XCTAssertThrowsError(try TestConfigurationShare.preset(from: "https://example.com/test"))
+    let shortTime = SavedTestPreset(
+      configuration: .timed(seconds: 2), quoteID: nil, customText: nil)
+    XCTAssertEqual(
+      try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: shortTime)),
+      shortTime)
+    let largeWords = SavedTestPreset(
+      configuration: .words(5_001), quoteID: nil, customText: nil)
+    XCTAssertEqual(
+      try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: largeWords)),
+      largeWords)
     XCTAssertThrowsError(
       try TestConfigurationShare.link(
-        for: .init(configuration: .timed(seconds: 2), quoteID: nil, customText: nil)))
+        for: .init(configuration: .timed(seconds: -1), quoteID: nil, customText: nil)))
     XCTAssertThrowsError(
       try TestConfigurationShare.preset(from: "typebar://test?preset=not-base64"))
+  }
+
+  func testOfficialTestLimitInputAcceptsNonnegativeSafeIntegers() {
+    XCTAssertEqual(OfficialTestLimitInput.value(from: "0"), 0)
+    XCTAssertEqual(OfficialTestLimitInput.value(from: "2"), 2)
+    XCTAssertEqual(OfficialTestLimitInput.value(from: "5001"), 5_001)
+    XCTAssertEqual(OfficialTestLimitInput.value(from: " 120 "), 120)
+    XCTAssertEqual(
+      OfficialTestLimitInput.value(from: String(OfficialTestLimitInput.maximumValue)),
+      OfficialTestLimitInput.maximumValue)
+    XCTAssertNil(OfficialTestLimitInput.value(from: "-1"))
+    XCTAssertNil(OfficialTestLimitInput.value(from: "1.5"))
+    XCTAssertNil(OfficialTestLimitInput.value(from: "many"))
+    XCTAssertNil(
+      OfficialTestLimitInput.value(from: String(OfficialTestLimitInput.maximumValue + 1)))
   }
 
   func testCustomTextPolicyBoundsEditorSharingAndArchiveImport() throws {
