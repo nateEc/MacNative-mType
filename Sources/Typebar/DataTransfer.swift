@@ -353,6 +353,41 @@ enum TypebarArchiveMerge {
 /// Resolves an archive version race without discarding either device's
 /// user-authored content. Scalar settings remain local; remote collections are
 /// added, and colliding identities receive a new identity and a visible label.
+enum SyncConflictKind: String, Codable, Equatable, Sendable {
+    case customTheme
+    case customKeyboardLayout
+    case preset
+    case savedText
+
+    var displayName: String {
+        switch self {
+        case .customTheme: "自定义主题"
+        case .customKeyboardLayout: "自定义键盘布局"
+        case .preset: "测试预设"
+        case .savedText: "自定义文本"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .customTheme: "paintpalette"
+        case .customKeyboardLayout: "keyboard"
+        case .preset: "slider.horizontal.3"
+        case .savedText: "doc.text"
+        }
+    }
+}
+
+struct SyncConflictCopy: Codable, Equatable, Sendable {
+    let kind: SyncConflictKind
+    let displayName: String
+}
+
+struct TypebarArchiveConflictMergeResult: Equatable {
+    let archive: TypebarArchive
+    let conflicts: [SyncConflictCopy]
+}
+
 enum TypebarArchiveConflictMerge {
     private static let conflictSuffix = "（同步冲突）"
 
@@ -361,7 +396,16 @@ enum TypebarArchiveConflictMerge {
         remote: TypebarArchive,
         makeID: () -> UUID = UUID.init
     ) -> TypebarArchive {
+        mergeWithReport(local: local, remote: remote, makeID: makeID).archive
+    }
+
+    static func mergeWithReport(
+        local: TypebarArchive,
+        remote: TypebarArchive,
+        makeID: () -> UUID = UUID.init
+    ) -> TypebarArchiveConflictMergeResult {
         var settings = local.settings
+        var conflicts: [SyncConflictCopy] = []
         var occupiedIDs = Set(settings.customThemes.map(\.id))
         occupiedIDs.formUnion(settings.customKeyboardLayouts.map(\.id))
         var remappedThemeIDs: [UUID: UUID] = [:]
@@ -377,6 +421,7 @@ enum TypebarArchiveConflictMerge {
                         maximumLength: 40))
                 remappedThemeIDs[remoteTheme.id] = copy.id
                 settings.customThemes.append(copy)
+                conflicts.append(.init(kind: .customTheme, displayName: copy.name))
             } else {
                 var copy = remoteTheme
                 occupiedIDs.insert(copy.id)
@@ -384,6 +429,7 @@ enum TypebarArchiveConflictMerge {
                     copy.name = conflictName(
                         for: copy.name, occupied: Set(settings.customThemes.map(\.name)),
                         maximumLength: 40)
+                    conflicts.append(.init(kind: .customTheme, displayName: copy.name))
                 }
                 settings.customThemes.append(copy)
             }
@@ -398,6 +444,7 @@ enum TypebarArchiveConflictMerge {
                     for: copy.name, occupied: Set(settings.customKeyboardLayouts.map(\.name)),
                     maximumLength: 40)
                 settings.customKeyboardLayouts.append(copy)
+                conflicts.append(.init(kind: .customKeyboardLayout, displayName: copy.name))
             } else {
                 var copy = remoteLayout
                 occupiedIDs.insert(copy.id)
@@ -405,6 +452,7 @@ enum TypebarArchiveConflictMerge {
                     copy.name = conflictName(
                         for: copy.name, occupied: Set(settings.customKeyboardLayouts.map(\.name)),
                         maximumLength: 40)
+                    conflicts.append(.init(kind: .customKeyboardLayout, displayName: copy.name))
                 }
                 settings.customKeyboardLayouts.append(copy)
             }
@@ -425,9 +473,9 @@ enum TypebarArchiveConflictMerge {
         var presets = local.presets
         for remotePreset in remote.presets where !presets.contains(remotePreset) {
             if presets.contains(where: { $0.name == remotePreset.name }) {
-                presets.append(.init(
-                    name: conflictName(for: remotePreset.name, occupied: Set(presets.map(\.name))),
-                    definition: remotePreset.definition))
+                let name = conflictName(for: remotePreset.name, occupied: Set(presets.map(\.name)))
+                presets.append(.init(name: name, definition: remotePreset.definition))
+                conflicts.append(.init(kind: .preset, displayName: name))
             } else {
                 presets.append(remotePreset)
             }
@@ -439,26 +487,30 @@ enum TypebarArchiveConflictMerge {
             && !savedTexts.contains(remoteText)
         {
             if savedTexts.contains(where: { $0.title == remoteText.title }) {
+                let title = conflictName(
+                    for: remoteText.title, occupied: Set(savedTexts.map(\.title)),
+                    maximumLength: CustomTextPolicy.maximumTitleLength)
                 savedTexts.append(.init(
-                    title: conflictName(
-                        for: remoteText.title, occupied: Set(savedTexts.map(\.title)),
-                        maximumLength: CustomTextPolicy.maximumTitleLength),
+                    title: title,
                     text: remoteText.text,
                     longProgress: remoteText.longProgress))
+                conflicts.append(.init(kind: .savedText, displayName: title))
             } else {
                 savedTexts.append(remoteText)
             }
         }
 
         return .init(
-            version: max(local.version, remote.version),
-            exportedAt: max(local.exportedAt, remote.exportedAt),
-            settings: settings,
-            results: local.results + remote.results.filter { remoteResult in
-                !local.results.contains(where: { $0.id == remoteResult.id })
-            },
-            presets: presets,
-            savedTexts: savedTexts)
+            archive: .init(
+                version: max(local.version, remote.version),
+                exportedAt: max(local.exportedAt, remote.exportedAt),
+                settings: settings,
+                results: local.results + remote.results.filter { remoteResult in
+                    !local.results.contains(where: { $0.id == remoteResult.id })
+                },
+                presets: presets,
+                savedTexts: savedTexts),
+            conflicts: conflicts)
     }
 
     private static func freshID(occupied: inout Set<UUID>, makeID: () -> UUID) -> UUID {
@@ -491,6 +543,53 @@ enum TypebarArchiveConflictMerge {
         var index = 1
         while occupied.contains(candidate(index: index)) { index += 1 }
         return candidate(index: index)
+    }
+}
+
+struct SyncConflictAuditEntry: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let occurredAt: Date
+    let kind: SyncConflictKind
+    let displayName: String
+}
+
+/// Keeps a small local record of conflict copies without retaining archive
+/// payloads, credentials, result details, or user-authored text bodies.
+final class SyncConflictAuditStore {
+    private static let keyPrefix = "remoteAccount.syncConflictAudit.v1"
+    private let defaults: UserDefaults
+    private let capacity: Int
+
+    init(defaults: UserDefaults = .standard, capacity: Int = 50) {
+        self.defaults = defaults
+        self.capacity = max(1, capacity)
+    }
+
+    static func storageKey(for scope: ResultPublicationScope) -> String {
+        "\(keyPrefix).\(scope.serverID).\(scope.userID.uuidString.lowercased())"
+    }
+
+    func entries(for scope: ResultPublicationScope) -> [SyncConflictAuditEntry] {
+        guard let data = defaults.data(forKey: Self.storageKey(for: scope)),
+            let entries = try? JSONDecoder().decode([SyncConflictAuditEntry].self, from: data)
+        else { return [] }
+        return Array(entries.prefix(capacity))
+    }
+
+    func append(_ conflicts: [SyncConflictCopy], for scope: ResultPublicationScope, at date: Date = .now) {
+        guard !conflicts.isEmpty else { return }
+        let additions = conflicts.reversed().map {
+            SyncConflictAuditEntry(
+                id: UUID(), occurredAt: date, kind: $0.kind,
+                displayName: String($0.displayName.prefix(80)))
+        }
+        let updated = Array((additions + entries(for: scope)).prefix(capacity))
+        guard let data = try? JSONEncoder().encode(updated) else { return }
+        defaults.set(data, forKey: Self.storageKey(for: scope))
+    }
+
+    func clear(for scope: ResultPublicationScope) {
+        defaults.removeObject(forKey: Self.storageKey(for: scope))
     }
 }
 

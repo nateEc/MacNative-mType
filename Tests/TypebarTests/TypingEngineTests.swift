@@ -18268,6 +18268,98 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(merged.savedTexts.last?.text, remoteText.text)
   }
 
+  func testArchiveConflictMergeReportsOnlyRenamedCopies() throws {
+    let sharedThemeID = UUID(uuidString: "00000000-0000-0000-0000-000000000111")!
+    let clonedThemeID = UUID(uuidString: "00000000-0000-0000-0000-000000000112")!
+    let sharedLayoutID = UUID(uuidString: "00000000-0000-0000-0000-000000000113")!
+    let clonedLayoutID = UUID(uuidString: "00000000-0000-0000-0000-000000000114")!
+    let localTheme = CustomThemeDefinition(
+      id: sharedThemeID, name: "Focus", background: .init(red: 0.1, green: 0.1, blue: 0.1),
+      panel: .init(red: 0.2, green: 0.2, blue: 0.2),
+      accent: .init(red: 0.9, green: 0.6, blue: 0.1), prefersDark: true)
+    let remoteTheme = CustomThemeDefinition(
+      id: sharedThemeID, name: "Focus", background: .init(red: 0.9, green: 0.9, blue: 0.9),
+      panel: .init(red: 0.8, green: 0.8, blue: 0.8),
+      accent: .init(red: 0.1, green: 0.4, blue: 0.9), prefersDark: false)
+    let localLayout = CustomKeyboardGuideLayout(
+      id: sharedLayoutID, name: "Board", numberRow: "123", topRow: "qwe",
+      homeRow: "asd", bottomRow: "zxc")
+    let remoteLayout = CustomKeyboardGuideLayout(
+      id: sharedLayoutID, name: "Board", numberRow: "456", topRow: "rty",
+      homeRow: "fgh", bottomRow: "vbn")
+    let local = TypebarArchive(
+      exportedAt: start,
+      settings: .init(customThemes: [localTheme], customKeyboardLayouts: [localLayout]),
+      results: [],
+      presets: [
+        .init(name: "Daily", definition: .init(configuration: .words(25), quoteID: nil, customText: nil))
+      ],
+      savedTexts: [.init(title: "Drill", text: "local words")])
+    let remote = TypebarArchive(
+      exportedAt: start,
+      settings: .init(customThemes: [remoteTheme], customKeyboardLayouts: [remoteLayout]),
+      results: [],
+      presets: [
+        .init(name: "Daily", definition: .init(configuration: .timed(seconds: 60), quoteID: nil, customText: nil)),
+        .init(name: "Unique", definition: .init(configuration: .words(10), quoteID: nil, customText: nil)),
+      ],
+      savedTexts: [
+        .init(title: "Drill", text: "remote words"),
+        .init(title: "Unique", text: "new words"),
+      ])
+    var generatedIDs = [clonedThemeID, clonedLayoutID].makeIterator()
+
+    let result = TypebarArchiveConflictMerge.mergeWithReport(
+      local: local, remote: remote, makeID: { generatedIDs.next()! })
+
+    XCTAssertEqual(result.archive.presets.map(\.name), ["Daily", "Daily（同步冲突）", "Unique"])
+    XCTAssertEqual(result.conflicts, [
+      .init(kind: .customTheme, displayName: "Focus（同步冲突）"),
+      .init(kind: .customKeyboardLayout, displayName: "Board（同步冲突）"),
+      .init(kind: .preset, displayName: "Daily（同步冲突）"),
+      .init(kind: .savedText, displayName: "Drill（同步冲突）"),
+    ])
+  }
+
+  func testSyncConflictAuditIsScopedBoundedPersistentAndClearable() {
+    let suiteName = "TypebarTests.sync-conflict-audit.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let userA = UUID()
+    let userB = UUID()
+    let scopeA = ResultPublicationScope(endpoint: "HTTPS://Example.com:443/", userID: userA)
+    let equivalentScopeA = ResultPublicationScope(endpoint: "https://example.com", userID: userA)
+    let scopeB = ResultPublicationScope(endpoint: "https://example.com", userID: userB)
+    let store = SyncConflictAuditStore(defaults: defaults, capacity: 2)
+
+    store.append([
+      .init(kind: .preset, displayName: "First（同步冲突）"),
+      .init(kind: .savedText, displayName: "Second（同步冲突）"),
+      .init(kind: .customTheme, displayName: "Third（同步冲突）"),
+    ], for: scopeA, at: start)
+
+    let restored = SyncConflictAuditStore(defaults: defaults, capacity: 2)
+    XCTAssertEqual(restored.entries(for: equivalentScopeA).map(\.displayName), [
+      "Third（同步冲突）", "Second（同步冲突）",
+    ])
+    XCTAssertTrue(restored.entries(for: scopeB).isEmpty)
+    restored.clear(for: equivalentScopeA)
+    XCTAssertTrue(store.entries(for: scopeA).isEmpty)
+  }
+
+  func testSyncConflictAuditRecoversFromCorruptMetadata() {
+    let suiteName = "TypebarTests.sync-conflict-audit-corrupt.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let scope = ResultPublicationScope(endpoint: "http://127.0.0.1:8080", userID: UUID())
+    defaults.set(Data("not-json".utf8), forKey: SyncConflictAuditStore.storageKey(for: scope))
+    let store = SyncConflictAuditStore(defaults: defaults)
+
+    XCTAssertTrue(store.entries(for: scope).isEmpty)
+    store.append([.init(kind: .preset, displayName: "Recovered")], for: scope, at: start)
+    XCTAssertEqual(SyncConflictAuditStore(defaults: defaults).entries(for: scope).count, 1)
+  }
+
   func testArchiveConflictLabelsStayWithinSavedTextTitleLimit() throws {
     let title = String(repeating: "a", count: CustomTextPolicy.maximumTitleLength)
     let local = TypebarArchive(

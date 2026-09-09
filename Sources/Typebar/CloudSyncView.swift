@@ -11,7 +11,9 @@ struct CloudSyncView: View {
     let settings: AppSettings
     let account: AccountSession
     let initialLeaderboard: RemoteLeaderboardSelection?
+    private let conflictAuditStore = SyncConflictAuditStore()
     @State private var message: String?
+    @State private var conflictAudit: [SyncConflictAuditEntry] = []
     @State private var leaderboard: [RemoteLeaderboardEntry] = []
     @State private var leaderboardMode: TestMode?
     @State private var leaderboardLanguage: TypingLanguage?
@@ -78,6 +80,38 @@ struct CloudSyncView: View {
                     if account.isWorking { ProgressView() }
                     if let message {
                         Text(message).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                if account.currentUser != nil {
+                    Section("同步冲突记录") {
+                        if conflictAudit.isEmpty {
+                            Text("当前账户还没有需要另存副本的同步冲突。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(conflictAudit) { entry in
+                                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                    Image(systemName: entry.kind.systemImage)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 18)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(entry.displayName).lineLimit(1)
+                                        Text(entry.kind.displayName)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(entry.occurredAt.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Button("清空当前账户记录", role: .destructive, action: clearConflictAudit)
+                        }
+                        Text("仅保存在这台 Mac，并按服务地址和账户分开；不记录文本正文、成绩或登录凭据。最多保留最近 50 条。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -222,6 +256,9 @@ struct CloudSyncView: View {
             guard initialLeaderboard != nil else { return }
             loadLeaderboard()
         }
+        .task(id: account.resultPublicationScope) {
+            reloadConflictAudit()
+        }
         .sheet(item: $selectedProfile) { profile in
             PublicProfileView(profile: profile, account: account)
         }
@@ -242,14 +279,18 @@ struct CloudSyncView: View {
                     else {
                         throw RemoteAccountError.serverMessage("无法取得服务器最新归档，未自动覆盖本机内容。")
                     }
-                    let merged = TypebarArchiveConflictMerge.merge(
+                    let mergeResult = TypebarArchiveConflictMerge.mergeWithReport(
                         local: archive, remote: remoteArchive)
                     let summary = try LocalArchiveImport.apply(
-                        merged, settings: settings, results: results, presets: presets,
+                        mergeResult.archive, settings: settings, results: results, presets: presets,
                         savedTexts: savedTexts, modelContext: modelContext)
+                    if let scope = account.resultPublicationScope {
+                        conflictAuditStore.append(mergeResult.conflicts, for: scope)
+                        reloadConflictAudit()
+                    }
                     account.confirmPulledArchive(pulled)
-                    let cursor = try await account.pushArchive(merged)
-                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本；冲突主题已另存并标记。"
+                    let cursor = try await account.pushArchive(mergeResult.archive)
+                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本；另存 \(mergeResult.conflicts.count) 个冲突副本。"
                 } catch {
                     message = "已停止冲突覆盖：\(error.localizedDescription)"
                 }
@@ -257,6 +298,20 @@ struct CloudSyncView: View {
                 message = error.localizedDescription
             }
         }
+    }
+
+    private func reloadConflictAudit() {
+        guard let scope = account.resultPublicationScope else {
+            conflictAudit = []
+            return
+        }
+        conflictAudit = conflictAuditStore.entries(for: scope)
+    }
+
+    private func clearConflictAudit() {
+        guard let scope = account.resultPublicationScope else { return }
+        conflictAuditStore.clear(for: scope)
+        conflictAudit = []
     }
 
     private func pull() {
