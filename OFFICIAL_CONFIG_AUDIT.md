@@ -219,6 +219,8 @@
 | `alwaysShowDecimalPlaces` | `alwaysShowDecimalPlaces` | 已映射。 |
 | `typingSpeedUnit` | `typingSpeedUnit` | 已映射。 |
 | `startGraphsAtZero` | `startGraphsAtZero` | 已映射。 |
+
+2026-09-10 `CFG-03` 命令入口补充：固定元数据中无需数值输入的 48 个显示命令已接入原生命令面板，覆盖 `timerStyle`、三种实时指标样式、`timerColor`、`timerOpacity`、`highlightMode`、`typedEffect`、`tapeMode`、四个布尔显示项及命令中可见的四种速度单位。全部直接写入既有持久设置且不重开；`highlightMode` 与 `showAllLines` 按固定挑战控制器清除活动挑战。`wph` 保留为设置页能力，但固定命令元数据明确隐藏该值，因此不伪装成命令选项。机器总账现同时固定这些枚举与布尔键，不复制参考显示代码、样式或资产。
 | `maxLineWidth` | `practiceLineWidth`、`customPracticeLineColumns` | 已映射；以原生列宽/自适应表达。 |
 | `fontSize` | `fontSize` | 已映射。 |
 | `fontFamily` | `practiceFont`、可搜索的本机字体目录、名称/导入 | 部分；可浏览当前 macOS 已安装字体家族，也可手填 PostScript 名，或导入用户拥有的 TTF、OTF、WOFF、WOFF2。四种格式都经原生 Core Text 读取描述符并实际注册后才替换旧文件，不复用或打包网页字体资产；状态仍为部分，因为官方 Web 字体目录不会被复制进纯原生重写。 |

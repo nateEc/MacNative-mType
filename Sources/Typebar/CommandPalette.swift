@@ -814,6 +814,169 @@ enum PaceCaretCommandCatalog {
     }
 }
 
+enum AppearanceCommandTarget: Equatable {
+    case progress(LiveProgressStyle)
+    case speed(LiveMetricStyle)
+    case accuracy(LiveMetricStyle)
+    case burst(LiveMetricStyle)
+    case color(LiveStatsColor)
+    case opacity(LiveStatsOpacity)
+    case highlight(PromptHighlightMode)
+    case typedEffect(TypedCharacterEffect)
+    case tape(PracticeTapeMode)
+    case smoothLineScroll(Bool)
+    case showAllLines(Bool)
+    case speedUnit(TypingSpeedUnit)
+    case alwaysShowDecimalPlaces(Bool)
+    case startGraphsAtZero(Bool)
+
+    var requiresRestart: Bool { false }
+
+    var exitsChallenge: Bool {
+        switch self {
+        case .highlight, .showAllLines: true
+        default: false
+        }
+    }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        switch self {
+        case .progress(let style): settings.liveProgressStyle = style
+        case .speed(let style): settings.liveSpeedStyle = style
+        case .accuracy(let style): settings.liveAccuracyStyle = style
+        case .burst(let style): settings.liveBurstStyle = style
+        case .color(let color): settings.liveStatsColor = color
+        case .opacity(let opacity): settings.liveStatsOpacity = opacity
+        case .highlight(let mode): settings.promptHighlightMode = mode
+        case .typedEffect(let effect): settings.typedCharacterEffect = effect
+        case .tape(let mode): settings.practiceTapeMode = mode
+        case .smoothLineScroll(let enabled): settings.smoothPracticeLineScroll = enabled
+        case .showAllLines(let enabled): settings.showAllPracticeLines = enabled
+        case .speedUnit(let unit): settings.typingSpeedUnit = unit
+        case .alwaysShowDecimalPlaces(let enabled): settings.alwaysShowDecimalPlaces = enabled
+        case .startGraphsAtZero(let enabled): settings.startGraphsAtZero = enabled
+        }
+    }
+}
+
+/// Exposes the fixed reference's discrete appearance commands through
+/// Typebar's existing native presentation settings.
+enum AppearanceCommandCatalog {
+    private struct Option {
+        let key: String
+        let value: String
+        let setting: String
+        let choice: String
+        let target: AppearanceCommandTarget
+    }
+
+    private static let options: [Option] = {
+        var result: [Option] = []
+        result += progressOptions.map {
+            Option(key: "timerStyle", value: $0.0, setting: "实时进度", choice: $0.1.displayName,
+                   target: .progress($0.1))
+        }
+        for (key, setting, target) in [
+            ("liveSpeedStyle", "实时速度", { AppearanceCommandTarget.speed($0) }),
+            ("liveAccStyle", "实时准确率", { AppearanceCommandTarget.accuracy($0) }),
+            ("liveBurstStyle", "实时 Burst", { AppearanceCommandTarget.burst($0) }),
+        ] {
+            result += metricOptions.map {
+                Option(key: key, value: $0.0, setting: setting, choice: $0.1.displayName,
+                       target: target($0.1))
+            }
+        }
+        result += colorOptions.map {
+            Option(key: "timerColor", value: $0.0, setting: "实时指标颜色",
+                   choice: $0.1.displayName, target: .color($0.1))
+        }
+        result += opacityOptions.map {
+            Option(key: "timerOpacity", value: $0.0, setting: "实时指标透明度",
+                   choice: $0.1.displayName, target: .opacity($0.1))
+        }
+        result += highlightOptions.map {
+            Option(key: "highlightMode", value: $0.0, setting: "提示高亮",
+                   choice: $0.1.displayName, target: .highlight($0.1))
+        }
+        result += TypedCharacterEffect.allCases.map {
+            Option(key: "typedEffect", value: $0.rawValue, setting: "已输入字符效果",
+                   choice: $0.displayName, target: .typedEffect($0))
+        }
+        result += tapeOptions.map {
+            Option(key: "tapeMode", value: $0.0, setting: "单行卷带",
+                   choice: $0.1.displayName, target: .tape($0.1))
+        }
+        result += booleanOptions(
+            key: "smoothLineScroll", setting: "平滑卷带滚动",
+            target: AppearanceCommandTarget.smoothLineScroll)
+        result += booleanOptions(
+            key: "showAllLines", setting: "显示完整提示行",
+            target: AppearanceCommandTarget.showAllLines)
+        result += speedUnitOptions.map {
+            Option(key: "typingSpeedUnit", value: $0.rawValue, setting: "速度单位",
+                   choice: $0.displayName, target: .speedUnit($0))
+        }
+        result += booleanOptions(
+            key: "alwaysShowDecimalPlaces", setting: "结果固定两位小数",
+            target: AppearanceCommandTarget.alwaysShowDecimalPlaces)
+        result += booleanOptions(
+            key: "startGraphsAtZero", setting: "图表从零开始",
+            target: AppearanceCommandTarget.startGraphsAtZero)
+        return result
+    }()
+
+    static let items = options.map { option in
+        let identifier = "appearance.\(option.key).\(option.value)"
+        return CommandPaletteItem(
+            id: identifier, title: "\(option.setting)：\(option.choice)",
+            subtitle: "立即更新原生显示，不重新生成练习", systemImage: "textformat.size",
+            keywords: [
+                identifier, "appearance", "display", "显示", option.key, option.value,
+                option.setting, option.choice,
+            ], group: .settings)
+    }
+
+    static func target(for identifier: String) -> AppearanceCommandTarget? {
+        options.first {
+            "appearance.\($0.key).\($0.value)" == identifier
+        }?.target
+    }
+
+    private static let progressOptions: [(String, LiveProgressStyle)] = [
+        ("off", .off), ("bar", .bar), ("text", .text), ("mini", .mini),
+        ("flash_text", .flashText), ("flash_mini", .flashMini),
+    ]
+    private static let metricOptions: [(String, LiveMetricStyle)] = [
+        ("off", .off), ("text", .text), ("mini", .mini),
+    ]
+    private static let colorOptions: [(String, LiveStatsColor)] = [
+        ("black", .black), ("sub", .secondary), ("text", .primary), ("main", .accent),
+    ]
+    private static let opacityOptions: [(String, LiveStatsOpacity)] = [
+        ("0.25", .quarter), ("0.5", .half), ("0.75", .threeQuarters), ("1", .full),
+    ]
+    private static let highlightOptions: [(String, PromptHighlightMode)] = [
+        ("off", .off), ("letter", .letter), ("word", .word), ("next_word", .nextWord),
+        ("next_two_words", .nextTwoWords), ("next_three_words", .nextThreeWords),
+    ]
+    private static let tapeOptions: [(String, PracticeTapeMode)] = [
+        ("off", .off), ("letter", .letter), ("word", .word),
+    ]
+    private static let speedUnitOptions: [TypingSpeedUnit] = [.wpm, .cpm, .wps, .cps]
+
+    private static func booleanOptions(
+        key: String,
+        setting: String,
+        target: (Bool) -> AppearanceCommandTarget
+    ) -> [Option] {
+        [
+            Option(key: key, value: "off", setting: setting, choice: "关闭", target: target(false)),
+            Option(key: key, value: "on", setting: setting, choice: "开启", target: target(true)),
+        ]
+    }
+}
+
 enum OfficialLayoutCommandTarget: Equatable {
     case system
     case builtIn(KeyboardLayout)
@@ -978,6 +1141,7 @@ enum TestConfigurationCommandChallengePolicy {
             || InputRuleCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || OfficialLayoutCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || PaceCaretCommandCatalog.target(for: identifier)?.exitsChallenge == true
+            || AppearanceCommandCatalog.target(for: identifier)?.exitsChallenge == true
     }
 }
 

@@ -2822,6 +2822,7 @@ private struct ContentView: View {
     items.append(contentsOf: SoundCommandCatalog.items)
     items.append(contentsOf: CaretCommandCatalog.items)
     items.append(contentsOf: PaceCaretCommandCatalog.items)
+    items.append(contentsOf: AppearanceCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2869,6 +2870,11 @@ private struct ContentView: View {
       case .customSpeed:
         showingPaceGuideSpeedEditor = true
       }
+      return
+    }
+    if let target = AppearanceCommandCatalog.target(for: item.id) {
+      if target.exitsChallenge { activeChallengeID = nil }
+      target.apply(to: settings)
       return
     }
     if let target = OfficialLayoutCommandCatalog.target(for: item.id) {

@@ -267,11 +267,66 @@
       "banana",
       "monkey"
     ],
+    "timerStyle": [
+      "off",
+      "bar",
+      "text",
+      "mini",
+      "flash_text",
+      "flash_mini"
+    ],
+    "liveSpeedStyle": [
+      "off",
+      "text",
+      "mini"
+    ],
+    "liveAccStyle": [
+      "off",
+      "text",
+      "mini"
+    ],
+    "liveBurstStyle": [
+      "off",
+      "text",
+      "mini"
+    ],
     "timerColor": [
       "black",
       "sub",
       "text",
       "main"
+    ],
+    "timerOpacity": [
+      "0.25",
+      "0.5",
+      "0.75",
+      "1"
+    ],
+    "highlightMode": [
+      "off",
+      "letter",
+      "word",
+      "next_word",
+      "next_two_words",
+      "next_three_words"
+    ],
+    "typedEffect": [
+      "keep",
+      "hide",
+      "fade",
+      "dots"
+    ],
+    "tapeMode": [
+      "off",
+      "letter",
+      "word"
+    ],
+    "typingSpeedUnit": [
+      "wpm",
+      "cpm",
+      "wps",
+      "cps",
+      "wph"
     ],
     "monkeyPowerLevel": [
       "off",
@@ -295,11 +350,24 @@
     "playTimeWarning": 5,
     "caretStyle": 8,
     "paceCaretStyle": 8,
+    "timerStyle": 6,
+    "liveSpeedStyle": 3,
+    "liveAccStyle": 3,
+    "liveBurstStyle": 3,
     "timerColor": 4,
+    "timerOpacity": 4,
+    "highlightMode": 6,
+    "typedEffect": 4,
+    "tapeMode": 3,
+    "typingSpeedUnit": 5,
     "monkeyPowerLevel": 5,
     "quoteLength": 6
   },
   "officialBooleanKeys": [
+    "smoothLineScroll",
+    "showAllLines",
+    "alwaysShowDecimalPlaces",
+    "startGraphsAtZero",
     "monkey"
   ],
   "sourceFiles": [

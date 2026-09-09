@@ -212,7 +212,9 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       [
         "playSoundOnClick": 27, "playSoundOnError": 5, "playTimeWarning": 5,
         "caretStyle": 8, "paceCaretStyle": 8, "timerColor": 4, "monkeyPowerLevel": 5,
-        "quoteLength": 6,
+        "quoteLength": 6, "timerStyle": 6, "liveSpeedStyle": 3, "liveAccStyle": 3,
+        "liveBurstStyle": 3, "timerOpacity": 4, "highlightMode": 6,
+        "typedEffect": 4, "tapeMode": 3, "typingSpeedUnit": 5,
       ])
     XCTAssertEqual(fixture.officialChoices["quoteLength"], ["-3", "-2", "0", "1", "2", "3"])
     XCTAssertEqual(
@@ -227,8 +229,27 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(
       fixture.officialChoices["timerColor"], ["black", "sub", "text", "main"])
     XCTAssertEqual(
+      fixture.officialChoices["timerStyle"],
+      ["off", "bar", "text", "mini", "flash_text", "flash_mini"])
+    XCTAssertEqual(fixture.officialChoices["liveSpeedStyle"], ["off", "text", "mini"])
+    XCTAssertEqual(fixture.officialChoices["liveAccStyle"], ["off", "text", "mini"])
+    XCTAssertEqual(fixture.officialChoices["liveBurstStyle"], ["off", "text", "mini"])
+    XCTAssertEqual(fixture.officialChoices["timerOpacity"], ["0.25", "0.5", "0.75", "1"])
+    XCTAssertEqual(
+      fixture.officialChoices["highlightMode"],
+      ["off", "letter", "word", "next_word", "next_two_words", "next_three_words"])
+    XCTAssertEqual(fixture.officialChoices["typedEffect"], ["keep", "hide", "fade", "dots"])
+    XCTAssertEqual(fixture.officialChoices["tapeMode"], ["off", "letter", "word"])
+    XCTAssertEqual(
+      fixture.officialChoices["typingSpeedUnit"], ["wpm", "cpm", "wps", "cps", "wph"])
+    XCTAssertEqual(
       fixture.officialChoices["monkeyPowerLevel"], ["off", "1", "2", "3", "4"])
-    XCTAssertEqual(fixture.officialBooleanKeys, ["monkey"])
+    XCTAssertEqual(
+      fixture.officialBooleanKeys,
+      [
+        "smoothLineScroll", "showAllLines", "alwaysShowDecimalPlaces", "startGraphsAtZero",
+        "monkey",
+      ])
     XCTAssertEqual(
       Set(TypingCaretStyle.allCases.map(\.compatibilityValue)),
       Set(fixture.officialChoices["caretStyle"] ?? []))

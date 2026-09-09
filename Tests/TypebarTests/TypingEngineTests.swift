@@ -1868,6 +1868,103 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(settings.paceGuideMode, .dailyBest)
   }
 
+  func testAppearanceCommandsCoverFixedReferenceChoicesAndRejectMalformedIDs() {
+    let expectedIDs = [
+      "appearance.timerStyle.off", "appearance.timerStyle.bar", "appearance.timerStyle.text",
+      "appearance.timerStyle.mini", "appearance.timerStyle.flash_text",
+      "appearance.timerStyle.flash_mini",
+      "appearance.liveSpeedStyle.off", "appearance.liveSpeedStyle.text",
+      "appearance.liveSpeedStyle.mini",
+      "appearance.liveAccStyle.off", "appearance.liveAccStyle.text",
+      "appearance.liveAccStyle.mini",
+      "appearance.liveBurstStyle.off", "appearance.liveBurstStyle.text",
+      "appearance.liveBurstStyle.mini",
+      "appearance.timerColor.black", "appearance.timerColor.sub",
+      "appearance.timerColor.text", "appearance.timerColor.main",
+      "appearance.timerOpacity.0.25", "appearance.timerOpacity.0.5",
+      "appearance.timerOpacity.0.75", "appearance.timerOpacity.1",
+      "appearance.highlightMode.off", "appearance.highlightMode.letter",
+      "appearance.highlightMode.word", "appearance.highlightMode.next_word",
+      "appearance.highlightMode.next_two_words", "appearance.highlightMode.next_three_words",
+      "appearance.typedEffect.keep", "appearance.typedEffect.hide",
+      "appearance.typedEffect.fade", "appearance.typedEffect.dots",
+      "appearance.tapeMode.off", "appearance.tapeMode.letter", "appearance.tapeMode.word",
+      "appearance.smoothLineScroll.off", "appearance.smoothLineScroll.on",
+      "appearance.showAllLines.off", "appearance.showAllLines.on",
+      "appearance.typingSpeedUnit.wpm", "appearance.typingSpeedUnit.cpm",
+      "appearance.typingSpeedUnit.wps", "appearance.typingSpeedUnit.cps",
+      "appearance.alwaysShowDecimalPlaces.off", "appearance.alwaysShowDecimalPlaces.on",
+      "appearance.startGraphsAtZero.off", "appearance.startGraphsAtZero.on",
+    ]
+
+    XCTAssertEqual(AppearanceCommandCatalog.items.map(\.id), expectedIDs)
+    XCTAssertEqual(
+      AppearanceCommandCatalog.target(for: "appearance.timerStyle.flash_text"),
+      .progress(.flashText))
+    XCTAssertEqual(
+      AppearanceCommandCatalog.target(for: "appearance.timerColor.main"), .color(.accent))
+    XCTAssertEqual(
+      AppearanceCommandCatalog.target(for: "appearance.timerOpacity.0.75"),
+      .opacity(.threeQuarters))
+    XCTAssertEqual(
+      AppearanceCommandCatalog.target(for: "appearance.highlightMode.next_two_words"),
+      .highlight(.nextTwoWords))
+    XCTAssertEqual(
+      AppearanceCommandCatalog.target(for: "appearance.typingSpeedUnit.cps"), .speedUnit(.cps))
+    XCTAssertNil(AppearanceCommandCatalog.target(for: "appearance.typingSpeedUnit.wph"))
+    XCTAssertNil(AppearanceCommandCatalog.target(for: "appearance.timerOpacity.0.50"))
+    XCTAssertNil(AppearanceCommandCatalog.target(for: "appearance.timerStyle.flash.text"))
+  }
+
+  func testAppearanceCommandsRemainSearchableAndPreserveRestartAndChallengePolicies() {
+    XCTAssertTrue(AppearanceCommandCatalog.items.allSatisfy { item in
+      guard let target = AppearanceCommandCatalog.target(for: item.id) else { return false }
+      return !target.requiresRestart
+        && TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
+          == target.exitsChallenge
+        && CommandPaletteSearch.results(items: AppearanceCommandCatalog.items, query: item.id)
+          .contains(where: { $0.id == item.id })
+    })
+    XCTAssertTrue(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(
+        for: "appearance.highlightMode.word"))
+    XCTAssertTrue(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(for: "appearance.showAllLines.on"))
+    XCTAssertFalse(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(for: "appearance.tapeMode.word"))
+  }
+
+  @MainActor
+  func testAppearanceCommandsApplyThroughExistingNativeSettings() throws {
+    let suiteName = "TypebarTests.AppearanceCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    let targets: [AppearanceCommandTarget] = [
+      .progress(.bar), .speed(.mini), .accuracy(.text), .burst(.mini), .color(.black),
+      .opacity(.quarter), .highlight(.nextThreeWords), .typedEffect(.dots), .tape(.letter),
+      .smoothLineScroll(true), .showAllLines(true), .speedUnit(.cps),
+      .alwaysShowDecimalPlaces(true), .startGraphsAtZero(false),
+    ]
+    targets.forEach { $0.apply(to: settings) }
+
+    XCTAssertEqual(settings.liveProgressStyle, .bar)
+    XCTAssertEqual(settings.liveSpeedStyle, .mini)
+    XCTAssertEqual(settings.liveAccuracyStyle, .text)
+    XCTAssertEqual(settings.liveBurstStyle, .mini)
+    XCTAssertEqual(settings.liveStatsColor, .black)
+    XCTAssertEqual(settings.liveStatsOpacity, .quarter)
+    XCTAssertEqual(settings.promptHighlightMode, .nextThreeWords)
+    XCTAssertEqual(settings.typedCharacterEffect, .dots)
+    XCTAssertEqual(settings.practiceTapeMode, .letter)
+    XCTAssertTrue(settings.smoothPracticeLineScroll)
+    XCTAssertTrue(settings.showAllPracticeLines)
+    XCTAssertEqual(settings.typingSpeedUnit, .cps)
+    XCTAssertTrue(settings.alwaysShowDecimalPlaces)
+    XCTAssertFalse(settings.startGraphsAtZero)
+  }
+
   func testOfficialLayoutCommandsRemainSearchableByDisplayNameAndFixedIdentifier() {
     XCTAssertEqual(
       CommandPaletteSearch.results(items: OfficialLayoutCommandCatalog.items, query: "Colemak-DH Wide ISO")
