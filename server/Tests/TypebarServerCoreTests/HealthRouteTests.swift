@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 314)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 323)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4305,6 +4305,15 @@ final class HealthRouteTests: XCTestCase {
       ("tatar9k", "Иң киң исемлек тә җирле һәм тикшерелә торган булып кала."),
       ("uzbek1k", "Har bir mahalliy roʻyxat alohida mashq yoʻlini saqlaydi."),
       ("uzbek70k", "Eng katta indeks ham faqat kerakli mashqlarni yaratadi."),
+      ("dutch1k", "Elke lokale lijst behoudt een eigen oefenroute."),
+      ("dutch10k", "De grotere index maakt alleen de gevraagde oefeningen."),
+      ("czech1k", "Každý místní seznam zachovává vlastní cestu cvičení."),
+      ("czech10k", "Větší rejstřík vytváří jen požadovaná cvičení."),
+      ("slovak1k", "Každý miestny zoznam zachováva vlastnú cestu cvičenia."),
+      ("slovak10k", "Väčší register vytvára iba požadované cvičenia."),
+      ("slovenian1k", "Vsak krajevni seznam ohrani svojo pot vaje."),
+      ("slovenian5k", "Večji indeks ustvari samo zahtevane vaje."),
+      ("croatian1k", "Svaki lokalni popis čuva zaseban put vježbe."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

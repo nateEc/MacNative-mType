@@ -9868,6 +9868,202 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testCentralEuropeanScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    struct ExpectedScale {
+      let rawValue: String
+      let displayName: String
+      let count: Int
+      let minimumLength: Int
+      let maximumLength: Int
+      let uppercaseCount: Int
+      let punctuationCount: Int
+      let spaceCount: Int
+      let maximumSpaces: Int
+      let nonASCIICount: Int
+      let numberCount: Int
+      let uppercasePunctuationOverlap: Int
+      let punctuationSpaceOverlap: Int
+      let uppercaseNonASCIIOverlap: Int
+      let punctuationNonASCIIOverlap: Int
+      let spaceNonASCIIOverlap: Int
+      let uppercaseNumberOverlap: Int
+      let maximumPunctuationCharacters: Int
+      let supportsLazyInput: Bool
+      let zipfSupport: ZipfFrequencySupport
+      let quoteSourceRawValue: String
+      let wikipediaCode: String
+      let speechLocale: String
+    }
+
+    let cases = [
+      ExpectedScale(
+        rawValue: "czech1k", displayName: "Čeština · 1k · Typebar", count: 899,
+        minimumLength: 1, maximumLength: 15, uppercaseCount: 16, punctuationCount: 2,
+        spaceCount: 0, maximumSpaces: 0, nonASCIICount: 532, numberCount: 0,
+        uppercasePunctuationOverlap: 0, punctuationSpaceOverlap: 0,
+        uppercaseNonASCIIOverlap: 5, punctuationNonASCIIOverlap: 1,
+        spaceNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        maximumPunctuationCharacters: 1, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "czech", wikipediaCode: "cs", speechLocale: "cs-CZ"),
+      ExpectedScale(
+        rawValue: "czech10k", displayName: "Čeština · 10k · Typebar", count: 9_629,
+        minimumLength: 1, maximumLength: 19, uppercaseCount: 418, punctuationCount: 5,
+        spaceCount: 0, maximumSpaces: 0, nonASCIICount: 6_245, numberCount: 0,
+        uppercasePunctuationOverlap: 1, punctuationSpaceOverlap: 0,
+        uppercaseNonASCIIOverlap: 156, punctuationNonASCIIOverlap: 0,
+        spaceNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        maximumPunctuationCharacters: 1, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "czech", wikipediaCode: "cs", speechLocale: "cs-CZ"),
+      ExpectedScale(
+        rawValue: "slovak1k", displayName: "Slovenčina · 1k · Typebar", count: 1_001,
+        minimumLength: 1, maximumLength: 13, uppercaseCount: 0, punctuationCount: 0,
+        spaceCount: 0, maximumSpaces: 0, nonASCIICount: 524, numberCount: 0,
+        uppercasePunctuationOverlap: 0, punctuationSpaceOverlap: 0,
+        uppercaseNonASCIIOverlap: 0, punctuationNonASCIIOverlap: 0,
+        spaceNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        maximumPunctuationCharacters: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "slovak", wikipediaCode: "sk", speechLocale: "sk-SK"),
+      ExpectedScale(
+        rawValue: "slovak10k", displayName: "Slovenčina · 10k · Typebar", count: 9_944,
+        minimumLength: 1, maximumLength: 15, uppercaseCount: 41, punctuationCount: 0,
+        spaceCount: 0, maximumSpaces: 0, nonASCIICount: 6_046, numberCount: 0,
+        uppercasePunctuationOverlap: 0, punctuationSpaceOverlap: 0,
+        uppercaseNonASCIIOverlap: 13, punctuationNonASCIIOverlap: 0,
+        spaceNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        maximumPunctuationCharacters: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "slovak", wikipediaCode: "sk", speechLocale: "sk-SK"),
+      ExpectedScale(
+        rawValue: "slovenian1k", displayName: "Slovenščina · 1k · Typebar", count: 1_023,
+        minimumLength: 1, maximumLength: 13, uppercaseCount: 0, punctuationCount: 0,
+        spaceCount: 0, maximumSpaces: 0, nonASCIICount: 227, numberCount: 0,
+        uppercasePunctuationOverlap: 0, punctuationSpaceOverlap: 0,
+        uppercaseNonASCIIOverlap: 0, punctuationNonASCIIOverlap: 0,
+        spaceNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        maximumPunctuationCharacters: 0, supportsLazyInput: true, zipfSupport: .supported,
+        quoteSourceRawValue: "slovenian", wikipediaCode: "sl", speechLocale: "sl-SI"),
+      ExpectedScale(
+        rawValue: "slovenian5k", displayName: "Slovenščina · 5k · Typebar", count: 4_971,
+        minimumLength: 1, maximumLength: 17, uppercaseCount: 0, punctuationCount: 2,
+        spaceCount: 0, maximumSpaces: 0, nonASCIICount: 1_213, numberCount: 0,
+        uppercasePunctuationOverlap: 0, punctuationSpaceOverlap: 0,
+        uppercaseNonASCIIOverlap: 0, punctuationNonASCIIOverlap: 0,
+        spaceNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        maximumPunctuationCharacters: 2, supportsLazyInput: true, zipfSupport: .supported,
+        quoteSourceRawValue: "slovenian", wikipediaCode: "sl", speechLocale: "sl-SI"),
+      ExpectedScale(
+        rawValue: "croatian1k", displayName: "Hrvatski · 1k · Typebar", count: 1_108,
+        minimumLength: 1, maximumLength: 14, uppercaseCount: 0, punctuationCount: 0,
+        spaceCount: 9, maximumSpaces: 1, nonASCIICount: 226, numberCount: 0,
+        uppercasePunctuationOverlap: 0, punctuationSpaceOverlap: 0,
+        uppercaseNonASCIIOverlap: 0, punctuationNonASCIIOverlap: 0,
+        spaceNonASCIIOverlap: 4, uppercaseNumberOverlap: 0,
+        maximumPunctuationCharacters: 0, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "croatian", wikipediaCode: "hr", speechLocale: "hr-HR"),
+      ExpectedScale(
+        rawValue: "dutch1k", displayName: "Nederlands · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 15, uppercaseCount: 0, punctuationCount: 0,
+        spaceCount: 0, maximumSpaces: 0, nonASCIICount: 1, numberCount: 0,
+        uppercasePunctuationOverlap: 0, punctuationSpaceOverlap: 0,
+        uppercaseNonASCIIOverlap: 0, punctuationNonASCIIOverlap: 0,
+        spaceNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        maximumPunctuationCharacters: 0, supportsLazyInput: false, zipfSupport: .unknown,
+        quoteSourceRawValue: "dutch", wikipediaCode: "nl", speechLocale: "nl-NL"),
+      ExpectedScale(
+        rawValue: "dutch10k", displayName: "Nederlands · 10k · Typebar", count: 9_998,
+        minimumLength: 1, maximumLength: 30, uppercaseCount: 131, punctuationCount: 181,
+        spaceCount: 62, maximumSpaces: 4, nonASCIICount: 80, numberCount: 1,
+        uppercasePunctuationOverlap: 51, punctuationSpaceOverlap: 3,
+        uppercaseNonASCIIOverlap: 1, punctuationNonASCIIOverlap: 3,
+        spaceNonASCIIOverlap: 0, uppercaseNumberOverlap: 1,
+        maximumPunctuationCharacters: 4, supportsLazyInput: false, zipfSupport: .unknown,
+        quoteSourceRawValue: "dutch", wikipediaCode: "nl", speechLocale: "nl-NL"),
+    ]
+
+    for expected in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: expected.rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: expected.quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+      let hasUppercase: (String) -> Bool = { $0.contains(where: \.isUppercase) }
+      let hasPunctuation: (String) -> Bool = { $0.contains(where: \.isPunctuation) }
+      let hasSpace: (String) -> Bool = { $0.contains(" ") }
+      let hasNonASCII: (String) -> Bool = {
+        $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }
+      let hasNumber: (String) -> Bool = { $0.contains(where: \.isNumber) }
+
+      XCTAssertEqual(language.displayName, expected.displayName, expected.rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, expected.rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, expected.rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, expected.rawValue)
+      XCTAssertEqual(language.supportsLazyLatinInput, expected.supportsLazyInput, expected.rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, expected.rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, expected.rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, expected.zipfSupport, expected.rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language),
+        expected.wikipediaCode, expected.rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertEqual(words.count, expected.count, expected.rawValue)
+      XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), expected.maximumLength, expected.rawValue)
+      XCTAssertEqual(words.filter(hasUppercase).count, expected.uppercaseCount, expected.rawValue)
+      XCTAssertEqual(words.filter(hasPunctuation).count, expected.punctuationCount, expected.rawValue)
+      XCTAssertEqual(words.filter(hasSpace).count, expected.spaceCount, expected.rawValue)
+      XCTAssertEqual(
+        words.lazy.map { $0.filter { $0 == " " }.count }.max(),
+        expected.maximumSpaces, expected.rawValue)
+      XCTAssertEqual(words.filter(hasNonASCII).count, expected.nonASCIICount, expected.rawValue)
+      XCTAssertEqual(words.filter(hasNumber).count, expected.numberCount, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasUppercase($0) && hasPunctuation($0) }.count,
+        expected.uppercasePunctuationOverlap, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasPunctuation($0) && hasSpace($0) }.count,
+        expected.punctuationSpaceOverlap, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasUppercase($0) && hasNonASCII($0) }.count,
+        expected.uppercaseNonASCIIOverlap, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasPunctuation($0) && hasNonASCII($0) }.count,
+        expected.punctuationNonASCIIOverlap, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasSpace($0) && hasNonASCII($0) }.count,
+        expected.spaceNonASCIIOverlap, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasUppercase($0) && hasNumber($0) }.count,
+        expected.uppercaseNumberOverlap, expected.rawValue)
+      XCTAssertEqual(
+        words.lazy.map { $0.filter(\.isPunctuation).count }.max(),
+        expected.maximumPunctuationCharacters, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, expected.rawValue)
+      XCTAssertFalse(
+        words.contains { $0.unicodeScalars.contains(where: \.properties.isJoinControl) },
+        expected.rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, expected.rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        expected.rawValue)
+      XCTAssertGreaterThanOrEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ").count,
+        25, expected.rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, expected.rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text,
+          expected.rawValue)
+      }
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),

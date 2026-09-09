@@ -226,7 +226,7 @@ enum LivePracticeContentService {
     case .armenianWestern: return "hyw"
     case .greek, .greek1k, .greek5k, .greek10k, .greek25k, .greekKoine,
       .greeklish, .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k: return "el"
-    case .dutch: return "nl"
+    case .dutch, .dutch1k, .dutch10k: return "nl"
     case .filipino: return "tl"
     case .catalan: return "ca"
     case .indonesian: return "id"
@@ -242,10 +242,10 @@ enum LivePracticeContentService {
       return "nn"
     case .swedish, .swedishDiacritics: return "sv"
     case .hungarian: return "hu"
-    case .czech: return "cs"
-    case .slovak: return "sk"
-    case .slovenian: return "sl"
-    case .croatian: return "hr"
+    case .czech, .czech1k, .czech10k: return "cs"
+    case .slovak, .slovak1k, .slovak10k: return "sk"
+    case .slovenian, .slovenian1k, .slovenian5k: return "sl"
+    case .croatian, .croatian1k: return "hr"
     case .serbian, .serbianLatin: return "sr"
     case .bulgarian, .bulgarianLatin: return "bg"
     case .romanian, .romanian1k, .romanian5k, .romanian10k, .romanian25k,

@@ -4632,6 +4632,11 @@ enum OfflineContent {
     case .kyrgyz1k: .kyrgyz
     case .tatar1k, .tatar5k, .tatar9k: .tatar
     case .uzbek1k, .uzbek70k: .uzbek
+    case .dutch1k, .dutch10k: .dutch
+    case .czech1k, .czech10k: .czech
+    case .slovak1k, .slovak10k: .slovak
+    case .slovenian1k, .slovenian5k: .slovenian
+    case .croatian1k: .croatian
     default: nil
     }
     if let source = inheritedScaleQuoteSource {
