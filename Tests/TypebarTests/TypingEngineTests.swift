@@ -17250,10 +17250,29 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(
       legacy,
-      .init(raw: false, burst: false, errors: true, personalBestLine: true, tagPersonalBestLine: true))
+      .init(
+        raw: false, burst: false, errors: true, smoothBurst: true,
+        personalBestLine: true, tagPersonalBestLine: true))
     let restored = try JSONDecoder().decode(
       ResultPerformanceVisibility.self, from: JSONEncoder().encode(legacy))
     XCTAssertEqual(restored, legacy)
+  }
+
+  func testResultBurstSmoothingCanPreserveRawValuesOrSoftenLocalSpikes() {
+    let points = [
+      ResultPerformancePoint(elapsed: 1, wpm: 30, rawWpm: 32, burstWpm: 20, errorCount: 0),
+      ResultPerformancePoint(elapsed: 2, wpm: 31, rawWpm: 34, burstWpm: 100, errorCount: 1),
+      ResultPerformancePoint(elapsed: 3, wpm: 32, rawWpm: 35, burstWpm: 20, errorCount: 0),
+      ResultPerformancePoint(elapsed: 4, wpm: 33, rawWpm: 36, burstWpm: 20, errorCount: 0),
+    ]
+
+    XCTAssertEqual(ResultBurstSmoothingPolicy.points(points, enabled: false), points)
+    let smoothed = ResultBurstSmoothingPolicy.points(points, enabled: true)
+    XCTAssertEqual(smoothed.map(\.burstWpm), [47, 60, 40, 20])
+    XCTAssertEqual(smoothed.map(\.wpm), points.map(\.wpm))
+    XCTAssertEqual(smoothed.map(\.rawWpm), points.map(\.rawWpm))
+    XCTAssertEqual(smoothed.map(\.errorCount), points.map(\.errorCount))
+    XCTAssertEqual(ResultBurstSmoothingPolicy.points([], enabled: true), [])
   }
 
   func testWordBurstHeatmapUsesCurrentResultQuintilesAndLeavesMissingBurstsNeutral() throws {
@@ -18500,7 +18519,8 @@ final class TypingEngineTests: XCTestCase {
     settings.alwaysShowDecimalPlaces = true
     settings.alwaysShowWordsHistory = true
     settings.showWordBurstHeatmap = true
-    settings.resultPerformanceVisibility = .init(raw: false, burst: false, errors: true)
+    settings.resultPerformanceVisibility = .init(
+      raw: false, burst: false, errors: true, smoothBurst: false)
     settings.startGraphsAtZero = false
     settings.mutateHistoryChartVisibility {
       $0.accuracy = false
@@ -18640,7 +18660,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(restored.alwaysShowDecimalPlaces)
     XCTAssertTrue(restored.alwaysShowWordsHistory)
     XCTAssertTrue(restored.showWordBurstHeatmap)
-    XCTAssertEqual(restored.resultPerformanceVisibility, .init(raw: false, burst: false, errors: true))
+    XCTAssertEqual(
+      restored.resultPerformanceVisibility,
+      .init(raw: false, burst: false, errors: true, smoothBurst: false))
     XCTAssertFalse(restored.startGraphsAtZero)
     XCTAssertEqual(
       restored.historyChartVisibility,

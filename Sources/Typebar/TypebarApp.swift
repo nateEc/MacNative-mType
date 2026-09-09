@@ -4506,6 +4506,17 @@ private struct ResultPerformanceChart: View {
         HStack(spacing: 6) {
           traceToggle("Raw", isOn: visibilityBinding(\.raw), color: .secondary)
           traceToggle("Burst", isOn: visibilityBinding(\.burst), color: .orange)
+          Button(visibility.smoothBurst ? "平滑" : "原始") {
+            visibility.smoothBurst.toggle()
+            onVisibilityChange(visibility)
+          }
+          .buttonStyle(.bordered)
+          .controlSize(.mini)
+          .tint(visibility.smoothBurst ? .orange : .secondary)
+          .disabled(!visibility.burst)
+          .accessibilityLabel("Burst 曲线")
+          .accessibilityValue(visibility.smoothBurst ? "平滑" : "原始")
+          .help(visibility.smoothBurst ? "显示原始 Burst 尖峰" : "平滑 Burst 尖峰")
           traceToggle("错误", isOn: visibilityBinding(\.errors), color: .red)
           if resultPersonalBestFeedback != nil {
             traceToggle("本机 PB", isOn: visibilityBinding(\.personalBestLine), color: .secondary)
@@ -4515,7 +4526,7 @@ private struct ResultPerformanceChart: View {
           }
           Spacer()
         }
-        Chart(points) { point in
+        Chart(displayedPoints) { point in
           LineMark(
             x: .value("秒", point.elapsed),
             y: .value(typingSpeedUnit.displayName, typingSpeedUnit.converted(wpm: point.wpm))
@@ -4606,7 +4617,7 @@ private struct ResultPerformanceChart: View {
           resultInspectionView(inspection)
         }
         if visibility.errors {
-          Chart(points) { point in
+          Chart(displayedPoints) { point in
             BarMark(
               x: .value("秒", point.elapsed),
               y: .value("错误", point.errorCount)
@@ -4629,7 +4640,11 @@ private struct ResultPerformanceChart: View {
 
   private var inspection: ResultPerformanceInspection? {
     ResultPerformanceInspectionPolicy.inspection(
-      nearestTo: selectedElapsed, points: points, reviews: reviews, events: events)
+      nearestTo: selectedElapsed, points: displayedPoints, reviews: reviews, events: events)
+  }
+
+  private var displayedPoints: [ResultPerformancePoint] {
+    ResultBurstSmoothingPolicy.points(points, enabled: visibility.smoothBurst)
   }
 
   private func resultInspectionView(_ inspection: ResultPerformanceInspection) -> some View {
@@ -4677,7 +4692,7 @@ private struct ResultPerformanceChart: View {
   }
 
   private var chartDescription: String {
-    var description = "强调色为 WPM，灰虚线为 Raw，橙色为 Burst"
+    var description = "强调色为 WPM，灰虚线为 Raw，橙色为\(visibility.smoothBurst ? "平滑" : "原始") Burst"
     if resultPersonalBestFeedback != nil { description += "；灰横线为本机 PB" }
     if !tagPersonalBestFeedback.isEmpty { description += "；灰点划线为已有标签 PB" }
     return "\(description)；数据仅由本机输入回放重建。"

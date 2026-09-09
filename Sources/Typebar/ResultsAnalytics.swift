@@ -734,6 +734,35 @@ struct ResultPerformancePoint: Equatable, Identifiable {
   var id: Int { Int((elapsed * 1_000).rounded()) }
 }
 
+/// Produces a presentation-only Burst trace. A short triangular window keeps
+/// local spikes legible without changing the saved result or any other metric.
+enum ResultBurstSmoothingPolicy {
+  static func points(
+    _ points: [ResultPerformancePoint], enabled: Bool
+  ) -> [ResultPerformancePoint] {
+    guard enabled, points.count > 1 else { return points }
+    return points.indices.map { index in
+      var weightedTotal = points[index].burstWpm * 2
+      var totalWeight = 2
+      if index > points.startIndex {
+        weightedTotal += points[index - 1].burstWpm
+        totalWeight += 1
+      }
+      if index < points.index(before: points.endIndex) {
+        weightedTotal += points[index + 1].burstWpm
+        totalWeight += 1
+      }
+      let point = points[index]
+      return .init(
+        elapsed: point.elapsed,
+        wpm: point.wpm,
+        rawWpm: point.rawWpm,
+        burstWpm: Int((Double(weightedTotal) / Double(totalWeight)).rounded()),
+        errorCount: point.errorCount)
+    }
+  }
+}
+
 struct ResultPerformanceInspection: Equatable {
   let point: ResultPerformancePoint
   let wordIndexes: [Int]
@@ -833,6 +862,7 @@ struct ResultPerformanceVisibility: Codable, Equatable {
   var raw: Bool
   var burst: Bool
   var errors: Bool
+  var smoothBurst: Bool
   var personalBestLine: Bool
   var tagPersonalBestLine: Bool
 
@@ -840,18 +870,20 @@ struct ResultPerformanceVisibility: Codable, Equatable {
     raw: Bool = true,
     burst: Bool = true,
     errors: Bool = true,
+    smoothBurst: Bool = true,
     personalBestLine: Bool = true,
     tagPersonalBestLine: Bool = true
   ) {
     self.raw = raw
     self.burst = burst
     self.errors = errors
+    self.smoothBurst = smoothBurst
     self.personalBestLine = personalBestLine
     self.tagPersonalBestLine = tagPersonalBestLine
   }
 
   private enum CodingKeys: String, CodingKey {
-    case raw, burst, errors, personalBestLine, tagPersonalBestLine
+    case raw, burst, errors, smoothBurst, personalBestLine, tagPersonalBestLine
   }
 
   init(from decoder: Decoder) throws {
@@ -859,6 +891,7 @@ struct ResultPerformanceVisibility: Codable, Equatable {
     raw = try values.decodeIfPresent(Bool.self, forKey: .raw) ?? true
     burst = try values.decodeIfPresent(Bool.self, forKey: .burst) ?? true
     errors = try values.decodeIfPresent(Bool.self, forKey: .errors) ?? true
+    smoothBurst = try values.decodeIfPresent(Bool.self, forKey: .smoothBurst) ?? true
     personalBestLine = try values.decodeIfPresent(Bool.self, forKey: .personalBestLine) ?? true
     tagPersonalBestLine = try values.decodeIfPresent(Bool.self, forKey: .tagPersonalBestLine) ?? true
   }
@@ -868,6 +901,7 @@ struct ResultPerformanceVisibility: Codable, Equatable {
     try values.encode(raw, forKey: .raw)
     try values.encode(burst, forKey: .burst)
     try values.encode(errors, forKey: .errors)
+    try values.encode(smoothBurst, forKey: .smoothBurst)
     try values.encode(personalBestLine, forKey: .personalBestLine)
     try values.encode(tagPersonalBestLine, forKey: .tagPersonalBestLine)
   }
