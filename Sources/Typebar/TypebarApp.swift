@@ -18,7 +18,10 @@ struct TypebarApp: App {
       dataStoreContent
     }
     .windowResizability(.contentMinSize)
-    .commands { TypebarAboutCommands() }
+    .commands {
+      TypebarAboutCommands()
+      CommandPaletteCommands()
+    }
 
     Settings {
       PreferencesView(settings: settings, account: account, hotkey: hotkey)
@@ -739,6 +742,7 @@ private struct ContentView: View {
     }
     .tint(activeTheme.accent)
     .preferredColorScheme(settings.followSystemTheme ? nil : activeTheme.colorScheme)
+    .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
@@ -1635,6 +1639,7 @@ private struct ContentView: View {
         onDelete: { session.deleteBackward() },
         onDeleteWord: { session.deleteWordBackward() },
         onRestart: attemptRestart,
+        onOpenCommandPalette: { showingCommandPalette = true },
         onBailoutArmed: armLongTestBailout,
         onBailout: {
           bailoutConfirmationMessage = nil
@@ -2299,7 +2304,7 @@ private struct ContentView: View {
     if settings.showKeyTips {
       VStack(spacing: 6) {
         Label("\(keyTipRestartShortcut) · 重新开始测试", systemImage: "arrow.counterclockwise")
-        Label("⇧⌘K · 打开命令面板", systemImage: "command")
+        Label("⇧⌘K / ⇧⌘P · 打开命令面板", systemImage: "command")
       }
       .font(.caption)
       .foregroundStyle(.secondary)

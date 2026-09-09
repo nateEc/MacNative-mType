@@ -18,6 +18,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onDelete: () -> Void
     let onDeleteWord: () -> Void
     let onRestart: () -> Void
+    let onOpenCommandPalette: () -> Void
     let onBailoutArmed: () -> Void
     let onBailout: () -> Void
     let onFinishZen: () -> Void
@@ -41,6 +42,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onDelete = onDelete
         view.onDeleteWord = onDeleteWord
         view.onRestart = onRestart
+        view.onOpenCommandPalette = onOpenCommandPalette
         view.quickRestartKey = quickRestartKey
         view.keyboardInputMapping = keyboardInputMapping
         view.keymapLayout = keymapLayout
@@ -71,6 +73,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onDelete: () -> Void = {}
     var onDeleteWord: () -> Void = {}
     var onRestart: () -> Void = {}
+    var onOpenCommandPalette: () -> Void = {}
     var onBailoutArmed: () -> Void = {}
     var onBailout: () -> Void = {}
     var quickRestartKey: QuickRestartKey = .off
@@ -139,6 +142,10 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
+        if Self.opensCommandPalette(event) {
+            if !event.isARepeat { onOpenCommandPalette() }
+            return
+        }
         onPhysicalKey(event.keyCode, true, event.isARepeat)
         onModifierFlagsChanged(event.modifierFlags)
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {
@@ -218,8 +225,16 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyUp(with event: NSEvent) {
+        if Self.opensCommandPalette(event) { return }
         onPhysicalKey(event.keyCode, false, false)
         super.keyUp(with: event)
+    }
+
+    private static func opensCommandPalette(_ event: NSEvent) -> Bool {
+        event.modifierFlags.contains([.command, .shift])
+          && !event.modifierFlags.contains(.control)
+          && !event.modifierFlags.contains(.option)
+          && event.charactersIgnoringModifiers?.lowercased() == "p"
     }
 
     func resetBailoutAttempt() {

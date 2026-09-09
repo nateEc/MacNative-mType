@@ -1,5 +1,28 @@
 import SwiftUI
 
+private struct OpenCommandPaletteFocusedValueKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+extension FocusedValues {
+    var openCommandPalette: (() -> Void)? {
+        get { self[OpenCommandPaletteFocusedValueKey.self] }
+        set { self[OpenCommandPaletteFocusedValueKey.self] = newValue }
+    }
+}
+
+struct CommandPaletteCommands: Commands {
+    @FocusedValue(\.openCommandPalette) private var openCommandPalette
+
+    var body: some Commands {
+        CommandGroup(after: .toolbar) {
+            Button("打开命令面板") { openCommandPalette?() }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(openCommandPalette == nil)
+        }
+    }
+}
+
 /// Controls whether the command palette starts as a global command search or
 /// exposes the same commands through native navigation groups.
 enum CommandPaletteListMode: String, CaseIterable, Codable, Equatable, Identifiable {

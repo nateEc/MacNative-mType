@@ -14103,6 +14103,40 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testNativeInputBridgeOpensCommandPaletteWithCommandShiftPWithoutTyping() throws {
+    var opens = 0
+    var accepted = [String]()
+    var physicalEvents = 0
+    let view = TypingInputView()
+    view.onOpenCommandPalette = { opens += 1 }
+    view.onInsert = { text, _ in accepted.append(text) }
+    view.onPhysicalKey = { _, _, _ in physicalEvents += 1 }
+    let shortcut = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: 0,
+        windowNumber: 0, context: nil, characters: "P", charactersIgnoringModifiers: "p",
+        isARepeat: false, keyCode: 35))
+    let repeatedShortcut = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: 0.1,
+        windowNumber: 0, context: nil, characters: "P", charactersIgnoringModifiers: "p",
+        isARepeat: true, keyCode: 35))
+    let shortcutRelease = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyUp, location: .zero, modifierFlags: [.command, .shift], timestamp: 0.2,
+        windowNumber: 0, context: nil, characters: "P", charactersIgnoringModifiers: "p",
+        isARepeat: false, keyCode: 35))
+
+    view.keyDown(with: shortcut)
+    view.keyDown(with: repeatedShortcut)
+    view.keyUp(with: shortcutRelease)
+
+    XCTAssertEqual(opens, 1)
+    XCTAssertTrue(accepted.isEmpty)
+    XCTAssertEqual(physicalEvents, 0)
+  }
+
+  @MainActor
   func testNativeInputBridgeOnlySendsReturnWhenThePromptAcceptsNewlines() throws {
     var accepted = [String]()
     var restarts = 0
