@@ -172,6 +172,70 @@ enum ResultHistoryRowSummaryPolicy {
   }
 }
 
+/// Builds the completed-result equivalent of the reference test-type block
+/// from the immutable result snapshot. It never reads the currently selected
+/// controls, so changing the next test cannot rewrite the visible summary.
+enum ResultConfigurationSummaryPolicy {
+  static func text(for result: CompletedTestResult) -> String {
+    let configuration = result.configuration
+    var pieces = [modeAndParameter(configuration, prompt: result.prompt)]
+
+    if configuration.mode != .custom,
+      configuration.modifiers.allSatisfy({
+        !TestModifierPolicy.languageIndependentResultModifiers.contains($0)
+      })
+    {
+      pieces.append(configuration.language.displayName)
+    }
+    if configuration.contentOptions.includePunctuation { pieces.append("标点") }
+    if configuration.contentOptions.includeNumbers { pieces.append("数字") }
+    if configuration.rules.blindMode { pieces.append("盲打") }
+    if configuration.modifiers.contains(.lazyLatin) {
+      pieces.append(TestModifier.lazyLatin.displayName)
+    }
+    pieces.append(contentsOf: configuration.modifiers.filter {
+      !TestModifier.inputPreferenceCases.contains($0)
+    }.map(\.displayName))
+    if configuration.difficulty != .normal {
+      pieces.append(configuration.difficulty.displayName)
+    }
+    if configuration.rules.stopOnErrorMode.isEnabled {
+      pieces.append("遇错停下：\(configuration.rules.stopOnErrorMode.displayName)")
+    }
+    if configuration.rules.deleteOnErrorMode.isEnabled {
+      pieces.append("遇错删除：\(configuration.rules.deleteOnErrorMode.displayName)")
+    }
+    return pieces.joined(separator: " · ")
+  }
+
+  private static func modeAndParameter(
+    _ configuration: TestConfiguration, prompt: String
+  ) -> String {
+    let mode = configuration.mode.displayName
+    switch configuration.mode {
+    case .time:
+      guard let duration = configuration.duration else { return "\(mode) 无限" }
+      guard duration.isFinite, duration > 0 else {
+        return duration == 0 ? "\(mode) 无限" : mode
+      }
+      return "\(mode) \(formatted(duration)) 秒"
+    case .words:
+      guard let wordLimit = configuration.wordLimit, wordLimit >= 0 else { return mode }
+      return wordLimit == 0 ? "\(mode) 无限" : "\(mode) \(wordLimit) 词"
+    case .quote:
+      let length = QuoteLengthPolicy.actualLength(
+        for: prompt, language: configuration.language)
+      return "\(mode) \(length.displayName)"
+    case .zen, .custom:
+      return mode
+    }
+  }
+
+  private static func formatted(_ duration: TimeInterval) -> String {
+    String(format: "%.0f", locale: Locale(identifier: "en_US_POSIX"), duration)
+  }
+}
+
 /// Controls the four independently visible traces in the local history view.
 /// The defaults mirror the reference account history's initially enabled set,
 /// while the native chart keeps its data entirely on this Mac.

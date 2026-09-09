@@ -12060,6 +12060,61 @@ final class TypingEngineTests: XCTestCase {
       "typebar-result-19700101-000000.png")
   }
 
+  func testCompletedResultConfigurationSummaryUsesTheCompletedSnapshotAndActualQuoteLength() {
+    let configuration = TestConfiguration(
+      mode: .time, duration: 30, wordLimit: nil, difficulty: .expert,
+      rules: .init(stopOnErrorMode: .word, blindMode: true), language: .french,
+      modifiers: [.uppercase, .lazyLatin],
+      contentOptions: .init(includePunctuation: true, includeNumbers: true))
+    let timed = CompletedTestResult(
+      id: UUID(), configuration: configuration, outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(30), typedCharacterCount: 100,
+      correctCharacterCount: 95, errorCount: 5, wpm: 40, rawWpm: 44, accuracy: 95)
+    XCTAssertEqual(
+      ResultConfigurationSummaryPolicy.text(for: timed),
+      "时间 30 秒 · Français · 标点 · 数字 · 盲打 · 简化重音输入 · 全大写 · 专家 · 遇错停下：单词")
+
+    let quote = CompletedTestResult(
+      id: UUID(), configuration: .init(
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        language: .english),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 121, correctCharacterCount: 121, errorCount: 0,
+      wpm: 48, rawWpm: 48, accuracy: 100, prompt: String(repeating: "x", count: 121))
+    XCTAssertEqual(
+      ResultConfigurationSummaryPolicy.text(for: quote),
+      "引语 中等引语 · English")
+
+    let infiniteWords = CompletedTestResult(
+      id: UUID(), configuration: .words(
+        0, rules: .init(deleteOnErrorMode: .letterHard)),
+      outcome: .bailedOut, startedAt: start, finishedAt: start.addingTimeInterval(5),
+      typedCharacterCount: 5, correctCharacterCount: 4, errorCount: 1,
+      wpm: 12, rawWpm: 15, accuracy: 80)
+    XCTAssertEqual(
+      ResultConfigurationSummaryPolicy.text(for: infiniteWords),
+      "字数 无限 · English · 遇错删除：字符（硬）")
+
+    let binary = CompletedTestResult(
+      id: UUID(), configuration: TestConfiguration.timed(
+        seconds: 30, language: .french).with(modifiers: [.binaryStream]),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 30, correctCharacterCount: 30, errorCount: 0,
+      wpm: 12, rawWpm: 12, accuracy: 100)
+    XCTAssertEqual(
+      ResultConfigurationSummaryPolicy.text(for: binary),
+      "时间 30 秒 · 二进制流")
+
+    let custom = CompletedTestResult(
+      id: UUID(), configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        language: .german),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(5),
+      typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
+      wpm: 12, rawWpm: 12, accuracy: 100)
+    XCTAssertEqual(ResultConfigurationSummaryPolicy.text(for: custom), "自定义")
+  }
+
   func testResultCSVExportEscapesLocalMetadataAndUsesUtcFilename() throws {
     let configuration = TestConfiguration.timed(
       seconds: 30, difficulty: .expert, language: .french,

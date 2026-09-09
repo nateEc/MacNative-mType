@@ -844,6 +844,15 @@ enum TestModifierPolicy {
     .memory, .poetryStream, .referenceStream,
   ]
 
+  /// Content modes whose visible prompt identity comes from the modifier,
+  /// matching the fixed reference metadata's `ignoresLanguage` result rule.
+  static let languageIndependentResultModifiers: Set<TestModifier> = [
+    .underscoreSeparators, .binaryStream, .accountingStream, .hexadecimalStream,
+    .symbolStream, .asciiStream, .specialCharacterStream, .gibberishStream,
+    .poetryStream, .referenceStream, .arrowStream, .ipv4Stream, .ipv6Stream,
+    .pseudolangStream, .morseStream,
+  ]
+
   static func compatibleWithInfiniteTest(_ modifiers: [TestModifier]) -> [TestModifier] {
     normalized(modifiers).filter { !finiteDurationOnly.contains($0) }
   }

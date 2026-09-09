@@ -3270,6 +3270,13 @@ private struct CompletedResultView: View {
         Text(resultOutcomeSubtitle)
           .font(.subheadline)
           .foregroundStyle(.secondary)
+        Text(ResultConfigurationSummaryPolicy.text(for: result))
+          .font(.caption.weight(.medium))
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+          .lineLimit(3)
+          .accessibilityLabel(
+            "测试类型，\(ResultConfigurationSummaryPolicy.text(for: result))")
       }
 
       HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -3879,12 +3886,9 @@ private struct ResultSnapshotCard: View {
           }
         }
       }
-      HStack {
-        Text(result.configuration.mode.rawValue.uppercased())
-        Text("•")
-        Text(result.configuration.language.displayName)
-        Text("•")
-        Text("\(Int(result.finishedAt.timeIntervalSince(result.startedAt))) 秒")
+      HStack(alignment: .firstTextBaseline) {
+        Text(ResultConfigurationSummaryPolicy.text(for: result))
+          .lineLimit(2)
         Spacer()
         Text("OFFLINE")
       }
