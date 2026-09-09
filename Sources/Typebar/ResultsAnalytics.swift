@@ -1905,6 +1905,17 @@ struct ActivityBarPoint: Equatable, Identifiable {
     var id: Date { day }
 }
 
+enum ActivityBarSelectionPolicy {
+    static func nearestPoint(to date: Date, in points: [ActivityBarPoint]) -> ActivityBarPoint? {
+        points.min { lhs, rhs in
+            let lhsDistance = abs(lhs.day.timeIntervalSince(date))
+            let rhsDistance = abs(rhs.day.timeIntervalSince(date))
+            if lhsDistance == rhsDistance { return lhs.day < rhs.day }
+            return lhsDistance < rhsDistance
+        }
+    }
+}
+
 struct ActivityTypingMinutesTrendPoint: Equatable, Identifiable {
     let day: Date
     let minutes: Double

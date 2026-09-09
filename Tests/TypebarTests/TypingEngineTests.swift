@@ -17793,6 +17793,27 @@ final class TypingEngineTests: XCTestCase {
       ])
   }
 
+  func testActivityBarSelectionChoosesNearestCalendarPointAndRejectsEmptyInput() {
+    let start = Date(timeIntervalSince1970: 86_400)
+    let points = [
+      ActivityBarPoint(day: start, completedTests: 1, typingSeconds: 30),
+      ActivityBarPoint(
+        day: start.addingTimeInterval(86_400), completedTests: 2, typingSeconds: 90),
+      ActivityBarPoint(
+        day: start.addingTimeInterval(172_800), completedTests: 0, typingSeconds: 0),
+    ]
+
+    XCTAssertEqual(
+      ActivityBarSelectionPolicy.nearestPoint(
+        to: start.addingTimeInterval(60_000), in: points)?.day,
+      start.addingTimeInterval(86_400))
+    XCTAssertEqual(
+      ActivityBarSelectionPolicy.nearestPoint(
+        to: start.addingTimeInterval(43_200), in: points)?.day,
+      start)
+    XCTAssertNil(ActivityBarSelectionPolicy.nearestPoint(to: start, in: []))
+  }
+
   func testTypingMinutesTrendUsesOnlyObservedDaysAndTheirCalendarSpacing() throws {
     let start = Date(timeIntervalSince1970: 86_400)
     let points = [

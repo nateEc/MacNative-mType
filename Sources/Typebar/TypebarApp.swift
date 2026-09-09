@@ -5147,6 +5147,11 @@ private struct ActivityBarChartView: View {
   @Binding var measure: ResultsHistoryView.ActivityChartMeasure
   let speedUnit: TypingSpeedUnit
   let startsAtZero: Bool
+  @State private var selectedDate: Date?
+
+  private var selectedPoint: ActivityBarPoint? {
+    selectedDate.flatMap { ActivityBarSelectionPolicy.nearestPoint(to: $0, in: points) }
+  }
 
   private var yTitle: String {
     switch measure {
@@ -5195,6 +5200,11 @@ private struct ActivityBarChartView: View {
           .accessibilityValue(
             "\(point.day.formatted(date: .abbreviated, time: .omitted))，\(point.minutes.formatted(.number.precision(.fractionLength(0...2)))) 分钟")
         }
+        if let selectedPoint {
+          RuleMark(x: .value("所选日期", selectedPoint.day, unit: .day))
+            .foregroundStyle(.secondary)
+            .lineStyle(.init(lineWidth: 1, dash: [3, 3]))
+        }
       }
       .chartXAxis {
         AxisMarks(values: .stride(by: .weekOfYear)) { _ in
@@ -5203,7 +5213,17 @@ private struct ActivityBarChartView: View {
         }
       }
       .chartYScale(domain: .automatic(includesZero: includesZero))
+      .chartXSelection(value: $selectedDate)
       .frame(height: 110)
+      if let selectedPoint {
+        ActivityDayDetailView(point: selectedPoint, speedUnit: speedUnit) {
+          selectedDate = nil
+        }
+      } else {
+        Text("点按或拖动图表，查看某一天的完整指标")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
     }
   }
 
@@ -5250,6 +5270,66 @@ private struct ActivityBarChartView: View {
   private func formattedSpeed(_ wpm: Double) -> String {
     speedUnit.converted(wpm: wpm).formatted(
       .number.precision(.fractionLength(0...2)))
+  }
+}
+
+private struct ActivityDayDetailView: View {
+  let point: ActivityBarPoint
+  let speedUnit: TypingSpeedUnit
+  let clearSelection: () -> Void
+
+  private let columns = [GridItem(.adaptive(minimum: 104), alignment: .leading)]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Text(point.day.formatted(date: .complete, time: .omitted))
+          .font(.caption.weight(.medium))
+        Spacer()
+        Button("清除选择", systemImage: "xmark.circle", action: clearSelection)
+          .labelStyle(.iconOnly)
+          .buttonStyle(.plain)
+          .help("清除活动日期选择")
+      }
+      LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
+        metric("练习时间", durationText)
+        metric("完成次数", "\(point.completedTests)")
+        metric("重开 / 完成", decimal(point.restartsPerCompletedTest, digits: 1...2))
+        metric("最高速度", optionalSpeed(Double(point.highestWPM)))
+        metric("平均速度", optionalSpeed(point.averageWPM))
+        metric("平均准确率", optionalPercent(point.averageAccuracy))
+        metric("平均稳定度", optionalPercent(point.averageConsistency))
+      }
+    }
+    .padding(8)
+    .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+  }
+
+  private func metric(_ title: String, _ value: String) -> some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text(title).font(.caption2).foregroundStyle(.secondary)
+      Text(value).font(.caption.monospacedDigit())
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private var durationText: String {
+    let seconds = max(0, Int(point.typingSeconds.rounded()))
+    return seconds >= 60 ? "\(seconds / 60) 分 \(seconds % 60) 秒" : "\(seconds) 秒"
+  }
+
+  private func optionalSpeed(_ wpm: Double) -> String {
+    guard point.completedTests > 0 else { return "—" }
+    return "\(speedUnit.converted(wpm: wpm).formatted(.number.precision(.fractionLength(0...2)))) \(speedUnit.displayName)"
+  }
+
+  private func optionalPercent(_ value: Double) -> String {
+    guard point.completedTests > 0 else { return "—" }
+    return "\(decimal(value, digits: 0...2))%"
+  }
+
+  private func decimal(_ value: Double, digits: ClosedRange<Int>) -> String {
+    value.formatted(.number.precision(.fractionLength(digits)))
   }
 }
 
