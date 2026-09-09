@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 268)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 276)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4259,6 +4259,14 @@ final class HealthRouteTests: XCTestCase {
       ("esperantoHSystem10k", "La loka indekso vastigas la ekzercon sen fremda vortaro."),
       ("esperantoHSystem25k", "Pli vasta kolekto restas klare aparta kaj loka."),
       ("esperantoHSystem36k", "La plej granda skalo generas nur la bezonatajn erojn."),
+      ("greek1k", "Κάθε μικρή κλίμακα κρατά τον δικό της ρυθμό."),
+      ("greek5k", "Ο τοπικός δείκτης μεγαλώνει χωρίς ξένη λίστα λέξεων."),
+      ("greek10k", "Η μεγαλύτερη συλλογή παραμένει καθαρή και ανεξάρτητη."),
+      ("greek25k", "Ο ευρύς δείκτης δημιουργεί μόνο τα αναγκαία στοιχεία."),
+      ("greeklish1k", "Kathe mikri klimaka krata ton diko tis rythmo."),
+      ("greeklish5k", "O topikos deiktis megalonei choris xeni lista lekseon."),
+      ("greeklish10k", "I megalyteri syllogi paramenei kathari kai anexartiti."),
+      ("greeklish25k", "O evrys deiktis dimiourgei mono ta anagkaia stoicheia."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

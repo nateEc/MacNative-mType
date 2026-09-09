@@ -514,6 +514,8 @@ public actor AuthStore {
     "esperanto1k", "esperanto10k", "esperanto25k", "esperanto36k",
     "esperantoXSystem1k", "esperantoXSystem10k", "esperantoXSystem25k", "esperantoXSystem36k",
     "esperantoHSystem1k", "esperantoHSystem10k", "esperantoHSystem25k", "esperantoHSystem36k",
+    "greek1k", "greek5k", "greek10k", "greek25k",
+    "greeklish1k", "greeklish5k", "greeklish10k", "greeklish25k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",

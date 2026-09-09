@@ -100,7 +100,8 @@ extension TypingLanguage {
     case .lao: "lo"
     case .amharic: "am-ET"
     case .armenianWestern: "hyw"
-    case .greek, .greekKoine, .greeklish: "el-GR"
+    case .greek, .greek1k, .greek5k, .greek10k, .greek25k, .greekKoine,
+      .greeklish, .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k: "el-GR"
     case .dutch: "nl-NL"
     case .filipino: "fil-PH"
     case .catalan: "ca-ES"

@@ -360,8 +360,16 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case kurdishCentral2k
   case kurdishCentral4k
   case greek
+  case greek1k
+  case greek5k
+  case greek10k
+  case greek25k
   case greekKoine
   case greeklish
+  case greeklish1k
+  case greeklish5k
+  case greeklish10k
+  case greeklish25k
   case dutch
   case filipino
   case catalan
@@ -5682,6 +5690,79 @@ enum StarterLexicon {
     "kleidi", "karekla", "ergasia", "skia", "spiti", "mathitis", "dasos", "elpida",
   ]
 
+  // These indexed streams preserve only the pinned configurations' aggregate
+  // shape. Their generated values are Typebar-authored and never read from the
+  // reference word lists.
+  private static let greekScaleAlphabet = Array("αβγδεζηθικλμνξοπρστυφχψω")
+
+  private static func greekScaleIndex(_ index: Int) -> String {
+    var value = index
+    var characters: [Character] = []
+    repeat {
+      characters.append(greekScaleAlphabet[value % greekScaleAlphabet.count])
+      value /= greekScaleAlphabet.count
+    } while value > 0
+    return String(characters.reversed())
+  }
+
+  private static func greekScaleLexicon(
+    marker: Character, count: Int, maximumLength: Int
+  ) -> IndexedLexicon {
+    IndexedLexicon(count: count) { index in
+      if index == 0 { return "ϙ" }
+      if index == 1 { return String(repeating: "ϙ", count: maximumLength) }
+      return "ϙ" + String(marker) + greekScaleIndex(index + 576)
+    }
+  }
+
+  private static func greeklishScaleLexicon(
+    marker: String, count: Int, maximumLength: Int, nonASCIICount: Int
+  ) -> IndexedLexicon {
+    precondition(nonASCIICount <= count - 2)
+    let nonASCIIEnd = 2 + nonASCIICount
+    return IndexedLexicon(count: count) { index in
+      if index == 0 { return "q" }
+      if index == 1 { return String(repeating: "q", count: maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      if index < nonASCIIEnd { return "ϙq" + marker + suffix }
+      return "qgl" + marker + suffix
+    }
+  }
+
+  static var greek1kLexicon: IndexedLexicon {
+    greekScaleLexicon(marker: "α", count: 993, maximumLength: 16)
+  }
+  static var greek5kLexicon: IndexedLexicon {
+    greekScaleLexicon(marker: "β", count: 4_963, maximumLength: 20)
+  }
+  static var greek10kLexicon: IndexedLexicon {
+    greekScaleLexicon(marker: "γ", count: 9_936, maximumLength: 21)
+  }
+  static var greek25kLexicon: IndexedLexicon {
+    greekScaleLexicon(marker: "δ", count: 24_836, maximumLength: 21)
+  }
+  static var greeklish1kLexicon: IndexedLexicon {
+    greeklishScaleLexicon(marker: "a", count: 990, maximumLength: 16, nonASCIICount: 12)
+  }
+  static var greeklish5kLexicon: IndexedLexicon {
+    greeklishScaleLexicon(marker: "b", count: 4_926, maximumLength: 20, nonASCIICount: 26)
+  }
+  static var greeklish10kLexicon: IndexedLexicon {
+    greeklishScaleLexicon(marker: "c", count: 9_808, maximumLength: 21, nonASCIICount: 49)
+  }
+  static var greeklish25kLexicon: IndexedLexicon {
+    greeklishScaleLexicon(marker: "d", count: 24_273, maximumLength: 21, nonASCIICount: 116)
+  }
+
+  static var greek1kWords: [String] { greek1kLexicon.materialized() }
+  static var greek5kWords: [String] { greek5kLexicon.materialized() }
+  static var greek10kWords: [String] { greek10kLexicon.materialized() }
+  static var greek25kWords: [String] { greek25kLexicon.materialized() }
+  static var greeklish1kWords: [String] { greeklish1kLexicon.materialized() }
+  static var greeklish5kWords: [String] { greeklish5kLexicon.materialized() }
+  static var greeklish10kWords: [String] { greeklish10kLexicon.materialized() }
+  static var greeklish25kWords: [String] { greeklish25kLexicon.materialized() }
+
   // Typebar-authored Dutch starter words. The compact corpus includes a
   // familiar accented form without importing a third-party word list.
   static let dutchWords = [
@@ -7690,6 +7771,12 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: greekWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .greek1k, .greek5k, .greek10k, .greek25k,
+      .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .greekKoine:
       return prompt(
         tokens: count, lexicon: greekKoineWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8398,8 +8485,16 @@ enum StarterLexicon {
     case .kurdishCentral2k: (kurdishCentral2kWords, ["،", "؛", "؟", "."])
     case .kurdishCentral4k: (kurdishCentral4kWords, ["،", "؛", "؟", "."])
     case .greek: (greekWords, [",", ".", "!", "?"])
+    case .greek1k: (greek1kWords, [",", ".", "!", "?"])
+    case .greek5k: (greek5kWords, [",", ".", "!", "?"])
+    case .greek10k: (greek10kWords, [",", ".", "!", "?"])
+    case .greek25k: (greek25kWords, [",", ".", "!", "?"])
     case .greekKoine: (greekKoineWords, [",", ".", "!", "?"])
     case .greeklish: (greeklishWords, [",", ".", "!", "?"])
+    case .greeklish1k: (greeklish1kWords, [",", ".", "!", "?"])
+    case .greeklish5k: (greeklish5kWords, [",", ".", "!", "?"])
+    case .greeklish10k: (greeklish10kWords, [",", ".", "!", "?"])
+    case .greeklish25k: (greeklish25kWords, [",", ".", "!", "?"])
     case .dutch: (dutchWords, [",", ".", "!", "?"])
     case .filipino: (filipinoWords, [",", ".", "!", "?"])
     case .catalan: (catalanWords, [",", ".", "!", "?"])
@@ -8746,8 +8841,16 @@ extension TypingLanguage {
     case .kurdishCentral2k: StarterLexicon.kurdishCentral2kWords
     case .kurdishCentral4k: StarterLexicon.kurdishCentral4kWords
     case .greek: StarterLexicon.greekWords
+    case .greek1k: StarterLexicon.greek1kWords
+    case .greek5k: StarterLexicon.greek5kWords
+    case .greek10k: StarterLexicon.greek10kWords
+    case .greek25k: StarterLexicon.greek25kWords
     case .greekKoine: StarterLexicon.greekKoineWords
     case .greeklish: StarterLexicon.greeklishWords
+    case .greeklish1k: StarterLexicon.greeklish1kWords
+    case .greeklish5k: StarterLexicon.greeklish5kWords
+    case .greeklish10k: StarterLexicon.greeklish10kWords
+    case .greeklish25k: StarterLexicon.greeklish25kWords
     case .dutch: StarterLexicon.dutchWords
     case .filipino: StarterLexicon.filipinoWords
     case .catalan: StarterLexicon.catalanWords
@@ -8973,6 +9076,14 @@ extension TypingLanguage {
     case .esperantoHSystem10k: StarterLexicon.esperantoHSystem10kLexicon
     case .esperantoHSystem25k: StarterLexicon.esperantoHSystem25kLexicon
     case .esperantoHSystem36k: StarterLexicon.esperantoHSystem36kLexicon
+    case .greek1k: StarterLexicon.greek1kLexicon
+    case .greek5k: StarterLexicon.greek5kLexicon
+    case .greek10k: StarterLexicon.greek10kLexicon
+    case .greek25k: StarterLexicon.greek25kLexicon
+    case .greeklish1k: StarterLexicon.greeklish1kLexicon
+    case .greeklish5k: StarterLexicon.greeklish5kLexicon
+    case .greeklish10k: StarterLexicon.greeklish10kLexicon
+    case .greeklish25k: StarterLexicon.greeklish25kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -9074,7 +9185,8 @@ extension TypingLanguage {
       .tamil, .hindi, .gujarati, .bangla, .banglaLetters,
       .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k,
       .nepali, .nepali1k, .kannada, .telugu, .malayalam,
-      .sanskrit, .greeklish, .dutch, .filipino,
+      .sanskrit, .greeklish, .greeklish1k, .greeklish5k, .greeklish10k,
+      .greeklish25k, .dutch, .filipino,
       .indonesian, .indonesian1k, .indonesian10k, .afrikaans1k, .serbian, .bulgarian,
       .bulgarianLatin,
       .khmer,
@@ -9156,6 +9268,7 @@ extension TypingLanguage {
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical, .english25k, .english450k, .kokanu, .likanu, .russianAbbreviations, .russianContractions, .russianContractions1k, .typingOfTheDead, .pokemon1k, .arabicMorocco, .sindhi, .armenian, .bemba,
       .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
+      .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k,
       .viossa, .viossaNjutro:
       return .unsupported
     default:
@@ -9330,8 +9443,16 @@ extension TypingLanguage {
     case .kurdishCentral2k: "کوردی ناوەندی · 2k · Typebar"
     case .kurdishCentral4k: "کوردی ناوەندی · 4k · Typebar"
     case .greek: "Ελληνικά"
+    case .greek1k: "Ελληνικά · 1k · Typebar"
+    case .greek5k: "Ελληνικά · 5k · Typebar"
+    case .greek10k: "Ελληνικά · 10k · Typebar"
+    case .greek25k: "Ελληνικά · 25k · Typebar"
     case .greekKoine: "Ἑλληνιστικὴ Κοινή"
     case .greeklish: "Greeklish"
+    case .greeklish1k: "Greeklish · 1k · Typebar"
+    case .greeklish5k: "Greeklish · 5k · Typebar"
+    case .greeklish10k: "Greeklish · 10k · Typebar"
+    case .greeklish25k: "Greeklish · 25k · Typebar"
     case .dutch: "Nederlands"
     case .filipino: "Filipino"
     case .catalan: "Català"

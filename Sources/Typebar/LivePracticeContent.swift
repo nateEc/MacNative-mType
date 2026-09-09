@@ -221,7 +221,8 @@ enum LivePracticeContentService {
     case .lao: return "lo"
     case .amharic: return "am"
     case .armenianWestern: return "hyw"
-    case .greek, .greekKoine, .greeklish: return "el"
+    case .greek, .greek1k, .greek5k, .greek10k, .greek25k, .greekKoine,
+      .greeklish, .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k: return "el"
     case .dutch: return "nl"
     case .filipino: return "tl"
     case .catalan: return "ca"
@@ -323,7 +324,7 @@ private extension TypingLanguage {
   /// source text remains directly typeable through the selected macOS IME and
   /// is segmented by the system tokenizer above.
   var supportsLiveEncyclopedia: Bool {
-    self != .greeklish && self != .ukrainianLatin
+    !rawValue.hasPrefix("greeklish") && self != .ukrainianLatin
       && self != .ukrainianLatynka1k && self != .ukrainianLatynka10k
       && self != .ukrainianLatynka50k && self != .serbianLatin && self != .japaneseRomaji
       && (usesSpaceDelimitedWords || self == .simplifiedChinese || self == .traditionalChinese)

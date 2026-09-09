@@ -4610,6 +4610,8 @@ enum OfflineContent {
       .esperantoXSystem25k, .esperantoXSystem36k: .esperantoXSystem
     case .esperantoHSystem1k, .esperantoHSystem10k,
       .esperantoHSystem25k, .esperantoHSystem36k: .esperantoHSystem
+    case .greek1k, .greek5k, .greek10k, .greek25k: .greek
+    case .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k: .greeklish
     default: nil
     }
     if let source = inheritedScaleQuoteSource {
