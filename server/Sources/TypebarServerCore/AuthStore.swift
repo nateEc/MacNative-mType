@@ -534,6 +534,8 @@ public actor AuthStore {
     "lithuanian1k", "lithuanian3k", "latvian1k", "maltese1k",
     "vietnamese1k", "vietnamese5k", "pinyin1k", "pinyin10k", "hausa1k",
     "bemba1k", "bemba10k", "catalan1k", "frisian1k",
+    "serbianLatin10k", "serbian10k", "bulgarian1k", "bulgarianLatin1k",
+    "bosnian4k", "albanian1k", "macedonian1k", "macedonian10k", "macedonian75k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",

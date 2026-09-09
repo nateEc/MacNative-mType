@@ -11,11 +11,11 @@
 
 `Compatibility/official-languages.json` 由 `Scripts/generate-official-language-audit.rb` 从固定提交的 schema ID 与 Typebar 本地枚举重新生成。生成器只读取 `packages/schemas/src/languages.ts` 和 `Sources/Typebar/TypingEngine.swift`，不读取 `frontend/static/languages/*.json`，因此清单只含标识和映射元数据，不含官方词表、引语、字体或标点内容。
 
-446 个官方 ID 当前严格分区为：423 个 Typebar 独立原生选择，以及 23 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项）。当前没有未映射 ID；由于 23 个规模变体仍非独立入口，不能宣称官方配置选择一一等价。
+446 个官方 ID 当前严格分区为：432 个 Typebar 独立原生选择，以及 14 个数字词表规模变体（由同语言的已有原生选择表达，但没有对应的独立规模选项）。当前没有未映射 ID；由于 14 个规模变体仍非独立入口，不能宣称官方配置选择一一等价。
 
 ## 已覆盖的原生语言面
 
-当前语言目录：353 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。353 个单语入口均支持 Typebar 自有引语；最新增加 Vietnamese 1k／5k、Pinyin 1k／10k、Hausa 1k、Bemba 1k／10k、Catalan 1k 与 Frisian 1k 数字规模入口。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
+当前语言目录：362 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。362 个单语入口均支持 Typebar 自有引语；最新增加 Serbian Latin 10k、Serbian 10k、Bulgarian 1k、Bulgarian Latin 1k、Bosnian 4k、Albanian 1k 与 Macedonian 1k／10k／75k 数字规模入口。较早逐项补充中的数量只记录当时状态，当前数字以本段及文末最新更正为准。
 
 | 语义类别 | 已重写的原生行为 | 边界 |
 | --- | --- | --- |
@@ -49,7 +49,7 @@
 
 ## 自动化守卫
 
-- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／423／23／0 守恒关系、分区互斥、每个映射可解析以及 423 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
+- `testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable` 固定 446／432／14／0 守恒关系、分区互斥、每个映射可解析以及 432 个非混合原生选择的一一覆盖；生成器还会拒绝错误参考提交和意外数量变化。
 - `testEverySingleLanguageHasAnOriginalExtendedQuoteThatBuildsACompleteSession` 直接枚举 `TypingLanguage.allCases`，保证任何新增的单语都有自有词流、超过 120 字的原创 extended 引语，并能构造完整 quote session。
 - 多语测试检查默认候选集、各语言轮转与候选数量；Arabic、Hebrew、Persian、Urdu、Yiddish 与 Central Kurdish 等 RTL 语言明确被排除，所有经审核的 LTR 单语均被包含；当前守卫固定 153 个候选，并明确覆盖各专项语言与书写变体。
 - 每次新增语言同时覆盖客户端内容路径、显示／排版、朗读或在线来源边界，以及服务端语言白名单、投稿、撤回、成绩和排行榜；Swiss German 以固定源码要求的“投稿拒绝、成绩接受”边界替代一般投稿路径。
@@ -173,3 +173,4 @@
 - 2026-09-09 更正：当前单语总数为三百三十五种，默认／自选 LTR 多语候选仍为一百五十三种。固定 Danish 1k／10k、Swedish 1k、Finnish 1k／10k、Estonian 1k／5k／10k 与 Icelandic 1k 以聚合方式确认逐档实际数量、长度、大小写、标点、非 ASCII、数字与交叠结构，不读取词值。Typebar 使用原创按需索引词流提供九个独立入口；九档保留简化输入与 Zipf 未知语义，前八档使用固定本族在线／朗读路径，Icelandic 1k 按缺省元数据使用 `en`／`en-US`，分别继承各族四档自有引语、贯通数据面且不加入多语混排。普通出题不物化整表，与九个固定词表逐档精确交集为零；Danish 受限授权词值未被复制，机器总账现为 446／405／41／0。
 - 2026-09-09 更正：当前单语总数为三百四十四种，默认／自选 LTR 多语候选仍为一百五十三种。固定 Irish 1k、Filipino 1k、Hungarian 1k／2k、Welsh 1k、Lithuanian 1k／3k、Latvian 1k 与 Maltese 1k 以聚合方式确认逐档实际数量、长度、组合标记、大小写、标点、内部空格、非 ASCII 与交叠结构，不读取词值。Typebar 使用原创按需索引词流提供九个独立入口；Filipino 1k 禁用简化输入，Hungarian 1k 明确不支持 Zipf，其余为未知，按各自 BCP-47 或缺省区域规则接入在线／朗读路径，分别继承各族四档自有引语、贯通数据面且不加入多语混排。普通出题不物化整表，与九个固定词表逐档精确交集为零；机器总账现为 446／414／32／0。
 - 2026-09-09 更正：当前单语总数为三百五十三种，默认／自选 LTR 多语候选仍为一百五十三种。固定 Vietnamese 1k／5k、Pinyin 1k／10k、Hausa 1k、Bemba 1k／10k、Catalan 1k 与 Frisian 1k 以聚合方式确认逐档实际数量、长度、大小写、标点、多级内部空格、非 ASCII 与交叠结构，不读取词值。Typebar 使用原创按需索引词流提供九个独立入口；九档保留简化输入，Bemba 两档明确不支持 Zipf，其余为未知，按各自 BCP-47 或缺省区域规则接入在线／朗读路径，分别继承各族四档自有引语、贯通数据面且不加入多语混排。普通出题不物化整表，与九个固定词表逐档精确交集为零；机器总账现为 446／423／23／0。
+- 2026-09-09 更正：当前单语总数为三百六十二种，默认／自选 LTR 多语候选仍为一百五十三种。固定 Serbian Latin 10k、Serbian 10k、Bulgarian 1k、Bulgarian Latin 1k、Bosnian 4k、Albanian 1k 与 Macedonian 1k／10k／75k 以聚合方式确认逐档实际数量、长度、拉丁或西里尔脚本、大小写、标点、多级内部空格与交叠结构，不读取词值。Typebar 使用原创按需索引词流提供九个独立入口；Serbian、Bulgarian 和 Macedonian 指定规模禁用简化输入，Bulgarian 两档明确不支持 Zipf，其余为未知，按各自 BCP-47 或缺省区域规则接入在线／朗读路径，分别继承各族四档自有引语、贯通数据面且不加入多语混排。普通出题不物化整表，与九个固定词表逐档精确交集为零；机器总账现为 446／432／14／0。

@@ -10064,6 +10064,169 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testBalkanScaleChoicesPreserveIndependentIDsScriptsAndPinnedAggregateShapes() throws {
+    struct ExpectedScale {
+      let rawValue: String
+      let displayName: String
+      let count: Int
+      let minimumLength: Int
+      let maximumLength: Int
+      let categorySignatures: [String: Int]
+      var punctuationHistogram: [Int: Int] = [:]
+      var spaceHistogram: [Int: Int] = [:]
+      let cyrillicCount: Int
+      let otherAlphabeticCount: Int
+      let supportsLazyInput: Bool
+      let zipfSupport: ZipfFrequencySupport
+      let quoteSourceRawValue: String
+      let wikipediaCode: String
+      let speechLocale: String
+    }
+
+    let cases = [
+      ExpectedScale(
+        rawValue: "serbianLatin10k", displayName: "Srpski (Latin) · 10k · Typebar",
+        count: 10_000, minimumLength: 1, maximumLength: 15,
+        categorySignatures: ["N": 2_479, "plain": 7_521], cyrillicCount: 0,
+        otherAlphabeticCount: 10_000, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "serbianLatin", wikipediaCode: "sr", speechLocale: "sr-Latn"),
+      ExpectedScale(
+        rawValue: "serbian10k", displayName: "Српски · 10k · Typebar", count: 10_000,
+        minimumLength: 1, maximumLength: 15, categorySignatures: ["N": 10_000],
+        cyrillicCount: 10_000, otherAlphabeticCount: 0, supportsLazyInput: false,
+        zipfSupport: .unknown, quoteSourceRawValue: "serbian", wikipediaCode: "sr",
+        speechLocale: "sr-Cyrl"),
+      ExpectedScale(
+        rawValue: "bulgarian1k", displayName: "Български · 1k · Typebar", count: 1_172,
+        minimumLength: 1, maximumLength: 14, categorySignatures: ["N": 1_172],
+        cyrillicCount: 1_172, otherAlphabeticCount: 0, supportsLazyInput: false,
+        zipfSupport: .unsupported, quoteSourceRawValue: "bulgarian", wikipediaCode: "bg",
+        speechLocale: "bg"),
+      ExpectedScale(
+        rawValue: "bulgarianLatin1k", displayName: "Balgarski (Latin) · 1k · Typebar",
+        count: 1_169, minimumLength: 1, maximumLength: 15,
+        categorySignatures: ["P": 1, "plain": 1_168], punctuationHistogram: [1: 1],
+        cyrillicCount: 0, otherAlphabeticCount: 1_169, supportsLazyInput: false,
+        zipfSupport: .unsupported, quoteSourceRawValue: "bulgarianLatin",
+        wikipediaCode: "bg", speechLocale: "bg"),
+      ExpectedScale(
+        rawValue: "bosnian4k", displayName: "Bosanski · 4k · Typebar", count: 3_816,
+        minimumLength: 1, maximumLength: 16,
+        categorySignatures: [
+          "N": 681, "P": 4, "U": 16, "UN": 6, "plain": 3_109,
+        ], punctuationHistogram: [1: 4], cyrillicCount: 0, otherAlphabeticCount: 3_816,
+        supportsLazyInput: true, zipfSupport: .unknown, quoteSourceRawValue: "bosnian",
+        wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "albanian1k", displayName: "Shqip · 1k · Typebar", count: 896,
+        minimumLength: 1, maximumLength: 16,
+        categorySignatures: [
+          "N": 309, "S": 16, "SN": 63, "U": 16, "UN": 2, "USN": 1,
+          "plain": 489,
+        ], spaceHistogram: [1: 71, 2: 7, 3: 2], cyrillicCount: 0,
+        otherAlphabeticCount: 896, supportsLazyInput: true, zipfSupport: .unknown,
+        quoteSourceRawValue: "albanian", wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "macedonian1k", displayName: "Македонски · 1k · Typebar", count: 901,
+        minimumLength: 1, maximumLength: 15,
+        categorySignatures: [
+          "N": 852, "PN": 1, "PSN": 1, "SN": 29, "UN": 16, "USN": 1,
+          "plain": 1,
+        ], punctuationHistogram: [1: 2], spaceHistogram: [1: 28, 2: 3],
+        cyrillicCount: 900, otherAlphabeticCount: 1, supportsLazyInput: false,
+        zipfSupport: .unknown, quoteSourceRawValue: "macedonian", wikipediaCode: "en",
+        speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "macedonian10k", displayName: "Македонски · 10k · Typebar",
+        count: 10_000, minimumLength: 1, maximumLength: 15,
+        categorySignatures: ["N": 10_000], cyrillicCount: 10_000,
+        otherAlphabeticCount: 0, supportsLazyInput: false, zipfSupport: .unknown,
+        quoteSourceRawValue: "macedonian", wikipediaCode: "en", speechLocale: "en-US"),
+      ExpectedScale(
+        rawValue: "macedonian75k", displayName: "Македонски · 75k · Typebar",
+        count: 75_000, minimumLength: 1, maximumLength: 55,
+        categorySignatures: ["N": 75_000], cyrillicCount: 75_000,
+        otherAlphabeticCount: 0, supportsLazyInput: false, zipfSupport: .unknown,
+        quoteSourceRawValue: "macedonian", wikipediaCode: "en", speechLocale: "en-US"),
+    ]
+
+    for expected in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: expected.rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: expected.quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+      var categorySignatures: [String: Int] = [:]
+      var punctuationHistogram: [Int: Int] = [:]
+      var spaceHistogram: [Int: Int] = [:]
+      var cyrillicCount = 0
+      var otherAlphabeticCount = 0
+      for word in words {
+        var signature = ""
+        if word.contains(where: \.isUppercase) { signature += "U" }
+        if word.contains(where: \.isPunctuation) { signature += "P" }
+        if word.contains(where: \.isWhitespace) { signature += "S" }
+        if word.unicodeScalars.contains(where: { !$0.isASCII }) { signature += "N" }
+        categorySignatures[signature.isEmpty ? "plain" : signature, default: 0] += 1
+        let punctuationCount = word.filter(\.isPunctuation).count
+        if punctuationCount > 0 { punctuationHistogram[punctuationCount, default: 0] += 1 }
+        let spaceCount = word.filter(\.isWhitespace).count
+        if spaceCount > 0 { spaceHistogram[spaceCount, default: 0] += 1 }
+        if word.unicodeScalars.contains(where: { (0x0400...0x052F).contains(Int($0.value)) }) {
+          cyrillicCount += 1
+        }
+        if word.unicodeScalars.contains(where: {
+          $0.properties.isAlphabetic && !(0x0400...0x052F).contains(Int($0.value))
+        }) {
+          otherAlphabeticCount += 1
+        }
+      }
+
+      XCTAssertEqual(language.displayName, expected.displayName, expected.rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, expected.rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, expected.rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, expected.rawValue)
+      XCTAssertEqual(language.supportsLazyLatinInput, expected.supportsLazyInput, expected.rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, expected.rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, expected.rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, expected.zipfSupport, expected.rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language),
+        expected.wikipediaCode, expected.rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertEqual(words.count, expected.count, expected.rawValue)
+      XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), expected.maximumLength, expected.rawValue)
+      XCTAssertEqual(categorySignatures, expected.categorySignatures, expected.rawValue)
+      XCTAssertEqual(punctuationHistogram, expected.punctuationHistogram, expected.rawValue)
+      XCTAssertEqual(spaceHistogram, expected.spaceHistogram, expected.rawValue)
+      XCTAssertEqual(cyrillicCount, expected.cyrillicCount, expected.rawValue)
+      XCTAssertEqual(otherAlphabeticCount, expected.otherAlphabeticCount, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, expected.rawValue)
+      XCTAssertFalse(
+        words.contains { $0.unicodeScalars.contains(where: \.properties.isJoinControl) },
+        expected.rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, expected.rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        expected.rawValue)
+      XCTAssertFalse(OfflineContent.generatedPrompt(wordCount: 25, language: language).isEmpty)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, expected.rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text,
+          expected.rawValue)
+      }
+    }
+  }
+
   func testLatinAndRomanizedScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     struct ExpectedScale {
       let rawValue: String

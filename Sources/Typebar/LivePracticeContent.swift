@@ -246,8 +246,8 @@ enum LivePracticeContentService {
     case .slovak, .slovak1k, .slovak10k: return "sk"
     case .slovenian, .slovenian1k, .slovenian5k: return "sl"
     case .croatian, .croatian1k: return "hr"
-    case .serbian, .serbianLatin: return "sr"
-    case .bulgarian, .bulgarianLatin: return "bg"
+    case .serbian, .serbian10k, .serbianLatin, .serbianLatin10k: return "sr"
+    case .bulgarian, .bulgarian1k, .bulgarianLatin, .bulgarianLatin1k: return "bg"
     case .romanian, .romanian1k, .romanian5k, .romanian10k, .romanian25k,
       .romanian50k, .romanian100k, .romanian200k: return "ro"
     case .finnish, .finnish1k, .finnish10k: return "fi"

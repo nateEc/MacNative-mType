@@ -4599,6 +4599,13 @@ enum OfflineContent {
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
     let inheritedScaleQuoteSource: TypingLanguage? = switch language {
+    case .serbian10k: .serbian
+    case .serbianLatin10k: .serbianLatin
+    case .bulgarian1k: .bulgarian
+    case .bulgarianLatin1k: .bulgarianLatin
+    case .bosnian4k: .bosnian
+    case .albanian1k: .albanian
+    case .macedonian1k, .macedonian10k, .macedonian75k: .macedonian
     case .ukrainian1k, .ukrainian10k, .ukrainian50k: .ukrainian
     case .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k: .ukrainianLatin
     case .indonesian1k, .indonesian10k: .indonesian
