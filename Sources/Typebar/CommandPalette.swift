@@ -503,6 +503,156 @@ enum InputRuleCommandCatalog {
     }
 }
 
+enum OfficialLayoutCommandTarget: Equatable {
+    case system
+    case builtIn(KeyboardLayout)
+
+    var requiresRestart: Bool { true }
+    var exitsChallenge: Bool { true }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        switch self {
+        case .system: settings.keyboardInputLayout = .system
+        case .builtIn(let layout): settings.keyboardInputLayout = .init(emulating: layout)
+        }
+    }
+}
+
+/// Exposes only the fixed reference layout schema. Five additional Typebar
+/// layouts remain available in Settings without masquerading as reference
+/// command choices.
+enum OfficialLayoutCommandCatalog {
+    private static let typebarOnlyLayouts: Set<KeyboardLayout> = [
+        .nordicQwerty, .hungarianQwertz, .greekAlphabetic, .bulgarianCyrillic,
+        .serbianCyrillic,
+    ]
+
+    private static let aliases: [String: KeyboardLayout] = [
+        "qwerty": .ansiQwerty,
+        "dvorak": .ansiDvorak,
+        "dvorak_L": .dvorakLeft,
+        "dvorak_R": .dvorakRight,
+        "colemak": .ansiColemak,
+        "colemak_angle": .ansiColemakAngle,
+        "colemak_wide": .ansiColemakWide,
+        "colemak_dh": .ansiColemakDH,
+        "colemak_dhv": .ansiColemakDHV,
+        "colemak_dh_iso": .colemakDHISO,
+        "colemak_dh_wide": .colemakDHWideANSI,
+        "colemak_dh_iso_wide": .colemakDHWideISO,
+        "colemak_dh_matrix": .colemakDHMatrix,
+        "colemak_dhk": .colemakDHKANSI,
+        "colemak_dhk_iso": .colemakDHKISO,
+        "MTGAP_ASRT": .mtgapASRT,
+        "QGMLWB": .qgmlwb,
+        "QGMLWY": .qgmlwy,
+        "prog_dvorak": .programmerDvorak,
+        "prog_dvorak_prime": .programmerDvorakPrime,
+        "german_dvorak": .germanDvorak,
+        "german_dvorak_imp": .germanDvorakImproved,
+        "spanish_dvorak": .spanishDvorak,
+        "swedish_colemak": .swedishColemak,
+        "swedish_dvorak": .swedishDvorak,
+        "dvorak_fr": .frenchDvorak,
+        "azerty_AFNOR": .frenchAzertyAFNOR,
+        "bepo": .frenchBepo,
+        "bepo_AFNOR": .frenchBepoAFNOR,
+        "alpha": .ansiAlpha,
+        "handsdown": .ansiHandsDown,
+        "handsdown_alt": .ansiHandsDownAlt,
+        "handsdown_neu": .ansiHandsDownNeu,
+        "handsdown_neu_inverted": .ansiHandsDownNeuInverted,
+        "MTGAP": .mtgap,
+        "MTGAP_full": .mtgapFull,
+        "ISRT": .isrt,
+        "ISRT_Angle": .isrtAngle,
+        "semimak_jq": .semimakJQ,
+        "semimak_jqc": .semimakJQC,
+        "canary_matrix": .canaryMatrix,
+        "boo_mangle": .booMangle,
+        "APT": .apt,
+        "APT_angle": .aptAngle,
+        "middlemak-nh": .middlemakNH,
+        "Foalmak": .foalmak,
+        "ARTS": .arts,
+        "capewell_dvorak": .capewellDvorak,
+        "qwertz": .germanQwertz,
+        "swiss_german": .swissGerman,
+        "swiss_french": .swissFrench,
+        "workman": .ansiWorkman,
+        "prog_workman": .programmerWorkman,
+        "norman": .ansiNorman,
+        "turkish_q": .turkishQ,
+        "turkish_f": .turkishF,
+        "turkish_e": .turkishE,
+        "uk_qwerty": .ukQwerty,
+        "spanish_qwerty": .spanishQwerty,
+        "italian_qwerty": .italianQwerty,
+        "latam_qwerty": .latinAmericanQwerty,
+        "azerty": .frenchAzerty,
+        "persian_standard": .persianStandard,
+        "persian_farsi": .persianFarsi,
+        "arabic_101": .arabic101,
+        "arabic_102": .arabic102,
+        "arabic_mac": .arabicMac,
+        "urdu_phonetic": .urduPhonetic,
+        "thai_kedmanee": .thaiKedmanee,
+        "thai_pattachote": .thaiPattachote,
+        "japanese_hiragana": .japaneseHiragana,
+        "hindi_inscript": .hindiInscript,
+        "armenian_hm_qwerty": .armenianHMQwerty,
+        "mongolian": .mongolianCyrillic,
+        "polish_programmers": .polishProgrammers,
+        "bulgarian_phonetic_traditional": .bulgarianPhoneticTraditional,
+        "ukrainian": .ukrainianJcuken,
+        "russian": .russianJcuken,
+        "norwegian_qwerty": .norwegianQwerty,
+        "portuguese_pt_qwerty_iso": .portugueseQwertyISO,
+        "portuguese_pt_qwerty_ansi": .portugueseQwertyANSI,
+        "ABNT2": .brazilianABNT2,
+        "swedish_qwerty": .swedishQwerty,
+        "danish_qwerty": .danishQwerty,
+        "hungarian": .hungarianOfficial,
+        "JCUKEN": .jcuken,
+        "bulgarian": .bulgarianOfficial,
+    ]
+
+    private static let officialNameByLayout = Dictionary(
+        uniqueKeysWithValues: aliases.map { ($0.value, $0.key) })
+
+    static let items: [CommandPaletteItem] = {
+        let disabled = CommandPaletteItem(
+            id: "input.layout.default", title: "输入布局模拟：关闭",
+            subtitle: "使用 macOS 当前输入源", systemImage: "keyboard",
+            keywords: [
+                "input", "layout", "default", "输入", "布局", "关闭", "系统当前输入源",
+            ], group: .settings)
+        let layouts = KeyboardLayout.allCases.compactMap { layout -> CommandPaletteItem? in
+            guard !typebarOnlyLayouts.contains(layout) else { return nil }
+            let officialName = officialNameByLayout[layout] ?? layout.rawValue
+            return CommandPaletteItem(
+                id: "input.layout.\(officialName)", title: "模拟布局：\(layout.displayName)",
+                subtitle: "按此布局解释物理按键并立即重开", systemImage: "keyboard.fill",
+                keywords: ["input", "layout", "输入", "布局", officialName, layout.displayName],
+                group: .settings)
+        }
+        return [disabled] + layouts
+    }()
+
+    static func target(for identifier: String) -> OfficialLayoutCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "input", parts[1] == "layout" else { return nil }
+        let officialName = String(parts[2])
+        if officialName == "default" { return .system }
+        if let layout = aliases[officialName] { return .builtIn(layout) }
+        guard let layout = KeyboardLayout(rawValue: officialName),
+            !typebarOnlyLayouts.contains(layout)
+        else { return nil }
+        return .builtIn(layout)
+    }
+}
+
 enum TestConfigurationCommandChallengePolicy {
     private static let modeIdentifiers: Set<String> = [
         "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
@@ -515,6 +665,7 @@ enum TestConfigurationCommandChallengePolicy {
             || LanguageCommandCatalog.target(for: identifier) != nil
             || PracticePreferenceCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || InputRuleCommandCatalog.target(for: identifier)?.exitsChallenge == true
+            || OfficialLayoutCommandCatalog.target(for: identifier)?.exitsChallenge == true
     }
 }
 

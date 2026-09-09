@@ -1637,6 +1637,42 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(settings.testModifiers.contains(.lazyLatin))
   }
 
+  @MainActor
+  func testOfficialLayoutCommandsApplyToNativeInputMappingAndAlwaysRestart() throws {
+    let suiteName = "TypebarTests.LayoutCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    let target = try XCTUnwrap(
+      OfficialLayoutCommandCatalog.target(for: "input.layout.colemak_dh_iso_wide"))
+    XCTAssertTrue(target.requiresRestart)
+    XCTAssertTrue(target.exitsChallenge)
+    target.apply(to: settings)
+    XCTAssertEqual(settings.keyboardInputLayout, .colemakDHWideISO)
+    XCTAssertEqual(settings.keyboardLayout, .ansiQwerty)
+
+    let disabled = try XCTUnwrap(
+      OfficialLayoutCommandCatalog.target(for: "input.layout.default"))
+    disabled.apply(to: settings)
+    XCTAssertEqual(settings.keyboardInputLayout, .system)
+  }
+
+  func testOfficialLayoutCommandsRemainSearchableByDisplayNameAndFixedIdentifier() {
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: OfficialLayoutCommandCatalog.items, query: "Colemak-DH Wide ISO")
+        .map(\.id),
+      ["input.layout.colemak_dh_iso_wide"])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: OfficialLayoutCommandCatalog.items, query: "armenian_hm_qwerty")
+        .map(\.id),
+      ["input.layout.armenian_hm_qwerty"])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: OfficialLayoutCommandCatalog.items, query: "系统当前输入源")
+        .map(\.id),
+      ["input.layout.default"])
+  }
+
   func testConfigurationCommandsExitChallengesButUnrelatedCommandsDoNot() {
     for identifier in [
       "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
@@ -1645,7 +1681,7 @@ final class TypingEngineTests: XCTestCase {
       "test.language.english", "test.language.codeSwift",
       "test.difficulty.expert", "test.englishVariant.british",
       "input.strictSpace.on", "input.stopOnError.word", "input.lazyMode.on",
-      "input.codeUnindentOnBackspace.on",
+      "input.codeUnindentOnBackspace.on", "input.layout.default", "input.layout.colemak_dh",
     ] {
       XCTAssertTrue(
         TestConfigurationCommandChallengePolicy.exitsChallenge(for: identifier), identifier)

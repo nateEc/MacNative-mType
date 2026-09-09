@@ -84,6 +84,30 @@ final class OfficialLayoutCoverageTests: XCTestCase {
         "\(fixture.nativeExact.count) 项精确映射与 \(fixture.nativeRelated.count) 项兼容映射"))
   }
 
+  func testLayoutCommandCatalogCoversOnlyPinnedOfficialChoicesAndRoutesEveryMapping() throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let data = try Data(
+      contentsOf: repositoryRoot.appendingPathComponent("Compatibility/official-layouts.json"))
+    let fixture = try JSONDecoder().decode(Fixture.self, from: data)
+    let expectedIDs = Set(["input.layout.default"] + fixture.officialNames.map { "input.layout.\($0)" })
+
+    XCTAssertEqual(OfficialLayoutCommandCatalog.items.count, fixture.officialCount + 1)
+    XCTAssertEqual(Set(OfficialLayoutCommandCatalog.items.map(\.id)), expectedIDs)
+    XCTAssertEqual(OfficialLayoutCommandCatalog.target(for: "input.layout.default"), .system)
+    for (officialName, rawValue) in fixture.nativeExact {
+      let layout = try XCTUnwrap(KeyboardLayout(rawValue: rawValue))
+      XCTAssertEqual(
+        OfficialLayoutCommandCatalog.target(for: "input.layout.\(officialName)"),
+        .builtIn(layout), officialName)
+    }
+    XCTAssertNil(OfficialLayoutCommandCatalog.target(for: "input.layout.nordicQwerty"))
+    XCTAssertNil(OfficialLayoutCommandCatalog.target(for: "input.layout.qwerty.extra"))
+    XCTAssertNil(OfficialLayoutCommandCatalog.target(for: "input.layout."))
+  }
+
   func testCurrentLanguageCatalogCountsMatchCompatibilityDocuments() throws {
     let languages = TypingLanguage.allCases
     let standalone = languages.filter(\.supportsQuotes)
