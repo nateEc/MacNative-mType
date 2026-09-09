@@ -4599,6 +4599,16 @@ enum OfflineContent {
 
   static func quotes(for language: TypingLanguage, length: QuoteLength = .all) -> [OfflineQuote] {
     if [
+      .simplifiedChinese1k, .simplifiedChinese5k, .simplifiedChinese10k,
+      .simplifiedChinese50k,
+    ].contains(language) {
+      return quotes(for: .simplifiedChinese, length: length).map { quote in
+        .init(
+          id: "\(language.rawValue)-\(quote.id)", title: quote.title, text: quote.text,
+          language: language, length: quote.length)
+      }
+    }
+    if [
       .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
       .norwegianNynorsk100k, .norwegianNynorsk400k,
     ].contains(language) {
@@ -4929,6 +4939,9 @@ enum NoSpaceWordBoundaryPolicy {
   private static func noSpaceLanguageWords(
     in source: String, language: TypingLanguage
   ) -> [String]? {
+    if language.isSimplifiedChineseScale {
+      return StarterLexicon.simplifiedChineseScaleWords(in: source, language: language)
+    }
     let lexicon = (StarterLexicon.noSpaceWords(for: language) ?? []).map { Array($0) }
       .sorted { $0.count > $1.count }
     guard !lexicon.isEmpty else { return nil }

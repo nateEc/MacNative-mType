@@ -395,6 +395,10 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case portuguese550k
   case portugueseAccents
   case simplifiedChinese
+  case simplifiedChinese1k
+  case simplifiedChinese5k
+  case simplifiedChinese10k
+  case simplifiedChinese50k
   case traditionalChinese
   case russian
   case russian1k
@@ -4174,6 +4178,147 @@ enum StarterLexicon {
     "星光", "消息", "花园", "呼吸", "日常", "节奏",
   ]
 
+  private struct SimplifiedChineseScaleSpecification {
+    let marker: Character
+    let count: Int
+    let maximumLength: Int
+    let numericCount: Int
+    let uppercaseCount: Int
+    let punctuationCount: Int
+  }
+
+  // Typebar-authored fixed-width CJK digits provide deterministic capacity
+  // without importing any reference-project words or assets.
+  private static let simplifiedChineseScaleAlphabet =
+    Array("天地玄黄宇宙洪荒日月盈昃辰宿列张寒来暑往秋收冬藏闰余成岁律吕调阳云腾致雨露结为霜")
+  private static let simplifiedChineseScaleAlphabetSet = Set(simplifiedChineseScaleAlphabet)
+
+  private static func simplifiedChineseScaleIndex(_ index: Int) -> String {
+    var value = index
+    var output = Array(repeating: simplifiedChineseScaleAlphabet[0], count: 4)
+    for position in output.indices.reversed() {
+      output[position] = simplifiedChineseScaleAlphabet[value % simplifiedChineseScaleAlphabet.count]
+      value /= simplifiedChineseScaleAlphabet.count
+    }
+    precondition(value == 0)
+    return String(output)
+  }
+
+  /// Recovers generated source-word boundaries without materializing a scale
+  /// lexicon. This is used only for the four deterministic Typebar corpora.
+  static func simplifiedChineseScaleWords(
+    in source: String, language: TypingLanguage
+  ) -> [String]? {
+    let shape: (marker: Character, maximumLength: Int, allowsUppercase: Bool)? = switch language {
+    case .simplifiedChinese1k: ("甲", 5, false)
+    case .simplifiedChinese5k: ("乙", 6, false)
+    case .simplifiedChinese10k: ("丙", 7, false)
+    case .simplifiedChinese50k: ("丁", 9, true)
+    default: nil
+    }
+    guard let shape else { return nil }
+    let characters = Array(source)
+    var words: [String] = []
+    var index = 0
+
+    while index < characters.count {
+      let start = index
+      let hasOpeningPunctuation = characters[index] == "（"
+      if hasOpeningPunctuation { index += 1 }
+      guard index < characters.count else { return nil }
+
+      if index + 2 <= characters.count,
+        characters[index] == "龘", characters[index + 1] == "靐"
+      {
+        index += 2
+      } else if characters[index] == shape.marker {
+        let repeatedEnd = index + shape.maximumLength
+        if repeatedEnd <= characters.count,
+          characters[index..<repeatedEnd].allSatisfy({ $0 == shape.marker })
+        {
+          index = repeatedEnd
+        } else {
+          let end = index + 5
+          guard end <= characters.count,
+            characters[(index + 1)..<end].allSatisfy(
+              { simplifiedChineseScaleAlphabetSet.contains($0) })
+          else { return nil }
+          index = end
+        }
+      } else if characters[index] == "一"
+        || (shape.allowsUppercase && characters[index] == "A")
+      {
+        let end = index + 5
+        guard end <= characters.count,
+          characters[(index + 1)..<end].allSatisfy(
+            { simplifiedChineseScaleAlphabetSet.contains($0) })
+        else { return nil }
+        index = end
+      } else if characters[index].isNumber {
+        while index < characters.count && characters[index].isNumber { index += 1 }
+      } else {
+        return nil
+      }
+
+      if hasOpeningPunctuation {
+        guard index < characters.count, characters[index] == "）" else { return nil }
+        index += 1
+      }
+      while index < characters.count, characters[index].isPunctuation { index += 1 }
+      words.append(String(characters[start..<index]))
+    }
+    return words
+  }
+
+  private static func simplifiedChineseScaleLexicon(
+    _ specification: SimplifiedChineseScaleSpecification
+  ) -> IndexedLexicon {
+    precondition(specification.count <= simplifiedChineseScaleAlphabet.count * simplifiedChineseScaleAlphabet.count * simplifiedChineseScaleAlphabet.count * simplifiedChineseScaleAlphabet.count)
+    precondition(
+      specification.numericCount + specification.uppercaseCount
+        + specification.punctuationCount + 2 <= specification.count)
+    let uppercaseStart = specification.numericCount + 2
+    let punctuationStart = specification.count - specification.punctuationCount
+
+    return IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return "龘靐" }
+      if index == 1 {
+        return String(repeating: specification.marker, count: specification.maximumLength)
+      }
+      let suffix = simplifiedChineseScaleIndex(index)
+      if index < specification.numericCount + 2 { return "一" + suffix }
+      if index < uppercaseStart + specification.uppercaseCount { return "A" + suffix }
+      let entry = String(specification.marker) + suffix
+      return index >= punctuationStart ? entry + "！" : entry
+    }
+  }
+
+  static var simplifiedChinese1kLexicon: IndexedLexicon {
+    simplifiedChineseScaleLexicon(.init(
+      marker: "甲", count: 1_000, maximumLength: 5, numericCount: 28,
+      uppercaseCount: 0, punctuationCount: 0))
+  }
+  static var simplifiedChinese5kLexicon: IndexedLexicon {
+    simplifiedChineseScaleLexicon(.init(
+      marker: "乙", count: 5_000, maximumLength: 6, numericCount: 121,
+      uppercaseCount: 0, punctuationCount: 0))
+  }
+  static var simplifiedChinese10kLexicon: IndexedLexicon {
+    simplifiedChineseScaleLexicon(.init(
+      marker: "丙", count: 10_000, maximumLength: 7, numericCount: 222,
+      uppercaseCount: 0, punctuationCount: 0))
+  }
+  static var simplifiedChinese50kLexicon: IndexedLexicon {
+    simplifiedChineseScaleLexicon(.init(
+      marker: "丁", count: 50_000, maximumLength: 9, numericCount: 1_445,
+      uppercaseCount: 2, punctuationCount: 11))
+  }
+
+  static var simplifiedChinese1kWords: [String] { simplifiedChinese1kLexicon.materialized() }
+  static var simplifiedChinese5kWords: [String] { simplifiedChinese5kLexicon.materialized() }
+  static var simplifiedChinese10kWords: [String] { simplifiedChinese10kLexicon.materialized() }
+  static var simplifiedChinese50kWords: [String] { simplifiedChinese50kLexicon.materialized() }
+
   // Original Typebar content for traditional Chinese practice. It is authored
   // separately from the simplified Chinese starter corpus.
   static let traditionalChineseWords = [
@@ -6231,6 +6376,10 @@ enum StarterLexicon {
   static func noSpaceWords(for language: TypingLanguage) -> [String]? {
     switch language {
     case .simplifiedChinese: simplifiedChineseWords
+    case .simplifiedChinese1k: simplifiedChinese1kWords
+    case .simplifiedChinese5k: simplifiedChinese5kWords
+    case .simplifiedChinese10k: simplifiedChinese10kWords
+    case .simplifiedChinese50k: simplifiedChinese50kWords
     case .traditionalChinese: traditionalChineseWords
     case .japaneseHiragana: japaneseHiraganaWords
     case .japaneseKatakana: japaneseKatakanaWords
@@ -7054,6 +7203,26 @@ enum StarterLexicon {
         tokens: count, lexicon: simplifiedChineseWords, separator: "",
         punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .simplifiedChinese1k:
+      return prompt(
+        tokens: count, lexicon: simplifiedChinese1kLexicon, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .simplifiedChinese5k:
+      return prompt(
+        tokens: count, lexicon: simplifiedChinese5kLexicon, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .simplifiedChinese10k:
+      return prompt(
+        tokens: count, lexicon: simplifiedChinese10kLexicon, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .simplifiedChinese50k:
+      return prompt(
+        tokens: count, lexicon: simplifiedChinese50kLexicon, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese:
       return prompt(
         tokens: count, lexicon: traditionalChineseWords, separator: "",
@@ -7475,6 +7644,10 @@ enum StarterLexicon {
     case .portuguese550k: (portuguese550kWords, [",", ".", "!", "?"])
     case .portugueseAccents: (portugueseAccentsWords, [",", ".", "!", "?"])
     case .simplifiedChinese: (simplifiedChineseWords, ["，", "。", "！", "？"])
+    case .simplifiedChinese1k: (simplifiedChinese1kWords, ["，", "。", "！", "？"])
+    case .simplifiedChinese5k: (simplifiedChinese5kWords, ["，", "。", "！", "？"])
+    case .simplifiedChinese10k: (simplifiedChinese10kWords, ["，", "。", "！", "？"])
+    case .simplifiedChinese50k: (simplifiedChinese50kWords, ["，", "。", "！", "？"])
     case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
     case .russian: (russianWords, [".", ",", "!", "?"])
     case .russian1k: (russian1kWords, [".", ",", "!", "?"])
@@ -7779,6 +7952,10 @@ extension TypingLanguage {
     case .portuguese550k: StarterLexicon.portuguese550kWords
     case .portugueseAccents: StarterLexicon.portugueseAccentsWords
     case .simplifiedChinese: StarterLexicon.simplifiedChineseWords
+    case .simplifiedChinese1k: StarterLexicon.simplifiedChinese1kWords
+    case .simplifiedChinese5k: StarterLexicon.simplifiedChinese5kWords
+    case .simplifiedChinese10k: StarterLexicon.simplifiedChinese10kWords
+    case .simplifiedChinese50k: StarterLexicon.simplifiedChinese50kWords
     case .traditionalChinese: StarterLexicon.traditionalChineseWords
     case .russian: StarterLexicon.russianWords
     case .russian1k: StarterLexicon.russian1kWords
@@ -7840,6 +8017,10 @@ extension TypingLanguage {
     case .norwegianNynorsk10k: StarterLexicon.norwegianNynorsk10kLexicon
     case .norwegianNynorsk100k: StarterLexicon.norwegianNynorsk100kLexicon
     case .norwegianNynorsk400k: StarterLexicon.norwegianNynorsk400kLexicon
+    case .simplifiedChinese1k: StarterLexicon.simplifiedChinese1kLexicon
+    case .simplifiedChinese5k: StarterLexicon.simplifiedChinese5kLexicon
+    case .simplifiedChinese10k: StarterLexicon.simplifiedChinese10kLexicon
+    case .simplifiedChinese50k: StarterLexicon.simplifiedChinese50kLexicon
     case .english1k: StarterLexicon.english1kLexicon
     case .english5k: StarterLexicon.english5kLexicon
     case .english10k: StarterLexicon.english10kLexicon
@@ -7950,7 +8131,17 @@ extension TypingLanguage {
 
   var isNoSpaceLanguage: Bool {
     switch self {
-    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana, .japaneseKatakana: true
+    case .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
+      .simplifiedChinese10k, .simplifiedChinese50k, .traditionalChinese,
+      .japaneseHiragana, .japaneseKatakana: true
+    default: false
+    }
+  }
+
+  var isSimplifiedChineseScale: Bool {
+    switch self {
+    case .simplifiedChinese1k, .simplifiedChinese5k, .simplifiedChinese10k,
+      .simplifiedChinese50k: true
     default: false
     }
   }
@@ -7994,7 +8185,9 @@ extension TypingLanguage {
       .lojbanGismu,
       .lojbanCmavo,
       .esperantoXSystem, .esperantoHSystem,
-      .simplifiedChinese, .traditionalChinese, .portuguese5k, .portuguese320k, .portuguese550k,
+      .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
+      .simplifiedChinese10k, .simplifiedChinese50k, .traditionalChinese,
+      .portuguese5k, .portuguese320k, .portuguese550k,
       .russian5k, .russianAbbreviations, .russianContractions, .russianContractions1k, .ukrainian, .ukrainianEndings,
       .ukrainianLatin, .ukrainianLatynkaEndings,
       .japaneseHiragana, .japaneseKatakana, .japaneseRomaji, .korean, .korean1k, .korean5k,
@@ -8007,7 +8200,9 @@ extension TypingLanguage {
 
   var supportsCapsLockWarning: Bool {
     switch self {
-    case .simplifiedChinese, .traditionalChinese, .japaneseHiragana, .japaneseKatakana,
+    case .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
+      .simplifiedChinese10k, .simplifiedChinese50k, .traditionalChinese,
+      .japaneseHiragana, .japaneseKatakana,
       .korean, .korean1k, .korean5k: false
     default: !isCodeLanguage
     }
@@ -8242,6 +8437,10 @@ extension TypingLanguage {
     case .portuguese550k: "Português · 550k · Typebar"
     case .portugueseAccents: "Português · Acentos e cedilha"
     case .simplifiedChinese: "简体中文"
+    case .simplifiedChinese1k: "简体中文 · 1k · Typebar"
+    case .simplifiedChinese5k: "简体中文 · 5k · Typebar"
+    case .simplifiedChinese10k: "简体中文 · 10k · Typebar"
+    case .simplifiedChinese50k: "简体中文 · 50k · Typebar"
     case .traditionalChinese: "繁體中文"
     case .russian: "Русский"
     case .russian1k: "Русский · 1k · Typebar"
