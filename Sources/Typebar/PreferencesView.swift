@@ -697,7 +697,7 @@ struct PreferencesView: View {
             }
           }
           Toggle("重开后沿用上一轮节奏一次", isOn: $settings.repeatedPace)
-          Text("在练习文本中显示第二个目标标记；个人最佳和平均只比较同一模式与语言的已完成本地成绩。“上一轮速度”与自动沿用只保留在本次应用运行中。")
+          Text("在练习文本中显示第二个目标标记；兼容模式会按当前测试参数与活动标签筛选，最近平均取 10 次，24 小时最佳采用滚动时间窗。Typebar 原有的全部同类平均与今日平均仍保留。“上一轮速度”与自动沿用只保留在本次应用运行中。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("键盘提示模式", selection: $settings.keyboardGuideMode) {

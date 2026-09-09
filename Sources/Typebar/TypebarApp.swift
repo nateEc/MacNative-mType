@@ -643,6 +643,7 @@ private struct ContentView: View {
   @State private var showingNotifications = false
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
+  @State private var showingPaceGuideSpeedEditor = false
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
   @State private var showingChallenges = false
@@ -913,6 +914,16 @@ private struct ContentView: View {
     .sheet(isPresented: $showingCommandPalette) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: settings.commandPaletteListMode, onSelect: runCommand)
+    }
+    .sheet(isPresented: $showingPaceGuideSpeedEditor) {
+      PaceGuideSpeedEditor(
+        unit: settings.typingSpeedUnit, initialWpm: settings.paceGuideCustomWpm
+      ) { wpm in
+        activeChallengeID = nil
+        settings.paceGuideCustomWpm = wpm
+        settings.paceGuideMode = .custom
+        reset()
+      }
     }
     .confirmationDialog(
       "中止当前长测试？", isPresented: $showingCommandBailoutConfirmation,
@@ -2705,7 +2716,7 @@ private struct ContentView: View {
       guard let result = record.portableResult else { return nil }
       return .init(
         configuration: result.configuration, outcome: result.outcome, finishedAt: result.finishedAt,
-        wpm: result.wpm, tags: result.tags)
+        wpm: result.wpm, tags: result.tags, prompt: result.prompt)
     }
     return PaceGuidePolicy.targetWpm(
       mode: settings.paceGuideMode,
@@ -2713,7 +2724,8 @@ private struct ContentView: View {
       configuration: configuration,
       samples: samples,
       activeTags: activeSessionTags,
-      lastTestWpm: repeatedWpm ?? lastCompletedWpm
+      lastTestWpm: repeatedWpm ?? lastCompletedWpm,
+      currentPrompt: session.prompt
     )
   }
 
@@ -2809,6 +2821,7 @@ private struct ContentView: View {
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
     items.append(contentsOf: SoundCommandCatalog.items)
     items.append(contentsOf: CaretCommandCatalog.items)
+    items.append(contentsOf: PaceCaretCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2845,6 +2858,17 @@ private struct ContentView: View {
     }
     if let target = CaretCommandCatalog.target(for: item.id) {
       target.apply(to: settings)
+      return
+    }
+    if let target = PaceCaretCommandCatalog.target(for: item.id) {
+      switch target {
+      case .mode:
+        activeChallengeID = nil
+        target.apply(to: settings)
+        reset()
+      case .customSpeed:
+        showingPaceGuideSpeedEditor = true
+      }
       return
     }
     if let target = OfficialLayoutCommandCatalog.target(for: item.id) {

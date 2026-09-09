@@ -767,6 +767,53 @@ enum CaretCommandCatalog {
     }
 }
 
+enum PaceCaretCommandTarget: Equatable {
+    case mode(PaceGuideMode)
+    case customSpeed
+
+    var requiresRestart: Bool { true }
+    var exitsChallenge: Bool { true }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        guard case .mode(let mode) = self else { return }
+        settings.paceGuideMode = mode
+    }
+}
+
+/// Preserves the fixed reference command values while mapping them to
+/// Typebar-owned pace modes and native result storage.
+enum PaceCaretCommandCatalog {
+    private static let options: [(value: String, target: PaceCaretCommandTarget, title: String)] = [
+        ("off", .mode(.off), "关闭"),
+        ("pb", .mode(.personalBest), "同类个人最佳"),
+        ("tagPb", .mode(.activeTagPersonalBest), "活动标签个人最佳"),
+        ("last", .mode(.lastTest), "上一轮速度"),
+        ("average", .mode(.recentAverage), "最近 10 次同类平均"),
+        ("daily", .mode(.dailyBest), "过去 24 小时同类最佳"),
+        ("custom", .customSpeed, "自定义速度…"),
+    ]
+
+    static let items = options.map { option in
+        let identifier = "caret.paceCaret.\(option.value)"
+        return CommandPaletteItem(
+            id: identifier, title: "节奏引导：\(option.title)",
+            subtitle: option.target == .customSpeed ? "输入目标速度并立即重开" : "切换目标来源并立即重开",
+            systemImage: option.target == .customSpeed ? "metronome.fill" : "metronome",
+            keywords: [
+                identifier, "caret", "paceCaret", "pace", "节奏", "目标", option.value,
+                option.title,
+            ], group: .settings)
+    }
+
+    static func target(for identifier: String) -> PaceCaretCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "caret", parts[1] == "paceCaret" else { return nil }
+        let value = String(parts[2])
+        return options.first(where: { $0.value == value })?.target
+    }
+}
+
 enum OfficialLayoutCommandTarget: Equatable {
     case system
     case builtIn(KeyboardLayout)
@@ -930,6 +977,7 @@ enum TestConfigurationCommandChallengePolicy {
             || PracticePreferenceCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || InputRuleCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || OfficialLayoutCommandCatalog.target(for: identifier)?.exitsChallenge == true
+            || PaceCaretCommandCatalog.target(for: identifier)?.exitsChallenge == true
     }
 }
 

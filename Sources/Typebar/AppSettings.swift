@@ -244,6 +244,19 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
     }
   }
 
+  func canonicalWpm(fromDisplayedValue value: Double) -> Int {
+    guard value.isFinite else { return 0 }
+    let converted: Double
+    switch self {
+    case .wpm: converted = value
+    case .cpm: converted = value / 5
+    case .wps: converted = value * 60
+    case .cps: converted = value * 60 / 5
+    case .wph: converted = value / 60
+    }
+    return Int(converted.rounded().clamped(to: -1_000_000...1_000_000))
+  }
+
   var histogramBucketSize: Double {
     switch self {
     case .wpm: 10

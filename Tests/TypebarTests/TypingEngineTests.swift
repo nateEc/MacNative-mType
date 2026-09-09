@@ -1830,6 +1830,44 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(settings.repeatedPace)
   }
 
+  func testPaceCaretCommandsCoverFixedReferenceModesAndRestartChallenges() {
+    let expectedIDs = [
+      "caret.paceCaret.off", "caret.paceCaret.pb", "caret.paceCaret.tagPb",
+      "caret.paceCaret.last", "caret.paceCaret.average", "caret.paceCaret.daily",
+      "caret.paceCaret.custom",
+    ]
+
+    XCTAssertEqual(PaceCaretCommandCatalog.items.map(\.id), expectedIDs)
+    XCTAssertEqual(PaceCaretCommandCatalog.target(for: expectedIDs[0]), .mode(.off))
+    XCTAssertEqual(PaceCaretCommandCatalog.target(for: expectedIDs[1]), .mode(.personalBest))
+    XCTAssertEqual(
+      PaceCaretCommandCatalog.target(for: expectedIDs[2]), .mode(.activeTagPersonalBest))
+    XCTAssertEqual(PaceCaretCommandCatalog.target(for: expectedIDs[3]), .mode(.lastTest))
+    XCTAssertEqual(PaceCaretCommandCatalog.target(for: expectedIDs[4]), .mode(.recentAverage))
+    XCTAssertEqual(PaceCaretCommandCatalog.target(for: expectedIDs[5]), .mode(.dailyBest))
+    XCTAssertEqual(PaceCaretCommandCatalog.target(for: expectedIDs[6]), .customSpeed)
+    XCTAssertNil(PaceCaretCommandCatalog.target(for: "caret.paceCaret.personalBest"))
+    XCTAssertNil(PaceCaretCommandCatalog.target(for: "caret.paceCaret.daily.extra"))
+    XCTAssertTrue(PaceCaretCommandCatalog.items.allSatisfy { item in
+      guard let target = PaceCaretCommandCatalog.target(for: item.id) else { return false }
+      return target.requiresRestart && target.exitsChallenge
+        && TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
+        && CommandPaletteSearch.results(items: PaceCaretCommandCatalog.items, query: item.id)
+          .contains(where: { $0.id == item.id })
+    })
+  }
+
+  @MainActor
+  func testPaceCaretModeCommandsApplyThroughNativeSettings() throws {
+    let suiteName = "TypebarTests.PaceCaretCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    PaceCaretCommandTarget.mode(.dailyBest).apply(to: settings)
+    XCTAssertEqual(settings.paceGuideMode, .dailyBest)
+  }
+
   func testOfficialLayoutCommandsRemainSearchableByDisplayNameAndFixedIdentifier() {
     XCTAssertEqual(
       CommandPaletteSearch.results(items: OfficialLayoutCommandCatalog.items, query: "Colemak-DH Wide ISO")
@@ -19694,6 +19732,43 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingSpeedUnit.wph.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "4320.00")
     XCTAssertEqual(TypingSpeedUnit.wps.converted(wpm: 72), 1.2, accuracy: 0.001)
     XCTAssertEqual(TypingSpeedUnit.cps.converted(wpm: 72), 6, accuracy: 0.001)
+    XCTAssertEqual(TypingSpeedUnit.wpm.canonicalWpm(fromDisplayedValue: 72), 72)
+    XCTAssertEqual(TypingSpeedUnit.cpm.canonicalWpm(fromDisplayedValue: 360), 72)
+    XCTAssertEqual(TypingSpeedUnit.wps.canonicalWpm(fromDisplayedValue: 1.2), 72)
+    XCTAssertEqual(TypingSpeedUnit.cps.canonicalWpm(fromDisplayedValue: 6), 72)
+    XCTAssertEqual(TypingSpeedUnit.wph.canonicalWpm(fromDisplayedValue: 4_320), 72)
+    XCTAssertEqual(TypingSpeedUnit.wpm.canonicalWpm(fromDisplayedValue: .infinity), 0)
+    XCTAssertEqual(TypingSpeedUnit.wpm.canonicalWpm(fromDisplayedValue: 1e100), 1_000_000)
+  }
+
+  func testReferenceCompatiblePaceGuideUsesRecentTenAndRollingDayBest() {
+    let now = Date(timeIntervalSinceReferenceDate: 20_000_000)
+    let configuration = TestConfiguration.timed(seconds: 30, language: .english)
+    let older = (0..<12).map { index in
+      PaceGuideSample(
+        configuration: configuration, outcome: .completed,
+        finishedAt: now.addingTimeInterval(TimeInterval(-index * 60)), wpm: 50 + index,
+        tags: index.isMultiple(of: 2) ? ["focus"] : [])
+    }
+    let previousDayPeak = PaceGuideSample(
+      configuration: configuration, outcome: .completed,
+      finishedAt: now.addingTimeInterval(-86_399), wpm: 140, tags: ["focus"])
+    let expiredPeak = PaceGuideSample(
+      configuration: configuration, outcome: .completed,
+      finishedAt: now.addingTimeInterval(-86_401), wpm: 220, tags: ["focus"])
+
+    XCTAssertEqual(
+      PaceGuidePolicy.targetWpm(
+        mode: .recentAverage, customWpm: 60, configuration: configuration,
+        samples: older + [previousDayPeak, expiredPeak], now: now), 55)
+    XCTAssertEqual(
+      PaceGuidePolicy.targetWpm(
+        mode: .recentAverage, customWpm: 60, configuration: configuration, samples: older,
+        activeTags: ["FOCUS"], now: now), 55)
+    XCTAssertEqual(
+      PaceGuidePolicy.targetWpm(
+        mode: .dailyBest, customWpm: 60, configuration: configuration,
+        samples: older + [previousDayPeak, expiredPeak], activeTags: ["focus"], now: now), 140)
   }
 
   func testPaceGuideUsesOnlyComparableCompletedResultsAndClampsProgress() {
