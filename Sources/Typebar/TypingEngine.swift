@@ -2081,22 +2081,47 @@ enum TypingReplay {
     }
   }
 
+  static func inputGlyphs(
+    prompt: String, events: [TypingReplayEvent], through elapsed: TimeInterval
+  ) -> [TypingPromptGlyph] {
+    let promptCharacters = Array(prompt)
+    let promptCoordinates = promptCharacterIndices(prompt: prompt)
+    var typed: [Character] = []
+    var output: [TypingPromptGlyph] = []
+    var typedWord = 0
+    var typedPosition = 0
+    for event in chronologicalEvents(events) {
+      guard event.offset <= elapsed else { break }
+      switch event.kind {
+      case .insert:
+        for character in event.text {
+          let coordinate = characterCoordinate(
+            word: typedWord, position: typedPosition, character: character)
+          let state: TypingPromptCharacterState
+          if let promptIndex = promptCoordinates[coordinate] {
+            state = promptCharacters[promptIndex] == character && !event.forceError
+              ? .correct : .incorrect
+          } else {
+            state = .extra
+          }
+          typed.append(character)
+          output.append(.init(character: character, state: state))
+          advanceCursor(for: character, word: &typedWord, position: &typedPosition)
+        }
+      case .delete:
+        guard !typed.isEmpty else { continue }
+        typed.removeLast()
+        output.removeLast()
+        (typedWord, typedPosition) = cursorPosition(after: typed)
+      }
+    }
+    return output
+  }
+
   static func characterSeekOffsets(
     prompt: String, events: [TypingReplayEvent]
   ) -> [Int: TimeInterval] {
-    var promptCoordinates: [CharacterCoordinate: Int] = [:]
-    var promptWord = 0
-    var promptPosition = 0
-    for (index, character) in prompt.enumerated() {
-      let isSeparator = isPromptWordSeparator(character)
-      promptCoordinates[
-        CharacterCoordinate(
-          word: promptWord, position: isSeparator ? 0 : promptPosition,
-          isSeparator: isSeparator)
-      ] = index
-      advanceCursor(
-        for: character, word: &promptWord, position: &promptPosition)
-    }
+    let promptCoordinates = promptCharacterIndices(prompt: prompt)
 
     var offsets: [Int: TimeInterval] = [:]
     var typed: [Character] = []
@@ -2106,10 +2131,8 @@ enum TypingReplay {
       switch event.kind {
       case .insert:
         for character in event.text {
-          let coordinate = CharacterCoordinate(
-            word: typedWord,
-            position: isPromptWordSeparator(character) ? 0 : typedPosition,
-            isSeparator: isPromptWordSeparator(character))
+          let coordinate = characterCoordinate(
+            word: typedWord, position: typedPosition, character: character)
           if let promptIndex = promptCoordinates[coordinate], offsets[promptIndex] == nil {
             offsets[promptIndex] = event.offset
           }
@@ -2124,6 +2147,25 @@ enum TypingReplay {
       }
     }
     return offsets
+  }
+
+  private static func promptCharacterIndices(prompt: String) -> [CharacterCoordinate: Int] {
+    var indices: [CharacterCoordinate: Int] = [:]
+    var word = 0
+    var position = 0
+    for (index, character) in prompt.enumerated() {
+      indices[characterCoordinate(word: word, position: position, character: character)] = index
+      advanceCursor(for: character, word: &word, position: &position)
+    }
+    return indices
+  }
+
+  private static func characterCoordinate(
+    word: Int, position: Int, character: Character
+  ) -> CharacterCoordinate {
+    let isSeparator = isPromptWordSeparator(character)
+    return CharacterCoordinate(
+      word: word, position: isSeparator ? 0 : position, isSeparator: isSeparator)
   }
 
   private static func advanceCursor(

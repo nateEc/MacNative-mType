@@ -3844,20 +3844,48 @@ private struct ReplayTimelineView: View {
   @State private var isPlaying = false
   @State private var selectedPromptIndex: Int?
   private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+  private let characterSeekOffsets: [Int: TimeInterval]
 
   private var duration: TimeInterval { events.last?.offset ?? 0 }
-  private var replayedText: String { TypingReplay.typedText(events: events, through: elapsed) }
+  private var replayedGlyphs: [TypingPromptGlyph] {
+    TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed)
+  }
+  private var replayedAttributedText: AttributedString {
+    let glyphs = replayedGlyphs
+    guard !glyphs.isEmpty else {
+      var waiting = AttributedString("等待播放")
+      waiting.foregroundColor = .secondary
+      return waiting
+    }
+    return glyphs.reduce(into: AttributedString()) { output, glyph in
+      var character = AttributedString(String(glyph.character))
+      switch glyph.state {
+      case .correct:
+        character.foregroundColor = .primary
+      case .incorrect:
+        character.foregroundColor = .red
+        character.backgroundColor = .red.opacity(0.14)
+      case .extra:
+        character.foregroundColor = .red
+        character.backgroundColor = .red.opacity(0.1)
+        character.strikethroughStyle = .single
+      case .pending, .current, .hidden:
+        character.foregroundColor = .secondary
+      }
+      output += character
+    }
+  }
   private var performance: ResultPerformancePoint {
     ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed)
   }
-  private var characterSeekOffsets: [Int: TimeInterval] {
-    TypingReplay.characterSeekOffsets(prompt: prompt, events: events)
-  }
 
   init(prompt: String, events: [TypingReplayEvent], speedUnit: TypingSpeedUnit) {
+    let chronologicalEvents = TypingReplay.chronologicalEvents(events)
     self.prompt = prompt
-    self.events = TypingReplay.chronologicalEvents(events)
+    self.events = chronologicalEvents
     self.speedUnit = speedUnit
+    self.characterSeekOffsets = TypingReplay.characterSeekOffsets(
+      prompt: prompt, events: chronologicalEvents)
   }
 
   var body: some View {
@@ -3872,7 +3900,7 @@ private struct ReplayTimelineView: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
-      Text(replayedText.isEmpty ? "等待播放" : replayedText)
+      Text(replayedAttributedText)
         .font(.system(.caption, design: .monospaced))
         .lineLimit(3)
         .frame(maxWidth: .infinity, alignment: .leading)

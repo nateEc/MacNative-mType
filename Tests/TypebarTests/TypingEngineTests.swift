@@ -12299,6 +12299,43 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(targets[2])
   }
 
+  func testReplayInputGlyphsRebuildCorrectForcedIncorrectDeletedAndExtraStates() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0.1, kind: .insert, text: "a"),
+      .init(offset: 0.2, kind: .insert, text: "m", forceError: true),
+      .init(offset: 0.3, kind: .insert, text: "x"),
+      .init(offset: 0.4, kind: .delete, text: "x"),
+      .init(offset: 0.5, kind: .insert, text: "b"),
+      .init(offset: 0.6, kind: .insert, text: "r"),
+    ]
+
+    XCTAssertEqual(
+      TypingReplay.inputGlyphs(prompt: "amb", events: events, through: 0.35),
+      [
+        .init(character: "a", state: .correct),
+        .init(character: "m", state: .incorrect),
+        .init(character: "x", state: .incorrect),
+      ])
+    XCTAssertEqual(
+      TypingReplay.inputGlyphs(prompt: "amb", events: events, through: 1),
+      [
+        .init(character: "a", state: .correct),
+        .init(character: "m", state: .incorrect),
+        .init(character: "b", state: .correct),
+        .init(character: "r", state: .extra),
+      ])
+  }
+
+  func testReplayInputGlyphsRealignAtTheNextWordAfterAnExtraCharacter() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0.5, kind: .insert, text: "amx bay"),
+    ]
+
+    XCTAssertEqual(
+      TypingReplay.inputGlyphs(prompt: "am bay", events: events, through: 1).map(\.state),
+      [.correct, .correct, .extra, .correct, .correct, .correct, .correct])
+  }
+
   func testExtraCharactersNeverCauseAnOutOfBoundsRead() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "a")
     session.insert("abc", at: start)
