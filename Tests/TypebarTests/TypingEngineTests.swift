@@ -11906,10 +11906,39 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(ResultPublicationState.idle.message)
     XCTAssertEqual(ResultPublicationState.sending.message, "正在发送至自建服务…")
     XCTAssertFalse(ResultPublicationState.sending.canRetry)
-    XCTAssertFalse(ResultPublicationState.sent("已发送").canRetry)
+    XCTAssertFalse(ResultPublicationState.sent(.init(
+      message: "已发送", dailyLeaderboardRank: nil)).canRetry)
     XCTAssertFalse(ResultPublicationState.notice("仅本机").canRetry)
     XCTAssertEqual(ResultPublicationState.failed("发送失败").message, "发送失败")
     XCTAssertTrue(ResultPublicationState.failed("发送失败").canRetry)
+  }
+
+  func testResultPublicationReceiptKeepsDailyRankStructured() {
+    let receipt = ResultPublicationReceipt(
+      message: "已发送至自建服务", dailyLeaderboardRank: 7)
+    let state = ResultPublicationState.sent(receipt)
+
+    XCTAssertEqual(state.message, "已发送至自建服务")
+    XCTAssertEqual(state.dailyLeaderboardRank, 7)
+    XCTAssertFalse(state.canRetry)
+  }
+
+  func testRemoteResultSubmissionResponseAcceptsOldAndNewDailyRankShapes() throws {
+    let id = UUID()
+    let oldPayload = """
+      {"id":"\(id.uuidString)","accepted":true,"leaderboardEligible":true,
+       "experienceGained":12,"totalExperience":90,"weeklyExperienceRank":3}
+      """
+    let newPayload = """
+      {"id":"\(id.uuidString)","accepted":true,"leaderboardEligible":true,
+       "dailyLeaderboardRank":7,"experienceGained":12,"totalExperience":90,
+       "weeklyExperienceRank":3}
+      """
+
+    XCTAssertNil(try JSONDecoder().decode(
+      RemoteResultSubmissionResponse.self, from: Data(oldPayload.utf8)).dailyLeaderboardRank)
+    XCTAssertEqual(try JSONDecoder().decode(
+      RemoteResultSubmissionResponse.self, from: Data(newPayload.utf8)).dailyLeaderboardRank, 7)
   }
 
   func testCompletedStatusTextReflectsWhetherResultWasSaved() {

@@ -564,6 +564,7 @@ private struct ContentView: View {
   @State private var terminalNotice: TestTerminalNotice?
   @State private var bailoutConfirmationMessage: String?
   @State private var showingSync = false
+  @State private var syncInitialLeaderboard: RemoteLeaderboardSelection?
   @State private var showingConnections = false
   @State private var showingNotifications = false
   @State private var unreadNotificationCount: Int?
@@ -767,7 +768,10 @@ private struct ContentView: View {
       Button("历史", systemImage: "clock.arrow.circlepath") { showingHistory = true }
       Button("弱项", systemImage: "scope") { showingWeakSpots = true }
       Button("数据", systemImage: "externaldrive") { showingDataMigration = true }
-      Button("同步", systemImage: "arrow.triangle.2.circlepath") { showingSync = true }
+      Button("同步", systemImage: "arrow.triangle.2.circlepath") {
+        syncInitialLeaderboard = nil
+        showingSync = true
+      }
       Button("好友", systemImage: "person.2") { showingConnections = true }
       Button { showingNotifications = true } label: {
         HStack(spacing: 4) {
@@ -801,8 +805,9 @@ private struct ContentView: View {
     .sheet(isPresented: $showingDataMigration) {
       ArchiveManagementView(settings: settings)
     }
-    .sheet(isPresented: $showingSync) {
-      CloudSyncView(settings: settings, account: account)
+    .sheet(isPresented: $showingSync, onDismiss: { syncInitialLeaderboard = nil }) {
+      CloudSyncView(
+        settings: settings, account: account, initialLeaderboard: syncInitialLeaderboard)
     }
     .sheet(isPresented: $showingConnections) {
       ConnectionsView(account: account)
@@ -913,6 +918,14 @@ private struct ContentView: View {
         challengeEvaluation: result.challengeEvaluation,
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
         onRetryPublication: { publishIfEnabled(result.result) },
+        onOpenDailyLeaderboard: {
+          completedResult = nil
+          syncInitialLeaderboard = .init(
+            mode: result.result.configuration.mode,
+            language: result.result.configuration.language,
+            period: .day)
+          showingSync = true
+        },
         onPracticeMissedWords: {
           startWordPractice(
             result.missedWordPracticeWords, selectedTargetCount: result.missedWords.count)
@@ -3120,10 +3133,11 @@ private struct ContentView: View {
         let response = try await account.submitCompletedResult(result)
         let rank = response.weeklyExperienceRank.map { " · 本周 XP #\($0)" } ?? ""
         guard publicationResultID == result.id else { return }
-        publicationState = .sent(
-          response.leaderboardEligible
+        publicationState = .sent(.init(
+          message: response.leaderboardEligible
             ? "已发送至自建服务 · +\(response.experienceGained) XP · 总计 \(response.totalExperience) XP\(rank)"
-            : "已发送至自建服务 · +\(response.experienceGained) XP")
+            : "已发送至自建服务 · +\(response.experienceGained) XP",
+          dailyLeaderboardRank: response.dailyLeaderboardRank))
       } catch {
         guard publicationResultID == result.id else { return }
         publicationState = .failed("本机成绩已保存；未能发送至服务：\(error.localizedDescription)")
@@ -3230,6 +3244,7 @@ private struct CompletedResultView: View {
   let challengeEvaluation: ChallengeEvaluation?
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onRetryPublication: () -> Void
+  let onOpenDailyLeaderboard: () -> Void
   let onPracticeMissedWords: () -> Void
   let onPracticeContextualMissedWords: ([String], Int) -> Void
   let onPracticeSlowWords: ([String], Int) -> Void
@@ -3345,6 +3360,13 @@ private struct CompletedResultView: View {
           if publicationState.canRetry {
             Button("重新发送成绩", action: onRetryPublication)
               .buttonStyle(.bordered)
+          }
+          if let dailyRank = publicationState.dailyLeaderboardRank {
+            Button(action: onOpenDailyLeaderboard) {
+              Label("今日同模式同语言排名 #\(dailyRank)", systemImage: "list.number")
+            }
+            .buttonStyle(.borderless)
+            .accessibilityHint("打开本轮模式和语言的今日全局排行榜")
           }
         }
       }

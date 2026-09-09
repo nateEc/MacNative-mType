@@ -626,17 +626,22 @@ struct RemoteResultSubmissionResponse: Codable, Sendable {
     let id: UUID
     let accepted: Bool
     let leaderboardEligible: Bool
+    let dailyLeaderboardRank: Int?
     let experienceGained: Int
     let totalExperience: Int
     let weeklyExperienceRank: Int?
 
-    private enum CodingKeys: String, CodingKey { case id, accepted, leaderboardEligible, experienceGained, totalExperience, weeklyExperienceRank }
+    private enum CodingKeys: String, CodingKey {
+        case id, accepted, leaderboardEligible, dailyLeaderboardRank
+        case experienceGained, totalExperience, weeklyExperienceRank
+    }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
         accepted = try values.decode(Bool.self, forKey: .accepted)
         leaderboardEligible = try values.decode(Bool.self, forKey: .leaderboardEligible)
+        dailyLeaderboardRank = try values.decodeIfPresent(Int.self, forKey: .dailyLeaderboardRank)
         experienceGained = try values.decodeIfPresent(Int.self, forKey: .experienceGained) ?? 0
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         weeklyExperienceRank = try values.decodeIfPresent(Int.self, forKey: .weeklyExperienceRank)
@@ -1007,6 +1012,12 @@ enum RemoteLeaderboardPeriod: String, CaseIterable {
         case .week: "本周"
         }
     }
+}
+
+struct RemoteLeaderboardSelection: Equatable {
+    let mode: TestMode?
+    let language: TypingLanguage?
+    let period: RemoteLeaderboardPeriod
 }
 
 enum RemoteLeaderboardScope: String, CaseIterable {

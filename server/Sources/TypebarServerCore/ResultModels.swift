@@ -69,6 +69,7 @@ public struct ResultSubmissionResponse: Content, Equatable {
     public let id: UUID
     public let accepted: Bool
     public let leaderboardEligible: Bool
+    public let dailyLeaderboardRank: Int?
     public let experienceGained: Int
     public let totalExperience: Int
     public let weeklyExperienceRank: Int?

@@ -7,10 +7,15 @@ enum ResultSavingPolicy {
   }
 }
 
+struct ResultPublicationReceipt: Equatable {
+  let message: String
+  let dailyLeaderboardRank: Int?
+}
+
 enum ResultPublicationState: Equatable {
   case idle
   case sending
-  case sent(String)
+  case sent(ResultPublicationReceipt)
   case failed(String)
   case notice(String)
 
@@ -18,7 +23,8 @@ enum ResultPublicationState: Equatable {
     switch self {
     case .idle: nil
     case .sending: "正在发送至自建服务…"
-    case .sent(let message), .failed(let message), .notice(let message): message
+    case .sent(let receipt): receipt.message
+    case .failed(let message), .notice(let message): message
     }
   }
 
@@ -30,6 +36,11 @@ enum ResultPublicationState: Equatable {
   var isSending: Bool {
     if case .sending = self { return true }
     return false
+  }
+
+  var dailyLeaderboardRank: Int? {
+    guard case .sent(let receipt) = self else { return nil }
+    return receipt.dailyLeaderboardRank
   }
 }
 

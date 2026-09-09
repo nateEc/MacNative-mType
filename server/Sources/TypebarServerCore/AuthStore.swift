@@ -2695,13 +2695,21 @@ public actor AuthStore {
 
   private func resultSubmissionResponse(
     for request: ResultSubmissionRequest, userID: UUID, now: Date
-  ) -> ResultSubmissionResponse {
+  ) throws -> ResultSubmissionResponse {
     let isLeaderboardEligible = !state.users.first(where: { $0.id == userID })!.leaderboardOptedOut
     let weeklyEntries = experienceLeaderboardEntries(now: now)
+    let isToday = request.finishedAt >= Calendar.current.startOfDay(for: now)
+    let dailyRank = isLeaderboardEligible && isToday
+      ? try leaderboardEntries(
+        .init(mode: request.mode, language: request.language, period: "day", limit: nil),
+        eligibleUserIDs: nil, now: now
+      ).first(where: { $0.userID == userID })?.rank
+      : nil
     return .init(
       id: request.id,
       accepted: true,
       leaderboardEligible: isLeaderboardEligible,
+      dailyLeaderboardRank: dailyRank,
       experienceGained: TypebarExperiencePolicy.points(for: request),
       totalExperience: experience(for: userID),
       weeklyExperienceRank: isLeaderboardEligible
@@ -2798,8 +2806,9 @@ public actor AuthStore {
     let user = try authenticatedUser(for: credential, now: now)
     try validate(result: request, now: now)
     let tags = try validatedResultTags(request.tags)
-    if state.results.contains(where: { $0.userID == user.id && $0.id == request.id }) {
-      return resultSubmissionResponse(for: request, userID: user.id, now: now)
+    if let existing = state.results.first(where: { $0.userID == user.id && $0.id == request.id }) {
+      return try resultSubmissionResponse(
+        for: resultRequest(from: existing), userID: user.id, now: now)
     }
     let existingBadgeIDs = Set(availablePublicBadges(for: user.id).map(\.id))
     state.results.append(
@@ -2822,7 +2831,7 @@ public actor AuthStore {
           badgeID: badge.id, createdAt: now, readAt: nil))
     }
     try persist()
-    return resultSubmissionResponse(for: request, userID: user.id, now: now)
+    return try resultSubmissionResponse(for: request, userID: user.id, now: now)
   }
 
   public func submitResult(

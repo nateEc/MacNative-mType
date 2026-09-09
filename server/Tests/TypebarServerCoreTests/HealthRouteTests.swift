@@ -2840,15 +2840,19 @@ final class HealthRouteTests: XCTestCase {
     let first = try await store.submitResult(
       result(id: firstID, wpm: 74, accuracy: 98, finishedAt: now), accessToken: slower.accessToken,
       now: now)
-    let duplicate = try await store.submitResult(
-      result(id: firstID, wpm: 74, accuracy: 98, finishedAt: now), accessToken: slower.accessToken,
-      now: now)
     _ = try await store.submitResult(
       result(id: UUID(), wpm: 101, accuracy: 96, consistency: 94, finishedAt: now), accessToken: faster.accessToken,
       now: now)
+    let duplicate = try await store.submitResult(
+      result(
+        id: firstID, wpm: 90, accuracy: 100, language: "spanish", finishedAt: now),
+      accessToken: slower.accessToken, now: now)
 
     XCTAssertTrue(first.accepted)
     XCTAssertTrue(duplicate.accepted)
+    XCTAssertEqual(duplicate.experienceGained, first.experienceGained)
+    XCTAssertEqual(first.dailyLeaderboardRank, 1)
+    XCTAssertEqual(duplicate.dailyLeaderboardRank, 2)
     _ = try await store.submitResult(
       result(
         id: UUID(), wpm: 80, accuracy: 99, consistency: 77,
@@ -2872,6 +2876,34 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(fullResponse.entries.map(\.wpm), [101, 80])
     XCTAssertEqual(fullResponse.entries.map(\.consistency), [94, 77])
     XCTAssertEqual(fullResponse.entries.map(\.id).count, Set(fullResponse.entries.map(\.id)).count)
+  }
+
+  func testResultSubmissionOnlyReturnsDailyRankForTodaysEligibleResult() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let visible = try await store.register(
+      .init(email: "daily-visible@example.com", password: "a secure password", displayName: "Visible"))
+    let hidden = try await store.register(
+      .init(email: "daily-hidden@example.com", password: "a secure password", displayName: "Hidden"))
+    let now = Date(timeIntervalSince1970: 1_788_825_600)
+
+    let old = try await store.submitResult(
+      result(id: UUID(), wpm: 120, accuracy: 100, finishedAt: now.addingTimeInterval(-86_400)),
+      accessToken: visible.accessToken, now: now)
+    XCTAssertNil(old.dailyLeaderboardRank)
+
+    _ = try await store.updateProfile(
+      .init(displayName: hidden.user.displayName, leaderboardOptedOut: true),
+      accessToken: hidden.accessToken, now: now)
+    let optedOut = try await store.submitResult(
+      result(id: UUID(), wpm: 140, accuracy: 100, finishedAt: now),
+      accessToken: hidden.accessToken, now: now)
+    XCTAssertFalse(optedOut.leaderboardEligible)
+    XCTAssertNil(optedOut.dailyLeaderboardRank)
+
+    let today = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 100, finishedAt: now),
+      accessToken: visible.accessToken, now: now)
+    XCTAssertEqual(today.dailyLeaderboardRank, 1)
   }
 
   func testResultSubmissionDefaultsMissingConsistencyForLegacyClient() throws {

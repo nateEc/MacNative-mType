@@ -10,6 +10,7 @@ struct CloudSyncView: View {
 
     let settings: AppSettings
     let account: AccountSession
+    let initialLeaderboard: RemoteLeaderboardSelection?
     @State private var message: String?
     @State private var leaderboard: [RemoteLeaderboardEntry] = []
     @State private var leaderboardMode: TestMode?
@@ -29,6 +30,18 @@ struct CloudSyncView: View {
     @State private var loadedExperienceRank = false
     @State private var selectedProfile: RemotePublicProfile?
     @State private var profileMessage: String?
+
+    init(
+        settings: AppSettings, account: AccountSession,
+        initialLeaderboard: RemoteLeaderboardSelection? = nil
+    ) {
+        self.settings = settings
+        self.account = account
+        self.initialLeaderboard = initialLeaderboard
+        _leaderboardMode = State(initialValue: initialLeaderboard?.mode)
+        _leaderboardLanguage = State(initialValue: initialLeaderboard?.language)
+        _leaderboardPeriod = State(initialValue: initialLeaderboard?.period ?? .all)
+    }
 
     var body: some View {
         NavigationStack {
@@ -205,6 +218,10 @@ struct CloudSyncView: View {
             }
         }
         .frame(minWidth: 500, minHeight: 350)
+        .task {
+            guard initialLeaderboard != nil else { return }
+            loadLeaderboard()
+        }
         .sheet(item: $selectedProfile) { profile in
             PublicProfileView(profile: profile, account: account)
         }
