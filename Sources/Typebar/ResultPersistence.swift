@@ -7,6 +7,92 @@ enum ResultSavingPolicy {
   }
 }
 
+enum ResultPublicationRetryPolicy {
+  static func shouldQueue(_ error: Error) -> Bool {
+    if error is URLError { return true }
+    guard let accountError = error as? RemoteAccountError else { return false }
+    if case .accountScopeChanged = accountError { return true }
+    guard case .serverResponse(let statusCode, _) = accountError else { return false }
+    return statusCode == 401 || statusCode == 408 || statusCode == 425 || statusCode == 429
+      || (500...599).contains(statusCode)
+  }
+}
+
+struct ResultPublicationScope: Codable, Equatable, Hashable, Sendable {
+  let serverID: String
+  let userID: UUID
+
+  init(endpoint: String, userID: UUID) {
+    serverID = RemoteServerScope(endpoint: endpoint).storageSuffix
+    self.userID = userID
+  }
+}
+
+private struct PendingResultPublication: Codable, Equatable, Hashable {
+  let resultID: UUID
+  let scope: ResultPublicationScope
+}
+
+/// Persists only result identifiers and their account/server ownership. The
+/// result payload remains in SwiftData and credentials remain in Keychain.
+final class PendingResultPublicationStore {
+  static let storageKey = "resultPublication.pending.v1"
+
+  private let defaults: UserDefaults
+  private var entries: [PendingResultPublication]
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+    entries = []
+    reload()
+  }
+
+  private func reload() {
+    if let data = defaults.data(forKey: Self.storageKey),
+      let decoded = try? JSONDecoder().decode([PendingResultPublication].self, from: data)
+    {
+      var seen = Set<PendingResultPublication>()
+      entries = decoded.filter { seen.insert($0).inserted }
+    } else {
+      entries = []
+    }
+  }
+
+  func resultIDs(for scope: ResultPublicationScope) -> [UUID] {
+    reload()
+    return entries.lazy.filter { $0.scope == scope }.map(\.resultID)
+  }
+
+  func enqueue(_ resultID: UUID, for scope: ResultPublicationScope) {
+    reload()
+    let entry = PendingResultPublication(resultID: resultID, scope: scope)
+    guard !entries.contains(entry) else { return }
+    entries.append(entry)
+    persist()
+  }
+
+  func remove(_ resultID: UUID, for scope: ResultPublicationScope) {
+    reload()
+    let oldCount = entries.count
+    entries.removeAll { $0.resultID == resultID && $0.scope == scope }
+    if entries.count != oldCount { persist() }
+  }
+
+  func removeAll() {
+    entries.removeAll()
+    defaults.removeObject(forKey: Self.storageKey)
+  }
+
+  private func persist() {
+    guard !entries.isEmpty else {
+      defaults.removeObject(forKey: Self.storageKey)
+      return
+    }
+    guard let data = try? JSONEncoder().encode(entries) else { return }
+    defaults.set(data, forKey: Self.storageKey)
+  }
+}
+
 struct ResultPublicationReceipt: Equatable {
   let message: String
   let dailyLeaderboardRank: Int?

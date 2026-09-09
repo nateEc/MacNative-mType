@@ -6,7 +6,8 @@ enum LocalAccountReset {
     modelContext: ModelContext,
     settings: AppSettings,
     removeBackground: (() throws -> Void)? = nil,
-    removePracticeFont: (() throws -> Void)? = nil
+    removePracticeFont: (() throws -> Void)? = nil,
+    clearPendingPublications: (() -> Void)? = nil
   ) throws {
     try (removeBackground ?? { try settings.removeLocalBackground() })()
     try (removePracticeFont ?? { try settings.removeLocalPracticeFont() })()
@@ -17,6 +18,7 @@ enum LocalAccountReset {
     try modelContext.delete(model: ResultFilterPresetRecord.self)
     try modelContext.save()
 
+    (clearPendingPublications ?? { PendingResultPublicationStore().removeAll() })()
     settings.restoreDefaults()
   }
 }

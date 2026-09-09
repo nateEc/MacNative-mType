@@ -1053,8 +1053,10 @@ enum RemoteAccountError: LocalizedError {
     case invalidOAuthCallback
     case oauthAuthorizationCancelled
     case oauthAuthorizationInProgress
+    case accountScopeChanged
     case archiveSyncConflict(serverVersion: Int)
     case serverMessage(String)
+    case serverResponse(statusCode: Int, message: String)
     case unexpectedResponse
 
     var errorDescription: String? {
@@ -1063,8 +1065,10 @@ enum RemoteAccountError: LocalizedError {
         case .invalidOAuthCallback: "第三方登录返回了无法识别的回调。"
         case .oauthAuthorizationCancelled: "第三方登录已取消。"
         case .oauthAuthorizationInProgress: "已有一个第三方登录正在进行。"
+        case .accountScopeChanged: "服务地址或登录账户已改变；未发送成绩。"
         case .archiveSyncConflict: "服务器存在更新冲突；正在保留双方内容并重新合并。"
         case .serverMessage(let message): message
+        case .serverResponse(_, let message): message
         case .unexpectedResponse: "服务返回了无法识别的响应。"
         }
     }
@@ -1126,6 +1130,10 @@ final class AccountSession {
 
     var hasStoredSession: Bool {
         tokenStore.load() != nil
+    }
+
+    var resultPublicationScope: ResultPublicationScope? {
+        currentUser.map { ResultPublicationScope(endpoint: endpoint, userID: $0.id) }
     }
 
     func restoreSession() async {
@@ -2026,11 +2034,16 @@ final class AccountSession {
     }
 
     func submitCompletedResult(
-        _ result: CompletedTestResult
+        _ result: CompletedTestResult,
+        for expectedScope: ResultPublicationScope
     ) async throws -> RemoteResultSubmissionResponse {
-        guard let token = tokenStore.load(), currentUser != nil else {
+        guard resultPublicationScope == expectedScope else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        guard let token = tokenStore.load(), let requestingUser = currentUser else {
             throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
         }
+        let requestScope = ResultPublicationScope(endpoint: endpoint, userID: requestingUser.id)
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: "v1/results",
             method: "POST",
@@ -2039,7 +2052,7 @@ final class AccountSession {
             response: RemoteResultSubmissionResponse.self
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }
-        if let user = currentUser {
+        if resultPublicationScope == requestScope, let user = currentUser {
             currentUser = .init(
                 id: user.id,
                 email: user.email,
@@ -2502,12 +2515,17 @@ private struct RemoteAccountAPI {
         guard let response = urlResponse as? HTTPURLResponse else { throw RemoteAccountError.unexpectedResponse }
         guard (200..<300).contains(response.statusCode) else {
             if response.statusCode == 503, response.value(forHTTPHeaderField: "X-Typebar-Maintenance") == "true" {
-                throw RemoteAccountError.serverMessage("自建 Typebar 服务正在维护中；本机离线练习仍可使用，请稍后重试。")
+                throw RemoteAccountError.serverResponse(
+                    statusCode: response.statusCode,
+                    message: "自建 Typebar 服务正在维护中；本机离线练习仍可使用，请稍后重试。")
             }
             if let message = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let reason = message["reason"] as? String {
-                throw RemoteAccountError.serverMessage(reason)
+                throw RemoteAccountError.serverResponse(
+                    statusCode: response.statusCode, message: reason)
             }
-            throw RemoteAccountError.serverMessage("服务请求失败（HTTP \(response.statusCode)）。")
+            throw RemoteAccountError.serverResponse(
+                statusCode: response.statusCode,
+                message: "服务请求失败（HTTP \(response.statusCode)）。")
         }
         return try JSONDecoder.remote.decode(Response.self, from: data)
     }

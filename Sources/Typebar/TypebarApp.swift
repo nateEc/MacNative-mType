@@ -562,6 +562,12 @@ private struct ActiveLongSavedText: Equatable {
   }
 }
 
+private struct PendingPublicationRetryTrigger: Equatable {
+  let networkStatus: NetworkConnectivityStatus
+  let scope: ResultPublicationScope?
+  let isEnabled: Bool
+}
+
 private struct ContentView: View {
   let settings: AppSettings
   let account: AccountSession
@@ -622,6 +628,8 @@ private struct ContentView: View {
   @State private var completedResult: CompletedResultPresentation?
   @State private var publicationState: ResultPublicationState = .idle
   @State private var publicationResultID: UUID?
+  @State private var pendingPublications = PendingResultPublicationStore()
+  @State private var isRetryingPendingPublications = false
   @State private var terminalNotice: TestTerminalNotice?
   @State private var bailoutConfirmationMessage: String?
   @State private var showingSync = false
@@ -746,6 +754,7 @@ private struct ContentView: View {
       if !mode.isEnabled { clearTypingPowerEffect() }
     }
     .task { await runClock() }
+    .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear {
       reset()
@@ -3210,23 +3219,96 @@ private struct ContentView: View {
     if publicationResultID == result.id, publicationState.isSending { return }
     publicationResultID = result.id
     publicationState = .idle
-    guard settings.publishCompletedResults, account.currentUser != nil else { return }
+    guard settings.publishCompletedResults, let scope = account.resultPublicationScope else { return }
     publicationState = .sending
     Task {
       do {
-        let response = try await account.submitCompletedResult(result)
-        let rank = response.weeklyExperienceRank.map { " · 本周 XP #\($0)" } ?? ""
-        guard publicationResultID == result.id else { return }
-        publicationState = .sent(.init(
-          message: response.leaderboardEligible
-            ? "已发送至自建服务 · +\(response.experienceGained) XP · 总计 \(response.totalExperience) XP\(rank)"
-            : "已发送至自建服务 · +\(response.experienceGained) XP",
-          dailyLeaderboardRank: response.dailyLeaderboardRank))
+        let response = try await account.submitCompletedResult(result, for: scope)
+        pendingPublications.remove(result.id, for: scope)
+        guard publicationResultID == result.id, account.resultPublicationScope == scope else { return }
+        publicationState = .sent(publicationReceipt(for: response))
       } catch {
-        guard publicationResultID == result.id else { return }
-        publicationState = .failed("本机成绩已保存；未能发送至服务：\(error.localizedDescription)")
+        let isQueued = ResultPublicationRetryPolicy.shouldQueue(error)
+        if isQueued {
+          pendingPublications.enqueue(result.id, for: scope)
+        } else {
+          pendingPublications.remove(result.id, for: scope)
+        }
+        guard publicationResultID == result.id, account.resultPublicationScope == scope else { return }
+        publicationState = .failed(isQueued
+          ? "本机成绩已保存并加入待发送队列；联网且登录同一账户时会自动重试：\(error.localizedDescription)"
+          : "本机成绩已保存；服务未接受本次成绩：\(error.localizedDescription)")
       }
     }
+  }
+
+  private var pendingPublicationRetryTrigger: PendingPublicationRetryTrigger {
+    .init(
+      networkStatus: network.status,
+      scope: account.resultPublicationScope,
+      isEnabled: settings.publishCompletedResults)
+  }
+
+  private func retryPendingPublicationsIfPossible() {
+    guard !isRetryingPendingPublications,
+      settings.publishCompletedResults,
+      network.status == .online,
+      let scope = account.resultPublicationScope
+    else { return }
+
+    let resultIDs = pendingPublications.resultIDs(for: scope)
+    guard !resultIDs.isEmpty else { return }
+    let recordsByID = Dictionary(uniqueKeysWithValues: savedResults.map { ($0.id, $0) })
+    var retryableResults: [CompletedTestResult] = []
+    for resultID in resultIDs {
+      guard let result = recordsByID[resultID]?.portableResult, result.outcome == .completed else {
+        pendingPublications.remove(resultID, for: scope)
+        continue
+      }
+      retryableResults.append(result)
+    }
+    guard !retryableResults.isEmpty else { return }
+
+    isRetryingPendingPublications = true
+    Task { @MainActor in
+      defer { isRetryingPendingPublications = false }
+      for result in retryableResults {
+        guard settings.publishCompletedResults,
+          network.status == .online,
+          account.resultPublicationScope == scope
+        else { break }
+        if publicationResultID == result.id { publicationState = .sending }
+        do {
+          let response = try await account.submitCompletedResult(result, for: scope)
+          pendingPublications.remove(result.id, for: scope)
+          if publicationResultID == result.id, account.resultPublicationScope == scope {
+            publicationState = .sent(publicationReceipt(for: response))
+          }
+        } catch {
+          let remainsQueued = ResultPublicationRetryPolicy.shouldQueue(error)
+          if !remainsQueued {
+            pendingPublications.remove(result.id, for: scope)
+          }
+          if publicationResultID == result.id, account.resultPublicationScope == scope {
+            publicationState = .failed(remainsQueued
+              ? "待发送成绩仍未送达；保留在这台 Mac，稍后会再次尝试：\(error.localizedDescription)"
+              : "服务未接受待发送成绩；已停止自动重试：\(error.localizedDescription)")
+          }
+          if remainsQueued { break }
+        }
+      }
+    }
+  }
+
+  private func publicationReceipt(
+    for response: RemoteResultSubmissionResponse
+  ) -> ResultPublicationReceipt {
+    let rank = response.weeklyExperienceRank.map { " · 本周 XP #\($0)" } ?? ""
+    return .init(
+      message: response.leaderboardEligible
+        ? "已发送至自建服务 · +\(response.experienceGained) XP · 总计 \(response.totalExperience) XP\(rank)"
+        : "已发送至自建服务 · +\(response.experienceGained) XP",
+      dailyLeaderboardRank: response.dailyLeaderboardRank)
   }
 }
 

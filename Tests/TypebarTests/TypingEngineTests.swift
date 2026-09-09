@@ -11762,6 +11762,7 @@ final class TypingEngineTests: XCTestCase {
     try container.mainContext.save()
     var removedBackground = false
     var removedPracticeFont = false
+    var clearedPendingPublications = false
 
     XCTAssertThrowsError(
       try LocalAccountReset.eraseCurrentMacData(
@@ -11770,16 +11771,19 @@ final class TypingEngineTests: XCTestCase {
         removeBackground: {},
         removePracticeFont: {
           throw CocoaError(.fileWriteUnknown)
-        }))
+        },
+        clearPendingPublications: { clearedPendingPublications = true }))
     XCTAssertEqual(
       try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).count, 1)
     XCTAssertEqual(settings.theme, .midnight)
+    XCTAssertFalse(clearedPendingPublications)
 
     try LocalAccountReset.eraseCurrentMacData(
       modelContext: container.mainContext,
       settings: settings,
       removeBackground: { removedBackground = true },
-      removePracticeFont: { removedPracticeFont = true })
+      removePracticeFont: { removedPracticeFont = true },
+      clearPendingPublications: { clearedPendingPublications = true })
 
     XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).isEmpty)
     XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<TestPresetRecord>()).isEmpty)
@@ -11789,6 +11793,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
     XCTAssertTrue(removedBackground)
     XCTAssertTrue(removedPracticeFont)
+    XCTAssertTrue(clearedPendingPublications)
   }
 
   @MainActor
@@ -11938,6 +11943,68 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(ResultPublicationState.notice("仅本机").canRetry)
     XCTAssertEqual(ResultPublicationState.failed("发送失败").message, "发送失败")
     XCTAssertTrue(ResultPublicationState.failed("发送失败").canRetry)
+  }
+
+  func testPendingResultPublicationsAreDeduplicatedAndIsolatedByAccountAndServer() {
+    let suiteName = "TypebarTests.pending-result-publications.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = PendingResultPublicationStore(defaults: defaults)
+    let userA = UUID()
+    let userB = UUID()
+    let first = UUID()
+    let second = UUID()
+    let scopeA = ResultPublicationScope(endpoint: "HTTPS://Example.com:443/", userID: userA)
+    let equivalentScopeA = ResultPublicationScope(endpoint: "https://example.com", userID: userA)
+    let scopeB = ResultPublicationScope(endpoint: "https://example.com", userID: userB)
+
+    XCTAssertEqual(scopeA, equivalentScopeA)
+    store.enqueue(first, for: scopeA)
+    store.enqueue(first, for: equivalentScopeA)
+    store.enqueue(second, for: scopeA)
+    store.enqueue(first, for: scopeB)
+
+    let restored = PendingResultPublicationStore(defaults: defaults)
+    XCTAssertEqual(restored.resultIDs(for: scopeA), [first, second])
+    XCTAssertEqual(restored.resultIDs(for: scopeB), [first])
+
+    restored.remove(first, for: scopeA)
+    XCTAssertEqual(restored.resultIDs(for: scopeA), [second])
+    XCTAssertEqual(restored.resultIDs(for: scopeB), [first])
+
+    restored.removeAll()
+    XCTAssertTrue(restored.resultIDs(for: scopeA).isEmpty)
+    XCTAssertTrue(restored.resultIDs(for: scopeB).isEmpty)
+    XCTAssertTrue(store.resultIDs(for: scopeA).isEmpty)
+  }
+
+  func testPendingResultPublicationStoreRecoversFromCorruptMetadata() {
+    let suiteName = "TypebarTests.pending-result-publications-corrupt.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(Data("not-json".utf8), forKey: PendingResultPublicationStore.storageKey)
+    let store = PendingResultPublicationStore(defaults: defaults)
+    let scope = ResultPublicationScope(endpoint: "http://127.0.0.1:8080", userID: UUID())
+    let resultID = UUID()
+
+    XCTAssertTrue(store.resultIDs(for: scope).isEmpty)
+    store.enqueue(resultID, for: scope)
+    XCTAssertEqual(PendingResultPublicationStore(defaults: defaults).resultIDs(for: scope), [resultID])
+  }
+
+  func testResultPublicationRetryPolicyQueuesOnlyRecoverableFailures() {
+    XCTAssertTrue(ResultPublicationRetryPolicy.shouldQueue(URLError(.notConnectedToInternet)))
+    XCTAssertTrue(ResultPublicationRetryPolicy.shouldQueue(RemoteAccountError.accountScopeChanged))
+    XCTAssertTrue(ResultPublicationRetryPolicy.shouldQueue(
+      RemoteAccountError.serverResponse(statusCode: 401, message: "重新登录")))
+    XCTAssertTrue(ResultPublicationRetryPolicy.shouldQueue(
+      RemoteAccountError.serverResponse(statusCode: 429, message: "稍后重试")))
+    XCTAssertTrue(ResultPublicationRetryPolicy.shouldQueue(
+      RemoteAccountError.serverResponse(statusCode: 503, message: "维护中")))
+    XCTAssertFalse(ResultPublicationRetryPolicy.shouldQueue(
+      RemoteAccountError.serverResponse(statusCode: 400, message: "成绩无效")))
+    XCTAssertFalse(ResultPublicationRetryPolicy.shouldQueue(RemoteAccountError.invalidServerURL))
+    XCTAssertFalse(ResultPublicationRetryPolicy.shouldQueue(RemoteAccountError.unexpectedResponse))
   }
 
   func testResultPublicationReceiptKeepsDailyRankStructured() {
