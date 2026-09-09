@@ -2807,6 +2807,7 @@ private struct ContentView: View {
     items.append(contentsOf: PracticePreferenceCommandCatalog.items)
     items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
+    items.append(contentsOf: SoundCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2826,6 +2827,18 @@ private struct ContentView: View {
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let target = SoundCommandCatalog.target(for: item.id) {
+      target.apply(to: settings)
+      switch target.preview {
+      case .click(let style):
+        TypingFeedbackSound.shared.playClick(style: style, volume: settings.soundVolume)
+      case .error(let style):
+        TypingFeedbackSound.shared.playError(style: style, volume: settings.soundVolume)
+      case nil:
+        break
+      }
+      return
+    }
     if let target = OfficialLayoutCommandCatalog.target(for: item.id) {
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings)

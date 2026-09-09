@@ -503,6 +503,141 @@ enum InputRuleCommandCatalog {
     }
 }
 
+enum SoundCommandPreview: Equatable {
+    case click(TypingClickSoundStyle)
+    case error(TypingErrorSoundStyle)
+}
+
+enum SoundCommandTarget: Equatable {
+    case volume(Double)
+    case click(TypingClickSoundStyle?)
+    case error(TypingErrorSoundStyle?)
+
+    var requiresRestart: Bool { false }
+    var exitsChallenge: Bool { false }
+
+    var preview: SoundCommandPreview? {
+        switch self {
+        case .click(let style?): .click(style)
+        case .error(let style?): .error(style)
+        case .volume, .click(nil), .error(nil): nil
+        }
+    }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        switch self {
+        case .volume(let volume):
+            settings.soundVolume = volume
+        case .click(let style):
+            settings.playKeyclickSound = style != nil
+            if let style { settings.clickSoundStyle = style }
+        case .error(let style):
+            settings.playErrorBeep = style != nil
+            if let style { settings.errorSoundStyle = style }
+        }
+    }
+}
+
+/// Preserves the fixed reference's sound-option cardinality and command values,
+/// while mapping each numbered option to a Typebar-owned native sound.
+enum SoundCommandCatalog {
+    private static let clickStyles: [TypingClickSoundStyle] = [
+        .tink, .pop, .ping, .morse, .ember, .drift, .quartz, .ripple, .reed,
+        .pebble, .loom, .orbit, .pulse, .velvet, .copper, .frost, .lantern,
+        .meadow, .prism, .rain, .slate, .spark, .tide, .willow, .zephyr, .nocturne,
+    ]
+    private static let errorStyles: [TypingErrorSoundStyle] = [
+        .basso, .funk, .sosumi, .submarine,
+    ]
+    private static let volumeOptions: [(value: Double, identifier: String, name: String)] = [
+        (0.1, "0.1", "轻"), (0.5, "0.5", "中"), (1, "1", "响"),
+    ]
+
+    static let items: [CommandPaletteItem] = {
+        var result: [CommandPaletteItem] = []
+        for option in volumeOptions {
+            let identifier = "sound.soundVolume.\(option.identifier)"
+            result.append(CommandPaletteItem(
+                id: identifier,
+                title: "提示音音量：\(option.name)", subtitle: "设为 \(Int(option.value * 100))%",
+                systemImage: "speaker.wave.2", keywords: [
+                    identifier, "sound", "soundVolume", "volume", "提示音", "音量",
+                    option.identifier,
+                ], group: .settings))
+        }
+        result.append(CommandPaletteItem(
+            id: "sound.playSoundOnClick.off", title: "键击提示音：关闭",
+            subtitle: "保留当前音型供下次开启", systemImage: "speaker.slash",
+            keywords: [
+                "sound.playSoundOnClick.off", "sound", "playSoundOnClick", "click", "off",
+                "键击", "提示音", "关闭",
+            ],
+            group: .settings))
+        for (index, style) in clickStyles.enumerated() {
+            let identifier = "sound.playSoundOnClick.\(index + 1)"
+            result.append(CommandPaletteItem(
+                id: identifier,
+                title: "键击提示音：\(style.displayName)", subtitle: "启用 Typebar 原生音型",
+                systemImage: "keyboard.badge.ellipsis", keywords: [
+                    identifier, "sound", "playSoundOnClick", "click", "键击", "提示音",
+                    style.displayName, String(index + 1),
+                ], group: .settings))
+        }
+        result.append(CommandPaletteItem(
+            id: "sound.playSoundOnError.off", title: "错误提示音：关闭",
+            subtitle: "保留当前音型供下次开启", systemImage: "speaker.slash",
+            keywords: [
+                "sound.playSoundOnError.off", "sound", "playSoundOnError", "error", "off",
+                "错误", "提示音", "关闭",
+            ],
+            group: .settings))
+        for (index, style) in errorStyles.enumerated() {
+            let identifier = "sound.playSoundOnError.\(index + 1)"
+            result.append(CommandPaletteItem(
+                id: identifier,
+                title: "错误提示音：\(style.displayName)", subtitle: "启用 macOS 原生音型",
+                systemImage: "exclamationmark.triangle", keywords: [
+                    identifier, "sound", "playSoundOnError", "error", "错误", "提示音",
+                    style.displayName, String(index + 1),
+                ], group: .settings))
+        }
+        return result
+    }()
+
+    static func target(for identifier: String) -> SoundCommandTarget? {
+        if let option = volumeOptions.first(where: {
+            identifier == "sound.soundVolume.\($0.identifier)"
+        }) {
+            return .volume(option.value)
+        }
+        if identifier == "sound.playSoundOnClick.off" { return .click(nil) }
+        if let index = numberedIndex(identifier, prefix: "sound.playSoundOnClick."),
+            clickStyles.indices.contains(index)
+        {
+            return .click(clickStyles[index])
+        }
+        if identifier == "sound.playSoundOnError.off" { return .error(nil) }
+        if let index = numberedIndex(identifier, prefix: "sound.playSoundOnError."),
+            errorStyles.indices.contains(index)
+        {
+            return .error(errorStyles[index])
+        }
+        return nil
+    }
+
+    private static func numberedIndex(_ identifier: String, prefix: String) -> Int? {
+        guard identifier.hasPrefix(prefix) else { return nil }
+        let value = String(identifier.dropFirst(prefix.count))
+        guard !value.isEmpty, value.allSatisfy(\.isNumber), let number = Int(value),
+            String(number) == value
+        else {
+            return nil
+        }
+        return number - 1
+    }
+}
+
 enum OfficialLayoutCommandTarget: Equatable {
     case system
     case builtIn(KeyboardLayout)

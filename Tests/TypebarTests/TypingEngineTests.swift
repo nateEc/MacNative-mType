@@ -1658,6 +1658,102 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(settings.keyboardInputLayout, .system)
   }
 
+  func testSoundCommandsCoverFixedReferenceChoicesAndRejectMalformedIDs() {
+    let expectedIDs = [
+      "sound.soundVolume.0.1", "sound.soundVolume.0.5", "sound.soundVolume.1",
+      "sound.playSoundOnClick.off",
+    ] + (1...26).map { "sound.playSoundOnClick.\($0)" } + [
+      "sound.playSoundOnError.off",
+    ] + (1...4).map { "sound.playSoundOnError.\($0)" }
+
+    XCTAssertEqual(SoundCommandCatalog.items.map(\.id), expectedIDs)
+    XCTAssertTrue(SoundCommandCatalog.items.allSatisfy { $0.group == .settings })
+    XCTAssertEqual(
+      Set(SoundCommandCatalog.items.compactMap {
+        guard case .click(let style) = SoundCommandCatalog.target(for: $0.id) else { return nil }
+        return style
+      }),
+      Set(TypingClickSoundStyle.allCases))
+    XCTAssertEqual(
+      Set(SoundCommandCatalog.items.compactMap {
+        guard case .error(let style) = SoundCommandCatalog.target(for: $0.id) else { return nil }
+        return style
+      }),
+      Set(TypingErrorSoundStyle.allCases))
+    XCTAssertEqual(
+      SoundCommandCatalog.target(for: "sound.soundVolume.0.1"), .volume(0.1))
+    XCTAssertEqual(
+      SoundCommandCatalog.target(for: "sound.playSoundOnClick.off"), .click(nil))
+    XCTAssertEqual(
+      SoundCommandCatalog.target(for: "sound.playSoundOnClick.1"),
+      .click(TypingClickSoundStyle.allCases[0]))
+    XCTAssertEqual(
+      SoundCommandCatalog.target(for: "sound.playSoundOnClick.26"),
+      .click(TypingClickSoundStyle.allCases[25]))
+    XCTAssertEqual(
+      SoundCommandCatalog.target(for: "sound.playSoundOnError.4"),
+      .error(TypingErrorSoundStyle.allCases[3]))
+    XCTAssertNil(SoundCommandCatalog.target(for: "sound.soundVolume.0.2"))
+    XCTAssertNil(SoundCommandCatalog.target(for: "sound.playSoundOnClick.0"))
+    XCTAssertNil(SoundCommandCatalog.target(for: "sound.playSoundOnClick.01"))
+    XCTAssertNil(SoundCommandCatalog.target(for: "sound.playSoundOnClick.27"))
+    XCTAssertNil(SoundCommandCatalog.target(for: "sound.playSoundOnError.5"))
+    XCTAssertNil(SoundCommandCatalog.target(for: "sound.playSoundOnError.1.extra"))
+    XCTAssertEqual(SoundCommandTarget.click(.lantern).preview, .click(.lantern))
+    XCTAssertEqual(SoundCommandTarget.error(.submarine).preview, .error(.submarine))
+    XCTAssertNil(SoundCommandTarget.click(nil).preview)
+    XCTAssertNil(SoundCommandTarget.error(nil).preview)
+    XCTAssertNil(SoundCommandTarget.volume(0.5).preview)
+  }
+
+  func testSoundCommandsRemainSearchableAndNeverRestartOrExitChallenges() {
+    XCTAssertEqual(
+      CommandPaletteSearch.results(
+        items: SoundCommandCatalog.items, query: "sound.soundVolume.0.5")
+        .map(\.id),
+      ["sound.soundVolume.0.5"])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: SoundCommandCatalog.items, query: "灯芯")
+        .map(\.id),
+      ["sound.playSoundOnClick.17"])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: SoundCommandCatalog.items, query: "回声")
+        .map(\.id),
+      ["sound.playSoundOnError.4"])
+    XCTAssertTrue(SoundCommandCatalog.items.allSatisfy { item in
+      CommandPaletteSearch.results(items: SoundCommandCatalog.items, query: item.id)
+        .contains(where: { $0.id == item.id })
+    })
+    XCTAssertTrue(SoundCommandCatalog.items.allSatisfy {
+      guard let target = SoundCommandCatalog.target(for: $0.id) else { return false }
+      return !target.requiresRestart && !target.exitsChallenge
+        && !TestConfigurationCommandChallengePolicy.exitsChallenge(for: $0.id)
+    })
+  }
+
+  @MainActor
+  func testSoundCommandsApplyThroughNativeSettingsAndOffPreservesSelectedStyles() throws {
+    let suiteName = "TypebarTests.SoundCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    SoundCommandTarget.volume(0.1).apply(to: settings)
+    XCTAssertEqual(settings.soundVolume, 0.1)
+    SoundCommandTarget.click(.lantern).apply(to: settings)
+    XCTAssertTrue(settings.playKeyclickSound)
+    XCTAssertEqual(settings.clickSoundStyle, .lantern)
+    SoundCommandTarget.click(nil).apply(to: settings)
+    XCTAssertFalse(settings.playKeyclickSound)
+    XCTAssertEqual(settings.clickSoundStyle, .lantern)
+    SoundCommandTarget.error(.submarine).apply(to: settings)
+    XCTAssertTrue(settings.playErrorBeep)
+    XCTAssertEqual(settings.errorSoundStyle, .submarine)
+    SoundCommandTarget.error(nil).apply(to: settings)
+    XCTAssertFalse(settings.playErrorBeep)
+    XCTAssertEqual(settings.errorSoundStyle, .submarine)
+  }
+
   func testOfficialLayoutCommandsRemainSearchableByDisplayNameAndFixedIdentifier() {
     XCTAssertEqual(
       CommandPaletteSearch.results(items: OfficialLayoutCommandCatalog.items, query: "Colemak-DH Wide ISO")
