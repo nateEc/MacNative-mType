@@ -3424,6 +3424,9 @@ private struct CompletedResultView: View {
             Button("复制结果文字", action: copyResultText)
             Button("复制练习提示", action: copyResultPrompt)
             Button("复制实际输入", action: copyResultInput)
+            if !missedWords.isEmpty {
+              Button("复制错词列表", action: copyMissedWords)
+            }
             if !wordReviews.isEmpty {
               Button("复制慢词列表…", action: prepareSlowWordCopy)
             }

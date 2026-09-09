@@ -1802,6 +1802,8 @@ final class TypingEngineTests: XCTestCase {
       WordPracticeText.make(words: chineseWithPunctuation.missedWords, language: .simplifiedChinese),
       "窗边")
     XCTAssertEqual(MissedWordCopyText.make(words: ["晨光", "窗边"]), "晨光 窗边")
+    XCTAssertEqual(MissedWordCopyText.make(words: ["harbor", "amber", "harbor"]), "harbor amber harbor")
+    XCTAssertEqual(MissedWordCopyText.make(words: []), "")
 
     var traditionalChinese = TypingSession(
       configuration: .timed(seconds: 30, language: .traditionalChinese), prompt: "晨霧海灣")
