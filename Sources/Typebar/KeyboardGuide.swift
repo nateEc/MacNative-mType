@@ -795,6 +795,7 @@ enum KeyboardInputMapping: Equatable {
 /// Chooses the source for a visual keyboard without changing text input.
 enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
   case builtIn
+  case inputEmulation
   case systemInput
   case custom
 
@@ -803,9 +804,28 @@ enum KeyboardGuideLayoutSource: String, Codable, CaseIterable, Identifiable {
   var displayName: String {
     switch self {
     case .builtIn: "内置布局"
+    case .inputEmulation: "跟随输入布局模拟"
     case .systemInput: "跟随 macOS 当前输入源"
     case .custom: "自定义键盘图"
     }
+  }
+
+  func resolvedBuiltInLayout(
+    selectedLayout: KeyboardLayout,
+    inputLayout: KeyboardInputLayout
+  ) -> KeyboardLayout {
+    guard self == .inputEmulation, let emulated = inputLayout.emulatedLayout else {
+      return selectedLayout
+    }
+    return emulated
+  }
+
+  func usesSystemInputRows(inputLayout: KeyboardInputLayout) -> Bool {
+    self == .systemInput || (self == .inputEmulation && inputLayout == .system)
+  }
+
+  func usesCustomRows(inputLayout: KeyboardInputLayout) -> Bool {
+    self == .custom || (self == .inputEmulation && inputLayout == .custom)
   }
 }
 
@@ -988,6 +1008,11 @@ struct KeyboardGuideFeedback: Equatable {
 
 enum KeyboardGuideScalePolicy {
   static let range: ClosedRange<Double> = 0.5...3.5
+
+  static func isValidInput(_ value: Double) -> Bool {
+    guard value.isFinite, range.contains(value) else { return false }
+    return abs(value * 10 - (value * 10).rounded()) < 0.000_001
+  }
 
   static func normalized(_ value: Double) -> Double {
     (value * 10).rounded().clamped(to: 5.0...35.0) / 10

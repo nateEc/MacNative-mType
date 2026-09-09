@@ -759,6 +759,10 @@ struct PreferencesView: View {
                 Text(layout.displayName).tag(layout)
               }
             }
+          } else if settings.keyboardGuideLayoutSource == .inputEmulation {
+            Text("键盘图持续跟随输入布局模拟；模拟关闭时跟随 macOS 当前输入源，自定义模拟则使用同一张自定义键盘图。它不会额外改变文字输入。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           } else if settings.keyboardGuideLayoutSource == .systemInput {
             Text("从 macOS 当前键盘输入源读取物理键位标签；切换输入源后会在下一次练习界面刷新时更新。它只影响视觉提示，不改变 IME 或文字输入。")
               .font(.caption)

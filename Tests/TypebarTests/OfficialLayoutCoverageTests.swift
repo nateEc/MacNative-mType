@@ -108,6 +108,38 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertNil(OfficialLayoutCommandCatalog.target(for: "input.layout."))
   }
 
+  func testKeymapLayoutCommandsCoverPinnedOfficialChoicesWithoutChangingInputContract() throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let data = try Data(
+      contentsOf: repositoryRoot.appendingPathComponent("Compatibility/official-layouts.json"))
+    let fixture = try JSONDecoder().decode(Fixture.self, from: data)
+    let expectedIDs = Set(
+      ["keyboard.keymapLayout.overrideSync"]
+        + fixture.officialNames.map { "keyboard.keymapLayout.\($0)" })
+
+    XCTAssertEqual(KeyboardGuideLayoutCommandCatalog.items.count, fixture.officialCount + 1)
+    XCTAssertEqual(Set(KeyboardGuideLayoutCommandCatalog.items.map(\.id)), expectedIDs)
+    XCTAssertEqual(
+      KeyboardGuideLayoutCommandCatalog.target(
+        for: "keyboard.keymapLayout.overrideSync"),
+      .inputSync)
+    for (officialName, rawValue) in fixture.nativeExact {
+      let layout = try XCTUnwrap(KeyboardLayout(rawValue: rawValue))
+      XCTAssertEqual(
+        KeyboardGuideLayoutCommandCatalog.target(
+          for: "keyboard.keymapLayout.\(officialName)"),
+        .builtIn(layout), officialName)
+    }
+    XCTAssertNil(
+      KeyboardGuideLayoutCommandCatalog.target(for: "keyboard.keymapLayout.nordicQwerty"))
+    XCTAssertNil(
+      KeyboardGuideLayoutCommandCatalog.target(for: "keyboard.keymapLayout.qwerty.extra"))
+    XCTAssertNil(KeyboardGuideLayoutCommandCatalog.target(for: "keyboard.keymapLayout."))
+  }
+
   func testCurrentLanguageCatalogCountsMatchCompatibilityDocuments() throws {
     let languages = TypingLanguage.allCases
     let standalone = languages.filter(\.supportsQuotes)
@@ -214,7 +246,8 @@ final class OfficialLayoutCoverageTests: XCTestCase {
         "caretStyle": 8, "paceCaretStyle": 8, "timerColor": 4, "monkeyPowerLevel": 5,
         "quoteLength": 6, "timerStyle": 6, "liveSpeedStyle": 3, "liveAccStyle": 3,
         "liveBurstStyle": 3, "timerOpacity": 4, "highlightMode": 6,
-        "typedEffect": 4, "tapeMode": 3, "typingSpeedUnit": 5,
+        "typedEffect": 4, "tapeMode": 3, "keymapMode": 4, "keymapStyle": 7,
+        "keymapLegendStyle": 4, "keymapKeys": 3, "typingSpeedUnit": 5,
       ])
     XCTAssertEqual(fixture.officialChoices["quoteLength"], ["-3", "-2", "0", "1", "2", "3"])
     XCTAssertEqual(
@@ -240,6 +273,16 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       ["off", "letter", "word", "next_word", "next_two_words", "next_three_words"])
     XCTAssertEqual(fixture.officialChoices["typedEffect"], ["keep", "hide", "fade", "dots"])
     XCTAssertEqual(fixture.officialChoices["tapeMode"], ["off", "letter", "word"])
+    XCTAssertEqual(
+      fixture.officialChoices["keymapMode"], ["off", "static", "react", "next"])
+    XCTAssertEqual(
+      fixture.officialChoices["keymapStyle"],
+      ["staggered", "alice", "matrix", "split", "split_matrix", "steno", "steno_matrix"])
+    XCTAssertEqual(
+      fixture.officialChoices["keymapLegendStyle"],
+      ["lowercase", "uppercase", "blank", "dynamic"])
+    XCTAssertEqual(
+      fixture.officialChoices["keymapKeys"], ["minimal", "minimal_numrow", "full"])
     XCTAssertEqual(
       fixture.officialChoices["typingSpeedUnit"], ["wpm", "cpm", "wps", "cps", "wph"])
     XCTAssertEqual(

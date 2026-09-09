@@ -1965,6 +1965,130 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(settings.startGraphsAtZero)
   }
 
+  func testKeyboardGuideCommandsCoverFixedChoicesAndRejectMalformedIDs() {
+    let expectedIDs = [
+      "keyboard.keymapMode.off", "keyboard.keymapMode.static",
+      "keyboard.keymapMode.react", "keyboard.keymapMode.next",
+      "keyboard.keymapStyle.staggered", "keyboard.keymapStyle.alice",
+      "keyboard.keymapStyle.matrix", "keyboard.keymapStyle.split",
+      "keyboard.keymapStyle.split_matrix", "keyboard.keymapStyle.steno",
+      "keyboard.keymapStyle.steno_matrix",
+      "keyboard.keymapLegendStyle.lowercase", "keyboard.keymapLegendStyle.uppercase",
+      "keyboard.keymapLegendStyle.blank", "keyboard.keymapLegendStyle.dynamic",
+      "keyboard.keymapKeys.minimal", "keyboard.keymapKeys.minimal_numrow",
+      "keyboard.keymapKeys.full",
+    ]
+
+    XCTAssertEqual(KeyboardGuideCommandCatalog.items.map(\.id), expectedIDs)
+    XCTAssertEqual(
+      KeyboardGuideCommandCatalog.target(for: "keyboard.keymapMode.static"),
+      .mode(.staticGuide))
+    XCTAssertEqual(
+      KeyboardGuideCommandCatalog.target(for: "keyboard.keymapStyle.split_matrix"),
+      .style(.splitMatrix))
+    XCTAssertEqual(
+      KeyboardGuideCommandCatalog.target(for: "keyboard.keymapLegendStyle.dynamic"),
+      .legend(.dynamic))
+    XCTAssertEqual(
+      KeyboardGuideCommandCatalog.target(for: "keyboard.keymapKeys.minimal_numrow"),
+      .keys(.minimalNumberRow))
+    XCTAssertNil(KeyboardGuideCommandCatalog.target(for: "keyboard.keymapMode.flash"))
+    XCTAssertNil(KeyboardGuideCommandCatalog.target(for: "keyboard.keymapStyle.split.matrix"))
+    XCTAssertNil(KeyboardGuideCommandCatalog.target(for: "keyboard.keymapKeys.minimum"))
+  }
+
+  func testKeyboardGuideCommandsPreserveRestartAndChallengePolicies() {
+    XCTAssertTrue(KeyboardGuideCommandCatalog.items.allSatisfy { item in
+      guard let target = KeyboardGuideCommandCatalog.target(for: item.id) else { return false }
+      return !target.requiresRestart
+        && TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
+          == target.exitsChallenge
+        && CommandPaletteSearch.results(items: KeyboardGuideCommandCatalog.items, query: item.id)
+          .contains(where: { $0.id == item.id })
+    })
+    XCTAssertTrue(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(for: "keyboard.keymapMode.next"))
+    XCTAssertFalse(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(
+        for: "keyboard.keymapStyle.matrix"))
+    for item in KeyboardGuideLayoutCommandCatalog.items {
+      let target = KeyboardGuideLayoutCommandCatalog.target(for: item.id)
+      XCTAssertNotNil(target, item.id)
+      XCTAssertEqual(target?.requiresRestart, true, item.id)
+      XCTAssertEqual(target?.exitsChallenge, true, item.id)
+      XCTAssertTrue(
+        TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id), item.id)
+      XCTAssertTrue(
+        CommandPaletteSearch.results(
+          items: KeyboardGuideLayoutCommandCatalog.items, query: item.id
+        ).contains(where: { $0.id == item.id }), item.id)
+    }
+    XCTAssertEqual(KeyboardGuideSizeCommand.item.id, "keyboard.keymapSize")
+    XCTAssertFalse(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(
+        for: KeyboardGuideSizeCommand.item.id))
+  }
+
+  @MainActor
+  func testKeyboardGuideCommandsApplyWithoutMutatingPhysicalInputLayout() throws {
+    let suiteName = "TypebarTests.KeyboardGuideCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.keyboardInputLayout = .swissGerman
+
+    KeyboardGuideCommandTarget.mode(.react).apply(to: settings)
+    KeyboardGuideCommandTarget.style(.stenoMatrix).apply(to: settings)
+    KeyboardGuideCommandTarget.legend(.uppercase).apply(to: settings)
+    KeyboardGuideCommandTarget.keys(.full).apply(to: settings)
+    KeyboardGuideLayoutCommandTarget.builtIn(.ansiDvorak).apply(to: settings)
+
+    XCTAssertEqual(settings.keyboardGuideMode, .react)
+    XCTAssertEqual(settings.keyboardGuideStyle, .stenoMatrix)
+    XCTAssertEqual(settings.keyboardGuideLegendStyle, .uppercase)
+    XCTAssertEqual(settings.keyboardGuideKeysMode, .full)
+    XCTAssertEqual(settings.keyboardGuideLayoutSource, .builtIn)
+    XCTAssertEqual(settings.keyboardLayout, .ansiDvorak)
+    XCTAssertEqual(settings.keyboardInputLayout, .swissGerman)
+
+    KeyboardGuideLayoutCommandTarget.inputSync.apply(to: settings)
+    XCTAssertEqual(settings.keyboardGuideLayoutSource, .inputEmulation)
+    XCTAssertEqual(settings.keyboardInputLayout, .swissGerman)
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.keyboardGuideLayoutSource, .inputEmulation)
+    XCTAssertEqual(restored.keyboardInputLayout, .swissGerman)
+  }
+
+  func testKeyboardGuideSizeAcceptsOnlyFixedSchemaSteps() {
+    XCTAssertTrue(KeyboardGuideScalePolicy.isValidInput(0.5))
+    XCTAssertTrue(KeyboardGuideScalePolicy.isValidInput(1.0))
+    XCTAssertTrue(KeyboardGuideScalePolicy.isValidInput(3.5))
+    XCTAssertFalse(KeyboardGuideScalePolicy.isValidInput(0.49))
+    XCTAssertFalse(KeyboardGuideScalePolicy.isValidInput(1.25))
+    XCTAssertFalse(KeyboardGuideScalePolicy.isValidInput(3.51))
+    XCTAssertFalse(KeyboardGuideScalePolicy.isValidInput(.nan))
+  }
+
+  func testKeyboardGuideInputSyncContinuouslyResolvesEveryInputSource() {
+    let source = KeyboardGuideLayoutSource.inputEmulation
+    XCTAssertEqual(
+      source.resolvedBuiltInLayout(
+        selectedLayout: .ansiQwerty, inputLayout: .swissGerman),
+      .swissGerman)
+    XCTAssertEqual(
+      source.resolvedBuiltInLayout(
+        selectedLayout: .ansiDvorak, inputLayout: .system),
+      .ansiDvorak)
+    XCTAssertTrue(source.usesSystemInputRows(inputLayout: .system))
+    XCTAssertFalse(source.usesSystemInputRows(inputLayout: .swissGerman))
+    XCTAssertTrue(source.usesCustomRows(inputLayout: .custom))
+    XCTAssertFalse(source.usesCustomRows(inputLayout: .system))
+    XCTAssertEqual(
+      KeyboardGuideLayoutSource.builtIn.resolvedBuiltInLayout(
+        selectedLayout: .ansiDvorak, inputLayout: .swissGerman),
+      .ansiDvorak)
+  }
+
   func testOfficialLayoutCommandsRemainSearchableByDisplayNameAndFixedIdentifier() {
     XCTAssertEqual(
       CommandPaletteSearch.results(items: OfficialLayoutCommandCatalog.items, query: "Colemak-DH Wide ISO")
@@ -2695,7 +2819,9 @@ final class TypingEngineTests: XCTestCase {
       optionKey.legend(style: .dynamic, modifierFlags: [.option], capsLockEnabled: false), "å")
     XCTAssertEqual(
       optionKey.legend(style: .dynamic, modifierFlags: [.option, .shift], capsLockEnabled: false), "Å")
-    XCTAssertEqual(KeyboardGuideLayoutSource.allCases, [.builtIn, .systemInput, .custom])
+    XCTAssertEqual(
+      KeyboardGuideLayoutSource.allCases,
+      [.builtIn, .inputEmulation, .systemInput, .custom])
     if let currentRows = SystemKeyboardGuide.currentRows() {
       XCTAssertTrue([[13, 13, 11, 10], [13, 13, 11, 11]].contains(currentRows.map(\.count)))
       XCTAssertTrue(currentRows.flatMap { $0 }.allSatisfy { !$0.label.isEmpty })
@@ -12531,6 +12657,7 @@ final class TypingEngineTests: XCTestCase {
     let settings = AppSettings(defaults: defaults)
     XCTAssertFalse(settings.showKeyboardGuide)
     XCTAssertEqual(settings.keyboardGuideMode, .off)
+    XCTAssertEqual(settings.keyboardGuideLayoutSource, .inputEmulation)
     XCTAssertEqual(settings.quickRestartKey, .off)
     XCTAssertFalse(settings.smoothPracticeLineScroll)
     XCTAssertEqual(settings.caretStyle, .bar)

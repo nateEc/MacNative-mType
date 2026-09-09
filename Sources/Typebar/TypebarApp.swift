@@ -644,6 +644,7 @@ private struct ContentView: View {
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
   @State private var showingPaceGuideSpeedEditor = false
+  @State private var showingKeyboardGuideScaleEditor = false
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
   @State private var showingChallenges = false
@@ -923,6 +924,11 @@ private struct ContentView: View {
         settings.paceGuideCustomWpm = wpm
         settings.paceGuideMode = .custom
         reset()
+      }
+    }
+    .sheet(isPresented: $showingKeyboardGuideScaleEditor) {
+      KeyboardGuideScaleEditor(initialScale: settings.keyboardGuideScale) { scale in
+        settings.keyboardGuideScale = scale
       }
     }
     .confirmationDialog(
@@ -1870,7 +1876,10 @@ private struct ContentView: View {
   }
 
   private var effectiveKeyboardLayout: KeyboardLayout {
-    guard session.configuration.modifiers.contains(.layoutFluid) else { return settings.keyboardLayout }
+    guard session.configuration.modifiers.contains(.layoutFluid) else {
+      return settings.keyboardGuideLayoutSource.resolvedBuiltInLayout(
+        selectedLayout: settings.keyboardLayout, inputLayout: settings.keyboardInputLayout)
+    }
     return LayoutFluidPolicy.activeLayout(
       completedWords: session.completedWordCount, wordLimit: session.configuration.wordLimit,
       layouts: settings.layoutFluidLayouts)
@@ -1878,16 +1887,18 @@ private struct ContentView: View {
 
   private var effectiveKeyboardGuideOverrideRows: [[KeyboardGuideKey]]? {
     guard !session.configuration.modifiers.contains(.layoutFluid) else { return nil }
-    switch settings.keyboardGuideLayoutSource {
-    case .builtIn:
-      return nil
-    case .systemInput:
+    if settings.keyboardGuideLayoutSource.usesCustomRows(
+      inputLayout: settings.keyboardInputLayout)
+    {
+      return settings.selectedCustomKeyboardLayout?.guideRows
+    }
+    if settings.keyboardGuideLayoutSource.usesSystemInputRows(
+      inputLayout: settings.keyboardInputLayout)
+    {
       _ = systemKeyboardGuide.revision
       return SystemKeyboardGuide.currentRows()
-    case .custom:
-      guard let id = settings.customKeyboardLayoutID else { return nil }
-      return settings.customKeyboardLayouts.first(where: { $0.id == id })?.guideRows
     }
+    return nil
   }
 
   /// Layout Fluid deliberately switches both the visible guide and simulated
@@ -2823,6 +2834,9 @@ private struct ContentView: View {
     items.append(contentsOf: CaretCommandCatalog.items)
     items.append(contentsOf: PaceCaretCommandCatalog.items)
     items.append(contentsOf: AppearanceCommandCatalog.items)
+    items.append(contentsOf: KeyboardGuideCommandCatalog.items)
+    items.append(KeyboardGuideSizeCommand.item)
+    items.append(contentsOf: KeyboardGuideLayoutCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2875,6 +2889,21 @@ private struct ContentView: View {
     if let target = AppearanceCommandCatalog.target(for: item.id) {
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings)
+      return
+    }
+    if let target = KeyboardGuideCommandCatalog.target(for: item.id) {
+      if target.exitsChallenge { activeChallengeID = nil }
+      target.apply(to: settings)
+      return
+    }
+    if item.id == KeyboardGuideSizeCommand.item.id {
+      showingKeyboardGuideScaleEditor = true
+      return
+    }
+    if let target = KeyboardGuideLayoutCommandCatalog.target(for: item.id) {
+      if target.exitsChallenge { activeChallengeID = nil }
+      target.apply(to: settings)
+      if target.requiresRestart { reset() }
       return
     }
     if let target = OfficialLayoutCommandCatalog.target(for: item.id) {

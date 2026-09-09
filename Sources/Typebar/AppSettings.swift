@@ -556,7 +556,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var keyboardGuideStyle: KeyboardGuideStyle = .staggered
   var keyboardLayout: KeyboardLayout = .ansiQwerty
   var keyboardInputLayout: KeyboardInputLayout = .system
-  var keyboardGuideLayoutSource: KeyboardGuideLayoutSource = .builtIn
+  var keyboardGuideLayoutSource: KeyboardGuideLayoutSource = .inputEmulation
   var customKeyboardLayouts: [CustomKeyboardGuideLayout] = []
   var customKeyboardLayoutID: UUID?
   var quickEnd = false
@@ -661,7 +661,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     keyboardGuideStyle: KeyboardGuideStyle = .staggered,
     keyboardLayout: KeyboardLayout = .ansiQwerty,
     keyboardInputLayout: KeyboardInputLayout = .system,
-    keyboardGuideLayoutSource: KeyboardGuideLayoutSource = .builtIn,
+    keyboardGuideLayoutSource: KeyboardGuideLayoutSource = .inputEmulation,
     customKeyboardLayouts: [CustomKeyboardGuideLayout] = [],
     customKeyboardLayoutID: UUID? = nil,
     quickEnd: Bool = false,
@@ -1196,7 +1196,7 @@ final class AppSettings {
   var keyboardGuideStyle: KeyboardGuideStyle = .staggered { didSet { persist() } }
   var keyboardLayout: KeyboardLayout = .ansiQwerty { didSet { persist() } }
   var keyboardInputLayout: KeyboardInputLayout = .system { didSet { persist() } }
-  var keyboardGuideLayoutSource: KeyboardGuideLayoutSource = .builtIn { didSet { persist() } }
+  var keyboardGuideLayoutSource: KeyboardGuideLayoutSource = .inputEmulation { didSet { persist() } }
   var customKeyboardLayouts: [CustomKeyboardGuideLayout] = [] { didSet { persist() } }
   var customKeyboardLayoutID: UUID? { didSet { persist() } }
   var selectedCustomKeyboardLayout: CustomKeyboardGuideLayout? {
@@ -1647,7 +1647,7 @@ final class AppSettings {
     keyboardGuideStyle = .staggered
     keyboardLayout = .ansiQwerty
     keyboardInputLayout = .system
-    keyboardGuideLayoutSource = .builtIn
+    keyboardGuideLayoutSource = .inputEmulation
     customKeyboardLayouts = []
     customKeyboardLayoutID = nil
     layoutFluidLayouts = LayoutFluidPolicy.defaultLayouts

@@ -321,6 +321,32 @@
       "letter",
       "word"
     ],
+    "keymapMode": [
+      "off",
+      "static",
+      "react",
+      "next"
+    ],
+    "keymapStyle": [
+      "staggered",
+      "alice",
+      "matrix",
+      "split",
+      "split_matrix",
+      "steno",
+      "steno_matrix"
+    ],
+    "keymapLegendStyle": [
+      "lowercase",
+      "uppercase",
+      "blank",
+      "dynamic"
+    ],
+    "keymapKeys": [
+      "minimal",
+      "minimal_numrow",
+      "full"
+    ],
     "typingSpeedUnit": [
       "wpm",
       "cpm",
@@ -359,6 +385,10 @@
     "highlightMode": 6,
     "typedEffect": 4,
     "tapeMode": 3,
+    "keymapMode": 4,
+    "keymapStyle": 7,
+    "keymapLegendStyle": 4,
+    "keymapKeys": 3,
     "typingSpeedUnit": 5,
     "monkeyPowerLevel": 5,
     "quoteLength": 6

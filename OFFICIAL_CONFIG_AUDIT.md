@@ -8,7 +8,7 @@
 - Typebar 的实现、文案、数据模型和测试均为原创；该表不复制参考实现的代码、资产、词表、布局定义或主题数据。
 - 当前语言目录：376 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
 - `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：446 个独立原生选择、0 个兼容代指、0 个未映射配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界见 `OFFICIAL_LANGUAGE_AUDIT.md`。
-- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：91 个已映射、2 个部分、1 个不适用、0 个未实现或漏记；声音、主／节奏光标、实时指标颜色与键入能量档位会提取固定枚举值，节奏伙伴会校验固定布尔类型，再与本机语义逐项对账。
+- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：91 个已映射、2 个部分、1 个不适用、0 个未实现或漏记；声音、主／节奏光标、实时指标、键盘提示与键入能量档位会提取固定枚举值，节奏伙伴会校验固定布尔类型，再与本机语义逐项对账。
 
 - Catalan、Indonesian 与 Malay 的自动化测试覆盖各自的自创词流、四档原创引语、完整多语混排轮转、`ca-ES` / `id-ID` / `ms-MY` 朗读 locale 与仅在明示启用时使用的 `ca` / `id` / `ms` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 
@@ -224,12 +224,12 @@
 | `maxLineWidth` | `practiceLineWidth`、`customPracticeLineColumns` | 已映射；以原生列宽/自适应表达。 |
 | `fontSize` | `fontSize` | 已映射。 |
 | `fontFamily` | `practiceFont`、可搜索的本机字体目录、名称/导入 | 部分；可浏览当前 macOS 已安装字体家族，也可手填 PostScript 名，或导入用户拥有的 TTF、OTF、WOFF、WOFF2。四种格式都经原生 Core Text 读取描述符并实际注册后才替换旧文件，不复用或打包网页字体资产；状态仍为部分，因为官方 Web 字体目录不会被复制进纯原生重写。 |
-| `keymapMode` | `keyboardGuideMode` | 已映射。 |
-| `keymapLayout` | `keyboardGuideLayoutSource`、`keyboardLayout`、自定义图 | 已映射；可选固定参考 239 个名称对应的原创原生键盘图、当前 macOS 输入源或用户自写 Unicode 图。官方命名资产不打包，逐项证据见 `OFFICIAL_LAYOUT_AUDIT.md` 与机器清单 `Compatibility/official-layouts.json`。 |
-| `keymapStyle` | `keyboardGuideStyle` | 已映射。 |
-| `keymapLegendStyle` | `keyboardGuideLegendStyle` | 已映射。 |
-| `keymapKeys` | `keyboardGuideKeysMode` | 已映射。 |
-| `keymapSize` | `keyboardGuideScale` | 已映射。 |
+| `keymapMode` | `keyboardGuideMode` | 已映射；四个固定值均进入命令面板，切换会退出挑战但不重开。 |
+| `keymapLayout` | `keyboardGuideLayoutSource`、`keyboardLayout`、自定义图 | 已映射；命令面板严格提供 `overrideSync + 239` 个固定值。同步态持续解析当前输入模拟的内置、系统或自定义来源；显式布局只改变视觉键盘。全部布局命令退出挑战并重开。官方命名资产不打包，逐项证据见 `OFFICIAL_LAYOUT_AUDIT.md` 与机器清单 `Compatibility/official-layouts.json`。 |
+| `keymapStyle` | `keyboardGuideStyle` | 已映射；七个固定值均可即时命令切换。 |
+| `keymapLegendStyle` | `keyboardGuideLegendStyle` | 已映射；四个固定值均可即时命令切换。 |
+| `keymapKeys` | `keyboardGuideKeysMode` | 已映射；三个固定值均可即时命令切换。 |
+| `keymapSize` | `keyboardGuideScale` | 已映射；原生命令输入页严格接受 0.5–3.5 且步长 0.1，不重开练习。 |
 | `flipTestColors` | `flipTestColors` | 已映射。 |
 | `colorfulMode` | `colorfulMode` | 已映射。 |
 | `customBackground` | `customBackgroundURL`、本地图片 | 已映射；额外支持私有本机背景。 |

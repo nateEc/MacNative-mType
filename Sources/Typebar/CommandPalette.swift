@@ -977,6 +977,148 @@ enum AppearanceCommandCatalog {
     }
 }
 
+enum KeyboardGuideCommandTarget: Equatable {
+    case mode(KeyboardGuideMode)
+    case style(KeyboardGuideStyle)
+    case legend(KeyboardGuideLegendStyle)
+    case keys(KeyboardGuideKeysMode)
+
+    var requiresRestart: Bool { false }
+
+    var exitsChallenge: Bool {
+        if case .mode = self { return true }
+        return false
+    }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        switch self {
+        case .mode(let mode): settings.keyboardGuideMode = mode
+        case .style(let style): settings.keyboardGuideStyle = style
+        case .legend(let legend): settings.keyboardGuideLegendStyle = legend
+        case .keys(let keys): settings.keyboardGuideKeysMode = keys
+        }
+    }
+}
+
+/// Preserves the fixed reference's discrete visual-keyboard values while
+/// applying them only to Typebar's presentation settings.
+enum KeyboardGuideCommandCatalog {
+    private struct Option {
+        let key: String
+        let value: String
+        let setting: String
+        let choice: String
+        let target: KeyboardGuideCommandTarget
+    }
+
+    private static let options: [Option] =
+        KeyboardGuideMode.allCases.map {
+            Option(
+                key: "keymapMode", value: $0.rawValue, setting: "键盘提示模式",
+                choice: $0.displayName, target: .mode($0))
+        }
+        + KeyboardGuideStyle.allCases.map {
+            Option(
+                key: "keymapStyle", value: $0.rawValue, setting: "键盘样式",
+                choice: $0.displayName, target: .style($0))
+        }
+        + KeyboardGuideLegendStyle.allCases.map {
+            Option(
+                key: "keymapLegendStyle", value: $0.rawValue, setting: "键盘图例",
+                choice: $0.displayName, target: .legend($0))
+        }
+        + KeyboardGuideKeysMode.allCases.map {
+            Option(
+                key: "keymapKeys", value: $0.rawValue, setting: "键盘按键",
+                choice: $0.displayName, target: .keys($0))
+        }
+
+    static let items = options.map { option in
+        let identifier = "keyboard.\(option.key).\(option.value)"
+        return CommandPaletteItem(
+            id: identifier, title: "\(option.setting)：\(option.choice)",
+            subtitle: "立即更新原生屏幕键盘", systemImage: "keyboard",
+            keywords: [
+                identifier, "keyboard", "keymap", "键盘", option.key, option.value,
+                option.setting, option.choice,
+            ], group: .settings)
+    }
+
+    static func target(for identifier: String) -> KeyboardGuideCommandTarget? {
+        options.first { "keyboard.\($0.key).\($0.value)" == identifier }?.target
+    }
+}
+
+enum KeyboardGuideSizeCommand {
+    static let item = CommandPaletteItem(
+        id: "keyboard.keymapSize", title: "键盘提示大小…",
+        subtitle: "输入 0.5–3.5 倍，步长 0.1", systemImage: "arrow.up.left.and.arrow.down.right",
+        keywords: ["keyboard", "keymap", "keymapSize", "键盘", "大小", "缩放"],
+        group: .settings)
+}
+
+enum KeyboardGuideLayoutCommandTarget: Equatable {
+    case inputSync
+    case builtIn(KeyboardLayout)
+
+    var requiresRestart: Bool { true }
+    var exitsChallenge: Bool { true }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        switch self {
+        case .inputSync:
+            settings.keyboardGuideLayoutSource = .inputEmulation
+        case .builtIn(let layout):
+            settings.keyboardLayout = layout
+            settings.keyboardGuideLayoutSource = .builtIn
+        }
+    }
+}
+
+/// Reuses the independently audited official layout-name mapping but routes
+/// selections to the visual guide rather than the physical input bridge.
+enum KeyboardGuideLayoutCommandCatalog {
+    private static let inputPrefix = "input.layout."
+    private static let keymapPrefix = "keyboard.keymapLayout."
+
+    static let items: [CommandPaletteItem] = {
+        let sync = CommandPaletteItem(
+            id: "\(keymapPrefix)overrideSync", title: "键盘图布局：跟随输入模拟",
+            subtitle: "持续同步输入布局并立即重开", systemImage: "keyboard.badge.ellipsis",
+            keywords: [
+                "\(keymapPrefix)overrideSync", "keyboard", "keymap", "keymapLayout",
+                "overrideSync", "default", "emulator sync",
+                "键盘", "布局", "跟随", "同步",
+            ], group: .settings)
+        let layouts = OfficialLayoutCommandCatalog.items.dropFirst().map { item in
+            let officialName = String(item.id.dropFirst(inputPrefix.count))
+            let identifier = "\(keymapPrefix)\(officialName)"
+            return CommandPaletteItem(
+                id: identifier,
+                title: item.title.replacingOccurrences(of: "模拟布局：", with: "键盘图布局："),
+                subtitle: "只切换屏幕键盘并立即重开", systemImage: "keyboard.fill",
+                keywords: item.keywords
+                    + [identifier, "keyboard", "keymap", "keymapLayout", officialName],
+                group: .settings)
+        }
+        return [sync] + layouts
+    }()
+
+    static func target(for identifier: String) -> KeyboardGuideLayoutCommandTarget? {
+        guard identifier.hasPrefix(keymapPrefix) else { return nil }
+        let officialName = String(identifier.dropFirst(keymapPrefix.count))
+        guard !officialName.isEmpty, !officialName.contains(".") else { return nil }
+        if officialName == "overrideSync" { return .inputSync }
+        guard
+            case .builtIn(let layout) = OfficialLayoutCommandCatalog.target(
+                for: "\(inputPrefix)\(officialName)")
+        else { return nil }
+        return .builtIn(layout)
+    }
+}
+
 enum OfficialLayoutCommandTarget: Equatable {
     case system
     case builtIn(KeyboardLayout)
@@ -1142,6 +1284,8 @@ enum TestConfigurationCommandChallengePolicy {
             || OfficialLayoutCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || PaceCaretCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || AppearanceCommandCatalog.target(for: identifier)?.exitsChallenge == true
+            || KeyboardGuideCommandCatalog.target(for: identifier)?.exitsChallenge == true
+            || KeyboardGuideLayoutCommandCatalog.target(for: identifier)?.exitsChallenge == true
     }
 }
 
