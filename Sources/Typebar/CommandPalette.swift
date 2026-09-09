@@ -506,12 +506,14 @@ enum InputRuleCommandCatalog {
 enum SoundCommandPreview: Equatable {
     case click(TypingClickSoundStyle)
     case error(TypingErrorSoundStyle)
+    case timeWarning
 }
 
 enum SoundCommandTarget: Equatable {
     case volume(Double)
     case click(TypingClickSoundStyle?)
     case error(TypingErrorSoundStyle?)
+    case timeWarning(TimeWarningOffset)
 
     var requiresRestart: Bool { false }
     var exitsChallenge: Bool { false }
@@ -520,7 +522,8 @@ enum SoundCommandTarget: Equatable {
         switch self {
         case .click(let style?): .click(style)
         case .error(let style?): .error(style)
-        case .volume, .click(nil), .error(nil): nil
+        case .timeWarning(let offset) where offset != .off: .timeWarning
+        case .volume, .click(nil), .error(nil), .timeWarning: nil
         }
     }
 
@@ -535,6 +538,8 @@ enum SoundCommandTarget: Equatable {
         case .error(let style):
             settings.playErrorBeep = style != nil
             if let style { settings.errorSoundStyle = style }
+        case .timeWarning(let offset):
+            settings.timeWarningOffset = offset
         }
     }
 }
@@ -552,6 +557,10 @@ enum SoundCommandCatalog {
     ]
     private static let volumeOptions: [(value: Double, identifier: String, name: String)] = [
         (0.1, "0.1", "轻"), (0.5, "0.5", "中"), (1, "1", "响"),
+    ]
+    private static let timeWarningOptions: [(value: String, offset: TimeWarningOffset)] = [
+        ("off", .off), ("1", .oneSecond), ("3", .threeSeconds),
+        ("5", .fiveSeconds), ("10", .tenSeconds),
     ]
 
     static let items: [CommandPaletteItem] = {
@@ -602,6 +611,17 @@ enum SoundCommandCatalog {
                     style.displayName, String(index + 1),
                 ], group: .settings))
         }
+        for option in timeWarningOptions {
+            let identifier = "sound.playTimeWarning.\(option.value)"
+            result.append(CommandPaletteItem(
+                id: identifier, title: "倒计时提示音：\(option.offset.displayName)",
+                subtitle: option.offset == .off ? "关闭结束前提示音" : "启用并试听当前倒计时音型",
+                systemImage: option.offset == .off ? "speaker.slash" : "timer",
+                keywords: [
+                    identifier, "sound", "playTimeWarning", "time", "warning", "倒计时",
+                    "提示音", option.value, option.offset.displayName,
+                ], group: .settings))
+        }
         return result
     }()
 
@@ -623,6 +643,11 @@ enum SoundCommandCatalog {
         {
             return .error(errorStyles[index])
         }
+        if let option = timeWarningOptions.first(where: {
+            identifier == "sound.playTimeWarning.\($0.value)"
+        }) {
+            return .timeWarning(option.offset)
+        }
         return nil
     }
 
@@ -635,6 +660,110 @@ enum SoundCommandCatalog {
             return nil
         }
         return number - 1
+    }
+}
+
+enum CaretCommandTarget: Equatable {
+    case smooth(SmoothCaretMotion)
+    case primary(TypingCaretStyle)
+    case pace(TypingCaretStyle)
+    case repeatedPace(Bool)
+
+    var requiresRestart: Bool { false }
+    var exitsChallenge: Bool { false }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        switch self {
+        case .smooth(let motion): settings.smoothCaretMotion = motion
+        case .primary(let style): settings.caretStyle = style
+        case .pace(let style): settings.paceCaretStyle = style
+        case .repeatedPace(let enabled): settings.repeatedPace = enabled
+        }
+    }
+}
+
+/// Uses the fixed schema values while keeping all caret rendering native.
+enum CaretCommandCatalog {
+    private static let motionOptions: [(value: String, motion: SmoothCaretMotion)] = [
+        ("off", .off), ("slow", .slow), ("medium", .medium), ("fast", .fast),
+    ]
+    private static let styleOptions: [(value: String, style: TypingCaretStyle)] = [
+        ("off", .off), ("default", .bar), ("block", .block), ("outline", .outline),
+        ("underline", .underline), ("carrot", .carrot), ("banana", .banana),
+        ("monkey", .monkey),
+    ]
+
+    static let items: [CommandPaletteItem] = {
+        var result: [CommandPaletteItem] = []
+        for option in motionOptions {
+            let identifier = "caret.smoothCaret.\(option.value)"
+            result.append(CommandPaletteItem(
+                id: identifier, title: "平滑光标：\(option.motion.displayName)",
+                subtitle: "立即更新字符间移动方式", systemImage: "character.cursor.ibeam",
+                keywords: [
+                    identifier, "caret", "smoothCaret", "smooth", "光标", "平滑",
+                    option.value, option.motion.displayName,
+                ], group: .settings))
+        }
+        appendStyleItems(
+            to: &result, key: "caretStyle", title: "光标样式", target: "主光标")
+        appendStyleItems(
+            to: &result, key: "paceCaretStyle", title: "节奏光标样式", target: "节奏光标")
+        for enabled in [false, true] {
+            let value = enabled ? "on" : "off"
+            let identifier = "caret.repeatedPace.\(value)"
+            result.append(CommandPaletteItem(
+                id: identifier, title: "重开沿用上一轮节奏：\(enabled ? "开启" : "关闭")",
+                subtitle: enabled ? "重开后使用上一轮速度一次" : "重开后不自动沿用上一轮速度",
+                systemImage: enabled ? "repeat.circle.fill" : "repeat.circle",
+                keywords: [
+                    identifier, "caret", "repeatedPace", "repeat", "重开", "节奏", value,
+                ], group: .settings))
+        }
+        return result
+    }()
+
+    static func target(for identifier: String) -> CaretCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "caret" else { return nil }
+        let key = String(parts[1])
+        let value = String(parts[2])
+        switch key {
+        case "smoothCaret":
+            return motionOptions.first(where: { $0.value == value }).map {
+                .smooth($0.motion)
+            }
+        case "caretStyle":
+            return styleOptions.first(where: { $0.value == value }).map {
+                .primary($0.style)
+            }
+        case "paceCaretStyle":
+            return styleOptions.first(where: { $0.value == value }).map {
+                .pace($0.style)
+            }
+        case "repeatedPace":
+            if value == "off" { return .repeatedPace(false) }
+            if value == "on" { return .repeatedPace(true) }
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    private static func appendStyleItems(
+        to result: inout [CommandPaletteItem], key: String, title: String, target: String
+    ) {
+        for option in styleOptions {
+            let identifier = "caret.\(key).\(option.value)"
+            result.append(CommandPaletteItem(
+                id: identifier, title: "\(title)：\(option.style.displayName)",
+                subtitle: "立即更新\(target)的原生绘制样式", systemImage: "cursorarrow.motionlines",
+                keywords: [
+                    identifier, "caret", key, "style", "光标", option.value,
+                    option.style.displayName,
+                ], group: .settings))
+        }
     }
 }
 

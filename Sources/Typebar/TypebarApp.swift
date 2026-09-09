@@ -2808,6 +2808,7 @@ private struct ContentView: View {
     items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
     items.append(contentsOf: SoundCommandCatalog.items)
+    items.append(contentsOf: CaretCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2834,9 +2835,16 @@ private struct ContentView: View {
         TypingFeedbackSound.shared.playClick(style: style, volume: settings.soundVolume)
       case .error(let style):
         TypingFeedbackSound.shared.playError(style: style, volume: settings.soundVolume)
+      case .timeWarning:
+        TypingFeedbackSound.shared.playTimeWarning(
+          style: settings.timeWarningSoundStyle, volume: settings.soundVolume)
       case nil:
         break
       }
+      return
+    }
+    if let target = CaretCommandCatalog.target(for: item.id) {
+      target.apply(to: settings)
       return
     }
     if let target = OfficialLayoutCommandCatalog.target(for: item.id) {

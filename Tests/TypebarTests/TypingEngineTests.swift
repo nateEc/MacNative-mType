@@ -1665,6 +1665,10 @@ final class TypingEngineTests: XCTestCase {
     ] + (1...26).map { "sound.playSoundOnClick.\($0)" } + [
       "sound.playSoundOnError.off",
     ] + (1...4).map { "sound.playSoundOnError.\($0)" }
+      + [
+        "sound.playTimeWarning.off", "sound.playTimeWarning.1", "sound.playTimeWarning.3",
+        "sound.playTimeWarning.5", "sound.playTimeWarning.10",
+      ]
 
     XCTAssertEqual(SoundCommandCatalog.items.map(\.id), expectedIDs)
     XCTAssertTrue(SoundCommandCatalog.items.allSatisfy { $0.group == .settings })
@@ -1699,10 +1703,17 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(SoundCommandCatalog.target(for: "sound.playSoundOnClick.27"))
     XCTAssertNil(SoundCommandCatalog.target(for: "sound.playSoundOnError.5"))
     XCTAssertNil(SoundCommandCatalog.target(for: "sound.playSoundOnError.1.extra"))
+    XCTAssertEqual(
+      SoundCommandCatalog.target(for: "sound.playTimeWarning.3"),
+      .timeWarning(.threeSeconds))
+    XCTAssertNil(SoundCommandCatalog.target(for: "sound.playTimeWarning.2"))
+    XCTAssertNil(SoundCommandCatalog.target(for: "sound.playTimeWarning.03"))
     XCTAssertEqual(SoundCommandTarget.click(.lantern).preview, .click(.lantern))
     XCTAssertEqual(SoundCommandTarget.error(.submarine).preview, .error(.submarine))
+    XCTAssertEqual(SoundCommandTarget.timeWarning(.fiveSeconds).preview, .timeWarning)
     XCTAssertNil(SoundCommandTarget.click(nil).preview)
     XCTAssertNil(SoundCommandTarget.error(nil).preview)
+    XCTAssertNil(SoundCommandTarget.timeWarning(.off).preview)
     XCTAssertNil(SoundCommandTarget.volume(0.5).preview)
   }
 
@@ -1752,6 +1763,71 @@ final class TypingEngineTests: XCTestCase {
     SoundCommandTarget.error(nil).apply(to: settings)
     XCTAssertFalse(settings.playErrorBeep)
     XCTAssertEqual(settings.errorSoundStyle, .submarine)
+    SoundCommandTarget.timeWarning(.tenSeconds).apply(to: settings)
+    XCTAssertEqual(settings.timeWarningOffset, .tenSeconds)
+  }
+
+  func testCaretCommandsCoverFixedReferenceChoicesAndRejectMalformedIDs() {
+    let styleValues = [
+      "off", "default", "block", "outline", "underline", "carrot", "banana", "monkey",
+    ]
+    let expectedIDs = [
+      "caret.smoothCaret.off", "caret.smoothCaret.slow", "caret.smoothCaret.medium",
+      "caret.smoothCaret.fast",
+    ] + styleValues.map { "caret.caretStyle.\($0)" }
+      + styleValues.map { "caret.paceCaretStyle.\($0)" }
+      + ["caret.repeatedPace.off", "caret.repeatedPace.on"]
+
+    XCTAssertEqual(CaretCommandCatalog.items.map(\.id), expectedIDs)
+    XCTAssertTrue(CaretCommandCatalog.items.allSatisfy { $0.group == .settings })
+    XCTAssertEqual(
+      CaretCommandCatalog.target(for: "caret.smoothCaret.fast"), .smooth(.fast))
+    XCTAssertEqual(
+      CaretCommandCatalog.target(for: "caret.caretStyle.default"), .primary(.bar))
+    XCTAssertEqual(
+      CaretCommandCatalog.target(for: "caret.paceCaretStyle.monkey"), .pace(.monkey))
+    XCTAssertEqual(
+      CaretCommandCatalog.target(for: "caret.repeatedPace.on"), .repeatedPace(true))
+    XCTAssertNil(CaretCommandCatalog.target(for: "caret.smoothCaret.instant"))
+    XCTAssertNil(CaretCommandCatalog.target(for: "caret.caretStyle.bar"))
+    XCTAssertNil(CaretCommandCatalog.target(for: "caret.paceCaretStyle.default.extra"))
+    XCTAssertNil(CaretCommandCatalog.target(for: "caret.repeatedPace.toggle"))
+  }
+
+  func testCaretCommandsRemainSearchableAndNeverRestartOrExitChallenges() {
+    XCTAssertEqual(
+      CommandPaletteSearch.results(
+        items: CaretCommandCatalog.items, query: "caret.smoothCaret.fast"
+      ).map(\.id),
+      ["caret.smoothCaret.fast"])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: CaretCommandCatalog.items, query: "节奏光标样式：小猴")
+        .map(\.id),
+      ["caret.paceCaretStyle.monkey"])
+    XCTAssertTrue(CaretCommandCatalog.items.allSatisfy { item in
+      guard let target = CaretCommandCatalog.target(for: item.id) else { return false }
+      return !target.requiresRestart && !target.exitsChallenge
+        && !TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
+        && CommandPaletteSearch.results(items: CaretCommandCatalog.items, query: item.id)
+          .contains(where: { $0.id == item.id })
+    })
+  }
+
+  @MainActor
+  func testCaretCommandsApplyThroughExistingNativeSettings() throws {
+    let suiteName = "TypebarTests.CaretCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    CaretCommandTarget.smooth(.slow).apply(to: settings)
+    CaretCommandTarget.primary(.outline).apply(to: settings)
+    CaretCommandTarget.pace(.banana).apply(to: settings)
+    CaretCommandTarget.repeatedPace(false).apply(to: settings)
+    XCTAssertEqual(settings.smoothCaretMotion, .slow)
+    XCTAssertEqual(settings.caretStyle, .outline)
+    XCTAssertEqual(settings.paceCaretStyle, .banana)
+    XCTAssertFalse(settings.repeatedPace)
   }
 
   func testOfficialLayoutCommandsRemainSearchableByDisplayNameAndFixedIdentifier() {
