@@ -194,7 +194,7 @@
 | `layout` | `KeyboardInputLayout` | 已映射；系统输入源为默认，固定参考的 239 个官方名称全部解析到独立编写的原生物理布局，另支持用户自写四行布局。机器清单 `Compatibility/official-layouts.json` 固定 239 项精确映射与 0 项兼容映射；覆盖测试验证名称唯一、目标存在且无未列项目。Typebar 不读取、打包或运行官方布局 JSON、代码或资产。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
-| `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 部分；提供四种 macOS 系统音型，而非网页端全部音效选择。 |
+| `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 已映射；提供 26 种可持久化的 Typebar 原创原生音型，其中四种使用 macOS 系统声音、二十二种在内存中独立合成短 WAV，不复制或打包网页端音频资产。 |
 | `playSoundOnError` | `playErrorBeep`、`errorSoundStyle` | 部分；提供四种 macOS 系统音型。 |
 | `playTimeWarning` | `timeWarningOffset`、`timeWarningSoundStyle` | 部分；保留时间点与四种原生音型。 |
 | `smoothCaret` | `smoothCaretMotion` | 已映射。 |

@@ -18055,6 +18055,35 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(GlobalHotkeyMonitor.matches(keyCode: 36, modifiers: [.control, .shift]))
   }
 
+  func testClickSoundCatalogProvidesTwentySixIndependentNativeChoices() throws {
+    let styles = TypingClickSoundStyle.allCases
+
+    XCTAssertEqual(styles.count, 26)
+    XCTAssertEqual(Set(styles.map(\.rawValue)).count, styles.count)
+    XCTAssertEqual(Set(styles.map(\.displayName)).count, styles.count)
+    XCTAssertEqual(Set(styles.map(\.playbackSource)).count, styles.count)
+
+    for legacyRawValue in ["tink", "pop", "ping", "morse"] {
+      XCTAssertNotNil(TypingClickSoundStyle(rawValue: legacyRawValue))
+    }
+    for style in styles {
+      let data = try JSONEncoder().encode(style)
+      XCTAssertEqual(try JSONDecoder().decode(TypingClickSoundStyle.self, from: data), style)
+    }
+
+    let synthesizedData = styles.compactMap { style -> Data? in
+      guard case .synthesized(let profile) = style.playbackSource else { return nil }
+      return profile.renderedWAVData()
+    }
+    XCTAssertEqual(synthesizedData.count, 22)
+    XCTAssertEqual(Set(synthesizedData).count, synthesizedData.count)
+    for data in synthesizedData {
+      XCTAssertGreaterThan(data.count, 44)
+      XCTAssertEqual(String(decoding: data.prefix(4), as: UTF8.self), "RIFF")
+      XCTAssertEqual(String(decoding: data.dropFirst(8).prefix(4), as: UTF8.self), "WAVE")
+    }
+  }
+
   func testLegacySettingsSnapshotDefaultsToPaperTheme() throws {
     let legacy = """
       {"difficulty":"normal","strictSpace":false,"stopOnError":false,"deleteOnError":false,"hideExtraLetters":false,"fontSize":28}

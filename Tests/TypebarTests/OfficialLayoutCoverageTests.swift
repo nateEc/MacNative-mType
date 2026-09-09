@@ -26,6 +26,20 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let method: String
   }
 
+  private struct ConfigFixture: Decodable {
+    let referenceRepository: String
+    let referenceCommit: String
+    let officialCount: Int
+    let officialKeys: [String]
+    let mapped: [String: String]
+    let partial: [String: String]
+    let notApplicable: [String: String]
+    let unimplemented: [String: String]
+    let untrackedOfficialKeys: [String]
+    let sourceFiles: [String]
+    let method: String
+  }
+
   func testPinnedOfficialLayoutCoverageIsCompleteUniqueAndResolvable() throws {
     let repositoryRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
@@ -138,5 +152,50 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       ["packages/schemas/src/languages.ts", "Sources/Typebar/TypingEngine.swift"])
     XCTAssertTrue(fixture.method.contains("metadata only"))
     XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("\"words\""))
+  }
+
+  func testPinnedOfficialConfigCoverageIsPartitionedWithoutMissingKeys() throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let data = try Data(
+      contentsOf: repositoryRoot.appendingPathComponent("Compatibility/official-configs.json"))
+    let fixture = try JSONDecoder().decode(ConfigFixture.self, from: data)
+    let officialKeys = Set(fixture.officialKeys)
+    let mappedKeys = Set(fixture.mapped.keys)
+    let partialKeys = Set(fixture.partial.keys)
+    let notApplicableKeys = Set(fixture.notApplicable.keys)
+    let unimplementedKeys = Set(fixture.unimplemented.keys)
+    let untrackedKeys = Set(fixture.untrackedOfficialKeys)
+
+    XCTAssertEqual(fixture.referenceRepository, "monkeytypegame/monkeytype")
+    XCTAssertEqual(fixture.referenceCommit, "91bd24bb8513785c7364cbea29296ff7adafac41")
+    XCTAssertEqual(fixture.officialCount, 94)
+    XCTAssertEqual(fixture.officialKeys.count, fixture.officialCount)
+    XCTAssertEqual(officialKeys.count, fixture.officialCount)
+    XCTAssertEqual(fixture.mapped.count, 82)
+    XCTAssertEqual(fixture.partial.count, 11)
+    XCTAssertEqual(fixture.notApplicable.count, 1)
+    XCTAssertEqual(fixture.notApplicable["ads"], "无")
+    XCTAssertTrue(unimplementedKeys.isEmpty)
+    XCTAssertTrue(untrackedKeys.isEmpty)
+    XCTAssertTrue(mappedKeys.isDisjoint(with: partialKeys))
+    XCTAssertTrue(mappedKeys.isDisjoint(with: notApplicableKeys))
+    XCTAssertTrue(mappedKeys.isDisjoint(with: unimplementedKeys))
+    XCTAssertTrue(partialKeys.isDisjoint(with: notApplicableKeys))
+    XCTAssertTrue(partialKeys.isDisjoint(with: unimplementedKeys))
+    XCTAssertTrue(notApplicableKeys.isDisjoint(with: unimplementedKeys))
+    XCTAssertEqual(
+      mappedKeys.union(partialKeys).union(notApplicableKeys).union(unimplementedKeys)
+        .union(untrackedKeys), officialKeys)
+    XCTAssertTrue(
+      (Array(fixture.mapped.values) + Array(fixture.partial.values)
+        + Array(fixture.notApplicable.values) + Array(fixture.unimplemented.values))
+        .allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+    XCTAssertEqual(
+      fixture.sourceFiles,
+      ["packages/schemas/src/configs.ts", "OFFICIAL_CONFIG_AUDIT.md"])
+    XCTAssertTrue(fixture.method.contains("metadata only"))
   }
 }
