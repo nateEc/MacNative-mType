@@ -112,14 +112,14 @@ extension TypingLanguage {
     case .indonesian1k: "hu-HU"
     case .indonesian10k: "id-ID"
     case .malay, .malay1k: "ms-MY"
-    case .danish: "da-DK"
+    case .danish, .danish1k, .danish10k: "da-DK"
     case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
       .norwegianBokmal10k, .norwegianBokmal150k, .norwegianBokmal600k:
       "nb-NO"
     case .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k,
       .norwegianNynorsk10k, .norwegianNynorsk100k, .norwegianNynorsk400k:
       "nn-NO"
-    case .swedish, .swedishDiacritics: "sv-SE"
+    case .swedish, .swedish1k, .swedishDiacritics: "sv-SE"
     case .hungarian: "hu-HU"
     case .czech, .czech1k, .czech10k: "cs-CZ"
     case .slovak, .slovak1k, .slovak10k: "sk-SK"
@@ -130,8 +130,8 @@ extension TypingLanguage {
     case .bulgarianLatin: "bg"
     case .romanian, .romanian1k, .romanian5k, .romanian10k, .romanian25k,
       .romanian50k, .romanian100k, .romanian200k: "ro-RO"
-    case .finnish: "fi-FI"
-    case .estonian: "et-EE"
+    case .finnish, .finnish1k, .finnish10k: "fi-FI"
+    case .estonian, .estonian1k, .estonian5k, .estonian10k: "et-EE"
     case .icelandic: "is-IS"
     case .french, .french1k, .french2k, .french10k, .french600k: "fr-FR"
     case .frenchBitoduc: "fr-fr"

@@ -233,14 +233,14 @@ enum LivePracticeContentService {
     case .indonesian1k: return "hu"
     case .indonesian10k: return "id"
     case .malay, .malay1k: return "ms"
-    case .danish: return "da"
+    case .danish, .danish1k, .danish10k: return "da"
     case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
       .norwegianBokmal10k, .norwegianBokmal150k, .norwegianBokmal600k:
       return "no"
     case .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k,
       .norwegianNynorsk10k, .norwegianNynorsk100k, .norwegianNynorsk400k:
       return "nn"
-    case .swedish, .swedishDiacritics: return "sv"
+    case .swedish, .swedish1k, .swedishDiacritics: return "sv"
     case .hungarian: return "hu"
     case .czech, .czech1k, .czech10k: return "cs"
     case .slovak, .slovak1k, .slovak10k: return "sk"
@@ -250,8 +250,8 @@ enum LivePracticeContentService {
     case .bulgarian, .bulgarianLatin: return "bg"
     case .romanian, .romanian1k, .romanian5k, .romanian10k, .romanian25k,
       .romanian50k, .romanian100k, .romanian200k: return "ro"
-    case .finnish: return "fi"
-    case .estonian: return "et"
+    case .finnish, .finnish1k, .finnish10k: return "fi"
+    case .estonian, .estonian1k, .estonian5k, .estonian10k: return "et"
     case .icelandic: return "is"
     case .french, .french1k, .french2k, .french10k, .french600k: return "fr"
     case .frenchBitoduc: return "fr"

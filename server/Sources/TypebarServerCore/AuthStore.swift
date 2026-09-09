@@ -528,6 +528,8 @@ public actor AuthStore {
     "tatar1k", "tatar5k", "tatar9k", "uzbek1k", "uzbek70k",
     "dutch1k", "dutch10k", "czech1k", "czech10k",
     "slovak1k", "slovak10k", "slovenian1k", "slovenian5k", "croatian1k",
+    "danish1k", "danish10k", "swedish1k", "finnish1k", "finnish10k",
+    "estonian1k", "estonian5k", "estonian10k", "icelandic1k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",

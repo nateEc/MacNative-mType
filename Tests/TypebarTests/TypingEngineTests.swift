@@ -10064,6 +10064,161 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testNordicAndBalticScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    struct ExpectedScale {
+      let rawValue: String
+      let displayName: String
+      let count: Int
+      let minimumLength: Int
+      let maximumLength: Int
+      let uppercaseCount: Int
+      let punctuationCount: Int
+      let nonASCIICount: Int
+      let numberCount: Int
+      let uppercaseNonASCIIOverlap: Int
+      let punctuationNonASCIIOverlap: Int
+      let uppercaseNumberOverlap: Int
+      let supportsLazyInput: Bool
+      let quoteSourceRawValue: String
+      let wikipediaCode: String
+      let speechLocale: String
+    }
+
+    let cases = [
+      ExpectedScale(
+        rawValue: "danish1k", displayName: "Dansk · 1k · Typebar", count: 954,
+        minimumLength: 1, maximumLength: 14, uppercaseCount: 2, punctuationCount: 0,
+        nonASCIICount: 181, numberCount: 0, uppercaseNonASCIIOverlap: 0,
+        punctuationNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        supportsLazyInput: true, quoteSourceRawValue: "danish",
+        wikipediaCode: "da", speechLocale: "da-DK"),
+      ExpectedScale(
+        rawValue: "danish10k", displayName: "Dansk · 10k · Typebar", count: 9_624,
+        minimumLength: 1, maximumLength: 24, uppercaseCount: 31, punctuationCount: 0,
+        nonASCIICount: 2_159, numberCount: 9, uppercaseNonASCIIOverlap: 4,
+        punctuationNonASCIIOverlap: 0, uppercaseNumberOverlap: 1,
+        supportsLazyInput: true, quoteSourceRawValue: "danish",
+        wikipediaCode: "da", speechLocale: "da-DK"),
+      ExpectedScale(
+        rawValue: "swedish1k", displayName: "Svenska · 1k · Typebar", count: 994,
+        minimumLength: 1, maximumLength: 12, uppercaseCount: 0, punctuationCount: 0,
+        nonASCIICount: 332, numberCount: 0, uppercaseNonASCIIOverlap: 0,
+        punctuationNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        supportsLazyInput: true, quoteSourceRawValue: "swedish",
+        wikipediaCode: "sv", speechLocale: "sv-SE"),
+      ExpectedScale(
+        rawValue: "finnish1k", displayName: "Suomi · 1k · Typebar", count: 1_000,
+        minimumLength: 2, maximumLength: 14, uppercaseCount: 0, punctuationCount: 0,
+        nonASCIICount: 240, numberCount: 0, uppercaseNonASCIIOverlap: 0,
+        punctuationNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        supportsLazyInput: true, quoteSourceRawValue: "finnish",
+        wikipediaCode: "fi", speechLocale: "fi-FI"),
+      ExpectedScale(
+        rawValue: "finnish10k", displayName: "Suomi · 10k · Typebar", count: 9_906,
+        minimumLength: 2, maximumLength: 15, uppercaseCount: 0, punctuationCount: 0,
+        nonASCIICount: 2_453, numberCount: 0, uppercaseNonASCIIOverlap: 0,
+        punctuationNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        supportsLazyInput: true, quoteSourceRawValue: "finnish",
+        wikipediaCode: "fi", speechLocale: "fi-FI"),
+      ExpectedScale(
+        rawValue: "estonian1k", displayName: "Eesti · 1k · Typebar", count: 1_000,
+        minimumLength: 2, maximumLength: 15, uppercaseCount: 0, punctuationCount: 1,
+        nonASCIICount: 233, numberCount: 0, uppercaseNonASCIIOverlap: 0,
+        punctuationNonASCIIOverlap: 1, uppercaseNumberOverlap: 0,
+        supportsLazyInput: true, quoteSourceRawValue: "estonian",
+        wikipediaCode: "et", speechLocale: "et-EE"),
+      ExpectedScale(
+        rawValue: "estonian5k", displayName: "Eesti · 5k · Typebar", count: 5_000,
+        minimumLength: 2, maximumLength: 23, uppercaseCount: 0, punctuationCount: 5,
+        nonASCIICount: 1_235, numberCount: 0, uppercaseNonASCIIOverlap: 0,
+        punctuationNonASCIIOverlap: 3, uppercaseNumberOverlap: 0,
+        supportsLazyInput: true, quoteSourceRawValue: "estonian",
+        wikipediaCode: "et", speechLocale: "et-EE"),
+      ExpectedScale(
+        rawValue: "estonian10k", displayName: "Eesti · 10k · Typebar", count: 10_000,
+        minimumLength: 2, maximumLength: 23, uppercaseCount: 0, punctuationCount: 13,
+        nonASCIICount: 2_471, numberCount: 0, uppercaseNonASCIIOverlap: 0,
+        punctuationNonASCIIOverlap: 6, uppercaseNumberOverlap: 0,
+        supportsLazyInput: true, quoteSourceRawValue: "estonian",
+        wikipediaCode: "et", speechLocale: "et-EE"),
+      ExpectedScale(
+        rawValue: "icelandic1k", displayName: "Íslenska · 1k · Typebar", count: 1_000,
+        minimumLength: 1, maximumLength: 12, uppercaseCount: 0, punctuationCount: 0,
+        nonASCIICount: 462, numberCount: 0, uppercaseNonASCIIOverlap: 0,
+        punctuationNonASCIIOverlap: 0, uppercaseNumberOverlap: 0,
+        supportsLazyInput: true, quoteSourceRawValue: "icelandic",
+        wikipediaCode: "en", speechLocale: "en-US"),
+    ]
+
+    for expected in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: expected.rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: expected.quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+      let hasUppercase: (String) -> Bool = { $0.contains(where: \.isUppercase) }
+      let hasPunctuation: (String) -> Bool = { $0.contains(where: \.isPunctuation) }
+      let hasNonASCII: (String) -> Bool = {
+        $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }
+      let hasNumber: (String) -> Bool = { $0.contains(where: \.isNumber) }
+
+      XCTAssertEqual(language.displayName, expected.displayName, expected.rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, expected.rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, expected.rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, expected.rawValue)
+      XCTAssertEqual(language.supportsLazyLatinInput, expected.supportsLazyInput, expected.rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, expected.rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, expected.rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown, expected.rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language),
+        expected.wikipediaCode, expected.rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, expected.speechLocale, expected.rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), expected.rawValue)
+      XCTAssertEqual(words.count, expected.count, expected.rawValue)
+      XCTAssertEqual(Set(words).count, expected.count, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), expected.minimumLength, expected.rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), expected.maximumLength, expected.rawValue)
+      XCTAssertEqual(words.filter(hasUppercase).count, expected.uppercaseCount, expected.rawValue)
+      XCTAssertEqual(words.filter(hasPunctuation).count, expected.punctuationCount, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(" ") }, expected.rawValue)
+      XCTAssertEqual(words.filter(hasNonASCII).count, expected.nonASCIICount, expected.rawValue)
+      XCTAssertEqual(words.filter(hasNumber).count, expected.numberCount, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasUppercase($0) && hasNonASCII($0) }.count,
+        expected.uppercaseNonASCIIOverlap, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasPunctuation($0) && hasNonASCII($0) }.count,
+        expected.punctuationNonASCIIOverlap, expected.rawValue)
+      XCTAssertEqual(
+        words.filter { hasUppercase($0) && hasNumber($0) }.count,
+        expected.uppercaseNumberOverlap, expected.rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, expected.rawValue)
+      XCTAssertFalse(
+        words.contains { $0.unicodeScalars.contains(where: \.properties.isJoinControl) },
+        expected.rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, expected.rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        expected.rawValue)
+      XCTAssertEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ").count,
+        25, expected.rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, expected.rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text,
+          expected.rawValue)
+      }
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),

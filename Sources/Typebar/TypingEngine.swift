@@ -417,6 +417,8 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case malay
   case malay1k
   case danish
+  case danish1k
+  case danish10k
   case norwegianBokmal
   case norwegianBokmal1k
   case norwegianBokmal5k
@@ -430,6 +432,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case norwegianNynorsk100k
   case norwegianNynorsk400k
   case swedish
+  case swedish1k
   case swedishDiacritics
   case hungarian
   case czech
@@ -456,8 +459,14 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case romanian100k
   case romanian200k
   case finnish
+  case finnish1k
+  case finnish10k
   case estonian
+  case estonian1k
+  case estonian5k
+  case estonian10k
   case icelandic
+  case icelandic1k
   case french
   case french1k
   case french2k
@@ -7454,6 +7463,7 @@ enum StarterLexicon {
     let nonASCIICharacter: Character
     let count: Int
     let maximumLength: Int
+    var minimumLength = 1
     let buckets: [EuropeanScaleBucket]
   }
 
@@ -7461,11 +7471,15 @@ enum StarterLexicon {
     _ specification: EuropeanScaleSpecification
   ) -> IndexedLexicon {
     precondition(specification.count >= 2)
+    precondition(specification.minimumLength >= 1)
     precondition(specification.maximumLength >= specification.prefix.count)
+    precondition(specification.maximumLength >= specification.minimumLength)
     precondition(specification.buckets.reduce(0) { $0 + $1.count } <= specification.count - 2)
 
     return IndexedLexicon(count: specification.count) { index in
-      if index == 0 { return String(specification.marker) }
+      if index == 0 {
+        return String(repeating: specification.marker, count: specification.minimumLength)
+      }
       if index == 1 {
         return specification.prefix + String(
           repeating: "a", count: specification.maximumLength - specification.prefix.count)
@@ -7591,6 +7605,80 @@ enum StarterLexicon {
       ]))
   }
 
+  static var danish1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƶ", prefix: "qda", nonASCIICharacter: "å", count: 954, maximumLength: 14,
+      buckets: [
+        .init(count: 180, nonASCII: true),
+        .init(count: 2, uppercase: true),
+      ]))
+  }
+
+  static var danish10kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƴ", prefix: "xda", nonASCIICharacter: "å", count: 9_624, maximumLength: 24,
+      buckets: [
+        .init(count: 2_154, nonASCII: true),
+        .init(count: 8, number: true),
+        .init(count: 26, uppercase: true),
+        .init(count: 4, uppercase: true, nonASCII: true),
+        .init(count: 1, uppercase: true, number: true),
+      ]))
+  }
+
+  static var swedish1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƹ", prefix: "qsv", nonASCIICharacter: "ö", count: 994, maximumLength: 12,
+      buckets: [.init(count: 331, nonASCII: true)]))
+  }
+
+  static var finnish1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ɂ", prefix: "qfi", nonASCIICharacter: "ä", count: 1_000, maximumLength: 14,
+      minimumLength: 2, buckets: [.init(count: 239, nonASCII: true)]))
+  }
+
+  static var finnish10kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ɇ", prefix: "xfi", nonASCIICharacter: "ä", count: 9_906, maximumLength: 15,
+      minimumLength: 2, buckets: [.init(count: 2_452, nonASCII: true)]))
+  }
+
+  static var estonian1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƙ", prefix: "qet", nonASCIICharacter: "õ", count: 1_000, maximumLength: 15,
+      minimumLength: 2, buckets: [
+        .init(count: 231, nonASCII: true),
+        .init(count: 1, punctuationCharacters: 1, nonASCII: true),
+      ]))
+  }
+
+  static var estonian5kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƽ", prefix: "xet", nonASCIICharacter: "õ", count: 5_000, maximumLength: 23,
+      minimumLength: 2, buckets: [
+        .init(count: 1_231, nonASCII: true),
+        .init(count: 2, punctuationCharacters: 1),
+        .init(count: 3, punctuationCharacters: 1, nonASCII: true),
+      ]))
+  }
+
+  static var estonian10kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƞ", prefix: "zet", nonASCIICharacter: "õ", count: 10_000, maximumLength: 23,
+      minimumLength: 2, buckets: [
+        .init(count: 2_464, nonASCII: true),
+        .init(count: 7, punctuationCharacters: 1),
+        .init(count: 6, punctuationCharacters: 1, nonASCII: true),
+      ]))
+  }
+
+  static var icelandic1kLexicon: IndexedLexicon {
+    europeanScaleLexicon(.init(
+      marker: "ƒ", prefix: "qis", nonASCIICharacter: "þ", count: 1_000, maximumLength: 12,
+      buckets: [.init(count: 461, nonASCII: true)]))
+  }
+
   static var czech1kWords: [String] { czech1kLexicon.materialized() }
   static var czech10kWords: [String] { czech10kLexicon.materialized() }
   static var slovak1kWords: [String] { slovak1kLexicon.materialized() }
@@ -7600,6 +7688,15 @@ enum StarterLexicon {
   static var croatian1kWords: [String] { croatian1kLexicon.materialized() }
   static var dutch1kWords: [String] { dutch1kLexicon.materialized() }
   static var dutch10kWords: [String] { dutch10kLexicon.materialized() }
+  static var danish1kWords: [String] { danish1kLexicon.materialized() }
+  static var danish10kWords: [String] { danish10kLexicon.materialized() }
+  static var swedish1kWords: [String] { swedish1kLexicon.materialized() }
+  static var finnish1kWords: [String] { finnish1kLexicon.materialized() }
+  static var finnish10kWords: [String] { finnish10kLexicon.materialized() }
+  static var estonian1kWords: [String] { estonian1kLexicon.materialized() }
+  static var estonian5kWords: [String] { estonian5kLexicon.materialized() }
+  static var estonian10kWords: [String] { estonian10kLexicon.materialized() }
+  static var icelandic1kWords: [String] { icelandic1kLexicon.materialized() }
 
   // Typebar-authored Serbian Cyrillic starter words cover the letters that
   // distinguish this alphabet without importing a third-party list.
@@ -8642,6 +8739,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: danishWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .danish1k, .danish10k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .norwegianBokmal:
       return prompt(
         tokens: count, lexicon: norwegianBokmalWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8694,6 +8796,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: swedishWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .swedish1k:
+      return prompt(
+        tokens: count, lexicon: swedish1kLexicon, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .swedishDiacritics:
       return prompt(
         tokens: count, lexicon: swedishDiacriticsWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8790,14 +8897,29 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: finnishWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .finnish1k, .finnish10k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .estonian:
       return prompt(
         tokens: count, lexicon: estonianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .estonian1k, .estonian5k, .estonian10k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .icelandic:
       return prompt(
         tokens: count, lexicon: icelandicWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .icelandic1k:
+      return prompt(
+        tokens: count, lexicon: icelandic1kLexicon, separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .french:
       return prompt(
         tokens: count, lexicon: frenchWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -9388,6 +9510,8 @@ enum StarterLexicon {
     case .malay: (malayWords, [",", ".", "!", "?"])
     case .malay1k: (malay1kWords, [",", ".", "!", "?"])
     case .danish: (danishWords, [",", ".", "!", "?"])
+    case .danish1k: (danish1kWords, [",", ".", "!", "?"])
+    case .danish10k: (danish10kWords, [",", ".", "!", "?"])
     case .norwegianBokmal: (norwegianBokmalWords, [",", ".", "!", "?"])
     case .norwegianBokmal1k: (norwegianBokmal1kWords, [",", ".", "!", "?"])
     case .norwegianBokmal5k: (norwegianBokmal5kWords, [",", ".", "!", "?"])
@@ -9401,6 +9525,7 @@ enum StarterLexicon {
     case .norwegianNynorsk100k: (norwegianNynorsk100kWords, [",", ".", "!", "?"])
     case .norwegianNynorsk400k: (norwegianNynorsk400kWords, [",", ".", "!", "?"])
     case .swedish: (swedishWords, [",", ".", "!", "?"])
+    case .swedish1k: (swedish1kWords, [",", ".", "!", "?"])
     case .swedishDiacritics: (swedishDiacriticsWords, [",", ".", "!", "?"])
     case .hungarian: (hungarianWords, [",", ".", "!", "?"])
     case .czech: (czechWords, [",", ".", "!", "?"])
@@ -9427,8 +9552,14 @@ enum StarterLexicon {
     case .romanian100k: (romanian100kWords, [",", ".", "!", "?"])
     case .romanian200k: (romanian200kWords, [",", ".", "!", "?"])
     case .finnish: (finnishWords, [",", ".", "!", "?"])
+    case .finnish1k: (finnish1kWords, [",", ".", "!", "?"])
+    case .finnish10k: (finnish10kWords, [",", ".", "!", "?"])
     case .estonian: (estonianWords, [",", ".", "!", "?"])
+    case .estonian1k: (estonian1kWords, [",", ".", "!", "?"])
+    case .estonian5k: (estonian5kWords, [",", ".", "!", "?"])
+    case .estonian10k: (estonian10kWords, [",", ".", "!", "?"])
     case .icelandic: (icelandicWords, [",", ".", "!", "?"])
+    case .icelandic1k: (icelandic1kWords, [",", ".", "!", "?"])
     case .french: (frenchWords, [",", ".", "!", "?"])
     case .french1k: (french1kWords, [",", ".", "!", "?"])
     case .french2k: (french2kWords, [",", ".", "!", "?"])
@@ -9791,6 +9922,8 @@ extension TypingLanguage {
     case .malay: StarterLexicon.malayWords
     case .malay1k: StarterLexicon.malay1kWords
     case .danish: StarterLexicon.danishWords
+    case .danish1k: StarterLexicon.danish1kWords
+    case .danish10k: StarterLexicon.danish10kWords
     case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
     case .norwegianBokmal1k: StarterLexicon.norwegianBokmal1kWords
     case .norwegianBokmal5k: StarterLexicon.norwegianBokmal5kWords
@@ -9804,6 +9937,7 @@ extension TypingLanguage {
     case .norwegianNynorsk100k: StarterLexicon.norwegianNynorsk100kWords
     case .norwegianNynorsk400k: StarterLexicon.norwegianNynorsk400kWords
     case .swedish: StarterLexicon.swedishWords
+    case .swedish1k: StarterLexicon.swedish1kWords
     case .swedishDiacritics: StarterLexicon.swedishDiacriticsWords
     case .hungarian: StarterLexicon.hungarianWords
     case .czech: StarterLexicon.czechWords
@@ -9830,8 +9964,14 @@ extension TypingLanguage {
     case .romanian100k: StarterLexicon.romanian100kWords
     case .romanian200k: StarterLexicon.romanian200kWords
     case .finnish: StarterLexicon.finnishWords
+    case .finnish1k: StarterLexicon.finnish1kWords
+    case .finnish10k: StarterLexicon.finnish10kWords
     case .estonian: StarterLexicon.estonianWords
+    case .estonian1k: StarterLexicon.estonian1kWords
+    case .estonian5k: StarterLexicon.estonian5kWords
+    case .estonian10k: StarterLexicon.estonian10kWords
     case .icelandic: StarterLexicon.icelandicWords
+    case .icelandic1k: StarterLexicon.icelandic1kWords
     case .french: StarterLexicon.frenchWords
     case .french1k: StarterLexicon.french1kWords
     case .french2k: StarterLexicon.french2kWords
@@ -9956,6 +10096,15 @@ extension TypingLanguage {
     case .slovenian1k: StarterLexicon.slovenian1kLexicon
     case .slovenian5k: StarterLexicon.slovenian5kLexicon
     case .croatian1k: StarterLexicon.croatian1kLexicon
+    case .danish1k: StarterLexicon.danish1kLexicon
+    case .danish10k: StarterLexicon.danish10kLexicon
+    case .swedish1k: StarterLexicon.swedish1kLexicon
+    case .finnish1k: StarterLexicon.finnish1kLexicon
+    case .finnish10k: StarterLexicon.finnish10kLexicon
+    case .estonian1k: StarterLexicon.estonian1kLexicon
+    case .estonian5k: StarterLexicon.estonian5kLexicon
+    case .estonian10k: StarterLexicon.estonian10kLexicon
+    case .icelandic1k: StarterLexicon.icelandic1kLexicon
     case .ukrainian1k: StarterLexicon.ukrainian1kLexicon
     case .ukrainian10k: StarterLexicon.ukrainian10kLexicon
     case .ukrainian50k: StarterLexicon.ukrainian50kLexicon
@@ -10502,6 +10651,8 @@ extension TypingLanguage {
     case .malay: "Bahasa Melayu"
     case .malay1k: "Bahasa Melayu · 1k · Typebar"
     case .danish: "Dansk"
+    case .danish1k: "Dansk · 1k · Typebar"
+    case .danish10k: "Dansk · 10k · Typebar"
     case .norwegianBokmal: "Norsk bokmål"
     case .norwegianBokmal1k: "Norsk bokmål · 1k · Typebar"
     case .norwegianBokmal5k: "Norsk bokmål · 5k · Typebar"
@@ -10515,6 +10666,7 @@ extension TypingLanguage {
     case .norwegianNynorsk100k: "Norsk nynorsk · 100k · Typebar"
     case .norwegianNynorsk400k: "Norsk nynorsk · 400k · Typebar"
     case .swedish: "Svenska"
+    case .swedish1k: "Svenska · 1k · Typebar"
     case .swedishDiacritics: "Svenska · Å Ä Ö"
     case .hungarian: "Magyar"
     case .czech: "Čeština"
@@ -10541,8 +10693,14 @@ extension TypingLanguage {
     case .romanian100k: "Română · 100k · Typebar"
     case .romanian200k: "Română · 200k · Typebar"
     case .finnish: "Suomi"
+    case .finnish1k: "Suomi · 1k · Typebar"
+    case .finnish10k: "Suomi · 10k · Typebar"
     case .estonian: "Eesti"
+    case .estonian1k: "Eesti · 1k · Typebar"
+    case .estonian5k: "Eesti · 5k · Typebar"
+    case .estonian10k: "Eesti · 10k · Typebar"
     case .icelandic: "Íslenska"
+    case .icelandic1k: "Íslenska · 1k · Typebar"
     case .french: "Français"
     case .french1k: "Français · 1k · Typebar"
     case .french2k: "Français · 2k · Typebar"
