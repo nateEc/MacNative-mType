@@ -64,6 +64,7 @@ final class TestResultRecord {
   var keySpacingSamplesData: Data?
   var keyOverlapDuration: TimeInterval?
   var tagsData: Data
+  var quoteSourceData: Data?
   var prompt: String
   var replayEventsData: Data?
 
@@ -86,6 +87,7 @@ final class TestResultRecord {
     keySpacingSamplesData = try? JSONEncoder().encode(result.keySpacingSamples)
     keyOverlapDuration = result.keyOverlapDuration
     tagsData = (try? JSONEncoder().encode(ResultTagPolicy.normalized(result.tags))) ?? Data()
+    quoteSourceData = result.quoteSource.flatMap { try? JSONEncoder().encode($0) }
     prompt = result.prompt
     replayEventsData = try? JSONEncoder().encode(result.replayEvents)
   }
@@ -102,6 +104,10 @@ final class TestResultRecord {
   var replayEvents: [TypingReplayEvent] {
     (replayEventsData.flatMap { try? JSONDecoder().decode([TypingReplayEvent].self, from: $0) })
       ?? []
+  }
+
+  var quoteSource: ResultQuoteSource? {
+    quoteSourceData.flatMap { try? JSONDecoder().decode(ResultQuoteSource.self, from: $0) }
   }
 
   var restartCount: Int {
@@ -164,6 +170,7 @@ final class TestResultRecord {
       keySpacingSamples: keySpacingSamples,
       keyOverlapDuration: keyOverlapDuration ?? 0,
       tags: tags,
+      quoteSource: quoteSource,
       prompt: prompt,
       replayEvents: replayEvents
     )

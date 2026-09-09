@@ -13,6 +13,7 @@ enum ResultShareText {
         case .zen: detail = "禅模式"
         case .custom: detail = "自定义文本"
         }
-        return "Typebar\n\(result.wpm) WPM · \(result.accuracy)% 准确率 · \(result.errorCount) 错误\n\(configuration.mode.rawValue) · \(configuration.language.rawValue) · \(detail)"
+        let source = result.quoteSource.map { "\n引语来源 · \($0.displayText)" } ?? ""
+        return "Typebar\n\(result.wpm) WPM · \(result.accuracy)% 准确率 · \(result.errorCount) 错误\n\(configuration.mode.rawValue) · \(configuration.language.rawValue) · \(detail)\(source)"
     }
 }

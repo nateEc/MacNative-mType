@@ -16717,10 +16717,79 @@ final class TypingEngineTests: XCTestCase {
       .community(quoteID: communityID))
     XCTAssertEqual(
       QuoteResultFeedbackTarget.make(
+        mode: .quote, sourceIsCommunity: true,
+        selectedQuoteID: "community-\(communityID.uuidString.lowercased())"),
+      .community(quoteID: communityID))
+    XCTAssertEqual(
+      QuoteResultFeedbackTarget.make(
         mode: .words, sourceIsCommunity: false, selectedQuoteID: "craft"), nil)
     XCTAssertEqual(
       QuoteResultFeedbackTarget.make(
         mode: .quote, sourceIsCommunity: true, selectedQuoteID: "craft"), nil)
+  }
+
+  func testResultQuoteSourceCapturesOnlyNormalizedQuoteMetadata() {
+    XCTAssertEqual(
+      ResultQuoteSource.make(
+        mode: .quote, sourceIsCommunity: false, title: "  Quiet\n  Hands  "),
+      .init(kind: .typebar, title: "Quiet Hands"))
+    XCTAssertEqual(
+      ResultQuoteSource.make(
+        mode: .quote, sourceIsCommunity: true,
+        title: String(repeating: "a", count: 81)),
+      .init(kind: .community, title: String(repeating: "a", count: 80)))
+    XCTAssertNil(
+      ResultQuoteSource.make(
+        mode: .words, sourceIsCommunity: false, title: "Quiet Hands"))
+    XCTAssertNil(
+      ResultQuoteSource.make(
+        mode: .quote, sourceIsCommunity: false, title: "  \n "))
+    XCTAssertNil(
+      CompletedTestResult(
+        id: UUID(), configuration: .words(1), outcome: .completed, startedAt: start,
+        finishedAt: start.addingTimeInterval(1), typedCharacterCount: 5,
+        correctCharacterCount: 5, errorCount: 0, wpm: 60, rawWpm: 60, accuracy: 100,
+        quoteSource: ResultQuoteSource(kind: .typebar, title: "Quiet Hands")
+      ).quoteSource)
+  }
+
+  @MainActor
+  func testCompletedResultQuoteSourceRoundTripsAndLegacyPayloadDefaultsSafely() throws {
+    let source = try XCTUnwrap(
+      ResultQuoteSource(kind: .community, title: "Community Author"))
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .init(
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 100, correctCharacterCount: 100, errorCount: 0,
+      wpm: 40, rawWpm: 40, accuracy: 100, quoteSource: source)
+
+    XCTAssertEqual(
+      try JSONDecoder().decode(CompletedTestResult.self, from: JSONEncoder().encode(result))
+        .quoteSource,
+      source)
+    XCTAssertTrue(ResultShareText.make(for: result).contains("引语来源 · 社区审核 · Community Author"))
+
+    var legacy = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any])
+    legacy.removeValue(forKey: "quoteSource")
+    XCTAssertNil(
+      try JSONDecoder().decode(
+        CompletedTestResult.self, from: JSONSerialization.data(withJSONObject: legacy)
+      ).quoteSource)
+    legacy["quoteSource"] = ["kind": "unknown", "title": 7]
+    XCTAssertNil(
+      try JSONDecoder().decode(
+        CompletedTestResult.self, from: JSONSerialization.data(withJSONObject: legacy)
+      ).quoteSource)
+
+    let container = try ModelContainer(
+      for: TestResultRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    container.mainContext.insert(TestResultRecord(result: result))
+    try container.mainContext.save()
+    let records = try container.mainContext.fetch(FetchDescriptor<TestResultRecord>())
+    XCTAssertEqual(try XCTUnwrap(records.first).portableResult?.quoteSource, source)
   }
 
   func testLegacyConfigurationDefaultsToEnglish() throws {

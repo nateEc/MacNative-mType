@@ -540,6 +540,7 @@ private struct ContentView: View {
   @State private var quoteSearchQuery = ""
   @State private var quoteRatings = QuoteRatingStore()
   @State private var activeQuoteFeedback: QuoteResultFeedbackTarget?
+  @State private var activeQuoteSource: ResultQuoteSource?
   @State private var customText = "A calm practice makes the next difficult sentence feel possible."
   @State private var customTextCompletion: CustomTextCompletion = .finish
   @State private var customTextDuration = 30
@@ -676,7 +677,7 @@ private struct ContentView: View {
       case .completed, .bailedOut, .invalidAFK:
         let restartCount = currentRestartCount
         guard let result = session.result(
-          tags: activeSessionTags, restartCount: restartCount
+          tags: activeSessionTags, restartCount: restartCount, quoteSource: activeQuoteSource
         ) else { return }
         currentRestartCount = 0
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
@@ -2312,6 +2313,8 @@ private struct ContentView: View {
     activeQuoteFeedback = QuoteResultFeedbackTarget.make(
       mode: mode, sourceIsCommunity: quoteSource == .community,
       selectedQuoteID: selectedQuote?.id ?? "")
+    activeQuoteSource = ResultQuoteSource.make(
+      mode: mode, sourceIsCommunity: quoteSource == .community, title: selectedQuote?.title)
     activeSessionTags = settings.activeResultTags
     session = TestSessionFactory.make(
       configuration: configuration,
@@ -3330,6 +3333,15 @@ private struct CompletedResultView: View {
         .font(.caption.weight(.medium))
         .foregroundStyle(.secondary)
 
+      if let quoteSource = result.quoteSource {
+        Label(quoteSource.displayText, systemImage: quoteSource.kind.systemImage)
+          .font(.caption.weight(.medium))
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .accessibilityLabel("引语来源，\(quoteSource.displayText)")
+      }
+
       ResultPerformanceChart(
         prompt: result.prompt,
         events: result.replayEvents,
@@ -3875,6 +3887,12 @@ private struct ResultSnapshotCard: View {
       }
       .font(.system(size: 11, weight: .medium, design: .monospaced))
       .foregroundStyle(.secondary)
+      if let quoteSource = result.quoteSource {
+        Text("SOURCE / \(quoteSource.displayText)")
+          .font(.system(size: 11, weight: .medium, design: .monospaced))
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
     }
     .padding(36)
     .frame(width: 760)
@@ -5678,6 +5696,12 @@ private struct ResultDetailView: View {
               Text("修饰器")
               Text(configuration.modifiers.map(\.displayName).joined(separator: "、"))
             }
+          }
+        }
+        if let quoteSource = result.quoteSource {
+          GridRow {
+            Text("引语来源")
+            Text(quoteSource.displayText)
           }
         }
         GridRow {

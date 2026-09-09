@@ -2337,6 +2337,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let keySpacingSamples: [TimeInterval]
   let keyOverlapDuration: TimeInterval
   let tags: [String]
+  let quoteSource: ResultQuoteSource?
   let prompt: String
   let replayEvents: [TypingReplayEvent]
 
@@ -2359,6 +2360,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     keySpacingSamples: [TimeInterval] = [],
     keyOverlapDuration: TimeInterval = 0,
     tags: [String] = [],
+    quoteSource: ResultQuoteSource? = nil,
     prompt: String = "",
     replayEvents: [TypingReplayEvent] = []
   ) {
@@ -2382,6 +2384,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.keySpacingSamples = keySpacingSamples.filter { $0.isFinite && $0 >= 0 }
     self.keyOverlapDuration = keyOverlapDuration.isFinite ? max(0, keyOverlapDuration) : 0
     self.tags = tags
+    self.quoteSource = configuration.mode == .quote ? quoteSource : nil
     self.prompt = prompt
     self.replayEvents = replayEvents
   }
@@ -2411,7 +2414,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
       restartCount, keyDurationSamples, keySpacingSamples, keyOverlapDuration, tags, prompt,
-      replayEvents
+      quoteSource, replayEvents
   }
 
   init(from decoder: Decoder) throws {
@@ -2444,6 +2447,9 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     keyOverlapDuration = decodedKeyOverlapDuration.isFinite
       ? max(0, decodedKeyOverlapDuration) : 0
     tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+    quoteSource = configuration.mode == .quote
+      ? (try? values.decodeIfPresent(ResultQuoteSource.self, forKey: .quoteSource)) ?? nil
+      : nil
     prompt = try values.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     replayEvents = try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? []
   }
@@ -2932,7 +2938,8 @@ struct TypingSession {
   }
 
   func result(
-    at date: Date = .now, tags: [String] = [], restartCount: Int = 0
+    at date: Date = .now, tags: [String] = [], restartCount: Int = 0,
+    quoteSource: ResultQuoteSource? = nil
   ) -> CompletedTestResult? {
     guard let startedAt, let finishedAt else { return nil }
     return .init(
@@ -2954,6 +2961,7 @@ struct TypingSession {
       keySpacingSamples: physicalKeySpacingSamples,
       keyOverlapDuration: completedPhysicalKeyOverlapDuration,
       tags: ResultTagPolicy.normalized(tags),
+      quoteSource: quoteSource,
       prompt: prompt,
       replayEvents: replayEvents
     )
