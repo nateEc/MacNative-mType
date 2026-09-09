@@ -400,6 +400,10 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case simplifiedChinese10k
   case simplifiedChinese50k
   case traditionalChinese
+  case traditionalChinese1k
+  case traditionalChinese5k
+  case traditionalChinese10k
+  case traditionalChinese50k
   case russian
   case russian1k
   case russian5k
@@ -4204,16 +4208,27 @@ enum StarterLexicon {
     return String(output)
   }
 
-  /// Recovers generated source-word boundaries without materializing a scale
-  /// lexicon. This is used only for the four deterministic Typebar corpora.
-  static func simplifiedChineseScaleWords(
+  /// Recovers generated source-word boundaries without materializing either
+  /// deterministic Typebar Chinese scale family.
+  static func chineseScaleWords(
     in source: String, language: TypingLanguage
   ) -> [String]? {
-    let shape: (marker: Character, maximumLength: Int, allowsUppercase: Bool)? = switch language {
-    case .simplifiedChinese1k: ("甲", 5, false)
-    case .simplifiedChinese5k: ("乙", 6, false)
-    case .simplifiedChinese10k: ("丙", 7, false)
-    case .simplifiedChinese50k: ("丁", 9, true)
+    let shape: (
+      marker: Character, maximumLength: Int, minimumToken: [Character],
+      alphabet: Set<Character>, allowsUppercase: Bool
+    )? = switch language {
+    case .simplifiedChinese1k: ("甲", 5, Array("龘靐"), simplifiedChineseScaleAlphabetSet, false)
+    case .simplifiedChinese5k: ("乙", 6, Array("龘靐"), simplifiedChineseScaleAlphabetSet, false)
+    case .simplifiedChinese10k: ("丙", 7, Array("龘靐"), simplifiedChineseScaleAlphabetSet, false)
+    case .simplifiedChinese50k: ("丁", 9, Array("龘靐"), simplifiedChineseScaleAlphabetSet, true)
+    case .traditionalChinese1k:
+      ("曦", 5, Array("鬱龘"), traditionalChineseScaleAlphabetSet, false)
+    case .traditionalChinese5k:
+      ("嵐", 6, Array("鬱龘"), traditionalChineseScaleAlphabetSet, false)
+    case .traditionalChinese10k:
+      ("澄", 7, Array("鬱龘"), traditionalChineseScaleAlphabetSet, false)
+    case .traditionalChinese50k:
+      ("曜", 9, Array("鬱"), traditionalChineseScaleAlphabetSet, true)
     default: nil
     }
     guard let shape else { return nil }
@@ -4227,10 +4242,11 @@ enum StarterLexicon {
       if hasOpeningPunctuation { index += 1 }
       guard index < characters.count else { return nil }
 
-      if index + 2 <= characters.count,
-        characters[index] == "龘", characters[index + 1] == "靐"
+      let minimumEnd = index + shape.minimumToken.count
+      if minimumEnd <= characters.count,
+        characters[index..<minimumEnd].elementsEqual(shape.minimumToken)
       {
-        index += 2
+        index = minimumEnd
       } else if characters[index] == shape.marker {
         let repeatedEnd = index + shape.maximumLength
         if repeatedEnd <= characters.count,
@@ -4240,8 +4256,7 @@ enum StarterLexicon {
         } else {
           let end = index + 5
           guard end <= characters.count,
-            characters[(index + 1)..<end].allSatisfy(
-              { simplifiedChineseScaleAlphabetSet.contains($0) })
+            characters[(index + 1)..<end].allSatisfy({ shape.alphabet.contains($0) })
           else { return nil }
           index = end
         }
@@ -4250,8 +4265,7 @@ enum StarterLexicon {
       {
         let end = index + 5
         guard end <= characters.count,
-          characters[(index + 1)..<end].allSatisfy(
-            { simplifiedChineseScaleAlphabetSet.contains($0) })
+          characters[(index + 1)..<end].allSatisfy({ shape.alphabet.contains($0) })
         else { return nil }
         index = end
       } else if characters[index].isNumber {
@@ -4326,6 +4340,91 @@ enum StarterLexicon {
     "街燈", "木門", "書頁", "旅途", "耐心", "片刻", "山徑", "風鈴", "安靜", "方向",
     "星群", "畫布", "庭院", "呼吸",
   ]
+
+  private struct TraditionalChineseScaleSpecification {
+    let marker: Character
+    let count: Int
+    let minimumToken: String
+    let maximumLength: Int
+    let numericCount: Int
+    let uppercaseCount: Int
+    let punctuationCount: Int
+    let punctuationNumberOverlap: Int
+  }
+
+  private static let traditionalChineseScaleAlphabet =
+    Array("風雲龍鳳龜鶴劍書畫燈門葉灣霧徑鈴聲靜遠島臺學練專廣東車馬魚鳥花園樹橋樓夢歡愛樂藝")
+  private static let traditionalChineseScaleAlphabetSet = Set(traditionalChineseScaleAlphabet)
+
+  private static func traditionalChineseScaleIndex(_ index: Int) -> String {
+    var value = index
+    var output = Array(repeating: traditionalChineseScaleAlphabet[0], count: 4)
+    for position in output.indices.reversed() {
+      output[position] = traditionalChineseScaleAlphabet[value % traditionalChineseScaleAlphabet.count]
+      value /= traditionalChineseScaleAlphabet.count
+    }
+    precondition(value == 0)
+    return String(output)
+  }
+
+  private static func traditionalChineseScaleLexicon(
+    _ specification: TraditionalChineseScaleSpecification
+  ) -> IndexedLexicon {
+    let standaloneNumbers = specification.numericCount - specification.punctuationNumberOverlap
+    let uppercaseStart = standaloneNumbers + 2
+    let punctuationStart = specification.count - specification.punctuationCount
+    precondition(standaloneNumbers >= 0)
+    precondition(specification.punctuationNumberOverlap <= specification.punctuationCount)
+    precondition(
+      uppercaseStart + specification.uppercaseCount <= punctuationStart)
+
+    return IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return specification.minimumToken }
+      if index == 1 {
+        return String(repeating: specification.marker, count: specification.maximumLength)
+      }
+      let suffix = traditionalChineseScaleIndex(index)
+      if index < standaloneNumbers + 2 { return "一" + suffix }
+      if index < uppercaseStart + specification.uppercaseCount { return "A" + suffix }
+      if index >= punctuationStart {
+        let punctuationOffset = index - punctuationStart
+        let prefix = punctuationOffset < specification.punctuationNumberOverlap
+          ? "一" : String(specification.marker)
+        return prefix + suffix + "！"
+      }
+      return String(specification.marker) + suffix
+    }
+  }
+
+  static var traditionalChinese1kLexicon: IndexedLexicon {
+    traditionalChineseScaleLexicon(.init(
+      marker: "曦", count: 1_000, minimumToken: "鬱龘", maximumLength: 5,
+      numericCount: 28, uppercaseCount: 0, punctuationCount: 0,
+      punctuationNumberOverlap: 0))
+  }
+  static var traditionalChinese5kLexicon: IndexedLexicon {
+    traditionalChineseScaleLexicon(.init(
+      marker: "嵐", count: 4_991, minimumToken: "鬱龘", maximumLength: 6,
+      numericCount: 121, uppercaseCount: 0, punctuationCount: 0,
+      punctuationNumberOverlap: 0))
+  }
+  static var traditionalChinese10kLexicon: IndexedLexicon {
+    traditionalChineseScaleLexicon(.init(
+      marker: "澄", count: 9_974, minimumToken: "鬱龘", maximumLength: 7,
+      numericCount: 220, uppercaseCount: 0, punctuationCount: 0,
+      punctuationNumberOverlap: 0))
+  }
+  static var traditionalChinese50kLexicon: IndexedLexicon {
+    traditionalChineseScaleLexicon(.init(
+      marker: "曜", count: 49_925, minimumToken: "鬱", maximumLength: 9,
+      numericCount: 1_427, uppercaseCount: 2, punctuationCount: 11,
+      punctuationNumberOverlap: 4))
+  }
+
+  static var traditionalChinese1kWords: [String] { traditionalChinese1kLexicon.materialized() }
+  static var traditionalChinese5kWords: [String] { traditionalChinese5kLexicon.materialized() }
+  static var traditionalChinese10kWords: [String] { traditionalChinese10kLexicon.materialized() }
+  static var traditionalChinese50kWords: [String] { traditionalChinese50kLexicon.materialized() }
 
   // Original Typebar content for Cyrillic keyboard practice.
   static let russianWords = [
@@ -6381,6 +6480,10 @@ enum StarterLexicon {
     case .simplifiedChinese10k: simplifiedChinese10kWords
     case .simplifiedChinese50k: simplifiedChinese50kWords
     case .traditionalChinese: traditionalChineseWords
+    case .traditionalChinese1k: traditionalChinese1kWords
+    case .traditionalChinese5k: traditionalChinese5kWords
+    case .traditionalChinese10k: traditionalChinese10kWords
+    case .traditionalChinese50k: traditionalChinese50kWords
     case .japaneseHiragana: japaneseHiraganaWords
     case .japaneseKatakana: japaneseKatakanaWords
     case .japaneseRomaji: japaneseRomajiWords
@@ -7228,6 +7331,26 @@ enum StarterLexicon {
         tokens: count, lexicon: traditionalChineseWords, separator: "",
         punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
+    case .traditionalChinese1k:
+      return prompt(
+        tokens: count, lexicon: traditionalChinese1kLexicon, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .traditionalChinese5k:
+      return prompt(
+        tokens: count, lexicon: traditionalChinese5kLexicon, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .traditionalChinese10k:
+      return prompt(
+        tokens: count, lexicon: traditionalChinese10kLexicon, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
+    case .traditionalChinese50k:
+      return prompt(
+        tokens: count, lexicon: traditionalChinese50kLexicon, separator: "",
+        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .russian:
       return prompt(
         tokens: count, lexicon: russianWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -7649,6 +7772,10 @@ enum StarterLexicon {
     case .simplifiedChinese10k: (simplifiedChinese10kWords, ["，", "。", "！", "？"])
     case .simplifiedChinese50k: (simplifiedChinese50kWords, ["，", "。", "！", "？"])
     case .traditionalChinese: (traditionalChineseWords, ["，", "。", "！", "？"])
+    case .traditionalChinese1k: (traditionalChinese1kWords, ["，", "。", "！", "？"])
+    case .traditionalChinese5k: (traditionalChinese5kWords, ["，", "。", "！", "？"])
+    case .traditionalChinese10k: (traditionalChinese10kWords, ["，", "。", "！", "？"])
+    case .traditionalChinese50k: (traditionalChinese50kWords, ["，", "。", "！", "？"])
     case .russian: (russianWords, [".", ",", "!", "?"])
     case .russian1k: (russian1kWords, [".", ",", "!", "?"])
     case .russian5k: (russian5kWords, [".", ",", "!", "?"])
@@ -7957,6 +8084,10 @@ extension TypingLanguage {
     case .simplifiedChinese10k: StarterLexicon.simplifiedChinese10kWords
     case .simplifiedChinese50k: StarterLexicon.simplifiedChinese50kWords
     case .traditionalChinese: StarterLexicon.traditionalChineseWords
+    case .traditionalChinese1k: StarterLexicon.traditionalChinese1kWords
+    case .traditionalChinese5k: StarterLexicon.traditionalChinese5kWords
+    case .traditionalChinese10k: StarterLexicon.traditionalChinese10kWords
+    case .traditionalChinese50k: StarterLexicon.traditionalChinese50kWords
     case .russian: StarterLexicon.russianWords
     case .russian1k: StarterLexicon.russian1kWords
     case .russian5k: StarterLexicon.russian5kWords
@@ -8021,6 +8152,10 @@ extension TypingLanguage {
     case .simplifiedChinese5k: StarterLexicon.simplifiedChinese5kLexicon
     case .simplifiedChinese10k: StarterLexicon.simplifiedChinese10kLexicon
     case .simplifiedChinese50k: StarterLexicon.simplifiedChinese50kLexicon
+    case .traditionalChinese1k: StarterLexicon.traditionalChinese1kLexicon
+    case .traditionalChinese5k: StarterLexicon.traditionalChinese5kLexicon
+    case .traditionalChinese10k: StarterLexicon.traditionalChinese10kLexicon
+    case .traditionalChinese50k: StarterLexicon.traditionalChinese50kLexicon
     case .english1k: StarterLexicon.english1kLexicon
     case .english5k: StarterLexicon.english5kLexicon
     case .english10k: StarterLexicon.english10kLexicon
@@ -8133,15 +8268,18 @@ extension TypingLanguage {
     switch self {
     case .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
       .simplifiedChinese10k, .simplifiedChinese50k, .traditionalChinese,
+      .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
+      .traditionalChinese50k,
       .japaneseHiragana, .japaneseKatakana: true
     default: false
     }
   }
 
-  var isSimplifiedChineseScale: Bool {
+  var isChineseScale: Bool {
     switch self {
     case .simplifiedChinese1k, .simplifiedChinese5k, .simplifiedChinese10k,
-      .simplifiedChinese50k: true
+      .simplifiedChinese50k, .traditionalChinese1k, .traditionalChinese5k,
+      .traditionalChinese10k, .traditionalChinese50k: true
     default: false
     }
   }
@@ -8187,6 +8325,8 @@ extension TypingLanguage {
       .esperantoXSystem, .esperantoHSystem,
       .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
       .simplifiedChinese10k, .simplifiedChinese50k, .traditionalChinese,
+      .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
+      .traditionalChinese50k,
       .portuguese5k, .portuguese320k, .portuguese550k,
       .russian5k, .russianAbbreviations, .russianContractions, .russianContractions1k, .ukrainian, .ukrainianEndings,
       .ukrainianLatin, .ukrainianLatynkaEndings,
@@ -8202,6 +8342,8 @@ extension TypingLanguage {
     switch self {
     case .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
       .simplifiedChinese10k, .simplifiedChinese50k, .traditionalChinese,
+      .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
+      .traditionalChinese50k,
       .japaneseHiragana, .japaneseKatakana,
       .korean, .korean1k, .korean5k: false
     default: !isCodeLanguage
@@ -8223,6 +8365,8 @@ extension TypingLanguage {
   var zipfFrequencySupport: ZipfFrequencySupport {
     switch self {
     case .english, .english1k, .english5k, .english10k, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k, .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
+      .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
+      .traditionalChinese50k,
       .russian, .russian1k, .russian5k, .icelandic, .galician, .marathi:
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
@@ -8442,6 +8586,10 @@ extension TypingLanguage {
     case .simplifiedChinese10k: "简体中文 · 10k · Typebar"
     case .simplifiedChinese50k: "简体中文 · 50k · Typebar"
     case .traditionalChinese: "繁體中文"
+    case .traditionalChinese1k: "繁體中文 · 1k · Typebar"
+    case .traditionalChinese5k: "繁體中文 · 5k · Typebar"
+    case .traditionalChinese10k: "繁體中文 · 10k · Typebar"
+    case .traditionalChinese50k: "繁體中文 · 50k · Typebar"
     case .russian: "Русский"
     case .russian1k: "Русский · 1k · Typebar"
     case .russian5k: "Русский · 5k · Typebar"

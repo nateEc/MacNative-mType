@@ -135,7 +135,8 @@ extension TypingLanguage {
     case .portuguese5k, .portuguese320k, .portuguese550k: "pt"
     case .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
       .simplifiedChinese10k, .simplifiedChinese50k, .mixedEnglishChinese: "zh-CN"
-    case .traditionalChinese: "zh-TW"
+    case .traditionalChinese, .traditionalChinese1k, .traditionalChinese5k,
+      .traditionalChinese10k, .traditionalChinese50k: "zh-TW"
     case .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k,
       .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k: "ru-RU"
     case .ukrainian, .ukrainianLatin: "uk-UA"

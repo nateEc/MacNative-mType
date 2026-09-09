@@ -8599,6 +8599,77 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testTraditionalChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int, Int)] = [
+      ("traditionalChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000, 0),
+      ("traditionalChinese5k", 4_991, 2, 6, 0, 0, 121, 4_991, 4_991, 0),
+      ("traditionalChinese10k", 9_974, 2, 7, 0, 0, 220, 9_974, 9_974, 0),
+      ("traditionalChinese50k", 49_925, 1, 9, 2, 11, 1_427, 49_925, 49_912, 4),
+    ]
+
+    for (
+      rawValue, count, minimum, maximum, uppercase, punctuation, numbers, nonASCII, cjkOnly,
+      punctuationNumberOverlap
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+      XCTAssertEqual(
+        language.displayName,
+        "繁體中文 · \(rawValue.dropFirst("traditionalChinese".count)) · Typebar")
+      XCTAssertFalse(language.usesRightToLeftPrompt)
+      XCTAssertFalse(language.usesJoiningScriptPrompt)
+      XCTAssertFalse(language.usesSpaceDelimitedWords)
+      XCTAssertFalse(language.supportsLazyLatinInput)
+      XCTAssertFalse(language.supportsCapsLockWarning)
+      XCTAssertEqual(language.zipfFrequencySupport, .supported)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "zh")
+      XCTAssertEqual(language.speechLocaleIdentifier, "zh-TW")
+      XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+      XCTAssertEqual(words.count, count)
+      XCTAssertEqual(Set(words).count, count)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimum)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximum)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercase)
+      XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuation)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isNumber) }.count, numbers)
+      XCTAssertEqual(
+        words.filter {
+          $0.contains(where: \.isPunctuation) && $0.contains(where: \.isNumber)
+        }.count,
+        punctuationNumberOverlap)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCII)
+      XCTAssertEqual(words.filter { word in
+        word.unicodeScalars.allSatisfy { scalar in
+          (0x3400...0x4DBF).contains(scalar.value)
+            || (0x4E00...0x9FFF).contains(scalar.value)
+            || (0x20000...0x2EBEF).contains(scalar.value)
+        }
+      }.count, cjkOnly)
+      XCTAssertFalse(words.contains { $0.contains(" ") })
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) })
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+      let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
+      XCTAssertFalse(prompt.contains(" "))
+      XCTAssertGreaterThanOrEqual(prompt.count, 25)
+      let boundarySource = [words[0], words[1], words[2], words[count - 1]].joined()
+      let boundaryLengths = NoSpaceWordBoundaryPolicy.wordLengths(
+        source: boundarySource, language: language, modifiers: [],
+        transformedPrompt: boundarySource)
+      XCTAssertEqual(boundaryLengths, [words[0], words[1], words[2], words[count - 1]].map(\.count))
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),
