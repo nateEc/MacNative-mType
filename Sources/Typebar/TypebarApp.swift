@@ -11,6 +11,7 @@ struct TypebarApp: App {
   @State private var announcements = RemoteAnnouncementCenter()
   @State private var hotkey = GlobalHotkeyMonitor()
   @State private var systemKeyboardGuide = SystemKeyboardGuideMonitor()
+  @State private var network = NetworkConnectivityMonitor()
 
   var body: some Scene {
     WindowGroup("Typebar") {
@@ -57,7 +58,7 @@ struct TypebarApp: App {
   private var rootContent: some View {
     ContentView(
       settings: settings, account: account, announcements: announcements, hotkey: hotkey,
-      systemKeyboardGuide: systemKeyboardGuide)
+      systemKeyboardGuide: systemKeyboardGuide, network: network)
       .frame(minWidth: 760, minHeight: 480)
       .task {
         await account.restoreSession()
@@ -133,6 +134,64 @@ private struct DataStoreRecoveryView: View {
         NSPasteboard.general.setString(recovery.diagnosticText, forType: .string)
       }
     }
+  }
+}
+
+private struct NetworkConnectivityNotice: View {
+  enum Kind {
+    case offline
+    case restored
+
+    var title: String {
+      switch self {
+      case .offline: "当前离线"
+      case .restored: "已恢复联网"
+      }
+    }
+
+    var detail: String? {
+      switch self {
+      case .offline: "练习和本机保存仍可用；同步、账户、社区与榜单可能暂时不可用。"
+      case .restored: nil
+      }
+    }
+
+    var systemImage: String {
+      switch self {
+      case .offline: "wifi.slash"
+      case .restored: "wifi"
+      }
+    }
+
+    var color: Color {
+      switch self {
+      case .offline: .orange
+      case .restored: .green
+      }
+    }
+  }
+
+  let kind: Kind
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Image(systemName: kind.systemImage)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(kind.title).fontWeight(.semibold)
+        if let detail = kind.detail {
+          Text(detail).foregroundStyle(.secondary)
+        }
+      }
+    }
+    .font(.caption)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+    .overlay {
+      RoundedRectangle(cornerRadius: 10)
+        .stroke(kind.color.opacity(0.35), lineWidth: 1)
+    }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -509,6 +568,7 @@ private struct ContentView: View {
   let announcements: RemoteAnnouncementCenter
   let hotkey: GlobalHotkeyMonitor
   let systemKeyboardGuide: SystemKeyboardGuideMonitor
+  let network: NetworkConnectivityMonitor
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
@@ -599,6 +659,7 @@ private struct ContentView: View {
   @State private var liveContentMessage: String?
   @State private var zipfNotice: String?
   @State private var zipfNoticeGeneration = 0
+  @State private var showsNetworkRecoveryNotice = false
 
   var body: some View {
     VStack(spacing: 30) {
@@ -657,12 +718,30 @@ private struct ContentView: View {
         filter: settings.customBackgroundFilter,
         localImageRevision: settings.localBackgroundRevision)
     )
+    .overlay(alignment: .top) {
+      if network.showsOfflineBanner, !session.hasStarted {
+        NetworkConnectivityNotice(kind: .offline)
+          .padding(.top, 12)
+      } else if showsNetworkRecoveryNotice, network.status == .online {
+        NetworkConnectivityNotice(kind: .restored)
+          .padding(.top, 12)
+      }
+    }
     .tint(activeTheme.accent)
     .preferredColorScheme(settings.followSystemTheme ? nil : activeTheme.colorScheme)
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.testModifiers) { _, _ in refreshZipfNotice() }
+    .onChange(of: network.recoveryEventID) { _, eventID in
+      guard eventID > 0 else { return }
+      showsNetworkRecoveryNotice = true
+      Task { @MainActor in
+        try? await Task.sleep(nanoseconds: 4_000_000_000)
+        guard network.recoveryEventID == eventID else { return }
+        showsNetworkRecoveryNotice = false
+      }
+    }
     .onChange(of: settings.typingPowerMode) { _, mode in
       if !mode.isEnabled { clearTypingPowerEffect() }
     }
@@ -876,6 +955,7 @@ private struct ContentView: View {
         accent: activeTheme.accent,
         colorScheme: activeTheme.colorScheme,
         publicationState: publicationState,
+        isOffline: network.showsOfflineBanner,
         savedResultRecord: result.savedRecord,
         quoteFeedback: result.quoteFeedback,
         resultPersonalBestFeedback: result.resultPersonalBestFeedback,
@@ -3222,6 +3302,7 @@ private struct CompletedResultView: View {
   let accent: Color
   let colorScheme: ColorScheme
   let publicationState: ResultPublicationState
+  let isOffline: Bool
   let savedResultRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
   let resultPersonalBestFeedback: ResultPersonalBestFeedback?
@@ -3363,6 +3444,10 @@ private struct CompletedResultView: View {
 
       if let challengeEvaluation {
         ChallengeResultView(evaluation: challengeEvaluation)
+      }
+
+      if isOffline {
+        NetworkConnectivityNotice(kind: .offline)
       }
 
       if let publicationMessage = publicationState.message {

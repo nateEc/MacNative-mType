@@ -8,6 +8,31 @@ import XCTest
 final class TypingEngineTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 10_000)
 
+  func testNetworkConnectivityStateOnlyAnnouncesARealOfflineRecovery() {
+    var state = NetworkConnectivityState()
+    var initiallyOffline = NetworkConnectivityState()
+
+    XCTAssertEqual(state.status, .checking)
+    XCTAssertNil(state.observe(.checking))
+    XCTAssertNil(state.observe(.online))
+    XCTAssertEqual(state.status, .online)
+    XCTAssertFalse(state.showsOfflineBanner)
+
+    XCTAssertNil(state.observe(.offline))
+    XCTAssertEqual(state.status, .offline)
+    XCTAssertTrue(state.showsOfflineBanner)
+    XCTAssertNil(state.observe(.offline))
+
+    XCTAssertEqual(state.observe(.online), .restored)
+    XCTAssertEqual(state.status, .online)
+    XCTAssertFalse(state.showsOfflineBanner)
+    XCTAssertNil(state.observe(.online))
+
+    XCTAssertNil(initiallyOffline.observe(.offline))
+    XCTAssertTrue(initiallyOffline.showsOfflineBanner)
+    XCTAssertEqual(initiallyOffline.observe(.online), .restored)
+  }
+
   func testAboutMetadataUsesBundleVersionAndSafeDevelopmentFallbacks() {
     XCTAssertEqual(
       TypebarAboutMetadata(info: [
