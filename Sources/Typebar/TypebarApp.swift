@@ -1501,7 +1501,10 @@ private struct ContentView: View {
       .frame(width: 1, height: 1)
     }
     .overlay(alignment: .bottomTrailing) {
-      if settings.showTypingCompanion, session.hasStarted, !session.isFinished {
+      if TypingCompanionVisibilityPolicy.shouldShow(
+        isEnabled: settings.showTypingCompanion, hasStarted: session.hasStarted,
+        isFinished: session.isFinished)
+      {
         TypingCompanion(
           hands: typingCompanionHands,
           wpm: Double(settings.blindMode ? session.rawWpm(at: .now) : session.wpm(at: .now)),
@@ -2178,7 +2181,10 @@ private struct ContentView: View {
 
   private func emitTypingPowerEffect(isCorrect: Bool, acceptedCharacters: Int) {
     let mode = settings.typingPowerMode
-    guard mode.isEnabled, acceptedCharacters > 0, !systemReduceMotion, !settings.reducePracticeMotion
+    guard
+      TypingPowerPolicy.shouldEmit(
+        mode: mode, acceptedCharacters: acceptedCharacters,
+        reducesMotion: systemReduceMotion || settings.reducePracticeMotion)
     else { return }
 
     let now = Date.now

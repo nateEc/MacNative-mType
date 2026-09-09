@@ -41,6 +41,12 @@ enum TypingCompanionMotion {
   }
 }
 
+enum TypingCompanionVisibilityPolicy {
+  static func shouldShow(isEnabled: Bool, hasStarted: Bool, isFinished: Bool) -> Bool {
+    isEnabled && hasStarted && !isFinished
+  }
+}
+
 /// An original code-drawn typing companion. It visualizes physical hand use
 /// and speed without bundling or reproducing any third-party art assets.
 struct TypingCompanion: View {

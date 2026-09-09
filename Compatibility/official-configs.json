@@ -185,15 +185,15 @@
     "capsLockWarning": "`showCapsLockWarning`",
     "showAverage": "`showAverage`",
     "showPb": "`showPersonalBest`",
-    "accountChart": "`historyChartVisibility`"
+    "accountChart": "`historyChartVisibility`",
+    "monkey": "`showTypingCompanion`",
+    "monkeyPowerLevel": "`typingPowerMode`"
   },
   "partial": {
     "quoteLength": "`QuoteLength`、收藏和本机搜索",
     "language": "`TypingLanguage`、`mixedLanguageComponents`",
     "customPolyglot": "`mixedLanguageComponents`",
-    "fontFamily": "`practiceFont`、本机字体名称/导入",
-    "monkey": "`showTypingCompanion`",
-    "monkeyPowerLevel": "`typingPowerMode`"
+    "fontFamily": "`practiceFont`、本机字体名称/导入"
   },
   "notApplicable": {
     "ads": "无"
@@ -272,6 +272,13 @@
       "sub",
       "text",
       "main"
+    ],
+    "monkeyPowerLevel": [
+      "off",
+      "1",
+      "2",
+      "3",
+      "4"
     ]
   },
   "officialChoiceCounts": {
@@ -280,11 +287,15 @@
     "playTimeWarning": 5,
     "caretStyle": 8,
     "paceCaretStyle": 8,
-    "timerColor": 4
+    "timerColor": 4,
+    "monkeyPowerLevel": 5
   },
+  "officialBooleanKeys": [
+    "monkey"
+  ],
   "sourceFiles": [
     "packages/schemas/src/configs.ts",
     "OFFICIAL_CONFIG_AUDIT.md"
   ],
-  "method": "metadata only; official keys and selected enum counts come from ConfigSchema, while statuses, mapping labels, and evidence remain in the compatibility table"
+  "method": "metadata only; official keys, selected enum choices, and selected boolean types come from ConfigSchema, while statuses, mapping labels, and evidence remain in the compatibility table"
 }

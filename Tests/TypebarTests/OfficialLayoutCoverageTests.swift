@@ -38,6 +38,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let untrackedOfficialKeys: [String]
     let officialChoices: [String: [String]]
     let officialChoiceCounts: [String: Int]
+    let officialBooleanKeys: [String]
     let sourceFiles: [String]
     let method: String
   }
@@ -176,15 +177,15 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 94)
     XCTAssertEqual(fixture.officialKeys.count, fixture.officialCount)
     XCTAssertEqual(officialKeys.count, fixture.officialCount)
-    XCTAssertEqual(fixture.mapped.count, 87)
-    XCTAssertEqual(fixture.partial.count, 6)
+    XCTAssertEqual(fixture.mapped.count, 89)
+    XCTAssertEqual(fixture.partial.count, 4)
     XCTAssertEqual(fixture.notApplicable.count, 1)
     XCTAssertEqual(fixture.notApplicable["ads"], "无")
     XCTAssertEqual(
       fixture.officialChoiceCounts,
       [
         "playSoundOnClick": 27, "playSoundOnError": 5, "playTimeWarning": 5,
-        "caretStyle": 8, "paceCaretStyle": 8, "timerColor": 4,
+        "caretStyle": 8, "paceCaretStyle": 8, "timerColor": 4, "monkeyPowerLevel": 5,
       ])
     XCTAssertEqual(
       fixture.officialChoices["playSoundOnError"], ["off", "1", "2", "3", "4"])
@@ -198,6 +199,9 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(
       fixture.officialChoices["timerColor"], ["black", "sub", "text", "main"])
     XCTAssertEqual(
+      fixture.officialChoices["monkeyPowerLevel"], ["off", "1", "2", "3", "4"])
+    XCTAssertEqual(fixture.officialBooleanKeys, ["monkey"])
+    XCTAssertEqual(
       Set(TypingCaretStyle.allCases.map(\.compatibilityValue)),
       Set(fixture.officialChoices["caretStyle"] ?? []))
     XCTAssertEqual(
@@ -206,6 +210,9 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(
       Set(LiveStatsColor.allCases.map(\.compatibilityValue)),
       Set(fixture.officialChoices["timerColor"] ?? []))
+    XCTAssertEqual(
+      Set(TypingPowerMode.allCases.map(\.compatibilityValue)),
+      Set(fixture.officialChoices["monkeyPowerLevel"] ?? []))
     XCTAssertEqual(
       TypingClickSoundStyle.allCases.count + 1,
       fixture.officialChoiceCounts["playSoundOnClick"])

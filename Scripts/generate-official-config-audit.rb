@@ -8,8 +8,8 @@ require "pathname"
 PINNED_COMMIT = "91bd24bb8513785c7364cbea29296ff7adafac41"
 EXPECTED_COUNTS = {
   official: 94,
-  mapped: 87,
-  partial: 6,
+  mapped: 89,
+  partial: 4,
   not_applicable: 1,
   unimplemented: 0,
   untracked: 0,
@@ -48,6 +48,7 @@ audited_enum_schema_names = {
   "caretStyle" => "CaretStyle",
   "paceCaretStyle" => "CaretStyle",
   "timerColor" => "TimerColor",
+  "monkeyPowerLevel" => "MonkeyPowerLevel",
 }
 official_choices = audited_enum_schema_names.to_h do |config_key, schema_name|
   enum_match = schema_source.match(
@@ -58,6 +59,12 @@ official_choices = audited_enum_schema_names.to_h do |config_key, schema_name|
   [config_key, choices]
 end
 official_choice_counts = official_choices.transform_values(&:length)
+
+official_boolean_keys = ["monkey"]
+official_boolean_keys.each do |config_key|
+  fail_audit("#{config_key} is not a boolean ConfigSchema key") unless schema_match[1].match?(
+    /^\s{4}#{config_key}:\s*z\.boolean\(\),/)
+end
 
 rows = audit_source.scan(/^\| `([^`]+)` \| ([^|]+) \| ([^|]+) \|$/)
 tracked = {}
@@ -114,8 +121,9 @@ fixture = {
   untrackedOfficialKeys: untracked,
   officialChoices: official_choices,
   officialChoiceCounts: official_choice_counts,
+  officialBooleanKeys: official_boolean_keys,
   sourceFiles: [schema_relative_path, audit_relative_path],
-  method: "metadata only; official keys and selected enum counts come from ConfigSchema, while statuses, mapping labels, and evidence remain in the compatibility table",
+  method: "metadata only; official keys, selected enum choices, and selected boolean types come from ConfigSchema, while statuses, mapping labels, and evidence remain in the compatibility table",
 }
 
 output_path.write(JSON.pretty_generate(fixture) + "\n")

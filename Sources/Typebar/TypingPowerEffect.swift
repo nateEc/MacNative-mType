@@ -25,6 +25,16 @@ enum TypingPowerMode: String, CaseIterable, Codable, Equatable, Identifiable {
   var usesSpectrum: Bool { self == .high || self == .over9000 }
   var usesShake: Bool { self == .ultra || self == .over9000 }
   var isEnabled: Bool { self != .off }
+
+  var compatibilityValue: String {
+    switch self {
+    case .off: "off"
+    case .mellow: "1"
+    case .high: "2"
+    case .ultra: "3"
+    case .over9000: "4"
+    }
+  }
 }
 
 enum TypingPowerTone: Equatable {
@@ -47,6 +57,12 @@ enum TypingPowerPolicy {
   static let maximumParticleCount = 9
   static let maximumParticles = 96
   static let particleLifetime: TimeInterval = 0.9
+
+  static func shouldEmit(
+    mode: TypingPowerMode, acceptedCharacters: Int, reducesMotion: Bool
+  ) -> Bool {
+    mode.isEnabled && acceptedCharacters > 0 && !reducesMotion
+  }
 
   static func particleCount(randomUnit: Double) -> Int {
     let unit = randomUnit.clamped(to: 0...1)

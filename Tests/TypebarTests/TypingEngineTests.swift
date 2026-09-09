@@ -11441,6 +11441,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 155), 0.5, accuracy: 0.001)
     XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 180), 1)
     XCTAssertEqual(TypingCompanionMotion.fastBlend(for: 250), 1)
+    XCTAssertFalse(
+      TypingCompanionVisibilityPolicy.shouldShow(
+        isEnabled: false, hasStarted: true, isFinished: false))
+    XCTAssertFalse(
+      TypingCompanionVisibilityPolicy.shouldShow(
+        isEnabled: true, hasStarted: false, isFinished: false))
+    XCTAssertTrue(
+      TypingCompanionVisibilityPolicy.shouldShow(
+        isEnabled: true, hasStarted: true, isFinished: false))
+    XCTAssertFalse(
+      TypingCompanionVisibilityPolicy.shouldShow(
+        isEnabled: true, hasStarted: true, isFinished: true))
   }
 
   func testTypingPowerModesKeepReferenceLevelSemanticsWithNativeParticles() {
@@ -11451,6 +11463,17 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingPowerMode.ultra.usesShake)
     XCTAssertTrue(TypingPowerMode.over9000.usesSpectrum)
     XCTAssertTrue(TypingPowerMode.over9000.usesShake)
+    XCTAssertEqual(
+      Set(TypingPowerMode.allCases.map(\.compatibilityValue)),
+      ["off", "1", "2", "3", "4"])
+    XCTAssertFalse(
+      TypingPowerPolicy.shouldEmit(mode: .off, acceptedCharacters: 1, reducesMotion: false))
+    XCTAssertFalse(
+      TypingPowerPolicy.shouldEmit(mode: .mellow, acceptedCharacters: 0, reducesMotion: false))
+    XCTAssertFalse(
+      TypingPowerPolicy.shouldEmit(mode: .mellow, acceptedCharacters: 1, reducesMotion: true))
+    XCTAssertTrue(
+      TypingPowerPolicy.shouldEmit(mode: .mellow, acceptedCharacters: 1, reducesMotion: false))
     XCTAssertEqual(TypingPowerPolicy.particleCount(randomUnit: -1), 6)
     XCTAssertEqual(TypingPowerPolicy.particleCount(randomUnit: 0.5), 8)
     XCTAssertEqual(TypingPowerPolicy.particleCount(randomUnit: 2), 9)
