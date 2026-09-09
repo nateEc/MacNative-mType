@@ -11456,7 +11456,8 @@ final class TypingEngineTests: XCTestCase {
         hasWordHistory: false,
         hasMissedWordPractice: false,
         hasSlowWordPractice: false,
-        hasCombinedPractice: false))
+        hasCombinedPractice: false,
+        hasConfigurablePractice: false))
     XCTAssertEqual(
       minimal.map(\.id),
       ["result.next", "result.repeat", "result.copyImage", "result.saveImage"])
@@ -11467,17 +11468,64 @@ final class TypingEngineTests: XCTestCase {
         hasWordHistory: true,
         hasMissedWordPractice: true,
         hasSlowWordPractice: true,
-        hasCombinedPractice: true))
+        hasCombinedPractice: true,
+        hasConfigurablePractice: true))
     XCTAssertEqual(
       complete.map(\.id),
       [
         "result.next", "result.repeat", "result.practiceMissed", "result.practiceSlow",
-        "result.practiceCombined", "result.toggleWordHistory", "result.copyWords",
-        "result.copyImage", "result.saveImage",
+        "result.practiceCombined", "result.configurePractice", "result.toggleWordHistory",
+        "result.copyWords", "result.copyImage", "result.saveImage",
       ])
     XCTAssertEqual(
       CompletedResultCommandCatalog.action(for: "result.practiceCombined"), .practiceCombined)
     XCTAssertNil(CompletedResultCommandCatalog.action(for: "result.unknown"))
+  }
+
+  func testCompletedResultPracticeOptionsResolveOnlySupportedCombinations() {
+    let availability = CompletedResultPracticeAvailability(
+      hasMissed: true,
+      hasContextualMissed: true,
+      hasSlow: true,
+      hasMissedAndSlow: true,
+      hasContextualMissedAndSlow: true)
+
+    XCTAssertEqual(
+      CompletedResultPracticePolicy.route(
+        selection: .init(missed: .words, includesSlow: false), availability: availability),
+      .missed)
+    XCTAssertEqual(
+      CompletedResultPracticePolicy.route(
+        selection: .init(missed: .context, includesSlow: false), availability: availability),
+      .contextualMissed)
+    XCTAssertEqual(
+      CompletedResultPracticePolicy.route(
+        selection: .init(missed: .off, includesSlow: true), availability: availability),
+      .slow)
+    XCTAssertEqual(
+      CompletedResultPracticePolicy.route(
+        selection: .init(missed: .words, includesSlow: true), availability: availability),
+      .missedAndSlow)
+    XCTAssertEqual(
+      CompletedResultPracticePolicy.route(
+        selection: .init(missed: .context, includesSlow: true), availability: availability),
+      .contextualMissedAndSlow)
+    XCTAssertNil(CompletedResultPracticePolicy.route(
+      selection: .init(missed: .off, includesSlow: false), availability: availability))
+
+    let slowOnly = CompletedResultPracticeAvailability(
+      hasMissed: false,
+      hasContextualMissed: false,
+      hasSlow: true,
+      hasMissedAndSlow: false,
+      hasContextualMissedAndSlow: false)
+    XCTAssertEqual(
+      CompletedResultPracticePolicy.defaultSelection(availability: slowOnly),
+      .init(missed: .off, includesSlow: true))
+    XCTAssertEqual(
+      CompletedResultPracticePolicy.missedChoices(availability: slowOnly), [.off])
+    XCTAssertNil(CompletedResultPracticePolicy.route(
+      selection: .init(missed: .words, includesSlow: false), availability: slowOnly))
   }
 
   func testTypingCompanionTracksPhysicalHandsAndClampsSpeedFeedback() {

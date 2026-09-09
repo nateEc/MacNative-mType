@@ -303,6 +303,7 @@ struct CompletedResultCommandAvailability: Equatable {
     let hasMissedWordPractice: Bool
     let hasSlowWordPractice: Bool
     let hasCombinedPractice: Bool
+    let hasConfigurablePractice: Bool
 }
 
 enum CompletedResultCommandAction: String, Equatable {
@@ -311,6 +312,7 @@ enum CompletedResultCommandAction: String, Equatable {
     case practiceMissed
     case practiceSlow
     case practiceCombined
+    case configurePractice
     case toggleWordHistory
     case copyWords
     case copyImage
@@ -336,6 +338,7 @@ enum CompletedResultCommandCatalog {
         if availability.hasMissedWordPractice { actions.append(.practiceMissed) }
         if availability.hasSlowWordPractice { actions.append(.practiceSlow) }
         if availability.hasCombinedPractice { actions.append(.practiceCombined) }
+        if availability.hasConfigurablePractice { actions.append(.configurePractice) }
         if availability.hasWordHistory { actions.append(.toggleWordHistory) }
         if availability.hasCopyableWords { actions.append(.copyWords) }
         actions.append(contentsOf: [.copyImage, .saveImage])
@@ -368,6 +371,11 @@ enum CompletedResultCommandCatalog {
                 id: action.identifier, title: "练习错词与慢词", subtitle: "合并本轮两类弱项生成练习",
                 systemImage: "scope", keywords: ["both", "combined", "错词", "慢词", "练习"],
                 group: .practice)
+        case .configurePractice:
+            CommandPaletteItem(
+                id: action.identifier, title: "自选弱项练习…", subtitle: "组合错词、上下文和慢词",
+                systemImage: "slider.horizontal.3", keywords: ["custom", "configure", "自选", "错词", "慢词"],
+                group: .practice)
         case .toggleWordHistory:
             CommandPaletteItem(
                 id: action.identifier, title: "展开或收起单词历史", subtitle: "切换本轮目标与实际输入对照",
@@ -387,6 +395,79 @@ enum CompletedResultCommandCatalog {
                 id: action.identifier, title: "保存结果图片…", subtitle: "将 Typebar 结果卡导出为 PNG",
                 systemImage: "square.and.arrow.down", keywords: ["save", "download", "PNG", "保存", "图片"],
                 group: .data)
+        }
+    }
+}
+
+enum CompletedResultPracticeMissedSelection: String, CaseIterable, Equatable, Identifiable {
+    case off
+    case words
+    case context
+
+    var id: Self { self }
+
+    var displayName: String {
+        switch self {
+        case .off: "不加入错词"
+        case .words: "错词"
+        case .context: "错词 + 前词上下文"
+        }
+    }
+}
+
+struct CompletedResultPracticeSelection: Equatable {
+    var missed: CompletedResultPracticeMissedSelection
+    var includesSlow: Bool
+}
+
+struct CompletedResultPracticeAvailability: Equatable {
+    let hasMissed: Bool
+    let hasContextualMissed: Bool
+    let hasSlow: Bool
+    let hasMissedAndSlow: Bool
+    let hasContextualMissedAndSlow: Bool
+
+    var hasAny: Bool { hasMissed || hasContextualMissed || hasSlow }
+}
+
+enum CompletedResultPracticeRoute: Equatable {
+    case missed
+    case contextualMissed
+    case slow
+    case missedAndSlow
+    case contextualMissedAndSlow
+}
+
+enum CompletedResultPracticePolicy {
+    static func missedChoices(
+        availability: CompletedResultPracticeAvailability
+    ) -> [CompletedResultPracticeMissedSelection] {
+        var choices: [CompletedResultPracticeMissedSelection] = [.off]
+        if availability.hasMissed { choices.append(.words) }
+        if availability.hasContextualMissed { choices.append(.context) }
+        return choices
+    }
+
+    static func defaultSelection(
+        availability: CompletedResultPracticeAvailability
+    ) -> CompletedResultPracticeSelection {
+        if availability.hasMissed { return .init(missed: .words, includesSlow: false) }
+        if availability.hasContextualMissed { return .init(missed: .context, includesSlow: false) }
+        return .init(missed: .off, includesSlow: availability.hasSlow)
+    }
+
+    static func route(
+        selection: CompletedResultPracticeSelection,
+        availability: CompletedResultPracticeAvailability
+    ) -> CompletedResultPracticeRoute? {
+        switch (selection.missed, selection.includesSlow) {
+        case (.off, false): nil
+        case (.off, true): availability.hasSlow ? .slow : nil
+        case (.words, false): availability.hasMissed ? .missed : nil
+        case (.words, true): availability.hasMissedAndSlow ? .missedAndSlow : nil
+        case (.context, false): availability.hasContextualMissed ? .contextualMissed : nil
+        case (.context, true):
+            availability.hasContextualMissedAndSlow ? .contextualMissedAndSlow : nil
         }
     }
 }

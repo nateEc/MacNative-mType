@@ -3461,6 +3461,7 @@ private struct CompletedResultView: View {
   @State private var inspectedResultWordIndexes: Set<Int> = []
   @State private var wordHistoryExpansionOverride: Bool?
   @State private var showingCommandPalette = false
+  @State private var showingPracticeOptions = false
 
   var body: some View {
     VStack(spacing: 28) {
@@ -3725,6 +3726,20 @@ private struct CompletedResultView: View {
         listMode: settings.commandPaletteListMode,
         onSelect: runResultCommand)
     }
+    .sheet(isPresented: $showingPracticeOptions) {
+      CompletedResultPracticeOptionsView(
+        availability: resultPracticeAvailability,
+        missedCount: missedWords.count,
+        contextualMissedCount: contextualMissedPractice?.missedWordCount ?? 0,
+        slowCount: slowWordPractice?.selectedWords.count ?? 0
+      ) { route in
+        showingPracticeOptions = false
+        Task { @MainActor in
+          await Task.yield()
+          runResultPractice(route)
+        }
+      }
+    }
     .alert("复制慢词列表", isPresented: $showingSlowWordCopy) {
       TextField("WPM 阈值", text: $slowWordThresholdText)
       Button("取消", role: .cancel) {}
@@ -3752,7 +3767,17 @@ private struct CompletedResultView: View {
         hasWordHistory: !wordReviews.isEmpty,
         hasMissedWordPractice: !missedWords.isEmpty,
         hasSlowWordPractice: slowWordPractice != nil,
-        hasCombinedPractice: missedAndSlowPractice != nil))
+        hasCombinedPractice: missedAndSlowPractice != nil,
+        hasConfigurablePractice: resultPracticeAvailability.hasAny))
+  }
+
+  private var resultPracticeAvailability: CompletedResultPracticeAvailability {
+    .init(
+      hasMissed: !missedWords.isEmpty,
+      hasContextualMissed: contextualMissedPractice != nil,
+      hasSlow: slowWordPractice != nil,
+      hasMissedAndSlow: missedAndSlowPractice != nil,
+      hasContextualMissedAndSlow: contextualMissedAndSlowPractice != nil)
   }
 
   private func runResultCommand(_ item: CommandPaletteItem) {
@@ -3763,19 +3788,13 @@ private struct CompletedResultView: View {
     case .repeatTest:
       leaveCommandPalette(then: onRepeat)
     case .practiceMissed:
-      guard !missedWords.isEmpty else { return }
-      leaveCommandPalette(then: onPracticeMissedWords)
+      leaveCommandPalette { runResultPractice(.missed) }
     case .practiceSlow:
-      guard let slowWordPractice else { return }
-      leaveCommandPalette {
-        onPracticeSlowWords(slowWordPractice.exerciseWords, slowWordPractice.selectedWords.count)
-      }
+      leaveCommandPalette { runResultPractice(.slow) }
     case .practiceCombined:
-      guard let missedAndSlowPractice else { return }
-      leaveCommandPalette {
-        onPracticeMissedAndSlowWords(
-          missedAndSlowPractice.exerciseWords, missedAndSlowPractice.selectedTargetCount)
-      }
+      leaveCommandPalette { runResultPractice(.missedAndSlow) }
+    case .configurePractice:
+      leaveCommandPalette { showingPracticeOptions = true }
     case .toggleWordHistory:
       guard !wordReviews.isEmpty else { return }
       wordHistoryExpansion.wrappedValue.toggle()
@@ -3785,6 +3804,30 @@ private struct CompletedResultView: View {
       copyResultImage()
     case .saveImage:
       leaveCommandPalette(then: saveResultImage)
+    }
+  }
+
+  private func runResultPractice(_ route: CompletedResultPracticeRoute) {
+    switch route {
+    case .missed:
+      guard !missedWords.isEmpty else { return }
+      onPracticeMissedWords()
+    case .contextualMissed:
+      guard let contextualMissedPractice else { return }
+      onPracticeContextualMissedWords(
+        contextualMissedPractice.phrases, contextualMissedPractice.selectedTargetCount)
+    case .slow:
+      guard let slowWordPractice else { return }
+      onPracticeSlowWords(slowWordPractice.exerciseWords, slowWordPractice.selectedWords.count)
+    case .missedAndSlow:
+      guard let missedAndSlowPractice else { return }
+      onPracticeMissedAndSlowWords(
+        missedAndSlowPractice.exerciseWords, missedAndSlowPractice.selectedTargetCount)
+    case .contextualMissedAndSlow:
+      guard let contextualMissedAndSlowPractice else { return }
+      onPracticeContextualMissedAndSlowWords(
+        contextualMissedAndSlowPractice.exerciseSegments,
+        contextualMissedAndSlowPractice.selectedTargetCount)
     }
   }
 
@@ -4100,6 +4143,90 @@ private struct CompletedResultView: View {
       panel: panel,
       accent: accent,
       colorScheme: colorScheme)
+  }
+}
+
+private struct CompletedResultPracticeOptionsView: View {
+  @Environment(\.dismiss) private var dismiss
+  let availability: CompletedResultPracticeAvailability
+  let missedCount: Int
+  let contextualMissedCount: Int
+  let slowCount: Int
+  let onStart: (CompletedResultPracticeRoute) -> Void
+  @State private var selection: CompletedResultPracticeSelection
+
+  init(
+    availability: CompletedResultPracticeAvailability,
+    missedCount: Int,
+    contextualMissedCount: Int,
+    slowCount: Int,
+    onStart: @escaping (CompletedResultPracticeRoute) -> Void
+  ) {
+    self.availability = availability
+    self.missedCount = missedCount
+    self.contextualMissedCount = contextualMissedCount
+    self.slowCount = slowCount
+    self.onStart = onStart
+    _selection = State(
+      initialValue: CompletedResultPracticePolicy.defaultSelection(availability: availability))
+  }
+
+  private var route: CompletedResultPracticeRoute? {
+    CompletedResultPracticePolicy.route(selection: selection, availability: availability)
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section("错词") {
+          Picker("加入方式", selection: $selection.missed) {
+            ForEach(CompletedResultPracticePolicy.missedChoices(availability: availability)) { choice in
+              Text(choiceTitle(choice)).tag(choice)
+            }
+          }
+          .pickerStyle(.radioGroup)
+        }
+
+        Section("慢词") {
+          Toggle("加入本轮最慢的 (slowCount) 个词", isOn: $selection.includesSlow)
+            .disabled(!availability.hasSlow)
+        }
+
+        Section {
+          if route == nil {
+            Label("至少选择一种有可用候选的练习。", systemImage: "info.circle")
+              .foregroundStyle(.secondary)
+          } else {
+            Label("每个候选会按错误或速度权重重复，并以分节练习开始。", systemImage: "shuffle")
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle("自选弱项练习")
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("取消") { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("开始练习") {
+            guard let route else { return }
+            dismiss()
+            onStart(route)
+          }
+          .disabled(route == nil)
+        }
+      }
+    }
+    .frame(width: 430, height: 330)
+  }
+
+  private func choiceTitle(_ choice: CompletedResultPracticeMissedSelection) -> String {
+    switch choice {
+    case .off: choice.displayName
+    case .words: "\(choice.displayName)（\(missedCount)）"
+    case .context: "\(choice.displayName)（\(contextualMissedCount)）"
+    }
   }
 }
 
