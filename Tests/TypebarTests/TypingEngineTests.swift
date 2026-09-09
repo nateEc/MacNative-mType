@@ -11934,6 +11934,30 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .invalidAFK, enabled: true))
   }
 
+  func testLocalResultSaveAttemptDistinguishesSavedAndRetryableFailure() {
+    var attempts = 0
+    let saved = LocalResultSaveAttempt.perform {
+      attempts += 1
+    }
+    XCTAssertEqual(saved, .saved)
+    XCTAssertTrue(saved.isSaved)
+    XCTAssertFalse(saved.canRetry)
+    XCTAssertTrue(ResultSavingPolicy.shouldPublish(localSaveState: saved))
+
+    let failed = LocalResultSaveAttempt.perform {
+      attempts += 1
+      throw NSError(
+        domain: "TypebarTests.LocalSave", code: 28,
+        userInfo: [NSLocalizedDescriptionKey: "磁盘空间不足"])
+    }
+    XCTAssertEqual(failed, .failed("磁盘空间不足"))
+    XCTAssertFalse(failed.isSaved)
+    XCTAssertTrue(failed.canRetry)
+    XCTAssertFalse(ResultSavingPolicy.shouldPublish(localSaveState: failed))
+    XCTAssertFalse(ResultSavingPolicy.shouldPublish(localSaveState: .notRequested))
+    XCTAssertEqual(attempts, 2)
+  }
+
   func testResultPublicationStateOnlyAllowsRetryAfterFailure() {
     XCTAssertNil(ResultPublicationState.idle.message)
     XCTAssertEqual(ResultPublicationState.sending.message, "正在发送至自建服务…")

@@ -5,6 +5,42 @@ enum ResultSavingPolicy {
   static func shouldPersist(outcome: TestOutcome, enabled: Bool) -> Bool {
     enabled && outcome == .completed
   }
+
+  static func shouldPublish(localSaveState: LocalResultSaveState) -> Bool {
+    localSaveState.isSaved
+  }
+}
+
+enum LocalResultSaveState: Equatable {
+  case notRequested
+  case saved
+  case failed(String)
+
+  var isSaved: Bool {
+    if case .saved = self { return true }
+    return false
+  }
+
+  var canRetry: Bool {
+    if case .failed = self { return true }
+    return false
+  }
+
+  var failureMessage: String? {
+    guard case .failed(let message) = self else { return nil }
+    return message
+  }
+}
+
+enum LocalResultSaveAttempt {
+  static func perform(_ save: () throws -> Void) -> LocalResultSaveState {
+    do {
+      try save()
+      return .saved
+    } catch {
+      return .failed(error.localizedDescription)
+    }
+  }
 }
 
 enum ResultPublicationRetryPolicy {

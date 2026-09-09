@@ -626,6 +626,8 @@ private struct ContentView: View {
   @State private var showingWordFilter = false
   @State private var showingCustomTextGenerator = false
   @State private var completedResult: CompletedResultPresentation?
+  @State private var localResultSaveState: LocalResultSaveState = .notRequested
+  @State private var savedResultRecord: TestResultRecord?
   @State private var publicationState: ResultPublicationState = .idle
   @State private var publicationResultID: UUID?
   @State private var pendingPublications = PendingResultPublicationStore()
@@ -787,22 +789,20 @@ private struct ContentView: View {
         let contextualMissedPractice = ContextualMissedWordPracticePlan.make(
           reviews: wordReviews, errorCounts: session.missedWordErrorCountsByWord)
         let repeatedSession = session.repeatedAttempt()
+        localResultSaveState = .notRequested
+        savedResultRecord = nil
+        publicationResultID = result.id
+        publicationState = .idle
         if result.outcome == .completed {
           currentProcessPractice.append(.init(result: result))
           settings.randomizeTheme(for: systemColorScheme)
         }
-        let savedRecord: TestResultRecord?
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
-          let record = TestResultRecord(result: result)
-          modelContext.insert(record)
-          savedRecord = record
-        } else {
-          savedRecord = nil
+          saveCompletedResultLocally(result)
         }
         completedResult = .init(
           result: result,
           savesResult: savesResult,
-          savedRecord: savedRecord,
           quoteFeedback: activeQuoteFeedback,
           resultPersonalBestFeedback: resultPersonalBestFeedback,
           tagPersonalBestFeedback: tagPersonalBestFeedback,
@@ -824,7 +824,7 @@ private struct ContentView: View {
             ).map { ChallengeEvaluator.evaluate(result, challenge: $0) }
             : nil
         )
-        if savesResult {
+        if savesResult, ResultSavingPolicy.shouldPublish(localSaveState: localResultSaveState) {
           publishIfEnabled(result)
         } else if result.outcome == .bailedOut {
           publicationResultID = nil
@@ -964,8 +964,9 @@ private struct ContentView: View {
         accent: activeTheme.accent,
         colorScheme: activeTheme.colorScheme,
         publicationState: publicationState,
+        localResultSaveState: localResultSaveState,
         isOffline: network.showsOfflineBanner,
-        savedResultRecord: result.savedRecord,
+        savedResultRecord: localResultSaveState.isSaved ? savedResultRecord : nil,
         quoteFeedback: result.quoteFeedback,
         resultPersonalBestFeedback: result.resultPersonalBestFeedback,
         tagPersonalBestFeedback: result.tagPersonalBestFeedback,
@@ -1009,6 +1010,12 @@ private struct ContentView: View {
         onResultPerformanceVisibilityChange: { settings.resultPerformanceVisibility = $0 },
         onResultGraphScaleChange: { settings.startGraphsAtZero = $0 },
         onRetryPublication: { publishIfEnabled(result.result) },
+        onRetryLocalSave: {
+          saveCompletedResultLocally(result.result)
+          if ResultSavingPolicy.shouldPublish(localSaveState: localResultSaveState) {
+            publishIfEnabled(result.result)
+          }
+        },
         onOpenDailyLeaderboard: {
           completedResult = nil
           syncInitialLeaderboard = .init(
@@ -3242,6 +3249,18 @@ private struct ContentView: View {
     }
   }
 
+  private func saveCompletedResultLocally(_ result: CompletedTestResult) {
+    let record = TestResultRecord(result: result)
+    modelContext.insert(record)
+    localResultSaveState = LocalResultSaveAttempt.perform { try modelContext.save() }
+    if localResultSaveState.isSaved {
+      savedResultRecord = record
+    } else {
+      modelContext.delete(record)
+      savedResultRecord = nil
+    }
+  }
+
   private var pendingPublicationRetryTrigger: PendingPublicationRetryTrigger {
     .init(
       networkStatus: network.status,
@@ -3353,7 +3372,6 @@ extension TestOutcome {
 private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
   let savesResult: Bool
-  let savedRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
   let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   let tagPersonalBestFeedback: [TagPersonalBestFeedback]
@@ -3385,6 +3403,7 @@ private struct CompletedResultView: View {
   let accent: Color
   let colorScheme: ColorScheme
   let publicationState: ResultPublicationState
+  let localResultSaveState: LocalResultSaveState
   let isOffline: Bool
   let savedResultRecord: TestResultRecord?
   let quoteFeedback: QuoteResultFeedbackTarget?
@@ -3412,6 +3431,7 @@ private struct CompletedResultView: View {
   let onResultPerformanceVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onResultGraphScaleChange: (Bool) -> Void
   let onRetryPublication: () -> Void
+  let onRetryLocalSave: () -> Void
   let onOpenDailyLeaderboard: () -> Void
   let onPracticeMissedWords: () -> Void
   let onPracticeContextualMissedWords: ([String], Int) -> Void
@@ -3523,8 +3543,10 @@ private struct CompletedResultView: View {
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: startGraphsAtZero,
         visibility: resultPerformanceVisibility,
-        resultPersonalBestFeedback: resultPersonalBestFeedback,
-        tagPersonalBestFeedback: tagPersonalBestFeedback,
+        resultPersonalBestFeedback: localResultSaveState.isSaved
+          ? resultPersonalBestFeedback : nil,
+        tagPersonalBestFeedback: localResultSaveState.isSaved
+          ? tagPersonalBestFeedback : [],
         onVisibilityChange: onResultPerformanceVisibilityChange,
         onScaleChange: onResultGraphScaleChange,
         onInspectionChange: { inspectedResultWordIndexes = Set($0) },
@@ -3536,6 +3558,19 @@ private struct CompletedResultView: View {
 
       if isOffline {
         NetworkConnectivityNotice(kind: .offline)
+      }
+
+      if let saveFailure = localResultSaveState.failureMessage {
+        VStack(spacing: 8) {
+          Label("尚未保存到这台 Mac：\(saveFailure)", systemImage: "externaldrive.badge.exclamationmark")
+            .font(.caption)
+            .foregroundStyle(.red)
+            .multilineTextAlignment(.center)
+          if localResultSaveState.canRetry {
+            Button("重新保存到本机", action: onRetryLocalSave)
+              .buttonStyle(.borderedProminent)
+          }
+        }
       }
 
       if let publicationMessage = publicationState.message {
@@ -3598,7 +3633,7 @@ private struct CompletedResultView: View {
 
       VStack(alignment: .leading, spacing: 10) {
         HStack {
-          if savesResult {
+          if localResultSaveState.isSaved {
             Button("查看历史", action: onHistory)
           }
           Menu("导出") {
@@ -3693,7 +3728,9 @@ private struct CompletedResultView: View {
 
   @ViewBuilder
   private var resultPersonalBestFeedbackView: some View {
-    if let feedback = resultPersonalBestFeedback, feedback.isNewPersonalBest {
+    if localResultSaveState.isSaved,
+      let feedback = resultPersonalBestFeedback, feedback.isNewPersonalBest
+    {
       Label(
         feedback.previousBestWpm == nil
           ? "本机个人最佳 · 首次 PB \(feedback.currentWpm) WPM"
@@ -3708,7 +3745,7 @@ private struct CompletedResultView: View {
 
   @ViewBuilder
   private var tagPersonalBestFeedbackView: some View {
-    if !tagPersonalBestFeedback.isEmpty {
+    if localResultSaveState.isSaved, !tagPersonalBestFeedback.isEmpty {
       VStack(alignment: .leading, spacing: 7) {
         Label("标签个人最佳", systemImage: "tag")
           .font(.headline)
@@ -3857,7 +3894,9 @@ private struct CompletedResultView: View {
     case .bailedOut: "中止结果只在当前窗口显示，不保存成绩"
     case .invalidAFK: "结束前连续约 5 秒没有文本输入；结果只在当前窗口显示，不保存成绩"
     case .active, .completed, .failed, .abandoned:
-      savesResult ? "已保存到这台 Mac" : "练习模式：不保存成绩"
+      savesResult
+        ? (localResultSaveState.isSaved ? "已保存到这台 Mac" : "尚未保存到这台 Mac")
+        : "练习模式：不保存成绩"
     }
   }
 
