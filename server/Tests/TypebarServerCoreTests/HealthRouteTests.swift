@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 300)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 305)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4291,6 +4291,11 @@ final class HealthRouteTests: XCTestCase {
       ("persian20k", "مجموعه گسترده همچنان محلی و قابل بررسی می‌ماند."),
       ("urdu1k", "ہر مقامی فہرست مشق کا الگ راستہ رکھتی ہے۔"),
       ("urdu5k", "بڑا اشاریہ صرف درکار اندراج بناتا ہے۔"),
+      ("tamil1k", "ஒவ்வொரு உள்ளூர் பட்டியலும் தனியான பயிற்சிப் பாதையை வைத்திருக்கிறது."),
+      ("telugu1k", "ప్రతి స్థానిక జాబితా ప్రత్యేక సాధన మార్గాన్ని ఉంచుతుంది."),
+      ("bangla10k", "প্রতিটি স্থানীয় তালিকা আলাদা অনুশীলনের পথ রাখে।"),
+      ("hindi1k", "हर स्थानीय सूची अभ्यास का अलग मार्ग रखती है।"),
+      ("gujarati1k", "દરેક સ્થાનિક સૂચિ અભ્યાસનો અલગ માર્ગ રાખે છે."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

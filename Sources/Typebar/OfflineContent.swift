@@ -4622,6 +4622,11 @@ enum OfflineContent {
     case .hebrew1k, .hebrew5k, .hebrew10k: .hebrew
     case .persian1k, .persian5k, .persian20k: .persian
     case .urdu1k, .urdu5k: .urdu
+    case .tamil1k: .tamil
+    case .hindi1k: .hindi
+    case .gujarati1k: .gujarati
+    case .bangla10k: .bangla
+    case .telugu1k: .telugu
     default: nil
     }
     if let source = inheritedScaleQuoteSource {

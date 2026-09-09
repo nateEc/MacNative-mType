@@ -9668,6 +9668,103 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testSouthAsianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(
+      String, String, Int, Int, Int, Int, Int, Int, Int, Int,
+      ZipfFrequencySupport, String, String, String, String, ClosedRange<UInt32>
+    )] = [
+      ("tamil1k", "தமிழ் · 1k · Typebar", 951, 1, 19, 1, 11, 942, 0, 0,
+       .supported, "tamil", "ta", "ta-IN", "ஶ", 0x0B80...0x0BFF),
+      ("telugu1k", "తెలుగు · 1k · Typebar", 901, 1, 18, 1, 11, 879, 0, 5,
+       .unknown, "telugu", "te", "te-IN", "ఴ", 0x0C00...0x0C7F),
+      ("bangla10k", "বাংলা · 10k · Typebar", 9_734, 1, 16, 1, 10, 9_392, 15, 0,
+       .unknown, "bangla", "bn", "bn-BD", "ৱ", 0x0980...0x09FF),
+      ("hindi1k", "हिन्दी · 1k · Typebar", 999, 1, 12, 1, 7, 956, 0, 0,
+       .unknown, "hindi", "hi", "hi-IN", "ॹ", 0x0900...0x097F),
+      ("gujarati1k", "ગુજરાતી · 1k · Typebar", 1_004, 1, 19, 1, 12, 900, 0, 33,
+       .unknown, "gujarati", "gu", "gu-IN", "ૹ", 0x0A80...0x0AFF),
+    ]
+
+    for (
+      rawValue, displayName, count, minimumScalars, maximumScalars, minimumCharacters,
+      maximumCharacters, markedCount, punctuationCount, spaceCount, zipfSupport,
+      quoteSourceRawValue, wikipediaCode, speechLocale, originalMarker, scriptRange
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+
+      XCTAssertEqual(language.displayName, displayName, rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, rawValue)
+      XCTAssertTrue(language.usesJoiningScriptPrompt, rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, rawValue)
+      XCTAssertFalse(language.supportsLazyLatinInput, rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, zipfSupport, rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language), wikipediaCode, rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, speechLocale, rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertEqual(words.count, count, rawValue)
+      XCTAssertEqual(Set(words).count, count, rawValue)
+      XCTAssertTrue(words.allSatisfy { $0.contains(originalMarker) }, rawValue)
+      XCTAssertEqual(words.lazy.map(\.unicodeScalars.count).min(), minimumScalars, rawValue)
+      XCTAssertEqual(words.lazy.map(\.unicodeScalars.count).max(), maximumScalars, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimumCharacters, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximumCharacters, rawValue)
+      XCTAssertEqual(words.filter { word in
+        word.unicodeScalars.contains { scalar in
+          switch scalar.properties.generalCategory {
+          case .nonspacingMark, .spacingMark, .enclosingMark: true
+          default: false
+          }
+        }
+      }.count, markedCount, rawValue)
+      XCTAssertEqual(
+        words.filter { $0.contains(where: \.isPunctuation) }.count, punctuationCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaceCount, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isUppercase) }, rawValue)
+      XCTAssertTrue(words.allSatisfy { word in
+        word.unicodeScalars.allSatisfy { scalar in
+          scriptRange.contains(scalar.value) || scalar.properties.isWhitespace
+            || scalar.properties.generalCategory == .otherPunctuation
+        }
+      }, rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        rawValue)
+      XCTAssertGreaterThanOrEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language)
+          .split(separator: " ").count,
+        25, rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text, rawValue)
+      }
+    }
+
+    XCTAssertEqual(
+      TypingLanguage.telugu1k.ownedPracticeLexicon().filter { $0.filter { $0 == " " }.count > 1 }
+        .count,
+      1)
+    XCTAssertEqual(
+      TypingLanguage.gujarati1k.ownedPracticeLexicon().filter {
+        $0.filter { $0 == " " }.count > 1
+      }.count,
+      5)
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),
@@ -15056,12 +15153,14 @@ final class TypingEngineTests: XCTestCase {
 
     let joiningLanguages: Set<TypingLanguage> = [
       .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
-      .bangla, .banglaLetters, .gujarati, .hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
-      .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k,
+      .bangla, .bangla10k, .banglaLetters, .gujarati, .gujarati1k,
+      .hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
+      .hindi, .hindi1k, .kannada, .khmer, .korean, .korean1k, .korean5k,
       .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .persian1k, .persian5k,
       .persian20k, .sanskrit, .sindhi, .sinhala,
-      .tamil, .tamilOld, .telugu, .tibetan, .urdu, .urdu1k, .urdu5k, .yiddish,
+      .tamil, .tamil1k, .tamilOld, .telugu, .telugu1k, .tibetan,
+      .urdu, .urdu1k, .urdu5k, .yiddish,
     ]
     XCTAssertEqual(
       Set(TypingLanguage.allCases.filter(\.usesJoiningScriptPrompt)), joiningLanguages)

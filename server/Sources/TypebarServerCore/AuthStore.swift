@@ -523,6 +523,7 @@ public actor AuthStore {
     "kabyle1k", "kabyle2k", "kabyle5k", "kabyle10k",
     "hebrew1k", "hebrew5k", "hebrew10k",
     "persian1k", "persian5k", "persian20k", "urdu1k", "urdu5k",
+    "tamil1k", "telugu1k", "bangla10k", "hindi1k", "gujarati1k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",

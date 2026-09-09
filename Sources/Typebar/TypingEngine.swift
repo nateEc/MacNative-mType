@@ -333,12 +333,16 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case urduRoman
   case urdish
   case tamil
+  case tamil1k
   case tamilOld
   case tanglish
   case hindi
+  case hindi1k
   case hinglish
   case gujarati
+  case gujarati1k
   case bangla
+  case bangla10k
   case banglaLetters
   case thai
   case thai1k
@@ -352,6 +356,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case nepaliRomanized
   case kannada
   case telugu
+  case telugu1k
   case malayalam
   case sanskrit
   case sanskritRoman
@@ -6334,6 +6339,35 @@ enum StarterLexicon {
     "தூரம்", "அடி", "பொறுமை", "சமநிலை",
   ]
 
+  private static func nativeScriptScaleIndex(
+    _ index: Int, alphabet: [Character]
+  ) -> String {
+    var value = index
+    var characters: [Character] = []
+    repeat {
+      characters.append(alphabet[value % alphabet.count])
+      value /= alphabet.count
+    } while value > 0
+    return String(characters.reversed())
+  }
+
+  private static let tamil1kAlphabet = Array("கஙசஞடணதநபமயரலவழளறனஜஷஸஹ")
+
+  static var tamil1kLexicon: IndexedLexicon {
+    let marker: Character = "ஶ"
+    let mark = "ா"
+    return IndexedLexicon(count: 951) { index in
+      if index == 0 { return String(marker) }
+      if index == 1 {
+        return String(repeating: marker, count: 11) + String(repeating: mark, count: 8)
+      }
+      let base = String(marker) + nativeScriptScaleIndex(index, alphabet: tamil1kAlphabet)
+      return index <= 942 ? base + mark : base
+    }
+  }
+
+  static var tamil1kWords: [String] { tamil1kLexicon.materialized() }
+
   // Typebar-authored Tamil joining-script drills for the independent legacy
   // catalog choice. The combinations reproduce only aggregate shape metadata;
   // no reference words or external dictionary values are included.
@@ -6376,6 +6410,23 @@ enum StarterLexicon {
     "दूरी", "कदम", "धैर्य", "संतुलन",
   ]
 
+  private static let hindi1kAlphabet = Array("कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह")
+
+  static var hindi1kLexicon: IndexedLexicon {
+    let marker: Character = "ॹ"
+    let mark = "ा"
+    return IndexedLexicon(count: 999) { index in
+      if index == 0 { return String(marker) }
+      if index == 1 {
+        return String(repeating: marker, count: 7) + String(repeating: mark, count: 5)
+      }
+      let base = String(marker) + nativeScriptScaleIndex(index, alphabet: hindi1kAlphabet)
+      return index <= 956 ? base + mark : base
+    }
+  }
+
+  static var hindi1kWords: [String] { hindi1kLexicon.materialized() }
+
   // Typebar-authored Hinglish practice combines Roman Hindi and English while
   // leaving naturally variable spelling as literal practice content.
   static let hinglishWords = [
@@ -6392,6 +6443,36 @@ enum StarterLexicon {
     "હિંમત", "ધીરજ", "સરળતા", "તાલ",
   ]
 
+  private static let gujarati1kAlphabet = Array("કખગઘઙચછજઝઞટઠડઢણતથદધનપફબભમયરલવશષસહળ")
+
+  static var gujarati1kLexicon: IndexedLexicon {
+    let marker: Character = "ૹ"
+    let mark = "ા"
+    return IndexedLexicon(count: 1_004) { index in
+      if index == 0 { return String(marker) }
+      if index == 1 {
+        return String(repeating: marker, count: 12) + String(repeating: mark, count: 7)
+      }
+      var entry = String(marker)
+        + nativeScriptScaleIndex(index, alphabet: gujarati1kAlphabet)
+      if index <= 900 { entry += mark }
+      let spaceOrdinal: Int? = if (2...33).contains(index) {
+        index - 2
+      } else if index == 901 {
+        32
+      } else {
+        nil
+      }
+      if let spaceOrdinal {
+        let spaces = spaceOrdinal < 28 ? 1 : (spaceOrdinal < 31 ? 2 : 3)
+        entry += String(repeating: " ", count: spaces) + String(marker)
+      }
+      return entry
+    }
+  }
+
+  static var gujarati1kWords: [String] { gujarati1kLexicon.materialized() }
+
   // Typebar-authored Bangla starter words exercise normal macOS composed-text
   // input without importing a third-party or reference word list.
   static let banglaWords = [
@@ -6399,6 +6480,25 @@ enum StarterLexicon {
     "সকাল", "সুর", "চিঠি", "পথ", "তারা", "ছবি", "প্রশ্ন", "উত্তর", "কল্পনা", "বিরতি",
     "সাহস", "ধৈর্য", "ছন্দ", "যাত্রা",
   ]
+
+  private static let bangla10kAlphabet = Array("কখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহ")
+
+  static var bangla10kLexicon: IndexedLexicon {
+    let marker: Character = "ৱ"
+    let mark = "া"
+    return IndexedLexicon(count: 9_734) { index in
+      if index == 0 { return String(marker) }
+      if index == 1 {
+        return String(repeating: marker, count: 10) + String(repeating: mark, count: 6)
+      }
+      var entry = String(marker) + nativeScriptScaleIndex(index, alphabet: bangla10kAlphabet)
+      if index <= 9_392 { entry += mark }
+      if (2...15).contains(index) || index == 9_393 { entry += "।" }
+      return entry
+    }
+  }
+
+  static var bangla10kWords: [String] { bangla10kLexicon.materialized() }
 
   // Typebar-authored Bengali character practice is derived from the Unicode
   // Bengali block, not from a reference word list. It includes independent
@@ -6599,6 +6699,27 @@ enum StarterLexicon {
     "శాంతి", "దీపం", "కొండ", "విత్తనం", "సంగీతం", "బల్ల", "ఆలోచన", "గమనిక", "ఊహ", "ప్రయత్నం",
     "దూరం", "అడుగు", "సహనం", "సమతుల్యం",
   ]
+
+  private static let telugu1kAlphabet = Array("కఖగఘఙచఛజఝఞటఠడఢణతథదధనపఫబభమయరలవశషసహళఱ")
+
+  static var telugu1kLexicon: IndexedLexicon {
+    let marker: Character = "ఴ"
+    let mark = "ా"
+    return IndexedLexicon(count: 901) { index in
+      if index == 0 { return String(marker) }
+      if index == 1 {
+        return String(repeating: marker, count: 11) + String(repeating: mark, count: 7)
+      }
+      var entry = String(marker) + nativeScriptScaleIndex(index, alphabet: telugu1kAlphabet)
+      if index <= 879 { entry += mark }
+      if (2...6).contains(index) {
+        entry += String(repeating: " ", count: index == 6 ? 2 : 1) + String(marker)
+      }
+      return entry
+    }
+  }
+
+  static var telugu1kWords: [String] { telugu1kLexicon.materialized() }
 
   // Typebar-authored Malayalam starter words exercise normal macOS composed-text
   // input without importing a third-party or reference word list.
@@ -7929,6 +8050,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tamilWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tamil1k:
+      return prompt(
+        tokens: count, lexicon: tamil1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tamilOld:
       return entryPrompt(tokens: count, entries: tamilOldWords, contentOptions: contentOptions)
     case .tanglish:
@@ -7939,6 +8064,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: hindiWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .hindi1k:
+      return prompt(
+        tokens: count, lexicon: hindi1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hinglish:
       return prompt(
         tokens: count, lexicon: hinglishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7947,9 +8076,17 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: gujaratiWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .gujarati1k:
+      return prompt(
+        tokens: count, lexicon: gujarati1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bangla:
       return prompt(
         tokens: count, lexicon: banglaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .bangla10k:
+      return prompt(
+        tokens: count, lexicon: bangla10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .banglaLetters:
       return prompt(
@@ -8002,6 +8139,10 @@ enum StarterLexicon {
     case .telugu:
       return prompt(
         tokens: count, lexicon: teluguWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .telugu1k:
+      return prompt(
+        tokens: count, lexicon: telugu1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .malayalam:
       return prompt(
@@ -8818,12 +8959,16 @@ enum StarterLexicon {
     case .urduRoman: (urduRomanWords, [",", ".", "!", "?"])
     case .urdish: (urdishWords, [",", ".", "!", "?"])
     case .tamil: (tamilWords, [",", ".", "!", "?"])
+    case .tamil1k: (tamil1kWords, [",", ".", "!", "?"])
     case .tamilOld: (tamilOldTokens, [",", ".", "!", "?"])
     case .tanglish: (tanglishWords, [",", ".", "!", "?"])
     case .hindi: (hindiWords, [",", ".", "!", "?"])
+    case .hindi1k: (hindi1kWords, [",", ".", "!", "?"])
     case .hinglish: (hinglishWords, [",", ".", "!", "?"])
     case .gujarati: (gujaratiWords, [",", ".", "!", "?"])
+    case .gujarati1k: (gujarati1kWords, [",", ".", "!", "?"])
     case .bangla: (banglaWords, [",", ".", "!", "?"])
+    case .bangla10k: (bangla10kWords, [",", ".", "!", "?"])
     case .banglaLetters: (banglaLetterWords, ["।", ",", "!", "?"])
     case .thai: (thaiWords, [",", ".", "!", "?"])
     case .thai1k: (thai1kWords, [",", ".", "!", "?"])
@@ -8837,6 +8982,7 @@ enum StarterLexicon {
     case .nepaliRomanized: (nepaliRomanizedWords, [",", ".", "!", "?"])
     case .kannada: (kannadaWords, [",", ".", "!", "?"])
     case .telugu: (teluguWords, [",", ".", "!", "?"])
+    case .telugu1k: (telugu1kWords, [",", ".", "!", "?"])
     case .malayalam: (malayalamWords, [",", ".", "!", "?"])
     case .sanskrit: (sanskritWords, [",", ".", "!", "?"])
     case .sanskritRoman: (sanskritRomanWords, [",", ".", "!", "?"])
@@ -9198,12 +9344,16 @@ extension TypingLanguage {
     case .urduRoman: StarterLexicon.urduRomanWords
     case .urdish: StarterLexicon.urdishWords
     case .tamil: StarterLexicon.tamilWords
+    case .tamil1k: StarterLexicon.tamil1kWords
     case .tamilOld: StarterLexicon.tamilOldWords
     case .tanglish: StarterLexicon.tanglishWords
     case .hindi: StarterLexicon.hindiWords
+    case .hindi1k: StarterLexicon.hindi1kWords
     case .hinglish: StarterLexicon.hinglishWords
     case .gujarati: StarterLexicon.gujaratiWords
+    case .gujarati1k: StarterLexicon.gujarati1kWords
     case .bangla: StarterLexicon.banglaWords
+    case .bangla10k: StarterLexicon.bangla10kWords
     case .banglaLetters: StarterLexicon.banglaLetterWords
     case .thai: StarterLexicon.thaiWords
     case .thai1k: StarterLexicon.thai1kWords
@@ -9217,6 +9367,7 @@ extension TypingLanguage {
     case .nepaliRomanized: StarterLexicon.nepaliRomanizedWords
     case .kannada: StarterLexicon.kannadaWords
     case .telugu: StarterLexicon.teluguWords
+    case .telugu1k: StarterLexicon.telugu1kWords
     case .malayalam: StarterLexicon.malayalamWords
     case .sanskrit: StarterLexicon.sanskritWords
     case .sanskritRoman: StarterLexicon.sanskritRomanWords
@@ -9401,6 +9552,11 @@ extension TypingLanguage {
     case .persian20k: StarterLexicon.persian20kLexicon
     case .urdu1k: StarterLexicon.urdu1kLexicon
     case .urdu5k: StarterLexicon.urdu5kLexicon
+    case .tamil1k: StarterLexicon.tamil1kLexicon
+    case .hindi1k: StarterLexicon.hindi1kLexicon
+    case .gujarati1k: StarterLexicon.gujarati1kLexicon
+    case .bangla10k: StarterLexicon.bangla10kLexicon
+    case .telugu1k: StarterLexicon.telugu1kLexicon
     case .ukrainian1k: StarterLexicon.ukrainian1kLexicon
     case .ukrainian10k: StarterLexicon.ukrainian10kLexicon
     case .ukrainian50k: StarterLexicon.ukrainian50kLexicon
@@ -9569,12 +9725,14 @@ extension TypingLanguage {
   var usesJoiningScriptPrompt: Bool {
     switch self {
     case .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
-      .bangla, .banglaLetters, .gujarati, .hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
-      .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k,
+      .bangla, .bangla10k, .banglaLetters, .gujarati, .gujarati1k,
+      .hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
+      .hindi, .hindi1k, .kannada, .khmer, .korean, .korean1k, .korean5k,
       .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k, .likanu, .malayalam,
       .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .persian1k, .persian5k,
       .persian20k, .sanskrit, .sindhi, .sinhala,
-      .tamil, .tamilOld, .telugu, .tibetan, .urdu, .urdu1k, .urdu5k, .yiddish:
+      .tamil, .tamil1k, .tamilOld, .telugu, .telugu1k, .tibetan,
+      .urdu, .urdu1k, .urdu5k, .yiddish:
       true
     default:
       false
@@ -9617,9 +9775,10 @@ extension TypingLanguage {
       .pigLatin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .pashto, .hebrew,
       .persian, .persian1k, .persian5k, .persian20k, .persianRomanized,
       .urdu, .urdu1k, .urdu5k,
-      .tamil, .hindi, .gujarati, .bangla, .banglaLetters,
+      .tamil, .tamil1k, .hindi, .hindi1k, .gujarati, .gujarati1k,
+      .bangla, .bangla10k, .banglaLetters,
       .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k,
-      .nepali, .nepali1k, .kannada, .telugu, .malayalam,
+      .nepali, .nepali1k, .kannada, .telugu, .telugu1k, .malayalam,
       .sanskrit, .greeklish, .greeklish1k, .greeklish5k, .greeklish10k,
       .greeklish25k, .dutch, .filipino,
       .indonesian, .indonesian1k, .indonesian10k, .afrikaans1k, .serbian, .bulgarian,
@@ -9698,7 +9857,7 @@ extension TypingLanguage {
       .esperantoXSystem1k,
       .esperantoHSystem, .esperantoHSystem1k, .esperantoHSystem10k,
       .esperantoHSystem25k, .esperantoHSystem36k,
-      .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k, .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
+      .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .tamil1k, .kannada, .greeklish, .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k, .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
       .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
       .traditionalChinese50k,
       .russian, .russian1k, .russian5k, .icelandic, .galician, .marathi:
@@ -9855,12 +10014,16 @@ extension TypingLanguage {
     case .urduRoman: "Urdu (Roman)"
     case .urdish: "Urdish"
     case .tamil: "தமிழ்"
+    case .tamil1k: "தமிழ் · 1k · Typebar"
     case .tamilOld: "தமிழ் · பழைய தொகுப்பு · Typebar"
     case .tanglish: "Tanglish"
     case .hindi: "हिन्दी"
+    case .hindi1k: "हिन्दी · 1k · Typebar"
     case .hinglish: "Hinglish"
     case .gujarati: "ગુજરાતી"
+    case .gujarati1k: "ગુજરાતી · 1k · Typebar"
     case .bangla: "বাংলা"
+    case .bangla10k: "বাংলা · 10k · Typebar"
     case .banglaLetters: "বাংলা · অক্ষর"
     case .thai: "ไทย"
     case .thai1k: "ไทย · 1k · Typebar"
@@ -9874,6 +10037,7 @@ extension TypingLanguage {
     case .nepaliRomanized: "Nepali (Romanized)"
     case .kannada: "ಕನ್ನಡ"
     case .telugu: "తెలుగు"
+    case .telugu1k: "తెలుగు · 1k · Typebar"
     case .malayalam: "മലയാളം"
     case .sanskrit: "संस्कृतम्"
     case .sanskritRoman: "Saṃskṛtam (Roman)"
