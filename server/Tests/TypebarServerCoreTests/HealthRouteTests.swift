@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 284)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 292)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4275,6 +4275,14 @@ final class HealthRouteTests: XCTestCase {
       ("tatarCrimeanCyrillic5k", "Ерли индекс мешкъни адым-адым кенишлете."),
       ("tatarCrimeanCyrillic10k", "Он бинъ ер ичюн тыш сёз джедвели керек дегиль."),
       ("tatarCrimeanCyrillic15k", "Энъ буюк сыра да ерли ве айры къала."),
+      ("occitan1k", "Cada pichona escala garda un ritme clar."),
+      ("occitan2k", "L'indèx local alarga l'exercici pas a pas."),
+      ("occitan5k", "La colleccion mai larga demòra locala e distinta."),
+      ("occitan10k", "Lo grand indèx crea sonque los elements demandats."),
+      ("kabyle1k", "Yal ammud ameẓyan yeskan abrid n uselmed."),
+      ("kabyle2k", "Asebdad adigan yessewsi armud s leɛqel."),
+      ("kabyle5k", "Ammud meqqren yeqqim d ilelli u d afessas."),
+      ("kabyle10k", "Asebdad ameqqran yettfaras kan ayen ilaqen."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

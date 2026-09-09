@@ -9492,6 +9492,85 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testOccitanAndKabyleScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, String, Int, Int, Int, Int, Int, Int, String, String, String, ZipfFrequencySupport)] = [
+      ("occitan1k", "Occitan · 1k · Typebar", 1_000, 1, 14, 0, 217, 0, "occitan", "oc", "oc-FR", .unknown),
+      ("occitan2k", "Occitan · 2k · Typebar", 2_000, 1, 16, 0, 499, 0, "occitan", "oc", "oc-FR", .unknown),
+      ("occitan5k", "Occitan · 5k · Typebar", 5_000, 1, 17, 0, 1_205, 0, "occitan", "oc", "oc-FR", .unknown),
+      ("occitan10k", "Occitan · 10k · Typebar", 10_000, 1, 23, 0, 2_387, 0, "occitan", "oc", "oc-FR", .unknown),
+      ("kabyle1k", "Taqbaylit · 1k · Typebar", 1_000, 3, 14, 139, 321, 35, "kabyle", "kab", "kab", .unsupported),
+      ("kabyle2k", "Taqbaylit · 2k · Typebar", 2_000, 3, 14, 299, 670, 62, "kabyle", "kab", "kab", .unsupported),
+      ("kabyle5k", "Taqbaylit · 5k · Typebar", 5_000, 3, 17, 736, 1_665, 179, "kabyle", "kab", "kab", .unsupported),
+      ("kabyle10k", "Taqbaylit · 10k · Typebar", 10_000, 3, 22, 1_420, 3_319, 345, "kabyle", "kab", "kab", .unsupported),
+    ]
+
+    for (
+      rawValue, displayName, count, minimumLength, maximumLength, punctuationCount,
+      nonASCIIcount, punctuationNonASCIIcount, quoteSourceRawValue, wikipediaCode,
+      speechLocale, zipfSupport
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let quoteSource = try XCTUnwrap(TypingLanguage(rawValue: quoteSourceRawValue))
+      let words = language.ownedPracticeLexicon()
+
+      XCTAssertEqual(language.displayName, displayName, rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, rawValue)
+      XCTAssertTrue(language.supportsLazyLatinInput, rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, zipfSupport, rawValue)
+      XCTAssertEqual(
+        LivePracticeContentService.wikipediaLanguageCode(for: language), wikipediaCode, rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, speechLocale, rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertEqual(words.count, count, rawValue)
+      XCTAssertEqual(Set(words).count, count, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), minimumLength, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximumLength, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isUppercase) }, rawValue)
+      XCTAssertEqual(
+        words.filter { $0.contains(where: \.isPunctuation) }.count, punctuationCount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, nonASCIIcount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isPunctuation)
+          && $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, punctuationNonASCIIcount, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(" ") }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, rawValue)
+      XCTAssertFalse(words.contains { word in
+        word.unicodeScalars.contains { scalar in
+          switch scalar.properties.generalCategory {
+          case .nonspacingMark, .spacingMark, .enclosingMark: true
+          default: false
+          }
+        }
+      }, rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        rawValue)
+      XCTAssertEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language).split(separator: " ").count,
+        25, rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quote = try XCTUnwrap(OfflineContent.quotes(for: language, length: length).first)
+        XCTAssertEqual(quote.language, language, rawValue)
+        XCTAssertEqual(
+          quote.text, OfflineContent.quotes(for: quoteSource, length: length).first?.text, rawValue)
+      }
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),

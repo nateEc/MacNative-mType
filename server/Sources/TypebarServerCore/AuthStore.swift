@@ -519,6 +519,8 @@ public actor AuthStore {
     "tatarCrimean1k", "tatarCrimean5k", "tatarCrimean10k", "tatarCrimean15k",
     "tatarCrimeanCyrillic1k", "tatarCrimeanCyrillic5k",
     "tatarCrimeanCyrillic10k", "tatarCrimeanCyrillic15k",
+    "occitan1k", "occitan2k", "occitan5k", "occitan10k",
+    "kabyle1k", "kabyle2k", "kabyle5k", "kabyle10k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",

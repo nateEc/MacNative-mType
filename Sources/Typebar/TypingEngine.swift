@@ -277,6 +277,10 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case lojbanCmavo
   case uzbek
   case occitan
+  case occitan1k
+  case occitan2k
+  case occitan5k
+  case occitan10k
   case oromo
   case macedonian
   case kazakh
@@ -289,6 +293,10 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case zulu
   case hawaiian
   case kabyle
+  case kabyle1k
+  case kabyle2k
+  case kabyle5k
+  case kabyle10k
   case maltese
   case tokiPona
   case tokiPonaKuSuli
@@ -5570,6 +5578,37 @@ enum StarterLexicon {
     "paciéncia", "equilibri", "vilatge", "pluèja", "estela", "amic", "espèr", "trabalh", "rius", "prima",
   ]
 
+  private static func occitanScaleLexicon(
+    marker: String, count: Int, maximumLength: Int, nonASCIICount: Int
+  ) -> IndexedLexicon {
+    IndexedLexicon(count: count) { index in
+      if index == 0 { return "w" }
+      if index == 1 { return String(repeating: "w", count: maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      return index < 2 + nonASCIICount
+        ? "òoc\(marker)\(suffix)"
+        : "qoc\(marker)\(suffix)"
+    }
+  }
+
+  static var occitan1kLexicon: IndexedLexicon {
+    occitanScaleLexicon(marker: "a", count: 1_000, maximumLength: 14, nonASCIICount: 217)
+  }
+  static var occitan2kLexicon: IndexedLexicon {
+    occitanScaleLexicon(marker: "b", count: 2_000, maximumLength: 16, nonASCIICount: 499)
+  }
+  static var occitan5kLexicon: IndexedLexicon {
+    occitanScaleLexicon(marker: "c", count: 5_000, maximumLength: 17, nonASCIICount: 1_205)
+  }
+  static var occitan10kLexicon: IndexedLexicon {
+    occitanScaleLexicon(marker: "d", count: 10_000, maximumLength: 23, nonASCIICount: 2_387)
+  }
+
+  static var occitan1kWords: [String] { occitan1kLexicon.materialized() }
+  static var occitan2kWords: [String] { occitan2kLexicon.materialized() }
+  static var occitan5kWords: [String] { occitan5kLexicon.materialized() }
+  static var occitan10kWords: [String] { occitan10kLexicon.materialized() }
+
   // Typebar-authored Oromo starter words provide local practice without
   // importing the reference dictionary or word list.
   static let oromoWords = [
@@ -5665,6 +5704,63 @@ enum StarterLexicon {
     "aseggas", "aman", "aḍris", "tura", "ass", "tala", "adrar", "aẓru", "akal", "ajenna",
     "tafukt", "ayyur", "tanemmirt", "leɛqel", "tazmilt", "amecwar", "ameẓyan", "uzekka",
   ]
+
+  private struct KabyleScaleSpecification {
+    let marker: String
+    let count: Int
+    let maximumLength: Int
+    let punctuationCount: Int
+    let nonASCIICount: Int
+    let punctuationNonASCIICount: Int
+  }
+
+  private static func kabyleScaleLexicon(
+    _ specification: KabyleScaleSpecification
+  ) -> IndexedLexicon {
+    IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return "qka" }
+      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      if index < 2 + specification.punctuationNonASCIICount {
+        return "ḳkb\(specification.marker)\(suffix)-"
+      }
+      if index < 2 + specification.punctuationCount {
+        return "qkb\(specification.marker)\(suffix)-"
+      }
+      if index < 2 + specification.punctuationCount
+        + specification.nonASCIICount - specification.punctuationNonASCIICount
+      {
+        return "ḳkb\(specification.marker)\(suffix)"
+      }
+      return "qkb\(specification.marker)\(suffix)"
+    }
+  }
+
+  static var kabyle1kLexicon: IndexedLexicon {
+    kabyleScaleLexicon(.init(
+      marker: "a", count: 1_000, maximumLength: 14, punctuationCount: 139,
+      nonASCIICount: 321, punctuationNonASCIICount: 35))
+  }
+  static var kabyle2kLexicon: IndexedLexicon {
+    kabyleScaleLexicon(.init(
+      marker: "b", count: 2_000, maximumLength: 14, punctuationCount: 299,
+      nonASCIICount: 670, punctuationNonASCIICount: 62))
+  }
+  static var kabyle5kLexicon: IndexedLexicon {
+    kabyleScaleLexicon(.init(
+      marker: "c", count: 5_000, maximumLength: 17, punctuationCount: 736,
+      nonASCIICount: 1_665, punctuationNonASCIICount: 179))
+  }
+  static var kabyle10kLexicon: IndexedLexicon {
+    kabyleScaleLexicon(.init(
+      marker: "d", count: 10_000, maximumLength: 22, punctuationCount: 1_420,
+      nonASCIICount: 3_319, punctuationNonASCIICount: 345))
+  }
+
+  static var kabyle1kWords: [String] { kabyle1kLexicon.materialized() }
+  static var kabyle2kWords: [String] { kabyle2kLexicon.materialized() }
+  static var kabyle5kWords: [String] { kabyle5kLexicon.materialized() }
+  static var kabyle10kWords: [String] { kabyle10kLexicon.materialized() }
 
   // Typebar-authored Maltese starter words exercise the selected `mt` path
   // without importing a reference dictionary.
@@ -7530,6 +7626,12 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: occitanWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .occitan1k, .occitan2k, .occitan5k, .occitan10k,
+      .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .oromo:
       return prompt(
         tokens: count, lexicon: oromoWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8523,6 +8625,10 @@ enum StarterLexicon {
     case .lojbanCmavo: (lojbanCmavoWords, [",", "!", "?"])
     case .uzbek: (uzbekWords, [",", ".", "!", "?"])
     case .occitan: (occitanWords, [",", ".", "!", "?"])
+    case .occitan1k: (occitan1kWords, [",", ".", "!", "?"])
+    case .occitan2k: (occitan2kWords, [",", ".", "!", "?"])
+    case .occitan5k: (occitan5kWords, [",", ".", "!", "?"])
+    case .occitan10k: (occitan10kWords, [",", ".", "!", "?"])
     case .oromo: (oromoWords, [",", ".", "!", "?"])
     case .macedonian: (macedonianWords, [",", ".", "!", "?"])
     case .kazakh: (kazakhWords, [",", ".", "!", "?"])
@@ -8535,6 +8641,10 @@ enum StarterLexicon {
     case .zulu: (zuluWords, [",", ".", "!", "?"])
     case .hawaiian: (hawaiianWords, [",", ".", "!", "?"])
     case .kabyle: (kabyleWords, [",", ".", "!", "?"])
+    case .kabyle1k: (kabyle1kWords, [",", ".", "!", "?"])
+    case .kabyle2k: (kabyle2kWords, [",", ".", "!", "?"])
+    case .kabyle5k: (kabyle5kWords, [",", ".", "!", "?"])
+    case .kabyle10k: (kabyle10kWords, [",", ".", "!", "?"])
     case .maltese: (malteseWords, [",", ".", "!", "?"])
     case .tokiPona: (tokiPonaWords, [",", ".", "!", "?"])
     case .tokiPonaKuSuli: (tokiPonaKuSuliWords, [",", ".", "!", "?"])
@@ -8887,6 +8997,10 @@ extension TypingLanguage {
     case .lojbanCmavo: StarterLexicon.lojbanCmavoWords
     case .uzbek: StarterLexicon.uzbekWords
     case .occitan: StarterLexicon.occitanWords
+    case .occitan1k: StarterLexicon.occitan1kWords
+    case .occitan2k: StarterLexicon.occitan2kWords
+    case .occitan5k: StarterLexicon.occitan5kWords
+    case .occitan10k: StarterLexicon.occitan10kWords
     case .oromo: StarterLexicon.oromoWords
     case .macedonian: StarterLexicon.macedonianWords
     case .kazakh: StarterLexicon.kazakhWords
@@ -8899,6 +9013,10 @@ extension TypingLanguage {
     case .zulu: StarterLexicon.zuluWords
     case .hawaiian: StarterLexicon.hawaiianWords
     case .kabyle: StarterLexicon.kabyleWords
+    case .kabyle1k: StarterLexicon.kabyle1kWords
+    case .kabyle2k: StarterLexicon.kabyle2kWords
+    case .kabyle5k: StarterLexicon.kabyle5kWords
+    case .kabyle10k: StarterLexicon.kabyle10kWords
     case .maltese: StarterLexicon.malteseWords
     case .tokiPona: StarterLexicon.tokiPonaWords
     case .tokiPonaKuSuli: StarterLexicon.tokiPonaKuSuliWords
@@ -9229,6 +9347,14 @@ extension TypingLanguage {
     case .tatarCrimeanCyrillic5k: StarterLexicon.tatarCrimeanCyrillic5kLexicon
     case .tatarCrimeanCyrillic10k: StarterLexicon.tatarCrimeanCyrillic10kLexicon
     case .tatarCrimeanCyrillic15k: StarterLexicon.tatarCrimeanCyrillic15kLexicon
+    case .occitan1k: StarterLexicon.occitan1kLexicon
+    case .occitan2k: StarterLexicon.occitan2kLexicon
+    case .occitan5k: StarterLexicon.occitan5kLexicon
+    case .occitan10k: StarterLexicon.occitan10kLexicon
+    case .kabyle1k: StarterLexicon.kabyle1kLexicon
+    case .kabyle2k: StarterLexicon.kabyle2kLexicon
+    case .kabyle5k: StarterLexicon.kabyle5kLexicon
+    case .kabyle10k: StarterLexicon.kabyle10kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -9415,7 +9541,8 @@ extension TypingLanguage {
       return .supported
     case .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical, .english25k, .english450k, .kokanu, .likanu, .russianAbbreviations, .russianContractions, .russianContractions1k, .typingOfTheDead, .pokemon1k, .arabicMorocco, .sindhi, .armenian, .bemba,
-      .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao, .kabyle,
+      .bulgarian, .bulgarianLatin, .urduRoman, .hungarian, .lao,
+      .kabyle, .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k,
       .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k,
       .viossa, .viossaNjutro:
       return .unsupported
@@ -9508,6 +9635,10 @@ extension TypingLanguage {
     case .lojbanCmavo: "Lojban · cmavo"
     case .uzbek: "Oʻzbekcha"
     case .occitan: "Occitan"
+    case .occitan1k: "Occitan · 1k · Typebar"
+    case .occitan2k: "Occitan · 2k · Typebar"
+    case .occitan5k: "Occitan · 5k · Typebar"
+    case .occitan10k: "Occitan · 10k · Typebar"
     case .oromo: "Oromo"
     case .macedonian: "Македонски"
     case .kazakh: "Қазақша"
@@ -9520,6 +9651,10 @@ extension TypingLanguage {
     case .zulu: "isiZulu"
     case .hawaiian: "ʻŌlelo Hawaiʻi"
     case .kabyle: "Taqbaylit"
+    case .kabyle1k: "Taqbaylit · 1k · Typebar"
+    case .kabyle2k: "Taqbaylit · 2k · Typebar"
+    case .kabyle5k: "Taqbaylit · 5k · Typebar"
+    case .kabyle10k: "Taqbaylit · 10k · Typebar"
     case .maltese: "Malti"
     case .tokiPona: "toki pona"
     case .tokiPonaKuSuli: "toki pona · ku suli"
