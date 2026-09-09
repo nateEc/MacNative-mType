@@ -4619,6 +4619,9 @@ enum OfflineContent {
       .tatarCrimeanCyrillic
     case .occitan1k, .occitan2k, .occitan5k, .occitan10k: .occitan
     case .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k: .kabyle
+    case .hebrew1k, .hebrew5k, .hebrew10k: .hebrew
+    case .persian1k, .persian5k, .persian20k: .persian
+    case .urdu1k, .urdu5k: .urdu
     default: nil
     }
     if let source = inheritedScaleQuoteSource {

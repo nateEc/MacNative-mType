@@ -319,9 +319,17 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case pashto
   case sindhi
   case hebrew
+  case hebrew1k
+  case hebrew5k
+  case hebrew10k
   case persian
+  case persian1k
+  case persian5k
+  case persian20k
   case persianRomanized
   case urdu
+  case urdu1k
+  case urdu5k
   case urduRoman
   case urdish
   case tamil
@@ -6164,6 +6172,42 @@ enum StarterLexicon {
     "מרחק", "צעד", "סבלנות", "איזון",
   ]
 
+  private static let hebrewScaleAlphabet = Array("אבגדהוזחטיכלמנסעפצקרשת")
+
+  private static func hebrewScaleIndex(_ index: Int) -> String {
+    var value = index
+    var characters: [Character] = []
+    repeat {
+      characters.append(hebrewScaleAlphabet[value % hebrewScaleAlphabet.count])
+      value /= hebrewScaleAlphabet.count
+    } while value > 0
+    return String(characters.reversed())
+  }
+
+  private static func hebrewScaleLexicon(
+    marker: Character, count: Int, maximumLength: Int
+  ) -> IndexedLexicon {
+    IndexedLexicon(count: count) { index in
+      if index == 0 { return String(repeating: marker, count: 2) }
+      if index == 1 { return String(repeating: marker, count: maximumLength) }
+      return String(marker) + hebrewScaleIndex(index + 484)
+    }
+  }
+
+  static var hebrew1kLexicon: IndexedLexicon {
+    hebrewScaleLexicon(marker: "װ", count: 1_000, maximumLength: 10)
+  }
+  static var hebrew5kLexicon: IndexedLexicon {
+    hebrewScaleLexicon(marker: "ױ", count: 5_000, maximumLength: 13)
+  }
+  static var hebrew10kLexicon: IndexedLexicon {
+    hebrewScaleLexicon(marker: "ײ", count: 10_000, maximumLength: 13)
+  }
+
+  static var hebrew1kWords: [String] { hebrew1kLexicon.materialized() }
+  static var hebrew5kWords: [String] { hebrew5kLexicon.materialized() }
+  static var hebrew10kWords: [String] { hebrew10kLexicon.materialized() }
+
   // Typebar-authored Persian starter words use direct Unicode text for macOS
   // Persian input sources; they are not an imported word list.
   static let persianWords = [
@@ -6171,6 +6215,49 @@ enum StarterLexicon {
     "آرامش", "فانوس", "کوه", "بذر", "آهنگ", "میز", "اندیشه", "یادداشت", "ایده", "تجربه",
     "فاصله", "گام", "صبر", "تعادل",
   ]
+
+  private static func plainArabicScriptScaleLexicon(
+    marker: Character, count: Int, minimumLength: Int, maximumLength: Int
+  ) -> IndexedLexicon {
+    IndexedLexicon(count: count) { index in
+      if index == 0 { return String(repeating: marker, count: minimumLength) }
+      if index == 1 { return String(repeating: marker, count: maximumLength) }
+      return String(marker) + arabicScaleIndex(index + 784)
+    }
+  }
+
+  static var persian1kLexicon: IndexedLexicon {
+    plainArabicScriptScaleLexicon(
+      marker: "ڨ", count: 1_000, minimumLength: 2, maximumLength: 10)
+  }
+  static var persian5kLexicon: IndexedLexicon {
+    plainArabicScriptScaleLexicon(
+      marker: "ڧ", count: 5_000, minimumLength: 2, maximumLength: 12)
+  }
+  static var persian20kLexicon: IndexedLexicon {
+    let marker: Character = "ݐ"
+    return IndexedLexicon(count: 21_715) { index in
+      if index == 0 { return String(repeating: marker, count: 2) }
+      if index == 1 { return String(repeating: marker, count: 82) }
+      let offset = index - 2
+      let base = String(marker) + arabicScaleIndex(index + 784)
+      if offset < 5 { return base + "۔" }
+      if offset < 31 {
+        let spaceOrdinal = offset - 5
+        let spaces = spaceOrdinal < 22 ? 1 : (spaceOrdinal < 25 ? 2 : 13)
+        let punctuation = spaceOrdinal < 7 ? "۔" : ""
+        return base + punctuation + String(repeating: " ", count: spaces) + String(marker)
+      }
+      if offset == 31 { return base + "\u{00A0}" + String(marker) }
+      if offset < 34 { return base + "\u{064B}" }
+      if offset < 58 { return base + "\u{200C}" + String(marker) }
+      return base
+    }
+  }
+
+  static var persian1kWords: [String] { persian1kLexicon.materialized() }
+  static var persian5kWords: [String] { persian5kLexicon.materialized() }
+  static var persian20kWords: [String] { persian20kLexicon.materialized() }
 
   // Typebar-authored Latin-script Persian practice. This is a deliberately
   // readable training corpus, not an imported or claimed-lossless transliteration.
@@ -6187,6 +6274,41 @@ enum StarterLexicon {
     "سکون", "چراغ", "پہاڑ", "بیج", "آواز", "میز", "خیال", "نوٹ", "تصور", "تجربہ",
     "فاصلہ", "قدم", "صبر", "توازن",
   ]
+
+  static var urdu1kLexicon: IndexedLexicon {
+    let marker: Character = "ݙ"
+    return IndexedLexicon(count: 934) { index in
+      if index == 0 { return String(repeating: marker, count: 2) }
+      if index == 1 { return String(repeating: marker, count: 17) }
+      let offset = index - 2
+      let base = String(marker) + arabicScaleIndex(index + 784)
+      if offset < 50 {
+        let spaces = offset < 33 ? 1 : (offset < 47 ? 2 : 3)
+        let punctuation = offset == 0 ? "۔" : ""
+        return base + punctuation + String(repeating: " ", count: spaces) + String(marker)
+      }
+      if offset == 50 { return base + "\u{064B}" }
+      return base
+    }
+  }
+
+  static var urdu5kLexicon: IndexedLexicon {
+    let marker: Character = "ݚ"
+    return IndexedLexicon(count: 4_981) { index in
+      if index == 0 { return String(marker) }
+      if index == 1 { return String(repeating: marker, count: 15) }
+      let offset = index - 2
+      let base = String(marker) + arabicScaleIndex(index + 784)
+      if offset < 72 {
+        let spaces = offset < 52 ? 1 : 2
+        return base + String(repeating: " ", count: spaces) + String(marker)
+      }
+      return base
+    }
+  }
+
+  static var urdu1kWords: [String] { urdu1kLexicon.materialized() }
+  static var urdu5kWords: [String] { urdu5kLexicon.materialized() }
 
   // Typebar-authored Roman Urdu practice keeps the fixed source's explicit
   // Latin-script selection separate from the native Urdu prompt.
@@ -7768,10 +7890,20 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: hebrewWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .hebrew1k, .hebrew5k, .hebrew10k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .persian:
       return prompt(
         tokens: count, lexicon: persianWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .persian1k, .persian5k, .persian20k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: ["،", "؛", "؟", "."], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .persianRomanized:
       return prompt(
         tokens: count, lexicon: persianRomanizedWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7780,6 +7912,11 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: urduWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .urdu1k, .urdu5k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: ["،", "؛", "؟", "."], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .urduRoman:
       return prompt(
         tokens: count, lexicon: urduRomanWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8667,9 +8804,17 @@ enum StarterLexicon {
     case .pashto: (pashtoWords, ["،", "؛", "؟", "."])
     case .sindhi: (sindhiWords, ["،", "؛", "؟", "."])
     case .hebrew: (hebrewWords, [",", ".", "!", "?"])
+    case .hebrew1k: (hebrew1kWords, [",", ".", "!", "?"])
+    case .hebrew5k: (hebrew5kWords, [",", ".", "!", "?"])
+    case .hebrew10k: (hebrew10kWords, [",", ".", "!", "?"])
     case .persian: (persianWords, ["،", "؛", "؟", "."])
+    case .persian1k: (persian1kWords, ["،", "؛", "؟", "."])
+    case .persian5k: (persian5kWords, ["،", "؛", "؟", "."])
+    case .persian20k: (persian20kWords, ["،", "؛", "؟", "."])
     case .persianRomanized: (persianRomanizedWords, [",", ".", "!", "?"])
     case .urdu: (urduWords, ["،", "؛", "؟", "."])
+    case .urdu1k: (urdu1kWords, ["،", "؛", "؟", "."])
+    case .urdu5k: (urdu5kWords, ["،", "؛", "؟", "."])
     case .urduRoman: (urduRomanWords, [",", ".", "!", "?"])
     case .urdish: (urdishWords, [",", ".", "!", "?"])
     case .tamil: (tamilWords, [",", ".", "!", "?"])
@@ -9039,9 +9184,17 @@ extension TypingLanguage {
     case .pashto: StarterLexicon.pashtoWords
     case .sindhi: StarterLexicon.sindhiWords
     case .hebrew: StarterLexicon.hebrewWords
+    case .hebrew1k: StarterLexicon.hebrew1kWords
+    case .hebrew5k: StarterLexicon.hebrew5kWords
+    case .hebrew10k: StarterLexicon.hebrew10kWords
     case .persian: StarterLexicon.persianWords
+    case .persian1k: StarterLexicon.persian1kWords
+    case .persian5k: StarterLexicon.persian5kWords
+    case .persian20k: StarterLexicon.persian20kWords
     case .persianRomanized: StarterLexicon.persianRomanizedWords
     case .urdu: StarterLexicon.urduWords
+    case .urdu1k: StarterLexicon.urdu1kWords
+    case .urdu5k: StarterLexicon.urdu5kWords
     case .urduRoman: StarterLexicon.urduRomanWords
     case .urdish: StarterLexicon.urdishWords
     case .tamil: StarterLexicon.tamilWords
@@ -9240,6 +9393,14 @@ extension TypingLanguage {
     case .afrikaans10k: StarterLexicon.afrikaans10kLexicon
     case .kurdishCentral2k: StarterLexicon.kurdishCentral2kLexicon
     case .kurdishCentral4k: StarterLexicon.kurdishCentral4kLexicon
+    case .hebrew1k: StarterLexicon.hebrew1kLexicon
+    case .hebrew5k: StarterLexicon.hebrew5kLexicon
+    case .hebrew10k: StarterLexicon.hebrew10kLexicon
+    case .persian1k: StarterLexicon.persian1kLexicon
+    case .persian5k: StarterLexicon.persian5kLexicon
+    case .persian20k: StarterLexicon.persian20kLexicon
+    case .urdu1k: StarterLexicon.urdu1kLexicon
+    case .urdu5k: StarterLexicon.urdu5kLexicon
     case .ukrainian1k: StarterLexicon.ukrainian1kLexicon
     case .ukrainian10k: StarterLexicon.ukrainian10kLexicon
     case .ukrainian50k: StarterLexicon.ukrainian50kLexicon
@@ -9401,18 +9562,19 @@ extension TypingLanguage {
   /// single-language until mixed bidirectional prompt layout has dedicated
   /// interaction coverage.
   var usesRightToLeftPrompt: Bool {
-    self == .arabic || self == .arabic10k || self == .arabicEgypt || self == .arabicEgypt1k || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .persian || self == .urdu || self == .kurdishCentral || self == .kurdishCentral2k || self == .kurdishCentral4k || self == .yiddish
+    self == .arabic || self == .arabic10k || self == .arabicEgypt || self == .arabicEgypt1k || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .hebrew1k || self == .hebrew5k || self == .hebrew10k || self == .persian || self == .persian1k || self == .persian5k || self == .persian20k || self == .urdu || self == .urdu1k || self == .urdu5k || self == .kurdishCentral || self == .kurdishCentral2k || self == .kurdishCentral4k || self == .yiddish
   }
 
   /// Preserve native shaping for source-pinned joining scripts.
   var usesJoiningScriptPrompt: Bool {
     switch self {
     case .arabic, .arabic10k, .arabicEgypt, .arabicEgypt1k, .arabicMorocco,
-      .bangla, .banglaLetters, .gujarati, .hebrew,
+      .bangla, .banglaLetters, .gujarati, .hebrew, .hebrew1k, .hebrew5k, .hebrew10k,
       .hindi, .kannada, .khmer, .korean, .korean1k, .korean5k,
       .kurdishCentral, .kurdishCentral2k, .kurdishCentral4k, .likanu, .malayalam,
-      .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .sanskrit, .sindhi, .sinhala,
-      .tamil, .tamilOld, .telugu, .tibetan, .urdu, .yiddish:
+      .myanmarBurmese, .nepali, .nepali1k, .pashto, .persian, .persian1k, .persian5k,
+      .persian20k, .sanskrit, .sindhi, .sinhala,
+      .tamil, .tamilOld, .telugu, .tibetan, .urdu, .urdu1k, .urdu5k, .yiddish:
       true
     default:
       false
@@ -9452,7 +9614,9 @@ extension TypingLanguage {
       .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
       .englishMedical,
       .englishShakespearean,
-      .pigLatin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .pashto, .hebrew, .persian, .persianRomanized, .urdu,
+      .pigLatin, .loremIpsum, .git, .twitchEmotes, .typingOfTheDead, .pashto, .hebrew,
+      .persian, .persian1k, .persian5k, .persian20k, .persianRomanized,
+      .urdu, .urdu1k, .urdu5k,
       .tamil, .hindi, .gujarati, .bangla, .banglaLetters,
       .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k,
       .nepali, .nepali1k, .kannada, .telugu, .malayalam,
@@ -9677,9 +9841,17 @@ extension TypingLanguage {
     case .pashto: "پښتو"
     case .sindhi: "سنڌي"
     case .hebrew: "עברית"
+    case .hebrew1k: "עברית · 1k · Typebar"
+    case .hebrew5k: "עברית · 5k · Typebar"
+    case .hebrew10k: "עברית · 10k · Typebar"
     case .persian: "فارسی"
+    case .persian1k: "فارسی · 1k · Typebar"
+    case .persian5k: "فارسی · 5k · Typebar"
+    case .persian20k: "فارسی · 20k · Typebar"
     case .persianRomanized: "Fârsi (Romanized)"
     case .urdu: "اردو"
+    case .urdu1k: "اردو · 1k · Typebar"
+    case .urdu5k: "اردو · 5k · Typebar"
     case .urduRoman: "Urdu (Roman)"
     case .urdish: "Urdish"
     case .tamil: "தமிழ்"
