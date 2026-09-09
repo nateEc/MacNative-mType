@@ -3351,7 +3351,8 @@ private struct CompletedResultView: View {
 
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
         ReplayTimelineView(
-          prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit)
+          prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
+          soundConfiguration: .init(settings: settings))
       }
 
       VStack(alignment: .leading, spacing: 10) {
@@ -3836,13 +3837,31 @@ private struct ChallengeResultView: View {
   }
 }
 
+private struct ReplaySoundConfiguration {
+  let playsClicks: Bool
+  let playsErrors: Bool
+  let clickStyle: TypingClickSoundStyle
+  let errorStyle: TypingErrorSoundStyle
+  let volume: Double
+
+  @MainActor init(settings: AppSettings) {
+    playsClicks = settings.playKeyclickSound
+    playsErrors = settings.playErrorBeep
+    clickStyle = settings.clickSoundStyle
+    errorStyle = settings.errorSoundStyle
+    volume = settings.soundVolume
+  }
+}
+
 private struct ReplayTimelineView: View {
   let prompt: String
   let events: [TypingReplayEvent]
   let speedUnit: TypingSpeedUnit
+  let soundConfiguration: ReplaySoundConfiguration
   @State private var elapsed: TimeInterval = 0
   @State private var isPlaying = false
   @State private var selectedPromptIndex: Int?
+  @State private var includesCurrentOffsetOnNextTick = true
   private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
   private let characterSeekOffsets: [Int: TimeInterval]
 
@@ -3879,11 +3898,15 @@ private struct ReplayTimelineView: View {
     ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed)
   }
 
-  init(prompt: String, events: [TypingReplayEvent], speedUnit: TypingSpeedUnit) {
+  init(
+    prompt: String, events: [TypingReplayEvent], speedUnit: TypingSpeedUnit,
+    soundConfiguration: ReplaySoundConfiguration
+  ) {
     let chronologicalEvents = TypingReplay.chronologicalEvents(events)
     self.prompt = prompt
     self.events = chronologicalEvents
     self.speedUnit = speedUnit
+    self.soundConfiguration = soundConfiguration
     self.characterSeekOffsets = TypingReplay.characterSeekOffsets(
       prompt: prompt, events: chronologicalEvents)
   }
@@ -3919,6 +3942,7 @@ private struct ReplayTimelineView: View {
           selectedPromptIndex = index
           elapsed = min(duration, targetOffset)
           isPlaying = false
+          includesCurrentOffsetOnNextTick = false
         }
         .frame(height: 38)
         .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
@@ -3929,13 +3953,17 @@ private struct ReplayTimelineView: View {
           if editing {
             isPlaying = false
             selectedPromptIndex = nil
+            includesCurrentOffsetOnNextTick = false
           }
         })
         .accessibilityLabel("回放时间")
         .accessibilityHint("调整回放位置；目标文本也支持鼠标点选字符定位")
       HStack {
         Button(isPlaying ? "暂停" : "播放") {
-          if elapsed >= duration { elapsed = 0 }
+          if elapsed >= duration {
+            elapsed = 0
+            includesCurrentOffsetOnNextTick = true
+          }
           selectedPromptIndex = nil
           isPlaying.toggle()
         }
@@ -3944,6 +3972,7 @@ private struct ReplayTimelineView: View {
           elapsed = 0
           isPlaying = false
           selectedPromptIndex = nil
+          includesCurrentOffsetOnNextTick = true
         }
         .disabled(elapsed == 0 && !isPlaying)
         Spacer()
@@ -3951,8 +3980,33 @@ private struct ReplayTimelineView: View {
     }
     .onReceive(timer) { _ in
       guard isPlaying else { return }
+      let previousElapsed = elapsed
       elapsed = min(duration, elapsed + 0.05)
+      let soundLowerBound = includesCurrentOffsetOnNextTick
+        ? -Double.leastNonzeroMagnitude : previousElapsed
+      includesCurrentOffsetOnNextTick = false
+      playSounds(after: soundLowerBound, through: elapsed)
       if elapsed >= duration { isPlaying = false }
+    }
+  }
+
+  private func playSounds(after lowerBound: TimeInterval, through upperBound: TimeInterval) {
+    for cue in TypingReplay.soundCues(
+      prompt: prompt, events: events, after: lowerBound, through: upperBound)
+    {
+      switch TypingReplaySoundRoute.resolve(
+        cue: cue, playsClicks: soundConfiguration.playsClicks,
+        playsErrors: soundConfiguration.playsErrors)
+      {
+      case .none:
+        break
+      case .click:
+        TypingFeedbackSound.shared.playClick(
+          style: soundConfiguration.clickStyle, volume: soundConfiguration.volume)
+      case .error:
+        TypingFeedbackSound.shared.playError(
+          style: soundConfiguration.errorStyle, volume: soundConfiguration.volume)
+      }
     }
   }
 }
@@ -4665,7 +4719,7 @@ private struct ResultsHistoryView: View {
       ResultDetailView(
         result: result, modeName: modeName(result.configuration?.mode),
         isPersonalBest: personalBestIDs.contains(result.id),
-        typingSpeedUnit: settings.typingSpeedUnit)
+        typingSpeedUnit: settings.typingSpeedUnit, settings: settings)
     }
     .sheet(isPresented: $showingPersonalBestTable) {
       LocalPersonalBestTableView(speedUnit: settings.typingSpeedUnit)
@@ -5497,6 +5551,7 @@ private struct ResultDetailView: View {
   let modeName: String
   let isPersonalBest: Bool
   let typingSpeedUnit: TypingSpeedUnit
+  let settings: AppSettings
 
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
@@ -5610,7 +5665,8 @@ private struct ResultDetailView: View {
       }
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
         ReplayTimelineView(
-          prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit)
+          prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
+          soundConfiguration: .init(settings: settings))
       }
       ResultTagEditor(result: result)
       Spacer()

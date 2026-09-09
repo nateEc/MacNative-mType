@@ -12336,6 +12336,53 @@ final class TypingEngineTests: XCTestCase {
       [.correct, .correct, .extra, .correct, .correct, .correct, .correct])
   }
 
+  func testReplaySoundCuesOnlyIncludeNewManualEventsInStableOrder() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0.4, kind: .insert, text: "m"),
+      .init(offset: 0.2, kind: .insert, text: "x"),
+      .init(offset: 0.3, kind: .delete, text: "x"),
+      .init(offset: 0.1, kind: .insert, text: "a"),
+      .init(offset: 0.5, kind: .insert, text: "z", automatic: true),
+    ]
+
+    XCTAssertEqual(
+      TypingReplay.soundCues(prompt: "am", events: events, after: 0.1, through: 0.4),
+      [.error, .click, .click])
+    XCTAssertEqual(
+      TypingReplay.soundCues(prompt: "am", events: events, after: 0.2, through: 0.3),
+      [.click])
+    XCTAssertEqual(
+      TypingReplay.soundCues(prompt: "am", events: events, after: 0.1, through: 0.5),
+      [.error, .click, .click])
+  }
+
+  func testReplaySoundCueClassifiesWholeInsertAndForcedErrors() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0, kind: .insert, text: "ab"),
+      .init(offset: 0.2, kind: .insert, text: "c", forceError: true),
+    ]
+
+    XCTAssertEqual(
+      TypingReplay.soundCues(
+        prompt: "abc", events: events, after: -Double.leastNonzeroMagnitude, through: 1),
+      [.click, .error])
+  }
+
+  func testReplaySoundRouteMatchesEnabledFeedbackSettings() {
+    XCTAssertEqual(
+      TypingReplaySoundRoute.resolve(cue: .error, playsClicks: true, playsErrors: true),
+      .error)
+    XCTAssertEqual(
+      TypingReplaySoundRoute.resolve(cue: .error, playsClicks: true, playsErrors: false),
+      .click)
+    XCTAssertEqual(
+      TypingReplaySoundRoute.resolve(cue: .error, playsClicks: false, playsErrors: false),
+      .none)
+    XCTAssertEqual(
+      TypingReplaySoundRoute.resolve(cue: .click, playsClicks: false, playsErrors: true),
+      .none)
+  }
+
   func testExtraCharactersNeverCauseAnOutOfBoundsRead() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "a")
     session.insert("abc", at: start)

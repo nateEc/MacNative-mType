@@ -2053,6 +2053,28 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   }
 }
 
+enum TypingReplaySoundCue: Equatable {
+  case click
+  case error
+}
+
+enum TypingReplaySoundRoute: Equatable {
+  case none
+  case click
+  case error
+
+  static func resolve(
+    cue: TypingReplaySoundCue, playsClicks: Bool, playsErrors: Bool
+  ) -> Self {
+    switch cue {
+    case .click:
+      playsClicks ? .click : .none
+    case .error:
+      playsErrors ? .error : (playsClicks ? .click : .none)
+    }
+  }
+}
+
 enum TypingReplay {
   private struct CharacterCoordinate: Hashable {
     let word: Int
@@ -2116,6 +2138,53 @@ enum TypingReplay {
       }
     }
     return output
+  }
+
+  static func soundCues(
+    prompt: String, events: [TypingReplayEvent], after lowerBound: TimeInterval,
+    through upperBound: TimeInterval
+  ) -> [TypingReplaySoundCue] {
+    guard upperBound > lowerBound else { return [] }
+    let promptCharacters = Array(prompt)
+    let promptCoordinates = promptCharacterIndices(prompt: prompt)
+    var typed: [Character] = []
+    var typedWord = 0
+    var typedPosition = 0
+    var cues: [TypingReplaySoundCue] = []
+
+    for event in chronologicalEvents(events) {
+      guard event.offset <= upperBound else { break }
+      var cue: TypingReplaySoundCue?
+      switch event.kind {
+      case .insert:
+        var containsError = event.forceError
+        for character in event.text {
+          let coordinate = characterCoordinate(
+            word: typedWord, position: typedPosition, character: character)
+          if let promptIndex = promptCoordinates[coordinate] {
+            containsError = containsError || promptCharacters[promptIndex] != character
+          } else {
+            containsError = true
+          }
+          typed.append(character)
+          advanceCursor(for: character, word: &typedWord, position: &typedPosition)
+        }
+        if !event.text.isEmpty {
+          cue = containsError ? .error : .click
+        }
+      case .delete:
+        if !typed.isEmpty {
+          typed.removeLast()
+          (typedWord, typedPosition) = cursorPosition(after: typed)
+        }
+        cue = .click
+      }
+
+      if event.offset > lowerBound, !event.automatic, let cue {
+        cues.append(cue)
+      }
+    }
+    return cues
   }
 
   static func characterSeekOffsets(
