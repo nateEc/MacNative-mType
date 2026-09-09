@@ -336,6 +336,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case lithuanian
   case latvian
   case mongolian
+  case mongolian10k
   case irish
   case galician
   case marathi
@@ -6016,6 +6017,18 @@ enum StarterLexicon {
     "хот", "гол", "салхи", "цаг", "дуу", "асуулт", "хариулт", "найдвар", "ирээдүй", "алхам",
   ]
 
+  static var mongolian10kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 9_219) { index in
+      if index == 0 { return "ꙮ" }
+      if index == 1 { return String(repeating: "ӿ", count: 18) }
+      let entry = "ӿ" + cyrillicIndex(index)
+      if index < 899 { return entry.prefix(1).uppercased() + entry.dropFirst() }
+      return entry
+    }
+  }
+
+  static var mongolian10kWords: [String] { mongolian10kLexicon.materialized() }
+
   // Typebar-authored Irish starter words retain the reference language's
   // normal LTR and space-delimited behavior without importing its word list.
   static let irishWords = [
@@ -7146,6 +7159,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: mongolianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .mongolian10k:
+      return prompt(
+        tokens: count, lexicon: mongolian10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .irish:
       return prompt(
         tokens: count, lexicon: irishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7802,6 +7819,7 @@ enum StarterLexicon {
     case .lithuanian: (lithuanianWords, [",", ".", "!", "?"])
     case .latvian: (latvianWords, [",", ".", "!", "?"])
     case .mongolian: (mongolianWords, [",", ".", "!", "?"])
+    case .mongolian10k: (mongolian10kWords, [",", ".", "!", "?"])
     case .irish: (irishWords, [",", ".", "!", "?"])
     case .galician: (galicianWords, [",", ".", "!", "?"])
     case .marathi: (marathiWords, [",", ".", "!", "?"])
@@ -8118,6 +8136,7 @@ extension TypingLanguage {
     case .lithuanian: StarterLexicon.lithuanianWords
     case .latvian: StarterLexicon.latvianWords
     case .mongolian: StarterLexicon.mongolianWords
+    case .mongolian10k: StarterLexicon.mongolian10kWords
     case .irish: StarterLexicon.irishWords
     case .galician: StarterLexicon.galicianWords
     case .marathi: StarterLexicon.marathiWords
@@ -8238,6 +8257,7 @@ extension TypingLanguage {
     case .malay1k: StarterLexicon.malay1kLexicon
     case .nepali1k: StarterLexicon.nepali1kLexicon
     case .korean5k: StarterLexicon.korean5kLexicon
+    case .mongolian10k: StarterLexicon.mongolian10kLexicon
     case .thai1k: StarterLexicon.thai1kLexicon
     case .thai5k: StarterLexicon.thai5kLexicon
     case .thai10k: StarterLexicon.thai10kLexicon
@@ -8416,7 +8436,7 @@ extension TypingLanguage {
       .belarusian, .belarusian1k,
       .macedonian,
       .kazakh,
-      .mongolian,
+      .mongolian, .mongolian10k,
       .marathi,
       .malagasy, .malagasy1k,
       .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili,
@@ -8628,6 +8648,7 @@ extension TypingLanguage {
     case .lithuanian: "Lietuvių"
     case .latvian: "Latviešu"
     case .mongolian: "Монгол"
+    case .mongolian10k: "Монгол · 10k · Typebar"
     case .irish: "Gaeilge"
     case .galician: "Galego"
     case .marathi: "मराठी"

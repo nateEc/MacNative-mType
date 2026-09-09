@@ -491,6 +491,7 @@
     "malay": "malay",
     "malay_1k": "malay1k",
     "mongolian": "mongolian",
+    "mongolian_10k": "mongolian10k",
     "kannada": "kannada",
     "korean": "korean",
     "korean_1k": "korean1k",
@@ -763,7 +764,6 @@
     "sindhi": "sindhi"
   },
   "nativeRelatedChoice": {
-    "mongolian_10k": "mongolian",
     "ukrainian_1k": "ukrainian",
     "ukrainian_10k": "ukrainian",
     "ukrainian_50k": "ukrainian",
