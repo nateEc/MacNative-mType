@@ -79,7 +79,9 @@ enum SettingsSearch {
         Entry("companion", "显示节奏伙伴", section: .display, keywords: "typing companion"),
         Entry("typingPower", "键入能量效果", section: .display, keywords: "typing power"),
         Entry("fontSize", "练习字体大小", section: .display, keywords: "font size"),
-        Entry("font", "练习字体", section: .display, keywords: "font family|local font"),
+        Entry(
+          "font", "练习字体", section: .display,
+          keywords: "font family|local font|本机字体|已安装字体|浏览字体|installed font"),
         Entry("lineWidth", "练习行宽", section: .display, keywords: "line width"),
         Entry("tapeMode", "单行卷带", section: .display, keywords: "tape mode"),
         Entry("allLines", "显示完整提示行", section: .display, keywords: "show all lines"),

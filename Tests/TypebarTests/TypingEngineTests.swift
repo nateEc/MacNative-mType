@@ -11681,6 +11681,18 @@ final class TypingEngineTests: XCTestCase {
       installedName)
   }
 
+  func testNativeFontCatalogNormalizesAndFiltersInjectedFamilies() {
+    let families = NativeFontCatalog.normalizedFamilies([
+      "  Zeta Sans  ", "alpha serif", "", "ALPHA SERIF", "Élan Mono", "\nBeta UI\t",
+    ])
+
+    XCTAssertEqual(families, ["alpha serif", "Beta UI", "Élan Mono", "Zeta Sans"])
+    XCTAssertEqual(NativeFontCatalog.filteredFamilies(families, query: "  ELAN "), ["Élan Mono"])
+    XCTAssertEqual(NativeFontCatalog.filteredFamilies(families, query: "ui"), ["Beta UI"])
+    XCTAssertEqual(NativeFontCatalog.filteredFamilies(families, query: "   "), families)
+    XCTAssertEqual(NativeFontCatalog.filteredFamilies(families, query: "missing"), [])
+  }
+
   func testLocalPracticeFontFilePolicyAcceptsNativeFormatsOnly() {
     XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "practice.ttf"))
     XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "PRACTICE.OTF"))
@@ -11830,6 +11842,9 @@ final class TypingEngineTests: XCTestCase {
     let catalog = SettingsSearch.preferenceCatalog
     XCTAssertEqual(Set(catalog.map(\.id)).count, catalog.count)
     XCTAssertEqual(Set(catalog.map(\.section)), Set(SettingsSearch.Section.allCases))
+    XCTAssertEqual(
+      SettingsSearch.results(query: "本机 字体", entries: catalog).map(\.id),
+      ["font"])
   }
 
   func testTestConfigurationShareRoundTripsAndRejectsInvalidLinks() throws {

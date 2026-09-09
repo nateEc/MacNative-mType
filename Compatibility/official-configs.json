@@ -193,7 +193,7 @@
     "quoteLength": "`QuoteLength`、收藏和本机搜索",
     "language": "`TypingLanguage`、`mixedLanguageComponents`",
     "customPolyglot": "`mixedLanguageComponents`",
-    "fontFamily": "`practiceFont`、本机字体名称/导入"
+    "fontFamily": "`practiceFont`、可搜索的本机字体目录、名称/导入"
   },
   "notApplicable": {
     "ads": "无"

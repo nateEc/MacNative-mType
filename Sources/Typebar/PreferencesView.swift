@@ -97,6 +97,8 @@ struct PreferencesView: View {
   @State private var showingCustomBackgroundImporter = false
   @State private var localPracticeFontMessage: String?
   @State private var showingLocalPracticeFontImporter = false
+  @State private var installedFontFamilies: [String] = []
+  @State private var showingInstalledFontPicker = false
 
   var body: some View {
     @Bindable var settings = settings
@@ -466,8 +468,14 @@ struct PreferencesView: View {
               Text(font.displayName).tag(font)
             }
           }
-          TextField("本机字体名称（可选）", text: $settings.installedPracticeFontName)
-            .textFieldStyle(.roundedBorder)
+          HStack {
+            TextField("本机字体名称（可选）", text: $settings.installedPracticeFontName)
+              .textFieldStyle(.roundedBorder)
+            Button("浏览…") {
+              installedFontFamilies = NativeFontCatalog.installedFamilies
+              showingInstalledFontPicker = true
+            }
+          }
           HStack {
             Button(settings.hasLocalPracticeFont ? "替换本地字体…" : "选择本地字体文件…") {
               showingLocalPracticeFontImporter = true
@@ -1884,6 +1892,11 @@ struct PreferencesView: View {
       case .success(let url): importLocalPracticeFont(from: url)
       case .failure(let error): localPracticeFontMessage = error.localizedDescription
       }
+    }
+    .sheet(isPresented: $showingInstalledFontPicker) {
+      NativeFontFamilyPicker(
+        selection: $settings.installedPracticeFontName,
+        families: installedFontFamilies)
     }
     .onAppear { customBackgroundURLDraft = settings.customBackgroundURL }
     .frame(width: 440)
