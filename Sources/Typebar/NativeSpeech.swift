@@ -132,6 +132,11 @@ extension TypingLanguage {
     case .french, .french1k, .french2k, .french10k, .french600k: "fr-FR"
     case .frenchBitoduc: "fr-fr"
     case .italian, .italian1k, .italian7k, .italian60k, .italian280k: "it-IT"
+    case .esperanto, .esperanto1k, .esperanto10k, .esperanto25k, .esperanto36k,
+      .esperantoXSystem, .esperantoXSystem1k, .esperantoXSystem10k,
+      .esperantoXSystem25k, .esperantoXSystem36k,
+      .esperantoHSystem, .esperantoHSystem1k, .esperantoHSystem10k,
+      .esperantoHSystem25k, .esperantoHSystem36k: "en-US"
     case .portuguese, .portuguese3k, .portugueseAccents: "pt-PT"
     case .portuguese1k: "pt-BR"
     case .portuguese5k, .portuguese320k, .portuguese550k: "pt"

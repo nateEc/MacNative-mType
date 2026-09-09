@@ -116,6 +116,18 @@
 | TST-179 | Italiano 7k 数字规模入口 | 选择「Italiano · 7k · Typebar」并重复 TST-178 流程 | 独立 ID 保持 7,154 项、1–18 字符、2 个大写项和 136 个非 ASCII 项；不进入多语混排 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
 | TST-180 | Italiano 60k 数字规模入口 | 选择「Italiano · 60k · Typebar」并重复 TST-178 流程 | 独立 ID 保持 60,442 项、1–18 字符、38 个标点项与 2 个独立符号项，无非 ASCII 或数字项 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
 | TST-181 | Italiano 280k 数字规模入口 | 选择「Italiano · 280k · Typebar」并重复 TST-178 流程 | 独立 ID 保持 279,833 个小写 ASCII 单 token 和 1–25 字符；普通出题不物化整表，服务端接受该 ID | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-182 | Esperanto 1k 数字规模入口 | 选择「Esperanto · 1k · Typebar」，完成普通、四档引语、预设、分享、投稿与成绩流程 | 独立 ID 保持 1,000 项、1–15 字符和 137 个非 ASCII 项；保留简化输入并支持 Zipf | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-183 | Esperanto 10k 数字规模入口 | 选择「Esperanto · 10k · Typebar」并重复 TST-182 流程 | 独立 ID 保持 10,000 项、1–17 字符和 1,560 个非 ASCII 项；服务端接受该 ID | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-184 | Esperanto 25k 数字规模入口 | 选择「Esperanto · 25k · Typebar」并重复 TST-182 流程 | 独立 ID 保持 24,998 项、1–17 字符和 4,528 个非 ASCII 项 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-185 | Esperanto 36k 数字规模入口 | 选择「Esperanto · 36k · Typebar」并重复 TST-182 流程 | 独立 ID 保持 36,342 项、1–40 字符和 6,843 个非 ASCII 项；普通出题不物化整表 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-186 | Esperanto X-sistemo 1k 数字规模入口 | 选择「Esperanto · X-sistemo · 1k · Typebar」，完成 TST-182 全流程 | 独立 ID 保持 999 项、1–15 字符和 4 个非 ASCII 项；禁用简化输入并支持 Zipf | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-187 | Esperanto X-sistemo 10k 数字规模入口 | 选择「Esperanto · X-sistemo · 10k · Typebar」并重复 TST-186 流程 | 独立 ID 保持 9,993 项、1–17 字符和 38 个非 ASCII 项；Zipf 保持未知提示 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-188 | Esperanto X-sistemo 25k 数字规模入口 | 选择「Esperanto · X-sistemo · 25k · Typebar」并重复 TST-186 流程 | 独立 ID 保持 24,970 项、1–18 字符和 213 个非 ASCII 项 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-189 | Esperanto X-sistemo 36k 数字规模入口 | 选择「Esperanto · X-sistemo · 36k · Typebar」并重复 TST-186 流程 | 独立 ID 保持 36,296 项、1–40 字符和 277 个非 ASCII 项；普通出题不物化整表 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-190 | Esperanto H-sistemo 1k 数字规模入口 | 选择「Esperanto · H-sistemo · 1k · Typebar」，完成 TST-182 全流程 | 独立 ID 保持 999 项、1–15 字符和 4 个非 ASCII 项；禁用简化输入并支持 Zipf | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-191 | Esperanto H-sistemo 10k 数字规模入口 | 选择「Esperanto · H-sistemo · 10k · Typebar」并重复 TST-190 流程 | 独立 ID 保持 9,969 项、1–17 字符和 38 个非 ASCII 项；支持 Zipf | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-192 | Esperanto H-sistemo 25k 数字规模入口 | 选择「Esperanto · H-sistemo · 25k · Typebar」并重复 TST-190 流程 | 独立 ID 保持 24,922 项、1–18 字符和 213 个非 ASCII 项 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
+| TST-193 | Esperanto H-sistemo 36k 数字规模入口 | 选择「Esperanto · H-sistemo · 36k · Typebar」并重复 TST-190 流程 | 独立 ID 保持 36,131 项、1–40 字符和 277 个非 ASCII 项；普通出题不物化整表 | 待验收（自动化覆盖；依用户要求不启动 GUI） |
 | TST-34 | Greeklish 离线练习 | 在语言菜单选择「Greeklish」，分别开始字数与引语练习；用普通 ASCII 键盘输入 `kalimera charti`，再启用“知识短文”。 | 词流和四档引语均为 Typebar 原创 ASCII 内容、以空格提交；知识短文不会请求或应用希腊字母原文，保持 Latin 提示。混排、错词复练、结果、服务端投稿/排行榜和系统 `el-GR` 朗读维持同一语言设置。 | 待验收（客户端与服务端自动化覆盖；依用户要求，本轮不启动 GUI） |
 | TST-35 | Norwegian Nynorsk 离线与百科练习 | 在语言菜单选择「Norsk nynorsk」，分别开始字数、引语和“知识短文”练习；用 macOS 挪威语输入源输入 `vindauge`。 | 词流和四档引语均来自 Typebar 原创内容，以空格提交；知识短文仅在用户明确启用时请求 `nn` 页面。Nynorsk 拼写、错词复练和系统 `nn-NO` 朗读维持同一语言设置。 | 待验收（客户端与服务端自动化覆盖；依用户要求，本轮不启动 GUI） |
 | TST-36 | Afrikaans 离线与百科练习 | 在语言菜单选择「Afrikaans」，分别开始字数、引语和“知识短文”练习；用 macOS 输入源输入 `môre reën`。 | 词流和四档引语均来自 Typebar 原创内容，以空格提交；知识短文仅在用户明确启用时请求 `af` 页面。组合变音输入、错词复练和系统 `af-ZA` 朗读维持同一语言设置。 | 待验收（客户端与服务端自动化覆盖；依用户要求，本轮不启动 GUI） |

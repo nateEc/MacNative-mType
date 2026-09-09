@@ -252,6 +252,11 @@ enum LivePracticeContentService {
     case .french, .french1k, .french2k, .french10k, .french600k: return "fr"
     case .frenchBitoduc: return "fr"
     case .italian, .italian1k, .italian7k, .italian60k, .italian280k: return "it"
+    case .esperanto, .esperanto1k, .esperanto10k, .esperanto25k, .esperanto36k,
+      .esperantoXSystem, .esperantoXSystem1k, .esperantoXSystem10k,
+      .esperantoXSystem25k, .esperantoXSystem36k,
+      .esperantoHSystem, .esperantoHSystem1k, .esperantoHSystem10k,
+      .esperantoHSystem25k, .esperantoHSystem36k: return "en"
     case .portuguese, .portuguese1k, .portuguese3k, .portuguese5k, .portuguese320k,
       .portuguese550k, .portugueseAccents: return "pt"
     case .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,

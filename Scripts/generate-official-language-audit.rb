@@ -6,7 +6,7 @@ require "open3"
 require "pathname"
 
 PINNED_COMMIT = "91bd24bb8513785c7364cbea29296ff7adafac41"
-EXPECTED_COUNTS = { official: 446, independent: 329, related: 117, unmapped: 0 }.freeze
+EXPECTED_COUNTS = { official: 446, independent: 341, related: 105, unmapped: 0 }.freeze
 MIXED_TYPEBAR_CASES = %w[mixedEnglishChinese mixedLanguages].freeze
 ALIASES = {
   "englishFiveLetter" => "wordle",
@@ -115,6 +115,18 @@ ALIASES = {
   "englishDoubleLetter" => "english_doubleletter",
   "esperantoXSystem" => "esperanto_x_sistemo",
   "esperantoHSystem" => "esperanto_h_sistemo",
+  "esperanto1k" => "esperanto_1k",
+  "esperanto10k" => "esperanto_10k",
+  "esperanto25k" => "esperanto_25k",
+  "esperanto36k" => "esperanto_36k",
+  "esperantoXSystem1k" => "esperanto_x_sistemo_1k",
+  "esperantoXSystem10k" => "esperanto_x_sistemo_10k",
+  "esperantoXSystem25k" => "esperanto_x_sistemo_25k",
+  "esperantoXSystem36k" => "esperanto_x_sistemo_36k",
+  "esperantoHSystem1k" => "esperanto_h_sistemo_1k",
+  "esperantoHSystem10k" => "esperanto_h_sistemo_10k",
+  "esperantoHSystem25k" => "esperanto_h_sistemo_25k",
+  "esperantoHSystem36k" => "esperanto_h_sistemo_36k",
   "maori" => "maori_1k",
   "basque" => "euskera",
   "yoruba" => "yoruba_1k",

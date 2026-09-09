@@ -4605,6 +4605,11 @@ enum OfflineContent {
     case .kurdishCentral2k, .kurdishCentral4k: .kurdishCentral
     case .afrikaans1k, .afrikaans10k: .afrikaans
     case .italian1k, .italian7k, .italian60k, .italian280k: .italian
+    case .esperanto1k, .esperanto10k, .esperanto25k, .esperanto36k: .esperanto
+    case .esperantoXSystem1k, .esperantoXSystem10k,
+      .esperantoXSystem25k, .esperantoXSystem36k: .esperantoXSystem
+    case .esperantoHSystem1k, .esperantoHSystem10k,
+      .esperantoHSystem25k, .esperantoHSystem36k: .esperantoHSystem
     default: nil
     }
     if let source = inheritedScaleQuoteSource {

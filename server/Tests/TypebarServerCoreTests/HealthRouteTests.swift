@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 256)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 268)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4247,6 +4247,18 @@ final class HealthRouteTests: XCTestCase {
       ("italian7k", "La seconda raccolta amplia la pratica senza copiare parole."),
       ("italian60k", "L'indice esteso genera soltanto gli elementi necessari."),
       ("italian280k", "La raccolta maggiore resta efficiente durante ogni prova."),
+      ("esperanto1k", "Ĉiu malgranda skalo konservas propran ritmon."),
+      ("esperanto10k", "La loka indekso vastigas la ekzercon sen fremda vortaro."),
+      ("esperanto25k", "Pli vasta kolekto restas klare aparta kaj loka."),
+      ("esperanto36k", "La plej granda skalo generas nur la bezonatajn erojn."),
+      ("esperantoXSystem1k", "Cxiu malgranda skalo konservas propran ritmon."),
+      ("esperantoXSystem10k", "La loka indekso vastigas la ekzercon sen fremda vortaro."),
+      ("esperantoXSystem25k", "Pli vasta kolekto restas klare aparta kaj loka."),
+      ("esperantoXSystem36k", "La plej granda skalo generas nur la bezonatajn erojn."),
+      ("esperantoHSystem1k", "Chiu malgranda skalo konservas propran ritmon."),
+      ("esperantoHSystem10k", "La loka indekso vastigas la ekzercon sen fremda vortaro."),
+      ("esperantoHSystem25k", "Pli vasta kolekto restas klare aparta kaj loka."),
+      ("esperantoHSystem36k", "La plej granda skalo generas nur la bezonatajn erojn."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

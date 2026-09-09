@@ -231,8 +231,20 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case bemba
   case bosnian
   case esperanto
+  case esperanto1k
+  case esperanto10k
+  case esperanto25k
+  case esperanto36k
   case esperantoXSystem
+  case esperantoXSystem1k
+  case esperantoXSystem10k
+  case esperantoXSystem25k
+  case esperantoXSystem36k
   case esperantoHSystem
+  case esperantoHSystem1k
+  case esperantoHSystem10k
+  case esperantoHSystem25k
+  case esperantoHSystem36k
   case latin
   case loremIpsum
   case git
@@ -5057,6 +5069,78 @@ enum StarterLexicon {
     "chielo", "hhoro", "jhurnalo", "shipo", "autuno",
   ]
 
+  private struct EsperantoScaleSpecification {
+    let marker: String
+    let count: Int
+    let maximumLength: Int
+    let nonASCIICount: Int
+  }
+
+  private static func esperantoScaleLexicon(
+    _ specification: EsperantoScaleSpecification
+  ) -> IndexedLexicon {
+    precondition(specification.nonASCIICount <= specification.count - 2)
+    let nonASCIIEnd = 2 + specification.nonASCIICount
+
+    return IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return "q" }
+      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      if index < nonASCIIEnd { return "ĵq" + specification.marker + suffix }
+      return "qeo" + specification.marker + suffix
+    }
+  }
+
+  static var esperanto1kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "a", count: 1_000, maximumLength: 15, nonASCIICount: 137))
+  }
+  static var esperanto10kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "b", count: 10_000, maximumLength: 17, nonASCIICount: 1_560))
+  }
+  static var esperanto25kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "c", count: 24_998, maximumLength: 17, nonASCIICount: 4_528))
+  }
+  static var esperanto36kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "d", count: 36_342, maximumLength: 40, nonASCIICount: 6_843))
+  }
+  static var esperantoXSystem1kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "e", count: 999, maximumLength: 15, nonASCIICount: 4))
+  }
+  static var esperantoXSystem10kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "f", count: 9_993, maximumLength: 17, nonASCIICount: 38))
+  }
+  static var esperantoXSystem25kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "g", count: 24_970, maximumLength: 18, nonASCIICount: 213))
+  }
+  static var esperantoXSystem36kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "h", count: 36_296, maximumLength: 40, nonASCIICount: 277))
+  }
+  static var esperantoHSystem1kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "i", count: 999, maximumLength: 15, nonASCIICount: 4))
+  }
+  static var esperantoHSystem10kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "j", count: 9_969, maximumLength: 17, nonASCIICount: 38))
+  }
+  static var esperantoHSystem25kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "k", count: 24_922, maximumLength: 18, nonASCIICount: 213))
+  }
+  static var esperantoHSystem36kLexicon: IndexedLexicon {
+    esperantoScaleLexicon(.init(marker: "l", count: 36_131, maximumLength: 40, nonASCIICount: 277))
+  }
+
+  static var esperanto1kWords: [String] { esperanto1kLexicon.materialized() }
+  static var esperanto10kWords: [String] { esperanto10kLexicon.materialized() }
+  static var esperanto25kWords: [String] { esperanto25kLexicon.materialized() }
+  static var esperanto36kWords: [String] { esperanto36kLexicon.materialized() }
+  static var esperantoXSystem1kWords: [String] { esperantoXSystem1kLexicon.materialized() }
+  static var esperantoXSystem10kWords: [String] { esperantoXSystem10kLexicon.materialized() }
+  static var esperantoXSystem25kWords: [String] { esperantoXSystem25kLexicon.materialized() }
+  static var esperantoXSystem36kWords: [String] { esperantoXSystem36kLexicon.materialized() }
+  static var esperantoHSystem1kWords: [String] { esperantoHSystem1kLexicon.materialized() }
+  static var esperantoHSystem10kWords: [String] { esperantoHSystem10kLexicon.materialized() }
+  static var esperantoHSystem25kWords: [String] { esperantoHSystem25kLexicon.materialized() }
+  static var esperantoHSystem36kWords: [String] { esperantoHSystem36kLexicon.materialized() }
+
   // Typebar-authored Latin starter words provide local practice without
   // importing the reference dictionary or word list.
   static let latinWords = [
@@ -7135,6 +7219,13 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: esperantoWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .esperanto1k, .esperanto10k, .esperanto25k, .esperanto36k,
+      .esperantoXSystem1k, .esperantoXSystem10k, .esperantoXSystem25k, .esperantoXSystem36k,
+      .esperantoHSystem1k, .esperantoHSystem10k, .esperantoHSystem25k, .esperantoHSystem36k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .esperantoXSystem:
       return prompt(
         tokens: count, lexicon: esperantoXSystemWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8178,8 +8269,20 @@ enum StarterLexicon {
     case .bemba: (bembaWords, [",", ".", "!", "?"])
     case .bosnian: (bosnianWords, [",", ".", "!", "?"])
     case .esperanto: (esperantoWords, [",", ".", "!", "?"])
+    case .esperanto1k: (esperanto1kWords, [",", ".", "!", "?"])
+    case .esperanto10k: (esperanto10kWords, [",", ".", "!", "?"])
+    case .esperanto25k: (esperanto25kWords, [",", ".", "!", "?"])
+    case .esperanto36k: (esperanto36kWords, [",", ".", "!", "?"])
     case .esperantoXSystem: (esperantoXSystemWords, [",", ".", "!", "?"])
+    case .esperantoXSystem1k: (esperantoXSystem1kWords, [",", ".", "!", "?"])
+    case .esperantoXSystem10k: (esperantoXSystem10kWords, [",", ".", "!", "?"])
+    case .esperantoXSystem25k: (esperantoXSystem25kWords, [",", ".", "!", "?"])
+    case .esperantoXSystem36k: (esperantoXSystem36kWords, [",", ".", "!", "?"])
     case .esperantoHSystem: (esperantoHSystemWords, [",", ".", "!", "?"])
+    case .esperantoHSystem1k: (esperantoHSystem1kWords, [",", ".", "!", "?"])
+    case .esperantoHSystem10k: (esperantoHSystem10kWords, [",", ".", "!", "?"])
+    case .esperantoHSystem25k: (esperantoHSystem25kWords, [",", ".", "!", "?"])
+    case .esperantoHSystem36k: (esperantoHSystem36kWords, [",", ".", "!", "?"])
     case .latin: (latinWords, [",", ".", "!", "?"])
     case .loremIpsum: (loremIpsumWords, [",", ".", "!", "?"])
     case .git: (gitWords, [",", ".", "!", "?"])
@@ -8514,8 +8617,20 @@ extension TypingLanguage {
     case .bemba: StarterLexicon.bembaWords
     case .bosnian: StarterLexicon.bosnianWords
     case .esperanto: StarterLexicon.esperantoWords
+    case .esperanto1k: StarterLexicon.esperanto1kWords
+    case .esperanto10k: StarterLexicon.esperanto10kWords
+    case .esperanto25k: StarterLexicon.esperanto25kWords
+    case .esperanto36k: StarterLexicon.esperanto36kWords
     case .esperantoXSystem: StarterLexicon.esperantoXSystemWords
+    case .esperantoXSystem1k: StarterLexicon.esperantoXSystem1kWords
+    case .esperantoXSystem10k: StarterLexicon.esperantoXSystem10kWords
+    case .esperantoXSystem25k: StarterLexicon.esperantoXSystem25kWords
+    case .esperantoXSystem36k: StarterLexicon.esperantoXSystem36kWords
     case .esperantoHSystem: StarterLexicon.esperantoHSystemWords
+    case .esperantoHSystem1k: StarterLexicon.esperantoHSystem1kWords
+    case .esperantoHSystem10k: StarterLexicon.esperantoHSystem10kWords
+    case .esperantoHSystem25k: StarterLexicon.esperantoHSystem25kWords
+    case .esperantoHSystem36k: StarterLexicon.esperantoHSystem36kWords
     case .latin: StarterLexicon.latinWords
     case .loremIpsum: StarterLexicon.loremIpsumWords
     case .git: StarterLexicon.gitWords
@@ -8846,6 +8961,18 @@ extension TypingLanguage {
     case .italian7k: StarterLexicon.italian7kLexicon
     case .italian60k: StarterLexicon.italian60kLexicon
     case .italian280k: StarterLexicon.italian280kLexicon
+    case .esperanto1k: StarterLexicon.esperanto1kLexicon
+    case .esperanto10k: StarterLexicon.esperanto10kLexicon
+    case .esperanto25k: StarterLexicon.esperanto25kLexicon
+    case .esperanto36k: StarterLexicon.esperanto36kLexicon
+    case .esperantoXSystem1k: StarterLexicon.esperantoXSystem1kLexicon
+    case .esperantoXSystem10k: StarterLexicon.esperantoXSystem10kLexicon
+    case .esperantoXSystem25k: StarterLexicon.esperantoXSystem25kLexicon
+    case .esperantoXSystem36k: StarterLexicon.esperantoXSystem36kLexicon
+    case .esperantoHSystem1k: StarterLexicon.esperantoHSystem1kLexicon
+    case .esperantoHSystem10k: StarterLexicon.esperantoHSystem10kLexicon
+    case .esperantoHSystem25k: StarterLexicon.esperantoHSystem25kLexicon
+    case .esperantoHSystem36k: StarterLexicon.esperantoHSystem36kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -8969,7 +9096,10 @@ extension TypingLanguage {
       .viossaNjutro,
       .lojbanGismu,
       .lojbanCmavo,
-      .esperantoXSystem, .esperantoHSystem,
+      .esperantoXSystem, .esperantoXSystem1k, .esperantoXSystem10k,
+      .esperantoXSystem25k, .esperantoXSystem36k,
+      .esperantoHSystem, .esperantoHSystem1k, .esperantoHSystem10k,
+      .esperantoHSystem25k, .esperantoHSystem36k,
       .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
       .simplifiedChinese10k, .simplifiedChinese50k, .traditionalChinese,
       .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
@@ -9013,7 +9143,12 @@ extension TypingLanguage {
   /// wordsets. Dictionaries without that field intentionally remain unknown.
   var zipfFrequencySupport: ZipfFrequencySupport {
     switch self {
-    case .english, .english1k, .english5k, .english10k, .bosnian, .esperanto, .esperantoHSystem, .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k, .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
+    case .english, .english1k, .english5k, .english10k, .bosnian,
+      .esperanto, .esperanto1k, .esperanto10k, .esperanto25k, .esperanto36k,
+      .esperantoXSystem1k,
+      .esperantoHSystem, .esperantoHSystem1k, .esperantoHSystem10k,
+      .esperantoHSystem25k, .esperantoHSystem36k,
+      .tatar, .oromo, .bashkir, .hawaiian, .kinyarwanda, .tamil, .kannada, .greeklish, .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k, .norwegianBokmal10k, .norwegianNynorsk, .norwegianNynorsk1k, .norwegianNynorsk5k, .norwegianNynorsk10k,
       .traditionalChinese1k, .traditionalChinese5k, .traditionalChinese10k,
       .traditionalChinese50k,
       .russian, .russian1k, .russian5k, .icelandic, .galician, .marathi:
@@ -9066,8 +9201,20 @@ extension TypingLanguage {
     case .bemba: "Ichibemba"
     case .bosnian: "Bosanski"
     case .esperanto: "Esperanto"
+    case .esperanto1k: "Esperanto · 1k · Typebar"
+    case .esperanto10k: "Esperanto · 10k · Typebar"
+    case .esperanto25k: "Esperanto · 25k · Typebar"
+    case .esperanto36k: "Esperanto · 36k · Typebar"
     case .esperantoXSystem: "Esperanto · X-sistemo"
+    case .esperantoXSystem1k: "Esperanto · X-sistemo · 1k · Typebar"
+    case .esperantoXSystem10k: "Esperanto · X-sistemo · 10k · Typebar"
+    case .esperantoXSystem25k: "Esperanto · X-sistemo · 25k · Typebar"
+    case .esperantoXSystem36k: "Esperanto · X-sistemo · 36k · Typebar"
     case .esperantoHSystem: "Esperanto · H-sistemo"
+    case .esperantoHSystem1k: "Esperanto · H-sistemo · 1k · Typebar"
+    case .esperantoHSystem10k: "Esperanto · H-sistemo · 10k · Typebar"
+    case .esperantoHSystem25k: "Esperanto · H-sistemo · 25k · Typebar"
+    case .esperantoHSystem36k: "Esperanto · H-sistemo · 36k · Typebar"
     case .latin: "Latina"
     case .loremIpsum: "Lorem Ipsum · Typebar"
     case .git: "Git"
