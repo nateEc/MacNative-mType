@@ -1631,6 +1631,102 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testThresholdCommandsCoverFixedReferenceModesAndInputSemantics() {
+    XCTAssertEqual(
+      PracticeThresholdCommandCatalog.items.map(\.id),
+      [
+        "behavior.minWpm.off", "behavior.minWpm.custom",
+        "behavior.minAcc.off", "behavior.minAcc.custom",
+        "behavior.minBurst.off", "behavior.minBurst.fixed", "behavior.minBurst.flex",
+      ])
+    XCTAssertEqual(
+      PracticeThresholdCommandCatalog.target(for: "behavior.minWpm.off"), .minimumWpmOff)
+    XCTAssertEqual(
+      PracticeThresholdCommandCatalog.target(for: "behavior.minWpm.custom"), .minimumWpmCustom)
+    XCTAssertEqual(
+      PracticeThresholdCommandCatalog.target(for: "behavior.minAcc.custom"),
+      .minimumAccuracyCustom)
+    XCTAssertEqual(
+      PracticeThresholdCommandCatalog.target(for: "behavior.minBurst.fixed"),
+      .minimumWordBurst(.fixed))
+    XCTAssertEqual(
+      PracticeThresholdCommandCatalog.target(for: "behavior.minBurst.flex"),
+      .minimumWordBurst(.flex))
+    XCTAssertNil(PracticeThresholdCommandCatalog.target(for: "behavior.minBurst.custom"))
+    XCTAssertNil(PracticeThresholdCommandCatalog.target(for: "behavior.minAcc.101"))
+
+    XCTAssertEqual(
+      PracticeThresholdInput.value(from: "301.25", kind: .speed, unit: .wpm), 301.25)
+    XCTAssertEqual(
+      PracticeThresholdInput.value(from: "301", kind: .speed, unit: .cpm), 60.2)
+    XCTAssertEqual(
+      PracticeThresholdInput.value(from: "99.5", kind: .accuracy, unit: .wpm), 99.5)
+    XCTAssertEqual(
+      PracticeThresholdInput.value(from: "301", kind: .wordBurst, unit: .cpm), 60.2)
+    XCTAssertNil(
+      PracticeThresholdInput.value(from: "1.5", kind: .wordBurst, unit: .wpm))
+    XCTAssertNil(
+      PracticeThresholdInput.value(from: "100.1", kind: .accuracy, unit: .wpm))
+    XCTAssertNil(
+      PracticeThresholdInput.value(from: "-1", kind: .speed, unit: .wpm))
+    XCTAssertNil(
+      PracticeThresholdInput.value(from: "1e309", kind: .speed, unit: .wpm))
+    XCTAssertNil(
+      PracticeThresholdInput.value(from: "1e308", kind: .speed, unit: .wps))
+    for item in PracticeThresholdCommandCatalog.items {
+      let target = PracticeThresholdCommandCatalog.target(for: item.id)
+      XCTAssertNotNil(target, item.id)
+      XCTAssertTrue(
+        CommandPaletteSearch.results(items: PracticeThresholdCommandCatalog.items, query: item.id)
+          .contains(where: { $0.id == item.id }), item.id)
+    }
+  }
+
+  @MainActor
+  func testThresholdCommandsApplyAndPersistWithoutLosingFractionalValues() throws {
+    let suiteName = "TypebarTests.ThresholdCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    XCTAssertEqual(
+      PracticeThresholdCommandTarget.minimumWpmCustom.editorKind, .minimumWpm)
+    XCTAssertEqual(
+      PracticeThresholdCommandTarget.minimumWordBurst(.flex).editorKind,
+      .minimumWordBurst(.flex))
+    XCTAssertFalse(
+      PracticeThresholdCommandTarget.minimumAccuracyCustom.applyImmediate(to: settings))
+
+    PracticeThresholdApplication.apply(301.25, kind: .minimumWpm, to: settings)
+    PracticeThresholdApplication.apply(99.5, kind: .minimumAccuracy, to: settings)
+    PracticeThresholdApplication.apply(
+      60.2, kind: .minimumWordBurst(.flex), to: settings)
+    XCTAssertEqual(settings.minimumWpm, 301.25)
+    XCTAssertEqual(settings.minimumAccuracy, 99.5)
+    XCTAssertEqual(settings.minimumWordBurstWpm, 60.2)
+    XCTAssertEqual(settings.minimumWordBurstMode, .flex)
+
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.minimumWpm, 301.25)
+    XCTAssertEqual(restored.minimumAccuracy, 99.5)
+    XCTAssertEqual(restored.minimumWordBurstWpm, 60.2)
+    XCTAssertEqual(restored.minimumWordBurstMode, .flex)
+
+    XCTAssertTrue(PracticeThresholdCommandTarget.minimumWpmOff.applyImmediate(to: settings))
+    XCTAssertTrue(
+      PracticeThresholdCommandTarget.minimumAccuracyOff.applyImmediate(to: settings))
+    XCTAssertTrue(
+      PracticeThresholdCommandTarget.minimumWordBurstOff.applyImmediate(to: settings))
+    XCTAssertEqual(settings.minimumWpm, 0)
+    XCTAssertEqual(settings.minimumAccuracy, 0)
+    XCTAssertEqual(settings.minimumWordBurstWpm, 0)
+    XCTAssertEqual(settings.minimumWordBurstMode, .off)
+    settings.minimumWpm = -.infinity
+    settings.minimumAccuracy = 101
+    XCTAssertEqual(settings.minimumWpm, 0)
+    XCTAssertEqual(settings.minimumAccuracy, 100)
+  }
+
   @MainActor
   func testBehaviorCommandsApplyWithoutRestartingOrExitingChallenges() throws {
     let suiteName = "TypebarTests.BehaviorCommands.\(UUID().uuidString)"
@@ -2367,6 +2463,48 @@ final class TypingEngineTests: XCTestCase {
     flexible.insert("w", at: start)
     flexible.insert("onderful ", at: start.addingTimeInterval(1.5))
     XCTAssertEqual(flexible.outcome, .active)
+  }
+
+  func testThresholdRulesPreserveOfficialNumberValuesAndLegacyIntegers() throws {
+    let high = InputRules(
+      minimumAccuracy: 100, minimumWpm: 301, minimumWordBurstWpm: 450,
+      minimumWordBurstMode: .fixed)
+    XCTAssertEqual(high.minimumWpm, 301)
+    XCTAssertEqual(high.minimumWordBurstWpm, 450)
+
+    let decimalJSON = Data(
+      #"{"minimumAccuracy":99.5,"minimumWpm":300.25,"minimumWordBurstWpm":75.5,"minimumWordBurstMode":"flex"}"#.utf8)
+    let decimal = try JSONDecoder().decode(InputRules.self, from: decimalJSON)
+    XCTAssertEqual(decimal.minimumAccuracy, 99.5)
+    XCTAssertEqual(decimal.minimumWpm, 300.25)
+    XCTAssertEqual(decimal.minimumWordBurstWpm, 75.5)
+    XCTAssertEqual(decimal.minimumWordBurstMode, .flex)
+
+    let legacyJSON = Data(
+      #"{"minimumAccuracy":97,"minimumWpm":85,"minimumWordBurstWpm":90}"#.utf8)
+    let legacy = try JSONDecoder().decode(InputRules.self, from: legacyJSON)
+    XCTAssertEqual(legacy.minimumAccuracy, 97)
+    XCTAssertEqual(legacy.minimumWpm, 85)
+    XCTAssertEqual(legacy.minimumWordBurstWpm, 90)
+    XCTAssertEqual(legacy.minimumWordBurstMode, .fixed)
+
+    let legacySettings = try JSONDecoder().decode(
+      AppSettingsSnapshot.self,
+      from: Data(
+        #"{"minimumAccuracy":96,"minimumWpm":80,"minimumWordBurstWpm":75}"#.utf8))
+    XCTAssertEqual(legacySettings.minimumAccuracy, 96)
+    XCTAssertEqual(legacySettings.minimumWpm, 80)
+    XCTAssertEqual(legacySettings.minimumWordBurstWpm, 75)
+    XCTAssertEqual(legacySettings.minimumWordBurstMode, .fixed)
+
+    let invalid = InputRules(
+      minimumAccuracy: .nan, minimumWpm: -1, minimumWordBurstWpm: .infinity,
+      minimumWordBurstMode: .flex)
+    XCTAssertEqual(invalid.minimumAccuracy, 0)
+    XCTAssertEqual(invalid.minimumWpm, 0)
+    XCTAssertEqual(invalid.minimumWordBurstWpm, 0)
+    XCTAssertEqual(invalid.minimumWordBurstMode, .off)
+    XCTAssertEqual(InputRules(minimumAccuracy: 101).minimumAccuracy, 100)
   }
 
   func testNoSpaceMinimumWordBurstCommitsAtEveryOriginalWordBoundary() {

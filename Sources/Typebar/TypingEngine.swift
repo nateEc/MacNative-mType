@@ -129,16 +129,25 @@ enum MinimumWordBurstMode: String, CaseIterable, Codable, Equatable, Identifiabl
 }
 
 enum MinimumWordBurstPolicy {
-  static func threshold(baseWpm: Int, mode: MinimumWordBurstMode, wordLength: Int) -> Int {
+  static func threshold(baseWpm: Double, mode: MinimumWordBurstMode, wordLength: Int) -> Double {
     switch mode {
     case .off: return 0
     case .fixed: return baseWpm
     case .flex:
-      let adjusted = Int(
-        floor(Double(baseWpm) * pow(1.03, -2 * Double(max(0, wordLength - 3))))
-      )
+      let adjusted = floor(baseWpm * pow(1.03, -2 * Double(max(0, wordLength - 3))))
       return min(baseWpm, adjusted)
     }
+  }
+}
+
+enum PracticeThresholdPolicy {
+  static func speed(_ value: Double) -> Double {
+    value.isFinite && value >= 0 ? value : 0
+  }
+
+  static func accuracy(_ value: Double) -> Double {
+    guard value.isFinite else { return 0 }
+    return value.clamped(to: 0...100)
   }
 }
 
@@ -1355,12 +1364,12 @@ struct InputRules: Codable, Equatable {
   var codeUnindentOnBackspace = false
   /// Zero disables the final-accuracy threshold. A positive threshold is
   /// evaluated whenever a finite test would otherwise complete.
-  var minimumAccuracy = 0
+  var minimumAccuracy = 0.0
   /// Zero disables the final whole-test WPM threshold.
-  var minimumWpm = 0
+  var minimumWpm = 0.0
   /// Zero disables Typebar's minimum per-word speed rule. A positive value
   /// is evaluated after a measurable, space-delimited word commit.
-  var minimumWordBurstWpm = 0
+  var minimumWordBurstWpm = 0.0
   var minimumWordBurstMode: MinimumWordBurstMode = .off
 
   init(
@@ -1376,9 +1385,9 @@ struct InputRules: Codable, Equatable {
     confidenceMode: ConfidenceMode = .off,
     oppositeShiftMode: OppositeShiftMode = .off,
     codeUnindentOnBackspace: Bool = false,
-    minimumAccuracy: Int = 0,
-    minimumWpm: Int = 0,
-    minimumWordBurstWpm: Int = 0,
+    minimumAccuracy: Double = 0,
+    minimumWpm: Double = 0,
+    minimumWordBurstWpm: Double = 0,
     minimumWordBurstMode: MinimumWordBurstMode = .off
   ) {
     self.strictSpace = strictSpace
@@ -1395,9 +1404,9 @@ struct InputRules: Codable, Equatable {
     self.confidenceMode = confidenceMode
     self.oppositeShiftMode = oppositeShiftMode
     self.codeUnindentOnBackspace = codeUnindentOnBackspace
-    self.minimumAccuracy = minimumAccuracy.clamped(to: 0...100)
-    self.minimumWpm = minimumWpm.clamped(to: 0...300)
-    self.minimumWordBurstWpm = minimumWordBurstWpm.clamped(to: 0...300)
+    self.minimumAccuracy = PracticeThresholdPolicy.accuracy(minimumAccuracy)
+    self.minimumWpm = PracticeThresholdPolicy.speed(minimumWpm)
+    self.minimumWordBurstWpm = PracticeThresholdPolicy.speed(minimumWordBurstWpm)
     self.minimumWordBurstMode = minimumWordBurstMode == .off && self.minimumWordBurstWpm > 0
       ? .fixed : minimumWordBurstMode
     normalizeErrorHandlingModes()
@@ -1431,12 +1440,12 @@ struct InputRules: Codable, Equatable {
       try values.decodeIfPresent(OppositeShiftMode.self, forKey: .oppositeShiftMode) ?? .off
     codeUnindentOnBackspace =
       try values.decodeIfPresent(Bool.self, forKey: .codeUnindentOnBackspace) ?? false
-    minimumAccuracy = (try values.decodeIfPresent(Int.self, forKey: .minimumAccuracy) ?? 0).clamped(
-      to: 0...100)
-    minimumWpm = (try values.decodeIfPresent(Int.self, forKey: .minimumWpm) ?? 0).clamped(
-      to: 0...300)
-    minimumWordBurstWpm = (try values.decodeIfPresent(Int.self, forKey: .minimumWordBurstWpm) ?? 0)
-      .clamped(to: 0...300)
+    minimumAccuracy = PracticeThresholdPolicy.accuracy(
+      try values.decodeIfPresent(Double.self, forKey: .minimumAccuracy) ?? 0)
+    minimumWpm = PracticeThresholdPolicy.speed(
+      try values.decodeIfPresent(Double.self, forKey: .minimumWpm) ?? 0)
+    minimumWordBurstWpm = PracticeThresholdPolicy.speed(
+      try values.decodeIfPresent(Double.self, forKey: .minimumWordBurstWpm) ?? 0)
     minimumWordBurstMode =
       try values.decodeIfPresent(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
       ?? (minimumWordBurstWpm > 0 ? .fixed : .off)
@@ -3438,7 +3447,7 @@ struct TypingSession {
     else { return false }
     let threshold = MinimumWordBurstPolicy.threshold(
       baseWpm: minimum, mode: mode, wordLength: targetLength)
-    return burst < threshold
+    return Double(burst) < threshold
   }
 
   private var lastCommittedBurstWordLength: Int? {
@@ -3939,8 +3948,10 @@ struct TypingSession {
   }
 
   private mutating func complete(at date: Date) {
-    if (configuration.rules.minimumAccuracy > 0 && accuracy < configuration.rules.minimumAccuracy)
-      || (configuration.rules.minimumWpm > 0 && wpm(at: date) < configuration.rules.minimumWpm)
+    if (configuration.rules.minimumAccuracy > 0
+      && Double(accuracy) < configuration.rules.minimumAccuracy)
+      || (configuration.rules.minimumWpm > 0
+        && Double(wpm(at: date)) < configuration.rules.minimumWpm)
     {
       fail(at: date)
     } else {

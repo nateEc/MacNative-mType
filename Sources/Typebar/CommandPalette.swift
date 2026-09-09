@@ -471,6 +471,77 @@ enum BehaviorCommandCatalog {
     }
 }
 
+enum PracticeThresholdCommandTarget: Equatable {
+    case minimumWpmOff
+    case minimumWpmCustom
+    case minimumAccuracyOff
+    case minimumAccuracyCustom
+    case minimumWordBurstOff
+    case minimumWordBurst(MinimumWordBurstMode)
+
+    var editorKind: PracticeThresholdEditorKind? {
+        switch self {
+        case .minimumWpmCustom: .minimumWpm
+        case .minimumAccuracyCustom: .minimumAccuracy
+        case .minimumWordBurst(let mode): .minimumWordBurst(mode)
+        case .minimumWpmOff, .minimumAccuracyOff, .minimumWordBurstOff: nil
+        }
+    }
+
+    @MainActor
+    func applyImmediate(to settings: AppSettings) -> Bool {
+        switch self {
+        case .minimumWpmOff:
+            settings.minimumWpm = 0
+        case .minimumAccuracyOff:
+            settings.minimumAccuracy = 0
+        case .minimumWordBurstOff:
+            settings.minimumWordBurstWpm = 0
+        case .minimumWpmCustom, .minimumAccuracyCustom, .minimumWordBurst:
+            return false
+        }
+        return true
+    }
+}
+
+enum PracticeThresholdCommandCatalog {
+    static let items: [CommandPaletteItem] = [
+        item("minWpm", "off", "最低整体速度：关闭", "不按最终速度判定失败"),
+        item("minWpm", "custom", "最低整体速度：自定义…", "按当前速度单位输入门槛"),
+        item("minAcc", "off", "最低准确率：关闭", "不按最终准确率判定失败"),
+        item("minAcc", "custom", "最低准确率：自定义…", "输入 0–100 的准确率门槛"),
+        item("minBurst", "off", "最低单词速度：关闭", "不检查单个单词速度"),
+        item("minBurst", "fixed", "最低单词速度：固定…", "每个单词使用相同门槛"),
+        item("minBurst", "flex", "最低单词速度：弹性…", "较长单词逐步放宽门槛"),
+    ]
+
+    static func target(for identifier: String) -> PracticeThresholdCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "behavior" else { return nil }
+        switch (parts[1], parts[2]) {
+        case ("minWpm", "off"): return .minimumWpmOff
+        case ("minWpm", "custom"): return .minimumWpmCustom
+        case ("minAcc", "off"): return .minimumAccuracyOff
+        case ("minAcc", "custom"): return .minimumAccuracyCustom
+        case ("minBurst", "off"): return .minimumWordBurstOff
+        case ("minBurst", "fixed"): return .minimumWordBurst(.fixed)
+        case ("minBurst", "flex"): return .minimumWordBurst(.flex)
+        default: return nil
+        }
+    }
+
+    private static func item(
+        _ key: String, _ value: String, _ title: String, _ subtitle: String
+    ) -> CommandPaletteItem {
+        let identifier = "behavior.\(key).\(value)"
+        return CommandPaletteItem(
+            id: identifier, title: title, subtitle: subtitle,
+            systemImage: value == "off" ? "speedometer" : "gauge.with.dots.needle.50percent",
+            keywords: ["behavior", "minimum", "阈值", key, value, title, identifier],
+            group: .settings)
+    }
+}
+
 enum InputRuleCommandTarget: Equatable {
     case freedomMode(Bool)
     case strictSpace(Bool)

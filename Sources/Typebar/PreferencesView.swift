@@ -248,8 +248,10 @@ struct PreferencesView: View {
             .foregroundStyle(.secondary)
           Toggle("最低准确率", isOn: minimumAccuracyEnabledBinding(settings: settings))
           if settings.minimumAccuracy > 0 {
-            Stepper(value: $settings.minimumAccuracy, in: 50...100, step: 1) {
-              LabeledContent("准确率门槛", value: "\(settings.minimumAccuracy)%")
+            Stepper(value: $settings.minimumAccuracy, in: 0...100, step: 1) {
+              LabeledContent(
+                "准确率门槛",
+                value: "\(settings.minimumAccuracy.formatted(.number.precision(.fractionLength(0...2))))%")
             }
           }
           Text("有限测试结束时检查；未达门槛会标记失败，不保存完成成绩或发布到榜单。")
@@ -257,8 +259,12 @@ struct PreferencesView: View {
             .foregroundStyle(.secondary)
           Toggle("最低整体速度", isOn: minimumWpmEnabledBinding(settings: settings))
           if settings.minimumWpm > 0 {
-            Stepper(value: $settings.minimumWpm, in: 10...300, step: 5) {
-              LabeledContent("速度门槛", value: "\(settings.minimumWpm) WPM")
+            Stepper(
+              value: $settings.minimumWpm, in: 0...Double.greatestFiniteMagnitude, step: 5
+            ) {
+              LabeledContent(
+                "速度门槛",
+                value: "\(settings.minimumWpm.formatted(.number.precision(.fractionLength(0...2)))) WPM")
             }
           }
           Text("有限测试结束时按最终 WPM 检查；未达门槛会标记失败，不保存完成成绩或发布到榜单。")
@@ -270,8 +276,13 @@ struct PreferencesView: View {
             }
           }
           if settings.minimumWordBurstMode != .off {
-            Stepper(value: $settings.minimumWordBurstWpm, in: 20...300, step: 5) {
-              LabeledContent("最低速度", value: "\(settings.minimumWordBurstWpm) WPM")
+            Stepper(
+              value: $settings.minimumWordBurstWpm,
+              in: 0...Double.greatestFiniteMagnitude, step: 5
+            ) {
+              LabeledContent(
+                "最低速度",
+                value: "\(settings.minimumWordBurstWpm.formatted(.number.precision(.fractionLength(0...2)))) WPM")
             }
           }
           Text("固定档使用该阈值；弹性档会随目标词变长按参考公式降低阈值。空格提交词、无空格的原始词末字符和禅模式空格/换行提交都会检查；未达标会结束本次测试且不保存完成成绩。")

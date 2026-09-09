@@ -647,6 +647,7 @@ private struct ContentView: View {
   @State private var showingKeyboardGuideScaleEditor = false
   @State private var showingCustomTimeEditor = false
   @State private var showingCustomWordsEditor = false
+  @State private var practiceThresholdEditorKind: PracticeThresholdEditorKind?
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
   @State private var showingChallenges = false
@@ -947,6 +948,14 @@ private struct ContentView: View {
         mode = .words
         wordLimit = value
         reset()
+      }
+    }
+    .sheet(item: $practiceThresholdEditorKind) { kind in
+      PracticeThresholdEditor(
+        kind: kind, unit: settings.typingSpeedUnit,
+        initialCanonicalValue: practiceThresholdValue(for: kind)
+      ) { value in
+        applyPracticeThreshold(value, kind: kind)
       }
     }
     .confirmationDialog(
@@ -2847,6 +2856,7 @@ private struct ContentView: View {
     items.append(contentsOf: QuoteCommandCatalog.items(hasFavorites: hasFavoriteQuotesInCurrentSource))
     items.append(contentsOf: PracticePreferenceCommandCatalog.items)
     items.append(contentsOf: BehaviorCommandCatalog.items)
+    items.append(contentsOf: PracticeThresholdCommandCatalog.items)
     items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
     items.append(contentsOf: SoundCommandCatalog.items)
@@ -2939,6 +2949,15 @@ private struct ContentView: View {
     }
     if let target = BehaviorCommandCatalog.target(for: item.id) {
       target.apply(to: settings)
+      return
+    }
+    if let target = PracticeThresholdCommandCatalog.target(for: item.id) {
+      if target.applyImmediate(to: settings) {
+        activeChallengeID = nil
+        reset()
+      } else {
+        practiceThresholdEditorKind = target.editorKind
+      }
       return
     }
     if let target = PracticePreferenceCommandCatalog.target(for: item.id) {
@@ -3072,6 +3091,20 @@ private struct ContentView: View {
       toggleSelectedQuoteFavorite()
     default: break
     }
+  }
+
+  private func practiceThresholdValue(for kind: PracticeThresholdEditorKind) -> Double {
+    switch kind {
+    case .minimumWpm: settings.minimumWpm
+    case .minimumAccuracy: settings.minimumAccuracy
+    case .minimumWordBurst: settings.minimumWordBurstWpm
+    }
+  }
+
+  private func applyPracticeThreshold(_ value: Double, kind: PracticeThresholdEditorKind) {
+    activeChallengeID = nil
+    PracticeThresholdApplication.apply(value, kind: kind, to: settings)
+    reset()
   }
 
   private var configuration: TestConfiguration {

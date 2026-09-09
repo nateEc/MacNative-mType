@@ -245,6 +245,11 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 
   func canonicalWpm(fromDisplayedValue value: Double) -> Int {
+    let converted = canonicalWpmValue(fromDisplayedValue: value)
+    return Int(converted.rounded().clamped(to: -1_000_000...1_000_000))
+  }
+
+  func canonicalWpmValue(fromDisplayedValue value: Double) -> Double {
     guard value.isFinite else { return 0 }
     let converted: Double
     switch self {
@@ -254,7 +259,7 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
     case .cps: converted = value * 60 / 5
     case .wph: converted = value / 60
     }
-    return Int(converted.rounded().clamped(to: -1_000_000...1_000_000))
+    return converted
   }
 
   var histogramBucketSize: Double {
@@ -586,9 +591,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var confidenceMode: ConfidenceMode = .off
   var oppositeShiftMode: OppositeShiftMode = .off
   var codeUnindentOnBackspace = false
-  var minimumAccuracy = 0
-  var minimumWpm = 0
-  var minimumWordBurstWpm = 0
+  var minimumAccuracy = 0.0
+  var minimumWpm = 0.0
+  var minimumWordBurstWpm = 0.0
   var minimumWordBurstMode: MinimumWordBurstMode = .off
   var practiceLineWidth: PracticeLineWidth = .standard
   var customPracticeLineColumns = 60
@@ -691,9 +696,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     confidenceMode: ConfidenceMode = .off,
     oppositeShiftMode: OppositeShiftMode = .off,
     codeUnindentOnBackspace: Bool = false,
-    minimumAccuracy: Int = 0,
-    minimumWpm: Int = 0,
-    minimumWordBurstWpm: Int = 0,
+    minimumAccuracy: Double = 0,
+    minimumWpm: Double = 0,
+    minimumWordBurstWpm: Double = 0,
     minimumWordBurstMode: MinimumWordBurstMode = .off,
     practiceLineWidth: PracticeLineWidth = .standard,
     customPracticeLineColumns: Int = 60,
@@ -807,9 +812,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.confidenceMode = confidenceMode
     self.oppositeShiftMode = oppositeShiftMode
     self.codeUnindentOnBackspace = codeUnindentOnBackspace
-    self.minimumAccuracy = minimumAccuracy.clamped(to: 0...100)
-    self.minimumWpm = minimumWpm.clamped(to: 0...300)
-    self.minimumWordBurstWpm = minimumWordBurstWpm.clamped(to: 0...300)
+    self.minimumAccuracy = PracticeThresholdPolicy.accuracy(minimumAccuracy)
+    self.minimumWpm = PracticeThresholdPolicy.speed(minimumWpm)
+    self.minimumWordBurstWpm = PracticeThresholdPolicy.speed(minimumWordBurstWpm)
     self.minimumWordBurstMode = minimumWordBurstMode == .off && self.minimumWordBurstWpm > 0
       ? .fixed : minimumWordBurstMode
     self.practiceLineWidth = practiceLineWidth
@@ -995,12 +1000,12 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(OppositeShiftMode.self, forKey: .oppositeShiftMode) ?? .off
     codeUnindentOnBackspace =
       try values.decodeIfPresent(Bool.self, forKey: .codeUnindentOnBackspace) ?? false
-    minimumAccuracy = (try values.decodeIfPresent(Int.self, forKey: .minimumAccuracy) ?? 0).clamped(
-      to: 0...100)
-    minimumWpm = (try values.decodeIfPresent(Int.self, forKey: .minimumWpm) ?? 0).clamped(
-      to: 0...300)
-    minimumWordBurstWpm = (try values.decodeIfPresent(Int.self, forKey: .minimumWordBurstWpm) ?? 0)
-      .clamped(to: 0...300)
+    minimumAccuracy = PracticeThresholdPolicy.accuracy(
+      try values.decodeIfPresent(Double.self, forKey: .minimumAccuracy) ?? 0)
+    minimumWpm = PracticeThresholdPolicy.speed(
+      try values.decodeIfPresent(Double.self, forKey: .minimumWpm) ?? 0)
+    minimumWordBurstWpm = PracticeThresholdPolicy.speed(
+      try values.decodeIfPresent(Double.self, forKey: .minimumWordBurstWpm) ?? 0)
     minimumWordBurstMode =
       try values.decodeIfPresent(MinimumWordBurstMode.self, forKey: .minimumWordBurstMode)
       ?? (minimumWordBurstWpm > 0 ? .fixed : .off)
@@ -1307,10 +1312,33 @@ final class AppSettings {
   }
   var oppositeShiftMode: OppositeShiftMode = .off { didSet { persist() } }
   var codeUnindentOnBackspace = false { didSet { persist() } }
-  var minimumAccuracy = 0 { didSet { persist() } }
-  var minimumWpm = 0 { didSet { persist() } }
-  var minimumWordBurstWpm = 0 {
+  var minimumAccuracy = 0.0 {
     didSet {
+      let normalized = PracticeThresholdPolicy.accuracy(minimumAccuracy)
+      guard minimumAccuracy == normalized else {
+        minimumAccuracy = normalized
+        return
+      }
+      persist()
+    }
+  }
+  var minimumWpm = 0.0 {
+    didSet {
+      let normalized = PracticeThresholdPolicy.speed(minimumWpm)
+      guard minimumWpm == normalized else {
+        minimumWpm = normalized
+        return
+      }
+      persist()
+    }
+  }
+  var minimumWordBurstWpm = 0.0 {
+    didSet {
+      let normalized = PracticeThresholdPolicy.speed(minimumWordBurstWpm)
+      guard minimumWordBurstWpm == normalized else {
+        minimumWordBurstWpm = normalized
+        return
+      }
       if minimumWordBurstWpm > 0 && minimumWordBurstMode == .off {
         minimumWordBurstMode = .fixed
         return

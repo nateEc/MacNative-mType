@@ -169,12 +169,12 @@
 | `blindMode` | `blindMode` | 已映射；命令面板可即时开关且不重开测试。 |
 | `alwaysShowWordsHistory` | `alwaysShowWordsHistory` | 已映射；命令面板可即时选择结果页默认展开或折叠。 |
 | `singleListCommandLine` | `commandPaletteListMode` | 已映射；`on` 对应打开即展示全部命令的单列表，`manual` 对应分组导航并可输入 `>` 展开全部命令；两值均有严格命令入口。 |
-| `minWpm` | `minimumWpm` | 已映射。 |
-| `minWpmCustomSpeed` | `minimumWpm` | 已映射；零值关闭。 |
-| `minAcc` | `minimumAccuracy` | 已映射。 |
-| `minAccCustom` | `minimumAccuracy` | 已映射；零值关闭。 |
-| `minBurst` | `minimumWordBurstMode` | 已映射；支持关闭/固定/弹性。 |
-| `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射。 |
+| `minWpm` | `minimumWpm` | 已映射；命令面板严格提供 `off/custom`。 |
+| `minWpmCustomSpeed` | `minimumWpm` | 已映射；使用有限非负小数且不施加额外速度上限，零值关闭；旧整数配置可直接迁移。 |
+| `minAcc` | `minimumAccuracy` | 已映射；命令面板严格提供 `off/custom`。 |
+| `minAccCustom` | `minimumAccuracy` | 已映射；使用 0–100 的有限小数，零值关闭；旧整数配置可直接迁移。 |
+| `minBurst` | `minimumWordBurstMode` | 已映射；命令面板严格提供关闭/固定/弹性。 |
+| `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射；使用有限非负小数且不施加额外速度上限，固定/弹性命令要求按当前显示单位输入整数后换算，旧整数配置可直接迁移。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
 | `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
