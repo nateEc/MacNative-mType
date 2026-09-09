@@ -156,6 +156,82 @@ struct CommandPaletteItem: Equatable, Identifiable {
     }
 }
 
+enum QuickTestParameterCommandTarget: Equatable {
+    case timed(Int)
+    case words(Int)
+    case punctuation(Bool)
+    case numbers(Bool)
+}
+
+/// Exposes the reference command palette's standard time, word, punctuation,
+/// and number choices without copying its command implementation or labels.
+enum QuickTestParameterCommandCatalog {
+    private static let durations = [15, 30, 60, 120]
+    private static let wordCounts = [10, 25, 50, 100]
+
+    static var items: [CommandPaletteItem] {
+        let timed = durations.map { seconds in
+            CommandPaletteItem(
+                id: "test.time.\(seconds)", title: "时间练习：\(seconds) 秒",
+                subtitle: "切换到时间模式并立即重开", systemImage: "timer",
+                keywords: ["time", "duration", "时间", "时长", "\(seconds)"], group: .practice)
+        }
+        let words = wordCounts.map { count in
+            CommandPaletteItem(
+                id: "test.words.\(count)", title: "字数练习：\(count) 词",
+                subtitle: "切换到字数模式并立即重开", systemImage: "text.word.spacing",
+                keywords: ["words", "count", "字数", "词数", "\(count)"], group: .practice)
+        }
+        let options = [
+            optionItem(kind: "punctuation", enabled: true, title: "开启标点", keyword: "标点"),
+            optionItem(kind: "punctuation", enabled: false, title: "关闭标点", keyword: "标点"),
+            optionItem(kind: "numbers", enabled: true, title: "开启数字", keyword: "数字"),
+            optionItem(kind: "numbers", enabled: false, title: "关闭数字", keyword: "数字"),
+        ]
+        return timed + words + options
+    }
+
+    static func target(for identifier: String) -> QuickTestParameterCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "test" else { return nil }
+        let value = String(parts[2])
+        switch parts[1] {
+        case "time":
+            guard let seconds = Int(value), durations.contains(seconds) else { return nil }
+            return .timed(seconds)
+        case "words":
+            guard let count = Int(value), wordCounts.contains(count) else { return nil }
+            return .words(count)
+        case "punctuation":
+            guard let enabled = enabledValue(value) else { return nil }
+            return .punctuation(enabled)
+        case "numbers":
+            guard let enabled = enabledValue(value) else { return nil }
+            return .numbers(enabled)
+        default:
+            return nil
+        }
+    }
+
+    private static func optionItem(
+        kind: String, enabled: Bool, title: String, keyword: String
+    ) -> CommandPaletteItem {
+        CommandPaletteItem(
+            id: "test.\(kind).\(enabled ? "on" : "off")", title: title,
+            subtitle: "更新内容选项并立即重开", systemImage: enabled ? "checkmark.circle" : "xmark.circle",
+            keywords: [kind, enabled ? "on" : "off", keyword, enabled ? "开启" : "关闭"],
+            group: .practice)
+    }
+
+    private static func enabledValue(_ value: String) -> Bool? {
+        switch value {
+        case "on": true
+        case "off": false
+        default: nil
+        }
+    }
+}
+
 enum ThemeCommandTarget: Equatable {
     case builtIn(AppTheme)
     case custom(UUID)

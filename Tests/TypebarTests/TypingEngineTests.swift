@@ -1404,6 +1404,32 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(PresetCommandCatalog.presetID(for: "preset.invalid"))
   }
 
+  func testQuickTestParameterCommandCatalogMatchesReferenceStandardChoices() {
+    let items = QuickTestParameterCommandCatalog.items
+
+    XCTAssertEqual(
+      items.map(\.id),
+      [
+        "test.time.15", "test.time.30", "test.time.60", "test.time.120",
+        "test.words.10", "test.words.25", "test.words.50", "test.words.100",
+        "test.punctuation.on", "test.punctuation.off",
+        "test.numbers.on", "test.numbers.off",
+      ])
+    XCTAssertTrue(items.allSatisfy { $0.group == .practice })
+    XCTAssertEqual(
+      QuickTestParameterCommandCatalog.target(for: "test.time.60"), .timed(60))
+    XCTAssertEqual(
+      QuickTestParameterCommandCatalog.target(for: "test.words.25"), .words(25))
+    XCTAssertEqual(
+      QuickTestParameterCommandCatalog.target(for: "test.punctuation.on"), .punctuation(true))
+    XCTAssertEqual(
+      QuickTestParameterCommandCatalog.target(for: "test.numbers.off"), .numbers(false))
+    XCTAssertNil(QuickTestParameterCommandCatalog.target(for: "test.time.45"))
+    XCTAssertNil(QuickTestParameterCommandCatalog.target(for: "test.words.many"))
+    XCTAssertNil(QuickTestParameterCommandCatalog.target(for: "test.punctuation.toggle"))
+    XCTAssertNil(QuickTestParameterCommandCatalog.target(for: "test.unknown.on"))
+  }
+
   func testChallengeCommandCatalogDescribesAndRoutesLibraryChallenges() throws {
     let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "calm-thirty"))
 

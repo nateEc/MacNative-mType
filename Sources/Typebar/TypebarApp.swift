@@ -2802,6 +2802,7 @@ private struct ContentView: View {
         id: "bailout", title: "中止长测试…", subtitle: "确认后显示未保存结果",
         systemImage: "figure.run", keywords: ["bail", "bailout", "中止", "退出"], group: .practice))
     }
+    items.append(contentsOf: QuickTestParameterCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2820,6 +2821,22 @@ private struct ContentView: View {
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let target = QuickTestParameterCommandCatalog.target(for: item.id) {
+      switch target {
+      case .timed(let seconds):
+        mode = .time
+        duration = seconds
+      case .words(let count):
+        mode = .words
+        wordLimit = count
+      case .punctuation(let enabled):
+        contentOptions.includePunctuation = enabled
+      case .numbers(let enabled):
+        contentOptions.includeNumbers = enabled
+      }
+      reset()
+      return
+    }
     if let target = ThemeCommandCatalog.target(for: item.id) {
       settings.followSystemTheme = false
       switch target {
