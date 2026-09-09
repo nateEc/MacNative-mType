@@ -3842,12 +3842,16 @@ private struct ReplayTimelineView: View {
   let speedUnit: TypingSpeedUnit
   @State private var elapsed: TimeInterval = 0
   @State private var isPlaying = false
+  @State private var selectedPromptIndex: Int?
   private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
   private var duration: TimeInterval { events.last?.offset ?? 0 }
   private var replayedText: String { TypingReplay.typedText(events: events, through: elapsed) }
   private var performance: ResultPerformancePoint {
     ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed)
+  }
+  private var characterSeekOffsets: [Int: TimeInterval] {
+    TypingReplay.characterSeekOffsets(prompt: prompt, events: events)
   }
 
   init(prompt: String, events: [TypingReplayEvent], speedUnit: TypingSpeedUnit) {
@@ -3874,27 +3878,47 @@ private struct ReplayTimelineView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(8)
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+      VStack(alignment: .leading, spacing: 4) {
+        Text("目标（点按已输入字符定位）")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+        ReplayCharacterPicker(
+          text: prompt,
+          reachableIndices: Set(characterSeekOffsets.keys),
+          selectedIndex: selectedPromptIndex
+        ) { index in
+          guard let targetOffset = characterSeekOffsets[index] else { return }
+          selectedPromptIndex = index
+          elapsed = min(duration, targetOffset)
+          isPlaying = false
+        }
+        .frame(height: 38)
+        .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
+      }
       Slider(
         value: $elapsed, in: 0...max(duration, 0.01),
         onEditingChanged: { editing in
-          if editing { isPlaying = false }
+          if editing {
+            isPlaying = false
+            selectedPromptIndex = nil
+          }
         })
+        .accessibilityLabel("回放时间")
+        .accessibilityHint("调整回放位置；目标文本也支持鼠标点选字符定位")
       HStack {
         Button(isPlaying ? "暂停" : "播放") {
           if elapsed >= duration { elapsed = 0 }
+          selectedPromptIndex = nil
           isPlaying.toggle()
         }
         .disabled(duration == 0)
         Button("重置") {
           elapsed = 0
           isPlaying = false
+          selectedPromptIndex = nil
         }
         .disabled(elapsed == 0 && !isPlaying)
         Spacer()
-        Text("目标：\(prompt.prefix(42))")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
       }
     }
     .onReceive(timer) { _ in

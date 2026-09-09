@@ -12262,6 +12262,43 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingReplay.typedText(events: result?.replayEvents ?? [], through: 2), "amber")
   }
 
+  func testReplayCharacterTargetsKeepLaterWordsAlignedAfterEarlierExtraInput() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0.1, kind: .insert, text: "a"),
+      .init(offset: 0.2, kind: .insert, text: "m"),
+      .init(offset: 0.3, kind: .insert, text: "b"),
+      .init(offset: 0.4, kind: .insert, text: "x"),
+      .init(offset: 0.5, kind: .insert, text: "e"),
+      .init(offset: 0.6, kind: .insert, text: "r"),
+      .init(offset: 0.7, kind: .insert, text: " "),
+      .init(offset: 0.8, kind: .insert, text: "b"),
+      .init(offset: 0.9, kind: .insert, text: "a"),
+    ]
+
+    let targets = TypingReplay.characterSeekOffsets(prompt: "amber bay", events: events)
+
+    XCTAssertEqual(targets[2], 0.3)
+    XCTAssertEqual(targets[5], 0.7)
+    XCTAssertEqual(targets[6], 0.8)
+    XCTAssertEqual(targets[7], 0.9)
+    XCTAssertNil(targets[8])
+  }
+
+  func testReplayCharacterTargetsUseFirstArrivalAndStableChronology() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0.4, kind: .insert, text: "m"),
+      .init(offset: 0.3, kind: .delete, text: "m"),
+      .init(offset: 0.2, kind: .insert, text: "m"),
+      .init(offset: 0.1, kind: .insert, text: "a"),
+    ]
+
+    let targets = TypingReplay.characterSeekOffsets(prompt: "amber", events: events)
+
+    XCTAssertEqual(targets[0], 0.1)
+    XCTAssertEqual(targets[1], 0.2)
+    XCTAssertNil(targets[2])
+  }
+
   func testExtraCharactersNeverCauseAnOutOfBoundsRead() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "a")
     session.insert("abc", at: start)

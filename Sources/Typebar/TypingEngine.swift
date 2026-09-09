@@ -2054,6 +2054,12 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
 }
 
 enum TypingReplay {
+  private struct CharacterCoordinate: Hashable {
+    let word: Int
+    let position: Int
+    let isSeparator: Bool
+  }
+
   static func chronologicalEvents(_ events: [TypingReplayEvent]) -> [TypingReplayEvent] {
     guard !zip(events, events.dropFirst()).allSatisfy({ $0.offset <= $1.offset }) else {
       return events
@@ -2073,6 +2079,71 @@ enum TypingReplay {
         typed.removeLast()
       }
     }
+  }
+
+  static func characterSeekOffsets(
+    prompt: String, events: [TypingReplayEvent]
+  ) -> [Int: TimeInterval] {
+    var promptCoordinates: [CharacterCoordinate: Int] = [:]
+    var promptWord = 0
+    var promptPosition = 0
+    for (index, character) in prompt.enumerated() {
+      let isSeparator = isPromptWordSeparator(character)
+      promptCoordinates[
+        CharacterCoordinate(
+          word: promptWord, position: isSeparator ? 0 : promptPosition,
+          isSeparator: isSeparator)
+      ] = index
+      advanceCursor(
+        for: character, word: &promptWord, position: &promptPosition)
+    }
+
+    var offsets: [Int: TimeInterval] = [:]
+    var typed: [Character] = []
+    var typedWord = 0
+    var typedPosition = 0
+    for event in chronologicalEvents(events) {
+      switch event.kind {
+      case .insert:
+        for character in event.text {
+          let coordinate = CharacterCoordinate(
+            word: typedWord,
+            position: isPromptWordSeparator(character) ? 0 : typedPosition,
+            isSeparator: isPromptWordSeparator(character))
+          if let promptIndex = promptCoordinates[coordinate], offsets[promptIndex] == nil {
+            offsets[promptIndex] = event.offset
+          }
+          typed.append(character)
+          advanceCursor(
+            for: character, word: &typedWord, position: &typedPosition)
+        }
+      case .delete:
+        guard !typed.isEmpty else { continue }
+        typed.removeLast()
+        (typedWord, typedPosition) = cursorPosition(after: typed)
+      }
+    }
+    return offsets
+  }
+
+  private static func advanceCursor(
+    for character: Character, word: inout Int, position: inout Int
+  ) {
+    if isPromptWordSeparator(character) {
+      word += 1
+      position = 0
+    } else {
+      position += 1
+    }
+  }
+
+  private static func cursorPosition(after characters: [Character]) -> (word: Int, position: Int) {
+    var word = 0
+    var position = 0
+    for character in characters {
+      advanceCursor(for: character, word: &word, position: &position)
+    }
+    return (word, position)
   }
 }
 
