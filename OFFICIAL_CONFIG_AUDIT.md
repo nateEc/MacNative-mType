@@ -8,7 +8,7 @@
 - Typebar 的实现、文案、数据模型和测试均为原创；该表不复制参考实现的代码、资产、词表、布局定义或主题数据。
 - 当前语言目录：376 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
 - `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：446 个独立原生选择、0 个兼容代指、0 个未映射配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界见 `OFFICIAL_LANGUAGE_AUDIT.md`。
-- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：84 个已映射、9 个部分、1 个不适用、0 个未实现或漏记；声音配置还会从固定 schema 提取 27／5／5 个选项并与本机枚举对账。
+- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：87 个已映射、6 个部分、1 个不适用、0 个未实现或漏记；声音、主／节奏光标和实时指标颜色还会从固定 schema 提取枚举值并与本机语义逐项对账。
 
 - Catalan、Indonesian 与 Malay 的自动化测试覆盖各自的自创词流、四档原创引语、完整多语混排轮转、`ca-ES` / `id-ID` / `ms-MY` 朗读 locale 与仅在明示启用时使用的 `ca` / `id` / `ms` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 
@@ -199,16 +199,16 @@
 | `playSoundOnError` | `playErrorBeep`、`errorSoundStyle` | 已映射；关闭开关加四种可持久化的 macOS 系统音型，覆盖固定 schema 的 off/1/2/3/4 五档契约。 |
 | `playTimeWarning` | `timeWarningOffset`、`timeWarningSoundStyle` | 已映射；关闭、结束前 1/3/5/10 秒五档与固定 schema 精确对应，并额外提供四种可持久化原生音型。 |
 | `smoothCaret` | `smoothCaretMotion` | 已映射。 |
-| `caretStyle` | `caretStyle` | 部分；以原创原生矢量样式实现相同可见角色。 |
+| `caretStyle` | `caretStyle` | 已映射；off/default/block/outline/underline/carrot/banana/monkey 八档逐项映射到关闭、条形及七种 Typebar 原创原生矢量呈现，旧存储 ID 保持不变。 |
 | `paceCaret` | `paceGuideMode` | 已映射；含 custom/PB/tag PB/average/daily/last。 |
 | `paceCaretCustomSpeed` | `paceGuideCustomWpm` | 已映射。 |
-| `paceCaretStyle` | `paceCaretStyle` | 部分；以原创原生矢量样式实现。 |
+| `paceCaretStyle` | `paceCaretStyle` | 已映射；与主光标共用完整八档原生样式目录和独立绘制层，不复制网页样式或资产。 |
 | `repeatedPace` | `repeatedPace` | 已映射。 |
 | `timerStyle` | `liveProgressStyle` | 已映射；含 off/bar/text/mini/flash 文本与迷你。 |
 | `liveSpeedStyle` | `liveSpeedStyle` | 已映射。 |
 | `liveAccStyle` | `liveAccuracyStyle` | 已映射。 |
 | `liveBurstStyle` | `liveBurstStyle` | 已映射。 |
-| `timerColor` | `liveStatsColor` | 部分；按原生主题语义提供强调色/次要/正文等选项。 |
+| `timerColor` | `liveStatsColor` | 已映射；black/sub/text/main 分别映射为黑色、辅助文字、主文字和主题强调色，作用于进度、速度、准确率与 Burst。 |
 | `timerOpacity` | `liveStatsOpacity` | 已映射；四档 25/50/75/100%。 |
 | `highlightMode` | `promptHighlightMode` | 已映射。 |
 | `typedEffect` | `typedCharacterEffect` | 已映射。 |

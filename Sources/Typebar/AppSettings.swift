@@ -103,6 +103,19 @@ enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 
   var drawsMarker: Bool { self != .off }
+
+  var compatibilityValue: String {
+    switch self {
+    case .off: "off"
+    case .bar: "default"
+    case .block: "block"
+    case .outline: "outline"
+    case .underline: "underline"
+    case .carrot: "carrot"
+    case .banana: "banana"
+    case .monkey: "monkey"
+    }
+  }
 }
 
 enum PromptTextRole: Equatable {
@@ -375,6 +388,15 @@ enum LiveStatsColor: String, CaseIterable, Codable, Equatable, Identifiable {
     case .secondary: "辅助文字"
     case .primary: "主文字"
     case .black: "黑色"
+    }
+  }
+
+  var compatibilityValue: String {
+    switch self {
+    case .accent: "main"
+    case .secondary: "sub"
+    case .primary: "text"
+    case .black: "black"
     }
   }
 

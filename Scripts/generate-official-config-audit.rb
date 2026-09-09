@@ -8,8 +8,8 @@ require "pathname"
 PINNED_COMMIT = "91bd24bb8513785c7364cbea29296ff7adafac41"
 EXPECTED_COUNTS = {
   official: 94,
-  mapped: 84,
-  partial: 9,
+  mapped: 87,
+  partial: 6,
   not_applicable: 1,
   unimplemented: 0,
   untracked: 0,
@@ -41,12 +41,15 @@ fail_audit("could not locate ConfigSchema object") unless schema_match
 official_keys = schema_match[1].scan(/^\s{4}([A-Za-z][A-Za-z0-9]*):/).flatten
 fail_audit("official keys are not unique") unless official_keys.uniq.length == official_keys.length
 
-sound_schema_names = {
+audited_enum_schema_names = {
   "playSoundOnClick" => "PlaySoundOnClick",
   "playSoundOnError" => "PlaySoundOnError",
   "playTimeWarning" => "PlayTimeWarning",
+  "caretStyle" => "CaretStyle",
+  "paceCaretStyle" => "CaretStyle",
+  "timerColor" => "TimerColor",
 }
-official_choices = sound_schema_names.to_h do |config_key, schema_name|
+official_choices = audited_enum_schema_names.to_h do |config_key, schema_name|
   enum_match = schema_source.match(
     /export const #{schema_name}Schema = z\s*\.enum\(\[(.*?)\]\)/m)
   fail_audit("could not locate #{schema_name}Schema enum") unless enum_match

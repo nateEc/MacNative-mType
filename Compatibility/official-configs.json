@@ -139,13 +139,16 @@
     "playSoundOnError": "`playErrorBeep`、`errorSoundStyle`",
     "playTimeWarning": "`timeWarningOffset`、`timeWarningSoundStyle`",
     "smoothCaret": "`smoothCaretMotion`",
+    "caretStyle": "`caretStyle`",
     "paceCaret": "`paceGuideMode`",
     "paceCaretCustomSpeed": "`paceGuideCustomWpm`",
+    "paceCaretStyle": "`paceCaretStyle`",
     "repeatedPace": "`repeatedPace`",
     "timerStyle": "`liveProgressStyle`",
     "liveSpeedStyle": "`liveSpeedStyle`",
     "liveAccStyle": "`liveAccuracyStyle`",
     "liveBurstStyle": "`liveBurstStyle`",
+    "timerColor": "`liveStatsColor`",
     "timerOpacity": "`liveStatsOpacity`",
     "highlightMode": "`promptHighlightMode`",
     "typedEffect": "`typedCharacterEffect`",
@@ -188,9 +191,6 @@
     "quoteLength": "`QuoteLength`、收藏和本机搜索",
     "language": "`TypingLanguage`、`mixedLanguageComponents`",
     "customPolyglot": "`mixedLanguageComponents`",
-    "caretStyle": "`caretStyle`",
-    "paceCaretStyle": "`paceCaretStyle`",
-    "timerColor": "`liveStatsColor`",
     "fontFamily": "`practiceFont`、本机字体名称/导入",
     "monkey": "`showTypingCompanion`",
     "monkeyPowerLevel": "`typingPowerMode`"
@@ -246,12 +246,41 @@
       "3",
       "5",
       "10"
+    ],
+    "caretStyle": [
+      "off",
+      "default",
+      "block",
+      "outline",
+      "underline",
+      "carrot",
+      "banana",
+      "monkey"
+    ],
+    "paceCaretStyle": [
+      "off",
+      "default",
+      "block",
+      "outline",
+      "underline",
+      "carrot",
+      "banana",
+      "monkey"
+    ],
+    "timerColor": [
+      "black",
+      "sub",
+      "text",
+      "main"
     ]
   },
   "officialChoiceCounts": {
     "playSoundOnClick": 27,
     "playSoundOnError": 5,
-    "playTimeWarning": 5
+    "playTimeWarning": 5,
+    "caretStyle": 8,
+    "paceCaretStyle": 8,
+    "timerColor": 4
   },
   "sourceFiles": [
     "packages/schemas/src/configs.ts",

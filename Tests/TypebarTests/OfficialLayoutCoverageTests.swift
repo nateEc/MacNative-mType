@@ -176,17 +176,36 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 94)
     XCTAssertEqual(fixture.officialKeys.count, fixture.officialCount)
     XCTAssertEqual(officialKeys.count, fixture.officialCount)
-    XCTAssertEqual(fixture.mapped.count, 84)
-    XCTAssertEqual(fixture.partial.count, 9)
+    XCTAssertEqual(fixture.mapped.count, 87)
+    XCTAssertEqual(fixture.partial.count, 6)
     XCTAssertEqual(fixture.notApplicable.count, 1)
     XCTAssertEqual(fixture.notApplicable["ads"], "无")
     XCTAssertEqual(
       fixture.officialChoiceCounts,
-      ["playSoundOnClick": 27, "playSoundOnError": 5, "playTimeWarning": 5])
+      [
+        "playSoundOnClick": 27, "playSoundOnError": 5, "playTimeWarning": 5,
+        "caretStyle": 8, "paceCaretStyle": 8, "timerColor": 4,
+      ])
     XCTAssertEqual(
       fixture.officialChoices["playSoundOnError"], ["off", "1", "2", "3", "4"])
     XCTAssertEqual(
       fixture.officialChoices["playTimeWarning"], ["off", "1", "3", "5", "10"])
+    XCTAssertEqual(
+      fixture.officialChoices["caretStyle"],
+      ["off", "default", "block", "outline", "underline", "carrot", "banana", "monkey"])
+    XCTAssertEqual(
+      fixture.officialChoices["paceCaretStyle"], fixture.officialChoices["caretStyle"])
+    XCTAssertEqual(
+      fixture.officialChoices["timerColor"], ["black", "sub", "text", "main"])
+    XCTAssertEqual(
+      Set(TypingCaretStyle.allCases.map(\.compatibilityValue)),
+      Set(fixture.officialChoices["caretStyle"] ?? []))
+    XCTAssertEqual(
+      Set(TypingCaretStyle.allCases.map(\.compatibilityValue)),
+      Set(fixture.officialChoices["paceCaretStyle"] ?? []))
+    XCTAssertEqual(
+      Set(LiveStatsColor.allCases.map(\.compatibilityValue)),
+      Set(fixture.officialChoices["timerColor"] ?? []))
     XCTAssertEqual(
       TypingClickSoundStyle.allCases.count + 1,
       fixture.officialChoiceCounts["playSoundOnClick"])
