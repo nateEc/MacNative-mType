@@ -163,12 +163,12 @@
 2026-09-05 更新：单语数量增至一百零三种，新增 Kabyle（`kabyle`）：基础、1k、2k、5k 与 10k 参考配置均定义 `bcp47: kab` 与 `orderedByFrequency: false`，没有 RTL、连写或 `noLazyMode`。Typebar 使用原创 Taqbaylit 词流与四档引语、LTR 空格提交；知识短文与系统朗读均精确使用 `kab`。该语言进入已测试的默认/自选多语混排、预设、归档、社区投稿、成绩及服务端排行榜全路径；保留用户显式选择的简化输入，Zipf 启用时显示不支持的七秒提示但不移除修饰器。
 | `burstHeatmap` | `showWordBurstHeatmap` | 已映射。 |
 | `difficulty` | `Difficulty` | 已映射。 |
-| `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护。 |
+| `quickRestart` | `QuickRestartKey` | 已映射；保留 macOS 快捷键与长测试保护，固定 off/esc/tab/enter 四值均可从命令面板即时选择。 |
 | `repeatQuotes` | `repeatQuotes` | 已映射。 |
 | `resultSaving` | `saveCompletedResults` | 已映射。 |
-| `blindMode` | `blindMode` | 已映射。 |
-| `alwaysShowWordsHistory` | `alwaysShowWordsHistory` | 已映射。 |
-| `singleListCommandLine` | `commandPaletteListMode` | 已映射；`on` 对应打开即展示全部命令的单列表，`manual` 对应分组导航并可输入 `>` 展开全部命令。 |
+| `blindMode` | `blindMode` | 已映射；命令面板可即时开关且不重开测试。 |
+| `alwaysShowWordsHistory` | `alwaysShowWordsHistory` | 已映射；命令面板可即时选择结果页默认展开或折叠。 |
+| `singleListCommandLine` | `commandPaletteListMode` | 已映射；`on` 对应打开即展示全部命令的单列表，`manual` 对应分组导航并可输入 `>` 展开全部命令；两值均有严格命令入口。 |
 | `minWpm` | `minimumWpm` | 已映射。 |
 | `minWpmCustomSpeed` | `minimumWpm` | 已映射；零值关闭。 |
 | `minAcc` | `minimumAccuracy` | 已映射。 |

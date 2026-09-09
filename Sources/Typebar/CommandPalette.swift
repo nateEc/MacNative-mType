@@ -374,6 +374,103 @@ enum PracticePreferenceCommandCatalog {
     }
 }
 
+enum BehaviorCommandTarget: Equatable {
+    case quickRestart(QuickRestartKey)
+    case blindMode(Bool)
+    case alwaysShowWordsHistory(Bool)
+    case commandPaletteListMode(CommandPaletteListMode)
+
+    var requiresRestart: Bool { false }
+    var exitsChallenge: Bool { false }
+
+    @MainActor
+    func apply(to settings: AppSettings) {
+        switch self {
+        case .quickRestart(let key): settings.quickRestartKey = key
+        case .blindMode(let enabled): settings.blindMode = enabled
+        case .alwaysShowWordsHistory(let enabled): settings.alwaysShowWordsHistory = enabled
+        case .commandPaletteListMode(let mode): settings.commandPaletteListMode = mode
+        }
+    }
+}
+
+/// Maps the fixed reference behavior commands to Typebar's existing native
+/// preferences without restarting the active test.
+enum BehaviorCommandCatalog {
+    static let items: [CommandPaletteItem] = [
+        option("quickRestart", "off", "快速重开：关闭", "仅保留 ⌘R", "arrow.counterclockwise"),
+        option("quickRestart", "esc", "快速重开：Esc", "使用 Esc 重新开始练习", "escape"),
+        option("quickRestart", "tab", "快速重开：Tab", "使用 Tab 重新开始练习", "arrow.right.to.line"),
+        option("quickRestart", "enter", "快速重开：Enter", "使用 Enter 重新开始练习", "return"),
+        toggle("blindMode", false, "盲打", "显示输入正确性", "eye"),
+        toggle("blindMode", true, "盲打", "隐藏输入正确性", "eye.slash"),
+        toggle(
+            "alwaysShowWordsHistory", false, "完成后展开单词历史",
+            "结果页默认保持折叠", "text.justify.left"),
+        toggle(
+            "alwaysShowWordsHistory", true, "完成后展开单词历史",
+            "有单词记录时自动展开", "text.justify.left"),
+        option(
+            "singleListCommandLine", "manual", "命令面板：手动分组",
+            "按分组浏览，输入 > 展开全部", "list.bullet.indent"),
+        option(
+            "singleListCommandLine", "on", "命令面板：单列表",
+            "打开时直接展示全部命令", "list.bullet"),
+    ]
+
+    static func target(for identifier: String) -> BehaviorCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "behavior" else { return nil }
+        let value = String(parts[2])
+        switch String(parts[1]) {
+        case "quickRestart":
+            let keys: [String: QuickRestartKey] = [
+                "off": .off, "esc": .escape, "tab": .tab, "enter": .enter,
+            ]
+            return keys[value].map(BehaviorCommandTarget.quickRestart)
+        case "blindMode":
+            return boolean(value).map(BehaviorCommandTarget.blindMode)
+        case "alwaysShowWordsHistory":
+            return boolean(value).map(BehaviorCommandTarget.alwaysShowWordsHistory)
+        case "singleListCommandLine":
+            let modes: [String: CommandPaletteListMode] = [
+                "manual": .grouped, "on": .singleList,
+            ]
+            return modes[value].map(BehaviorCommandTarget.commandPaletteListMode)
+        default:
+            return nil
+        }
+    }
+
+    private static func toggle(
+        _ key: String, _ enabled: Bool, _ title: String, _ subtitle: String,
+        _ systemImage: String
+    ) -> CommandPaletteItem {
+        option(
+            key, enabled ? "on" : "off", "\(title)：\(enabled ? "开启" : "关闭")",
+            subtitle, systemImage)
+    }
+
+    private static func option(
+        _ key: String, _ value: String, _ title: String, _ subtitle: String,
+        _ systemImage: String
+    ) -> CommandPaletteItem {
+        let identifier = "behavior.\(key).\(value)"
+        return CommandPaletteItem(
+            id: identifier, title: title, subtitle: subtitle,
+            systemImage: systemImage,
+            keywords: ["behavior", "行为", key, value, title, identifier], group: .settings)
+    }
+
+    private static func boolean(_ value: String) -> Bool? {
+        switch value {
+        case "on": true
+        case "off": false
+        default: nil
+        }
+    }
+}
+
 enum InputRuleCommandTarget: Equatable {
     case freedomMode(Bool)
     case strictSpace(Bool)

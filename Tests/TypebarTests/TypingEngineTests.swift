@@ -1592,6 +1592,73 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testBehaviorCommandsCoverFixedReferenceChoicesAndRejectMalformedIDs() {
+    XCTAssertEqual(
+      BehaviorCommandCatalog.items.map(\.id),
+      [
+        "behavior.quickRestart.off", "behavior.quickRestart.esc",
+        "behavior.quickRestart.tab", "behavior.quickRestart.enter",
+        "behavior.blindMode.off", "behavior.blindMode.on",
+        "behavior.alwaysShowWordsHistory.off", "behavior.alwaysShowWordsHistory.on",
+        "behavior.singleListCommandLine.manual", "behavior.singleListCommandLine.on",
+      ])
+    XCTAssertTrue(BehaviorCommandCatalog.items.allSatisfy { $0.group == .settings })
+    XCTAssertEqual(
+      BehaviorCommandCatalog.target(for: "behavior.quickRestart.esc"),
+      .quickRestart(.escape))
+    XCTAssertEqual(
+      BehaviorCommandCatalog.target(for: "behavior.blindMode.on"), .blindMode(true))
+    XCTAssertEqual(
+      BehaviorCommandCatalog.target(for: "behavior.alwaysShowWordsHistory.off"),
+      .alwaysShowWordsHistory(false))
+    XCTAssertEqual(
+      BehaviorCommandCatalog.target(for: "behavior.singleListCommandLine.manual"),
+      .commandPaletteListMode(.grouped))
+    XCTAssertEqual(
+      BehaviorCommandCatalog.target(for: "behavior.singleListCommandLine.on"),
+      .commandPaletteListMode(.singleList))
+    XCTAssertNil(BehaviorCommandCatalog.target(for: "behavior.quickRestart.escape"))
+    XCTAssertNil(BehaviorCommandCatalog.target(for: "behavior.blindMode.yes"))
+    XCTAssertNil(BehaviorCommandCatalog.target(for: "behavior.quickRestart.off.extra"))
+    for item in BehaviorCommandCatalog.items {
+      let target = BehaviorCommandCatalog.target(for: item.id)
+      XCTAssertNotNil(target, item.id)
+      XCTAssertEqual(target?.requiresRestart, false, item.id)
+      XCTAssertEqual(target?.exitsChallenge, false, item.id)
+      XCTAssertTrue(
+        CommandPaletteSearch.results(items: BehaviorCommandCatalog.items, query: item.id)
+          .contains(where: { $0.id == item.id }), item.id)
+    }
+  }
+
+  @MainActor
+  func testBehaviorCommandsApplyWithoutRestartingOrExitingChallenges() throws {
+    let suiteName = "TypebarTests.BehaviorCommands.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    let targets: [BehaviorCommandTarget] = [
+      .quickRestart(.tab), .blindMode(true), .alwaysShowWordsHistory(true),
+      .commandPaletteListMode(.grouped),
+    ]
+    for target in targets {
+      XCTAssertFalse(target.requiresRestart)
+      XCTAssertFalse(target.exitsChallenge)
+      target.apply(to: settings)
+    }
+
+    XCTAssertEqual(settings.quickRestartKey, .tab)
+    XCTAssertTrue(settings.blindMode)
+    XCTAssertTrue(settings.alwaysShowWordsHistory)
+    XCTAssertEqual(settings.commandPaletteListMode, .grouped)
+    let restored = AppSettings(defaults: defaults)
+    XCTAssertEqual(restored.quickRestartKey, .tab)
+    XCTAssertTrue(restored.blindMode)
+    XCTAssertTrue(restored.alwaysShowWordsHistory)
+    XCTAssertEqual(restored.commandPaletteListMode, .grouped)
+  }
+
   func testInputRuleCommandsCoverReferenceChoicesAndRejectMalformedIDs() {
     XCTAssertEqual(
       InputRuleCommandCatalog.items.map(\.id),

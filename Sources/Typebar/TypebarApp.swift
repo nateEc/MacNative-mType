@@ -2846,6 +2846,7 @@ private struct ContentView: View {
     items.append(contentsOf: QuickTestParameterCommandCatalog.items)
     items.append(contentsOf: QuoteCommandCatalog.items(hasFavorites: hasFavoriteQuotesInCurrentSource))
     items.append(contentsOf: PracticePreferenceCommandCatalog.items)
+    items.append(contentsOf: BehaviorCommandCatalog.items)
     items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
     items.append(contentsOf: SoundCommandCatalog.items)
@@ -2934,6 +2935,10 @@ private struct ContentView: View {
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings)
       if target.requiresRestart { reset() }
+      return
+    }
+    if let target = BehaviorCommandCatalog.target(for: item.id) {
+      target.apply(to: settings)
       return
     }
     if let target = PracticePreferenceCommandCatalog.target(for: item.id) {
