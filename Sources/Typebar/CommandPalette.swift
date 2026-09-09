@@ -232,6 +232,61 @@ enum QuickTestParameterCommandCatalog {
     }
 }
 
+enum QuoteCommandTarget: Equatable {
+    case lengths(Set<QuoteLength>)
+    case favorites
+    case search
+}
+
+enum QuoteCommandCatalog {
+    static func items(hasFavorites: Bool) -> [CommandPaletteItem] {
+        var values: [(String, String, String)] = [
+            ("all", "引语长度：全部", "使用全部四档原创引语"),
+            ("short", "引语长度：短", "只使用短引语"),
+            ("medium", "引语长度：中", "只使用中等长度引语"),
+            ("long", "引语长度：长", "只使用长引语"),
+            ("extended", "引语长度：超长", "只使用超长引语"),
+        ]
+        if hasFavorites {
+            values.append(("favorites", "引语：本机收藏", "只使用当前语言和来源的收藏"))
+        }
+        values.append(("search", "搜索引语", "切换到仅在本机筛选的引语搜索"))
+        return values.map { value, title, subtitle in
+            CommandPaletteItem(
+                id: "test.quote.\(value)", title: title, subtitle: subtitle,
+                systemImage: value == "search" ? "magnifyingglass" : "quote.opening",
+                keywords: ["quote", "quotes", "引语", "长度", value], group: .practice)
+        }
+    }
+
+    static func target(for identifier: String) -> QuoteCommandTarget? {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "test", parts[1] == "quote" else { return nil }
+        switch parts[2] {
+        case "all": return .lengths(QuoteLengthSelection.selectable)
+        case "short": return .lengths([.short])
+        case "medium": return .lengths([.medium])
+        case "long": return .lengths([.long])
+        case "extended": return .lengths([.extended])
+        case "favorites": return .favorites
+        case "search": return .search
+        default: return nil
+        }
+    }
+}
+
+enum TestConfigurationCommandChallengePolicy {
+    private static let modeIdentifiers: Set<String> = [
+        "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
+    ]
+
+    static func exitsChallenge(for identifier: String) -> Bool {
+        modeIdentifiers.contains(identifier)
+            || QuickTestParameterCommandCatalog.target(for: identifier) != nil
+            || QuoteCommandCatalog.target(for: identifier) != nil
+    }
+}
+
 enum ThemeCommandTarget: Equatable {
     case builtIn(AppTheme)
     case custom(UUID)

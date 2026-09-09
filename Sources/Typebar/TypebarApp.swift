@@ -2803,6 +2803,7 @@ private struct ContentView: View {
         systemImage: "figure.run", keywords: ["bail", "bailout", "中止", "退出"], group: .practice))
     }
     items.append(contentsOf: QuickTestParameterCommandCatalog.items)
+    items.append(contentsOf: QuoteCommandCatalog.items(hasFavorites: hasFavoriteQuotesInCurrentSource))
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -2821,6 +2822,27 @@ private struct ContentView: View {
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let target = QuoteCommandCatalog.target(for: item.id) {
+      if target == .favorites, !hasFavoriteQuotesInCurrentSource { return }
+      activeChallengeID = nil
+      mode = .quote
+      quoteQueue.reset()
+      switch target {
+      case .lengths(let lengths):
+        quoteSelectionMode = .lengths
+        quoteLengths = QuoteLengthSelection.normalized(lengths)
+      case .favorites:
+        quoteSelectionMode = .favorites
+      case .search:
+        quoteSelectionMode = .search
+      }
+      ensureSelectedQuote()
+      reset()
+      return
+    }
+    if TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id) {
+      activeChallengeID = nil
+    }
     if let target = QuickTestParameterCommandCatalog.target(for: item.id) {
       switch target {
       case .timed(let seconds):
@@ -3080,13 +3102,19 @@ private struct ContentView: View {
   }
 
   private var availableQuotes: [OfflineQuote] {
-    let sourceQuotes =
-      quoteSource == .builtIn
+    QuoteSelection.filtered(
+      currentSourceQuotes, mode: quoteSelectionMode, lengths: quoteLengths,
+      searchQuery: quoteSearchQuery, isFavorite: settings.isFavoriteQuote)
+  }
+
+  private var currentSourceQuotes: [OfflineQuote] {
+    quoteSource == .builtIn
       ? OfflineContent.quotes(for: language)
       : communityQuotes.filter { $0.language == language }
-    return QuoteSelection.filtered(
-      sourceQuotes, mode: quoteSelectionMode, lengths: quoteLengths,
-      searchQuery: quoteSearchQuery, isFavorite: settings.isFavoriteQuote)
+  }
+
+  private var hasFavoriteQuotesInCurrentSource: Bool {
+    currentSourceQuotes.contains { settings.isFavoriteQuote($0.id) }
   }
 
   private func refreshCommunityQuotes() {

@@ -1430,6 +1430,47 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(QuickTestParameterCommandCatalog.target(for: "test.unknown.on"))
   }
 
+  func testQuoteCommandCatalogCoversLengthsFavoritesAndSearchWithoutEmptyFavorites() {
+    XCTAssertEqual(
+      QuoteCommandCatalog.items(hasFavorites: false).map(\.id),
+      [
+        "test.quote.all", "test.quote.short", "test.quote.medium", "test.quote.long",
+        "test.quote.extended", "test.quote.search",
+      ])
+    XCTAssertEqual(
+      QuoteCommandCatalog.items(hasFavorites: true).map(\.id),
+      [
+        "test.quote.all", "test.quote.short", "test.quote.medium", "test.quote.long",
+        "test.quote.extended", "test.quote.favorites", "test.quote.search",
+      ])
+    XCTAssertEqual(
+      QuoteCommandCatalog.target(for: "test.quote.all"),
+      .lengths(QuoteLengthSelection.selectable))
+    XCTAssertEqual(
+      QuoteCommandCatalog.target(for: "test.quote.short"), .lengths([.short]))
+    XCTAssertEqual(
+      QuoteCommandCatalog.target(for: "test.quote.extended"), .lengths([.extended]))
+    XCTAssertEqual(QuoteCommandCatalog.target(for: "test.quote.favorites"), .favorites)
+    XCTAssertEqual(QuoteCommandCatalog.target(for: "test.quote.search"), .search)
+    XCTAssertNil(QuoteCommandCatalog.target(for: "test.quote.tiny"))
+    XCTAssertNil(QuoteCommandCatalog.target(for: "test.quote.short.extra"))
+  }
+
+  func testConfigurationCommandsExitChallengesButUnrelatedCommandsDoNot() {
+    for identifier in [
+      "mode.time", "mode.words", "mode.quote", "mode.zen", "mode.custom",
+      "test.time.30", "test.words.25", "test.punctuation.on", "test.numbers.off",
+      "test.quote.all", "test.quote.favorites", "test.quote.search",
+    ] {
+      XCTAssertTrue(
+        TestConfigurationCommandChallengePolicy.exitsChallenge(for: identifier), identifier)
+    }
+    XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: "restart"))
+    XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: "theme.builtin.paper"))
+    XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: "test.time.45"))
+    XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: "mode.unknown"))
+  }
+
   func testChallengeCommandCatalogDescribesAndRoutesLibraryChallenges() throws {
     let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "calm-thirty"))
 
