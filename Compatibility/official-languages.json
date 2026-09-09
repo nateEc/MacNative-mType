@@ -545,7 +545,11 @@
     "german_10k": "german10k",
     "german_250k": "german250k",
     "swiss_german": "swissGerman",
+    "swiss_german_1k": "swissGerman1k",
+    "swiss_german_2k": "swissGerman2k",
     "afrikaans": "afrikaans",
+    "afrikaans_1k": "afrikaans1k",
+    "afrikaans_10k": "afrikaans10k",
     "georgian": "georgian",
     "tamil": "tamil",
     "tanglish": "tanglish",
@@ -774,10 +778,6 @@
     "sindhi": "sindhi"
   },
   "nativeRelatedChoice": {
-    "swiss_german_1k": "swissGerman",
-    "swiss_german_2k": "swissGerman",
-    "afrikaans_1k": "afrikaans",
-    "afrikaans_10k": "afrikaans",
     "tamil_1k": "tamil",
     "telugu_1k": "telugu",
     "greek_1k": "greek",

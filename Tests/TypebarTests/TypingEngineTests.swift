@@ -9070,6 +9070,129 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testSwissGermanScaleChoicesPreserveIndependentIDsAndSpecialRuntimeBehavior() throws {
+    let cases: [(String, String, Int, Int, Int, Int, Int, Int, Int, Int, Int)] = [
+      ("swissGerman1k", "Swiss German · 1k · Typebar", 1_000, 16, 553, 1, 1, 0, 98, 44, 0),
+      ("swissGerman2k", "Swiss German · 2k · Typebar", 2_000, 29, 974, 10, 0, 1, 385, 144, 3),
+    ]
+
+    for (
+      rawValue, displayName, count, maximumLength, uppercaseCount, punctuationCount,
+      spaceCount, numberCount, nonASCIIcount, uppercaseNonASCIIcount, punctuationNonASCIIcount
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+
+      XCTAssertEqual(language.displayName, displayName, rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, rawValue)
+      XCTAssertTrue(language.supportsLazyLatinInput, rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, rawValue)
+      XCTAssertFalse(language.supportsCommunityQuoteSubmission, rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "de", rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, "de-CH", rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertEqual(language.presentationText("groß"), "gross", rawValue)
+      XCTAssertEqual(words.count, count, rawValue)
+      XCTAssertEqual(Set(words).count, count, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), 2, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximumLength, rawValue)
+      XCTAssertFalse(words.contains { $0.contains("ß") }, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercaseCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuationCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(" ") }.count, spaceCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isNumber) }.count, numberCount, rawValue)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCIIcount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isUppercase)
+          && $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, uppercaseNonASCIIcount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isPunctuation)
+          && $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, punctuationNonASCIIcount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isNumber) && $0.contains(where: \.isPunctuation)
+      }.count, numberCount, rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        rawValue)
+      XCTAssertFalse(OfflineContent.generatedPrompt(wordCount: 25, language: language).contains("ß"))
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        let quotes = OfflineContent.quotes(for: language, length: length)
+        XCTAssertEqual(quotes.first?.language, language, "\(rawValue)-\(length)")
+        XCTAssertTrue(quotes.allSatisfy { !$0.title.contains("ß") && !$0.text.contains("ß") })
+      }
+    }
+  }
+
+  func testAfrikaansScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, String, Int, Int, Int, Int, Int, Int, Int, Bool)] = [
+      ("afrikaans1k", "Afrikaans · 1k · Typebar", 1_000, 19, 19, 4, 13, 3, 0, false),
+      ("afrikaans10k", "Afrikaans · 10k · Typebar", 8_164, 22, 151, 37, 113, 15, 4, true),
+    ]
+
+    for (
+      rawValue, displayName, count, maximumLength, uppercaseCount, punctuationCount,
+      nonASCIIcount, uppercasePunctuationCount, uppercaseNonASCIIcount, supportsLazyInput
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+
+      XCTAssertEqual(language.displayName, displayName, rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, rawValue)
+      XCTAssertEqual(language.supportsLazyLatinInput, supportsLazyInput, rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "af", rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, "af-ZA", rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertEqual(words.count, count, rawValue)
+      XCTAssertEqual(Set(words).count, count, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), 2, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximumLength, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercaseCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuationCount, rawValue)
+      XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, nonASCIIcount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isUppercase) && $0.contains(where: \.isPunctuation)
+      }.count, uppercasePunctuationCount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.contains(where: \.isUppercase)
+          && $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, uppercaseNonASCIIcount, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(" ") }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        rawValue)
+      XCTAssertEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language).split(separator: " ").count,
+        25, rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),
@@ -12482,7 +12605,8 @@ final class TypingEngineTests: XCTestCase {
       OfflineContent.quotes(for: .swissGerman).map(\.text),
       OfflineContent.quotes(for: .german).map { $0.text.replacingOccurrences(of: "ß", with: "ss") })
     XCTAssertTrue(OfflineContent.quotes(for: .swissGerman).allSatisfy {
-      $0.language == .swissGerman && !$0.title.contains("ß") && !$0.text.contains("ß")
+      $0.id.hasPrefix("swiss-german-") && $0.language == .swissGerman
+        && !$0.title.contains("ß") && !$0.text.contains("ß")
     })
 
     let custom = TestSessionFactory.make(

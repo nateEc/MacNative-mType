@@ -4603,6 +4603,7 @@ enum OfflineContent {
     case .ukrainianLatynka1k, .ukrainianLatynka10k, .ukrainianLatynka50k: .ukrainianLatin
     case .indonesian1k, .indonesian10k: .indonesian
     case .kurdishCentral2k, .kurdishCentral4k: .kurdishCentral
+    case .afrikaans1k, .afrikaans10k: .afrikaans
     default: nil
     }
     if let source = inheritedScaleQuoteSource {
@@ -4790,13 +4791,14 @@ enum OfflineContent {
           language: language, length: quote.length)
       }
     }
-    if language == .swissGerman {
+    if language.rawValue.hasPrefix("swissGerman") {
+      let quoteIDPrefix = language == .swissGerman ? "swiss-german" : language.rawValue
       return quotes(for: .german, length: length).map { quote in
         .init(
-          id: "swiss-german-\(quote.id)",
+          id: "\(quoteIDPrefix)-\(quote.id)",
           title: quote.title.replacingOccurrences(of: "ß", with: "ss"),
           text: quote.text.replacingOccurrences(of: "ß", with: "ss"),
-          language: .swissGerman,
+          language: language,
           length: quote.length)
       }
     }

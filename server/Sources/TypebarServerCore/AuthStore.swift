@@ -509,6 +509,7 @@ public actor AuthStore {
     "ukrainian1k", "ukrainian10k", "ukrainian50k",
     "ukrainianLatynka1k", "ukrainianLatynka10k", "ukrainianLatynka50k",
     "indonesian1k", "indonesian10k", "kurdishCentral2k", "kurdishCentral4k",
+    "afrikaans1k", "afrikaans10k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",
@@ -543,7 +544,10 @@ public actor AuthStore {
   ]
   private static let supportedResultLanguageIDs = supportedSingleLanguageIDs
     .union(supportedCodeLanguageIDs)
-    .union(["swissGerman", "mixedEnglishChinese", "mixedLanguages"])
+    .union([
+      "swissGerman", "swissGerman1k", "swissGerman2k",
+      "mixedEnglishChinese", "mixedLanguages",
+    ])
 
   private struct PersistedState: Codable {
     var users: [StoredUser] = []

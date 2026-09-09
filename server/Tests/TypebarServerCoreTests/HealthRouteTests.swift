@@ -945,13 +945,15 @@ final class HealthRouteTests: XCTestCase {
           attribution: nil), accessToken: session.accessToken)
       XCTFail("Unsupported quote languages must be rejected")
     } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidQuoteSubmission) }
-    do {
-      _ = try await store.submitQuote(
-        .init(
-          language: "swissGerman", text: "Eine ruhige Übung macht den nächsten Schritt klarer.",
-          attribution: nil), accessToken: session.accessToken)
-      XCTFail("Swiss German community quote submissions must be rejected")
-    } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidQuoteSubmission) }
+    for language in ["swissGerman", "swissGerman1k", "swissGerman2k"] {
+      do {
+        _ = try await store.submitQuote(
+          .init(
+            language: language, text: "Eine ruhige Übung macht den nächsten Schritt klarer.",
+            attribution: nil), accessToken: session.accessToken)
+        XCTFail("Swiss German community quote submissions must be rejected: \(language)")
+      } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidQuoteSubmission) }
+    }
   }
 
   func testOnlyApprovedQuotesAreExposedPubliclyAndCanBeModerated() async throws {
@@ -3859,10 +3861,10 @@ final class HealthRouteTests: XCTestCase {
       })
     let auditedQuoteLanguageIDs = Set(fixture.nativeIndependent.values)
       .subtracting(auditedCodeLanguageIDs)
-      .subtracting(["swissGerman"])
+      .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 250)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 252)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4239,6 +4241,8 @@ final class HealthRouteTests: XCTestCase {
       ("indonesian10k", "Indeks yang lebih besar tetap menghasilkan bagian yang diperlukan."),
       ("kurdishCentral2k", "ڕیزبەندیی ناوخۆیی ڕاهێنانی کوردی بە ڕوونی دەپارێزێت."),
       ("kurdishCentral4k", "پێڕستی فراوان تەنها بەشە پێویستەکان دروست دەکات."),
+      ("afrikaans1k", "Elke plaaslike reeks hou die Afrikaanse oefening duidelik."),
+      ("afrikaans10k", "Die groter indeks skep slegs die nodige oefenitems."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),
@@ -4321,6 +4325,38 @@ final class HealthRouteTests: XCTestCase {
       XCTAssertTrue(accepted.accepted)
       let leaderboard = try await store.leaderboard(
         .init(mode: "time", language: item.0, period: "all", limit: 10), now: now)
+      XCTAssertEqual(leaderboard.entries.map(\.wpm), [wpm])
+    }
+  }
+
+  func testSwissGermanScaleChoicesRejectQuotesButAcceptResultsAndLeaderboard() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(
+        email: "swiss-scales@example.com", password: "a secure password",
+        displayName: "Swiss Scale User"))
+    let now = Date(timeIntervalSince1970: 1_735_689_600)
+
+    for (offset, language) in ["swissGerman1k", "swissGerman2k"].enumerated() {
+      do {
+        _ = try await store.submitQuote(
+          .init(
+            language: language, text: "Eine lokale Übung bleibt klar und ruhig.",
+            attribution: nil), accessToken: session.accessToken)
+        XCTFail("Swiss German scale quotes must be rejected: \(language)")
+      } catch let error as AuthStoreError {
+        XCTAssertEqual(error, .invalidQuoteSubmission)
+      }
+
+      let wpm = 84 + offset
+      let accepted = try await store.submitResult(
+        result(
+          id: UUID(), wpm: wpm, accuracy: 100, language: language,
+          finishedAt: now.addingTimeInterval(Double(offset))),
+        accessToken: session.accessToken, now: now)
+      XCTAssertTrue(accepted.accepted)
+      let leaderboard = try await store.leaderboard(
+        .init(mode: "time", language: language, period: "all", limit: 10), now: now)
       XCTAssertEqual(leaderboard.entries.map(\.wpm), [wpm])
     }
   }

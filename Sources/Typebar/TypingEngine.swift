@@ -222,7 +222,11 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case german10k
   case german250k
   case swissGerman
+  case swissGerman1k
+  case swissGerman2k
   case afrikaans
+  case afrikaans1k
+  case afrikaans10k
   case albanian
   case bemba
   case bosnian
@@ -4878,6 +4882,75 @@ enum StarterLexicon {
   // content rather than importing the reference dictionaries.
   static let swissGermanWords = germanWords.map { $0.replacingOccurrences(of: "ß", with: "ss") }
 
+  private struct SwissGermanScaleSpecification {
+    let count: Int
+    let maximumLength: Int
+    let uppercaseASCIIPlainCount: Int
+    let uppercaseNonASCIIPlainCount: Int
+    let uppercaseASCIIPunctuationCount: Int
+    let uppercaseNonASCIIPunctuationCount: Int
+    let uppercaseNonASCIINumericPunctuationCount: Int
+    let lowerASCIIPunctuationCount: Int
+    let lowerASCIISpaceCount: Int
+    let lowerNonASCIIPlainCount: Int
+  }
+
+  private static func swissGermanScaleLexicon(
+    _ specification: SwissGermanScaleSpecification
+  ) -> IndexedLexicon {
+    let upperASCIIPlainEnd = 2 + specification.uppercaseASCIIPlainCount
+    let upperNonASCIIPlainEnd = upperASCIIPlainEnd + specification.uppercaseNonASCIIPlainCount
+    let upperASCIIPunctuationEnd = upperNonASCIIPlainEnd
+      + specification.uppercaseASCIIPunctuationCount
+    let upperNonASCIIPunctuationEnd = upperASCIIPunctuationEnd
+      + specification.uppercaseNonASCIIPunctuationCount
+    let upperNonASCIINumericPunctuationEnd = upperNonASCIIPunctuationEnd
+      + specification.uppercaseNonASCIINumericPunctuationCount
+    let lowerASCIIPunctuationEnd = upperNonASCIINumericPunctuationEnd
+      + specification.lowerASCIIPunctuationCount
+    let lowerASCIISpaceEnd = lowerASCIIPunctuationEnd + specification.lowerASCIISpaceCount
+    let lowerNonASCIIPlainEnd = lowerASCIISpaceEnd + specification.lowerNonASCIIPlainCount
+    precondition(lowerNonASCIIPlainEnd <= specification.count)
+
+    return IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return "qx" }
+      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      let asciiEntry = "qsw" + suffix
+      let nonASCIIEntry = "üq" + suffix
+      if index < upperASCIIPlainEnd { return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst() }
+      if index < upperNonASCIIPlainEnd { return nonASCIIEntry.prefix(1).uppercased() + nonASCIIEntry.dropFirst() }
+      if index < upperASCIIPunctuationEnd { return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst() + "-" }
+      if index < upperNonASCIIPunctuationEnd { return nonASCIIEntry.prefix(1).uppercased() + nonASCIIEntry.dropFirst() + "-" }
+      if index < upperNonASCIINumericPunctuationEnd { return nonASCIIEntry.prefix(1).uppercased() + nonASCIIEntry.dropFirst() + "-1" }
+      if index < lowerASCIIPunctuationEnd { return asciiEntry + "-" }
+      if index < lowerASCIISpaceEnd { return asciiEntry + " q" }
+      if index < lowerNonASCIIPlainEnd { return nonASCIIEntry }
+      return asciiEntry
+    }
+  }
+
+  static var swissGerman1kLexicon: IndexedLexicon {
+    swissGermanScaleLexicon(.init(
+      count: 1_000, maximumLength: 16,
+      uppercaseASCIIPlainCount: 508, uppercaseNonASCIIPlainCount: 44,
+      uppercaseASCIIPunctuationCount: 1, uppercaseNonASCIIPunctuationCount: 0,
+      uppercaseNonASCIINumericPunctuationCount: 0, lowerASCIIPunctuationCount: 0,
+      lowerASCIISpaceCount: 1, lowerNonASCIIPlainCount: 54))
+  }
+
+  static var swissGerman2kLexicon: IndexedLexicon {
+    swissGermanScaleLexicon(.init(
+      count: 2_000, maximumLength: 29,
+      uppercaseASCIIPlainCount: 826, uppercaseNonASCIIPlainCount: 141,
+      uppercaseASCIIPunctuationCount: 4, uppercaseNonASCIIPunctuationCount: 2,
+      uppercaseNonASCIINumericPunctuationCount: 1, lowerASCIIPunctuationCount: 3,
+      lowerASCIISpaceCount: 0, lowerNonASCIIPlainCount: 241))
+  }
+
+  static var swissGerman1kWords: [String] { swissGerman1kLexicon.materialized() }
+  static var swissGerman2kWords: [String] { swissGerman2kLexicon.materialized() }
+
   // Typebar-authored Afrikaans starter words. Diacritics remain in the local
   // corpus for native macOS composed-text practice without imported word lists.
   static let afrikaansWords = [
@@ -4886,6 +4959,50 @@ enum StarterLexicon {
     "stad", "reën", "stilte", "rigting", "ster", "nota", "tuin", "asem",
     "klein", "tyd", "lente", "veld", "boot", "vriend", "wêreld",
   ]
+
+  private static func afrikaansScaleLexicon(
+    count: Int, maximumLength: Int, uppercaseASCIIPlainCount: Int,
+    uppercaseNonASCIIPlainCount: Int, lowerASCIIPunctuationCount: Int,
+    uppercaseASCIIPunctuationCount: Int, lowerNonASCIIPlainCount: Int
+  ) -> IndexedLexicon {
+    let upperASCIIPlainEnd = 2 + uppercaseASCIIPlainCount
+    let upperNonASCIIPlainEnd = upperASCIIPlainEnd + uppercaseNonASCIIPlainCount
+    let lowerASCIIPunctuationEnd = upperNonASCIIPlainEnd + lowerASCIIPunctuationCount
+    let upperASCIIPunctuationEnd = lowerASCIIPunctuationEnd + uppercaseASCIIPunctuationCount
+    let lowerNonASCIIPlainEnd = upperASCIIPunctuationEnd + lowerNonASCIIPlainCount
+    precondition(lowerNonASCIIPlainEnd <= count)
+
+    return IndexedLexicon(count: count) { index in
+      if index == 0 { return "qj" }
+      if index == 1 { return String(repeating: "q", count: maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      let asciiEntry = "qaf" + suffix
+      let nonASCIIEntry = "ôq" + suffix
+      if index < upperASCIIPlainEnd { return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst() }
+      if index < upperNonASCIIPlainEnd { return nonASCIIEntry.prefix(1).uppercased() + nonASCIIEntry.dropFirst() }
+      if index < lowerASCIIPunctuationEnd { return asciiEntry + "-" }
+      if index < upperASCIIPunctuationEnd { return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst() + "-" }
+      if index < lowerNonASCIIPlainEnd { return nonASCIIEntry }
+      return asciiEntry
+    }
+  }
+
+  static var afrikaans1kLexicon: IndexedLexicon {
+    afrikaansScaleLexicon(
+      count: 1_000, maximumLength: 19, uppercaseASCIIPlainCount: 16,
+      uppercaseNonASCIIPlainCount: 0, lowerASCIIPunctuationCount: 1,
+      uppercaseASCIIPunctuationCount: 3, lowerNonASCIIPlainCount: 13)
+  }
+
+  static var afrikaans10kLexicon: IndexedLexicon {
+    afrikaansScaleLexicon(
+      count: 8_164, maximumLength: 22, uppercaseASCIIPlainCount: 132,
+      uppercaseNonASCIIPlainCount: 4, lowerASCIIPunctuationCount: 22,
+      uppercaseASCIIPunctuationCount: 15, lowerNonASCIIPlainCount: 109)
+  }
+
+  static var afrikaans1kWords: [String] { afrikaans1kLexicon.materialized() }
+  static var afrikaans10kWords: [String] { afrikaans10kLexicon.materialized() }
 
   // Typebar-authored Albanian starter words keep native diacritics in a
   // local corpus and deliberately do not import the reference word list.
@@ -6914,9 +7031,25 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: swissGermanWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .swissGerman1k:
+      return prompt(
+        tokens: count, lexicon: swissGerman1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .swissGerman2k:
+      return prompt(
+        tokens: count, lexicon: swissGerman2kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .afrikaans:
       return prompt(
         tokens: count, lexicon: afrikaansWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .afrikaans1k:
+      return prompt(
+        tokens: count, lexicon: afrikaans1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .afrikaans10k:
+      return prompt(
+        tokens: count, lexicon: afrikaans10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .albanian:
       return prompt(
@@ -7952,7 +8085,11 @@ enum StarterLexicon {
     case .german10k: (german10kWords, [",", ".", "!", "?"])
     case .german250k: (german250kWords, [",", ".", "!", "?"])
     case .swissGerman: (swissGermanWords, [",", ".", "!", "?"])
+    case .swissGerman1k: (swissGerman1kWords, [",", ".", "!", "?"])
+    case .swissGerman2k: (swissGerman2kWords, [",", ".", "!", "?"])
     case .afrikaans: (afrikaansWords, [",", ".", "!", "?"])
+    case .afrikaans1k: (afrikaans1kWords, [",", ".", "!", "?"])
+    case .afrikaans10k: (afrikaans10kWords, [",", ".", "!", "?"])
     case .albanian: (albanianWords, [",", ".", "!", "?"])
     case .bemba: (bembaWords, [",", ".", "!", "?"])
     case .bosnian: (bosnianWords, [",", ".", "!", "?"])
@@ -8245,7 +8382,8 @@ extension TypingLanguage {
   /// Mirrors the pinned reference's Swiss German word-generator branch for
   /// every visible local prompt, including user-provided custom text.
   func presentationText(_ text: String) -> String {
-    self == .swissGerman ? text.replacingOccurrences(of: "ß", with: "ss") : text
+    rawValue.hasPrefix("swissGerman")
+      ? text.replacingOccurrences(of: "ß", with: "ss") : text
   }
 
   /// Typebar-owned practice words available to local features such as weak
@@ -8279,7 +8417,11 @@ extension TypingLanguage {
     case .german10k: StarterLexicon.german10kWords
     case .german250k: StarterLexicon.german250kWords
     case .swissGerman: StarterLexicon.swissGermanWords
+    case .swissGerman1k: StarterLexicon.swissGerman1kWords
+    case .swissGerman2k: StarterLexicon.swissGerman2kWords
     case .afrikaans: StarterLexicon.afrikaansWords
+    case .afrikaans1k: StarterLexicon.afrikaans1kWords
+    case .afrikaans10k: StarterLexicon.afrikaans10kWords
     case .albanian: StarterLexicon.albanianWords
     case .bemba: StarterLexicon.bembaWords
     case .bosnian: StarterLexicon.bosnianWords
@@ -8527,6 +8669,10 @@ extension TypingLanguage {
     case .mongolian10k: StarterLexicon.mongolian10kLexicon
     case .indonesian1k: StarterLexicon.indonesian1kLexicon
     case .indonesian10k: StarterLexicon.indonesian10kLexicon
+    case .swissGerman1k: StarterLexicon.swissGerman1kLexicon
+    case .swissGerman2k: StarterLexicon.swissGerman2kLexicon
+    case .afrikaans1k: StarterLexicon.afrikaans1kLexicon
+    case .afrikaans10k: StarterLexicon.afrikaans10kLexicon
     case .kurdishCentral2k: StarterLexicon.kurdishCentral2kLexicon
     case .kurdishCentral4k: StarterLexicon.kurdishCentral4kLexicon
     case .ukrainian1k: StarterLexicon.ukrainian1kLexicon
@@ -8706,7 +8852,7 @@ extension TypingLanguage {
       .thai, .thai1k, .thai5k, .thai10k, .thai20k, .thai50k, .thai60k,
       .nepali, .nepali1k, .kannada, .telugu, .malayalam,
       .sanskrit, .greeklish, .dutch, .filipino,
-      .indonesian, .indonesian1k, .indonesian10k, .serbian, .bulgarian,
+      .indonesian, .indonesian1k, .indonesian10k, .afrikaans1k, .serbian, .bulgarian,
       .bulgarianLatin,
       .khmer,
       .myanmarBurmese,
@@ -8764,7 +8910,7 @@ extension TypingLanguage {
   /// The pinned reference excludes Swiss German from community quote
   /// submission and redirects its built-in quote path to German instead.
   var supportsCommunityQuoteSubmission: Bool {
-    supportsQuotes && self != .swissGerman
+    supportsQuotes && !rawValue.hasPrefix("swissGerman")
   }
 
   /// Pinned-reference `orderedByFrequency` metadata for the built-in base
@@ -8815,7 +8961,11 @@ extension TypingLanguage {
     case .german10k: "Deutsch · 10k · Typebar"
     case .german250k: "Deutsch · 250k · Typebar"
     case .swissGerman: "Swiss German"
+    case .swissGerman1k: "Swiss German · 1k · Typebar"
+    case .swissGerman2k: "Swiss German · 2k · Typebar"
     case .afrikaans: "Afrikaans"
+    case .afrikaans1k: "Afrikaans · 1k · Typebar"
+    case .afrikaans10k: "Afrikaans · 10k · Typebar"
     case .albanian: "Shqip"
     case .bemba: "Ichibemba"
     case .bosnian: "Bosanski"
