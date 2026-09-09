@@ -3228,6 +3228,8 @@ private struct CompletedResultView: View {
   @State private var quoteReportReason: RemoteQuoteReportReason = .other
   @State private var quoteReportNote = ""
   @State private var isUpdatingCommunityQuote = false
+  @State private var showingSlowWordCopy = false
+  @State private var slowWordThresholdText = ""
 
   var body: some View {
     VStack(spacing: 28) {
@@ -3364,6 +3366,9 @@ private struct CompletedResultView: View {
             Button("复制结果文字", action: copyResultText)
             Button("复制练习提示", action: copyResultPrompt)
             Button("复制实际输入", action: copyResultInput)
+            if !wordReviews.isEmpty {
+              Button("复制慢词列表…", action: prepareSlowWordCopy)
+            }
             Button("复制结果图片", action: copyResultImage)
             Divider()
             Button("保存结果图片…", action: saveResultImage)
@@ -3419,6 +3424,13 @@ private struct CompletedResultView: View {
     .frame(width: 390)
     .onAppear {
       communityRating = initialCommunityRating
+    }
+    .alert("复制慢词列表", isPresented: $showingSlowWordCopy) {
+      TextField("WPM 阈值", text: $slowWordThresholdText)
+      Button("取消", role: .cancel) {}
+      Button("复制", action: copySlowWords)
+    } message: {
+      Text("复制本轮 Burst 严格低于该 WPM 的已输入词；默认值是本轮有效 Burst 的平均值。")
     }
   }
 
@@ -3663,6 +3675,28 @@ private struct CompletedResultView: View {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(MissedWordCopyText.make(words: missedWords), forType: .string)
     exportStatus = "错词列表已复制"
+  }
+
+  private func prepareSlowWordCopy() {
+    let threshold = SlowWordCopyPolicy.defaultThreshold(bursts: wordBursts)
+    slowWordThresholdText = String(format: "%.0f", threshold)
+    showingSlowWordCopy = true
+  }
+
+  private func copySlowWords() {
+    guard let threshold = Double(slowWordThresholdText), threshold.isFinite, threshold > 0 else {
+      exportStatus = "请输入大于 0 的 WPM 阈值"
+      return
+    }
+    let words = SlowWordCopyPolicy.words(
+      reviews: wordReviews, bursts: wordBursts, below: threshold)
+    guard !words.isEmpty else {
+      exportStatus = "没有低于 \(slowWordThresholdText) WPM 的已输入词"
+      return
+    }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(words.joined(separator: " "), forType: .string)
+    exportStatus = "已复制 \(words.count) 个慢词"
   }
 
   private func copyResultImage() {

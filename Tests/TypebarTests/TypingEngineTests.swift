@@ -12143,6 +12143,30 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(repeatedTarget.selectedWords, ["cabin"])
   }
 
+  func testSlowWordCopyUsesAverageThresholdAndPreservesTypedOrder() {
+    let reviews = [
+      TypedWordReview(index: 0, target: "ember", typed: "ember"),
+      TypedWordReview(index: 1, target: "cabin", typed: "cabin"),
+      TypedWordReview(index: 2, target: "ember", typed: "ember"),
+      TypedWordReview(index: 3, target: "tail", typed: "tail"),
+    ]
+    let bursts: [Int?] = [40, 101, nil, 0]
+
+    XCTAssertEqual(SlowWordCopyPolicy.defaultThreshold(bursts: bursts), 71)
+    XCTAssertEqual(
+      SlowWordCopyPolicy.words(reviews: reviews, bursts: bursts, below: 80),
+      ["ember", "tail"])
+    XCTAssertEqual(
+      SlowWordCopyPolicy.words(reviews: reviews, bursts: bursts, below: 40),
+      ["tail"])
+    XCTAssertEqual(
+      SlowWordCopyPolicy.words(
+        reviews: reviews, bursts: [40, 101, 50, nil], below: 80),
+      ["ember", "ember"])
+    XCTAssertTrue(SlowWordCopyPolicy.words(reviews: reviews, bursts: bursts, below: 0).isEmpty)
+    XCTAssertEqual(SlowWordCopyPolicy.defaultThreshold(bursts: [nil, 0]), 80)
+  }
+
   func testContextualMissedWordPracticeKeepsOnlyAttemptedTargetContext() throws {
     let plan = try XCTUnwrap(
       ContextualMissedWordPracticePlan.make(

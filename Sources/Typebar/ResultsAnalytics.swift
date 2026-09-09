@@ -476,6 +476,28 @@ struct SlowWordPracticePlan: Equatable {
   }
 }
 
+enum SlowWordCopyPolicy {
+  static let fallbackThreshold = 80.0
+
+  static func defaultThreshold(bursts: [Int?]) -> Double {
+    let measured = bursts.compactMap { $0 }.filter { $0 > 0 }
+    guard !measured.isEmpty else { return fallbackThreshold }
+    return (measured.reduce(0.0) { $0 + Double($1) } / Double(measured.count)).rounded()
+  }
+
+  static func words(
+    reviews: [TypedWordReview], bursts: [Int?], below threshold: Double
+  ) -> [String] {
+    guard threshold.isFinite, threshold > 0 else { return [] }
+    return reviews.enumerated().compactMap { index, review in
+      guard !review.target.isEmpty, bursts.indices.contains(index),
+        let burst = bursts[index], Double(burst) < threshold
+      else { return nil }
+      return review.target
+    }
+  }
+}
+
 /// Builds a finite, local follow-up that keeps the previous target word next
 /// to each missed word. The context is derived only from the attempt being
 /// reviewed, never from a remote corpus or an unattempted tail of the prompt.
