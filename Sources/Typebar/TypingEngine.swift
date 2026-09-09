@@ -259,7 +259,15 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case hausa
   case tatar
   case tatarCrimean
+  case tatarCrimean1k
+  case tatarCrimean5k
+  case tatarCrimean10k
+  case tatarCrimean15k
   case tatarCrimeanCyrillic
+  case tatarCrimeanCyrillic1k
+  case tatarCrimeanCyrillic5k
+  case tatarCrimeanCyrillic10k
+  case tatarCrimeanCyrillic15k
   case klingon
   case quenya
   case viossa
@@ -5375,6 +5383,61 @@ enum StarterLexicon {
     "ses", "sual", "cevap", "ümit", "kelecek",
   ]
 
+  private struct CrimeanTatarLatinScaleSpecification {
+    let marker: String
+    let count: Int
+    let maximumLength: Int
+    let nonASCIICount: Int
+    let punctuationCount: Int
+    let uppercaseNonASCIICount: Int
+  }
+
+  private static func crimeanTatarLatinScaleLexicon(
+    _ specification: CrimeanTatarLatinScaleSpecification
+  ) -> IndexedLexicon {
+    IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return "q" }
+      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      if index < 2 + specification.punctuationCount {
+        return "ıqtc\(specification.marker)\(suffix)-"
+      }
+      if index < 2 + specification.punctuationCount + specification.uppercaseNonASCIICount {
+        return "İqtc\(specification.marker)\(suffix)"
+      }
+      if index < 2 + specification.nonASCIICount {
+        return "ıqtc\(specification.marker)\(suffix)"
+      }
+      return "qtc\(specification.marker)\(suffix)"
+    }
+  }
+
+  static var tatarCrimean1kLexicon: IndexedLexicon {
+    crimeanTatarLatinScaleLexicon(.init(
+      marker: "a", count: 1_000, maximumLength: 17, nonASCIICount: 526,
+      punctuationCount: 0, uppercaseNonASCIICount: 0))
+  }
+  static var tatarCrimean5kLexicon: IndexedLexicon {
+    crimeanTatarLatinScaleLexicon(.init(
+      marker: "b", count: 5_000, maximumLength: 17, nonASCIICount: 2_752,
+      punctuationCount: 2, uppercaseNonASCIICount: 0))
+  }
+  static var tatarCrimean10kLexicon: IndexedLexicon {
+    crimeanTatarLatinScaleLexicon(.init(
+      marker: "c", count: 10_000, maximumLength: 17, nonASCIICount: 5_560,
+      punctuationCount: 2, uppercaseNonASCIICount: 0))
+  }
+  static var tatarCrimean15kLexicon: IndexedLexicon {
+    crimeanTatarLatinScaleLexicon(.init(
+      marker: "d", count: 15_082, maximumLength: 18, nonASCIICount: 8_400,
+      punctuationCount: 4, uppercaseNonASCIICount: 1))
+  }
+
+  static var tatarCrimean1kWords: [String] { tatarCrimean1kLexicon.materialized() }
+  static var tatarCrimean5kWords: [String] { tatarCrimean5kLexicon.materialized() }
+  static var tatarCrimean10kWords: [String] { tatarCrimean10kLexicon.materialized() }
+  static var tatarCrimean15kWords: [String] { tatarCrimean15kLexicon.materialized() }
+
   // Typebar-authored Crimean Tatar Cyrillic starter words intentionally use
   // their own corpus so script selection stays visible in offline practice.
   static let tatarCrimeanCyrillicWords = [
@@ -5383,6 +5446,57 @@ enum StarterLexicon {
     "маса", "фикир", "нот", "иш", "теджрюбе", "дост", "шеер", "дениз", "кой", "вакъыт",
     "сес", "суаль", "джевап", "юмют", "келеджек",
   ]
+
+  private struct CrimeanTatarCyrillicScaleSpecification {
+    let marker: String
+    let count: Int
+    let maximumLength: Int
+    let punctuationCount: Int
+    let uppercaseNonASCIICount: Int
+  }
+
+  private static func crimeanTatarCyrillicScaleLexicon(
+    _ specification: CrimeanTatarCyrillicScaleSpecification
+  ) -> IndexedLexicon {
+    IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return "ѳ" }
+      if index == 1 { return String(repeating: "ѳ", count: specification.maximumLength) }
+      let suffix = cyrillicIndex(index + 676)
+      if index < 2 + specification.punctuationCount {
+        return "ѳкъ\(specification.marker)\(suffix)-"
+      }
+      if index < 2 + specification.punctuationCount + specification.uppercaseNonASCIICount {
+        return "Ѳкъ\(specification.marker)\(suffix)"
+      }
+      return "ѳкъ\(specification.marker)\(suffix)"
+    }
+  }
+
+  static var tatarCrimeanCyrillic1kLexicon: IndexedLexicon {
+    crimeanTatarCyrillicScaleLexicon(.init(
+      marker: "а", count: 1_000, maximumLength: 18, punctuationCount: 0,
+      uppercaseNonASCIICount: 0))
+  }
+  static var tatarCrimeanCyrillic5kLexicon: IndexedLexicon {
+    crimeanTatarCyrillicScaleLexicon(.init(
+      marker: "б", count: 5_000, maximumLength: 19, punctuationCount: 2,
+      uppercaseNonASCIICount: 0))
+  }
+  static var tatarCrimeanCyrillic10kLexicon: IndexedLexicon {
+    crimeanTatarCyrillicScaleLexicon(.init(
+      marker: "в", count: 10_000, maximumLength: 20, punctuationCount: 2,
+      uppercaseNonASCIICount: 0))
+  }
+  static var tatarCrimeanCyrillic15kLexicon: IndexedLexicon {
+    crimeanTatarCyrillicScaleLexicon(.init(
+      marker: "г", count: 15_082, maximumLength: 20, punctuationCount: 4,
+      uppercaseNonASCIICount: 1))
+  }
+
+  static var tatarCrimeanCyrillic1kWords: [String] { tatarCrimeanCyrillic1kLexicon.materialized() }
+  static var tatarCrimeanCyrillic5kWords: [String] { tatarCrimeanCyrillic5kLexicon.materialized() }
+  static var tatarCrimeanCyrillic10kWords: [String] { tatarCrimeanCyrillic10kLexicon.materialized() }
+  static var tatarCrimeanCyrillic15kWords: [String] { tatarCrimeanCyrillic15kLexicon.materialized() }
 
   // Typebar-authored Klingon starter words retain the language's case and
   // apostrophe conventions without importing the reference dictionary.
@@ -7369,6 +7483,13 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: tatarCrimeanWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .tatarCrimean1k, .tatarCrimean5k, .tatarCrimean10k, .tatarCrimean15k,
+      .tatarCrimeanCyrillic1k, .tatarCrimeanCyrillic5k,
+      .tatarCrimeanCyrillic10k, .tatarCrimeanCyrillic15k:
+      return prompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .tatarCrimeanCyrillic:
       return prompt(
         tokens: count, lexicon: tatarCrimeanCyrillicWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8384,7 +8505,15 @@ enum StarterLexicon {
     case .hausa: (hausaWords, [",", ".", "!", "?"])
     case .tatar: (tatarWords, [",", ".", "!", "?"])
     case .tatarCrimean: (tatarCrimeanWords, [",", ".", "!", "?"])
+    case .tatarCrimean1k: (tatarCrimean1kWords, [",", ".", "!", "?"])
+    case .tatarCrimean5k: (tatarCrimean5kWords, [",", ".", "!", "?"])
+    case .tatarCrimean10k: (tatarCrimean10kWords, [",", ".", "!", "?"])
+    case .tatarCrimean15k: (tatarCrimean15kWords, [",", ".", "!", "?"])
     case .tatarCrimeanCyrillic: (tatarCrimeanCyrillicWords, [",", ".", "!", "?"])
+    case .tatarCrimeanCyrillic1k: (tatarCrimeanCyrillic1kWords, [",", ".", "!", "?"])
+    case .tatarCrimeanCyrillic5k: (tatarCrimeanCyrillic5kWords, [",", ".", "!", "?"])
+    case .tatarCrimeanCyrillic10k: (tatarCrimeanCyrillic10kWords, [",", ".", "!", "?"])
+    case .tatarCrimeanCyrillic15k: (tatarCrimeanCyrillic15kWords, [",", ".", "!", "?"])
     case .klingon: (klingonWords, [",", ".", "!", "?"])
     case .quenya: (quenyaWords, [",", ".", "!", "?"])
     case .viossa: (viossaWords, [",", ".", "!", "?"])
@@ -8740,7 +8869,15 @@ extension TypingLanguage {
     case .hausa: StarterLexicon.hausaWords
     case .tatar: StarterLexicon.tatarWords
     case .tatarCrimean: StarterLexicon.tatarCrimeanWords
+    case .tatarCrimean1k: StarterLexicon.tatarCrimean1kWords
+    case .tatarCrimean5k: StarterLexicon.tatarCrimean5kWords
+    case .tatarCrimean10k: StarterLexicon.tatarCrimean10kWords
+    case .tatarCrimean15k: StarterLexicon.tatarCrimean15kWords
     case .tatarCrimeanCyrillic: StarterLexicon.tatarCrimeanCyrillicWords
+    case .tatarCrimeanCyrillic1k: StarterLexicon.tatarCrimeanCyrillic1kWords
+    case .tatarCrimeanCyrillic5k: StarterLexicon.tatarCrimeanCyrillic5kWords
+    case .tatarCrimeanCyrillic10k: StarterLexicon.tatarCrimeanCyrillic10kWords
+    case .tatarCrimeanCyrillic15k: StarterLexicon.tatarCrimeanCyrillic15kWords
     case .klingon: StarterLexicon.klingonWords
     case .quenya: StarterLexicon.quenyaWords
     case .viossa: StarterLexicon.viossaWords
@@ -9084,6 +9221,14 @@ extension TypingLanguage {
     case .greeklish5k: StarterLexicon.greeklish5kLexicon
     case .greeklish10k: StarterLexicon.greeklish10kLexicon
     case .greeklish25k: StarterLexicon.greeklish25kLexicon
+    case .tatarCrimean1k: StarterLexicon.tatarCrimean1kLexicon
+    case .tatarCrimean5k: StarterLexicon.tatarCrimean5kLexicon
+    case .tatarCrimean10k: StarterLexicon.tatarCrimean10kLexicon
+    case .tatarCrimean15k: StarterLexicon.tatarCrimean15kLexicon
+    case .tatarCrimeanCyrillic1k: StarterLexicon.tatarCrimeanCyrillic1kLexicon
+    case .tatarCrimeanCyrillic5k: StarterLexicon.tatarCrimeanCyrillic5kLexicon
+    case .tatarCrimeanCyrillic10k: StarterLexicon.tatarCrimeanCyrillic10kLexicon
+    case .tatarCrimeanCyrillic15k: StarterLexicon.tatarCrimeanCyrillic15kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -9204,7 +9349,10 @@ extension TypingLanguage {
       .swahili,
       .kinyarwanda,
       .tatarCrimean,
+      .tatarCrimean1k, .tatarCrimean5k, .tatarCrimean10k, .tatarCrimean15k,
       .tatarCrimeanCyrillic,
+      .tatarCrimeanCyrillic1k, .tatarCrimeanCyrillic5k,
+      .tatarCrimeanCyrillic10k, .tatarCrimeanCyrillic15k,
       .viossaNjutro,
       .lojbanGismu,
       .lojbanCmavo,
@@ -9342,7 +9490,15 @@ extension TypingLanguage {
     case .hausa: "Hausa"
     case .tatar: "Татарча"
     case .tatarCrimean: "Qırımtatarca"
+    case .tatarCrimean1k: "Qırımtatarca · 1k · Typebar"
+    case .tatarCrimean5k: "Qırımtatarca · 5k · Typebar"
+    case .tatarCrimean10k: "Qırımtatarca · 10k · Typebar"
+    case .tatarCrimean15k: "Qırımtatarca · 15k · Typebar"
     case .tatarCrimeanCyrillic: "Къырымтатарджа"
+    case .tatarCrimeanCyrillic1k: "Къырымтатарджа · 1k · Typebar"
+    case .tatarCrimeanCyrillic5k: "Къырымтатарджа · 5k · Typebar"
+    case .tatarCrimeanCyrillic10k: "Къырымтатарджа · 10k · Typebar"
+    case .tatarCrimeanCyrillic15k: "Къырымтатарджа · 15k · Typebar"
     case .klingon: "tlhIngan Hol"
     case .quenya: "Quenya"
     case .viossa: "Viossa"

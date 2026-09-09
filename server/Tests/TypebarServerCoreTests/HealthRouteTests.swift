@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 276)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 284)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4267,6 +4267,14 @@ final class HealthRouteTests: XCTestCase {
       ("greeklish5k", "O topikos deiktis megalonei choris xeni lista lekseon."),
       ("greeklish10k", "I megalyteri syllogi paramenei kathari kai anexartiti."),
       ("greeklish25k", "O evrys deiktis dimiourgei mono ta anagkaia stoicheia."),
+      ("tatarCrimean1k", "Kiçik yerli sıra Qırımtatarca meşqni açıq saqlay."),
+      ("tatarCrimean5k", "Yerli indeks meşqni adım-adım kenişlete."),
+      ("tatarCrimean10k", "On biñ yer içün tış söz cedveli kerek degil."),
+      ("tatarCrimean15k", "Eñ büyük sıra da yerli ve ayrı qala."),
+      ("tatarCrimeanCyrillic1k", "Кичик ерли сыра Къырымтатарджа мешкъни ачыкъ сакълай."),
+      ("tatarCrimeanCyrillic5k", "Ерли индекс мешкъни адым-адым кенишлете."),
+      ("tatarCrimeanCyrillic10k", "Он бинъ ер ичюн тыш сёз джедвели керек дегиль."),
+      ("tatarCrimeanCyrillic15k", "Энъ буюк сыра да ерли ве айры къала."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

@@ -162,7 +162,10 @@ enum LivePracticeContentService {
     case .afrikaans, .afrikaans1k, .afrikaans10k: return "af"
     case .hausa: return "ha"
     case .tatar: return "tt"
-    case .tatarCrimean, .tatarCrimeanCyrillic: return "crh"
+    case .tatarCrimean, .tatarCrimean1k, .tatarCrimean5k, .tatarCrimean10k,
+      .tatarCrimean15k, .tatarCrimeanCyrillic, .tatarCrimeanCyrillic1k,
+      .tatarCrimeanCyrillic5k, .tatarCrimeanCyrillic10k,
+      .tatarCrimeanCyrillic15k: return "crh"
     case .klingon: return "tlh"
     case .quenya: return "en"
     case .viossa, .viossaNjutro: return "en"
