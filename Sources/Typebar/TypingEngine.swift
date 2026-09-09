@@ -2,7 +2,7 @@ import Foundation
 
 /// Monkeytype treats spaces and explicit line breaks as word commits. Tabs
 /// remain content because code and custom prompts may need them verbatim.
-private func isPromptWordSeparator(_ character: Character) -> Bool {
+func isPromptWordSeparator(_ character: Character) -> Bool {
   character == " " || character == "\n"
 }
 

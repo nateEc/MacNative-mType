@@ -17290,6 +17290,85 @@ final class TypingEngineTests: XCTestCase {
       [])
   }
 
+  func testResultPerformanceInspectionSnapsToASecondAndFindsItsTouchedWords() throws {
+    let points = [
+      ResultPerformancePoint(elapsed: 1, wpm: 24, rawWpm: 30, burstWpm: 32, errorCount: 0),
+      ResultPerformancePoint(elapsed: 2, wpm: 36, rawWpm: 42, burstWpm: 48, errorCount: 1),
+      ResultPerformancePoint(elapsed: 3, wpm: 40, rawWpm: 44, burstWpm: 46, errorCount: 0),
+      ResultPerformancePoint(elapsed: 4, wpm: 40, rawWpm: 44, burstWpm: 0, errorCount: 0),
+    ]
+    let reviews = [
+      TypedWordReview(index: 0, target: "amber", typed: "amber"),
+      TypedWordReview(index: 1, target: "harbor", typed: "harbor"),
+      TypedWordReview(index: 2, target: "quiet", typed: "q"),
+    ]
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0, kind: .insert, text: "am"),
+      .init(offset: 0.8, kind: .insert, text: "ber "),
+      .init(offset: 1.2, kind: .insert, text: "har"),
+      .init(offset: 1.8, kind: .insert, text: "bor "),
+      .init(offset: 2, kind: .insert, text: "q"),
+      .init(offset: 2.4, kind: .insert, text: "x"),
+      .init(offset: 2.6, kind: .delete, text: ""),
+    ]
+
+    let first = try XCTUnwrap(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: 0.7, points: points, reviews: reviews, events: events))
+    XCTAssertEqual(first.point, points[0])
+    XCTAssertEqual(first.wordIndexes, [0])
+
+    let second = try XCTUnwrap(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: 1.5, points: points, reviews: reviews, events: events))
+    XCTAssertEqual(second.point, points[1])
+    XCTAssertEqual(second.wordIndexes, [1, 2])
+
+    let third = try XCTUnwrap(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: 2.7, points: points, reviews: reviews, events: events))
+    XCTAssertEqual(third.point, points[2])
+    XCTAssertEqual(third.wordIndexes, [2])
+    let emptySecond = try XCTUnwrap(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: 4, points: points, reviews: reviews, events: events))
+    XCTAssertEqual(emptySecond.point, points[3])
+    XCTAssertTrue(emptySecond.wordIndexes.isEmpty)
+
+    let deletedSeparator = try XCTUnwrap(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: 2,
+      points: Array(points.prefix(2)),
+      reviews: reviews,
+      events: [
+        .init(offset: 0.5, kind: .insert, text: "amber "),
+        .init(offset: 1.5, kind: .delete, text: ""),
+      ]))
+    XCTAssertEqual(deletedSeparator.wordIndexes, [0])
+    XCTAssertNil(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: nil, points: points, reviews: reviews, events: events))
+    XCTAssertNil(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: .infinity, points: points, reviews: reviews, events: events))
+  }
+
+  func testResultPerformanceInspectionUsesReviewLengthsForNoSpaceWords() throws {
+    let points = [
+      ResultPerformancePoint(elapsed: 1, wpm: 20, rawWpm: 20, burstWpm: 20, errorCount: 0),
+      ResultPerformancePoint(elapsed: 2, wpm: 30, rawWpm: 35, burstWpm: 40, errorCount: 1),
+    ]
+    let reviews = [
+      TypedWordReview(index: 0, target: "你好", typed: "你好"),
+      TypedWordReview(index: 1, target: "世界", typed: "世"),
+    ]
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0.4, kind: .insert, text: "你好"),
+      .init(offset: 1.2, kind: .insert, text: "世"),
+      .init(offset: 1.5, kind: .insert, text: "x"),
+      .init(offset: 1.7, kind: .delete, text: ""),
+    ]
+
+    let inspection = try XCTUnwrap(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: 2, points: points, reviews: reviews, events: events))
+    XCTAssertEqual(inspection.wordIndexes, [1])
+    XCTAssertNil(ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: 1, points: [], reviews: reviews, events: events))
+  }
+
   func testReplayPerformancePointUsesCurrentInputStateBeyondTheChartDurationLimit() {
     let events: [TypingReplayEvent] = [
       .init(offset: 120, kind: .insert, text: "am"),

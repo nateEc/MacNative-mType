@@ -3426,6 +3426,7 @@ private struct CompletedResultView: View {
   @State private var isUpdatingCommunityQuote = false
   @State private var showingSlowWordCopy = false
   @State private var slowWordThresholdText = ""
+  @State private var inspectedResultWordIndexes: Set<Int> = []
 
   var body: some View {
     VStack(spacing: 28) {
@@ -3518,6 +3519,7 @@ private struct CompletedResultView: View {
         prompt: result.prompt,
         events: result.replayEvents,
         duration: result.elapsedDuration,
+        reviews: wordReviews,
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: startGraphsAtZero,
         visibility: resultPerformanceVisibility,
@@ -3525,6 +3527,7 @@ private struct CompletedResultView: View {
         tagPersonalBestFeedback: tagPersonalBestFeedback,
         onVisibilityChange: onResultPerformanceVisibilityChange,
         onScaleChange: onResultGraphScaleChange,
+        onInspectionChange: { inspectedResultWordIndexes = Set($0) },
         accent: accent)
 
       if let challengeEvaluation {
@@ -3583,6 +3586,7 @@ private struct CompletedResultView: View {
           showsBurstHeatmap: showWordBurstHeatmap,
           typingSpeedUnit: typingSpeedUnit,
           accent: accent,
+          highlightedWordIndexes: inspectedResultWordIndexes,
           initiallyExpanded: alwaysShowWordsHistory)
       }
 
@@ -4292,6 +4296,7 @@ private struct WordReviewHistoryView: View {
   let showsBurstHeatmap: Bool
   let typingSpeedUnit: TypingSpeedUnit
   let accent: Color
+  let highlightedWordIndexes: Set<Int>
   @State private var isExpanded: Bool
 
   private var heatmap: WordBurstHeatmap? {
@@ -4305,6 +4310,7 @@ private struct WordReviewHistoryView: View {
     showsBurstHeatmap: Bool,
     typingSpeedUnit: TypingSpeedUnit,
     accent: Color,
+    highlightedWordIndexes: Set<Int> = [],
     initiallyExpanded: Bool
   ) {
     self.reviews = reviews
@@ -4312,6 +4318,7 @@ private struct WordReviewHistoryView: View {
     self.showsBurstHeatmap = showsBurstHeatmap
     self.typingSpeedUnit = typingSpeedUnit
     self.accent = accent
+    self.highlightedWordIndexes = highlightedWordIndexes
     _isExpanded = State(initialValue: initiallyExpanded)
   }
 
@@ -4340,6 +4347,14 @@ private struct WordReviewHistoryView: View {
                 }
                 Spacer()
               }
+              .padding(.horizontal, 5)
+              .padding(.vertical, 3)
+              .background(
+                highlightedWordIndexes.contains(review.index)
+                  ? accent.opacity(0.16) : .clear,
+                in: RoundedRectangle(cornerRadius: 5))
+              .accessibilityValue(
+                highlightedWordIndexes.contains(review.index) ? "图表当前秒" : "")
             }
           }
         }
@@ -4356,6 +4371,9 @@ private struct WordReviewHistoryView: View {
     }
     .padding(10)
     .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .onChange(of: highlightedWordIndexes) { _, indexes in
+      if !indexes.isEmpty { isExpanded = true }
+    }
   }
 }
 
@@ -4424,12 +4442,16 @@ private extension WordBurstHeatmapTone {
 
 private struct ResultPerformanceChart: View {
   let points: [ResultPerformancePoint]
+  let reviews: [TypedWordReview]
+  let events: [TypingReplayEvent]
   let typingSpeedUnit: TypingSpeedUnit
   let startsAtZero: Bool
   let accent: Color
   let onVisibilityChange: (ResultPerformanceVisibility) -> Void
   let onScaleChange: (Bool) -> Void
+  let onInspectionChange: ([Int]) -> Void
   @State private var visibility: ResultPerformanceVisibility
+  @State private var selectedElapsed: TimeInterval?
   private let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   private let tagPersonalBestFeedback: [TagPersonalBestFeedback]
 
@@ -4437,6 +4459,7 @@ private struct ResultPerformanceChart: View {
     prompt: String,
     events: [TypingReplayEvent],
     duration: TimeInterval,
+    reviews: [TypedWordReview],
     typingSpeedUnit: TypingSpeedUnit,
     startsAtZero: Bool,
     visibility: ResultPerformanceVisibility,
@@ -4444,14 +4467,19 @@ private struct ResultPerformanceChart: View {
     tagPersonalBestFeedback: [TagPersonalBestFeedback],
     onVisibilityChange: @escaping (ResultPerformanceVisibility) -> Void,
     onScaleChange: @escaping (Bool) -> Void,
+    onInspectionChange: @escaping ([Int]) -> Void,
     accent: Color
   ) {
     points = ResultPerformanceTrace.points(prompt: prompt, events: events, duration: duration)
+    self.reviews = reviews
+    self.events = events
     self.typingSpeedUnit = typingSpeedUnit
     self.startsAtZero = startsAtZero
     self.onVisibilityChange = onVisibilityChange
     self.onScaleChange = onScaleChange
+    self.onInspectionChange = onInspectionChange
     _visibility = State(initialValue: visibility)
+    _selectedElapsed = State(initialValue: nil)
     self.resultPersonalBestFeedback = resultPersonalBestFeedback?.showsPreviousBestLine == true
       ? resultPersonalBestFeedback : nil
     self.tagPersonalBestFeedback = tagPersonalBestFeedback.filter(\.showsPreviousBestLine)
@@ -4540,8 +4568,19 @@ private struct ResultPerformanceChart: View {
               }
             }
           }
+          if inspection?.point.id == point.id {
+            RuleMark(x: .value("选中秒", point.elapsed))
+              .foregroundStyle(accent.opacity(0.55))
+              .lineStyle(.init(lineWidth: 1))
+            PointMark(
+              x: .value("秒", point.elapsed),
+              y: .value(typingSpeedUnit.displayName, typingSpeedUnit.converted(wpm: point.wpm)))
+              .foregroundStyle(accent)
+              .symbolSize(38)
+          }
         }
         .chartYScale(domain: .automatic(includesZero: startsAtZero))
+        .chartXSelection(value: $selectedElapsed)
         .chartXAxis {
           AxisMarks(values: .automatic(desiredCount: 4)) { value in
             AxisGridLine().foregroundStyle(.secondary.opacity(0.2))
@@ -4554,6 +4593,18 @@ private struct ResultPerformanceChart: View {
           }
         }
         .frame(height: 118)
+        .onHover { hovering in
+          if !hovering { selectedElapsed = nil }
+        }
+        .onChange(of: selectedElapsed) { _, elapsed in
+          let selectedWords = ResultPerformanceInspectionPolicy.inspection(
+            nearestTo: elapsed, points: points, reviews: reviews, events: events)?.wordIndexes ?? []
+          onInspectionChange(selectedWords)
+        }
+        .accessibilityHint("在图表中选择某一秒以查看指标并联动单词历史")
+        if let inspection {
+          resultInspectionView(inspection)
+        }
         if visibility.errors {
           Chart(points) { point in
             BarMark(
@@ -4574,6 +4625,46 @@ private struct ResultPerformanceChart: View {
       .padding(10)
       .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
+  }
+
+  private var inspection: ResultPerformanceInspection? {
+    ResultPerformanceInspectionPolicy.inspection(
+      nearestTo: selectedElapsed, points: points, reviews: reviews, events: events)
+  }
+
+  private func resultInspectionView(_ inspection: ResultPerformanceInspection) -> some View {
+    HStack(spacing: 10) {
+      Text("\(inspection.point.elapsed.formatted(.number.precision(.fractionLength(0...1)))) 秒")
+        .fontWeight(.semibold)
+      Text("WPM \(typingSpeedUnit.formatted(wpm: inspection.point.wpm))")
+      if visibility.raw {
+        Text("Raw \(typingSpeedUnit.formatted(wpm: inspection.point.rawWpm))")
+      }
+      if visibility.burst {
+        Text("Burst \(typingSpeedUnit.formatted(wpm: inspection.point.burstWpm))")
+      }
+      if visibility.errors {
+        Text("错误 \(inspection.point.errorCount)")
+      }
+      if !inspection.wordIndexes.isEmpty {
+        Text("关联单词 \(inspection.wordIndexes.map { String($0 + 1) }.joined(separator: "、"))")
+          .foregroundStyle(accent)
+      }
+      Spacer()
+      Button {
+        selectedElapsed = nil
+      } label: {
+        Image(systemName: "xmark.circle.fill")
+      }
+      .buttonStyle(.plain)
+      .foregroundStyle(.secondary)
+      .accessibilityLabel("清除图表选择")
+    }
+    .font(.caption.monospacedDigit())
+    .padding(.horizontal, 7)
+    .padding(.vertical, 5)
+    .background(accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+    .accessibilityElement(children: .combine)
   }
 
   private func traceToggle(_ title: String, isOn: Binding<Bool>, color: Color) -> some View {

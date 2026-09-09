@@ -734,6 +734,101 @@ struct ResultPerformancePoint: Equatable, Identifiable {
   var id: Int { Int((elapsed * 1_000).rounded()) }
 }
 
+struct ResultPerformanceInspection: Equatable {
+  let point: ResultPerformancePoint
+  let wordIndexes: [Int]
+}
+
+/// Resolves an interactive chart selection without storing another copy of
+/// result data. Word ownership is reconstructed from the same replay and word
+/// reviews already used by the result screen.
+enum ResultPerformanceInspectionPolicy {
+  static func inspection(
+    nearestTo selection: TimeInterval?,
+    points: [ResultPerformancePoint],
+    reviews: [TypedWordReview],
+    events: [TypingReplayEvent]
+  ) -> ResultPerformanceInspection? {
+    guard let selection, selection.isFinite, !points.isEmpty else { return nil }
+    var selectedIndex = 0
+    for index in points.indices.dropFirst() {
+      let selectedDistance = abs(points[selectedIndex].elapsed - selection)
+      let candidateDistance = abs(points[index].elapsed - selection)
+      if candidateDistance <= selectedDistance { selectedIndex = index }
+    }
+    let lowerBound = selectedIndex > 0 ? points[selectedIndex - 1].elapsed : nil
+    return .init(
+      point: points[selectedIndex],
+      wordIndexes: touchedWordIndexes(
+        reviews: reviews, events: events, after: lowerBound, through: points[selectedIndex].elapsed))
+  }
+
+  private static func touchedWordIndexes(
+    reviews: [TypedWordReview],
+    events: [TypingReplayEvent],
+    after lowerBound: TimeInterval?,
+    through upperBound: TimeInterval
+  ) -> [Int] {
+    guard upperBound.isFinite, upperBound >= 0, !reviews.isEmpty else { return [] }
+    let orderedReviews = reviews.sorted { $0.index < $1.index }
+    let validIndexes = Set(orderedReviews.map(\.index))
+    let usesUnspacedBoundaries = orderedReviews.count > 1
+      && orderedReviews.map(\.target).joined().allSatisfy { !isPromptWordSeparator($0) }
+      && events.allSatisfy { $0.text.allSatisfy { !isPromptWordSeparator($0) } }
+    let unspacedEnds = orderedReviews.reduce(into: [Int]()) { ends, review in
+      ends.append((ends.last ?? 0) + review.target.count)
+    }
+    let orderedEvents = TypingReplay.chronologicalEvents(
+      events.filter { $0.offset.isFinite && $0.offset >= 0 })
+    var typed: [Character] = []
+    var spacedWordIndex = 0
+    var touched = Set<Int>()
+
+    func unspacedWordIndex(at characterOffset: Int) -> Int? {
+      guard let position = unspacedEnds.firstIndex(where: { characterOffset < $0 })
+        ?? unspacedEnds.indices.last
+      else { return nil }
+      return orderedReviews[position].index
+    }
+
+    for event in orderedEvents {
+      guard event.offset <= upperBound else { break }
+      let belongsToInterval = lowerBound.map { event.offset > $0 } ?? true
+      switch event.kind {
+      case .insert:
+        for character in event.text {
+          let wordIndex = usesUnspacedBoundaries
+            ? unspacedWordIndex(at: typed.count) : spacedWordIndex
+          if belongsToInterval, let wordIndex, validIndexes.contains(wordIndex) {
+            touched.insert(wordIndex)
+          }
+          typed.append(character)
+          if !usesUnspacedBoundaries, isPromptWordSeparator(character) {
+            spacedWordIndex += 1
+          }
+        }
+      case .delete:
+        guard let removed = typed.last else { continue }
+        let wordIndex: Int?
+        if usesUnspacedBoundaries {
+          wordIndex = unspacedWordIndex(at: typed.count - 1)
+        } else {
+          wordIndex = isPromptWordSeparator(removed)
+            ? max(0, spacedWordIndex - 1) : spacedWordIndex
+        }
+        if belongsToInterval, let wordIndex, validIndexes.contains(wordIndex) {
+          touched.insert(wordIndex)
+        }
+        typed.removeLast()
+        if !usesUnspacedBoundaries, isPromptWordSeparator(removed) {
+          spacedWordIndex = max(0, spacedWordIndex - 1)
+        }
+      }
+    }
+    return touched.sorted()
+  }
+}
+
 struct ResultPerformanceVisibility: Codable, Equatable {
   var raw: Bool
   var burst: Bool
