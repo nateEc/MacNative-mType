@@ -6,7 +6,7 @@ require "open3"
 require "pathname"
 
 PINNED_COMMIT = "91bd24bb8513785c7364cbea29296ff7adafac41"
-EXPECTED_COUNTS = { official: 446, independent: 307, related: 139, unmapped: 0 }.freeze
+EXPECTED_COUNTS = { official: 446, independent: 308, related: 138, unmapped: 0 }.freeze
 MIXED_TYPEBAR_CASES = %w[mixedEnglishChinese mixedLanguages].freeze
 ALIASES = {
   "englishFiveLetter" => "wordle",
@@ -47,6 +47,7 @@ ALIASES = {
   "traditionalChinese10k" => "chinese_traditional_10k",
   "traditionalChinese50k" => "chinese_traditional_50k",
   "nepali1k" => "nepali_1k",
+  "azerbaijani1k" => "azerbaijani_1k",
   "french1k" => "french_1k",
   "french2k" => "french_2k",
   "french10k" => "french_10k",

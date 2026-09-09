@@ -323,6 +323,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case armenianWestern
   case georgian
   case azerbaijani
+  case azerbaijani1k
   case belarusian
   case belarusian1k
   case belarusian5k
@@ -5864,6 +5865,28 @@ enum StarterLexicon {
     "dost", "şəhər", "dəniz", "kənd", "vaxt", "səs", "sual", "cavab", "ümid", "gələcək",
   ]
 
+  private static let azerbaijani1kAlphabet = Array("abcdefghijklmnopqrstuvwxyz")
+
+  private static func azerbaijani1kIndex(_ index: Int) -> String {
+    let radix = azerbaijani1kAlphabet.count
+    precondition(index < radix * radix)
+    return String([
+      azerbaijani1kAlphabet[index / radix],
+      azerbaijani1kAlphabet[index % radix],
+    ])
+  }
+
+  static var azerbaijani1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 989) { index in
+      if index == 0 { return "qz" }
+      if index == 1 { return "qxqxqxq" }
+      if index < 321 { return "qx" + azerbaijani1kIndex(index) }
+      return "əx" + azerbaijani1kIndex(index - 321)
+    }
+  }
+
+  static var azerbaijani1kWords: [String] { azerbaijani1kLexicon.materialized() }
+
   // Typebar-authored Belarusian starter words exercise the native macOS input
   // source without importing a third-party or reference word list.
   static let belarusianWords = [
@@ -7041,6 +7064,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: azerbaijaniWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .azerbaijani1k:
+      return prompt(
+        tokens: count, lexicon: azerbaijani1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusian:
       return prompt(
         tokens: count, lexicon: belarusianWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7724,6 +7751,7 @@ enum StarterLexicon {
     case .armenianWestern: (armenianWesternWords, [",", ".", "!", "?"])
     case .georgian: (georgianWords, [",", ".", "!", "?"])
     case .azerbaijani: (azerbaijaniWords, [",", ".", "!", "?"])
+    case .azerbaijani1k: (azerbaijani1kWords, [",", ".", "!", "?"])
     case .belarusian: (belarusianWords, [",", ".", "!", "?"])
     case .belarusian1k: (belarusian1kWords, [",", ".", "!", "?"])
     case .belarusian5k: (belarusian5kWords, [",", ".", "!", "?"])
@@ -8037,6 +8065,7 @@ extension TypingLanguage {
     case .armenianWestern: StarterLexicon.armenianWesternWords
     case .georgian: StarterLexicon.georgianWords
     case .azerbaijani: StarterLexicon.azerbaijaniWords
+    case .azerbaijani1k: StarterLexicon.azerbaijani1kWords
     case .belarusian: StarterLexicon.belarusianWords
     case .belarusian1k: StarterLexicon.belarusian1kWords
     case .belarusian5k: StarterLexicon.belarusian5kWords
@@ -8161,6 +8190,7 @@ extension TypingLanguage {
     switch self {
     case .arabic10k: StarterLexicon.arabic10kLexicon
     case .arabicEgypt1k: StarterLexicon.arabicEgypt1kLexicon
+    case .azerbaijani1k: StarterLexicon.azerbaijani1kLexicon
     case .korean1k: StarterLexicon.korean1kLexicon
     case .nepali1k: StarterLexicon.nepali1kLexicon
     case .korean5k: StarterLexicon.korean5kLexicon
@@ -8541,6 +8571,7 @@ extension TypingLanguage {
     case .armenianWestern: "Հայերէն (Արեւմտեան)"
     case .georgian: "ქართული"
     case .azerbaijani: "Azərbaycanca"
+    case .azerbaijani1k: "Azərbaycanca · 1k · Typebar"
     case .belarusian: "Беларуская"
     case .belarusian1k: "Беларуская · 1k · Typebar"
     case .belarusian5k: "Беларуская · 5k · Typebar"

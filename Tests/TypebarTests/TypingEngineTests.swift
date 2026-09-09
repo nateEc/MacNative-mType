@@ -8729,6 +8729,47 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testAzerbaijani1kPreservesIndependentIDAndPinnedAggregateShape() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "azerbaijani1k"))
+    let words = language.ownedPracticeLexicon()
+
+    XCTAssertEqual(language.displayName, "Azərbaycanca · 1k · Typebar")
+    XCTAssertFalse(language.usesRightToLeftPrompt)
+    XCTAssertFalse(language.usesJoiningScriptPrompt)
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertTrue(language.supportsCapsLockWarning)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "az")
+    XCTAssertEqual(language.speechLocaleIdentifier, "az-AZ")
+    XCTAssertFalse(TypingLanguage.defaultMixedComponents.contains(language))
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertEqual(words.count, 989)
+    XCTAssertEqual(Set(words).count, 989)
+    XCTAssertEqual(words.lazy.map(\.count).min(), 2)
+    XCTAssertEqual(words.lazy.map(\.count).max(), 7)
+    XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, 668)
+    XCTAssertFalse(words.contains { $0.contains(where: \.isUppercase) })
+    XCTAssertFalse(words.contains { $0.contains(" ") })
+    XCTAssertTrue(words.allSatisfy { word in
+      word.unicodeScalars.allSatisfy { $0.properties.isAlphabetic }
+    })
+
+    let configuration = TestConfiguration.words(25, language: language)
+    XCTAssertEqual(
+      try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+      configuration)
+    let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+    XCTAssertEqual(
+      try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+    XCTAssertEqual(
+      OfflineContent.generatedPrompt(wordCount: 25, language: language).split(separator: " ").count,
+      25)
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),

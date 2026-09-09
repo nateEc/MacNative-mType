@@ -62,7 +62,7 @@ extension TypingLanguage {
     case .yiddish: "yi"
     case .friulian: "fur"
     case .bemba: "bem"
-    case .azerbaijani: "az-AZ"
+    case .azerbaijani, .azerbaijani1k: "az-AZ"
     case .belarusian, .belarusian1k, .belarusian5k, .belarusian10k, .belarusian25k,
       .belarusian50k, .belarusian100k: "be-BY"
     case .belarusianLacinka: "en-US"

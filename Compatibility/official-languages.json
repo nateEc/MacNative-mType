@@ -480,6 +480,7 @@
     "sanskrit_roman": "sanskritRoman",
     "santali": "santali",
     "azerbaijani": "azerbaijani",
+    "azerbaijani_1k": "azerbaijani1k",
     "arabic": "arabic",
     "arabic_10k": "arabic10k",
     "arabic_egypt": "arabicEgypt",
@@ -760,7 +761,6 @@
     "sindhi": "sindhi"
   },
   "nativeRelatedChoice": {
-    "azerbaijani_1k": "azerbaijani",
     "malagasy_1k": "malagasy",
     "malay_1k": "malay",
     "mongolian_10k": "mongolian",

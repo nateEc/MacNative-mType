@@ -3862,7 +3862,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 236)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 237)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4225,6 +4225,7 @@ final class HealthRouteTests: XCTestCase {
       ("traditionalChinese10k", "一萬個位置不需要匯入外部詞表。"),
       ("traditionalChinese50k", "最大的繁體中文索引仍在本機高效生成。"),
       ("nepali1k", "स्थिर स्थानीय अनुक्रमले नेपाली अभ्यासलाई स्पष्ट राख्छ।"),
+      ("azerbaijani1k", "Yerli ardıcıllıq Azərbaycan dilində məşqi aydın saxlayır."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),
