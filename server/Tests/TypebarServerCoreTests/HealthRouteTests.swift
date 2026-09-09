@@ -3864,7 +3864,7 @@ final class HealthRouteTests: XCTestCase {
       .subtracting(["swissGerman", "swissGerman1k", "swissGerman2k"])
 
     XCTAssertEqual(auditedCodeLanguageIDs.count, 70)
-    XCTAssertEqual(auditedQuoteLanguageIDs.count, 252)
+    XCTAssertEqual(auditedQuoteLanguageIDs.count, 256)
     XCTAssertEqual(AuthStore.supportedCodeLanguageIDs, auditedCodeLanguageIDs)
     XCTAssertEqual(AuthStore.supportedSingleLanguageIDs, auditedQuoteLanguageIDs)
   }
@@ -4243,6 +4243,10 @@ final class HealthRouteTests: XCTestCase {
       ("kurdishCentral4k", "پێڕستی فراوان تەنها بەشە پێویستەکان دروست دەکات."),
       ("afrikaans1k", "Elke plaaslike reeks hou die Afrikaanse oefening duidelik."),
       ("afrikaans10k", "Die groter indeks skep slegs die nodige oefenitems."),
+      ("italian1k", "Ogni indice locale conserva una pratica italiana distinta."),
+      ("italian7k", "La seconda raccolta amplia la pratica senza copiare parole."),
+      ("italian60k", "L'indice esteso genera soltanto gli elementi necessari."),
+      ("italian280k", "La raccolta maggiore resta efficiente durante ogni prova."),
       ("french1k", "Chaque échelle garde une identité locale distincte."),
       ("french2k", "La deuxième échelle élargit la pratique sans importer de liste."),
       ("french10k", "Le grand index ne produit que les entrées demandées."),

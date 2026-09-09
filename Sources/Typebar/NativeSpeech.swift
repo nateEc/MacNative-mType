@@ -131,7 +131,7 @@ extension TypingLanguage {
     case .icelandic: "is-IS"
     case .french, .french1k, .french2k, .french10k, .french600k: "fr-FR"
     case .frenchBitoduc: "fr-fr"
-    case .italian: "it-IT"
+    case .italian, .italian1k, .italian7k, .italian60k, .italian280k: "it-IT"
     case .portuguese, .portuguese3k, .portugueseAccents: "pt-PT"
     case .portuguese1k: "pt-BR"
     case .portuguese5k, .portuguese320k, .portuguese550k: "pt"

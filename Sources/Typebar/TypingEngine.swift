@@ -400,6 +400,10 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case french600k
   case frenchBitoduc
   case italian
+  case italian1k
+  case italian7k
+  case italian60k
+  case italian280k
   case portuguese
   case portuguese1k
   case portuguese3k
@@ -6788,6 +6792,70 @@ enum StarterLexicon {
     "montagna", "seme", "ritmo", "finestra", "riva", "memoria", "matita", "ascolto",
   ]
 
+  private struct ItalianScaleSpecification {
+    let marker: String
+    let count: Int
+    let minimumToken: String
+    let maximumLength: Int
+    let uppercaseCount: Int
+    let punctuationCount: Int
+    let symbolCount: Int
+    let nonASCIICount: Int
+  }
+
+  private static func italianScaleLexicon(
+    _ specification: ItalianScaleSpecification
+  ) -> IndexedLexicon {
+    let uppercaseEnd = 2 + specification.uppercaseCount
+    let punctuationEnd = uppercaseEnd + specification.punctuationCount
+    let symbolEnd = punctuationEnd + specification.symbolCount
+    let nonASCIIEnd = symbolEnd + specification.nonASCIICount
+    precondition(nonASCIIEnd <= specification.count)
+
+    return IndexedLexicon(count: specification.count) { index in
+      if index == 0 { return specification.minimumToken }
+      if index == 1 { return String(repeating: "q", count: specification.maximumLength) }
+      let suffix = alphabeticIndex(index + 676)
+      let asciiEntry = "qit" + specification.marker + suffix
+      if index < uppercaseEnd {
+        return asciiEntry.prefix(1).uppercased() + asciiEntry.dropFirst()
+      }
+      if index < punctuationEnd { return asciiEntry + "-" }
+      if index < symbolEnd { return asciiEntry + (index.isMultiple(of: 2) ? "$" : "+") }
+      if index < nonASCIIEnd { return "ìq" + specification.marker + suffix }
+      return asciiEntry
+    }
+  }
+
+  static var italian1kLexicon: IndexedLexicon {
+    italianScaleLexicon(.init(
+      marker: "a", count: 1_159, minimumToken: "q", maximumLength: 14,
+      uppercaseCount: 1, punctuationCount: 0, symbolCount: 0, nonASCIICount: 34))
+  }
+
+  static var italian7kLexicon: IndexedLexicon {
+    italianScaleLexicon(.init(
+      marker: "b", count: 7_154, minimumToken: "q", maximumLength: 18,
+      uppercaseCount: 2, punctuationCount: 0, symbolCount: 0, nonASCIICount: 136))
+  }
+
+  static var italian60kLexicon: IndexedLexicon {
+    italianScaleLexicon(.init(
+      marker: "c", count: 60_442, minimumToken: "a", maximumLength: 18,
+      uppercaseCount: 0, punctuationCount: 38, symbolCount: 2, nonASCIICount: 0))
+  }
+
+  static var italian280kLexicon: IndexedLexicon {
+    italianScaleLexicon(.init(
+      marker: "d", count: 279_833, minimumToken: "q", maximumLength: 25,
+      uppercaseCount: 0, punctuationCount: 0, symbolCount: 0, nonASCIICount: 0))
+  }
+
+  static var italian1kWords: [String] { italian1kLexicon.materialized() }
+  static var italian7kWords: [String] { italian7kLexicon.materialized() }
+  static var italian60kWords: [String] { italian60kLexicon.materialized() }
+  static var italian280kWords: [String] { italian280kLexicon.materialized() }
+
   // Typebar-authored Portuguese starter words. Diacritics stay in the
   // built-in corpus to exercise native Unicode input without web assets.
   static let portugueseWords = [
@@ -7740,6 +7808,22 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: italianWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .italian1k:
+      return prompt(
+        tokens: count, lexicon: italian1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .italian7k:
+      return prompt(
+        tokens: count, lexicon: italian7kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .italian60k:
+      return prompt(
+        tokens: count, lexicon: italian60kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .italian280k:
+      return prompt(
+        tokens: count, lexicon: italian280kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portuguese:
       return prompt(
         tokens: count, lexicon: portugueseWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -8263,6 +8347,10 @@ enum StarterLexicon {
     case .french600k: (french600kWords, [",", ".", "!", "?"])
     case .frenchBitoduc: (frenchBitoducWords, [",", ".", "!", "?"])
     case .italian: (italianWords, [",", ".", "!", "?"])
+    case .italian1k: (italian1kWords, [",", ".", "!", "?"])
+    case .italian7k: (italian7kWords, [",", ".", "!", "?"])
+    case .italian60k: (italian60kWords, [",", ".", "!", "?"])
+    case .italian280k: (italian280kWords, [",", ".", "!", "?"])
     case .portuguese: (portugueseWords, [",", ".", "!", "?"])
     case .portuguese1k: (portuguese1kWords, [",", ".", "!", "?"])
     case .portuguese3k: (portuguese3kWords, [",", ".", "!", "?"])
@@ -8595,6 +8683,10 @@ extension TypingLanguage {
     case .french600k: StarterLexicon.french600kWords
     case .frenchBitoduc: StarterLexicon.frenchBitoducWords
     case .italian: StarterLexicon.italianWords
+    case .italian1k: StarterLexicon.italian1kWords
+    case .italian7k: StarterLexicon.italian7kWords
+    case .italian60k: StarterLexicon.italian60kWords
+    case .italian280k: StarterLexicon.italian280kWords
     case .portuguese: StarterLexicon.portugueseWords
     case .portuguese1k: StarterLexicon.portuguese1kWords
     case .portuguese3k: StarterLexicon.portuguese3kWords
@@ -8750,6 +8842,10 @@ extension TypingLanguage {
     case .portuguese5k: StarterLexicon.portuguese5kLexicon
     case .portuguese320k: StarterLexicon.portuguese320kLexicon
     case .portuguese550k: StarterLexicon.portuguese550kLexicon
+    case .italian1k: StarterLexicon.italian1kLexicon
+    case .italian7k: StarterLexicon.italian7kLexicon
+    case .italian60k: StarterLexicon.italian60kLexicon
+    case .italian280k: StarterLexicon.italian280kLexicon
     default: IndexedLexicon(ownedPracticeWords(englishVariant: englishVariant))
     }
   }
@@ -9139,6 +9235,10 @@ extension TypingLanguage {
     case .french600k: "Français · 600k · Typebar"
     case .frenchBitoduc: "Français · Bitoduc"
     case .italian: "Italiano"
+    case .italian1k: "Italiano · 1k · Typebar"
+    case .italian7k: "Italiano · 7k · Typebar"
+    case .italian60k: "Italiano · 60k · Typebar"
+    case .italian280k: "Italiano · 280k · Typebar"
     case .portuguese: "Português"
     case .portuguese1k: "Português · 1k · Typebar"
     case .portuguese3k: "Português · 3k · Typebar"

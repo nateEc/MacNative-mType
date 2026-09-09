@@ -8269,6 +8269,9 @@ final class TypingEngineTests: XCTestCase {
     let largestPortugueseScalePrompt = StarterLexicon.prompt(
       wordCount: 25, language: .portuguese550k, contentOptions: ContentOptions())
     XCTAssertGreaterThanOrEqual(largestPortugueseScalePrompt.split(separator: " ").count, 25)
+    let largestItalianScalePrompt = StarterLexicon.prompt(
+      wordCount: 25, language: .italian280k, contentOptions: ContentOptions())
+    XCTAssertEqual(largestItalianScalePrompt.split(separator: " ").count, 25)
   }
 
   func testEnglish450kWeakSpotUsesTheIndexedCorpus() throws {
@@ -9175,6 +9178,69 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertFalse(words.contains { $0.contains(" ") }, rawValue)
       XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, rawValue)
       XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) }, rawValue)
+
+      let configuration = TestConfiguration.words(25, language: language)
+      XCTAssertEqual(
+        try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+        configuration, rawValue)
+      let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+      XCTAssertEqual(
+        try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset,
+        rawValue)
+      XCTAssertEqual(
+        OfflineContent.generatedPrompt(wordCount: 25, language: language).split(separator: " ").count,
+        25, rawValue)
+      for length in [QuoteLength.short, .medium, .long, .extended] {
+        XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+      }
+    }
+  }
+
+  func testItalianScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
+    let cases: [(String, String, Int, Int, Int, Int, Int, Int)] = [
+      ("italian1k", "Italiano · 1k · Typebar", 1_159, 14, 1, 0, 0, 34),
+      ("italian7k", "Italiano · 7k · Typebar", 7_154, 18, 2, 0, 0, 136),
+      ("italian60k", "Italiano · 60k · Typebar", 60_442, 18, 0, 38, 2, 0),
+      ("italian280k", "Italiano · 280k · Typebar", 279_833, 25, 0, 0, 0, 0),
+    ]
+
+    for (
+      rawValue, displayName, count, maximumLength, uppercaseCount,
+      punctuationCount, symbolCount, nonASCIIcount
+    ) in cases {
+      let language = try XCTUnwrap(TypingLanguage(rawValue: rawValue))
+      let words = language.ownedPracticeLexicon()
+
+      XCTAssertEqual(language.displayName, displayName, rawValue)
+      XCTAssertFalse(language.usesRightToLeftPrompt, rawValue)
+      XCTAssertFalse(language.usesJoiningScriptPrompt, rawValue)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, rawValue)
+      XCTAssertTrue(language.supportsLazyLatinInput, rawValue)
+      XCTAssertTrue(language.supportsCapsLockWarning, rawValue)
+      XCTAssertTrue(language.supportsCommunityQuoteSubmission, rawValue)
+      XCTAssertEqual(language.zipfFrequencySupport, .unknown, rawValue)
+      XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "it", rawValue)
+      XCTAssertEqual(language.speechLocaleIdentifier, "it-IT", rawValue)
+      XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language), rawValue)
+      XCTAssertEqual(words.count, count, rawValue)
+      XCTAssertEqual(Set(words).count, count, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).min(), 1, rawValue)
+      XCTAssertEqual(words.lazy.map(\.count).max(), maximumLength, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, uppercaseCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, punctuationCount, rawValue)
+      XCTAssertEqual(words.filter { $0.contains(where: \.isSymbol) }.count, symbolCount, rawValue)
+      XCTAssertEqual(words.filter {
+        $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }.count, nonASCIIcount, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(" ") }, rawValue)
+      XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) }, rawValue)
+      XCTAssertFalse(words.contains {
+        $0.contains(where: \.isUppercase)
+          && $0.unicodeScalars.contains(where: { !$0.isASCII })
+      }, rawValue)
+      XCTAssertFalse(words.contains {
+        $0.contains(where: \.isPunctuation) && $0.contains(where: \.isSymbol)
+      }, rawValue)
 
       let configuration = TestConfiguration.words(25, language: language)
       XCTAssertEqual(

@@ -510,6 +510,7 @@ public actor AuthStore {
     "ukrainianLatynka1k", "ukrainianLatynka10k", "ukrainianLatynka50k",
     "indonesian1k", "indonesian10k", "kurdishCentral2k", "kurdishCentral4k",
     "afrikaans1k", "afrikaans10k",
+    "italian1k", "italian7k", "italian60k", "italian280k",
     "french1k", "french2k", "french10k", "french600k",
     "german1k", "german10k", "german250k",
     "romanian1k", "romanian5k", "romanian10k", "romanian25k",
