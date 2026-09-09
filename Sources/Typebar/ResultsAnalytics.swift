@@ -849,6 +849,32 @@ enum ResultConsistencyPolicy {
 enum ResultPerformanceTrace {
   static let maximumChartDuration: TimeInterval = 120
 
+  static func point(
+    prompt: String,
+    events: [TypingReplayEvent],
+    elapsed: TimeInterval
+  ) -> ResultPerformancePoint {
+    let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
+    let orderedEvents = TypingReplay.chronologicalEvents(events)
+    var typed: [Character] = []
+    var forcedErrors: [Bool] = []
+    var characterTimes: [TimeInterval] = []
+    for event in orderedEvents where event.offset <= safeElapsed {
+      apply(
+        event, typed: &typed, forcedErrors: &forcedErrors,
+        characterTimes: &characterTimes)
+    }
+    let errors = errorCount(
+      typed: typed, prompt: Array(prompt), forcedErrors: forcedErrors)
+    let correct = max(0, typed.count - errors)
+    return .init(
+      elapsed: safeElapsed,
+      wpm: wpm(characters: correct, elapsed: safeElapsed),
+      rawWpm: wpm(characters: typed.count, elapsed: safeElapsed),
+      burstWpm: burst(typed: typed, dates: characterTimes),
+      errorCount: errors)
+  }
+
   static func points(
     prompt: String,
     events: [TypingReplayEvent],
@@ -859,9 +885,7 @@ enum ResultPerformanceTrace {
     else { return [] }
 
     let sampleTimes = samplingTimes(for: duration)
-    let orderedEvents = events.enumerated().sorted { lhs, rhs in
-      lhs.element.offset == rhs.element.offset ? lhs.offset < rhs.offset : lhs.element.offset < rhs.element.offset
-    }.map(\.element)
+    let orderedEvents = TypingReplay.chronologicalEvents(events)
     var eventIndex = 0
     var typed: [Character] = []
     var forcedErrors: [Bool] = []

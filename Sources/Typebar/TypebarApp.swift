@@ -3350,7 +3350,8 @@ private struct CompletedResultView: View {
       }
 
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
-        ReplayTimelineView(prompt: result.prompt, events: result.replayEvents)
+        ReplayTimelineView(
+          prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit)
       }
 
       VStack(alignment: .leading, spacing: 10) {
@@ -3838,12 +3839,22 @@ private struct ChallengeResultView: View {
 private struct ReplayTimelineView: View {
   let prompt: String
   let events: [TypingReplayEvent]
+  let speedUnit: TypingSpeedUnit
   @State private var elapsed: TimeInterval = 0
   @State private var isPlaying = false
   private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
   private var duration: TimeInterval { events.last?.offset ?? 0 }
   private var replayedText: String { TypingReplay.typedText(events: events, through: elapsed) }
+  private var performance: ResultPerformancePoint {
+    ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed)
+  }
+
+  init(prompt: String, events: [TypingReplayEvent], speedUnit: TypingSpeedUnit) {
+    self.prompt = prompt
+    self.events = TypingReplay.chronologicalEvents(events)
+    self.speedUnit = speedUnit
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -3851,7 +3862,9 @@ private struct ReplayTimelineView: View {
         Label("输入回放", systemImage: "play.rectangle")
           .font(.caption.weight(.medium))
         Spacer()
-        Text("\(String(format: "%.1f", elapsed)) / \(String(format: "%.1f", duration)) 秒")
+        Text(
+          "\(speedUnit.formatted(wpm: performance.wpm)) \(speedUnit.displayName) · \(String(format: "%.1f", elapsed)) / \(String(format: "%.1f", duration)) 秒"
+        )
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
@@ -4599,7 +4612,8 @@ private struct ResultsHistoryView: View {
     .sheet(item: $selectedResult) { result in
       ResultDetailView(
         result: result, modeName: modeName(result.configuration?.mode),
-        isPersonalBest: personalBestIDs.contains(result.id))
+        isPersonalBest: personalBestIDs.contains(result.id),
+        typingSpeedUnit: settings.typingSpeedUnit)
     }
     .sheet(isPresented: $showingPersonalBestTable) {
       LocalPersonalBestTableView(speedUnit: settings.typingSpeedUnit)
@@ -5430,6 +5444,7 @@ private struct ResultDetailView: View {
   let result: TestResultRecord
   let modeName: String
   let isPersonalBest: Bool
+  let typingSpeedUnit: TypingSpeedUnit
 
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
@@ -5542,7 +5557,8 @@ private struct ResultDetailView: View {
         }
       }
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
-        ReplayTimelineView(prompt: result.prompt, events: result.replayEvents)
+        ReplayTimelineView(
+          prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit)
       }
       ResultTagEditor(result: result)
       Spacer()

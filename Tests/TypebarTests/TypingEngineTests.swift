@@ -16875,6 +16875,34 @@ final class TypingEngineTests: XCTestCase {
       [])
   }
 
+  func testReplayPerformancePointUsesCurrentInputStateBeyondTheChartDurationLimit() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 120, kind: .insert, text: "am"),
+      .init(offset: 121, kind: .insert, text: "x"),
+      .init(offset: 122, kind: .delete, text: ""),
+      .init(offset: 123, kind: .insert, text: "b"),
+      .init(offset: 124, kind: .insert, text: "e", forceError: true),
+    ]
+
+    XCTAssertEqual(
+      ResultPerformanceTrace.point(prompt: "amber", events: events, elapsed: 121),
+      .init(elapsed: 121, wpm: 0, rawWpm: 0, burstWpm: 48, errorCount: 1))
+    XCTAssertEqual(
+      ResultPerformanceTrace.point(prompt: "amber", events: events, elapsed: 123),
+      .init(elapsed: 123, wpm: 0, rawWpm: 0, burstWpm: 16, errorCount: 0))
+    XCTAssertEqual(
+      ResultPerformanceTrace.point(prompt: "amber", events: events, elapsed: 124),
+      .init(elapsed: 124, wpm: 0, rawWpm: 0, burstWpm: 15, errorCount: 1))
+    XCTAssertEqual(
+      ResultPerformanceTrace.point(
+        prompt: "amber", events: Array(events.reversed()), elapsed: 124),
+      ResultPerformanceTrace.point(prompt: "amber", events: events, elapsed: 124))
+    XCTAssertEqual(
+      TypingReplay.typedText(
+        events: TypingReplay.chronologicalEvents(Array(events.reversed())), through: 124),
+      "ambe")
+  }
+
   func testOfflineAchievementsAreDerivedFromCompletedLocalMetrics() {
     let metrics = [
       ResultMetric(finishedAt: start, wpm: 84, accuracy: 99, typingSeconds: 16),

@@ -2054,6 +2054,16 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
 }
 
 enum TypingReplay {
+  static func chronologicalEvents(_ events: [TypingReplayEvent]) -> [TypingReplayEvent] {
+    guard !zip(events, events.dropFirst()).allSatisfy({ $0.offset <= $1.offset }) else {
+      return events
+    }
+    return events.enumerated().sorted { lhs, rhs in
+      lhs.element.offset == rhs.element.offset
+        ? lhs.offset < rhs.offset : lhs.element.offset < rhs.element.offset
+    }.map(\.element)
+  }
+
   static func typedText(events: [TypingReplayEvent], through elapsed: TimeInterval) -> String {
     events.filter { $0.offset <= elapsed }.reduce(into: "") { typed, event in
       switch event.kind {
