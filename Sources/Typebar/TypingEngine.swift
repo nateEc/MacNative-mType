@@ -238,6 +238,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case arenaStrategy
   case friulian
   case malagasy
+  case malagasy1k
   case welsh
   case hausa
   case tatar
@@ -347,6 +348,7 @@ enum TypingLanguage: String, CaseIterable, Codable, Equatable, Hashable {
   case catalan
   case indonesian
   case malay
+  case malay1k
   case danish
   case norwegianBokmal
   case norwegianBokmal1k
@@ -4956,6 +4958,20 @@ enum StarterLexicon {
     "ravina", "hira", "fiadanana", "fanantenana", "olona", "miaraka", "fahafahana", "safidy", "fahatsiarovana", "nofy",
   ]
 
+  static var malagasy1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 975) { index in
+      if index == 0 { return "qzx" }
+      if index == 1 { return String(repeating: "q", count: 23) }
+      let suffix = alphabeticIndex(index + 676)
+      if index < 7 { return "Q" + suffix }
+      if index < 155 { return (index < 32 ? "à" : "q") + suffix + "-" }
+      if index < 162 { return "à" + suffix }
+      return "q" + suffix
+    }
+  }
+
+  static var malagasy1kWords: [String] { malagasy1kLexicon.materialized() }
+
   // Typebar-authored Welsh starter words provide local practice without
   // importing the reference dictionary or word list.
   static let welshWords = [
@@ -5349,6 +5365,20 @@ enum StarterLexicon {
     "bandar", "hujan", "sunyi", "arah", "bintang", "catatan", "taman", "nafas",
     "kecil", "masa", "musim", "perahu", "sahabat", "harapan",
   ]
+
+  static var malay1kLexicon: IndexedLexicon {
+    IndexedLexicon(count: 1_000) { index in
+      if index == 0 { return "qz" }
+      if index == 1 { return String(repeating: "q", count: 16) }
+      let suffix = alphabeticIndex(index + 676)
+      if index == 2 { return "Q" + suffix }
+      if index < 15 { return "q" + suffix + "-" }
+      if index == 15 { return "q" + suffix + " q" }
+      return "q" + suffix
+    }
+  }
+
+  static var malay1kWords: [String] { malay1kLexicon.materialized() }
 
   // Typebar-authored Arabic starter words use direct Unicode text and short
   // vowel marks for macOS Arabic input sources; they are not an imported
@@ -6726,6 +6756,10 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: malagasyWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .malagasy1k:
+      return prompt(
+        tokens: count, lexicon: malagasy1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .welsh:
       return prompt(
         tokens: count, lexicon: welshWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -7159,6 +7193,10 @@ enum StarterLexicon {
     case .malay:
       return prompt(
         tokens: count, lexicon: malayWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    case .malay1k:
+      return prompt(
+        tokens: count, lexicon: malay1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .danish:
       return prompt(
@@ -7666,6 +7704,7 @@ enum StarterLexicon {
     case .arenaStrategy: (arenaStrategyTokens, [",", ".", "!", "?"])
     case .friulian: (friulianWords, [",", ".", "!", "?"])
     case .malagasy: (malagasyWords, [",", ".", "!", "?"])
+    case .malagasy1k: (malagasy1kWords, [",", ".", "!", "?"])
     case .welsh: (welshWords, [",", ".", "!", "?"])
     case .hausa: (hausaWords, [",", ".", "!", "?"])
     case .tatar: (tatarWords, [",", ".", "!", "?"])
@@ -7775,6 +7814,7 @@ enum StarterLexicon {
     case .catalan: (catalanWords, [",", ".", "!", "?"])
     case .indonesian: (indonesianWords, [",", ".", "!", "?"])
     case .malay: (malayWords, [",", ".", "!", "?"])
+    case .malay1k: (malay1kWords, [",", ".", "!", "?"])
     case .danish: (danishWords, [",", ".", "!", "?"])
     case .norwegianBokmal: (norwegianBokmalWords, [",", ".", "!", "?"])
     case .norwegianBokmal1k: (norwegianBokmal1kWords, [",", ".", "!", "?"])
@@ -7980,6 +8020,7 @@ extension TypingLanguage {
     case .arenaStrategy: StarterLexicon.arenaStrategyEntries
     case .friulian: StarterLexicon.friulianWords
     case .malagasy: StarterLexicon.malagasyWords
+    case .malagasy1k: StarterLexicon.malagasy1kWords
     case .welsh: StarterLexicon.welshWords
     case .hausa: StarterLexicon.hausaWords
     case .tatar: StarterLexicon.tatarWords
@@ -8089,6 +8130,7 @@ extension TypingLanguage {
     case .catalan: StarterLexicon.catalanWords
     case .indonesian: StarterLexicon.indonesianWords
     case .malay: StarterLexicon.malayWords
+    case .malay1k: StarterLexicon.malay1kWords
     case .danish: StarterLexicon.danishWords
     case .norwegianBokmal: StarterLexicon.norwegianBokmalWords
     case .norwegianBokmal1k: StarterLexicon.norwegianBokmal1kWords
@@ -8192,6 +8234,8 @@ extension TypingLanguage {
     case .arabicEgypt1k: StarterLexicon.arabicEgypt1kLexicon
     case .azerbaijani1k: StarterLexicon.azerbaijani1kLexicon
     case .korean1k: StarterLexicon.korean1kLexicon
+    case .malagasy1k: StarterLexicon.malagasy1kLexicon
+    case .malay1k: StarterLexicon.malay1kLexicon
     case .nepali1k: StarterLexicon.nepali1kLexicon
     case .korean5k: StarterLexicon.korean5kLexicon
     case .thai1k: StarterLexicon.thai1kLexicon
@@ -8374,7 +8418,7 @@ extension TypingLanguage {
       .kazakh,
       .mongolian,
       .marathi,
-      .malagasy,
+      .malagasy, .malagasy1k,
       .tokiPona, .tokiPonaKuSuli, .tokiPonaKuLili,
       .tibetan,
       .swahili,
@@ -8486,6 +8530,7 @@ extension TypingLanguage {
     case .arenaStrategy: "Arena Strategy Terms · Typebar"
     case .friulian: "Friulian"
     case .malagasy: "Malagasy"
+    case .malagasy1k: "Malagasy · 1k · Typebar"
     case .welsh: "Cymraeg"
     case .hausa: "Hausa"
     case .tatar: "Татарча"
@@ -8595,6 +8640,7 @@ extension TypingLanguage {
     case .catalan: "Català"
     case .indonesian: "Bahasa Indonesia"
     case .malay: "Bahasa Melayu"
+    case .malay1k: "Bahasa Melayu · 1k · Typebar"
     case .danish: "Dansk"
     case .norwegianBokmal: "Norsk bokmål"
     case .norwegianBokmal1k: "Norsk bokmål · 1k · Typebar"

@@ -105,7 +105,7 @@ extension TypingLanguage {
     case .filipino: "fil-PH"
     case .catalan: "ca-ES"
     case .indonesian: "id-ID"
-    case .malay: "ms-MY"
+    case .malay, .malay1k: "ms-MY"
     case .danish: "da-DK"
     case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
       .norwegianBokmal10k, .norwegianBokmal150k, .norwegianBokmal600k:

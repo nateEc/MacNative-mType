@@ -225,7 +225,7 @@ enum LivePracticeContentService {
     case .filipino: return "tl"
     case .catalan: return "ca"
     case .indonesian: return "id"
-    case .malay: return "ms"
+    case .malay, .malay1k: return "ms"
     case .danish: return "da"
     case .norwegianBokmal, .norwegianBokmal1k, .norwegianBokmal5k,
       .norwegianBokmal10k, .norwegianBokmal150k, .norwegianBokmal600k:

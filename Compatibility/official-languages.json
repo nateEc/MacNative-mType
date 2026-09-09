@@ -487,7 +487,9 @@
     "arabic_egypt_1k": "arabicEgypt1k",
     "arabic_morocco": "arabicMorocco",
     "malagasy": "malagasy",
+    "malagasy_1k": "malagasy1k",
     "malay": "malay",
+    "malay_1k": "malay1k",
     "mongolian": "mongolian",
     "kannada": "kannada",
     "korean": "korean",
@@ -761,8 +763,6 @@
     "sindhi": "sindhi"
   },
   "nativeRelatedChoice": {
-    "malagasy_1k": "malagasy",
-    "malay_1k": "malay",
     "mongolian_10k": "mongolian",
     "ukrainian_1k": "ukrainian",
     "ukrainian_10k": "ukrainian",

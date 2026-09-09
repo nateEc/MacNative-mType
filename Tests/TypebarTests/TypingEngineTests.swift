@@ -8770,6 +8770,89 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testMalagasy1kPreservesIndependentIDAndPinnedAggregateShape() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "malagasy1k"))
+    let words = language.ownedPracticeLexicon()
+
+    XCTAssertEqual(language.displayName, "Malagasy · 1k · Typebar")
+    XCTAssertFalse(language.usesRightToLeftPrompt)
+    XCTAssertFalse(language.usesJoiningScriptPrompt)
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertFalse(language.supportsLazyLatinInput)
+    XCTAssertTrue(language.supportsCapsLockWarning)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "en")
+    XCTAssertEqual(language.speechLocaleIdentifier, "en-US")
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertEqual(words.count, 975)
+    XCTAssertEqual(Set(words).count, 975)
+    XCTAssertEqual(words.lazy.map(\.count).min(), 3)
+    XCTAssertEqual(words.lazy.map(\.count).max(), 23)
+    XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, 5)
+    XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, 148)
+    XCTAssertEqual(words.filter { $0.unicodeScalars.contains(where: { !$0.isASCII }) }.count, 32)
+    XCTAssertEqual(words.filter {
+      $0.contains(where: \.isPunctuation)
+        && $0.unicodeScalars.contains(where: { !$0.isASCII })
+    }.count, 25)
+    XCTAssertFalse(words.contains { $0.contains(" ") })
+    XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) })
+    XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) })
+
+    let configuration = TestConfiguration.words(25, language: language)
+    XCTAssertEqual(
+      try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+      configuration)
+    let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+    XCTAssertEqual(
+      try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+    XCTAssertEqual(
+      OfflineContent.generatedPrompt(wordCount: 25, language: language).split(separator: " ").count,
+      25)
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+    }
+  }
+
+  func testMalay1kPreservesIndependentIDAndPinnedAggregateShape() throws {
+    let language = try XCTUnwrap(TypingLanguage(rawValue: "malay1k"))
+    let words = language.ownedPracticeLexicon()
+
+    XCTAssertEqual(language.displayName, "Bahasa Melayu · 1k · Typebar")
+    XCTAssertFalse(language.usesRightToLeftPrompt)
+    XCTAssertFalse(language.usesJoiningScriptPrompt)
+    XCTAssertTrue(language.usesSpaceDelimitedWords)
+    XCTAssertTrue(language.supportsLazyLatinInput)
+    XCTAssertTrue(language.supportsCapsLockWarning)
+    XCTAssertEqual(language.zipfFrequencySupport, .unknown)
+    XCTAssertEqual(LivePracticeContentService.wikipediaLanguageCode(for: language), "ms")
+    XCTAssertEqual(language.speechLocaleIdentifier, "ms-MY")
+    XCTAssertFalse(TypingLanguage.mixableLanguages.contains(language))
+    XCTAssertEqual(words.count, 1_000)
+    XCTAssertEqual(Set(words).count, 1_000)
+    XCTAssertEqual(words.lazy.map(\.count).min(), 2)
+    XCTAssertEqual(words.lazy.map(\.count).max(), 16)
+    XCTAssertEqual(words.filter { $0.contains(where: \.isUppercase) }.count, 1)
+    XCTAssertEqual(words.filter { $0.contains(where: \.isPunctuation) }.count, 12)
+    XCTAssertEqual(words.filter { $0.contains(" ") }.count, 1)
+    XCTAssertEqual(words.filter { $0.contains(where: { !$0.isLetter }) }.count, 13)
+    XCTAssertFalse(words.contains { $0.contains(where: \.isNumber) })
+    XCTAssertFalse(words.contains { $0.contains(where: \.isSymbol) })
+    XCTAssertTrue(words.allSatisfy { $0.unicodeScalars.allSatisfy(\.isASCII) })
+
+    let configuration = TestConfiguration.words(25, language: language)
+    XCTAssertEqual(
+      try JSONDecoder().decode(TestConfiguration.self, from: JSONEncoder().encode(configuration)),
+      configuration)
+    let preset = SavedTestPreset(configuration: configuration, quoteID: nil, customText: nil)
+    XCTAssertEqual(
+      try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
+    XCTAssertFalse(OfflineContent.generatedPrompt(wordCount: 25, language: language).isEmpty)
+    for length in [QuoteLength.short, .medium, .long, .extended] {
+      XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
+    }
+  }
+
   func testSimplifiedChineseScaleChoicesPreserveIndependentIDsAndPinnedAggregateShapes() throws {
     let cases: [(String, Int, Int, Int, Int, Int, Int, Int, Int)] = [
       ("simplifiedChinese1k", 1_000, 2, 5, 0, 0, 28, 1_000, 1_000),
