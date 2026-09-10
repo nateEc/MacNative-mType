@@ -2941,7 +2941,7 @@ private struct ContentView: View {
         id: "presets", title: "打开测试预设", subtitle: "保存或应用完整测试配置", systemImage: "slider.horizontal.3",
         keywords: ["preset", "预设"], group: .library),
       .init(
-        id: "challenges", title: "打开离线挑战", subtitle: "加载固定配置并验收速度、准确率和错误",
+        id: "challenges", title: "打开离线挑战", subtitle: "加载固定配置并逐项验收完整挑战条件",
         systemImage: "flag.checkered", keywords: ["challenge", "挑战", "目标"], group: .library),
       .init(
         id: "savedTexts", title: "打开已保存文本", subtitle: "选择本地自定义练习文本", systemImage: "doc.text",

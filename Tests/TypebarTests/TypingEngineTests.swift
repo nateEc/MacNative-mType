@@ -19524,6 +19524,171 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
   }
 
+  func testChallengeEvaluatorReportsEverySupportedReferenceCondition() {
+    let configuration = TestConfiguration(
+      mode: .time,
+      duration: 60,
+      wordLimit: nil,
+      difficulty: .master,
+      rules: .init(),
+      language: .german,
+      modifiers: [.memory, .noSpaces],
+      contentOptions: .init(includePunctuation: true, includeNumbers: false)
+    )
+    let challenge = TypebarChallenge(
+      id: "condition-audit",
+      title: "条件审计",
+      description: "测试挑战条件聚合。",
+      preset: .init(configuration: configuration, quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .exact(70),
+        rawWPM: .exact(75),
+        accuracy: .minimum(99),
+        consistency: .exact(80),
+        minimumDuration: 61,
+        maximumAFKPercentage: 5,
+        exactFunboxes: [.memory],
+        configuration: .init(
+          mode: .words,
+          language: .english,
+          difficulty: .expert,
+          punctuation: false,
+          numbers: true
+        ),
+        maximumErrors: 0
+      )
+    )
+    let result = CompletedTestResult(
+      id: UUID(),
+      configuration: configuration,
+      outcome: .completed,
+      startedAt: start,
+      finishedAt: start.addingTimeInterval(60),
+      afkDuration: 6,
+      typedCharacterCount: 100,
+      correctCharacterCount: 98,
+      errorCount: 1,
+      wpm: 69,
+      rawWpm: 74,
+      accuracy: 98
+    )
+
+    let failures = ChallengeEvaluator.evaluate(result, challenge: challenge).failedRequirements
+
+    for category in [
+      "速度", "原始速度", "准确率", "一致性", "时长", "闲置", "趣味模式",
+      "模式", "语言", "难度", "标点", "数字", "错误",
+    ] {
+      XCTAssertTrue(failures.contains { $0.contains(category) }, "缺少 \(category) 条件失败说明")
+    }
+  }
+
+  func testChallengeEvaluatorAcceptsExactConditionsAndOrderIndependentModifiers() {
+    let configuration = TestConfiguration.words(
+      25,
+      difficulty: .master,
+      language: .german,
+      contentOptions: .init(includePunctuation: true, includeNumbers: true)
+    ).with(modifiers: [.noSpaces, .memory, .lazyLatin])
+    let challenge = TypebarChallenge(
+      id: "exact-pass",
+      title: "精确通过",
+      description: "测试精确条件。",
+      preset: .init(configuration: configuration, quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .exact(60),
+        rawWPM: .exact(60),
+        accuracy: .exact(100),
+        consistency: .exact(0),
+        minimumDuration: 20,
+        maximumAFKPercentage: 5,
+        exactFunboxes: [.memory, .noSpaces],
+        configuration: .init(
+          mode: .words,
+          language: .german,
+          difficulty: .master,
+          punctuation: true,
+          numbers: true
+        ),
+        maximumErrors: 0
+      )
+    )
+    let result = CompletedTestResult(
+      id: UUID(),
+      configuration: configuration,
+      outcome: .completed,
+      startedAt: start,
+      finishedAt: start.addingTimeInterval(20),
+      afkDuration: 1,
+      typedCharacterCount: 100,
+      correctCharacterCount: 100,
+      errorCount: 0,
+      wpm: 60,
+      rawWpm: 60,
+      accuracy: 100
+    )
+
+    XCTAssertTrue(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
+  }
+
+  func testChallengeEvaluatorAppliesDefaultAFKLimitAndSummarizesIt() {
+    let challenge = TypebarChallenge(
+      id: "default-afk",
+      title: "默认闲置限制",
+      description: "测试未覆盖闲置条件时的全局限制。",
+      preset: .init(configuration: .timed(seconds: 100), quoteID: nil, customText: nil),
+      requirements: .init()
+    )
+    let result = CompletedTestResult(
+      id: UUID(),
+      configuration: challenge.preset.configuration,
+      outcome: .completed,
+      startedAt: start,
+      finishedAt: start.addingTimeInterval(100),
+      afkDuration: 11,
+      typedCharacterCount: 100,
+      correctCharacterCount: 100,
+      errorCount: 0,
+      wpm: 100,
+      rawWpm: 100,
+      accuracy: 100
+    )
+
+    let evaluation = ChallengeEvaluator.evaluate(result, challenge: challenge)
+
+    XCTAssertFalse(evaluation.passed)
+    XCTAssertTrue(evaluation.failedRequirements.contains { $0.contains("10%") })
+    XCTAssertTrue(challenge.requirements.summary.contains("闲置不超过 10%"))
+
+    let invalidAFKResult = CompletedTestResult(
+      id: UUID(),
+      configuration: challenge.preset.configuration,
+      outcome: .completed,
+      startedAt: start,
+      finishedAt: start.addingTimeInterval(100),
+      afkDuration: .infinity,
+      typedCharacterCount: 100,
+      correctCharacterCount: 100,
+      errorCount: 0,
+      wpm: 100,
+      rawWpm: 100,
+      accuracy: 100
+    )
+    XCTAssertTrue(
+      ChallengeEvaluator.evaluate(invalidAFKResult, challenge: challenge)
+        .failedRequirements.contains { $0.contains("无法验收") })
+
+    let attemptedLoosening = TypebarChallenge(
+      id: "loose-afk",
+      title: "不可放宽闲置限制",
+      description: "测试全局限制优先级。",
+      preset: challenge.preset,
+      requirements: .init(maximumAFKPercentage: 15)
+    )
+    XCTAssertEqual(attemptedLoosening.requirements.effectiveMaximumAFKPercentage, 10)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result, challenge: attemptedLoosening).passed)
+  }
+
   func testDailyChallengeIsStableForOneCalendarDayAndCyclesLibrary() {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
