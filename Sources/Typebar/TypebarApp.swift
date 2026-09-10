@@ -1024,6 +1024,14 @@ private struct ContentView: View {
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
         let document = try SettingsJSONCommandImport.apply(json, to: settings)
+        let memory = document.testParameterMemory
+        duration = memory.duration
+        wordLimit = memory.wordLimit
+        customTextDuration = memory.customTextDuration
+        customTextWordLimit = memory.customTextWordLimit
+        customTextSectionLimit = min(
+          memory.customTextSectionLimit,
+          max(1, CustomTextPolicy.sections(in: customText).count))
         var configuration = document.configuration
         var retainedCustomText: String?
         if configuration.mode == .custom {
@@ -3012,7 +3020,13 @@ private struct ContentView: View {
             initialJSON: try SettingsJSONCommandCodec.export(
               settings: settings.snapshot,
               configuration: configuration,
-              layoutFluidLayouts: settings.layoutFluidLayouts),
+              layoutFluidLayouts: settings.layoutFluidLayouts,
+              testParameterMemory: .init(
+                duration: duration,
+                wordLimit: wordLimit,
+                customTextDuration: customTextDuration,
+                customTextWordLimit: customTextWordLimit,
+                customTextSectionLimit: customTextSectionLimit)),
             initialError: nil)
         } catch {
           settingsJSONCommand = .init(

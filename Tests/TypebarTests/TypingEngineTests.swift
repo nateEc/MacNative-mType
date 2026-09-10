@@ -12895,9 +12895,13 @@ final class TypingEngineTests: XCTestCase {
     let configuration = TestConfiguration.words(
       50, difficulty: .master, rules: source.inputRules, language: .german,
       contentOptions: .init(includePunctuation: true, includeNumbers: true))
+    let testParameterMemory = TypebarTestParameterMemory(
+      duration: 47, wordLimit: 50, customTextDuration: 61,
+      customTextWordLimit: 73, customTextSectionLimit: 4)
     let exported = try SettingsJSONCommandCodec.export(
       settings: source.snapshot, configuration: configuration,
-      layoutFluidLayouts: source.layoutFluidLayouts)
+      layoutFluidLayouts: source.layoutFluidLayouts,
+      testParameterMemory: testParameterMemory)
     let target = AppSettings(defaults: targetDefaults)
 
     let document = try SettingsJSONCommandImport.apply(exported, to: target)
@@ -12905,11 +12909,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(document.version, TypebarSettingsDocument.currentVersion)
     XCTAssertEqual(target.snapshot, source.snapshot)
     XCTAssertEqual(document.configuration, configuration)
+    XCTAssertEqual(document.testParameterMemory, testParameterMemory)
     XCTAssertEqual(target.layoutFluidLayouts, [.ansiWorkman, .frenchAzerty])
     let importedSnapshot = target.snapshot
     let importedLayouts = target.layoutFluidLayouts
     let unsupported = exported.replacingOccurrences(
-      of: #""version" : 1"#, with: #""version" : 999"#)
+      of: #""version" : 2"#, with: #""version" : 999"#)
     XCTAssertThrowsError(try SettingsJSONCommandImport.apply(unsupported, to: target)) {
       XCTAssertEqual($0 as? SettingsJSONCommandError, .unsupportedVersion(999))
     }
@@ -12924,8 +12929,68 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertThrowsError(try SettingsJSONCommandImport.apply(invalidLimit, to: target)) {
       XCTAssertEqual($0 as? SettingsJSONCommandError, .invalidConfiguration)
     }
+    let invalidMemory = exported.replacingOccurrences(
+      of: #""customTextDuration" : 61"#, with: #""customTextDuration" : -1"#)
+    XCTAssertThrowsError(try SettingsJSONCommandImport.apply(invalidMemory, to: target)) {
+      XCTAssertEqual($0 as? SettingsJSONCommandError, .invalidConfiguration)
+    }
     XCTAssertEqual(target.snapshot, importedSnapshot)
     XCTAssertEqual(target.layoutFluidLayouts, importedLayouts)
+  }
+
+  @MainActor
+  func testSettingsJSONCommandMigratesV1ParameterMemoryWithoutRequiringV2Field() throws {
+    let suiteName = "TypebarTests.settings-json-v1.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults).snapshot
+    let configuration = TestConfiguration.words(83, language: .german)
+    let exported = try SettingsJSONCommandCodec.export(
+      settings: settings, configuration: configuration,
+      layoutFluidLayouts: [.ansiQwerty],
+      testParameterMemory: .init(
+        duration: 47, wordLimit: 83, customTextDuration: 61,
+        customTextWordLimit: 73, customTextSectionLimit: 4))
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(exported.utf8)) as? [String: Any])
+    object["version"] = 1
+    object.removeValue(forKey: "testParameterMemory")
+    let legacyJSON = String(
+      decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+
+    let migrated = try SettingsJSONCommandCodec.decode(legacyJSON)
+
+    XCTAssertEqual(migrated.version, 1)
+    XCTAssertEqual(
+      migrated.testParameterMemory,
+      .init(
+        duration: 30, wordLimit: 83, customTextDuration: 30,
+        customTextWordLimit: 25, customTextSectionLimit: 1))
+  }
+
+  @MainActor
+  func testSettingsJSONCommandRequiresParameterMemoryForV2ButReportsUnknownVersionFirst() throws {
+    let suiteName = "TypebarTests.settings-json-v2.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let exported = try SettingsJSONCommandCodec.export(
+      settings: AppSettings(defaults: defaults).snapshot, configuration: .timed(seconds: 30),
+      layoutFluidLayouts: [], testParameterMemory: .defaults)
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(exported.utf8)) as? [String: Any])
+    object.removeValue(forKey: "testParameterMemory")
+    let missingV2Field = String(
+      decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+    XCTAssertThrowsError(try SettingsJSONCommandCodec.decode(missingV2Field)) {
+      XCTAssertEqual($0 as? SettingsJSONCommandError, .invalidDocument)
+    }
+
+    object["version"] = 999
+    let unknownVersion = String(
+      decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+    XCTAssertThrowsError(try SettingsJSONCommandCodec.decode(unknownVersion)) {
+      XCTAssertEqual($0 as? SettingsJSONCommandError, .unsupportedVersion(999))
+    }
   }
 
   func testCommandPaletteDynamicShortcutProtectsRestartAndPromptTabKeys() {

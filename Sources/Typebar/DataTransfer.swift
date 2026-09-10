@@ -322,24 +322,119 @@ enum DataTransferError: Error, Equatable {
     case unsupportedVersion(Int)
 }
 
+struct TypebarTestParameterMemory: Codable, Equatable {
+    static let defaults = TypebarTestParameterMemory(
+        duration: 30,
+        wordLimit: 25,
+        customTextDuration: 30,
+        customTextWordLimit: 25,
+        customTextSectionLimit: 1)
+
+    let duration: Int
+    let wordLimit: Int
+    let customTextDuration: Int
+    let customTextWordLimit: Int
+    let customTextSectionLimit: Int
+
+    static func legacyDefaults(configuration: TestConfiguration) -> Self {
+        var result = defaults
+        switch configuration.mode {
+        case .time:
+            if let duration = safeInteger(configuration.duration) {
+                result = result.with(duration: duration)
+            }
+        case .words:
+            if let wordLimit = configuration.wordLimit {
+                result = result.with(wordLimit: wordLimit)
+            }
+        case .custom:
+            switch configuration.customTextCompletion {
+            case .time:
+                if let duration = safeInteger(configuration.duration) {
+                    result = result.with(customTextDuration: duration)
+                }
+            case .words:
+                if let wordLimit = configuration.wordLimit {
+                    result = result.with(customTextWordLimit: wordLimit)
+                }
+            case .sections:
+                if let sectionLimit = configuration.customTextSectionLimit {
+                    result = result.with(customTextSectionLimit: sectionLimit)
+                }
+            case .finish:
+                break
+            }
+        case .quote, .zen:
+            break
+        }
+        return result
+    }
+
+    private static func safeInteger(_ value: TimeInterval?) -> Int? {
+        guard let value, value.isFinite, value >= 0,
+              value <= Double(OfficialTestLimitInput.maximumValue),
+              value.rounded(.towardZero) == value
+        else { return nil }
+        return Int(value)
+    }
+
+    private func with(
+        duration: Int? = nil,
+        wordLimit: Int? = nil,
+        customTextDuration: Int? = nil,
+        customTextWordLimit: Int? = nil,
+        customTextSectionLimit: Int? = nil
+    ) -> Self {
+        .init(
+            duration: duration ?? self.duration,
+            wordLimit: wordLimit ?? self.wordLimit,
+            customTextDuration: customTextDuration ?? self.customTextDuration,
+            customTextWordLimit: customTextWordLimit ?? self.customTextWordLimit,
+            customTextSectionLimit: customTextSectionLimit ?? self.customTextSectionLimit)
+    }
+}
+
 struct TypebarSettingsDocument: Codable, Equatable {
-    static let currentVersion = 1
+    static let currentVersion = 2
 
     let version: Int
     let settings: AppSettingsSnapshot
     let configuration: TestConfiguration
     let layoutFluidLayouts: [KeyboardLayout]
+    let testParameterMemory: TypebarTestParameterMemory
 
     init(
         version: Int = TypebarSettingsDocument.currentVersion,
         settings: AppSettingsSnapshot,
         configuration: TestConfiguration,
-        layoutFluidLayouts: [KeyboardLayout]
+        layoutFluidLayouts: [KeyboardLayout],
+        testParameterMemory: TypebarTestParameterMemory
     ) {
         self.version = version
         self.settings = settings
         self.configuration = configuration.with(challengeID: nil)
         self.layoutFluidLayouts = LayoutFluidPolicy.normalizedLayouts(layoutFluidLayouts)
+        self.testParameterMemory = testParameterMemory
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, settings, configuration, layoutFluidLayouts, testParameterMemory
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        version = try values.decode(Int.self, forKey: .version)
+        settings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+        configuration = try values.decode(TestConfiguration.self, forKey: .configuration)
+        layoutFluidLayouts = try values.decode([KeyboardLayout].self, forKey: .layoutFluidLayouts)
+        if version == Self.currentVersion {
+            testParameterMemory = try values.decode(
+                TypebarTestParameterMemory.self, forKey: .testParameterMemory)
+        } else {
+            testParameterMemory = try values.decodeIfPresent(
+                TypebarTestParameterMemory.self, forKey: .testParameterMemory)
+                ?? .legacyDefaults(configuration: configuration)
+        }
     }
 }
 
@@ -364,14 +459,20 @@ enum SettingsJSONCommandError: Error, Equatable, LocalizedError {
 }
 
 enum SettingsJSONCommandCodec {
+    private struct VersionEnvelope: Decodable {
+        let version: Int
+    }
+
     static func export(
         settings: AppSettingsSnapshot,
         configuration: TestConfiguration,
-        layoutFluidLayouts: [KeyboardLayout]
+        layoutFluidLayouts: [KeyboardLayout],
+        testParameterMemory: TypebarTestParameterMemory
     ) throws -> String {
         let data = try JSONEncoder.typebar.encode(TypebarSettingsDocument(
             settings: settings, configuration: configuration,
-            layoutFluidLayouts: layoutFluidLayouts))
+            layoutFluidLayouts: layoutFluidLayouts,
+            testParameterMemory: testParameterMemory))
         return String(decoding: data, as: UTF8.self)
     }
 
@@ -379,28 +480,45 @@ enum SettingsJSONCommandCodec {
         guard !json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw SettingsJSONCommandError.emptyDocument
         }
-        let decoded: TypebarSettingsDocument
+        let data = Data(json.utf8)
+        let version: Int
         do {
-            decoded = try JSONDecoder.typebar.decode(
-                TypebarSettingsDocument.self, from: Data(json.utf8))
+            version = try JSONDecoder.typebar.decode(VersionEnvelope.self, from: data).version
         } catch {
             throw SettingsJSONCommandError.invalidDocument
         }
-        guard decoded.version == TypebarSettingsDocument.currentVersion else {
-            throw SettingsJSONCommandError.unsupportedVersion(decoded.version)
+        guard (1...TypebarSettingsDocument.currentVersion).contains(version) else {
+            throw SettingsJSONCommandError.unsupportedVersion(version)
         }
-        guard SettingsJSONConfigurationPolicy.isValid(decoded.configuration) else {
+        let decoded: TypebarSettingsDocument
+        do {
+            decoded = try JSONDecoder.typebar.decode(TypebarSettingsDocument.self, from: data)
+        } catch {
+            throw SettingsJSONCommandError.invalidDocument
+        }
+        guard SettingsJSONConfigurationPolicy.isValid(decoded.configuration),
+              SettingsJSONConfigurationPolicy.isValid(decoded.testParameterMemory)
+        else {
             throw SettingsJSONCommandError.invalidConfiguration
         }
         return TypebarSettingsDocument(
             version: decoded.version,
             settings: decoded.settings,
             configuration: decoded.configuration,
-            layoutFluidLayouts: decoded.layoutFluidLayouts)
+            layoutFluidLayouts: decoded.layoutFluidLayouts,
+            testParameterMemory: decoded.testParameterMemory)
     }
 }
 
 enum SettingsJSONConfigurationPolicy {
+    static func isValid(_ memory: TypebarTestParameterMemory) -> Bool {
+        isValidLimit(memory.duration)
+            && isValidLimit(memory.wordLimit)
+            && isValidLimit(memory.customTextDuration)
+            && isValidLimit(memory.customTextWordLimit)
+            && (1...OfficialTestLimitInput.maximumValue).contains(memory.customTextSectionLimit)
+    }
+
     static func isValid(_ configuration: TestConfiguration) -> Bool {
         switch configuration.mode {
         case .time:
