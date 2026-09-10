@@ -2905,6 +2905,10 @@ private struct ContentView: View {
     items.append(contentsOf: KeyboardGuideLayoutCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
+    if let theme = settings.currentBuiltInThemeForFavoriteCommand(for: systemColorScheme) {
+      items.append(CurrentThemeFavoriteCommandCatalog.item(
+        theme: theme, isFavorite: settings.isFavoriteTheme(theme)))
+    }
     items.append(contentsOf: CustomBackgroundCommandCatalog.items(
       hasBackground: settings.hasLocalBackground || !settings.customBackgroundURL.isEmpty))
     items.append(contentsOf: PresetCommandCatalog.items(
@@ -3122,6 +3126,11 @@ private struct ContentView: View {
       case .builtIn(let theme): settings.selectBuiltInTheme(theme)
       case .custom(let id): settings.selectCustomTheme(id)
       }
+      return
+    }
+    if let target = CurrentThemeFavoriteCommandCatalog.target(for: item.id) {
+      _ = CurrentThemeFavoriteCommandApplication.apply(
+        target, to: settings, colorScheme: systemColorScheme)
       return
     }
     if let target = CustomBackgroundCommandCatalog.target(for: item.id) {

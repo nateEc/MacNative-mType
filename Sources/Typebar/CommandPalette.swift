@@ -1691,6 +1691,54 @@ enum ThemeCommandCatalog {
     }
 }
 
+enum CurrentThemeFavoriteCommandTarget: Equatable {
+    case add
+    case remove
+}
+
+enum CurrentThemeFavoriteCommandCatalog {
+    static func item(theme: AppTheme, isFavorite: Bool) -> CommandPaletteItem {
+        CommandPaletteItem(
+            id: isFavorite ? "removeThemeFromFavorite" : "addThemeToFavorite",
+            title: isFavorite ? "取消收藏当前主题" : "收藏当前主题",
+            subtitle: "当前显示：\(theme.displayName)",
+            systemImage: isFavorite ? "star.slash" : "star",
+            keywords: [
+                isFavorite ? "removeThemeFromFavorite" : "addThemeToFavorite",
+                "favorite", "theme", "收藏", "主题", theme.displayName, theme.rawValue,
+            ],
+            group: .appearance)
+    }
+
+    static func target(for identifier: String) -> CurrentThemeFavoriteCommandTarget? {
+        switch identifier {
+        case "addThemeToFavorite": .add
+        case "removeThemeFromFavorite": .remove
+        default: nil
+        }
+    }
+}
+
+enum CurrentThemeFavoriteCommandApplication {
+    @MainActor
+    static func apply(
+        _ target: CurrentThemeFavoriteCommandTarget, to settings: AppSettings,
+        colorScheme: ColorScheme
+    ) -> Bool {
+        guard let theme = settings.currentBuiltInThemeForFavoriteCommand(for: colorScheme) else {
+            return false
+        }
+        let isFavorite = settings.isFavoriteTheme(theme)
+        switch target {
+        case .add where !isFavorite, .remove where isFavorite:
+            settings.toggleFavoriteTheme(theme)
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 struct PresetCommandEntry: Equatable {
     let id: UUID
     let name: String

@@ -1545,6 +1545,62 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(ThemeCommandCatalog.target(for: "theme.custom.not-a-uuid"))
   }
 
+  func testCurrentThemeFavoriteCommandsExposeOnlyTheValidFixedAction() {
+    let add = CurrentThemeFavoriteCommandCatalog.item(theme: .paper, isFavorite: false)
+    XCTAssertEqual(add.id, "addThemeToFavorite")
+    XCTAssertEqual(CurrentThemeFavoriteCommandCatalog.target(for: add.id), .add)
+    XCTAssertTrue(CommandPaletteSearch.results(items: [add], query: add.id).contains(add))
+
+    let remove = CurrentThemeFavoriteCommandCatalog.item(theme: .midnight, isFavorite: true)
+    XCTAssertEqual(remove.id, "removeThemeFromFavorite")
+    XCTAssertEqual(CurrentThemeFavoriteCommandCatalog.target(for: remove.id), .remove)
+    XCTAssertNil(CurrentThemeFavoriteCommandCatalog.target(for: "addThemeToFavorite.extra"))
+    XCTAssertNil(CurrentThemeFavoriteCommandCatalog.target(for: "toggleThemeFavorite"))
+  }
+
+  @MainActor
+  func testCurrentThemeFavoriteCommandsFollowTheVisibleBuiltInThemeAndRejectStaleActions() throws {
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    settings.selectBuiltInTheme(.paper)
+    settings.randomThemeMode = .on
+    settings.randomizeTheme(for: .light, using: 1)
+    let visibleTheme = AppTheme.allCases[1]
+    XCTAssertEqual(settings.currentBuiltInThemeForFavoriteCommand(for: .light), visibleTheme)
+    XCTAssertTrue(
+      CurrentThemeFavoriteCommandApplication.apply(.add, to: settings, colorScheme: .light))
+    XCTAssertTrue(settings.isFavoriteTheme(visibleTheme))
+    XCTAssertFalse(settings.isFavoriteTheme(.paper))
+    XCTAssertFalse(
+      CurrentThemeFavoriteCommandApplication.apply(.add, to: settings, colorScheme: .light))
+    XCTAssertTrue(
+      CurrentThemeFavoriteCommandApplication.apply(.remove, to: settings, colorScheme: .light))
+    XCTAssertFalse(settings.isFavoriteTheme(visibleTheme))
+    XCTAssertFalse(
+      CurrentThemeFavoriteCommandApplication.apply(.remove, to: settings, colorScheme: .light))
+
+    settings.selectBuiltInTheme(.paper)
+    settings.followSystemTheme = true
+    settings.systemDarkTheme = .midnight
+    XCTAssertEqual(settings.currentBuiltInThemeForFavoriteCommand(for: .dark), .midnight)
+    XCTAssertTrue(
+      CurrentThemeFavoriteCommandApplication.apply(.add, to: settings, colorScheme: .dark))
+    XCTAssertTrue(settings.isFavoriteTheme(.midnight))
+
+    XCTAssertNotNil(settings.addCustomTheme(
+      name: "Harbour", background: .black, panel: .gray, accent: .orange,
+      prefersDark: true))
+    settings.selectCustomTheme(try XCTUnwrap(settings.customThemes.last?.id))
+    XCTAssertEqual(settings.currentBuiltInThemeForFavoriteCommand(for: .dark), .midnight)
+    settings.followSystemTheme = false
+    XCTAssertNil(settings.currentBuiltInThemeForFavoriteCommand(for: .light))
+    XCTAssertFalse(
+      CurrentThemeFavoriteCommandApplication.apply(.add, to: settings, colorScheme: .light))
+  }
+
   func testPresetCommandCatalogDescribesAndRoutesLocalPresets() {
     let id = UUID(uuidString: "E5D0D867-373F-4B15-B2ED-4F05919AE94B")!
     let preset = SavedTestPreset(configuration: .timed(seconds: 60), quoteID: nil, customText: nil)

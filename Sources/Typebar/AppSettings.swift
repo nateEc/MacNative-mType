@@ -1956,6 +1956,18 @@ final class AppSettings {
     return custom.resolvedTheme
   }
 
+  func currentBuiltInThemeForFavoriteCommand(for systemColorScheme: ColorScheme) -> AppTheme? {
+    if followSystemTheme {
+      return systemColorScheme == .dark ? systemDarkTheme : systemLightTheme
+    }
+    if let randomThemeTarget {
+      guard case .builtIn(let theme) = randomThemeTarget else { return nil }
+      return theme
+    }
+    guard activeCustomThemeID == nil else { return nil }
+    return theme
+  }
+
   var hasLocalBackground: Bool { TypebarLocalBackgroundStore.hasImage }
 
   var localPracticeFontInfo: LocalPracticeFontInfo? {
