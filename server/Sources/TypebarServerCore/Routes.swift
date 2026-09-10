@@ -56,6 +56,7 @@ public func configure(
                 "discordOAuth": oauthProviderClient?.isConfigured(for: .discord) == true ? .available : .planned,
                 "synchronization": .partial,
                 "resultSubmission": .partial,
+                "resultTimingEvidence": .available,
                 "resultHistory": .partial,
                 "leaderboards": .partial,
                 "profiles": .partial,
@@ -757,7 +758,8 @@ public func configure(
         }
     }
 
-    app.post("v1", "results") { request async throws -> ResultSubmissionResponse in
+    app.on(.POST, "v1", "results", body: .collect(maxSize: "256kb")) {
+      request async throws -> ResultSubmissionResponse in
         do {
             let credential = try request.resultCredential()
             let submission = try request.content.decode(ResultSubmissionRequest.self)

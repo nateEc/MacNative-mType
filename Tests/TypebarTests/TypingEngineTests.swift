@@ -487,6 +487,86 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(overlapResult.keyOverlapDuration, 0.05, accuracy: 0.000_001)
   }
 
+  func testRemoteTimingEvidenceIsBoundedAndContainsNoTypedContent() throws {
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
+      wpm: 2, rawWpm: 2, accuracy: 100,
+      keyDurationSamples: [0.08, 0.12], keySpacingSamples: [0.1, 0.2],
+      keyOverlapDuration: 0.03, prompt: "private prompt",
+      replayEvents: [.init(offset: 0.1, kind: .insert, text: "secret")])
+
+    let evidence = try XCTUnwrap(RemoteResultTimingEvidence(result: result))
+    XCTAssertEqual(evidence.version, 1)
+    XCTAssertEqual(evidence.keyDurationMilliseconds, [80, 120])
+    XCTAssertEqual(evidence.keySpacingMilliseconds, [100, 200])
+    XCTAssertEqual(evidence.keyOverlapMilliseconds, 30)
+    let encoded = String(decoding: try JSONEncoder().encode(evidence), as: UTF8.self)
+    XCTAssertFalse(encoded.contains("private prompt"))
+    XCTAssertFalse(encoded.contains("secret"))
+    XCTAssertFalse(encoded.contains("keyCode"))
+    let negotiatedSubmission = String(
+      decoding: try JSONEncoder().encode(
+        RemoteResultSubmission(result: result, includesTimingEvidence: true)), as: UTF8.self)
+    XCTAssertTrue(negotiatedSubmission.contains("timingEvidence"))
+    XCTAssertFalse(negotiatedSubmission.contains("private prompt"))
+    XCTAssertFalse(negotiatedSubmission.contains("secret"))
+    let legacySubmission = String(
+      decoding: try JSONEncoder().encode(RemoteResultSubmission(result: result)), as: UTF8.self)
+    XCTAssertFalse(legacySubmission.contains("timingEvidence"))
+
+    let negotiatedCapabilities = try JSONDecoder().decode(
+      RemoteServiceCapabilities.self,
+      from: Data(
+        #"{"apiVersion":"v1","service":"typebar","capabilities":{"resultTimingEvidence":"available"}}"#
+          .utf8))
+    XCTAssertTrue(negotiatedCapabilities.supportsResultTimingEvidence)
+    let legacyCapabilities = try JSONDecoder().decode(
+      RemoteServiceCapabilities.self,
+      from: Data(#"{"apiVersion":"v1","service":"typebar","capabilities":{}}"#.utf8))
+    XCTAssertFalse(legacyCapabilities.supportsResultTimingEvidence)
+    XCTAssertFalse(
+      RemoteServiceCapabilities(
+        apiVersion: "v1", service: "other",
+        capabilities: ["resultTimingEvidence": "available"]
+      ).supportsResultTimingEvidence)
+
+    let longResult = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 123), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(123),
+      typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
+      wpm: 0, rawWpm: 0, accuracy: 100,
+      keyDurationSamples: [0.08], keySpacingSamples: [0.1])
+    XCTAssertNil(RemoteResultTimingEvidence(result: longResult))
+
+    let oversizedResult = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
+      wpm: 2, rawWpm: 2, accuracy: 100,
+      keyDurationSamples: Array(
+        repeating: 0.08, count: RemoteResultTimingEvidence.maximumSamples + 1),
+      keySpacingSamples: [0.1])
+    XCTAssertNil(RemoteResultTimingEvidence(result: oversizedResult))
+
+    let unsafeImportedResult = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
+      wpm: 2, rawWpm: 2, accuracy: 100,
+      keyDurationSamples: [.greatestFiniteMagnitude], keySpacingSamples: [0.1])
+    XCTAssertNil(RemoteResultTimingEvidence(result: unsafeImportedResult))
+
+    let negativeImportedResult = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 30), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
+      wpm: 2, rawWpm: 2, accuracy: 100,
+      keyDurationSamples: [-0.01], keySpacingSamples: [-0.1])
+    XCTAssertNil(RemoteResultTimingEvidence(result: negativeImportedResult))
+  }
+
   func testLegacyLeaderboardResponseDefaultsMissingConsistencyToZero() throws {
     let id = UUID()
     let finishedAt = Date(timeIntervalSinceReferenceDate: 1_000)

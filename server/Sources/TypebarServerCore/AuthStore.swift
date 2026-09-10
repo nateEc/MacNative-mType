@@ -3389,6 +3389,9 @@ public actor AuthStore {
 
     let elapsed = result.finishedAt.timeIntervalSince(result.startedAt)
     guard (1...3600).contains(elapsed) else { throw ResultStoreError.invalidResult }
+    if let evidence = result.timingEvidence {
+      try validate(timingEvidence: evidence, elapsed: elapsed)
+    }
     if result.mode == "time", let configuredDuration = result.durationSeconds {
       guard abs(elapsed - Double(configuredDuration)) <= 1 else {
         throw ResultStoreError.invalidResult
@@ -3405,6 +3408,27 @@ public actor AuthStore {
     guard result.accuracy == expectedAccuracy,
       abs(result.wpm - expectedWPM) <= 1,
       abs(result.rawWpm - expectedRawWPM) <= 1
+    else { throw ResultStoreError.invalidResult }
+  }
+
+  private func validate(timingEvidence: ResultTimingEvidence, elapsed: TimeInterval) throws {
+    let maximumSamples = 12_000
+    let elapsedMilliseconds = Int((elapsed * 1_000).rounded())
+    let maximumEventMilliseconds = elapsedMilliseconds + 1_000
+    guard timingEvidence.version == 1,
+      elapsed <= 122,
+      !timingEvidence.keyDurationMilliseconds.isEmpty
+        || !timingEvidence.keySpacingMilliseconds.isEmpty,
+      timingEvidence.keyDurationMilliseconds.count
+        + timingEvidence.keySpacingMilliseconds.count <= maximumSamples,
+      timingEvidence.keyDurationMilliseconds.allSatisfy({
+        (0...maximumEventMilliseconds).contains($0)
+      }),
+      timingEvidence.keySpacingMilliseconds.allSatisfy({
+        (0...maximumEventMilliseconds).contains($0)
+      }),
+      (0...maximumEventMilliseconds).contains(timingEvidence.keyOverlapMilliseconds),
+      timingEvidence.keySpacingMilliseconds.reduce(0, +) <= maximumEventMilliseconds
     else { throw ResultStoreError.invalidResult }
   }
 

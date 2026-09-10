@@ -584,7 +584,7 @@ struct RemoteArchivePull {
     let syncScope: RemoteSyncStateScope
 }
 
-private struct RemoteResultSubmission: Codable, Sendable {
+struct RemoteResultSubmission: Codable, Sendable {
     let id: UUID
     let mode: String
     let language: String
@@ -598,10 +598,11 @@ private struct RemoteResultSubmission: Codable, Sendable {
     let eventCount: Int
     let restartCount: Int
     let tags: [String]
+    let timingEvidence: RemoteResultTimingEvidence?
     let startedAt: Date
     let finishedAt: Date
 
-    init(result: CompletedTestResult) {
+    init(result: CompletedTestResult, includesTimingEvidence: Bool = false) {
         id = result.id
         mode = result.configuration.mode.rawValue
         language = result.configuration.language.rawValue
@@ -617,8 +618,53 @@ private struct RemoteResultSubmission: Codable, Sendable {
         eventCount = result.typedCharacterCount
         restartCount = result.restartCount
         tags = result.tags
+        timingEvidence = includesTimingEvidence ? RemoteResultTimingEvidence(result: result) : nil
         startedAt = result.startedAt
         finishedAt = result.finishedAt
+    }
+}
+
+struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
+    let apiVersion: String
+    let service: String
+    let capabilities: [String: String]
+
+    var supportsResultTimingEvidence: Bool {
+        apiVersion == "v1"
+            && service == "typebar"
+            && capabilities["resultTimingEvidence"] == "available"
+    }
+}
+
+struct RemoteResultTimingEvidence: Codable, Equatable, Sendable {
+    static let currentVersion = 1
+    static let maximumDuration: TimeInterval = 122
+    static let maximumSamples = 12_000
+
+    let version: Int
+    let keyDurationMilliseconds: [Int]
+    let keySpacingMilliseconds: [Int]
+    let keyOverlapMilliseconds: Int
+
+    init?(result: CompletedTestResult) {
+        let durationSamples = result.keyDurationSamples
+        let spacingSamples = result.keySpacingSamples
+        let maximumSample = result.elapsedDuration + 1
+        guard (0...Self.maximumDuration).contains(result.elapsedDuration),
+            !durationSamples.isEmpty || !spacingSamples.isEmpty,
+            durationSamples.count + spacingSamples.count <= Self.maximumSamples,
+            durationSamples.allSatisfy({ (0...maximumSample).contains($0) }),
+            spacingSamples.allSatisfy({ (0...maximumSample).contains($0) }),
+            (0...maximumSample).contains(result.keyOverlapDuration)
+        else { return nil }
+        version = Self.currentVersion
+        keyDurationMilliseconds = Self.milliseconds(durationSamples)
+        keySpacingMilliseconds = Self.milliseconds(spacingSamples)
+        keyOverlapMilliseconds = Int((result.keyOverlapDuration * 1_000).rounded())
+    }
+
+    private static func milliseconds(_ samples: [TimeInterval]) -> [Int] {
+        samples.map { Int(($0 * 1_000).rounded()) }
     }
 }
 
@@ -2043,12 +2089,25 @@ final class AccountSession {
         guard let token = tokenStore.load(), let requestingUser = currentUser else {
             throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
         }
-        let requestScope = ResultPublicationScope(endpoint: endpoint, userID: requestingUser.id)
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+        let requestEndpoint = endpoint
+        let requestScope = ResultPublicationScope(endpoint: requestEndpoint, userID: requestingUser.id)
+        let capabilities = try? await RemoteAccountAPI(endpoint: requestEndpoint).request(
+            path: "v1/capabilities",
+            method: "GET",
+            token: nil,
+            body: Optional<String>.none,
+            response: RemoteServiceCapabilities.self
+        )
+        guard resultPublicationScope == requestScope else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        let response = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
             path: "v1/results",
             method: "POST",
             token: token,
-            body: RemoteResultSubmission(result: result),
+            body: RemoteResultSubmission(
+                result: result,
+                includesTimingEvidence: capabilities?.supportsResultTimingEvidence == true),
             response: RemoteResultSubmissionResponse.self
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }

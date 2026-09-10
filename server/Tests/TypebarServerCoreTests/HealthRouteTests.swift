@@ -62,6 +62,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["emailVerification"], .planned)
         XCTAssertEqual(capabilities.capabilities["synchronization"], .partial)
         XCTAssertEqual(capabilities.capabilities["resultSubmission"], .partial)
+        XCTAssertEqual(capabilities.capabilities["resultTimingEvidence"], .available)
         XCTAssertEqual(capabilities.capabilities["resultHistory"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboards"], .partial)
         XCTAssertEqual(capabilities.capabilities["profiles"], .partial)
@@ -2916,6 +2917,7 @@ final class HealthRouteTests: XCTestCase {
 
     XCTAssertEqual(request.consistency, 0)
     XCTAssertEqual(request.restartCount, 0)
+    XCTAssertNil(request.timingEvidence)
   }
 
   func testSubmittedResultsTrackRestartCountsWithoutDoubleCountingRetries() async throws {
@@ -3834,6 +3836,95 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testResultTimingEvidenceIsValidatedButRemainsOptionalForOldClients() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "timing@example.com", password: "a secure password", displayName: "Timing User"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let validEvidence = ResultTimingEvidence(
+      version: 1,
+      keyDurationMilliseconds: [80, 120],
+      keySpacingMilliseconds: [100, 200],
+      keyOverlapMilliseconds: 30)
+    let valid = ResultSubmissionRequest(
+      id: UUID(), mode: "time", language: "english", durationSeconds: 30, wordLimit: nil,
+      wpm: 20, rawWpm: 20, accuracy: 100, errorCount: 0, eventCount: 50,
+      timingEvidence: validEvidence,
+      startedAt: now.addingTimeInterval(-30), finishedAt: now)
+
+    let accepted = try await store.submitResult(
+      valid, accessToken: session.accessToken, now: now)
+    XCTAssertTrue(accepted.accepted)
+
+    let legacy = ResultSubmissionRequest(
+      id: UUID(), mode: "time", language: "english", durationSeconds: 30, wordLimit: nil,
+      wpm: 20, rawWpm: 20, accuracy: 100, errorCount: 0, eventCount: 50,
+      startedAt: now.addingTimeInterval(-30), finishedAt: now)
+    let legacyResponse = try await store.submitResult(
+      legacy, accessToken: session.accessToken, now: now)
+    XCTAssertTrue(legacyResponse.accepted)
+
+    let invalidEvidenceCases: [ResultTimingEvidence] = [
+      ResultTimingEvidence(
+        version: 2, keyDurationMilliseconds: [80], keySpacingMilliseconds: [100],
+        keyOverlapMilliseconds: 0),
+      ResultTimingEvidence(
+        version: 1, keyDurationMilliseconds: [-1], keySpacingMilliseconds: [100],
+        keyOverlapMilliseconds: 0),
+      ResultTimingEvidence(
+        version: 1, keyDurationMilliseconds: [80], keySpacingMilliseconds: [31_001],
+        keyOverlapMilliseconds: 0),
+      ResultTimingEvidence(
+        version: 1, keyDurationMilliseconds: [80], keySpacingMilliseconds: [100],
+        keyOverlapMilliseconds: 31_001),
+      ResultTimingEvidence(
+        version: 1,
+        keyDurationMilliseconds: Array(repeating: 80, count: 12_001),
+        keySpacingMilliseconds: [], keyOverlapMilliseconds: 0),
+    ]
+    for invalidEvidence in invalidEvidenceCases {
+      let invalid = ResultSubmissionRequest(
+        id: UUID(), mode: "time", language: "english", durationSeconds: 30, wordLimit: nil,
+        wpm: 20, rawWpm: 20, accuracy: 100, errorCount: 0, eventCount: 50,
+        timingEvidence: invalidEvidence,
+        startedAt: now.addingTimeInterval(-30), finishedAt: now)
+      do {
+        _ = try await store.submitResult(
+          invalid, accessToken: session.accessToken, now: now)
+        XCTFail("Malformed anonymous timing evidence must be rejected")
+      } catch let error as ResultStoreError {
+        XCTAssertEqual(error, .invalidResult)
+      }
+    }
+
+    let app = try await Application.make(.testing)
+    do {
+      try configure(app, authStore: store)
+      let routeNow = Date.now
+      let largeEvidenceResult = result(
+        id: UUID(), wpm: 88, accuracy: 99,
+        timingEvidence: .init(
+          version: 1,
+          keyDurationMilliseconds: Array(repeating: 80, count: 8_000),
+          keySpacingMilliseconds: [100, 200], keyOverlapMilliseconds: 30),
+        finishedAt: routeNow)
+      XCTAssertGreaterThan(try JSONEncoder().encode(largeEvidenceResult).count, 16_384)
+      try await app.test(
+        .POST, "v1/results",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(largeEvidenceResult)
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+        })
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testEveryCodeResultCanBeSubmittedAndFilteredWithoutEnablingQuoteSubmission() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let session = try await store.register(
@@ -4548,7 +4639,7 @@ final class HealthRouteTests: XCTestCase {
   private func result(
     id: UUID, wpm: Int, accuracy: Int, consistency: Double = 0, mode: String = "time",
     durationSeconds: Int? = 30, wordLimit: Int? = nil, restartCount: Int = 0,
-    language: String = "english", finishedAt: Date
+    language: String = "english", timingEvidence: ResultTimingEvidence? = nil, finishedAt: Date
   )
     -> ResultSubmissionRequest
   {
@@ -4564,7 +4655,7 @@ final class HealthRouteTests: XCTestCase {
       id: id, mode: mode, language: language, durationSeconds: durationSeconds, wordLimit: wordLimit,
       wpm: wpm, rawWpm: rawWpm, accuracy: accuracy, consistency: consistency,
       errorCount: eventCount - correctCharacters, eventCount: eventCount,
-      restartCount: restartCount,
+      restartCount: restartCount, timingEvidence: timingEvidence,
       startedAt: finishedAt.addingTimeInterval(-elapsed),
       finishedAt: finishedAt)
   }
