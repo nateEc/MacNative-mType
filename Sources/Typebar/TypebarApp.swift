@@ -661,6 +661,7 @@ private struct ContentView: View {
   @State private var practiceThresholdEditorKind: PracticeThresholdEditorKind?
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
+  @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
   @State private var showingChallenges = false
   @State private var activeChallengeID: String?
   @State private var focusRequest = 0
@@ -1019,6 +1020,22 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingTestShare) {
       TestConfigurationShareView(currentPreset: presetDefinition, onApply: apply)
+    }
+    .sheet(item: $settingsJSONCommand) { presentation in
+      SettingsJSONCommandView(presentation: presentation) { json in
+        let document = try SettingsJSONCommandImport.apply(json, to: settings)
+        var configuration = document.configuration
+        var retainedCustomText: String?
+        if configuration.mode == .custom {
+          retainedCustomText = customText
+          if configuration.customTextCompletion == .sections {
+            configuration.customTextSectionLimit = min(
+              configuration.customTextSectionLimit ?? 1,
+              max(1, CustomTextPolicy.sections(in: customText).count))
+          }
+        }
+        apply(.init(configuration: configuration, customText: retainedCustomText))
+      }
     }
     .sheet(isPresented: $showingSavedTexts) {
       SavedTextsView(onUse: loadSavedCustomText)
@@ -2985,6 +3002,23 @@ private struct ContentView: View {
         reset()
       case .shareTestSettings:
         showingTestShare = true
+      case .importSettingsJSON:
+        settingsJSONCommand = .init(
+          mode: .importSettings, initialJSON: "", initialError: nil)
+      case .exportSettingsJSON:
+        do {
+          settingsJSONCommand = .init(
+            mode: .exportSettings,
+            initialJSON: try SettingsJSONCommandCodec.export(
+              settings: settings.snapshot,
+              configuration: configuration,
+              layoutFluidLayouts: settings.layoutFluidLayouts),
+            initialError: nil)
+        } catch {
+          settingsJSONCommand = .init(
+            mode: .exportSettings, initialJSON: "",
+            initialError: "无法生成设置 JSON：\(error.localizedDescription)")
+        }
       case .nextRandomTheme:
         guard settings.randomThemeMode.isEnabled, !settings.followSystemTheme else { return }
         settings.randomizeTheme(for: systemColorScheme)

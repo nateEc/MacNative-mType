@@ -322,6 +322,142 @@ enum DataTransferError: Error, Equatable {
     case unsupportedVersion(Int)
 }
 
+struct TypebarSettingsDocument: Codable, Equatable {
+    static let currentVersion = 1
+
+    let version: Int
+    let settings: AppSettingsSnapshot
+    let configuration: TestConfiguration
+    let layoutFluidLayouts: [KeyboardLayout]
+
+    init(
+        version: Int = TypebarSettingsDocument.currentVersion,
+        settings: AppSettingsSnapshot,
+        configuration: TestConfiguration,
+        layoutFluidLayouts: [KeyboardLayout]
+    ) {
+        self.version = version
+        self.settings = settings
+        self.configuration = configuration.with(challengeID: nil)
+        self.layoutFluidLayouts = LayoutFluidPolicy.normalizedLayouts(layoutFluidLayouts)
+    }
+}
+
+enum SettingsJSONCommandError: Error, Equatable, LocalizedError {
+    case emptyDocument
+    case invalidDocument
+    case invalidConfiguration
+    case unsupportedVersion(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyDocument:
+            "请粘贴 Typebar 设置 JSON。"
+        case .invalidDocument:
+            "无法读取这份设置 JSON；请确认内容完整且格式正确。"
+        case .invalidConfiguration:
+            "设置 JSON 包含不支持的测试模式或数值范围。"
+        case .unsupportedVersion(let version):
+            "不支持设置 JSON 版本 \(version)。请使用当前版本的 Typebar 导出。"
+        }
+    }
+}
+
+enum SettingsJSONCommandCodec {
+    static func export(
+        settings: AppSettingsSnapshot,
+        configuration: TestConfiguration,
+        layoutFluidLayouts: [KeyboardLayout]
+    ) throws -> String {
+        let data = try JSONEncoder.typebar.encode(TypebarSettingsDocument(
+            settings: settings, configuration: configuration,
+            layoutFluidLayouts: layoutFluidLayouts))
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    static func decode(_ json: String) throws -> TypebarSettingsDocument {
+        guard !json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SettingsJSONCommandError.emptyDocument
+        }
+        let decoded: TypebarSettingsDocument
+        do {
+            decoded = try JSONDecoder.typebar.decode(
+                TypebarSettingsDocument.self, from: Data(json.utf8))
+        } catch {
+            throw SettingsJSONCommandError.invalidDocument
+        }
+        guard decoded.version == TypebarSettingsDocument.currentVersion else {
+            throw SettingsJSONCommandError.unsupportedVersion(decoded.version)
+        }
+        guard SettingsJSONConfigurationPolicy.isValid(decoded.configuration) else {
+            throw SettingsJSONCommandError.invalidConfiguration
+        }
+        return TypebarSettingsDocument(
+            version: decoded.version,
+            settings: decoded.settings,
+            configuration: decoded.configuration,
+            layoutFluidLayouts: decoded.layoutFluidLayouts)
+    }
+}
+
+enum SettingsJSONConfigurationPolicy {
+    static func isValid(_ configuration: TestConfiguration) -> Bool {
+        switch configuration.mode {
+        case .time:
+            guard let duration = configuration.duration,
+                  isValidDuration(duration), configuration.wordLimit == nil
+            else { return false }
+        case .words:
+            guard let wordLimit = configuration.wordLimit,
+                  isValidLimit(wordLimit), configuration.duration == nil
+            else { return false }
+        case .quote, .zen:
+            guard configuration.duration == nil, configuration.wordLimit == nil else { return false }
+        case .custom:
+            switch configuration.customTextCompletion {
+            case .finish:
+                guard configuration.duration == nil, configuration.wordLimit == nil else { return false }
+            case .time:
+                guard let duration = configuration.duration,
+                      isValidDuration(duration), configuration.wordLimit == nil
+                else { return false }
+            case .words:
+                guard let wordLimit = configuration.wordLimit,
+                      isValidLimit(wordLimit), configuration.duration == nil
+                else { return false }
+            case .sections:
+                guard let sectionLimit = configuration.customTextSectionLimit,
+                      (1...OfficialTestLimitInput.maximumValue).contains(sectionLimit),
+                      configuration.duration == nil, configuration.wordLimit == nil
+                else { return false }
+            }
+        }
+        return true
+    }
+
+    private static func isValidDuration(_ duration: TimeInterval) -> Bool {
+        duration.isFinite
+            && duration >= 0
+            && duration.rounded(.towardZero) == duration
+            && duration <= Double(OfficialTestLimitInput.maximumValue)
+    }
+
+    private static func isValidLimit(_ value: Int) -> Bool {
+        (0...OfficialTestLimitInput.maximumValue).contains(value)
+    }
+}
+
+@MainActor
+enum SettingsJSONCommandImport {
+    @discardableResult
+    static func apply(_ json: String, to settings: AppSettings) throws -> TypebarSettingsDocument {
+        let document = try SettingsJSONCommandCodec.decode(json)
+        settings.apply(document.settings)
+        settings.layoutFluidLayouts = document.layoutFluidLayouts
+        return document
+    }
+}
+
 enum TypebarDataTransfer {
     static func exportArchive(settings: AppSettingsSnapshot, results: [CompletedTestResult], presets: [NamedPreset], savedTexts: [NamedSavedText] = [], at date: Date = .now) throws -> Data {
         try JSONEncoder.typebar.encode(TypebarArchive(version: TypebarArchive.currentVersion, exportedAt: date, settings: settings, results: results, presets: presets, savedTexts: savedTexts))

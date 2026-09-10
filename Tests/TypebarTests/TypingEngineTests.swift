@@ -12828,21 +12828,104 @@ final class TypingEngineTests: XCTestCase {
   func testCommandPaletteUtilityCommandsExposeFixedAvailableActions() {
     XCTAssertEqual(
       CommandPaletteUtilityCatalog.items(randomThemeEnabled: false, authenticated: false).map(\.id),
-      ["changeCustomModeText", "shareTestSettings"])
+      [
+        "changeCustomModeText", "shareTestSettings", "importSettingsJSON",
+        "exportSettingsJSON",
+      ])
     XCTAssertEqual(
       CommandPaletteUtilityCatalog.items(randomThemeEnabled: true, authenticated: true).map(\.id),
-      ["changeCustomModeText", "shareTestSettings", "randomizeTheme", "signOut"])
+      [
+        "changeCustomModeText", "shareTestSettings", "importSettingsJSON",
+        "exportSettingsJSON", "randomizeTheme", "signOut",
+      ])
 
     XCTAssertEqual(
       CommandPaletteUtilityCatalog.action(for: "changeCustomModeText"), .editCustomText)
     XCTAssertEqual(
       CommandPaletteUtilityCatalog.action(for: "shareTestSettings"), .shareTestSettings)
     XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "share"), .shareTestSettings)
+    XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "importSettingsJSON"), .importSettingsJSON)
+    XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "exportSettingsJSON"), .exportSettingsJSON)
     XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "randomizeTheme"), .nextRandomTheme)
     XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "signOut"), .signOut)
     XCTAssertNil(CommandPaletteUtilityCatalog.action(for: "clearNotifications"))
     XCTAssertNil(CommandPaletteUtilityCatalog.action(for: "watchVideoAd"))
     XCTAssertNil(CommandPaletteUtilityCatalog.action(for: "unknown"))
+  }
+
+  @MainActor
+  func testAppSettingsApplyRestoresSelectableErrorAndPracticeTapeSettings() {
+    let sourceSuite = "TypebarTests.settings-source.\(UUID().uuidString)"
+    let targetSuite = "TypebarTests.settings-target.\(UUID().uuidString)"
+    let sourceDefaults = UserDefaults(suiteName: sourceSuite)!
+    let targetDefaults = UserDefaults(suiteName: targetSuite)!
+    defer {
+      sourceDefaults.removePersistentDomain(forName: sourceSuite)
+      targetDefaults.removePersistentDomain(forName: targetSuite)
+    }
+    let source = AppSettings(defaults: sourceDefaults)
+    source.deleteOnErrorMode = .wordHard
+    source.codeUnindentOnBackspace = true
+    source.practiceTapeMode = .letter
+    source.practiceTapeMargin = 0.8
+    source.smoothPracticeLineScroll = true
+    source.showAllPracticeLines = true
+    let target = AppSettings(defaults: targetDefaults)
+
+    target.apply(source.snapshot)
+
+    XCTAssertEqual(target.snapshot, source.snapshot)
+  }
+
+  @MainActor
+  func testSettingsJSONCommandRoundTripsAllSettingsAndRejectsUnknownVersionWithoutMutation() throws {
+    let sourceSuite = "TypebarTests.settings-json-source.\(UUID().uuidString)"
+    let targetSuite = "TypebarTests.settings-json-target.\(UUID().uuidString)"
+    let sourceDefaults = UserDefaults(suiteName: sourceSuite)!
+    let targetDefaults = UserDefaults(suiteName: targetSuite)!
+    defer {
+      sourceDefaults.removePersistentDomain(forName: sourceSuite)
+      targetDefaults.removePersistentDomain(forName: targetSuite)
+    }
+    let source = AppSettings(defaults: sourceDefaults)
+    source.difficulty = .master
+    source.stopOnErrorMode = .word
+    source.practiceTapeMode = .word
+    source.layoutFluidLayouts = [.ansiWorkman, .frenchAzerty, .ansiWorkman]
+    let configuration = TestConfiguration.words(
+      50, difficulty: .master, rules: source.inputRules, language: .german,
+      contentOptions: .init(includePunctuation: true, includeNumbers: true))
+    let exported = try SettingsJSONCommandCodec.export(
+      settings: source.snapshot, configuration: configuration,
+      layoutFluidLayouts: source.layoutFluidLayouts)
+    let target = AppSettings(defaults: targetDefaults)
+
+    let document = try SettingsJSONCommandImport.apply(exported, to: target)
+
+    XCTAssertEqual(document.version, TypebarSettingsDocument.currentVersion)
+    XCTAssertEqual(target.snapshot, source.snapshot)
+    XCTAssertEqual(document.configuration, configuration)
+    XCTAssertEqual(target.layoutFluidLayouts, [.ansiWorkman, .frenchAzerty])
+    let importedSnapshot = target.snapshot
+    let importedLayouts = target.layoutFluidLayouts
+    let unsupported = exported.replacingOccurrences(
+      of: #""version" : 1"#, with: #""version" : 999"#)
+    XCTAssertThrowsError(try SettingsJSONCommandImport.apply(unsupported, to: target)) {
+      XCTAssertEqual($0 as? SettingsJSONCommandError, .unsupportedVersion(999))
+    }
+    XCTAssertThrowsError(try SettingsJSONCommandImport.apply("  \n", to: target)) {
+      XCTAssertEqual($0 as? SettingsJSONCommandError, .emptyDocument)
+    }
+    XCTAssertThrowsError(try SettingsJSONCommandImport.apply("{not-json}", to: target)) {
+      XCTAssertEqual($0 as? SettingsJSONCommandError, .invalidDocument)
+    }
+    let invalidLimit = exported.replacingOccurrences(
+      of: #""wordLimit" : 50"#, with: #""wordLimit" : -1"#)
+    XCTAssertThrowsError(try SettingsJSONCommandImport.apply(invalidLimit, to: target)) {
+      XCTAssertEqual($0 as? SettingsJSONCommandError, .invalidConfiguration)
+    }
+    XCTAssertEqual(target.snapshot, importedSnapshot)
+    XCTAssertEqual(target.layoutFluidLayouts, importedLayouts)
   }
 
   func testCommandPaletteDynamicShortcutProtectsRestartAndPromptTabKeys() {

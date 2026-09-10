@@ -1940,6 +1940,8 @@ enum ResultTagCommandPolicy {
 enum CommandPaletteUtilityAction: Equatable {
     case editCustomText
     case shareTestSettings
+    case importSettingsJSON
+    case exportSettingsJSON
     case nextRandomTheme
     case signOut
 }
@@ -1962,6 +1964,18 @@ enum CommandPaletteUtilityCatalog {
                 subtitle: "复制或导入 Typebar 测试配置链接",
                 systemImage: "square.and.arrow.up", keywords: [
                     "shareTestSettings", "share", "test", "settings", "分享", "链接", "配置",
+                ], group: .data),
+            CommandPaletteItem(
+                id: "importSettingsJSON", title: "导入设置 JSON",
+                subtitle: "检查并应用另一份 Typebar 设置",
+                systemImage: "square.and.arrow.down", keywords: [
+                    "importSettingsJSON", "import", "config", "settings", "导入", "设置", "JSON",
+                ], group: .data),
+            CommandPaletteItem(
+                id: "exportSettingsJSON", title: "导出设置 JSON",
+                subtitle: "查看并复制当前 Typebar 设置",
+                systemImage: "doc.on.doc", keywords: [
+                    "exportSettingsJSON", "export", "config", "settings", "导出", "设置", "JSON",
                 ], group: .data),
         ]
         if randomThemeEnabled {
@@ -1987,6 +2001,8 @@ enum CommandPaletteUtilityCatalog {
         switch identifier {
         case "changeCustomModeText": .editCustomText
         case "shareTestSettings", "share": .shareTestSettings
+        case "importSettingsJSON": .importSettingsJSON
+        case "exportSettingsJSON": .exportSettingsJSON
         case "randomizeTheme": .nextRandomTheme
         case "signOut": .signOut
         default: nil

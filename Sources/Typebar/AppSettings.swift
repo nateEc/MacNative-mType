@@ -1848,8 +1848,19 @@ final class AppSettings {
   func apply(_ snapshot: AppSettingsSnapshot) {
     difficulty = snapshot.difficulty
     strictSpace = snapshot.strictSpace
-    stopOnError = snapshot.stopOnError
-    deleteOnError = snapshot.deleteOnError
+    confidenceMode = .off
+    freedomMode = false
+    stopOnErrorMode = .off
+    deleteOnErrorMode = .off
+    if snapshot.confidenceMode != .off {
+      confidenceMode = snapshot.confidenceMode
+    } else if snapshot.stopOnErrorMode.isEnabled {
+      stopOnErrorMode = snapshot.stopOnErrorMode
+    } else if snapshot.deleteOnErrorMode.isEnabled {
+      deleteOnErrorMode = snapshot.deleteOnErrorMode
+    } else {
+      freedomMode = snapshot.freedomMode
+    }
     hideExtraLetters = snapshot.hideExtraLetters
     blindMode = snapshot.blindMode
     fontSize = snapshot.fontSize
@@ -1895,15 +1906,18 @@ final class AppSettings {
     favoriteQuoteIDs = snapshot.favoriteQuoteIDs
     activeResultTags = snapshot.activeResultTags
     repeatQuotes = snapshot.repeatQuotes
-    freedomMode = snapshot.freedomMode
-    confidenceMode = snapshot.confidenceMode
     oppositeShiftMode = snapshot.oppositeShiftMode
+    codeUnindentOnBackspace = snapshot.codeUnindentOnBackspace
     minimumAccuracy = snapshot.minimumAccuracy
     minimumWpm = snapshot.minimumWpm
     minimumWordBurstWpm = snapshot.minimumWordBurstWpm
     minimumWordBurstMode = snapshot.minimumWordBurstMode
     practiceLineWidth = snapshot.practiceLineWidth
     customPracticeLineColumns = snapshot.customPracticeLineColumns
+    practiceTapeMode = snapshot.practiceTapeMode
+    practiceTapeMargin = snapshot.practiceTapeMargin
+    smoothPracticeLineScroll = snapshot.smoothPracticeLineScroll
+    showAllPracticeLines = snapshot.showAllPracticeLines
     smoothCaretMotion = snapshot.smoothCaretMotion
     caretStyle = snapshot.caretStyle
     typoIndicatorStyle = snapshot.typoIndicatorStyle
