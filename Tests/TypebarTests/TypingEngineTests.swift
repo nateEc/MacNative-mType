@@ -12825,6 +12825,26 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(CommandPaletteKeyboardSelection.moved(current: 0, count: 0, offset: 1))
   }
 
+  func testCommandPaletteUtilityCommandsExposeFixedAvailableActions() {
+    XCTAssertEqual(
+      CommandPaletteUtilityCatalog.items(randomThemeEnabled: false, authenticated: false).map(\.id),
+      ["changeCustomModeText", "shareTestSettings"])
+    XCTAssertEqual(
+      CommandPaletteUtilityCatalog.items(randomThemeEnabled: true, authenticated: true).map(\.id),
+      ["changeCustomModeText", "shareTestSettings", "randomizeTheme", "signOut"])
+
+    XCTAssertEqual(
+      CommandPaletteUtilityCatalog.action(for: "changeCustomModeText"), .editCustomText)
+    XCTAssertEqual(
+      CommandPaletteUtilityCatalog.action(for: "shareTestSettings"), .shareTestSettings)
+    XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "share"), .shareTestSettings)
+    XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "randomizeTheme"), .nextRandomTheme)
+    XCTAssertEqual(CommandPaletteUtilityCatalog.action(for: "signOut"), .signOut)
+    XCTAssertNil(CommandPaletteUtilityCatalog.action(for: "clearNotifications"))
+    XCTAssertNil(CommandPaletteUtilityCatalog.action(for: "watchVideoAd"))
+    XCTAssertNil(CommandPaletteUtilityCatalog.action(for: "unknown"))
+  }
+
   func testCommandPaletteDynamicShortcutProtectsRestartAndPromptTabKeys() {
     XCTAssertEqual(
       CommandPaletteDynamicShortcut.resolve(quickRestartKey: .off, promptAcceptsTab: false),

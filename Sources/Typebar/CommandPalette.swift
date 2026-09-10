@@ -1937,6 +1937,63 @@ enum ResultTagCommandPolicy {
     }
 }
 
+enum CommandPaletteUtilityAction: Equatable {
+    case editCustomText
+    case shareTestSettings
+    case nextRandomTheme
+    case signOut
+}
+
+/// Maps reference top-level actions to existing native Typebar workflows.
+/// Browser-only cache, advertising, diagnostics, and brand links are omitted.
+enum CommandPaletteUtilityCatalog {
+    static func items(
+        randomThemeEnabled: Bool, authenticated: Bool
+    ) -> [CommandPaletteItem] {
+        var items = [
+            CommandPaletteItem(
+                id: "changeCustomModeText", title: "编辑自定义文本",
+                subtitle: "切换到自定义模式并编辑自己的练习内容",
+                systemImage: "text.cursor", keywords: [
+                    "changeCustomModeText", "custom", "text", "编辑", "自定义", "文本",
+                ], group: .library),
+            CommandPaletteItem(
+                id: "shareTestSettings", title: "分享当前测试",
+                subtitle: "复制或导入 Typebar 测试配置链接",
+                systemImage: "square.and.arrow.up", keywords: [
+                    "shareTestSettings", "share", "test", "settings", "分享", "链接", "配置",
+                ], group: .data),
+        ]
+        if randomThemeEnabled {
+            items.append(CommandPaletteItem(
+                id: "randomizeTheme", title: "下一个随机主题",
+                subtitle: "从当前随机主题池选择下一项",
+                systemImage: "shuffle", keywords: [
+                    "randomizeTheme", "random", "theme", "随机", "主题", "下一项",
+                ], group: .appearance))
+        }
+        if authenticated {
+            items.append(CommandPaletteItem(
+                id: "signOut", title: "退出登录",
+                subtitle: "清除这台 Mac 上当前服务的登录会话",
+                systemImage: "rectangle.portrait.and.arrow.right", keywords: [
+                    "signOut", "logout", "account", "退出", "登录", "账户",
+                ], group: .connections))
+        }
+        return items
+    }
+
+    static func action(for identifier: String) -> CommandPaletteUtilityAction? {
+        switch identifier {
+        case "changeCustomModeText": .editCustomText
+        case "shareTestSettings", "share": .shareTestSettings
+        case "randomizeTheme": .nextRandomTheme
+        case "signOut": .signOut
+        default: nil
+        }
+    }
+}
+
 struct CompletedResultCommandAvailability: Equatable {
     let hasCopyableWords: Bool
     let hasWordHistory: Bool

@@ -2923,10 +2923,10 @@ private struct ContentView: View {
         id: "notifications", title: "打开通知", subtitle: "查看好友请求和接受事件", systemImage: "bell",
         keywords: ["notification", "通知", "好友请求"], group: .connections),
       ReleaseHistoryCommand.item,
-      .init(
-        id: "share", title: "分享当前测试", subtitle: "复制或导入 Typebar 测试配置链接",
-        systemImage: "square.and.arrow.up", keywords: ["share", "分享", "链接", "配置"], group: .data),
     ]
+    items.append(contentsOf: CommandPaletteUtilityCatalog.items(
+      randomThemeEnabled: settings.randomThemeMode.isEnabled && !settings.followSystemTheme,
+      authenticated: account.currentUser != nil))
     items.append(contentsOf: NavigationCommandCatalog.items)
     if session.hasStarted, !session.isFinished, commandBailoutAvailable {
       items.append(.init(
@@ -2977,6 +2977,24 @@ private struct ContentView: View {
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let action = CommandPaletteUtilityCatalog.action(for: item.id) {
+      switch action {
+      case .editCustomText:
+        activeChallengeID = nil
+        mode = .custom
+        reset()
+      case .shareTestSettings:
+        showingTestShare = true
+      case .nextRandomTheme:
+        guard settings.randomThemeMode.isEnabled, !settings.followSystemTheme else { return }
+        settings.randomizeTheme(for: systemColorScheme)
+      case .signOut:
+        guard account.currentUser != nil else { return }
+        account.signOut()
+        unreadNotificationCount = nil
+      }
+      return
+    }
     if let target = NavigationCommandCatalog.target(for: item.id) {
       switch target {
       case .typingPage:
@@ -3283,7 +3301,6 @@ private struct ContentView: View {
     case "friends": showingConnections = true
     case "notifications": showingNotifications = true
     case ReleaseHistoryCommand.identifier: openWindow(id: "release-history")
-    case "share": showingTestShare = true
     case "bailout": showingCommandBailoutConfirmation = true
     case QuoteFavoriteCommand.identifier:
       guard mode == .quote, availableQuotes.contains(where: { $0.id == selectedQuoteID }) else { return }
