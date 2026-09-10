@@ -13069,12 +13069,12 @@ final class TypingEngineTests: XCTestCase {
         customTextWordLimit: 73, customTextSectionLimit: 4))
     XCTAssertTrue(settings.saveActiveTestSelection(document))
     XCTAssertEqual(settings.activeTestSelection, document)
-    XCTAssertEqual(settings.testSelectionResetGeneration, 0)
+    XCTAssertEqual(settings.activeTestSelectionGeneration, 0)
 
     settings.restoreDefaults()
 
     XCTAssertNil(settings.activeTestSelection)
-    XCTAssertEqual(settings.testSelectionResetGeneration, 1)
+    XCTAssertEqual(settings.activeTestSelectionGeneration, 1)
   }
 
   func testCommandPaletteDynamicShortcutProtectsRestartAndPromptTabKeys() {
@@ -20089,31 +20089,117 @@ final class TypingEngineTests: XCTestCase {
       NamedSavedText(title: "Notes", text: "An original text for focused practice."),
       NamedSavedText(title: "Chapter", text: "amber harbor willow", longProgress: 6),
     ]
+    let activeTestSelection = ActiveTestSelectionDocument(
+      preset: .init(configuration: .words(83, language: .german)),
+      quoteSource: .community,
+      testParameterMemory: .init(
+        duration: 47, wordLimit: 83, customTextDuration: 61,
+        customTextWordLimit: 73, customTextSectionLimit: 4))
     let data = try TypebarDataTransfer.exportArchive(
-      settings: settings, results: [result], presets: [preset], savedTexts: savedTexts, at: start)
+      settings: settings, results: [result], presets: [preset], savedTexts: savedTexts,
+      activeTestSelection: activeTestSelection, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
     XCTAssertEqual(archive.version, 3)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
     XCTAssertEqual(archive.savedTexts, savedTexts)
+    XCTAssertEqual(archive.activeTestSelection, activeTestSelection)
+
+    var legacyVersionThreePayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
+    legacyVersionThreePayload.removeValue(forKey: "activeTestSelection")
+    let legacyVersionThreeData = try JSONSerialization.data(
+      withJSONObject: legacyVersionThreePayload)
+    let legacyVersionThreeArchive = try TypebarDataTransfer.importArchive(
+      from: legacyVersionThreeData)
+    XCTAssertEqual(legacyVersionThreeArchive.version, 3)
+    XCTAssertNil(legacyVersionThreeArchive.activeTestSelection)
 
     var versionTwoPayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     versionTwoPayload["version"] = 2
+    versionTwoPayload.removeValue(forKey: "activeTestSelection")
     var versionTwoResults = try XCTUnwrap(versionTwoPayload["results"] as? [[String: Any]])
     versionTwoResults[0].removeValue(forKey: "restartCount")
     versionTwoPayload["results"] = versionTwoResults
     let versionTwoData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
     let versionTwoArchive = try TypebarDataTransfer.importArchive(from: versionTwoData)
     XCTAssertEqual(versionTwoArchive.version, 2)
+    XCTAssertNil(versionTwoArchive.activeTestSelection)
     XCTAssertEqual(versionTwoArchive.results.first?.restartCount, 0)
+
+    var invalidSelectionPayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
+    var invalidSelection = try XCTUnwrap(
+      invalidSelectionPayload["activeTestSelection"] as? [String: Any])
+    var invalidMemory = try XCTUnwrap(
+      invalidSelection["testParameterMemory"] as? [String: Any])
+    invalidMemory["duration"] = -1
+    invalidSelection["testParameterMemory"] = invalidMemory
+    invalidSelectionPayload["activeTestSelection"] = invalidSelection
+    let invalidSelectionData = try JSONSerialization.data(withJSONObject: invalidSelectionPayload)
+    XCTAssertNil(
+      try TypebarDataTransfer.importArchive(from: invalidSelectionData).activeTestSelection)
 
     versionTwoPayload["version"] = 4
     let futureData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
     XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: futureData)) { error in
       XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(4))
     }
+  }
+
+  @MainActor
+  func testLocalArchiveImportRestoresOnlyAValidDifferentActiveTestSelection() throws {
+    let suiteName = "TypebarTests.archive-active-selection.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    let existing = ActiveTestSelectionDocument(
+      preset: .init(configuration: .timed(seconds: 30)),
+      testParameterMemory: .defaults)
+    XCTAssertTrue(settings.saveActiveTestSelection(existing))
+    let imported = ActiveTestSelectionDocument(
+      preset: .init(configuration: .words(83, language: .german)),
+      testParameterMemory: .init(
+        duration: 47, wordLimit: 83, customTextDuration: 61,
+        customTextWordLimit: 73, customTextSectionLimit: 4))
+    let container = try ModelContainer(
+      for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+
+    let unchangedSummary = try LocalArchiveImport.apply(
+      .init(
+        exportedAt: start, settings: settings.snapshot, results: [], presets: [],
+        activeTestSelection: existing),
+      settings: settings, results: [], presets: [], savedTexts: [],
+      modelContext: container.mainContext)
+
+    XCTAssertEqual(settings.activeTestSelection, existing)
+    XCTAssertEqual(settings.activeTestSelectionGeneration, 0)
+    XCTAssertFalse(unchangedSummary.restoredActiveTestSelection)
+
+    let importedSummary = try LocalArchiveImport.apply(
+      .init(
+        exportedAt: start, settings: settings.snapshot, results: [], presets: [],
+        activeTestSelection: imported),
+      settings: settings, results: [], presets: [], savedTexts: [],
+      modelContext: container.mainContext)
+
+    XCTAssertEqual(settings.activeTestSelection, imported)
+    XCTAssertEqual(settings.activeTestSelectionGeneration, 1)
+    XCTAssertTrue(importedSummary.restoredActiveTestSelection)
+
+    let legacySummary = try LocalArchiveImport.apply(
+      .init(
+        version: 2, exportedAt: start, settings: settings.snapshot,
+        results: [], presets: []),
+      settings: settings, results: [], presets: [], savedTexts: [],
+      modelContext: container.mainContext)
+
+    XCTAssertEqual(settings.activeTestSelection, imported)
+    XCTAssertEqual(settings.activeTestSelectionGeneration, 1)
+    XCTAssertFalse(legacySummary.restoredActiveTestSelection)
   }
 
   func testCompletedResultDecodesArchivesWrittenBeforeInactivityTracking() throws {
@@ -20185,18 +20271,24 @@ final class TypingEngineTests: XCTestCase {
       name: "Daily", definition: .init(configuration: .timed(seconds: 60), quoteID: nil, customText: nil))
     let localText = NamedSavedText(title: "Drill", text: "local words")
     let remoteText = NamedSavedText(title: "Drill", text: "remote words")
+    let localSelection = ActiveTestSelectionDocument(
+      preset: .init(configuration: .words(25)), testParameterMemory: .defaults)
+    let remoteSelection = ActiveTestSelectionDocument(
+      preset: .init(configuration: .timed(seconds: 60)), testParameterMemory: .defaults)
     let local = TypebarArchive(
       exportedAt: start,
       settings: .init(
         fontSize: 31, customThemes: [localTheme], activeCustomThemeID: sharedThemeID,
         favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: sharedThemeID)]),
-      results: [], presets: [localPreset], savedTexts: [localText])
+      results: [], presets: [localPreset], savedTexts: [localText],
+      activeTestSelection: localSelection)
     let remote = TypebarArchive(
       exportedAt: start.addingTimeInterval(1),
       settings: .init(
         fontSize: 46, customThemes: [remoteTheme], activeCustomThemeID: sharedThemeID,
         favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: sharedThemeID)]),
-      results: [], presets: [remotePreset], savedTexts: [remoteText])
+      results: [], presets: [remotePreset], savedTexts: [remoteText],
+      activeTestSelection: remoteSelection)
 
     let merged = TypebarArchiveConflictMerge.merge(
       local: local, remote: remote, makeID: { clonedThemeID })
@@ -20212,6 +20304,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(merged.presets.last?.definition, remotePreset.definition)
     XCTAssertEqual(merged.savedTexts.map(\.title), ["Drill", "Drill（同步冲突）"])
     XCTAssertEqual(merged.savedTexts.last?.text, remoteText.text)
+    XCTAssertEqual(merged.activeTestSelection, localSelection)
   }
 
   func testArchiveConflictMergeReportsOnlyRenamedCopies() throws {
@@ -20330,6 +20423,7 @@ final class TypingEngineTests: XCTestCase {
     let archive = try TypebarDataTransfer.importArchive(from: Data(oldArchive.utf8))
     XCTAssertEqual(archive.version, 1)
     XCTAssertTrue(archive.savedTexts.isEmpty)
+    XCTAssertNil(archive.activeTestSelection)
   }
 
   func testSavedTextArchiveDefaultsMissingLongProgressToAnOrdinaryText() throws {

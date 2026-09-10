@@ -33,6 +33,34 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
   }
 }
 
+enum ActiveTestSelectionPolicy {
+  static func validated(
+    _ document: ActiveTestSelectionDocument
+  ) -> ActiveTestSelectionDocument? {
+    guard document.version == ActiveTestSelectionDocument.currentVersion,
+      SettingsJSONConfigurationPolicy.isValid(document.preset.configuration),
+      SettingsJSONConfigurationPolicy.isValid(document.testParameterMemory)
+    else { return nil }
+    if let quoteID = document.preset.quoteID,
+      quoteID.isEmpty || quoteID.count > 256
+    {
+      return nil
+    }
+    if document.preset.configuration.mode == .custom {
+      guard let customText = document.preset.customText,
+        CustomTextPolicy.isValid(customText)
+      else { return nil }
+    } else if document.preset.customText != nil {
+      return nil
+    }
+    return ActiveTestSelectionDocument(
+      version: document.version,
+      preset: document.preset,
+      quoteSource: document.quoteSource,
+      testParameterMemory: document.testParameterMemory)
+  }
+}
+
 struct ActiveTestSelectionStore {
   static let storageKey = "activeTestSelection.v1"
 
@@ -44,44 +72,21 @@ struct ActiveTestSelectionStore {
 
   func load() -> ActiveTestSelectionDocument? {
     guard let data = defaults.data(forKey: Self.storageKey),
-      let decoded = try? JSONDecoder().decode(ActiveTestSelectionDocument.self, from: data),
-      isValid(decoded)
+      let decoded = try? JSONDecoder().decode(ActiveTestSelectionDocument.self, from: data)
     else { return nil }
-    return ActiveTestSelectionDocument(
-      version: decoded.version,
-      preset: decoded.preset,
-      quoteSource: decoded.quoteSource,
-      testParameterMemory: decoded.testParameterMemory)
+    return ActiveTestSelectionPolicy.validated(decoded)
   }
 
   @discardableResult
   func save(_ document: ActiveTestSelectionDocument) -> Bool {
-    guard isValid(document), let data = try? JSONEncoder().encode(document) else { return false }
+    guard let document = ActiveTestSelectionPolicy.validated(document),
+      let data = try? JSONEncoder().encode(document)
+    else { return false }
     defaults.set(data, forKey: Self.storageKey)
     return true
   }
 
   func remove() {
     defaults.removeObject(forKey: Self.storageKey)
-  }
-
-  private func isValid(_ document: ActiveTestSelectionDocument) -> Bool {
-    guard document.version == ActiveTestSelectionDocument.currentVersion,
-      SettingsJSONConfigurationPolicy.isValid(document.preset.configuration),
-      SettingsJSONConfigurationPolicy.isValid(document.testParameterMemory)
-    else { return false }
-    if let quoteID = document.preset.quoteID,
-      quoteID.isEmpty || quoteID.count > 256
-    {
-      return false
-    }
-    if document.preset.configuration.mode == .custom {
-      guard let customText = document.preset.customText,
-        CustomTextPolicy.isValid(customText)
-      else { return false }
-    } else if document.preset.customText != nil {
-      return false
-    }
-    return true
   }
 }

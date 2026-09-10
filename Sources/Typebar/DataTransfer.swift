@@ -258,18 +258,30 @@ struct TypebarArchive: Codable, Equatable {
     let results: [CompletedTestResult]
     let presets: [NamedPreset]
     let savedTexts: [NamedSavedText]
+    let activeTestSelection: ActiveTestSelectionDocument?
 
-    init(version: Int = TypebarArchive.currentVersion, exportedAt: Date, settings: AppSettingsSnapshot, results: [CompletedTestResult], presets: [NamedPreset], savedTexts: [NamedSavedText] = []) {
+    init(
+        version: Int = TypebarArchive.currentVersion,
+        exportedAt: Date,
+        settings: AppSettingsSnapshot,
+        results: [CompletedTestResult],
+        presets: [NamedPreset],
+        savedTexts: [NamedSavedText] = [],
+        activeTestSelection: ActiveTestSelectionDocument? = nil
+    ) {
         self.version = version
         self.exportedAt = exportedAt
         self.settings = settings
         self.results = results
         self.presets = presets
         self.savedTexts = savedTexts
+        self.activeTestSelection = version >= 3
+            ? activeTestSelection.flatMap(ActiveTestSelectionPolicy.validated)
+            : nil
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, exportedAt, settings, results, presets, savedTexts
+        case version, exportedAt, settings, results, presets, savedTexts, activeTestSelection
     }
 
     init(from decoder: Decoder) throws {
@@ -280,6 +292,11 @@ struct TypebarArchive: Codable, Equatable {
         results = try values.decode([CompletedTestResult].self, forKey: .results)
         presets = try values.decode([NamedPreset].self, forKey: .presets)
         savedTexts = try values.decodeIfPresent([NamedSavedText].self, forKey: .savedTexts) ?? []
+        activeTestSelection = version >= 3
+            ? try values
+                .decodeIfPresent(ActiveTestSelectionDocument.self, forKey: .activeTestSelection)
+                .flatMap(ActiveTestSelectionPolicy.validated)
+            : nil
     }
 }
 
@@ -577,8 +594,22 @@ enum SettingsJSONCommandImport {
 }
 
 enum TypebarDataTransfer {
-    static func exportArchive(settings: AppSettingsSnapshot, results: [CompletedTestResult], presets: [NamedPreset], savedTexts: [NamedSavedText] = [], at date: Date = .now) throws -> Data {
-        try JSONEncoder.typebar.encode(TypebarArchive(version: TypebarArchive.currentVersion, exportedAt: date, settings: settings, results: results, presets: presets, savedTexts: savedTexts))
+    static func exportArchive(
+        settings: AppSettingsSnapshot,
+        results: [CompletedTestResult],
+        presets: [NamedPreset],
+        savedTexts: [NamedSavedText] = [],
+        activeTestSelection: ActiveTestSelectionDocument? = nil,
+        at date: Date = .now
+    ) throws -> Data {
+        try JSONEncoder.typebar.encode(TypebarArchive(
+            version: TypebarArchive.currentVersion,
+            exportedAt: date,
+            settings: settings,
+            results: results,
+            presets: presets,
+            savedTexts: savedTexts,
+            activeTestSelection: activeTestSelection))
     }
 
     static func importArchive(from data: Data) throws -> TypebarArchive {
@@ -763,7 +794,8 @@ enum TypebarArchiveConflictMerge {
                     !local.results.contains(where: { $0.id == remoteResult.id })
                 },
                 presets: presets,
-                savedTexts: savedTexts),
+                savedTexts: savedTexts,
+                activeTestSelection: local.activeTestSelection),
             conflicts: conflicts)
     }
 
@@ -851,6 +883,7 @@ struct ArchiveImportSummary: Equatable {
     let insertedResults: Int
     let insertedPresets: Int
     let insertedSavedTexts: Int
+    let restoredActiveTestSelection: Bool
 }
 
 @MainActor
@@ -881,9 +914,20 @@ enum LocalArchiveImport {
             modelContext.insert(SavedCustomTextRecord(
                 title: savedText.title, text: savedText.text, longProgress: savedText.longProgress))
         }
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
         settings.apply(archive.settings)
-        try modelContext.save()
-        return .init(insertedResults: newResults.count, insertedPresets: newPresets.count, insertedSavedTexts: newSavedTexts.count)
+        let restoredActiveTestSelection = archive.activeTestSelection.map(
+            settings.importActiveTestSelection) ?? false
+        return .init(
+            insertedResults: newResults.count,
+            insertedPresets: newPresets.count,
+            insertedSavedTexts: newSavedTexts.count,
+            restoredActiveTestSelection: restoredActiveTestSelection)
     }
 }
 
@@ -908,6 +952,7 @@ struct TypebarArchiveDocument: FileDocument {
             results: archive.results,
             presets: archive.presets,
             savedTexts: archive.savedTexts,
+            activeTestSelection: archive.activeTestSelection,
             at: archive.exportedAt
         ))
     }

@@ -20,7 +20,10 @@ struct ArchiveManagementView: View {
                     LabeledContent("已保存成绩", value: "\(results.count) 条")
                     LabeledContent("测试预设", value: "\(presets.count) 个")
                     LabeledContent("自定义文本", value: "\(savedTexts.count) 篇")
-                    Text("导出文件不含账户或远程服务数据，可用于迁移到另一台 Mac。")
+                    LabeledContent(
+                        "当前测试选择",
+                        value: settings.activeTestSelection == nil ? "尚未生成" : "会迁移")
+                    Text("导出文件包含当前测试选择，但不含账户或远程服务数据，可用于迁移到另一台 Mac。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -28,7 +31,7 @@ struct ArchiveManagementView: View {
                 Section("迁移") {
                     Button("导出本机数据…", systemImage: "square.and.arrow.up") { beginExport() }
                     Button("导入本机数据…", systemImage: "square.and.arrow.down") { showingImporter = true }
-                    Text("导入会合并新成绩、预设和自定义文本；相同内容不会重复写入。导入文件中的设置会应用到本机。")
+                    Text("导入会合并新成绩、预设和自定义文本；相同内容不会重复写入。导入文件中的设置和有效测试选择会应用到本机。旧版备份不会改变当前测试。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -82,7 +85,8 @@ struct ArchiveManagementView: View {
             settings: settings.snapshot,
             results: portableResults,
             presets: namedPresets,
-            savedTexts: namedSavedTexts
+            savedTexts: namedSavedTexts,
+            activeTestSelection: settings.activeTestSelection
         ))
     }
 
@@ -95,7 +99,8 @@ struct ArchiveManagementView: View {
         do {
             let archive = try TypebarDataTransfer.importArchive(from: Data(contentsOf: url))
             let summary = try LocalArchiveImport.apply(archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts, modelContext: modelContext)
-            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本，并已应用文件中的设置。")
+            let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
+            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本，已应用文件中的设置\(selectionDetail)。")
         } catch {
             message = .init(title: "无法导入", detail: error.localizedDescription)
         }

@@ -1097,7 +1097,7 @@ final class AppSettings {
   @ObservationIgnored private var randomThemeBag: [RandomThemeTarget] = []
   @ObservationIgnored private var randomThemeBagSignature: [RandomThemeTarget] = []
   private var randomThemeTarget: RandomThemeTarget?
-  private(set) var testSelectionResetGeneration = 0
+  private(set) var activeTestSelectionGeneration = 0
 
   var activeTestSelection: ActiveTestSelectionDocument? {
     ActiveTestSelectionStore(defaults: defaults).load()
@@ -1106,6 +1106,16 @@ final class AppSettings {
   @discardableResult
   func saveActiveTestSelection(_ document: ActiveTestSelectionDocument) -> Bool {
     ActiveTestSelectionStore(defaults: defaults).save(document)
+  }
+
+  @discardableResult
+  func importActiveTestSelection(_ document: ActiveTestSelectionDocument) -> Bool {
+    guard let document = ActiveTestSelectionPolicy.validated(document),
+      document != activeTestSelection,
+      ActiveTestSelectionStore(defaults: defaults).save(document)
+    else { return false }
+    activeTestSelectionGeneration &+= 1
+    return true
   }
 
   var difficulty: Difficulty = .normal { didSet { persist() } }
@@ -1764,7 +1774,7 @@ final class AppSettings {
     streakDayBoundaryOffsetHours = 0
     hasSetStreakDayBoundary = false
     ActiveTestSelectionStore(defaults: defaults).remove()
-    testSelectionResetGeneration &+= 1
+    activeTestSelectionGeneration &+= 1
   }
 
   func apply(_ configuration: TestConfiguration) {

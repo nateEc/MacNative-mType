@@ -773,8 +773,8 @@ private struct ContentView: View {
     .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear(perform: contentAppeared)
-    .onChange(of: settings.testSelectionResetGeneration) { _, _ in
-      restoreDefaultTestSelection()
+    .onChange(of: settings.activeTestSelectionGeneration) { _, _ in
+      restorePersistedTestSelection()
     }
     .onChange(of: session.outcome) { _, outcome in
       switch outcome {
@@ -2600,11 +2600,7 @@ private struct ContentView: View {
   private func contentAppeared() {
     if !didRestoreActiveTestSelection {
       didRestoreActiveTestSelection = true
-      if let document = settings.activeTestSelection {
-        restoreActiveTestSelection(document)
-      } else {
-        reset()
-      }
+      restorePersistedTestSelection()
     }
     refreshZipfNotice()
   }
@@ -3605,6 +3601,14 @@ private struct ContentView: View {
       .init(configuration: .timed(seconds: TimeInterval(memory.duration))),
       overwritesParameterMemory: false,
       appliesGlobalSettings: false)
+  }
+
+  private func restorePersistedTestSelection() {
+    if let document = settings.activeTestSelection {
+      restoreActiveTestSelection(document)
+    } else {
+      restoreDefaultTestSelection()
+    }
   }
 
   private func persistActiveTestSelection() {

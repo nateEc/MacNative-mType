@@ -62,7 +62,7 @@ struct CloudSyncView: View {
                     LabeledContent("成绩", value: "\(results.count) 条")
                     LabeledContent("预设", value: "\(presets.count) 个")
                     LabeledContent("自定义文本", value: "\(savedTexts.count) 篇")
-                    Text("上传会创建版本化归档变更；普通下载会去重合并并应用远端设置。若上传发现并发冲突，则保留本机设置，并将双方不同的内容另存为带标记副本后重试。")
+                    Text("上传会创建包含当前测试选择的版本化归档变更；普通下载会去重合并并应用远端设置和有效测试选择。若上传发现并发冲突，则保留本机设置与测试选择，并将双方不同的内容另存为带标记副本后重试。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -290,7 +290,7 @@ struct CloudSyncView: View {
                     }
                     account.confirmPulledArchive(pulled)
                     let cursor = try await account.pushArchive(mergeResult.archive)
-                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本；另存 \(mergeResult.conflicts.count) 个冲突副本。"
+                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置与测试选择，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本；另存 \(mergeResult.conflicts.count) 个冲突副本。"
                 } catch {
                     message = "已停止冲突覆盖：\(error.localizedDescription)"
                 }
@@ -325,7 +325,8 @@ struct CloudSyncView: View {
                 }
                 let summary = try LocalArchiveImport.apply(archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts, modelContext: modelContext)
                 account.confirmPulledArchive(pulled)
-                message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本。"
+                let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
+                message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本\(selectionDetail)。"
             } catch {
                 message = error.localizedDescription
             }
@@ -409,7 +410,13 @@ struct CloudSyncView: View {
         let namedSavedTexts = savedTexts.map {
             NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
         }
-        return .init(exportedAt: .now, settings: settings.snapshot, results: portableResults, presets: namedPresets, savedTexts: namedSavedTexts)
+        return .init(
+            exportedAt: .now,
+            settings: settings.snapshot,
+            results: portableResults,
+            presets: namedPresets,
+            savedTexts: namedSavedTexts,
+            activeTestSelection: settings.activeTestSelection)
     }
 }
 
