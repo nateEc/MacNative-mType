@@ -2177,6 +2177,19 @@ enum CommandPaletteBrowsePolicy {
     }
 }
 
+enum CommandPaletteKeyboardSelection {
+    static func index(current: Int, count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        return min(max(current, 0), count - 1)
+    }
+
+    static func moved(current: Int, count: Int, offset: Int) -> Int? {
+        guard count > 0 else { return nil }
+        let start = index(current: current, count: count) ?? 0
+        return ((start + offset) % count + count) % count
+    }
+}
+
 struct CommandPaletteView: View {
     @Environment(\.dismiss) private var dismiss
     let items: [CommandPaletteItem]
@@ -2185,6 +2198,7 @@ struct CommandPaletteView: View {
     let onPreview: (CommandPaletteItem?) -> Void
     @State private var query = ""
     @State private var selectedGroup: CommandPaletteGroup?
+    @State private var activeIndex = 0
     @FocusState private var searchFocused: Bool
 
     init(
@@ -2234,6 +2248,8 @@ struct CommandPaletteView: View {
                 TextField(searchPlaceholder, text: $query)
                     .textFieldStyle(.plain)
                     .focused($searchFocused)
+                    .onSubmit(activateSelection)
+                    .onKeyPress(phases: [.down, .repeat], action: handleKeyPress)
                 if !query.isEmpty {
                     Button("清除") { query = "" }
                         .buttonStyle(.borderless)
@@ -2251,16 +2267,27 @@ struct CommandPaletteView: View {
                         description: Text("输入 > 可直接搜索全部命令。"))
                     .frame(maxHeight: .infinity)
                 } else {
-                    List(groups) { group in
-                        Button {
-                            selectedGroup = group
-                            query = ""
-                        } label: {
-                            groupRow(group)
+                    ScrollViewReader { proxy in
+                        List {
+                            ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                                Button {
+                                    selectedGroup = group
+                                    query = ""
+                                } label: {
+                                    groupRow(group, isSelected: isActiveRow(index))
+                                }
+                                .buttonStyle(.plain)
+                                .id(groupRowID(group))
+                                .onHover { hovering in
+                                    if hovering { activateRow(index) }
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
+                        .listStyle(.plain)
+                        .onChange(of: activeIndex) { _, _ in
+                            if let id = activeRowID { proxy.scrollTo(id, anchor: .center) }
+                        }
                     }
-                    .listStyle(.plain)
                 }
             case .items(let results):
                 if results.isEmpty {
@@ -2269,27 +2296,49 @@ struct CommandPaletteView: View {
                         description: Text("试试“历史”、“模式”或“设置”。"))
                     .frame(maxHeight: .infinity)
                 } else {
-                    List(results) { item in
-                        Button {
-                            onSelect(item)
-                            dismiss()
-                        } label: {
-                            commandRow(item)
+                    ScrollViewReader { proxy in
+                        List {
+                            ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
+                                Button {
+                                    onSelect(item)
+                                    dismiss()
+                                } label: {
+                                    commandRow(item, isSelected: isActiveRow(index))
+                                }
+                                .buttonStyle(.plain)
+                                .id(commandRowID(item))
+                                .onHover { hovering in
+                                    if hovering { activateRow(index) }
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
+                        .listStyle(.plain)
+                        .onChange(of: activeIndex) { _, _ in
+                            if let id = activeRowID { proxy.scrollTo(id, anchor: .center) }
+                        }
                     }
-                    .listStyle(.plain)
                 }
             }
+
+            Divider()
+            Text("↑↓ 或 Tab 选择 · Return 执行 · Esc 返回或关闭")
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
         }
         .frame(width: 480, height: 390)
-        .onAppear { searchFocused = true }
-        .onChange(of: query) { _, _ in previewFirstVisibleCommand() }
-        .onChange(of: selectedGroup) { _, _ in previewFirstVisibleCommand() }
+        .onAppear {
+            searchFocused = true
+            resetSelection()
+        }
+        .onChange(of: query) { _, _ in resetSelection() }
+        .onChange(of: selectedGroup) { _, _ in resetSelection() }
         .onDisappear { onPreview(nil) }
     }
 
-    private func groupRow(_ group: CommandPaletteGroup) -> some View {
+    private func groupRow(_ group: CommandPaletteGroup, isSelected: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: group.systemImage)
                 .frame(width: 18)
@@ -2305,9 +2354,14 @@ struct CommandPaletteView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background(selectionBackground(isSelected), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .leading) { selectionCaret(isSelected) }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private func commandRow(_ item: CommandPaletteItem) -> some View {
+    private func commandRow(_ item: CommandPaletteItem, isSelected: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: item.systemImage)
                 .frame(width: 18)
@@ -2320,16 +2374,140 @@ struct CommandPaletteView: View {
             }
             Spacer()
         }
-        .onHover { hovering in
-            if hovering { onPreview(item) }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background(selectionBackground(isSelected), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .leading) { selectionCaret(isSelected) }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var visibleRowCount: Int {
+        switch destination {
+        case .groups(let groups): groups.count
+        case .items(let items): items.count
         }
     }
 
-    private func previewFirstVisibleCommand() {
-        guard case .items(let results) = destination else {
+    private var activeRowID: String? {
+        guard let index = CommandPaletteKeyboardSelection.index(
+            current: activeIndex, count: visibleRowCount)
+        else { return nil }
+        switch destination {
+        case .groups(let groups): return groupRowID(groups[index])
+        case .items(let items): return commandRowID(items[index])
+        }
+    }
+
+    private func isActiveRow(_ index: Int) -> Bool {
+        CommandPaletteKeyboardSelection.index(
+            current: activeIndex, count: visibleRowCount) == index
+    }
+
+    private func groupRowID(_ group: CommandPaletteGroup) -> String {
+        "group:\(group.id)"
+    }
+
+    private func commandRowID(_ item: CommandPaletteItem) -> String {
+        "command:\(item.id)"
+    }
+
+    private func selectionBackground(_ isSelected: Bool) -> Color {
+        isSelected ? Color.accentColor.opacity(0.14) : .clear
+    }
+
+    @ViewBuilder
+    private func selectionCaret(_ isSelected: Bool) -> some View {
+        if isSelected {
+            Capsule()
+                .fill(.tint)
+                .frame(width: 3)
+                .padding(.vertical, 5)
+        }
+    }
+
+    private func resetSelection() {
+        activeIndex = 0
+        previewActiveCommand()
+    }
+
+    private func activateRow(_ index: Int) {
+        activeIndex = index
+        previewActiveCommand()
+    }
+
+    private func moveSelection(by offset: Int) {
+        guard let index = CommandPaletteKeyboardSelection.moved(
+            current: activeIndex, count: visibleRowCount, offset: offset)
+        else {
             onPreview(nil)
             return
         }
-        onPreview(results.first)
+        activeIndex = index
+        previewActiveCommand()
+    }
+
+    private func previewActiveCommand() {
+        guard case .items(let items) = destination,
+            let index = CommandPaletteKeyboardSelection.index(
+                current: activeIndex, count: items.count)
+        else {
+            onPreview(nil)
+            return
+        }
+        onPreview(items[index])
+    }
+
+    private func activateSelection() {
+        guard let index = CommandPaletteKeyboardSelection.index(
+            current: activeIndex, count: visibleRowCount)
+        else { return }
+        switch destination {
+        case .groups(let groups):
+            selectedGroup = groups[index]
+            query = ""
+        case .items(let items):
+            onSelect(items[index])
+            dismiss()
+        }
+    }
+
+    private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
+        let controlOnly = press.modifiers.contains(.control)
+            && !press.modifiers.contains(.command) && !press.modifiers.contains(.option)
+            && !press.modifiers.contains(.shift)
+        let plainArrow = !press.modifiers.contains(.command)
+            && !press.modifiers.contains(.option) && !press.modifiers.contains(.control)
+            && !press.modifiers.contains(.shift)
+        let controlKey = String(press.key.character).lowercased()
+        if (plainArrow && press.key == .upArrow)
+            || (controlOnly && ["k", "p"].contains(controlKey))
+        {
+            moveSelection(by: -1)
+            return .handled
+        }
+        if (plainArrow && press.key == .downArrow)
+            || (controlOnly && ["j", "n"].contains(controlKey))
+        {
+            moveSelection(by: 1)
+            return .handled
+        }
+        if press.key == .tab && !press.modifiers.contains(.command)
+            && !press.modifiers.contains(.option) && !press.modifiers.contains(.control)
+        {
+            moveSelection(by: press.modifiers.contains(.shift) ? -1 : 1)
+            return .handled
+        }
+        if press.key == .escape {
+            if isGlobalSearch {
+                query = ""
+                return .handled
+            }
+            if selectedGroup != nil {
+                selectedGroup = nil
+                query = ""
+                return .handled
+            }
+        }
+        return .ignored
     }
 }

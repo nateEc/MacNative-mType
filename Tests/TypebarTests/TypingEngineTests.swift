@@ -12810,6 +12810,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CommandPaletteBrowsePolicy.globalSearchQuery("> theme"), " theme")
   }
 
+  func testCommandPaletteKeyboardSelectionWrapsAndRejectsEmptyLists() {
+    XCTAssertEqual(CommandPaletteKeyboardSelection.index(current: 0, count: 3), 0)
+    XCTAssertEqual(CommandPaletteKeyboardSelection.index(current: 8, count: 3), 2)
+    XCTAssertEqual(CommandPaletteKeyboardSelection.index(current: -2, count: 3), 0)
+    XCTAssertNil(CommandPaletteKeyboardSelection.index(current: 0, count: 0))
+
+    XCTAssertEqual(CommandPaletteKeyboardSelection.moved(current: 0, count: 3, offset: 1), 1)
+    XCTAssertEqual(CommandPaletteKeyboardSelection.moved(current: 2, count: 3, offset: 1), 0)
+    XCTAssertEqual(CommandPaletteKeyboardSelection.moved(current: 0, count: 3, offset: -1), 2)
+    XCTAssertEqual(CommandPaletteKeyboardSelection.moved(current: 1, count: 3, offset: -1), 0)
+    XCTAssertEqual(CommandPaletteKeyboardSelection.moved(current: 1, count: 3, offset: 8), 0)
+    XCTAssertEqual(CommandPaletteKeyboardSelection.moved(current: 1, count: 3, offset: -8), 2)
+    XCTAssertNil(CommandPaletteKeyboardSelection.moved(current: 0, count: 0, offset: 1))
+  }
+
   func testCommandPaletteDynamicShortcutProtectsRestartAndPromptTabKeys() {
     XCTAssertEqual(
       CommandPaletteDynamicShortcut.resolve(quickRestartKey: .off, promptAcceptsTab: false),
