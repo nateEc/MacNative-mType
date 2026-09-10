@@ -435,7 +435,7 @@ private struct LeaderboardAvatar: View {
     }
 }
 
-private struct PublicProfileView: View {
+struct PublicProfileView: View {
     @Environment(\.dismiss) private var dismiss
     let profile: RemotePublicProfile
     let account: AccountSession

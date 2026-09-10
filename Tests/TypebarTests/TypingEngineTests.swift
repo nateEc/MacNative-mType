@@ -1545,6 +1545,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(ThemeCommandCatalog.target(for: "theme.custom.not-a-uuid"))
   }
 
+  func testNavigationCommandCatalogExposesReferenceRoutesAndSearchAvailability() {
+    let items = NavigationCommandCatalog.items
+    XCTAssertEqual(items.map(\.id), [
+      "viewTypingPage", "viewLeaderboards", "viewAbout", "viewSettings", "viewAccount",
+      "searchProfile", "toggleFullscreen",
+    ])
+    XCTAssertTrue(items.allSatisfy { $0.group == .navigation })
+    for item in items {
+      XCTAssertEqual(NavigationCommandCatalog.target(for: item.id)?.identifier, item.id)
+      XCTAssertTrue(CommandPaletteSearch.results(items: items, query: item.id).contains(item))
+    }
+  }
+
+  func testProfileSearchCommandPolicyNormalizesAndBoundsQueries() {
+    XCTAssertEqual(ProfileSearchCommandPolicy.normalized("  River Stone  "), "River Stone")
+    XCTAssertNil(ProfileSearchCommandPolicy.normalized("a"))
+    XCTAssertNil(ProfileSearchCommandPolicy.normalized(String(repeating: "x", count: 41)))
+    XCTAssertNil(ProfileSearchCommandPolicy.normalized("line\nbreak"))
+    XCTAssertEqual(
+      ProfileSearchCommandPolicy.normalized(String(repeating: "界", count: 40)),
+      String(repeating: "界", count: 40))
+  }
+
   func testCurrentThemeFavoriteCommandsExposeOnlyTheValidFixedAction() {
     let add = CurrentThemeFavoriteCommandCatalog.item(theme: .paper, isFavorite: false)
     XCTAssertEqual(add.id, "addThemeToFavorite")

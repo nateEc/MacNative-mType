@@ -73,6 +73,7 @@ enum CommandPaletteListMode: String, CaseIterable, Codable, Equatable, Identifia
 }
 
 enum CommandPaletteGroup: String, CaseIterable, Codable, Equatable, Hashable, Identifiable {
+    case navigation
     case practice
     case library
     case appearance
@@ -85,6 +86,7 @@ enum CommandPaletteGroup: String, CaseIterable, Codable, Equatable, Hashable, Id
 
     var title: String {
         switch self {
+        case .navigation: "导航"
         case .practice: "练习与模式"
         case .library: "文本、预设与挑战"
         case .appearance: "主题与外观"
@@ -97,6 +99,7 @@ enum CommandPaletteGroup: String, CaseIterable, Codable, Equatable, Hashable, Id
 
     var subtitle: String {
         switch self {
+        case .navigation: "前往练习、榜单、账户或应用窗口"
         case .practice: "重开练习或切换测试模式"
         case .library: "打开已保存内容或加载本机挑战"
         case .appearance: "选择内置或自定义主题"
@@ -109,6 +112,7 @@ enum CommandPaletteGroup: String, CaseIterable, Codable, Equatable, Hashable, Id
 
     var systemImage: String {
         switch self {
+        case .navigation: "location"
         case .practice: "keyboard"
         case .library: "books.vertical"
         case .appearance: "paintpalette"
@@ -121,6 +125,7 @@ enum CommandPaletteGroup: String, CaseIterable, Codable, Equatable, Hashable, Id
 
     var keywords: [String] {
         switch self {
+        case .navigation: ["navigate", "window", "导航", "窗口", "前往"]
         case .practice: ["practice", "test", "mode", "练习", "测试", "模式", "重开"]
         case .library: ["library", "preset", "challenge", "text", "文本", "预设", "挑战"]
         case .appearance: ["appearance", "theme", "主题", "外观"]

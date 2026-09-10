@@ -643,6 +643,7 @@ private struct ContentView: View {
   @State private var showingNotifications = false
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
+  @State private var showingProfileSearchCommandEditor = false
   @State private var showingActiveResultTagEditor = false
   @State private var showingFontFamilyNameCommandEditor = false
   @State private var showingInstalledFontCommandPicker = false
@@ -927,6 +928,9 @@ private struct ContentView: View {
     .sheet(isPresented: $showingCommandPalette) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: settings.commandPaletteListMode, onSelect: runCommand)
+    }
+    .sheet(isPresented: $showingProfileSearchCommandEditor) {
+      ProfileSearchCommandView(account: account)
     }
     .sheet(isPresented: $showingActiveResultTagEditor) {
       ActiveResultTagEditor(currentTags: settings.activeResultTags) { tag in
@@ -2905,15 +2909,12 @@ private struct ContentView: View {
       .init(
         id: "notifications", title: "打开通知", subtitle: "查看好友请求和接受事件", systemImage: "bell",
         keywords: ["notification", "通知", "好友请求"], group: .connections),
-      .init(
-        id: "settings", title: "打开设置", subtitle: "修改输入规则、显示和账户选项", systemImage: "gearshape",
-        keywords: ["settings", "设置", "主题", "键盘"], group: .settings),
-      AboutCommand.item,
       ReleaseHistoryCommand.item,
       .init(
         id: "share", title: "分享当前测试", subtitle: "复制或导入 Typebar 测试配置链接",
         systemImage: "square.and.arrow.up", keywords: ["share", "分享", "链接", "配置"], group: .data),
     ]
+    items.append(contentsOf: NavigationCommandCatalog.items)
     if session.hasStarted, !session.isFinished, commandBailoutAvailable {
       items.append(.init(
         id: "bailout", title: "中止长测试…", subtitle: "确认后显示未保存结果",
@@ -2963,6 +2964,25 @@ private struct ContentView: View {
   }
 
   private func runCommand(_ item: CommandPaletteItem) {
+    if let target = NavigationCommandCatalog.target(for: item.id) {
+      switch target {
+      case .typingPage:
+        focusRequest &+= 1
+      case .leaderboards:
+        syncInitialLeaderboard = .init(mode: nil, language: nil, period: .all)
+        showingSync = true
+      case .about:
+        openWindow(id: "about")
+      case .settings, .account:
+        openSettings()
+      case .profileSearch:
+        showingProfileSearchCommandEditor = true
+      case .fullscreen:
+        let activeWindow = NSApp.keyWindow?.sheetParent ?? NSApp.keyWindow ?? NSApp.mainWindow
+        activeWindow?.toggleFullScreen(nil)
+      }
+      return
+    }
     if let target = SoundCommandCatalog.target(for: item.id) {
       target.apply(to: settings)
       switch target.preview {
@@ -3249,8 +3269,6 @@ private struct ContentView: View {
     case "sync": showingSync = true
     case "friends": showingConnections = true
     case "notifications": showingNotifications = true
-    case "settings": openSettings()
-    case AboutCommand.identifier: openWindow(id: "about")
     case ReleaseHistoryCommand.identifier: openWindow(id: "release-history")
     case "share": showingTestShare = true
     case "bailout": showingCommandBailoutConfirmation = true
