@@ -176,7 +176,7 @@
 | `minBurst` | `minimumWordBurstMode` | 已映射；命令面板严格提供关闭/固定/弹性。 |
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射；使用有限非负小数且不施加额外速度上限，固定/弹性命令要求按当前显示单位输入整数后换算，旧整数配置可直接迁移。 |
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
-| `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。 |
+| `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。命令面板另按固定名称提供 48 项切换与 `none` 清除入口，弱项和多语路由到 Typebar 已有原生工作流。 |
 | `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并按选择顺序轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。旧配置缺失或不足两项时回退原有 153 项默认组合。 |
 | `freedomMode` | `freedomMode` | 已映射。 |

@@ -1682,6 +1682,105 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testFunboxCommandsCoverPinnedReferenceNamesWithoutExposingPrivateModifiers() {
+    let names = [
+      "58008", "mirror", "upside_down", "nausea", "round_round_baby", "simon_says",
+      "tts", "choo_choo", "arrows", "rAnDoMcAsE", "sPoNgEcAsE", "capitals",
+      "layout_mirror", "layoutfluid", "earthquake", "space_balls", "gibberish", "ascii",
+      "specials", "plus_zero", "plus_one", "plus_two", "plus_three", "read_ahead_easy",
+      "read_ahead", "read_ahead_hard", "memory", "nospace", "poetry", "wikipedia",
+      "weakspot", "pseudolang", "IPv4", "IPv6", "binary", "hexadecimal", "zipf", "morse",
+      "crt", "backwards", "ddoouubblleedd", "instant_messaging", "underscore_spaces",
+      "ALL_CAPS", "polyglot", "asl", "rot13", "no_quit",
+    ]
+    XCTAssertEqual(FunboxCommandCatalog.officialNames, names)
+    XCTAssertEqual(FunboxCommandCatalog.items.count, 49)
+    XCTAssertEqual(FunboxCommandCatalog.items.first?.id, "funbox.changeFunboxNone")
+    XCTAssertEqual(
+      FunboxCommandCatalog.items.dropFirst().map(\.id),
+      names.map { "funbox.changeFunbox\($0)" })
+    XCTAssertEqual(
+      FunboxCommandCatalog.target(for: "funbox.changeFunboxcapitals"),
+      .modifier(.titleCase))
+    XCTAssertEqual(
+      FunboxCommandCatalog.target(for: "funbox.changeFunboxweakspot"), .weakSpot)
+    XCTAssertEqual(
+      FunboxCommandCatalog.target(for: "funbox.changeFunboxpolyglot"), .polyglot)
+    XCTAssertEqual(
+      FunboxCommandCatalog.target(for: "funbox.changeFunboxNone"), .clear)
+    XCTAssertNil(FunboxCommandCatalog.target(for: "funbox.changeFunboxsymbolStream"))
+    XCTAssertNil(FunboxCommandCatalog.target(for: "changeFunboxcapitals"))
+
+    let mapped = Set(FunboxCommandCatalog.targets.compactMap(\.modifier))
+    XCTAssertEqual(
+      mapped,
+      Set(TestModifier.allCases).subtracting([
+        .symbolStream, .correctBeforeAdvance, .clearCurrentWordOnError, .lazyLatin,
+      ]))
+    for item in FunboxCommandCatalog.items {
+      XCTAssertNotNil(FunboxCommandCatalog.target(for: item.id), item.id)
+      XCTAssertTrue(
+        CommandPaletteSearch.results(items: FunboxCommandCatalog.items, query: item.id)
+          .contains(where: { $0.id == item.id }), item.id)
+    }
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: FunboxCommandCatalog.items, query: "numbers").map(\.id),
+      ["funbox.changeFunbox58008"])
+    XCTAssertEqual(
+      CommandPaletteSearch.results(items: FunboxCommandCatalog.items, query: "network").map(\.id),
+      ["funbox.changeFunboxIPv4", "funbox.changeFunboxIPv6"])
+  }
+
+  func testFunboxCommandPolicyPreservesPrivateSettingsAndBlocksUnsafeRestarts() {
+    XCTAssertEqual(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .clear,
+        current: [.uppercase, .rot13, .symbolStream, .correctBeforeAdvance, .lazyLatin],
+        isInfinite: false, hasStarted: false),
+      [.symbolStream, .correctBeforeAdvance, .lazyLatin])
+    XCTAssertEqual(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.titleCase), current: [.uppercase, .rot13], isInfinite: false,
+        hasStarted: false),
+      [.titleCase, .rot13])
+    XCTAssertEqual(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.titleCase), current: [.titleCase, .rot13], isInfinite: false,
+        hasStarted: false),
+      [.rot13])
+    XCTAssertNil(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.layoutFluid), current: [], isInfinite: true, hasStarted: false))
+    XCTAssertEqual(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.layoutFluid), current: [.layoutFluid], isInfinite: true,
+        hasStarted: false),
+      [])
+    XCTAssertNil(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .clear, current: [.noQuit, .rot13], isInfinite: false, hasStarted: true))
+    XCTAssertNil(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.noQuit), current: [.noQuit], isInfinite: false, hasStarted: true))
+    XCTAssertEqual(
+      FunboxCommandPolicy.mode(
+        afterToggling: .modifier(.memory), currentMode: .time, currentModifiers: []),
+      .words)
+    XCTAssertEqual(
+      FunboxCommandPolicy.mode(
+        afterToggling: .modifier(.memory), currentMode: .quote, currentModifiers: []),
+      .quote)
+    XCTAssertEqual(
+      FunboxCommandPolicy.mode(
+        afterToggling: .modifier(.memory), currentMode: .time,
+        currentModifiers: [.memory]),
+      .time)
+    XCTAssertEqual(
+      FunboxCommandPolicy.mode(
+        afterToggling: .modifier(.rot13), currentMode: .time, currentModifiers: []),
+      .time)
+  }
+
   @MainActor
   func testThresholdCommandsApplyAndPersistWithoutLosingFractionalValues() throws {
     let suiteName = "TypebarTests.ThresholdCommands.\(UUID().uuidString)"

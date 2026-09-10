@@ -2857,6 +2857,7 @@ private struct ContentView: View {
     items.append(contentsOf: PracticePreferenceCommandCatalog.items)
     items.append(contentsOf: BehaviorCommandCatalog.items)
     items.append(contentsOf: PracticeThresholdCommandCatalog.items)
+    items.append(contentsOf: FunboxCommandCatalog.items)
     items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
     items.append(contentsOf: SoundCommandCatalog.items)
@@ -2957,6 +2958,36 @@ private struct ContentView: View {
         reset()
       } else {
         practiceThresholdEditorKind = target.editorKind
+      }
+      return
+    }
+    if let target = FunboxCommandCatalog.target(for: item.id) {
+      if session.hasStarted && settings.testModifiers.contains(.noQuit) {
+        restartLockMessage = "锁定重开已开启：请完成或放弃本次测试。"
+        return
+      }
+      switch target {
+      case .weakSpot:
+        showingWeakSpots = true
+      case .polyglot:
+        activeChallengeID = nil
+        language = language == .mixedLanguages ? .english : .mixedLanguages
+        reset()
+      case .clear, .modifier:
+        let updatedMode = FunboxCommandPolicy.mode(
+          afterToggling: target, currentMode: mode, currentModifiers: settings.testModifiers)
+        guard let updated = FunboxCommandPolicy.updatedModifiers(
+          for: target, current: settings.testModifiers,
+          isInfinite: session.configuration.isInfinite, hasStarted: session.hasStarted)
+        else {
+          restartLockMessage = "当前无限测试不支持这个修饰器；请先选择有限时长或字数。"
+          return
+        }
+        settings.testModifiers = updated
+        mode = updatedMode
+        if target == .clear && language == .mixedLanguages { language = .english }
+        activeChallengeID = nil
+        reset()
       }
       return
     }

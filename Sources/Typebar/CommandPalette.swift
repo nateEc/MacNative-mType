@@ -542,6 +542,151 @@ enum PracticeThresholdCommandCatalog {
     }
 }
 
+enum FunboxCommandTarget: Equatable {
+    case clear
+    case modifier(TestModifier)
+    case weakSpot
+    case polyglot
+
+    var modifier: TestModifier? {
+        guard case .modifier(let modifier) = self else { return nil }
+        return modifier
+    }
+}
+
+enum FunboxCommandCatalog {
+    private struct Option {
+        let officialName: String
+        let target: FunboxCommandTarget
+    }
+
+    private static let options: [Option] = [
+        .init(officialName: "58008", target: .modifier(.accountingStream)),
+        .init(officialName: "mirror", target: .modifier(.mirrorVisual)),
+        .init(officialName: "upside_down", target: .modifier(.upsideDownVisual)),
+        .init(officialName: "nausea", target: .modifier(.nauseaVisual)),
+        .init(officialName: "round_round_baby", target: .modifier(.roundVisual)),
+        .init(officialName: "simon_says", target: .modifier(.simonSays)),
+        .init(officialName: "tts", target: .modifier(.listening)),
+        .init(officialName: "choo_choo", target: .modifier(.chooVisual)),
+        .init(officialName: "arrows", target: .modifier(.arrowStream)),
+        .init(officialName: "rAnDoMcAsE", target: .modifier(.randomCase)),
+        .init(officialName: "sPoNgEcAsE", target: .modifier(.alternatingCase)),
+        .init(officialName: "capitals", target: .modifier(.titleCase)),
+        .init(officialName: "layout_mirror", target: .modifier(.mirrorKeyboard)),
+        .init(officialName: "layoutfluid", target: .modifier(.layoutFluid)),
+        .init(officialName: "earthquake", target: .modifier(.earthquakeVisual)),
+        .init(officialName: "space_balls", target: .modifier(.spaceVisual)),
+        .init(officialName: "gibberish", target: .modifier(.gibberishStream)),
+        .init(officialName: "ascii", target: .modifier(.asciiStream)),
+        .init(officialName: "specials", target: .modifier(.specialCharacterStream)),
+        .init(officialName: "plus_zero", target: .modifier(.focusCurrentWord)),
+        .init(officialName: "plus_one", target: .modifier(.focusNextWord)),
+        .init(officialName: "plus_two", target: .modifier(.focusTwoWords)),
+        .init(officialName: "plus_three", target: .modifier(.focusThreeWords)),
+        .init(officialName: "read_ahead_easy", target: .modifier(.readAheadEasy)),
+        .init(officialName: "read_ahead", target: .modifier(.readAhead)),
+        .init(officialName: "read_ahead_hard", target: .modifier(.readAheadHard)),
+        .init(officialName: "memory", target: .modifier(.memory)),
+        .init(officialName: "nospace", target: .modifier(.noSpaces)),
+        .init(officialName: "poetry", target: .modifier(.poetryStream)),
+        .init(officialName: "wikipedia", target: .modifier(.referenceStream)),
+        .init(officialName: "weakspot", target: .weakSpot),
+        .init(officialName: "pseudolang", target: .modifier(.pseudolangStream)),
+        .init(officialName: "IPv4", target: .modifier(.ipv4Stream)),
+        .init(officialName: "IPv6", target: .modifier(.ipv6Stream)),
+        .init(officialName: "binary", target: .modifier(.binaryStream)),
+        .init(officialName: "hexadecimal", target: .modifier(.hexadecimalStream)),
+        .init(officialName: "zipf", target: .modifier(.zipf)),
+        .init(officialName: "morse", target: .modifier(.morseStream)),
+        .init(officialName: "crt", target: .modifier(.crtVisual)),
+        .init(officialName: "backwards", target: .modifier(.backwards)),
+        .init(officialName: "ddoouubblleedd", target: .modifier(.doubleCharacters)),
+        .init(officialName: "instant_messaging", target: .modifier(.messagingStyle)),
+        .init(officialName: "underscore_spaces", target: .modifier(.underscoreSeparators)),
+        .init(officialName: "ALL_CAPS", target: .modifier(.uppercase)),
+        .init(officialName: "polyglot", target: .polyglot),
+        .init(officialName: "asl", target: .modifier(.aslVisual)),
+        .init(officialName: "rot13", target: .modifier(.rot13)),
+        .init(officialName: "no_quit", target: .modifier(.noQuit)),
+    ]
+
+    static let officialNames = options.map(\.officialName)
+    static let targets = options.map(\.target)
+    static let items: [CommandPaletteItem] = [
+        CommandPaletteItem(
+            id: "funbox.changeFunboxNone", title: "趣味修饰器：全部关闭",
+            subtitle: "清除固定参考修饰器并重新开始练习", systemImage: "gamecontroller",
+            keywords: [
+                "funbox", "funbox.changeFunboxNone", "changeFunboxNone", "none", "off", "趣味", "修饰器",
+            ],
+            group: .settings)
+    ] + options.map { option in
+        let title: String
+        switch option.target {
+        case .modifier(let modifier): title = modifier.displayName
+        case .weakSpot: title = "弱项训练"
+        case .polyglot: title = "自选多语"
+        case .clear: title = "全部关闭"
+        }
+        let referenceIdentifier = "changeFunbox\(option.officialName)"
+        let identifier = "funbox.\(referenceIdentifier)"
+        let aliases: [String] = switch option.officialName {
+        case "58008": ["numbers"]
+        case "IPv4", "IPv6": ["network"]
+        default: []
+        }
+        return CommandPaletteItem(
+            id: identifier, title: "趣味修饰器：\(title)",
+            subtitle: option.target == .weakSpot ? "打开本机弱项分析并选择训练" : "切换并重新开始练习",
+            systemImage: "gamecontroller.fill",
+            keywords: [
+                "funbox", "趣味", "修饰器", option.officialName, referenceIdentifier, identifier, title,
+            ] + aliases, group: .settings)
+    }
+
+    static func target(for identifier: String) -> FunboxCommandTarget? {
+        guard identifier.hasPrefix("funbox.changeFunbox") else { return nil }
+        let name = String(identifier.dropFirst("funbox.changeFunbox".count))
+        if name == "None" { return .clear }
+        return options.first { $0.officialName == name }?.target
+    }
+}
+
+enum FunboxCommandPolicy {
+    static func updatedModifiers(
+        for target: FunboxCommandTarget, current: [TestModifier], isInfinite: Bool,
+        hasStarted: Bool
+    ) -> [TestModifier]? {
+        guard !(hasStarted && current.contains(.noQuit)) else { return nil }
+        switch target {
+        case .clear:
+            let officialModifiers = Set(FunboxCommandCatalog.targets.compactMap(\.modifier))
+            return current.filter { !officialModifiers.contains($0) }
+        case .modifier(let modifier):
+            if current.contains(modifier) {
+                return current.filter { $0 != modifier }
+            }
+            guard !(isInfinite && TestModifierPolicy.finiteDurationOnly.contains(modifier)) else {
+                return nil
+            }
+            return TestModifierPolicy.toggling(modifier, in: current)
+        case .weakSpot, .polyglot:
+            return nil
+        }
+    }
+
+    static func mode(
+        afterToggling target: FunboxCommandTarget, currentMode: TestMode,
+        currentModifiers: [TestModifier]
+    ) -> TestMode {
+        guard target == .modifier(.memory), !currentModifiers.contains(.memory) else {
+            return currentMode
+        }
+        return [.words, .quote, .custom].contains(currentMode) ? currentMode : .words
+    }
+}
+
 enum InputRuleCommandTarget: Equatable {
     case freedomMode(Bool)
     case strictSpace(Bool)
