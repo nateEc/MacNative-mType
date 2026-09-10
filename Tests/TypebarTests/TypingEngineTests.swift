@@ -1535,6 +1535,10 @@ final class TypingEngineTests: XCTestCase {
       builtInThemes: [.paper, .midnight], customThemes: [custom], favoriteThemeIDs: [favoriteID])
 
     XCTAssertEqual(items.first?.id, ThemeCommandCatalog.identifier(for: .custom(customID)))
+    XCTAssertEqual(
+      ThemeCommandCatalog.identifier(for: .custom(customID)),
+      "setCustomThemeId8a692c7b-0f0f-42c6-916d-a5a82f0b99fe")
+    XCTAssertEqual(ThemeCommandCatalog.identifier(for: .builtIn(.paper)), "changeThemePaper")
     XCTAssertEqual(items.first?.subtitle, "自定义主题 · 已收藏")
     XCTAssertEqual(
       ThemeCommandCatalog.target(for: ThemeCommandCatalog.identifier(for: .builtIn(.midnight))),
@@ -1542,7 +1546,38 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ThemeCommandCatalog.target(for: ThemeCommandCatalog.identifier(for: .custom(customID))),
       .custom(customID))
+    XCTAssertEqual(ThemeCommandCatalog.target(for: "theme.builtin.paper"), .builtIn(.paper))
+    XCTAssertEqual(
+      ThemeCommandCatalog.target(for: "theme.custom.8a692c7b-0f0f-42c6-916D-A5A82F0B99FE"),
+      .custom(customID))
     XCTAssertNil(ThemeCommandCatalog.target(for: "theme.custom.not-a-uuid"))
+  }
+
+  func testThemeCommandPreviewPolicyPreviewsOnlyResolvableThemeRows() throws {
+    let customID = UUID(uuidString: "8A692C7B-0F0F-42C6-916D-A5A82F0B99FE")!
+    let custom = CustomThemeDefinition(
+      id: customID, name: "Dawn", background: .init(red: 0.1, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.2, green: 0.3, blue: 0.4), accent: .init(red: 0.7, green: 0.4, blue: 0.2),
+      prefersDark: true)
+    let themeItem = try XCTUnwrap(ThemeCommandCatalog.items(
+      builtInThemes: [], customThemes: [custom], favoriteThemeIDs: []).first)
+    let nonThemeItem = CommandPaletteItem(
+      id: "history", title: "历史", subtitle: "本机成绩", systemImage: "clock",
+      keywords: [])
+
+    XCTAssertEqual(ThemeCommandPreviewPolicy.target(for: themeItem), .custom(customID))
+    XCTAssertNil(ThemeCommandPreviewPolicy.target(for: nonThemeItem))
+    XCTAssertNil(ThemeCommandPreviewPolicy.target(for: nil))
+    XCTAssertEqual(
+      ThemeCommandPreviewPolicy.resolvedTheme(
+        for: .custom(customID), customThemes: [custom])?.colorScheme,
+      .dark)
+    XCTAssertEqual(
+      ThemeCommandPreviewPolicy.resolvedTheme(
+        for: .builtIn(.paper), customThemes: [])?.colorScheme,
+      .light)
+    XCTAssertNil(ThemeCommandPreviewPolicy.resolvedTheme(
+      for: .custom(UUID()), customThemes: [custom]))
   }
 
   func testNavigationCommandCatalogExposesReferenceRoutesAndSearchAvailability() {

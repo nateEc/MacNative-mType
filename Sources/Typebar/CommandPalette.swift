@@ -1639,12 +1639,25 @@ enum ThemeCommandCatalog {
 
     static func identifier(for target: ThemeCommandTarget) -> String {
         switch target {
-        case .builtIn(let theme): "theme.builtin.\(theme.rawValue)"
-        case .custom(let id): "theme.custom.\(id.uuidString.lowercased())"
+        case .builtIn(let theme):
+            "changeTheme\(theme.rawValue.prefix(1).uppercased())\(theme.rawValue.dropFirst())"
+        case .custom(let id): "setCustomThemeId\(id.uuidString.lowercased())"
         }
     }
 
     static func target(for identifier: String) -> ThemeCommandTarget? {
+        if let theme = AppTheme.allCases.first(where: {
+            ThemeCommandCatalog.identifier(for: .builtIn($0)) == identifier
+        }) {
+            return .builtIn(theme)
+        }
+        if identifier.hasPrefix("setCustomThemeId"),
+            let id = UUID(uuidString: String(identifier.dropFirst("setCustomThemeId".count)))
+        {
+            return .custom(id)
+        }
+        // Keep the identifiers used by earlier Typebar builds routable while
+        // exposing the fixed reference command IDs in the current catalog.
         if let rawValue = identifier.split(separator: ".").last,
             identifier.hasPrefix("theme.builtin."),
             let theme = AppTheme(rawValue: String(rawValue))
@@ -1693,6 +1706,22 @@ enum ThemeCommandCatalog {
                     id: identifier(for: option.target), title: option.title, subtitle: option.subtitle,
                     systemImage: "paintpalette", keywords: option.keywords, group: .appearance)
             }
+    }
+}
+
+enum ThemeCommandPreviewPolicy {
+    static func target(for item: CommandPaletteItem?) -> ThemeCommandTarget? {
+        guard let item else { return nil }
+        return ThemeCommandCatalog.target(for: item.id)
+    }
+
+    static func resolvedTheme(
+        for target: ThemeCommandTarget, customThemes: [CustomThemeDefinition]
+    ) -> ResolvedTheme? {
+        switch target {
+        case .builtIn(let theme): theme.resolvedTheme
+        case .custom(let id): customThemes.first(where: { $0.id == id })?.resolvedTheme
+        }
     }
 }
 
@@ -2153,9 +2182,21 @@ struct CommandPaletteView: View {
     let items: [CommandPaletteItem]
     let listMode: CommandPaletteListMode
     let onSelect: (CommandPaletteItem) -> Void
+    let onPreview: (CommandPaletteItem?) -> Void
     @State private var query = ""
     @State private var selectedGroup: CommandPaletteGroup?
     @FocusState private var searchFocused: Bool
+
+    init(
+        items: [CommandPaletteItem], listMode: CommandPaletteListMode,
+        onSelect: @escaping (CommandPaletteItem) -> Void,
+        onPreview: @escaping (CommandPaletteItem?) -> Void = { _ in }
+    ) {
+        self.items = items
+        self.listMode = listMode
+        self.onSelect = onSelect
+        self.onPreview = onPreview
+    }
 
     private var destination: CommandPaletteBrowseDestination {
         CommandPaletteBrowsePolicy.destination(
@@ -2243,6 +2284,9 @@ struct CommandPaletteView: View {
         }
         .frame(width: 480, height: 390)
         .onAppear { searchFocused = true }
+        .onChange(of: query) { _, _ in previewFirstVisibleCommand() }
+        .onChange(of: selectedGroup) { _, _ in previewFirstVisibleCommand() }
+        .onDisappear { onPreview(nil) }
     }
 
     private func groupRow(_ group: CommandPaletteGroup) -> some View {
@@ -2276,5 +2320,16 @@ struct CommandPaletteView: View {
             }
             Spacer()
         }
+        .onHover { hovering in
+            if hovering { onPreview(item) }
+        }
+    }
+
+    private func previewFirstVisibleCommand() {
+        guard case .items(let results) = destination else {
+            onPreview(nil)
+            return
+        }
+        onPreview(results.first)
     }
 }

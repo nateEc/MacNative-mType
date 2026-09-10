@@ -643,6 +643,7 @@ private struct ContentView: View {
   @State private var showingNotifications = false
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
+  @State private var commandThemePreviewTarget: ThemeCommandTarget?
   @State private var showingProfileSearchCommandEditor = false
   @State private var showingActiveResultTagEditor = false
   @State private var showingFontFamilyNameCommandEditor = false
@@ -925,9 +926,15 @@ private struct ContentView: View {
     }) {
       NotificationsView(account: account) { unreadNotificationCount = $0 }
     }
-    .sheet(isPresented: $showingCommandPalette) {
+    .sheet(isPresented: $showingCommandPalette, onDismiss: {
+      commandThemePreviewTarget = nil
+    }) {
       CommandPaletteView(
-        items: commandPaletteItems, listMode: settings.commandPaletteListMode, onSelect: runCommand)
+        items: commandPaletteItems, listMode: settings.commandPaletteListMode,
+        onSelect: runCommand,
+        onPreview: { item in
+          commandThemePreviewTarget = ThemeCommandPreviewPolicy.target(for: item)
+        })
     }
     .sheet(isPresented: $showingProfileSearchCommandEditor) {
       ProfileSearchCommandView(account: account)
@@ -2859,7 +2866,13 @@ private struct ContentView: View {
   }
 
   private var activeTheme: ResolvedTheme {
-    settings.resolvedTheme(for: systemColorScheme)
+    if let commandThemePreviewTarget,
+      let preview = ThemeCommandPreviewPolicy.resolvedTheme(
+        for: commandThemePreviewTarget, customThemes: settings.customThemes)
+    {
+      return preview
+    }
+    return settings.resolvedTheme(for: systemColorScheme)
   }
 
   private var commandPaletteItems: [CommandPaletteItem] {
