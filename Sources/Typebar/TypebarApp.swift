@@ -644,6 +644,11 @@ private struct ContentView: View {
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
   @State private var showingActiveResultTagEditor = false
+  @State private var showingFontFamilyNameCommandEditor = false
+  @State private var showingInstalledFontCommandPicker = false
+  @State private var installedFontCommandFamilies: [String] = []
+  @State private var showingLocalFontCommandImporter = false
+  @State private var fontFamilyCommandMessage: String?
   @State private var customBackgroundCommandEditorKind: CustomBackgroundCommandEditorKind?
   @State private var showingCustomBackgroundCommandImporter = false
   @State private var customBackgroundCommandMessage: String?
@@ -928,6 +933,20 @@ private struct ContentView: View {
         updateActiveResultTags { settings.activateResultTag(tag) }
       }
     }
+    .sheet(isPresented: $showingFontFamilyNameCommandEditor) {
+      FontFamilyNameCommandEditor(initialName: settings.installedPracticeFontName) { name in
+        if FontFamilyNameCommandPolicy.apply(name, to: settings) {
+          fontFamilyCommandMessage = nil
+        }
+      }
+    }
+    .sheet(isPresented: $showingInstalledFontCommandPicker) {
+      NativeFontFamilyPicker(
+        selection: Binding(
+          get: { settings.installedPracticeFontName },
+          set: { settings.installedPracticeFontName = $0 }),
+        families: installedFontCommandFamilies)
+    }
     .sheet(item: $customBackgroundCommandEditorKind) { kind in
       CustomBackgroundCommandEditor(
         kind: kind,
@@ -1012,6 +1031,15 @@ private struct ContentView: View {
       switch result {
       case .success(let url): importCustomBackgroundFromCommand(url)
       case .failure(let error): customBackgroundCommandMessage = error.localizedDescription
+      }
+    }
+    .fileImporter(
+      isPresented: $showingLocalFontCommandImporter,
+      allowedContentTypes: LocalPracticeFontFilePolicy.supportedContentTypes
+    ) { result in
+      switch result {
+      case .success(let url): importLocalFontFromCommand(url)
+      case .failure(let error): fontFamilyCommandMessage = error.localizedDescription
       }
     }
     .sheet(item: $completedResult) { result in
@@ -2353,6 +2381,11 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .offset(y: 24)
+      } else if let fontFamilyCommandMessage {
+        Label(fontFamilyCommandMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
       }
     }
   }
@@ -2903,6 +2936,8 @@ private struct ContentView: View {
     items.append(contentsOf: KeyboardGuideCommandCatalog.items)
     items.append(KeyboardGuideSizeCommand.item)
     items.append(contentsOf: KeyboardGuideLayoutCommandCatalog.items)
+    items.append(contentsOf: FontFamilyCommandCatalog.items(
+      hasLocalFont: settings.hasLocalPracticeFont))
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     if let theme = settings.currentBuiltInThemeForFavoriteCommand(for: systemColorScheme) {
@@ -3128,6 +3163,29 @@ private struct ContentView: View {
       }
       return
     }
+    if let target = FontFamilyCommandCatalog.target(for: item.id) {
+      fontFamilyCommandMessage = nil
+      switch target {
+      case .systemDesign, .installedName:
+        if !FontFamilyCommandApplication.apply(target, to: settings) {
+          fontFamilyCommandMessage = "此 Mac 当前无法使用所选字体。"
+        }
+      case .customName:
+        showingFontFamilyNameCommandEditor = true
+      case .browseInstalled:
+        installedFontCommandFamilies = NativeFontCatalog.installedFamilies
+        showingInstalledFontCommandPicker = true
+      case .localFile:
+        showingLocalFontCommandImporter = true
+      case .removeLocalFile:
+        do {
+          try settings.removeLocalPracticeFont()
+        } catch {
+          fontFamilyCommandMessage = error.localizedDescription
+        }
+      }
+      return
+    }
     if let target = CurrentThemeFavoriteCommandCatalog.target(for: item.id) {
       _ = CurrentThemeFavoriteCommandApplication.apply(
         target, to: settings, colorScheme: systemColorScheme)
@@ -3227,6 +3285,24 @@ private struct ContentView: View {
       customBackgroundCommandMessage = nil
     } catch {
       customBackgroundCommandMessage = error.localizedDescription
+    }
+  }
+
+  private func importLocalFontFromCommand(_ url: URL) {
+    guard LocalPracticeFontFilePolicy.supports(filename: url.lastPathComponent) else {
+      fontFamilyCommandMessage = "请选择 TTF、OTF、WOFF 或 WOFF2 字体文件。"
+      return
+    }
+    let canAccess = url.startAccessingSecurityScopedResource()
+    defer {
+      if canAccess { url.stopAccessingSecurityScopedResource() }
+    }
+    do {
+      try settings.importLocalPracticeFont(
+        data: Data(contentsOf: url), originalFilename: url.lastPathComponent)
+      fontFamilyCommandMessage = nil
+    } catch {
+      fontFamilyCommandMessage = error.localizedDescription
     }
   }
 

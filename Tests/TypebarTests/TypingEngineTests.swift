@@ -13144,6 +13144,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(NativeFontCatalog.filteredFamilies(families, query: "ui"), ["Beta UI"])
     XCTAssertEqual(NativeFontCatalog.filteredFamilies(families, query: "   "), families)
     XCTAssertEqual(NativeFontCatalog.filteredFamilies(families, query: "missing"), [])
+    XCTAssertTrue(NativeFontCatalog.containsFamily("élan mono", in: families))
+    XCTAssertFalse(NativeFontCatalog.containsFamily("Missing Sans", in: families))
   }
 
   func testLocalPracticeFontFilePolicyAcceptsCoreTextFormatsOnly() {
@@ -13159,6 +13161,85 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(LocalPracticeFontFilePolicy.supportedContentTypes.contains {
       $0.preferredFilenameExtension == "woff2"
     })
+  }
+
+  func testFontFamilyCommandsExposeNativeAvailableAndConditionalLocalActions() {
+    XCTAssertEqual(FontFamilyCommandCatalog.fixedKnownFontIDs.count, 43)
+    XCTAssertEqual(
+      Set(FontFamilyCommandCatalog.fixedKnownFontIDs).count,
+      FontFamilyCommandCatalog.fixedKnownFontIDs.count)
+    XCTAssertTrue(FontFamilyCommandCatalog.fixedKnownFontIDs.allSatisfy {
+      FontFamilyCommandCatalog.target(for: "setFontFamily\($0)") != nil
+    })
+    let withoutLocal = FontFamilyCommandCatalog.items(
+      hasLocalFont: false, availableKnownFontIDs: ["Courier", "Roboto_Mono"])
+    let withoutLocalIDs = withoutLocal.map(\.id)
+    XCTAssertTrue(withoutLocalIDs.starts(with: [
+      "fontFamily.native.monospaced", "fontFamily.native.rounded",
+      "fontFamily.native.serif", "fontFamily.native.defaultSystem",
+    ]))
+    XCTAssertTrue(withoutLocalIDs.contains("setFontFamilyCourier"))
+    XCTAssertTrue(withoutLocalIDs.contains("setFontFamilyRoboto_Mono"))
+    XCTAssertTrue(withoutLocalIDs.contains("customFontName"))
+    XCTAssertTrue(withoutLocalIDs.contains("browseInstalledFonts"))
+    XCTAssertTrue(withoutLocalIDs.contains("customLocalFont"))
+    XCTAssertFalse(withoutLocalIDs.contains("removeLocalFont"))
+
+    let withLocal = FontFamilyCommandCatalog.items(
+      hasLocalFont: true, availableKnownFontIDs: [])
+    XCTAssertFalse(withLocal.map(\.id).contains("customLocalFont"))
+    XCTAssertTrue(withLocal.map(\.id).contains("removeLocalFont"))
+    XCTAssertEqual(
+      FontFamilyCommandCatalog.target(for: "fontFamily.native.serif"),
+      .systemDesign(.serif))
+    XCTAssertEqual(
+      FontFamilyCommandCatalog.target(for: "setFontFamilyRoboto_Mono"),
+      .installedName("Roboto Mono"))
+    XCTAssertEqual(FontFamilyCommandCatalog.target(for: "customFontName"), .customName)
+    XCTAssertEqual(FontFamilyCommandCatalog.target(for: "customLocalFont"), .localFile)
+    XCTAssertEqual(FontFamilyCommandCatalog.target(for: "removeLocalFont"), .removeLocalFile)
+    XCTAssertNil(FontFamilyCommandCatalog.target(for: "setFontFamilyUnknown"))
+    XCTAssertNil(FontFamilyCommandCatalog.target(for: "customLocalFont.extra"))
+    XCTAssertTrue(withoutLocal.allSatisfy {
+      CommandPaletteSearch.results(items: withoutLocal, query: $0.id).contains($0)
+    })
+  }
+
+  @MainActor
+  func testFontFamilyCommandPolicyValidatesAndAppliesWithoutRestarting() {
+    XCTAssertEqual(FontFamilyNameCommandPolicy.normalized("  Élan Mono  "), "Élan Mono")
+    XCTAssertNil(FontFamilyNameCommandPolicy.normalized(""))
+    XCTAssertNil(FontFamilyNameCommandPolicy.normalized("Line\nBreak"))
+    XCTAssertNil(FontFamilyNameCommandPolicy.normalized(String(repeating: "a", count: 51)))
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.practiceFont = .rounded
+    settings.installedPracticeFontName = "Existing Font"
+
+    XCTAssertTrue(FontFamilyCommandApplication.apply(
+      .systemDesign(.serif), to: settings, isFontAvailable: { _ in false }))
+    XCTAssertEqual(settings.practiceFont, .serif)
+    XCTAssertEqual(settings.installedPracticeFontName, "")
+    XCTAssertFalse(FontFamilyCommandApplication.apply(
+      .installedName("Missing Font"), to: settings, isFontAvailable: { _ in false }))
+    XCTAssertEqual(settings.installedPracticeFontName, "")
+    XCTAssertTrue(FontFamilyCommandApplication.apply(
+      .installedName("Local Sans"), to: settings, isFontAvailable: { $0 == "Local Sans" }))
+    XCTAssertEqual(settings.installedPracticeFontName, "Local Sans")
+    XCTAssertTrue(FontFamilyNameCommandPolicy.apply("  Élan Mono  ", to: settings))
+    XCTAssertEqual(settings.installedPracticeFontName, "Élan Mono")
+    XCTAssertFalse(FontFamilyNameCommandPolicy.apply("Bad\nName", to: settings))
+    XCTAssertEqual(settings.installedPracticeFontName, "Élan Mono")
+
+    for identifier in [
+      "fontFamily.native.monospaced", "setFontFamilyCourier", "customFontName",
+      "browseInstalledFonts", "customLocalFont", "removeLocalFont",
+    ] {
+      XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: identifier))
+    }
   }
 
   @MainActor

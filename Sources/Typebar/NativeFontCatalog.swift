@@ -36,6 +36,12 @@ enum NativeFontCatalog {
     return families.filter { comparisonKey($0).contains(queryKey) }
   }
 
+  static func containsFamily(_ family: String, in families: [String]) -> Bool {
+    let identity = comparisonKey(family.trimmingCharacters(in: .whitespacesAndNewlines))
+    guard !identity.isEmpty else { return false }
+    return families.contains { comparisonKey($0) == identity }
+  }
+
   @MainActor
   static var installedFamilies: [String] {
     normalizedFamilies(NSFontManager.shared.availableFontFamilies)
