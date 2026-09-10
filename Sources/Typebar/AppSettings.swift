@@ -1097,6 +1097,16 @@ final class AppSettings {
   @ObservationIgnored private var randomThemeBag: [RandomThemeTarget] = []
   @ObservationIgnored private var randomThemeBagSignature: [RandomThemeTarget] = []
   private var randomThemeTarget: RandomThemeTarget?
+  private(set) var testSelectionResetGeneration = 0
+
+  var activeTestSelection: ActiveTestSelectionDocument? {
+    ActiveTestSelectionStore(defaults: defaults).load()
+  }
+
+  @discardableResult
+  func saveActiveTestSelection(_ document: ActiveTestSelectionDocument) -> Bool {
+    ActiveTestSelectionStore(defaults: defaults).save(document)
+  }
 
   var difficulty: Difficulty = .normal { didSet { persist() } }
   var strictSpace = false { didSet { persist() } }
@@ -1753,6 +1763,8 @@ final class AppSettings {
     repeatedPace = true
     streakDayBoundaryOffsetHours = 0
     hasSetStreakDayBoundary = false
+    ActiveTestSelectionStore(defaults: defaults).remove()
+    testSelectionResetGeneration &+= 1
   }
 
   func apply(_ configuration: TestConfiguration) {

@@ -12993,6 +12993,90 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  @MainActor
+  func testActiveTestSelectionStoreRoundTripsLocalModeAndParameterMemoryWithoutTags() throws {
+    let suiteName = "TypebarTests.active-selection.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = ActiveTestSelectionStore(defaults: defaults)
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 41, difficulty: .master,
+      rules: .init(strictSpace: true), language: .german,
+      customTextCompletion: .words, customTextOrdering: .shuffled,
+      contentOptions: .init(includePunctuation: true, includeNumbers: true))
+    let document = ActiveTestSelectionDocument(
+      preset: .init(
+        configuration: configuration, customText: "alpha beta gamma",
+        activeResultTags: ["private-session-tag"]),
+      quoteSource: .community,
+      testParameterMemory: .init(
+        duration: 47, wordLimit: 59, customTextDuration: 61,
+        customTextWordLimit: 41, customTextSectionLimit: 2))
+
+    XCTAssertTrue(store.save(document))
+    let restored = try XCTUnwrap(store.load())
+    XCTAssertEqual(restored.version, ActiveTestSelectionDocument.currentVersion)
+    XCTAssertEqual(restored.preset.configuration, configuration)
+    XCTAssertEqual(restored.preset.customText, "alpha beta gamma")
+    XCTAssertNil(restored.preset.activeResultTags)
+    XCTAssertEqual(restored.quoteSource, .community)
+    XCTAssertEqual(restored.testParameterMemory, document.testParameterMemory)
+  }
+
+  @MainActor
+  func testActiveTestSelectionStoreRejectsInvalidWritesAndUnsupportedOrCorruptDocuments() throws {
+    let suiteName = "TypebarTests.active-selection-invalid.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = ActiveTestSelectionStore(defaults: defaults)
+    let valid = ActiveTestSelectionDocument(
+      preset: .init(configuration: .timed(seconds: 30)),
+      testParameterMemory: .defaults)
+    XCTAssertTrue(store.save(valid))
+
+    let invalid = ActiveTestSelectionDocument(
+      preset: .init(configuration: .timed(seconds: 30)),
+      testParameterMemory: .init(
+        duration: -1, wordLimit: 25, customTextDuration: 30,
+        customTextWordLimit: 25, customTextSectionLimit: 1))
+    XCTAssertFalse(store.save(invalid))
+    XCTAssertEqual(store.load(), valid)
+
+    var futureObject = try XCTUnwrap(
+      JSONSerialization.jsonObject(
+        with: try XCTUnwrap(defaults.data(forKey: ActiveTestSelectionStore.storageKey)))
+        as? [String: Any])
+    futureObject["version"] = 999
+    defaults.set(
+      try JSONSerialization.data(withJSONObject: futureObject),
+      forKey: ActiveTestSelectionStore.storageKey)
+    XCTAssertNil(store.load())
+
+    defaults.set(Data("not-json".utf8), forKey: ActiveTestSelectionStore.storageKey)
+    XCTAssertNil(store.load())
+  }
+
+  @MainActor
+  func testRestoringAppDefaultsClearsTheActiveTestSelectionAndSignalsTheCurrentWindow() {
+    let suiteName = "TypebarTests.active-selection-reset.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    let document = ActiveTestSelectionDocument(
+      preset: .init(configuration: .words(83, language: .german)),
+      testParameterMemory: .init(
+        duration: 47, wordLimit: 83, customTextDuration: 61,
+        customTextWordLimit: 73, customTextSectionLimit: 4))
+    XCTAssertTrue(settings.saveActiveTestSelection(document))
+    XCTAssertEqual(settings.activeTestSelection, document)
+    XCTAssertEqual(settings.testSelectionResetGeneration, 0)
+
+    settings.restoreDefaults()
+
+    XCTAssertNil(settings.activeTestSelection)
+    XCTAssertEqual(settings.testSelectionResetGeneration, 1)
+  }
+
   func testCommandPaletteDynamicShortcutProtectsRestartAndPromptTabKeys() {
     XCTAssertEqual(
       CommandPaletteDynamicShortcut.resolve(quickRestartKey: .off, promptAcceptsTab: false),

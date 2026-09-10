@@ -198,14 +198,6 @@ private struct NetworkConnectivityNotice: View {
   }
 }
 
-private enum QuoteSource: String, CaseIterable, Identifiable {
-  case builtIn
-  case community
-
-  var id: Self { self }
-  var title: String { self == .builtIn ? "Typebar 自有" : "社区审核" }
-}
-
 private struct CRTPracticeOverlay: View {
   var body: some View {
     Canvas { context, size in
@@ -690,8 +682,9 @@ private struct ContentView: View {
   @State private var zipfNotice: String?
   @State private var zipfNoticeGeneration = 0
   @State private var showsNetworkRecoveryNotice = false
+  @State private var didRestoreActiveTestSelection = false
 
-  var body: some View {
+  private var lifecycleContent: some View {
     VStack(spacing: 30) {
       header
       RemoteAnnouncementBannerStack(center: announcements)
@@ -779,9 +772,9 @@ private struct ContentView: View {
     .task { await runClock() }
     .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
-    .onAppear {
-      reset()
-      refreshZipfNotice()
+    .onAppear(perform: contentAppeared)
+    .onChange(of: settings.testSelectionResetGeneration) { _, _ in
+      restoreDefaultTestSelection()
     }
     .onChange(of: session.outcome) { _, outcome in
       switch outcome {
@@ -869,6 +862,10 @@ private struct ContentView: View {
         break
       }
     }
+  }
+
+  private var presentedContent: some View {
+    lifecycleContent
     .toolbar {
       Button("命令", systemImage: "command") { showingCommandPalette = true }
         .keyboardShortcut("k", modifiers: [.command, .shift])
@@ -907,7 +904,7 @@ private struct ContentView: View {
         onStart: startWeakSpotPractice(prompt:language:))
     }
     .sheet(isPresented: $showingPresets) {
-      PresetLibraryView(currentPreset: presetDefinition, onApply: apply)
+      PresetLibraryView(currentPreset: presetDefinition) { apply($0) }
     }
     .sheet(isPresented: $showingChallenges) {
       ChallengeLibraryView(onSelect: loadChallenge)
@@ -1019,7 +1016,7 @@ private struct ContentView: View {
       Text("结果不会保存、本机统计、同步或发布。")
     }
     .sheet(isPresented: $showingTestShare) {
-      TestConfigurationShareView(currentPreset: presetDefinition, onApply: apply)
+      TestConfigurationShareView(currentPreset: presetDefinition) { apply($0) }
     }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
@@ -1182,6 +1179,10 @@ private struct ContentView: View {
           startWordPractice(words, selectedTargetCount: selectedTargetCount)
         }
       )
+  }
+
+  var body: some View {
+    presentedContent
   }
 
   private func runClock() async {
@@ -1397,6 +1398,7 @@ private struct ContentView: View {
           .pickerStyle(.segmented)
           .onChange(of: quoteSource) { _, source in
             if source == .community {
+              persistActiveTestSelection()
               refreshCommunityQuotes()
               return
             }
@@ -2582,6 +2584,7 @@ private struct ContentView: View {
       customText: customText,
       quote: selectedQuote
     )
+    persistActiveTestSelection()
     if shouldCountRestart { currentRestartCount += 1 }
     let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
@@ -2592,6 +2595,18 @@ private struct ContentView: View {
     }
     refreshLiveContentIfNeeded(configuration: session.configuration, requestID: requestID)
     requestTypingFocus()
+  }
+
+  private func contentAppeared() {
+    if !didRestoreActiveTestSelection {
+      didRestoreActiveTestSelection = true
+      if let document = settings.activeTestSelection {
+        restoreActiveTestSelection(document)
+      } else {
+        reset()
+      }
+    }
+    refreshZipfNotice()
   }
 
   private func refreshLiveContentIfNeeded(configuration: TestConfiguration, requestID: UUID) {
@@ -3495,25 +3510,35 @@ private struct ContentView: View {
     )
   }
 
-  private func apply(_ preset: SavedTestPreset) {
+  private func apply(
+    _ preset: SavedTestPreset,
+    overwritesParameterMemory: Bool = true,
+    appliesGlobalSettings: Bool = true
+  ) {
     practiceReturnPreset = nil
     let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID)
     activeChallengeID = challenge?.id
     let configuration = challenge?.preset.configuration ?? preset.configuration
     mode = configuration.mode
-    if let duration = configuration.duration { self.duration = Int(duration) }
-    if let wordLimit = configuration.wordLimit { self.wordLimit = wordLimit }
+    if overwritesParameterMemory {
+      if let duration = configuration.duration { self.duration = Int(duration) }
+      if let wordLimit = configuration.wordLimit { self.wordLimit = wordLimit }
+    }
     let requestedQuoteID = preset.quoteID
     if let requestedQuoteID { selectedQuoteID = requestedQuoteID }
     if let customText = preset.customText { self.customText = customText }
     customTextCompletion = configuration.customTextCompletion
-    if configuration.customTextCompletion == .time, let duration = configuration.duration {
+    if overwritesParameterMemory, configuration.customTextCompletion == .time,
+      let duration = configuration.duration
+    {
       customTextDuration = Int(duration)
     }
-    if configuration.customTextCompletion == .words, let wordLimit = configuration.wordLimit {
+    if overwritesParameterMemory, configuration.customTextCompletion == .words,
+      let wordLimit = configuration.wordLimit
+    {
       customTextWordLimit = wordLimit
     }
-    if configuration.customTextCompletion == .sections,
+    if overwritesParameterMemory, configuration.customTextCompletion == .sections,
       let sectionLimit = configuration.customTextSectionLimit
     {
       customTextSectionLimit = sectionLimit
@@ -3525,11 +3550,13 @@ private struct ContentView: View {
     quoteSelectionMode = configuration.quoteSelectionMode
     if quoteSelectionMode == .search { quoteSearchQuery = "" }
     quoteLengths = configuration.effectiveQuoteLengths
-    quoteSelectionMode = QuoteSelection.resolvedMode(
-      quoteSelectionMode, hasEligibleQuotes: !availableQuotes.isEmpty)
+    if quoteSource != .community || !communityQuotes.isEmpty {
+      quoteSelectionMode = QuoteSelection.resolvedMode(
+        quoteSelectionMode, hasEligibleQuotes: !availableQuotes.isEmpty)
+    }
     quoteQueue.reset()
     contentOptions = configuration.contentOptions
-    settings.apply(configuration)
+    if appliesGlobalSettings { settings.apply(configuration) }
     if let activeResultTags = preset.activeResultTags {
       settings.activeResultTags = activeResultTags
     }
@@ -3539,6 +3566,61 @@ private struct ContentView: View {
       ensureSelectedQuote()
     }
     reset()
+  }
+
+  private func restoreActiveTestSelection(_ document: ActiveTestSelectionDocument) {
+    let memory = document.testParameterMemory
+    duration = memory.duration
+    wordLimit = memory.wordLimit
+    customTextDuration = memory.customTextDuration
+    customTextWordLimit = memory.customTextWordLimit
+    customTextSectionLimit = memory.customTextSectionLimit
+    quoteSource = document.quoteSource
+    var preset = document.preset
+    if preset.configuration.mode == .custom, let customText = preset.customText {
+      preset.configuration.customTextSectionLimit = min(
+        preset.configuration.customTextSectionLimit ?? 1,
+        max(1, CustomTextPolicy.sections(in: customText).count))
+      customTextSectionLimit = min(
+        customTextSectionLimit,
+        max(1, CustomTextPolicy.sections(in: customText).count))
+    }
+    apply(
+      preset,
+      overwritesParameterMemory: false,
+      appliesGlobalSettings: false)
+    if mode == .quote, quoteSource == .community {
+      refreshCommunityQuotes()
+    }
+  }
+
+  private func restoreDefaultTestSelection() {
+    let memory = TypebarTestParameterMemory.defaults
+    duration = memory.duration
+    wordLimit = memory.wordLimit
+    customTextDuration = memory.customTextDuration
+    customTextWordLimit = memory.customTextWordLimit
+    customTextSectionLimit = memory.customTextSectionLimit
+    apply(
+      .init(configuration: .timed(seconds: TimeInterval(memory.duration))),
+      overwritesParameterMemory: false,
+      appliesGlobalSettings: false)
+  }
+
+  private func persistActiveTestSelection() {
+    let preset = SavedTestPreset(
+      configuration: session.configuration,
+      quoteID: mode == .quote ? selectedQuoteID : nil,
+      customText: mode == .custom ? customText : nil)
+    settings.saveActiveTestSelection(.init(
+      preset: preset,
+      quoteSource: quoteSource,
+      testParameterMemory: .init(
+        duration: duration,
+        wordLimit: wordLimit,
+        customTextDuration: customTextDuration,
+        customTextWordLimit: customTextWordLimit,
+        customTextSectionLimit: customTextSectionLimit)))
   }
 
   private var activeChallenge: TypebarChallenge? {
