@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 private struct OpenCommandPaletteFocusedValueKey: FocusedValueKey {
@@ -1752,6 +1753,105 @@ enum QuoteFavoriteCommand {
             subtitle: isFavorite ? "从本机引语收藏中移除" : "加入本机引语收藏",
             systemImage: isFavorite ? "heart.slash" : "heart",
             keywords: ["quote", "引语", "favorite", "收藏"])
+    }
+}
+
+enum ResultTagCommandTarget: Equatable {
+    case clear
+    case toggle(String)
+    case create
+}
+
+/// Mirrors the reference command palette's tag actions while keeping tags
+/// entirely local and routing them through Typebar's existing result-tag state.
+enum ResultTagCommandCatalog {
+    static func knownTags(active: [String], historical: [String]) -> [String] {
+        let activeTags = uniqueNormalized(active)
+        let activeKeys = Set(activeTags.map(comparisonKey))
+        let historicalTags = uniqueNormalized(historical)
+            .filter { !activeKeys.contains(comparisonKey($0)) }
+            .sorted { lhs, rhs in
+                lhs.compare(rhs, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedAscending
+            }
+        return activeTags + historicalTags
+    }
+
+    static func items(active: [String], historical: [String]) -> [CommandPaletteItem] {
+        let tags = knownTags(active: active, historical: historical)
+        let activeKeys = Set(ResultTagPolicy.normalized(active).map(comparisonKey))
+        var items: [CommandPaletteItem] = []
+        if !tags.isEmpty {
+            items.append(CommandPaletteItem(
+                id: "tag.clear", title: "清除活动标签", subtitle: "之后开始的练习不再附加标签",
+                systemImage: "tag.slash",
+                keywords: ["tag.clear", "clearTags", "tag", "clear", "标签", "清除"],
+                group: .activity))
+        }
+        items.append(contentsOf: tags.map { tag in
+            let isActive = activeKeys.contains(comparisonKey(tag))
+            return CommandPaletteItem(
+                id: identifier(for: tag), title: "活动标签：\(tag)",
+                subtitle: isActive ? "已启用；选择后关闭" : "选择后用于之后开始的练习",
+                systemImage: isActive ? "tag.fill" : "tag",
+                keywords: ["toggleTag", "tag", "标签", tag, identifier(for: tag)], group: .activity)
+        })
+        items.append(CommandPaletteItem(
+            id: "tag.create", title: "新建活动标签…", subtitle: "创建并启用一个本机标签",
+            systemImage: "tag.circle",
+            keywords: ["tag.create", "createTag", "tag", "new", "标签", "新建"],
+            group: .activity))
+        return items
+    }
+
+    static func target(
+        for identifier: String, knownTags: [String]
+    ) -> ResultTagCommandTarget? {
+        switch identifier {
+        case "tag.clear": return .clear
+        case "tag.create": return .create
+        default:
+            return knownTags.first { Self.identifier(for: $0) == identifier }.map {
+                .toggle($0)
+            }
+        }
+    }
+
+    private static func identifier(for tag: String) -> String {
+        let value = tag.utf8.map { String(format: "%02x", $0) }.joined()
+        return "tag.toggle.\(value)"
+    }
+
+    private static func uniqueNormalized(_ tags: [String]) -> [String] {
+        var seen = Set<String>()
+        return tags.compactMap { ResultTagPolicy.normalized([$0]).first }.filter { tag in
+            seen.insert(comparisonKey(tag)).inserted
+        }
+    }
+
+    private static func comparisonKey(_ tag: String) -> String {
+        tag.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+}
+
+enum ResultTagCommandPolicy {
+    static func updatedActiveTags(
+        for target: ResultTagCommandTarget, current: [String]
+    ) -> [String]? {
+        switch target {
+        case .clear:
+            return []
+        case .create:
+            return nil
+        case .toggle(let tag):
+            if current.contains(where: { equivalent($0, tag) }) {
+                return current.filter { !equivalent($0, tag) }
+            }
+            return ResultTagPolicy.appending(tag, to: current)
+        }
+    }
+
+    private static func equivalent(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.compare(rhs, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
     }
 }
 

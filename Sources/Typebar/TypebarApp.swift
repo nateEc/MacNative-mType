@@ -643,6 +643,7 @@ private struct ContentView: View {
   @State private var showingNotifications = false
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
+  @State private var showingActiveResultTagEditor = false
   @State private var showingPaceGuideSpeedEditor = false
   @State private var showingKeyboardGuideScaleEditor = false
   @State private var showingCustomTimeEditor = false
@@ -918,6 +919,11 @@ private struct ContentView: View {
     .sheet(isPresented: $showingCommandPalette) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: settings.commandPaletteListMode, onSelect: runCommand)
+    }
+    .sheet(isPresented: $showingActiveResultTagEditor) {
+      ActiveResultTagEditor(currentTags: settings.activeResultTags) { tag in
+        updateActiveResultTags { settings.activateResultTag(tag) }
+      }
     }
     .sheet(isPresented: $showingPaceGuideSpeedEditor) {
       PaceGuideSpeedEditor(
@@ -2858,6 +2864,8 @@ private struct ContentView: View {
     items.append(contentsOf: BehaviorCommandCatalog.items)
     items.append(contentsOf: PracticeThresholdCommandCatalog.items)
     items.append(contentsOf: FunboxCommandCatalog.items)
+    items.append(contentsOf: ResultTagCommandCatalog.items(
+      active: settings.activeResultTags, historical: savedResults.flatMap(\.tags)))
     items.append(contentsOf: InputRuleCommandCatalog.items)
     items.append(contentsOf: OfficialLayoutCommandCatalog.items)
     items.append(contentsOf: SoundCommandCatalog.items)
@@ -2988,6 +2996,18 @@ private struct ContentView: View {
         if target == .clear && language == .mixedLanguages { language = .english }
         activeChallengeID = nil
         reset()
+      }
+      return
+    }
+    let knownResultTags = ResultTagCommandCatalog.knownTags(
+      active: settings.activeResultTags, historical: savedResults.flatMap(\.tags))
+    if let target = ResultTagCommandCatalog.target(for: item.id, knownTags: knownResultTags) {
+      if target == .create {
+        showingActiveResultTagEditor = true
+      } else if let updated = ResultTagCommandPolicy.updatedActiveTags(
+        for: target, current: settings.activeResultTags)
+      {
+        updateActiveResultTags { settings.activeResultTags = updated }
       }
       return
     }

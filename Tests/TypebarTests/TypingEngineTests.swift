@@ -2468,6 +2468,82 @@ final class TypingEngineTests: XCTestCase {
       "取消收藏当前引语")
   }
 
+  func testResultTagCommandsExposeStableOfflineTargetsWithoutDuplicateNames() {
+    let knownTags = ResultTagCommandCatalog.knownTags(
+      active: ["Focus", "Résumé"], historical: ["Night", " focus ", "resume", ""])
+    XCTAssertEqual(knownTags, ["Focus", "Résumé", "Night"])
+
+    let items = ResultTagCommandCatalog.items(
+      active: ["Focus", "Résumé"], historical: ["Night", " focus ", "resume"])
+    XCTAssertEqual(
+      items.map(\.id),
+      [
+        "tag.clear",
+        "tag.toggle.466f637573",
+        "tag.toggle.52c3a973756dc3a9",
+        "tag.toggle.4e69676874",
+        "tag.create",
+      ])
+    XCTAssertEqual(
+      ResultTagCommandCatalog.target(for: items[1].id, knownTags: knownTags),
+      .toggle("Focus"))
+    XCTAssertEqual(
+      ResultTagCommandCatalog.target(for: items[2].id, knownTags: knownTags),
+      .toggle("Résumé"))
+    XCTAssertEqual(
+      ResultTagCommandCatalog.target(for: "tag.clear", knownTags: knownTags), .clear)
+    XCTAssertEqual(
+      ResultTagCommandCatalog.target(for: "tag.create", knownTags: knownTags), .create)
+    XCTAssertNil(
+      ResultTagCommandCatalog.target(for: "tag.toggle.466f63757300", knownTags: knownTags))
+    XCTAssertNil(ResultTagCommandCatalog.target(for: "tag.toggle.", knownTags: knownTags))
+    XCTAssertEqual(
+      ResultTagCommandCatalog.items(active: [], historical: []).map(\.id), ["tag.create"])
+    XCTAssertTrue(items.allSatisfy {
+      CommandPaletteSearch.results(items: items, query: $0.id).contains($0)
+    })
+  }
+
+  func testResultTagCommandPolicyTogglesWithinLimitAndKeepsStartedSessionSnapshotsSeparate() {
+    XCTAssertEqual(
+      ResultTagCommandPolicy.updatedActiveTags(
+        for: .toggle("focus"), current: ["Focus", "Résumé"]),
+      ["Résumé"])
+    XCTAssertEqual(
+      ResultTagCommandPolicy.updatedActiveTags(
+        for: .toggle("Night"), current: ["Focus", "Résumé"]),
+      ["Focus", "Résumé", "Night"])
+    XCTAssertEqual(
+      ResultTagCommandPolicy.updatedActiveTags(
+        for: .toggle("six"), current: ["one", "two", "three", "four", "five"]),
+      ["one", "two", "three", "four", "five"])
+    XCTAssertEqual(
+      ResultTagCommandPolicy.updatedActiveTags(
+        for: .toggle("one"), current: ["one", "two", "three", "four", "five"]),
+      ["two", "three", "four", "five"])
+    XCTAssertEqual(
+      ResultTagCommandPolicy.updatedActiveTags(for: .clear, current: ["Focus"]), [])
+    XCTAssertNil(
+      ResultTagCommandPolicy.updatedActiveTags(for: .create, current: ["Focus"]))
+    XCTAssertEqual(
+      ActiveResultTagEditorPolicy.candidate(rawTag: " Night ", currentTags: ["Focus"]),
+      "Night")
+    XCTAssertNil(
+      ActiveResultTagEditorPolicy.candidate(rawTag: "resume", currentTags: ["Résumé"]))
+    XCTAssertNil(
+      ActiveResultTagEditorPolicy.candidate(
+        rawTag: "six", currentTags: ["one", "two", "three", "four", "five"]))
+    XCTAssertNil(
+      ActiveResultTagEditorPolicy.candidate(
+        rawTag: String(repeating: "x", count: ResultTagPolicy.maximumLength + 1), currentTags: []))
+
+    let startedSessionTags = ["Focus"]
+    let updatedSettingsTags = ResultTagCommandPolicy.updatedActiveTags(
+      for: .toggle("Night"), current: startedSessionTags)
+    XCTAssertEqual(startedSessionTags, ["Focus"])
+    XCTAssertEqual(updatedSettingsTags, ["Focus", "Night"])
+  }
+
   func testClearCurrentWordOnErrorModifierKeepsCompletedWordsAndReplayInSync() {
     var session = TypingSession(
       configuration: .words(2).with(modifiers: [.clearCurrentWordOnError]),
