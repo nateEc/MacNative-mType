@@ -787,6 +787,111 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(filter, .init(blur: 0, brightness: 2, saturation: 0, opacity: 1))
   }
 
+  func testCustomBackgroundCommandsCoverFixedActionsAndRejectUnknownIdentifiers() {
+    let withoutBackground = CustomBackgroundCommandCatalog.items(hasBackground: false)
+    XCTAssertEqual(
+      withoutBackground.map(\.id),
+      [
+        "customBackground",
+        "customLocalBackground",
+        "customBackgroundSize.cover",
+        "customBackgroundSize.contain",
+        "customBackgroundSize.max",
+        "setCustomBackgroundBlur",
+        "setCustomBackgroundBrightness",
+        "setCustomBackgroundSaturation",
+        "setCustomBackgroundOpacity",
+      ])
+    XCTAssertEqual(
+      CustomBackgroundCommandCatalog.items(hasBackground: true).map(\.id),
+      [
+        "customBackground",
+        "customLocalBackground",
+        "removeCustomBackground",
+        "customBackgroundSize.cover",
+        "customBackgroundSize.contain",
+        "customBackgroundSize.max",
+        "setCustomBackgroundBlur",
+        "setCustomBackgroundBrightness",
+        "setCustomBackgroundSaturation",
+        "setCustomBackgroundOpacity",
+      ])
+    XCTAssertEqual(CustomBackgroundCommandCatalog.target(for: "customBackground"), .editor(.remoteURL))
+    XCTAssertEqual(CustomBackgroundCommandCatalog.target(for: "customLocalBackground"), .localFile)
+    XCTAssertEqual(CustomBackgroundCommandCatalog.target(for: "removeCustomBackground"), .remove)
+    XCTAssertEqual(
+      CustomBackgroundCommandCatalog.target(for: "customBackgroundSize.contain"), .fit(.contain))
+    XCTAssertEqual(
+      CustomBackgroundCommandCatalog.target(for: "setCustomBackgroundOpacity"), .editor(.opacity))
+    XCTAssertNil(CustomBackgroundCommandCatalog.target(for: "customBackgroundSize.stretch"))
+    XCTAssertNil(CustomBackgroundCommandCatalog.target(for: "setCustomBackgroundBlur.extra"))
+    XCTAssertTrue(withoutBackground.allSatisfy {
+      CommandPaletteSearch.results(items: withoutBackground, query: $0.id).contains($0)
+    })
+  }
+
+  @MainActor
+  func testCustomBackgroundCommandEditorValidatesAndAppliesOnlyTheSelectedValue() throws {
+    XCTAssertEqual(
+      CustomBackgroundCommandEditorPolicy.value(
+        from: " https://images.example.test/mist.webp ", kind: .remoteURL),
+      .remoteURL("https://images.example.test/mist.webp"))
+    XCTAssertEqual(
+      CustomBackgroundCommandEditorPolicy.value(from: "", kind: .remoteURL), .remoteURL(""))
+    XCTAssertNil(
+      CustomBackgroundCommandEditorPolicy.value(
+        from: "file:///tmp/private.png", kind: .remoteURL))
+    XCTAssertEqual(
+      CustomBackgroundCommandEditorPolicy.value(from: "20", kind: .blur), .number(20))
+    XCTAssertEqual(
+      CustomBackgroundCommandEditorPolicy.value(from: "2", kind: .brightness), .number(2))
+    XCTAssertEqual(
+      CustomBackgroundCommandEditorPolicy.value(from: "3", kind: .saturation), .number(3))
+    XCTAssertEqual(
+      CustomBackgroundCommandEditorPolicy.value(from: "1", kind: .opacity), .number(1))
+    XCTAssertNil(CustomBackgroundCommandEditorPolicy.value(from: "20.1", kind: .blur))
+    XCTAssertNil(CustomBackgroundCommandEditorPolicy.value(from: "-0.1", kind: .brightness))
+    XCTAssertNil(CustomBackgroundCommandEditorPolicy.value(from: "nan", kind: .opacity))
+
+    let suiteName = "TypebarTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.customBackgroundFilter = .init(
+      blur: 4, brightness: 0.8, saturation: 1.4, opacity: 0.7)
+
+    XCTAssertTrue(CustomBackgroundCommandApplication.applyImmediate(.fit(.max), to: settings))
+    XCTAssertEqual(settings.customBackgroundFit, .max)
+    XCTAssertFalse(
+      CustomBackgroundCommandApplication.applyImmediate(.editor(.brightness), to: settings))
+    XCTAssertTrue(
+      CustomBackgroundCommandEditorPolicy.apply("1.5", kind: .brightness, to: settings))
+    XCTAssertEqual(
+      settings.customBackgroundFilter,
+      .init(blur: 4, brightness: 1.5, saturation: 1.4, opacity: 0.7))
+    XCTAssertTrue(
+      CustomBackgroundCommandEditorPolicy.apply(
+        "https://images.example.test/mist.jpg", kind: .remoteURL, to: settings))
+    XCTAssertEqual(settings.customBackgroundURL, "https://images.example.test/mist.jpg")
+    XCTAssertFalse(
+      CustomBackgroundCommandEditorPolicy.apply("https://example.test/not-image", kind: .remoteURL, to: settings))
+    XCTAssertEqual(settings.customBackgroundURL, "https://images.example.test/mist.jpg")
+
+    enum RemovalFailure: Error { case denied }
+    XCTAssertThrowsError(
+      try CustomBackgroundCommandApplication.removeBackground(from: settings) {
+        throw RemovalFailure.denied
+      })
+    XCTAssertEqual(settings.customBackgroundURL, "https://images.example.test/mist.jpg")
+
+    var removedLocalBackground = false
+    CustomBackgroundCommandApplication.removeBackground(from: settings) {
+      removedLocalBackground = true
+    }
+    XCTAssertTrue(removedLocalBackground)
+    XCTAssertEqual(settings.customBackgroundURL, "")
+  }
+
   func testNoSpaceWordTestsKeepTheirCommittedWordProgress() {
     let configuration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
     var session = TypingSession(

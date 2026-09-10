@@ -644,6 +644,9 @@ private struct ContentView: View {
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
   @State private var showingActiveResultTagEditor = false
+  @State private var customBackgroundCommandEditorKind: CustomBackgroundCommandEditorKind?
+  @State private var showingCustomBackgroundCommandImporter = false
+  @State private var customBackgroundCommandMessage: String?
   @State private var showingPaceGuideSpeedEditor = false
   @State private var showingKeyboardGuideScaleEditor = false
   @State private var showingCustomTimeEditor = false
@@ -925,6 +928,18 @@ private struct ContentView: View {
         updateActiveResultTags { settings.activateResultTag(tag) }
       }
     }
+    .sheet(item: $customBackgroundCommandEditorKind) { kind in
+      CustomBackgroundCommandEditor(
+        kind: kind,
+        initialText: CustomBackgroundCommandEditorPolicy.initialText(
+          kind: kind, remoteURL: settings.customBackgroundURL,
+          filter: settings.customBackgroundFilter)
+      ) { value in
+        if CustomBackgroundCommandEditorPolicy.apply(value, kind: kind, to: settings) {
+          customBackgroundCommandMessage = nil
+        }
+      }
+    }
     .sheet(isPresented: $showingPaceGuideSpeedEditor) {
       PaceGuideSpeedEditor(
         unit: settings.typingSpeedUnit, initialWpm: settings.paceGuideCustomWpm
@@ -989,6 +1004,14 @@ private struct ContentView: View {
     .sheet(isPresented: $showingCustomTextGenerator) {
       CustomTextGeneratorView { text, appending in
         applyGeneratedCustomText(text, appending: appending)
+      }
+    }
+    .fileImporter(
+      isPresented: $showingCustomBackgroundCommandImporter, allowedContentTypes: [.image]
+    ) { result in
+      switch result {
+      case .success(let url): importCustomBackgroundFromCommand(url)
+      case .failure(let error): customBackgroundCommandMessage = error.localizedDescription
       }
     }
     .sheet(item: $completedResult) { result in
@@ -2325,6 +2348,11 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .offset(y: 24)
+      } else if let customBackgroundCommandMessage {
+        Label(customBackgroundCommandMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
       }
     }
   }
@@ -2877,6 +2905,8 @@ private struct ContentView: View {
     items.append(contentsOf: KeyboardGuideLayoutCommandCatalog.items)
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
+    items.append(contentsOf: CustomBackgroundCommandCatalog.items(
+      hasBackground: settings.hasLocalBackground || !settings.customBackgroundURL.isEmpty))
     items.append(contentsOf: PresetCommandCatalog.items(
       presets: savedPresets.compactMap { preset in
         guard let definition = preset.definition else { return nil }
@@ -3094,6 +3124,26 @@ private struct ContentView: View {
       }
       return
     }
+    if let target = CustomBackgroundCommandCatalog.target(for: item.id) {
+      customBackgroundCommandMessage = nil
+      switch target {
+      case .editor(let kind):
+        customBackgroundCommandEditorKind = kind
+      case .localFile:
+        showingCustomBackgroundCommandImporter = true
+      case .remove:
+        do {
+          try CustomBackgroundCommandApplication.removeBackground(from: settings) {
+            try settings.removeLocalBackground()
+          }
+        } catch {
+          customBackgroundCommandMessage = error.localizedDescription
+        }
+      case .fit:
+        _ = CustomBackgroundCommandApplication.applyImmediate(target, to: settings)
+      }
+      return
+    }
     if let presetID = PresetCommandCatalog.presetID(for: item.id),
       let preset = savedPresets.first(where: { $0.id == presetID })?.definition
     {
@@ -3156,6 +3206,19 @@ private struct ContentView: View {
     activeChallengeID = nil
     PracticeThresholdApplication.apply(value, kind: kind, to: settings)
     reset()
+  }
+
+  private func importCustomBackgroundFromCommand(_ url: URL) {
+    let canAccess = url.startAccessingSecurityScopedResource()
+    defer {
+      if canAccess { url.stopAccessingSecurityScopedResource() }
+    }
+    do {
+      try settings.importLocalBackground(data: Data(contentsOf: url))
+      customBackgroundCommandMessage = nil
+    } catch {
+      customBackgroundCommandMessage = error.localizedDescription
+    }
   }
 
   private var configuration: TestConfiguration {
