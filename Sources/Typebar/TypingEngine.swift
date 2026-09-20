@@ -4544,6 +4544,18 @@ enum EnglishPunctuationPolicy {
       .joined(separator: " ")
   }
 
+  static func sentenceCasedPrompt(_ prompt: String) -> String {
+    var startsSentence = true
+    return prompt.split(separator: " ", omittingEmptySubsequences: false)
+      .map { substring in
+        let token = String(substring)
+        let sentenceCased = startsSentence ? capitalizingFirstCharacter(in: token) : token
+        startsSentence = sentenceCased.last.map(isSentenceTerminator) ?? false
+        return sentenceCased
+      }
+      .joined(separator: " ")
+  }
+
   private static func isASCIIAlphabetic(_ character: Character) -> Bool {
     character.isASCII && character.isLetter
   }
@@ -4561,6 +4573,15 @@ enum EnglishPunctuationPolicy {
       return replacement
     }
     return replacement.prefix(1).uppercased() + replacement.dropFirst()
+  }
+
+  private static func capitalizingFirstCharacter(in token: String) -> String {
+    guard let first = token.first else { return token }
+    return String(first).uppercased() + token.dropFirst()
+  }
+
+  private static func isSentenceTerminator(_ character: Character) -> Bool {
+    character == "." || character == "?" || character == "!" || character == "؟"
   }
 }
 
@@ -10593,7 +10614,8 @@ enum StarterLexicon {
       tokens: tokens, lexicon: lexicon, separator: " ", punctuation: [",", ".", "!", "?"],
       contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     guard contentOptions.includePunctuation else { return generated }
-    return EnglishPunctuationPolicy.transformedPrompt(generated, random: punctuationRandom)
+    return EnglishPunctuationPolicy.sentenceCasedPrompt(
+      EnglishPunctuationPolicy.transformedPrompt(generated, random: punctuationRandom))
   }
 
   private static func sectionPrompt(

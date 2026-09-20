@@ -15612,12 +15612,24 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.englishPrompt(
         tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
         usesZipfFrequency: false, punctuationRandom: { punctuationRandomValues.removeFirst() }),
-      "aren't,")
+      "Aren't,")
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
         tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(),
         usesZipfFrequency: false, punctuationRandom: { 0 }),
       "are")
+  }
+
+  func testEnglishPunctuationUsesSentenceCaseAtStartsAndAfterTerminators() {
+    var punctuationRandomValues = Array(repeating: 0.0, count: 18)
+    let words = StarterLexicon.englishPrompt(
+      tokens: 9, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
+      usesZipfFrequency: false, punctuationRandom: { punctuationRandomValues.removeFirst() }
+    ).split(separator: " ").map(String.init)
+
+    XCTAssertEqual(words[0], "Aren't,")
+    XCTAssertEqual(words[7], "aren't.")
+    XCTAssertEqual(words[8], "Aren't")
   }
 
   func testOfflineCharacterStreamsOverrideBuiltInWordsWithoutExternalContent() {
