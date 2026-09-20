@@ -349,6 +349,22 @@ enum TimeWarningPolicy {
   }
 }
 
+/// Produces the missed whole-second ticks from a test's original start time.
+/// This keeps countdown side effects on the same grid after a brief run-loop
+/// stall instead of silently skipping them based on the recovery instant.
+enum ClockTickPolicy {
+  static func dueSeconds(after previousSecond: Int, startedAt: Date, now: Date) -> [Int] {
+    let elapsedSecond = max(0, Int(now.timeIntervalSince(startedAt).rounded(.down)))
+    let lastDeliveredSecond = max(0, previousSecond)
+    guard elapsedSecond > lastDeliveredSecond else { return [] }
+    return Array((lastDeliveredSecond + 1)...elapsedSecond)
+  }
+
+  static func remainingSeconds(duration: TimeInterval, elapsedSecond: Int) -> Int {
+    max(0, Int((duration - Double(max(0, elapsedSecond))).rounded(.up)))
+  }
+}
+
 /// Uses only local system sounds and in-memory waveforms. Playback is
 /// best-effort: unavailable audio never affects input acceptance or scoring.
 @MainActor

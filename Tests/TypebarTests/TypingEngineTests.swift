@@ -3001,6 +3001,29 @@ final class TypingEngineTests: XCTestCase {
       TimeWarningPolicy.shouldPlay(remainingSeconds: 5, previousSecond: 6, offset: .off))
   }
 
+  func testClockTickPlannerCatchesUpCountdownWarningsOnTheStartAnchoredGrid() {
+    let startedAt = Date(timeIntervalSinceReferenceDate: 1_000)
+    let dueSeconds = ClockTickPolicy.dueSeconds(
+      after: 24, startedAt: startedAt, now: startedAt.addingTimeInterval(26.4))
+    XCTAssertEqual(dueSeconds, [25, 26])
+    XCTAssertEqual(
+      ClockTickPolicy.dueSeconds(after: 26, startedAt: startedAt, now: startedAt.addingTimeInterval(26.9)),
+      [])
+    XCTAssertEqual(
+      ClockTickPolicy.dueSeconds(after: 0, startedAt: startedAt, now: startedAt.addingTimeInterval(2.1)),
+      [1, 2])
+
+    var previousSecond: Int?
+    let warnings = dueSeconds.compactMap { elapsedSecond -> Int? in
+      let remaining = ClockTickPolicy.remainingSeconds(duration: 30, elapsedSecond: elapsedSecond)
+      defer { previousSecond = remaining }
+      return TimeWarningPolicy.shouldPlay(
+        remainingSeconds: remaining, previousSecond: previousSecond, offset: .fiveSeconds)
+        ? remaining : nil
+    }
+    XCTAssertEqual(warnings, [5])
+  }
+
   func testMinimumWordBurstFailsForEverySlowCommittedWordAndCanBeDisabled() {
     var rules = InputRules(minimumWordBurstWpm: 60)
     var slow = TypingSession(configuration: .words(2, rules: rules), prompt: "amber harbor")

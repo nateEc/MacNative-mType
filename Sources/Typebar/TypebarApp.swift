@@ -674,6 +674,7 @@ private struct ContentView: View {
   @State private var focusWarningSequence = 0
   @State private var capsLockEnabled = false
   @State private var lastTimeWarningSecond: Int?
+  @State private var lastClockTickSecond = 0
   @State private var restartLockMessage: String?
   @State private var currentRestartCount = 0
   @State private var weakSpotScores = WeakSpotScores()
@@ -1242,16 +1243,26 @@ private struct ContentView: View {
 
   private func advanceClock(at now: Date) {
     capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
-    session.tick(at: now)
-    let remaining = session.remainingSeconds(at: now)
-    if TimeWarningPolicy.shouldPlay(
-      remainingSeconds: remaining, previousSecond: lastTimeWarningSecond,
-      offset: settings.timeWarningOffset)
-    {
-      TypingFeedbackSound.shared.playTimeWarning(
-        style: settings.timeWarningSoundStyle, volume: settings.soundVolume)
+    if let startedAt = session.startedAt {
+      let dueSeconds = ClockTickPolicy.dueSeconds(
+        after: lastClockTickSecond, startedAt: startedAt, now: now)
+      if let duration = session.configuration.duration, duration > 0 {
+        for elapsedSecond in dueSeconds {
+          let remaining = ClockTickPolicy.remainingSeconds(
+            duration: duration, elapsedSecond: elapsedSecond)
+          if TimeWarningPolicy.shouldPlay(
+            remainingSeconds: remaining, previousSecond: lastTimeWarningSecond,
+            offset: settings.timeWarningOffset)
+          {
+            TypingFeedbackSound.shared.playTimeWarning(
+              style: settings.timeWarningSoundStyle, volume: settings.soundVolume)
+          }
+          lastTimeWarningSecond = remaining
+        }
+      }
+      if let lastDueSecond = dueSeconds.last { lastClockTickSecond = lastDueSecond }
     }
-    lastTimeWarningSecond = remaining
+    session.tick(at: now)
   }
 
   private var header: some View {
@@ -2589,6 +2600,7 @@ private struct ContentView: View {
     typingCompanionHands.reset()
     clearTypingPowerEffect()
     lastTimeWarningSecond = nil
+    lastClockTickSecond = 0
     liveContentRequestID = UUID()
     let requestID = liveContentRequestID
     isLoadingLiveContent = false
@@ -2786,6 +2798,7 @@ private struct ContentView: View {
     compositionText = ""
     keyboardGuideFeedback = nil
     lastTimeWarningSecond = nil
+    lastClockTickSecond = 0
     NativeSpeech.shared.stop()
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
