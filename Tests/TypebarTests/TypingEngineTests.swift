@@ -3531,6 +3531,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(singleLineCode.typed, "")
   }
 
+  func testRussianYoInputEquivalenceCoversBaseAndScaleLanguages() {
+    let languages: [TypingLanguage] = [
+      .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k, .russian375k,
+    ]
+
+    for language in languages {
+      var session = TypingSession(
+        configuration: .words(1, language: language), prompt: "ёл")
+      session.insert("eл", at: start)
+
+      XCTAssertEqual(session.outcome, .completed, "\(language.rawValue)")
+      XCTAssertEqual(session.errors, 0, "\(language.rawValue)")
+      XCTAssertEqual(session.typed, "ёл", "\(language.rawValue)")
+    }
+
+    let literalLanguages: [TypingLanguage] = [
+      .russianAbbreviations, .russianContractions, .russianContractions1k,
+    ]
+    for language in literalLanguages {
+      var session = TypingSession(
+        configuration: .words(1, language: language), prompt: "ёл")
+      session.insert("eл", at: start)
+
+      XCTAssertEqual(session.errors, 1, "\(language.rawValue)")
+      XCTAssertEqual(session.typed, "eл", "\(language.rawValue)")
+    }
+  }
+
   func testTimedStatsRejectAnIncorrectActiveWordPrefix() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber")
     session.insert("amxzr", at: start)

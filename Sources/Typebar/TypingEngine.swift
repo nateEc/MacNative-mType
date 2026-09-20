@@ -21,9 +21,16 @@ private enum InputCharacterEquivalence {
     ["–", "—", "-", "‐", "‑"],
     [",", "‚"],
   ]
+  static let russianYoSet: Set<Character> = ["ё", "е", "e"]
 
-  static func matches(_ first: Character, _ second: Character) -> Bool {
-    first == second || sets.contains { $0.contains(first) && $0.contains(second) }
+  static func matches(
+    _ first: Character, _ second: Character, language: TypingLanguage
+  ) -> Bool {
+    if first == second || sets.contains(where: { $0.contains(first) && $0.contains(second) }) {
+      return true
+    }
+    return language.usesRussianYoInputEquivalence
+      && russianYoSet.contains(first) && russianYoSet.contains(second)
   }
 }
 
@@ -3794,7 +3801,7 @@ struct TypingSession {
     {
       return expected
     }
-    if InputCharacterEquivalence.matches(character, expected) {
+    if InputCharacterEquivalence.matches(character, expected, language: configuration.language) {
       return expected
     }
     return isReferenceInputSpace(character) ? " " : character
@@ -11609,6 +11616,17 @@ extension TypingLanguage {
 
   var isCodeLanguage: Bool {
     self == .dockerFile || rawValue.hasPrefix("code")
+  }
+
+  /// The fixed reference normalizes ё/е/e only for the base Russian catalog
+  /// and its numeric sizes; specialized Russian catalogs retain literal input.
+  var usesRussianYoInputEquivalence: Bool {
+    switch self {
+    case .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k, .russian375k:
+      true
+    default:
+      false
+    }
   }
 
   /// Mirrors Monkeytype's `noLazyMode` language metadata for every Typebar
