@@ -138,6 +138,7 @@ struct CloudSyncView: View {
                             Text(period.displayName).tag(period)
                         }
                     }
+                    WPMLeaderboardRefreshCountdown(period: leaderboardPeriod)
                     Button("刷新\(leaderboardScope.displayName)", action: loadLeaderboard)
                         .disabled(isLoadingLeaderboard || (leaderboardScope == .friends && account.currentUser == nil))
                     if isLoadingLeaderboard { ProgressView() }
@@ -200,6 +201,7 @@ struct CloudSyncView: View {
                             Text(scope.displayName).tag(scope)
                         }
                     }
+                    ExperienceLeaderboardRefreshCountdown(period: experiencePeriod)
                     Button("刷新\(experienceScope.displayName)", action: loadExperienceLeaderboard)
                         .disabled(isLoadingExperience || (experienceScope == .friends && account.currentUser == nil))
                     if isLoadingExperience { ProgressView() }
@@ -417,6 +419,46 @@ struct CloudSyncView: View {
             presets: namedPresets,
             savedTexts: namedSavedTexts,
             activeTestSelection: settings.activeTestSelection)
+    }
+}
+
+private struct WPMLeaderboardRefreshCountdown: View {
+    let period: RemoteLeaderboardPeriod
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if let message = LeaderboardRefreshSchedule.message(for: period, at: context.date) {
+                Label(message, systemImage: "clock.arrow.circlepath")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .accessibilityLabel(message)
+            } else {
+                Text("历史周期已固定")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct ExperienceLeaderboardRefreshCountdown: View {
+    let period: RemoteExperienceLeaderboardPeriod
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if let message = LeaderboardRefreshSchedule.message(for: period, at: context.date) {
+                Label(message, systemImage: "clock.arrow.circlepath")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .accessibilityLabel(message)
+            } else {
+                Text("历史周期已固定")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

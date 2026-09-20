@@ -579,6 +579,35 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(entry.consistency, 0)
   }
 
+  func testLeaderboardRefreshCountdownMatchesPinnedUTCCadence() throws {
+    let formatter = ISO8601DateFormatter()
+    let afternoon = try XCTUnwrap(formatter.date(from: "2024-07-01T13:08:30Z"))
+    let mondayMidnight = try XCTUnwrap(formatter.date(from: "2024-07-01T00:00:00Z"))
+    let finalMillisecondBeforeRefresh = Date(timeIntervalSince1970: 1_719_839_699.999)
+
+    XCTAssertEqual(
+      LeaderboardRefreshSchedule.remainingSeconds(for: .all, at: afternoon), 390)
+    XCTAssertEqual(
+      LeaderboardRefreshSchedule.remainingSeconds(for: .all, at: finalMillisecondBeforeRefresh), 1)
+    XCTAssertEqual(
+      LeaderboardRefreshSchedule.remainingSeconds(for: .day, at: afternoon), 39_089)
+    XCTAssertNil(LeaderboardRefreshSchedule.remainingSeconds(for: .yesterday, at: afternoon))
+    XCTAssertEqual(
+      LeaderboardRefreshSchedule.remainingSeconds(
+        for: RemoteLeaderboardPeriod.week, at: mondayMidnight), 604_799)
+    XCTAssertEqual(
+      LeaderboardRefreshSchedule.remainingSeconds(for: RemoteExperienceLeaderboardPeriod.week, at: mondayMidnight),
+      604_799)
+    XCTAssertNil(
+      LeaderboardRefreshSchedule.remainingSeconds(
+        for: RemoteExperienceLeaderboardPeriod.lastWeek, at: mondayMidnight))
+    XCTAssertEqual(
+      LeaderboardRefreshSchedule.message(for: .all, at: afternoon), "下次刷新：06:30")
+    XCTAssertEqual(
+      LeaderboardRefreshSchedule.message(for: RemoteLeaderboardPeriod.week, at: mondayMidnight),
+      "下次重置：6 天 23:59:59")
+  }
+
   func testLeaderboardRankResponsesDecodeAnAbsentStanding() throws {
     let wpm = try JSONDecoder().decode(
       RemoteLeaderboardRankResponse.self, from: Data(#"{"entry":null}"#.utf8))
