@@ -5729,9 +5729,8 @@ private struct ResultsHistoryView: View {
       metrics: metrics, dayBoundaryOffsetHours: settings.streakDayBoundaryOffsetHours)
   }
 
-  private var recentActivity: [ActivityBarPoint] {
-    ActivityAggregation.recentDays(
-      activity: activity, dayBoundaryOffsetHours: settings.streakDayBoundaryOffsetHours)
+  private var chartActivity: [ActivityBarPoint] {
+    ActivityAggregation.chartDays(activity: activity)
   }
 
   private var speedHistogram: [SpeedHistogramBucket] {
@@ -5770,7 +5769,7 @@ private struct ResultsHistoryView: View {
               .padding(.top, 8)
 
             ActivityBarChartView(
-              points: recentActivity, measure: $activityChartMeasure,
+              points: chartActivity, measure: $activityChartMeasure,
               speedUnit: settings.typingSpeedUnit, startsAtZero: settings.startGraphsAtZero)
               .padding(.horizontal)
               .padding(.top, 8)
@@ -6558,7 +6557,7 @@ private struct ActivityBarChartView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
       HStack {
-        Text("近 28 日练习").font(.caption.weight(.medium))
+        Text("每日练习").font(.caption.weight(.medium))
         Spacer()
         Picker("柱状图指标", selection: $measure) {
           ForEach(ResultsHistoryView.ActivityChartMeasure.allCases) { measure in

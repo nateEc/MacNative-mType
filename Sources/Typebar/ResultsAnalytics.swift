@@ -2285,6 +2285,29 @@ enum ActivityAggregation {
         }
     }
 
+    /// Builds the complete set of observed calendar days represented by a filtered
+    /// activity set. Swift Charts preserves the dates between these points on its
+    /// time axis without inventing zero-valued activity records.
+    static func chartDays(
+        activity: [DailyActivity], calendar: Calendar = .current
+    ) -> [ActivityBarPoint] {
+        activity
+            .sorted { calendar.startOfDay(for: $0.day) < calendar.startOfDay(for: $1.day) }
+            .map { value in
+                let day = calendar.startOfDay(for: value.day)
+                return ActivityBarPoint(
+                    day: day,
+                    completedTests: value.completedTests,
+                    typingSeconds: value.typingSeconds,
+                    averageWPM: value.averageWPM,
+                    highestWPM: value.highestWPM,
+                    averageAccuracy: value.averageAccuracy,
+                    averageConsistency: value.averageConsistency,
+                    restartsPerCompletedTest: value.restartsPerCompletedTest
+                )
+            }
+    }
+
     private static func average(_ values: [Int]) -> Double {
         guard !values.isEmpty else { return 0 }
         return Double(values.reduce(0, +)) / Double(values.count)

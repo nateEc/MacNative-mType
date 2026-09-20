@@ -702,6 +702,8 @@ INP-04 的“按键位图”档用所选 Typebar 布局的原创映射，将 QMK
 
 2026-09-20 `CFG-02`、`VIS-02`、`VIS-05` 键盘矩阵更正：`KeyboardLayout` 的 244 个 Typebar 自有内置布局均可用于提示、明确 AppKit 物理键模拟、归档和 Layout Fluid（最多 15 项）。同一 raw value 在 `KeyboardInputLayout` 中解析为对应布局，因此视觉选择与显式模拟不再各自维护目录。覆盖范围包含 Greek、BDS/传统音标 Bulgarian、Belarusian、Macedonian、Pashto、Estonian、Persian Standard/Farsi、Arabic 101/102/macOS、Urdu Phonetic、Thai Kedmanee/Pattachote、Japanese Hiragana、Hindi InScript、Tamil99、Armenian HM QWERTY、Mongolian Cyrillic、Hebrew 与 Serbian Cyrillic 等非 Latin 布局；默认系统输入、未定义死键及系统层仍交由 macOS。此条取代表格中“二十种”或仅 Russian、Ukrainian、Serbian 可原生模拟的历史快照；总数、固定目录与关键布局持久化均有客户端测试守护。
 
+2026-09-20 `MET-04`、`MET-35`、`MET-51`、`MET-56` 每日活动图更正：表中较早的“近 28 日”或“连续空白日写入零活动”描述均由当前行为取代。每日图对当前筛选的完整本机结果集按统计日界聚合，输出有完成成绩的实际日期；Swift Charts 时间轴保持日期之间的真实间隔，不合成零日记录或平均值。分钟趋势仍只以实际有成绩日期拟合；活动日历维持其独立的 52 周／自然年范围。
+
 ## 可追溯性规则
 
 每个实现 PR/提交必须至少写出一个本表 ID。完成时还要补充：测试文件、人工验收步骤、数据迁移策略和隐私/离线行为。任何 ID 为“未开始”或“部分实现”时，完整重写仍未完成。

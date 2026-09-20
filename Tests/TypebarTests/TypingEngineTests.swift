@@ -20820,6 +20820,29 @@ final class TypingEngineTests: XCTestCase {
       ])
   }
 
+  func testActivityChartCoversTheEntireFilteredHistoryWithoutCollapsingGaps() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let firstDay = Date(timeIntervalSince1970: 86_400)
+    let activity = [
+      DailyActivity(
+        day: firstDay.addingTimeInterval(3 * 86_400), completedTests: 1, typingSeconds: 30,
+        averageWPM: 60, highestWPM: 60, averageAccuracy: 90, averageConsistency: 50,
+        restartsPerCompletedTest: 0),
+      DailyActivity(
+        day: firstDay, completedTests: 2, typingSeconds: 75,
+        averageWPM: 45.5, highestWPM: 51, averageAccuracy: 85.5, averageConsistency: 80,
+        restartsPerCompletedTest: 1.5),
+    ]
+
+    let points = ActivityAggregation.chartDays(activity: activity, calendar: calendar)
+
+    XCTAssertEqual(points.map(\.day), [firstDay, firstDay.addingTimeInterval(3 * 86_400)])
+    XCTAssertEqual(points.map(\.completedTests), [2, 1])
+    XCTAssertEqual(points.map(\.typingSeconds), [75, 30])
+    XCTAssertEqual(ActivityAggregation.chartDays(activity: [], calendar: calendar), [])
+  }
+
   func testActivityBarSelectionChoosesNearestCalendarPointAndRejectsEmptyInput() {
     let start = Date(timeIntervalSince1970: 86_400)
     let points = [
