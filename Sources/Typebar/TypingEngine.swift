@@ -1368,7 +1368,7 @@ enum TypingTextNormalizer {
     let ligatures: [(String, String)] = [
       ("ß", "ss"), ("ẞ", "SS"), ("æ", "ae"), ("Æ", "AE"),
       ("œ", "oe"), ("Œ", "OE"), ("ø", "o"), ("Ø", "O"),
-      ("ł", "l"), ("Ł", "L"), ("đ", "d"), ("Đ", "D"),
+      ("ł", "l"), ("Ł", "L"), ("đ", "d"), ("Đ", "D"), ("ı", "i"),
     ]
     let thornExpanded = expandThorn(in: value)
     let expanded = ligatures.reduce(thornExpanded) { text, replacement in

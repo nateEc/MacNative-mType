@@ -18341,6 +18341,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.prompt, "thorn")
   }
 
+  func testLazyLatinModifierExpandsTurkishDotlessI() {
+    XCTAssertEqual(TypingTextNormalizer.lazyLatin("kırmızı"), "kirmizi")
+
+    let configuration = TestConfiguration.words(1, language: .turkish).with(
+      modifiers: [.lazyLatin])
+    let session = TestSessionFactory.make(
+      configuration: configuration, streamPrompt: "kırmızı")
+    XCTAssertEqual(session.prompt, "kirmizi")
+  }
+
   func testLazyInputPolicyMirrorsReferenceLanguageAndPolyglotAvailability() {
     XCTAssertFalse(TypingLanguage.english.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.hindi.supportsLazyLatinInput)
