@@ -5284,6 +5284,74 @@ enum IndicPunctuationPolicy {
   }
 }
 
+/// Generates the standard reference word stream while retaining the quote
+/// exclusions used by the Russian, Ukrainian, and Slovak language families.
+enum SlavicPunctuationPolicy {
+  static func punctuatedPrompt(
+    _ tokens: [String], allowsDoubleQuotes: Bool, allowsApostrophes: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    generatedPrompt(
+      tokens, allowsDoubleQuotes: allowsDoubleQuotes, allowsApostrophes: allowsApostrophes,
+      includesPunctuation: true, includesNumbers: false, random: random)
+  }
+
+  static func generatedPrompt(
+    _ tokens: [String], allowsDoubleQuotes: Bool, allowsApostrophes: Bool,
+    includesPunctuation: Bool, includesNumbers: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    var result: [String] = []
+    for (index, raw) in tokens.enumerated() {
+      let word = includesPunctuation ? punctuated(
+        previous: result.last, raw: raw, index: index, total: tokens.count,
+        allowsDoubleQuotes: allowsDoubleQuotes, allowsApostrophes: allowsApostrophes,
+        random: random) : raw
+      result.append(includesNumbers && random() < 0.1 ? number(random: random) : word)
+    }
+    return result
+  }
+
+  private static func punctuated(
+    previous: String?, raw: String, index: Int, total: Int,
+    allowsDoubleQuotes: Bool, allowsApostrophes: Bool, random: () -> Double
+  ) -> String {
+    let last = previous?.last
+    let followsComma = last == ","
+    let followsPeriod = last == "."
+    let followsSemicolon = last == ";" || last == "؛" || last == "；" || last == "："
+    let followsColon = last == ":" || last == "："
+    if index == 0 || [".", "?", "!", "؟"].contains(last) {
+      guard let first = raw.first else { return raw }
+      return String(first).uppercased() + raw.dropFirst()
+    }
+    if (random() < 0.1 && !followsPeriod && !followsComma && index != total - 2) || index == total - 1 {
+      let choice = random()
+      if choice <= 0.8 { return raw + "." }
+      if choice > 0.8 && choice < 0.9 { return raw + "?" }
+      return raw + "!"
+    }
+    if random() < 0.01 && !followsComma && !followsPeriod && allowsDoubleQuotes { return "\"\(raw)\"" }
+    if random() < 0.011 && !followsComma && !followsPeriod && allowsApostrophes { return "'\(raw)'" }
+    if random() < 0.012 && !followsComma && !followsPeriod { return "(\(raw))" }
+    if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon { return raw + ":" }
+    if random() < 0.014 && !followsComma && !followsPeriod && previous != "-" { return "-" }
+    if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon { return raw + ";" }
+    if random() < 0.2 && !followsComma { return raw + "," }
+    return raw
+  }
+
+  private static func number(random: () -> Double) -> String {
+    let count = min(max(Int(random() * 4), 0), 3) + 1
+    return (0..<count).map { index in
+      let lower = index == 0 ? 1 : 0
+      let range = index == 0 ? 9 : 10
+      let offset = min(max(Int(random() * Double(range)), 0), range - 1)
+      return String(lower + offset)
+    }.joined()
+  }
+}
+
 /// Applies the source-compatible Turkish sentence case and contextual marks to
 /// Typebar-owned Turkish words without importing the web generator or corpus.
 enum TurkishPunctuationPolicy {
@@ -10925,13 +10993,13 @@ enum StarterLexicon {
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .slovak:
-      return prompt(
-        tokens: count, lexicon: slovakWords, separator: " ", punctuation: [",", ".", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: slovakWords, allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .slovak1k, .slovak10k:
-      return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+      return slavicPrompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), allowsDoubleQuotes: true,
+        allowsApostrophes: false, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .slovenian:
       return prompt(
@@ -11154,85 +11222,85 @@ enum StarterLexicon {
         punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .russian:
-      return prompt(
-        tokens: count, lexicon: russianWords, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: russianWords, allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian1k:
-      return prompt(
-        tokens: count, lexicon: russian1kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: russian1kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian5k:
-      return prompt(
-        tokens: count, lexicon: russian5kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: russian5kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian10k:
-      return prompt(
-        tokens: count, lexicon: russian10kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: russian10kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian25k:
-      return prompt(
-        tokens: count, lexicon: russian25kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: russian25kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian50k:
-      return prompt(
-        tokens: count, lexicon: russian50kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: russian50kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian375k:
-      return prompt(
-        tokens: count, lexicon: russian375kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: russian375kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russianAbbreviations:
-      return prompt(
-        tokens: count, lexicon: russianAbbreviationWords, separator: " ", punctuation: [".", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return slavicPrompt(
+        tokens: count, lexicon: russianAbbreviationWords, allowsDoubleQuotes: false,
+        allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russianContractions:
-      return entryPrompt(
-        tokens: count, entries: russianShortFormWords, contentOptions: contentOptions,
-        lowercasesWithoutPunctuation: true)
+      return slavicEntryPrompt(
+        tokens: count, entries: russianShortFormWords, allowsDoubleQuotes: false,
+        allowsApostrophes: false, contentOptions: contentOptions, lowercasesWithoutPunctuation: true)
     case .russianContractions1k:
-      return entryPrompt(
-        tokens: count, entries: russianShortForm1kWords, contentOptions: contentOptions,
-        lowercasesWithoutPunctuation: true)
+      return slavicEntryPrompt(
+        tokens: count, entries: russianShortForm1kWords, allowsDoubleQuotes: false,
+        allowsApostrophes: false, contentOptions: contentOptions, lowercasesWithoutPunctuation: true)
     case .ukrainian:
-      return prompt(
-        tokens: count, lexicon: ukrainianWords, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainianWords, allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainian1k:
-      return prompt(
-        tokens: count, lexicon: ukrainian1kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainian1kLexicon, allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainian10k:
-      return prompt(
-        tokens: count, lexicon: ukrainian10kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainian10kLexicon, allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainian50k:
-      return prompt(
-        tokens: count, lexicon: ukrainian50kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainian50kLexicon, allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianEndings:
-      return prompt(
-        tokens: count, lexicon: ukrainianEndingWords, separator: " ", punctuation: [".", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainianEndingWords, allowsDoubleQuotes: true,
+        allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatin:
-      return prompt(
-        tokens: count, lexicon: ukrainianLatinWords, separator: " ", punctuation: [".", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainianLatinWords, allowsDoubleQuotes: true,
+        allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynka1k:
-      return prompt(
-        tokens: count, lexicon: ukrainianLatynka1kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainianLatynka1kLexicon, allowsDoubleQuotes: true,
+        allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynka10k:
-      return prompt(
-        tokens: count, lexicon: ukrainianLatynka10kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainianLatynka10kLexicon, allowsDoubleQuotes: true,
+        allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynka50k:
-      return prompt(
-        tokens: count, lexicon: ukrainianLatynka50kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainianLatynka50kLexicon, allowsDoubleQuotes: true,
+        allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynkaEndings:
-      return prompt(
-        tokens: count, lexicon: ukrainianLatynkaEndingWords, separator: " ", punctuation: [".", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return slavicPrompt(
+        tokens: count, lexicon: ukrainianLatynkaEndingWords, allowsDoubleQuotes: true,
+        allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseHiragana:
       return prompt(
         tokens: count, lexicon: japaneseHiraganaWords, separator: "",
@@ -11500,6 +11568,60 @@ enum StarterLexicon {
     guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
     return IndicPunctuationPolicy.generatedPrompt(
       generated.split(separator: " ").map(String.init), digits: digits,
+      includesPunctuation: contentOptions.includePunctuation, includesNumbers: contentOptions.includeNumbers
+    ).joined(separator: " ")
+  }
+
+  static func slavicPrompt(
+    tokens: Int, lexicon: [String], allowsDoubleQuotes: Bool, allowsApostrophes: Bool,
+    contentOptions: ContentOptions, usesZipfFrequency: Bool
+  ) -> String {
+    slavicPrompt(
+      tokens: tokens, lexicon: IndexedLexicon(lexicon), allowsDoubleQuotes: allowsDoubleQuotes,
+      allowsApostrophes: allowsApostrophes, contentOptions: contentOptions,
+      usesZipfFrequency: usesZipfFrequency)
+  }
+
+  static func slavicPrompt(
+    tokens: Int, lexicon: IndexedLexicon, allowsDoubleQuotes: Bool, allowsApostrophes: Bool,
+    contentOptions: ContentOptions, usesZipfFrequency: Bool
+  ) -> String {
+    let generated = prompt(
+      tokens: tokens, lexicon: lexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      contentOptions: ContentOptions(), usesZipfFrequency: usesZipfFrequency)
+    guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
+    return SlavicPunctuationPolicy.generatedPrompt(
+      generated.split(separator: " ").map(String.init), allowsDoubleQuotes: allowsDoubleQuotes,
+      allowsApostrophes: allowsApostrophes, includesPunctuation: contentOptions.includePunctuation,
+      includesNumbers: contentOptions.includeNumbers
+    ).joined(separator: " ")
+  }
+
+  static func slavicEntryPrompt(
+    tokens: Int, entries: [String], allowsDoubleQuotes: Bool, allowsApostrophes: Bool,
+    contentOptions: ContentOptions, lowercasesWithoutPunctuation: Bool = false
+  ) -> String {
+    let punctuationEligibleEntries = contentOptions.includePunctuation
+      ? entries
+      : entries.filter { entry in entry.allSatisfy { $0.isLetter || $0.isNumber || $0.isWhitespace } }
+    let eligibleEntries = contentOptions.includeNumbers
+      ? punctuationEligibleEntries
+      : punctuationEligibleEntries.filter { !$0.contains(where: \.isNumber) }
+    precondition(!eligibleEntries.isEmpty)
+    var words: [String] = []
+    while words.count < tokens {
+      let entry = eligibleEntries[Int.random(in: eligibleEntries.indices)]
+      let entryWords = entry.split(whereSeparator: \.isWhitespace).map(String.init)
+      words.append(contentsOf: lowercasesWithoutPunctuation && !contentOptions.includePunctuation
+        ? entryWords.map { $0.lowercased() }
+        : entryWords)
+    }
+    words = Array(words.prefix(tokens))
+    guard contentOptions.includePunctuation || contentOptions.includeNumbers else {
+      return words.joined(separator: " ")
+    }
+    return SlavicPunctuationPolicy.generatedPrompt(
+      words, allowsDoubleQuotes: allowsDoubleQuotes, allowsApostrophes: allowsApostrophes,
       includesPunctuation: contentOptions.includePunctuation, includesNumbers: contentOptions.includeNumbers
     ).joined(separator: " ")
   }

@@ -10098,9 +10098,9 @@ final class TypingEngineTests: XCTestCase {
         contentOptions: ContentOptions(includeNumbers: true))
         .split(separator: " ").map(String.init)
       XCTAssertEqual(numbered.count, 25)
-      XCTAssertEqual(numbered[0], "1")
-      XCTAssertEqual(numbered[9], "2")
-      XCTAssertEqual(numbered[18], "3")
+      XCTAssertTrue(numbered.allSatisfy {
+        $0.allSatisfy(\.isNumber) || $0.range(of: "^[а-яё]+$", options: .regularExpression) != nil
+      })
 
       for length in [QuoteLength.short, .medium, .long, .extended] {
         let quotes = OfflineContent.quotes(for: language, length: length)
@@ -15904,6 +15904,37 @@ final class TypingEngineTests: XCTestCase {
       ["১", "কলম।"])
   }
 
+  func testSlavicPunctuationPolicyHonorsSourceQuoteExclusions() {
+    var russianRandomValues = [0.9, 0, 0, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0]
+    XCTAssertEqual(
+      SlavicPunctuationPolicy.punctuatedPrompt(
+        ["вода", "река", "море"], allowsDoubleQuotes: false, allowsApostrophes: false,
+        random: { russianRandomValues.removeFirst() }),
+      ["Вода", "река", "море."])
+
+    var ukrainianRandomValues = [0.9, 0, 0.9, 0]
+    XCTAssertEqual(
+      SlavicPunctuationPolicy.punctuatedPrompt(
+        ["вода", "ріка", "море"], allowsDoubleQuotes: true, allowsApostrophes: false,
+        random: { ukrainianRandomValues.removeFirst() }),
+      ["Вода", "\"ріка\"", "море."])
+
+    var slovakRandomValues = [0.9, 0.9, 0, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0]
+    XCTAssertEqual(
+      SlavicPunctuationPolicy.punctuatedPrompt(
+        ["dom", "strom", "more"], allowsDoubleQuotes: true, allowsApostrophes: false,
+        random: { slovakRandomValues.removeFirst() }),
+      ["Dom", "strom", "more."])
+
+    var numberRandomValues = [0, 0, 0, 0.9]
+    XCTAssertEqual(
+      SlavicPunctuationPolicy.generatedPrompt(
+        ["слово", "ряд"], allowsDoubleQuotes: false, allowsApostrophes: false,
+        includesPunctuation: false, includesNumbers: true,
+        random: { numberRandomValues.removeFirst() }),
+      ["1", "ряд"])
+  }
+
   func testSentenceInitialTokensSkipTerminalPunctuationBranches() {
     XCTAssertEqual(EnglishPunctuationPolicy.punctuatedPrompt(["are"], random: { 0 }), ["Are"])
     XCTAssertEqual(SpanishPunctuationPolicy.punctuatedPrompt(["casa"], random: { 0.95 }), ["¿Casa"])
@@ -17852,6 +17883,12 @@ final class TypingEngineTests: XCTestCase {
           .urdu, .urdu1k, .urdu5k, .urduRoman,
           .hindi, .hindi1k, .bangla, .bangla10k, .banglaLetters,
           .nepali, .nepali1k, .nepaliRomanized,
+          .slovak, .slovak1k, .slovak10k,
+          .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k,
+          .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k,
+          .ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k, .ukrainianEndings,
+          .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k,
+          .ukrainianLatynka50k, .ukrainianLatynkaEndings,
         ].contains(language) && rawToken == "-" {
           return nil
         }
@@ -17883,6 +17920,14 @@ final class TypingEngineTests: XCTestCase {
           }
         case .french, .persianRomanized, .urduRoman, .nepaliRomanized:
           baseTokens = [normalized.lowercased()]
+        case
+          .slovak, .slovak1k, .slovak10k,
+          .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k,
+          .russian375k, .russianAbbreviations, .russianContractions, .russianContractions1k,
+          .ukrainian, .ukrainian1k, .ukrainian10k, .ukrainian50k, .ukrainianEndings,
+          .ukrainianLatin, .ukrainianLatynka1k, .ukrainianLatynka10k,
+          .ukrainianLatynka50k, .ukrainianLatynkaEndings:
+          baseTokens = [normalized, normalized.lowercased()]
         case .greek:
           baseTokens = [normalized.lowercased()]
         default:
