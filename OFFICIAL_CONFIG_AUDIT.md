@@ -19,7 +19,7 @@
 | 官方键 | Typebar 对应项 | 状态与证据 |
 | --- | --- | --- |
 | `punctuation` | `ContentOptions.includePunctuation` | 已映射；进入 `TestConfiguration` 与历史筛选。兼容的英文词表以原生的上下文分支生成句末、引号、括号、冒号、破折号、分号、逗号和随机缩写；首词及 `.?!` 后词句首大写，外围标点和大小写保持一致。 |
-| `numbers` | `ContentOptions.includeNumbers` | 已映射；进入 `TestConfiguration` 与历史筛选。 |
+| `numbers` | `ContentOptions.includeNumbers` | 已映射；进入 `TestConfiguration` 与历史筛选。兼容英文词流会在标点处理后以 10% 概率替换为 1–4 位、首位非零的独立数字 token。 |
 | `words` | `TestConfiguration.wordLimit` | 已映射；命令面板含 10/25/50/100 标准值与自定义非负安全整数输入，0 表示无限；大型有限值按需扩展提示。 |
 | `time` | `TestConfiguration.duration` | 已映射；命令面板含 15/30/60/120 标准值与自定义非负安全整数秒输入，0 表示无限；大型有限值按需扩展提示。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |

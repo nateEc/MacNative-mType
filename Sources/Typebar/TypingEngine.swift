@@ -4539,14 +4539,23 @@ enum EnglishPunctuationPolicy {
   static func punctuatedPrompt(
     _ rawTokens: [String], random: () -> Double = { Double.random(in: 0..<1) }
   ) -> [String] {
-    var punctuated: [String] = []
+    generatedPrompt(rawTokens, includesPunctuation: true, includesNumbers: false, random: random)
+  }
+
+  static func generatedPrompt(
+    _ rawTokens: [String], includesPunctuation: Bool, includesNumbers: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    var generated: [String] = []
     for (index, rawToken) in rawTokens.enumerated() {
-      punctuated.append(
-        punctuatedToken(
-          previousToken: punctuated.last, rawToken: rawToken, index: index,
-          totalCount: rawTokens.count, random: random))
+      let punctuated = includesPunctuation
+        ? punctuatedToken(
+          previousToken: generated.last, rawToken: rawToken, index: index,
+          totalCount: rawTokens.count, random: random)
+        : rawToken
+      generated.append(includesNumbers && random() < 0.1 ? numberToken(random: random) : punctuated)
     }
-    return punctuated
+    return generated
   }
 
   private static func isASCIIAlphabetic(_ character: Character) -> Bool {
@@ -4613,6 +4622,15 @@ enum EnglishPunctuationPolicy {
       return rawToken + ","
     }
     return transformed(rawToken, random: random)
+  }
+
+  private static func numberToken(random: () -> Double) -> String {
+    let length = boundedIndex(random(), upperBound: 4) + 1
+    return (0..<length).map { index in
+      let lowerBound = index == 0 ? 1 : 0
+      let rangeSize = index == 0 ? 9 : 10
+      return String(lowerBound + boundedIndex(random(), upperBound: rangeSize))
+    }.joined()
   }
 
   private static func capitalizingFirstCharacter(in token: String) -> String {
@@ -10639,24 +10657,27 @@ enum StarterLexicon {
 
   static func englishPrompt(
     tokens: Int, lexicon: [String], contentOptions: ContentOptions,
-    usesZipfFrequency: Bool, punctuationRandom: () -> Double = { Double.random(in: 0..<1) }
+    usesZipfFrequency: Bool, contentRandom: () -> Double = { Double.random(in: 0..<1) }
   ) -> String {
     englishPrompt(
       tokens: tokens, lexicon: IndexedLexicon(lexicon), contentOptions: contentOptions,
-      usesZipfFrequency: usesZipfFrequency, punctuationRandom: punctuationRandom)
+      usesZipfFrequency: usesZipfFrequency, contentRandom: contentRandom)
   }
 
   static func englishPrompt(
     tokens: Int, lexicon: IndexedLexicon, contentOptions: ContentOptions,
-    usesZipfFrequency: Bool, punctuationRandom: () -> Double = { Double.random(in: 0..<1) }
+    usesZipfFrequency: Bool, contentRandom: () -> Double = { Double.random(in: 0..<1) }
   ) -> String {
     let generated = prompt(
       tokens: tokens, lexicon: lexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-      contentOptions: ContentOptions(includeNumbers: contentOptions.includeNumbers),
+      contentOptions: ContentOptions(),
       usesZipfFrequency: usesZipfFrequency)
-    guard contentOptions.includePunctuation else { return generated }
-    return EnglishPunctuationPolicy.punctuatedPrompt(
-      generated.split(separator: " ").map(String.init), random: punctuationRandom
+    guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
+    return EnglishPunctuationPolicy.generatedPrompt(
+      generated.split(separator: " ").map(String.init),
+      includesPunctuation: contentOptions.includePunctuation,
+      includesNumbers: contentOptions.includeNumbers,
+      random: contentRandom
     ).joined(separator: " ")
   }
 

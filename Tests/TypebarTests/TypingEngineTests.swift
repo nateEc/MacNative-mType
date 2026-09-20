@@ -15573,8 +15573,7 @@ final class TypingEngineTests: XCTestCase {
     let options = ContentOptions(includePunctuation: true, includeNumbers: true)
     let configuration = TestConfiguration.words(10, language: .english, contentOptions: options)
     var session = TestSessionFactory.make(configuration: configuration)
-    XCTAssertTrue(session.prompt.contains(where: { $0.isNumber }))
-    XCTAssertTrue(session.prompt.contains(where: { ",.!?".contains($0) }))
+    XCTAssertEqual(session.prompt.split(separator: " ").count, 10)
 
     session.insert(session.prompt, at: start)
     XCTAssertEqual(session.outcome, .completed)
@@ -15624,16 +15623,25 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(words, ["Are", "it'll", "are?"])
   }
 
+  func testEnglishContentPolicyReplacesPunctuatedWordsWithIndependentNumbers() {
+    var randomValues = [0.0, 0.9, 0.0, 0.1, 0.2, 0.3, 0.9, 0.0, 0.9]
+    let words = EnglishPunctuationPolicy.generatedPrompt(
+      ["are", "it"], includesPunctuation: true, includesNumbers: true,
+      random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["1123", "it."])
+  }
+
   func testEnglishPromptPunctuatesOnlyWhenPunctuationIsEnabled() {
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
         tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
-        usesZipfFrequency: false, punctuationRandom: { 0 }),
+        usesZipfFrequency: false, contentRandom: { 0 }),
       "Are")
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
         tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(),
-        usesZipfFrequency: false, punctuationRandom: { 0 }),
+        usesZipfFrequency: false, contentRandom: { 0 }),
       "are")
   }
 
@@ -15641,7 +15649,7 @@ final class TypingEngineTests: XCTestCase {
     var punctuationRandomValues = [0.0, 0.0, 0.9, 0.85]
     let words = StarterLexicon.englishPrompt(
       tokens: 4, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
-      usesZipfFrequency: false, punctuationRandom: { punctuationRandomValues.removeFirst() }
+      usesZipfFrequency: false, contentRandom: { punctuationRandomValues.removeFirst() }
     ).split(separator: " ").map(String.init)
 
     XCTAssertEqual(words, ["Are", "are.", "Are", "are?"])
