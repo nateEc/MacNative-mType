@@ -1370,12 +1370,35 @@ enum TypingTextNormalizer {
       ("œ", "oe"), ("Œ", "OE"), ("ø", "o"), ("Ø", "O"),
       ("ł", "l"), ("Ł", "L"), ("đ", "d"), ("Đ", "D"),
     ]
-    let expanded = ligatures.reduce(value) { text, replacement in
+    let thornExpanded = expandThorn(in: value)
+    let expanded = ligatures.reduce(thornExpanded) { text, replacement in
       text.replacingOccurrences(of: replacement.0, with: replacement.1)
     }
     let latinSimplified = expanded.folding(
       options: [.diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
     return simplifyArabicMarks(in: latinSimplified)
+  }
+
+  /// Thorn expands to the two-key sequence used by simplified Icelandic input.
+  /// When it starts an all-caps word, the second replacement letter follows
+  /// the casing of the next source character as well.
+  private static func expandThorn(in value: String) -> String {
+    let characters = Array(value)
+    return characters.enumerated().reduce(into: "") { output, entry in
+      let (index, character) = entry
+      switch character {
+      case "þ":
+        output += "th"
+      case "Þ":
+        let nextIndex = index + 1
+        let secondLetterIsUppercase =
+          nextIndex < characters.count
+          && String(characters[nextIndex]) == String(characters[nextIndex]).uppercased()
+        output += secondLetterIsUppercase ? "TH" : "Th"
+      default:
+        output.append(character)
+      }
+    }
   }
 
   /// Arabic simplified input deliberately removes only short-vowel, tanwin,

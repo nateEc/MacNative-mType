@@ -18329,6 +18329,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(session.prompt.contains("ß"))
   }
 
+  func testLazyLatinModifierExpandsIcelandicThornWithCasePreserved() {
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("þorn Þorn ÞORN"),
+      "thorn Thorn THORN")
+
+    let configuration = TestConfiguration.words(1, language: .icelandic).with(
+      modifiers: [.lazyLatin])
+    let session = TestSessionFactory.make(
+      configuration: configuration, streamPrompt: "þorn")
+    XCTAssertEqual(session.prompt, "thorn")
+  }
+
   func testLazyInputPolicyMirrorsReferenceLanguageAndPolyglotAvailability() {
     XCTAssertFalse(TypingLanguage.english.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.hindi.supportsLazyLatinInput)
