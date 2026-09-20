@@ -20967,6 +20967,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(rollingCells.first?.day, calendar.date(byAdding: .day, value: -363, to: endingAt))
     XCTAssertEqual(rollingCells.last?.day, endingAt)
     XCTAssertEqual(rollingCells.last?.completedTests, 1)
+    XCTAssertEqual(ActivityHeatmap.completedTestCount(in: rollingCells), 4)
 
     let calendarYearCells = ActivityHeatmap.cells(
       activity: activity, period: .calendarYear(2024), endingAt: endingAt, calendar: calendar)
@@ -20975,6 +20976,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(calendarYearCells.last?.day, last2024Day)
     XCTAssertEqual(calendarYearCells.first?.completedTests, 2)
     XCTAssertEqual(calendarYearCells.last?.completedTests, 3)
+    XCTAssertEqual(ActivityHeatmap.completedTestCount(in: calendarYearCells), 5)
   }
 
   func testActivityHeatmapMonthMarkersAlignWithVisibleWeekColumns() {

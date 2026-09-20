@@ -6786,12 +6786,13 @@ private struct ActivityHeatmapView: View {
     return calendar.shortMonthSymbols[index]
   }
 
+  private var completedTestCount: Int { ActivityHeatmap.completedTestCount(in: cells) }
   private var hasCompletedTests: Bool { cells.contains { $0.completedTests > 0 } }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
-        Text("活动日历").font(.caption.weight(.medium))
+        Text("活动日历 · \(completedTestCount) 次完成").font(.caption.weight(.medium))
         Spacer()
         Picker("活动范围", selection: $selectedPeriod) {
           ForEach(availablePeriods) { period in
@@ -6800,7 +6801,20 @@ private struct ActivityHeatmapView: View {
         }
         .pickerStyle(.menu)
         .frame(width: 142)
-        Text("深色代表更多完成次数").font(.caption2).foregroundStyle(.secondary)
+        HStack(spacing: 3) {
+          Text("少")
+          ForEach(0...4, id: \.self) { intensity in
+            RoundedRectangle(cornerRadius: 2)
+              .fill(Color.accentColor.opacity(opacity(for: intensity)))
+              .frame(width: 11, height: 11)
+          }
+          Text("多")
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("完成次数强度图例")
+        .accessibilityValue("由少到多；当前范围共 \(completedTestCount) 次完成")
       }
       HStack(alignment: .top, spacing: 6) {
         VStack(spacing: 3) {

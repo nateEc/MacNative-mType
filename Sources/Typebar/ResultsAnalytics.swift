@@ -2322,6 +2322,10 @@ enum ActivityHeatmapPeriod: Hashable, Identifiable {
 }
 
 enum ActivityHeatmap {
+    static func completedTestCount(in cells: [ActivityHeatmapCell]) -> Int {
+        cells.reduce(0) { count, cell in count + max(0, cell.completedTests) }
+    }
+
     static func monthMarkers(
         cells: [ActivityHeatmapCell], calendar: Calendar = .current
     ) -> [ActivityHeatmapMonthMarker] {
