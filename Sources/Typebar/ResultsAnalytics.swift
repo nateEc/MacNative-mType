@@ -2330,31 +2330,33 @@ enum ActivityHeatmap {
     /// remain neutral, while a small trimmed sample prevents a single import outlier
     /// from flattening every ordinary active day into the lightest color.
     static func displayCells(for cells: [ActivityHeatmapCell]) -> [ActivityHeatmapDisplayCell] {
-        let positiveCounts = cells.compactMap { cell -> Double? in
-            let count = max(0, cell.completedTests)
-            return count > 0 ? Double(count) : nil
-        }
-        guard !positiveCounts.isEmpty else {
+        let visibleCounts = cells.map { max(0, $0.completedTests) }
+        guard !visibleCounts.isEmpty else {
             return cells.map { .init(cell: $0, intensity: 0) }
         }
 
-        let sorted = positiveCounts.sorted()
+        let sorted = visibleCounts.sorted()
         let trimCount = min(
             Int((Double(sorted.count) * 0.1).rounded(.toNearestOrAwayFromZero)),
             (sorted.count - 1) / 2)
         let baselineValues = sorted[trimCount..<(sorted.count - trimCount)]
-        let baseline = baselineValues.reduce(0, +) / Double(baselineValues.count)
+        let baseline = baselineValues.reduce(0.0) { $0 + Double($1) } / Double(baselineValues.count)
+        let thresholds = [
+            (baseline / 2).rounded(.down),
+            baseline.rounded(.toNearestOrAwayFromZero),
+            (baseline * 1.5).rounded(.toNearestOrAwayFromZero),
+        ]
 
         return cells.map { cell in
             let count = Double(max(0, cell.completedTests))
             let intensity: Int
             if count == 0 {
                 intensity = 0
-            } else if count <= baseline * 0.5 {
+            } else if count <= thresholds[0] {
                 intensity = 1
-            } else if count <= baseline {
+            } else if count <= thresholds[1] {
                 intensity = 2
-            } else if count <= baseline * 1.5 {
+            } else if count <= thresholds[2] {
                 intensity = 3
             } else {
                 intensity = 4

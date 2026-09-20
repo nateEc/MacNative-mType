@@ -20934,7 +20934,7 @@ final class TypingEngineTests: XCTestCase {
       activity: activity, days: 4, endingAt: end, calendar: calendar)
 
     XCTAssertEqual(cells.map(\.completedTests), [0, 0, 1, 5])
-    XCTAssertEqual(ActivityHeatmap.displayCells(for: cells).map(\.intensity), [0, 0, 1, 4])
+    XCTAssertEqual(ActivityHeatmap.displayCells(for: cells).map(\.intensity), [0, 0, 2, 4])
   }
 
   func testActivityHeatmapTrimsOutliersWhenDerivingDisplayIntensity() {
@@ -20946,6 +20946,27 @@ final class TypingEngineTests: XCTestCase {
     }
 
     XCTAssertEqual(ActivityHeatmap.displayCells(for: cells).map(\.intensity), [0, 1, 2, 2, 3, 4])
+  }
+
+  func testActivityHeatmapKeepsKnownZeroDaysInTheVisibleDistribution() {
+    let day = Date(timeIntervalSince1970: 0)
+    let counts = Array(repeating: 0, count: 10) + [1, 2]
+    let cells = counts.enumerated().map { offset, count in
+      ActivityHeatmapCell(
+        day: day.addingTimeInterval(TimeInterval(offset * 86_400)),
+        completedTests: count)
+    }
+
+    XCTAssertEqual(
+      ActivityHeatmap.displayCells(for: cells).map(\.intensity),
+      Array(repeating: 0, count: 10) + [4, 4])
+
+    let halfMeanCells = [0, 1].enumerated().map { offset, count in
+      ActivityHeatmapCell(
+        day: day.addingTimeInterval(TimeInterval(offset * 86_400)),
+        completedTests: count)
+    }
+    XCTAssertEqual(ActivityHeatmap.displayCells(for: halfMeanCells).map(\.intensity), [0, 2])
   }
 
   func testActivityHeatmapOffersRollingAndCalendarYearRanges() {
