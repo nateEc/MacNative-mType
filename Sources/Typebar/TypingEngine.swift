@@ -3397,7 +3397,7 @@ struct TypingSession {
     if configuration.modifiers.contains(.noSpaces), isReferenceInputSpace(character) {
       return false
     }
-    if character == "\n", !configuration.language.isCodeLanguage, !prompt.contains("\n") {
+    if character == "\n", !prompt.contains("\n") {
       return false
     }
     extendPromptIfNeeded()

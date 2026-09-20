@@ -3523,6 +3523,12 @@ final class TypingEngineTests: XCTestCase {
     var plainPrompt = TypingSession(configuration: .words(1), prompt: "amber")
     plainPrompt.insert("\n", at: start)
     XCTAssertFalse(plainPrompt.hasStarted)
+
+    var singleLineCode = TypingSession(
+      configuration: .words(1, language: .codeSwift), prompt: "let value")
+    singleLineCode.insert("\n", at: start)
+    XCTAssertFalse(singleLineCode.hasStarted)
+    XCTAssertEqual(singleLineCode.typed, "")
   }
 
   func testTimedStatsRejectAnIncorrectActiveWordPrefix() {
