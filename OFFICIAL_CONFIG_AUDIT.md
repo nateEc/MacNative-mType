@@ -18,7 +18,7 @@
 
 | 官方键 | Typebar 对应项 | 状态与证据 |
 | --- | --- | --- |
-| `punctuation` | `ContentOptions.includePunctuation` | 已映射；进入 `TestConfiguration` 与历史筛选。 |
+| `punctuation` | `ContentOptions.includePunctuation` | 已映射；进入 `TestConfiguration` 与历史筛选。兼容的英文词表还会以原生随机缩写替换基础词，同时保留大小写与外围标点。 |
 | `numbers` | `ContentOptions.includeNumbers` | 已映射；进入 `TestConfiguration` 与历史筛选。 |
 | `words` | `TestConfiguration.wordLimit` | 已映射；命令面板含 10/25/50/100 标准值与自定义非负安全整数输入，0 表示无限；大型有限值按需扩展提示。 |
 | `time` | `TestConfiguration.duration` | 已映射；命令面板含 15/30/60/120 标准值与自定义非负安全整数秒输入，0 表示无限；大型有限值按需扩展提示。 |

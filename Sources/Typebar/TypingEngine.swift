@@ -4497,6 +4497,73 @@ struct IndexedLexicon: RandomAccessCollection {
   }
 }
 
+/// Recreates the visible English contraction behavior used when punctuation is
+/// enabled without depending on the reference generator or its word lists.
+enum EnglishPunctuationPolicy {
+  private static let replacements: [String: [String]] = [
+    "are": ["aren't"], "can": ["can't"], "could": ["couldn't"],
+    "did": ["didn't"], "does": ["doesn't"], "do": ["don't"],
+    "had": ["hadn't"], "has": ["hasn't"], "have": ["haven't"],
+    "is": ["isn't"], "it": ["it's", "it'll"],
+    "i": ["i'm", "i'll", "i've", "i'd"],
+    "you": ["you'll", "you're", "you've", "you'd"],
+    "that": ["that's", "that'll", "that'd"],
+    "must": ["mustn't", "must've"],
+    "there": ["there's", "there'll", "there'd"],
+    "he": ["he's", "he'll", "he'd"], "she": ["she's", "she'll", "she'd"],
+    "we": ["we're", "we'll", "we'd"], "they": ["they're", "they'll", "they'd"],
+    "should": ["shouldn't", "should've"], "was": ["wasn't"],
+    "were": ["weren't"], "will": ["won't"],
+    "would": ["wouldn't", "would've"], "going": ["goin'"]
+  ]
+
+  static func transformed(_ token: String, random: () -> Double = { Double.random(in: 0..<1) }) -> String {
+    guard random() < 0.5 else { return token }
+
+    let characters = Array(token)
+    var start = 0
+    while start < characters.count, !isASCIIAlphabetic(characters[start]) { start += 1 }
+    var end = characters.count
+    while end > start, !isASCIIAlphabetic(characters[end - 1]) { end -= 1 }
+    guard start < end else { return token }
+
+    let prefix = String(characters[..<start])
+    let source = String(characters[start..<end])
+    let suffix = end < characters.count ? String(characters[end...]) : ""
+    guard let choices = replacements[source.lowercased()] else { return token }
+
+    let choice = choices[boundedIndex(random(), upperBound: choices.count)]
+    return prefix + preservingCase(of: source, in: choice) + suffix
+  }
+
+  static func transformedPrompt(
+    _ prompt: String, random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    prompt.split(separator: " ", omittingEmptySubsequences: false)
+      .map { transformed(String($0), random: random) }
+      .joined(separator: " ")
+  }
+
+  private static func isASCIIAlphabetic(_ character: Character) -> Bool {
+    character.isASCII && character.isLetter
+  }
+
+  private static func boundedIndex(_ value: Double, upperBound: Int) -> Int {
+    let normalized = min(max(value, 0), 0.999_999_999)
+    return min(Int(normalized * Double(upperBound)), upperBound - 1)
+  }
+
+  private static func preservingCase(of source: String, in replacement: String) -> String {
+    if source != "I", source == source.uppercased() {
+      return replacement.uppercased()
+    }
+    guard let first = source.first, String(first) == String(first).uppercased() else {
+      return replacement
+    }
+    return replacement.prefix(1).uppercased() + replacement.dropFirst()
+  }
+}
+
 enum StarterLexicon {
   private static let englishScaleRoots = [
     "amber", "birch", "cairn", "delta", "ember", "field", "grove", "harbor",
@@ -9183,30 +9250,29 @@ enum StarterLexicon {
     }
     switch language {
     case .english:
-      return prompt(
-        tokens: count, lexicon: englishVariant == .british ? britishWords : words, separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return englishPrompt(
+        tokens: count, lexicon: englishVariant == .british ? britishWords : words,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .english1k:
-      return prompt(
-        tokens: count, lexicon: english1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return englishPrompt(
+        tokens: count, lexicon: english1kLexicon, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .english5k:
-      return prompt(
-        tokens: count, lexicon: english5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return englishPrompt(
+        tokens: count, lexicon: english5kLexicon, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .english10k:
-      return prompt(
-        tokens: count, lexicon: english10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return englishPrompt(
+        tokens: count, lexicon: english10kLexicon, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .english25k:
-      return prompt(
-        tokens: count, lexicon: english25kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return englishPrompt(
+        tokens: count, lexicon: english25kLexicon, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .english450k:
-      return prompt(
-        tokens: count, lexicon: english450kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return englishPrompt(
+        tokens: count, lexicon: english450kLexicon, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .englishFiveLetter:
       return prompt(
         tokens: count, lexicon: englishFiveLetterWords, separator: " ",
@@ -9218,39 +9284,32 @@ enum StarterLexicon {
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishCommonlyMisspelled:
-      return prompt(
-        tokens: count, lexicon: englishCommonlyMisspelledWords, separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+      return englishPrompt(
+        tokens: count, lexicon: englishCommonlyMisspelledWords, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishContractions:
-      return prompt(
-        tokens: count, lexicon: englishContractionWords, separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+      return englishPrompt(
+        tokens: count, lexicon: englishContractionWords, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishDoubleLetter:
-      return prompt(
-        tokens: count, lexicon: englishDoubleLetterWords, separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+      return englishPrompt(
+        tokens: count, lexicon: englishDoubleLetterWords, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishLegal:
-      return prompt(
-        tokens: count, lexicon: englishLegalWords, separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+      return englishPrompt(
+        tokens: count, lexicon: englishLegalWords, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishMedical:
-      return prompt(
-        tokens: count, lexicon: englishMedicalWords, separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+      return englishPrompt(
+        tokens: count, lexicon: englishMedicalWords, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishShakespearean:
-      return prompt(
-        tokens: count, lexicon: englishShakespeareanWords, separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+      return englishPrompt(
+        tokens: count, lexicon: englishShakespeareanWords, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .oldEnglish:
-      return prompt(
-        tokens: count, lexicon: oldEnglishWords, separator: " ",
-        punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
+      return englishPrompt(
+        tokens: count, lexicon: oldEnglishWords, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .kokanu:
       return prompt(
@@ -10515,6 +10574,26 @@ enum StarterLexicon {
         from: lexicon, punctuation: punctuation, index: index, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     }.joined(separator: separator)
+  }
+
+  static func englishPrompt(
+    tokens: Int, lexicon: [String], contentOptions: ContentOptions,
+    usesZipfFrequency: Bool, punctuationRandom: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    englishPrompt(
+      tokens: tokens, lexicon: IndexedLexicon(lexicon), contentOptions: contentOptions,
+      usesZipfFrequency: usesZipfFrequency, punctuationRandom: punctuationRandom)
+  }
+
+  static func englishPrompt(
+    tokens: Int, lexicon: IndexedLexicon, contentOptions: ContentOptions,
+    usesZipfFrequency: Bool, punctuationRandom: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    let generated = prompt(
+      tokens: tokens, lexicon: lexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+      contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+    guard contentOptions.includePunctuation else { return generated }
+    return EnglishPunctuationPolicy.transformedPrompt(generated, random: punctuationRandom)
   }
 
   private static func sectionPrompt(

@@ -15581,6 +15581,45 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.configuration.contentOptions, options)
   }
 
+  func testEnglishPunctuationPolicyAddsReferenceStyleContractions() {
+    XCTAssertEqual(
+      EnglishPunctuationPolicy.transformed("are", random: { 0 }),
+      "aren't")
+    XCTAssertEqual(
+      EnglishPunctuationPolicy.transformed("Are,", random: { 0 }),
+      "Aren't,")
+    XCTAssertEqual(
+      EnglishPunctuationPolicy.transformed("ARE!", random: { 0 }),
+      "AREN'T!")
+    XCTAssertEqual(
+      EnglishPunctuationPolicy.transformed("I", random: { 0 }),
+      "I'm")
+    var replacementRandomValues = [0.0, 0.9]
+    XCTAssertEqual(
+      EnglishPunctuationPolicy.transformed("(it)", random: { replacementRandomValues.removeFirst() }),
+      "(it'll)")
+    XCTAssertEqual(
+      EnglishPunctuationPolicy.transformed("plain", random: { 0 }),
+      "plain")
+    XCTAssertEqual(
+      EnglishPunctuationPolicy.transformed("are", random: { 0.5 }),
+      "are")
+  }
+
+  func testEnglishPromptAppliesContractionsOnlyWhenPunctuationIsEnabled() {
+    var punctuationRandomValues = [0.0, 0.0]
+    XCTAssertEqual(
+      StarterLexicon.englishPrompt(
+        tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
+        usesZipfFrequency: false, punctuationRandom: { punctuationRandomValues.removeFirst() }),
+      "aren't,")
+    XCTAssertEqual(
+      StarterLexicon.englishPrompt(
+        tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(),
+        usesZipfFrequency: false, punctuationRandom: { 0 }),
+      "are")
+  }
+
   func testOfflineCharacterStreamsOverrideBuiltInWordsWithoutExternalContent() {
     let binary = TestSessionFactory.make(
       configuration: TestConfiguration.words(3).with(modifiers: [.binaryStream]))
