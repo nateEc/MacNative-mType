@@ -658,6 +658,10 @@ private struct PublicProfileActivityCalendar: View {
             completedTestsByDay: activity.testsByDays, endingAt: activity.lastDay, calendar: calendar)
     }
 
+    private var displayCells: [ActivityHeatmapDisplayCell] {
+        ActivityHeatmap.displayCells(for: cells)
+    }
+
     private var weekdaySymbols: [String] {
         let symbols = calendar.veryShortWeekdaySymbols
         let first = max(0, calendar.firstWeekday - 1)
@@ -737,14 +741,14 @@ private struct PublicProfileActivityCalendar: View {
                             ForEach(0..<leadingFillerCount, id: \.self) { _ in
                                 Color.clear.frame(width: 10, height: 10)
                             }
-                            ForEach(cells) { cell in
+                            ForEach(displayCells) { displayCell in
                                 RoundedRectangle(cornerRadius: 2)
-                                    .fill(Color.accentColor.opacity(opacity(for: cell.intensity)))
+                                    .fill(Color.accentColor.opacity(opacity(for: displayCell.intensity)))
                                     .frame(width: 10, height: 10)
-                                    .accessibilityLabel(dayLabel(for: cell.day))
+                                    .accessibilityLabel(dayLabel(for: displayCell.cell.day))
                                     .accessibilityValue(
-                                        cell.completedTests == 0
-                                            ? "没有完成练习" : "\(cell.completedTests) 次完成")
+                                        displayCell.cell.completedTests == 0
+                                            ? "没有完成练习" : "\(displayCell.cell.completedTests) 次完成")
                             }
                             ForEach(0..<trailingFillerCount, id: \.self) { _ in
                                 Color.clear.frame(width: 10, height: 10)

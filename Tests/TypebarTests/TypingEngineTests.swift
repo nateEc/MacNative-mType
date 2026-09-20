@@ -20922,7 +20922,7 @@ final class TypingEngineTests: XCTestCase {
       [1, 1])
   }
 
-  func testHeatmapIncludesEmptyDaysAndMapsIntensity() {
+  func testHeatmapIncludesEmptyDaysAndDerivesDisplayIntensity() {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     let end = Date(timeIntervalSince1970: 345_600)
@@ -20934,7 +20934,18 @@ final class TypingEngineTests: XCTestCase {
       activity: activity, days: 4, endingAt: end, calendar: calendar)
 
     XCTAssertEqual(cells.map(\.completedTests), [0, 0, 1, 5])
-    XCTAssertEqual(cells.map(\.intensity), [0, 0, 1, 3])
+    XCTAssertEqual(ActivityHeatmap.displayCells(for: cells).map(\.intensity), [0, 0, 1, 4])
+  }
+
+  func testActivityHeatmapTrimsOutliersWhenDerivingDisplayIntensity() {
+    let day = Date(timeIntervalSince1970: 0)
+    let cells = [0, 1, 2, 3, 4, 100].enumerated().map { offset, count in
+      ActivityHeatmapCell(
+        day: day.addingTimeInterval(TimeInterval(offset * 86_400)),
+        completedTests: count)
+    }
+
+    XCTAssertEqual(ActivityHeatmap.displayCells(for: cells).map(\.intensity), [0, 1, 2, 2, 3, 4])
   }
 
   func testActivityHeatmapOffersRollingAndCalendarYearRanges() {
@@ -21010,6 +21021,13 @@ final class TypingEngineTests: XCTestCase {
     ])
     XCTAssertEqual(cells.map(\.completedTests), [2, 0, 0, 3])
     XCTAssertEqual(ActivityHeatmap.completedTestCount(in: cells), 5)
+
+    let saturatedCells = [
+      ActivityHeatmapCell(day: endingAt, completedTests: Int.max),
+      ActivityHeatmapCell(day: endingAt.addingTimeInterval(86_400), completedTests: 1),
+      ActivityHeatmapCell(day: endingAt.addingTimeInterval(172_800), completedTests: -4),
+    ]
+    XCTAssertEqual(ActivityHeatmap.completedTestCount(in: saturatedCells), Int.max)
   }
 
   @MainActor

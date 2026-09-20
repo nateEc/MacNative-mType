@@ -6751,6 +6751,10 @@ private struct ActivityHeatmapView: View {
     )
   }
 
+  private var displayCells: [ActivityHeatmapDisplayCell] {
+    ActivityHeatmap.displayCells(for: cells)
+  }
+
   private let rows = Array(repeating: GridItem(.fixed(11), spacing: 3), count: 7)
 
   private var weekdaySymbols: [String] {
@@ -6843,13 +6847,15 @@ private struct ActivityHeatmapView: View {
               ForEach(0..<leadingFillerCount, id: \.self) { _ in
                 Color.clear.frame(width: 11, height: 11)
               }
-              ForEach(cells) { cell in
+              ForEach(displayCells) { displayCell in
                 RoundedRectangle(cornerRadius: 2)
-                  .fill(Color.accentColor.opacity(opacity(for: cell.intensity)))
+                  .fill(Color.accentColor.opacity(opacity(for: displayCell.intensity)))
                   .frame(width: 11, height: 11)
-                  .accessibilityLabel(cell.day.formatted(date: .abbreviated, time: .omitted))
+                  .accessibilityLabel(
+                    displayCell.cell.day.formatted(date: .abbreviated, time: .omitted))
                   .accessibilityValue(
-                    cell.completedTests == 0 ? "没有完成练习" : "\(cell.completedTests) 次完成")
+                    displayCell.cell.completedTests == 0
+                      ? "没有完成练习" : "\(displayCell.cell.completedTests) 次完成")
               }
               ForEach(0..<trailingFillerCount, id: \.self) { _ in
                 Color.clear.frame(width: 11, height: 11)

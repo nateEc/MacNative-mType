@@ -2203,16 +2203,12 @@ struct ActivityHeatmapCell: Equatable, Identifiable {
     let day: Date
     let completedTests: Int
     var id: Date { day }
+}
 
-    var intensity: Int {
-        switch completedTests {
-        case 0: 0
-        case 1: 1
-        case 2...3: 2
-        case 4...6: 3
-        default: 4
-        }
-    }
+struct ActivityHeatmapDisplayCell: Equatable, Identifiable {
+    let cell: ActivityHeatmapCell
+    let intensity: Int
+    var id: Date { cell.id }
 }
 
 struct ActivityHeatmapMonthMarker: Equatable, Identifiable {
@@ -2323,7 +2319,48 @@ enum ActivityHeatmapPeriod: Hashable, Identifiable {
 
 enum ActivityHeatmap {
     static func completedTestCount(in cells: [ActivityHeatmapCell]) -> Int {
-        cells.reduce(0) { count, cell in count + max(0, cell.completedTests) }
+        cells.reduce(0) { count, cell in
+            let next = max(0, cell.completedTests)
+            guard count <= Int.max - next else { return Int.max }
+            return count + next
+        }
+    }
+
+    /// Derives five display levels from the visible activity distribution. Empty days
+    /// remain neutral, while a small trimmed sample prevents a single import outlier
+    /// from flattening every ordinary active day into the lightest color.
+    static func displayCells(for cells: [ActivityHeatmapCell]) -> [ActivityHeatmapDisplayCell] {
+        let positiveCounts = cells.compactMap { cell -> Double? in
+            let count = max(0, cell.completedTests)
+            return count > 0 ? Double(count) : nil
+        }
+        guard !positiveCounts.isEmpty else {
+            return cells.map { .init(cell: $0, intensity: 0) }
+        }
+
+        let sorted = positiveCounts.sorted()
+        let trimCount = min(
+            Int((Double(sorted.count) * 0.1).rounded(.toNearestOrAwayFromZero)),
+            (sorted.count - 1) / 2)
+        let baselineValues = sorted[trimCount..<(sorted.count - trimCount)]
+        let baseline = baselineValues.reduce(0, +) / Double(baselineValues.count)
+
+        return cells.map { cell in
+            let count = Double(max(0, cell.completedTests))
+            let intensity: Int
+            if count == 0 {
+                intensity = 0
+            } else if count <= baseline * 0.5 {
+                intensity = 1
+            } else if count <= baseline {
+                intensity = 2
+            } else if count <= baseline * 1.5 {
+                intensity = 3
+            } else {
+                intensity = 4
+            }
+            return .init(cell: cell, intensity: intensity)
+        }
     }
 
     static func monthMarkers(
