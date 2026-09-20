@@ -4586,10 +4586,9 @@ enum EnglishPunctuationPolicy {
     let followsPeriod = previousLastCharacter == "."
     let followsSemicolon = previousLastCharacter == ";"
     let followsColon = previousLastCharacter == ":"
-    var word = rawToken
 
     if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
-      word = capitalizingFirstCharacter(in: word)
+      return capitalizingFirstCharacter(in: rawToken)
     }
 
     if (
@@ -4597,32 +4596,32 @@ enum EnglishPunctuationPolicy {
         || index == totalCount - 1
     ) {
       let terminalChoice = random()
-      if terminalChoice <= 0.8 { return word + "." }
-      if terminalChoice < 0.9 { return word + "?" }
-      return word + "!"
+      if terminalChoice <= 0.8 { return rawToken + "." }
+      if terminalChoice < 0.9 { return rawToken + "?" }
+      return rawToken + "!"
     }
     if random() < 0.01 && !followsComma && !followsPeriod {
-      return "\"\(word)\""
+      return "\"\(rawToken)\""
     }
     if random() < 0.011 && !followsComma && !followsPeriod {
-      return "'\(word)'"
+      return "'\(rawToken)'"
     }
     if random() < 0.012 && !followsComma && !followsPeriod {
-      return "(\(word))"
+      return "(\(rawToken))"
     }
     if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ":"
+      return rawToken + ":"
     }
     if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
       return "-"
     }
     if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ";"
+      return rawToken + ";"
     }
     if random() < 0.2 && !followsComma {
-      return word + ","
+      return rawToken + ","
     }
-    return transformed(word, random: random)
+    return transformed(rawToken, random: random)
   }
 
   private static func numberToken(random: () -> Double) -> String {
@@ -4680,18 +4679,19 @@ enum SpanishPunctuationPolicy {
     let followsPeriod = previousLastCharacter == "."
     let followsSemicolon = previousLastCharacter == ";"
     let followsColon = previousLastCharacter == ":"
-    var word = rawToken
 
     if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
-      word = capitalizingFirstCharacter(in: word)
+      let word = capitalizingFirstCharacter(in: rawToken)
       let sentenceStartChoice = random()
       if sentenceStartChoice > 0.9 {
         sentenceTracker = "?"
-        word = "¿\(word)"
-      } else if sentenceStartChoice > 0.8 {
-        sentenceTracker = "!"
-        word = "¡\(word)"
+        return "¿\(word)"
       }
+      if sentenceStartChoice > 0.8 {
+        sentenceTracker = "!"
+        return "¡\(word)"
+      }
+      return word
     }
 
     if (
@@ -4699,30 +4699,30 @@ enum SpanishPunctuationPolicy {
         || index == totalCount - 1
     ) {
       defer { sentenceTracker = nil }
-      return sentenceTracker.map { word + String($0) } ?? word
+      return sentenceTracker.map { rawToken + String($0) } ?? rawToken
     }
     if random() < 0.01 && !followsComma && !followsPeriod {
-      return "\"\(word)\""
+      return "\"\(rawToken)\""
     }
     if random() < 0.011 && !followsComma && !followsPeriod {
-      return "'\(word)'"
+      return "'\(rawToken)'"
     }
     if random() < 0.012 && !followsComma && !followsPeriod {
-      return "(\(word))"
+      return "(\(rawToken))"
     }
     if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ":"
+      return rawToken + ":"
     }
     if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
       return "-"
     }
     if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ";"
+      return rawToken + ";"
     }
     if random() < 0.2 && !followsComma {
-      return word + ","
+      return rawToken + ","
     }
-    return word
+    return rawToken
   }
 
   private static func numberToken(random: () -> Double) -> String {
@@ -4783,10 +4783,9 @@ enum FrenchPunctuationPolicy {
     let followsPeriod = previousLastCharacter == "."
     let followsSemicolon = previousLastCharacter == ";"
     let followsColon = previousLastCharacter == ":"
-    var word = rawToken
 
     if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
-      word = capitalizingFirstCharacter(in: word)
+      return capitalizingFirstCharacter(in: rawToken)
     }
 
     if (
@@ -4794,18 +4793,18 @@ enum FrenchPunctuationPolicy {
         || index == totalCount - 1
     ) {
       let terminalChoice = random()
-      if terminalChoice <= 0.8 { return word + "." }
+      if terminalChoice <= 0.8 { return rawToken + "." }
       if terminalChoice < 0.9 { return "?" }
       return "!"
     }
     if random() < 0.01 && !followsComma && !followsPeriod {
-      return "\"\(word)\""
+      return "\"\(rawToken)\""
     }
     if random() < 0.011 && !followsComma && !followsPeriod {
-      return "'\(word)'"
+      return "'\(rawToken)'"
     }
     if random() < 0.012 && !followsComma && !followsPeriod {
-      return "(\(word))"
+      return "(\(rawToken))"
     }
     if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
       return ":"
@@ -4817,9 +4816,9 @@ enum FrenchPunctuationPolicy {
       return ";"
     }
     if random() < 0.2 && !followsComma {
-      return word + ","
+      return rawToken + ","
     }
-    return word
+    return rawToken
   }
 
   private static func numberToken(random: () -> Double) -> String {
@@ -4880,10 +4879,9 @@ enum GreekPunctuationPolicy {
     let followsPeriod = previousLastCharacter == "."
     let followsSemicolon = previousLastCharacter == ";"
     let followsColon = previousLastCharacter == ":"
-    var word = rawToken
 
     if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
-      word = capitalizingFirstCharacter(in: word)
+      return capitalizingFirstCharacter(in: rawToken)
     }
 
     if (
@@ -4891,21 +4889,21 @@ enum GreekPunctuationPolicy {
         || index == totalCount - 1
     ) {
       let terminalChoice = random()
-      if terminalChoice <= 0.8 { return word + "." }
-      if terminalChoice < 0.9 { return word + ";" }
-      return word + "!"
+      if terminalChoice <= 0.8 { return rawToken + "." }
+      if terminalChoice < 0.9 { return rawToken + ";" }
+      return rawToken + "!"
     }
     if random() < 0.01 && !followsComma && !followsPeriod {
-      return "\"\(word)\""
+      return "\"\(rawToken)\""
     }
     if random() < 0.011 && !followsComma && !followsPeriod {
-      return "'\(word)'"
+      return "'\(rawToken)'"
     }
     if random() < 0.012 && !followsComma && !followsPeriod {
-      return "(\(word))"
+      return "(\(rawToken))"
     }
     if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ":"
+      return rawToken + ":"
     }
     if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
       return "-"
@@ -4914,9 +4912,9 @@ enum GreekPunctuationPolicy {
       return "."
     }
     if random() < 0.2 && !followsComma {
-      return word + ","
+      return rawToken + ","
     }
-    return word
+    return rawToken
   }
 
   private static func numberToken(random: () -> Double) -> String {
@@ -4978,10 +4976,9 @@ enum KurdishPunctuationPolicy {
     let followsSemicolon = previousLastCharacter == ";" || previousLastCharacter == "؛"
       || previousLastCharacter == "；" || previousLastCharacter == "："
     let followsColon = previousLastCharacter == ":" || previousLastCharacter == "："
-    var word = rawToken
 
     if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
-      word = capitalizingFirstCharacter(in: word)
+      return capitalizingFirstCharacter(in: rawToken)
     }
 
     if (
@@ -4989,32 +4986,32 @@ enum KurdishPunctuationPolicy {
         || index == totalCount - 1
     ) {
       let terminalChoice = random()
-      if terminalChoice <= 0.8 { return word + "." }
-      if terminalChoice < 0.9 { return word + "؟" }
-      return word + "!"
+      if terminalChoice <= 0.8 { return rawToken + "." }
+      if terminalChoice < 0.9 { return rawToken + "؟" }
+      return rawToken + "!"
     }
     if random() < 0.01 && !followsComma && !followsPeriod {
-      return "\"\(word)\""
+      return "\"\(rawToken)\""
     }
     if random() < 0.011 && !followsComma && !followsPeriod {
-      return "'\(word)'"
+      return "'\(rawToken)'"
     }
     if random() < 0.012 && !followsComma && !followsPeriod {
-      return "(\(word))"
+      return "(\(rawToken))"
     }
     if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ":"
+      return rawToken + ":"
     }
     if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
       return "-"
     }
     if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon {
-      return word + "؛"
+      return rawToken + "؛"
     }
     if random() < 0.2 && !followsComma {
-      return word + "،"
+      return rawToken + "،"
     }
-    return word
+    return rawToken
   }
 
   private static func numberToken(random: () -> Double) -> String {
@@ -5077,10 +5074,9 @@ enum ArabicPunctuationPolicy {
     let followsSemicolon = previousLastCharacter == ";" || previousLastCharacter == "؛"
       || previousLastCharacter == "；" || previousLastCharacter == "："
     let followsColon = previousLastCharacter == ":" || previousLastCharacter == "："
-    var word = rawToken
 
     if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
-      word = capitalizingFirstCharacter(in: word)
+      return capitalizingFirstCharacter(in: rawToken)
     }
 
     if (
@@ -5088,32 +5084,32 @@ enum ArabicPunctuationPolicy {
         || index == totalCount - 1
     ) {
       let terminalChoice = random()
-      if terminalChoice <= 0.8 { return word + "." }
-      if terminalChoice < 0.9 { return word + "؟" }
-      return word + "!"
+      if terminalChoice <= 0.8 { return rawToken + "." }
+      if terminalChoice < 0.9 { return rawToken + "؟" }
+      return rawToken + "!"
     }
     if random() < 0.01 && !followsComma && !followsPeriod {
-      return "\"\(word)\""
+      return "\"\(rawToken)\""
     }
     if random() < 0.011 && !followsComma && !followsPeriod {
-      return "'\(word)'"
+      return "'\(rawToken)'"
     }
     if random() < 0.012 && !followsComma && !followsPeriod {
-      return "(\(word))"
+      return "(\(rawToken))"
     }
     if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ":"
+      return rawToken + ":"
     }
     if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
       return "-"
     }
     if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon {
-      return word + "؛"
+      return rawToken + "؛"
     }
     if random() < 0.2 && !followsComma {
-      return word + "،"
+      return rawToken + "،"
     }
-    return word
+    return rawToken
   }
 
   private static func numberToken(random: () -> Double) -> String {
@@ -5174,10 +5170,9 @@ enum TurkishPunctuationPolicy {
     let followsPeriod = previousLastCharacter == "."
     let followsSemicolon = previousLastCharacter == ";"
     let followsColon = previousLastCharacter == ":"
-    var word = rawToken
 
     if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
-      word = sentenceCase(word)
+      return sentenceCase(rawToken)
     }
 
     if (
@@ -5185,32 +5180,32 @@ enum TurkishPunctuationPolicy {
         || index == totalCount - 1
     ) {
       let terminalChoice = random()
-      if terminalChoice <= 0.8 { return word + "." }
-      if terminalChoice < 0.9 { return word + "?" }
-      return word + "!"
+      if terminalChoice <= 0.8 { return rawToken + "." }
+      if terminalChoice < 0.9 { return rawToken + "?" }
+      return rawToken + "!"
     }
     if random() < 0.01 && !followsComma && !followsPeriod {
-      return "\"\(word)\""
+      return "\"\(rawToken)\""
     }
     if random() < 0.011 && !followsComma && !followsPeriod {
-      return "'\(word)'"
+      return "'\(rawToken)'"
     }
     if random() < 0.012 && !followsComma && !followsPeriod {
-      return "(\(word))"
+      return "(\(rawToken))"
     }
     if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ":"
+      return rawToken + ":"
     }
     if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
       return "-"
     }
     if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
-      return word + ";"
+      return rawToken + ";"
     }
     if random() < 0.2 && !followsComma {
-      return word + ","
+      return rawToken + ","
     }
-    return word
+    return rawToken
   }
 
   private static func sentenceCase(_ token: String) -> String {

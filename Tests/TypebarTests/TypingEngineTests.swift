@@ -15606,9 +15606,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testEnglishPunctuationPolicyFollowsSentenceBranchOrder() {
-    var randomValues =
-      Array(repeating: 0.9, count: 9) + [0.0, 0.0]
-      + Array(repeating: 0.9, count: 10) + [0.85]
+    var randomValues = [0.0, 0.0, 0.9, 0.85]
     let words = EnglishPunctuationPolicy.punctuatedPrompt(
       ["are", "it", "are", "are"], random: { randomValues.removeFirst() })
 
@@ -15617,9 +15615,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testEnglishPunctuationPolicyAppliesContractionsAfterOtherBranches() {
     var randomValues = [
-      0.9, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.9,
-      0.9, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0, 0.9,
-      0.9, 0.85,
+      0.9, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0, 0.9, 0.9, 0.85,
     ]
     let words = EnglishPunctuationPolicy.punctuatedPrompt(
       ["are", "it", "are"], random: { randomValues.removeFirst() })
@@ -15628,8 +15624,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testEnglishContentPolicyReplacesPunctuatedWordsWithIndependentNumbers() {
-    var randomValues =
-      Array(repeating: 0.9, count: 9) + [0.0, 0.9, 0.0, 0.1, 0.2, 0.3, 0.9, 0.0, 0.9]
+    var randomValues = [0.0, 0.9, 0.0, 0.1, 0.2, 0.3, 0.9, 0.0, 0.9]
     let words = EnglishPunctuationPolicy.generatedPrompt(
       ["are", "it"], includesPunctuation: true, includesNumbers: true,
       random: { randomValues.removeFirst() })
@@ -15638,7 +15633,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testSpanishPunctuationPolicyPairsInvertedQuestionMarksAcrossSentences() {
-    var randomValues = [0.95] + Array(repeating: 0.9, count: 17)
+    var randomValues = [0.95] + Array(repeating: 0.9, count: 9)
     let words = SpanishPunctuationPolicy.punctuatedPrompt(
       ["casa", "luz", "rio"], random: { randomValues.removeFirst() })
 
@@ -15646,8 +15641,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testSpanishContentPolicyReplacesWordsWithIndependentNumbers() {
-    var randomValues =
-      [0.0] + Array(repeating: 0.9, count: 8) + [0.0, 0.9, 0.0, 0.1, 0.2, 0.3, 0.9, 0.9]
+    var randomValues = [0.0, 0.0, 0.9, 0.0, 0.1, 0.2, 0.3, 0.9, 0.9]
     let words = SpanishPunctuationPolicy.generatedPrompt(
       ["casa", "rio"], includesPunctuation: true, includesNumbers: true,
       random: { randomValues.removeFirst() })
@@ -15656,7 +15650,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testSpanishPromptUsesSentencePolicyOnlyWhenPunctuationIsEnabled() {
-    var randomValues = [0.95] + Array(repeating: 0.9, count: 17)
+    var randomValues = [0.95] + Array(repeating: 0.9, count: 9)
     XCTAssertEqual(
       StarterLexicon.spanishPrompt(
         tokens: 3, lexicon: ["casa"], contentOptions: ContentOptions(includePunctuation: true),
@@ -15670,9 +15664,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testTurkishPunctuationPolicyUsesDottedSentenceCase() {
-    var randomValues =
-      Array(repeating: 0.9, count: 8) + [0.0, 0.85]
-      + Array(repeating: 0.9, count: 9) + [0.0]
+    var randomValues = [0.0, 0.85, 0.9, 0.0]
     let words = TurkishPunctuationPolicy.punctuatedPrompt(
       ["istanbul", "kent", "izmir", "odak"], random: { randomValues.removeFirst() })
 
@@ -15682,7 +15674,7 @@ final class TypingEngineTests: XCTestCase {
   func testTurkishPunctuationPolicyConflatesDotlessSentenceInitialI() {
     XCTAssertEqual(
       TurkishPunctuationPolicy.punctuatedPrompt(["ışık"], random: { 0 }),
-      ["İşık."])
+      ["İşık"])
   }
 
   func testTurkishPromptUsesSentencePolicyOnlyWhenPunctuationIsEnabled() {
@@ -15690,7 +15682,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.turkishPrompt(
         tokens: 1, lexicon: ["istanbul"], contentOptions: ContentOptions(includePunctuation: true),
         usesZipfFrequency: false, contentRandom: { 0 }),
-      "İstanbul.")
+      "İstanbul")
     XCTAssertEqual(
       StarterLexicon.turkishPrompt(
         tokens: 1, lexicon: ["istanbul"], contentOptions: ContentOptions(),
@@ -15699,7 +15691,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testFrenchPunctuationPolicyUsesStandaloneTerminalSymbols() {
-    var randomValues = Array(repeating: 0.9, count: 17) + [0.85]
+    var randomValues = Array(repeating: 0.9, count: 9) + [0.85]
     let words = FrenchPunctuationPolicy.punctuatedPrompt(
       ["maison", "lumiere", "rivage"], random: { randomValues.removeFirst() })
 
@@ -15707,11 +15699,10 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testFrenchPunctuationPolicyUsesStandaloneColonAndSemicolon() {
-    var randomValues = Array(repeating: 0.9, count: 8)
-    randomValues += Array(repeating: 0.9, count: 4) + [0]
-    randomValues += [0.9, 0.9, 0.9, 0.9, 0, 0.9, 0.9, 0.9]
-    randomValues += Array(repeating: 0.9, count: 6) + [0]
-    randomValues += [0.9, 0]
+    var randomValues =
+      Array(repeating: 0.9, count: 4) + [0]
+      + Array(repeating: 0.9, count: 14) + [0]
+      + [0.9, 0]
     let words = FrenchPunctuationPolicy.punctuatedPrompt(
       ["un", "deux", "trois", "quatre", "cinq"], random: { randomValues.removeFirst() })
 
@@ -15719,7 +15710,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testFrenchContentPolicyReplacesWordsWithIndependentNumbers() {
-    var randomValues = Array(repeating: 0.9, count: 8) + [0, 0, 0, 0.9, 0, 0.9]
+    var randomValues = [0, 0, 0, 0.9, 0, 0.9]
     let words = FrenchPunctuationPolicy.generatedPrompt(
       ["maison", "rivage"], includesPunctuation: true, includesNumbers: true,
       random: { randomValues.removeFirst() })
@@ -15732,7 +15723,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.frenchPrompt(
         tokens: 1, lexicon: ["maison"], contentOptions: ContentOptions(includePunctuation: true),
         usesZipfFrequency: false, contentRandom: { 0 }),
-      "Maison.")
+      "Maison")
     XCTAssertEqual(
       StarterLexicon.frenchPrompt(
         tokens: 1, lexicon: ["maison"], contentOptions: ContentOptions(),
@@ -15741,7 +15732,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testGreekPunctuationPolicyUsesSemicolonForQuestions() {
-    var randomValues = Array(repeating: 0.9, count: 17) + [0.85]
+    var randomValues = Array(repeating: 0.9, count: 9) + [0.85]
     let words = GreekPunctuationPolicy.punctuatedPrompt(
       ["πρωί", "λόγος", "φως"], random: { randomValues.removeFirst() })
 
@@ -15749,10 +15740,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testGreekPunctuationPolicyUsesStandalonePeriodForSeparatorBranch() {
-    var randomValues =
-      Array(repeating: 0.9, count: 8)
-      + Array(repeating: 0.9, count: 6) + [0]
-      + Array(repeating: 0.9, count: 9) + [0]
+    var randomValues = Array(repeating: 0.9, count: 6) + [0, 0.9, 0]
     let words = GreekPunctuationPolicy.punctuatedPrompt(
       ["ένα", "δύο", "τρία", "τέσσερα"], random: { randomValues.removeFirst() })
 
@@ -15760,7 +15748,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testGreekContentPolicyReplacesWordsWithIndependentNumbers() {
-    var randomValues = Array(repeating: 0.9, count: 8) + [0, 0, 0, 0.9, 0, 0.9]
+    var randomValues = [0, 0, 0, 0.9, 0, 0.9]
     let words = GreekPunctuationPolicy.generatedPrompt(
       ["ένα", "δύο"], includesPunctuation: true, includesNumbers: true,
       random: { randomValues.removeFirst() })
@@ -15773,7 +15761,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.greekPrompt(
         tokens: 1, lexicon: ["πρωί"], contentOptions: ContentOptions(includePunctuation: true),
         usesZipfFrequency: false, contentRandom: { 0 }),
-      "Πρωί.")
+      "Πρωί")
     XCTAssertEqual(
       StarterLexicon.greekPrompt(
         tokens: 1, lexicon: ["πρωί"], contentOptions: ContentOptions(),
@@ -15782,7 +15770,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testKurdishPunctuationPolicyUsesArabicQuestionMarks() {
-    var randomValues = Array(repeating: 0.9, count: 17) + [0.85]
+    var randomValues = Array(repeating: 0.9, count: 9) + [0.85]
     let words = KurdishPunctuationPolicy.punctuatedPrompt(
       ["کتێب", "قەڵەم", "پەنجەرە"], random: { randomValues.removeFirst() })
 
@@ -15790,10 +15778,9 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testKurdishPunctuationPolicyUsesArabicSeparators() {
-    var randomValues = Array(repeating: 0.9, count: 8)
-    randomValues += Array(repeating: 0.9, count: 6) + [0]
-    randomValues += Array(repeating: 0.9, count: 7) + [0]
-    randomValues += [0.9, 0]
+    var randomValues =
+      Array(repeating: 0.9, count: 6) + [0]
+      + Array(repeating: 0.9, count: 7) + [0, 0.9, 0]
     let words = KurdishPunctuationPolicy.punctuatedPrompt(
       ["کتێب", "قەڵەم", "ڕێگا", "پەنجەرە"], random: { randomValues.removeFirst() })
 
@@ -15801,7 +15788,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testKurdishContentPolicyUsesArabicIndicNumbers() {
-    var randomValues = Array(repeating: 0.9, count: 8) + [0, 0, 0, 0.9, 0, 0.9]
+    var randomValues = [0, 0, 0, 0.9, 0, 0.9]
     let words = KurdishPunctuationPolicy.generatedPrompt(
       ["کتێب", "قەڵەم"], includesPunctuation: true, includesNumbers: true,
       random: { randomValues.removeFirst() })
@@ -15823,7 +15810,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testArabicPunctuationPolicyUsesArabicQuestionMarks() {
-    var randomValues = Array(repeating: 0.9, count: 17) + [0.85]
+    var randomValues = Array(repeating: 0.9, count: 9) + [0.85]
     let words = ArabicPunctuationPolicy.punctuatedPrompt(
       ["كتاب", "قلم", "نافذة"], random: { randomValues.removeFirst() })
 
@@ -15831,10 +15818,9 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testArabicPunctuationPolicyUsesArabicSeparators() {
-    var randomValues = Array(repeating: 0.9, count: 8)
-    randomValues += Array(repeating: 0.9, count: 6) + [0]
-    randomValues += Array(repeating: 0.9, count: 7) + [0]
-    randomValues += [0.9, 0]
+    var randomValues =
+      Array(repeating: 0.9, count: 6) + [0]
+      + Array(repeating: 0.9, count: 7) + [0, 0.9, 0]
     let words = ArabicPunctuationPolicy.punctuatedPrompt(
       ["كتاب", "قلم", "طريق", "نافذة"], random: { randomValues.removeFirst() })
 
@@ -15842,8 +15828,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testArabicContentPolicyKeepsAsciiNumbers() {
-    var randomValues =
-      Array(repeating: 0.9, count: 8) + [0, 0, 0, 0.9, 0, 0.9]
+    var randomValues = [0, 0, 0, 0.9, 0, 0.9]
     let words = ArabicPunctuationPolicy.generatedPrompt(
       ["كتاب", "قلم"], includesPunctuation: true, includesNumbers: true,
       random: { randomValues.removeFirst() })
@@ -15864,14 +15849,14 @@ final class TypingEngineTests: XCTestCase {
       "كتاب كتاب كتاب")
   }
 
-  func testSentenceInitialTokensStillReachTheirTerminalPunctuationBranches() {
-    XCTAssertEqual(EnglishPunctuationPolicy.punctuatedPrompt(["are"], random: { 0 }), ["Are."])
-    XCTAssertEqual(SpanishPunctuationPolicy.punctuatedPrompt(["casa"], random: { 0.95 }), ["¿Casa?"])
-    XCTAssertEqual(FrenchPunctuationPolicy.punctuatedPrompt(["maison"], random: { 0 }), ["Maison."])
-    XCTAssertEqual(GreekPunctuationPolicy.punctuatedPrompt(["πρωί"], random: { 0 }), ["Πρωί."])
-    XCTAssertEqual(KurdishPunctuationPolicy.punctuatedPrompt(["کتێب"], random: { 0 }), ["کتێب."])
-    XCTAssertEqual(ArabicPunctuationPolicy.punctuatedPrompt(["كتاب"], random: { 0 }), ["كتاب."])
-    XCTAssertEqual(TurkishPunctuationPolicy.punctuatedPrompt(["istanbul"], random: { 0 }), ["İstanbul."])
+  func testSentenceInitialTokensSkipTerminalPunctuationBranches() {
+    XCTAssertEqual(EnglishPunctuationPolicy.punctuatedPrompt(["are"], random: { 0 }), ["Are"])
+    XCTAssertEqual(SpanishPunctuationPolicy.punctuatedPrompt(["casa"], random: { 0.95 }), ["¿Casa"])
+    XCTAssertEqual(FrenchPunctuationPolicy.punctuatedPrompt(["maison"], random: { 0 }), ["Maison"])
+    XCTAssertEqual(GreekPunctuationPolicy.punctuatedPrompt(["πρωί"], random: { 0 }), ["Πρωί"])
+    XCTAssertEqual(KurdishPunctuationPolicy.punctuatedPrompt(["کتێب"], random: { 0 }), ["کتێب"])
+    XCTAssertEqual(ArabicPunctuationPolicy.punctuatedPrompt(["كتاب"], random: { 0 }), ["كتاب"])
+    XCTAssertEqual(TurkishPunctuationPolicy.punctuatedPrompt(["istanbul"], random: { 0 }), ["İstanbul"])
   }
 
   func testEnglishPromptPunctuatesOnlyWhenPunctuationIsEnabled() {
@@ -15879,7 +15864,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.englishPrompt(
         tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
         usesZipfFrequency: false, contentRandom: { 0 }),
-      "Are.")
+      "Are")
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
         tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(),
@@ -15888,9 +15873,7 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testEnglishPunctuationUsesSentenceCaseAtStartsAndAfterTerminators() {
-    var punctuationRandomValues =
-      Array(repeating: 0.9, count: 9) + [0.0, 0.0]
-      + Array(repeating: 0.9, count: 10) + [0.85]
+    var punctuationRandomValues = [0.0, 0.0, 0.9, 0.85]
     let words = StarterLexicon.englishPrompt(
       tokens: 4, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
       usesZipfFrequency: false, contentRandom: { punctuationRandomValues.removeFirst() }
