@@ -18395,6 +18395,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(quenyaSession.prompt, "pa")
   }
 
+  func testLazyLatinModifierUsesYiddishCharacterMappings() {
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin(
+        "אַ אָ בּ בֿ וּ וֹ יִ כּ פּ פֿ שׂ תּ \u{05F2}\u{05B7} ײ ױ װ", language: .yiddish),
+      "איי אא בת בפ ות וו יי כת פת פפ שש תת יייי יי וי וו")
+
+    let yiddishSession = TestSessionFactory.make(
+      configuration: .words(1, language: .yiddish).with(modifiers: [.lazyLatin]),
+      streamPrompt: "אַ")
+    XCTAssertEqual(yiddishSession.prompt, "איי")
+  }
+
   func testLazyInputPolicyMirrorsReferenceLanguageAndPolyglotAvailability() {
     XCTAssertFalse(TypingLanguage.english.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.hindi.supportsLazyLatinInput)

@@ -1420,24 +1420,29 @@ enum TypingTextNormalizer {
       replacements = ["ü": "v", "ǖ": "v", "ǘ": "v", "ǚ": "v", "ǜ": "v"]
     case .quenya:
       replacements = ["χ": "x", "þ": "p"]
+    case .yiddish:
+      replacements = [
+        "א": "א", "ַ": "יי", "ָ": "א", "ב": "ב", "ּ": "ת", "ֿ": "פ",
+        "ו": "ו", "ֹ": "ו", "י": "י", "ִ": "י", "כ": "כ", "פ": "פ",
+        "ש": "ש", "ׂ": "ש", "ת": "ת", "ײ": "יי", "ױ": "וי", "װ": "וו",
+      ]
     default:
       return value
     }
 
-    let characters = Array(value)
-    return characters.enumerated().reduce(into: "") { output, entry in
-      let (index, character) = entry
-      let source = String(character)
+    let sourceCharacters = value.unicodeScalars.map(String.init)
+    return sourceCharacters.enumerated().reduce(into: "") { output, entry in
+      let (index, source) = entry
       guard let replacement = replacements[source.lowercased()] else {
-        output.append(character)
+        output += source
         return
       }
 
       for (offset, replacementCharacter) in replacement.enumerated() {
         let sourceIndex = index + offset
         let replacementFollowsUppercaseSource =
-          sourceIndex < characters.count
-          && String(characters[sourceIndex]) == String(characters[sourceIndex]).uppercased()
+          sourceIndex < sourceCharacters.count
+          && sourceCharacters[sourceIndex] == sourceCharacters[sourceIndex].uppercased()
         output += replacementFollowsUppercaseSource
           ? replacementCharacter.uppercased()
           : String(replacementCharacter)
