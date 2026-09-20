@@ -1416,6 +1416,10 @@ enum TypingTextNormalizer {
       replacements = ["ä": "ae", "ö": "oe", "ü": "ue"]
     case .serbianLatin, .serbianLatin10k:
       replacements = ["đ": "dj"]
+    case .pinyin, .pinyin1k, .pinyin10k:
+      replacements = ["ü": "v", "ǖ": "v", "ǘ": "v", "ǚ": "v", "ǜ": "v"]
+    case .quenya:
+      replacements = ["χ": "x", "þ": "p"]
     default:
       return value
     }

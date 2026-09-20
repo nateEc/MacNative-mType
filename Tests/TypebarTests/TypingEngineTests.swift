@@ -18373,6 +18373,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(serbianSession.prompt, "Djordje")
   }
 
+  func testLazyLatinModifierUsesPinyinAndQuenyaSpecificExpansions() {
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("nǚ lǜ Ü", language: .pinyin),
+      "nv lv V")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("χ Þ á", language: .quenya),
+      "x P a")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("þ", language: .icelandic),
+      "th")
+
+    let pinyinSession = TestSessionFactory.make(
+      configuration: .words(1, language: .pinyin10k).with(modifiers: [.lazyLatin]),
+      streamPrompt: "lǚ")
+    XCTAssertEqual(pinyinSession.prompt, "lv")
+
+    let quenyaSession = TestSessionFactory.make(
+      configuration: .words(1, language: .quenya).with(modifiers: [.lazyLatin]),
+      streamPrompt: "þa")
+    XCTAssertEqual(quenyaSession.prompt, "pa")
+  }
+
   func testLazyInputPolicyMirrorsReferenceLanguageAndPolyglotAvailability() {
     XCTAssertFalse(TypingLanguage.english.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.hindi.supportsLazyLatinInput)
