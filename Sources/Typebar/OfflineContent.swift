@@ -5207,7 +5207,8 @@ struct TestSessionFactory {
     configuration: TestConfiguration,
     customText: String = "",
     quote: OfflineQuote? = nil,
-    streamPrompt: String? = nil
+    streamPrompt: String? = nil,
+    weakSpotScores: WeakSpotScores = .init()
   ) -> TypingSession {
     let prompt: String
     var sectionEndIndices: [Int] = []
@@ -5221,21 +5222,13 @@ struct TestSessionFactory {
     } else {
       switch configuration.mode {
       case .time:
-        prompt = OfflineContent.generatedPrompt(
-          wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
-          language: configuration.language,
-          englishVariant: configuration.englishVariant,
-          mixedLanguageComponents: configuration.mixedLanguageComponents,
-          contentOptions: configuration.contentOptions,
-          usesZipfFrequency: configuration.modifiers.contains(.zipf))
+        prompt = weakSpotPrompt(
+          configuration: configuration, wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
+          scores: weakSpotScores)
       case .words:
-        prompt = OfflineContent.generatedPrompt(
-          wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
-          language: configuration.language,
-          englishVariant: configuration.englishVariant,
-          mixedLanguageComponents: configuration.mixedLanguageComponents,
-          contentOptions: configuration.contentOptions,
-          usesZipfFrequency: configuration.modifiers.contains(.zipf))
+        prompt = weakSpotPrompt(
+          configuration: configuration, wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
+          scores: weakSpotScores)
       case .quote:
         prompt =
           quote?.text ?? OfflineContent.quotes(for: configuration.language).first?.text
@@ -5309,6 +5302,27 @@ struct TestSessionFactory {
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeats ? noSpaceWordLengths : [],
       repeatingNoSpaceTargetWords: repeats ? noSpaceTargetWords : [])
+  }
+
+  private static func weakSpotPrompt(
+    configuration: TestConfiguration, wordCount: Int, scores: WeakSpotScores
+  ) -> String {
+    if configuration.modifiers.contains(.weakSpot),
+      let prompt = WeakSpotWordSelection.prompt(
+        wordCount: wordCount, language: configuration.language,
+        englishVariant: configuration.englishVariant,
+        mixedLanguageComponents: configuration.mixedLanguageComponents,
+        contentOptions: configuration.contentOptions,
+        scores: scores)
+    {
+      return prompt
+    }
+    return OfflineContent.generatedPrompt(
+      wordCount: wordCount, language: configuration.language,
+      englishVariant: configuration.englishVariant,
+      mixedLanguageComponents: configuration.mixedLanguageComponents,
+      contentOptions: configuration.contentOptions,
+      usesZipfFrequency: configuration.modifiers.contains(.zipf))
   }
 }
 

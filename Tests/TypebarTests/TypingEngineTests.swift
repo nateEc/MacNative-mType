@@ -2002,7 +2002,7 @@ final class TypingEngineTests: XCTestCase {
       FunboxCommandCatalog.target(for: "funbox.changeFunboxcapitals"),
       .modifier(.titleCase))
     XCTAssertEqual(
-      FunboxCommandCatalog.target(for: "funbox.changeFunboxweakspot"), .weakSpot)
+      FunboxCommandCatalog.target(for: "funbox.changeFunboxweakspot"), .modifier(.weakSpot))
     XCTAssertEqual(
       FunboxCommandCatalog.target(for: "funbox.changeFunboxpolyglot"), .polyglot)
     XCTAssertEqual(
@@ -2028,6 +2028,62 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       CommandPaletteSearch.results(items: FunboxCommandCatalog.items, query: "network").map(\.id),
       ["funbox.changeFunboxIPv4", "funbox.changeFunboxIPv6"])
+  }
+
+  func testWeakspotFunboxRetainsLiveTypingScoresAndSelectsTheWeakestCandidate() {
+    var scores = WeakSpotScores()
+    scores.record(character: "m", interval: 0.1, isCorrect: true)
+    scores.record(character: "x", interval: 0.2, isCorrect: false)
+
+    XCTAssertEqual(scores.averageScore(for: "m"), 0.1, accuracy: 0.000_001)
+    XCTAssertEqual(scores.averageScore(for: "x"), 5.2, accuracy: 0.000_001)
+
+    var smoothed = WeakSpotScores()
+    for _ in 0..<WeakSpotScores.maximumSamplesPerCharacter {
+      smoothed.record(character: "s", interval: 1, isCorrect: true)
+    }
+    smoothed.record(character: "s", interval: 3, isCorrect: true)
+    XCTAssertEqual(smoothed.averageScore(for: "s"), 1.04, accuracy: 0.000_001)
+
+    var sourceReadCount = 0
+    let candidates = IndexedLexicon(count: 2) { index in
+      sourceReadCount += 1
+      return ["moon", "xray"][index]
+    }
+    var candidateIndex = 0
+    let selected = WeakSpotWordSelection.word(
+      from: candidates, scores: scores,
+      random: {
+        defer { candidateIndex += 1 }
+        return candidateIndex % 2
+      })
+    XCTAssertEqual(selected, "xray")
+    XCTAssertEqual(candidateIndex, WeakSpotWordSelection.candidateCount)
+    XCTAssertEqual(sourceReadCount, WeakSpotWordSelection.candidateCount)
+    XCTAssertEqual(
+      TestModifierPolicy.toggling(.weakSpot, in: [.binaryStream]), [.weakSpot])
+    XCTAssertEqual(
+      TestModifierPolicy.toggling(.binaryStream, in: [.weakSpot]), [.binaryStream])
+  }
+
+  func testWeakspotCapturesInputScoresBeforeItsFunboxIsEnabled() {
+    var session = TypingSession(configuration: .words(1), prompt: "amber")
+    session.insert("a", at: start)
+    session.insert("x", at: start.addingTimeInterval(0.2))
+
+    XCTAssertEqual(
+      session.liveWeakSpotInputSamples,
+      [.init(character: "x", interval: 0.2, isCorrect: false)])
+
+    var scores = WeakSpotScores()
+    scores.absorb(session.liveWeakSpotInputSamples)
+    XCTAssertEqual(scores.averageScore(for: "x"), 5.2, accuracy: 0.000_001)
+
+    var nextSession = TypingSession(configuration: .words(1), prompt: "am")
+    nextSession.insert("a", at: start)
+    nextSession.insert("m", at: start.addingTimeInterval(0.3))
+    scores.absorb(nextSession.liveWeakSpotInputSamples)
+    XCTAssertEqual(scores.averageScore(for: "m"), 0.3, accuracy: 0.000_001)
   }
 
   func testFunboxCommandPolicyPreservesPrivateSettingsAndBlocksUnsafeRestarts() {

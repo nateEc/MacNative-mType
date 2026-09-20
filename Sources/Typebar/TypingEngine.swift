@@ -778,6 +778,7 @@ enum TestModifier: String, CaseIterable, Codable, Equatable, Identifiable {
   case pseudolangStream
   case morseStream
   case zipf
+  case weakSpot
   case focusCurrentWord
   case focusNextWord
   case focusTwoWords
@@ -836,6 +837,7 @@ enum TestModifier: String, CaseIterable, Codable, Equatable, Identifiable {
     case .pseudolangStream: "伪语言词流"
     case .morseStream: "摩斯符号流"
     case .zipf: "Zipf 高频词"
+    case .weakSpot: "弱项选词"
     case .focusCurrentWord: "专注当前词"
     case .focusNextWord: "预读下一词"
     case .focusTwoWords: "预读后两词"
@@ -900,7 +902,9 @@ enum TestModifierPolicy {
         ? .readAhead
         : modifiers.contains(.readAheadHard) ? .readAheadHard : nil
     let streamModifier: TestModifier? =
-      modifiers.contains(.binaryStream)
+      modifiers.contains(.weakSpot)
+      ? nil
+      : modifiers.contains(.binaryStream)
       ? .binaryStream
       : modifiers.contains(.accountingStream)
         ? .accountingStream
@@ -936,6 +940,7 @@ enum TestModifierPolicy {
       modifiers.contains(.clearCurrentWordOnError) ? .clearCurrentWordOnError : nil,
       modifiers.contains(.lazyLatin) ? .lazyLatin : nil,
       modifiers.contains(.zipf) ? .zipf : nil,
+      modifiers.contains(.weakSpot) ? .weakSpot : nil,
       modifiers.contains(.mirrorVisual) ? .mirrorVisual : nil,
       modifiers.contains(.upsideDownVisual) ? .upsideDownVisual : nil,
       modifiers.contains(.crtVisual) ? .crtVisual : nil,
@@ -975,14 +980,14 @@ enum TestModifierPolicy {
         .readAheadEasy, .readAhead, .readAheadHard,
       ]
     case .listening: conflicts = [.simonSays, .memory, .readAheadEasy, .readAhead, .readAheadHard]
-    case .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream, .asciiStream, .specialCharacterStream,
+    case .weakSpot, .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream, .asciiStream, .specialCharacterStream,
       .gibberishStream,
       .poetryStream,
       .referenceStream,
       .arrowStream, .ipv4Stream, .ipv6Stream,
       .pseudolangStream, .morseStream:
       conflicts = [
-        .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream, .asciiStream, .specialCharacterStream,
+        .weakSpot, .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream, .asciiStream, .specialCharacterStream,
         .gibberishStream,
         .poetryStream,
         .referenceStream,
@@ -2554,6 +2559,8 @@ struct TypingSession {
   private var attemptedErrorCounts = [Int: Int]()
   private var committedWordBursts: [Int] = []
   private var replayEvents: [TypingReplayEvent] = []
+  private var weakSpotInputSamples: [WeakSpotInputSample] = []
+  private var weakSpotLastInputDate: Date?
   private var activePhysicalKeyDownDates: [UInt16: Date] = [:]
   private var completedPhysicalKeyDurations: [TimeInterval] = []
   private var lastPhysicalKeyDownDate: Date?
@@ -2598,6 +2605,7 @@ struct TypingSession {
   var isFinished: Bool { outcome != .active }
   var hasStarted: Bool { startedAt != nil }
   var usesIncrementalPromptExtension: Bool { repeatingPrompt?.isEmpty == false }
+  var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
   var typedCharacterCount: Int { typed.count }
   var afkDuration: TimeInterval {
     guard let startedAt, let finishedAt else { return 0 }
@@ -3167,7 +3175,9 @@ struct TypingSession {
     _ character: Character, forceError: Bool, at date: Date, evaluatesTerminalRules: Bool
   ) -> Bool {
     if configuration.mode == .zen {
-      return insertZenCharacter(character, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
+      let accepted = insertZenCharacter(character, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
+      if accepted { recordWeakSpotInput(character, isCorrect: true, at: date) }
+      return accepted
     }
     // The reference input accepts several platform space characters as the
     // regular word separator, but no-space rejects every one of them before
@@ -3190,6 +3200,7 @@ struct TypingSession {
       return false
     }
     if currentTargetIndex >= prompt.count {
+      recordWeakSpotInput(inputCharacter, isCorrect: false, at: date)
       appendTypedCharacter(
         inputCharacter, targetIndex: nil,
         countsAsExtraError: inputCharacter != " " && hasUncommittedSpaceDelimitedInput, at: date)
@@ -3212,6 +3223,7 @@ struct TypingSession {
     let targetIndex = retainsCurrentWordAsExtra
       ? nil : earlyWordCommitTargetIndex ?? currentTargetIndex
     let isCorrect = !retainsCurrentWordAsExtra && inputCharacter == expected && !forceError
+    recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
     if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
     let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
       with: inputCharacter, forceError: forceError)
@@ -3259,6 +3271,21 @@ struct TypingSession {
       fail(at: date)
     }
     return true
+  }
+
+  private mutating func recordWeakSpotInput(
+    _ character: Character, isCorrect: Bool, at date: Date
+  ) {
+    defer { weakSpotLastInputDate = date }
+    guard let previous = weakSpotLastInputDate else { return }
+    let interval = date.timeIntervalSince(previous)
+    guard interval.isFinite, interval >= 0 else { return }
+    // The reference live cache rounds the millisecond gap to two decimal
+    // places before weakspot consumes it, which also avoids Date's binary
+    // floating-point noise changing an otherwise identical ranking.
+    let roundedInterval = (interval * 100_000).rounded() / 100_000
+    weakSpotInputSamples.append(
+      .init(character: character, interval: roundedInterval, isCorrect: isCorrect))
   }
 
   /// Zen accepts the user's own text rather than comparing it to a generated
@@ -10536,6 +10563,10 @@ enum StarterLexicon {
     default:
       (words, [",", ".", "!", "?"])
     }
+  }
+
+  static func punctuation(for language: TypingLanguage, englishVariant: EnglishVariant) -> [String] {
+    source(for: language, englishVariant: englishVariant).1
   }
 
   private static func decoratedToken(

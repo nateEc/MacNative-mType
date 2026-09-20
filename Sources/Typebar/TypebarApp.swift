@@ -664,6 +664,7 @@ private struct ContentView: View {
   @State private var lastTimeWarningSecond: Int?
   @State private var restartLockMessage: String?
   @State private var currentRestartCount = 0
+  @State private var weakSpotScores = WeakSpotScores()
   @State private var lastCompletedWpm: Int?
   @State private var currentProcessPractice: [CurrentProcessPractice] = []
   @State private var repeatedPaceArmed = false
@@ -2564,6 +2565,7 @@ private struct ContentView: View {
 
   private func reset(restarting: Bool = false) {
     let shouldCountRestart = session.hasStarted && !session.isFinished
+    absorbLiveWeakSpotScores(from: session)
     restartLockMessage = nil
     bailoutConfirmationMessage = nil
     compositionText = ""
@@ -2594,7 +2596,8 @@ private struct ContentView: View {
     session = TestSessionFactory.make(
       configuration: configuration,
       customText: customText,
-      quote: selectedQuote
+      quote: selectedQuote,
+      weakSpotScores: weakSpotScores
     )
     persistActiveTestSelection()
     if shouldCountRestart { currentRestartCount += 1 }
@@ -2770,6 +2773,7 @@ private struct ContentView: View {
     keyboardGuideFeedback = nil
     lastTimeWarningSecond = nil
     NativeSpeech.shared.stop()
+    absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
     session = repeatedSession
     let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
@@ -2780,6 +2784,10 @@ private struct ContentView: View {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
     requestTypingFocus()
+  }
+
+  private func absorbLiveWeakSpotScores(from session: TypingSession) {
+    weakSpotScores.absorb(session.liveWeakSpotInputSamples)
   }
 
   private func refreshPaceTarget() {
@@ -3167,8 +3175,6 @@ private struct ContentView: View {
         return
       }
       switch target {
-      case .weakSpot:
-        showingWeakSpots = true
       case .polyglot:
         activeChallengeID = nil
         language = language == .mixedLanguages ? .english : .mixedLanguages

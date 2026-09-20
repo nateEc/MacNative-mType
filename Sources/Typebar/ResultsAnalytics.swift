@@ -1316,7 +1316,7 @@ enum CurrentPersonalBestPolicy {
       .messagingStyle, .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream,
       .asciiStream, .specialCharacterStream, .gibberishStream, .poetryStream, .referenceStream,
       .arrowStream, .ipv4Stream, .ipv6Stream, .pseudolangStream, .morseStream, .zipf,
-      .correctBeforeAdvance, .clearCurrentWordOnError:
+      .weakSpot, .correctBeforeAdvance, .clearCurrentWordOnError:
       false
     case .mirrorVisual, .upsideDownVisual, .crtVisual, .earthquakeVisual, .spaceVisual,
       .nauseaVisual, .roundVisual, .chooVisual, .layoutFluid, .aslVisual, .rot13, .backwards,

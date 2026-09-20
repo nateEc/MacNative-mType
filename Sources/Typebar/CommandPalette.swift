@@ -551,7 +551,6 @@ enum PracticeThresholdCommandCatalog {
 enum FunboxCommandTarget: Equatable {
     case clear
     case modifier(TestModifier)
-    case weakSpot
     case polyglot
 
     var modifier: TestModifier? {
@@ -597,7 +596,7 @@ enum FunboxCommandCatalog {
         .init(officialName: "nospace", target: .modifier(.noSpaces)),
         .init(officialName: "poetry", target: .modifier(.poetryStream)),
         .init(officialName: "wikipedia", target: .modifier(.referenceStream)),
-        .init(officialName: "weakspot", target: .weakSpot),
+        .init(officialName: "weakspot", target: .modifier(.weakSpot)),
         .init(officialName: "pseudolang", target: .modifier(.pseudolangStream)),
         .init(officialName: "IPv4", target: .modifier(.ipv4Stream)),
         .init(officialName: "IPv6", target: .modifier(.ipv6Stream)),
@@ -631,7 +630,6 @@ enum FunboxCommandCatalog {
         let title: String
         switch option.target {
         case .modifier(let modifier): title = modifier.displayName
-        case .weakSpot: title = "弱项训练"
         case .polyglot: title = "自选多语"
         case .clear: title = "全部关闭"
         }
@@ -644,7 +642,7 @@ enum FunboxCommandCatalog {
         }
         return CommandPaletteItem(
             id: identifier, title: "趣味修饰器：\(title)",
-            subtitle: option.target == .weakSpot ? "打开本机弱项分析并选择训练" : "切换并重新开始练习",
+            subtitle: "切换并重新开始练习",
             systemImage: "gamecontroller.fill",
             keywords: [
                 "funbox", "趣味", "修饰器", option.officialName, referenceIdentifier, identifier, title,
@@ -677,7 +675,7 @@ enum FunboxCommandPolicy {
                 return nil
             }
             return TestModifierPolicy.toggling(modifier, in: current)
-        case .weakSpot, .polyglot:
+        case .polyglot:
             return nil
         }
     }
