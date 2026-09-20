@@ -15879,6 +15879,31 @@ final class TypingEngineTests: XCTestCase {
       "Ketab ketab ketab!")
   }
 
+  func testIndicPunctuationPolicyUsesDandaAndScriptSpecificDigits() {
+    var punctuationRandomValues = Array(repeating: 0.9, count: 9) + [0]
+    XCTAssertEqual(
+      IndicPunctuationPolicy.punctuatedPrompt(
+        ["किताब", "कलम", "घर"], digits: Array("०१२३४५६७८९"),
+        random: { punctuationRandomValues.removeFirst() }),
+      ["किताब", "कलम", "घर।"])
+
+    var devanagariNumberRandomValues = [0, 0, 0, 0.9, 0, 0.9]
+    XCTAssertEqual(
+      IndicPunctuationPolicy.generatedPrompt(
+        ["किताब", "कलम"], digits: Array("०१२३४५६७८९"),
+        includesPunctuation: true, includesNumbers: true,
+        random: { devanagariNumberRandomValues.removeFirst() }),
+      ["१", "कलम।"])
+
+    var banglaNumberRandomValues = [0, 0, 0, 0.9, 0, 0.9]
+    XCTAssertEqual(
+      IndicPunctuationPolicy.generatedPrompt(
+        ["বই", "কলম"], digits: Array("০১২৩৪৫৬৭৮৯"),
+        includesPunctuation: true, includesNumbers: true,
+        random: { banglaNumberRandomValues.removeFirst() }),
+      ["১", "কলম।"])
+  }
+
   func testSentenceInitialTokensSkipTerminalPunctuationBranches() {
     XCTAssertEqual(EnglishPunctuationPolicy.punctuatedPrompt(["are"], random: { 0 }), ["Are"])
     XCTAssertEqual(SpanishPunctuationPolicy.punctuatedPrompt(["casa"], random: { 0.95 }), ["¿Casa"])
@@ -15887,6 +15912,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(KurdishPunctuationPolicy.punctuatedPrompt(["کتێب"], random: { 0 }), ["کتێب"])
     XCTAssertEqual(ArabicPunctuationPolicy.punctuatedPrompt(["كتاب"], random: { 0 }), ["كتاب"])
     XCTAssertEqual(PersianUrduPunctuationPolicy.punctuatedPrompt(["کتاب"], random: { 0 }), ["کتاب"])
+    XCTAssertEqual(
+      IndicPunctuationPolicy.punctuatedPrompt(
+        ["namaste"], digits: Array("०१२३४५६७८९"), random: { 0 }),
+      ["Namaste"])
     XCTAssertEqual(TurkishPunctuationPolicy.punctuatedPrompt(["istanbul"], random: { 0 }), ["İstanbul"])
   }
 
@@ -17821,13 +17850,18 @@ final class TypingEngineTests: XCTestCase {
           .arabic, .arabicEgypt, .arabicMorocco, .kurdishCentral,
           .persian, .persian1k, .persian5k, .persian20k, .persianRomanized,
           .urdu, .urdu1k, .urdu5k, .urduRoman,
+          .hindi, .hindi1k, .bangla, .bangla10k, .banglaLetters,
+          .nepali, .nepali1k, .nepaliRomanized,
         ].contains(language) && rawToken == "-" {
           return nil
         }
         let punctuation = language == .tibetan
           ? CharacterSet(charactersIn: "།")
-          : language == .banglaLetters
-            ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "।"))
+          : [
+              .hindi, .hindi1k, .bangla, .bangla10k, .banglaLetters,
+              .nepali, .nepali1k, .nepaliRomanized,
+            ].contains(language)
+            ? CharacterSet.punctuationCharacters.union(CharacterSet(charactersIn: "।"))
           : language == .git
             ? CharacterSet.punctuationCharacters.subtracting(CharacterSet(charactersIn: "@-"))
           : language == .klingon
@@ -17847,7 +17881,7 @@ final class TypingEngineTests: XCTestCase {
           } else {
             baseTokens = [localeLowercased]
           }
-        case .french, .persianRomanized, .urduRoman:
+        case .french, .persianRomanized, .urduRoman, .nepaliRomanized:
           baseTokens = [normalized.lowercased()]
         case .greek:
           baseTokens = [normalized.lowercased()]

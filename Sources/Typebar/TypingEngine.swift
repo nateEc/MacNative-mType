@@ -5224,6 +5224,66 @@ enum PersianUrduPunctuationPolicy {
   }
 }
 
+/// Generates the shared Hindi, Nepali, and Bangla punctuation branch with a
+/// caller-supplied local digit system.
+enum IndicPunctuationPolicy {
+  static func punctuatedPrompt(
+    _ tokens: [String], digits: [Character], random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    generatedPrompt(tokens, digits: digits, includesPunctuation: true, includesNumbers: false, random: random)
+  }
+
+  static func generatedPrompt(
+    _ tokens: [String], digits: [Character], includesPunctuation: Bool, includesNumbers: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    var result: [String] = []
+    for (index, raw) in tokens.enumerated() {
+      let word = includesPunctuation ? punctuated(
+        previous: result.last, raw: raw, index: index, total: tokens.count, random: random) : raw
+      result.append(includesNumbers && random() < 0.1 ? number(digits: digits, random: random) : word)
+    }
+    return result
+  }
+
+  private static func punctuated(
+    previous: String?, raw: String, index: Int, total: Int, random: () -> Double
+  ) -> String {
+    let last = previous?.last
+    let followsComma = last == ","
+    let followsPeriod = last == "."
+    let followsSemicolon = last == ";" || last == "؛" || last == "；" || last == "："
+    let followsColon = last == ":" || last == "："
+    if index == 0 || [".", "?", "!", "؟"].contains(last) {
+      guard let first = raw.first else { return raw }
+      return String(first).uppercased() + raw.dropFirst()
+    }
+    if (random() < 0.1 && !followsPeriod && !followsComma && index != total - 2) || index == total - 1 {
+      let choice = random()
+      return raw + (choice <= 0.8 ? "।" : choice < 0.9 ? "?" : "!")
+    }
+    if random() < 0.01 && !followsComma && !followsPeriod { return "\"\(raw)\"" }
+    if random() < 0.011 && !followsComma && !followsPeriod { return "'\(raw)'" }
+    if random() < 0.012 && !followsComma && !followsPeriod { return "(\(raw))" }
+    if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon { return raw + ":" }
+    if random() < 0.014 && !followsComma && !followsPeriod && previous != "-" { return "-" }
+    if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon { return raw + ";" }
+    if random() < 0.2 && !followsComma { return raw + "," }
+    return raw
+  }
+
+  private static func number(digits: [Character], random: () -> Double) -> String {
+    precondition(digits.count == 10)
+    let count = min(max(Int(random() * 4), 0), 3) + 1
+    return (0..<count).map { index in
+      let lower = index == 0 ? 1 : 0
+      let range = index == 0 ? 9 : 10
+      let offset = min(max(Int(random() * Double(range)), 0), range - 1)
+      return String(digits[lower + offset])
+    }.joined()
+  }
+}
+
 /// Applies the source-compatible Turkish sentence case and contextual marks to
 /// Typebar-owned Turkish words without importing the web generator or corpus.
 enum TurkishPunctuationPolicy {
@@ -10518,13 +10578,11 @@ enum StarterLexicon {
         tokens: count, lexicon: tanglishWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hindi:
-      return prompt(
-        tokens: count, lexicon: hindiWords, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return indicPrompt(tokens: count, lexicon: hindiWords, digits: Array("०१२३४५६७८९"),
+                         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hindi1k:
-      return prompt(
-        tokens: count, lexicon: hindi1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return indicPrompt(tokens: count, lexicon: hindi1kLexicon, digits: Array("०१२३४५६७८९"),
+                         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hinglish:
       return prompt(
         tokens: count, lexicon: hinglishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -10538,17 +10596,14 @@ enum StarterLexicon {
         tokens: count, lexicon: gujarati1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bangla:
-      return prompt(
-        tokens: count, lexicon: banglaWords, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return indicPrompt(tokens: count, lexicon: banglaWords, digits: Array("০১২৩৪৫৬৭৮৯"),
+                         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bangla10k:
-      return prompt(
-        tokens: count, lexicon: bangla10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return indicPrompt(tokens: count, lexicon: bangla10kLexicon, digits: Array("০১২৩৪৫৬৭৮৯"),
+                         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .banglaLetters:
-      return prompt(
-        tokens: count, lexicon: banglaLetterWords, separator: " ", punctuation: ["।", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return indicPrompt(tokens: count, lexicon: banglaLetterWords, digits: Array("০১২৩৪৫৬৭৮৯"),
+                         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai:
       return prompt(
         tokens: count, lexicon: thaiWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -10578,17 +10633,14 @@ enum StarterLexicon {
         tokens: count, lexicon: thai60kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .nepali:
-      return prompt(
-        tokens: count, lexicon: nepaliWords, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return indicPrompt(tokens: count, lexicon: nepaliWords, digits: Array("०१२३४५६७८९"),
+                         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .nepali1k:
-      return prompt(
-        tokens: count, lexicon: nepali1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return indicPrompt(tokens: count, lexicon: nepali1kLexicon, digits: Array("०१२३४५६७८९"),
+                         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .nepaliRomanized:
-      return prompt(
-        tokens: count, lexicon: nepaliRomanizedWords, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return indicPrompt(tokens: count, lexicon: nepaliRomanizedWords, digits: Array("०१२३४५६७८९"),
+                         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kannada:
       return prompt(
         tokens: count, lexicon: kannadaWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -11426,6 +11478,29 @@ enum StarterLexicon {
       includesPunctuation: contentOptions.includePunctuation,
       includesNumbers: contentOptions.includeNumbers,
       random: contentRandom
+    ).joined(separator: " ")
+  }
+
+  static func indicPrompt(
+    tokens: Int, lexicon: [String], digits: [Character], contentOptions: ContentOptions,
+    usesZipfFrequency: Bool
+  ) -> String {
+    indicPrompt(
+      tokens: tokens, lexicon: IndexedLexicon(lexicon), digits: digits, contentOptions: contentOptions,
+      usesZipfFrequency: usesZipfFrequency)
+  }
+
+  static func indicPrompt(
+    tokens: Int, lexicon: IndexedLexicon, digits: [Character], contentOptions: ContentOptions,
+    usesZipfFrequency: Bool
+  ) -> String {
+    let generated = prompt(
+      tokens: tokens, lexicon: lexicon, separator: " ", punctuation: ["।", ",", "!", "?"],
+      contentOptions: ContentOptions(), usesZipfFrequency: usesZipfFrequency)
+    guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
+    return IndicPunctuationPolicy.generatedPrompt(
+      generated.split(separator: " ").map(String.init), digits: digits,
+      includesPunctuation: contentOptions.includePunctuation, includesNumbers: contentOptions.includeNumbers
     ).joined(separator: " ")
   }
 
