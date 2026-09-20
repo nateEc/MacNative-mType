@@ -53,6 +53,22 @@ struct PaceGuideSample: Equatable {
     }
 }
 
+/// Mirrors Monkeytype's in-memory `lastTestWpm` update rule. Only a normally
+/// completed test is eligible, and a same-wordset repeated-pace chain retains
+/// its fastest completed result.
+enum LastTestPacePolicy {
+    static func updatedWpm(
+        previousWpm: Int?,
+        candidateWpm: Int,
+        outcome: TestOutcome,
+        isPaceRepeat: Bool
+    ) -> Int? {
+        guard outcome == .completed else { return previousWpm }
+        guard isPaceRepeat, let previousWpm else { return candidateWpm }
+        return max(previousWpm, candidateWpm)
+    }
+}
+
 enum PaceGuidePolicy {
     static let minimumWpm = 10
     static let maximumWpm = 300
@@ -107,7 +123,8 @@ enum PaceGuidePolicy {
             .map(\.wpm)
             .max()
         case .lastTest:
-            return lastTestWpm.map { $0.clamped(to: minimumWpm...maximumWpm) }
+            guard let lastTestWpm, lastTestWpm > 0 else { return nil }
+            return lastTestWpm.clamped(to: minimumWpm...maximumWpm)
         }
     }
 

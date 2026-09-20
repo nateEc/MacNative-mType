@@ -679,7 +679,7 @@ private struct ContentView: View {
   @State private var weakSpotScores = WeakSpotScores()
   @State private var lastCompletedWpm: Int?
   @State private var currentProcessPractice: [CurrentProcessPractice] = []
-  @State private var repeatedPaceArmed = false
+  @State private var isRepeatedPaceAttempt = false
   @State private var activePaceTargetWpm: Int?
   @State private var compositionText = ""
   @State private var keyboardGuideFeedback: KeyboardGuideFeedback?
@@ -812,8 +812,11 @@ private struct ContentView: View {
         ) else { return }
         currentRestartCount = 0
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
-        lastCompletedWpm = result.wpm
-        repeatedPaceArmed = settings.repeatedPace
+        lastCompletedWpm = LastTestPacePolicy.updatedWpm(
+          previousWpm: lastCompletedWpm,
+          candidateWpm: result.wpm,
+          outcome: result.outcome,
+          isPaceRepeat: isRepeatedPaceAttempt)
         let savesResult = result.outcome == .completed && settings.saveCompletedResults
         let resultPersonalBestFeedback = savesResult
           ? ResultPersonalBestPolicy.feedback(
@@ -2614,10 +2617,8 @@ private struct ContentView: View {
     )
     persistActiveTestSelection()
     if shouldCountRestart { currentRestartCount += 1 }
-    let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
-    activePaceTargetWpm = paceGuideTarget(
-      usingRepeatedPace: shouldUseRepeatedPace ? lastCompletedWpm : nil)
-    repeatedPaceArmed = false
+    isRepeatedPaceAttempt = false
+    activePaceTargetWpm = paceGuideTarget()
     if session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
@@ -2789,10 +2790,10 @@ private struct ContentView: View {
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
     session = repeatedSession
-    let shouldUseRepeatedPace = repeatedPaceArmed && settings.paceGuideMode == .off
+    isRepeatedPaceAttempt = settings.repeatedPace
+    let shouldUseRepeatedPace = isRepeatedPaceAttempt && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
       usingRepeatedPace: shouldUseRepeatedPace ? lastCompletedWpm : nil)
-    repeatedPaceArmed = false
     if session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
@@ -2894,7 +2895,7 @@ private struct ContentView: View {
   }
 
   private func paceGuideTarget(usingRepeatedPace repeatedWpm: Int? = nil) -> Int? {
-    if settings.paceGuideMode == .off, let repeatedWpm {
+    if settings.paceGuideMode == .off, let repeatedWpm, repeatedWpm > 0 {
       return repeatedWpm.clamped(to: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm)
     }
     let samples = savedResults.compactMap { record -> PaceGuideSample? in

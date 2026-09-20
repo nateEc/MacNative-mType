@@ -21729,6 +21729,35 @@ final class TypingEngineTests: XCTestCase {
         samples: older + [previousDayPeak, expiredPeak], activeTags: ["focus"], now: now), 140)
   }
 
+  func testLastTestPaceMatchesCompletedAndRepeatedReferenceRules() {
+    XCTAssertEqual(
+      LastTestPacePolicy.updatedWpm(
+        previousWpm: 80, candidateWpm: 70, outcome: .completed, isPaceRepeat: false),
+      70)
+    XCTAssertEqual(
+      LastTestPacePolicy.updatedWpm(
+        previousWpm: 80, candidateWpm: 70, outcome: .completed, isPaceRepeat: true),
+      80)
+    XCTAssertEqual(
+      LastTestPacePolicy.updatedWpm(
+        previousWpm: 80, candidateWpm: 90, outcome: .completed, isPaceRepeat: true),
+      90)
+    XCTAssertEqual(
+      LastTestPacePolicy.updatedWpm(
+        previousWpm: 80, candidateWpm: 20, outcome: .bailedOut, isPaceRepeat: true),
+      80)
+    XCTAssertEqual(
+      LastTestPacePolicy.updatedWpm(
+        previousWpm: 80, candidateWpm: 20, outcome: .invalidAFK, isPaceRepeat: false),
+      80)
+
+    let configuration = TestConfiguration.timed(seconds: 30, language: .english)
+    XCTAssertNil(
+      PaceGuidePolicy.targetWpm(
+        mode: .lastTest, customWpm: 60, configuration: configuration, samples: [],
+        lastTestWpm: 0))
+  }
+
   func testPaceGuideUsesOnlyComparableCompletedResultsAndClampsProgress() {
     let calendar = Calendar(identifier: .gregorian)
     let today = Date(timeIntervalSinceReferenceDate: 10_000_000)
