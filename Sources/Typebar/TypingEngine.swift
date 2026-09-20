@@ -3214,9 +3214,6 @@ struct TypingSession {
     evaluatesTerminalRulesOnLastCharacterOnly: Bool
   ) {
     guard !isFinished, !text.isEmpty else { return }
-    beginIfNeeded(at: date)
-    keyboardActivityDates.append(date)
-    insertionActivityDates.append(date)
     let characters = Array(text)
     for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
@@ -3239,6 +3236,14 @@ struct TypingSession {
         recordReplayEvent(kind: .insert, text: String(character), forceError: forceError, at: date)
         insertCodeIndentationIfNeeded(after: character, at: date)
       }
+    }
+    // Browser input guards reject a leading separator, unsupported Return,
+    // and no-space whitespace before the reference test starts. Once an
+    // attempt exists, rejected keys still count as local activity, but an
+    // entirely rejected first event must not begin the timer.
+    if startedAt != nil {
+      keyboardActivityDates.append(date)
+      insertionActivityDates.append(date)
     }
     finishIfNeeded(at: date)
   }
@@ -3407,6 +3412,7 @@ struct TypingSession {
       return false
     }
     if currentTargetIndex >= prompt.count {
+      beginIfNeeded(at: date)
       recordInputAttempt(isCorrect: false)
       recordWeakSpotInput(inputCharacter, isCorrect: false, at: date)
       appendTypedCharacter(
@@ -3423,6 +3429,7 @@ struct TypingSession {
     if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator {
       return false
     }
+    beginIfNeeded(at: date)
     let expected = Array(prompt)[currentTargetIndex]
     let retainsCurrentWordAsExtra = shouldRetainInCurrentWord(
       inputCharacter, expected: expected)
@@ -3513,6 +3520,7 @@ struct TypingSession {
     if activeLength >= 30 && !commitsWord { return false }
     if character == " " && activeLength == 0 { return false }
 
+    beginIfNeeded(at: date)
     appendTypedCharacter(character, targetIndex: nil, at: date)
     recordZenWordBurstIfCommitted(after: character)
     if evaluatesTerminalRules, shouldFailMinimumWordBurst(after: character) { fail(at: date) }

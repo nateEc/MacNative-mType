@@ -3502,6 +3502,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(expert.outcome, .active)
   }
 
+  func testRejectedInitialInputDoesNotStartTheSessionClock() throws {
+    var leadingSpace = TypingSession(configuration: .words(1), prompt: "amber")
+    leadingSpace.insert("\u{3000}", at: start)
+    XCTAssertFalse(leadingSpace.hasStarted)
+    XCTAssertEqual(leadingSpace.typed, "")
+
+    leadingSpace.insert("a", at: start.addingTimeInterval(2))
+    leadingSpace.insert("mber", at: start.addingTimeInterval(4))
+    XCTAssertEqual(leadingSpace.outcome, .completed)
+    XCTAssertEqual(leadingSpace.wpm(at: start.addingTimeInterval(4)), 30)
+    XCTAssertEqual(leadingSpace.rawWpm(at: start.addingTimeInterval(4)), 30)
+
+    var noSpace = TypingSession(
+      configuration: .words(1).with(modifiers: [.noSpaces]), prompt: "amber",
+      noSpaceWordEndIndices: [5], noSpaceTargetWords: ["amber"])
+    noSpace.insert(" ", at: start)
+    XCTAssertFalse(noSpace.hasStarted)
+
+    var plainPrompt = TypingSession(configuration: .words(1), prompt: "amber")
+    plainPrompt.insert("\n", at: start)
+    XCTAssertFalse(plainPrompt.hasStarted)
+  }
+
   func testTimedStatsRejectAnIncorrectActiveWordPrefix() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber")
     session.insert("amxzr", at: start)
