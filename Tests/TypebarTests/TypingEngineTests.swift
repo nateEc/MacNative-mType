@@ -13549,6 +13549,37 @@ final class TypingEngineTests: XCTestCase {
       newer.id)
   }
 
+  func testHistoryChartSelectionRevealExpandsRequiredPagesWithoutHidingLoadedRows() {
+    let ids = (0..<27).map { value in
+      UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", value + 1))!
+    }
+
+    XCTAssertEqual(
+      ResultHistorySelectionRevealPolicy.visibleLimit(
+        currentLimit: 10, selectedID: ids[0], sortedIDs: ids),
+      10)
+    XCTAssertEqual(
+      ResultHistorySelectionRevealPolicy.visibleLimit(
+        currentLimit: 10, selectedID: ids[10], sortedIDs: ids),
+      20)
+    XCTAssertEqual(
+      ResultHistorySelectionRevealPolicy.visibleLimit(
+        currentLimit: 24, selectedID: ids[26], sortedIDs: ids),
+      27)
+    XCTAssertEqual(
+      ResultHistorySelectionRevealPolicy.visibleLimit(
+        currentLimit: 30, selectedID: ids[10], sortedIDs: ids),
+      27)
+    XCTAssertEqual(
+      ResultHistorySelectionRevealPolicy.visibleLimit(
+        currentLimit: 10, selectedID: UUID(), sortedIDs: ids),
+      10)
+    XCTAssertEqual(
+      ResultHistorySelectionRevealPolicy.visibleLimit(
+        currentLimit: -1, selectedID: ids[0], sortedIDs: []),
+      0)
+  }
+
   func testResultHistorySortingCoversEverySortableColumnWithStableTies() {
     let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     let secondID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!

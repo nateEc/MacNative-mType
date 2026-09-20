@@ -112,6 +112,27 @@ enum ResultHistoryPagePolicy {
     }
 }
 
+/// Keeps a chart-selected history row visible without discarding pages that
+/// the person has already asked to load. The source account page expands its
+/// result query before it scrolls to a selected chart point; this native
+/// policy provides the same data-availability guarantee for the local list.
+enum ResultHistorySelectionRevealPolicy {
+    static func visibleLimit(currentLimit: Int, selectedID: UUID?, sortedIDs: [UUID]) -> Int {
+        let total = sortedIDs.count
+        let boundedCurrent = ResultHistoryPagePolicy.visibleCount(
+            requested: currentLimit, total: total)
+        guard let selectedID, let index = sortedIDs.firstIndex(of: selectedID) else {
+            return boundedCurrent
+        }
+
+        let requiredPageCount = (index / ResultHistoryPagePolicy.pageSize + 1)
+            * ResultHistoryPagePolicy.pageSize
+        let requiredLimit = ResultHistoryPagePolicy.visibleCount(
+            requested: requiredPageCount, total: total)
+        return max(boundedCurrent, requiredLimit)
+    }
+}
+
 struct ResultHistoryRowSummary: Equatable {
   let modeAndParameter: String
   let characterStats: String

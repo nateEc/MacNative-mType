@@ -5665,6 +5665,7 @@ private struct ResultsHistoryView: View {
   @State private var filterPresetName = ""
   @State private var activityChartMeasure: ActivityChartMeasure = .completedTests
   @State private var selectedHistoryDate: Date?
+  @State private var historyListScrollTarget: UUID?
   @State private var historySortField: ResultHistorySortField = .finishedAt
   @State private var historySortDirection: ResultHistorySortDirection = .descending
   @State private var visibleResultLimit = ResultHistoryPagePolicy.pageSize
@@ -5976,6 +5977,12 @@ private struct ResultsHistoryView: View {
                   }
                 }
                 .buttonStyle(.plain)
+                .id(result.id)
+                .background(
+                  selectedHistoryMetric?.id == result.id ? Color.accentColor.opacity(0.14) : .clear,
+                  in: RoundedRectangle(cornerRadius: 6))
+                .accessibilityValue(
+                  selectedHistoryMetric?.id == result.id ? "趋势图已选择" : "")
               }
               .onDelete(perform: delete)
               if visibleResults.count < sortedFilteredResults.count {
@@ -5986,6 +5993,7 @@ private struct ResultsHistoryView: View {
                 .frame(maxWidth: .infinity)
               }
             }
+            .scrollPosition(id: $historyListScrollTarget, anchor: .center)
           }
         }
       }
@@ -6016,9 +6024,27 @@ private struct ResultsHistoryView: View {
     .onChange(of: activeFilter) {
       visibleResultLimit = ResultHistoryPagePolicy.pageSize
       selectedHistoryDate = nil
+      historyListScrollTarget = nil
     }
-    .onChange(of: historySortField) { visibleResultLimit = ResultHistoryPagePolicy.pageSize }
-    .onChange(of: historySortDirection) { visibleResultLimit = ResultHistoryPagePolicy.pageSize }
+    .onChange(of: selectedHistoryDate) { revealSelectedHistoryResult() }
+    .onChange(of: historySortField) { resetHistoryPagination() }
+    .onChange(of: historySortDirection) { resetHistoryPagination() }
+  }
+
+  private func revealSelectedHistoryResult() {
+    guard let selectedID = selectedHistoryMetric?.id else {
+      historyListScrollTarget = nil
+      return
+    }
+    visibleResultLimit = ResultHistorySelectionRevealPolicy.visibleLimit(
+      currentLimit: visibleResultLimit, selectedID: selectedID,
+      sortedIDs: sortedFilteredResults.map(\.id))
+    historyListScrollTarget = selectedID
+  }
+
+  private func resetHistoryPagination() {
+    visibleResultLimit = ResultHistoryPagePolicy.pageSize
+    revealSelectedHistoryResult()
   }
 
   private var historyChartPoints: [HistoryChartPoint] {
