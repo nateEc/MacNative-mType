@@ -2388,6 +2388,22 @@ enum ActivityHeatmap {
         }
     }
 
+    /// Creates dated cells for the compact activity array returned by a public profile.
+    /// The server deliberately sends counts only, so this preserves that privacy boundary
+    /// while giving the native calendar stable day and accessibility labels.
+    static func cells(
+        completedTestsByDay: [Int], endingAt endDate: Date, calendar: Calendar = .current
+    ) -> [ActivityHeatmapCell] {
+        guard !completedTestsByDay.isEmpty else { return [] }
+        let end = calendar.startOfDay(for: endDate)
+        guard let start = calendar.date(byAdding: .day, value: 1 - completedTestsByDay.count, to: end)
+        else { return [] }
+        return completedTestsByDay.enumerated().compactMap { offset, count in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
+            return ActivityHeatmapCell(day: day, completedTests: max(0, count))
+        }
+    }
+
     static func cells(
         activity: [DailyActivity],
         days: Int = 84,

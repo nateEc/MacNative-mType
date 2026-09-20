@@ -634,47 +634,152 @@ struct PublicProfileView: View {
 private struct PublicProfileActivityCalendar: View {
     let activity: RemotePublicProfileActivity
 
+    private static let dayLabelFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = .current
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
     private var calendar: Calendar {
         var value = Calendar(identifier: .gregorian)
         value.timeZone = TimeZone(secondsFromGMT: 0)!
+        value.firstWeekday = Calendar.current.firstWeekday
         return value
     }
 
-    private var maximum: Int { max(1, activity.testsByDays.max() ?? 0) }
+    private let rows = Array(repeating: GridItem(.fixed(10), spacing: 3), count: 7)
+
+    private var cells: [ActivityHeatmapCell] {
+        ActivityHeatmap.cells(
+            completedTestsByDay: activity.testsByDays, endingAt: activity.lastDay, calendar: calendar)
+    }
+
+    private var weekdaySymbols: [String] {
+        let symbols = calendar.veryShortWeekdaySymbols
+        let first = max(0, calendar.firstWeekday - 1)
+        return Array(symbols[first...]) + Array(symbols[..<first])
+    }
+
+    private var leadingFillerCount: Int {
+        guard let first = cells.first else { return 0 }
+        return (calendar.component(.weekday, from: first.day) - calendar.firstWeekday + 7) % 7
+    }
+
+    private var trailingFillerCount: Int {
+        guard !cells.isEmpty else { return 0 }
+        return (7 - (leadingFillerCount + cells.count) % 7) % 7
+    }
+
+    private var weekColumnCount: Int {
+        (leadingFillerCount + cells.count + trailingFillerCount) / 7
+    }
+
+    private var monthByColumn: [Int: Date] {
+        ActivityHeatmap.monthMarkers(cells: cells, calendar: calendar).reduce(into: [:]) { months, marker in
+            months[marker.column] = marker.month
+        }
+    }
+
+    private var completedTestCount: Int { ActivityHeatmap.completedTestCount(in: cells) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("近 12 个月公开活动")
+                Text("近 12 个月公开活动 · \(completedTestCount) 次完成")
                     .font(.headline)
                 Spacer()
                 Text(dayBoundaryLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHGrid(
-                    rows: Array(repeating: GridItem(.fixed(10), spacing: 3), count: 7), spacing: 3
-                ) {
-                    ForEach(Array(activity.testsByDays.enumerated()), id: \.offset) { offset, count in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.accentColor.opacity(opacity(for: count)))
+            HStack(spacing: 3) {
+                Text("少")
+                ForEach(0...4, id: \.self) { intensity in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor.opacity(opacity(for: intensity)))
+                        .frame(width: 10, height: 10)
+                }
+                Text("多")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("公开完成次数强度图例")
+            .accessibilityValue("由少到多；近 12 个月共 \(completedTestCount) 次完成")
+            HStack(alignment: .top, spacing: 6) {
+                VStack(spacing: 3) {
+                    ForEach(weekdaySymbols, id: \.self) { symbol in
+                        Text(symbol)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                             .frame(width: 10, height: 10)
-                            .accessibilityLabel("\(dayLabel(offset: offset))：完成 \(count) 次")
                     }
                 }
-                .padding(.vertical, 2)
+                .accessibilityHidden(true)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 3) {
+                            ForEach(0..<weekColumnCount, id: \.self) { column in
+                                Text(monthLabel(for: column))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .frame(width: 10, height: 10, alignment: .leading)
+                            }
+                        }
+                        .accessibilityHidden(true)
+                        LazyHGrid(rows: rows, spacing: 3) {
+                            ForEach(0..<leadingFillerCount, id: \.self) { _ in
+                                Color.clear.frame(width: 10, height: 10)
+                            }
+                            ForEach(cells) { cell in
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(Color.accentColor.opacity(opacity(for: cell.intensity)))
+                                    .frame(width: 10, height: 10)
+                                    .accessibilityLabel(dayLabel(for: cell.day))
+                                    .accessibilityValue(
+                                        cell.completedTests == 0
+                                            ? "没有完成练习" : "\(cell.completedTests) 次完成")
+                            }
+                            ForEach(0..<trailingFillerCount, id: \.self) { _ in
+                                Color.clear.frame(width: 10, height: 10)
+                            }
+                        }
+                        .frame(height: 88)
+                    }
+                }
             }
-            Text("颜色越深表示完成次数越多；只显示完成次数，不显示文本或输入回放。")
+            Text("只显示完成次数，不显示文本或输入回放。")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func opacity(for count: Int) -> Double {
-        guard count > 0 else { return 0.1 }
-        return 0.25 + 0.75 * min(1, Double(count) / Double(maximum))
+    private func monthLabel(for column: Int) -> String {
+        guard let month = monthByColumn[column] else { return "" }
+        let index = calendar.component(.month, from: month) - 1
+        guard calendar.shortMonthSymbols.indices.contains(index) else { return "" }
+        return calendar.shortMonthSymbols[index]
+    }
+
+    private func dayLabel(for day: Date) -> String {
+        Self.dayLabelFormatter.string(from: day)
+    }
+
+    private func opacity(for intensity: Int) -> Double {
+        switch intensity {
+        case 0: 0.12
+        case 1: 0.35
+        case 2: 0.55
+        case 3: 0.75
+        default: 1
+        }
     }
 
     private var dayBoundaryLabel: String {
@@ -684,9 +789,4 @@ private struct PublicProfileActivityCalendar: View {
         return "按账户日界 UTC\(offset > 0 ? "+" : "−")\(magnitude)"
     }
 
-    private func dayLabel(offset: Int) -> String {
-        let startOffset = offset - activity.testsByDays.count + 1
-        let day = calendar.date(byAdding: .day, value: startOffset, to: activity.lastDay) ?? activity.lastDay
-        return day.formatted(date: .abbreviated, time: .omitted)
-    }
 }

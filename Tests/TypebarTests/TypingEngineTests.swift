@@ -20993,6 +20993,25 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(markers.map { calendar.component(.month, from: $0.month) }, [1, 2])
   }
 
+  func testActivityHeatmapBuildsPublicActivityCellsWithSafeTotals() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    calendar.firstWeekday = 2
+    let endingAt = calendar.date(from: DateComponents(year: 2025, month: 3, day: 15))!
+
+    let cells = ActivityHeatmap.cells(
+      completedTestsByDay: [2, -4, 0, 3], endingAt: endingAt, calendar: calendar)
+
+    XCTAssertEqual(cells.map(\.day), [
+      calendar.date(from: DateComponents(year: 2025, month: 3, day: 12))!,
+      calendar.date(from: DateComponents(year: 2025, month: 3, day: 13))!,
+      calendar.date(from: DateComponents(year: 2025, month: 3, day: 14))!,
+      endingAt,
+    ])
+    XCTAssertEqual(cells.map(\.completedTests), [2, 0, 0, 3])
+    XCTAssertEqual(ActivityHeatmap.completedTestCount(in: cells), 5)
+  }
+
   @MainActor
   func testAppSettingsPersistAndRestore() throws {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
