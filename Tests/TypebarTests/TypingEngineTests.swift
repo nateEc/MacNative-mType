@@ -15769,6 +15769,46 @@ final class TypingEngineTests: XCTestCase {
       "πρωί")
   }
 
+  func testKurdishPunctuationPolicyUsesArabicQuestionMarks() {
+    var randomValues = Array(repeating: 0.9, count: 9) + [0.85]
+    let words = KurdishPunctuationPolicy.punctuatedPrompt(
+      ["کتێب", "قەڵەم", "پەنجەرە"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["کتێب", "قەڵەم", "پەنجەرە؟"])
+  }
+
+  func testKurdishPunctuationPolicyUsesArabicSeparators() {
+    var randomValues =
+      Array(repeating: 0.9, count: 6) + [0]
+      + Array(repeating: 0.9, count: 7) + [0, 0.9, 0]
+    let words = KurdishPunctuationPolicy.punctuatedPrompt(
+      ["کتێب", "قەڵەم", "ڕێگا", "پەنجەرە"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["کتێب", "قەڵەم؛", "ڕێگا،", "پەنجەرە."])
+  }
+
+  func testKurdishContentPolicyUsesArabicIndicNumbers() {
+    var randomValues = [0, 0, 0, 0.9, 0, 0.9]
+    let words = KurdishPunctuationPolicy.generatedPrompt(
+      ["کتێب", "قەڵەم"], includesPunctuation: true, includesNumbers: true,
+      random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["١", "قەڵەم."])
+  }
+
+  func testKurdishPromptUsesPolicyOnlyWhenContentOptionsAreEnabled() {
+    XCTAssertEqual(
+      StarterLexicon.kurdishPrompt(
+        tokens: 3, lexicon: ["کتێب"], contentOptions: ContentOptions(includePunctuation: true),
+        usesZipfFrequency: false, contentRandom: { 0.9 }),
+      "کتێب کتێب کتێب!")
+    XCTAssertEqual(
+      StarterLexicon.kurdishPrompt(
+        tokens: 3, lexicon: ["کتێب"], contentOptions: ContentOptions(),
+        usesZipfFrequency: false, contentRandom: { 0.9 }),
+      "کتێب کتێب کتێب")
+  }
+
   func testEnglishPromptPunctuatesOnlyWhenPunctuationIsEnabled() {
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
