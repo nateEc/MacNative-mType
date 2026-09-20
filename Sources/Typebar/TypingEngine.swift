@@ -2806,7 +2806,63 @@ struct TypingSession {
     }
   }
 
-  var correctCharacters: Int { max(0, typed.count - errors) }
+  /// Result WPM follows word-completion scoring for ordinary space-delimited
+  /// tests. A completed typo does not earn partial WPM credit, while a timed
+  /// or bailed-out final word can retain its correctly typed prefix.
+  private var scoredCorrectCharacters: Int {
+    referenceScoredCorrectCharacters(countPartialLastWord: resultCreditsPartialLastWord)
+  }
+
+  private var resultCreditsPartialLastWord: Bool {
+    configuration.duration != nil || outcome == .bailedOut
+  }
+
+  /// The pre-result display always credits a correct prefix of the active
+  /// word, matching the live speed readout without changing final scoring.
+  private var liveScoredCorrectCharacters: Int {
+    referenceScoredCorrectCharacters(countPartialLastWord: true)
+  }
+
+  private func referenceScoredCorrectCharacters(countPartialLastWord: Bool) -> Int {
+    guard configuration.language.usesSpaceDelimitedWords,
+      !configuration.language.isCodeLanguage,
+      !configuration.modifiers.contains(.noSpaces)
+    else {
+      return max(0, typed.count - errors)
+    }
+
+    let targetWords = metricWords(in: prompt)
+    let inputWords = metricWords(in: typed)
+    return inputWords.enumerated().reduce(into: 0) { total, entry in
+      let (index, inputWord) = entry
+      guard targetWords.indices.contains(index) else {
+        total += inputWord.count
+        return
+      }
+      let targetWord = targetWords[index]
+      if inputWord == targetWord {
+        total += targetWord.count
+      } else if countPartialLastWord, index == inputWords.index(before: inputWords.endIndex),
+        targetWord.hasPrefix(inputWord)
+      {
+        total += inputWord.count
+      }
+    }
+  }
+
+  private func metricWords(in text: String) -> [String] {
+    var words: [String] = []
+    var current = ""
+    for character in text {
+      current.append(character)
+      if isPromptWordSeparator(character) {
+        words.append(current)
+        current = ""
+      }
+    }
+    if !current.isEmpty { words.append(current) }
+    return words
+  }
 
   /// A native final-state classification derived from the accepted input's
   /// exact target mapping. It is descriptive only and never feeds scoring.
@@ -2854,7 +2910,8 @@ struct TypingSession {
   func wpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    return wpm(characters: correctCharacters, seconds: end.timeIntervalSince(startedAt))
+    let characters = finishedAt == nil ? liveScoredCorrectCharacters : scoredCorrectCharacters
+    return wpm(characters: characters, seconds: end.timeIntervalSince(startedAt))
   }
 
   func rawWpm(at date: Date) -> Int {
@@ -3095,7 +3152,7 @@ struct TypingSession {
       finishedAt: finishedAt,
       afkDuration: afkDuration,
       typedCharacterCount: typed.count,
-      correctCharacterCount: correctCharacters,
+      correctCharacterCount: scoredCorrectCharacters,
       errorCount: errors,
       wpm: wpm(at: date),
       rawWpm: rawWpm(at: date),
@@ -4077,13 +4134,12 @@ struct TypingSession {
     let targetWords = Array(
       splitPromptWords(prompt, omittingEmptySubsequences: true).prefix(wordLimit))
     let typedWords = splitPromptWords(typed, omittingEmptySubsequences: true)
-    guard targetWords.count == wordLimit, typedWords.count >= wordLimit,
-      let expectedInput = targetInputThroughWord(wordLimit - 1)
+    guard targetWords.count == wordLimit, typedWords.count >= wordLimit
     else { return false }
 
-    // A correct final word always completes. A user can otherwise commit an
-    // incorrect final word with space, matching normal typing behavior.
-    if typed == expectedInput || typed.last.map(isPromptWordSeparator) == true { return true }
+    // A correct final word completes even if an earlier word was submitted
+    // with errors. An incorrect final word instead needs its separator.
+    if currentWordIsCorrect || typed.last.map(isPromptWordSeparator) == true { return true }
 
     // Quick end only applies at the final generated word and is deliberately
     // disabled when an error rule would reject the same character upstream.

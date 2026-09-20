@@ -1434,7 +1434,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.wordReviews, [.init(index: 0, target: "amber", typed: "amberx")])
   }
 
-  func testResultCharacterStatsClassifyFinalAcceptedInputWithoutChangingScoring() throws {
+  func testResultCharacterStatsRemainFinalStateDiagnosticsAlongsideWordScoredResults() throws {
     var earlyCommit = TypingSession(configuration: .timed(seconds: 1), prompt: "cat dog")
     earlyCommit.insert("ca ", at: start)
     earlyCommit.tick(at: start.addingTimeInterval(1))
@@ -1443,7 +1443,7 @@ final class TypingEngineTests: XCTestCase {
       earlyResult.characterStats,
       .init(matched: 2, incorrect: 1, extra: 0, missed: 1))
     XCTAssertEqual(earlyResult.typedCharacterCount, 3)
-    XCTAssertEqual(earlyResult.correctCharacterCount, 2)
+    XCTAssertEqual(earlyResult.correctCharacterCount, 0)
     XCTAssertEqual(earlyResult.errorCount, 1)
 
     var extraInput = TypingSession(configuration: .timed(seconds: 1), prompt: "cat dog")
@@ -3502,12 +3502,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(expert.outcome, .active)
   }
 
-  func testStatsUseCorrectCharactersAndFixedClock() {
+  func testTimedStatsRejectAnIncorrectActiveWordPrefix() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber")
     session.insert("amxzr", at: start)
     XCTAssertEqual(session.errors, 2)
     XCTAssertEqual(session.accuracy, 60)
-    XCTAssertEqual(session.wpm(at: start.addingTimeInterval(12)), 3)
+    XCTAssertEqual(session.wpm(at: start.addingTimeInterval(12)), 0)
     XCTAssertEqual(session.rawWpm(at: start.addingTimeInterval(12)), 5)
   }
 
@@ -3548,6 +3548,35 @@ final class TypingEngineTests: XCTestCase {
     instant.insert("a", at: start)
     XCTAssertEqual(instant.wpm(at: start), 0)
     XCTAssertEqual(instant.rawWpm(at: start), 0)
+  }
+
+  func testFiniteWpmCreditsOnlyFullyCorrectWordsWhileRawCountsAllInput() throws {
+    var session = TypingSession(configuration: .words(2), prompt: "amber bay")
+    session.insert("axber ", at: start)
+    session.insert("bay", at: start.addingTimeInterval(2))
+
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.wpm(at: start.addingTimeInterval(2)), 18)
+    XCTAssertEqual(session.rawWpm(at: start.addingTimeInterval(2)), 54)
+    XCTAssertEqual(try XCTUnwrap(session.result(at: start.addingTimeInterval(2))).correctCharacterCount, 3)
+  }
+
+  func testTimedAndBailedWpmRetainOnlyTheCorrectActiveWordPrefix() throws {
+    var timed = TypingSession(configuration: .timed(seconds: 2), prompt: "amber bay")
+    timed.insert("axber ba", at: start)
+    timed.tick(at: start.addingTimeInterval(2))
+
+    XCTAssertEqual(timed.outcome, .completed)
+    XCTAssertEqual(timed.wpm(at: start.addingTimeInterval(2)), 12)
+    XCTAssertEqual(timed.rawWpm(at: start.addingTimeInterval(2)), 48)
+    XCTAssertEqual(try XCTUnwrap(timed.result(at: start.addingTimeInterval(2))).correctCharacterCount, 2)
+
+    var bailed = TypingSession(configuration: .words(2), prompt: "amber bay")
+    bailed.insert("am", at: start)
+    bailed.bailOut(at: start.addingTimeInterval(2))
+
+    XCTAssertEqual(bailed.wpm(at: start.addingTimeInterval(2)), 12)
+    XCTAssertEqual(try XCTUnwrap(bailed.result(at: start.addingTimeInterval(2))).correctCharacterCount, 2)
   }
 
   func testBurstUsesAcceptedCharactersFromTheCurrentOrLatestCommittedWord() {
