@@ -18351,6 +18351,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.prompt, "kirmizi")
   }
 
+  func testLazyLatinModifierUsesLanguageSpecificAccentExpansions() {
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("Ärger ÖL Ü", language: .german),
+      "Aerger OEL Ue")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("Đorđe ĐORĐE", language: .serbianLatin),
+      "Djordje DJORDJE")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("Ärger", language: .spanish),
+      "Arger")
+
+    let germanSession = TestSessionFactory.make(
+      configuration: .words(1, language: .german).with(modifiers: [.lazyLatin]),
+      streamPrompt: "Ärger")
+    XCTAssertEqual(germanSession.prompt, "Aerger")
+
+    let serbianSession = TestSessionFactory.make(
+      configuration: .words(1, language: .serbianLatin).with(modifiers: [.lazyLatin]),
+      streamPrompt: "Đorđe")
+    XCTAssertEqual(serbianSession.prompt, "Djordje")
+  }
+
   func testLazyInputPolicyMirrorsReferenceLanguageAndPolyglotAvailability() {
     XCTAssertFalse(TypingLanguage.english.supportsLazyLatinInput)
     XCTAssertFalse(TypingLanguage.hindi.supportsLazyLatinInput)

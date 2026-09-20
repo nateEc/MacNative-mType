@@ -5095,7 +5095,7 @@ enum NoSpaceWordBoundaryPolicy {
     if modifiers.contains(.backwards) { words.reverse() }
     let lengths = words.map {
       language.presentationText(
-        TestModifierPolicy.transformed($0, modifiers: modifiers)
+        TestModifierPolicy.transformed($0, modifiers: modifiers, language: language)
       ).count
     }
     guard lengths.reduce(0, +) == transformedPrompt.count else { return [] }
@@ -5248,7 +5248,8 @@ struct TestSessionFactory {
             max(configuration.customTextSectionLimit ?? sections.count, 1), sections.count)
           let transformedSections = sections.prefix(limit).map {
             configuration.language.presentationText(
-              TestModifierPolicy.transformed($0, modifiers: configuration.modifiers))
+              TestModifierPolicy.transformed(
+                $0, modifiers: configuration.modifiers, language: configuration.language))
           }
           noSpaceBoundarySource = sections.prefix(limit).joined(separator: " ")
           let separator =
@@ -5270,7 +5271,8 @@ struct TestSessionFactory {
     let transformedPrompt = configuration.language.presentationText(
       configuration.mode == .custom && configuration.customTextCompletion == .sections
         ? prompt
-        : TestModifierPolicy.transformed(prompt, modifiers: configuration.modifiers))
+        : TestModifierPolicy.transformed(
+          prompt, modifiers: configuration.modifiers, language: configuration.language))
     let noSpaceWordLengths = NoSpaceWordBoundaryPolicy.wordLengths(
       source: noSpaceBoundarySource ?? prompt, language: configuration.language,
       modifiers: configuration.modifiers,

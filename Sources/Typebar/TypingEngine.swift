@@ -1010,7 +1010,9 @@ enum TestModifierPolicy {
     return normalized(modifiers.filter { !conflicts.contains($0) } + [modifier])
   }
 
-  static func transformed(_ prompt: String, modifiers: [TestModifier]) -> String {
+  static func transformed(
+    _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil
+  ) -> String {
     var transformed = prompt
     if modifiers.contains(.noSpaces) {
       transformed = transformed.replacingOccurrences(of: " ", with: "")
@@ -1067,7 +1069,7 @@ enum TestModifierPolicy {
       }
     }
     if modifiers.contains(.lazyLatin) {
-      transformed = TypingTextNormalizer.lazyLatin(transformed)
+      transformed = TypingTextNormalizer.lazyLatin(transformed, language: language)
     }
     return transformed
   }
@@ -1364,13 +1366,14 @@ enum MessagingTextPolicy {
 }
 
 enum TypingTextNormalizer {
-  static func lazyLatin(_ value: String) -> String {
+  static func lazyLatin(_ value: String, language: TypingLanguage? = nil) -> String {
     let ligatures: [(String, String)] = [
       ("ß", "ss"), ("ẞ", "SS"), ("æ", "ae"), ("Æ", "AE"),
       ("œ", "oe"), ("Œ", "OE"), ("ø", "o"), ("Ø", "O"),
       ("ł", "l"), ("Ł", "L"), ("đ", "d"), ("Đ", "D"), ("ı", "i"),
     ]
-    let thornExpanded = expandThorn(in: value)
+    let languageExpanded = expandLanguageSpecificMappings(in: value, language: language)
+    let thornExpanded = expandThorn(in: languageExpanded)
     let expanded = ligatures.reduce(thornExpanded) { text, replacement in
       text.replacingOccurrences(of: replacement.0, with: replacement.1)
     }
@@ -1397,6 +1400,43 @@ enum TypingTextNormalizer {
         output += secondLetterIsUppercase ? "TH" : "Th"
       default:
         output.append(character)
+      }
+    }
+  }
+
+  /// Monkeytype assigns a few replacement sequences to specific word-list
+  /// languages. Keep them scoped: globally simplifying these characters would
+  /// make the prompt differ from other languages that share the same glyphs.
+  private static func expandLanguageSpecificMappings(
+    in value: String, language: TypingLanguage?
+  ) -> String {
+    let replacements: [String: String]
+    switch language {
+    case .german, .german1k, .german10k, .german250k:
+      replacements = ["ä": "ae", "ö": "oe", "ü": "ue"]
+    case .serbianLatin, .serbianLatin10k:
+      replacements = ["đ": "dj"]
+    default:
+      return value
+    }
+
+    let characters = Array(value)
+    return characters.enumerated().reduce(into: "") { output, entry in
+      let (index, character) = entry
+      let source = String(character)
+      guard let replacement = replacements[source.lowercased()] else {
+        output.append(character)
+        return
+      }
+
+      for (offset, replacementCharacter) in replacement.enumerated() {
+        let sourceIndex = index + offset
+        let replacementFollowsUppercaseSource =
+          sourceIndex < characters.count
+          && String(characters[sourceIndex]) == String(characters[sourceIndex]).uppercased()
+        output += replacementFollowsUppercaseSource
+          ? replacementCharacter.uppercased()
+          : String(replacementCharacter)
       }
     }
   }
