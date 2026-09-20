@@ -3234,6 +3234,14 @@ struct TypingSession {
           evaluatesTerminalRulesOnLastCharacterOnly: true)
         continue
       }
+      if shouldExpandDutchLigature(character) {
+        // The reference expands the Dutch IJ ligature through its ordinary
+        // multi-character input path, but preserves a literal ligature target.
+        insertText(
+          "ij", forceError: forceError, at: date,
+          evaluatesTerminalRulesOnLastCharacterOnly: true)
+        continue
+      }
       let evaluatesTerminalRules = !evaluatesTerminalRulesOnLastCharacterOnly
         || index == characters.indices.last
       if insertCharacter(
@@ -3381,6 +3389,18 @@ struct TypingSession {
   /// in custom text while accepting the common macOS replacement for `...`.
   private mutating func shouldExpandReferenceEllipsis(_ character: Character) -> Bool {
     guard character == "…" else { return false }
+    extendPromptIfNeeded()
+    guard nextTargetIndex < prompt.count else { return true }
+    return Array(prompt)[nextTargetIndex] != character
+  }
+
+  /// The fixed reference expands the Dutch IJ ligature through regular `i`
+  /// and `j` input for the base catalog and its numeric-size variants. It
+  /// keeps a literal ligature target intact for custom prompts.
+  private mutating func shouldExpandDutchLigature(_ character: Character) -> Bool {
+    guard character == "ĳ", configuration.language.usesDutchLigatureInputExpansion else {
+      return false
+    }
     extendPromptIfNeeded()
     guard nextTargetIndex < prompt.count else { return true }
     return Array(prompt)[nextTargetIndex] != character
@@ -11623,6 +11643,17 @@ extension TypingLanguage {
   var usesRussianYoInputEquivalence: Bool {
     switch self {
     case .russian, .russian1k, .russian5k, .russian10k, .russian25k, .russian50k, .russian375k:
+      true
+    default:
+      false
+    }
+  }
+
+  /// The fixed reference accepts the system Dutch IJ ligature as two ordinary
+  /// letters only for its base Dutch catalog and numeric-size variants.
+  var usesDutchLigatureInputExpansion: Bool {
+    switch self {
+    case .dutch, .dutch1k, .dutch10k:
       true
     default:
       false

@@ -3559,6 +3559,36 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testDutchLigatureInputExpandsOnlyForDutchCatalogs() throws {
+    let dutchLanguages: [TypingLanguage] = [.dutch, .dutch1k, .dutch10k]
+    for language in dutchLanguages {
+      var session = TypingSession(
+        configuration: .words(1, language: language), prompt: "ij")
+      session.insert("ĳ", at: start)
+
+      XCTAssertEqual(session.outcome, .completed, "\(language.rawValue)")
+      XCTAssertEqual(session.errors, 0, "\(language.rawValue)")
+      XCTAssertEqual(session.typed, "ij", "\(language.rawValue)")
+      XCTAssertEqual(
+        try XCTUnwrap(session.result(at: start)).replayEvents.map(\.text), ["i", "j"],
+        "\(language.rawValue)")
+    }
+
+    var literalDutch = TypingSession(
+      configuration: .words(1, language: .dutch), prompt: "ĳ")
+    literalDutch.insert("ĳ", at: start)
+    XCTAssertEqual(literalDutch.outcome, .completed)
+    XCTAssertEqual(literalDutch.errors, 0)
+    XCTAssertEqual(literalDutch.typed, "ĳ")
+
+    var nonDutch = TypingSession(
+      configuration: .words(1, language: .english), prompt: "ij")
+    nonDutch.insert("ĳ", at: start)
+    XCTAssertNotEqual(nonDutch.outcome, .completed)
+    XCTAssertEqual(nonDutch.errors, 1)
+    XCTAssertEqual(nonDutch.typed, "ĳ")
+  }
+
   func testTimedStatsRejectAnIncorrectActiveWordPrefix() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber")
     session.insert("amxzr", at: start)
