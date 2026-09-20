@@ -897,7 +897,7 @@ private struct ContentView: View {
       case .failed:
         terminalNotice = .failed(
           savedLongTextProgress: updateLongSavedTextProgress(for: outcome),
-          timerWasUnhealthy: timerHealth.shouldFail)
+          reason: session.failureReason)
       case .abandoned:
         terminalNotice = .abandoned
       case .active:
@@ -1281,7 +1281,11 @@ private struct ContentView: View {
           lastTimeWarningSecond = remaining
         }
       }
-      if let lastDueSecond = dueSeconds.last { lastClockTickSecond = lastDueSecond }
+      if let lastDueSecond = dueSeconds.last {
+        lastClockTickSecond = lastDueSecond
+        session.enforceLivePracticeThresholds(at: now)
+        if session.isFinished { return }
+      }
     }
     session.tick(at: now)
   }
@@ -4041,7 +4045,7 @@ private struct ContentView: View {
 }
 
 private enum TestTerminalNotice: Hashable, Identifiable {
-  case failed(savedLongTextProgress: Bool, timerWasUnhealthy: Bool)
+  case failed(savedLongTextProgress: Bool, reason: TestFailureReason?)
   case abandoned
 
   var id: Self { self }
@@ -4055,12 +4059,18 @@ private enum TestTerminalNotice: Hashable, Identifiable {
 
   var message: String {
     switch self {
-    case .failed(let savedLongTextProgress, let timerWasUnhealthy):
+    case .failed(let savedLongTextProgress, let reason):
       let progressMessage = savedLongTextProgress ? "长文本进度已保存；" : ""
-      if timerWasUnhealthy {
+      switch reason {
+      case .timerHealth:
         return progressMessage + "检测到计时调度持续延迟，为避免不准确的成绩，已停止本次测试。"
+      case .minimumWpm:
+        return progressMessage + "当前整体速度低于设定的最低速度，本次没有保存为完成成绩。"
+      case .minimumAccuracy:
+        return progressMessage + "当前准确率低于设定的最低准确率，本次没有保存为完成成绩。"
+      case nil:
+        return progressMessage + "本次没有保存为完成成绩。"
       }
-      return progressMessage + "本次没有保存为完成成绩。"
     case .abandoned: return "本次没有保存为完成成绩。"
     }
   }

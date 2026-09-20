@@ -3345,33 +3345,63 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.wordReviews.map(\.typed), ["yab", "rebma"])
   }
 
-  func testMinimumAccuracyFailsFiniteTestsOnlyWhenCompletionWouldOtherwiseSucceed() {
-    let rules = InputRules(minimumAccuracy: 90)
-    var failed = TypingSession(configuration: .words(2, rules: rules), prompt: "amber bay")
-    failed.insert("axxer bay ", at: start)
-    XCTAssertEqual(failed.accuracy, 80)
-    XCTAssertEqual(failed.outcome, .failed)
-    XCTAssertEqual(failed.result()?.outcome, .failed)
+  func testMinimumAccuracyFailsOnLiveTimerTickWithUnroundedSourcePrecision() {
+    var failing = TypingSession(
+      configuration: .words(6, rules: .init(minimumAccuracy: 50.1)),
+      prompt: "amber bay cedar delta ember fjord")
+    failing.insert("ax", at: start)
+    failing.enforceLivePracticeThresholds(at: start.addingTimeInterval(1))
 
-    var passing = TypingSession(configuration: .words(2, rules: rules), prompt: "amber bay")
-    passing.insert("amber bay", at: start)
-    XCTAssertEqual(passing.outcome, .completed)
+    XCTAssertEqual(failing.accuracy, 50)
+    XCTAssertEqual(failing.outcome, .failed)
+    XCTAssertEqual(failing.failureReason, .minimumAccuracy)
+    XCTAssertEqual(failing.result()?.outcome, .failed)
 
-    var disabled = TypingSession(configuration: .words(2, rules: .init()), prompt: "amber bay")
-    disabled.insert("axxer bay ", at: start)
-    XCTAssertEqual(disabled.outcome, .completed)
+    var exactBoundary = TypingSession(
+      configuration: .words(6, rules: .init(minimumAccuracy: 50)),
+      prompt: "amber bay cedar delta ember fjord")
+    exactBoundary.insert("ax", at: start)
+    exactBoundary.enforceLivePracticeThresholds(at: start.addingTimeInterval(1))
+
+    XCTAssertEqual(exactBoundary.outcome, .active)
+    XCTAssertNil(exactBoundary.failureReason)
   }
 
-  func testMinimumWpmFailsFiniteTestsOnlyWhenFinalPaceIsTooLow() {
-    let rules = InputRules(minimumWpm: 10)
-    var slow = TypingSession(configuration: .words(2, rules: rules), prompt: "amber bay")
-    slow.insert("a", at: start)
-    slow.insert("mber bay", at: start.addingTimeInterval(60))
-    XCTAssertEqual(slow.outcome, .failed)
+  func testMinimumWpmWaitsForFourCompletedWordsAndUsesStrictThreshold() {
+    let prompt = "aaaa aaaa aaaa aaaa aaaa aaaa"
+    var delayed = TypingSession(
+      configuration: .words(6, rules: .init(minimumWpm: 5)), prompt: prompt)
+    delayed.insert("aaaa aaaa aaaa ", at: start)
+    delayed.enforceLivePracticeThresholds(at: start.addingTimeInterval(60))
 
-    var fast = TypingSession(configuration: .words(2, rules: rules), prompt: "amber bay")
-    fast.insert("amber bay", at: start)
-    XCTAssertEqual(fast.outcome, .completed)
+    XCTAssertEqual(delayed.completedWordCount, 3)
+    XCTAssertEqual(delayed.outcome, .active)
+
+    delayed.insert("aaaa ", at: start.addingTimeInterval(60))
+    delayed.enforceLivePracticeThresholds(at: start.addingTimeInterval(60))
+
+    XCTAssertEqual(delayed.completedWordCount, 4)
+    XCTAssertEqual(delayed.outcome, .failed)
+    XCTAssertEqual(delayed.failureReason, .minimumWpm)
+
+    var exactBoundary = TypingSession(
+      configuration: .words(6, rules: .init(minimumWpm: 4)), prompt: prompt)
+    exactBoundary.insert("aaaa aaaa aaaa aaaa ", at: start)
+    exactBoundary.enforceLivePracticeThresholds(at: start.addingTimeInterval(60))
+
+    XCTAssertEqual(exactBoundary.wpm(at: start.addingTimeInterval(60)), 4)
+    XCTAssertEqual(exactBoundary.outcome, .active)
+    XCTAssertNil(exactBoundary.failureReason)
+  }
+
+  func testThresholdsDoNotRetroactivelyFailACompletedAttemptWithoutTimerTick() {
+    var session = TypingSession(
+      configuration: .words(2, rules: .init(minimumAccuracy: 90, minimumWpm: 100)),
+      prompt: "amber bay")
+    session.insert("axxer bay ", at: start)
+
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertNil(session.failureReason)
   }
 
   func testFreedomModeOnlyAllowsDeletingCommittedCorrectWordsWhenEnabled() {

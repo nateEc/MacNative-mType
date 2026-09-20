@@ -78,8 +78,8 @@ enum PracticeThresholdEditorKind: Equatable, Identifiable {
 
   var explanation: String {
     switch self {
-    case .minimumWpm: "有限练习完成时，速度低于该值会判定失败。"
-    case .minimumAccuracy: "有限练习完成时，准确率低于该值会判定失败。"
+    case .minimumWpm: "开始后的每个整秒检查；完成至少四个词后，速度低于该值会判定失败。"
+    case .minimumAccuracy: "开始后的每个整秒检查；准确率低于该值会判定失败。"
     case .minimumWordBurst(.fixed): "每个可测单词都使用同一速度门槛。"
     case .minimumWordBurst(.flex): "较长单词会使用逐步放宽的速度门槛。"
     case .minimumWordBurst(.off): ""

@@ -1746,6 +1746,14 @@ enum TestOutcome: String, Codable, Equatable {
   case bailedOut
 }
 
+/// The user-visible cause of a failed attempt when the reference timer stops
+/// it for an enabled practice threshold or unreliable timer delivery.
+enum TestFailureReason: Hashable {
+  case minimumWpm
+  case minimumAccuracy
+  case timerHealth
+}
+
 /// Native equivalent of the reference test's one-second inactivity accounting.
 /// It consumes only local event timestamps; the timer is deliberately not
 /// paused, so timed tests keep their normal wall-clock deadline.
@@ -2657,6 +2665,7 @@ struct TypingSession {
   private(set) var startedAt: Date?
   private(set) var finishedAt: Date?
   private(set) var outcome: TestOutcome = .active
+  private(set) var failureReason: TestFailureReason?
 
   init(
     configuration: TestConfiguration, prompt: String, repeatingPrompt: String? = nil,
@@ -2835,7 +2844,7 @@ struct TypingSession {
 
   var accuracy: Int {
     guard !typed.isEmpty else { return 100 }
-    return Int((Double(correctCharacters) / Double(typed.count) * 100).rounded())
+    return Int((liveAccuracy * 100).rounded())
   }
 
   func wpm(at date: Date) -> Int {
@@ -3058,7 +3067,10 @@ struct TypingSession {
       else { return false }
       return isPromptWordSeparator(typedCharacters[typedIndex])
     }.count
-    guard isFinished, !typed.isEmpty else { return committed }
+    guard nextTargetIndex >= targetCharacters.count,
+      !targetCharacters.isEmpty,
+      !isPromptWordSeparator(targetCharacters[targetCharacters.count - 1])
+    else { return committed }
     return committed + 1
   }
 
@@ -3217,12 +3229,20 @@ struct TypingSession {
     if date.timeIntervalSince(startedAt) >= duration { complete(at: date) }
   }
 
+  /// Mirrors the reference's once-per-real-second threshold evaluation. Speed
+  /// is intentionally deferred until the fifth active word; accuracy is not.
+  mutating func enforceLivePracticeThresholds(at date: Date = .now) {
+    guard !isFinished, startedAt != nil else { return }
+    guard let reason = livePracticeThresholdFailure(at: date) else { return }
+    fail(at: date, reason: reason)
+  }
+
   /// Stops a running attempt when local timer delivery has become too delayed
   /// to trust a short-test result. It intentionally uses the ordinary failed
   /// outcome so result saving, statistics, sync, and publication stay off.
   mutating func failForTimerHealth(at date: Date = .now) {
     guard !isFinished, startedAt != nil else { return }
-    fail(at: date)
+    fail(at: date, reason: .timerHealth)
   }
 
   mutating func abandon(at date: Date = .now) {
@@ -4083,16 +4103,31 @@ struct TypingSession {
   }
 
   private mutating func complete(at date: Date) {
-    if (configuration.rules.minimumAccuracy > 0
-      && Double(accuracy) < configuration.rules.minimumAccuracy)
-      || (configuration.rules.minimumWpm > 0
-        && Double(wpm(at: date)) < configuration.rules.minimumWpm)
+    finishedAt = date
+    outcome = hasTrailingInactivity(endingAt: date) ? .invalidAFK : .completed
+  }
+
+  /// Retain unrounded accuracy for threshold comparison: the reference
+  /// compares its live percentage directly, while `accuracy` is display data.
+  private var liveAccuracy: Double {
+    guard !typed.isEmpty else { return 1 }
+    return Double(correctCharacters) / Double(typed.count)
+  }
+
+  private func livePracticeThresholdFailure(at date: Date) -> TestFailureReason? {
+    let rules = configuration.rules
+    if rules.minimumWpm > 0,
+      completedWordCount > 3,
+      Double(wpm(at: date)) < rules.minimumWpm
     {
-      fail(at: date)
-    } else {
-      finishedAt = date
-      outcome = hasTrailingInactivity(endingAt: date) ? .invalidAFK : .completed
+      return .minimumWpm
     }
+    if rules.minimumAccuracy > 0,
+      liveAccuracy * 100 < rules.minimumAccuracy
+    {
+      return .minimumAccuracy
+    }
+    return nil
   }
 
   private func hasTrailingInactivity(endingAt date: Date) -> Bool {
@@ -4102,7 +4137,8 @@ struct TypingSession {
       includesFractionalTail: configuration.duration == nil)
   }
 
-  private mutating func fail(at date: Date) {
+  private mutating func fail(at date: Date, reason: TestFailureReason? = nil) {
+    failureReason = reason
     outcome = .failed
     finishedAt = date
   }
