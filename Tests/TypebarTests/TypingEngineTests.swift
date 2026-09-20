@@ -3511,6 +3511,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.rawWpm(at: start.addingTimeInterval(12)), 5)
   }
 
+  func testAccuracyRetainsCorrectedInputEventsForLiveAndCompletedMetrics() throws {
+    var session = TypingSession(configuration: .timed(seconds: 1), prompt: "amber")
+    session.insert("ax", at: start)
+    session.deleteBackward(at: start.addingTimeInterval(0.1))
+    session.insert("mber", at: start.addingTimeInterval(0.2))
+
+    XCTAssertEqual(session.typed, "amber")
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertEqual(session.accuracy, 83)
+
+    var threshold = TypingSession(
+      configuration: .timed(seconds: 10, rules: .init(minimumAccuracy: 90)), prompt: "amber")
+    threshold.insert("ax", at: start)
+    threshold.deleteBackward(at: start.addingTimeInterval(0.1))
+    threshold.insert("mber", at: start.addingTimeInterval(0.2))
+    threshold.enforceLivePracticeThresholds(at: start.addingTimeInterval(0.5))
+    XCTAssertEqual(threshold.outcome, .failed)
+    XCTAssertEqual(threshold.failureReason, .minimumAccuracy)
+
+    session.tick(at: start.addingTimeInterval(1))
+    XCTAssertEqual(try XCTUnwrap(session.result(at: start.addingTimeInterval(1))).accuracy, 83)
+  }
+
   func testCompletedMetricsUseActualSubsecondDuration() throws {
     var session = TypingSession(configuration: .words(1), prompt: "amber")
     session.insert("a", at: start)

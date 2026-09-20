@@ -2647,6 +2647,10 @@ struct TypingSession {
   private var typedCharacterDates: [Date] = []
   private var keyboardActivityDates: [Date] = []
   private var insertionActivityDates: [Date] = []
+  /// Accuracy is an input-event metric. Unlike the rendered input, it keeps
+  /// an incorrect attempt after the user deletes and corrects that character.
+  private var inputAttemptCount = 0
+  private var correctInputAttemptCount = 0
   private var forcedErrorIndices = Set<Int>()
   /// Target positions at which the user made an input error during this
   /// attempt. Unlike `forcedErrorIndices`, these remain after a backspace so
@@ -2843,7 +2847,7 @@ struct TypingSession {
   }
 
   var accuracy: Int {
-    guard !typed.isEmpty else { return 100 }
+    guard inputAttemptCount > 0 else { return 100 }
     return Int((liveAccuracy * 100).rounded())
   }
 
@@ -3294,7 +3298,10 @@ struct TypingSession {
   ) -> Bool {
     if configuration.mode == .zen {
       let accepted = insertZenCharacter(character, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
-      if accepted { recordWeakSpotInput(character, isCorrect: true, at: date) }
+      if accepted {
+        recordInputAttempt(isCorrect: true)
+        recordWeakSpotInput(character, isCorrect: true, at: date)
+      }
       return accepted
     }
     // The reference input accepts several platform space characters as the
@@ -3318,6 +3325,7 @@ struct TypingSession {
       return false
     }
     if currentTargetIndex >= prompt.count {
+      recordInputAttempt(isCorrect: false)
       recordWeakSpotInput(inputCharacter, isCorrect: false, at: date)
       appendTypedCharacter(
         inputCharacter, targetIndex: nil,
@@ -3341,6 +3349,7 @@ struct TypingSession {
     let targetIndex = retainsCurrentWordAsExtra
       ? nil : earlyWordCommitTargetIndex ?? currentTargetIndex
     let isCorrect = !retainsCurrentWordAsExtra && inputCharacter == expected && !forceError
+    recordInputAttempt(isCorrect: isCorrect)
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
     if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
     let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
@@ -3404,6 +3413,11 @@ struct TypingSession {
     let roundedInterval = (interval * 100_000).rounded() / 100_000
     weakSpotInputSamples.append(
       .init(character: character, interval: roundedInterval, isCorrect: isCorrect))
+  }
+
+  private mutating func recordInputAttempt(isCorrect: Bool) {
+    inputAttemptCount += 1
+    if isCorrect { correctInputAttemptCount += 1 }
   }
 
   /// Zen accepts the user's own text rather than comparing it to a generated
@@ -3871,6 +3885,7 @@ struct TypingSession {
       isTypedCharacterCorrect(at: nextTargetIndex - 1)
     else { return }
     while nextTargetIndex < prompt.count, Array(prompt)[nextTargetIndex] == "\t" {
+      recordInputAttempt(isCorrect: true)
       appendTypedCharacter("\t", targetIndex: nextTargetIndex, at: date)
       recordReplayEvent(kind: .insert, text: "\t", automatic: true, at: date)
     }
@@ -4122,8 +4137,8 @@ struct TypingSession {
   /// Retain unrounded accuracy for threshold comparison: the reference
   /// compares its live percentage directly, while `accuracy` is display data.
   private var liveAccuracy: Double {
-    guard !typed.isEmpty else { return 1 }
-    return Double(correctCharacters) / Double(typed.count)
+    guard inputAttemptCount > 0 else { return 1 }
+    return Double(correctInputAttemptCount) / Double(inputAttemptCount)
   }
 
   private func livePracticeThresholdFailure(at date: Date) -> TestFailureReason? {
