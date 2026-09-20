@@ -2426,6 +2426,7 @@ private struct ContentView: View {
 
   private var progressMetricBar: some View {
     let foreground = settings.liveStatsColor.resolved(accent: activeTheme.accent)
+    let progress = session.progressFraction(at: .now) ?? 0
     return VStack(spacing: 6) {
       HStack {
         Text(session.progressLabel).font(.caption).foregroundStyle(foreground.opacity(0.76))
@@ -2433,14 +2434,22 @@ private struct ContentView: View {
         Text(session.progressText(at: .now) ?? "—")
           .font(.caption.weight(.semibold))
       }
-      ProgressView(value: session.progressFraction(at: .now) ?? 0)
+      ProgressView(value: progress)
         .tint(foreground)
+        .animation(progressBarAnimation, value: progress)
     }
     .foregroundStyle(foreground)
     .opacity(settings.liveStatsOpacity.rawValue)
     .frame(maxWidth: .infinity)
     .padding(.horizontal, 14)
     .padding(.vertical, 16)
+  }
+
+  private var progressBarAnimation: Animation? {
+    if let duration = session.configuration.duration {
+      return duration == 0 ? nil : .linear(duration: 1)
+    }
+    return .easeInOut(duration: 0.25)
   }
 
   private var controls: some View {

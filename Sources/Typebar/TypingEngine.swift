@@ -3045,8 +3045,13 @@ struct TypingSession {
   func progressFraction(at date: Date = .now) -> Double? {
     if let duration = configuration.duration {
       if duration == 0 { return 1 }
-      guard let startedAt else { return 0 }
-      return (date.timeIntervalSince(startedAt) / duration).clamped(to: 0...1)
+      // The reference bar depicts time remaining, not elapsed time. Before a
+      // test begins it is full; once started it targets the following one
+      // second of the countdown so its linear animation continues shrinking.
+      // This only informs the native bar and never affects timer or scoring.
+      guard let startedAt else { return 1 }
+      let elapsedSeconds = max(0, Int(date.timeIntervalSince(startedAt).rounded(.down)))
+      return (1 - Double(elapsedSeconds + 1) / duration).clamped(to: 0...1)
     }
     guard let wordLimit = configuration.wordLimit,
       (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts)

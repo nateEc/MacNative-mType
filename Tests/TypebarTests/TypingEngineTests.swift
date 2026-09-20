@@ -770,15 +770,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.outcome, .completed)
   }
 
-  func testLiveProgressUsesCountdownForTimeAndCommittedWordsForWordTests() {
+  func testLiveProgressUsesReferenceCountdownBarForTimeAndCommittedWordsForWordTests() {
     var timed = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor")
     XCTAssertEqual(timed.progressLabel, "剩余")
     XCTAssertEqual(timed.progressText(at: start), "30s")
-    XCTAssertEqual(timed.progressFraction(at: start), 0)
+    XCTAssertEqual(timed.progressFraction(at: start), 1)
     timed.insert("a", at: start)
     XCTAssertEqual(timed.progressText(at: start.addingTimeInterval(4.2)), "26s")
     XCTAssertEqual(
-      try XCTUnwrap(timed.progressFraction(at: start.addingTimeInterval(4.2))), 0.14, accuracy: 0.001)
+      try XCTUnwrap(timed.progressFraction(at: start.addingTimeInterval(4.2))), 25.0 / 30.0,
+      accuracy: 0.001)
 
     var words = TypingSession(configuration: .words(3), prompt: "amber harbor quiet")
     XCTAssertEqual(words.progressLabel, "进度")
