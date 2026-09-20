@@ -6769,6 +6769,23 @@ private struct ActivityHeatmapView: View {
     return (7 - (leadingFillerCount + cells.count) % 7) % 7
   }
 
+  private var weekColumnCount: Int {
+    (leadingFillerCount + cells.count + trailingFillerCount) / 7
+  }
+
+  private var monthByColumn: [Int: Date] {
+    ActivityHeatmap.monthMarkers(cells: cells, calendar: calendar).reduce(into: [:]) { months, marker in
+      months[marker.column] = marker.month
+    }
+  }
+
+  private func monthLabel(for column: Int) -> String {
+    guard let month = monthByColumn[column] else { return "" }
+    let index = calendar.component(.month, from: month) - 1
+    guard calendar.shortMonthSymbols.indices.contains(index) else { return "" }
+    return calendar.shortMonthSymbols[index]
+  }
+
   private var hasCompletedTests: Bool { cells.contains { $0.completedTests > 0 } }
 
   var body: some View {
@@ -6796,23 +6813,36 @@ private struct ActivityHeatmapView: View {
         }
         .accessibilityHidden(true)
         ScrollView(.horizontal, showsIndicators: false) {
-          LazyHGrid(rows: rows, spacing: 3) {
-            ForEach(0..<leadingFillerCount, id: \.self) { _ in
-              Color.clear.frame(width: 11, height: 11)
+          VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 3) {
+              ForEach(0..<weekColumnCount, id: \.self) { column in
+                Text(monthLabel(for: column))
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+                  .lineLimit(1)
+                  .fixedSize(horizontal: true, vertical: false)
+                  .frame(width: 11, height: 11, alignment: .leading)
+              }
             }
-            ForEach(cells) { cell in
-              RoundedRectangle(cornerRadius: 2)
-                .fill(Color.accentColor.opacity(opacity(for: cell.intensity)))
-                .frame(width: 11, height: 11)
-                .accessibilityLabel(cell.day.formatted(date: .abbreviated, time: .omitted))
-                .accessibilityValue(
-                  cell.completedTests == 0 ? "没有完成练习" : "\(cell.completedTests) 次完成")
+            .accessibilityHidden(true)
+            LazyHGrid(rows: rows, spacing: 3) {
+              ForEach(0..<leadingFillerCount, id: \.self) { _ in
+                Color.clear.frame(width: 11, height: 11)
+              }
+              ForEach(cells) { cell in
+                RoundedRectangle(cornerRadius: 2)
+                  .fill(Color.accentColor.opacity(opacity(for: cell.intensity)))
+                  .frame(width: 11, height: 11)
+                  .accessibilityLabel(cell.day.formatted(date: .abbreviated, time: .omitted))
+                  .accessibilityValue(
+                    cell.completedTests == 0 ? "没有完成练习" : "\(cell.completedTests) 次完成")
+              }
+              ForEach(0..<trailingFillerCount, id: \.self) { _ in
+                Color.clear.frame(width: 11, height: 11)
+              }
             }
-            ForEach(0..<trailingFillerCount, id: \.self) { _ in
-              Color.clear.frame(width: 11, height: 11)
-            }
+            .frame(height: 95)
           }
-          .frame(height: 95)
         }
       }
       if !hasCompletedTests {

@@ -2215,6 +2215,12 @@ struct ActivityHeatmapCell: Equatable, Identifiable {
     }
 }
 
+struct ActivityHeatmapMonthMarker: Equatable, Identifiable {
+    let column: Int
+    let month: Date
+    var id: Int { column }
+}
+
 enum ActivityAggregation {
     static func daily(
         metrics: [ResultMetric], dayBoundaryOffsetHours: Double = 0, calendar: Calendar = .current
@@ -2316,6 +2322,32 @@ enum ActivityHeatmapPeriod: Hashable, Identifiable {
 }
 
 enum ActivityHeatmap {
+    static func monthMarkers(
+        cells: [ActivityHeatmapCell], calendar: Calendar = .current
+    ) -> [ActivityHeatmapMonthMarker] {
+        guard let first = cells.first else { return [] }
+        let leading =
+            (calendar.component(.weekday, from: first.day) - calendar.firstWeekday + 7) % 7
+        let lastColumn = (leading + cells.count - 1) / 7
+        var previousYear: Int?
+        var previousMonth: Int?
+        var markers: [ActivityHeatmapMonthMarker] = []
+
+        for column in 0...lastColumn {
+            let index = max(0, column * 7 - leading)
+            guard index < cells.count else { continue }
+            let day = cells[index].day
+            let year = calendar.component(.year, from: day)
+            let month = calendar.component(.month, from: day)
+            guard year != previousYear || month != previousMonth else { continue }
+            guard let start = calendar.dateInterval(of: .month, for: day)?.start else { continue }
+            markers.append(.init(column: column, month: start))
+            previousYear = year
+            previousMonth = month
+        }
+        return markers
+    }
+
     static func availableCalendarYears(
         activity: [DailyActivity],
         endingAt endDate: Date = .now,

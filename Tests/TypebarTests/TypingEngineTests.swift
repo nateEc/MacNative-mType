@@ -20977,6 +20977,20 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(calendarYearCells.last?.completedTests, 3)
   }
 
+  func testActivityHeatmapMonthMarkersAlignWithVisibleWeekColumns() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let start = calendar.date(from: .init(year: 2024, month: 1, day: 29))!
+    let end = calendar.date(from: .init(year: 2024, month: 2, day: 10))!
+    let cells = ActivityHeatmap.cells(
+      activity: [], days: 13, endingAt: end, calendar: calendar)
+
+    XCTAssertEqual(cells.first?.day, start)
+    let markers = ActivityHeatmap.monthMarkers(cells: cells, calendar: calendar)
+    XCTAssertEqual(markers.map(\.column), [0, 1])
+    XCTAssertEqual(markers.map { calendar.component(.month, from: $0.month) }, [1, 2])
+  }
+
   @MainActor
   func testAppSettingsPersistAndRestore() throws {
     let suiteName = "TypebarTests.\(UUID().uuidString)"
