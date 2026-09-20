@@ -4643,6 +4643,112 @@ enum EnglishPunctuationPolicy {
   }
 }
 
+/// Produces Spanish sentence punctuation from native rules, including paired
+/// inverted question and exclamation marks, without using reference assets.
+enum SpanishPunctuationPolicy {
+  static func punctuatedPrompt(
+    _ rawTokens: [String], random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    generatedPrompt(rawTokens, includesPunctuation: true, includesNumbers: false, random: random)
+  }
+
+  static func generatedPrompt(
+    _ rawTokens: [String], includesPunctuation: Bool, includesNumbers: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    var generated: [String] = []
+    var sentenceTracker: Character?
+
+    for (index, rawToken) in rawTokens.enumerated() {
+      let punctuated = includesPunctuation
+        ? punctuatedToken(
+          previousToken: generated.last, rawToken: rawToken, index: index,
+          totalCount: rawTokens.count, sentenceTracker: &sentenceTracker, random: random)
+        : rawToken
+      generated.append(includesNumbers && random() < 0.1 ? numberToken(random: random) : punctuated)
+    }
+    return generated
+  }
+
+  private static func punctuatedToken(
+    previousToken: String?, rawToken: String, index: Int, totalCount: Int,
+    sentenceTracker: inout Character?, random: () -> Double
+  ) -> String {
+    let previousLastCharacter = previousToken?.last
+    let followsComma = previousLastCharacter == ","
+    let followsPeriod = previousLastCharacter == "."
+    let followsSemicolon = previousLastCharacter == ";"
+    let followsColon = previousLastCharacter == ":"
+
+    if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
+      let word = capitalizingFirstCharacter(in: rawToken)
+      let sentenceStartChoice = random()
+      if sentenceStartChoice > 0.9 {
+        sentenceTracker = "?"
+        return "¿\(word)"
+      }
+      if sentenceStartChoice > 0.8 {
+        sentenceTracker = "!"
+        return "¡\(word)"
+      }
+      return word
+    }
+
+    if (
+      (random() < 0.1 && !followsPeriod && !followsComma && index != totalCount - 2)
+        || index == totalCount - 1
+    ) {
+      defer { sentenceTracker = nil }
+      return sentenceTracker.map { rawToken + String($0) } ?? rawToken
+    }
+    if random() < 0.01 && !followsComma && !followsPeriod {
+      return "\"\(rawToken)\""
+    }
+    if random() < 0.011 && !followsComma && !followsPeriod {
+      return "'\(rawToken)'"
+    }
+    if random() < 0.012 && !followsComma && !followsPeriod {
+      return "(\(rawToken))"
+    }
+    if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return rawToken + ":"
+    }
+    if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
+      return "-"
+    }
+    if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return rawToken + ";"
+    }
+    if random() < 0.2 && !followsComma {
+      return rawToken + ","
+    }
+    return rawToken
+  }
+
+  private static func numberToken(random: () -> Double) -> String {
+    let length = boundedIndex(random(), upperBound: 4) + 1
+    return (0..<length).map { index in
+      let lowerBound = index == 0 ? 1 : 0
+      let rangeSize = index == 0 ? 9 : 10
+      return String(lowerBound + boundedIndex(random(), upperBound: rangeSize))
+    }.joined()
+  }
+
+  private static func boundedIndex(_ value: Double, upperBound: Int) -> Int {
+    let normalized = min(max(value, 0), 0.999_999_999)
+    return min(Int(normalized * Double(upperBound)), upperBound - 1)
+  }
+
+  private static func capitalizingFirstCharacter(in token: String) -> String {
+    guard let first = token.first else { return token }
+    return String(first).uppercased() + token.dropFirst()
+  }
+
+  private static func isSentenceTerminator(_ character: Character) -> Bool {
+    character == "." || character == "?" || character == "!" || character == "؟"
+  }
+}
+
 enum StarterLexicon {
   private static let englishScaleRoots = [
     "amber", "birch", "cairn", "delta", "ember", "field", "grove", "harbor",
@@ -9405,21 +9511,21 @@ enum StarterLexicon {
         tokens: count, lexicon: pigLatinWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .spanish:
-      return prompt(
-        tokens: count, lexicon: spanishWords, separator: " ", punctuation: [",", ".", "¡", "¿"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return spanishPrompt(
+        tokens: count, lexicon: spanishWords, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .spanish1k:
-      return prompt(
-        tokens: count, lexicon: spanish1kLexicon, separator: " ", punctuation: [",", ".", "¡", "¿"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return spanishPrompt(
+        tokens: count, lexicon: spanish1kLexicon, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .spanish10k:
-      return prompt(
-        tokens: count, lexicon: spanish10kLexicon, separator: " ", punctuation: [",", ".", "¡", "¿"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return spanishPrompt(
+        tokens: count, lexicon: spanish10kLexicon, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .spanish650k:
-      return prompt(
-        tokens: count, lexicon: spanish650kLexicon, separator: " ", punctuation: [",", ".", "¡", "¿"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return spanishPrompt(
+        tokens: count, lexicon: spanish650kLexicon, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .german:
       return prompt(
         tokens: count, lexicon: germanWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -10674,6 +10780,31 @@ enum StarterLexicon {
       usesZipfFrequency: usesZipfFrequency)
     guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
     return EnglishPunctuationPolicy.generatedPrompt(
+      generated.split(separator: " ").map(String.init),
+      includesPunctuation: contentOptions.includePunctuation,
+      includesNumbers: contentOptions.includeNumbers,
+      random: contentRandom
+    ).joined(separator: " ")
+  }
+
+  static func spanishPrompt(
+    tokens: Int, lexicon: [String], contentOptions: ContentOptions,
+    usesZipfFrequency: Bool, contentRandom: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    spanishPrompt(
+      tokens: tokens, lexicon: IndexedLexicon(lexicon), contentOptions: contentOptions,
+      usesZipfFrequency: usesZipfFrequency, contentRandom: contentRandom)
+  }
+
+  static func spanishPrompt(
+    tokens: Int, lexicon: IndexedLexicon, contentOptions: ContentOptions,
+    usesZipfFrequency: Bool, contentRandom: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    let generated = prompt(
+      tokens: tokens, lexicon: lexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+      contentOptions: ContentOptions(), usesZipfFrequency: usesZipfFrequency)
+    guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
+    return SpanishPunctuationPolicy.generatedPrompt(
       generated.split(separator: " ").map(String.init),
       includesPunctuation: contentOptions.includePunctuation,
       includesNumbers: contentOptions.includeNumbers,

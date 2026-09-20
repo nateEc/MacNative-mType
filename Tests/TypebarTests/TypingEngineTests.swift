@@ -15632,6 +15632,37 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(words, ["1123", "it."])
   }
 
+  func testSpanishPunctuationPolicyPairsInvertedQuestionMarksAcrossSentences() {
+    var randomValues = [0.95] + Array(repeating: 0.9, count: 9)
+    let words = SpanishPunctuationPolicy.punctuatedPrompt(
+      ["casa", "luz", "rio"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["¿Casa", "luz", "rio?"])
+  }
+
+  func testSpanishContentPolicyReplacesWordsWithIndependentNumbers() {
+    var randomValues = [0.0, 0.0, 0.9, 0.0, 0.1, 0.2, 0.3, 0.9, 0.9]
+    let words = SpanishPunctuationPolicy.generatedPrompt(
+      ["casa", "rio"], includesPunctuation: true, includesNumbers: true,
+      random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["1123", "rio"])
+  }
+
+  func testSpanishPromptUsesSentencePolicyOnlyWhenPunctuationIsEnabled() {
+    var randomValues = [0.95] + Array(repeating: 0.9, count: 9)
+    XCTAssertEqual(
+      StarterLexicon.spanishPrompt(
+        tokens: 3, lexicon: ["casa"], contentOptions: ContentOptions(includePunctuation: true),
+        usesZipfFrequency: false, contentRandom: { randomValues.removeFirst() }),
+      "¿Casa casa casa?")
+    XCTAssertEqual(
+      StarterLexicon.spanishPrompt(
+        tokens: 1, lexicon: ["casa"], contentOptions: ContentOptions(),
+        usesZipfFrequency: false, contentRandom: { 0.95 }),
+      "casa")
+  }
+
   func testEnglishPromptPunctuatesOnlyWhenPunctuationIsEnabled() {
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
