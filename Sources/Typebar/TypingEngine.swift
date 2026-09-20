@@ -4536,24 +4536,17 @@ enum EnglishPunctuationPolicy {
     return prefix + preservingCase(of: source, in: choice) + suffix
   }
 
-  static func transformedPrompt(
-    _ prompt: String, random: () -> Double = { Double.random(in: 0..<1) }
-  ) -> String {
-    prompt.split(separator: " ", omittingEmptySubsequences: false)
-      .map { transformed(String($0), random: random) }
-      .joined(separator: " ")
-  }
-
-  static func sentenceCasedPrompt(_ prompt: String) -> String {
-    var startsSentence = true
-    return prompt.split(separator: " ", omittingEmptySubsequences: false)
-      .map { substring in
-        let token = String(substring)
-        let sentenceCased = startsSentence ? capitalizingFirstCharacter(in: token) : token
-        startsSentence = sentenceCased.last.map(isSentenceTerminator) ?? false
-        return sentenceCased
-      }
-      .joined(separator: " ")
+  static func punctuatedPrompt(
+    _ rawTokens: [String], random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    var punctuated: [String] = []
+    for (index, rawToken) in rawTokens.enumerated() {
+      punctuated.append(
+        punctuatedToken(
+          previousToken: punctuated.last, rawToken: rawToken, index: index,
+          totalCount: rawTokens.count, random: random))
+    }
+    return punctuated
   }
 
   private static func isASCIIAlphabetic(_ character: Character) -> Bool {
@@ -4573,6 +4566,53 @@ enum EnglishPunctuationPolicy {
       return replacement
     }
     return replacement.prefix(1).uppercased() + replacement.dropFirst()
+  }
+
+  private static func punctuatedToken(
+    previousToken: String?, rawToken: String, index: Int, totalCount: Int,
+    random: () -> Double
+  ) -> String {
+    let previousLastCharacter = previousToken?.last
+    let followsComma = previousLastCharacter == ","
+    let followsPeriod = previousLastCharacter == "."
+    let followsSemicolon = previousLastCharacter == ";"
+    let followsColon = previousLastCharacter == ":"
+
+    if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
+      return capitalizingFirstCharacter(in: rawToken)
+    }
+
+    if (
+      (random() < 0.1 && !followsPeriod && !followsComma && index != totalCount - 2)
+        || index == totalCount - 1
+    ) {
+      let terminalChoice = random()
+      if terminalChoice <= 0.8 { return rawToken + "." }
+      if terminalChoice < 0.9 { return rawToken + "?" }
+      return rawToken + "!"
+    }
+    if random() < 0.01 && !followsComma && !followsPeriod {
+      return "\"\(rawToken)\""
+    }
+    if random() < 0.011 && !followsComma && !followsPeriod {
+      return "'\(rawToken)'"
+    }
+    if random() < 0.012 && !followsComma && !followsPeriod {
+      return "(\(rawToken))"
+    }
+    if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return rawToken + ":"
+    }
+    if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
+      return "-"
+    }
+    if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return rawToken + ";"
+    }
+    if random() < 0.2 && !followsComma {
+      return rawToken + ","
+    }
+    return transformed(rawToken, random: random)
   }
 
   private static func capitalizingFirstCharacter(in token: String) -> String {
@@ -10612,10 +10652,12 @@ enum StarterLexicon {
   ) -> String {
     let generated = prompt(
       tokens: tokens, lexicon: lexicon, separator: " ", punctuation: [",", ".", "!", "?"],
-      contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      contentOptions: ContentOptions(includeNumbers: contentOptions.includeNumbers),
+      usesZipfFrequency: usesZipfFrequency)
     guard contentOptions.includePunctuation else { return generated }
-    return EnglishPunctuationPolicy.sentenceCasedPrompt(
-      EnglishPunctuationPolicy.transformedPrompt(generated, random: punctuationRandom))
+    return EnglishPunctuationPolicy.punctuatedPrompt(
+      generated.split(separator: " ").map(String.init), random: punctuationRandom
+    ).joined(separator: " ")
   }
 
   private static func sectionPrompt(

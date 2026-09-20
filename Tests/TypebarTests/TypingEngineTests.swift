@@ -15606,13 +15606,30 @@ final class TypingEngineTests: XCTestCase {
       "are")
   }
 
-  func testEnglishPromptAppliesContractionsOnlyWhenPunctuationIsEnabled() {
-    var punctuationRandomValues = [0.0, 0.0]
+  func testEnglishPunctuationPolicyFollowsSentenceBranchOrder() {
+    var randomValues = [0.0, 0.0, 0.9, 0.85]
+    let words = EnglishPunctuationPolicy.punctuatedPrompt(
+      ["are", "it", "are", "are"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["Are", "it.", "Are", "are?"])
+  }
+
+  func testEnglishPunctuationPolicyAppliesContractionsAfterOtherBranches() {
+    var randomValues = [
+      0.9, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0, 0.9, 0.9, 0.85,
+    ]
+    let words = EnglishPunctuationPolicy.punctuatedPrompt(
+      ["are", "it", "are"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["Are", "it'll", "are?"])
+  }
+
+  func testEnglishPromptPunctuatesOnlyWhenPunctuationIsEnabled() {
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
         tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
-        usesZipfFrequency: false, punctuationRandom: { punctuationRandomValues.removeFirst() }),
-      "Aren't,")
+        usesZipfFrequency: false, punctuationRandom: { 0 }),
+      "Are")
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
         tokens: 1, lexicon: ["are"], contentOptions: ContentOptions(),
@@ -15621,15 +15638,13 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testEnglishPunctuationUsesSentenceCaseAtStartsAndAfterTerminators() {
-    var punctuationRandomValues = Array(repeating: 0.0, count: 18)
+    var punctuationRandomValues = [0.0, 0.0, 0.9, 0.85]
     let words = StarterLexicon.englishPrompt(
-      tokens: 9, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
+      tokens: 4, lexicon: ["are"], contentOptions: ContentOptions(includePunctuation: true),
       usesZipfFrequency: false, punctuationRandom: { punctuationRandomValues.removeFirst() }
     ).split(separator: " ").map(String.init)
 
-    XCTAssertEqual(words[0], "Aren't,")
-    XCTAssertEqual(words[7], "aren't.")
-    XCTAssertEqual(words[8], "Aren't")
+    XCTAssertEqual(words, ["Are", "are.", "Are", "are?"])
   }
 
   func testOfflineCharacterStreamsOverrideBuiltInWordsWithoutExternalContent() {
