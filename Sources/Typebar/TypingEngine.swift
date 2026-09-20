@@ -4749,6 +4749,103 @@ enum SpanishPunctuationPolicy {
   }
 }
 
+/// Applies the source-compatible Turkish sentence case and contextual marks to
+/// Typebar-owned Turkish words without importing the web generator or corpus.
+enum TurkishPunctuationPolicy {
+  static func punctuatedPrompt(
+    _ rawTokens: [String], random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    generatedPrompt(rawTokens, includesPunctuation: true, includesNumbers: false, random: random)
+  }
+
+  static func generatedPrompt(
+    _ rawTokens: [String], includesPunctuation: Bool, includesNumbers: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    var generated: [String] = []
+    for (index, rawToken) in rawTokens.enumerated() {
+      let punctuated = includesPunctuation
+        ? punctuatedToken(
+          previousToken: generated.last, rawToken: rawToken, index: index,
+          totalCount: rawTokens.count, random: random)
+        : rawToken
+      generated.append(includesNumbers && random() < 0.1 ? numberToken(random: random) : punctuated)
+    }
+    return generated
+  }
+
+  private static func punctuatedToken(
+    previousToken: String?, rawToken: String, index: Int, totalCount: Int,
+    random: () -> Double
+  ) -> String {
+    let previousLastCharacter = previousToken?.last
+    let followsComma = previousLastCharacter == ","
+    let followsPeriod = previousLastCharacter == "."
+    let followsSemicolon = previousLastCharacter == ";"
+    let followsColon = previousLastCharacter == ":"
+
+    if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
+      return sentenceCase(rawToken)
+    }
+
+    if (
+      (random() < 0.1 && !followsPeriod && !followsComma && index != totalCount - 2)
+        || index == totalCount - 1
+    ) {
+      let terminalChoice = random()
+      if terminalChoice <= 0.8 { return rawToken + "." }
+      if terminalChoice < 0.9 { return rawToken + "?" }
+      return rawToken + "!"
+    }
+    if random() < 0.01 && !followsComma && !followsPeriod {
+      return "\"\(rawToken)\""
+    }
+    if random() < 0.011 && !followsComma && !followsPeriod {
+      return "'\(rawToken)'"
+    }
+    if random() < 0.012 && !followsComma && !followsPeriod {
+      return "(\(rawToken))"
+    }
+    if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return rawToken + ":"
+    }
+    if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" {
+      return "-"
+    }
+    if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return rawToken + ";"
+    }
+    if random() < 0.2 && !followsComma {
+      return rawToken + ","
+    }
+    return rawToken
+  }
+
+  private static func sentenceCase(_ token: String) -> String {
+    guard let first = token.first else { return token }
+    let capitalized = String(first).uppercased().replacingOccurrences(of: "I", with: "İ")
+    return capitalized + token.dropFirst()
+  }
+
+  private static func numberToken(random: () -> Double) -> String {
+    let length = boundedIndex(random(), upperBound: 4) + 1
+    return (0..<length).map { index in
+      let lowerBound = index == 0 ? 1 : 0
+      let rangeSize = index == 0 ? 9 : 10
+      return String(lowerBound + boundedIndex(random(), upperBound: rangeSize))
+    }.joined()
+  }
+
+  private static func boundedIndex(_ value: Double, upperBound: Int) -> Int {
+    let normalized = min(max(value, 0), 0.999_999_999)
+    return min(Int(normalized * Double(upperBound)), upperBound - 1)
+  }
+
+  private static func isSentenceTerminator(_ character: Character) -> Bool {
+    character == "." || character == "?" || character == "!" || character == "؟"
+  }
+}
+
 enum StarterLexicon {
   private static let englishScaleRoots = [
     "amber", "birch", "cairn", "delta", "ember", "field", "grove", "harbor",
@@ -10646,13 +10743,12 @@ enum StarterLexicon {
         tokens: count, lexicon: korean5kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .turkish:
-      return prompt(
-        tokens: count, lexicon: turkishWords, separator: " ", punctuation: [".", ",", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return turkishPrompt(
+        tokens: count, lexicon: turkishWords, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .turkish1k, .turkish5k:
-      return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
-        punctuation: [".", ",", "!", "?"], contentOptions: contentOptions,
+      return turkishPrompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .polish:
       return prompt(
@@ -10805,6 +10901,31 @@ enum StarterLexicon {
       contentOptions: ContentOptions(), usesZipfFrequency: usesZipfFrequency)
     guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
     return SpanishPunctuationPolicy.generatedPrompt(
+      generated.split(separator: " ").map(String.init),
+      includesPunctuation: contentOptions.includePunctuation,
+      includesNumbers: contentOptions.includeNumbers,
+      random: contentRandom
+    ).joined(separator: " ")
+  }
+
+  static func turkishPrompt(
+    tokens: Int, lexicon: [String], contentOptions: ContentOptions,
+    usesZipfFrequency: Bool, contentRandom: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    turkishPrompt(
+      tokens: tokens, lexicon: IndexedLexicon(lexicon), contentOptions: contentOptions,
+      usesZipfFrequency: usesZipfFrequency, contentRandom: contentRandom)
+  }
+
+  static func turkishPrompt(
+    tokens: Int, lexicon: IndexedLexicon, contentOptions: ContentOptions,
+    usesZipfFrequency: Bool, contentRandom: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    let generated = prompt(
+      tokens: tokens, lexicon: lexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+      contentOptions: ContentOptions(), usesZipfFrequency: usesZipfFrequency)
+    guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
+    return TurkishPunctuationPolicy.generatedPrompt(
       generated.split(separator: " ").map(String.init),
       includesPunctuation: contentOptions.includePunctuation,
       includesNumbers: contentOptions.includeNumbers,

@@ -15663,6 +15663,27 @@ final class TypingEngineTests: XCTestCase {
       "casa")
   }
 
+  func testTurkishPunctuationPolicyUsesDottedSentenceCase() {
+    var randomValues = [0.0, 0.85, 0.9, 0.0]
+    let words = TurkishPunctuationPolicy.punctuatedPrompt(
+      ["istanbul", "kent", "izmir", "odak"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["İstanbul", "kent?", "İzmir", "odak."])
+  }
+
+  func testTurkishPromptUsesSentencePolicyOnlyWhenPunctuationIsEnabled() {
+    XCTAssertEqual(
+      StarterLexicon.turkishPrompt(
+        tokens: 1, lexicon: ["istanbul"], contentOptions: ContentOptions(includePunctuation: true),
+        usesZipfFrequency: false, contentRandom: { 0 }),
+      "İstanbul")
+    XCTAssertEqual(
+      StarterLexicon.turkishPrompt(
+        tokens: 1, lexicon: ["istanbul"], contentOptions: ContentOptions(),
+        usesZipfFrequency: false, contentRandom: { 0 }),
+      "istanbul")
+  }
+
   func testEnglishPromptPunctuatesOnlyWhenPunctuationIsEnabled() {
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
@@ -17599,7 +17620,10 @@ final class TypingEngineTests: XCTestCase {
               : CharacterSet.punctuationCharacters
         let normalized = token.trimmingCharacters(
           in: punctuation)
-        return lexicon.contains(normalized) ? nil : "\(token) → \(normalized)"
+        let baseToken = language == .turkish
+          ? normalized.lowercased(with: Locale(identifier: "tr"))
+          : normalized
+        return lexicon.contains(baseToken) ? nil : "\(token) → \(baseToken)"
       }
       XCTAssertTrue(
         invalidTokens.isEmpty,
