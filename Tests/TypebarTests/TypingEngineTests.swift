@@ -3511,6 +3511,22 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.rawWpm(at: start.addingTimeInterval(12)), 5)
   }
 
+  func testCompletedMetricsUseActualSubsecondDuration() throws {
+    var session = TypingSession(configuration: .words(1), prompt: "amber")
+    session.insert("a", at: start)
+    session.insert("mber", at: start.addingTimeInterval(0.2))
+
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.wpm(at: start.addingTimeInterval(0.2)), 300)
+    XCTAssertEqual(session.rawWpm(at: start.addingTimeInterval(0.2)), 300)
+    XCTAssertEqual(try XCTUnwrap(session.result(at: start.addingTimeInterval(0.2))).wpm, 300)
+
+    var instant = TypingSession(configuration: .words(1), prompt: "a")
+    instant.insert("a", at: start)
+    XCTAssertEqual(instant.wpm(at: start), 0)
+    XCTAssertEqual(instant.rawWpm(at: start), 0)
+  }
+
   func testBurstUsesAcceptedCharactersFromTheCurrentOrLatestCommittedWord() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor")
     session.insert("a", at: start)
@@ -14344,7 +14360,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(result.typedCharacterCount, 5)
     XCTAssertEqual(result.correctCharacterCount, 5)
     XCTAssertEqual(result.configuration.mode, .custom)
-    XCTAssertEqual(result.rawWpm, 60)
+    XCTAssertEqual(result.rawWpm, 0)
     XCTAssertEqual(result.tags, ["morning", "focus"])
     XCTAssertEqual(result.prompt, "amber")
     XCTAssertEqual(result.replayEvents.map(\.kind), [.insert, .insert, .insert, .insert, .insert])

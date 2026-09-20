@@ -2850,15 +2850,13 @@ struct TypingSession {
   func wpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    let seconds = max(end.timeIntervalSince(startedAt), 1)
-    return Int((Double(correctCharacters) / 5 / seconds * 60).rounded())
+    return wpm(characters: correctCharacters, seconds: end.timeIntervalSince(startedAt))
   }
 
   func rawWpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    let seconds = max(end.timeIntervalSince(startedAt), 1)
-    return Int((Double(typed.count) / 5 / seconds * 60).rounded())
+    return wpm(characters: typed.count, seconds: end.timeIntervalSince(startedAt))
   }
 
   /// Word burst is the WPM for the latest completed word, or the currently
@@ -3988,7 +3986,8 @@ struct TypingSession {
   }
 
   private func wpm(characters: Int, seconds: TimeInterval) -> Int {
-    Int((Double(characters) / 5 / seconds * 60).rounded())
+    guard seconds.isFinite, seconds > 0 else { return 0 }
+    return Int((Double(characters) / 5 / seconds * 60).rounded())
   }
 
   private mutating func finishIfNeeded(at date: Date) {
