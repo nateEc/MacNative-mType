@@ -189,6 +189,7 @@ final class TestResultRecord {
   var quoteSourceData: Data?
   var prompt: String
   var replayEventsData: Data?
+  var challengePresentationData: Data?
 
   init(result: CompletedTestResult) {
     id = result.id
@@ -212,6 +213,9 @@ final class TestResultRecord {
     quoteSourceData = result.quoteSource.flatMap { try? JSONEncoder().encode($0) }
     prompt = result.prompt
     replayEventsData = try? JSONEncoder().encode(result.replayEvents)
+    challengePresentationData = result.challengePresentation.flatMap {
+      try? JSONEncoder().encode($0)
+    }
   }
 
   var configuration: TestConfiguration? {
@@ -230,6 +234,12 @@ final class TestResultRecord {
 
   var quoteSource: ResultQuoteSource? {
     quoteSourceData.flatMap { try? JSONDecoder().decode(ResultQuoteSource.self, from: $0) }
+  }
+
+  var challengePresentation: ChallengePresentationSnapshot? {
+    challengePresentationData.flatMap {
+      try? JSONDecoder().decode(ChallengePresentationSnapshot.self, from: $0)
+    }
   }
 
   var restartCount: Int {
@@ -294,7 +304,8 @@ final class TestResultRecord {
       tags: tags,
       quoteSource: quoteSource,
       prompt: prompt,
-      replayEvents: replayEvents
+      replayEvents: replayEvents,
+      challengePresentation: challengePresentation
     )
   }
 }

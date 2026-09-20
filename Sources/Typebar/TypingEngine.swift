@@ -2336,6 +2336,12 @@ struct ResultKeyTimingStats: Equatable {
   }
 }
 
+struct ChallengePresentationSnapshot: Codable, Equatable {
+  let liveSpeedStyle: LiveMetricStyle
+  let paceCaretStyle: TypingCaretStyle
+  let tapeMode: PracticeTapeMode
+}
+
 struct CompletedTestResult: Codable, Equatable, Identifiable {
   let id: UUID
   let configuration: TestConfiguration
@@ -2358,6 +2364,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let quoteSource: ResultQuoteSource?
   let prompt: String
   let replayEvents: [TypingReplayEvent]
+  let challengePresentation: ChallengePresentationSnapshot?
 
   init(
     id: UUID,
@@ -2380,7 +2387,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     tags: [String] = [],
     quoteSource: ResultQuoteSource? = nil,
     prompt: String = "",
-    replayEvents: [TypingReplayEvent] = []
+    replayEvents: [TypingReplayEvent] = [],
+    challengePresentation: ChallengePresentationSnapshot? = nil
   ) {
     self.id = id
     self.configuration = configuration
@@ -2405,6 +2413,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.quoteSource = configuration.mode == .quote ? quoteSource : nil
     self.prompt = prompt
     self.replayEvents = replayEvents
+    self.challengePresentation = challengePresentation
   }
 
   var elapsedDuration: TimeInterval {
@@ -2432,7 +2441,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
       restartCount, keyDurationSamples, keySpacingSamples, keyOverlapDuration, tags, prompt,
-      quoteSource, replayEvents
+      quoteSource, replayEvents, challengePresentation
   }
 
   init(from decoder: Decoder) throws {
@@ -2470,6 +2479,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       : nil
     prompt = try values.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     replayEvents = try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? []
+    challengePresentation = try values.decodeIfPresent(
+      ChallengePresentationSnapshot.self, forKey: .challengePresentation)
   }
 }
 
@@ -2958,7 +2969,8 @@ struct TypingSession {
 
   func result(
     at date: Date = .now, tags: [String] = [], restartCount: Int = 0,
-    quoteSource: ResultQuoteSource? = nil
+    quoteSource: ResultQuoteSource? = nil,
+    challengePresentation: ChallengePresentationSnapshot? = nil
   ) -> CompletedTestResult? {
     guard let startedAt, let finishedAt else { return nil }
     return .init(
@@ -2982,7 +2994,8 @@ struct TypingSession {
       tags: ResultTagPolicy.normalized(tags),
       quoteSource: quoteSource,
       prompt: prompt,
-      replayEvents: replayEvents
+      replayEvents: replayEvents,
+      challengePresentation: challengePresentation
     )
   }
 

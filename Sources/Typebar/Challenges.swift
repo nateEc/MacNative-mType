@@ -37,6 +37,9 @@ struct ChallengeConfigurationRequirements: Equatable {
   var difficulty: Difficulty?
   var punctuation: Bool?
   var numbers: Bool?
+  var liveSpeedStyle: LiveMetricStyle?
+  var paceCaretStyle: TypingCaretStyle?
+  var tapeMode: PracticeTapeMode?
 }
 
 struct ChallengeRequirements: Equatable {
@@ -79,6 +82,13 @@ struct ChallengeRequirements: Equatable {
     if let difficulty = required.difficulty { parts.append("难度 \(difficulty.rawValue)") }
     if let punctuation = required.punctuation { parts.append(punctuation ? "启用标点" : "关闭标点") }
     if let numbers = required.numbers { parts.append(numbers ? "启用数字" : "关闭数字") }
+    if let liveSpeedStyle = required.liveSpeedStyle {
+      parts.append("实时速度 \(liveSpeedStyle.displayName)")
+    }
+    if let paceCaretStyle = required.paceCaretStyle {
+      parts.append("节奏光标 \(paceCaretStyle.displayName)")
+    }
+    if let tapeMode = required.tapeMode { parts.append("卷带 \(tapeMode.displayName)") }
     return parts.joined(separator: "、")
   }
 }
@@ -152,7 +162,11 @@ enum ChallengeEvaluator {
     }
 
     if let required = requirements.configuration {
-      evaluateConfiguration(result.configuration, required: required, failures: &failedRequirements)
+      evaluateConfiguration(
+        result.configuration,
+        presentation: result.challengePresentation,
+        required: required,
+        failures: &failedRequirements)
     }
 
     if let maximumErrors = requirements.maximumErrors, result.errorCount > maximumErrors {
@@ -169,6 +183,7 @@ enum ChallengeEvaluator {
 
   private static func evaluateConfiguration(
     _ actual: TestConfiguration,
+    presentation: ChallengePresentationSnapshot?,
     required: ChallengeConfigurationRequirements,
     failures: inout [String]
   ) {
@@ -190,6 +205,30 @@ enum ChallengeEvaluator {
       actual.contentOptions.includeNumbers != expected
     {
       failures.append("数字需要\(expected ? "启用" : "关闭")")
+    }
+    let requiresPresentation = required.liveSpeedStyle != nil || required.paceCaretStyle != nil
+      || required.tapeMode != nil
+    guard !requiresPresentation || presentation != nil else {
+      failures.append("缺少挑战显示设置快照，无法验收")
+      return
+    }
+    if let expected = required.liveSpeedStyle,
+      presentation?.liveSpeedStyle != expected
+    {
+      failures.append(
+        "实时速度需要为 \(expected.displayName)（本次 \(presentation?.liveSpeedStyle.displayName ?? "未知")）")
+    }
+    if let expected = required.paceCaretStyle,
+      presentation?.paceCaretStyle != expected
+    {
+      failures.append(
+        "节奏光标需要为 \(expected.displayName)（本次 \(presentation?.paceCaretStyle.displayName ?? "未知")）")
+    }
+    if let expected = required.tapeMode,
+      presentation?.tapeMode != expected
+    {
+      failures.append(
+        "卷带需要为 \(expected.displayName)（本次 \(presentation?.tapeMode.displayName ?? "未知")）")
     }
   }
 }
@@ -239,6 +278,22 @@ enum TypebarChallengeLibrary {
         accuracy: .minimum(95),
         exactFunboxes: [.memory],
         configuration: .init(mode: .words, difficulty: .master)
+      )
+    ),
+    .init(
+      id: "quiet-thirty",
+      title: "静默三十",
+      description: "关闭速度提示与滚动辅助，只凭手感完成短练习。",
+      preset: .init(configuration: .timed(seconds: 30), quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .minimum(35),
+        accuracy: .minimum(94),
+        minimumDuration: 30,
+        configuration: .init(
+          liveSpeedStyle: .off,
+          paceCaretStyle: .off,
+          tapeMode: .off
+        )
       )
     ),
   ]

@@ -1001,7 +1001,10 @@ enum CaretCommandTarget: Equatable {
     case repeatedPace(Bool)
 
     var requiresRestart: Bool { false }
-    var exitsChallenge: Bool { false }
+    var exitsChallenge: Bool {
+        if case .pace = self { return true }
+        return false
+    }
 
     @MainActor
     func apply(to settings: AppSettings) {
@@ -1165,7 +1168,7 @@ enum AppearanceCommandTarget: Equatable {
 
     var exitsChallenge: Bool {
         switch self {
-        case .highlight, .showAllLines: true
+        case .speed, .highlight, .showAllLines: true
         default: false
         }
     }
@@ -1613,6 +1616,7 @@ enum TestConfigurationCommandChallengePolicy {
             || PracticePreferenceCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || InputRuleCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || OfficialLayoutCommandCatalog.target(for: identifier)?.exitsChallenge == true
+            || CaretCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || PaceCaretCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || AppearanceCommandCatalog.target(for: identifier)?.exitsChallenge == true
             || KeyboardGuideCommandCatalog.target(for: identifier)?.exitsChallenge == true

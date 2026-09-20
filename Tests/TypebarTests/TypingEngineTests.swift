@@ -2411,7 +2411,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(CaretCommandCatalog.target(for: "caret.repeatedPace.toggle"))
   }
 
-  func testCaretCommandsRemainSearchableAndNeverRestartOrExitChallenges() {
+  func testCaretCommandsRemainSearchableAndMatchChallengeInvalidation() {
     XCTAssertEqual(
       CommandPaletteSearch.results(
         items: CaretCommandCatalog.items, query: "caret.smoothCaret.fast"
@@ -2423,8 +2423,11 @@ final class TypingEngineTests: XCTestCase {
       ["caret.paceCaretStyle.monkey"])
     XCTAssertTrue(CaretCommandCatalog.items.allSatisfy { item in
       guard let target = CaretCommandCatalog.target(for: item.id) else { return false }
-      return !target.requiresRestart && !target.exitsChallenge
-        && !TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
+      let shouldExitChallenge: Bool
+      if case .pace = target { shouldExitChallenge = true } else { shouldExitChallenge = false }
+      return !target.requiresRestart && target.exitsChallenge == shouldExitChallenge
+        && TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
+          == shouldExitChallenge
         && CommandPaletteSearch.results(items: CaretCommandCatalog.items, query: item.id)
           .contains(where: { $0.id == item.id })
     })
@@ -2545,6 +2548,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(
       TestConfigurationCommandChallengePolicy.exitsChallenge(
         for: "appearance.highlightMode.word"))
+    XCTAssertTrue(
+      TestConfigurationCommandChallengePolicy.exitsChallenge(
+        for: "appearance.liveSpeedStyle.text"))
     XCTAssertTrue(
       TestConfigurationCommandChallengePolicy.exitsChallenge(for: "appearance.showAllLines.on"))
     XCTAssertFalse(
@@ -19689,6 +19695,85 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(ChallengeEvaluator.evaluate(result, challenge: attemptedLoosening).passed)
   }
 
+  func testChallengePresentationSnapshotIsPortableAndRequiredForDisplayConditions() throws {
+    let challenge = TypebarChallenge(
+      id: "quiet-display",
+      title: "安静显示",
+      description: "测试显示条件快照。",
+      preset: .init(configuration: .timed(seconds: 30), quoteID: nil, customText: nil),
+      requirements: .init(
+        configuration: .init(
+          liveSpeedStyle: .off,
+          paceCaretStyle: .off,
+          tapeMode: .off
+        )
+      )
+    )
+    let snapshot = ChallengePresentationSnapshot(
+      liveSpeedStyle: .off,
+      paceCaretStyle: .off,
+      tapeMode: .off
+    )
+    let result = CompletedTestResult(
+      id: UUID(),
+      configuration: challenge.preset.configuration.with(challengeID: challenge.id),
+      outcome: .completed,
+      startedAt: start,
+      finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 100,
+      correctCharacterCount: 100,
+      errorCount: 0,
+      wpm: 40,
+      rawWpm: 40,
+      accuracy: 100,
+      challengePresentation: snapshot
+    )
+
+    XCTAssertTrue(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
+    XCTAssertEqual(
+      try JSONDecoder().decode(CompletedTestResult.self, from: JSONEncoder().encode(result))
+        .challengePresentation,
+      snapshot
+    )
+
+    var legacyPayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any]
+    )
+    legacyPayload.removeValue(forKey: "challengePresentation")
+    let legacyResult = try JSONDecoder().decode(
+      CompletedTestResult.self,
+      from: JSONSerialization.data(withJSONObject: legacyPayload)
+    )
+    XCTAssertNil(legacyResult.challengePresentation)
+    XCTAssertEqual(
+      ChallengeEvaluator.evaluate(legacyResult, challenge: challenge).failedRequirements,
+      ["缺少挑战显示设置快照，无法验收"]
+    )
+
+    let mismatched = CompletedTestResult(
+      id: UUID(),
+      configuration: challenge.preset.configuration.with(challengeID: challenge.id),
+      outcome: .completed,
+      startedAt: start,
+      finishedAt: start.addingTimeInterval(30),
+      typedCharacterCount: 100,
+      correctCharacterCount: 100,
+      errorCount: 0,
+      wpm: 40,
+      rawWpm: 40,
+      accuracy: 100,
+      challengePresentation: .init(
+        liveSpeedStyle: .text,
+        paceCaretStyle: .bar,
+        tapeMode: .word
+      )
+    )
+    let failures = ChallengeEvaluator.evaluate(mismatched, challenge: challenge).failedRequirements
+    for category in ["实时速度", "节奏光标", "卷带"] {
+      XCTAssertTrue(failures.contains { $0.contains(category) })
+    }
+  }
+
   func testDailyChallengeIsStableForOneCalendarDayAndCyclesLibrary() {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -21632,7 +21717,14 @@ final class TypingEngineTests: XCTestCase {
     session.recordPhysicalKeyEvent(
       keyCode: 1, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(0.15))
     session.insert("mber", at: start.addingTimeInterval(6))
-    let result = try XCTUnwrap(session.result(restartCount: 4))
+    let challengePresentation = ChallengePresentationSnapshot(
+      liveSpeedStyle: .mini,
+      paceCaretStyle: .underline,
+      tapeMode: .letter
+    )
+    let result = try XCTUnwrap(
+      session.result(restartCount: 4, challengePresentation: challengePresentation)
+    )
     XCTAssertEqual(result.afkDuration, 4)
     XCTAssertEqual(result.engagedDuration, 2)
     XCTAssertEqual(result.restartCount, 4)
@@ -21657,6 +21749,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(stored.keySpacingSamples[0], 0.05, accuracy: 0.000_001)
     XCTAssertEqual(try XCTUnwrap(stored.keyOverlapDuration), 0.05, accuracy: 0.000_001)
     XCTAssertEqual(stored.afkPercentage, 66.666_666_666_7, accuracy: 0.000_001)
+    XCTAssertEqual(stored.portableResult?.challengePresentation, challengePresentation)
     XCTAssertEqual(stored.portableResult, result)
 
     stored.addTag("morning")

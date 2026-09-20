@@ -756,6 +756,10 @@ private struct ContentView: View {
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
+    .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
+    .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
+    .onChange(of: settings.promptHighlightMode) { _, _ in activeChallengeID = nil }
+    .onChange(of: settings.showAllPracticeLines) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.testModifiers) { _, _ in refreshZipfNotice() }
     .onChange(of: network.recoveryEventID) { _, eventID in
       guard eventID > 0 else { return }
@@ -780,8 +784,17 @@ private struct ContentView: View {
       switch outcome {
       case .completed, .bailedOut, .invalidAFK:
         let restartCount = currentRestartCount
+        let challengePresentation = activeChallengeID == nil
+          ? nil
+          : ChallengePresentationSnapshot(
+            liveSpeedStyle: settings.liveSpeedStyle,
+            paceCaretStyle: settings.paceCaretStyle,
+            tapeMode: settings.practiceTapeMode)
         guard let result = session.result(
-          tags: activeSessionTags, restartCount: restartCount, quoteSource: activeQuoteSource
+          tags: activeSessionTags,
+          restartCount: restartCount,
+          quoteSource: activeQuoteSource,
+          challengePresentation: challengePresentation
         ) else { return }
         currentRestartCount = 0
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
@@ -833,9 +846,8 @@ private struct ContentView: View {
           todayPractice: todayPracticeSummary,
           repeatedSession: repeatedSession,
           challengeEvaluation: result.outcome == .completed
-            ? TypebarChallengeLibrary.challenge(
-              id: result.configuration.challengeID
-            ).map { ChallengeEvaluator.evaluate(result, challenge: $0) }
+            ? TypebarChallengeLibrary.challenge(id: activeChallengeID)
+              .map { ChallengeEvaluator.evaluate(result, challenge: $0) }
             : nil
         )
         if savesResult, ResultSavingPolicy.shouldPublish(localSaveState: localResultSaveState) {
@@ -3089,6 +3101,7 @@ private struct ContentView: View {
       return
     }
     if let target = CaretCommandCatalog.target(for: item.id) {
+      if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings)
       return
     }
