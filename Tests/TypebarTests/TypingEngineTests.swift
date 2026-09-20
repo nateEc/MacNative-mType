@@ -15684,6 +15684,47 @@ final class TypingEngineTests: XCTestCase {
       "istanbul")
   }
 
+  func testFrenchPunctuationPolicyUsesStandaloneTerminalSymbols() {
+    var randomValues = Array(repeating: 0.9, count: 9) + [0.85]
+    let words = FrenchPunctuationPolicy.punctuatedPrompt(
+      ["maison", "lumiere", "rivage"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["Maison", "lumiere", "?"])
+  }
+
+  func testFrenchPunctuationPolicyUsesStandaloneColonAndSemicolon() {
+    var randomValues =
+      Array(repeating: 0.9, count: 4) + [0]
+      + Array(repeating: 0.9, count: 14) + [0]
+      + [0.9, 0]
+    let words = FrenchPunctuationPolicy.punctuatedPrompt(
+      ["un", "deux", "trois", "quatre", "cinq"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["Un", ":", "trois", ";", "cinq."])
+  }
+
+  func testFrenchContentPolicyReplacesWordsWithIndependentNumbers() {
+    var randomValues = [0, 0, 0, 0.9, 0, 0.9]
+    let words = FrenchPunctuationPolicy.generatedPrompt(
+      ["maison", "rivage"], includesPunctuation: true, includesNumbers: true,
+      random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["1", "rivage."])
+  }
+
+  func testFrenchPromptUsesSentencePolicyOnlyWhenPunctuationIsEnabled() {
+    XCTAssertEqual(
+      StarterLexicon.frenchPrompt(
+        tokens: 1, lexicon: ["maison"], contentOptions: ContentOptions(includePunctuation: true),
+        usesZipfFrequency: false, contentRandom: { 0 }),
+      "Maison")
+    XCTAssertEqual(
+      StarterLexicon.frenchPrompt(
+        tokens: 1, lexicon: ["maison"], contentOptions: ContentOptions(),
+        usesZipfFrequency: false, contentRandom: { 0 }),
+      "maison")
+  }
+
   func testEnglishPromptPunctuatesOnlyWhenPunctuationIsEnabled() {
     XCTAssertEqual(
       StarterLexicon.englishPrompt(
@@ -17606,7 +17647,10 @@ final class TypingEngineTests: XCTestCase {
         wordCount: 12, language: language,
         contentOptions: .init(includePunctuation: true, includeNumbers: true))
       let invalidTokens = prompt.split(separator: " ").compactMap { token -> String? in
-        if token.allSatisfy(\.isNumber) { return nil }
+        let rawToken = String(token)
+        if rawToken.allSatisfy(\.isNumber) { return nil }
+        if language == .french && ["?", "!", ":", ";", "-"].contains(rawToken) { return nil }
+        if language == .turkish && rawToken == "-" { return nil }
         let punctuation = language == .tibetan
           ? CharacterSet(charactersIn: "།")
           : language == .banglaLetters
@@ -17620,9 +17664,15 @@ final class TypingEngineTests: XCTestCase {
               : CharacterSet.punctuationCharacters
         let normalized = token.trimmingCharacters(
           in: punctuation)
-        let baseToken = language == .turkish
-          ? normalized.lowercased(with: Locale(identifier: "tr"))
-          : normalized
+        let baseToken: String
+        switch language {
+        case .turkish:
+          baseToken = normalized.lowercased(with: Locale(identifier: "tr"))
+        case .french:
+          baseToken = normalized.lowercased()
+        default:
+          baseToken = normalized
+        }
         return lexicon.contains(baseToken) ? nil : "\(token) → \(baseToken)"
       }
       XCTAssertTrue(
