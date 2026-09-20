@@ -414,6 +414,8 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 
 本节逐条保留各批次当时的数量与新增语义；其中使用“当前”的旧句均是历史快照，现行总数以本文件上方机器守护的 152／69／2 摘要及本节末尾 `TST-132` 为准。
 
+- 2026-09-20 键盘覆盖更正：`KeyboardLayout` 当前有 244 个 Typebar 自有内置布局，`KeyboardInputLayout` 以同一稳定 raw value 将每一项用于明确的物理键模拟，且 Layout Fluid 可从中选择最多 15 项。Greek、BDS/传统音标 Bulgarian、Belarusian、Macedonian、Pashto、Estonian、Persian、Arabic、Urdu、Thai、Japanese、Hindi、Tamil、Armenian、Mongolian、Hebrew 与 Serbian 等非 Latin 布局均已包含；默认输入仍保持 macOS 当前输入源，未定义的死键／系统层不会被猜测。此前“二十种”或仅 Russian、Ukrainian、Serbian 三种非 Latin 映射的段落均为过期快照，不应作为兼容性缺口。`TypingEngineTests` 与 `OfficialLayoutCoverageTests` 分别守护总数、持久化和固定布局目录映射。
+
 - `TypingLanguage` 当时有一百四十八种 Typebar 自有单语；默认与自选多语混排使用一百三十八种 LTR 单语。该阶段增加 Русский · Аббревиатуры：固定 `russian_abbreviations` 定义 `bcp47: ru-RU`、`noLazyMode: true` 与 `orderedByFrequency: false`，结构审计确认其主要为不超过 6 字符的全大写西里尔 token。Typebar 以 64 个自写短缩略词和四档原创俄语文本重建该可见约束，使用 `ru`／`ru-RU`、禁用简化输入并显示 Zipf 不支持；不读取或复制参考词值。当时浅克隆尚不能解释 `english_old`，随后已由官方引入提交确认其为 Old English 并在 `TST-134` 实现。
 
 - `TypingLanguage` 当前有一百二十二种 Typebar 自有单语；默认与自选多语混排使用一百一十二种 LTR 单语。新增 `Te reo Māori` 只对应固定源码的 `maori_1k` 映射；该配置未定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序，因此以保留 macron 的原创 LTR 词流及四档引语、`en`／`en-US` 缺省在线/朗读路径、显式简化输入和 Zipf 未知提示实现，并覆盖投稿、撤回、成绩和排行榜。

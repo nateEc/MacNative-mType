@@ -700,6 +700,8 @@ INP-04 的“按键位图”档用所选 Typebar 布局的原创映射，将 QMK
 
 2026-09-20 `MET-04`、`SOC-01` 色阶补充：本机和公开资料活动日历共用原创分布派生器。它只考虑当前可见的非空完成日，以两端 10% 的小样本裁剪计算代表完成量，分别映射为空白与四档活跃色阶；负计数按零处理。这样异常导入不会把日常记录压成同一浅色，也不会改变成绩、筛选、账户日界、服务端接口或公开字段。
 
+2026-09-20 `CFG-02`、`VIS-02`、`VIS-05` 键盘矩阵更正：`KeyboardLayout` 的 244 个 Typebar 自有内置布局均可用于提示、明确 AppKit 物理键模拟、归档和 Layout Fluid（最多 15 项）。同一 raw value 在 `KeyboardInputLayout` 中解析为对应布局，因此视觉选择与显式模拟不再各自维护目录。覆盖范围包含 Greek、BDS/传统音标 Bulgarian、Belarusian、Macedonian、Pashto、Estonian、Persian Standard/Farsi、Arabic 101/102/macOS、Urdu Phonetic、Thai Kedmanee/Pattachote、Japanese Hiragana、Hindi InScript、Tamil99、Armenian HM QWERTY、Mongolian Cyrillic、Hebrew 与 Serbian Cyrillic 等非 Latin 布局；默认系统输入、未定义死键及系统层仍交由 macOS。此条取代表格中“二十种”或仅 Russian、Ukrainian、Serbian 可原生模拟的历史快照；总数、固定目录与关键布局持久化均有客户端测试守护。
+
 ## 可追溯性规则
 
 每个实现 PR/提交必须至少写出一个本表 ID。完成时还要补充：测试文件、人工验收步骤、数据迁移策略和隐私/离线行为。任何 ID 为“未开始”或“部分实现”时，完整重写仍未完成。
