@@ -15671,6 +15671,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(words, ["İstanbul", "kent?", "İzmir", "odak."])
   }
 
+  func testTurkishPunctuationPolicyConflatesDotlessSentenceInitialI() {
+    XCTAssertEqual(
+      TurkishPunctuationPolicy.punctuatedPrompt(["ışık"], random: { 0 }),
+      ["İşık"])
+  }
+
   func testTurkishPromptUsesSentencePolicyOnlyWhenPunctuationIsEnabled() {
     XCTAssertEqual(
       StarterLexicon.turkishPrompt(
@@ -15723,6 +15729,44 @@ final class TypingEngineTests: XCTestCase {
         tokens: 1, lexicon: ["maison"], contentOptions: ContentOptions(),
         usesZipfFrequency: false, contentRandom: { 0 }),
       "maison")
+  }
+
+  func testGreekPunctuationPolicyUsesSemicolonForQuestions() {
+    var randomValues = Array(repeating: 0.9, count: 9) + [0.85]
+    let words = GreekPunctuationPolicy.punctuatedPrompt(
+      ["πρωί", "λόγος", "φως"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["Πρωί", "λόγος", "φως;"])
+  }
+
+  func testGreekPunctuationPolicyUsesStandalonePeriodForSeparatorBranch() {
+    var randomValues = Array(repeating: 0.9, count: 6) + [0, 0.9, 0]
+    let words = GreekPunctuationPolicy.punctuatedPrompt(
+      ["ένα", "δύο", "τρία", "τέσσερα"], random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["Ένα", ".", "Τρία", "τέσσερα."])
+  }
+
+  func testGreekContentPolicyReplacesWordsWithIndependentNumbers() {
+    var randomValues = [0, 0, 0, 0.9, 0, 0.9]
+    let words = GreekPunctuationPolicy.generatedPrompt(
+      ["ένα", "δύο"], includesPunctuation: true, includesNumbers: true,
+      random: { randomValues.removeFirst() })
+
+    XCTAssertEqual(words, ["1", "δύο."])
+  }
+
+  func testGreekPromptUsesSentencePolicyOnlyWhenPunctuationIsEnabled() {
+    XCTAssertEqual(
+      StarterLexicon.greekPrompt(
+        tokens: 1, lexicon: ["πρωί"], contentOptions: ContentOptions(includePunctuation: true),
+        usesZipfFrequency: false, contentRandom: { 0 }),
+      "Πρωί")
+    XCTAssertEqual(
+      StarterLexicon.greekPrompt(
+        tokens: 1, lexicon: ["πρωί"], contentOptions: ContentOptions(),
+        usesZipfFrequency: false, contentRandom: { 0 }),
+      "πρωί")
   }
 
   func testEnglishPromptPunctuatesOnlyWhenPunctuationIsEnabled() {
@@ -17651,6 +17695,7 @@ final class TypingEngineTests: XCTestCase {
         if rawToken.allSatisfy(\.isNumber) { return nil }
         if language == .french && ["?", "!", ":", ";", "-"].contains(rawToken) { return nil }
         if language == .turkish && rawToken == "-" { return nil }
+        if language == .greek && [".", "-"].contains(rawToken) { return nil }
         let punctuation = language == .tibetan
           ? CharacterSet(charactersIn: "།")
           : language == .banglaLetters
@@ -17664,16 +17709,26 @@ final class TypingEngineTests: XCTestCase {
               : CharacterSet.punctuationCharacters
         let normalized = token.trimmingCharacters(
           in: punctuation)
-        let baseToken: String
+        let baseTokens: [String]
         switch language {
         case .turkish:
-          baseToken = normalized.lowercased(with: Locale(identifier: "tr"))
+          let localeLowercased = normalized.lowercased(with: Locale(identifier: "tr"))
+          if normalized.first == "İ" {
+            let suffix = String(normalized.dropFirst())
+            baseTokens = [localeLowercased, "i" + suffix, "ı" + suffix]
+          } else {
+            baseTokens = [localeLowercased]
+          }
         case .french:
-          baseToken = normalized.lowercased()
+          baseTokens = [normalized.lowercased()]
+        case .greek:
+          baseTokens = [normalized.lowercased()]
         default:
-          baseToken = normalized
+          baseTokens = [normalized]
         }
-        return lexicon.contains(baseToken) ? nil : "\(token) → \(baseToken)"
+        return baseTokens.contains(where: lexicon.contains)
+          ? nil
+          : "\(token) → \(baseTokens.joined(separator: " / "))"
       }
       XCTAssertTrue(
         invalidTokens.isEmpty,
