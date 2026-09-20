@@ -449,6 +449,25 @@ struct PreferencesView: View {
           Text("未设置自定义图片时，背景由 Typebar 的原生矢量绘制；光晕会遵从 macOS“减少动态效果”辅助功能设置。")
             .font(.caption)
             .foregroundStyle(.secondary)
+          Stepper(
+            value: $settings.animationFrameRate,
+            in: AnimationFrameRatePolicy.supportedRange
+          ) {
+            LabeledContent(
+              "动画帧率上限",
+              value: settings.animationFrameRate == AnimationFrameRatePolicy.nativeFrameRate
+                ? "原生" : "\(settings.animationFrameRate) FPS")
+          }
+          HStack {
+            Button("使用原生刷新率") {
+              settings.animationFrameRate = AnimationFrameRatePolicy.nativeFrameRate
+            }
+            .disabled(settings.animationFrameRate == AnimationFrameRatePolicy.nativeFrameRate)
+            Spacer()
+          }
+          Text("可设为 15–1000 FPS；“原生”会让 Typebar 的连续原创动效按显示器节奏绘制。该项只影响呈现，不改变输入、计分、回放或网络请求。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           Toggle(
             "显示节奏伙伴",
             isOn: Binding(

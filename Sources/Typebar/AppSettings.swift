@@ -580,6 +580,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var customBackgroundFilter = CustomBackgroundFilter()
   var practiceBackdrop: PracticeBackdropStyle = .solid
   var reducePracticeMotion = false
+  var animationFrameRate = AnimationFrameRatePolicy.nativeFrameRate
   var showTypingCompanion = false
   var typingPowerMode: TypingPowerMode = .off
   var englishVariant: EnglishVariant = .american
@@ -685,6 +686,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     customBackgroundFilter: CustomBackgroundFilter = .init(),
     practiceBackdrop: PracticeBackdropStyle = .solid,
     reducePracticeMotion: Bool = false,
+    animationFrameRate: Int = AnimationFrameRatePolicy.nativeFrameRate,
     showTypingCompanion: Bool = false,
     typingPowerMode: TypingPowerMode = .off,
     englishVariant: EnglishVariant = .american,
@@ -801,6 +803,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.customBackgroundFilter = customBackgroundFilter.normalized
     self.practiceBackdrop = practiceBackdrop
     self.reducePracticeMotion = reducePracticeMotion
+    self.animationFrameRate = AnimationFrameRatePolicy.normalized(animationFrameRate)
     self.showTypingCompanion = showTypingCompanion
     self.typingPowerMode = typingPowerMode
     self.englishVariant = englishVariant
@@ -872,7 +875,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
       practiceFont, installedPracticeFontName, theme, publishCompletedResults, saveCompletedResults, customThemes,
       activeCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, keyboardInputLayout, keyboardGuideLayoutSource, customKeyboardLayouts, customKeyboardLayoutID, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
-      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, showTypingCompanion, typingPowerMode, englishVariant, prefersArabicLazyInput,
+      randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, animationFrameRate, showTypingCompanion, typingPowerMode, englishVariant, prefersArabicLazyInput,
       favoriteQuoteIDs, activeResultTags, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
       minimumAccuracy, minimumWpm, minimumWordBurstWpm, minimumWordBurstMode,
       practiceLineWidth, customPracticeLineColumns, practiceTapeMode, practiceTapeMargin,
@@ -982,6 +985,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
       try values.decodeIfPresent(PracticeBackdropStyle.self, forKey: .practiceBackdrop) ?? .solid
     reducePracticeMotion =
       try values.decodeIfPresent(Bool.self, forKey: .reducePracticeMotion) ?? false
+    animationFrameRate = AnimationFrameRatePolicy.normalized(
+      try values.decodeIfPresent(Int.self, forKey: .animationFrameRate)
+        ?? AnimationFrameRatePolicy.nativeFrameRate)
     showTypingCompanion =
       try values.decodeIfPresent(Bool.self, forKey: .showTypingCompanion) ?? false
     typingPowerMode =
@@ -1303,6 +1309,16 @@ final class AppSettings {
   private(set) var localPracticeFontRevision = 0
   var practiceBackdrop: PracticeBackdropStyle = .solid { didSet { persist() } }
   var reducePracticeMotion = false { didSet { persist() } }
+  var animationFrameRate = AnimationFrameRatePolicy.nativeFrameRate {
+    didSet {
+      let normalized = AnimationFrameRatePolicy.normalized(animationFrameRate)
+      if animationFrameRate != normalized {
+        animationFrameRate = normalized
+      } else {
+        persist()
+      }
+    }
+  }
   var showTypingCompanion = false { didSet { persist() } }
   var typingPowerMode: TypingPowerMode = .off { didSet { persist() } }
   var englishVariant: EnglishVariant = .american { didSet { persist() } }
@@ -1482,6 +1498,7 @@ final class AppSettings {
     customBackgroundFilter = snapshot.customBackgroundFilter
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
+    animationFrameRate = snapshot.animationFrameRate
     showTypingCompanion = snapshot.showTypingCompanion
     typingPowerMode = snapshot.typingPowerMode
     englishVariant = snapshot.englishVariant
@@ -1623,6 +1640,7 @@ final class AppSettings {
       customBackgroundURL: customBackgroundURL, customBackgroundFit: customBackgroundFit,
       customBackgroundFilter: customBackgroundFilter,
       practiceBackdrop: practiceBackdrop, reducePracticeMotion: reducePracticeMotion,
+      animationFrameRate: animationFrameRate,
       showTypingCompanion: showTypingCompanion, typingPowerMode: typingPowerMode,
       englishVariant: englishVariant, prefersArabicLazyInput: prefersArabicLazyInput,
       favoriteQuoteIDs: favoriteQuoteIDs,
@@ -1714,6 +1732,7 @@ final class AppSettings {
     customBackgroundFilter = .init()
     practiceBackdrop = .solid
     reducePracticeMotion = false
+    animationFrameRate = AnimationFrameRatePolicy.nativeFrameRate
     showTypingCompanion = false
     typingPowerMode = .off
     englishVariant = .american
@@ -1921,6 +1940,7 @@ final class AppSettings {
     customBackgroundFilter = snapshot.customBackgroundFilter
     practiceBackdrop = snapshot.practiceBackdrop
     reducePracticeMotion = snapshot.reducePracticeMotion
+    animationFrameRate = snapshot.animationFrameRate
     showTypingCompanion = snapshot.showTypingCompanion
     typingPowerMode = snapshot.typingPowerMode
     englishVariant = snapshot.englishVariant
@@ -2232,6 +2252,7 @@ final class AppSettings {
       customBackgroundFilter: customBackgroundFilter,
       practiceBackdrop: practiceBackdrop,
       reducePracticeMotion: reducePracticeMotion,
+      animationFrameRate: animationFrameRate,
       showTypingCompanion: showTypingCompanion,
       typingPowerMode: typingPowerMode,
       englishVariant: englishVariant,

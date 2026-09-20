@@ -109,9 +109,12 @@ struct PracticeBackdrop: View {
     let theme: ResolvedTheme
     let reduceMotion: Bool
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+        TimelineView(
+            .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+        ) { timeline in
             GeometryReader { proxy in
                 let phase = reduceMotion || systemReduceMotion ? 0 : sin(timeline.date.timeIntervalSinceReferenceDate / 4)
                 ZStack {

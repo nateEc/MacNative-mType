@@ -56,12 +56,15 @@ struct TypingCompanion: View {
   let panel: Color
   let reduceMotion: Bool
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   private var fastBlend: Double { TypingCompanionMotion.fastBlend(for: wpm) }
   private var motionIsReduced: Bool { reduceMotion || systemReduceMotion }
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+    ) { timeline in
       let pulse = motionIsReduced ? 0 : sin(timeline.date.timeIntervalSinceReferenceDate * (2 + fastBlend * 12))
       ZStack {
         RoundedRectangle(cornerRadius: 15)

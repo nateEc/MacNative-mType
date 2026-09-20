@@ -76,6 +76,7 @@ enum SettingsSearch {
         Entry("background", "背景图片", section: .display, keywords: "custom background image url"),
         Entry("backgroundFilter", "背景图片滤镜", section: .display, keywords: "blur brightness saturation opacity"),
         Entry("backdrop", "练习背景", section: .display, keywords: "practice backdrop"),
+        Entry("animationFps", "动画帧率上限", section: .display, keywords: "animation fps frame rate native 动画 帧率"),
         Entry("companion", "显示节奏伙伴", section: .display, keywords: "typing companion"),
         Entry("typingPower", "键入能量效果", section: .display, keywords: "typing power"),
         Entry("fontSize", "练习字体大小", section: .display, keywords: "font size"),

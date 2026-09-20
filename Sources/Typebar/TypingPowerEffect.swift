@@ -111,9 +111,11 @@ struct TypingPowerOverlay: View {
   let error: Color
   let reducesMotion: Bool
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+    let frameInterval = AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate)
+    TimelineView(.animation(minimumInterval: frameInterval)) { timeline in
       Canvas { context, size in
         guard !reducesMotion, !systemReduceMotion else { return }
         for particle in particles {
@@ -121,7 +123,7 @@ struct TypingPowerOverlay: View {
           let opacity = TypingPowerPolicy.opacity(at: age)
           guard opacity > 0 else { continue }
           let previous = TypingPowerPolicy.position(
-            for: particle, at: max(0, age - 1.0 / 30.0), in: size)
+            for: particle, at: max(0, age - frameInterval), in: size)
           let current = TypingPowerPolicy.position(for: particle, at: age, in: size)
           var trail = Path()
           trail.move(to: previous)

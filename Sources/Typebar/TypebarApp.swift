@@ -227,9 +227,12 @@ private struct EarthquakePracticeContent<Content: View>: View {
   let reducesMotion: Bool
   @ViewBuilder let content: Content
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+    ) { timeline in
       let offset = EarthquakeOffsetPolicy.offset(
         at: timeline.date, isEnabled: isEnabled,
         reducesMotion: reducesMotion || systemReduceMotion)
@@ -243,9 +246,12 @@ private struct NauseaPracticeContent<Content: View>: View {
   let reducesMotion: Bool
   @ViewBuilder let content: Content
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+    ) { timeline in
       let transform = NauseaVisualPolicy.transform(
         at: timeline.date, isEnabled: isEnabled,
         reducesMotion: reducesMotion || systemReduceMotion)
@@ -261,9 +267,12 @@ private struct RoundPracticeContent<Content: View>: View {
   let reducesMotion: Bool
   @ViewBuilder let content: Content
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+    ) { timeline in
       content.rotationEffect(.degrees(RoundVisualPolicy.rotationDegrees(
         at: timeline.date, isEnabled: isEnabled,
         reducesMotion: reducesMotion || systemReduceMotion)))
@@ -368,9 +377,12 @@ private struct ChooPracticePrompt: View {
   let isEnabled: Bool
   let reducesMotion: Bool
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+    ) { timeline in
       PromptFlowLayout {
         ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
           if glyph.character == "\n" {
@@ -742,6 +754,7 @@ private struct ContentView: View {
         filter: settings.customBackgroundFilter,
         localImageRevision: settings.localBackgroundRevision)
     )
+    .environment(\.typebarAnimationFrameRate, settings.animationFrameRate)
     .overlay(alignment: .top) {
       if network.showsOfflineBanner, !session.hasStarted {
         NetworkConnectivityNotice(kind: .offline)

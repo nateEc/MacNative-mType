@@ -33,6 +33,35 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(initiallyOffline.observe(.online), .restored)
   }
 
+  @MainActor
+  func testAnimationFrameRatePreservesReferenceBoundsAndNativeFallback() throws {
+    XCTAssertEqual(AnimationFrameRatePolicy.normalized(14), 15)
+    XCTAssertEqual(AnimationFrameRatePolicy.normalized(15), 15)
+    XCTAssertEqual(AnimationFrameRatePolicy.normalized(60), 60)
+    XCTAssertEqual(AnimationFrameRatePolicy.normalized(1_001), 1_000)
+    XCTAssertEqual(
+      AnimationFrameRatePolicy.minimumInterval(for: 30), 1.0 / 30.0, accuracy: 0.000_000_1)
+    XCTAssertEqual(
+      AnimationFrameRatePolicy.minimumInterval(for: 1_000), 1.0 / 1_000.0,
+      accuracy: 0.000_000_1)
+
+    XCTAssertEqual(AppSettingsSnapshot(animationFrameRate: 2).animationFrameRate, 15)
+    let legacy = try JSONDecoder().decode(AppSettingsSnapshot.self, from: Data("{}".utf8))
+    XCTAssertEqual(legacy.animationFrameRate, 1_000)
+    XCTAssertEqual(SettingsSearch.results(query: "fps").map(\.id), ["animationFps"])
+    XCTAssertEqual(SettingsSearch.results(query: "动画 帧率").map(\.id), ["animationFps"])
+
+    let suiteName = "TypebarTests.animation-frame-rate.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.animationFrameRate = 2
+    XCTAssertEqual(settings.animationFrameRate, 15)
+    XCTAssertEqual(AppSettings(defaults: defaults).animationFrameRate, 15)
+    settings.apply(.init(animationFrameRate: 2_000))
+    XCTAssertEqual(settings.animationFrameRate, 1_000)
+  }
+
   func testAboutMetadataUsesBundleVersionAndSafeDevelopmentFallbacks() {
     XCTAssertEqual(
       TypebarAboutMetadata(info: [
