@@ -3223,7 +3223,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(InputRules(minimumAccuracy: 101).minimumAccuracy, 100)
   }
 
-  func testNoSpaceMinimumWordBurstCommitsAtEveryOriginalWordBoundary() {
+  func testNoSpaceMinimumWordBurstSkipsTheTerminalOriginalWord() {
     let rules = InputRules(minimumWordBurstWpm: 60, minimumWordBurstMode: .fixed)
     let configuration = TestConfiguration(
       mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: rules,
@@ -3238,7 +3238,28 @@ final class TypingEngineTests: XCTestCase {
 
     session.insert("h", at: start.addingTimeInterval(1))
     session.insert("arbor", at: start.addingTimeInterval(9))
-    XCTAssertEqual(session.outcome, .failed, "the second original word should independently check min burst")
+    // The reference only checks minBurst after navigation actually advances
+    // the active word. The terminal no-space boundary completes this finite
+    // prompt instead, even when that final word's burst is below the limit.
+    XCTAssertEqual(session.outcome, .completed)
+  }
+
+  func testNoSpaceMinimumWordBurstStillChecksAnIncrementalPromptBoundary() {
+    let configuration = TestConfiguration(
+      mode: .time, duration: 30, wordLimit: nil, difficulty: .normal,
+      rules: .init(minimumWordBurstWpm: 60, minimumWordBurstMode: .fixed),
+      modifiers: [.noSpaces])
+    var session = TypingSession(
+      configuration: configuration, prompt: "amber", repeatingPrompt: "amber",
+      noSpaceWordEndIndices: [5], noSpaceTargetWords: ["amber"],
+      repeatingNoSpaceWordLengths: [5], repeatingNoSpaceTargetWords: ["amber"])
+
+    session.insert("a", at: start)
+    session.insert("mber", at: start.addingTimeInterval(8))
+
+    // A timed test grows the word stream before navigation, so this apparent
+    // chunk boundary is not terminal and must still enforce minBurst.
+    XCTAssertEqual(session.outcome, .failed)
   }
 
   func testNoSpaceFlexibleMinimumWordBurstUsesTheOriginalWordLength() {

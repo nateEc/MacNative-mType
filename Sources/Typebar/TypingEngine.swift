@@ -3596,7 +3596,15 @@ struct TypingSession {
       commitsWord = isPromptWordSeparator(character) && configuration.language.usesSpaceDelimitedWords
         && !configuration.modifiers.contains(.noSpaces)
     }
-    guard mode != .off, minimum > 0, commitsWord,
+    // Monkeytype computes minBurst only after goToNextWord has actually
+    // advanced its active-word index. A terminal finite word completes the
+    // attempt instead, so its burst is visible but cannot turn completion
+    // into a failure. Repeating prompts can grow before that navigation, and
+    // zen always creates another active word.
+    let advancesToAnotherWord = configuration.mode == .zen
+      || nextTargetIndex < prompt.count
+      || usesIncrementalPromptExtension
+    guard mode != .off, minimum > 0, commitsWord, advancesToAnotherWord,
       let burst = committedWordBursts.last,
       let targetLength = lastCommittedBurstWordLength
     else { return false }
