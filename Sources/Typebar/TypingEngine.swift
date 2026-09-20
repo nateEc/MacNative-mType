@@ -5136,6 +5136,94 @@ enum ArabicPunctuationPolicy {
   }
 }
 
+/// Shares the reference Persian and Urdu family branch while keeping every
+/// Typebar corpus local. Unlike Arabic and Kurdish, this branch emits an ASCII
+/// semicolon and ASCII number tokens.
+enum PersianUrduPunctuationPolicy {
+  static func punctuatedPrompt(
+    _ rawTokens: [String], random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    generatedPrompt(rawTokens, includesPunctuation: true, includesNumbers: false, random: random)
+  }
+
+  static func generatedPrompt(
+    _ rawTokens: [String], includesPunctuation: Bool, includesNumbers: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    var generated: [String] = []
+    for (index, rawToken) in rawTokens.enumerated() {
+      let punctuated = includesPunctuation
+        ? punctuatedToken(
+          previousToken: generated.last, rawToken: rawToken, index: index,
+          totalCount: rawTokens.count, random: random)
+        : rawToken
+      generated.append(includesNumbers && random() < 0.1 ? numberToken(random: random) : punctuated)
+    }
+    return generated
+  }
+
+  private static func punctuatedToken(
+    previousToken: String?, rawToken: String, index: Int, totalCount: Int,
+    random: () -> Double
+  ) -> String {
+    let previousLastCharacter = previousToken?.last
+    let followsComma = previousLastCharacter == ","
+    let followsPeriod = previousLastCharacter == "."
+    let followsSemicolon = previousLastCharacter == ";" || previousLastCharacter == "؛"
+      || previousLastCharacter == "；" || previousLastCharacter == "："
+    let followsColon = previousLastCharacter == ":" || previousLastCharacter == "："
+
+    if index == 0 || previousLastCharacter.map(isSentenceTerminator) == true {
+      return capitalizingFirstCharacter(in: rawToken)
+    }
+
+    if (
+      (random() < 0.1 && !followsPeriod && !followsComma && index != totalCount - 2)
+        || index == totalCount - 1
+    ) {
+      let terminalChoice = random()
+      if terminalChoice <= 0.8 { return rawToken + "." }
+      if terminalChoice < 0.9 { return rawToken + "؟" }
+      return rawToken + "!"
+    }
+    if random() < 0.01 && !followsComma && !followsPeriod { return "\"\(rawToken)\"" }
+    if random() < 0.011 && !followsComma && !followsPeriod { return "'\(rawToken)'" }
+    if random() < 0.012 && !followsComma && !followsPeriod { return "(\(rawToken))" }
+    if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return rawToken + ":"
+    }
+    if random() < 0.014 && !followsComma && !followsPeriod && previousToken != "-" { return "-" }
+    if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon {
+      return rawToken + ";"
+    }
+    if random() < 0.2 && !followsComma { return rawToken + "،" }
+    return rawToken
+  }
+
+  private static func numberToken(random: () -> Double) -> String {
+    let length = boundedIndex(random(), upperBound: 4) + 1
+    return (0..<length).map { index in
+      let lowerBound = index == 0 ? 1 : 0
+      let rangeSize = index == 0 ? 9 : 10
+      return String(lowerBound + boundedIndex(random(), upperBound: rangeSize))
+    }.joined()
+  }
+
+  private static func boundedIndex(_ value: Double, upperBound: Int) -> Int {
+    let normalized = min(max(value, 0), 0.999_999_999)
+    return min(Int(normalized * Double(upperBound)), upperBound - 1)
+  }
+
+  private static func capitalizingFirstCharacter(in token: String) -> String {
+    guard let first = token.first else { return token }
+    return String(first).uppercased() + token.dropFirst()
+  }
+
+  private static func isSentenceTerminator(_ character: Character) -> Bool {
+    character == "." || character == "?" || character == "!" || character == "؟"
+  }
+}
+
 /// Applies the source-compatible Turkish sentence case and contextual marks to
 /// Typebar-owned Turkish words without importing the web generator or corpus.
 enum TurkishPunctuationPolicy {
@@ -10388,31 +10476,29 @@ enum StarterLexicon {
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .persian:
-      return prompt(
-        tokens: count, lexicon: persianWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return persianUrduPrompt(
+        tokens: count, lexicon: persianWords, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .persian1k, .persian5k, .persian20k:
-      return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
-        punctuation: ["،", "؛", "؟", "."], contentOptions: contentOptions,
+      return persianUrduPrompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .persianRomanized:
-      return prompt(
-        tokens: count, lexicon: persianRomanizedWords, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return persianUrduPrompt(
+        tokens: count, lexicon: persianRomanizedWords, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .urdu:
-      return prompt(
-        tokens: count, lexicon: urduWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return persianUrduPrompt(
+        tokens: count, lexicon: urduWords, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .urdu1k, .urdu5k:
-      return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
-        punctuation: ["،", "؛", "؟", "."], contentOptions: contentOptions,
+      return persianUrduPrompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .urduRoman:
-      return prompt(
-        tokens: count, lexicon: urduRomanWords, separator: " ", punctuation: [",", ".", "!", "?"],
-        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      return persianUrduPrompt(
+        tokens: count, lexicon: urduRomanWords, contentOptions: contentOptions,
+        usesZipfFrequency: usesZipfFrequency)
     case .urdish:
       return prompt(
         tokens: count, lexicon: urdishWords, separator: " ", punctuation: [",", ".", "!", "?"],
@@ -11311,6 +11397,31 @@ enum StarterLexicon {
       contentOptions: ContentOptions(), usesZipfFrequency: usesZipfFrequency)
     guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
     return ArabicPunctuationPolicy.generatedPrompt(
+      generated.split(separator: " ").map(String.init),
+      includesPunctuation: contentOptions.includePunctuation,
+      includesNumbers: contentOptions.includeNumbers,
+      random: contentRandom
+    ).joined(separator: " ")
+  }
+
+  static func persianUrduPrompt(
+    tokens: Int, lexicon: [String], contentOptions: ContentOptions,
+    usesZipfFrequency: Bool, contentRandom: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    persianUrduPrompt(
+      tokens: tokens, lexicon: IndexedLexicon(lexicon), contentOptions: contentOptions,
+      usesZipfFrequency: usesZipfFrequency, contentRandom: contentRandom)
+  }
+
+  static func persianUrduPrompt(
+    tokens: Int, lexicon: IndexedLexicon, contentOptions: ContentOptions,
+    usesZipfFrequency: Bool, contentRandom: () -> Double = { Double.random(in: 0..<1) }
+  ) -> String {
+    let generated = prompt(
+      tokens: tokens, lexicon: lexicon, separator: " ", punctuation: ["،", ";", "؟", "."],
+      contentOptions: ContentOptions(), usesZipfFrequency: usesZipfFrequency)
+    guard contentOptions.includePunctuation || contentOptions.includeNumbers else { return generated }
+    return PersianUrduPunctuationPolicy.generatedPrompt(
       generated.split(separator: " ").map(String.init),
       includesPunctuation: contentOptions.includePunctuation,
       includesNumbers: contentOptions.includeNumbers,

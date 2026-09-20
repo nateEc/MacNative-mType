@@ -15849,6 +15849,36 @@ final class TypingEngineTests: XCTestCase {
       "كتاب كتاب كتاب")
   }
 
+  func testPersianUrduPunctuationPolicyUsesArabicQuestionMarksAndCommas() {
+    var questionRandomValues = Array(repeating: 0.9, count: 9) + [0.85]
+    XCTAssertEqual(
+      PersianUrduPunctuationPolicy.punctuatedPrompt(
+        ["کتاب", "قلم", "پنجره"], random: { questionRandomValues.removeFirst() }),
+      ["کتاب", "قلم", "پنجره؟"])
+
+    var separatorRandomValues =
+      Array(repeating: 0.9, count: 6) + [0]
+      + Array(repeating: 0.9, count: 7) + [0, 0.9, 0]
+    XCTAssertEqual(
+      PersianUrduPunctuationPolicy.punctuatedPrompt(
+        ["کتاب", "قلم", "راہ", "کھڑکی"], random: { separatorRandomValues.removeFirst() }),
+      ["کتاب", "قلم;", "راہ،", "کھڑکی."])
+  }
+
+  func testPersianUrduContentPolicyKeepsAsciiNumbersAndRoutesRomanizedPrompts() {
+    var randomValues = [0, 0, 0, 0.9, 0, 0.9]
+    XCTAssertEqual(
+      PersianUrduPunctuationPolicy.generatedPrompt(
+        ["کتاب", "قلم"], includesPunctuation: true, includesNumbers: true,
+        random: { randomValues.removeFirst() }),
+      ["1", "قلم."])
+    XCTAssertEqual(
+      StarterLexicon.persianUrduPrompt(
+        tokens: 3, lexicon: ["ketab"], contentOptions: ContentOptions(includePunctuation: true),
+        usesZipfFrequency: false, contentRandom: { 0.9 }),
+      "Ketab ketab ketab!")
+  }
+
   func testSentenceInitialTokensSkipTerminalPunctuationBranches() {
     XCTAssertEqual(EnglishPunctuationPolicy.punctuatedPrompt(["are"], random: { 0 }), ["Are"])
     XCTAssertEqual(SpanishPunctuationPolicy.punctuatedPrompt(["casa"], random: { 0.95 }), ["¿Casa"])
@@ -15856,6 +15886,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(GreekPunctuationPolicy.punctuatedPrompt(["πρωί"], random: { 0 }), ["Πρωί"])
     XCTAssertEqual(KurdishPunctuationPolicy.punctuatedPrompt(["کتێب"], random: { 0 }), ["کتێب"])
     XCTAssertEqual(ArabicPunctuationPolicy.punctuatedPrompt(["كتاب"], random: { 0 }), ["كتاب"])
+    XCTAssertEqual(PersianUrduPunctuationPolicy.punctuatedPrompt(["کتاب"], random: { 0 }), ["کتاب"])
     XCTAssertEqual(TurkishPunctuationPolicy.punctuatedPrompt(["istanbul"], random: { 0 }), ["İstanbul"])
   }
 
@@ -17786,7 +17817,11 @@ final class TypingEngineTests: XCTestCase {
         if language == .french && ["?", "!", ":", ";", "-"].contains(rawToken) { return nil }
         if language == .turkish && rawToken == "-" { return nil }
         if language == .greek && [".", "-"].contains(rawToken) { return nil }
-        if [.arabic, .arabicEgypt, .arabicMorocco, .kurdishCentral].contains(language) && rawToken == "-" {
+        if [
+          .arabic, .arabicEgypt, .arabicMorocco, .kurdishCentral,
+          .persian, .persian1k, .persian5k, .persian20k, .persianRomanized,
+          .urdu, .urdu1k, .urdu5k, .urduRoman,
+        ].contains(language) && rawToken == "-" {
           return nil
         }
         let punctuation = language == .tibetan
@@ -17812,7 +17847,7 @@ final class TypingEngineTests: XCTestCase {
           } else {
             baseTokens = [localeLowercased]
           }
-        case .french:
+        case .french, .persianRomanized, .urduRoman:
           baseTokens = [normalized.lowercased()]
         case .greek:
           baseTokens = [normalized.lowercased()]
