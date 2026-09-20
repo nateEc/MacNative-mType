@@ -2063,6 +2063,11 @@ private struct ContentView: View {
       return settings.keyboardGuideLayoutSource.resolvedBuiltInLayout(
         selectedLayout: settings.keyboardLayout, inputLayout: settings.keyboardInputLayout)
     }
+    if session.configuration.mode == .time {
+      return LayoutFluidPolicy.activeLayout(
+        elapsedSeconds: lastClockTickSecond, duration: session.configuration.duration,
+        layouts: settings.layoutFluidLayouts)
+    }
     return LayoutFluidPolicy.activeLayout(
       completedWords: session.completedWordCount, wordLimit: session.configuration.wordLimit,
       layouts: settings.layoutFluidLayouts)
@@ -2096,6 +2101,13 @@ private struct ContentView: View {
 
   private var layoutFluidNotice: String? {
     guard session.configuration.modifiers.contains(.layoutFluid) else { return nil }
+    if session.configuration.mode == .time, session.hasStarted,
+      let upcoming = LayoutFluidPolicy.upcomingLayout(
+        elapsedSeconds: lastClockTickSecond, duration: session.configuration.duration,
+        layouts: settings.layoutFluidLayouts)
+    {
+      return "\(upcoming.layout.displayName) 将于 \(upcoming.secondsRemaining) 秒后切换"
+    }
     if let upcoming = LayoutFluidPolicy.upcomingLayout(
       completedWords: session.completedWordCount, wordLimit: session.configuration.wordLimit,
       layouts: settings.layoutFluidLayouts)

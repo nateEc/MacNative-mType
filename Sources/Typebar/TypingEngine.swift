@@ -1256,6 +1256,45 @@ enum LayoutFluidPolicy {
     guard remaining <= 3, currentIndex + 1 < layouts.count else { return nil }
     return (layouts[currentIndex + 1], remaining)
   }
+
+  /// The fixed reference's timer recomputes the selected layout from its
+  /// integer elapsed-second tick. Keeping that integer boundary means a
+  /// delayed native clock can catch up without stretching a layout segment.
+  static func activeLayout(
+    elapsedSeconds: Int, duration: TimeInterval?, layouts: [KeyboardLayout] = defaultLayouts
+  ) -> KeyboardLayout {
+    let layouts = normalizedLayouts(layouts)
+    guard let duration, duration.isFinite, duration > 0 else { return layouts[0] }
+    let secondsPerLayout = duration / Double(layouts.count)
+    guard secondsPerLayout.isFinite, secondsPerLayout > 0 else { return layouts[0] }
+    let index = Int((Double(max(0, elapsedSeconds)) / secondsPerLayout).rounded(.down))
+    return layouts[min(layouts.count - 1, max(0, index))]
+  }
+
+  /// Countdown boundaries intentionally use the floor of each split, while
+  /// the active layout remains based on the elapsed-time quotient. This
+  /// preserves the fixed reference's behavior for durations that do not
+  /// divide evenly by the selected layout count.
+  static func upcomingLayout(
+    elapsedSeconds: Int, duration: TimeInterval?, layouts: [KeyboardLayout] = defaultLayouts
+  ) -> (layout: KeyboardLayout, secondsRemaining: Int)? {
+    let layouts = normalizedLayouts(layouts)
+    guard layouts.count > 1, let duration, duration.isFinite, duration > 0 else { return nil }
+    let secondsPerLayout = duration / Double(layouts.count)
+    guard secondsPerLayout.isFinite, secondsPerLayout > 0 else { return nil }
+    let elapsedSeconds = max(0, elapsedSeconds)
+    let currentIndex = Int((Double(elapsedSeconds) / secondsPerLayout).rounded(.down))
+    guard currentIndex >= 0, currentIndex + 1 < layouts.count else { return nil }
+    let switchSeconds = (1..<layouts.count).map {
+      Int((secondsPerLayout * Double($0)).rounded(.down))
+    }
+    for secondsRemaining in stride(from: 3, through: 1, by: -1)
+      where switchSeconds.contains(elapsedSeconds + secondsRemaining)
+    {
+      return (layouts[currentIndex + 1], secondsRemaining)
+    }
+    return nil
+  }
 }
 
 enum StarfieldPolicy {

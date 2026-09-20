@@ -3082,6 +3082,47 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(warnings, [5])
   }
 
+  func testLayoutFluidTimeModeSwitchesOnElapsedSecondAndShowsSourceCountdown() {
+    let layouts: [KeyboardLayout] = [.ansiQwerty, .ansiColemak, .ansiDvorak]
+
+    XCTAssertEqual(
+      LayoutFluidPolicy.activeLayout(elapsedSeconds: 0, duration: 30, layouts: layouts), .ansiQwerty)
+    XCTAssertEqual(
+      LayoutFluidPolicy.activeLayout(elapsedSeconds: 9, duration: 30, layouts: layouts), .ansiQwerty)
+    XCTAssertEqual(
+      LayoutFluidPolicy.upcomingLayout(elapsedSeconds: 7, duration: 30, layouts: layouts)?.layout,
+      .ansiColemak)
+    XCTAssertEqual(
+      LayoutFluidPolicy.upcomingLayout(
+        elapsedSeconds: 7, duration: 30, layouts: layouts)?.secondsRemaining, 3)
+    XCTAssertEqual(
+      LayoutFluidPolicy.upcomingLayout(
+        elapsedSeconds: 8, duration: 30, layouts: layouts)?.secondsRemaining, 2)
+    XCTAssertEqual(
+      LayoutFluidPolicy.upcomingLayout(
+        elapsedSeconds: 9, duration: 30, layouts: layouts)?.secondsRemaining, 1)
+    XCTAssertEqual(
+      LayoutFluidPolicy.activeLayout(elapsedSeconds: 10, duration: 30, layouts: layouts), .ansiColemak)
+    XCTAssertNil(LayoutFluidPolicy.upcomingLayout(elapsedSeconds: 10, duration: 30, layouts: layouts))
+    XCTAssertEqual(
+      LayoutFluidPolicy.activeLayout(elapsedSeconds: 20, duration: 30, layouts: layouts), .ansiDvorak)
+    XCTAssertEqual(
+      LayoutFluidPolicy.activeLayout(elapsedSeconds: 30, duration: 30, layouts: layouts), .ansiDvorak)
+
+    // The reference uses floored split points even when a configured duration
+    // does not divide evenly by the selected layout count.
+    XCTAssertEqual(
+      LayoutFluidPolicy.upcomingLayout(
+        elapsedSeconds: 7, duration: 31, layouts: layouts)?.secondsRemaining, 3)
+    XCTAssertEqual(
+      LayoutFluidPolicy.activeLayout(elapsedSeconds: 10, duration: 31, layouts: layouts), .ansiQwerty)
+    XCTAssertEqual(
+      LayoutFluidPolicy.activeLayout(elapsedSeconds: 11, duration: 31, layouts: layouts), .ansiColemak)
+    XCTAssertEqual(
+      LayoutFluidPolicy.activeLayout(elapsedSeconds: 3, duration: 0, layouts: layouts), .ansiQwerty)
+    XCTAssertNil(LayoutFluidPolicy.upcomingLayout(elapsedSeconds: 3, duration: 0, layouts: layouts))
+  }
+
   func testMinimumWordBurstFailsForEverySlowCommittedWordAndCanBeDisabled() {
     var rules = InputRules(minimumWordBurstWpm: 60)
     var slow = TypingSession(configuration: .words(2, rules: rules), prompt: "amber harbor")
