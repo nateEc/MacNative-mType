@@ -1751,6 +1751,54 @@ enum TestInactivityPolicy {
   }
 }
 
+/// Keeps short tests from producing a misleading score after the local timer
+/// has repeatedly missed its one-second grid. The thresholds mirror the
+/// pinned reference's observable safety boundary, while the state remains
+/// wholly local to the current native attempt.
+enum TimerHealthPolicy {
+  static let lowFrameRateDrift: TimeInterval = 0.125
+  static let severeDrift: TimeInterval = 0.250
+  static let fatalDrift: TimeInterval = 0.500
+  static let allowedSevereDrifts = 5
+  static let reducedFrameRate = 30
+
+  static func monitors(_ configuration: TestConfiguration) -> Bool {
+    switch configuration.mode {
+    case .time:
+      guard let duration = configuration.duration else { return false }
+      return duration > 0 && duration < 130
+    case .words:
+      guard let wordLimit = configuration.wordLimit else { return false }
+      return wordLimit > 0 && wordLimit < 250
+    case .quote, .zen, .custom:
+      return false
+    }
+  }
+}
+
+struct TimerHealthState: Equatable {
+  private(set) var usesLowFrameRate = false
+  private(set) var severeDriftCount = 0
+  private(set) var shouldFail = false
+
+  mutating func observe(drift: TimeInterval, configuration: TestConfiguration) {
+    guard TimerHealthPolicy.monitors(configuration), !shouldFail else { return }
+    guard drift.isFinite else {
+      usesLowFrameRate = true
+      shouldFail = true
+      return
+    }
+    let lateness = max(0, drift)
+    if lateness > TimerHealthPolicy.lowFrameRateDrift { usesLowFrameRate = true }
+    if lateness > TimerHealthPolicy.severeDrift { severeDriftCount += 1 }
+    if lateness > TimerHealthPolicy.fatalDrift
+      || severeDriftCount > TimerHealthPolicy.allowedSevereDrifts
+    {
+      shouldFail = true
+    }
+  }
+}
+
 enum TypingPromptCharacterState: Equatable {
   case correct
   case incorrect
@@ -3128,6 +3176,14 @@ struct TypingSession {
     guard !isFinished, let duration = configuration.duration, let startedAt else { return }
     guard duration > 0 else { return }
     if date.timeIntervalSince(startedAt) >= duration { complete(at: date) }
+  }
+
+  /// Stops a running attempt when local timer delivery has become too delayed
+  /// to trust a short-test result. It intentionally uses the ordinary failed
+  /// outcome so result saving, statistics, sync, and publication stay off.
+  mutating func failForTimerHealth(at date: Date = .now) {
+    guard !isFinished, startedAt != nil else { return }
+    fail(at: date)
   }
 
   mutating func abandon(at date: Date = .now) {

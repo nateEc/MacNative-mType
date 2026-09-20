@@ -675,6 +675,7 @@ private struct ContentView: View {
   @State private var capsLockEnabled = false
   @State private var lastTimeWarningSecond: Int?
   @State private var lastClockTickSecond = 0
+  @State private var timerHealth = TimerHealthState()
   @State private var restartLockMessage: String?
   @State private var currentRestartCount = 0
   @State private var weakSpotScores = WeakSpotScores()
@@ -697,6 +698,12 @@ private struct ContentView: View {
   @State private var zipfNoticeGeneration = 0
   @State private var showsNetworkRecoveryNotice = false
   @State private var didRestoreActiveTestSelection = false
+
+  private var effectiveAnimationFrameRate: Int {
+    timerHealth.usesLowFrameRate
+      ? min(settings.animationFrameRate, TimerHealthPolicy.reducedFrameRate)
+      : settings.animationFrameRate
+  }
 
   private var lifecycleContent: some View {
     VStack(spacing: 30) {
@@ -755,7 +762,7 @@ private struct ContentView: View {
         filter: settings.customBackgroundFilter,
         localImageRevision: settings.localBackgroundRevision)
     )
-    .environment(\.typebarAnimationFrameRate, settings.animationFrameRate)
+    .environment(\.typebarAnimationFrameRate, effectiveAnimationFrameRate)
     .overlay(alignment: .top) {
       if network.showsOfflineBanner, !session.hasStarted {
         NetworkConnectivityNotice(kind: .offline)
@@ -796,6 +803,9 @@ private struct ContentView: View {
       restorePersistedTestSelection()
     }
     .onChange(of: session.outcome) { _, outcome in
+      defer {
+        if outcome != .active { timerHealth = .init() }
+      }
       switch outcome {
       case .completed, .bailedOut, .invalidAFK:
         let restartCount = currentRestartCount
@@ -885,7 +895,9 @@ private struct ContentView: View {
           publicationState = .notice("练习模式：本次成绩不会保存、本机统计、同步或发布。")
         }
       case .failed:
-        terminalNotice = .failed(savedLongTextProgress: updateLongSavedTextProgress(for: outcome))
+        terminalNotice = .failed(
+          savedLongTextProgress: updateLongSavedTextProgress(for: outcome),
+          timerWasUnhealthy: timerHealth.shouldFail)
       case .abandoned:
         terminalNotice = .abandoned
       case .active:
@@ -1246,6 +1258,15 @@ private struct ContentView: View {
     if let startedAt = session.startedAt {
       let dueSeconds = ClockTickPolicy.dueSeconds(
         after: lastClockTickSecond, startedAt: startedAt, now: now)
+      if let firstDueSecond = dueSeconds.first {
+        let expectedTick = startedAt.addingTimeInterval(Double(firstDueSecond))
+        timerHealth.observe(
+          drift: now.timeIntervalSince(expectedTick), configuration: session.configuration)
+        if timerHealth.shouldFail {
+          session.failForTimerHealth(at: now)
+          return
+        }
+      }
       if let duration = session.configuration.duration, duration > 0 {
         for elapsedSecond in dueSeconds {
           let remaining = ClockTickPolicy.remainingSeconds(
@@ -2601,6 +2622,7 @@ private struct ContentView: View {
     clearTypingPowerEffect()
     lastTimeWarningSecond = nil
     lastClockTickSecond = 0
+    timerHealth = .init()
     liveContentRequestID = UUID()
     let requestID = liveContentRequestID
     isLoadingLiveContent = false
@@ -2799,6 +2821,7 @@ private struct ContentView: View {
     keyboardGuideFeedback = nil
     lastTimeWarningSecond = nil
     lastClockTickSecond = 0
+    timerHealth = .init()
     NativeSpeech.shared.stop()
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
@@ -4006,7 +4029,7 @@ private struct ContentView: View {
 }
 
 private enum TestTerminalNotice: Hashable, Identifiable {
-  case failed(savedLongTextProgress: Bool)
+  case failed(savedLongTextProgress: Bool, timerWasUnhealthy: Bool)
   case abandoned
 
   var id: Self { self }
@@ -4020,11 +4043,13 @@ private enum TestTerminalNotice: Hashable, Identifiable {
 
   var message: String {
     switch self {
-    case .failed(let savedLongTextProgress):
-      savedLongTextProgress
-        ? "长文本进度已保存；本次没有保存为完成成绩。"
-        : "本次没有保存为完成成绩。"
-    case .abandoned: "本次没有保存为完成成绩。"
+    case .failed(let savedLongTextProgress, let timerWasUnhealthy):
+      let progressMessage = savedLongTextProgress ? "长文本进度已保存；" : ""
+      if timerWasUnhealthy {
+        return progressMessage + "检测到计时调度持续延迟，为避免不准确的成绩，已停止本次测试。"
+      }
+      return progressMessage + "本次没有保存为完成成绩。"
+    case .abandoned: return "本次没有保存为完成成绩。"
     }
   }
 }

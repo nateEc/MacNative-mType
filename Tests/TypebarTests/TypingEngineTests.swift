@@ -353,6 +353,64 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.remainingSeconds(at: start.addingTimeInterval(15)), 0)
   }
 
+  func testTimerHealthProtectsOnlyEligibleShortTestsFromRepeatedSevereDrift() {
+    let shortTimed = TestConfiguration.timed(seconds: 15)
+    let boundaryTimed = TestConfiguration.timed(seconds: 130)
+    let infiniteTimed = TestConfiguration.timed(seconds: 0)
+    let shortWords = TestConfiguration.words(249)
+    let boundaryWords = TestConfiguration.words(250)
+    let quote = TestConfiguration(
+      mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())
+    let zen = TestConfiguration(
+      mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init())
+    let custom = TestConfiguration(
+      mode: .custom, duration: 15, wordLimit: nil, difficulty: .normal, rules: .init())
+
+    XCTAssertTrue(TimerHealthPolicy.monitors(shortTimed))
+    XCTAssertFalse(TimerHealthPolicy.monitors(boundaryTimed))
+    XCTAssertFalse(TimerHealthPolicy.monitors(infiniteTimed))
+    XCTAssertTrue(TimerHealthPolicy.monitors(shortWords))
+    XCTAssertFalse(TimerHealthPolicy.monitors(boundaryWords))
+    XCTAssertFalse(TimerHealthPolicy.monitors(quote))
+    XCTAssertFalse(TimerHealthPolicy.monitors(zen))
+    XCTAssertFalse(TimerHealthPolicy.monitors(custom))
+
+    var state = TimerHealthState()
+    state.observe(drift: 0.125, configuration: shortTimed)
+    XCTAssertFalse(state.usesLowFrameRate)
+    state.observe(drift: 0.126, configuration: shortTimed)
+    XCTAssertTrue(state.usesLowFrameRate)
+    XCTAssertEqual(state.severeDriftCount, 0)
+    XCTAssertFalse(state.shouldFail)
+
+    for _ in 0..<5 {
+      state.observe(drift: 0.251, configuration: shortTimed)
+    }
+    XCTAssertEqual(state.severeDriftCount, 5)
+    XCTAssertFalse(state.shouldFail)
+    state.observe(drift: 0.251, configuration: shortTimed)
+    XCTAssertEqual(state.severeDriftCount, 6)
+    XCTAssertTrue(state.shouldFail)
+
+    var fatalState = TimerHealthState()
+    fatalState.observe(drift: 0.5, configuration: shortTimed)
+    XCTAssertFalse(fatalState.shouldFail)
+    fatalState.observe(drift: 0.501, configuration: shortTimed)
+    XCTAssertTrue(fatalState.shouldFail)
+
+    var ignoredState = TimerHealthState()
+    ignoredState.observe(drift: 5, configuration: boundaryTimed)
+    XCTAssertFalse(ignoredState.usesLowFrameRate)
+    XCTAssertEqual(ignoredState.severeDriftCount, 0)
+    XCTAssertFalse(ignoredState.shouldFail)
+
+    var session = TypingSession(configuration: shortTimed, prompt: "amber harbor")
+    session.insert("a", at: start)
+    session.failForTimerHealth(at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.outcome, .failed)
+    XCTAssertEqual(session.finishedAt, start.addingTimeInterval(2))
+  }
+
   func testCustomDurationAndWordCountRespectTheirExactConfiguredLimits() {
     var timed = TypingSession(configuration: .timed(seconds: 73), prompt: "amber harbor")
     timed.insert("a", at: start)
