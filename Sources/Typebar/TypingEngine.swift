@@ -2824,6 +2824,9 @@ struct TypingSession {
   }
 
   private func referenceScoredCorrectCharacters(countPartialLastWord: Bool) -> Int {
+    if hasNoSpaceWordSegmentation {
+      return noSpaceScoredCorrectCharacters(countPartialLastWord: countPartialLastWord)
+    }
     guard configuration.language.usesSpaceDelimitedWords,
       !configuration.language.isCodeLanguage,
       !configuration.modifiers.contains(.noSpaces)
@@ -2845,6 +2848,28 @@ struct TypingSession {
       } else if countPartialLastWord, index == inputWords.index(before: inputWords.endIndex),
         targetWord.hasPrefix(inputWord)
       {
+        total += inputWord.count
+      }
+    }
+  }
+
+  /// No-space input visually flattens its prompt but still advances through
+  /// source words one at a time. Result WPM therefore keeps the same complete
+  /// word rule as ordinary input rather than treating an early typo as a
+  /// globally correct character prefix.
+  private func noSpaceScoredCorrectCharacters(countPartialLastWord: Bool) -> Int {
+    let typedCharacters = Array(typed)
+    let activeWordIndex = noSpaceWordRanges.lastIndex { typedCharacters.count > $0.lowerBound }
+    return noSpaceWordRanges.enumerated().reduce(into: 0) { total, entry in
+      let (index, range) = entry
+      guard noSpaceTargetWords.indices.contains(index) else { return }
+      let typedEnd = min(range.upperBound, typedCharacters.count)
+      guard typedEnd > range.lowerBound else { return }
+      let inputWord = String(typedCharacters[range.lowerBound..<typedEnd])
+      let targetWord = noSpaceTargetWords[index]
+      if inputWord == targetWord {
+        total += targetWord.count
+      } else if countPartialLastWord, index == activeWordIndex, targetWord.hasPrefix(inputWord) {
         total += inputWord.count
       }
     }

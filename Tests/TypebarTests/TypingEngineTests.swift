@@ -3561,6 +3561,30 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(try XCTUnwrap(session.result(at: start.addingTimeInterval(2))).correctCharacterCount, 3)
   }
 
+  func testNoSpaceWpmPreservesHiddenWholeWordScoring() throws {
+    let configuration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
+    var finite = TypingSession(
+      configuration: configuration, prompt: "amberbay", noSpaceWordEndIndices: [5, 8],
+      noSpaceTargetWords: ["amber", "bay"])
+    finite.insert("axber", at: start)
+    finite.insert("bay", at: start.addingTimeInterval(2))
+
+    XCTAssertEqual(finite.outcome, .completed)
+    XCTAssertEqual(finite.wpm(at: start.addingTimeInterval(2)), 18)
+    XCTAssertEqual(finite.rawWpm(at: start.addingTimeInterval(2)), 48)
+    XCTAssertEqual(try XCTUnwrap(finite.result(at: start.addingTimeInterval(2))).correctCharacterCount, 3)
+
+    var timed = TypingSession(
+      configuration: .timed(seconds: 2).with(modifiers: [.noSpaces]), prompt: "amberbay",
+      noSpaceWordEndIndices: [5, 8], noSpaceTargetWords: ["amber", "bay"])
+    timed.insert("axberba", at: start)
+    timed.tick(at: start.addingTimeInterval(2))
+
+    XCTAssertEqual(timed.wpm(at: start.addingTimeInterval(2)), 12)
+    XCTAssertEqual(timed.rawWpm(at: start.addingTimeInterval(2)), 42)
+    XCTAssertEqual(try XCTUnwrap(timed.result(at: start.addingTimeInterval(2))).correctCharacterCount, 2)
+  }
+
   func testTimedAndBailedWpmRetainOnlyTheCorrectActiveWordPrefix() throws {
     var timed = TypingSession(configuration: .timed(seconds: 2), prompt: "amber bay")
     timed.insert("axber ba", at: start)
