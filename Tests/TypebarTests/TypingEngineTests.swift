@@ -20937,6 +20937,46 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(cells.map(\.intensity), [0, 0, 1, 3])
   }
 
+  func testActivityHeatmapOffersRollingAndCalendarYearRanges() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let endingAt = calendar.date(from: .init(year: 2025, month: 3, day: 15))!
+    let first2024Day = calendar.date(from: .init(year: 2024, month: 1, day: 1))!
+    let last2024Day = calendar.date(from: .init(year: 2024, month: 12, day: 31))!
+    let activity = [
+      DailyActivity(day: first2024Day, completedTests: 2, typingSeconds: 20),
+      DailyActivity(day: last2024Day, completedTests: 3, typingSeconds: 30),
+      DailyActivity(day: endingAt, completedTests: 1, typingSeconds: 10),
+    ]
+
+    XCTAssertEqual(
+      ActivityHeatmap.availableCalendarYears(
+        activity: activity, endingAt: endingAt, calendar: calendar),
+      [2025, 2024]
+    )
+    let boundaryNewYear = calendar.date(from: .init(year: 2025, month: 1, day: 1, hour: 1))!
+    XCTAssertEqual(
+      ActivityHeatmap.availableCalendarYears(
+        activity: [], endingAt: boundaryNewYear, dayBoundaryOffsetHours: 3, calendar: calendar),
+      [2024]
+    )
+
+    let rollingCells = ActivityHeatmap.cells(
+      activity: activity, period: .rollingYear, endingAt: endingAt, calendar: calendar)
+    XCTAssertEqual(rollingCells.count, 364)
+    XCTAssertEqual(rollingCells.first?.day, calendar.date(byAdding: .day, value: -363, to: endingAt))
+    XCTAssertEqual(rollingCells.last?.day, endingAt)
+    XCTAssertEqual(rollingCells.last?.completedTests, 1)
+
+    let calendarYearCells = ActivityHeatmap.cells(
+      activity: activity, period: .calendarYear(2024), endingAt: endingAt, calendar: calendar)
+    XCTAssertEqual(calendarYearCells.count, 366)
+    XCTAssertEqual(calendarYearCells.first?.day, first2024Day)
+    XCTAssertEqual(calendarYearCells.last?.day, last2024Day)
+    XCTAssertEqual(calendarYearCells.first?.completedTests, 2)
+    XCTAssertEqual(calendarYearCells.last?.completedTests, 3)
+  }
+
   @MainActor
   func testAppSettingsPersistAndRestore() throws {
     let suiteName = "TypebarTests.\(UUID().uuidString)"

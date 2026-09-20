@@ -6727,32 +6727,102 @@ private struct ActivityDayDetailView: View {
 private struct ActivityHeatmapView: View {
   let activity: [DailyActivity]
   let dayBoundaryOffsetHours: Double
+  @State private var selectedPeriod: ActivityHeatmapPeriod = .rollingYear
+
+  private var calendar: Calendar { .current }
+
+  private var availablePeriods: [ActivityHeatmapPeriod] {
+    let years = ActivityHeatmap.availableCalendarYears(
+      activity: activity,
+      dayBoundaryOffsetHours: dayBoundaryOffsetHours,
+      calendar: calendar
+    ).map(ActivityHeatmapPeriod.calendarYear)
+    var periods = [.rollingYear] + years
+    if !periods.contains(selectedPeriod) { periods.append(selectedPeriod) }
+    return periods
+  }
 
   private var cells: [ActivityHeatmapCell] {
-    ActivityHeatmap.cells(activity: activity, dayBoundaryOffsetHours: dayBoundaryOffsetHours)
+    ActivityHeatmap.cells(
+      activity: activity,
+      period: selectedPeriod,
+      dayBoundaryOffsetHours: dayBoundaryOffsetHours,
+      calendar: calendar
+    )
   }
 
   private let rows = Array(repeating: GridItem(.fixed(11), spacing: 3), count: 7)
 
+  private var weekdaySymbols: [String] {
+    let symbols = calendar.veryShortWeekdaySymbols
+    let first = max(0, calendar.firstWeekday - 1)
+    return Array(symbols[first...]) + Array(symbols[..<first])
+  }
+
+  private var leadingFillerCount: Int {
+    guard let first = cells.first else { return 0 }
+    return (calendar.component(.weekday, from: first.day) - calendar.firstWeekday + 7) % 7
+  }
+
+  private var trailingFillerCount: Int {
+    guard !cells.isEmpty else { return 0 }
+    return (7 - (leadingFillerCount + cells.count) % 7) % 7
+  }
+
+  private var hasCompletedTests: Bool { cells.contains { $0.completedTests > 0 } }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
-        Text("近 12 周活动").font(.caption.weight(.medium))
+        Text("活动日历").font(.caption.weight(.medium))
         Spacer()
-        Text("深色代表更多完成次数").font(.caption2).foregroundStyle(.secondary)
-      }
-      ScrollView(.horizontal, showsIndicators: false) {
-        LazyHGrid(rows: rows, spacing: 3) {
-          ForEach(cells) { cell in
-            RoundedRectangle(cornerRadius: 2)
-              .fill(Color.accentColor.opacity(opacity(for: cell.intensity)))
-              .frame(width: 11, height: 11)
-              .accessibilityLabel(cell.day.formatted(date: .abbreviated, time: .omitted))
-              .accessibilityValue("\(cell.completedTests) 次完成")
+        Picker("活动范围", selection: $selectedPeriod) {
+          ForEach(availablePeriods) { period in
+            Text(period.title).tag(period)
           }
         }
-        .frame(height: 95)
+        .pickerStyle(.menu)
+        .frame(width: 142)
+        Text("深色代表更多完成次数").font(.caption2).foregroundStyle(.secondary)
       }
+      HStack(alignment: .top, spacing: 6) {
+        VStack(spacing: 3) {
+          ForEach(weekdaySymbols, id: \.self) { symbol in
+            Text(symbol)
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+              .frame(width: 12, height: 11)
+          }
+        }
+        .accessibilityHidden(true)
+        ScrollView(.horizontal, showsIndicators: false) {
+          LazyHGrid(rows: rows, spacing: 3) {
+            ForEach(0..<leadingFillerCount, id: \.self) { _ in
+              Color.clear.frame(width: 11, height: 11)
+            }
+            ForEach(cells) { cell in
+              RoundedRectangle(cornerRadius: 2)
+                .fill(Color.accentColor.opacity(opacity(for: cell.intensity)))
+                .frame(width: 11, height: 11)
+                .accessibilityLabel(cell.day.formatted(date: .abbreviated, time: .omitted))
+                .accessibilityValue(
+                  cell.completedTests == 0 ? "没有完成练习" : "\(cell.completedTests) 次完成")
+            }
+            ForEach(0..<trailingFillerCount, id: \.self) { _ in
+              Color.clear.frame(width: 11, height: 11)
+            }
+          }
+          .frame(height: 95)
+        }
+      }
+      if !hasCompletedTests {
+        Text("这个时间范围没有完成记录。")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      Text("按这台 Mac 的统计日界聚合；范围切换不会修改本机成绩。")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
     }
   }
 

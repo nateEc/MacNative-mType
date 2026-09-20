@@ -2296,7 +2296,62 @@ enum ActivityAggregation {
     }
 }
 
+enum ActivityHeatmapPeriod: Hashable, Identifiable {
+    case rollingYear
+    case calendarYear(Int)
+
+    var id: String {
+        switch self {
+        case .rollingYear: "rolling-year"
+        case .calendarYear(let year): "calendar-year-\(year)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .rollingYear: "最近 12 个月"
+        case .calendarYear(let year): "\(year) 年"
+        }
+    }
+}
+
 enum ActivityHeatmap {
+    static func availableCalendarYears(
+        activity: [DailyActivity],
+        endingAt endDate: Date = .now,
+        dayBoundaryOffsetHours: Double = 0,
+        calendar: Calendar = .current
+    ) -> [Int] {
+        let currentDay = ActivityAggregation.practiceDay(
+            for: endDate, dayBoundaryOffsetHours: dayBoundaryOffsetHours, calendar: calendar)
+        var years = Set(activity.map { calendar.component(.year, from: $0.day) })
+        years.insert(calendar.component(.year, from: currentDay))
+        return years.sorted(by: >)
+    }
+
+    static func cells(
+        activity: [DailyActivity],
+        period: ActivityHeatmapPeriod,
+        endingAt endDate: Date = .now,
+        dayBoundaryOffsetHours: Double = 0,
+        calendar: Calendar = .current
+    ) -> [ActivityHeatmapCell] {
+        switch period {
+        case .rollingYear:
+            return cells(
+                activity: activity, days: 364, endingAt: endDate,
+                dayBoundaryOffsetHours: dayBoundaryOffsetHours, calendar: calendar)
+        case .calendarYear(let year):
+            guard
+                let firstDay = calendar.date(from: DateComponents(year: year, month: 1, day: 1)),
+                let lastDay = calendar.date(from: DateComponents(year: year, month: 12, day: 31))
+            else {
+                return []
+            }
+            return cells(activity: activity, from: firstDay, through: lastDay, calendar: calendar)
+        }
+    }
+
     static func cells(
         activity: [DailyActivity],
         days: Int = 84,
@@ -2304,11 +2359,29 @@ enum ActivityHeatmap {
         dayBoundaryOffsetHours: Double = 0,
         calendar: Calendar = .current
     ) -> [ActivityHeatmapCell] {
-        let countByDay = Dictionary(uniqueKeysWithValues: activity.map { (calendar.startOfDay(for: $0.day), $0.completedTests) })
+        guard days > 0 else { return [] }
         let end = ActivityAggregation.practiceDay(
             for: endDate, dayBoundaryOffsetHours: dayBoundaryOffsetHours, calendar: calendar)
-        return (0..<days).compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: offset - days + 1, to: end) else { return nil }
+        guard let start = calendar.date(byAdding: .day, value: 1 - days, to: end) else { return [] }
+        return cells(activity: activity, from: start, through: end, calendar: calendar)
+    }
+
+    private static func cells(
+        activity: [DailyActivity], from startDate: Date, through endDate: Date, calendar: Calendar
+    ) -> [ActivityHeatmapCell] {
+        let start = calendar.startOfDay(for: startDate)
+        let end = calendar.startOfDay(for: endDate)
+        guard start <= end,
+            let dayCount = calendar.dateComponents([.day], from: start, to: end).day
+        else {
+            return []
+        }
+        let countByDay = activity.reduce(into: [Date: Int]()) { counts, value in
+            let day = calendar.startOfDay(for: value.day)
+            counts[day, default: 0] += max(0, value.completedTests)
+        }
+        return (0...dayCount).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
             return ActivityHeatmapCell(day: day, completedTests: countByDay[day] ?? 0)
         }
     }
