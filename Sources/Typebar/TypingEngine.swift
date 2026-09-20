@@ -5352,6 +5352,73 @@ enum SlavicPunctuationPolicy {
   }
 }
 
+/// Generates the Japanese and Chinese punctuation branches without importing
+/// the reference generator or its content.
+enum CJKPunctuationPolicy {
+  static func punctuatedPrompt(
+    _ tokens: [String], usesChineseMarks: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    generatedPrompt(
+      tokens, usesChineseMarks: usesChineseMarks, includesPunctuation: true,
+      includesNumbers: false, random: random)
+  }
+
+  static func generatedPrompt(
+    _ tokens: [String], usesChineseMarks: Bool, includesPunctuation: Bool, includesNumbers: Bool,
+    random: () -> Double = { Double.random(in: 0..<1) }
+  ) -> [String] {
+    var result: [String] = []
+    for (index, raw) in tokens.enumerated() {
+      let word = includesPunctuation ? punctuated(
+        previous: result.last, raw: raw, index: index, total: tokens.count,
+        usesChineseMarks: usesChineseMarks, random: random) : raw
+      result.append(includesNumbers && random() < 0.1 ? number(random: random) : word)
+    }
+    return result
+  }
+
+  private static func punctuated(
+    previous: String?, raw: String, index: Int, total: Int, usesChineseMarks: Bool,
+    random: () -> Double
+  ) -> String {
+    let last = previous?.last
+    let followsComma = last == ","
+    let followsPeriod = last == "."
+    let followsSemicolon = last == ";" || last == "؛" || last == "；" || last == "："
+    let followsColon = last == ":" || last == "："
+    if index == 0 || [".", "?", "!", "؟"].contains(last) { return raw }
+    if (random() < 0.1 && !followsPeriod && !followsComma && index != total - 2) || index == total - 1 {
+      let choice = random()
+      if choice <= 0.8 { return raw + "。" }
+      if choice > 0.8 && choice < 0.9 { return raw + "？" }
+      return raw + "！"
+    }
+    if random() < 0.01 && !followsComma && !followsPeriod { return "\"\(raw)\"" }
+    if random() < 0.011 && !followsComma && !followsPeriod { return "'\(raw)'" }
+    if random() < 0.012 && !followsComma && !followsPeriod { return "（\(raw)）" }
+    if random() < 0.013 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return raw + (usesChineseMarks ? "：" : ":")
+    }
+    if random() < 0.014 && !followsComma && !followsPeriod && previous != "-" { return "-" }
+    if random() < 0.015 && !followsComma && !followsPeriod && !followsSemicolon && !followsColon {
+      return raw + (usesChineseMarks ? "；" : ";")
+    }
+    if random() < 0.2 && !followsComma { return raw + (usesChineseMarks ? "，" : "、") }
+    return raw
+  }
+
+  private static func number(random: () -> Double) -> String {
+    let count = min(max(Int(random() * 4), 0), 3) + 1
+    return (0..<count).map { index in
+      let lower = index == 0 ? 1 : 0
+      let range = index == 0 ? 9 : 10
+      let offset = min(max(Int(random() * Double(range)), 0), range - 1)
+      return String(lower + offset)
+    }.joined()
+  }
+}
+
 /// Applies the source-compatible Turkish sentence case and contextual marks to
 /// Typebar-owned Turkish words without importing the web generator or corpus.
 enum TurkishPunctuationPolicy {
@@ -11172,55 +11239,45 @@ enum StarterLexicon {
         tokens: count, lexicon: portugueseAccentsWords, separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese:
-      return prompt(
-        tokens: count, lexicon: simplifiedChineseWords, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: simplifiedChineseWords, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese1k:
-      return prompt(
-        tokens: count, lexicon: simplifiedChinese1kLexicon, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: simplifiedChinese1kLexicon, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese5k:
-      return prompt(
-        tokens: count, lexicon: simplifiedChinese5kLexicon, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: simplifiedChinese5kLexicon, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese10k:
-      return prompt(
-        tokens: count, lexicon: simplifiedChinese10kLexicon, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: simplifiedChinese10kLexicon, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese50k:
-      return prompt(
-        tokens: count, lexicon: simplifiedChinese50kLexicon, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: simplifiedChinese50kLexicon, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese:
-      return prompt(
-        tokens: count, lexicon: traditionalChineseWords, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: traditionalChineseWords, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese1k:
-      return prompt(
-        tokens: count, lexicon: traditionalChinese1kLexicon, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: traditionalChinese1kLexicon, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese5k:
-      return prompt(
-        tokens: count, lexicon: traditionalChinese5kLexicon, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: traditionalChinese5kLexicon, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese10k:
-      return prompt(
-        tokens: count, lexicon: traditionalChinese10kLexicon, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: traditionalChinese10kLexicon, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese50k:
-      return prompt(
-        tokens: count, lexicon: traditionalChinese50kLexicon, separator: "",
-        punctuation: ["，", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: traditionalChinese50kLexicon, usesChineseMarks: true,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian:
       return slavicPrompt(
         tokens: count, lexicon: russianWords, allowsDoubleQuotes: false, allowsApostrophes: false,
@@ -11302,25 +11359,21 @@ enum StarterLexicon {
         tokens: count, lexicon: ukrainianLatynkaEndingWords, allowsDoubleQuotes: true,
         allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseHiragana:
-      return prompt(
-        tokens: count, lexicon: japaneseHiraganaWords, separator: "",
-        punctuation: ["、", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: japaneseHiraganaWords, usesChineseMarks: false,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseKatakana:
-      return prompt(
-        tokens: count, lexicon: japaneseKatakanaWords, separator: "",
-        punctuation: ["、", "。", "！", "？"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: japaneseKatakanaWords, usesChineseMarks: false,
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseRomaji:
-      return prompt(
-        tokens: count, lexicon: japaneseRomajiWords, separator: " ",
-        punctuation: [".", ",", "!", "?"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: japaneseRomajiWords, usesChineseMarks: false, separator: " ",
+        contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseRomaji1k:
-      return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
-        punctuation: [".", ",", "!", "?"], contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+      return cjkPrompt(
+        tokens: count, lexicon: language.ownedPracticeLexicon(), usesChineseMarks: false,
+        separator: " ", contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .korean:
       return prompt(
         tokens: count, lexicon: koreanWords, separator: " ", punctuation: [".", ",", "!", "?"],
@@ -11624,6 +11677,35 @@ enum StarterLexicon {
       words, allowsDoubleQuotes: allowsDoubleQuotes, allowsApostrophes: allowsApostrophes,
       includesPunctuation: contentOptions.includePunctuation, includesNumbers: contentOptions.includeNumbers
     ).joined(separator: " ")
+  }
+
+  static func cjkPrompt(
+    tokens: Int, lexicon: [String], usesChineseMarks: Bool, separator: String = "",
+    contentOptions: ContentOptions, usesZipfFrequency: Bool
+  ) -> String {
+    cjkPrompt(
+      tokens: tokens, lexicon: IndexedLexicon(lexicon), usesChineseMarks: usesChineseMarks,
+      separator: separator, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+  }
+
+  static func cjkPrompt(
+    tokens: Int, lexicon: IndexedLexicon, usesChineseMarks: Bool, separator: String = "",
+    contentOptions: ContentOptions, usesZipfFrequency: Bool
+  ) -> String {
+    let generated = (0..<tokens).map { _ in
+      let index = usesZipfFrequency
+        ? ZipfWordSelection.index(in: lexicon.count)
+        : Int.random(in: lexicon.indices)
+      return lexicon[index]
+    }
+    guard contentOptions.includePunctuation || contentOptions.includeNumbers else {
+      return generated.joined(separator: separator)
+    }
+    return CJKPunctuationPolicy.generatedPrompt(
+      generated, usesChineseMarks: usesChineseMarks,
+      includesPunctuation: contentOptions.includePunctuation,
+      includesNumbers: contentOptions.includeNumbers
+    ).joined(separator: separator)
   }
 
   static func frenchPrompt(
@@ -12101,7 +12183,7 @@ enum StarterLexicon {
     case .ukrainianLatynkaEndings: (ukrainianLatynkaEndingWords, [".", ",", "!", "?"])
     case .japaneseHiragana: (japaneseHiraganaWords, ["、", "。", "！", "？"])
     case .japaneseKatakana: (japaneseKatakanaWords, ["、", "。", "！", "？"])
-    case .japaneseRomaji: (japaneseRomajiWords, [".", ",", "!", "?"])
+    case .japaneseRomaji: (japaneseRomajiWords, ["、", "。", "！", "？"])
     case .korean: (koreanWords, [".", ",", "!", "?"])
     case .korean1k: (korean1kWords, [".", ",", "!", "?"])
     case .korean5k: (korean5kWords, [".", ",", "!", "?"])

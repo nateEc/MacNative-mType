@@ -15274,7 +15274,8 @@ final class TypingEngineTests: XCTestCase {
       let configuration = TestConfiguration.words(
         4, language: language,
         contentOptions: .init(includePunctuation: true, includeNumbers: true))
-      var session = TestSessionFactory.make(configuration: configuration)
+      let source = ["1", lexicon[0], lexicon[1], lexicon[2]].joined()
+      var session = TestSessionFactory.make(configuration: configuration, streamPrompt: source)
       guard let firstWord = lexicon.sorted(by: { $0.count > $1.count }).first(where: {
         session.prompt.dropFirst().hasPrefix($0)
       }) else {
@@ -15933,6 +15934,43 @@ final class TypingEngineTests: XCTestCase {
         includesPunctuation: false, includesNumbers: true,
         random: { numberRandomValues.removeFirst() }),
       ["1", "ряд"])
+  }
+
+  func testCJKPunctuationPolicyUsesSourceSpecificMarksAndBrackets() {
+    var chineseRandomValues =
+      [0.9, 0.9, 0.9, 0]
+      + Array(repeating: 0.9, count: 8)
+      + [0.9, 0.85]
+    XCTAssertEqual(
+      CJKPunctuationPolicy.punctuatedPrompt(
+        ["晨光", "窗边", "纸张", "远山"], usesChineseMarks: true,
+        random: { chineseRandomValues.removeFirst() }),
+      ["晨光", "（窗边）", "纸张", "远山？"])
+
+    var japaneseRandomValues =
+      Array(repeating: 0.9, count: 7) + [0]
+      + Array(repeating: 0.9, count: 8)
+      + [0.9, 0.85]
+    XCTAssertEqual(
+      CJKPunctuationPolicy.punctuatedPrompt(
+        ["あさ", "まど", "ひかり", "うみ"], usesChineseMarks: false,
+        random: { japaneseRandomValues.removeFirst() }),
+      ["あさ", "まど、", "ひかり", "うみ？"])
+
+    var numberRandomValues = [0, 0, 0.2]
+    XCTAssertEqual(
+      CJKPunctuationPolicy.generatedPrompt(
+        ["字"], usesChineseMarks: true, includesPunctuation: false, includesNumbers: true,
+        random: { numberRandomValues.removeFirst() }),
+      ["2"])
+  }
+
+  func testJapaneseRomajiUsesCJKPunctuationWithCommitSpaces() {
+    XCTAssertEqual(
+      StarterLexicon.cjkPrompt(
+        tokens: 2, lexicon: ["kaze"], usesChineseMarks: false, separator: " ",
+        contentOptions: .init(includePunctuation: true), usesZipfFrequency: false),
+      "kaze kaze。")
   }
 
   func testSentenceInitialTokensSkipTerminalPunctuationBranches() {
