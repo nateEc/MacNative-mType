@@ -17542,6 +17542,14 @@ final class TypingEngineTests: XCTestCase {
     )
     XCTAssertEqual(cipherAndBackwards.prompt, "lno erozn")
     XCTAssertEqual(
+      TestModifierPolicy.transformed("a\u{301}b cd", modifiers: [.backwards]),
+      "dc b\u{301}a",
+      "backwards follows the reference's UTF-16 unit reversal within every word")
+    XCTAssertEqual(
+      TestModifierPolicy.transformed("😀", modifiers: [.backwards]),
+      "\u{FFFD}\u{FFFD}",
+      "reversing a non-BMP code point mirrors the reference's repaired UTF-16 display")
+    XCTAssertEqual(
       TestModifierPolicy.normalized([.uppercase, .titleCase, .alternatingCase]), [.uppercase])
     XCTAssertEqual(
       TestModifierPolicy.toggling(.titleCase, in: [.uppercase, .noSpaces]), [.noSpaces, .titleCase])

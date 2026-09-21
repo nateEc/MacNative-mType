@@ -1052,7 +1052,10 @@ enum TestModifierPolicy {
     if modifiers.contains(.backwards) {
       transformed = transformed.split(separator: " ", omittingEmptySubsequences: false)
         .reversed()
-        .map { String($0.reversed()) }
+        // The reference reverses each word through JavaScript's UTF-16 string
+        // units. Decode reversed units with replacement so combining marks
+        // and non-BMP values produce the same visible text on macOS.
+        .map { String(decoding: $0.utf16.reversed(), as: UTF16.self) }
         .joined(separator: " ")
     }
     if modifiers.contains(.doubleCharacters) {
