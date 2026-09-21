@@ -282,6 +282,10 @@ private struct RemoteUpdateProfileRequest: Codable, Sendable {
     let selectedBadgeID: String?
 }
 
+private struct RemoteDisplayNameAvailabilityResponse: Codable, Sendable {
+    let available: Bool
+}
+
 private struct RemoteSetStreakDayBoundaryRequest: Codable, Sendable {
     let offsetHours: Double
 }
@@ -1370,6 +1374,24 @@ final class AccountSession {
 
     func register(email: String, password: String, displayName: String) async {
         await performAuth(path: "v1/auth/register", body: RemoteRegisterRequest(email: email, password: password, displayName: displayName))
+    }
+
+    /// Performs the advisory server-side preflight used by display-name fields.
+    /// A `nil` result intentionally leaves submission enabled for older servers
+    /// or transient network failures; the mutation endpoint remains authoritative.
+    func displayNameAvailability(_ displayName: String) async -> Bool? {
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (2...32).contains(name.count) else { return nil }
+        do {
+            return try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/profiles/display-name-availability", method: "GET", token: tokenStore.load(),
+                body: Optional<String>.none,
+                queryItems: [URLQueryItem(name: "name", value: name)],
+                response: RemoteDisplayNameAvailabilityResponse.self
+            ).available
+        } catch {
+            return nil
+        }
     }
 
     func login(email: String, password: String) async {

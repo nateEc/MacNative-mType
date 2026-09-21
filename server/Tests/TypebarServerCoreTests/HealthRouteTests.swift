@@ -2065,6 +2065,51 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testDisplayNameAvailabilityRouteSupportsPublicAndAuthenticatedChecks() async throws {
+    struct AvailabilityResponse: Decodable {
+      let available: Bool
+    }
+
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "availability@example.com", password: "a secure password", displayName: "Café Runner"))
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(
+        .GET, "v1/profiles/display-name-availability?name=cafe%20runner",
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertFalse((try? response.content.decode(AvailabilityResponse.self))?.available ?? true)
+        })
+      try await app.test(
+        .GET, "v1/profiles/display-name-availability?name=Fresh%20Handle",
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertTrue((try? response.content.decode(AvailabilityResponse.self))?.available ?? false)
+        })
+      try await app.test(
+        .GET, "v1/profiles/display-name-availability?name=CAF%C3%89%20RUNNER",
+        beforeRequest: { request async in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertTrue((try? response.content.decode(AvailabilityResponse.self))?.available ?? false)
+        })
+      try await app.test(
+        .GET, "v1/profiles/display-name-availability?name=x",
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .badRequest)
+        })
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testDisplayNameAvailabilityAndCooldownPersistWithoutBlockingRequiredRename() async throws {
     let now = Date(timeIntervalSince1970: 60_000)
     let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(

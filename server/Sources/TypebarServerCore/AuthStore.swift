@@ -184,6 +184,26 @@ public struct UpdateProfileRequest: Content, Equatable {
   }
 }
 
+/// A display-name candidate supplied by a registration or profile form. The
+/// response is advisory only; registration and profile updates remain the
+/// authoritative availability checks so a concurrent registration cannot win
+/// a name after it has been checked.
+public struct DisplayNameAvailabilityQuery: Content, Equatable {
+  public let name: String
+
+  public init(name: String) {
+    self.name = name
+  }
+}
+
+public struct DisplayNameAvailabilityResponse: Content, Equatable {
+  public let available: Bool
+
+  public init(available: Bool) {
+    self.available = available
+  }
+}
+
 public struct SetStreakDayBoundaryRequest: Content, Equatable {
   public let offsetHours: Double
 
@@ -1994,6 +2014,22 @@ public actor AuthStore {
     state.users[index] = updatedUser
     try persist()
     return userResponse(for: updatedUser)
+  }
+
+  /// Checks whether a display name is currently available without reserving it.
+  /// If an authenticated account is supplied, its own current name remains
+  /// available so a case-only correction can be preflighted before an update.
+  public func displayNameAvailability(
+    _ requestedName: String, accessToken: String? = nil
+  ) throws -> DisplayNameAvailabilityResponse {
+    let displayName = try validatedDisplayName(requestedName)
+    let excludingUserID: UUID?
+    if let accessToken {
+      excludingUserID = try authenticatedUser(for: accessToken).id
+    } else {
+      excludingUserID = nil
+    }
+    return .init(available: isDisplayNameAvailable(displayName, excluding: excludingUserID))
   }
 
   /// Atomically returns the previous rank and records the current rank for one

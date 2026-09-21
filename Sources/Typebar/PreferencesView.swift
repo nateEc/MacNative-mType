@@ -17,6 +17,9 @@ struct PreferencesView: View {
   @State private var confirmedPasswordResetPassword = ""
   @State private var emailVerificationToken = ""
   @State private var updatedDisplayName = ""
+  @State private var registrationDisplayNameAvailability: DisplayNameAvailabilityState = .idle
+  @State private var oauthDisplayNameAvailability: DisplayNameAvailabilityState = .idle
+  @State private var updatedDisplayNameAvailability: DisplayNameAvailabilityState = .idle
   @State private var profileBio = ""
   @State private var profileKeyboard = ""
   @State private var profileGitHub = ""
@@ -1074,7 +1077,20 @@ struct PreferencesView: View {
             TextField("公开显示名", text: $updatedDisplayName)
               .onAppear { updatedDisplayName = user.displayName }
               .onChange(of: user.displayName) { _, value in updatedDisplayName = value }
+              .task(id: updatedDisplayNameAvailabilityCheck) {
+                guard let check = updatedDisplayNameAvailabilityCheck else {
+                  updatedDisplayNameAvailability = .idle
+                  return
+                }
+                updatedDisplayNameAvailability = .checking
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                let available = await account.displayNameAvailability(check.name)
+                guard !Task.isCancelled, updatedDisplayNameAvailabilityCheck == check else { return }
+                updatedDisplayNameAvailability = .init(available: available)
+              }
               .disabled(user.accountSuspended)
+            displayNameAvailabilityHint(updatedDisplayNameAvailability)
             Button("更新显示名") {
               Task { await account.updateDisplayName(updatedDisplayName) }
             }
@@ -1082,8 +1098,9 @@ struct PreferencesView: View {
               account.isWorking
                 || user.accountSuspended
                 || updatedDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2
-                || updatedDisplayName == user.displayName)
-            Text("显示名会出现在公开资料、基础排行榜与好友列表；邮箱不会公开。成功更改后 30 天内不能再次更改。")
+                || updatedDisplayName == user.displayName
+                || updatedDisplayNameAvailability.preventsSubmission)
+            Text("显示名会出现在公开资料、基础排行榜与好友列表；邮箱不会公开。输入停止 1 秒后会先检查可用性，但最终更新仍由服务端确认。成功更改后 30 天内不能再次更改。")
               .font(.caption)
               .foregroundStyle(.secondary)
             if user.displayNameChangeRequired {
@@ -1585,6 +1602,19 @@ struct PreferencesView: View {
                     oauthDisplayName = pending.suggestedDisplayName ?? ""
                   }
                 }
+                .task(id: oauthDisplayNameAvailabilityCheck) {
+                  guard let check = oauthDisplayNameAvailabilityCheck else {
+                    oauthDisplayNameAvailability = .idle
+                    return
+                  }
+                  oauthDisplayNameAvailability = .checking
+                  try? await Task.sleep(nanoseconds: 1_000_000_000)
+                  guard !Task.isCancelled else { return }
+                  let available = await account.displayNameAvailability(check.name)
+                  guard !Task.isCancelled, oauthDisplayNameAvailabilityCheck == check else { return }
+                  oauthDisplayNameAvailability = .init(available: available)
+                }
+              displayNameAvailabilityHint(oauthDisplayNameAvailability)
               Button("完成注册") {
                 Task {
                   if await account.completeOAuthRegistration(displayName: oauthDisplayName) {
@@ -1594,7 +1624,8 @@ struct PreferencesView: View {
               }
               .disabled(
                 account.isWorking
-                  || oauthDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                  || oauthDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2
+                  || oauthDisplayNameAvailability.preventsSubmission)
               Button("取消") {
                 account.cancelOAuthRegistration()
                 oauthDisplayName = ""
@@ -1658,6 +1689,19 @@ struct PreferencesView: View {
             }
             if accountMode == .register {
               TextField("显示名", text: $displayName)
+                .task(id: registrationDisplayNameAvailabilityCheck) {
+                  guard let check = registrationDisplayNameAvailabilityCheck else {
+                    registrationDisplayNameAvailability = .idle
+                    return
+                  }
+                  registrationDisplayNameAvailability = .checking
+                  try? await Task.sleep(nanoseconds: 1_000_000_000)
+                  guard !Task.isCancelled else { return }
+                  let available = await account.displayNameAvailability(check.name)
+                  guard !Task.isCancelled, registrationDisplayNameAvailabilityCheck == check else { return }
+                  registrationDisplayNameAvailability = .init(available: available)
+                }
+              displayNameAvailabilityHint(registrationDisplayNameAvailability)
             }
             if accountMode != .passwordReset {
               Button(accountMode == .login ? "登录" : "创建账户") {
@@ -1674,7 +1718,8 @@ struct PreferencesView: View {
                 account.isWorking || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                   || password.isEmpty
                   || (accountMode == .register
-                    && displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    && (displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                      || registrationDisplayNameAvailability.preventsSubmission))
               )
             }
             Divider()
@@ -2523,6 +2568,53 @@ struct PreferencesView: View {
     }
   }
 
+  private var registrationDisplayNameAvailabilityCheck: DisplayNameAvailabilityCheck? {
+    guard accountMode == .register else { return nil }
+    return displayNameAvailabilityCheck(for: displayName)
+  }
+
+  private var oauthDisplayNameAvailabilityCheck: DisplayNameAvailabilityCheck? {
+    guard account.pendingOAuthRegistration != nil else { return nil }
+    return displayNameAvailabilityCheck(for: oauthDisplayName)
+  }
+
+  private var updatedDisplayNameAvailabilityCheck: DisplayNameAvailabilityCheck? {
+    guard let user = account.currentUser else { return nil }
+    let check = displayNameAvailabilityCheck(for: updatedDisplayName)
+    guard check?.name != user.displayName else { return nil }
+    return check
+  }
+
+  private func displayNameAvailabilityCheck(for value: String) -> DisplayNameAvailabilityCheck? {
+    let name = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard (2...32).contains(name.count) else { return nil }
+    return .init(endpoint: account.endpoint, name: name)
+  }
+
+  @ViewBuilder
+  private func displayNameAvailabilityHint(_ state: DisplayNameAvailabilityState) -> some View {
+    switch state {
+    case .idle:
+      EmptyView()
+    case .checking:
+      Label("正在检查显示名可用性…", systemImage: "hourglass")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    case .available:
+      Label("显示名可用", systemImage: "checkmark.circle.fill")
+        .font(.caption)
+        .foregroundStyle(.green)
+    case .unavailable:
+      Label("该显示名已被占用", systemImage: "xmark.circle.fill")
+        .font(.caption)
+        .foregroundStyle(.red)
+    case .unavailableToCheck:
+      Text("暂时无法预先检查；提交时仍会由服务端确认。")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+  }
+
   private func languageTitle(_ rawValue: String) -> String {
     TypingLanguage(rawValue: rawValue)?.displayName ?? rawValue
   }
@@ -2641,4 +2733,37 @@ private enum AccountMode: Hashable {
   case login
   case register
   case passwordReset
+}
+
+private struct DisplayNameAvailabilityCheck: Hashable {
+  let endpoint: String
+  let name: String
+}
+
+private enum DisplayNameAvailabilityState: Equatable {
+  case idle
+  case checking
+  case available
+  case unavailable
+  case unavailableToCheck
+
+  init(available: Bool?) {
+    switch available {
+    case true:
+      self = .available
+    case false:
+      self = .unavailable
+    case nil:
+      self = .unavailableToCheck
+    }
+  }
+
+  var preventsSubmission: Bool {
+    switch self {
+    case .checking, .unavailable:
+      true
+    case .idle, .available, .unavailableToCheck:
+      false
+    }
+  }
 }

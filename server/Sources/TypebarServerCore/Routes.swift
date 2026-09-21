@@ -415,6 +415,16 @@ public func configure(
         }
     }
 
+    app.get("v1", "profiles", "display-name-availability") { request async throws -> DisplayNameAvailabilityResponse in
+        do {
+            let query = try request.query.decode(DisplayNameAvailabilityQuery.self)
+            return try await authStore.displayNameAvailability(
+                query.name, accessToken: try request.optionalAccessToken())
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.get("v1", "profiles") { request async throws -> PublicProfileSearchResponse in
         do {
             let query = try request.query.decode(ProfileSearchQuery.self)
@@ -1064,10 +1074,18 @@ private extension AuthStoreError {
 
 private extension Request {
     func accessToken() throws -> String {
-        guard let token = headers.bearerAuthorization?.token, !token.isEmpty else {
+        guard let token = try optionalAccessToken() else {
             throw Abort(.unauthorized, reason: "A Typebar access token is required.")
         }
         return token
+    }
+
+    func optionalAccessToken() throws -> String? {
+        guard let authorization = headers.bearerAuthorization else { return nil }
+        guard !authorization.token.isEmpty else {
+            throw Abort(.unauthorized, reason: "A Typebar access token is required.")
+        }
+        return authorization.token
     }
 
     func resultCredential() throws -> ResultServiceCredential {

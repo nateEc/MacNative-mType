@@ -14,6 +14,8 @@ Typebar 新增独立、可逆的“显示名整改要求”。自建服务部署
 
 Typebar 同时以自有 Swift/Vapor 实现补齐正常显示名的可用性与冷却：密码注册、直接 OAuth 注册、完成 OAuth 注册以及后续改名都会拒绝已被其他账户使用的大小写/重音等价名称。新账户及旧持久化记录没有改名时间时可立即完成一次改名；一旦实际名称改变，服务端私有地持久化时间，在不足 30 个 24 小时内拒绝下一次真实改名，恰好满 30 天允许。只更新隐身或其他资料、提交同一名称、登录方式/邮箱变更和账户重置都不会消除或刷新该冷却；部署方已经设置整改要求时，账户可立即用实际不同的可用名称解除要求。该私有时间不进入公开资料、排行榜或账户响应。
 
+固定参考的注册、第三方补名和改名输入均会在停止输入约一秒后预检名称。Typebar 以原创只读 `GET /v1/profiles/display-name-availability?name=` 映射这一反馈：它只返回布尔可用性、不会预留名称或返回账户资料，仍由注册与改名写入端作最终原子校验。匿名调用用于密码注册与 OAuth 补名；带有效 Bearer 令牌时会排除当前账户，以支持仅改大小写/重音的预检。三个原生输入同样采用一秒防抖，切换服务器或继续输入会丢弃过期结果；旧服务或临时网络失败只提示预检不可用，不会阻止最终提交。该公开布尔查询受既有读取限速保护，且显示名本已可通过公开资料搜索发现。
+
 历史服务状态如已存在重复展示名，不会在升级时自动合并、改写或删除账户：它们仍可登录和读取现有资料，但新注册和任何实际改名将按新可用性规则验证。
 
 ## 重写边界
@@ -26,6 +28,7 @@ Typebar 同时以自有 Swift/Vapor 实现补齐正常显示名的可用性与�
 - 权限与可逆性：`swift test --filter HealthRouteTests.testDisplayNameRequirementRouteRequiresDeploymentKeyAndIsReversible`，覆盖无部署密钥拒绝、受密钥设置与撤销。
 - 持久化与防绕过：`swift test --filter HealthRouteTests.testDisplayNameRequirementPersistsAndSurvivesAccountReset`，覆盖服务重载与账户重置。
 - 可用性、冷却与迁移：`swift test --filter HealthRouteTests.testDisplayNameAvailabilityAndCooldownPersistWithoutBlockingRequiredRename`，覆盖大小写/重音等价的密码与 OAuth 注册拒绝、无关资料更新不刷新冷却、重载后仍生效、30 天边界和整改要求的优先改名。
+- 可用性预检：`swift test --filter HealthRouteTests.testDisplayNameAvailabilityRouteSupportsPublicAndAuthenticatedChecks`，覆盖匿名占用/空闲查询、当前账户大小写变体的可用例外与非法名称拒绝。
 - HTTP 契约：`swift test --filter HealthRouteTests.testProfileRouteReportsDisplayNameCooldownAsConflict`，覆盖第二次改名返回明确的 `409`。
 - 原生协议兼容：`swift test --filter 'TypingEngineTests.test(RemoteAccountUserDefaultsLegacyServersToPasswordAndDecodesOAuthMethods|LeaderboardRankResponsesDecodeAnAbsentStanding|ModerationProfileReportDefaultsAndDecodesDeploymentAccountControls)'`，覆盖账户、资格和审核队列的旧字段回退及新字段解码。
-- 已串行验收：服务端 `swift test` 99 项、0 失败（1.222 秒）；原生 `swift test` 650 项、0 失败（160.975 秒）。全程未启动 Typebar 图形程序，结束时未留下 Typebar、xctest 或 Swift 测试进程。
+- 已串行验收：服务端 `swift test` 100 项、0 失败（1.242 秒）；原生 `swift test` 650 项、0 失败（161.909 秒）。全程未启动 Typebar 图形程序，结束时未留下 Typebar、xctest 或 Swift 测试进程。
