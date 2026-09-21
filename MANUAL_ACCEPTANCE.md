@@ -5,8 +5,25 @@
 ## 当前构建
 
 - 应用：`Typebar.app`
-- 自动化基线：客户端 566 项、服务端 80 项通过（2026-09-20）
+- 自动化基线：客户端 653 项、服务端 109 项通过（2026-09-22）
 - 参考基线：Monkeytype 官方源码提交 `91bd24bb8513785c7364cbea29296ff7adafac41`，只读盘点使用
+
+## 单实例执行规则
+
+人工验收必须一次只运行一个 Typebar 图形实例、一个场景。不得同时从 Xcode、Finder、命令行或不同构建目录启动多个候选包；也不得在 GUI 仍运行时开始任何 `swift test`。场景完成后完全退出该实例并确认进程已消失，才可开始下一场景。
+
+每个场景**启动前**和**退出后**都执行以下检查：
+
+```zsh
+for process_name in Typebar xctest swift-test
+do
+  pgrep -alf -x "$process_name" || true
+done
+pgrep -alf -f 'swift( |$)' || true
+pgrep -alf -f 'TypebarPackageTests' || true
+```
+
+若检查显示任何并非检查命令自身的 Typebar 或测试进程，停止启动新实例；先正常退出既有程序，仍无法退出时记录 PID 与场景并由操作者决定后续处理。每次验收记录必须注明：场景 ID、构建版本、开始／结束检查结果，以及是否在单实例中完成。自动化测试和人工验收绝不并行。
 
 ## 待执行场景
 
