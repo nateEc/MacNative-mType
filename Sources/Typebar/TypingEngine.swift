@@ -2616,6 +2616,15 @@ enum TypingRestartPolicy {
   }
 }
 
+/// The reference rejects a configuration change when it would restart an
+/// in-progress no-quit test. Preferences that apply live stay outside this
+/// gate.
+enum NoQuitConfigurationChangePolicy {
+  static func allowsRestartingChange(for session: TypingSession) -> Bool {
+    !TypingRestartPolicy.isLocked(session)
+  }
+}
+
 /// Mirrors the reference thresholds that protect lengthy configured tests
 /// and explicitly saved long texts from an accidental quick-restart keypress.
 enum QuickRestartSafetyPolicy {

@@ -1092,8 +1092,10 @@ enum PaceCaretCommandTarget: Equatable {
     case mode(PaceGuideMode)
     case customSpeed
 
-    var requiresRestart: Bool { true }
-    var exitsChallenge: Bool { true }
+    // Monkeytype treats pace-caret preferences as live settings rather than
+    // test configuration, so changing them neither restarts nor exits a run.
+    var requiresRestart: Bool { false }
+    var exitsChallenge: Bool { false }
 
     @MainActor
     func apply(to settings: AppSettings) {
@@ -1119,7 +1121,7 @@ enum PaceCaretCommandCatalog {
         let identifier = "caret.paceCaret.\(option.value)"
         return CommandPaletteItem(
             id: identifier, title: "节奏引导：\(option.title)",
-            subtitle: option.target == .customSpeed ? "输入目标速度并立即重开" : "切换目标来源并立即重开",
+            subtitle: option.target == .customSpeed ? "输入目标速度并立即生效" : "切换目标来源并立即生效",
             systemImage: option.target == .customSpeed ? "metronome.fill" : "metronome",
             keywords: [
                 identifier, "caret", "paceCaret", "pace", "节奏", "目标", option.value,

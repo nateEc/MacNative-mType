@@ -2747,7 +2747,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(settings.repeatedPace)
   }
 
-  func testPaceCaretCommandsCoverFixedReferenceModesAndRestartChallenges() {
+  func testPaceCaretCommandsCoverFixedReferenceModesWithoutRestartingChallenges() {
     let expectedIDs = [
       "caret.paceCaret.off", "caret.paceCaret.pb", "caret.paceCaret.tagPb",
       "caret.paceCaret.last", "caret.paceCaret.average", "caret.paceCaret.daily",
@@ -2767,8 +2767,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(PaceCaretCommandCatalog.target(for: "caret.paceCaret.daily.extra"))
     XCTAssertTrue(PaceCaretCommandCatalog.items.allSatisfy { item in
       guard let target = PaceCaretCommandCatalog.target(for: item.id) else { return false }
-      return target.requiresRestart && target.exitsChallenge
-        && TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
+      return !target.requiresRestart && !target.exitsChallenge
+        && !TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
         && CommandPaletteSearch.results(items: PaceCaretCommandCatalog.items, query: item.id)
           .contains(where: { $0.id == item.id })
     })
@@ -18153,10 +18153,15 @@ final class TypingEngineTests: XCTestCase {
     var session = TypingSession(
       configuration: TestConfiguration.words(2).with(modifiers: [.noQuit]), prompt: "amber harbor")
     XCTAssertFalse(TypingRestartPolicy.isLocked(session))
+    XCTAssertTrue(NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session))
     session.insert("a", at: start)
     XCTAssertTrue(TypingRestartPolicy.isLocked(session))
+    XCTAssertFalse(NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session))
     session.abandon(at: start)
     XCTAssertFalse(TypingRestartPolicy.isLocked(session))
+    XCTAssertTrue(NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session))
+    let ordinarySession = TestSessionFactory.make(configuration: .words(2))
+    XCTAssertTrue(NoQuitConfigurationChangePolicy.allowsRestartingChange(for: ordinarySession))
     XCTAssertTrue(TestModifierPolicy.normalized([.noQuit, .uppercase]).contains(.noQuit))
   }
 

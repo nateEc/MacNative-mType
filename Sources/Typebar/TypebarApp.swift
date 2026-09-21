@@ -1040,7 +1040,6 @@ private struct ContentView: View {
         activeChallengeID = nil
         settings.paceGuideCustomWpm = wpm
         settings.paceGuideMode = .custom
-        reset()
       }
     }
     .sheet(isPresented: $showingKeyboardGuideScaleEditor) {
@@ -1050,16 +1049,16 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingCustomTimeEditor) {
       TestLimitEditor(kind: .time, initialValue: duration) { value in
-        activeChallengeID = nil
         guard selectMode(.time) else { return }
+        activeChallengeID = nil
         duration = value
         reset()
       }
     }
     .sheet(isPresented: $showingCustomWordsEditor) {
       TestLimitEditor(kind: .words, initialValue: wordLimit) { value in
-        activeChallengeID = nil
         guard selectMode(.words) else { return }
+        activeChallengeID = nil
         wordLimit = value
         reset()
       }
@@ -1085,6 +1084,7 @@ private struct ContentView: View {
     }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in
+        guard acceptsRestartingConfigurationChange() else { return }
         let document = try SettingsJSONCommandImport.apply(json, to: settings)
         let memory = document.testParameterMemory
         duration = memory.duration
@@ -1330,7 +1330,7 @@ private struct ContentView: View {
       }
       .pickerStyle(.segmented)
       .frame(width: 420)
-      .disabled(activeChallenge != nil)
+      .disabled(activeChallenge != nil || isRestartingConfigurationChangeLocked)
       .onChange(of: mode) { _, nextMode in
         // A deliberate departure from temporary word practice becomes the
         // user's new source configuration, matching the reference reset rule.
@@ -1352,6 +1352,7 @@ private struct ContentView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
           Button("退出挑战") {
+            guard acceptsRestartingConfigurationChange() else { return }
             activeChallengeID = nil
             reset()
           }
@@ -1360,7 +1361,10 @@ private struct ContentView: View {
         .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
       } else {
         if mode != .custom && mode != .zen {
-          Picker("语言", selection: $language) {
+          Picker("语言", selection: Binding(
+            get: { language },
+            set: { _ = selectLanguage($0) }
+          )) {
             ForEach(availableLanguages, id: \.self) { language in
               Text(language.displayName).tag(language)
             }
@@ -1370,14 +1374,16 @@ private struct ContentView: View {
             refreshZipfNotice()
           }
           if language == .arabic {
-            Toggle("Arabic 快速输入（省略元音符号）", isOn: $settings.prefersArabicLazyInput)
+            Toggle(
+              "Arabic 快速输入（省略元音符号）",
+              isOn: restartingConfigurationBinding($settings.prefersArabicLazyInput))
               .onChange(of: settings.prefersArabicLazyInput) { _, _ in reset() }
             Text("默认开启；会省略短元音、tanwin、shadda、sukun，并统一常见的 alef 变体。关闭后保留完整原创 Arabic 提示。")
               .font(.caption)
               .foregroundStyle(.secondary)
           }
           if language == .english {
-            Picker("英文拼写", selection: $settings.englishVariant) {
+            Picker("英文拼写", selection: restartingConfigurationBinding($settings.englishVariant)) {
               ForEach(EnglishVariant.allCases) { variant in
                 Text(variant.displayName).tag(variant)
               }
@@ -1478,7 +1484,11 @@ private struct ContentView: View {
             Text("计时器正向累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
               .font(.caption).foregroundStyle(.secondary)
           } else {
-            Stepper(value: $duration, in: 1...OfficialTestLimitInput.maximumValue, step: 1) {
+            Stepper(
+              value: restartingConfigurationBinding($duration),
+              in: 1...OfficialTestLimitInput.maximumValue,
+              step: 1
+            ) {
               LabeledContent("时长", value: "\(duration) 秒")
             }
             .onChange(of: duration) { _, _ in reset() }
@@ -1490,13 +1500,13 @@ private struct ContentView: View {
             Text("词数持续累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
               .font(.caption).foregroundStyle(.secondary)
           } else {
-            Stepper(value: $wordLimit, in: 1...OfficialTestLimitInput.maximumValue) {
+            Stepper(value: restartingConfigurationBinding($wordLimit), in: 1...OfficialTestLimitInput.maximumValue) {
               LabeledContent("字数", value: "\(wordLimit) 词")
             }
             .onChange(of: wordLimit) { _, _ in reset() }
           }
         case .quote:
-          Picker("内容来源", selection: $quoteSource) {
+          Picker("内容来源", selection: restartingConfigurationBinding($quoteSource)) {
             ForEach(availableQuoteSources) { source in Text(source.title).tag(source) }
           }
           .pickerStyle(.segmented)
@@ -1510,7 +1520,7 @@ private struct ContentView: View {
             ensureSelectedQuote()
             reset()
           }
-          Picker("引语选择", selection: $quoteSelectionMode) {
+          Picker("引语选择", selection: restartingConfigurationBinding($quoteSelectionMode)) {
             ForEach(QuoteSelectionMode.allCases) { selectionMode in
               Text(selectionMode.displayName).tag(selectionMode)
             }
@@ -1533,7 +1543,7 @@ private struct ContentView: View {
               }
             }
           } else if quoteSelectionMode == .search {
-            TextField("搜索当前引语（仅本机）", text: $quoteSearchQuery)
+            TextField("搜索当前引语（仅本机）", text: restartingConfigurationBinding($quoteSearchQuery))
               .onChange(of: quoteSearchQuery) { _, _ in
                 quoteQueue.reset()
                 guard !availableQuotes.isEmpty else { return }
@@ -1580,7 +1590,7 @@ private struct ContentView: View {
                   : quoteSelectionMode == .favorites
                     ? "先在长度或搜索模式中收藏一条引语。" : "更换搜索词后再试。"))
           } else {
-            Picker("引语", selection: $selectedQuoteID) {
+            Picker("引语", selection: restartingConfigurationBinding($selectedQuoteID)) {
               ForEach(availableQuotes) { quote in
                 Text(quote.title).tag(quote.id)
               }
@@ -1592,6 +1602,7 @@ private struct ContentView: View {
               }
               if quoteSelectionMode.advancesAutomatically {
                 Button("随机一条") {
+                  guard acceptsRestartingConfigurationChange() else { return }
                   chooseNextQuote()
                   reset()
                 }
@@ -1649,7 +1660,7 @@ private struct ContentView: View {
                 .buttonStyle(.borderless)
                 .font(.caption)
             }
-            Picker("完成方式", selection: $customTextCompletion) {
+            Picker("完成方式", selection: restartingConfigurationBinding($customTextCompletion)) {
               ForEach(CustomTextCompletion.allCases) { completion in
                 Text(completion.displayName).tag(completion)
               }
@@ -1665,7 +1676,11 @@ private struct ContentView: View {
                 Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
                   .font(.caption).foregroundStyle(.secondary)
               } else {
-                Stepper(value: $customTextDuration, in: 5...3600, step: 5) {
+                Stepper(
+                  value: restartingConfigurationBinding($customTextDuration),
+                  in: 5...3600,
+                  step: 5
+                ) {
                   LabeledContent("循环时长", value: "\(customTextDuration) 秒")
                 }
                 .disabled(activeLongSavedText != nil)
@@ -1681,7 +1696,7 @@ private struct ContentView: View {
                 Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
                   .font(.caption).foregroundStyle(.secondary)
               } else {
-                Stepper(value: $customTextWordLimit, in: 1...1000) {
+                Stepper(value: restartingConfigurationBinding($customTextWordLimit), in: 1...1000) {
                   LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
                 }
                 .disabled(activeLongSavedText != nil)
@@ -1689,7 +1704,10 @@ private struct ContentView: View {
               }
             }
             if customTextCompletion == .sections {
-              Stepper(value: $customTextSectionLimit, in: 1...max(1, customTextSections.count)) {
+              Stepper(
+                value: restartingConfigurationBinding($customTextSectionLimit),
+                in: 1...max(1, customTextSections.count)
+              ) {
                 LabeledContent(
                   "完成段数", value: "\(customTextSectionLimit) / \(customTextSections.count) 段")
               }
@@ -1699,7 +1717,7 @@ private struct ContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             } else {
-              Picker("文本顺序", selection: $customTextOrdering) {
+              Picker("文本顺序", selection: restartingConfigurationBinding($customTextOrdering)) {
                 ForEach(CustomTextOrdering.allCases) { ordering in
                   Text(ordering.displayName).tag(ordering)
                 }
@@ -1708,7 +1726,10 @@ private struct ContentView: View {
               .onChange(of: customTextOrdering) { _, _ in reset() }
             }
             HStack {
-              Button("使用这段文本开始") { reset() }
+              Button("使用这段文本开始") {
+                guard acceptsRestartingConfigurationChange() else { return }
+                reset()
+              }
                 .disabled(!CustomTextPolicy.isValid(customText))
               Button("保存文本…") { showingSaveCustomText = true }
                 .disabled(!CustomTextPolicy.isValid(customText))
@@ -2568,15 +2589,35 @@ private struct ContentView: View {
   }
 
   private func attemptRestart() {
-    guard !TypingRestartPolicy.isLocked(session) else {
-      restartLockMessage = "锁定重开已开启：请完成或放弃本次测试。"
-      return
-    }
+    guard acceptsRestartingConfigurationChange() else { return }
     reset(restarting: true)
+  }
+
+  private var isRestartingConfigurationChangeLocked: Bool {
+    !NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session)
+  }
+
+  @discardableResult
+  private func acceptsRestartingConfigurationChange() -> Bool {
+    guard !isRestartingConfigurationChangeLocked else {
+      restartLockMessage = "锁定重开已开启：请完成或放弃本次测试。"
+      return false
+    }
+    return true
+  }
+
+  private func restartingConfigurationBinding<Value>(_ value: Binding<Value>) -> Binding<Value> {
+    Binding(
+      get: { value.wrappedValue },
+      set: { updatedValue in
+        guard acceptsRestartingConfigurationChange() else { return }
+        value.wrappedValue = updatedValue
+      })
   }
 
   @discardableResult
   private func selectMode(_ requested: TestMode) -> Bool {
+    guard acceptsRestartingConfigurationChange() else { return false }
     guard TestModifierPolicy.acceptsModeSelection(requested, modifiers: settings.testModifiers) else {
       modeCompatibilityMessage = "当前修饰器不支持“\(requested.displayName)”模式；请先关闭不兼容的趣味模式。"
       return false
@@ -2588,6 +2629,7 @@ private struct ContentView: View {
 
   @discardableResult
   private func selectContentOptions(_ requested: ContentOptions) -> Bool {
+    guard acceptsRestartingConfigurationChange() else { return false }
     guard FunboxForcedContentOptionsPolicy.accepts(
       requested, modifiers: settings.testModifiers)
     else {
@@ -2596,6 +2638,16 @@ private struct ContentView: View {
     }
     funboxConfigurationMessage = nil
     contentOptions = requested
+    return true
+  }
+
+  @discardableResult
+  private func selectLanguage(_ requested: TypingLanguage) -> Bool {
+    guard acceptsRestartingConfigurationChange(), availableLanguages.contains(requested) else {
+      return false
+    }
+    polyglotReturnLanguage = nil
+    language = requested
     return true
   }
 
@@ -2733,6 +2785,7 @@ private struct ContentView: View {
   }
 
   private func reset(restarting: Bool = false) {
+    guard acceptsRestartingConfigurationChange() else { return }
     let effectiveMemoryMode = MemoryFunboxModePolicy.effectiveMode(
       requested: mode, modifiers: settings.testModifiers)
     if mode != effectiveMemoryMode { mode = effectiveMemoryMode }
@@ -2859,6 +2912,7 @@ private struct ContentView: View {
     Binding(
       get: { value.wrappedValue == 0 },
       set: { enabled in
+        guard acceptsRestartingConfigurationChange() else { return }
         guard !enabled || infiniteIncompatibleModifiers.isEmpty else { return }
         value.wrappedValue = enabled ? 0 : fallback
         reset()
@@ -3319,9 +3373,7 @@ private struct ContentView: View {
     if let target = PaceCaretCommandCatalog.target(for: item.id) {
       switch target {
       case .mode:
-        activeChallengeID = nil
         target.apply(to: settings)
-        reset()
       case .customSpeed:
         showingPaceGuideSpeedEditor = true
       }
@@ -3342,18 +3394,21 @@ private struct ContentView: View {
       return
     }
     if let target = KeyboardGuideLayoutCommandCatalog.target(for: item.id) {
+      if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings)
       if target.requiresRestart { reset() }
       return
     }
     if let target = OfficialLayoutCommandCatalog.target(for: item.id) {
+      if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings)
       if target.requiresRestart { reset() }
       return
     }
     if let target = InputRuleCommandCatalog.target(for: item.id) {
+      if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
       target.apply(to: settings)
       if target.requiresRestart { reset() }
@@ -3364,6 +3419,7 @@ private struct ContentView: View {
       return
     }
     if let target = PracticeThresholdCommandCatalog.target(for: item.id) {
+      guard acceptsRestartingConfigurationChange() else { return }
       if target.applyImmediate(to: settings) {
         activeChallengeID = nil
         reset()
@@ -3373,10 +3429,7 @@ private struct ContentView: View {
       return
     }
     if let target = FunboxCommandCatalog.target(for: item.id) {
-      if session.hasStarted && settings.testModifiers.contains(.noQuit) {
-        restartLockMessage = "锁定重开已开启：请完成或放弃本次测试。"
-        return
-      }
+      guard acceptsRestartingConfigurationChange() else { return }
       switch target {
       case .polyglot:
         activeChallengeID = nil
@@ -3434,6 +3487,7 @@ private struct ContentView: View {
       return
     }
     if let target = PracticePreferenceCommandCatalog.target(for: item.id) {
+      if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
       switch target {
       case .difficulty(let difficulty): settings.difficulty = difficulty
@@ -3445,11 +3499,9 @@ private struct ContentView: View {
       return
     }
     if let selectedLanguage = LanguageCommandCatalog.target(for: item.id) {
-      guard availableLanguages.contains(selectedLanguage) else { return }
-      activeChallengeID = nil
       let changed = language != selectedLanguage
-      polyglotReturnLanguage = nil
-      language = selectedLanguage
+      guard selectLanguage(selectedLanguage) else { return }
+      activeChallengeID = nil
       if !changed {
         languageChanged(to: selectedLanguage)
         refreshZipfNotice()
@@ -3487,6 +3539,7 @@ private struct ContentView: View {
       }
     }
     if TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id) {
+      guard acceptsRestartingConfigurationChange() else { return }
       activeChallengeID = nil
     }
     if let target = QuickTestParameterCommandCatalog.target(for: item.id) {
@@ -3620,6 +3673,7 @@ private struct ContentView: View {
   }
 
   private func applyPracticeThreshold(_ value: Double, kind: PracticeThresholdEditorKind) {
+    guard acceptsRestartingConfigurationChange() else { return }
     activeChallengeID = nil
     PracticeThresholdApplication.apply(value, kind: kind, to: settings)
     reset()
@@ -3763,6 +3817,7 @@ private struct ContentView: View {
     appliesGlobalSettings: Bool = true,
     polyglotReturnLanguage: TypingLanguage? = nil
   ) {
+    guard acceptsRestartingConfigurationChange() else { return }
     practiceReturnPreset = nil
     let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID)
     activeChallengeID = challenge?.id
@@ -3866,9 +3921,10 @@ private struct ContentView: View {
     }
   }
 
-  private func persistActiveTestSelection() {
+  private func persistActiveTestSelection(for selectedConfiguration: TestConfiguration? = nil) {
+    let selectedConfiguration = selectedConfiguration ?? session.configuration
     let preset = SavedTestPreset(
-      configuration: session.configuration,
+      configuration: selectedConfiguration,
       quoteID: mode == .quote ? selectedQuoteID : nil,
       customText: mode == .custom ? customText : nil)
     settings.saveActiveTestSelection(.init(
@@ -3880,7 +3936,7 @@ private struct ContentView: View {
         customTextDuration: customTextDuration,
         customTextWordLimit: customTextWordLimit,
         customTextSectionLimit: customTextSectionLimit),
-      polyglotReturnLanguage: session.configuration.language == .mixedLanguages
+      polyglotReturnLanguage: selectedConfiguration.language == .mixedLanguages
         ? polyglotReturnLanguage : nil))
   }
 
@@ -3924,7 +3980,9 @@ private struct ContentView: View {
           mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
             mixedLanguageComponents)
         }
-        reset()
+        // The reference saves custom Polyglot choices for the next restart
+        // instead of interrupting the current test.
+        persistActiveTestSelection(for: configuration)
       }
     )
   }
@@ -3946,11 +4004,16 @@ private struct ContentView: View {
   }
 
   private func refreshCommunityQuotes() {
+    guard acceptsRestartingConfigurationChange() else { return }
     isLoadingCommunityQuotes = true
     communityQuoteMessage = nil
     Task {
       do {
         let remoteQuotes = try await account.publicQuotes(language: language)
+        guard NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session) else {
+          isLoadingCommunityQuotes = false
+          return
+        }
         communityQuoteRatings = Dictionary(
           uniqueKeysWithValues: remoteQuotes.map {
             (
@@ -4050,6 +4113,11 @@ private struct ContentView: View {
   }
 
   private func toggleSelectedQuoteFavorite() {
+    if quoteSelectionMode == .favorites,
+       !acceptsRestartingConfigurationChange()
+    {
+      return
+    }
     settings.toggleFavoriteQuote(selectedQuoteID)
     guard quoteSelectionMode == .favorites else {
       ensureSelectedQuote()
@@ -4070,6 +4138,7 @@ private struct ContentView: View {
     Binding(
       get: { quoteLengths.contains(length) },
       set: { selected in
+        guard acceptsRestartingConfigurationChange() else { return }
         guard selected || quoteLengths.count > 1 else { return }
         if selected {
           quoteLengths.insert(length)
