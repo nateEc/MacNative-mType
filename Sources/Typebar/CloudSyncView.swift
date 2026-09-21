@@ -27,6 +27,10 @@ struct CloudSyncView: View {
     @State private var leaderboardPageIndex = 0
     @State private var requestedLeaderboardPage = 1
     @State private var leaderboardRequestGeneration = 0
+    @State private var leaderboardDurationSeconds: Int?
+    @State private var leaderboardWordLimit: Int?
+    @State private var leaderboardSupportsParameterFilter = false
+    @State private var leaderboardParameterEditor: LeaderboardParameterEditorTarget?
     @State private var experienceLeaderboard: [RemoteExperienceLeaderboardEntry] = []
     @State private var experiencePeriod: RemoteExperienceLeaderboardPeriod = .week
     @State private var experienceScope: RemoteLeaderboardScope = .global
@@ -48,9 +52,15 @@ struct CloudSyncView: View {
         self.settings = settings
         self.account = account
         self.initialLeaderboard = initialLeaderboard
+        let initialParameter = LeaderboardParameterFilterPolicy.filter(
+            mode: initialLeaderboard?.mode,
+            durationSeconds: initialLeaderboard?.durationSeconds,
+            wordLimit: initialLeaderboard?.wordLimit)
         _leaderboardMode = State(initialValue: initialLeaderboard?.mode)
         _leaderboardLanguage = State(initialValue: initialLeaderboard?.language)
         _leaderboardPeriod = State(initialValue: initialLeaderboard?.period ?? .all)
+        _leaderboardDurationSeconds = State(initialValue: initialParameter.durationSeconds)
+        _leaderboardWordLimit = State(initialValue: initialParameter.wordLimit)
     }
 
     var body: some View {
@@ -145,6 +155,24 @@ struct CloudSyncView: View {
                         ForEach(RemoteLeaderboardPeriod.allCases, id: \.self) { period in
                             Text(period.displayName).tag(period)
                         }
+                    }
+                    if leaderboardSupportsParameterFilter {
+                        switch leaderboardMode {
+                        case .time:
+                            LeaderboardParameterPicker(
+                                target: .duration, selectedValue: $leaderboardDurationSeconds,
+                                onCustomize: { leaderboardParameterEditor = .duration })
+                        case .words:
+                            LeaderboardParameterPicker(
+                                target: .wordLimit, selectedValue: $leaderboardWordLimit,
+                                onCustomize: { leaderboardParameterEditor = .wordLimit })
+                        case .quote, .zen, .custom, .none:
+                            EmptyView()
+                        }
+                    } else if pendingLeaderboardParameterFilter.isActive {
+                        Text("当前自建服务未声明按时长或词数分桶；为避免把错误的混合榜单当作精确名次，暂不发送该筛选。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     WPMLeaderboardRefreshCountdown(period: leaderboardPeriod)
                     Button("刷新\(leaderboardScope.displayName)", action: loadLeaderboard)
@@ -301,10 +329,23 @@ struct CloudSyncView: View {
         .onChange(of: leaderboardMode) { _, _ in resetLeaderboardPagination() }
         .onChange(of: leaderboardLanguage) { _, _ in resetLeaderboardPagination() }
         .onChange(of: leaderboardPeriod) { _, _ in resetLeaderboardPagination() }
+        .onChange(of: leaderboardDurationSeconds) { _, _ in resetLeaderboardPagination() }
+        .onChange(of: leaderboardWordLimit) { _, _ in resetLeaderboardPagination() }
         .onChange(of: experienceScope) { _, _ in resetExperiencePagination() }
         .onChange(of: experiencePeriod) { _, _ in resetExperiencePagination() }
         .sheet(item: $selectedProfile) { profile in
             PublicProfileView(profile: profile, account: account)
+        }
+        .sheet(item: $leaderboardParameterEditor) { target in
+            LeaderboardParameterEditor(
+                target: target,
+                initialValue: target == .duration ? leaderboardDurationSeconds : leaderboardWordLimit
+            ) { value in
+                switch target {
+                case .duration: leaderboardDurationSeconds = value
+                case .wordLimit: leaderboardWordLimit = value
+                }
+            }
         }
     }
 
@@ -388,6 +429,18 @@ struct CloudSyncView: View {
         loadedLeaderboardRank = false
     }
 
+    private var pendingLeaderboardParameterFilter: LeaderboardParameterFilter {
+        LeaderboardParameterFilterPolicy.filter(
+            mode: leaderboardMode, durationSeconds: leaderboardDurationSeconds,
+            wordLimit: leaderboardWordLimit)
+    }
+
+    private var leaderboardParameterFilter: LeaderboardParameterFilter {
+        leaderboardSupportsParameterFilter
+            ? pendingLeaderboardParameterFilter
+            : .init(durationSeconds: nil, wordLimit: nil)
+    }
+
     private func loadLeaderboard() {
         loadLeaderboard(pageIndex: 0)
     }
@@ -396,18 +449,37 @@ struct CloudSyncView: View {
         guard !isLoadingLeaderboard else { return }
         let normalizedPageIndex = max(0, pageIndex)
         let requestGeneration = leaderboardRequestGeneration
+        let parameterFilter = leaderboardParameterFilter
         leaderboardPageIndex = normalizedPageIndex
         requestedLeaderboardPage = normalizedPageIndex + 1
         Task {
+            var shouldReloadWithParameterFilter = false
             isLoadingLeaderboard = true
-            defer { isLoadingLeaderboard = false }
+            defer {
+                isLoadingLeaderboard = false
+                if shouldReloadWithParameterFilter { loadLeaderboard() }
+            }
             do {
                 let page = try await account.leaderboardPage(
                     mode: leaderboardMode, language: leaderboardLanguage,
-                    period: leaderboardPeriod, scope: leaderboardScope,
+                    period: leaderboardPeriod, durationSeconds: parameterFilter.durationSeconds,
+                    wordLimit: parameterFilter.wordLimit, scope: leaderboardScope,
                     offset: normalizedPageIndex * LeaderboardPaginationPolicy.preferredPageSize,
                     limit: LeaderboardPaginationPolicy.preferredPageSize)
                 guard requestGeneration == leaderboardRequestGeneration else { return }
+                if page.parameterFilterSupported == true {
+                    let discoveredCapability = !leaderboardSupportsParameterFilter
+                    leaderboardSupportsParameterFilter = true
+                    if discoveredCapability && pendingLeaderboardParameterFilter.isActive {
+                        leaderboardRequestGeneration += 1
+                        leaderboard = []
+                        leaderboardPage = nil
+                        leaderboardRank = nil
+                        loadedLeaderboardRank = false
+                        shouldReloadWithParameterFilter = true
+                        return
+                    }
+                }
                 leaderboard = page.entries
                 leaderboardPage = page
                 leaderboardRank = nil
@@ -416,20 +488,26 @@ struct CloudSyncView: View {
                     do {
                         leaderboardRank = try await account.leaderboardRank(
                             mode: leaderboardMode, language: leaderboardLanguage,
-                            period: leaderboardPeriod, scope: leaderboardScope)
+                            period: leaderboardPeriod, durationSeconds: parameterFilter.durationSeconds,
+                            wordLimit: parameterFilter.wordLimit, scope: leaderboardScope)
                         guard requestGeneration == leaderboardRequestGeneration else { return }
                         loadedLeaderboardRank = true
                     } catch {
                         // Older self-hosted servers may not have the rank route yet.
                     }
                 }
+                let summary: String
                 if let total = page.total {
-                    leaderboardMessage = total == 0
+                    summary = total == 0
                         ? "当前筛选没有成绩。"
                         : "第 \(normalizedPageIndex + 1) / \(LeaderboardPaginationPolicy.lastPageIndex(total: total, pageSize: page.pageSize) + 1) 页，共 \(total) 条成绩。"
                 } else {
-                    leaderboardMessage = leaderboard.isEmpty ? "当前筛选没有成绩。" : "已加载 \(leaderboard.count) 条成绩。"
+                    summary = leaderboard.isEmpty ? "当前筛选没有成绩。" : "已加载 \(leaderboard.count) 条成绩。"
                 }
+                leaderboardMessage = !leaderboardSupportsParameterFilter
+                    && pendingLeaderboardParameterFilter.isActive
+                    ? "\(summary) 此服务未声明速度参数分桶，当前为通用榜单。"
+                    : summary
             } catch {
                 guard requestGeneration == leaderboardRequestGeneration else { return }
                 leaderboard = []
@@ -531,6 +609,98 @@ struct CloudSyncView: View {
             presets: namedPresets,
             savedTexts: namedSavedTexts,
             activeTestSelection: settings.activeTestSelection)
+    }
+}
+
+private struct LeaderboardParameterPicker: View {
+    let target: LeaderboardParameterEditorTarget
+    @Binding var selectedValue: Int?
+    let onCustomize: () -> Void
+
+    var body: some View {
+        Picker(target.label, selection: $selectedValue) {
+            Text("全部").tag(Int?.none)
+            if let selectedValue, !target.standardValues.contains(selectedValue) {
+                Text("\(selectedValue) \(target.unit)").tag(Optional(selectedValue))
+            }
+            ForEach(target.standardValues, id: \.self) { value in
+                Text("\(value) \(target.unit)").tag(Optional(value))
+            }
+        }
+        HStack(spacing: 8) {
+            Text("仅和相同\(target.label)的完成成绩比较。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("自定义…", action: onCustomize)
+                .font(.caption)
+        }
+    }
+}
+
+private struct LeaderboardParameterEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let target: LeaderboardParameterEditorTarget
+    let onApply: (Int) -> Void
+    @State private var text: String
+    @FocusState private var inputFocused: Bool
+
+    init(
+        target: LeaderboardParameterEditorTarget, initialValue: Int?,
+        onApply: @escaping (Int) -> Void
+    ) {
+        self.target = target
+        self.onApply = onApply
+        _text = State(initialValue: String(initialValue ?? target.standardValues[0]))
+    }
+
+    private var value: Int? {
+        guard let value = Int(text.trimmingCharacters(in: .whitespacesAndNewlines)),
+            target.validRange.contains(value)
+        else { return nil }
+        return value
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(target.label) {
+                    TextField(target.unit, text: $text)
+                        .focused($inputFocused)
+                    if let value {
+                        LabeledContent("将筛选", value: "\(value) \(target.unit)")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("请输入 \(target.validRange.lowerBound)–\(target.validRange.upperBound) 之间的整数。")
+                            .foregroundStyle(.red)
+                    }
+                }
+                Section {
+                    Text("排行榜只比较使用相同测试参数的成绩；此筛选不会改变你的练习设置。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle(target.title)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                        .keyboardShortcut(.cancelAction)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("应用") {
+                        guard let value else { return }
+                        onApply(value)
+                        dismiss()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(value == nil)
+                }
+            }
+        }
+        .frame(width: 420, height: 270)
+        .onAppear { inputFocused = true }
     }
 }
 

@@ -669,12 +669,35 @@ final class TypingEngineTests: XCTestCase {
   func testLeaderboardPageCompatibilityGatesPaginationForLegacyResponses() throws {
     let legacy = try JSONDecoder().decode(
       RemoteLeaderboardPage.self, from: Data(#"{"entries":[]}"#.utf8))
+    let parameterAware = try JSONDecoder().decode(
+      RemoteLeaderboardPage.self,
+      from: Data(#"{"entries":[],"total":0,"offset":0,"pageSize":50,"parameterFilterSupported":true}"#.utf8))
 
     XCTAssertNil(legacy.total)
+    XCTAssertNil(legacy.parameterFilterSupported)
+    XCTAssertEqual(parameterAware.parameterFilterSupported, true)
     XCTAssertFalse(LeaderboardPaginationPolicy.isAvailable(total: legacy.total, pageSize: 50))
     XCTAssertNil(LeaderboardPaginationPolicy.pageIndex(containingRank: 101, total: legacy.total, pageSize: 50))
     XCTAssertEqual(LeaderboardPaginationPolicy.pageIndex(containingRank: 101, total: 124, pageSize: 50), 2)
     XCTAssertEqual(LeaderboardPaginationPolicy.lastPageIndex(total: 124, pageSize: 50), 2)
+  }
+
+  func testLeaderboardParameterFilterKeepsTimeAndWordBucketsMutuallyExclusive() {
+    XCTAssertEqual(
+      LeaderboardParameterFilterPolicy.filter(
+        mode: .time, durationSeconds: 15, wordLimit: 25),
+      .init(durationSeconds: 15, wordLimit: nil))
+    XCTAssertEqual(
+      LeaderboardParameterFilterPolicy.filter(
+        mode: .words, durationSeconds: 15, wordLimit: 25),
+      .init(durationSeconds: nil, wordLimit: 25))
+    XCTAssertEqual(
+      LeaderboardParameterFilterPolicy.filter(
+        mode: .quote, durationSeconds: 15, wordLimit: 25),
+      .init(durationSeconds: nil, wordLimit: nil))
+    XCTAssertFalse(
+      LeaderboardParameterFilterPolicy.filter(
+        mode: .time, durationSeconds: 4, wordLimit: nil).isActive)
   }
 
   func testLeaderboardRefreshCountdownMatchesPinnedUTCCadence() throws {

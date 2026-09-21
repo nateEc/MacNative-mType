@@ -175,16 +175,23 @@ public struct LeaderboardQuery: Content {
     public let mode: String?
     public let language: String?
     public let period: String?
+    /// The duration or word count is the native counterpart of Monkeytype's
+    /// `mode2`: a speed result is comparable only with the same configured limit.
+    public let durationSeconds: Int?
+    public let wordLimit: Int?
     public let limit: Int?
     public let offset: Int?
 
     public init(
         mode: String? = nil, language: String? = nil, period: String? = nil,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil,
         limit: Int? = nil, offset: Int? = nil
     ) {
         self.mode = mode
         self.language = language
         self.period = period
+        self.durationSeconds = durationSeconds
+        self.wordLimit = wordLimit
         self.limit = limit
         self.offset = offset
     }
@@ -210,12 +217,19 @@ public struct LeaderboardResponse: Content, Equatable {
     public let total: Int
     public let offset: Int
     public let pageSize: Int
+    /// Lets newer native clients avoid sending parameter filters to an older
+    /// self-hosted service that would silently ignore them.
+    public let parameterFilterSupported: Bool
 
-    public init(entries: [LeaderboardEntry], total: Int, offset: Int, pageSize: Int) {
+    public init(
+        entries: [LeaderboardEntry], total: Int, offset: Int, pageSize: Int,
+        parameterFilterSupported: Bool = true
+    ) {
         self.entries = entries
         self.total = total
         self.offset = offset
         self.pageSize = pageSize
+        self.parameterFilterSupported = parameterFilterSupported
     }
 }
 

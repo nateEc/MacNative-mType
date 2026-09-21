@@ -2955,6 +2955,84 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testLeaderboardRoutesSeparateSpeedBucketsByConfiguredLimit() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let fifteenSeconds = try await store.register(
+      .init(
+        email: "bucket-fifteen@example.com", password: "a secure password",
+        displayName: "Fifteen Seconds"))
+    let thirtySeconds = try await store.register(
+      .init(
+        email: "bucket-thirty@example.com", password: "a secure password",
+        displayName: "Thirty Seconds"))
+    let twentyFiveWords = try await store.register(
+      .init(
+        email: "bucket-words-25@example.com", password: "a secure password",
+        displayName: "Word Twenty Five"))
+    let fiftyWords = try await store.register(
+      .init(
+        email: "bucket-words-50@example.com", password: "a secure password",
+        displayName: "Word Fifty"))
+    let now = Date(timeIntervalSince1970: 1_788_825_600)
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 150, accuracy: 100, durationSeconds: 30, finishedAt: now),
+      accessToken: thirtySeconds.accessToken, now: now)
+    let fifteenSubmission = try await store.submitResult(
+      result(id: UUID(), wpm: 90, accuracy: 100, durationSeconds: 15, finishedAt: now),
+      accessToken: fifteenSeconds.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 120, accuracy: 100, mode: "words", durationSeconds: nil, wordLimit: 50,
+        finishedAt: now), accessToken: fiftyWords.accessToken, now: now)
+    let twentyFiveSubmission = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 70, accuracy: 100, mode: "words", durationSeconds: nil, wordLimit: 25,
+        finishedAt: now), accessToken: twentyFiveWords.accessToken, now: now)
+
+    XCTAssertEqual(fifteenSubmission.dailyLeaderboardRank, 1)
+    XCTAssertEqual(twentyFiveSubmission.dailyLeaderboardRank, 1)
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(
+        .GET, "v1/leaderboards?mode=time&language=english&durationSeconds=15") { response async in
+          XCTAssertEqual(response.status, .ok)
+          let leaderboard = try? response.content.decode(LeaderboardResponse.self)
+          XCTAssertEqual(leaderboard?.entries.map(\.displayName), ["Fifteen Seconds"])
+          XCTAssertEqual(leaderboard?.total, 1)
+          XCTAssertEqual(leaderboard?.parameterFilterSupported, true)
+        }
+      try await app.test(
+        .GET, "v1/leaderboards?mode=words&language=english&wordLimit=25") { response async in
+          XCTAssertEqual(response.status, .ok)
+          let leaderboard = try? response.content.decode(LeaderboardResponse.self)
+          XCTAssertEqual(leaderboard?.entries.map(\.displayName), ["Word Twenty Five"])
+          XCTAssertEqual(leaderboard?.total, 1)
+        }
+      try await app.test(
+        .GET, "v1/leaderboards/rank?mode=time&language=english&durationSeconds=15",
+        beforeRequest: { request async in
+          request.headers.add(name: "Authorization", value: "Bearer \(fifteenSeconds.accessToken)")
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            (try? response.content.decode(LeaderboardRankResponse.self))?.entry?.rank, 1)
+        })
+      try await app.test(
+        .GET, "v1/leaderboards?mode=time&language=english&durationSeconds=15&wordLimit=25"
+      ) { response async in
+        XCTAssertEqual(response.status, .badRequest)
+      }
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testResultSubmissionOnlyReturnsDailyRankForTodaysEligibleResult() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let visible = try await store.register(

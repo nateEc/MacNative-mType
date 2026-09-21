@@ -1251,7 +1251,13 @@ private struct ContentView: View {
           syncInitialLeaderboard = .init(
             mode: result.result.configuration.mode,
             language: result.result.configuration.language,
-            period: .day)
+            period: .day,
+            durationSeconds: result.result.configuration.mode == .time
+              ? result.result.configuration.duration.map { Int($0.rounded()) }
+              : nil,
+            wordLimit: result.result.configuration.mode == .words
+              ? result.result.configuration.wordLimit
+              : nil)
           showingSync = true
         },
         onPracticeMissedWords: {

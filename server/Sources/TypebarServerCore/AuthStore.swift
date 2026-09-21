@@ -2701,7 +2701,11 @@ public actor AuthStore {
     let isToday = request.finishedAt >= Calendar.current.startOfDay(for: now)
     let dailyRank = isLeaderboardEligible && isToday
       ? try leaderboardEntries(
-        .init(mode: request.mode, language: request.language, period: "day", limit: nil),
+        .init(
+          mode: request.mode, language: request.language, period: "day",
+          durationSeconds: request.mode == "time" ? request.durationSeconds : nil,
+          wordLimit: request.mode == "words" ? request.wordLimit : nil,
+          limit: nil),
         eligibleUserIDs: nil, now: now
       ).first(where: { $0.userID == userID })?.rank
       : nil
@@ -2945,7 +2949,8 @@ public actor AuthStore {
       offset: query.offset, limit: query.limit, defaultLimit: 25)
     return .init(
       entries: Array(entries.dropFirst(pagination.offset).prefix(pagination.pageSize)),
-      total: entries.count, offset: pagination.offset, pageSize: pagination.pageSize)
+      total: entries.count, offset: pagination.offset, pageSize: pagination.pageSize,
+      parameterFilterSupported: true)
   }
 
   public func leaderboardRank(
@@ -2969,7 +2974,8 @@ public actor AuthStore {
       offset: query.offset, limit: query.limit, defaultLimit: 25)
     return .init(
       entries: Array(entries.dropFirst(pagination.offset).prefix(pagination.pageSize)),
-      total: entries.count, offset: pagination.offset, pageSize: pagination.pageSize)
+      total: entries.count, offset: pagination.offset, pageSize: pagination.pageSize,
+      parameterFilterSupported: true)
   }
 
   public func friendLeaderboardRank(
@@ -3102,6 +3108,14 @@ public actor AuthStore {
     let modes = Set(["time", "words", "quote", "zen", "custom"])
     let periods = Set(["all", "day", "yesterday", "week"])
     if let mode = query.mode, !modes.contains(mode) { throw ResultStoreError.invalidResult }
+    if let durationSeconds = query.durationSeconds {
+      guard query.mode == "time", query.wordLimit == nil, (5...3_600).contains(durationSeconds)
+      else { throw ResultStoreError.invalidResult }
+    }
+    if let wordLimit = query.wordLimit {
+      guard query.mode == "words", query.durationSeconds == nil, (1...1_000).contains(wordLimit)
+      else { throw ResultStoreError.invalidResult }
+    }
     if let language = query.language, !Self.supportedResultLanguageIDs.contains(language) {
       throw ResultStoreError.invalidResult
     }
@@ -3131,6 +3145,8 @@ public actor AuthStore {
         && users[result.userID]?.leaderboardOptedOut == false
         && (query.mode == nil || result.mode == query.mode)
         && (query.language == nil || result.language == query.language)
+        && (query.durationSeconds == nil || result.durationSeconds == query.durationSeconds)
+        && (query.wordLimit == nil || result.wordLimit == query.wordLimit)
         && (lowerBound == nil || result.finishedAt >= lowerBound!)
         && (upperBound == nil || result.finishedAt < upperBound!)
     }.sorted {

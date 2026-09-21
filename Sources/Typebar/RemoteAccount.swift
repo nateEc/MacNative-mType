@@ -736,8 +736,13 @@ struct RemoteLeaderboardPage: Codable, Sendable {
     let total: Int?
     let offset: Int
     let pageSize: Int
+    /// Nil means an older self-hosted service predates speed-parameter filtering.
+    /// The UI must not send a filter that such a service would silently ignore.
+    let parameterFilterSupported: Bool?
 
-    private enum CodingKeys: String, CodingKey { case entries, total, offset, pageSize }
+    private enum CodingKeys: String, CodingKey {
+        case entries, total, offset, pageSize, parameterFilterSupported
+    }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -745,6 +750,8 @@ struct RemoteLeaderboardPage: Codable, Sendable {
         total = try values.decodeIfPresent(Int.self, forKey: .total)
         offset = max(0, try values.decodeIfPresent(Int.self, forKey: .offset) ?? 0)
         pageSize = max(1, try values.decodeIfPresent(Int.self, forKey: .pageSize) ?? entries.count)
+        parameterFilterSupported = try values.decodeIfPresent(
+            Bool.self, forKey: .parameterFilterSupported)
     }
 }
 
@@ -1093,6 +1100,19 @@ struct RemoteLeaderboardSelection: Equatable {
     let mode: TestMode?
     let language: TypingLanguage?
     let period: RemoteLeaderboardPeriod
+    let durationSeconds: Int?
+    let wordLimit: Int?
+
+    init(
+        mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil
+    ) {
+        self.mode = mode
+        self.language = language
+        self.period = period
+        self.durationSeconds = durationSeconds
+        self.wordLimit = wordLimit
+    }
 }
 
 enum RemoteLeaderboardScope: String, CaseIterable {
@@ -2156,6 +2176,7 @@ final class AccountSession {
 
     func leaderboardPage(
         mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil,
         scope: RemoteLeaderboardScope = .global, offset: Int = 0,
         limit: Int = LeaderboardPaginationPolicy.preferredPageSize
     ) async throws -> RemoteLeaderboardPage {
@@ -2166,6 +2187,10 @@ final class AccountSession {
         ]
         if let mode { queryItems.append(.init(name: "mode", value: mode.rawValue)) }
         if let language { queryItems.append(.init(name: "language", value: language.rawValue)) }
+        if let durationSeconds {
+            queryItems.append(.init(name: "durationSeconds", value: "\(durationSeconds)"))
+        }
+        if let wordLimit { queryItems.append(.init(name: "wordLimit", value: "\(wordLimit)")) }
         return try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends ? "v1/leaderboards/friends" : "v1/leaderboards",
             method: "GET",
@@ -2178,19 +2203,26 @@ final class AccountSession {
 
     func leaderboard(
         mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil,
         scope: RemoteLeaderboardScope = .global, limit: Int = 25
     ) async throws -> [RemoteLeaderboardEntry] {
         (try await leaderboardPage(
-            mode: mode, language: language, period: period, scope: scope, limit: limit)).entries
+            mode: mode, language: language, period: period, durationSeconds: durationSeconds,
+            wordLimit: wordLimit, scope: scope, limit: limit)).entries
     }
 
     func leaderboardRank(
         mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil,
         scope: RemoteLeaderboardScope = .global
     ) async throws -> RemoteLeaderboardEntry? {
         var queryItems = [URLQueryItem(name: "period", value: period.rawValue)]
         if let mode { queryItems.append(.init(name: "mode", value: mode.rawValue)) }
         if let language { queryItems.append(.init(name: "language", value: language.rawValue)) }
+        if let durationSeconds {
+            queryItems.append(.init(name: "durationSeconds", value: "\(durationSeconds)"))
+        }
+        if let wordLimit { queryItems.append(.init(name: "wordLimit", value: "\(wordLimit)")) }
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends ? "v1/leaderboards/friends/rank" : "v1/leaderboards/rank",
             method: "GET",
