@@ -81,6 +81,373 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testConfiguredHumanVerificationRejectsMissingAndReplayedRegistrationProofs() async throws {
+    let app = try await Application.make(.testing)
+    let humanVerification = HumanVerificationController(
+      configuration: .init(siteKey: "test-site-key", allowedHostnames: ["typebar.test"]),
+      verify: { token, action, cData in
+        token == "provider-token" && action == "typebar" && !cData.isEmpty
+      })
+
+    do {
+      try configure(
+        app,
+        authStore: AuthStore(fileURL: nil, bcryptCost: 4),
+        humanVerification: humanVerification)
+
+      try await app.test(.GET, "v1/capabilities") { response async in
+        let capabilities = try? response.content.decode(ServiceCapabilitiesResponse.self)
+        XCTAssertEqual(capabilities?.capabilities["humanVerification"], .available)
+      }
+
+      try await app.test(
+        .POST,
+        "v1/auth/register",
+        beforeRequest: { request async throws in
+          try request.content.encode(
+            RegisterRequest(
+              email: "missing-proof@example.com", password: "a secure password", displayName: "Missing Proof"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unprocessableEntity)
+        })
+
+      var challenge: HumanVerificationChallengeStartResponse?
+      try await app.test(
+        .POST,
+        "v1/human-verification/challenges",
+        beforeRequest: { request async throws in
+          try request.content.encode(HumanVerificationChallengeStartRequest(purpose: .registration))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          challenge = try? response.content.decode(HumanVerificationChallengeStartResponse.self)
+        })
+      let challengeResponse = try XCTUnwrap(challenge)
+
+      var callbackURL: URL?
+      try await app.test(
+        .POST,
+        "v1/human-verification/challenges/\(challengeResponse.id.uuidString)/complete",
+        beforeRequest: { request async throws in
+          try request.content.encode(HumanVerificationChallengeCompletionRequest(token: "provider-token"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .found)
+          callbackURL = response.headers.first(name: .location).flatMap(URL.init(string:))
+        })
+      let proof = try HumanVerificationProof(callbackURL: try XCTUnwrap(callbackURL))
+
+      try await app.test(
+        .POST,
+        "v1/auth/register",
+        beforeRequest: { request async throws in
+          try request.content.encode(
+            RegisterRequest(
+              email: "first-proof@example.com", password: "a secure password", displayName: "First Proof",
+              humanVerification: proof))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+        })
+
+      try await app.test(
+        .POST,
+        "v1/auth/register",
+        beforeRequest: { request async throws in
+          try request.content.encode(
+            RegisterRequest(
+              email: "replayed-proof@example.com", password: "a secure password", displayName: "Replayed Proof",
+              humanVerification: proof))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unprocessableEntity)
+        })
+
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
+  func testConfiguredHumanVerificationRejectsPasswordResetBeforeDelivery() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let deliveryRecorder = PasswordResetDeliveryRecorder()
+    let humanVerification = HumanVerificationController(
+      configuration: .init(siteKey: "test-site-key", allowedHostnames: ["typebar.test"]),
+      verify: { token, action, cData in
+        token == "provider-token" && action == "typebar" && !cData.isEmpty
+      })
+    _ = try await store.register(
+      .init(email: "reset-proof@example.com", password: "a secure password", displayName: "Reset Proof"))
+
+    do {
+      try configure(
+        app,
+        authStore: store,
+        passwordResetDelivery: { delivery in await deliveryRecorder.record(delivery) },
+        humanVerification: humanVerification)
+
+      try await app.test(
+        .POST,
+        "v1/auth/password-reset/request",
+        beforeRequest: { request async throws in
+          try request.content.encode(PasswordResetRequest(email: "reset-proof@example.com"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unprocessableEntity)
+        })
+      let missingProofDeliveryCount = await deliveryRecorder.count()
+      XCTAssertEqual(missingProofDeliveryCount, 0)
+
+      let challenge = await humanVerification.start(.init(purpose: .passwordResetRequest))
+      let callbackURL = try await humanVerification.complete(
+        challengeID: challenge.id,
+        request: .init(token: "provider-token"))
+      let proof = try HumanVerificationProof(callbackURL: callbackURL)
+      try await app.test(
+        .POST,
+        "v1/auth/password-reset/request",
+        beforeRequest: { request async throws in
+          try request.content.encode(
+            PasswordResetRequest(email: "reset-proof@example.com", humanVerification: proof))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+        })
+      let verifiedProofDeliveryCount = await deliveryRecorder.count()
+      XCTAssertEqual(verifiedProofDeliveryCount, 1)
+
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
+  func testTurnstileConfigurationIsAllOrNothingAndBindsChallengeContext() async throws {
+    XCTAssertNil(
+      try TurnstileConfiguration.from(siteKey: nil, secret: nil, allowedHostnames: nil))
+    XCTAssertThrowsError(
+      try TurnstileConfiguration.from(
+        siteKey: "site-key", secret: nil, allowedHostnames: "typebar.test"))
+    XCTAssertThrowsError(
+      try TurnstileConfiguration.from(siteKey: "site-key", secret: "secret", allowedHostnames: nil))
+
+    let configuration = try XCTUnwrap(
+      TurnstileConfiguration.from(
+        siteKey: "site-key", secret: "secret", allowedHostnames: "typebar.test"))
+    let accepted = configuration.makeHumanVerificationController { request in
+      .init(
+        success: true, hostname: "typebar.test", action: request.expectedAction,
+        cData: request.expectedCData)
+    }
+    let acceptedProof = try HumanVerificationProof(callbackURL: try await completedHumanVerificationCallback(
+      accepted, purpose: .registration))
+    try await accepted.consume(acceptedProof, for: .registration)
+
+    let wrongHostname = configuration.makeHumanVerificationController { request in
+      .init(
+        success: true, hostname: "unexpected.example", action: request.expectedAction,
+        cData: request.expectedCData)
+    }
+    let challenge = await wrongHostname.start(.init(purpose: .registration))
+    do {
+      _ = try await wrongHostname.complete(
+        challengeID: challenge.id,
+        request: .init(token: "provider-token"))
+      XCTFail("A provider response from an unconfigured hostname must be rejected")
+    } catch let error as Abort {
+      XCTAssertEqual(error.status, .unprocessableEntity)
+    }
+  }
+
+  func testHumanVerificationRejectsWrongPurposeExpiredChallengesAndProviderFailures() async throws {
+    let accepted = HumanVerificationController(
+      configuration: .init(siteKey: "test-site-key", allowedHostnames: ["typebar.test"]),
+      verify: { token, action, cData in
+        token == "provider-token" && action == "typebar" && !cData.isEmpty
+      })
+    let proof = try HumanVerificationProof(callbackURL: try await completedHumanVerificationCallback(
+      accepted, purpose: .profileReport))
+
+    do {
+      try await accepted.consume(proof, for: .registration)
+      XCTFail("A proof cannot be substituted for a different protected write")
+    } catch let error as Abort {
+      XCTAssertEqual(error.status, .unprocessableEntity)
+    }
+
+    let fixedNow = Date(timeIntervalSince1970: 1_700_000_000)
+    let expired = await accepted.start(.init(purpose: .registration), now: fixedNow)
+    do {
+      _ = try await accepted.complete(
+        challengeID: expired.id,
+        request: .init(token: "provider-token"),
+        now: fixedNow.addingTimeInterval(HumanVerificationController.lifetime))
+      XCTFail("An expired challenge cannot receive a provider response")
+    } catch let error as Abort {
+      XCTAssertEqual(error.status, .unprocessableEntity)
+    }
+
+    let unavailable = HumanVerificationController(
+      configuration: .init(siteKey: "test-site-key", allowedHostnames: ["typebar.test"]),
+      verify: { _, _, _ in throw TurnstileConfigurationError.providerUnavailable }
+    )
+    let unavailableChallenge = await unavailable.start(.init(purpose: .registration))
+    do {
+      _ = try await unavailable.complete(
+        challengeID: unavailableChallenge.id, request: .init(token: "provider-token"))
+      XCTFail("Provider outages must fail closed without issuing a proof")
+    } catch let error as Abort {
+      XCTAssertEqual(error.status, .serviceUnavailable)
+    }
+  }
+
+  func testHumanVerificationConsumesOneProofAtomicallyAcrossConcurrentWrites() async throws {
+    let humanVerification = HumanVerificationController(
+      configuration: .init(siteKey: "test-site-key", allowedHostnames: ["typebar.test"]),
+      verify: { token, action, cData in
+        token == "provider-token" && action == "typebar" && !cData.isEmpty
+      })
+    let proof = try HumanVerificationProof(callbackURL: try await completedHumanVerificationCallback(
+      humanVerification, purpose: .registration))
+
+    let acceptedCount = await withTaskGroup(of: Bool.self, returning: Int.self) { group in
+      for _ in 0..<2 {
+        group.addTask {
+          do {
+            try await humanVerification.consume(proof, for: .registration)
+            return true
+          } catch {
+            return false
+          }
+        }
+      }
+      var accepted = 0
+      for await didConsume in group where didConsume {
+        accepted += 1
+      }
+      return accepted
+    }
+
+    XCTAssertEqual(acceptedCount, 1)
+  }
+
+  func testConfiguredHumanVerificationProtectsProfileAndQuoteWrites() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let humanVerification = HumanVerificationController(
+      configuration: .init(siteKey: "test-site-key", allowedHostnames: ["typebar.test"]),
+      verify: { token, action, cData in
+        token == "provider-token" && action == "typebar" && !cData.isEmpty
+      })
+    let author = try await store.register(
+      .init(email: "quote-author@example.com", password: "a secure password", displayName: "Quote Author"))
+    let reporter = try await store.register(
+      .init(email: "reporter-proof@example.com", password: "a secure password", displayName: "Proof Reporter"))
+    let target = try await store.register(
+      .init(email: "target-proof@example.com", password: "a secure password", displayName: "Proof Target"))
+    let approvedQuote = try await store.submitQuote(
+      .init(
+        language: "english", text: "A careful shared practice keeps tomorrow's work clear.", attribution: nil),
+      accessToken: author.accessToken)
+    _ = try await store.moderateQuote(approvedQuote.id, status: "approved")
+
+    do {
+      try configure(app, authStore: store, humanVerification: humanVerification)
+
+      try await app.test(
+        .POST,
+        "v1/reports/profiles",
+        beforeRequest: { request async throws in
+          request.headers.bearerAuthorization = .init(token: reporter.accessToken)
+          try request.content.encode(
+            ProfileReportRequest(profileID: target.user.id, reason: .suspiciousResults, note: nil))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unprocessableEntity)
+        })
+      let profileProof = try HumanVerificationProof(callbackURL: try await completedHumanVerificationCallback(
+        humanVerification, purpose: .profileReport))
+      try await app.test(
+        .POST,
+        "v1/reports/profiles",
+        beforeRequest: { request async throws in
+          request.headers.bearerAuthorization = .init(token: reporter.accessToken)
+          try request.content.encode(
+            ProfileReportRequest(
+              profileID: target.user.id, reason: .suspiciousResults, note: nil,
+              humanVerification: profileProof))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+        })
+
+      try await app.test(
+        .POST,
+        "v1/quotes",
+        beforeRequest: { request async throws in
+          request.headers.bearerAuthorization = .init(token: author.accessToken)
+          try request.content.encode(
+            QuoteSubmissionRequest(
+              language: "english", text: "Small pauses can make focused practice more reliable.", attribution: nil))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unprocessableEntity)
+        })
+      let quoteSubmissionProof = try HumanVerificationProof(callbackURL: try await completedHumanVerificationCallback(
+        humanVerification, purpose: .quoteSubmission))
+      try await app.test(
+        .POST,
+        "v1/quotes",
+        beforeRequest: { request async throws in
+          request.headers.bearerAuthorization = .init(token: author.accessToken)
+          try request.content.encode(
+            QuoteSubmissionRequest(
+              language: "english", text: "Small pauses can make focused practice more reliable.", attribution: nil,
+              humanVerification: quoteSubmissionProof))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+        })
+
+      try await app.test(
+        .POST,
+        "v1/reports/quotes",
+        beforeRequest: { request async throws in
+          request.headers.bearerAuthorization = .init(token: reporter.accessToken)
+          try request.content.encode(
+            QuoteReportRequest(quoteID: approvedQuote.id, reason: .lowQualityContent, note: nil))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .unprocessableEntity)
+        })
+      let quoteReportProof = try HumanVerificationProof(callbackURL: try await completedHumanVerificationCallback(
+        humanVerification, purpose: .quoteReport))
+      try await app.test(
+        .POST,
+        "v1/reports/quotes",
+        beforeRequest: { request async throws in
+          request.headers.bearerAuthorization = .init(token: reporter.accessToken)
+          try request.content.encode(
+            QuoteReportRequest(
+              quoteID: approvedQuote.id, reason: .lowQualityContent, note: nil,
+              humanVerification: quoteReportProof))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+        })
+
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testMaintenanceModeKeepsStatusAndReadsAvailableButRejectsWrites() async throws {
     let app = try await Application.make(.testing)
     do {
@@ -5608,5 +5975,14 @@ final class HealthRouteTests: XCTestCase {
       moderationKey: moderationKey,
       oauthProviderClient: oauthProviderClient,
       maintenanceMode: maintenanceMode)
+  }
+
+  private func completedHumanVerificationCallback(
+    _ humanVerification: HumanVerificationController, purpose: HumanVerificationPurpose
+  ) async throws -> URL {
+    let challenge = await humanVerification.start(.init(purpose: purpose))
+    return try await humanVerification.complete(
+      challengeID: challenge.id,
+      request: .init(token: "provider-token"))
   }
 }

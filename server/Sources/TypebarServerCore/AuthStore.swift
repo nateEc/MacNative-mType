@@ -5,6 +5,17 @@ public struct RegisterRequest: Content, Equatable {
   public let email: String
   public let password: String
   public let displayName: String
+  public let humanVerification: HumanVerificationProof?
+
+  public init(
+    email: String, password: String, displayName: String,
+    humanVerification: HumanVerificationProof? = nil
+  ) {
+    self.email = email
+    self.password = password
+    self.displayName = displayName
+    self.humanVerification = humanVerification
+  }
 }
 
 public struct LoginRequest: Content, Equatable {
@@ -27,6 +38,12 @@ public struct RemovePasswordAuthenticationRequest: Content, Equatable {
 
 public struct PasswordResetRequest: Content, Equatable {
   public let email: String
+  public let humanVerification: HumanVerificationProof?
+
+  public init(email: String, humanVerification: HumanVerificationProof? = nil) {
+    self.email = email
+    self.humanVerification = humanVerification
+  }
 }
 
 public struct PasswordResetRequestResponse: Content, Equatable {

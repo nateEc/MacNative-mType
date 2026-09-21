@@ -185,6 +185,14 @@ private struct RemoteRegisterRequest: Codable, Sendable {
     let email: String
     let password: String
     let displayName: String
+    let humanVerification: RemoteHumanVerificationProof?
+
+    init(email: String, password: String, displayName: String, humanVerification: RemoteHumanVerificationProof? = nil) {
+        self.email = email
+        self.password = password
+        self.displayName = displayName
+        self.humanVerification = humanVerification
+    }
 }
 
 private struct RemoteLoginRequest: Codable, Sendable {
@@ -251,7 +259,15 @@ private struct RemoteRemovePasswordAuthenticationRequest: Codable, Sendable {
     let currentPassword: String
 }
 
-private struct RemotePasswordResetRequest: Codable, Sendable { let email: String }
+private struct RemotePasswordResetRequest: Codable, Sendable {
+    let email: String
+    let humanVerification: RemoteHumanVerificationProof?
+
+    init(email: String, humanVerification: RemoteHumanVerificationProof? = nil) {
+        self.email = email
+        self.humanVerification = humanVerification
+    }
+}
 private struct RemotePasswordResetRequestResponse: Codable, Sendable { let accepted: Bool }
 private struct RemoteCompletePasswordResetRequest: Codable, Sendable {
     let token: String
@@ -391,6 +407,19 @@ private struct RemoteQuoteSubmissionRequest: Codable, Sendable {
     let language: String
     let text: String
     let attribution: String?
+    let humanVerification: RemoteHumanVerificationProof?
+
+    init(
+        language: String,
+        text: String,
+        attribution: String?,
+        humanVerification: RemoteHumanVerificationProof? = nil
+    ) {
+        self.language = language
+        self.text = text
+        self.attribution = attribution
+        self.humanVerification = humanVerification
+    }
 }
 
 struct RemoteQuoteSubmissionResponse: Codable, Sendable {
@@ -480,7 +509,24 @@ enum RemoteQuoteReportReason: String, CaseIterable, Codable, Sendable {
         }
     }
 }
-private struct RemoteQuoteReportRequest: Codable, Sendable { let quoteID: UUID; let reason: RemoteQuoteReportReason; let note: String? }
+private struct RemoteQuoteReportRequest: Codable, Sendable {
+    let quoteID: UUID
+    let reason: RemoteQuoteReportReason
+    let note: String?
+    let humanVerification: RemoteHumanVerificationProof?
+
+    init(
+        quoteID: UUID,
+        reason: RemoteQuoteReportReason,
+        note: String?,
+        humanVerification: RemoteHumanVerificationProof? = nil
+    ) {
+        self.quoteID = quoteID
+        self.reason = reason
+        self.note = note
+        self.humanVerification = humanVerification
+    }
+}
 private struct RemoteQuoteReportResponse: Codable, Sendable { let id: UUID; let submittedAt: Date }
 
 private struct RemoteSyncChange: Codable, Sendable {
@@ -657,6 +703,12 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
         apiVersion == "v1"
             && service == "typebar"
             && capabilities["resultTimingEvidence"] == "available"
+    }
+
+    var supportsHumanVerification: Bool {
+        apiVersion == "v1"
+            && service == "typebar"
+            && capabilities["humanVerification"] == "available"
     }
 }
 
@@ -1091,6 +1143,19 @@ private struct RemoteProfileReportRequest: Codable, Sendable {
     let profileID: UUID
     let reason: RemoteProfileReportReason
     let note: String?
+    let humanVerification: RemoteHumanVerificationProof?
+
+    init(
+        profileID: UUID,
+        reason: RemoteProfileReportReason,
+        note: String?,
+        humanVerification: RemoteHumanVerificationProof? = nil
+    ) {
+        self.profileID = profileID
+        self.reason = reason
+        self.note = note
+        self.humanVerification = humanVerification
+    }
 }
 
 struct RemoteProfileReportResponse: Codable, Sendable {
@@ -1280,6 +1345,8 @@ enum RemoteExperienceLeaderboardPeriod: String, CaseIterable {
 enum RemoteAccountError: LocalizedError {
     case invalidServerURL
     case invalidOAuthCallback
+    case invalidHumanVerificationCallback
+    case invalidHumanVerificationChallenge
     case oauthAuthorizationCancelled
     case oauthAuthorizationInProgress
     case accountScopeChanged
@@ -1292,6 +1359,8 @@ enum RemoteAccountError: LocalizedError {
         switch self {
         case .invalidServerURL: "请输入有效的 Typebar 服务地址。"
         case .invalidOAuthCallback: "第三方登录返回了无法识别的回调。"
+        case .invalidHumanVerificationCallback: "人机验证返回了无法识别的回调。"
+        case .invalidHumanVerificationChallenge: "自建服务返回了不安全的人机验证地址。"
         case .oauthAuthorizationCancelled: "第三方登录已取消。"
         case .oauthAuthorizationInProgress: "已有一个第三方登录正在进行。"
         case .accountScopeChanged: "服务地址或登录账户已改变；未发送成绩。"
@@ -1312,6 +1381,7 @@ final class AccountSession {
     @ObservationIgnored private let syncIDKey = "remoteAccount.archiveSyncID.v1"
     @ObservationIgnored private let tokenStore = AccountTokenStore()
     @ObservationIgnored private let oauthBrowser = OAuthWebAuthenticationSession()
+    @ObservationIgnored private let humanVerificationBrowser = OAuthWebAuthenticationSession()
 
     private(set) var endpoint = "http://127.0.0.1:8080" {
         didSet {
@@ -1373,7 +1443,30 @@ final class AccountSession {
     }
 
     func register(email: String, password: String, displayName: String) async {
-        await performAuth(path: "v1/auth/register", body: RemoteRegisterRequest(email: email, password: password, displayName: displayName))
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let requestEndpoint = endpoint
+            let proof = try await humanVerificationProof(
+                for: .registration, endpoint: requestEndpoint)
+            let session = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
+                path: "v1/auth/register",
+                method: "POST",
+                token: nil,
+                body: RemoteRegisterRequest(
+                    email: email,
+                    password: password,
+                    displayName: displayName,
+                    humanVerification: proof
+                ),
+                response: RemoteAuthSession.self
+            )
+            guard endpoint == requestEndpoint else { throw RemoteAccountError.accountScopeChanged }
+            try applyAuthenticatedSession(session)
+            statusMessage = nil
+        } catch {
+            statusMessage = error.localizedDescription
+        }
     }
 
     /// Performs the advisory server-side preflight used by display-name fields.
@@ -1476,13 +1569,17 @@ final class AccountSession {
         isWorking = true
         defer { isWorking = false }
         do {
-            let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            let requestEndpoint = endpoint
+            let proof = try await humanVerificationProof(
+                for: .passwordResetRequest, endpoint: requestEndpoint)
+            let response = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                 path: "v1/auth/password-reset/request",
                 method: "POST",
                 token: nil,
-                body: RemotePasswordResetRequest(email: email),
+                body: RemotePasswordResetRequest(email: email, humanVerification: proof),
                 response: RemotePasswordResetRequestResponse.self
             )
+            guard endpoint == requestEndpoint else { throw RemoteAccountError.accountScopeChanged }
             guard response.accepted else { throw RemoteAccountError.unexpectedResponse }
             statusMessage = "若该邮箱已注册，重置码已发送；请粘贴邮件中的重置码。"
         } catch {
@@ -2104,7 +2201,22 @@ final class AccountSession {
         isWorking = true
         defer { isWorking = false }
         do {
-            let response = try await RemoteAccountAPI(endpoint: endpoint).request(path: "v1/quotes", method: "POST", token: token, body: RemoteQuoteSubmissionRequest(language: language.rawValue, text: text, attribution: attribution), response: RemoteQuoteSubmissionResponse.self)
+            let requestEndpoint = endpoint
+            let proof = try await humanVerificationProof(
+                for: .quoteSubmission, endpoint: requestEndpoint)
+            let response = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
+                path: "v1/quotes",
+                method: "POST",
+                token: token,
+                body: RemoteQuoteSubmissionRequest(
+                    language: language.rawValue,
+                    text: text,
+                    attribution: attribution,
+                    humanVerification: proof
+                ),
+                response: RemoteQuoteSubmissionResponse.self
+            )
+            guard endpoint == requestEndpoint else { throw RemoteAccountError.accountScopeChanged }
             statusMessage = response.status == "pending" ? "引语已提交，等待审核。" : "引语已提交。"
         } catch { statusMessage = error.localizedDescription }
     }
@@ -2224,12 +2336,21 @@ final class AccountSession {
 
     func reportQuote(_ quoteID: UUID, reason: RemoteQuoteReportReason, note: String?) async throws {
         let token = try accessToken()
+        let requestEndpoint = endpoint
+        let proof = try await humanVerificationProof(
+            for: .quoteReport, endpoint: requestEndpoint)
         let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
-        _ = try await RemoteAccountAPI(endpoint: endpoint).request(
+        _ = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
             path: "v1/reports/quotes", method: "POST", token: token,
-            body: RemoteQuoteReportRequest(quoteID: quoteID, reason: reason, note: normalizedNote?.isEmpty == true ? nil : normalizedNote),
+            body: RemoteQuoteReportRequest(
+                quoteID: quoteID,
+                reason: reason,
+                note: normalizedNote?.isEmpty == true ? nil : normalizedNote,
+                humanVerification: proof
+            ),
             response: RemoteQuoteReportResponse.self
         )
+        guard endpoint == requestEndpoint else { throw RemoteAccountError.accountScopeChanged }
     }
 
     func refreshProfile() async {
@@ -2710,11 +2831,21 @@ final class AccountSession {
 
     func reportProfile(_ profileID: UUID, reason: RemoteProfileReportReason, note: String?) async throws -> RemoteProfileReportResponse {
         let token = try accessToken()
-        return try await RemoteAccountAPI(endpoint: endpoint).request(
+        let requestEndpoint = endpoint
+        let proof = try await humanVerificationProof(
+            for: .profileReport, endpoint: requestEndpoint)
+        let response = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
             path: "v1/reports/profiles", method: "POST", token: token,
-            body: RemoteProfileReportRequest(profileID: profileID, reason: reason, note: note),
+            body: RemoteProfileReportRequest(
+                profileID: profileID,
+                reason: reason,
+                note: note,
+                humanVerification: proof
+            ),
             response: RemoteProfileReportResponse.self
         )
+        guard endpoint == requestEndpoint else { throw RemoteAccountError.accountScopeChanged }
+        return response
     }
 
     private func accessToken() throws -> String {
@@ -2863,6 +2994,40 @@ final class AccountSession {
         developerAccessKeys = []
         remoteResults = []
         pendingOAuthRegistration = nil
+    }
+
+    private func humanVerificationProof(
+        for purpose: RemoteHumanVerificationPurpose,
+        endpoint requestEndpoint: String
+    ) async throws -> RemoteHumanVerificationProof? {
+        let api = RemoteAccountAPI(endpoint: requestEndpoint)
+        let capabilities = try? await api.request(
+            path: "v1/capabilities",
+            method: "GET",
+            token: nil,
+            body: Optional<String>.none,
+            response: RemoteServiceCapabilities.self
+        )
+        guard capabilities?.supportsHumanVerification == true else { return nil }
+
+        let challenge = try await api.request(
+            path: "v1/human-verification/challenges",
+            method: "POST",
+            token: nil,
+            body: RemoteHumanVerificationChallengeStartRequest(purpose: purpose),
+            response: RemoteHumanVerificationChallengeStartResponse.self
+        )
+        let challengeURL = try RemoteHumanVerificationURL.challengeURL(
+            endpoint: requestEndpoint,
+            relativePath: challenge.verificationPath
+        )
+        let callbackURL = try await humanVerificationBrowser.authorize(url: challengeURL)
+        guard endpoint == requestEndpoint else { throw RemoteAccountError.accountScopeChanged }
+        let proof = try RemoteHumanVerificationProof(callbackURL: callbackURL)
+        guard proof.challengeID == challenge.id else {
+            throw RemoteAccountError.invalidHumanVerificationCallback
+        }
+        return proof
     }
 
     private func oauthState(from callbackURL: URL) throws -> String {

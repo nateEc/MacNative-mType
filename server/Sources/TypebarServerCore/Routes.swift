@@ -30,6 +30,7 @@ public func configure(
     passwordResetDelivery: PasswordResetDeliveryHandler? = nil,
     emailVerificationDelivery: EmailVerificationDeliveryHandler? = nil,
     oauthProviderClient: OAuthProviderClient? = nil,
+    humanVerification: HumanVerificationController? = nil,
     maintenanceMode: Bool = TypebarMaintenanceMode.environmentEnabled
 ) throws {
     let resolvedAuthStore: AuthStore
@@ -58,6 +59,7 @@ public func configure(
                 "health": .available,
                 "rateLimiting": .partial,
                 "authentication": .available,
+                "humanVerification": humanVerification == nil ? .planned : .available,
                 "developerAccessKeys": .partial,
                 "passwordReset": passwordResetDelivery == nil ? .planned : .available,
                 "emailVerification": emailVerificationDelivery == nil ? .planned : .available,
@@ -82,9 +84,45 @@ public func configure(
         )
     }
 
+    app.post("v1", "human-verification", "challenges") { request async throws -> HumanVerificationChallengeStartResponse in
+        guard let humanVerification else {
+            throw Abort(.serviceUnavailable, reason: "Human verification is not configured for this Typebar service.")
+        }
+        return await humanVerification.start(try request.content.decode(HumanVerificationChallengeStartRequest.self))
+    }
+
+    app.get("v1", "human-verification", "challenges", ":id", "web") { request async throws -> Response in
+        guard let humanVerification else {
+            throw Abort(.serviceUnavailable, reason: "Human verification is not configured for this Typebar service.")
+        }
+        guard let rawID = request.parameters.get("id"), let challengeID = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The human-verification challenge identifier was invalid.")
+        }
+        return try await humanVerification.page(challengeID: challengeID)
+    }
+
+    app.post("v1", "human-verification", "challenges", ":id", "complete") { request async throws -> Response in
+        guard let humanVerification else {
+            throw Abort(.serviceUnavailable, reason: "Human verification is not configured for this Typebar service.")
+        }
+        guard let rawID = request.parameters.get("id"), let challengeID = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The human-verification challenge identifier was invalid.")
+        }
+        let callbackURL = try await humanVerification.complete(
+            challengeID: challengeID,
+            request: try request.content.decode(HumanVerificationChallengeCompletionRequest.self))
+        var headers = HTTPHeaders()
+        headers.replaceOrAdd(name: "Location", value: callbackURL.absoluteString)
+        return Response(status: .found, headers: headers)
+    }
+
     app.post("v1", "auth", "register") { request async throws -> AuthSessionResponse in
         do {
-            let session = try await authStore.register(request.content.decode(RegisterRequest.self))
+            let registration = try request.content.decode(RegisterRequest.self)
+            if let humanVerification {
+                try await humanVerification.consume(registration.humanVerification, for: .registration)
+            }
+            let session = try await authStore.register(registration)
             if let emailVerificationDelivery,
                 let delivery = try await authStore.requestEmailVerification(accessToken: session.accessToken)
             {
@@ -117,6 +155,9 @@ public func configure(
             )
         }
         let reset = try request.content.decode(PasswordResetRequest.self)
+        if let humanVerification {
+            try await humanVerification.consume(reset.humanVerification, for: .passwordResetRequest)
+        }
         do {
             if let delivery = try await authStore.requestPasswordReset(for: reset.email) {
                 do {
@@ -534,14 +575,26 @@ public func configure(
 
     app.post("v1", "reports", "profiles") { request async throws -> ProfileReportResponse in
         do {
+            let token = try request.accessToken()
+            let report = try request.content.decode(ProfileReportRequest.self)
+            if let humanVerification {
+                try await humanVerification.consume(report.humanVerification, for: .profileReport)
+            }
             return try await authStore.submitProfileReport(
-                request.content.decode(ProfileReportRequest.self), accessToken: try request.accessToken()
+                report, accessToken: token
             )
         } catch let error as AuthStoreError { throw error.abort }
     }
 
     app.post("v1", "reports", "quotes") { request async throws -> QuoteReportResponse in
-        do { return try await authStore.submitQuoteReport(try request.content.decode(QuoteReportRequest.self), accessToken: try request.accessToken()) }
+        do {
+            let token = try request.accessToken()
+            let report = try request.content.decode(QuoteReportRequest.self)
+            if let humanVerification {
+                try await humanVerification.consume(report.humanVerification, for: .quoteReport)
+            }
+            return try await authStore.submitQuoteReport(report, accessToken: token)
+        }
         catch let error as AuthStoreError { throw error.abort }
     }
 
@@ -660,7 +713,11 @@ public func configure(
     app.post("v1", "quotes") { request async throws -> QuoteSubmissionResponse in
         do {
             let token = try request.accessToken()
-            return try await authStore.submitQuote(try request.content.decode(QuoteSubmissionRequest.self), accessToken: token)
+            let quote = try request.content.decode(QuoteSubmissionRequest.self)
+            if let humanVerification {
+                try await humanVerification.consume(quote.humanVerification, for: .quoteSubmission)
+            }
+            return try await authStore.submitQuote(quote, accessToken: token)
         } catch let error as AuthStoreError { throw error.abort }
     }
 

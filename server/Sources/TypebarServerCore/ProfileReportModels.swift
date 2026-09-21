@@ -16,6 +16,17 @@ public struct ProfileReportRequest: Content, Equatable {
     public let profileID: UUID
     public let reason: ProfileReportReason
     public let note: String?
+    public let humanVerification: HumanVerificationProof?
+
+    public init(
+        profileID: UUID, reason: ProfileReportReason, note: String?,
+        humanVerification: HumanVerificationProof? = nil
+    ) {
+        self.profileID = profileID
+        self.reason = reason
+        self.note = note
+        self.humanVerification = humanVerification
+    }
 }
 
 public struct ProfileReportResponse: Content, Equatable {

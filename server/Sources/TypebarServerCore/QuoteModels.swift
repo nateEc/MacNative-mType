@@ -5,6 +5,17 @@ public struct QuoteSubmissionRequest: Content, Equatable {
     public let language: String
     public let text: String
     public let attribution: String?
+    public let humanVerification: HumanVerificationProof?
+
+    public init(
+        language: String, text: String, attribution: String?,
+        humanVerification: HumanVerificationProof? = nil
+    ) {
+        self.language = language
+        self.text = text
+        self.attribution = attribution
+        self.humanVerification = humanVerification
+    }
 }
 
 public struct QuoteSubmissionResponse: Content, Equatable {

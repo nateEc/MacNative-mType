@@ -15,6 +15,17 @@ public struct QuoteReportRequest: Content, Equatable {
     public let quoteID: UUID
     public let reason: QuoteReportReason
     public let note: String?
+    public let humanVerification: HumanVerificationProof?
+
+    public init(
+        quoteID: UUID, reason: QuoteReportReason, note: String?,
+        humanVerification: HumanVerificationProof? = nil
+    ) {
+        self.quoteID = quoteID
+        self.reason = reason
+        self.note = note
+        self.humanVerification = humanVerification
+    }
 }
 
 public struct QuoteReportResponse: Content, Equatable {

@@ -637,6 +637,45 @@ final class TypingEngineTests: XCTestCase {
         capabilities: ["resultTimingEvidence": "available"]
       ).supportsResultTimingEvidence)
 
+    let humanVerificationCapabilities = try JSONDecoder().decode(
+      RemoteServiceCapabilities.self,
+      from: Data(
+        #"{"apiVersion":"v1","service":"typebar","capabilities":{"humanVerification":"available"}}"#
+          .utf8))
+    XCTAssertTrue(humanVerificationCapabilities.supportsHumanVerification)
+    XCTAssertFalse(legacyCapabilities.supportsHumanVerification)
+    XCTAssertFalse(
+      RemoteServiceCapabilities(
+        apiVersion: "v1", service: "other",
+        capabilities: ["humanVerification": "available"]
+      ).supportsHumanVerification)
+
+    let challengeID = UUID()
+    let challengeURL = try RemoteHumanVerificationURL.challengeURL(
+      endpoint: "https://typebar.example",
+      relativePath: "v1/human-verification/challenges/\(challengeID.uuidString)/web")
+    XCTAssertEqual(
+      challengeURL.absoluteString,
+      "https://typebar.example/v1/human-verification/challenges/\(challengeID.uuidString)/web")
+    XCTAssertThrowsError(
+      try RemoteHumanVerificationURL.challengeURL(
+        endpoint: "http://127.0.0.1:8080",
+        relativePath: "v1/human-verification/challenges/\(challengeID.uuidString)/web"))
+    XCTAssertThrowsError(
+      try RemoteHumanVerificationURL.challengeURL(
+        endpoint: "https://typebar.example",
+        relativePath: "https://untrusted.example/challenge"))
+
+    let proof = try RemoteHumanVerificationProof(
+      callbackURL: try XCTUnwrap(URL(string:
+        "typebar://human-verification/callback?id=\(challengeID.uuidString)&proof=one-time-proof")))
+    XCTAssertEqual(proof.challengeID, challengeID)
+    XCTAssertEqual(proof.value, "one-time-proof")
+    XCTAssertThrowsError(
+      try RemoteHumanVerificationProof(
+        callbackURL: try XCTUnwrap(URL(string:
+          "typebar://oauth/callback?id=\(challengeID.uuidString)&proof=one-time-proof"))))
+
     let longResult = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 123), outcome: .completed,
       startedAt: start, finishedAt: start.addingTimeInterval(123),

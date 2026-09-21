@@ -10,7 +10,8 @@ enum TypebarServer {
             app,
             passwordResetDelivery: try PasswordResetWebhookDelivery.fromEnvironment(),
             emailVerificationDelivery: try EmailVerificationWebhookDelivery.fromEnvironment(),
-            oauthProviderClient: try OAuthProviderClient.fromEnvironment()
+            oauthProviderClient: try OAuthProviderClient.fromEnvironment(),
+            humanVerification: try TurnstileConfiguration.fromEnvironment()?.makeHumanVerificationController()
         )
 
         do {

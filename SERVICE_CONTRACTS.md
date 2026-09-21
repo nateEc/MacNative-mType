@@ -6,9 +6,10 @@
 
 | 操作 | 方法与路径 | 核心请求 / 响应 |
 | --- | --- | --- |
-| 注册 | `POST /v1/auth/register` | 邮箱、密码、显示名 → 用户与会话（已实现服务端基础） |
+| 人机验证挑战 | `POST /v1/human-verification/challenges`、`GET /v1/human-verification/challenges/{id}/web`、`POST /v1/human-verification/challenges/{id}/complete` | 仅完整配置 Turnstile 时可用。创建请求为 `purpose`（`registration`、`passwordResetRequest`、`profileReport`、`quoteSubmission` 或 `quoteReport`），返回 UUID 和相对 `verificationPath`；网页端点只提供 Typebar 自写的最小组件容器；完成请求携带第三方 `token`，服务端独立校验 Siteverify 的 `success`、固定 action、challenge cData 和允许 hostname 后，以 `302` 重定向至固定 `typebar://human-verification/callback?id=&proof=`。proof 为 5 分钟、单用途、一次性且不持久化（已实现） |
+| 注册 | `POST /v1/auth/register` | 邮箱、密码、显示名、可选 `humanVerification` → 用户与会话。能力 `humanVerification=available` 时证明必填且在注册前消费；旧／未配置服务维持原请求契约（已实现） |
 | 登录 | `POST /v1/auth/login` | 邮箱、密码 → 用户与会话（已实现服务端基础） |
-| 请求密码重置 | `POST /v1/auth/password-reset/request` | 邮箱 → `accepted: true`；只有配置 HTTPS 投递 webhook 时可用，已注册、未注册和无效邮箱始终得到相同响应。服务端只保存 20 分钟的一次性令牌 SHA-256 哈希；投递失败会撤销令牌（已实现） |
+| 请求密码重置 | `POST /v1/auth/password-reset/request` | 邮箱、可选 `humanVerification` → `accepted: true`；配置验证时在投递前消费用途匹配的 proof，否则不发送邮件。只有配置 HTTPS 投递 webhook 时可用，已注册、未注册和无效邮箱始终得到相同响应。服务端只保存 20 分钟的一次性令牌 SHA-256 哈希；投递失败会撤销令牌（已实现） |
 | 完成密码重置 | `POST /v1/auth/password-reset/complete` | 重置码、新密码 → `reset: true`；重哈希密码、消费令牌并撤销所有设备会话，不签发新会话（已实现） |
 | 请求邮箱验证 | `POST /v1/auth/email-verification/request` | Bearer 令牌 → `accepted: true`；只有配置 HTTPS 投递 webhook 时可用。未验证账户会获得新的 24 小时一次性验证码，重发会撤销旧码；已验证账户不再投递（已实现） |
 | 完成邮箱验证 | `POST /v1/auth/email-verification/complete` | 验证码 → `verified: true`；消费验证码并将当前账户标为已验证，不轮换会话令牌（已实现） |
@@ -30,12 +31,12 @@
 | 好友 | `GET/POST /v1/connections`、`POST /v1/connections/{requesterID}/accept`、`DELETE /v1/connections/{userID}` | 受令牌保护的好友请求、接受、列表与解除关系（部分实现） |
 | 通知 | `GET /v1/notifications`、`POST /v1/notifications/{id}/read` | Bearer 令牌保护；仅返回当前账户的好友请求、接受与新私信事件及触发者公开资料，不携带私信正文，可单条标记已读（部分实现） |
 | 服务公告 | `GET /v1/announcements`、`POST /v1/moderation/announcements`、`DELETE /v1/moderation/announcements/{id}` | 读取公开且不需要账户；每项仅返回 UUID、1–500 字纯文本、等级、置顶标记、可选计划日期和发布时间。发布/删除要求部署者显式配置 `TYPEBAR_MODERATION_TOKEN`，客户端以 `X-Typebar-Moderation-Key` 提交；有计划日期时，正文的 `{date}`、`{dateNoTime}` 和 `{dateDifference}` 分别由原生客户端按当前地区替换为日期时间、日期和相对时间；普通公告可仅在当前 Mac 关闭，置顶项不能由客户端关闭，且不会携带账户、提示、输入、成绩、邮箱或令牌（已实现） |
-| 资料举报与审核 | `POST /v1/reports/profiles`、`GET /v1/moderation/profile-reports`、`PATCH /v1/moderation/profile-reports/{id}` | 投稿者提交受 Bearer 令牌保护；审核读写要求部署者显式配置的 `TYPEBAR_MODERATION_TOKEN` 与 `X-Typebar-Moderation-Key`。队列可按 `open`、`resolved` 或 `dismissed` 筛选，最多 100 条，只返回目标的公开资料、分类、说明、状态和时间，绝不返回举报者身份或邮箱；审核修改只更新举报状态，不通知或自动改变目标账户（部分实现） |
+| 资料举报与审核 | `POST /v1/reports/profiles`、`GET /v1/moderation/profile-reports`、`PATCH /v1/moderation/profile-reports/{id}` | 投稿者提交受 Bearer 令牌保护，并在启用人机验证时附用途为 `profileReport` 的 proof；审核读写要求部署者显式配置的 `TYPEBAR_MODERATION_TOKEN` 与 `X-Typebar-Moderation-Key`。队列可按 `open`、`resolved` 或 `dismissed` 筛选，最多 100 条，只返回目标的公开资料、分类、说明、状态和时间，绝不返回举报者身份或邮箱；审核修改只更新举报状态，不通知或自动改变目标账户（部分实现） |
 | 部署账户治理 | `PATCH /v1/moderation/profiles/{id}/leaderboard-restriction`、`PATCH /v1/moderation/profiles/{id}/display-name-requirement`、`PATCH /v1/moderation/profiles/{id}/account-suspension` | 三个路由都要求部署者显式配置的 `TYPEBAR_MODERATION_TOKEN` 与 `X-Typebar-Moderation-Key`，并接受可逆的布尔请求。排行榜限制只影响共享榜资格；显示名整改立即排除 WPM/XP 的公共、好友和个人榜，并在持久化前拒绝新的成绩，直到用户提交不同且有效的显示名；账户封禁同样排除共享榜、把公开资料降级为基础统计和个人最佳，并拒绝资料更新与账户重置。封禁期间登录、同步、本机练习、成绩保存、密码和删号均可用，不删除历史数据；封禁状态回传账户本人、公开资料和私有审核队列，其他两个状态只回传账户本人和私有队列。旧响应或旧持久化状态缺字段时默认未设置（已实现） |
-| 引语举报 | `POST /v1/reports/quotes` | Bearer 令牌保护；仅可举报已批准且非本人投稿的社区引语，原因相同不可重复提交，说明最多 400 字。报告只进入私有待审核队列，不通知作者或自动下架（部分实现） |
+| 引语举报 | `POST /v1/reports/quotes` | Bearer 令牌保护；启用人机验证时附用途为 `quoteReport` 的 proof。仅可举报已批准且非本人投稿的社区引语，原因相同不可重复提交，说明最多 400 字。报告只进入私有待审核队列，不通知作者或自动下架（部分实现） |
 | 社区引语评分 | `PUT /v1/quotes/{id}/rating` | Bearer 令牌保护；仅可对已批准且非本人投稿设为 `-1`、`0` 或 `1`。`0` 撤销评分；公共引语列表仅返回聚合支持/不适合计数，带本人令牌时才附带本人的评分（部分实现） |
 | 私信 | `GET /v1/messages/{friendID}`、`POST /v1/messages`、`POST /v1/messages/{friendID}/read` | Bearer 令牌保护；仅双方已接受好友且未屏蔽时可读取、发送（1–1,000 字）和标记已读。屏蔽或账户删除会清除相关会话（部分实现） |
-| 引语投稿与审核 | `POST /v1/quotes`、`GET /v1/quotes/mine`、`GET /v1/quotes`、`GET /v1/moderation/quotes`、`PATCH /v1/moderation/quotes/{id}` | 投稿读取受 Bearer 令牌保护并以 `pending` 保存；公共查询可按语言、最多 100 条且只返回 `approved` 内容及聚合社区评分。两个审核端点都要求部署者显式配置的 `TYPEBAR_MODERATION_TOKEN` 与 `X-Typebar-Moderation-Key`；队列可按 `pending`、`approved` 或 `rejected` 筛选，最多 100 条，并返回引语及举报原因/说明但不返回举报者身份；审核修改可设为 `approved` 或 `rejected`（部分实现） |
+| 引语投稿与审核 | `POST /v1/quotes`、`GET /v1/quotes/mine`、`GET /v1/quotes`、`GET /v1/moderation/quotes`、`PATCH /v1/moderation/quotes/{id}` | 投稿读取受 Bearer 令牌保护，并在启用人机验证时附用途为 `quoteSubmission` 的 proof，以 `pending` 保存；公共查询可按语言、最多 100 条且只返回 `approved` 内容及聚合社区评分。两个审核端点都要求部署者显式配置的 `TYPEBAR_MODERATION_TOKEN` 与 `X-Typebar-Moderation-Key`；队列可按 `pending`、`approved` 或 `rejected` 筛选，最多 100 条，并返回引语及举报原因/说明但不返回举报者身份；审核修改可设为 `approved` 或 `rejected`（部分实现） |
 
 冲突规则：同一 UUID 使用单调版本和服务器时间；服务端会拒绝未前进版本。原生客户端遇到整包归档版本冲突时，会重新拉取服务器权威归档，以本机标量设置为准合并成绩、预设和文本；同名但内容不同的远端预设/文本，以及同 UUID 但内容不同的远端主题/自定义键盘布局，会另存并标记“同步冲突”，随后按服务器最新版本重试上传。服务端内容级三方合并和冲突审计尚未实现。成绩接口会校验枚举、数值范围、完成时间窗口、输入量与错误数、准确率、raw/WPM 和起止耗时的相互一致性，并限制提交速率；尚未实现不可伪造的签名或完整事件回放，因此排行榜仍不应被视作可信竞赛成绩。
 
