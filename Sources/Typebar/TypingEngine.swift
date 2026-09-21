@@ -43,8 +43,8 @@ enum TestMode: String, CaseIterable, Codable {
 }
 
 /// The reference memory funbox only runs in word, quote, and custom tests.
-/// It remembers a disallowed source mode while active so the next funbox
-/// change can restore it.
+/// Direct controls reject an incompatible toggle; this fallback only cleans
+/// up an imported configuration that predates the shared mode gate.
 enum MemoryFunboxModePolicy {
   static let allowedModes: Set<TestMode> = [.words, .quote, .custom]
   /// Imported configurations do not carry the live control's separate word
@@ -54,16 +54,6 @@ enum MemoryFunboxModePolicy {
   static func effectiveMode(requested: TestMode, modifiers: [TestModifier]) -> TestMode {
     guard modifiers.contains(.memory), !allowedModes.contains(requested) else { return requested }
     return .words
-  }
-
-  static func restoredMode(
-    rememberedMode: TestMode?, currentMode: TestMode,
-    previousModifiers: [TestModifier], updatedModifiers: [TestModifier]
-  ) -> TestMode {
-    guard previousModifiers.contains(.memory), !updatedModifiers.contains(.memory) else {
-      return currentMode
-    }
-    return rememberedMode ?? currentMode
   }
 }
 
@@ -1979,6 +1969,31 @@ enum FunboxForcedContentOptionsPolicy {
     .accountingStream, .arrowStream, .asciiStream, .specialCharacterStream, .poetryStream,
     .referenceStream, .ipv4Stream, .ipv6Stream, .binaryStream, .hexadecimalStream,
   ]
+
+  /// The fixed source metadata only restricts highlighting for this subset.
+  /// Native presentation can impose additional temporary fallbacks when a
+  /// prompt has no reliable word boundaries, but those do not reject a saved
+  /// user preference.
+  static let characterOnlyHighlightModifiers: Set<TestModifier> = [
+    .simonSays, .listening, .arrowStream, .readAheadEasy, .readAhead, .readAheadHard, .noSpaces,
+  ]
+
+  static let allowedForcedHighlightModes: Set<PromptHighlightMode> = [.letter, .off]
+
+  /// Direct configuration changes are rejected by the reference whenever a
+  /// funbox forces punctuation or numbers off. Persisted data is instead
+  /// sanitized by `effectiveOptions`.
+  static func accepts(_ selected: ContentOptions, modifiers: [TestModifier]) -> Bool {
+    effectiveOptions(selected, modifiers: modifiers) == selected
+  }
+
+  /// Mirrors the source `highlightMode: ["letter", "off"]` constraint.
+  static func accepts(
+    promptHighlightMode: PromptHighlightMode, modifiers: [TestModifier]
+  ) -> Bool {
+    characterOnlyHighlightModifiers.isDisjoint(with: Set(modifiers))
+      || allowedForcedHighlightModes.contains(promptHighlightMode)
+  }
 
   static func effectiveOptions(
     _ selected: ContentOptions, modifiers: [TestModifier]

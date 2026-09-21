@@ -950,6 +950,18 @@ final class TypingEngineTests: XCTestCase {
       TestConfiguration.timed(seconds: 30, contentOptions: enabled)
         .with(modifiers: [.accountingStream]).contentOptions,
       .init(includePunctuation: true, includeNumbers: false))
+    XCTAssertFalse(
+      FunboxForcedContentOptionsPolicy.accepts(enabled, modifiers: [.arrowStream]))
+    XCTAssertTrue(
+      FunboxForcedContentOptionsPolicy.accepts(.init(), modifiers: [.arrowStream]))
+    XCTAssertFalse(
+      FunboxForcedContentOptionsPolicy.accepts(.init(includePunctuation: true), modifiers: [.binaryStream]))
+    XCTAssertFalse(
+      FunboxForcedContentOptionsPolicy.accepts(
+        promptHighlightMode: .nextWord, modifiers: [.arrowStream]))
+    XCTAssertTrue(
+      FunboxForcedContentOptionsPolicy.accepts(
+        promptHighlightMode: .off, modifiers: [.arrowStream]))
 
     for modifier in FunboxForcedContentOptionsPolicy.punctuationDisabledModifiers {
       XCTAssertEqual(
@@ -2304,23 +2316,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(
       FunboxCommandPolicy.updatedModifiers(
         for: .modifier(.noQuit), current: [.noQuit], isInfinite: false, hasStarted: true))
-    XCTAssertEqual(
-      FunboxCommandPolicy.mode(
-        afterToggling: .modifier(.memory), currentMode: .time, currentModifiers: []),
-      .words)
-    XCTAssertEqual(
-      FunboxCommandPolicy.mode(
-        afterToggling: .modifier(.memory), currentMode: .quote, currentModifiers: []),
-      .quote)
-    XCTAssertEqual(
-      FunboxCommandPolicy.mode(
-        afterToggling: .modifier(.memory), currentMode: .time,
-        currentModifiers: [.memory]),
-      .time)
-    XCTAssertEqual(
-      FunboxCommandPolicy.mode(
-        afterToggling: .modifier(.rot13), currentMode: .time, currentModifiers: []),
-      .time)
+    let memory = try! XCTUnwrap(FunboxCommandPolicy.updatedModifiers(
+      for: .modifier(.memory), current: [], isInfinite: false, hasStarted: false))
+    XCTAssertEqual(memory, [.memory])
+    XCTAssertFalse(TestModifierPolicy.acceptsModeSelection(.time, modifiers: memory))
+    XCTAssertTrue(TestModifierPolicy.acceptsModeSelection(.quote, modifiers: memory))
   }
 
   @MainActor
@@ -17993,19 +17993,6 @@ final class TypingEngineTests: XCTestCase {
       MemoryFunboxModePolicy.effectiveMode(requested: .zen, modifiers: [.memory]), .words)
     XCTAssertEqual(
       MemoryFunboxModePolicy.effectiveMode(requested: .quote, modifiers: [.memory]), .quote)
-    XCTAssertEqual(
-      MemoryFunboxModePolicy.restoredMode(
-        rememberedMode: .time, currentMode: .words,
-        previousModifiers: [.memory], updatedModifiers: []), .time)
-    XCTAssertEqual(
-      MemoryFunboxModePolicy.restoredMode(
-        rememberedMode: .zen, currentMode: .words,
-        previousModifiers: [.memory], updatedModifiers: [.crtVisual]), .zen)
-    XCTAssertEqual(
-      MemoryFunboxModePolicy.restoredMode(
-        rememberedMode: .time, currentMode: .quote,
-        previousModifiers: [.memory], updatedModifiers: [.memory, .crtVisual]), .quote)
-
     let configuration = TestConfiguration.words(2).with(modifiers: [.memory])
     var session = TypingSession(configuration: configuration, prompt: "amber harbor")
 

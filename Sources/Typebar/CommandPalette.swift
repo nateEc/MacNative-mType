@@ -679,17 +679,6 @@ enum FunboxCommandPolicy {
             return nil
         }
     }
-
-    static func mode(
-        afterToggling target: FunboxCommandTarget, currentMode: TestMode,
-        currentModifiers: [TestModifier]
-    ) -> TestMode {
-        guard target == .modifier(.memory), !currentModifiers.contains(.memory) else {
-            return currentMode
-        }
-        return MemoryFunboxModePolicy.effectiveMode(
-            requested: currentMode, modifiers: [.memory])
-    }
 }
 
 enum InputRuleCommandTarget: Equatable {

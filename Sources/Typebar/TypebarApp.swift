@@ -597,7 +597,6 @@ private struct ContentView: View {
     [TestPresetRecord]
   @State private var session = TestSessionFactory.make(configuration: .timed(seconds: 30))
   @State private var mode: TestMode = .time
-  @State private var rememberedMemoryFunboxMode: TestMode?
   @State private var language: TypingLanguage = .english
   @State private var mixedLanguageComponents = TypingLanguage.defaultMixedComponents
   @State private var mixedLanguageSearch = ""
@@ -683,6 +682,8 @@ private struct ContentView: View {
   @State private var timerHealth = TimerHealthState()
   @State private var restartLockMessage: String?
   @State private var modeCompatibilityMessage: String?
+  @State private var funboxConfigurationMessage: String?
+  @State private var restoringPromptHighlightAfterFunboxConflict = false
   @State private var currentRestartCount = 0
   @State private var weakSpotScores = WeakSpotScores()
   @State private var lastCompletedWpm: Int?
@@ -786,7 +787,22 @@ private struct ContentView: View {
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
-    .onChange(of: settings.promptHighlightMode) { _, _ in activeChallengeID = nil }
+    .onChange(of: settings.promptHighlightMode) { previous, selected in
+      if restoringPromptHighlightAfterFunboxConflict {
+        restoringPromptHighlightAfterFunboxConflict = false
+        return
+      }
+      guard FunboxForcedContentOptionsPolicy.accepts(
+        promptHighlightMode: selected, modifiers: settings.testModifiers)
+      else {
+        restoringPromptHighlightAfterFunboxConflict = true
+        settings.promptHighlightMode = previous
+        funboxConfigurationMessage = "当前趣味模式仅支持“当前字符”或“关闭”提示高亮。"
+        return
+      }
+      funboxConfigurationMessage = nil
+      activeChallengeID = nil
+    }
     .onChange(of: settings.showAllPracticeLines) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.testModifiers) { _, _ in refreshZipfNotice() }
     .onChange(of: network.recoveryEventID) { _, eventID in
@@ -1399,10 +1415,23 @@ private struct ContentView: View {
 
         if mode == .time || mode == .words {
           HStack {
-            Toggle("标点", isOn: $contentOptions.includePunctuation)
-            Toggle("数字", isOn: $contentOptions.includeNumbers)
+            Toggle("标点", isOn: Binding(
+              get: { contentOptions.includePunctuation },
+              set: { enabled in
+                var selected = contentOptions
+                selected.includePunctuation = enabled
+                if selectContentOptions(selected) { reset() }
+              }
+            ))
+            Toggle("数字", isOn: Binding(
+              get: { contentOptions.includeNumbers },
+              set: { enabled in
+                var selected = contentOptions
+                selected.includeNumbers = enabled
+                if selectContentOptions(selected) { reset() }
+              }
+            ))
           }
-          .onChange(of: contentOptions) { _, _ in reset() }
         }
 
         if !settings.testModifiers.isEmpty {
@@ -2518,6 +2547,11 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .offset(y: 24)
+      } else if let funboxConfigurationMessage {
+        Label(funboxConfigurationMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
       } else if let customBackgroundCommandMessage {
         Label(customBackgroundCommandMessage, systemImage: "exclamationmark.triangle.fill")
           .font(.caption)
@@ -2548,6 +2582,38 @@ private struct ContentView: View {
     }
     modeCompatibilityMessage = nil
     mode = requested
+    return true
+  }
+
+  @discardableResult
+  private func selectContentOptions(_ requested: ContentOptions) -> Bool {
+    guard FunboxForcedContentOptionsPolicy.accepts(
+      requested, modifiers: settings.testModifiers)
+    else {
+      funboxConfigurationMessage = "当前趣味模式要求关闭标点或数字；请先关闭对应选项。"
+      return false
+    }
+    funboxConfigurationMessage = nil
+    contentOptions = requested
+    return true
+  }
+
+  private func acceptsFunboxConfiguration(_ modifiers: [TestModifier]) -> Bool {
+    guard TestModifierPolicy.acceptsModeSelection(mode, modifiers: modifiers) else {
+      funboxConfigurationMessage = "当前模式不支持这个趣味模式；请先切换到兼容模式。"
+      return false
+    }
+    guard FunboxForcedContentOptionsPolicy.accepts(contentOptions, modifiers: modifiers) else {
+      funboxConfigurationMessage = "当前标点或数字设置不支持这个趣味模式；请先关闭对应选项。"
+      return false
+    }
+    guard FunboxForcedContentOptionsPolicy.accepts(
+      promptHighlightMode: settings.promptHighlightMode, modifiers: modifiers)
+    else {
+      funboxConfigurationMessage = "当前提示高亮范围不支持这个趣味模式；请改为“当前字符”或“关闭”。"
+      return false
+    }
+    funboxConfigurationMessage = nil
     return true
   }
 
@@ -3304,9 +3370,6 @@ private struct ContentView: View {
         }
         reset()
       case .clear, .modifier:
-        let previousModifiers = settings.testModifiers
-        let commandMode = FunboxCommandPolicy.mode(
-          afterToggling: target, currentMode: mode, currentModifiers: settings.testModifiers)
         guard let updated = FunboxCommandPolicy.updatedModifiers(
           for: target, current: settings.testModifiers,
           isInfinite: session.configuration.isInfinite, hasStarted: session.hasStarted)
@@ -3314,17 +3377,8 @@ private struct ContentView: View {
           restartLockMessage = "当前无限测试不支持这个修饰器；请先选择有限时长或字数。"
           return
         }
-        if !previousModifiers.contains(.memory), updated.contains(.memory) {
-          rememberedMemoryFunboxMode = mode
-        }
-        let updatedMode = MemoryFunboxModePolicy.restoredMode(
-          rememberedMode: rememberedMemoryFunboxMode, currentMode: commandMode,
-          previousModifiers: previousModifiers, updatedModifiers: updated)
-        if previousModifiers.contains(.memory), !updated.contains(.memory) {
-          rememberedMemoryFunboxMode = nil
-        }
+        guard acceptsFunboxConfiguration(updated) else { return }
         settings.testModifiers = updated
-        mode = updatedMode
         if target == .clear && language == .mixedLanguages { language = .english }
         activeChallengeID = nil
         reset()
@@ -3411,9 +3465,13 @@ private struct ContentView: View {
       case .customWords:
         return
       case .punctuation(let enabled):
-        contentOptions.includePunctuation = enabled
+        var selected = contentOptions
+        selected.includePunctuation = enabled
+        guard selectContentOptions(selected) else { return }
       case .numbers(let enabled):
-        contentOptions.includeNumbers = enabled
+        var selected = contentOptions
+        selected.includeNumbers = enabled
+        guard selectContentOptions(selected) else { return }
       }
       reset()
       return
@@ -3668,7 +3726,6 @@ private struct ContentView: View {
     appliesGlobalSettings: Bool = true
   ) {
     practiceReturnPreset = nil
-    rememberedMemoryFunboxMode = nil
     let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID)
     activeChallengeID = challenge?.id
     let configuration = challenge?.preset.configuration ?? preset.configuration
