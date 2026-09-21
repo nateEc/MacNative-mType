@@ -990,6 +990,10 @@ private extension AuthStoreError {
             Abort(.badRequest, reason: "The request did not meet Typebar account requirements.")
         case .emailAlreadyRegistered:
             Abort(.conflict, reason: "An account already exists for this email address.")
+        case .displayNameUnavailable:
+            Abort(.conflict, reason: "This Typebar display name is unavailable.")
+        case .displayNameChangeCooldownActive:
+            Abort(.conflict, reason: "A Typebar account can change its display name only once every 30 days.")
         case .oauthIdentityAlreadyLinked:
             Abort(.conflict, reason: "That OAuth identity is already linked to a Typebar account.")
         case .passwordAuthenticationAlreadyLinked:

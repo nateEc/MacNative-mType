@@ -1762,7 +1762,7 @@ final class AccountSession {
     }
 
     func setLeaderboardOptOut(_ optedOut: Bool) async {
-        guard let token = tokenStore.load(), let user = currentUser else {
+        guard let token = tokenStore.load(), currentUser != nil else {
             statusMessage = "请先登录自建 Typebar 服务。"
             return
         }
@@ -1774,7 +1774,7 @@ final class AccountSession {
                 method: "PATCH",
                 token: token,
                 body: RemoteUpdateProfileRequest(
-                    displayName: user.displayName, leaderboardOptedOut: optedOut, profileDetails: nil,
+                    displayName: nil, leaderboardOptedOut: optedOut, profileDetails: nil,
                     selectedBadgeID: nil),
                 response: RemoteAccountUser.self
             )

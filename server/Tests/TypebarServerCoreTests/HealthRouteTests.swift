@@ -2065,6 +2065,106 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testDisplayNameAvailabilityAndCooldownPersistWithoutBlockingRequiredRename() async throws {
+    let now = Date(timeIntervalSince1970: 60_000)
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-display-name-cooldown-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let store = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "cafe@example.com", password: "a secure password", displayName: "Café Runner"),
+      now: now)
+
+    do {
+      _ = try await store.register(
+        .init(email: "duplicate@example.com", password: "a secure password", displayName: "cafe runner"),
+        now: now)
+      XCTFail("A case- and diacritic-insensitive duplicate display name must be unavailable")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .displayNameUnavailable)
+    }
+    do {
+      _ = try await store.registerWithOAuth(
+        .init(
+          provider: .github, subject: "duplicate-display-name", email: "oauth@example.com"),
+        displayName: "cafe runner", now: now)
+      XCTFail("OAuth registration must use the same display-name availability rule")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .displayNameUnavailable)
+    }
+
+    let renamed = try await store.updateProfile(
+      .init(displayName: "Fresh Handle"), accessToken: session.accessToken, now: now)
+    XCTAssertEqual(renamed.displayName, "Fresh Handle")
+    _ = try await store.updateProfile(
+      .init(leaderboardOptedOut: true), accessToken: session.accessToken,
+      now: now.addingTimeInterval(60))
+
+    let reloadedStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let reloadedSession = try await reloadedStore.login(
+      .init(email: "cafe@example.com", password: "a secure password"),
+      now: now.addingTimeInterval(60))
+    do {
+      _ = try await reloadedStore.updateProfile(
+        .init(displayName: "Another Handle"), accessToken: reloadedSession.accessToken,
+        now: now.addingTimeInterval(30 * 24 * 60 * 60 - 1))
+      XCTFail("A normal account may not change its display name before the 30-day cooldown ends")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .displayNameChangeCooldownActive)
+    }
+
+    let allowed = try await reloadedStore.updateProfile(
+      .init(displayName: "Another Handle"), accessToken: reloadedSession.accessToken,
+      now: now.addingTimeInterval(30 * 24 * 60 * 60))
+    XCTAssertEqual(allowed.displayName, "Another Handle")
+
+    _ = try await reloadedStore.setDisplayNameChangeRequired(
+      userID: reloadedSession.user.id, required: true)
+    let resolved = try await reloadedStore.updateProfile(
+      .init(displayName: "Required Rename"), accessToken: reloadedSession.accessToken,
+      now: now.addingTimeInterval(30 * 24 * 60 * 60 + 1))
+    XCTAssertEqual(resolved.displayName, "Required Rename")
+    XCTAssertFalse(resolved.displayNameChangeRequired)
+  }
+
+  func testProfileRouteReportsDisplayNameCooldownAsConflict() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "cooldown-route@example.com", password: "a secure password", displayName: "Route Name"))
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(
+        .PATCH,
+        "v1/profiles/me",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(UpdateProfileRequest(displayName: "First Rename"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+        }
+      )
+      try await app.test(
+        .PATCH,
+        "v1/profiles/me",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(session.accessToken)")
+          try request.content.encode(UpdateProfileRequest(displayName: "Second Rename"))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .conflict)
+          XCTAssertTrue(response.body.string.contains("once every 30 days"))
+        }
+      )
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testLeaderboardRankMemoryRouteReturnsPreviousRankAndIsolatesSelections() async throws {
     let app = try await Application.make(.testing)
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)

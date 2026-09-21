@@ -1083,7 +1083,7 @@ struct PreferencesView: View {
                 || user.accountSuspended
                 || updatedDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2
                 || updatedDisplayName == user.displayName)
-            Text("显示名会出现在公开资料、基础排行榜与好友列表；邮箱不会公开。")
+            Text("显示名会出现在公开资料、基础排行榜与好友列表；邮箱不会公开。成功更改后 30 天内不能再次更改。")
               .font(.caption)
               .foregroundStyle(.secondary)
             if user.displayNameChangeRequired {

@@ -437,6 +437,8 @@ public struct PublicProfileSearchResponse: Content, Equatable {
 public enum AuthStoreError: Error, Equatable {
   case invalidEmail
   case invalidDisplayName
+  case displayNameUnavailable
+  case displayNameChangeCooldownActive
   case weakPassword
   case emailAlreadyRegistered
   case invalidCredentials
@@ -484,6 +486,7 @@ public enum AuthStoreError: Error, Equatable {
 public actor AuthStore {
   private static let maxNotificationsPerUser = 100
   private static let maxLeaderboardRankMemoriesPerUser = 500
+  private static let displayNameChangeCooldown: TimeInterval = 30 * 24 * 60 * 60
 
   /// Community quotes accept the client-facing single-language choices except
   /// Swiss German. Result and leaderboard requests additionally accept Swiss
@@ -680,6 +683,7 @@ public actor AuthStore {
     let leaderboardOptedOut: Bool
     var leaderboardRestricted: Bool
     var displayNameChangeRequired: Bool
+    var lastDisplayNameChangeAt: Date?
     var accountSuspended: Bool
     let profileDetails: ProfileDetails
     let selectedBadgeID: String?
@@ -687,7 +691,7 @@ public actor AuthStore {
 
     private enum CodingKeys: String, CodingKey {
       case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut,
-        leaderboardRestricted, displayNameChangeRequired, accountSuspended, profileDetails, selectedBadgeID,
+        leaderboardRestricted, displayNameChangeRequired, lastDisplayNameChangeAt, accountSuspended, profileDetails, selectedBadgeID,
         startedTestCount
     }
 
@@ -697,6 +701,7 @@ public actor AuthStore {
       leaderboardOptedOut: Bool = false,
       leaderboardRestricted: Bool = false,
       displayNameChangeRequired: Bool = false,
+      lastDisplayNameChangeAt: Date? = nil,
       accountSuspended: Bool = false,
       profileDetails: ProfileDetails = .init(), selectedBadgeID: String? = nil,
       startedTestCount: Int = 0
@@ -710,6 +715,7 @@ public actor AuthStore {
       self.leaderboardOptedOut = leaderboardOptedOut
       self.leaderboardRestricted = leaderboardRestricted
       self.displayNameChangeRequired = displayNameChangeRequired
+      self.lastDisplayNameChangeAt = lastDisplayNameChangeAt
       self.accountSuspended = accountSuspended
       self.profileDetails = profileDetails
       self.selectedBadgeID = selectedBadgeID
@@ -728,6 +734,7 @@ public actor AuthStore {
       leaderboardRestricted = try values.decodeIfPresent(Bool.self, forKey: .leaderboardRestricted) ?? false
       displayNameChangeRequired =
         try values.decodeIfPresent(Bool.self, forKey: .displayNameChangeRequired) ?? false
+      lastDisplayNameChangeAt = try values.decodeIfPresent(Date.self, forKey: .lastDisplayNameChangeAt)
       accountSuspended = try values.decodeIfPresent(Bool.self, forKey: .accountSuspended) ?? false
       profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
       selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
@@ -1128,6 +1135,7 @@ public actor AuthStore {
     guard !state.users.contains(where: { $0.email == email }) else {
       throw AuthStoreError.emailAlreadyRegistered
     }
+    guard isDisplayNameAvailable(displayName) else { throw AuthStoreError.displayNameUnavailable }
 
     let user = StoredUser(
       id: UUID(),
@@ -1173,6 +1181,7 @@ public actor AuthStore {
     guard !state.users.contains(where: { $0.email == email }) else {
       throw AuthStoreError.emailAlreadyRegistered
     }
+    guard isDisplayNameAvailable(name) else { throw AuthStoreError.displayNameUnavailable }
 
     let user = StoredUser(
       id: UUID(), email: email, displayName: name, passwordHash: nil, createdAt: now,
@@ -1271,6 +1280,7 @@ public actor AuthStore {
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
@@ -1316,6 +1326,7 @@ public actor AuthStore {
       passwordHash: nil, createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
@@ -1533,6 +1544,7 @@ public actor AuthStore {
     guard !state.users.contains(where: { $0.email == email }) else {
       throw AuthStoreError.emailAlreadyRegistered
     }
+    guard isDisplayNameAvailable(name) else { throw AuthStoreError.displayNameUnavailable }
     let user = StoredUser(
       id: UUID(), email: email, displayName: name, passwordHash: nil, createdAt: now,
       emailVerified: true)
@@ -1604,6 +1616,7 @@ public actor AuthStore {
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
@@ -1665,6 +1678,7 @@ public actor AuthStore {
       passwordHash: user.passwordHash, createdAt: user.createdAt, emailVerified: true,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
@@ -1769,6 +1783,7 @@ public actor AuthStore {
       leaderboardOptedOut: user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
@@ -1810,6 +1825,7 @@ public actor AuthStore {
       leaderboardOptedOut: user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
@@ -1927,6 +1943,7 @@ public actor AuthStore {
       passwordHash: user.passwordHash, createdAt: user.createdAt,
       emailVerified: user.emailVerified, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended)
     state.users[index] = resetUser
     state.developerAccessKeys.removeAll { $0.userID == user.id }
@@ -1949,6 +1966,18 @@ public actor AuthStore {
     let user = state.users[index]
     guard !user.accountSuspended else { throw AuthStoreError.accountSuspended }
     let displayName = try request.displayName.map(validatedDisplayName) ?? user.displayName
+    let isChangingDisplayName = displayName != user.displayName
+    if isChangingDisplayName {
+      guard isDisplayNameAvailable(displayName, excluding: user.id) else {
+        throw AuthStoreError.displayNameUnavailable
+      }
+      if !user.displayNameChangeRequired,
+        let lastDisplayNameChangeAt = user.lastDisplayNameChangeAt,
+        now.timeIntervalSince(lastDisplayNameChangeAt) < Self.displayNameChangeCooldown
+      {
+        throw AuthStoreError.displayNameChangeCooldownActive
+      }
+    }
     let profileDetails = try request.profileDetails.map(validatedProfileDetails) ?? user.profileDetails
     let selectedBadgeID = try validatedSelectedBadgeID(
       request.selectedBadgeID, existing: user.selectedBadgeID, userID: user.id)
@@ -1958,6 +1987,7 @@ public actor AuthStore {
       leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired && displayName == user.displayName,
+      lastDisplayNameChangeAt: isChangingDisplayName ? now : user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
       profileDetails: profileDetails, selectedBadgeID: selectedBadgeID,
       startedTestCount: user.startedTestCount)
@@ -3586,6 +3616,18 @@ public actor AuthStore {
     let name = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard (2...32).contains(name.count) else { throw AuthStoreError.invalidDisplayName }
     return name
+  }
+
+  private func isDisplayNameAvailable(_ displayName: String, excluding userID: UUID? = nil) -> Bool {
+    let comparisonKey = displayNameComparisonKey(displayName)
+    return !state.users.contains { user in
+      user.id != userID && displayNameComparisonKey(user.displayName) == comparisonKey
+    }
+  }
+
+  private func displayNameComparisonKey(_ displayName: String) -> String {
+    displayName.folding(
+      options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
   }
 
   private func validatedDeveloperAccessKeyName(_ value: String) throws -> String {
