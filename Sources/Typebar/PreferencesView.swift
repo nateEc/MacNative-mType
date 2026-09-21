@@ -99,6 +99,7 @@ struct PreferencesView: View {
   @State private var showingLocalPracticeFontImporter = false
   @State private var installedFontFamilies: [String] = []
   @State private var showingInstalledFontPicker = false
+  @State private var showingNoQuitConfigurationLockAlert = false
 
   var body: some View {
     @Bindable var settings = settings
@@ -118,13 +119,13 @@ struct PreferencesView: View {
 
       if testSectionVisible {
         Section("测试") {
-          Picker("难度", selection: $settings.difficulty) {
+          Picker("难度", selection: restartingConfigurationBinding($settings.difficulty)) {
             ForEach(Difficulty.allCases, id: \.self) { difficulty in
               Text(difficulty.displayName).tag(difficulty)
             }
           }
-          Toggle("严格空格", isOn: $settings.strictSpace)
-          Picker("遇错停下", selection: $settings.stopOnErrorMode) {
+          Toggle("严格空格", isOn: restartingConfigurationBinding($settings.strictSpace))
+          Picker("遇错停下", selection: restartingConfigurationBinding($settings.stopOnErrorMode)) {
             ForEach(StopOnErrorMode.allCases) { mode in
               Text(mode.displayName).tag(mode)
             }
@@ -242,13 +243,17 @@ struct PreferencesView: View {
           Text("“开启”使用 macOS 物理键码；“按键位图”按所选 Typebar 布局反查实际字符，适用于 QMK 等外部重映射。中间位置 6、Y、B 可使用任意一侧。错误 Shift 会按一次输入错误计分。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Toggle("代码：退格反缩进", isOn: $settings.codeUnindentOnBackspace)
+          Toggle(
+            "代码：退格反缩进",
+            isOn: restartingConfigurationBinding($settings.codeUnindentOnBackspace))
           Text("仅代码语言有效：光标位于自动插入的行首 Tab 时，退格会移除整段缩进并返回上一行。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("最低准确率", isOn: minimumAccuracyEnabledBinding(settings: settings))
           if settings.minimumAccuracy > 0 {
-            Stepper(value: $settings.minimumAccuracy, in: 0...100, step: 1) {
+            Stepper(
+              value: restartingConfigurationBinding($settings.minimumAccuracy), in: 0...100, step: 1
+            ) {
               LabeledContent(
                 "准确率门槛",
                 value: "\(settings.minimumAccuracy.formatted(.number.precision(.fractionLength(0...2))))%")
@@ -260,7 +265,9 @@ struct PreferencesView: View {
           Toggle("最低整体速度", isOn: minimumWpmEnabledBinding(settings: settings))
           if settings.minimumWpm > 0 {
             Stepper(
-              value: $settings.minimumWpm, in: 0...Double.greatestFiniteMagnitude, step: 5
+              value: restartingConfigurationBinding($settings.minimumWpm),
+              in: 0...Double.greatestFiniteMagnitude,
+              step: 5
             ) {
               LabeledContent(
                 "速度门槛",
@@ -270,14 +277,16 @@ struct PreferencesView: View {
           Text("有限测试结束时按最终 WPM 检查；未达门槛会标记失败，不保存完成成绩或发布到榜单。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Picker("最低单词速度", selection: $settings.minimumWordBurstMode) {
+          Picker(
+            "最低单词速度",
+            selection: restartingConfigurationBinding($settings.minimumWordBurstMode)) {
             ForEach(MinimumWordBurstMode.allCases) { mode in
               Text(mode.displayName).tag(mode)
             }
           }
           if settings.minimumWordBurstMode != .off {
             Stepper(
-              value: $settings.minimumWordBurstWpm,
+              value: restartingConfigurationBinding($settings.minimumWordBurstWpm),
               in: 0...Double.greatestFiniteMagnitude, step: 5
             ) {
               LabeledContent(
@@ -292,7 +301,7 @@ struct PreferencesView: View {
           Text("仅在字数、引语或有限自定义测试的最后一词达到目标长度时生效；“遇错停下”或“遇错删除”会自动禁用该行为。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Picker("英文拼写", selection: $settings.englishVariant) {
+          Picker("英文拼写", selection: restartingConfigurationBinding($settings.englishVariant)) {
             ForEach(EnglishVariant.allCases) { variant in
               Text(variant.displayName).tag(variant)
             }
@@ -798,7 +807,7 @@ struct PreferencesView: View {
               .font(.caption)
               .foregroundStyle(.secondary)
           } else {
-            Picker("自定义键盘图", selection: $settings.customKeyboardLayoutID) {
+            Picker("自定义键盘图", selection: customKeyboardGuideLayoutBinding(settings: settings)) {
               Text("选择要使用的图").tag(nil as UUID?)
               ForEach(settings.customKeyboardLayouts) { layout in
                 Text(layout.name).tag(layout.id as UUID?)
@@ -820,6 +829,7 @@ struct PreferencesView: View {
               TextField("Shift 主行", text: $customKeyboardShiftedHomeRow)
               TextField("Shift 底行", text: $customKeyboardShiftedBottomRow)
               Button("添加并应用", systemImage: "plus") {
+                guard acceptsCustomKeyboardLayoutMutation(settings: settings) else { return }
                 guard let layout = settings.addCustomKeyboardLayout(
                   name: customKeyboardLayoutName,
                   numberRow: customKeyboardNumberRow,
@@ -853,9 +863,15 @@ struct PreferencesView: View {
                 HStack {
                   Text(layout.name)
                   Spacer()
-                  Button("使用") { settings.selectCustomKeyboardLayout(layout.id) }
+                  Button("使用") {
+                    guard layout.id == settings.customKeyboardLayoutID
+                      || acceptsCustomKeyboardLayoutMutation(settings: settings)
+                    else { return }
+                    settings.selectCustomKeyboardLayout(layout.id)
+                  }
                     .buttonStyle(.borderless)
                   Button(role: .destructive) {
+                    guard acceptsCustomKeyboardLayoutDeletion(layout, settings: settings) else { return }
                     settings.deleteCustomKeyboardLayout(layout.id)
                   } label: {
                     Image(systemName: "trash")
@@ -869,13 +885,15 @@ struct PreferencesView: View {
                 .foregroundStyle(.secondary)
             }
           }
-          Picker("输入布局模拟", selection: $settings.keyboardInputLayout) {
+          Picker("输入布局模拟", selection: restartingConfigurationBinding($settings.keyboardInputLayout)) {
             ForEach(KeyboardInputLayout.allCases) { layout in
               Text(layout.displayName).tag(layout)
             }
           }
           if settings.keyboardInputLayout == .custom {
-            Picker("模拟的自定义键盘图", selection: $settings.customKeyboardLayoutID) {
+            Picker(
+              "模拟的自定义键盘图",
+              selection: restartingConfigurationBinding($settings.customKeyboardLayoutID)) {
               Text("选择要模拟的图").tag(nil as UUID?)
               ForEach(settings.customKeyboardLayouts) { layout in
                 Text(layout.name).tag(layout.id as UUID?)
@@ -898,7 +916,10 @@ struct PreferencesView: View {
                     "第 \(index + 1) 段",
                     selection: Binding(
                       get: { settings.layoutFluidLayouts[index] },
-                      set: { settings.setLayoutFluidLayout($0, at: index) }
+                      set: {
+                        guard acceptsRestartingConfigurationChange() else { return }
+                        settings.setLayoutFluidLayout($0, at: index)
+                      }
                     )
                   ) {
                     ForEach(KeyboardLayout.allCases) { layout in
@@ -907,6 +928,7 @@ struct PreferencesView: View {
                   }
                   if settings.layoutFluidLayouts.count > 1 {
                     Button(role: .destructive) {
+                      guard acceptsRestartingConfigurationChange() else { return }
                       settings.removeLayoutFluidLayout(at: index)
                     } label: {
                       Image(systemName: "minus.circle")
@@ -916,7 +938,10 @@ struct PreferencesView: View {
                   }
                 }
               }
-              Button("添加布局", systemImage: "plus") { settings.addLayoutFluidLayout() }
+              Button("添加布局", systemImage: "plus") {
+                guard acceptsRestartingConfigurationChange() else { return }
+                settings.addLayoutFluidLayout()
+              }
                 .disabled(settings.layoutFluidLayouts.count >= LayoutFluidPolicy.maximumSupportedLayouts)
               Text("Layout Fluid 会按完成进度均分各段并切换键盘提示和输入模拟；当前原生布局最多 \(LayoutFluidPolicy.maximumSupportedLayouts) 种（官方上限为 15）。")
                 .font(.caption)
@@ -1822,10 +1847,18 @@ struct PreferencesView: View {
       }
     }
     .formStyle(.grouped)
+    .alert("锁定重开已开启", isPresented: $showingNoQuitConfigurationLockAlert) {
+      Button("好", role: .cancel) {}
+    } message: {
+      Text("请完成或放弃所有正在进行的锁定重开测试。")
+    }
     .confirmationDialog(
       "恢复默认设置？", isPresented: $showingRestoreDefaultsConfirmation, titleVisibility: .visible
     ) {
-      Button("恢复默认", role: .destructive) { settings.restoreDefaults() }
+      Button("恢复默认", role: .destructive) {
+        guard acceptsRestartingConfigurationChange() else { return }
+        settings.restoreDefaults()
+      }
     } message: {
       Text("练习与外观设置将恢复默认，本地背景图片会移除；本地字体文件和练习历史会保留。")
     }
@@ -2157,11 +2190,56 @@ struct PreferencesView: View {
     !searchIsActive || searchResults.contains { $0.section == section }
   }
 
+  @discardableResult
+  private func acceptsRestartingConfigurationChange() -> Bool {
+    guard settings.allowsRestartingConfigurationChange else {
+      showingNoQuitConfigurationLockAlert = true
+      return false
+    }
+    return true
+  }
+
+  private func restartingConfigurationBinding<Value>(_ binding: Binding<Value>) -> Binding<Value> {
+    Binding(
+      get: { binding.wrappedValue },
+      set: { updatedValue in
+        guard acceptsRestartingConfigurationChange() else { return }
+        binding.wrappedValue = updatedValue
+      }
+    )
+  }
+
+  private func customKeyboardGuideLayoutBinding(settings: AppSettings) -> Binding<UUID?> {
+    Binding(
+      get: { settings.customKeyboardLayoutID },
+      set: { layoutID in
+        guard layoutID != settings.customKeyboardLayoutID else { return }
+        guard acceptsCustomKeyboardLayoutMutation(settings: settings) else { return }
+        settings.customKeyboardLayoutID = layoutID
+      }
+    )
+  }
+
+  @discardableResult
+  private func acceptsCustomKeyboardLayoutMutation(settings: AppSettings) -> Bool {
+    guard settings.keyboardInputLayout == .custom else { return true }
+    return acceptsRestartingConfigurationChange()
+  }
+
+  @discardableResult
+  private func acceptsCustomKeyboardLayoutDeletion(
+    _ layout: CustomKeyboardGuideLayout, settings: AppSettings
+  ) -> Bool {
+    guard layout.id == settings.customKeyboardLayoutID else { return true }
+    return acceptsCustomKeyboardLayoutMutation(settings: settings)
+  }
+
   private func modifierBinding(_ modifier: TestModifier, settings: AppSettings) -> Binding<Bool> {
     Binding(
       get: { settings.testModifiers.contains(modifier) },
       set: { enabled in
         guard enabled != settings.testModifiers.contains(modifier) else { return }
+        guard acceptsRestartingConfigurationChange() else { return }
         settings.toggleTestModifier(modifier)
       }
     )
@@ -2170,14 +2248,20 @@ struct PreferencesView: View {
   private func minimumAccuracyEnabledBinding(settings: AppSettings) -> Binding<Bool> {
     Binding(
       get: { settings.minimumAccuracy > 0 },
-      set: { settings.minimumAccuracy = $0 ? max(95, settings.minimumAccuracy) : 0 }
+      set: {
+        guard acceptsRestartingConfigurationChange() else { return }
+        settings.minimumAccuracy = $0 ? max(95, settings.minimumAccuracy) : 0
+      }
     )
   }
 
   private func minimumWpmEnabledBinding(settings: AppSettings) -> Binding<Bool> {
     Binding(
       get: { settings.minimumWpm > 0 },
-      set: { settings.minimumWpm = $0 ? max(60, settings.minimumWpm) : 0 }
+      set: {
+        guard acceptsRestartingConfigurationChange() else { return }
+        settings.minimumWpm = $0 ? max(60, settings.minimumWpm) : 0
+      }
     )
   }
 

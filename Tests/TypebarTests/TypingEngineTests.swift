@@ -18165,6 +18165,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.noQuit, .uppercase]).contains(.noQuit))
   }
 
+  func testNoQuitConfigurationLockRegistryBlocksUntilEveryActiveOwnerReleases() {
+    var registry = NoQuitConfigurationLockRegistry()
+    let firstOwner = UUID()
+    let secondOwner = UUID()
+
+    XCTAssertTrue(registry.allowsRestartingConfigurationChange)
+    registry.setLock(true, for: firstOwner)
+    XCTAssertFalse(registry.allowsRestartingConfigurationChange)
+    registry.setLock(true, for: secondOwner)
+    registry.setLock(false, for: firstOwner)
+    XCTAssertFalse(registry.allowsRestartingConfigurationChange)
+    registry.setLock(false, for: secondOwner)
+    XCTAssertTrue(registry.allowsRestartingConfigurationChange)
+  }
+
   func testRepeatingCustomTextSupportsWordAndTimeLimits() {
     let wordConfiguration = TestConfiguration(
       mode: .custom, duration: nil, wordLimit: 3, difficulty: .normal, rules: .init(),
@@ -22144,6 +22159,33 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(settings.activeTestSelection, imported)
     XCTAssertEqual(settings.activeTestSelectionGeneration, 1)
     XCTAssertFalse(legacySummary.restoredActiveTestSelection)
+  }
+
+  @MainActor
+  func testLocalArchiveImportRejectsAnActiveNoQuitConfigurationLock() throws {
+    let suiteName = "TypebarTests.archive-no-quit.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    let container = try ModelContainer(
+      for: TestResultRecord.self, TestPresetRecord.self, SavedCustomTextRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let imported = ActiveTestSelectionDocument(
+      preset: .init(configuration: .words(83, language: .german)),
+      testParameterMemory: .defaults)
+    settings.setNoQuitConfigurationLock(true, for: UUID())
+
+    XCTAssertThrowsError(
+      try LocalArchiveImport.apply(
+        .init(
+          exportedAt: start, settings: settings.snapshot, results: [], presets: [],
+          activeTestSelection: imported),
+        settings: settings, results: [], presets: [], savedTexts: [],
+        modelContext: container.mainContext)
+    ) { error in
+      XCTAssertEqual(error as? LocalArchiveImportError, .noQuitConfigurationLocked)
+    }
+    XCTAssertNil(settings.activeTestSelection)
   }
 
   func testCompletedResultDecodesArchivesWrittenBeforeInactivityTracking() throws {

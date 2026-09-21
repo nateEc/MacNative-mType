@@ -1102,11 +1102,20 @@ final class AppSettings {
   @ObservationIgnored private let layoutFluidStorageKey = "layoutFluidLayouts.v1"
   @ObservationIgnored private var randomThemeBag: [RandomThemeTarget] = []
   @ObservationIgnored private var randomThemeBagSignature: [RandomThemeTarget] = []
+  private var noQuitConfigurationLocks = NoQuitConfigurationLockRegistry()
   private var randomThemeTarget: RandomThemeTarget?
   private(set) var activeTestSelectionGeneration = 0
 
   var activeTestSelection: ActiveTestSelectionDocument? {
     ActiveTestSelectionStore(defaults: defaults).load()
+  }
+
+  var allowsRestartingConfigurationChange: Bool {
+    noQuitConfigurationLocks.allowsRestartingConfigurationChange
+  }
+
+  func setNoQuitConfigurationLock(_ isLocked: Bool, for ownerID: UUID) {
+    noQuitConfigurationLocks.setLock(isLocked, for: ownerID)
   }
 
   @discardableResult

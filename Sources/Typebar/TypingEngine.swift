@@ -2625,6 +2625,25 @@ enum NoQuitConfigurationChangePolicy {
   }
 }
 
+/// Shared settings must remain unchanged while any app window owns an active
+/// no-quit test. The registry intentionally has no persistence: closing a
+/// window releases its process-local test state.
+struct NoQuitConfigurationLockRegistry: Equatable {
+  private(set) var ownerIDs: Set<UUID> = []
+
+  var allowsRestartingConfigurationChange: Bool {
+    ownerIDs.isEmpty
+  }
+
+  mutating func setLock(_ isLocked: Bool, for ownerID: UUID) {
+    if isLocked {
+      ownerIDs.insert(ownerID)
+    } else {
+      ownerIDs.remove(ownerID)
+    }
+  }
+}
+
 /// Mirrors the reference thresholds that protect lengthy configured tests
 /// and explicitly saved long texts from an accidental quick-restart keypress.
 enum QuickRestartSafetyPolicy {

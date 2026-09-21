@@ -886,6 +886,17 @@ struct ArchiveImportSummary: Equatable {
     let restoredActiveTestSelection: Bool
 }
 
+enum LocalArchiveImportError: Error, Equatable, LocalizedError {
+    case noQuitConfigurationLocked
+
+    var errorDescription: String? {
+        switch self {
+        case .noQuitConfigurationLocked:
+            return "锁定重开测试进行中，暂时不能导入会改写设置的数据。"
+        }
+    }
+}
+
 @MainActor
 enum LocalArchiveImport {
     static func apply(
@@ -896,6 +907,9 @@ enum LocalArchiveImport {
         savedTexts: [SavedCustomTextRecord],
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
+        guard settings.allowsRestartingConfigurationChange else {
+            throw LocalArchiveImportError.noQuitConfigurationLocked
+        }
         let newResults = TypebarArchiveMerge.resultsToInsert(from: archive, existingIDs: Set(results.map(\.id)))
         let existingPresets = presets.compactMap { record in
             record.definition.map { NamedPreset(name: record.name, definition: $0) }

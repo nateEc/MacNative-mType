@@ -579,6 +579,25 @@ private struct PendingPublicationRetryTrigger: Equatable {
   let isEnabled: Bool
 }
 
+private struct NoQuitConfigurationLockSynchronizer: ViewModifier {
+  let session: TypingSession
+  let settings: AppSettings
+  let ownerID: UUID
+
+  func body(content: Content) -> some View {
+    content
+      .onChange(of: session.hasStarted) { _, _ in synchronize() }
+      .onChange(of: session.isFinished) { _, _ in synchronize() }
+      .onChange(of: session.configuration.modifiers) { _, _ in synchronize() }
+      .onDisappear { settings.setNoQuitConfigurationLock(false, for: ownerID) }
+  }
+
+  private func synchronize() {
+    settings.setNoQuitConfigurationLock(
+      !NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session), for: ownerID)
+  }
+}
+
 private struct ContentView: View {
   let settings: AppSettings
   let account: AccountSession
@@ -596,6 +615,7 @@ private struct ContentView: View {
   @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
     [TestPresetRecord]
   @State private var session = TestSessionFactory.make(configuration: .timed(seconds: 30))
+  @State private var noQuitConfigurationLockOwnerID = UUID()
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
   @State private var polyglotReturnLanguage: TypingLanguage?
@@ -818,6 +838,9 @@ private struct ContentView: View {
     .onChange(of: settings.typingPowerMode) { _, mode in
       if !mode.isEnabled { clearTypingPowerEffect() }
     }
+    .modifier(
+      NoQuitConfigurationLockSynchronizer(
+        session: session, settings: settings, ownerID: noQuitConfigurationLockOwnerID))
     .task { await runClock() }
     .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
@@ -2594,11 +2617,12 @@ private struct ContentView: View {
   }
 
   private var isRestartingConfigurationChangeLocked: Bool {
-    !NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session)
+    !settings.allowsRestartingConfigurationChange
   }
 
   @discardableResult
   private func acceptsRestartingConfigurationChange() -> Bool {
+    synchronizeNoQuitConfigurationLock()
     guard !isRestartingConfigurationChangeLocked else {
       restartLockMessage = "锁定重开已开启：请完成或放弃本次测试。"
       return false
@@ -2835,6 +2859,7 @@ private struct ContentView: View {
       quote: selectedQuote,
       weakSpotScores: weakSpotScores
     )
+    synchronizeNoQuitConfigurationLock()
     persistActiveTestSelection()
     if shouldCountRestart { currentRestartCount += 1 }
     isRepeatedPaceAttempt = false
@@ -2847,11 +2872,18 @@ private struct ContentView: View {
   }
 
   private func contentAppeared() {
+    synchronizeNoQuitConfigurationLock()
     if !didRestoreActiveTestSelection {
       didRestoreActiveTestSelection = true
       restorePersistedTestSelection()
     }
     refreshZipfNotice()
+  }
+
+  private func synchronizeNoQuitConfigurationLock() {
+    settings.setNoQuitConfigurationLock(
+      !NoQuitConfigurationChangePolicy.allowsRestartingChange(for: session),
+      for: noQuitConfigurationLockOwnerID)
   }
 
   private func refreshLiveContentIfNeeded(configuration: TestConfiguration, requestID: UUID) {
