@@ -15473,6 +15473,45 @@ final class TypingEngineTests: XCTestCase {
     )
   }
 
+  func testTypingInputAutofocusPolicyKeepsModalAndTextInputEventsOutsidePractice() {
+    XCTAssertEqual(
+      TypingInputAutofocusPolicy.disposition(
+        inputIsFocused: false, windowIsKey: true, hasAttachedSheet: false,
+        externalTextInputIsFocused: false, charactersIgnoringModifiers: "a",
+        commandPressed: false, controlPressed: false, discardsAutofocusInput: true),
+      .focusAndDiscard
+    )
+    XCTAssertEqual(
+      TypingInputAutofocusPolicy.disposition(
+        inputIsFocused: false, windowIsKey: true, hasAttachedSheet: false,
+        externalTextInputIsFocused: false, charactersIgnoringModifiers: "a",
+        commandPressed: false, controlPressed: false, discardsAutofocusInput: false),
+      .focusAndForward
+    )
+
+    for (inputIsFocused, windowIsKey, hasAttachedSheet, externalTextInputIsFocused, characters, command, control) in [
+      (true, true, false, false, "a", false, false),
+      (false, false, false, false, "a", false, false),
+      (false, true, true, false, "a", false, false),
+      (false, true, false, true, "a", false, false),
+      (false, true, false, false, " ", false, false),
+      (false, true, false, false, "\t", false, false),
+      (false, true, false, false, "\r", false, false),
+      (false, true, false, false, "\u{1B}", false, false),
+      (false, true, false, false, "a", true, false),
+      (false, true, false, false, "a", false, true),
+    ] {
+      XCTAssertEqual(
+        TypingInputAutofocusPolicy.disposition(
+          inputIsFocused: inputIsFocused, windowIsKey: windowIsKey, hasAttachedSheet: hasAttachedSheet,
+          externalTextInputIsFocused: externalTextInputIsFocused,
+          charactersIgnoringModifiers: characters, commandPressed: command,
+          controlPressed: control, discardsAutofocusInput: true),
+        .ignore
+      )
+    }
+  }
+
   func testSessionFactoryLeavesZenPromptFreeformAndBuildsOtherModePrompts() {
     let timed = TestSessionFactory.make(configuration: .timed(seconds: 120))
     let words = TestSessionFactory.make(configuration: .words(25))

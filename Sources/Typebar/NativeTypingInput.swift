@@ -1,6 +1,41 @@
 @preconcurrency import AppKit
 import SwiftUI
 
+enum TypingInputAutofocusDisposition: Equatable {
+    case ignore
+    case focusAndForward
+    case focusAndDiscard
+}
+
+/// Keeps the reference's ordinary-key autofocus behavior separate from AppKit
+/// monitor lifecycle details, so modal and text-field boundaries are testable.
+enum TypingInputAutofocusPolicy {
+    static func disposition(
+        inputIsFocused: Bool,
+        windowIsKey: Bool,
+        hasAttachedSheet: Bool,
+        externalTextInputIsFocused: Bool,
+        charactersIgnoringModifiers: String?,
+        commandPressed: Bool,
+        controlPressed: Bool,
+        discardsAutofocusInput: Bool
+    ) -> TypingInputAutofocusDisposition {
+        guard !inputIsFocused,
+              windowIsKey,
+              !hasAttachedSheet,
+              !externalTextInputIsFocused,
+              !commandPressed,
+              !controlPressed,
+              let charactersIgnoringModifiers,
+              !charactersIgnoringModifiers.isEmpty,
+              !["\r", "\n", " ", "\t", "\u{1B}"].contains(charactersIgnoringModifiers)
+        else {
+            return .ignore
+        }
+        return discardsAutofocusInput ? .focusAndDiscard : .focusAndForward
+    }
+}
+
 struct NativeTypingInput: NSViewRepresentable {
     var focusRequest: Int
     var quickRestartKey: QuickRestartKey
@@ -10,6 +45,7 @@ struct NativeTypingInput: NSViewRepresentable {
     var mapsArrowKeysToInput: Bool
     var acceptsNewlineInput: Bool
     var acceptsTabInput: Bool
+    var discardsAutofocusInput: Bool
     var requiresShiftQuickRestart: Bool
     var disablesQuickRestart: Bool
     var enablesLongTestBailout: Bool
@@ -52,6 +88,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.mapsArrowKeysToInput = mapsArrowKeysToInput
         view.acceptsNewlineInput = acceptsNewlineInput
         view.acceptsTabInput = acceptsTabInput
+        view.discardsAutofocusInput = discardsAutofocusInput
         view.requiresShiftQuickRestart = requiresShiftQuickRestart
         view.disablesQuickRestart = disablesQuickRestart
         view.enablesLongTestBailout = enablesLongTestBailout
@@ -89,6 +126,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var mapsArrowKeysToInput = false
     var acceptsNewlineInput = false
     var acceptsTabInput = false
+    var discardsAutofocusInput = true
     var requiresShiftQuickRestart = false
     var disablesQuickRestart = false
     var enablesLongTestBailout = false
@@ -106,6 +144,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     private var pendingForcedError = false
     private var lastBailoutAttempt: Date?
     private weak var observedWindow: NSWindow?
+    private var localKeyDownMonitor: Any?
     var bailoutClock: () -> Date = { .now }
 
     override init(frame frameRect: NSRect) {
@@ -119,12 +158,14 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
       removeWindowFocusObservers()
+      removeLocalKeyDownMonitor()
       super.viewWillMove(toWindow: newWindow)
     }
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
       removeWindowFocusObservers()
+      removeLocalKeyDownMonitor()
       guard let window else { return }
       let center = NotificationCenter.default
       center.addObserver(
@@ -134,6 +175,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         self, selector: #selector(windowDidResignKey(_:)),
         name: NSWindow.didResignKeyNotification, object: window)
       observedWindow = window
+      installLocalKeyDownMonitor(for: window)
       onWindowFocusChanged(window.isKeyWindow)
     }
 
@@ -150,6 +192,40 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       center.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: observedWindow)
       center.removeObserver(self, name: NSWindow.didResignKeyNotification, object: observedWindow)
       self.observedWindow = nil
+    }
+
+    private func installLocalKeyDownMonitor(for window: NSWindow) {
+      localKeyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak window] event in
+        guard let self, let window, event.window === window else { return event }
+        let responder = window.firstResponder
+        let externalTextInputIsFocused = responder !== self
+          && (responder is NSTextView || responder is NSTextField)
+        switch TypingInputAutofocusPolicy.disposition(
+          inputIsFocused: responder === self,
+          windowIsKey: window.isKeyWindow,
+          hasAttachedSheet: window.attachedSheet != nil,
+          externalTextInputIsFocused: externalTextInputIsFocused,
+          charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+          commandPressed: event.modifierFlags.contains(.command),
+          controlPressed: event.modifierFlags.contains(.control),
+          discardsAutofocusInput: self.discardsAutofocusInput
+        ) {
+        case .ignore:
+          return event
+        case .focusAndForward:
+          window.makeFirstResponder(self)
+          return event
+        case .focusAndDiscard:
+          window.makeFirstResponder(self)
+          return nil
+        }
+      }
+    }
+
+    private func removeLocalKeyDownMonitor() {
+      guard let localKeyDownMonitor else { return }
+      NSEvent.removeMonitor(localKeyDownMonitor)
+      self.localKeyDownMonitor = nil
     }
 
     @objc private func windowDidBecomeKey(_ notification: Notification) {

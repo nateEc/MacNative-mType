@@ -1900,6 +1900,7 @@ private struct ContentView: View {
         mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
         acceptsNewlineInput: session.configuration.mode == .zen || session.prompt.contains("\n"),
         acceptsTabInput: session.configuration.mode == .zen || session.prompt.contains("\t"),
+        discardsAutofocusInput: settings.showFocusWarning,
         requiresShiftQuickRestart: quickRestartRequiresProtection
           && settings.quickRestartKey != .enter,
         disablesQuickRestart: quickRestartRequiresProtection
