@@ -1028,15 +1028,7 @@ enum TestModifierPolicy {
         return first.uppercased() + word.dropFirst().lowercased()
       }.joined(separator: " ")
     } else if modifiers.contains(.alternatingCase) {
-      var uppercase = false
-      transformed = transformed.reduce(into: "") { output, character in
-        if character.isASCII, character.isLetter {
-          output += uppercase ? character.uppercased() : character.lowercased()
-        } else {
-          output.append(character)
-        }
-        uppercase.toggle()
-      }
+      transformed = AlternatingCasePolicy.transformed(transformed)
     } else if modifiers.contains(.randomCase) {
       transformed = RandomCasePolicy.transformed(transformed)
     }
@@ -1072,6 +1064,20 @@ enum TestModifierPolicy {
       transformed = TypingTextNormalizer.lazyLatin(transformed, language: language)
     }
     return transformed
+  }
+}
+
+/// `sPoNgEcAsE` is applied by Monkeytype's generator to each word before its
+/// commit separator is appended. Keep that word boundary observable in the
+/// native prompt rather than carrying its lower/upper phase through spaces.
+enum AlternatingCasePolicy {
+  static func transformed(_ source: String) -> String {
+    source.split(separator: " ", omittingEmptySubsequences: false).map { word in
+      word.enumerated().reduce(into: "") { output, entry in
+        let (index, character) = entry
+        output += index.isMultiple(of: 2) ? character.lowercased() : character.uppercased()
+      }
+    }.joined(separator: " ")
   }
 }
 

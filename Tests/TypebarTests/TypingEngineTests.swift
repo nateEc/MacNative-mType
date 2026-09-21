@@ -17478,6 +17478,11 @@ final class TypingEngineTests: XCTestCase {
       customText: "amber bay!"
     )
     XCTAssertEqual(alternatingCase.prompt, "aMbEr bAy!")
+    XCTAssertEqual(
+      TestModifierPolicy.transformed("ab cd", modifiers: [.alternatingCase]),
+      "aB cD",
+      "sPoNgEcAsE restarts its lower/upper phase for every generated word"
+    )
     let cipherAndBackwards = TestSessionFactory.make(
       configuration: .init(
         mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
