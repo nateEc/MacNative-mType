@@ -17419,6 +17419,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(accepted.isEmpty)
   }
 
+  func testTypingInputNavigationPolicyBlocksOnlyPracticeNavigationCommands() {
+    let blockedSelectors: [Selector] = [
+      #selector(NSResponder.moveLeft(_:)),
+      #selector(NSResponder.moveWordRight(_:)),
+      #selector(NSResponder.moveToBeginningOfDocumentAndModifySelection(_:)),
+      #selector(NSResponder.pageDown(_:)),
+      #selector(NSResponder.scrollToEndOfDocument(_:)),
+    ]
+    for selector in blockedSelectors {
+      XCTAssertTrue(TypingInputNavigationPolicy.shouldIntercept(selector))
+    }
+
+    let allowedSelectors: [Selector] = [
+      #selector(NSResponder.moveForward(_:)),
+      #selector(NSResponder.moveBackward(_:)),
+      #selector(NSResponder.centerSelectionInVisibleArea(_:)),
+      #selector(NSResponder.scrollLineUp(_:)),
+    ]
+    for selector in allowedSelectors {
+      XCTAssertFalse(TypingInputNavigationPolicy.shouldIntercept(selector))
+    }
+  }
+
   @MainActor
   func testNativeInputBridgeIgnoresRepeatedShortcutAndArrowActions() throws {
     var restarts = 0

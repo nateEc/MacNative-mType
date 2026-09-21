@@ -52,6 +52,62 @@ enum TypingInputEditingPolicy {
   }
 }
 
+/// The reference suppresses Home, End, Page, and direction-key browser
+/// navigation outside arrow practice. Keep the equivalent AppKit text-system
+/// commands local without swallowing unrelated Control-key bindings.
+enum TypingInputNavigationPolicy {
+  private static let blockedSelectorNames: Set<String> = [
+    #selector(NSResponder.moveLeft(_:)),
+    #selector(NSResponder.moveRight(_:)),
+    #selector(NSResponder.moveUp(_:)),
+    #selector(NSResponder.moveDown(_:)),
+    #selector(NSResponder.moveWordBackward(_:)),
+    #selector(NSResponder.moveWordForward(_:)),
+    #selector(NSResponder.moveWordLeft(_:)),
+    #selector(NSResponder.moveWordRight(_:)),
+    #selector(NSResponder.moveToBeginningOfLine(_:)),
+    #selector(NSResponder.moveToEndOfLine(_:)),
+    #selector(NSResponder.moveToLeftEndOfLine(_:)),
+    #selector(NSResponder.moveToRightEndOfLine(_:)),
+    #selector(NSResponder.moveToBeginningOfParagraph(_:)),
+    #selector(NSResponder.moveToEndOfParagraph(_:)),
+    #selector(NSResponder.moveToBeginningOfDocument(_:)),
+    #selector(NSResponder.moveToEndOfDocument(_:)),
+    #selector(NSResponder.pageUp(_:)),
+    #selector(NSResponder.pageDown(_:)),
+    #selector(NSResponder.moveLeftAndModifySelection(_:)),
+    #selector(NSResponder.moveRightAndModifySelection(_:)),
+    #selector(NSResponder.moveUpAndModifySelection(_:)),
+    #selector(NSResponder.moveDownAndModifySelection(_:)),
+    #selector(NSResponder.moveBackwardAndModifySelection(_:)),
+    #selector(NSResponder.moveForwardAndModifySelection(_:)),
+    #selector(NSResponder.moveWordBackwardAndModifySelection(_:)),
+    #selector(NSResponder.moveWordForwardAndModifySelection(_:)),
+    #selector(NSResponder.moveWordLeftAndModifySelection(_:)),
+    #selector(NSResponder.moveWordRightAndModifySelection(_:)),
+    #selector(NSResponder.moveToBeginningOfLineAndModifySelection(_:)),
+    #selector(NSResponder.moveToEndOfLineAndModifySelection(_:)),
+    #selector(NSResponder.moveToLeftEndOfLineAndModifySelection(_:)),
+    #selector(NSResponder.moveToRightEndOfLineAndModifySelection(_:)),
+    #selector(NSResponder.moveToBeginningOfParagraphAndModifySelection(_:)),
+    #selector(NSResponder.moveToEndOfParagraphAndModifySelection(_:)),
+    #selector(NSResponder.moveToBeginningOfDocumentAndModifySelection(_:)),
+    #selector(NSResponder.moveToEndOfDocumentAndModifySelection(_:)),
+    #selector(NSResponder.moveParagraphBackwardAndModifySelection(_:)),
+    #selector(NSResponder.moveParagraphForwardAndModifySelection(_:)),
+    #selector(NSResponder.pageUpAndModifySelection(_:)),
+    #selector(NSResponder.pageDownAndModifySelection(_:)),
+    #selector(NSResponder.scrollPageUp(_:)),
+    #selector(NSResponder.scrollPageDown(_:)),
+    #selector(NSResponder.scrollToBeginningOfDocument(_:)),
+    #selector(NSResponder.scrollToEndOfDocument(_:)),
+  ].reduce(into: Set<String>()) { $0.insert(NSStringFromSelector($1)) }
+
+  static func shouldIntercept(_ selector: Selector) -> Bool {
+    blockedSelectorNames.contains(NSStringFromSelector(selector))
+  }
+}
+
 struct NativeTypingInput: NSViewRepresentable {
     var focusRequest: Int
     var quickRestartKey: QuickRestartKey
@@ -435,6 +491,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 
     override func doCommand(by selector: Selector) {
       pendingForcedError = false
+      if TypingInputNavigationPolicy.shouldIntercept(selector) { return }
       switch selector {
         case #selector(copy(_:)):
           guard !interceptsEditingCommand(.copy) else { return }
