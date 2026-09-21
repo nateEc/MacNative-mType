@@ -8,7 +8,7 @@
 - Typebar 的实现、文案、数据模型和测试均为原创；该表不复制参考实现的代码、资产、词表、布局定义或主题数据。
 - 当前语言目录：376 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
 - `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：446 个独立原生选择、0 个兼容代指、0 个未映射配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界见 `OFFICIAL_LANGUAGE_AUDIT.md`。
-- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：91 个已映射、2 个部分、1 个不适用、0 个未实现或漏记；声音、主／节奏光标、实时指标、键盘提示与键入能量档位会提取固定枚举值，节奏伙伴会校验固定布尔类型，再与本机语义逐项对账。
+- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：92 个已映射、1 个部分、1 个不适用、0 个未实现或漏记；声音、主／节奏光标、实时指标、键盘提示与键入能量档位会提取固定枚举值，节奏伙伴会校验固定布尔类型，再与本机语义逐项对账。
 
 - Catalan、Indonesian 与 Malay 的自动化测试覆盖各自的自创词流、四档原创引语、完整多语混排轮转、`ca-ES` / `id-ID` / `ms-MY` 朗读 locale 与仅在明示启用时使用的 `ca` / `id` / `ms` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 
@@ -26,7 +26,7 @@
 | `time` | `TestConfiguration.duration` | 已映射；命令面板含 15/30/60/120 标准值与自定义非负安全整数秒输入，0 表示无限；大型有限值按需扩展提示。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
 | `quoteLength` | `quoteLengths`、`quoteSelectionMode`、所选引语 ID | 已映射；`0/1/2/3` 对应短/中/长/超长集合，`-3` 对应忽略长度的收藏模式，`-2` 对应锁定所选 ID 的本机搜索模式；六值由固定 schema 机器校验，不复制引语内容。 |
-| `language` | `TypingLanguage`、`mixedLanguageComponents` | 部分；一百五十八种 Typebar 自有单语（最新增加 Français · Bitoduc、Streaming Emotes · Typebar 与 Arcade Horror Phrases · Typebar）、中英混合和自选多语组合，不复制官方语言目录。Arabic、Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版；固定元数据中的全部 26 个 `joiningScript` 语言使用系统原生塑形、连写行距与逐字隐藏保护，九种 RTL 语言仍暂不进入双向多语混排；经配置验证的 LTR 语言可进入混排，Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文、朗读、Zipf 与简化输入严格按每项固定配置或其缺省分支处理，完整映射记录在后续审计条目与自动化测试中。Swiss German 复用 Typebar 自有 German 内容并把可见 `ß` 变为 `ss`，可进入成绩和排行榜但不能投稿或选择社区引语。乌克兰语 Latin、日语罗马字、Greeklish 与 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们；Pig Latin、Lorem Ipsum 和五字母英语的离线内容分别保持原创变换、原创伪拉丁与严格五字母边界；Kokanu 仅从其官方语言资料取词汇与语法边界，练习文本独立编写；Likanu 由自写音节解析器按官方字符规则从这些自有内容确定性派生；专项词流分别保留英语、瑞典语、葡萄牙语、俄语缩略词、两种乌克兰语词尾、Bangla 字符、Git 小写 ASCII 命令／概念、两个独立 toki pona ku 集合、Old English、Bitoduc 科技法语、虚构流媒体表情 token 和原创街机恐怖多词 section 的可见输入约束，均不导入参考词值。 |
+| `language` | `TypingLanguage`、`mixedLanguageComponents` | 已映射；固定 schema 的 446 个语言 ID 均映射为独立、可搜索的原生选择，使用 Typebar 自有词流与引语而不复制官方目录内容。Arabic、Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版；固定元数据中的全部 26 个 `joiningScript` 语言使用系统原生塑形、连写行距与逐字隐藏保护。所有 446 项均可用于自选多语组合，RTL 与双向组合交由 macOS Unicode 双向排版；Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文、朗读、Zipf 与简化输入严格按每项固定配置或其缺省分支处理，完整映射记录在后续审计条目与自动化测试中。Swiss German 复用 Typebar 自有 German 内容并把可见 `ß` 变为 `ss`，可进入成绩和排行榜但不能投稿或选择社区引语。乌克兰语 Latin、日语罗马字、Greeklish 与 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们；Pig Latin、Lorem Ipsum 和五字母英语的离线内容分别保持原创变换、原创伪拉丁与严格五字母边界；Kokanu 仅从其官方语言资料取词汇与语法边界，练习文本独立编写；Likanu 由自写音节解析器按官方字符规则从这些自有内容确定性派生；专项词流分别保留英语、瑞典语、葡萄牙语、俄语缩略词、两种乌克兰语词尾、Bangla 字符、Git 小写 ASCII 命令／概念、两个独立 toki pona ku 集合、Old English、Bitoduc 科技法语、虚构流媒体表情 token 和原创街机恐怖多词 section 的可见输入约束，均不导入参考词值。 |
 
 2026-09-09 当前更正：上表 `language` 行的数量快照由 162 种单语和 152 个 LTR 多语候选取代；最新增加两个 Русский · Краткие формы独立规模，以 200 条基础和包含基础集的 880 条扩展原创形式覆盖符号、数字、大小写、长度及 section 结构，不导入参考词值、代码或资产。
 

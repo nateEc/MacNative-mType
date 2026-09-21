@@ -105,6 +105,7 @@
     "time": "`TestConfiguration.duration`",
     "mode": "`TestMode`",
     "quoteLength": "`quoteLengths`、`quoteSelectionMode`、所选引语 ID",
+    "language": "`TypingLanguage`、`mixedLanguageComponents`",
     "burstHeatmap": "`showWordBurstHeatmap`",
     "difficulty": "`Difficulty`",
     "quickRestart": "`QuickRestartKey`",
@@ -192,7 +193,6 @@
     "monkeyPowerLevel": "`typingPowerMode`"
   },
   "partial": {
-    "language": "`TypingLanguage`、`mixedLanguageComponents`",
     "fontFamily": "`practiceFont`、可搜索的本机字体目录、名称/导入"
   },
   "notApplicable": {

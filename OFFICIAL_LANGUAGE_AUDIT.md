@@ -33,7 +33,7 @@
 | Uzbek BCP-47 | `uzbek` 定义 `rightToLeft: false` 与 `bcp47: uz-UZ`，未设连写、`noLazyMode` 或词频排序。Typebar 使用 LTR 空格分词、保留简化输入，知识短文按首段使用 `uz`，朗读精确使用 `uz-UZ`；Zipf 显示七秒可能不支持提示而不移除修饰器。 | 不导入参考词表或补造地区代码。 |
 | Swiss German 专用分支 | `swiss_german` 定义 `bcp47: de-CH`，没有 RTL、连写、`noLazyMode` 或词频排序。源码将词流／引语读取转向 German，并在可见词中把 `ß` 替换为 `ss`；社区投稿选择排除该组。Typebar 以自有 German 内容做同样派生和转换，知识短文／朗读使用 `de`／`de-CH`；Zipf 显示未知提示且不移除修饰器。 | 不导入参考词表、引语、German 引语或布局资产；Swiss German 仍可作为成绩与排行榜筛选。 |
 | Zipf 词频状态 | `orderedByFrequency: true` 时无提示，`false` 时显示七秒“未按频率排序”提示，缺失时显示七秒“可能不支持”提示；提示不移除 Zipf。Bemba 与 Kabyle 使用明确 `false` 路径，Bosnian、Esperanto、Esperanto H、Tatar、Oromo、Bashkir 与 Hawaiian 使用明确 `true` 路径，Esperanto X、Latin、Friulian、Malagasy、Welsh、Hausa、Uzbek、Macedonian、Kazakh、Vietnamese、Jyutping、Pinyin、Euskera、Frisian、Zulu、Western Armenian、Maltese、toki pona、Xhosa、Tibetan、Kyrgyz、Udmurt、Yoruba、Yiddish 与 Swiss German 使用未知路径。 | 使用自有词表排序，不导入参考词表。 |
-| 无空格词界 | 简体／繁体中文、日语平假名与片假名走无空格的原生词界与计分路径。 | 仅在已验证脚本上启用，不能由语言名称推断。 |
+| CJK 词界 | 简体／繁体中文及日语平假名／片假名的常规词流按官方生成器使用提交空格；`noSpaces` 修饰保留原始词界。在线中文短文保留无空格显示并传递系统分词边界，历史连续 CJK 成绩继续按旧本机词界解析。 | 空格提交仅来自固定生成器证据；不从自然书写习惯推断。 |
 | 罗马化／替代书写 | Greeklish、Ukrainian Latin、Japanese Romaji 使用原创 ASCII 离线内容，且不会被在线原文替换为另一书写方式。 | 不把参考项目的变体词表纳入应用。 |
 | 代码 | 70 个代码选择以原创短片段覆盖缩进、输入、回放与结果路径；Dockerfile 使用虚构镜像和本地练习路径，保持 `noLazyMode` 的字面输入语义。 | 标识可参考公开语言目录；所有片段、标签组合与 UI 均由 Typebar 自写。 |
 
@@ -177,3 +177,5 @@
 - 2026-09-09 最新更正：当前单语总数为三百七十六种；Amharic 1k／5k、Armenian 1k、Western Armenian 1k、Belarusian Lacinka 1k、Hawaiian 1k、Japanese Romaji 1k、Klingon 1k、Oromo 1k／5k、Shona 1k、Tibetan 1k、English Five-Letter 1k 与 Xhosa 3k 已成为独立入口。聚合验证覆盖数量、唯一性、字符／标量长度、标点、空格、大小写及脚本边界，机器总账现为 446／446／0／0；固定参考词值仍只用于零交集验证，不进入产品源码、资产或生成内容。
 
 - 2026-09-09 `customPolyglot` 更正：上述历史快照中的“默认／自选 LTR 多语候选仍为一百五十三种”和“不加入多语混排”仅描述当时状态，现统一由“153 项默认组合、446 项可搜索自选候选”取代。固定 schema 的每个语言 ID 都映射到独立原生候选；全 RTL、双向、无空格及代码组合使用 Typebar 自有内容和 macOS 原生排版，规模词流按需取样，不复制或物化参考词表。
+
+- 2026-09-21 词界更正：固定生成器的 `appendCommitCharacter` 在未启用 `nospace` 时为所有词项（包括中文与假名）附加提交空格。Typebar 的常规 CJK 词流已遵循该规则；`noSpaces`、在线中文系统分词与历史连续成绩分别保留显式边界或旧解析，以免迁移破坏进行中会话和既有结果。
