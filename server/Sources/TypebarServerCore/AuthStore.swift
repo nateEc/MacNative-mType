@@ -2941,12 +2941,17 @@ public actor AuthStore {
   public func leaderboard(_ query: LeaderboardQuery, now: Date = .now) throws -> LeaderboardResponse
   {
     let entries = try leaderboardEntries(query, eligibleUserIDs: nil, now: now)
-    return .init(entries: Array(entries.prefix(leaderboardLimit(query))))
+    let pagination = try leaderboardPagination(
+      offset: query.offset, limit: query.limit, defaultLimit: 25)
+    return .init(
+      entries: Array(entries.dropFirst(pagination.offset).prefix(pagination.pageSize)),
+      total: entries.count, offset: pagination.offset, pageSize: pagination.pageSize)
   }
 
   public func leaderboardRank(
     _ query: LeaderboardQuery, accessToken: String, now: Date = .now
   ) throws -> LeaderboardRankResponse {
+    _ = try leaderboardPagination(offset: query.offset, limit: query.limit, defaultLimit: 25)
     let user = try authenticatedUser(for: accessToken, now: now)
     return .init(
       entry: try leaderboardEntries(query, eligibleUserIDs: nil, now: now)
@@ -2960,12 +2965,17 @@ public actor AuthStore {
     let entries = try leaderboardEntries(
       query, eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now
     )
-    return .init(entries: Array(entries.prefix(leaderboardLimit(query))))
+    let pagination = try leaderboardPagination(
+      offset: query.offset, limit: query.limit, defaultLimit: 25)
+    return .init(
+      entries: Array(entries.dropFirst(pagination.offset).prefix(pagination.pageSize)),
+      total: entries.count, offset: pagination.offset, pageSize: pagination.pageSize)
   }
 
   public func friendLeaderboardRank(
     _ query: LeaderboardQuery, accessToken: String, now: Date = .now
   ) throws -> LeaderboardRankResponse {
+    _ = try leaderboardPagination(offset: query.offset, limit: query.limit, defaultLimit: 25)
     let current = try authenticatedUser(for: accessToken, now: now)
     return .init(
       entry: try leaderboardEntries(
@@ -2974,13 +2984,18 @@ public actor AuthStore {
   }
 
   public func experienceLeaderboard(
-    period: String? = nil, eligibleUserIDs: Set<UUID>? = nil, now: Date = .now
+    period: String? = nil, offset: Int? = nil, limit: Int? = nil,
+    eligibleUserIDs: Set<UUID>? = nil, now: Date = .now
   ) throws -> ExperienceLeaderboardResponse
   {
     let resolvedPeriod = try experienceLeaderboardPeriod(period)
     let entries = experienceLeaderboardEntries(
       eligibleUserIDs: eligibleUserIDs, period: resolvedPeriod, now: now)
-    return .init(entries: Array(entries.prefix(100)), period: resolvedPeriod.rawValue)
+    let pagination = try leaderboardPagination(offset: offset, limit: limit, defaultLimit: 100)
+    return .init(
+      entries: Array(entries.dropFirst(pagination.offset).prefix(pagination.pageSize)),
+      period: resolvedPeriod.rawValue, total: entries.count, offset: pagination.offset,
+      pageSize: pagination.pageSize)
   }
 
   public func experienceLeaderboardRank(
@@ -2995,13 +3010,15 @@ public actor AuthStore {
   }
 
   public func friendExperienceLeaderboard(
-    period: String? = nil, accessToken: String, now: Date = .now
+    period: String? = nil, offset: Int? = nil, limit: Int? = nil,
+    accessToken: String, now: Date = .now
   ) throws
     -> ExperienceLeaderboardResponse
   {
     let current = try authenticatedUser(for: accessToken, now: now)
     return try experienceLeaderboard(
-      period: period, eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now)
+      period: period, offset: offset, limit: limit,
+      eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now)
   }
 
   public func friendExperienceLeaderboardRank(
@@ -3071,8 +3088,12 @@ public actor AuthStore {
     }
   }
 
-  private func leaderboardLimit(_ query: LeaderboardQuery) -> Int {
-    min(max(query.limit ?? 25, 1), 100)
+  private func leaderboardPagination(
+    offset: Int?, limit: Int?, defaultLimit: Int
+  ) throws -> (offset: Int, pageSize: Int) {
+    let safeOffset = offset ?? 0
+    guard safeOffset >= 0 else { throw ResultStoreError.invalidResult }
+    return (safeOffset, min(max(limit ?? defaultLimit, 1), 200))
   }
 
   private func leaderboardEntries(

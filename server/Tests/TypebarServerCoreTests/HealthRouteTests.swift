@@ -2901,6 +2901,60 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(fullResponse.entries.map(\.id).count, Set(fullResponse.entries.map(\.id)).count)
   }
 
+  func testLeaderboardsExposeStablePagesWithTotalsAndOffsets() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let fastest = try await store.register(
+      .init(email: "page-fastest@example.com", password: "a secure password", displayName: "Fastest"))
+    let middle = try await store.register(
+      .init(email: "page-middle@example.com", password: "a secure password", displayName: "Middle"))
+    let slowest = try await store.register(
+      .init(email: "page-slowest@example.com", password: "a secure password", displayName: "Slowest"))
+    let now = Date.now
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 100, accuracy: 100, finishedAt: now),
+      accessToken: fastest.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 100, finishedAt: now),
+      accessToken: middle.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 60, accuracy: 100, finishedAt: now),
+      accessToken: slowest.accessToken, now: now)
+
+    let wpmPage = try await store.leaderboard(
+      .init(mode: "time", language: "english", period: "all", limit: 1, offset: 1), now: now)
+    XCTAssertEqual(wpmPage.total, 3)
+    XCTAssertEqual(wpmPage.offset, 1)
+    XCTAssertEqual(wpmPage.pageSize, 1)
+    XCTAssertEqual(wpmPage.entries.map(\.displayName), ["Middle"])
+    XCTAssertEqual(wpmPage.entries.map(\.rank), [2])
+
+    let cappedWPMPage = try await store.leaderboard(
+      .init(mode: "time", language: "english", period: "all", limit: 999), now: now)
+    XCTAssertEqual(cappedWPMPage.pageSize, 200)
+
+    let emptyWPMPage = try await store.leaderboard(
+      .init(mode: "time", language: "english", period: "all", limit: 1, offset: 3), now: now)
+    XCTAssertEqual(emptyWPMPage.total, 3)
+    XCTAssertEqual(emptyWPMPage.offset, 3)
+    XCTAssertTrue(emptyWPMPage.entries.isEmpty)
+
+    let experiencePage = try await store.experienceLeaderboard(
+      period: "week", offset: 1, limit: 1, now: now)
+    XCTAssertEqual(experiencePage.total, 3)
+    XCTAssertEqual(experiencePage.offset, 1)
+    XCTAssertEqual(experiencePage.pageSize, 1)
+    XCTAssertEqual(experiencePage.entries.map(\.rank), [2])
+
+    do {
+      _ = try await store.leaderboard(
+        .init(mode: "time", language: "english", period: "all", offset: -1), now: now)
+      XCTFail("Negative offsets must be rejected")
+    } catch let error as ResultStoreError {
+      XCTAssertEqual(error, .invalidResult)
+    }
+  }
+
   func testResultSubmissionOnlyReturnsDailyRankForTodaysEligibleResult() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let visible = try await store.register(
@@ -4079,11 +4133,13 @@ final class HealthRouteTests: XCTestCase {
           XCTAssertEqual(response.status, .ok)
           XCTAssertEqual((try? response.content.decode(AccountResultResponse.self))?.tags, ["route"])
         })
-      try await app.test(.GET, "v1/leaderboards?mode=time&language=english") { response async in
+      try await app.test(.GET, "v1/leaderboards?mode=time&language=english&limit=1&offset=0") { response async in
         XCTAssertEqual(response.status, .ok)
-        XCTAssertEqual(
-          (try? response.content.decode(LeaderboardResponse.self))?.entries.first?.displayName,
-          "Route User")
+        let leaderboard = try? response.content.decode(LeaderboardResponse.self)
+        XCTAssertEqual(leaderboard?.entries.first?.displayName, "Route User")
+        XCTAssertEqual(leaderboard?.total, 1)
+        XCTAssertEqual(leaderboard?.offset, 0)
+        XCTAssertEqual(leaderboard?.pageSize, 1)
       }
       try await app.test(
         .GET, "v1/leaderboards/rank?mode=time&language=english",
@@ -4096,11 +4152,14 @@ final class HealthRouteTests: XCTestCase {
             (try? response.content.decode(LeaderboardRankResponse.self))?.entry?.displayName,
             "Route User")
         })
-      try await app.test(.GET, "v1/leaderboards/experience") { response async in
+      try await app.test(.GET, "v1/leaderboards/experience?limit=1&offset=0") { response async in
         XCTAssertEqual(response.status, .ok)
         let leaderboard = try? response.content.decode(ExperienceLeaderboardResponse.self)
         let entries = leaderboard?.entries
         XCTAssertEqual(leaderboard?.period, "week")
+        XCTAssertEqual(leaderboard?.total, 1)
+        XCTAssertEqual(leaderboard?.offset, 0)
+        XCTAssertEqual(leaderboard?.pageSize, 1)
         XCTAssertEqual(entries?.first?.displayName, "Route User")
         XCTAssertTrue((entries?.first?.totalExperience ?? 0) > 0)
       }

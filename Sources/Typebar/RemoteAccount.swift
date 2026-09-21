@@ -729,8 +729,23 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     }
 }
 
-struct RemoteLeaderboardResponse: Codable, Sendable {
+struct RemoteLeaderboardPage: Codable, Sendable {
     let entries: [RemoteLeaderboardEntry]
+    /// Nil means an older self-hosted server returned the historical
+    /// entries-only payload. The UI must keep pagination disabled in that case.
+    let total: Int?
+    let offset: Int
+    let pageSize: Int
+
+    private enum CodingKeys: String, CodingKey { case entries, total, offset, pageSize }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        entries = try values.decode([RemoteLeaderboardEntry].self, forKey: .entries)
+        total = try values.decodeIfPresent(Int.self, forKey: .total)
+        offset = max(0, try values.decodeIfPresent(Int.self, forKey: .offset) ?? 0)
+        pageSize = max(1, try values.decodeIfPresent(Int.self, forKey: .pageSize) ?? entries.count)
+    }
 }
 
 struct RemoteLeaderboardRankResponse: Codable, Sendable {
@@ -747,9 +762,23 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
     let discordAvatar: RemoteDiscordAvatar?
 }
 
-private struct RemoteExperienceLeaderboardResponse: Codable, Sendable {
+struct RemoteExperienceLeaderboardPage: Codable, Sendable {
     let entries: [RemoteExperienceLeaderboardEntry]
     let period: String?
+    let total: Int?
+    let offset: Int
+    let pageSize: Int
+
+    private enum CodingKeys: String, CodingKey { case entries, period, total, offset, pageSize }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        entries = try values.decode([RemoteExperienceLeaderboardEntry].self, forKey: .entries)
+        period = try values.decodeIfPresent(String.self, forKey: .period)
+        total = try values.decodeIfPresent(Int.self, forKey: .total)
+        offset = max(0, try values.decodeIfPresent(Int.self, forKey: .offset) ?? 0)
+        pageSize = max(1, try values.decodeIfPresent(Int.self, forKey: .pageSize) ?? entries.count)
+    }
 }
 
 struct RemoteExperienceLeaderboardRankResponse: Codable, Sendable {
@@ -2125,22 +2154,34 @@ final class AccountSession {
         return response
     }
 
-    func leaderboard(mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod, scope: RemoteLeaderboardScope = .global, limit: Int = 25) async throws -> [RemoteLeaderboardEntry] {
+    func leaderboardPage(
+        mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        scope: RemoteLeaderboardScope = .global, offset: Int = 0,
+        limit: Int = LeaderboardPaginationPolicy.preferredPageSize
+    ) async throws -> RemoteLeaderboardPage {
         var queryItems = [
             URLQueryItem(name: "period", value: period.rawValue),
-            URLQueryItem(name: "limit", value: "\(min(max(limit, 1), 100))")
+            URLQueryItem(name: "offset", value: "\(max(offset, 0))"),
+            URLQueryItem(name: "limit", value: "\(min(max(limit, 1), 200))")
         ]
         if let mode { queryItems.append(.init(name: "mode", value: mode.rawValue)) }
         if let language { queryItems.append(.init(name: "language", value: language.rawValue)) }
-        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+        return try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends ? "v1/leaderboards/friends" : "v1/leaderboards",
             method: "GET",
             token: scope == .friends ? try accessToken() : nil,
             body: Optional<String>.none,
             queryItems: queryItems,
-            response: RemoteLeaderboardResponse.self
+            response: RemoteLeaderboardPage.self
         )
-        return response.entries
+    }
+
+    func leaderboard(
+        mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        scope: RemoteLeaderboardScope = .global, limit: Int = 25
+    ) async throws -> [RemoteLeaderboardEntry] {
+        (try await leaderboardPage(
+            mode: mode, language: language, period: period, scope: scope, limit: limit)).entries
     }
 
     func leaderboardRank(
@@ -2161,20 +2202,32 @@ final class AccountSession {
         return response.entry
     }
 
-    func experienceLeaderboard(
+    func experienceLeaderboardPage(
         period: RemoteExperienceLeaderboardPeriod = .week,
-        scope: RemoteLeaderboardScope = .global
-    ) async throws -> [RemoteExperienceLeaderboardEntry] {
+        scope: RemoteLeaderboardScope = .global, offset: Int = 0,
+        limit: Int = LeaderboardPaginationPolicy.preferredPageSize
+    ) async throws -> RemoteExperienceLeaderboardPage {
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends ? "v1/leaderboards/experience/friends" : "v1/leaderboards/experience",
             method: "GET",
             token: scope == .friends ? try accessToken() : nil,
             body: Optional<String>.none,
-            queryItems: [.init(name: "period", value: period.rawValue)],
-            response: RemoteExperienceLeaderboardResponse.self
+            queryItems: [
+                .init(name: "period", value: period.rawValue),
+                .init(name: "offset", value: "\(max(offset, 0))"),
+                .init(name: "limit", value: "\(min(max(limit, 1), 200))")
+            ],
+            response: RemoteExperienceLeaderboardPage.self
         )
         try requireConfirmedExperienceLeaderboardPeriod(period, responsePeriod: response.period)
-        return response.entries
+        return response
+    }
+
+    func experienceLeaderboard(
+        period: RemoteExperienceLeaderboardPeriod = .week,
+        scope: RemoteLeaderboardScope = .global
+    ) async throws -> [RemoteExperienceLeaderboardEntry] {
+        (try await experienceLeaderboardPage(period: period, scope: scope)).entries
     }
 
     func experienceLeaderboardRank(

@@ -23,6 +23,10 @@ struct CloudSyncView: View {
     @State private var leaderboardMessage: String?
     @State private var leaderboardRank: RemoteLeaderboardEntry?
     @State private var loadedLeaderboardRank = false
+    @State private var leaderboardPage: RemoteLeaderboardPage?
+    @State private var leaderboardPageIndex = 0
+    @State private var requestedLeaderboardPage = 1
+    @State private var leaderboardRequestGeneration = 0
     @State private var experienceLeaderboard: [RemoteExperienceLeaderboardEntry] = []
     @State private var experiencePeriod: RemoteExperienceLeaderboardPeriod = .week
     @State private var experienceScope: RemoteLeaderboardScope = .global
@@ -30,6 +34,10 @@ struct CloudSyncView: View {
     @State private var experienceMessage: String?
     @State private var experienceRank: RemoteExperienceLeaderboardEntry?
     @State private var loadedExperienceRank = false
+    @State private var experienceLeaderboardPage: RemoteExperienceLeaderboardPage?
+    @State private var experiencePageIndex = 0
+    @State private var requestedExperiencePage = 1
+    @State private var experienceRequestGeneration = 0
     @State private var selectedProfile: RemotePublicProfile?
     @State private var profileMessage: String?
 
@@ -161,6 +169,20 @@ struct CloudSyncView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    if let leaderboardPage {
+                        LeaderboardPaginationControls(
+                            total: leaderboardPage.total,
+                            pageSize: leaderboardPage.pageSize,
+                            pageIndex: leaderboardPageIndex,
+                            requestedPage: $requestedLeaderboardPage,
+                            isLoading: isLoadingLeaderboard,
+                            myPageIndex: leaderboardRank.flatMap {
+                                LeaderboardPaginationPolicy.pageIndex(
+                                    containingRank: $0.rank, total: leaderboardPage.total,
+                                    pageSize: leaderboardPage.pageSize)
+                            },
+                            onLoadPage: { loadLeaderboard(pageIndex: $0) })
+                    }
                     if let profileMessage {
                         Text(profileMessage).font(.caption).foregroundStyle(.red)
                     }
@@ -224,6 +246,20 @@ struct CloudSyncView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    if let experienceLeaderboardPage {
+                        LeaderboardPaginationControls(
+                            total: experienceLeaderboardPage.total,
+                            pageSize: experienceLeaderboardPage.pageSize,
+                            pageIndex: experiencePageIndex,
+                            requestedPage: $requestedExperiencePage,
+                            isLoading: isLoadingExperience,
+                            myPageIndex: experienceRank.flatMap {
+                                LeaderboardPaginationPolicy.pageIndex(
+                                    containingRank: $0.rank, total: experienceLeaderboardPage.total,
+                                    pageSize: experienceLeaderboardPage.pageSize)
+                            },
+                            onLoadPage: { loadExperienceLeaderboard(pageIndex: $0) })
+                    }
                     ForEach(experienceLeaderboard) { entry in
                         HStack {
                             Text("#\(entry.rank)").monospacedDigit().foregroundStyle(.secondary)
@@ -261,6 +297,12 @@ struct CloudSyncView: View {
         .task(id: account.resultPublicationScope) {
             reloadConflictAudit()
         }
+        .onChange(of: leaderboardScope) { _, _ in resetLeaderboardPagination() }
+        .onChange(of: leaderboardMode) { _, _ in resetLeaderboardPagination() }
+        .onChange(of: leaderboardLanguage) { _, _ in resetLeaderboardPagination() }
+        .onChange(of: leaderboardPeriod) { _, _ in resetLeaderboardPagination() }
+        .onChange(of: experienceScope) { _, _ in resetExperiencePagination() }
+        .onChange(of: experiencePeriod) { _, _ in resetExperiencePagination() }
         .sheet(item: $selectedProfile) { profile in
             PublicProfileView(profile: profile, account: account)
         }
@@ -335,12 +377,39 @@ struct CloudSyncView: View {
         }
     }
 
+    private func resetLeaderboardPagination() {
+        leaderboardRequestGeneration += 1
+        leaderboard = []
+        leaderboardPage = nil
+        leaderboardPageIndex = 0
+        requestedLeaderboardPage = 1
+        leaderboardMessage = nil
+        leaderboardRank = nil
+        loadedLeaderboardRank = false
+    }
+
     private func loadLeaderboard() {
+        loadLeaderboard(pageIndex: 0)
+    }
+
+    private func loadLeaderboard(pageIndex: Int) {
+        guard !isLoadingLeaderboard else { return }
+        let normalizedPageIndex = max(0, pageIndex)
+        let requestGeneration = leaderboardRequestGeneration
+        leaderboardPageIndex = normalizedPageIndex
+        requestedLeaderboardPage = normalizedPageIndex + 1
         Task {
             isLoadingLeaderboard = true
             defer { isLoadingLeaderboard = false }
             do {
-                leaderboard = try await account.leaderboard(mode: leaderboardMode, language: leaderboardLanguage, period: leaderboardPeriod, scope: leaderboardScope)
+                let page = try await account.leaderboardPage(
+                    mode: leaderboardMode, language: leaderboardLanguage,
+                    period: leaderboardPeriod, scope: leaderboardScope,
+                    offset: normalizedPageIndex * LeaderboardPaginationPolicy.preferredPageSize,
+                    limit: LeaderboardPaginationPolicy.preferredPageSize)
+                guard requestGeneration == leaderboardRequestGeneration else { return }
+                leaderboard = page.entries
+                leaderboardPage = page
                 leaderboardRank = nil
                 loadedLeaderboardRank = false
                 if let user = account.currentUser, !user.leaderboardOptedOut {
@@ -348,14 +417,23 @@ struct CloudSyncView: View {
                         leaderboardRank = try await account.leaderboardRank(
                             mode: leaderboardMode, language: leaderboardLanguage,
                             period: leaderboardPeriod, scope: leaderboardScope)
+                        guard requestGeneration == leaderboardRequestGeneration else { return }
                         loadedLeaderboardRank = true
                     } catch {
                         // Older self-hosted servers may not have the rank route yet.
                     }
                 }
-                leaderboardMessage = leaderboard.isEmpty ? "当前筛选没有成绩。" : "已加载 \(leaderboard.count) 条成绩。"
+                if let total = page.total {
+                    leaderboardMessage = total == 0
+                        ? "当前筛选没有成绩。"
+                        : "第 \(normalizedPageIndex + 1) / \(LeaderboardPaginationPolicy.lastPageIndex(total: total, pageSize: page.pageSize) + 1) 页，共 \(total) 条成绩。"
+                } else {
+                    leaderboardMessage = leaderboard.isEmpty ? "当前筛选没有成绩。" : "已加载 \(leaderboard.count) 条成绩。"
+                }
             } catch {
+                guard requestGeneration == leaderboardRequestGeneration else { return }
                 leaderboard = []
+                leaderboardPage = nil
                 leaderboardRank = nil
                 loadedLeaderboardRank = false
                 leaderboardMessage = error.localizedDescription
@@ -374,29 +452,63 @@ struct CloudSyncView: View {
         }
     }
 
+    private func resetExperiencePagination() {
+        experienceRequestGeneration += 1
+        experienceLeaderboard = []
+        experienceLeaderboardPage = nil
+        experiencePageIndex = 0
+        requestedExperiencePage = 1
+        experienceMessage = nil
+        experienceRank = nil
+        loadedExperienceRank = false
+    }
+
     private func loadExperienceLeaderboard() {
+        loadExperienceLeaderboard(pageIndex: 0)
+    }
+
+    private func loadExperienceLeaderboard(pageIndex: Int) {
+        guard !isLoadingExperience else { return }
+        let normalizedPageIndex = max(0, pageIndex)
+        let requestGeneration = experienceRequestGeneration
+        experiencePageIndex = normalizedPageIndex
+        requestedExperiencePage = normalizedPageIndex + 1
         Task {
             isLoadingExperience = true
             defer { isLoadingExperience = false }
             do {
-                experienceLeaderboard = try await account.experienceLeaderboard(
-                    period: experiencePeriod, scope: experienceScope)
+                let page = try await account.experienceLeaderboardPage(
+                    period: experiencePeriod, scope: experienceScope,
+                    offset: normalizedPageIndex * LeaderboardPaginationPolicy.preferredPageSize,
+                    limit: LeaderboardPaginationPolicy.preferredPageSize)
+                guard requestGeneration == experienceRequestGeneration else { return }
+                experienceLeaderboard = page.entries
+                experienceLeaderboardPage = page
                 experienceRank = nil
                 loadedExperienceRank = false
                 if let user = account.currentUser, !user.leaderboardOptedOut {
                     do {
                         experienceRank = try await account.experienceLeaderboardRank(
                             period: experiencePeriod, scope: experienceScope)
+                        guard requestGeneration == experienceRequestGeneration else { return }
                         loadedExperienceRank = true
                     } catch {
                         // Older self-hosted servers may not have the rank route yet.
                     }
                 }
-                experienceMessage = experienceLeaderboard.isEmpty
-                    ? "\(experiencePeriod.displayName)还没有 XP 成绩。"
-                    : "已加载 \(experienceLeaderboard.count) 位练习者。"
+                if let total = page.total {
+                    experienceMessage = total == 0
+                        ? "\(experiencePeriod.displayName)还没有 XP 成绩。"
+                        : "第 \(normalizedPageIndex + 1) / \(LeaderboardPaginationPolicy.lastPageIndex(total: total, pageSize: page.pageSize) + 1) 页，共 \(total) 位练习者。"
+                } else {
+                    experienceMessage = experienceLeaderboard.isEmpty
+                        ? "\(experiencePeriod.displayName)还没有 XP 成绩。"
+                        : "已加载 \(experienceLeaderboard.count) 位练习者。"
+                }
             } catch {
+                guard requestGeneration == experienceRequestGeneration else { return }
                 experienceLeaderboard = []
+                experienceLeaderboardPage = nil
                 experienceRank = nil
                 loadedExperienceRank = false
                 experienceMessage = error.localizedDescription
@@ -419,6 +531,57 @@ struct CloudSyncView: View {
             presets: namedPresets,
             savedTexts: namedSavedTexts,
             activeTestSelection: settings.activeTestSelection)
+    }
+}
+
+private struct LeaderboardPaginationControls: View {
+    let total: Int?
+    let pageSize: Int
+    let pageIndex: Int
+    @Binding var requestedPage: Int
+    let isLoading: Bool
+    let myPageIndex: Int?
+    let onLoadPage: (Int) -> Void
+
+    var body: some View {
+        if let total, LeaderboardPaginationPolicy.isAvailable(total: total, pageSize: pageSize) {
+            if total > 0 {
+                let lastPageIndex = LeaderboardPaginationPolicy.lastPageIndex(
+                    total: total, pageSize: pageSize)
+                HStack(spacing: 8) {
+                    Button("首页") { onLoadPage(0) }
+                        .disabled(isLoading || pageIndex == 0)
+                    Button("上一页") { onLoadPage(max(0, pageIndex - 1)) }
+                        .disabled(isLoading || pageIndex == 0)
+                    TextField("页码", value: $requestedPage, format: .number)
+                        .frame(width: 46)
+                        .multilineTextAlignment(.trailing)
+                    Button("跳转") {
+                        guard let target = LeaderboardPaginationPolicy.pageIndex(
+                            forDisplayPage: requestedPage, total: total, pageSize: pageSize)
+                        else { return }
+                        onLoadPage(target)
+                    }
+                    .disabled(isLoading)
+                    Text("第 \(pageIndex + 1) / \(lastPageIndex + 1) 页 · 共 \(total) 条")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    if let myPageIndex, myPageIndex != pageIndex {
+                        Button("前往我的页") { onLoadPage(myPageIndex) }
+                            .disabled(isLoading)
+                    }
+                    Spacer()
+                    Button("下一页") { onLoadPage(min(lastPageIndex, pageIndex + 1)) }
+                        .disabled(isLoading || pageIndex >= lastPageIndex)
+                }
+                .accessibilityElement(children: .contain)
+            }
+        } else {
+            Text("当前自建服务未提供分页元数据；为避免重复显示，已停留在首批结果。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

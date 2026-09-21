@@ -176,6 +176,18 @@ public struct LeaderboardQuery: Content {
     public let language: String?
     public let period: String?
     public let limit: Int?
+    public let offset: Int?
+
+    public init(
+        mode: String? = nil, language: String? = nil, period: String? = nil,
+        limit: Int? = nil, offset: Int? = nil
+    ) {
+        self.mode = mode
+        self.language = language
+        self.period = period
+        self.limit = limit
+        self.offset = offset
+    }
 }
 
 public struct LeaderboardEntry: Content, Equatable, Identifiable {
@@ -195,6 +207,16 @@ public struct LeaderboardEntry: Content, Equatable, Identifiable {
 
 public struct LeaderboardResponse: Content, Equatable {
     public let entries: [LeaderboardEntry]
+    public let total: Int
+    public let offset: Int
+    public let pageSize: Int
+
+    public init(entries: [LeaderboardEntry], total: Int, offset: Int, pageSize: Int) {
+        self.entries = entries
+        self.total = total
+        self.offset = offset
+        self.pageSize = pageSize
+    }
 }
 
 public struct LeaderboardRankResponse: Content, Equatable {
@@ -217,19 +239,32 @@ public struct ExperienceLeaderboardEntry: Content, Equatable, Identifiable {
 
 public struct ExperienceLeaderboardQuery: Content {
     public let period: String?
+    public let limit: Int?
+    public let offset: Int?
 
-    public init(period: String? = nil) {
+    public init(period: String? = nil, limit: Int? = nil, offset: Int? = nil) {
         self.period = period
+        self.limit = limit
+        self.offset = offset
     }
 }
 
 public struct ExperienceLeaderboardResponse: Content, Equatable {
     public let entries: [ExperienceLeaderboardEntry]
     public let period: String
+    public let total: Int
+    public let offset: Int
+    public let pageSize: Int
 
-    public init(entries: [ExperienceLeaderboardEntry], period: String) {
+    public init(
+        entries: [ExperienceLeaderboardEntry], period: String, total: Int,
+        offset: Int, pageSize: Int
+    ) {
         self.entries = entries
         self.period = period
+        self.total = total
+        self.offset = offset
+        self.pageSize = pageSize
     }
 }
 

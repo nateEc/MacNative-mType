@@ -666,6 +666,17 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(entry.consistency, 0)
   }
 
+  func testLeaderboardPageCompatibilityGatesPaginationForLegacyResponses() throws {
+    let legacy = try JSONDecoder().decode(
+      RemoteLeaderboardPage.self, from: Data(#"{"entries":[]}"#.utf8))
+
+    XCTAssertNil(legacy.total)
+    XCTAssertFalse(LeaderboardPaginationPolicy.isAvailable(total: legacy.total, pageSize: 50))
+    XCTAssertNil(LeaderboardPaginationPolicy.pageIndex(containingRank: 101, total: legacy.total, pageSize: 50))
+    XCTAssertEqual(LeaderboardPaginationPolicy.pageIndex(containingRank: 101, total: 124, pageSize: 50), 2)
+    XCTAssertEqual(LeaderboardPaginationPolicy.lastPageIndex(total: 124, pageSize: 50), 2)
+  }
+
   func testLeaderboardRefreshCountdownMatchesPinnedUTCCadence() throws {
     let formatter = ISO8601DateFormatter()
     let afternoon = try XCTUnwrap(formatter.date(from: "2024-07-01T13:08:30Z"))

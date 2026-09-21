@@ -847,8 +847,9 @@ public func configure(
 
     app.get("v1", "leaderboards", "experience") { request async throws -> ExperienceLeaderboardResponse in
         do {
+            let query = try request.query.decode(ExperienceLeaderboardQuery.self)
             return try await authStore.experienceLeaderboard(
-                period: try request.query.decode(ExperienceLeaderboardQuery.self).period
+                period: query.period, offset: query.offset, limit: query.limit
             )
         } catch is ResultStoreError {
             throw Abort(.badRequest, reason: "The experience leaderboard period was invalid.")
@@ -857,8 +858,9 @@ public func configure(
 
     app.get("v1", "leaderboards", "experience", "friends") { request async throws -> ExperienceLeaderboardResponse in
         do {
+            let query = try request.query.decode(ExperienceLeaderboardQuery.self)
             return try await authStore.friendExperienceLeaderboard(
-                period: try request.query.decode(ExperienceLeaderboardQuery.self).period,
+                period: query.period, offset: query.offset, limit: query.limit,
                 accessToken: try request.accessToken()
             )
         } catch let error as AuthStoreError {
