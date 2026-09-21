@@ -17490,7 +17490,7 @@ final class TypingEngineTests: XCTestCase {
         modifiers: [.rot13, .backwards]),
       customText: "amber bay"
     )
-    XCTAssertEqual(cipherAndBackwards.prompt, "erozn lno")
+    XCTAssertEqual(cipherAndBackwards.prompt, "lno erozn")
     XCTAssertEqual(
       TestModifierPolicy.normalized([.uppercase, .titleCase, .alternatingCase]), [.uppercase])
     XCTAssertEqual(

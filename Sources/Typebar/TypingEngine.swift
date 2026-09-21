@@ -1051,6 +1051,7 @@ enum TestModifierPolicy {
     }
     if modifiers.contains(.backwards) {
       transformed = transformed.split(separator: " ", omittingEmptySubsequences: false)
+        .reversed()
         .map { String($0.reversed()) }
         .joined(separator: " ")
     }
