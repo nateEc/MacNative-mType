@@ -666,6 +666,8 @@ private struct ContentView: View {
   @State private var isRetryingPendingPublications = false
   @State private var terminalNotice: TestTerminalNotice?
   @State private var bailoutConfirmationMessage: String?
+  @State private var quickRestartProtectionMessage: String?
+  @State private var quickRestartProtectionSequence = 0
   @State private var showingSync = false
   @State private var syncInitialLeaderboard: RemoteLeaderboardSelection?
   @State private var showingConnections = false
@@ -1938,6 +1940,7 @@ private struct ContentView: View {
           bailoutConfirmationMessage = nil
           session.bailOut()
         },
+        onQuickRestartProtectionRequired: showQuickRestartProtectionNotice,
         onFinishZen: { session.finishZen() },
         onFocusChanged: { isFocused in
           if !isFocused { typingCompanionHands.reset() }
@@ -2588,6 +2591,11 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .offset(y: 24)
+      } else if let quickRestartProtectionMessage {
+        Label(quickRestartProtectionMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
       } else if let restartLockMessage {
         Label(restartLockMessage, systemImage: "lock.fill")
           .font(.caption)
@@ -2841,6 +2849,7 @@ private struct ContentView: View {
     absorbLiveWeakSpotScores(from: session)
     restartLockMessage = nil
     bailoutConfirmationMessage = nil
+    quickRestartProtectionMessage = nil
     compositionText = ""
     keyboardGuideFeedback = nil
     typingCompanionHands.reset()
@@ -3066,6 +3075,25 @@ private struct ContentView: View {
       try? await Task.sleep(nanoseconds: 5_000_000_000)
       guard bailoutConfirmationMessage == message else { return }
       bailoutConfirmationMessage = nil
+    }
+  }
+
+  private func showQuickRestartProtectionNotice() {
+    let shortcut: String
+    switch settings.quickRestartKey {
+    case .escape: shortcut = "Shift+Esc"
+    case .tab: shortcut = "Shift+Tab"
+    case .enter: shortcut = "Shift+Enter"
+    case .off: return
+    }
+    let message = "长测试已保护：按 \(shortcut) 或点击“重新开始”确认。"
+    quickRestartProtectionSequence &+= 1
+    let sequence = quickRestartProtectionSequence
+    quickRestartProtectionMessage = message
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 4_000_000_000)
+      guard quickRestartProtectionSequence == sequence else { return }
+      quickRestartProtectionMessage = nil
     }
   }
 

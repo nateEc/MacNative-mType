@@ -17544,10 +17544,12 @@ final class TypingEngineTests: XCTestCase {
   @MainActor
   func testNativeInputBridgeRequiresShiftToRestartLongTests() throws {
     var restarts = 0
+    var protectionWarnings = 0
     let view = TypingInputView()
     view.quickRestartKey = .escape
     view.requiresShiftQuickRestart = true
     view.onRestart = { restarts += 1 }
+    view.onQuickRestartProtectionRequired = { protectionWarnings += 1 }
     let escape = try XCTUnwrap(
       NSEvent.keyEvent(
         with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
@@ -17561,8 +17563,10 @@ final class TypingEngineTests: XCTestCase {
 
     view.keyDown(with: escape)
     XCTAssertEqual(restarts, 0)
+    XCTAssertEqual(protectionWarnings, 1)
     view.keyDown(with: shiftEscape)
     XCTAssertEqual(restarts, 1)
+    XCTAssertEqual(protectionWarnings, 1)
   }
 
   @MainActor
@@ -17570,6 +17574,7 @@ final class TypingEngineTests: XCTestCase {
     var restarts = 0
     var armedBailouts = 0
     var bailouts = 0
+    var protectionWarnings = 0
     var now = start
     let view = TypingInputView()
     view.quickRestartKey = .enter
@@ -17579,6 +17584,7 @@ final class TypingEngineTests: XCTestCase {
     view.onRestart = { restarts += 1 }
     view.onBailoutArmed = { armedBailouts += 1 }
     view.onBailout = { bailouts += 1 }
+    view.onQuickRestartProtectionRequired = { protectionWarnings += 1 }
     let enter = try XCTUnwrap(
       NSEvent.keyEvent(
         with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
@@ -17591,12 +17597,14 @@ final class TypingEngineTests: XCTestCase {
         keyCode: 36))
 
     view.keyDown(with: enter)
+    XCTAssertEqual(protectionWarnings, 1)
     view.keyDown(with: shiftEnter)
     now = start.addingTimeInterval(0.1)
     view.keyDown(with: shiftEnter)
     XCTAssertEqual(restarts, 0)
     XCTAssertEqual(armedBailouts, 1)
     XCTAssertEqual(bailouts, 1)
+    XCTAssertEqual(protectionWarnings, 1)
 
     now = start.addingTimeInterval(0.4)
     view.keyDown(with: shiftEnter)

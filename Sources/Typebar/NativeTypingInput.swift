@@ -21,6 +21,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onOpenCommandPalette: () -> Void
     let onBailoutArmed: () -> Void
     let onBailout: () -> Void
+    let onQuickRestartProtectionRequired: () -> Void
     let onFinishZen: () -> Void
     let onFocusChanged: (Bool) -> Void
     let onWindowFocusChanged: (Bool) -> Void
@@ -57,6 +58,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.finishesOnShiftEnter = finishesOnShiftEnter
         view.onBailoutArmed = onBailoutArmed
         view.onBailout = onBailout
+        view.onQuickRestartProtectionRequired = onQuickRestartProtectionRequired
         view.onFinishZen = onFinishZen
         view.onFocusChanged = onFocusChanged
         view.onWindowFocusChanged = onWindowFocusChanged
@@ -79,6 +81,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onOpenCommandPalette: () -> Void = {}
     var onBailoutArmed: () -> Void = {}
     var onBailout: () -> Void = {}
+    var onQuickRestartProtectionRequired: () -> Void = {}
     var quickRestartKey: QuickRestartKey = .off
     var keyboardInputMapping: KeyboardInputMapping = .system
     var keymapLayout: KeyboardLayout = .ansiQwerty
@@ -228,8 +231,14 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             return
         }
         if quickRestartKey.matches(charactersIgnoringModifiers: event.charactersIgnoringModifiers) {
-            if disablesQuickRestart { return }
-            if requiresShiftQuickRestart, !event.modifierFlags.contains(.shift) { return }
+            if disablesQuickRestart {
+                onQuickRestartProtectionRequired()
+                return
+            }
+            if requiresShiftQuickRestart, !event.modifierFlags.contains(.shift) {
+                onQuickRestartProtectionRequired()
+                return
+            }
             onRestart()
             return
         }
