@@ -22,6 +22,7 @@
 | 私有成绩 | `GET /v1/results`、`GET /v1/results/{id}` | 接受 Bearer 令牌或 `X-Typebar-Access-Key`；只返回认证账户已提交成绩的最小元数据，不含提示、输入回放、邮箱或资料。列表按完成时间倒序，可用 UTC 秒级 `finishedOnOrAfter`、`offset` 和最多 1,000 条的 `limit` 过滤分页（部分实现） |
 | 私有成绩标签 | `PATCH /v1/results/{id}/tags` | 仅接受 Bearer 令牌，且只可修改当前账户自己的成绩；标签为最多五个非空、去首尾空白后最长 24 个字符的字符串，不允许大小写或重音差异的重复项。旧服务或旧数据未提供标签时客户端安全回退为空数组，开发者密钥无此权限（部分实现） |
 | 清除私有成绩 | `DELETE /v1/results` | 仅接受 Bearer 令牌；密码账户必须提交当前密码，纯第三方账户必须携带一次性 `X-Typebar-Reauthentication`。只删除当前账户的远端成绩与相应 XP，返回删除数量；本机历史、同步和其他账户不受影响。每令牌每小时最多 10 次（部分实现） |
+| 重置公开个人最佳 | `DELETE /v1/personal-bests` | 仅接受 Bearer 令牌；密码账户提交当前密码，纯第三方账户使用一次性 `X-Typebar-Reauthentication`。成功后返回新的 `resetAt`，从此时开始计算公开资料的个人最佳；既有服务端成绩、XP、徽章、排行榜、本机历史和本机个人最佳均保留。重新认证证明只能消费一次，旧服务缺少 `personalBestResetAt` 时客户端安全显示为从未重置（已实现） |
 | 提交结果 | `POST /v1/results` | 接受 Bearer 令牌或 `X-Typebar-Access-Key`；保存具 UUID 的结果，基本范围/时间校验与重复提交幂等；响应包含服务端重算的本次 XP、总 XP、可选本周 XP 名次，以及当天且未退出榜单时同模式同语言的可选全局 WPM 名次。重复 UUID 的回执始终从首次保存记录生成，不信任重试正文（部分实现） |
 | 匿名公开练习统计 | `GET /v1/public/practice-stats`、`GET /v1/public/speed-distribution` | 两者均为无认证只读接口。前者只返回完成成绩数、开始测试数和完成成绩的实际累计秒数；后者固定为 English、60 秒、time 成绩，每个允许公开统计的账户只取一个最高 WPM，并以十 WPM 非空桶返回。隐身、排行榜限制、显示名整改和账户封禁均即时排除贡献。响应绝不包含账户身份、邮箱、提示、输入、回放、令牌、单条时间戳或单条成绩；客户端只在 About 打开或用户主动重读时调用，旧服务不可用时不回退为本机统计（已实现） |
 | 排行榜 | `GET /v1/leaderboards`、`GET /v1/leaderboards/friends` | 前者为公开全局结果榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者都可按模式、语言与 `all`/`day`/`yesterday`/`week` 周期筛选；`yesterday` 是服务端当前日历日前的完整一天。每位用户仅保留该筛选下的最佳一条成绩，按此成绩排名，最多返回 100 位用户（部分实现） |
