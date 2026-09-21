@@ -60,7 +60,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onQuickRestartProtectionRequired: () -> Void
     let onFinishZen: () -> Void
     let onFocusChanged: (Bool) -> Void
-    let onWindowFocusChanged: (Bool) -> Void
+    let onWindowFocusChanged: (Bool, Bool) -> Void
     let onCompositionChanged: (String) -> Void
     let onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void
     let onPhysicalKey: (UInt16, Bool, Bool) -> Void
@@ -133,7 +133,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var finishesOnShiftEnter = false
     var onFinishZen: () -> Void = {}
     var onFocusChanged: (Bool) -> Void = { _ in }
-    var onWindowFocusChanged: (Bool) -> Void = { _ in }
+    var onWindowFocusChanged: (Bool, Bool) -> Void = { _, _ in }
     var onCompositionChanged: (String) -> Void = { _ in }
     var onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void = { _ in }
     var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
@@ -176,14 +176,14 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         name: NSWindow.didResignKeyNotification, object: window)
       observedWindow = window
       installLocalKeyDownMonitor(for: window)
-      onWindowFocusChanged(window.isKeyWindow)
+      onWindowFocusChanged(window.isKeyWindow, window.attachedSheet != nil)
     }
 
     override var acceptsFirstResponder: Bool { true }
 
     func refreshWindowFocusState() {
       guard let window else { return }
-      onWindowFocusChanged(window.isKeyWindow)
+      onWindowFocusChanged(window.isKeyWindow, window.attachedSheet != nil)
     }
 
     private func removeWindowFocusObservers() {
@@ -229,11 +229,11 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     @objc private func windowDidBecomeKey(_ notification: Notification) {
-      onWindowFocusChanged(true)
+      onWindowFocusChanged(true, window?.attachedSheet != nil)
     }
 
     @objc private func windowDidResignKey(_ notification: Notification) {
-      onWindowFocusChanged(false)
+      onWindowFocusChanged(false, window?.attachedSheet != nil)
     }
 
     override func becomeFirstResponder() -> Bool {

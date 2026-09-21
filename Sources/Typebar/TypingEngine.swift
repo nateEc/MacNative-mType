@@ -2624,6 +2624,30 @@ enum TypingRestartPolicy {
   }
 }
 
+/// The reference refreshes an untouched time/word prompt after the page comes
+/// back into focus, so a user cannot inspect it elsewhere before beginning.
+/// A native window reports its initial key state too, therefore callers pass
+/// only an actual return from a prior unfocused state.
+enum TypingWindowRefocusRestartPolicy {
+  static func shouldRememberWindowResignation(hasAttachedSheet: Bool) -> Bool {
+    !hasAttachedSheet
+  }
+
+  static func shouldRestart(
+    returnedFromUnfocusedWindow: Bool,
+    hasStarted: Bool,
+    isFinished: Bool,
+    resultIsVisible: Bool,
+    mode: TestMode
+  ) -> Bool {
+    returnedFromUnfocusedWindow
+      && !hasStarted
+      && !isFinished
+      && !resultIsVisible
+      && (mode == .time || mode == .words)
+  }
+}
+
 /// The reference rejects a configuration change when it would restart an
 /// in-progress no-quit test. Preferences that apply live stay outside this
 /// gate.

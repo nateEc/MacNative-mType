@@ -15512,6 +15512,36 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testWindowRefocusRestartOnlyProtectsUnstartedTimeAndWordsTests() {
+    XCTAssertTrue(
+      TypingWindowRefocusRestartPolicy.shouldRememberWindowResignation(hasAttachedSheet: false))
+    XCTAssertFalse(
+      TypingWindowRefocusRestartPolicy.shouldRememberWindowResignation(hasAttachedSheet: true))
+    XCTAssertTrue(
+      TypingWindowRefocusRestartPolicy.shouldRestart(
+        returnedFromUnfocusedWindow: true, hasStarted: false, isFinished: false,
+        resultIsVisible: false, mode: .time))
+    XCTAssertTrue(
+      TypingWindowRefocusRestartPolicy.shouldRestart(
+        returnedFromUnfocusedWindow: true, hasStarted: false, isFinished: false,
+        resultIsVisible: false, mode: .words))
+
+    for (returnedFromUnfocusedWindow, hasStarted, isFinished, resultIsVisible, mode) in [
+      (false, false, false, false, TestMode.time),
+      (true, true, false, false, TestMode.time),
+      (true, false, true, false, TestMode.words),
+      (true, false, false, true, TestMode.words),
+      (true, false, false, false, TestMode.quote),
+      (true, false, false, false, TestMode.zen),
+      (true, false, false, false, TestMode.custom),
+    ] {
+      XCTAssertFalse(
+        TypingWindowRefocusRestartPolicy.shouldRestart(
+          returnedFromUnfocusedWindow: returnedFromUnfocusedWindow, hasStarted: hasStarted,
+          isFinished: isFinished, resultIsVisible: resultIsVisible, mode: mode))
+    }
+  }
+
   func testSessionFactoryLeavesZenPromptFreeformAndBuildsOtherModePrompts() {
     let timed = TestSessionFactory.make(configuration: .timed(seconds: 120))
     let words = TestSessionFactory.make(configuration: .words(25))

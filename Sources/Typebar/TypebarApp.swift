@@ -698,6 +698,7 @@ private struct ContentView: View {
   @State private var focusRequest = 0
   @State private var inputHasFocus = false
   @State private var typingWindowHasFocus = true
+  @State private var typingWindowWasUnfocused = false
   @State private var focusWarningDelayElapsed = false
   @State private var focusWarningSequence = 0
   @State private var capsLockEnabled = false
@@ -1947,9 +1948,9 @@ private struct ContentView: View {
           if !isFocused { typingCompanionHands.reset() }
           handleTypingFocusChange(isFocused)
         },
-        onWindowFocusChanged: { isFocused in
+        onWindowFocusChanged: { isFocused, hasAttachedSheet in
           if !isFocused { typingCompanionHands.reset() }
-          handleTypingWindowFocusChange(isFocused)
+          handleTypingWindowFocusChange(isFocused, hasAttachedSheet: hasAttachedSheet)
         },
         onCompositionChanged: { compositionText = $0 },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
@@ -2763,8 +2764,21 @@ private struct ContentView: View {
     updateFocusWarningDelay()
   }
 
-  private func handleTypingWindowFocusChange(_ hasFocus: Bool) {
+  private func handleTypingWindowFocusChange(_ hasFocus: Bool, hasAttachedSheet: Bool) {
+    let shouldRestart = TypingWindowRefocusRestartPolicy.shouldRestart(
+      returnedFromUnfocusedWindow: hasFocus && typingWindowWasUnfocused,
+      hasStarted: session.hasStarted,
+      isFinished: session.isFinished,
+      resultIsVisible: completedResult != nil,
+      mode: session.configuration.mode)
     typingWindowHasFocus = hasFocus
+    if hasFocus {
+      typingWindowWasUnfocused = false
+      if shouldRestart { attemptRestart() }
+    } else {
+      typingWindowWasUnfocused = TypingWindowRefocusRestartPolicy.shouldRememberWindowResignation(
+        hasAttachedSheet: hasAttachedSheet)
+    }
     updateFocusWarningDelay()
   }
 
