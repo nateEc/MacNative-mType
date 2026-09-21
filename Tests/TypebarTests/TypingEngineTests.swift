@@ -2296,7 +2296,7 @@ final class TypingEngineTests: XCTestCase {
       FunboxCommandPolicy.updatedModifiers(
         for: .modifier(.titleCase), current: [.uppercase, .rot13], isInfinite: false,
         hasStarted: false),
-      [.titleCase, .rot13])
+      nil)
     XCTAssertEqual(
       FunboxCommandPolicy.updatedModifiers(
         for: .modifier(.titleCase), current: [.titleCase, .rot13], isInfinite: false,
@@ -2321,6 +2321,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(memory, [.memory])
     XCTAssertFalse(TestModifierPolicy.acceptsModeSelection(.time, modifiers: memory))
     XCTAssertTrue(TestModifierPolicy.acceptsModeSelection(.quote, modifiers: memory))
+  }
+
+  func testFunboxCommandPolicyRejectsConflictingAdditionsWithoutReplacingCurrentSelection() {
+    let textCaseSelection: [TestModifier] = [.uppercase, .rot13]
+    XCTAssertFalse(
+      TestModifierPolicy.acceptsInteractiveModifierAddition(.titleCase, to: textCaseSelection))
+    XCTAssertNil(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.titleCase), current: textCaseSelection, isInfinite: false,
+        hasStarted: false))
+    XCTAssertEqual(textCaseSelection, [.uppercase, .rot13])
+
+    let layoutSelection: [TestModifier] = [.layoutFluid]
+    XCTAssertFalse(
+      TestModifierPolicy.acceptsInteractiveModifierAddition(.arrowStream, to: layoutSelection))
+    XCTAssertNil(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.arrowStream), current: layoutSelection, isInfinite: false,
+        hasStarted: false))
+    XCTAssertEqual(layoutSelection, [.layoutFluid])
+
+    XCTAssertTrue(
+      TestModifierPolicy.acceptsInteractiveModifierAddition(.morseStream, to: [.gibberishStream]))
+    XCTAssertEqual(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.morseStream), current: [.gibberishStream], isInfinite: false,
+        hasStarted: false),
+      [.gibberishStream, .morseStream])
   }
 
   @MainActor

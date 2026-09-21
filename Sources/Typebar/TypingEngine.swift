@@ -974,6 +974,16 @@ enum TestModifierPolicy {
     return modifiersCompatibleWithMode(modifiers, mode: mode) == modifiers
   }
 
+  /// The reference rejects an interactive attempt to add a conflicting
+  /// funbox, preserving the selected set. This differs from persisted-config
+  /// normalization, which safely reduces legacy or imported combinations.
+  static func acceptsInteractiveModifierAddition(
+    _ modifier: TestModifier, to modifiers: [TestModifier]
+  ) -> Bool {
+    guard !modifiers.contains(modifier) else { return false }
+    return isSourceCompatible(modifiers + [modifier])
+  }
+
   /// Returns whether a group would be accepted by the fixed reference
   /// metadata validator. This is deliberately visible to the package so tests
   /// can assert the user-facing combination boundary directly.

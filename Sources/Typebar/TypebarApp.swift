@@ -3370,6 +3370,15 @@ private struct ContentView: View {
         }
         reset()
       case .clear, .modifier:
+        if case .modifier(let modifier) = target,
+           !settings.testModifiers.contains(modifier),
+           !TestModifierPolicy.acceptsInteractiveModifierAddition(
+             modifier, to: settings.testModifiers)
+        {
+          funboxConfigurationMessage =
+            "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。"
+          return
+        }
         guard let updated = FunboxCommandPolicy.updatedModifiers(
           for: target, current: settings.testModifiers,
           isInfinite: session.configuration.isInfinite, hasStarted: session.hasStarted)

@@ -674,7 +674,10 @@ enum FunboxCommandPolicy {
             guard !(isInfinite && TestModifierPolicy.finiteDurationOnly.contains(modifier)) else {
                 return nil
             }
-            return TestModifierPolicy.toggling(modifier, in: current)
+            guard TestModifierPolicy.acceptsInteractiveModifierAddition(modifier, to: current) else {
+                return nil
+            }
+            return current + [modifier]
         case .polyglot:
             return nil
         }
