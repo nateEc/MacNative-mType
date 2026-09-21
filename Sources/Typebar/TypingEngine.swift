@@ -3133,7 +3133,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.tags = tags
     self.quoteSource = configuration.mode == .quote ? quoteSource : nil
     self.prompt = prompt
-    self.replayEvents = replayEvents
+    self.replayEvents = TypingReplay.chronologicalEvents(replayEvents)
     self.challengePresentation = challengePresentation
   }
 
@@ -3199,7 +3199,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       ? (try? values.decodeIfPresent(ResultQuoteSource.self, forKey: .quoteSource)) ?? nil
       : nil
     prompt = try values.decodeIfPresent(String.self, forKey: .prompt) ?? ""
-    replayEvents = try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? []
+    replayEvents = TypingReplay.chronologicalEvents(
+      try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? [])
     challengePresentation = try values.decodeIfPresent(
       ChallengePresentationSnapshot.self, forKey: .challengePresentation)
   }

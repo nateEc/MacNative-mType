@@ -15164,6 +15164,21 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingReplay.typedText(events: events, through: 1), "a")
   }
 
+  func testCompletedResultNormalizesImportedReplayEventsChronologically() {
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .words(1), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(1),
+      typedCharacterCount: 1, correctCharacterCount: 1, errorCount: 0,
+      wpm: 12, rawWpm: 12, accuracy: 100,
+      replayEvents: [
+        .init(offset: 0.3, kind: .delete, text: ""),
+        .init(offset: 0.1, kind: .insert, text: "a"),
+        .init(offset: 0.2, kind: .insert, text: "b"),
+      ])
+
+    XCTAssertEqual(result.replayEvents.map(\.offset), [0.1, 0.2, 0.3])
+  }
+
   func testReplayCharacterTargetsKeepLaterWordsAlignedAfterEarlierExtraInput() {
     let events: [TypingReplayEvent] = [
       .init(offset: 0.1, kind: .insert, text: "a"),
