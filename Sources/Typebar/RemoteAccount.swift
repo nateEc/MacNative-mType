@@ -101,6 +101,9 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     /// Deployment-controlled shared-leaderboard state. It is returned only
     /// to the account owner and defaults safely for older self-hosted servers.
     let leaderboardRestricted: Bool
+    /// Deployment-controlled requirement to choose a new display name before
+    /// submitting another server-side result. Older deployments omit it.
+    let displayNameChangeRequired: Bool
     let profileDetails: RemoteProfileDetails
     let authenticationMethods: [RemoteAuthenticationMethod]
     let availableBadges: [RemotePublicProfileBadge]
@@ -110,7 +113,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut,
-            leaderboardRestricted, profileDetails,
+            leaderboardRestricted, displayNameChangeRequired, profileDetails,
             authenticationMethods, availableBadges, selectedBadgeID, streakDayBoundaryOffsetHours,
             personalBestResetAt
     }
@@ -123,6 +126,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         totalExperience: Int,
         leaderboardOptedOut: Bool = false,
         leaderboardRestricted: Bool = false,
+        displayNameChangeRequired: Bool = false,
         profileDetails: RemoteProfileDetails = .init(),
         authenticationMethods: [RemoteAuthenticationMethod] = [.password],
         availableBadges: [RemotePublicProfileBadge] = [], selectedBadgeID: String? = nil,
@@ -135,6 +139,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         self.totalExperience = totalExperience
         self.leaderboardOptedOut = leaderboardOptedOut
         self.leaderboardRestricted = leaderboardRestricted
+        self.displayNameChangeRequired = displayNameChangeRequired
         self.profileDetails = profileDetails
         self.authenticationMethods = authenticationMethods
         self.availableBadges = availableBadges
@@ -152,6 +157,8 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
         leaderboardRestricted = try values.decodeIfPresent(Bool.self, forKey: .leaderboardRestricted) ?? false
+        displayNameChangeRequired =
+            try values.decodeIfPresent(Bool.self, forKey: .displayNameChangeRequired) ?? false
         profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
         authenticationMethods = try values.decodeIfPresent([RemoteAuthenticationMethod].self, forKey: .authenticationMethods) ?? [.password]
         availableBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .availableBadges) ?? []
@@ -775,21 +782,25 @@ struct RemoteLeaderboardEligibility: Codable, Equatable, Sendable {
     let completedPracticeSeconds: Int
     let minimumPracticeSeconds: Int
     let isLeaderboardRestricted: Bool
+    let isDisplayNameChangeRequired: Bool
 
     init(
         isEligible: Bool,
         completedPracticeSeconds: Int,
         minimumPracticeSeconds: Int,
-        isLeaderboardRestricted: Bool = false
+        isLeaderboardRestricted: Bool = false,
+        isDisplayNameChangeRequired: Bool = false
     ) {
         self.isEligible = isEligible
         self.completedPracticeSeconds = completedPracticeSeconds
         self.minimumPracticeSeconds = minimumPracticeSeconds
         self.isLeaderboardRestricted = isLeaderboardRestricted
+        self.isDisplayNameChangeRequired = isDisplayNameChangeRequired
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isEligible, completedPracticeSeconds, minimumPracticeSeconds, isLeaderboardRestricted
+        case isEligible, completedPracticeSeconds, minimumPracticeSeconds, isLeaderboardRestricted,
+            isDisplayNameChangeRequired
     }
 
     init(from decoder: Decoder) throws {
@@ -799,6 +810,8 @@ struct RemoteLeaderboardEligibility: Codable, Equatable, Sendable {
         minimumPracticeSeconds = try values.decode(Int.self, forKey: .minimumPracticeSeconds)
         isLeaderboardRestricted = try values.decodeIfPresent(
             Bool.self, forKey: .isLeaderboardRestricted) ?? false
+        isDisplayNameChangeRequired = try values.decodeIfPresent(
+            Bool.self, forKey: .isDisplayNameChangeRequired) ?? false
     }
 }
 
@@ -1010,13 +1023,16 @@ struct RemoteModerationProfileReport: Codable, Identifiable, Sendable {
     /// Older deployments only return review state, so omission means no
     /// deployment restriction is known for that profile.
     let isLeaderboardRestricted: Bool
+    /// Older deployments omit this deployment-only account state.
+    let isDisplayNameChangeRequired: Bool
     let reason: RemoteProfileReportReason
     let note: String?
     let status: RemoteProfileModerationStatus
     let submittedAt: Date
 
     private enum CodingKeys: String, CodingKey {
-        case id, profile, isLeaderboardRestricted, reason, note, status, submittedAt
+        case id, profile, isLeaderboardRestricted, isDisplayNameChangeRequired, reason, note, status,
+            submittedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -1025,6 +1041,8 @@ struct RemoteModerationProfileReport: Codable, Identifiable, Sendable {
         profile = try values.decode(RemotePublicProfile.self, forKey: .profile)
         isLeaderboardRestricted = try values.decodeIfPresent(
             Bool.self, forKey: .isLeaderboardRestricted) ?? false
+        isDisplayNameChangeRequired = try values.decodeIfPresent(
+            Bool.self, forKey: .isDisplayNameChangeRequired) ?? false
         reason = try values.decode(RemoteProfileReportReason.self, forKey: .reason)
         note = try values.decodeIfPresent(String.self, forKey: .note)
         status = try values.decode(RemoteProfileModerationStatus.self, forKey: .status)
@@ -1038,6 +1056,11 @@ private struct RemoteLeaderboardRestrictionRequest: Codable, Sendable { let isRe
 private struct RemoteLeaderboardRestrictionResponse: Codable, Sendable {
     let userID: UUID
     let isRestricted: Bool
+}
+private struct RemoteDisplayNameRequirementRequest: Codable, Sendable { let isRequired: Bool }
+private struct RemoteDisplayNameRequirementResponse: Codable, Sendable {
+    let userID: UUID
+    let isRequired: Bool
 }
 
 private struct RemoteProfileReportRequest: Codable, Sendable {
@@ -1886,6 +1909,7 @@ final class AccountSession {
                 displayName: user.displayName, totalExperience: 0,
                 leaderboardOptedOut: user.leaderboardOptedOut,
                 leaderboardRestricted: user.leaderboardRestricted,
+                displayNameChangeRequired: user.displayNameChangeRequired,
                 profileDetails: user.profileDetails,
                 authenticationMethods: user.authenticationMethods,
                 streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
@@ -1924,6 +1948,7 @@ final class AccountSession {
                 displayName: user.displayName, totalExperience: user.totalExperience,
                 leaderboardOptedOut: user.leaderboardOptedOut,
                 leaderboardRestricted: user.leaderboardRestricted,
+                displayNameChangeRequired: user.displayNameChangeRequired,
                 profileDetails: user.profileDetails,
                 authenticationMethods: user.authenticationMethods,
                 availableBadges: user.availableBadges, selectedBadgeID: user.selectedBadgeID,
@@ -2106,6 +2131,21 @@ final class AccountSession {
         return response.isRestricted
     }
 
+    func setDisplayNameChangeRequired(_ profileID: UUID, key: String, required: Bool) async throws -> Bool {
+        let normalizedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedKey.isEmpty else {
+            throw RemoteAccountError.serverMessage("请输入部署者配置的审核密钥。")
+        }
+        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/moderation/profiles/\(profileID.uuidString)/display-name-requirement",
+            method: "PATCH", token: nil,
+            body: RemoteDisplayNameRequirementRequest(isRequired: required),
+            headers: ["X-Typebar-Moderation-Key": normalizedKey],
+            response: RemoteDisplayNameRequirementResponse.self)
+        guard response.userID == profileID else { throw RemoteAccountError.unexpectedResponse }
+        return response.isRequired
+    }
+
     func publicQuotes(language: TypingLanguage) async throws -> [RemotePublicQuote] {
         try await RemoteAccountAPI(endpoint: endpoint).request(
             path: "v1/quotes", method: "GET", token: tokenStore.load(),
@@ -2273,6 +2313,7 @@ final class AccountSession {
                 totalExperience: response.totalExperience,
                 leaderboardOptedOut: user.leaderboardOptedOut,
                 leaderboardRestricted: user.leaderboardRestricted,
+                displayNameChangeRequired: user.displayNameChangeRequired,
                 authenticationMethods: user.authenticationMethods
             )
         }

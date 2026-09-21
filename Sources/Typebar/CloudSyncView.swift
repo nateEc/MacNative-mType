@@ -186,7 +186,11 @@ struct CloudSyncView: View {
                         Text(leaderboardMessage).font(.caption).foregroundStyle(.secondary)
                     }
                     if let user = account.currentUser, leaderboardMessage != nil {
-                        if user.leaderboardRestricted
+                        if user.displayNameChangeRequired
+                            || leaderboardEligibility?.isDisplayNameChangeRequired == true
+                        {
+                            DisplayNameRequirementLabel()
+                        } else if user.leaderboardRestricted
                             || leaderboardEligibility?.isLeaderboardRestricted == true
                         {
                             LeaderboardRestrictionLabel()
@@ -276,7 +280,11 @@ struct CloudSyncView: View {
                         Text(experienceMessage).font(.caption).foregroundStyle(.secondary)
                     }
                     if let user = account.currentUser, experienceMessage != nil {
-                        if user.leaderboardRestricted
+                        if user.displayNameChangeRequired
+                            || experienceLeaderboardEligibility?.isDisplayNameChangeRequired == true
+                        {
+                            DisplayNameRequirementLabel()
+                        } else if user.leaderboardRestricted
                             || experienceLeaderboardEligibility?.isLeaderboardRestricted == true
                         {
                             LeaderboardRestrictionLabel()
@@ -726,6 +734,16 @@ private struct LeaderboardRestrictionLabel: View {
         Label(
             "此账户当前被部署方限制参与共享排行榜。",
             systemImage: "exclamationmark.shield")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+}
+
+private struct DisplayNameRequirementLabel: View {
+    var body: some View {
+        Label(
+            "请先更新账户显示名，新的服务端成绩才能参与共享排行榜。",
+            systemImage: "person.badge.exclamationmark")
             .font(.caption)
             .foregroundStyle(.secondary)
     }

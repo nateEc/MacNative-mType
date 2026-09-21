@@ -247,15 +247,19 @@ public struct LeaderboardEligibility: Content, Equatable, Sendable {
     /// True only for the authenticated account when the deployment has
     /// explicitly excluded it from Typebar's shared leaderboards.
     public let isLeaderboardRestricted: Bool
+    /// True only for the authenticated account when it must update its display
+    /// name before it can submit another shared result.
+    public let isDisplayNameChangeRequired: Bool
 
     public init(
         isEligible: Bool, completedPracticeSeconds: Int, minimumPracticeSeconds: Int,
-        isLeaderboardRestricted: Bool = false
+        isLeaderboardRestricted: Bool = false, isDisplayNameChangeRequired: Bool = false
     ) {
         self.isEligible = isEligible
         self.completedPracticeSeconds = completedPracticeSeconds
         self.minimumPracticeSeconds = minimumPracticeSeconds
         self.isLeaderboardRestricted = isLeaderboardRestricted
+        self.isDisplayNameChangeRequired = isDisplayNameChangeRequired
     }
 }
 

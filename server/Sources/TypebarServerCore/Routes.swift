@@ -596,6 +596,23 @@ public func configure(
         }
     }
 
+    app.patch("v1", "moderation", "profiles", ":id", "display-name-requirement") { request async throws -> DisplayNameRequirementResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The profile identifier was invalid.")
+        }
+        do {
+            return try await authStore.setDisplayNameChangeRequired(
+                userID: id,
+                required: try request.content.decode(DisplayNameRequirementRequest.self).isRequired)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.get("v1", "messages", ":id") { request async throws -> DirectConversationResponse in
         guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The profile identifier was invalid.") }
         do { return try await authStore.directConversation(with: id, accessToken: try request.accessToken()) }
@@ -1014,6 +1031,8 @@ private extension AuthStoreError {
             Abort(.badRequest, reason: "Result tags must be unique, non-empty, and no longer than 24 characters.")
         case .invalidAnnouncement:
             Abort(.badRequest, reason: "Announcements must contain 1 to 500 non-whitespace characters.")
+        case .displayNameChangeRequired:
+            Abort(.forbidden, reason: "Update this Typebar account display name before submitting new results.")
         case .directMessageNotAllowed:
             Abort(.forbidden, reason: "Direct messages are only available between accepted Typebar friends.")
         }

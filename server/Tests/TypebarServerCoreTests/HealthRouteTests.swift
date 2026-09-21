@@ -1218,6 +1218,60 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testDisplayNameRequirementRouteRequiresDeploymentKeyAndIsReversible() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    do {
+      try configure(app, authStore: store, moderationKey: "test-display-name-requirement-key")
+      let target = try await store.register(
+        .init(
+          email: "name-requirement-route@example.com", password: "a secure password",
+          displayName: "Name Requirement Route"))
+      let route = "v1/moderation/profiles/\(target.user.id.uuidString)/display-name-requirement"
+
+      try await app.test(.PATCH, route) { response async in
+        XCTAssertEqual(response.status, .forbidden)
+      }
+      try await app.test(
+        .PATCH,
+        route,
+        beforeRequest: { request async throws in
+          request.headers.add(
+            name: "X-Typebar-Moderation-Key", value: "test-display-name-requirement-key")
+          try request.content.encode(DisplayNameRequirementRequest(isRequired: true))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            try response.content.decode(DisplayNameRequirementResponse.self),
+            .init(userID: target.user.id, isRequired: true))
+        })
+      let requiredUser = try await store.authenticatedUser(for: target.accessToken)
+      XCTAssertTrue(requiredUser.displayNameChangeRequired)
+
+      try await app.test(
+        .PATCH,
+        route,
+        beforeRequest: { request async throws in
+          request.headers.add(
+            name: "X-Typebar-Moderation-Key", value: "test-display-name-requirement-key")
+          try request.content.encode(DisplayNameRequirementRequest(isRequired: false))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            try response.content.decode(DisplayNameRequirementResponse.self),
+            .init(userID: target.user.id, isRequired: false))
+        })
+      let restoredUser = try await store.authenticatedUser(for: target.accessToken)
+      XCTAssertFalse(restoredUser.displayNameChangeRequired)
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testProfileReportRouteRequiresAuthentication() async throws {
     let app = try await Application.make(.testing)
     do {
@@ -2281,6 +2335,81 @@ final class HealthRouteTests: XCTestCase {
     let resetUser = try await reloadedStore.resetAccount(
       .init(currentPassword: "a secure password"), accessToken: reloadedSession.accessToken)
     XCTAssertTrue(resetUser.leaderboardRestricted)
+  }
+
+  func testDisplayNameRequirementBlocksServerResultsUntilTheNameActuallyChanges() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let now = Date(timeIntervalSince1970: 40_000)
+    let session = try await store.register(
+      .init(
+        email: "name-requirement@example.com", password: "a secure password",
+        displayName: "Rename Me"), now: now)
+    let query = LeaderboardQuery(mode: "time", language: "english", period: "all")
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 100, durationSeconds: 30, finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    let initialEntries = try await store.leaderboard(query, now: now).entries.map(\.userID)
+    XCTAssertEqual(initialEntries, [session.user.id])
+
+    let requirement = try await store.setDisplayNameChangeRequired(
+      userID: session.user.id, required: true)
+    XCTAssertEqual(requirement, .init(userID: session.user.id, isRequired: true))
+    let currentUser = try await store.authenticatedUser(for: session.accessToken, now: now)
+    XCTAssertTrue(currentUser.displayNameChangeRequired)
+    let requiredEntries = try await store.leaderboard(query, now: now).entries
+    XCTAssertTrue(requiredEntries.isEmpty)
+    let rank = try await store.leaderboardRank(query, accessToken: session.accessToken, now: now)
+    XCTAssertNil(rank.entry)
+    XCTAssertEqual(rank.eligibility, .init(
+      isEligible: false, completedPracticeSeconds: 30, minimumPracticeSeconds: 0,
+      isDisplayNameChangeRequired: true))
+    do {
+      _ = try await store.submitResult(
+        result(id: UUID(), wpm: 81, accuracy: 100, durationSeconds: 30,
+          finishedAt: now.addingTimeInterval(30)),
+        accessToken: session.accessToken, now: now.addingTimeInterval(30))
+      XCTFail("A flagged account must change its display name before submitting a server result")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .displayNameChangeRequired)
+    }
+
+    let unchanged = try await store.updateProfile(
+      .init(displayName: "Rename Me"), accessToken: session.accessToken, now: now)
+    XCTAssertTrue(unchanged.displayNameChangeRequired)
+    let renamed = try await store.updateProfile(
+      .init(displayName: "Resolved Name"), accessToken: session.accessToken, now: now)
+    XCTAssertFalse(renamed.displayNameChangeRequired)
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 81, accuracy: 100, durationSeconds: 30,
+        finishedAt: now.addingTimeInterval(30)),
+      accessToken: session.accessToken, now: now.addingTimeInterval(30))
+    let restoredEntries = try await store.leaderboard(query, now: now).entries.map(\.userID)
+    XCTAssertEqual(restoredEntries, [session.user.id])
+  }
+
+  func testDisplayNameRequirementPersistsAndSurvivesAccountReset() async throws {
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-display-name-requirement-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let initialStore = try AuthStore(
+      fileURL: fileURL, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let initialSession = try await initialStore.register(
+      .init(
+        email: "name-requirement-persistence@example.com", password: "a secure password",
+        displayName: "Name Requirement Persistence"))
+    _ = try await initialStore.setDisplayNameChangeRequired(
+      userID: initialSession.user.id, required: true)
+
+    let reloadedStore = try AuthStore(
+      fileURL: fileURL, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let reloadedSession = try await reloadedStore.login(
+      .init(email: "name-requirement-persistence@example.com", password: "a secure password"))
+    XCTAssertTrue(reloadedSession.user.displayNameChangeRequired)
+
+    let resetUser = try await reloadedStore.resetAccount(
+      .init(currentPassword: "a secure password"), accessToken: reloadedSession.accessToken)
+    XCTAssertTrue(resetUser.displayNameChangeRequired)
   }
 
   func testLeaderboardMinimumPracticeConfigurationUsesSafeDefaultsAndRejectsInvalidValues() throws {

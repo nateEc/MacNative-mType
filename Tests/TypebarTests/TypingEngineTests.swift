@@ -299,11 +299,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(legacy.selectedBadgeID)
     XCTAssertNil(legacy.personalBestResetAt)
     XCTAssertFalse(legacy.leaderboardRestricted)
+    XCTAssertFalse(legacy.displayNameChangeRequired)
 
     let modern = try JSONDecoder().decode(
       RemoteAccountUser.self,
       from: Data(
-        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"leaderboardRestricted":true,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","personalBestResetAt":100,"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
+        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"leaderboardRestricted":true,"displayNameChangeRequired":true,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","personalBestResetAt":100,"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
           .utf8))
     XCTAssertTrue(modern.emailVerified)
     XCTAssertEqual(modern.authenticationMethods, [.google, .password, .discord])
@@ -316,6 +317,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(modern.selectedBadgeID, "swift-line")
     XCTAssertEqual(modern.personalBestResetAt, Date(timeIntervalSinceReferenceDate: 100))
     XCTAssertTrue(modern.leaderboardRestricted)
+    XCTAssertTrue(modern.displayNameChangeRequired)
 
     let leaderboardEntry = try JSONDecoder().decode(
       RemoteLeaderboardEntry.self,
@@ -764,6 +766,9 @@ final class TypingEngineTests: XCTestCase {
     let restricted = try JSONDecoder().decode(
       RemoteLeaderboardRankResponse.self,
       from: Data(#"{"entry":null,"eligibility":{"isEligible":false,"completedPracticeSeconds":600,"minimumPracticeSeconds":120,"isLeaderboardRestricted":true}}"#.utf8))
+    let nameRequirement = try JSONDecoder().decode(
+      RemoteLeaderboardRankResponse.self,
+      from: Data(#"{"entry":null,"eligibility":{"isEligible":false,"completedPracticeSeconds":600,"minimumPracticeSeconds":120,"isDisplayNameChangeRequired":true}}"#.utf8))
 
     XCTAssertNil(wpm.entry)
     XCTAssertNil(wpm.eligibility)
@@ -773,7 +778,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(qualified.eligibility, .init(
       isEligible: false, completedPracticeSeconds: 60, minimumPracticeSeconds: 120))
     XCTAssertFalse(qualified.eligibility?.isLeaderboardRestricted ?? true)
+    XCTAssertFalse(qualified.eligibility?.isDisplayNameChangeRequired ?? true)
     XCTAssertTrue(restricted.eligibility?.isLeaderboardRestricted ?? false)
+    XCTAssertTrue(nameRequirement.eligibility?.isDisplayNameChangeRequired ?? false)
     XCTAssertEqual(RemoteExperienceLeaderboardPeriod.lastWeek.displayName, "上周")
     XCTAssertTrue(RemoteExperienceLeaderboardPeriod.week.isConfirmed(by: nil))
     XCTAssertTrue(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: "lastWeek"))
@@ -781,23 +788,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: "week"))
   }
 
-  func testModerationProfileReportDefaultsAndDecodesLeaderboardRestriction() throws {
+  func testModerationProfileReportDefaultsAndDecodesDeploymentAccountControls() throws {
     let profileID = UUID()
     let reportID = UUID()
-    func payload(isRestricted: Bool?) -> Data {
-      let restriction = isRestricted.map { ",\"isLeaderboardRestricted\":\($0)" } ?? ""
+    func payload(isRestricted: Bool?, isDisplayNameChangeRequired: Bool?) -> Data {
+      let controls = [
+        isRestricted.map { "\"isLeaderboardRestricted\":\($0)" },
+        isDisplayNameChangeRequired.map { "\"isDisplayNameChangeRequired\":\($0)" }
+      ]
+      .compactMap { $0 }
+      .joined(separator: ",")
+      let suffix = controls.isEmpty ? "" : ",\(controls)"
       return Data(
         """
-        {"id":"\(reportID.uuidString)","profile":{"id":"\(profileID.uuidString)","displayName":"Profile","joinedAt":0,"completedResultCount":0,"bestWPM":0},"reason":"other","status":"open","submittedAt":0\(restriction)}
+        {"id":"\(reportID.uuidString)","profile":{"id":"\(profileID.uuidString)","displayName":"Profile","joinedAt":0,"completedResultCount":0,"bestWPM":0},"reason":"other","status":"open","submittedAt":0\(suffix)}
         """.utf8)
     }
 
-    let legacy = try JSONDecoder().decode(RemoteModerationProfileReport.self, from: payload(isRestricted: nil))
+    let legacy = try JSONDecoder().decode(
+      RemoteModerationProfileReport.self,
+      from: payload(isRestricted: nil, isDisplayNameChangeRequired: nil))
     let restricted = try JSONDecoder().decode(
-      RemoteModerationProfileReport.self, from: payload(isRestricted: true))
+      RemoteModerationProfileReport.self,
+      from: payload(isRestricted: true, isDisplayNameChangeRequired: true))
 
     XCTAssertFalse(legacy.isLeaderboardRestricted)
+    XCTAssertFalse(legacy.isDisplayNameChangeRequired)
     XCTAssertTrue(restricted.isLeaderboardRestricted)
+    XCTAssertTrue(restricted.isDisplayNameChangeRequired)
   }
 
   func testLegacyPublicProfileResponseDefaultsMissingHighestConsistencyToZero() throws {

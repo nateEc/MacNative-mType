@@ -39,6 +39,8 @@ public struct ModerationProfileReportResponse: Content, Equatable {
     /// Deployment-only state. It is never added to public profiles or
     /// leaderboard entries.
     public let isLeaderboardRestricted: Bool
+    /// Deployment-only account state; never exposed from public profile routes.
+    public let isDisplayNameChangeRequired: Bool
     public let reason: ProfileReportReason
     public let note: String?
     public let status: ProfileReportModerationStatus
@@ -65,6 +67,17 @@ public struct LeaderboardRestrictionRequest: Content, Equatable {
 }
 
 public struct LeaderboardRestrictionResponse: Content, Equatable {
-    public let userID: UUID
-    public let isRestricted: Bool
+  public let userID: UUID
+  public let isRestricted: Bool
+}
+
+/// A reversible deployment decision requiring a real display-name change
+/// before the account can submit a new server-side result.
+public struct DisplayNameRequirementRequest: Content, Equatable {
+  public let isRequired: Bool
+}
+
+public struct DisplayNameRequirementResponse: Content, Equatable {
+  public let userID: UUID
+  public let isRequired: Bool
 }

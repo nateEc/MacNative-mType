@@ -346,6 +346,9 @@ public struct AuthUserResponse: Content, Equatable {
   public let totalExperience: Int
   public let leaderboardOptedOut: Bool
   public let leaderboardRestricted: Bool
+  /// Deployment-only account state that accepts normal account use but requires
+  /// a real display-name change before new shared results are accepted.
+  public let displayNameChangeRequired: Bool
   public let profileDetails: ProfileDetails
   public let authenticationMethods: [AuthenticationMethod]
   public let availableBadges: [PublicProfileBadge]
@@ -467,6 +470,7 @@ public enum AuthStoreError: Error, Equatable {
   case resultNotFound
   case invalidResultTags
   case invalidAnnouncement
+  case displayNameChangeRequired
 }
 
 public actor AuthStore {
@@ -667,13 +671,15 @@ public actor AuthStore {
     let emailVerified: Bool
     let leaderboardOptedOut: Bool
     var leaderboardRestricted: Bool
+    var displayNameChangeRequired: Bool
     let profileDetails: ProfileDetails
     let selectedBadgeID: String?
     var startedTestCount: Int
 
     private enum CodingKeys: String, CodingKey {
       case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut,
-        leaderboardRestricted, profileDetails, selectedBadgeID, startedTestCount
+        leaderboardRestricted, displayNameChangeRequired, profileDetails, selectedBadgeID,
+        startedTestCount
     }
 
     init(
@@ -681,6 +687,7 @@ public actor AuthStore {
       emailVerified: Bool = false,
       leaderboardOptedOut: Bool = false,
       leaderboardRestricted: Bool = false,
+      displayNameChangeRequired: Bool = false,
       profileDetails: ProfileDetails = .init(), selectedBadgeID: String? = nil,
       startedTestCount: Int = 0
     ) {
@@ -692,6 +699,7 @@ public actor AuthStore {
       self.emailVerified = emailVerified
       self.leaderboardOptedOut = leaderboardOptedOut
       self.leaderboardRestricted = leaderboardRestricted
+      self.displayNameChangeRequired = displayNameChangeRequired
       self.profileDetails = profileDetails
       self.selectedBadgeID = selectedBadgeID
       self.startedTestCount = startedTestCount
@@ -707,6 +715,8 @@ public actor AuthStore {
       emailVerified = try values.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
       leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
       leaderboardRestricted = try values.decodeIfPresent(Bool.self, forKey: .leaderboardRestricted) ?? false
+      displayNameChangeRequired =
+        try values.decodeIfPresent(Bool.self, forKey: .displayNameChangeRequired) ?? false
       profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
       selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
       startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
@@ -1248,6 +1258,7 @@ public actor AuthStore {
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
@@ -1291,6 +1302,7 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: nil, createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.passwordResetTokens.removeAll { $0.userID == user.id }
@@ -1577,6 +1589,7 @@ public actor AuthStore {
       passwordHash: try Bcrypt.hash(request.newPassword, cost: bcryptCost),
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.sessions.removeAll { $0.userID == user.id }
@@ -1636,6 +1649,7 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: user.passwordHash, createdAt: user.createdAt, emailVerified: true,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.emailVerificationTokens.removeAll { $0.userID == user.id }
@@ -1738,6 +1752,7 @@ public actor AuthStore {
       emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
       startedTestCount: user.startedTestCount
@@ -1777,6 +1792,7 @@ public actor AuthStore {
       emailVerified: false,
       leaderboardOptedOut: user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
       startedTestCount: user.startedTestCount
@@ -1890,7 +1906,8 @@ public actor AuthStore {
     let resetUser = StoredUser(
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: user.passwordHash, createdAt: user.createdAt,
-      emailVerified: user.emailVerified, leaderboardRestricted: user.leaderboardRestricted)
+      emailVerified: user.emailVerified, leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired)
     state.users[index] = resetUser
     state.developerAccessKeys.removeAll { $0.userID == user.id }
     state.syncRecords.removeAll { $0.userID == user.id }
@@ -1919,6 +1936,7 @@ public actor AuthStore {
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired && displayName == user.displayName,
       profileDetails: profileDetails, selectedBadgeID: selectedBadgeID,
       startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
@@ -2267,6 +2285,7 @@ public actor AuthStore {
           id: report.id,
           profile: publicProfile(for: profile),
           isLeaderboardRestricted: profile.leaderboardRestricted,
+          isDisplayNameChangeRequired: profile.displayNameChangeRequired,
           reason: report.reason,
           note: report.note,
           status: report.status,
@@ -2291,7 +2310,9 @@ public actor AuthStore {
     let report = state.profileReports[index]
     return .init(
       id: report.id, profile: publicProfile(for: profile),
-      isLeaderboardRestricted: profile.leaderboardRestricted, reason: report.reason, note: report.note,
+      isLeaderboardRestricted: profile.leaderboardRestricted,
+      isDisplayNameChangeRequired: profile.displayNameChangeRequired,
+      reason: report.reason, note: report.note,
       status: report.status,
       submittedAt: report.submittedAt)
   }
@@ -2310,6 +2331,22 @@ public actor AuthStore {
       try persist()
     }
     return .init(userID: userID, isRestricted: restricted)
+  }
+
+  /// Requires a profile to choose a different valid display name before it can
+  /// submit another server-side result. This leaves sign-in, local practice,
+  /// existing records, and every other account capability intact.
+  public func setDisplayNameChangeRequired(userID: UUID, required: Bool) throws
+    -> DisplayNameRequirementResponse
+  {
+    guard let index = state.users.firstIndex(where: { $0.id == userID }) else {
+      throw AuthStoreError.profileNotFound
+    }
+    if state.users[index].displayNameChangeRequired != required {
+      state.users[index].displayNameChangeRequired = required
+      try persist()
+    }
+    return .init(userID: userID, isRequired: required)
   }
 
   public func submitQuoteReport(
@@ -2733,10 +2770,12 @@ public actor AuthStore {
     let total = typingSeconds ?? totalTypingSecondsByUser()[user.id, default: 0]
     let completedSeconds = max(0, Int(total.rounded(.down)))
     return .init(
-      isEligible: !user.leaderboardRestricted && total > Double(minimumLeaderboardTypingSeconds),
+      isEligible: !user.leaderboardRestricted && !user.displayNameChangeRequired
+        && total > Double(minimumLeaderboardTypingSeconds),
       completedPracticeSeconds: completedSeconds,
       minimumPracticeSeconds: minimumLeaderboardTypingSeconds,
-      isLeaderboardRestricted: user.leaderboardRestricted)
+      isLeaderboardRestricted: user.leaderboardRestricted,
+      isDisplayNameChangeRequired: user.displayNameChangeRequired)
   }
 
   private func leaderboardEligibility(for userID: UUID) -> LeaderboardEligibility {
@@ -2744,7 +2783,8 @@ public actor AuthStore {
       return .init(
         isEligible: false, completedPracticeSeconds: 0,
         minimumPracticeSeconds: minimumLeaderboardTypingSeconds,
-        isLeaderboardRestricted: false)
+        isLeaderboardRestricted: false,
+        isDisplayNameChangeRequired: false)
     }
     return leaderboardEligibility(for: user)
   }
@@ -2957,6 +2997,9 @@ public actor AuthStore {
     _ request: ResultSubmissionRequest, credential: ResultServiceCredential, now: Date = .now
   ) throws -> ResultSubmissionResponse {
     let user = try authenticatedUser(for: credential, now: now)
+    guard !user.displayNameChangeRequired else {
+      throw AuthStoreError.displayNameChangeRequired
+    }
     try validate(result: request, now: now)
     let tags = try validatedResultTags(request.tags)
     if let existing = state.results.first(where: { $0.userID == user.id && $0.id == request.id }) {
@@ -3397,6 +3440,7 @@ public actor AuthStore {
       id: user.id, email: user.email, emailVerified: user.emailVerified, displayName: user.displayName,
       totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
+      displayNameChangeRequired: user.displayNameChangeRequired,
       profileDetails: user.profileDetails,
       authenticationMethods: authenticationMethods(for: user.id), availableBadges: availableBadges,
       selectedBadgeID: selectedBadgeID,

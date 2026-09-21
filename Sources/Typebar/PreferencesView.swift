@@ -1082,6 +1082,13 @@ struct PreferencesView: View {
             Text("显示名会出现在公开资料、基础排行榜与好友列表；邮箱不会公开。")
               .font(.caption)
               .foregroundStyle(.secondary)
+            if user.displayNameChangeRequired {
+              Label(
+                "部署方要求你先更换显示名。更新为不同的有效显示名后，才能提交新的服务端成绩并重新参与共享排行榜；本机练习不会受影响。",
+                systemImage: "person.badge.exclamationmark")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             Toggle(
               "从 WPM 和 XP 排行榜隐藏我",
               isOn: Binding(
@@ -1801,7 +1808,7 @@ struct PreferencesView: View {
           .disabled(
             moderationIsWorking
               || moderationKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          Text("“标为已处理/驳回”只更新审核状态。单独的排行榜限制只影响共享榜单，可恢复；不会修改资料、删除账户、通知被举报者或透露举报者身份。")
+          Text("“标为已处理/驳回”只更新审核状态。排行榜限制只影响共享榜单且可恢复；显示名整改会拒绝新的服务端成绩，直到用户实际更新有效显示名。两者都不会修改资料、删除账户、通知被举报者或透露举报者身份。")
             .font(.caption)
             .foregroundStyle(.secondary)
           ForEach(moderationProfileReports) { report in
@@ -1831,6 +1838,22 @@ struct PreferencesView: View {
                   Task {
                     await setLeaderboardRestriction(
                       report, restricted: !report.isLeaderboardRestricted)
+                  }
+                }
+                .buttonStyle(.bordered)
+              }
+              .disabled(
+                moderationIsWorking
+                  || moderationKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+              HStack {
+                Text(report.isDisplayNameChangeRequired ? "显示名：需更新" : "显示名：正常")
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+                Spacer()
+                Button(report.isDisplayNameChangeRequired ? "撤销显示名整改" : "要求更换显示名") {
+                  Task {
+                    await setDisplayNameRequirement(
+                      report, required: !report.isDisplayNameChangeRequired)
                   }
                 }
                 .buttonStyle(.bordered)
@@ -2411,6 +2434,25 @@ struct PreferencesView: View {
       moderationMessage = isRestricted
         ? "已限制该账户参与共享排行榜；成绩和登录不受影响。"
         : "已恢复该账户参与共享排行榜；原有合格成绩会重新计算。"
+    } catch {
+      moderationMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func setDisplayNameRequirement(
+    _ report: RemoteModerationProfileReport, required: Bool
+  ) async {
+    moderationIsWorking = true
+    defer { moderationIsWorking = false }
+    do {
+      let isRequired = try await account.setDisplayNameChangeRequired(
+        report.profile.id, key: moderationKey, required: required)
+      moderationProfileReports = try await account.moderationProfileReports(
+        key: moderationKey, status: profileModerationStatus)
+      moderationMessage = isRequired
+        ? "已要求该账户更换显示名；完成前不会接受新的服务端成绩。"
+        : "已撤销显示名整改要求；该账户可再次提交服务端成绩。"
     } catch {
       moderationMessage = error.localizedDescription
     }
