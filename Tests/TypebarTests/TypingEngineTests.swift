@@ -15154,6 +15154,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingReplay.typedText(events: result?.replayEvents ?? [], through: 2), "amber")
   }
 
+  func testReplayTypedTextUsesRecordedChronologyForImportedEvents() {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0.3, kind: .delete, text: ""),
+      .init(offset: 0.2, kind: .insert, text: "b"),
+      .init(offset: 0.1, kind: .insert, text: "a"),
+    ]
+
+    XCTAssertEqual(TypingReplay.typedText(events: events, through: 1), "a")
+  }
+
   func testReplayCharacterTargetsKeepLaterWordsAlignedAfterEarlierExtraInput() {
     let events: [TypingReplayEvent] = [
       .init(offset: 0.1, kind: .insert, text: "a"),

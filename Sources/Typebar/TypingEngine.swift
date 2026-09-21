@@ -2832,7 +2832,7 @@ enum TypingReplay {
   }
 
   static func typedText(events: [TypingReplayEvent], through elapsed: TimeInterval) -> String {
-    events.filter { $0.offset <= elapsed }.reduce(into: "") { typed, event in
+    chronologicalEvents(events).filter { $0.offset <= elapsed }.reduce(into: "") { typed, event in
       switch event.kind {
       case .insert: typed += event.text
       case .delete:
