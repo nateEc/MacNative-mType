@@ -1568,6 +1568,22 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.typed, "amber")
   }
 
+  func testDeleteOnErrorReplaysTheFailedAttemptAndAutomaticRecovery() throws {
+    let rules = InputRules(deleteOnErrorMode: .letter)
+    var session = TypingSession(
+      configuration: .timed(seconds: 30, rules: rules), prompt: "amber")
+
+    session.insert("am", at: start)
+    session.insert("x", at: start.addingTimeInterval(1))
+    session.bailOut(at: start.addingTimeInterval(2))
+
+    let events = try XCTUnwrap(session.result()?.replayEvents)
+    XCTAssertEqual(events.map(\.kind), [.insert, .insert, .insert, .delete, .delete])
+    XCTAssertEqual(events.map(\.text), ["a", "m", "x", "", ""])
+    XCTAssertEqual(events.map(\.automatic), [false, false, false, true, true])
+    XCTAssertEqual(TypingReplay.typedText(events: events, through: 2), "a")
+  }
+
   func testDeleteOnErrorWordClearsTheActiveWord() {
     let rules = InputRules(deleteOnErrorMode: .word)
     var session = TypingSession(

@@ -3644,7 +3644,19 @@ struct TypingSession {
     }
     if !isCorrect && configuration.rules.stopOnErrorMode == .letter { return false }
     if !isCorrect && configuration.rules.deleteOnErrorMode.isEnabled {
-      deleteForError(configuration.rules.deleteOnErrorMode, at: date)
+      // The reference first inserts and logs the failed key, then emits its
+      // recovery deletes. Keeping that transient state in the native replay
+      // makes playback, automatic-event sound policy, and live input history
+      // agree with the visible error recovery.
+      let activeWordWasEmpty = activeDeleteOnErrorWordIsEmpty
+      appendTypedCharacter(
+        inputCharacter, targetIndex: targetIndex,
+        forceError: forceError || earlyWordCommitTargetIndex != nil,
+        countsAsExtraError: retainsCurrentWordAsExtra, at: date)
+      recordReplayEvent(
+        kind: .insert, text: String(inputCharacter), forceError: forceError, at: date)
+      deleteForError(
+        configuration.rules.deleteOnErrorMode, activeWordWasEmpty: activeWordWasEmpty, at: date)
       return false
     }
     if !isCorrect && configuration.modifiers.contains(.clearCurrentWordOnError),
@@ -3724,47 +3736,59 @@ struct TypingSession {
   /// Removes accepted characters from the active, unfinished word while
   /// preserving any already submitted words. Each removal becomes a replay
   /// event so result playback reconstructs the same input state.
-  private mutating func clearCurrentWord(at date: Date) {
+  private mutating func clearCurrentWord(at date: Date, automatic: Bool = false) {
     if let range = activeNoSpaceWordRange {
       while typed.count > range.lowerBound {
         removeLastTypedCharacter()
-        recordReplayEvent(kind: .delete, text: "", at: date)
+        recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
       }
       return
     }
     while let last = typed.last, !isPromptWordSeparator(last) {
       removeLastTypedCharacter()
-      recordReplayEvent(kind: .delete, text: "", at: date)
+      recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
     }
   }
 
-  /// Applies an original native equivalent of the selectable delete-on-error
-  /// modes. The failed key remains in `attemptedErrorCounts`; only accepted
-  /// text is removed, so metrics and replay stay internally consistent.
-  private mutating func deleteForError(_ mode: DeleteOnErrorMode, at date: Date) {
-    let activeWordIsEmpty = typed.isEmpty || typed.last.map(isPromptWordSeparator) == true
-      || activeNoSpaceWordRange.map { typed.count == $0.lowerBound } == true
-    if mode.returnsToPreviousWordAtStart && activeWordIsEmpty,
+  /// Mirrors the reference's event sequence: the failed key is logged first,
+  /// then automatic deletions remove it and, depending on the selected mode,
+  /// prior progress. Historical input attempts deliberately remain scored.
+  private mutating func deleteForError(
+    _ mode: DeleteOnErrorMode, activeWordWasEmpty: Bool, at date: Date
+  ) {
+    // `insertCharacter` has already retained the failed key long enough to
+    // serialize it to replay. It must be removed before examining the prior
+    // word boundary, including when the failed key is itself a separator.
+    guard !typed.isEmpty else { return }
+    removeLastTypedCharacter()
+    recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
+
+    if mode.returnsToPreviousWordAtStart && activeWordWasEmpty,
       ((configuration.language.usesSpaceDelimitedWords
         && !configuration.modifiers.contains(.noSpaces)) || tracksNoSpaceWordBursts), !typed.isEmpty
     {
-      removePreviousWordForHardDelete(clearingWord: mode.clearsWholeWord, at: date)
+      removePreviousWordForHardDelete(
+        clearingWord: mode.clearsWholeWord, automatic: true, at: date)
       return
     }
     if mode.clearsWholeWord {
-      clearCurrentWord(at: date)
+      clearCurrentWord(at: date, automatic: true)
     } else {
-      removeLastCharacterFromCurrentWord(at: date)
+      removeLastCharacterFromCurrentWord(at: date, automatic: true)
     }
   }
 
-  private mutating func removeLastCharacterFromCurrentWord(at date: Date) {
+  private mutating func removeLastCharacterFromCurrentWord(
+    at date: Date, automatic: Bool = false
+  ) {
     guard let last = typed.last, !last.isWhitespace else { return }
     removeLastTypedCharacter()
-    recordReplayEvent(kind: .delete, text: "", at: date)
+    recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
   }
 
-  private mutating func removePreviousWordForHardDelete(clearingWord: Bool, at date: Date) {
+  private mutating func removePreviousWordForHardDelete(
+    clearingWord: Bool, automatic: Bool = false, at date: Date
+  ) {
     if tracksNoSpaceWordBursts,
       let wordIndex = noSpaceWordEndIndices.firstIndex(of: typed.count),
       let previousRange = noSpaceWordRange(for: wordIndex)
@@ -3772,19 +3796,19 @@ struct TypingSession {
       if clearingWord {
         while typed.count > previousRange.lowerBound {
           removeLastTypedCharacter()
-          recordReplayEvent(kind: .delete, text: "", at: date)
+          recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
         }
       } else {
         removeLastTypedCharacter()
-        recordReplayEvent(kind: .delete, text: "", at: date)
+        recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
       }
       return
     }
     guard typed.last.map(isPromptWordSeparator) == true else { return }
     removeLastTypedCharacter()
-    recordReplayEvent(kind: .delete, text: "", at: date)
+    recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
     if clearingWord {
-      clearCurrentWord(at: date)
+      clearCurrentWord(at: date, automatic: automatic)
     }
   }
 
@@ -4002,6 +4026,12 @@ struct TypingSession {
   /// edge is an empty input buffer for the current source word.
   private var inputWordIsEmpty: Bool {
     typed.isEmpty || typed.last.map(isPromptWordSeparator) == true
+  }
+
+  /// Delete-on-error hard modes also apply to a retained hidden boundary in
+  /// no-space languages, where the visible input has no separator to inspect.
+  private var activeDeleteOnErrorWordIsEmpty: Bool {
+    activeNoSpaceWordRange.map { typed.count == $0.lowerBound } ?? inputWordIsEmpty
   }
 
   private var hasUncommittedSpaceDelimitedInput: Bool {
