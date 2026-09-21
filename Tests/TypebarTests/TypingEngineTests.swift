@@ -15297,6 +15297,19 @@ final class TypingEngineTests: XCTestCase {
     ).isEmpty)
   }
 
+  func testFunboxPromptHighlightAvailabilityUsesCharacterOnlyForForcedModes() {
+    XCTAssertTrue(PromptHighlightAvailabilityPolicy.allowsWordRanges(
+      languageUsesSpaceDelimitedWords: true, usesTapePractice: false, modifiers: []))
+    XCTAssertFalse(PromptHighlightAvailabilityPolicy.allowsWordRanges(
+      languageUsesSpaceDelimitedWords: true, usesTapePractice: false, modifiers: [.arrowStream]))
+    XCTAssertFalse(PromptHighlightAvailabilityPolicy.allowsWordRanges(
+      languageUsesSpaceDelimitedWords: true, usesTapePractice: false, modifiers: [.readAhead]))
+    XCTAssertFalse(PromptHighlightAvailabilityPolicy.allowsWordRanges(
+      languageUsesSpaceDelimitedWords: false, usesTapePractice: false, modifiers: []))
+    XCTAssertFalse(PromptHighlightAvailabilityPolicy.allowsWordRanges(
+      languageUsesSpaceDelimitedWords: true, usesTapePractice: true, modifiers: []))
+  }
+
   func testTypedCharacterEffectsOnlySelectCompletedPromptWords() {
     XCTAssertEqual(
       TypedCharacterEffectPolicy.completedCharacterIndices(

@@ -2135,13 +2135,9 @@ private struct ContentView: View {
   }
 
   private var promptHighlightAllowsWordRanges: Bool {
-    guard session.configuration.language.usesSpaceDelimitedWords,
-      !usesTapePractice else { return false }
-    let restrictedModifiers: [TestModifier] = [
-      .noSpaces, .underscoreSeparators, .listening, .simonSays, .memory,
-      .readAheadEasy, .readAhead, .readAheadHard,
-    ]
-    return !restrictedModifiers.contains { session.configuration.modifiers.contains($0) }
+    PromptHighlightAvailabilityPolicy.allowsWordRanges(
+      languageUsesSpaceDelimitedWords: session.configuration.language.usesSpaceDelimitedWords,
+      usesTapePractice: usesTapePractice, modifiers: session.configuration.modifiers)
   }
 
   private var effectivePromptHighlightMode: PromptHighlightMode {

@@ -2876,6 +2876,24 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   }
 }
 
+/// Funboxes with source-enforced character highlighting, along with native
+/// concealment and separator modes that cannot safely expose word ranges.
+enum PromptHighlightAvailabilityPolicy {
+  static let characterOnlyModifiers: Set<TestModifier> = [
+    .noSpaces, .underscoreSeparators, .listening, .simonSays, .memory,
+    .readAheadEasy, .readAhead, .readAheadHard, .arrowStream,
+  ]
+
+  static func allowsWordRanges(
+    languageUsesSpaceDelimitedWords: Bool, usesTapePractice: Bool,
+    modifiers: [TestModifier]
+  ) -> Bool {
+    languageUsesSpaceDelimitedWords
+      && !usesTapePractice
+      && characterOnlyModifiers.isDisjoint(with: modifiers)
+  }
+}
+
 /// Determines the prompt positions that receive a presentation-only emphasis.
 /// It is deliberately independent from the accepted text, error accounting,
 /// and word-completion rules.
