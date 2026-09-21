@@ -51,7 +51,7 @@
 | `crt` | CRT 练习区 | 等价实现 | 原生扫描线、色调与边缘光晕，不改变输入或计分 |
 | `backwards` | 逐词反写 | 等价实现 | 纯文本变换 |
 | `ddoouubblleedd` | 字符双写 | 等价实现 | 纯文本变换 |
-| `instant_messaging` | 即时消息文本 | 等价实现 | Typebar 自有小写、短行与包裹性标点清理规则；`FUN-08` |
+| `instant_messaging` | 即时消息文本 | 等价实现 | 逐词小写；仅词末 ASCII `. ! ?` 变成换行，再清除 `. ( ) ' "`，保留词中问号、方括号、花括号和非 ASCII 句末符；`FUN-08` |
 | `underscore_spaces` | 下划线分隔 | 等价实现 | 纯文本变换 |
 | `ALL_CAPS` | 全大写 | 等价实现 | 纯文本变换 |
 | `polyglot` | 多语混排 | 等价实现 | 使用 Typebar 自有一百零一种可混排 LTR 语言内容 |

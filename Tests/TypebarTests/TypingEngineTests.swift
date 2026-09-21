@@ -17577,10 +17577,10 @@ final class TypingEngineTests: XCTestCase {
 
   func testMessagingStyleUsesLowercaseShortLinesAndConflictsWithCaseModes() {
     XCTAssertEqual(
-      MessagingTextPolicy.transformed("Hello, World! (Next?) \"Ready.\""),
-      "hello, world\n next\n ready")
+      MessagingTextPolicy.transformed("Hello, World! (Next?) \"Ready.\" [Keep] {Braces} 终。"),
+      "hello, world\nnext? ready [keep] {braces} 终。")
     XCTAssertEqual(
-      TestModifierPolicy.transformed("Hi! There?", modifiers: [.messagingStyle]), "hi\n there")
+      TestModifierPolicy.transformed("Hi! There?", modifiers: [.messagingStyle]), "hi\nthere")
     XCTAssertEqual(
       TestModifierPolicy.toggling(.messagingStyle, in: [.uppercase, .noSpaces]),
       [.noSpaces, .messagingStyle])

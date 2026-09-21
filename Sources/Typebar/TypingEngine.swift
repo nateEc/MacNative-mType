@@ -1344,27 +1344,39 @@ enum RandomCasePolicy {
 }
 
 enum MessagingTextPolicy {
-  /// Creates a compact chat-like prompt from user-owned or Typebar-authored text.
-  /// Sentence punctuation becomes a line break so the existing native Return path
-  /// can be used to practice a realistic multi-line exchange.
+  /// Mirrors the source funbox's per-word chat conversion. Only an ASCII terminal
+  /// `.`, `!`, or `?` becomes a line break; punctuation inside a word remains
+  /// input, as do brackets and non-ASCII sentence marks.
   static func transformed(_ value: String) -> String {
-    let removable = CharacterSet(charactersIn: "()[]{}\"'")
+    let words = value.split(separator: " ", omittingEmptySubsequences: false)
+    let transformedWords = words.map { transformedWord(String($0)) }
     var output = ""
-    var previousWasNewline = false
-    for scalar in value.lowercased().unicodeScalars {
-      if removable.contains(scalar) { continue }
-      if ".!?。！？".unicodeScalars.contains(scalar) {
-        if !output.isEmpty, !previousWasNewline {
-          output.append("\n")
-          previousWasNewline = true
-        }
-        continue
+    for (index, word) in transformedWords.enumerated() {
+      output += word
+      if index < transformedWords.count - 1, !word.hasSuffix("\n") {
+        output.append(" ")
       }
-      output.unicodeScalars.append(scalar)
-      previousWasNewline = scalar.properties.isWhitespace && scalar != "\n"
-        ? false : scalar == "\n"
     }
-    return output.trimmingCharacters(in: .whitespacesAndNewlines)
+    return collapsingNewlines(in: output).trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private static func transformedWord(_ source: String) -> String {
+    var output = source.lowercased()
+    if let terminal = output.last, ".!?".contains(terminal) {
+      output.removeLast()
+      output.append("\n")
+    }
+    let removable = CharacterSet(charactersIn: ".()'\"")
+    return output.unicodeScalars.reduce(into: "") { result, scalar in
+      if !removable.contains(scalar) { result.unicodeScalars.append(scalar) }
+    }
+  }
+
+  private static func collapsingNewlines(in value: String) -> String {
+    value.reduce(into: "") { output, character in
+      guard character != "\n" || output.last != "\n" else { return }
+      output.append(character)
+    }
   }
 }
 
