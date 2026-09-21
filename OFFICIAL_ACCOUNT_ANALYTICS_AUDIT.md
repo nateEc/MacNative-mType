@@ -17,5 +17,5 @@
 ## 验证
 
 - 本次新增双轴标尺先以缺失符号的编译失败建立红灯，再实现至单测通过；覆盖零起点、裁切起点、WPM、CPM 与空输入。
-- 2026-09-22 完整 `swift test`：644 项、0 失败、161.925 秒。CoreData/AddressBook XPC 提示是既有测试环境噪声，XCTest 汇总为准。
+- 2026-09-22 最近一次完整 `swift test`：653 项、0 失败、162.358 秒。CoreData/AddressBook XPC 提示是既有测试环境噪声，XCTest 汇总为准。
 - 尚需在真实窗口中人工核对 Swift Charts 的实际像素排版和 VoiceOver 朗读；为遵守当前“不开多个 Typebar”的约束，本次未启动任何 Typebar 图形界面。
