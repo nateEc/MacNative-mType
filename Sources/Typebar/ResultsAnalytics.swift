@@ -2222,6 +2222,84 @@ enum ActivityTypingMinutesTrendPolicy {
     }
 }
 
+/// Maps the reference daily-activity chart's two units onto one native chart
+/// ordinate. Minutes remain the canonical plotted position for bars; average
+/// speed is converted into that same range and receives its own trailing axis.
+/// This keeps the relationship inspectable without changing persisted result
+/// data or relying on a web charting runtime.
+struct DailyActivityOverviewScale: Equatable {
+    let minutesUpperBound: Double
+    let speedLowerBound: Double
+    let speedUpperBound: Double
+    let speedUnit: TypingSpeedUnit
+
+    static func make(
+        points: [ActivityBarPoint], speedUnit: TypingSpeedUnit, startsAtZero: Bool
+    ) -> Self? {
+        let observed = points.filter {
+            $0.completedTests > 0 && $0.typingSeconds.isFinite && $0.typingSeconds >= 0
+                && $0.averageWPM.isFinite && $0.averageWPM >= 0
+        }
+        guard !observed.isEmpty else { return nil }
+
+        let highestMinutes = observed.map { $0.typingSeconds / 60 }.max() ?? 0
+        let minutesUpperBound = niceUpperBound(for: highestMinutes)
+        let displayedSpeeds = observed.map { speedUnit.converted(wpm: $0.averageWPM) }
+        guard displayedSpeeds.allSatisfy(\.isFinite),
+            let lowestSpeed = displayedSpeeds.min(), let highestSpeed = displayedSpeeds.max()
+        else { return nil }
+
+        let speedLowerBound = startsAtZero ? 0 : niceLowerBound(for: lowestSpeed)
+        var speedUpperBound = niceUpperBound(for: highestSpeed)
+        if speedUpperBound <= speedLowerBound {
+            speedUpperBound = niceUpperBound(for: speedLowerBound + max(1, abs(speedLowerBound) * 0.1))
+        }
+        guard minutesUpperBound > 0, speedUpperBound > speedLowerBound else { return nil }
+        return .init(
+            minutesUpperBound: minutesUpperBound, speedLowerBound: speedLowerBound,
+            speedUpperBound: speedUpperBound, speedUnit: speedUnit)
+    }
+
+    /// The chart ordinate corresponding to an average speed stored in canonical WPM.
+    func ordinate(forAverageWPM wpm: Double) -> Double {
+        guard wpm.isFinite else { return 0 }
+        let displayedSpeed = speedUnit.converted(wpm: max(0, wpm))
+        let proportion = (displayedSpeed - speedLowerBound) / (speedUpperBound - speedLowerBound)
+        return min(minutesUpperBound, max(0, proportion * minutesUpperBound))
+    }
+
+    /// The user-selected speed unit value corresponding to a chart ordinate.
+    func speed(atOrdinate ordinate: Double) -> Double {
+        guard ordinate.isFinite, minutesUpperBound > 0 else { return speedLowerBound }
+        let proportion = min(1, max(0, ordinate / minutesUpperBound))
+        return speedLowerBound + proportion * (speedUpperBound - speedLowerBound)
+    }
+
+    var ordinateTicks: [Double] {
+        (0...4).map { Double($0) / 4 * minutesUpperBound }
+    }
+
+    private static func niceUpperBound(for value: Double) -> Double {
+        guard value.isFinite, value > 0 else { return 1 }
+        let magnitude = pow(10, floor(log10(value)))
+        let normalized = value / magnitude
+        let leading: Double
+        switch normalized {
+        case ...1: leading = 1
+        case ...2: leading = 2
+        case ...5: leading = 5
+        default: leading = 10
+        }
+        return leading * magnitude
+    }
+
+    private static func niceLowerBound(for value: Double) -> Double {
+        guard value.isFinite, value > 0 else { return 0 }
+        let magnitude = pow(10, floor(log10(value)))
+        return floor(value / magnitude) * magnitude
+    }
+}
+
 struct ActivityHeatmapCell: Equatable, Identifiable {
     let day: Date
     let completedTests: Int

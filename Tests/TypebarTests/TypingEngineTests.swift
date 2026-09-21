@@ -22795,6 +22795,40 @@ final class TypingEngineTests: XCTestCase {
       ]).isEmpty)
   }
 
+  func testDailyActivityOverviewScaleAlignsMinutesAndAverageSpeedOnSeparateAxes() throws {
+    let start = Date(timeIntervalSince1970: 86_400)
+    let points = [
+      ActivityBarPoint(
+        day: start, completedTests: 1, typingSeconds: 5 * 60, averageWPM: 50),
+      ActivityBarPoint(
+        day: start.addingTimeInterval(86_400), completedTests: 2, typingSeconds: 10 * 60,
+        averageWPM: 100),
+    ]
+
+    let zeroBased = try XCTUnwrap(
+      DailyActivityOverviewScale.make(points: points, speedUnit: .wpm, startsAtZero: true))
+    XCTAssertEqual(zeroBased.minutesUpperBound, 10)
+    XCTAssertEqual(zeroBased.speedLowerBound, 0)
+    XCTAssertEqual(zeroBased.speedUpperBound, 100)
+    XCTAssertEqual(zeroBased.ordinate(forAverageWPM: 50), 5, accuracy: 0.000_001)
+    XCTAssertEqual(zeroBased.ordinate(forAverageWPM: 100), 10, accuracy: 0.000_001)
+
+    let cropped = try XCTUnwrap(
+      DailyActivityOverviewScale.make(points: points, speedUnit: .wpm, startsAtZero: false))
+    XCTAssertEqual(cropped.speedLowerBound, 50)
+    XCTAssertEqual(cropped.speedUpperBound, 100)
+    XCTAssertEqual(cropped.ordinate(forAverageWPM: 50), 0, accuracy: 0.000_001)
+    XCTAssertEqual(cropped.ordinate(forAverageWPM: 100), 10, accuracy: 0.000_001)
+    XCTAssertEqual(cropped.speed(atOrdinate: 5), 75, accuracy: 0.000_001)
+
+    let cpm = try XCTUnwrap(
+      DailyActivityOverviewScale.make(points: points, speedUnit: .cpm, startsAtZero: true))
+    XCTAssertEqual(cpm.speedUpperBound, 500)
+    XCTAssertEqual(cpm.ordinate(forAverageWPM: 50), 5, accuracy: 0.000_001)
+    XCTAssertEqual(cpm.speed(atOrdinate: 5), 250, accuracy: 0.000_001)
+    XCTAssertNil(DailyActivityOverviewScale.make(points: [], speedUnit: .wpm, startsAtZero: true))
+  }
+
   func testCurrentStreakOnlyCountsConsecutiveDaysEndingToday() {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!

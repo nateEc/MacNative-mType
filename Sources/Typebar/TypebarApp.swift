@@ -6003,6 +6003,7 @@ private struct ResultsHistoryView: View {
   fileprivate enum ActivityChartMeasure: String, CaseIterable, Identifiable {
     case completedTests
     case typingMinutes
+    case typingMinutesAndAverageSpeed
     case averageSpeed
     case highestSpeed
     case averageAccuracy
@@ -6015,6 +6016,7 @@ private struct ResultsHistoryView: View {
       switch self {
       case .completedTests: "完成次数"
       case .typingMinutes: "练习分钟"
+      case .typingMinutesAndAverageSpeed: "分钟 + 平均速度"
       case .averageSpeed: "平均速度"
       case .highestSpeed: "最高速度"
       case .averageAccuracy: "平均准确率"
@@ -6984,12 +6986,24 @@ private struct ActivityBarChartView: View {
   private var yTitle: String {
     switch measure {
     case .averageSpeed, .highestSpeed: speedUnit.displayName
+    case .typingMinutesAndAverageSpeed: "练习分钟"
     default: measure.title
     }
   }
 
   private var typingMinutesTrend: [ActivityTypingMinutesTrendPoint] {
-    measure == .typingMinutes ? ActivityTypingMinutesTrendPolicy.points(for: points) : []
+    switch measure {
+    case .typingMinutes, .typingMinutesAndAverageSpeed:
+      ActivityTypingMinutesTrendPolicy.points(for: points)
+    default:
+      []
+    }
+  }
+
+  private var overviewScale: DailyActivityOverviewScale? {
+    guard measure == .typingMinutesAndAverageSpeed else { return nil }
+    return DailyActivityOverviewScale.make(
+      points: points, speedUnit: speedUnit, startsAtZero: startsAtZero)
   }
 
   var body: some View {
@@ -7005,7 +7019,32 @@ private struct ActivityBarChartView: View {
         .pickerStyle(.menu)
         .frame(width: 180)
       }
-      Chart {
+      if measure == .typingMinutesAndAverageSpeed {
+        if let overviewScale {
+          overviewChart(scale: overviewScale)
+        } else {
+          ContentUnavailableView(
+            "没有可用的每日活动数据", systemImage: "chart.bar.xaxis",
+            description: Text("完成练习后即可并列查看练习分钟和平均速度。"))
+            .frame(height: 110)
+        }
+      } else {
+        singleMetricChart
+      }
+      if let selectedPoint {
+        ActivityDayDetailView(point: selectedPoint, speedUnit: speedUnit) {
+          selectedDate = nil
+        }
+      } else {
+        Text("点按或拖动图表，查看某一天的完整指标")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private var singleMetricChart: some View {
+    Chart {
         ForEach(points) { point in
           if let value = value(for: point) {
             BarMark(
@@ -7043,22 +7082,100 @@ private struct ActivityBarChartView: View {
       .chartYScale(domain: .automatic(includesZero: includesZero))
       .chartXSelection(value: $selectedDate)
       .frame(height: 110)
-      if let selectedPoint {
-        ActivityDayDetailView(point: selectedPoint, speedUnit: speedUnit) {
-          selectedDate = nil
-        }
-      } else {
-        Text("点按或拖动图表，查看某一天的完整指标")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
+  }
+
+  private func overviewChart(scale: DailyActivityOverviewScale) -> some View {
+    Chart {
+      overviewMarks(scale: scale)
+    }
+    .chartXAxis {
+      AxisMarks(values: .stride(by: .weekOfYear)) { _ in
+        AxisGridLine().foregroundStyle(.secondary.opacity(0.2))
+        AxisValueLabel(format: .dateTime.month().day())
       }
     }
+    .chartYAxis {
+      AxisMarks(position: .leading) { _ in
+        AxisGridLine().foregroundStyle(.secondary.opacity(0.2))
+        AxisTick()
+        AxisValueLabel()
+      }
+      AxisMarks(position: .trailing, values: scale.ordinateTicks) { value in
+        AxisTick()
+        AxisValueLabel {
+          if let ordinate = value.as(Double.self) {
+            Text(formattedOverviewSpeed(scale.speed(atOrdinate: ordinate)))
+          }
+        }
+      }
+    }
+    .chartYScale(domain: 0...scale.minutesUpperBound)
+    .chartXSelection(value: $selectedDate)
+    .chartYAxisLabel("左：练习分钟 · 右：平均 \(speedUnit.displayName)")
+    .frame(height: 150)
+    .accessibilityLabel("每日练习分钟与平均速度")
+    .accessibilityHint("柱状图使用左轴，折线使用右轴；拖动可查看某一天的完整指标")
+  }
+
+  @ChartContentBuilder
+  private func overviewMarks(scale: DailyActivityOverviewScale) -> some ChartContent {
+    ForEach(points) { point in
+      if point.completedTests > 0 {
+        overviewDayMarks(for: point, scale: scale)
+      }
+    }
+    ForEach(typingMinutesTrend) { point in
+      LineMark(
+        x: .value("日期", point.day, unit: .day),
+        y: .value("练习分钟趋势", point.minutes)
+      )
+      .foregroundStyle(.secondary.opacity(0.65))
+      .lineStyle(.init(lineWidth: 2, dash: [4, 3]))
+      .accessibilityLabel("练习分钟趋势")
+    }
+    if let selectedPoint {
+      RuleMark(x: .value("所选日期", selectedPoint.day, unit: .day))
+        .foregroundStyle(.secondary)
+        .lineStyle(.init(lineWidth: 1, dash: [3, 3]))
+    }
+  }
+
+  @ChartContentBuilder
+  private func overviewDayMarks(
+    for point: ActivityBarPoint, scale: DailyActivityOverviewScale
+  ) -> some ChartContent {
+    let minutes = point.typingSeconds / 60
+    BarMark(
+      x: .value("日期", point.day, unit: .day),
+      y: .value("练习分钟", minutes)
+    )
+    .foregroundStyle(Color.accentColor.gradient)
+    .accessibilityLabel(point.day.formatted(date: .abbreviated, time: .omitted))
+    .accessibilityValue(
+      minutes.formatted(.number.precision(.fractionLength(0...2))) + " 分钟练习；平均 "
+        + formattedOverviewSpeed(
+          scale.speed(atOrdinate: scale.ordinate(forAverageWPM: point.averageWPM)))
+        + " " + speedUnit.displayName)
+
+    LineMark(
+      x: .value("日期", point.day, unit: .day),
+      y: .value("平均速度（右轴）", scale.ordinate(forAverageWPM: point.averageWPM))
+    )
+    .foregroundStyle(.secondary)
+    .lineStyle(.init(lineWidth: 2))
+    PointMark(
+      x: .value("日期", point.day, unit: .day),
+      y: .value("平均速度（右轴）", scale.ordinate(forAverageWPM: point.averageWPM))
+    )
+    .foregroundStyle(.secondary)
+    .symbol(.triangle)
   }
 
   private var includesZero: Bool {
     switch measure {
     case .completedTests, .typingMinutes, .restartsPerCompletedTest: true
     case .averageSpeed, .highestSpeed, .averageAccuracy, .averageConsistency: startsAtZero
+    case .typingMinutesAndAverageSpeed: true
     }
   }
 
@@ -7066,6 +7183,7 @@ private struct ActivityBarChartView: View {
     switch measure {
     case .completedTests: Double(point.completedTests)
     case .typingMinutes: point.typingSeconds / 60
+    case .typingMinutesAndAverageSpeed: nil
     case .averageSpeed:
       point.completedTests > 0 ? speedUnit.converted(wpm: point.averageWPM) : nil
     case .highestSpeed:
@@ -7082,6 +7200,8 @@ private struct ActivityBarChartView: View {
     switch measure {
     case .completedTests: "\(point.completedTests) 次完成"
     case .typingMinutes: "\(Int((point.typingSeconds / 60).rounded())) 分钟练习"
+    case .typingMinutesAndAverageSpeed:
+      "\(Int((point.typingSeconds / 60).rounded())) 分钟练习；平均 \(formattedSpeed(point.averageWPM)) \(speedUnit.displayName)"
     case .averageSpeed:
       "平均 \(formattedSpeed(point.averageWPM)) \(speedUnit.displayName)"
     case .highestSpeed:
@@ -7098,6 +7218,10 @@ private struct ActivityBarChartView: View {
   private func formattedSpeed(_ wpm: Double) -> String {
     speedUnit.converted(wpm: wpm).formatted(
       .number.precision(.fractionLength(0...2)))
+  }
+
+  private func formattedOverviewSpeed(_ speed: Double) -> String {
+    speed.formatted(.number.precision(.fractionLength(0...2)))
   }
 }
 
