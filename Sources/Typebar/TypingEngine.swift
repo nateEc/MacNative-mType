@@ -3851,6 +3851,15 @@ struct TypingSession {
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true)
   }
 
+  /// A marked-text composition starts the reference attempt before its text is
+  /// committed. It intentionally leaves scoring and replay untouched until
+  /// the text input system confirms the composition through `insertBatch`.
+  mutating func beginComposition(at date: Date = .now) {
+    guard !isFinished else { return }
+    beginIfNeeded(at: date)
+    recordKeyboardActivity(at: date)
+  }
+
   private mutating func insertText(
     _ text: String, forceError: Bool, at date: Date,
     evaluatesTerminalRulesOnLastCharacterOnly: Bool

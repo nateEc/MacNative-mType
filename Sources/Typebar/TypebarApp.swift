@@ -1952,6 +1952,7 @@ private struct ContentView: View {
           if !isFocused { typingCompanionHands.reset() }
           handleTypingWindowFocusChange(isFocused, hasAttachedSheet: hasAttachedSheet)
         },
+        onCompositionStarted: { session.beginComposition() },
         onCompositionChanged: { compositionText = $0 },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
         onPhysicalKey: { keyCode, isKeyDown, isRepeat in

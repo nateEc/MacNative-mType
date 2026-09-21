@@ -133,6 +133,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onFinishZen: () -> Void
     let onFocusChanged: (Bool) -> Void
     let onWindowFocusChanged: (Bool, Bool) -> Void
+    let onCompositionStarted: () -> Void
     let onCompositionChanged: (String) -> Void
     let onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void
     let onPhysicalKey: (UInt16, Bool, Bool) -> Void
@@ -171,6 +172,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onFinishZen = onFinishZen
         view.onFocusChanged = onFocusChanged
         view.onWindowFocusChanged = onWindowFocusChanged
+        view.onCompositionStarted = onCompositionStarted
         view.onCompositionChanged = onCompositionChanged
         view.onModifierFlagsChanged = onModifierFlagsChanged
         view.onPhysicalKey = onPhysicalKey
@@ -206,6 +208,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onFinishZen: () -> Void = {}
     var onFocusChanged: (Bool) -> Void = { _ in }
     var onWindowFocusChanged: (Bool, Bool) -> Void = { _, _ in }
+    var onCompositionStarted: () -> Void = {}
     var onCompositionChanged: (String) -> Void = { _ in }
     var onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void = { _ in }
     var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
@@ -534,11 +537,13 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        let startsComposition = composition.length == 0
         if let attributed = string as? NSAttributedString {
             composition = attributed
         } else {
             composition = NSAttributedString(string: string as? String ?? "")
         }
+        if startsComposition, composition.length > 0 { onCompositionStarted() }
         onCompositionChanged(composition.string)
     }
 

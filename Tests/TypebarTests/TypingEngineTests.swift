@@ -9738,6 +9738,36 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(input.hasMarkedText())
   }
 
+  func testCompositionBeginsSessionBeforeItsTextIsCommitted() throws {
+    var session = TypingSession(configuration: .words(1), prompt: "拼")
+    let compositionStartedAt = start.addingTimeInterval(2)
+    let committedAt = compositionStartedAt.addingTimeInterval(3)
+
+    session.beginComposition(at: compositionStartedAt)
+    XCTAssertEqual(session.startedAt, compositionStartedAt)
+    XCTAssertEqual(session.typedCharacterCount, 0)
+
+    session.insertBatch("拼", at: committedAt)
+    let result = try XCTUnwrap(session.result(at: committedAt))
+    XCTAssertEqual(result.startedAt, compositionStartedAt)
+    XCTAssertEqual(result.elapsedDuration, 3, accuracy: 0.000_001)
+  }
+
+  @MainActor
+  func testNativeInputSignalsOnlyTheFirstMarkedUpdateOfEachComposition() {
+    let input = TypingInputView(frame: .zero)
+    var compositionStarts = 0
+    input.onCompositionStarted = { compositionStarts += 1 }
+
+    input.setMarkedText("p", selectedRange: NSRange(location: 0, length: 1), replacementRange: .init())
+    input.setMarkedText("pi", selectedRange: NSRange(location: 0, length: 2), replacementRange: .init())
+    XCTAssertEqual(compositionStarts, 1)
+
+    input.insertText("拼", replacementRange: .init())
+    input.setMarkedText("q", selectedRange: NSRange(location: 0, length: 1), replacementRange: .init())
+    XCTAssertEqual(compositionStarts, 2)
+  }
+
   func testOppositeShiftPolicyAllowsCentreKeysAndRequiresTheOtherHandElsewhere() {
     XCTAssertFalse(
       OppositeShiftPolicy.usesOppositeShift(
