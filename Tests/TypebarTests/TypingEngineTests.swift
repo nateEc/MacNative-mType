@@ -671,15 +671,25 @@ final class TypingEngineTests: XCTestCase {
       RemoteLeaderboardPage.self, from: Data(#"{"entries":[]}"#.utf8))
     let parameterAware = try JSONDecoder().decode(
       RemoteLeaderboardPage.self,
-      from: Data(#"{"entries":[],"total":0,"offset":0,"pageSize":50,"parameterFilterSupported":true}"#.utf8))
+      from: Data(#"{"entries":[],"total":0,"offset":0,"pageSize":50,"parameterFilterSupported":true,"rankMemorySupported":true}"#.utf8))
 
     XCTAssertNil(legacy.total)
     XCTAssertNil(legacy.parameterFilterSupported)
+    XCTAssertNil(legacy.rankMemorySupported)
     XCTAssertEqual(parameterAware.parameterFilterSupported, true)
+    XCTAssertEqual(parameterAware.rankMemorySupported, true)
     XCTAssertFalse(LeaderboardPaginationPolicy.isAvailable(total: legacy.total, pageSize: 50))
     XCTAssertNil(LeaderboardPaginationPolicy.pageIndex(containingRank: 101, total: legacy.total, pageSize: 50))
     XCTAssertEqual(LeaderboardPaginationPolicy.pageIndex(containingRank: 101, total: 124, pageSize: 50), 2)
     XCTAssertEqual(LeaderboardPaginationPolicy.lastPageIndex(total: 124, pageSize: 50), 2)
+  }
+
+  func testLeaderboardRankChangeUsesOnlyConfirmedPositiveRanks() {
+    XCTAssertNil(LeaderboardRankChange(previousRank: nil, currentRank: 7))
+    XCTAssertNil(LeaderboardRankChange(previousRank: 4, currentRank: 0))
+    XCTAssertEqual(LeaderboardRankChange(previousRank: 11, currentRank: 7), .improved(4))
+    XCTAssertEqual(LeaderboardRankChange(previousRank: 7, currentRank: 11), .declined(4))
+    XCTAssertEqual(LeaderboardRankChange(previousRank: 7, currentRank: 7), .unchanged)
   }
 
   func testLeaderboardParameterFilterKeepsTimeAndWordBucketsMutuallyExclusive() {

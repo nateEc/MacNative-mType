@@ -739,9 +739,11 @@ struct RemoteLeaderboardPage: Codable, Sendable {
     /// Nil means an older self-hosted service predates speed-parameter filtering.
     /// The UI must not send a filter that such a service would silently ignore.
     let parameterFilterSupported: Bool?
+    /// Nil means the service does not support account-backed rank movement.
+    let rankMemorySupported: Bool?
 
     private enum CodingKeys: String, CodingKey {
-        case entries, total, offset, pageSize, parameterFilterSupported
+        case entries, total, offset, pageSize, parameterFilterSupported, rankMemorySupported
     }
 
     init(from decoder: Decoder) throws {
@@ -752,11 +754,27 @@ struct RemoteLeaderboardPage: Codable, Sendable {
         pageSize = max(1, try values.decodeIfPresent(Int.self, forKey: .pageSize) ?? entries.count)
         parameterFilterSupported = try values.decodeIfPresent(
             Bool.self, forKey: .parameterFilterSupported)
+        rankMemorySupported = try values.decodeIfPresent(Bool.self, forKey: .rankMemorySupported)
     }
 }
 
 struct RemoteLeaderboardRankResponse: Codable, Sendable {
     let entry: RemoteLeaderboardEntry?
+}
+
+private struct RemoteLeaderboardRankMemoryRequest: Codable, Sendable {
+    let kind: String
+    let scope: String
+    let period: String
+    let mode: String?
+    let language: String?
+    let durationSeconds: Int?
+    let wordLimit: Int?
+    let rank: Int
+}
+
+private struct RemoteLeaderboardRankMemoryResponse: Codable, Sendable {
+    let previousRank: Int?
 }
 
 struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
@@ -775,8 +793,11 @@ struct RemoteExperienceLeaderboardPage: Codable, Sendable {
     let total: Int?
     let offset: Int
     let pageSize: Int
+    let rankMemorySupported: Bool?
 
-    private enum CodingKeys: String, CodingKey { case entries, period, total, offset, pageSize }
+    private enum CodingKeys: String, CodingKey {
+        case entries, period, total, offset, pageSize, rankMemorySupported
+    }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -785,6 +806,7 @@ struct RemoteExperienceLeaderboardPage: Codable, Sendable {
         total = try values.decodeIfPresent(Int.self, forKey: .total)
         offset = max(0, try values.decodeIfPresent(Int.self, forKey: .offset) ?? 0)
         pageSize = max(1, try values.decodeIfPresent(Int.self, forKey: .pageSize) ?? entries.count)
+        rankMemorySupported = try values.decodeIfPresent(Bool.self, forKey: .rankMemorySupported)
     }
 }
 
@@ -2234,6 +2256,16 @@ final class AccountSession {
         return response.entry
     }
 
+    func recordSpeedLeaderboardRankMemory(
+        rank: Int, mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        durationSeconds: Int?, wordLimit: Int?, scope: RemoteLeaderboardScope
+    ) async throws -> LeaderboardRankChange? {
+        try await recordLeaderboardRankMemory(.init(
+            kind: "speed", scope: scope.rawValue, period: period.rawValue,
+            mode: mode?.rawValue, language: language?.rawValue,
+            durationSeconds: durationSeconds, wordLimit: wordLimit, rank: rank))
+    }
+
     func experienceLeaderboardPage(
         period: RemoteExperienceLeaderboardPeriod = .week,
         scope: RemoteLeaderboardScope = .global, offset: Int = 0,
@@ -2277,6 +2309,35 @@ final class AccountSession {
         )
         try requireConfirmedExperienceLeaderboardPeriod(period, responsePeriod: response.period)
         return response.entry
+    }
+
+    func recordExperienceLeaderboardRankMemory(
+        rank: Int, period: RemoteExperienceLeaderboardPeriod, scope: RemoteLeaderboardScope
+    ) async throws -> LeaderboardRankChange? {
+        try await recordLeaderboardRankMemory(.init(
+            kind: "experience", scope: scope.rawValue, period: period.rawValue,
+            mode: nil, language: nil, durationSeconds: nil, wordLimit: nil, rank: rank))
+    }
+
+    private func recordLeaderboardRankMemory(
+        _ request: RemoteLeaderboardRankMemoryRequest
+    ) async throws -> LeaderboardRankChange? {
+        guard let user = currentUser else {
+            throw RemoteAccountError.serverMessage("请先登录自建 Typebar 服务。")
+        }
+        let requestEndpoint = endpoint
+        let expectedScope = ResultPublicationScope(endpoint: requestEndpoint, userID: user.id)
+        let token = try accessToken()
+        guard resultPublicationScope == expectedScope else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        let response = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
+            path: "v1/profiles/me/leaderboard-memory", method: "PUT", token: token,
+            body: request, response: RemoteLeaderboardRankMemoryResponse.self)
+        guard resultPublicationScope == expectedScope else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        return .init(previousRank: response.previousRank, currentRank: request.rank)
     }
 
     func publicProfile(id: UUID) async throws -> RemotePublicProfile {

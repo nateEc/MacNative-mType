@@ -220,16 +220,20 @@ public struct LeaderboardResponse: Content, Equatable {
     /// Lets newer native clients avoid sending parameter filters to an older
     /// self-hosted service that would silently ignore them.
     public let parameterFilterSupported: Bool
+    /// Lets native clients use cross-device personal rank movement only when
+    /// this service implements the matching account-scoped memory route.
+    public let rankMemorySupported: Bool
 
     public init(
         entries: [LeaderboardEntry], total: Int, offset: Int, pageSize: Int,
-        parameterFilterSupported: Bool = true
+        parameterFilterSupported: Bool = true, rankMemorySupported: Bool = true
     ) {
         self.entries = entries
         self.total = total
         self.offset = offset
         self.pageSize = pageSize
         self.parameterFilterSupported = parameterFilterSupported
+        self.rankMemorySupported = rankMemorySupported
     }
 }
 
@@ -269,16 +273,18 @@ public struct ExperienceLeaderboardResponse: Content, Equatable {
     public let total: Int
     public let offset: Int
     public let pageSize: Int
+    public let rankMemorySupported: Bool
 
     public init(
         entries: [ExperienceLeaderboardEntry], period: String, total: Int,
-        offset: Int, pageSize: Int
+        offset: Int, pageSize: Int, rankMemorySupported: Bool = true
     ) {
         self.entries = entries
         self.period = period
         self.total = total
         self.offset = offset
         self.pageSize = pageSize
+        self.rankMemorySupported = rankMemorySupported
     }
 }
 

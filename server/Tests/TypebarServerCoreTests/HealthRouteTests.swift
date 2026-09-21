@@ -65,6 +65,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["resultTimingEvidence"], .available)
         XCTAssertEqual(capabilities.capabilities["resultHistory"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboards"], .partial)
+        XCTAssertEqual(capabilities.capabilities["leaderboardRankMemory"], .available)
         XCTAssertEqual(capabilities.capabilities["profiles"], .partial)
         XCTAssertEqual(capabilities.capabilities["connections"], .partial)
         XCTAssertEqual(capabilities.capabilities["notifications"], .partial)
@@ -1954,6 +1955,119 @@ final class HealthRouteTests: XCTestCase {
       try? await app.asyncShutdown()
       throw error
     }
+  }
+
+  func testLeaderboardRankMemoryRouteReturnsPreviousRankAndIsolatesSelections() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let alice = try await store.register(
+      .init(email: "rank-alice@example.com", password: "a secure password", displayName: "Alice"))
+    let bob = try await store.register(
+      .init(email: "rank-bob@example.com", password: "a secure password", displayName: "Bob"))
+    let time15 = LeaderboardRankMemoryRequest(
+      kind: "speed", scope: "global", period: "all", mode: "time", language: "english",
+      durationSeconds: 15, rank: 11)
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(
+        .PUT, "v1/profiles/me/leaderboard-memory",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(alice.accessToken)")
+          try request.content.encode(time15)
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertNil(try response.content.decode(LeaderboardRankMemoryResponse.self).previousRank)
+        })
+      try await app.test(
+        .PUT, "v1/profiles/me/leaderboard-memory",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(alice.accessToken)")
+          try request.content.encode(LeaderboardRankMemoryRequest(
+            kind: "speed", scope: "global", period: "all", mode: "time", language: "english",
+            durationSeconds: 15, rank: 7))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(try response.content.decode(LeaderboardRankMemoryResponse.self).previousRank, 11)
+        })
+      try await app.test(
+        .PUT, "v1/profiles/me/leaderboard-memory",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(alice.accessToken)")
+          try request.content.encode(LeaderboardRankMemoryRequest(
+            kind: "speed", scope: "global", period: "all", mode: "time", language: "english",
+            durationSeconds: 30, rank: 4))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertNil(try response.content.decode(LeaderboardRankMemoryResponse.self).previousRank)
+        })
+      try await app.test(
+        .PUT, "v1/profiles/me/leaderboard-memory",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(alice.accessToken)")
+          try request.content.encode(LeaderboardRankMemoryRequest(
+            kind: "speed", scope: "friends", period: "all", mode: "time", language: "english",
+            durationSeconds: 15, rank: 8))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertNil(try response.content.decode(LeaderboardRankMemoryResponse.self).previousRank)
+        })
+      try await app.test(
+        .PUT, "v1/profiles/me/leaderboard-memory",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(bob.accessToken)")
+          try request.content.encode(LeaderboardRankMemoryRequest(
+            kind: "speed", scope: "global", period: "all", mode: "time", language: "english",
+            durationSeconds: 15, rank: 3))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertNil(try response.content.decode(LeaderboardRankMemoryResponse.self).previousRank)
+        })
+      try await app.test(
+        .PUT, "v1/profiles/me/leaderboard-memory",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "Authorization", value: "Bearer \(alice.accessToken)")
+          try request.content.encode(LeaderboardRankMemoryRequest(
+            kind: "speed", scope: "global", period: "all", mode: "time", language: "english",
+            durationSeconds: 15, wordLimit: 25, rank: 1))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .badRequest)
+        })
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
+  func testLeaderboardRankMemoryPersistsAcrossServerStoreReload() async throws {
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-rank-memory-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let request = LeaderboardRankMemoryRequest(
+      kind: "experience", scope: "global", period: "week", rank: 9)
+    let initialStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let initialSession = try await initialStore.register(
+      .init(email: "rank-reload@example.com", password: "a secure password", displayName: "Reload"))
+
+    let initialResponse = try await initialStore.recordLeaderboardRankMemory(
+      request, accessToken: initialSession.accessToken)
+    XCTAssertNil(initialResponse.previousRank)
+
+    let reloadedStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let reloadedSession = try await reloadedStore.login(
+      .init(email: "rank-reload@example.com", password: "a secure password"))
+    let response = try await reloadedStore.recordLeaderboardRankMemory(
+      .init(kind: "experience", scope: "global", period: "week", rank: 4),
+      accessToken: reloadedSession.accessToken)
+
+    XCTAssertEqual(response.previousRank, 9)
   }
 
   func testPublicProfileDetailsValidateAndControlActivityVisibility() async throws {

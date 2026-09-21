@@ -59,6 +59,7 @@ public func configure(
                 "resultTimingEvidence": .available,
                 "resultHistory": .partial,
                 "leaderboards": .partial,
+                "leaderboardRankMemory": .available,
                 "profiles": .partial,
                 "connections": .partial,
                 "notifications": .partial,
@@ -388,6 +389,19 @@ public func configure(
             )
         } catch let error as AuthStoreError {
             throw error.abort
+        }
+    }
+
+    app.put("v1", "profiles", "me", "leaderboard-memory") { request async throws -> LeaderboardRankMemoryResponse in
+        do {
+            return try await authStore.recordLeaderboardRankMemory(
+                request.content.decode(LeaderboardRankMemoryRequest.self),
+                accessToken: try request.accessToken()
+            )
+        } catch let error as AuthStoreError {
+            throw error.abort
+        } catch is ResultStoreError {
+            throw Abort(.badRequest, reason: "The leaderboard memory selection was invalid.")
         }
     }
 

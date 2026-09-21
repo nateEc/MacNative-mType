@@ -470,6 +470,7 @@ public enum AuthStoreError: Error, Equatable {
 
 public actor AuthStore {
   private static let maxNotificationsPerUser = 100
+  private static let maxLeaderboardRankMemoriesPerUser = 500
 
   /// Community quotes accept the client-facing single-language choices except
   /// Swiss German. Result and leaderboard requests additionally accept Swiss
@@ -589,6 +590,7 @@ public actor AuthStore {
     var reauthenticationTokens: [StoredReauthenticationToken] = []
     var syncRecords: [StoredSyncRecord] = []
     var results: [StoredResult] = []
+    var leaderboardRankMemories: [StoredLeaderboardRankMemory] = []
     var connections: [StoredConnection] = []
     var blockedUserIDs: [UUID: [UUID]] = [:]
     var streakDayBoundaryOffsets: [UUID: Double] = [:]
@@ -603,7 +605,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
+      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
         nextSyncCursor
     }
@@ -628,6 +630,8 @@ public actor AuthStore {
         try values.decodeIfPresent([StoredReauthenticationToken].self, forKey: .reauthenticationTokens) ?? []
       syncRecords = try values.decodeIfPresent([StoredSyncRecord].self, forKey: .syncRecords) ?? []
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
+      leaderboardRankMemories = try values.decodeIfPresent(
+        [StoredLeaderboardRankMemory].self, forKey: .leaderboardRankMemories) ?? []
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
       blockedUserIDs =
         try values.decodeIfPresent([UUID: [UUID]].self, forKey: .blockedUserIDs) ?? [:]
@@ -701,6 +705,46 @@ public actor AuthStore {
       profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
       selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
       startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
+    }
+  }
+
+  /// Account-scoped state for a leaderboard view. The stored record contains
+  /// only filter identifiers and one ordinal rank, making it safe to persist
+  /// independently of results, authentication tokens, and public profiles.
+  private struct StoredLeaderboardRankMemory: Codable {
+    let userID: UUID
+    let kind: String
+    let scope: String
+    let period: String
+    let mode: String?
+    let language: String?
+    let durationSeconds: Int?
+    let wordLimit: Int?
+    var rank: Int
+    var updatedAt: Date
+
+    init(userID: UUID, request: LeaderboardRankMemoryRequest, updatedAt: Date) {
+      self.userID = userID
+      kind = request.kind
+      scope = request.scope
+      period = request.period
+      mode = request.mode
+      language = request.language
+      durationSeconds = request.durationSeconds
+      wordLimit = request.wordLimit
+      rank = request.rank
+      self.updatedAt = updatedAt
+    }
+
+    func matches(userID: UUID, request: LeaderboardRankMemoryRequest) -> Bool {
+      self.userID == userID
+        && kind == request.kind
+        && scope == request.scope
+        && period == request.period
+        && mode == request.mode
+        && language == request.language
+        && durationSeconds == request.durationSeconds
+        && wordLimit == request.wordLimit
     }
   }
 
@@ -1786,6 +1830,7 @@ public actor AuthStore {
     state.reauthenticationTokens.removeAll { $0.userID == userID }
     state.syncRecords.removeAll { $0.userID == userID }
     state.results.removeAll { $0.userID == userID }
+    state.leaderboardRankMemories.removeAll { $0.userID == userID }
     state.connections.removeAll { $0.requesterID == userID || $0.recipientID == userID }
     state.quoteSubmissions.removeAll { $0.userID == userID }
     state.quoteRatings.removeAll { $0.userID == userID || removedQuoteIDs.contains($0.quoteID) }
@@ -1832,6 +1877,7 @@ public actor AuthStore {
     state.developerAccessKeys.removeAll { $0.userID == user.id }
     state.syncRecords.removeAll { $0.userID == user.id }
     state.results.removeAll { $0.userID == user.id }
+    state.leaderboardRankMemories.removeAll { $0.userID == user.id }
     state.notifications.removeAll { $0.recipientID == user.id }
     state.personalBestResetDates.removeValue(forKey: user.id)
     try persist()
@@ -1859,6 +1905,41 @@ public actor AuthStore {
     state.users[index] = updatedUser
     try persist()
     return userResponse(for: updatedUser)
+  }
+
+  /// Atomically returns the previous rank and records the current rank for one
+  /// authenticated account and exact leaderboard filter. This allows clients on
+  /// different devices to show rank movement without exposing the memory in
+  /// public profiles or trusting a local cache.
+  public func recordLeaderboardRankMemory(
+    _ request: LeaderboardRankMemoryRequest, accessToken: String, now: Date = .now
+  ) throws -> LeaderboardRankMemoryResponse {
+    let user = try authenticatedUser(for: accessToken, now: now)
+    try validate(leaderboardRankMemory: request, now: now)
+
+    if let index = state.leaderboardRankMemories.firstIndex(where: {
+      $0.matches(userID: user.id, request: request)
+    }) {
+      let previousRank = state.leaderboardRankMemories[index].rank
+      state.leaderboardRankMemories[index].rank = request.rank
+      state.leaderboardRankMemories[index].updatedAt = now
+      try persist()
+      return .init(previousRank: previousRank)
+    }
+
+    let userMemoryIndices = state.leaderboardRankMemories.indices.filter {
+      state.leaderboardRankMemories[$0].userID == user.id
+    }
+    if userMemoryIndices.count >= Self.maxLeaderboardRankMemoriesPerUser,
+      let oldestIndex = userMemoryIndices.min(by: {
+        state.leaderboardRankMemories[$0].updatedAt < state.leaderboardRankMemories[$1].updatedAt
+      })
+    {
+      state.leaderboardRankMemories.remove(at: oldestIndex)
+    }
+    state.leaderboardRankMemories.append(.init(userID: user.id, request: request, updatedAt: now))
+    try persist()
+    return .init(previousRank: nil)
   }
 
   public func setStreakDayBoundary(
@@ -3164,6 +3245,26 @@ public actor AuthStore {
         mode: result.mode, language: result.language, wpm: result.wpm,
         accuracy: result.accuracy, consistency: result.consistency, finishedAt: result.finishedAt,
         selectedBadge: selectedPublicBadge(for: user), discordAvatar: publicDiscordAvatar(for: user))
+    }
+  }
+
+  private func validate(leaderboardRankMemory request: LeaderboardRankMemoryRequest, now: Date) throws {
+    guard Set(["global", "friends"]).contains(request.scope), (1...1_000_000).contains(request.rank)
+    else { throw ResultStoreError.invalidResult }
+
+    switch request.kind {
+    case "speed":
+      _ = try leaderboardEntries(
+        .init(
+          mode: request.mode, language: request.language, period: request.period,
+          durationSeconds: request.durationSeconds, wordLimit: request.wordLimit),
+        eligibleUserIDs: nil, now: now)
+    case "experience":
+      guard request.mode == nil, request.language == nil, request.durationSeconds == nil,
+        request.wordLimit == nil, Set(["week", "lastWeek"]).contains(request.period)
+      else { throw ResultStoreError.invalidResult }
+    default:
+      throw ResultStoreError.invalidResult
     }
   }
 

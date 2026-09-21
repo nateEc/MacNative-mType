@@ -22,6 +22,7 @@ struct CloudSyncView: View {
     @State private var isLoadingLeaderboard = false
     @State private var leaderboardMessage: String?
     @State private var leaderboardRank: RemoteLeaderboardEntry?
+    @State private var leaderboardRankChange: LeaderboardRankChange?
     @State private var loadedLeaderboardRank = false
     @State private var leaderboardPage: RemoteLeaderboardPage?
     @State private var leaderboardPageIndex = 0
@@ -37,6 +38,7 @@ struct CloudSyncView: View {
     @State private var isLoadingExperience = false
     @State private var experienceMessage: String?
     @State private var experienceRank: RemoteExperienceLeaderboardEntry?
+    @State private var experienceRankChange: LeaderboardRankChange?
     @State private var loadedExperienceRank = false
     @State private var experienceLeaderboardPage: RemoteExperienceLeaderboardPage?
     @State private var experiencePageIndex = 0
@@ -187,10 +189,15 @@ struct CloudSyncView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else if let leaderboardRank {
-                            Label(
-                                "你的排名 #\(leaderboardRank.rank) · \(leaderboardRank.wpm) WPM",
-                                systemImage: "person.fill")
-                                .font(.caption.weight(.medium))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Label(
+                                    "你的排名 #\(leaderboardRank.rank) · \(leaderboardRank.wpm) WPM",
+                                    systemImage: "person.fill")
+                                    .font(.caption.weight(.medium))
+                                if let leaderboardRankChange {
+                                    LeaderboardRankChangeLabel(change: leaderboardRankChange)
+                                }
+                            }
                         } else if loadedLeaderboardRank {
                             Text("当前筛选没有你的有效成绩。")
                                 .font(.caption)
@@ -264,10 +271,15 @@ struct CloudSyncView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else if let experienceRank {
-                            Label(
-                                "你的\(experiencePeriod.displayName) XP 排名 #\(experienceRank.rank) · \(experienceRank.totalExperience) XP",
-                                systemImage: "person.fill")
-                                .font(.caption.weight(.medium))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Label(
+                                    "你的\(experiencePeriod.displayName) XP 排名 #\(experienceRank.rank) · \(experienceRank.totalExperience) XP",
+                                    systemImage: "person.fill")
+                                    .font(.caption.weight(.medium))
+                                if let experienceRankChange {
+                                    LeaderboardRankChangeLabel(change: experienceRankChange)
+                                }
+                            }
                         } else if loadedExperienceRank {
                             Text("\(experiencePeriod.displayName)还没有你的有效 XP 成绩。")
                                 .font(.caption)
@@ -324,6 +336,10 @@ struct CloudSyncView: View {
         }
         .task(id: account.resultPublicationScope) {
             reloadConflictAudit()
+        }
+        .onChange(of: account.resultPublicationScope) { _, _ in
+            resetLeaderboardPagination()
+            resetExperiencePagination()
         }
         .onChange(of: leaderboardScope) { _, _ in resetLeaderboardPagination() }
         .onChange(of: leaderboardMode) { _, _ in resetLeaderboardPagination() }
@@ -426,6 +442,7 @@ struct CloudSyncView: View {
         requestedLeaderboardPage = 1
         leaderboardMessage = nil
         leaderboardRank = nil
+        leaderboardRankChange = nil
         loadedLeaderboardRank = false
     }
 
@@ -450,6 +467,11 @@ struct CloudSyncView: View {
         let normalizedPageIndex = max(0, pageIndex)
         let requestGeneration = leaderboardRequestGeneration
         let parameterFilter = leaderboardParameterFilter
+        let selection = RemoteLeaderboardSelection(
+            mode: leaderboardMode, language: leaderboardLanguage, period: leaderboardPeriod,
+            durationSeconds: parameterFilter.durationSeconds, wordLimit: parameterFilter.wordLimit)
+        let scope = leaderboardScope
+        let accountScope = account.resultPublicationScope
         leaderboardPageIndex = normalizedPageIndex
         requestedLeaderboardPage = normalizedPageIndex + 1
         Task {
@@ -461,12 +483,14 @@ struct CloudSyncView: View {
             }
             do {
                 let page = try await account.leaderboardPage(
-                    mode: leaderboardMode, language: leaderboardLanguage,
-                    period: leaderboardPeriod, durationSeconds: parameterFilter.durationSeconds,
-                    wordLimit: parameterFilter.wordLimit, scope: leaderboardScope,
+                    mode: selection.mode, language: selection.language,
+                    period: selection.period, durationSeconds: selection.durationSeconds,
+                    wordLimit: selection.wordLimit, scope: scope,
                     offset: normalizedPageIndex * LeaderboardPaginationPolicy.preferredPageSize,
                     limit: LeaderboardPaginationPolicy.preferredPageSize)
-                guard requestGeneration == leaderboardRequestGeneration else { return }
+                guard requestGeneration == leaderboardRequestGeneration,
+                    account.resultPublicationScope == accountScope
+                else { return }
                 if page.parameterFilterSupported == true {
                     let discoveredCapability = !leaderboardSupportsParameterFilter
                     leaderboardSupportsParameterFilter = true
@@ -483,15 +507,28 @@ struct CloudSyncView: View {
                 leaderboard = page.entries
                 leaderboardPage = page
                 leaderboardRank = nil
+                leaderboardRankChange = nil
                 loadedLeaderboardRank = false
                 if let user = account.currentUser, !user.leaderboardOptedOut {
                     do {
-                        leaderboardRank = try await account.leaderboardRank(
-                            mode: leaderboardMode, language: leaderboardLanguage,
-                            period: leaderboardPeriod, durationSeconds: parameterFilter.durationSeconds,
-                            wordLimit: parameterFilter.wordLimit, scope: leaderboardScope)
-                        guard requestGeneration == leaderboardRequestGeneration else { return }
+                        let rank = try await account.leaderboardRank(
+                            mode: selection.mode, language: selection.language,
+                            period: selection.period, durationSeconds: selection.durationSeconds,
+                            wordLimit: selection.wordLimit, scope: scope)
+                        guard requestGeneration == leaderboardRequestGeneration,
+                            account.resultPublicationScope == accountScope
+                        else { return }
+                        leaderboardRank = rank
                         loadedLeaderboardRank = true
+                        if let rank, page.rankMemorySupported == true {
+                            leaderboardRankChange = try? await account.recordSpeedLeaderboardRankMemory(
+                                rank: rank.rank, mode: selection.mode, language: selection.language,
+                                period: selection.period, durationSeconds: selection.durationSeconds,
+                                wordLimit: selection.wordLimit, scope: scope)
+                            guard requestGeneration == leaderboardRequestGeneration,
+                                account.resultPublicationScope == accountScope
+                            else { return }
+                        }
                     } catch {
                         // Older self-hosted servers may not have the rank route yet.
                     }
@@ -513,6 +550,7 @@ struct CloudSyncView: View {
                 leaderboard = []
                 leaderboardPage = nil
                 leaderboardRank = nil
+                leaderboardRankChange = nil
                 loadedLeaderboardRank = false
                 leaderboardMessage = error.localizedDescription
             }
@@ -538,6 +576,7 @@ struct CloudSyncView: View {
         requestedExperiencePage = 1
         experienceMessage = nil
         experienceRank = nil
+        experienceRankChange = nil
         loadedExperienceRank = false
     }
 
@@ -549,6 +588,9 @@ struct CloudSyncView: View {
         guard !isLoadingExperience else { return }
         let normalizedPageIndex = max(0, pageIndex)
         let requestGeneration = experienceRequestGeneration
+        let period = experiencePeriod
+        let scope = experienceScope
+        let accountScope = account.resultPublicationScope
         experiencePageIndex = normalizedPageIndex
         requestedExperiencePage = normalizedPageIndex + 1
         Task {
@@ -556,20 +598,33 @@ struct CloudSyncView: View {
             defer { isLoadingExperience = false }
             do {
                 let page = try await account.experienceLeaderboardPage(
-                    period: experiencePeriod, scope: experienceScope,
+                    period: period, scope: scope,
                     offset: normalizedPageIndex * LeaderboardPaginationPolicy.preferredPageSize,
                     limit: LeaderboardPaginationPolicy.preferredPageSize)
-                guard requestGeneration == experienceRequestGeneration else { return }
+                guard requestGeneration == experienceRequestGeneration,
+                    account.resultPublicationScope == accountScope
+                else { return }
                 experienceLeaderboard = page.entries
                 experienceLeaderboardPage = page
                 experienceRank = nil
+                experienceRankChange = nil
                 loadedExperienceRank = false
                 if let user = account.currentUser, !user.leaderboardOptedOut {
                     do {
-                        experienceRank = try await account.experienceLeaderboardRank(
-                            period: experiencePeriod, scope: experienceScope)
-                        guard requestGeneration == experienceRequestGeneration else { return }
+                        let rank = try await account.experienceLeaderboardRank(
+                            period: period, scope: scope)
+                        guard requestGeneration == experienceRequestGeneration,
+                            account.resultPublicationScope == accountScope
+                        else { return }
+                        experienceRank = rank
                         loadedExperienceRank = true
+                        if let rank, page.rankMemorySupported == true {
+                            experienceRankChange = try? await account.recordExperienceLeaderboardRankMemory(
+                                rank: rank.rank, period: period, scope: scope)
+                            guard requestGeneration == experienceRequestGeneration,
+                                account.resultPublicationScope == accountScope
+                            else { return }
+                        }
                     } catch {
                         // Older self-hosted servers may not have the rank route yet.
                     }
@@ -588,6 +643,7 @@ struct CloudSyncView: View {
                 experienceLeaderboard = []
                 experienceLeaderboardPage = nil
                 experienceRank = nil
+                experienceRankChange = nil
                 loadedExperienceRank = false
                 experienceMessage = error.localizedDescription
             }
@@ -609,6 +665,16 @@ struct CloudSyncView: View {
             presets: namedPresets,
             savedTexts: namedSavedTexts,
             activeTestSelection: settings.activeTestSelection)
+    }
+}
+
+private struct LeaderboardRankChangeLabel: View {
+    let change: LeaderboardRankChange
+
+    var body: some View {
+        Label(change.displayName, systemImage: change.systemImage)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
     }
 }
 
