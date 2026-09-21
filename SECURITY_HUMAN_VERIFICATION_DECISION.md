@@ -12,7 +12,7 @@ Typebar 将实现一个**可选部署、配置后强制执行**的 Cloudflare Tu
 
 | 类型 | 内容 |
 | --- | --- |
-| 已知事实 | 官方固定参考在创建账号、找回密码请求、用户举报、引语投稿和引语举报中提交验证码 token，并在服务器侧验证。 |
+| 已知事实 | 官方固定参考在密码创建账号、Google OAuth 首次补名创建账号、找回密码请求、用户举报、引语投稿和引语举报中提交验证码 token，并在服务器侧验证。 |
 | 已知事实 | Typebar 已有 `ASWebAuthenticationSession`，并在 OAuth 中严格校验 `typebar://oauth/callback` 的 scheme、host、path 与 state。 |
 | 已知事实 | Typebar 当前限速是进程内固定窗口；重启会清空，且不会验证人机证明。 |
 | 设计约束 | 不持久化原始证明或第三方 token；不把私密密钥给 macOS；不改变未配置服务的既有注册／本地开发可用性。 |
@@ -47,7 +47,7 @@ macOS                    Typebar service                   Turnstile
 - `HumanVerificationChallenge`：状态 `pending → verified → consumed`，5 分钟有效；验证成功后的 callback proof 只能消费一次。
 - `POST /v1/human-verification/challenges` 只在提供方已配置时创建；响应返回**相对**挑战路径，客户端以当前服务 endpoint 解析，避免服务端猜测反向代理的公网 URL。
 - `GET …/web` 仅提供 Typebar 自写的最小 HTML 容器；`POST …/complete` 在服务端请求 Turnstile `siteverify`，检查 `success`、固定 action、cData 与配置的 hostname，随后才重定向到固定 `typebar://human-verification/callback`。
-- 受保护写接口把 proof 作为请求体字段传给服务端；服务端在执行写入前、同一 actor 临界区中消费它。OAuth 身份绑定、会话、密码重置完成和普通读取不在此范围内。
+- 受保护写接口把 proof 作为请求体字段传给服务端；服务端在执行写入前、同一 actor 临界区中消费它。密码注册和 OAuth 新用户注册同属 `registration` 用途；OAuth 身份绑定、已有账户登录、会话、密码重置完成和普通读取不在此范围内。
 
 ## 对抗性审查
 
@@ -55,7 +55,7 @@ macOS                    Typebar service                   Turnstile
 
 **反例：** 自动化客户端跳过 macOS 页面，或两条并发写请求复用同一已完成 token。
 
-**证据：** 当前注册、重置请求、资料举报、引语投稿与举报路由各自直接调用 store；仅客户端显示控件无法保护路由。
+**证据：** 当前密码注册、OAuth 新用户注册、重置请求、资料举报、引语投稿与举报路由各自直接调用 store；仅客户端显示控件无法保护路由。
 
 **处理：** 把 proof 消费放进服务端 actor、在业务写入之前执行，并按 purpose 比较。记录从 `verified` 原子转为 `consumed`；第二次、过期或用途不符均为拒绝。分类：**可行动缺陷，纳入实现和并发测试。**
 
@@ -73,7 +73,7 @@ macOS                    Typebar service                   Turnstile
 
 **证据：** Typebar 已用 capabilities 表达可选邮件和 OAuth 配置，原生客户端也要兼容旧服务。
 
-**处理：** 配置必须成对且 hostname 列表有效；不完整配置使服务启动失败。完整配置时 capabilities 将人机验证标为可用，并对五种用途 fail closed。完全未配置时能力如实为计划中，写路由保留当前契约；原生客户端只在能力为可用时启动挑战。分类：**接受的兼容性权衡。** 它让本地／既有自建服务不突然失效，但生产部署必须显式配置才能获得官方同等的额外防滥用层。
+**处理：** 配置必须成对且 hostname 列表有效；不完整配置使服务启动失败。完整配置时 capabilities 将人机验证标为可用，并对五种用途、六条具体写入路径 fail closed。完全未配置时能力如实为计划中，写路由保留当前契约；原生客户端只在能力为可用时启动挑战。分类：**接受的兼容性权衡。** 它让本地／既有自建服务不突然失效，但生产部署必须显式配置才能获得官方同等的额外防滥用层。
 
 ### 4. 内存状态、重启与隐私
 
@@ -86,10 +86,11 @@ macOS                    Typebar service                   Turnstile
 ## 实现与验收记录
 
 1. 已实现 `HumanVerificationController`、Turnstile Siteverify 适配、服务托管的最小挑战页与固定 callback；配置由三项环境变量共同决定，局部配置会在启动时失败。
-2. 已为注册、密码重置请求、资料举报、引语投稿和引语举报编写服务端覆盖：缺 proof 拒绝、正确用途可写、重放拒绝；另有用途替换、到期、hostname 不符、配置不完整与 provider 故障的拒绝测试。测试通过注入 Siteverify 结果，不向 Cloudflare 发送请求。
+2. 已为密码注册、OAuth 新用户注册、密码重置请求、资料举报、引语投稿和引语举报编写服务端覆盖：缺 proof 拒绝、正确用途可写、重放拒绝；另有用途替换、到期、hostname 不符、配置不完整与 provider 故障的拒绝测试。OAuth 路由的缺 proof 拒绝后保留注册 transaction，验证成功后可完成，防止验证门禁本身消耗用户可重试状态。测试通过注入 Siteverify 结果，不向 Cloudflare 发送请求。
 3. 已实现原生能力协商、仅 HTTPS endpoint 的相对挑战路径解析、固定 callback 三元组校验和各受保护请求的 proof 携带。旧服务或能力缺失时不会调用新路由。
 4. 自动化验收必须以单个串行会话完成服务端完整套件与原生完整套件，且不得启动 GUI。真实部署仍须由部署者使用自己的 Turnstile 密钥和 HTTPS hostname 手工验证一次；配置说明只列环境变量和失败语义，绝不提交真实密钥。
 5. 后续代码风险复核确认网页回调必须按浏览器的 URL 编码表单格式验收，服务端用该格式完成端到端测试；同时修正固定窗口限流桶未回收的问题。每个桶现在携带到期时间，只在最早到期时清理失效状态；注册、重置与人机验证入口的配额本身不变。
+6. 固定参考源码复核确认 `GoogleSignUpModal` 在调用 `Ape.users.create` 前要求 captcha；因此 Typebar 的 OAuth 新用户注册不能因其统一提供方流程而绕开既有 `registration` proof。完整服务端 108 项与原生 651 项串行套件均已通过，且未启动 GUI。
 
 ## 残余风险
 

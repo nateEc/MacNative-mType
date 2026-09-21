@@ -4901,6 +4901,52 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(linked.user?.authenticationMethods, [.github, .google])
   }
 
+  func testConfiguredHumanVerificationRejectsOAuthRegistrationWithoutProof() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let humanVerification = HumanVerificationController(
+      configuration: .init(siteKey: "test-site-key", allowedHostnames: ["typebar.test"]),
+      verify: { _, _, _ in true })
+    let start = Date.now
+    let transaction = try await store.beginOAuth(provider: .google, purpose: .signIn, now: start)
+    _ = try await store.beginOAuthCallback(
+      provider: .google, stateToken: transaction.state, now: start)
+    try await store.completeOAuthCallback(
+      stateToken: transaction.state,
+      identity: .init(
+        provider: .google, subject: "human-verification-oauth", email: "oauth-proof@example.com"),
+      now: start)
+    _ = try await store.oauthCompletion(stateToken: transaction.state, now: start)
+
+    do {
+      try configure(app, authStore: store, humanVerification: humanVerification)
+      try await app.test(.POST, "v1/auth/oauth/registration", beforeRequest: { request in
+        try request.content.encode(
+          OAuthRegistrationRequest(state: transaction.state, displayName: "OAuth Proof"))
+      }) { response async in
+        XCTAssertEqual(response.status, .unprocessableEntity)
+      }
+      let challenge = await humanVerification.start(.init(purpose: .registration))
+      let callback = try await humanVerification.complete(
+        challengeID: challenge.id,
+        request: .init(token: "oauth-registration-provider-token"))
+      let proof = try HumanVerificationProof(callbackURL: callback)
+      try await app.test(.POST, "v1/auth/oauth/registration", beforeRequest: { request in
+        try request.content.encode(
+          OAuthRegistrationRequest(
+            state: transaction.state, displayName: "OAuth Proof", humanVerification: proof))
+      }) { response async in
+        XCTAssertEqual(response.status, .ok)
+        let session = try? response.content.decode(AuthSessionResponse.self)
+        XCTAssertEqual(session?.user.authenticationMethods, [.google])
+      }
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testOAuthProviderAuthorizationURLsUseMinimalScopesAndPKCE() throws {
     let githubRedirect = try XCTUnwrap(
       URL(string: "https://typebar.example.com/v1/auth/oauth/github/callback"))

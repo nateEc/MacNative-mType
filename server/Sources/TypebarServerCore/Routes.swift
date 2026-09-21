@@ -284,6 +284,9 @@ public func configure(
     app.post("v1", "auth", "oauth", "registration") { request async throws -> AuthSessionResponse in
         do {
             let registration = try request.content.decode(OAuthRegistrationRequest.self)
+            if let humanVerification {
+                try await humanVerification.consume(registration.humanVerification, for: .registration)
+            }
             return try await authStore.completeOAuthRegistration(
                 stateToken: registration.state, displayName: registration.displayName)
         } catch let error as AuthStoreError {

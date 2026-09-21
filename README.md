@@ -36,6 +36,10 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 
 密码重置与邮箱验证由部署者显式配置的 HTTPS webhook 投递，不绑定特定邮件服务。设置 `TYPEBAR_PASSWORD_RESET_WEBHOOK_URL` 后，密码重置会继续向该地址 `POST` JSON 的 `email`、`token` 和 ISO 8601 `expiresAt`；邮箱验证在相同字段外额外带 `kind: "emailVerification"`，以兼容既有的重置收件端。可选的 `TYPEBAR_PASSWORD_RESET_WEBHOOK_TOKEN` 会以 Bearer 令牌放入请求头。webhook 必须为带 `kind` 的事件生成验证邮件，且切勿记录或转发一次性码。未配置 webhook 时，能力端点会标为计划中，重置或验证请求会返回明确的 `503`，不会伪称邮件已发出。
 
+### 配置外部人机验证
+
+可选的 Cloudflare Turnstile 防滥用层必须同时设置 `TYPEBAR_TURNSTILE_SITE_KEY`、`TYPEBAR_TURNSTILE_SECRET` 和 `TYPEBAR_TURNSTILE_ALLOWED_HOSTNAMES`；仅设置其中一部分会拒绝服务启动。完整配置后，密码注册、OAuth 新用户注册、密码重置请求、资料举报、引语投稿和引语举报都必须先完成系统授权窗口中的一次性验证。客户端和服务端从不持久化 proof 或 Turnstile token；挑战状态仅在单个服务进程的内存中存在，所以真实 HTTPS 部署验收与多副本前的共享原子 TTL 存储仍由部署者负责。
+
 ### 配置第三方登录
 
 自建服务可按标准授权码流程接入 GitHub、Google 或 Discord。每个提供商都必须同时设置客户端 ID、客户端密钥和精确的回调地址：`TYPEBAR_GITHUB_OAUTH_CLIENT_ID`、`TYPEBAR_GITHUB_OAUTH_CLIENT_SECRET`、`TYPEBAR_GITHUB_OAUTH_REDIRECT_URL`，或相应的 `TYPEBAR_GOOGLE_OAUTH_*` / `TYPEBAR_DISCORD_OAUTH_*` 三项。回调地址必须是 HTTPS（本机 `localhost`、`127.0.0.1` 或 `::1` 可使用 HTTP），不能带查询参数、片段或用户信息。服务端会使用 PKCE、一次性且仅保存哈希的短期 state，并只接受已验证的提供商邮箱；Discord 仅请求 `identify email`。提供商访问令牌不会保存或写入日志。尚未配置的提供商会在能力端点显示为“计划中”。原生账户设置会通过 macOS 系统授权窗口调用这套流程，并以 `typebar://oauth/callback` 接收回调。Discord 头像仅在用户已关联 Discord 且主动开启公开资料开关时，以受格式校验的公开 ID 与头像哈希构成 CDN 请求；未开启时不会从公开资料接口返回 Discord 关联。

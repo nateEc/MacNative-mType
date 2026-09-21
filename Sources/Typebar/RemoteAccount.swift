@@ -234,9 +234,30 @@ private struct RemoteOAuthCompletionResponse: Codable, Sendable {
     let message: String?
 }
 
-private struct RemoteOAuthRegistrationRequest: Codable, Sendable {
+private struct RemoteOAuthRegistrationRequest: Encodable, Sendable {
     let state: String
     let displayName: String
+    let humanVerification: RemoteHumanVerificationProof?
+
+    init(
+        state: String, displayName: String,
+        humanVerification: RemoteHumanVerificationProof? = nil
+    ) {
+        self.state = state
+        self.displayName = displayName
+        self.humanVerification = humanVerification
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case state, displayName, humanVerification
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(state, forKey: .state)
+        try values.encode(displayName, forKey: .displayName)
+        try values.encodeIfPresent(humanVerification, forKey: .humanVerification)
+    }
 }
 
 struct PendingRemoteOAuthRegistration: Equatable, Sendable {
@@ -1517,13 +1538,22 @@ final class AccountSession {
         isWorking = true
         defer { isWorking = false }
         do {
-            let session = try await RemoteAccountAPI(endpoint: endpoint).request(
+            let requestEndpoint = endpoint
+            let proof = try await humanVerificationProof(
+                for: .registration, endpoint: requestEndpoint)
+            guard endpoint == requestEndpoint, pendingOAuthRegistration == pending else {
+                throw RemoteAccountError.accountScopeChanged
+            }
+            let session = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                 path: "v1/auth/oauth/registration",
                 method: "POST",
                 token: nil,
-                body: RemoteOAuthRegistrationRequest(state: pending.state, displayName: normalizedDisplayName),
+                body: RemoteOAuthRegistrationRequest(
+                    state: pending.state, displayName: normalizedDisplayName,
+                    humanVerification: proof),
                 response: RemoteAuthSession.self
             )
+            guard endpoint == requestEndpoint else { throw RemoteAccountError.accountScopeChanged }
             try applyAuthenticatedSession(session)
             statusMessage = "已使用 \(pending.provider.displayName) 登录。"
             return true

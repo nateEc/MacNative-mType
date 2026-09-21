@@ -350,6 +350,15 @@ public struct OAuthStartResponse: Content, Equatable {
 public struct OAuthRegistrationRequest: Content, Equatable {
   public let state: String
   public let displayName: String
+  public let humanVerification: HumanVerificationProof?
+
+  public init(
+    state: String, displayName: String, humanVerification: HumanVerificationProof? = nil
+  ) {
+    self.state = state
+    self.displayName = displayName
+    self.humanVerification = humanVerification
+  }
 }
 
 /// A verified identity returned by a configured OAuth provider. It deliberately
