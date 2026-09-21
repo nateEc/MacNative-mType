@@ -98,6 +98,9 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     let displayName: String
     let totalExperience: Int
     let leaderboardOptedOut: Bool
+    /// Deployment-controlled shared-leaderboard state. It is returned only
+    /// to the account owner and defaults safely for older self-hosted servers.
+    let leaderboardRestricted: Bool
     let profileDetails: RemoteProfileDetails
     let authenticationMethods: [RemoteAuthenticationMethod]
     let availableBadges: [RemotePublicProfileBadge]
@@ -106,7 +109,8 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     let personalBestResetAt: Date?
 
     private enum CodingKeys: String, CodingKey {
-        case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut, profileDetails,
+        case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut,
+            leaderboardRestricted, profileDetails,
             authenticationMethods, availableBadges, selectedBadgeID, streakDayBoundaryOffsetHours,
             personalBestResetAt
     }
@@ -118,6 +122,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         displayName: String,
         totalExperience: Int,
         leaderboardOptedOut: Bool = false,
+        leaderboardRestricted: Bool = false,
         profileDetails: RemoteProfileDetails = .init(),
         authenticationMethods: [RemoteAuthenticationMethod] = [.password],
         availableBadges: [RemotePublicProfileBadge] = [], selectedBadgeID: String? = nil,
@@ -129,6 +134,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         self.displayName = displayName
         self.totalExperience = totalExperience
         self.leaderboardOptedOut = leaderboardOptedOut
+        self.leaderboardRestricted = leaderboardRestricted
         self.profileDetails = profileDetails
         self.authenticationMethods = authenticationMethods
         self.availableBadges = availableBadges
@@ -145,6 +151,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         displayName = try values.decode(String.self, forKey: .displayName)
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         leaderboardOptedOut = try values.decodeIfPresent(Bool.self, forKey: .leaderboardOptedOut) ?? false
+        leaderboardRestricted = try values.decodeIfPresent(Bool.self, forKey: .leaderboardRestricted) ?? false
         profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
         authenticationMethods = try values.decodeIfPresent([RemoteAuthenticationMethod].self, forKey: .authenticationMethods) ?? [.password]
         availableBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .availableBadges) ?? []
@@ -767,6 +774,32 @@ struct RemoteLeaderboardEligibility: Codable, Equatable, Sendable {
     let isEligible: Bool
     let completedPracticeSeconds: Int
     let minimumPracticeSeconds: Int
+    let isLeaderboardRestricted: Bool
+
+    init(
+        isEligible: Bool,
+        completedPracticeSeconds: Int,
+        minimumPracticeSeconds: Int,
+        isLeaderboardRestricted: Bool = false
+    ) {
+        self.isEligible = isEligible
+        self.completedPracticeSeconds = completedPracticeSeconds
+        self.minimumPracticeSeconds = minimumPracticeSeconds
+        self.isLeaderboardRestricted = isLeaderboardRestricted
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case isEligible, completedPracticeSeconds, minimumPracticeSeconds, isLeaderboardRestricted
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        isEligible = try values.decode(Bool.self, forKey: .isEligible)
+        completedPracticeSeconds = try values.decode(Int.self, forKey: .completedPracticeSeconds)
+        minimumPracticeSeconds = try values.decode(Int.self, forKey: .minimumPracticeSeconds)
+        isLeaderboardRestricted = try values.decodeIfPresent(
+            Bool.self, forKey: .isLeaderboardRestricted) ?? false
+    }
 }
 
 private struct RemoteLeaderboardRankMemoryRequest: Codable, Sendable {
@@ -974,14 +1007,38 @@ enum RemoteProfileModerationStatus: String, CaseIterable, Codable, Identifiable,
 struct RemoteModerationProfileReport: Codable, Identifiable, Sendable {
     let id: UUID
     let profile: RemotePublicProfile
+    /// Older deployments only return review state, so omission means no
+    /// deployment restriction is known for that profile.
+    let isLeaderboardRestricted: Bool
     let reason: RemoteProfileReportReason
     let note: String?
     let status: RemoteProfileModerationStatus
     let submittedAt: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case id, profile, isLeaderboardRestricted, reason, note, status, submittedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        profile = try values.decode(RemotePublicProfile.self, forKey: .profile)
+        isLeaderboardRestricted = try values.decodeIfPresent(
+            Bool.self, forKey: .isLeaderboardRestricted) ?? false
+        reason = try values.decode(RemoteProfileReportReason.self, forKey: .reason)
+        note = try values.decodeIfPresent(String.self, forKey: .note)
+        status = try values.decode(RemoteProfileModerationStatus.self, forKey: .status)
+        submittedAt = try values.decode(Date.self, forKey: .submittedAt)
+    }
 }
 
 private struct RemoteModerationProfileReportListResponse: Codable, Sendable { let reports: [RemoteModerationProfileReport] }
 private struct RemoteProfileReportModerationRequest: Codable, Sendable { let status: RemoteProfileModerationStatus }
+private struct RemoteLeaderboardRestrictionRequest: Codable, Sendable { let isRestricted: Bool }
+private struct RemoteLeaderboardRestrictionResponse: Codable, Sendable {
+    let userID: UUID
+    let isRestricted: Bool
+}
 
 private struct RemoteProfileReportRequest: Codable, Sendable {
     let profileID: UUID
@@ -1828,6 +1885,7 @@ final class AccountSession {
                 id: user.id, email: user.email, emailVerified: user.emailVerified,
                 displayName: user.displayName, totalExperience: 0,
                 leaderboardOptedOut: user.leaderboardOptedOut,
+                leaderboardRestricted: user.leaderboardRestricted,
                 profileDetails: user.profileDetails,
                 authenticationMethods: user.authenticationMethods,
                 streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
@@ -1865,6 +1923,7 @@ final class AccountSession {
                 id: user.id, email: user.email, emailVerified: user.emailVerified,
                 displayName: user.displayName, totalExperience: user.totalExperience,
                 leaderboardOptedOut: user.leaderboardOptedOut,
+                leaderboardRestricted: user.leaderboardRestricted,
                 profileDetails: user.profileDetails,
                 authenticationMethods: user.authenticationMethods,
                 availableBadges: user.availableBadges, selectedBadgeID: user.selectedBadgeID,
@@ -2030,6 +2089,21 @@ final class AccountSession {
             body: RemoteProfileReportModerationRequest(status: status),
             headers: ["X-Typebar-Moderation-Key": normalizedKey], response: RemoteModerationProfileReport.self
         )
+    }
+
+    func setLeaderboardRestricted(_ profileID: UUID, key: String, restricted: Bool) async throws -> Bool {
+        let normalizedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedKey.isEmpty else {
+            throw RemoteAccountError.serverMessage("请输入部署者配置的审核密钥。")
+        }
+        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/moderation/profiles/\(profileID.uuidString)/leaderboard-restriction",
+            method: "PATCH", token: nil,
+            body: RemoteLeaderboardRestrictionRequest(isRestricted: restricted),
+            headers: ["X-Typebar-Moderation-Key": normalizedKey],
+            response: RemoteLeaderboardRestrictionResponse.self)
+        guard response.userID == profileID else { throw RemoteAccountError.unexpectedResponse }
+        return response.isRestricted
     }
 
     func publicQuotes(language: TypingLanguage) async throws -> [RemotePublicQuote] {
@@ -2198,6 +2272,7 @@ final class AccountSession {
                 displayName: user.displayName,
                 totalExperience: response.totalExperience,
                 leaderboardOptedOut: user.leaderboardOptedOut,
+                leaderboardRestricted: user.leaderboardRestricted,
                 authenticationMethods: user.authenticationMethods
             )
         }

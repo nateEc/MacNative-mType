@@ -1093,6 +1093,13 @@ struct PreferencesView: View {
             Text("隐藏后不会出现在全局或好友排行榜；已保存的服务端成绩、XP、本机历史与同步不受影响。")
               .font(.caption)
               .foregroundStyle(.secondary)
+            if user.leaderboardRestricted {
+              Label(
+                "此账户当前被部署方限制参与共享排行榜；本机与服务端练习记录不会被删除。",
+                systemImage: "exclamationmark.shield")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             Divider()
             VStack(alignment: .leading, spacing: 9) {
               Text("公开连续练习日界").font(.headline)
@@ -1794,7 +1801,7 @@ struct PreferencesView: View {
           .disabled(
             moderationIsWorking
               || moderationKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          Text("处理只更新审核状态，不会自动修改资料、删除账户、通知被举报者或透露举报者身份。")
+          Text("“标为已处理/驳回”只更新审核状态。单独的排行榜限制只影响共享榜单，可恢复；不会修改资料、删除账户、通知被举报者或透露举报者身份。")
             .font(.caption)
             .foregroundStyle(.secondary)
           ForEach(moderationProfileReports) { report in
@@ -1815,6 +1822,22 @@ struct PreferencesView: View {
               )
               .font(.caption2)
               .foregroundStyle(.secondary)
+              HStack {
+                Text(report.isLeaderboardRestricted ? "共享排行榜：已限制" : "共享排行榜：可参与")
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+                Spacer()
+                Button(report.isLeaderboardRestricted ? "恢复排行榜资格" : "限制共享排行榜资格") {
+                  Task {
+                    await setLeaderboardRestriction(
+                      report, restricted: !report.isLeaderboardRestricted)
+                  }
+                }
+                .buttonStyle(.bordered)
+              }
+              .disabled(
+                moderationIsWorking
+                  || moderationKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
               if report.status == .open {
                 HStack {
                   Button("标为已处理") { Task { await moderateProfileReport(report, as: .resolved) } }
@@ -2369,6 +2392,25 @@ struct PreferencesView: View {
       try await account.moderateProfileReport(report.id, key: moderationKey, status: status)
       moderationMessage = "已将资料举报标为\(status.displayName)。"
       moderationProfileReports.removeAll { $0.id == report.id }
+    } catch {
+      moderationMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func setLeaderboardRestriction(
+    _ report: RemoteModerationProfileReport, restricted: Bool
+  ) async {
+    moderationIsWorking = true
+    defer { moderationIsWorking = false }
+    do {
+      let isRestricted = try await account.setLeaderboardRestricted(
+        report.profile.id, key: moderationKey, restricted: restricted)
+      moderationProfileReports = try await account.moderationProfileReports(
+        key: moderationKey, status: profileModerationStatus)
+      moderationMessage = isRestricted
+        ? "已限制该账户参与共享排行榜；成绩和登录不受影响。"
+        : "已恢复该账户参与共享排行榜；原有合格成绩会重新计算。"
     } catch {
       moderationMessage = error.localizedDescription
     }

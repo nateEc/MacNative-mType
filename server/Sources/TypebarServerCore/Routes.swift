@@ -579,6 +579,23 @@ public func configure(
         catch let error as AuthStoreError { throw error.abort }
     }
 
+    app.patch("v1", "moderation", "profiles", ":id", "leaderboard-restriction") { request async throws -> LeaderboardRestrictionResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The profile identifier was invalid.")
+        }
+        do {
+            return try await authStore.setLeaderboardRestricted(
+                userID: id,
+                restricted: try request.content.decode(LeaderboardRestrictionRequest.self).isRestricted)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.get("v1", "messages", ":id") { request async throws -> DirectConversationResponse in
         guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The profile identifier was invalid.") }
         do { return try await authStore.directConversation(with: id, accessToken: try request.accessToken()) }

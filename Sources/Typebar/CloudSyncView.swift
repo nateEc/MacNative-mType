@@ -186,7 +186,11 @@ struct CloudSyncView: View {
                         Text(leaderboardMessage).font(.caption).foregroundStyle(.secondary)
                     }
                     if let user = account.currentUser, leaderboardMessage != nil {
-                        if user.leaderboardOptedOut {
+                        if user.leaderboardRestricted
+                            || leaderboardEligibility?.isLeaderboardRestricted == true
+                        {
+                            LeaderboardRestrictionLabel()
+                        } else if user.leaderboardOptedOut {
                             Text("你已选择从自建服务排行榜隐藏。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -272,7 +276,11 @@ struct CloudSyncView: View {
                         Text(experienceMessage).font(.caption).foregroundStyle(.secondary)
                     }
                     if let user = account.currentUser, experienceMessage != nil {
-                        if user.leaderboardOptedOut {
+                        if user.leaderboardRestricted
+                            || experienceLeaderboardEligibility?.isLeaderboardRestricted == true
+                        {
+                            LeaderboardRestrictionLabel()
+                        } else if user.leaderboardOptedOut {
                             Text("你已选择从自建服务排行榜隐藏。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -708,6 +716,16 @@ private struct LeaderboardEligibilityLabel: View {
         Label(
             "还需累计练习 \(Duration.seconds(Double(remaining)).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated))) 才能进入排行榜。",
             systemImage: "timer")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+}
+
+private struct LeaderboardRestrictionLabel: View {
+    var body: some View {
+        Label(
+            "此账户当前被部署方限制参与共享排行榜。",
+            systemImage: "exclamationmark.shield")
             .font(.caption)
             .foregroundStyle(.secondary)
     }

@@ -244,13 +244,18 @@ public struct LeaderboardEligibility: Content, Equatable, Sendable {
     public let isEligible: Bool
     public let completedPracticeSeconds: Int
     public let minimumPracticeSeconds: Int
+    /// True only for the authenticated account when the deployment has
+    /// explicitly excluded it from Typebar's shared leaderboards.
+    public let isLeaderboardRestricted: Bool
 
     public init(
-        isEligible: Bool, completedPracticeSeconds: Int, minimumPracticeSeconds: Int
+        isEligible: Bool, completedPracticeSeconds: Int, minimumPracticeSeconds: Int,
+        isLeaderboardRestricted: Bool = false
     ) {
         self.isEligible = isEligible
         self.completedPracticeSeconds = completedPracticeSeconds
         self.minimumPracticeSeconds = minimumPracticeSeconds
+        self.isLeaderboardRestricted = isLeaderboardRestricted
     }
 }
 

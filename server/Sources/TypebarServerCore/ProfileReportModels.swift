@@ -36,6 +36,9 @@ public enum ProfileReportModerationStatus: String, CaseIterable, Content, Equata
 public struct ModerationProfileReportResponse: Content, Equatable {
     public let id: UUID
     public let profile: PublicProfileResponse
+    /// Deployment-only state. It is never added to public profiles or
+    /// leaderboard entries.
+    public let isLeaderboardRestricted: Bool
     public let reason: ProfileReportReason
     public let note: String?
     public let status: ProfileReportModerationStatus
@@ -53,4 +56,15 @@ public struct ModerationProfileReportListQuery: Content, Equatable {
 
 public struct ProfileReportModerationRequest: Content, Equatable {
     public let status: ProfileReportModerationStatus
+}
+
+/// A reversible deployment decision that affects shared leaderboard visibility
+/// only. It never suspends login or deletes account data.
+public struct LeaderboardRestrictionRequest: Content, Equatable {
+    public let isRestricted: Bool
+}
+
+public struct LeaderboardRestrictionResponse: Content, Equatable {
+    public let userID: UUID
+    public let isRestricted: Bool
 }

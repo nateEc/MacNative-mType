@@ -298,11 +298,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(legacy.availableBadges.isEmpty)
     XCTAssertNil(legacy.selectedBadgeID)
     XCTAssertNil(legacy.personalBestResetAt)
+    XCTAssertFalse(legacy.leaderboardRestricted)
 
     let modern = try JSONDecoder().decode(
       RemoteAccountUser.self,
       from: Data(
-        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","personalBestResetAt":100,"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
+        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"leaderboardRestricted":true,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","personalBestResetAt":100,"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
           .utf8))
     XCTAssertTrue(modern.emailVerified)
     XCTAssertEqual(modern.authenticationMethods, [.google, .password, .discord])
@@ -314,6 +315,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(modern.availableBadges.map(\.id), ["swift-line"])
     XCTAssertEqual(modern.selectedBadgeID, "swift-line")
     XCTAssertEqual(modern.personalBestResetAt, Date(timeIntervalSinceReferenceDate: 100))
+    XCTAssertTrue(modern.leaderboardRestricted)
 
     let leaderboardEntry = try JSONDecoder().decode(
       RemoteLeaderboardEntry.self,
@@ -759,6 +761,9 @@ final class TypingEngineTests: XCTestCase {
     let qualified = try JSONDecoder().decode(
       RemoteLeaderboardRankResponse.self,
       from: Data(#"{"entry":null,"eligibility":{"isEligible":false,"completedPracticeSeconds":60,"minimumPracticeSeconds":120}}"#.utf8))
+    let restricted = try JSONDecoder().decode(
+      RemoteLeaderboardRankResponse.self,
+      from: Data(#"{"entry":null,"eligibility":{"isEligible":false,"completedPracticeSeconds":600,"minimumPracticeSeconds":120,"isLeaderboardRestricted":true}}"#.utf8))
 
     XCTAssertNil(wpm.entry)
     XCTAssertNil(wpm.eligibility)
@@ -767,11 +772,32 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(experience.eligibility)
     XCTAssertEqual(qualified.eligibility, .init(
       isEligible: false, completedPracticeSeconds: 60, minimumPracticeSeconds: 120))
+    XCTAssertFalse(qualified.eligibility?.isLeaderboardRestricted ?? true)
+    XCTAssertTrue(restricted.eligibility?.isLeaderboardRestricted ?? false)
     XCTAssertEqual(RemoteExperienceLeaderboardPeriod.lastWeek.displayName, "上周")
     XCTAssertTrue(RemoteExperienceLeaderboardPeriod.week.isConfirmed(by: nil))
     XCTAssertTrue(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: "lastWeek"))
     XCTAssertFalse(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: nil))
     XCTAssertFalse(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: "week"))
+  }
+
+  func testModerationProfileReportDefaultsAndDecodesLeaderboardRestriction() throws {
+    let profileID = UUID()
+    let reportID = UUID()
+    func payload(isRestricted: Bool?) -> Data {
+      let restriction = isRestricted.map { ",\"isLeaderboardRestricted\":\($0)" } ?? ""
+      return Data(
+        """
+        {"id":"\(reportID.uuidString)","profile":{"id":"\(profileID.uuidString)","displayName":"Profile","joinedAt":0,"completedResultCount":0,"bestWPM":0},"reason":"other","status":"open","submittedAt":0\(restriction)}
+        """.utf8)
+    }
+
+    let legacy = try JSONDecoder().decode(RemoteModerationProfileReport.self, from: payload(isRestricted: nil))
+    let restricted = try JSONDecoder().decode(
+      RemoteModerationProfileReport.self, from: payload(isRestricted: true))
+
+    XCTAssertFalse(legacy.isLeaderboardRestricted)
+    XCTAssertTrue(restricted.isLeaderboardRestricted)
   }
 
   func testLegacyPublicProfileResponseDefaultsMissingHighestConsistencyToZero() throws {
