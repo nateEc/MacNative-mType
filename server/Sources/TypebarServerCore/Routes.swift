@@ -613,6 +613,23 @@ public func configure(
         }
     }
 
+    app.patch("v1", "moderation", "profiles", ":id", "account-suspension") { request async throws -> AccountSuspensionResponse in
+        guard let expectedKey = moderationKey, !expectedKey.isEmpty,
+              request.headers.first(name: "X-Typebar-Moderation-Key") == expectedKey else {
+            throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
+        }
+        guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else {
+            throw Abort(.badRequest, reason: "The profile identifier was invalid.")
+        }
+        do {
+            return try await authStore.setAccountSuspended(
+                userID: id,
+                suspended: try request.content.decode(AccountSuspensionRequest.self).isSuspended)
+        } catch let error as AuthStoreError {
+            throw error.abort
+        }
+    }
+
     app.get("v1", "messages", ":id") { request async throws -> DirectConversationResponse in
         guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The profile identifier was invalid.") }
         do { return try await authStore.directConversation(with: id, accessToken: try request.accessToken()) }
@@ -1033,6 +1050,8 @@ private extension AuthStoreError {
             Abort(.badRequest, reason: "Announcements must contain 1 to 500 non-whitespace characters.")
         case .displayNameChangeRequired:
             Abort(.forbidden, reason: "Update this Typebar account display name before submitting new results.")
+        case .accountSuspended:
+            Abort(.forbidden, reason: "This Typebar account is suspended; profile updates and account reset are disabled.")
         case .directMessageNotAllowed:
             Abort(.forbidden, reason: "Direct messages are only available between accepted Typebar friends.")
         }

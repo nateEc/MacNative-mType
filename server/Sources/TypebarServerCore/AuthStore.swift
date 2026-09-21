@@ -349,6 +349,10 @@ public struct AuthUserResponse: Content, Equatable {
   /// Deployment-only account state that accepts normal account use but requires
   /// a real display-name change before new shared results are accepted.
   public let displayNameChangeRequired: Bool
+  /// Deployment-only account state matching the reference project's bounded
+  /// ban behavior: shared visibility is removed and mutable profile/reset
+  /// actions are refused, while sign-in, sync, results, and deletion remain.
+  public let accountSuspended: Bool
   public let profileDetails: ProfileDetails
   public let authenticationMethods: [AuthenticationMethod]
   public let availableBadges: [PublicProfileBadge]
@@ -362,6 +366,9 @@ public struct AuthUserResponse: Content, Equatable {
 public struct PublicProfileResponse: Content, Equatable {
   public let id: UUID
   public let displayName: String
+  /// Publicly marks a profile whose expanded presentation is intentionally
+  /// limited to the base statistics returned by the reference behavior.
+  public let accountSuspended: Bool
   public let joinedAt: Date
   public let completedResultCount: Int
   public let startedTestCount: Int
@@ -471,6 +478,7 @@ public enum AuthStoreError: Error, Equatable {
   case invalidResultTags
   case invalidAnnouncement
   case displayNameChangeRequired
+  case accountSuspended
 }
 
 public actor AuthStore {
@@ -672,13 +680,14 @@ public actor AuthStore {
     let leaderboardOptedOut: Bool
     var leaderboardRestricted: Bool
     var displayNameChangeRequired: Bool
+    var accountSuspended: Bool
     let profileDetails: ProfileDetails
     let selectedBadgeID: String?
     var startedTestCount: Int
 
     private enum CodingKeys: String, CodingKey {
       case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut,
-        leaderboardRestricted, displayNameChangeRequired, profileDetails, selectedBadgeID,
+        leaderboardRestricted, displayNameChangeRequired, accountSuspended, profileDetails, selectedBadgeID,
         startedTestCount
     }
 
@@ -688,6 +697,7 @@ public actor AuthStore {
       leaderboardOptedOut: Bool = false,
       leaderboardRestricted: Bool = false,
       displayNameChangeRequired: Bool = false,
+      accountSuspended: Bool = false,
       profileDetails: ProfileDetails = .init(), selectedBadgeID: String? = nil,
       startedTestCount: Int = 0
     ) {
@@ -700,6 +710,7 @@ public actor AuthStore {
       self.leaderboardOptedOut = leaderboardOptedOut
       self.leaderboardRestricted = leaderboardRestricted
       self.displayNameChangeRequired = displayNameChangeRequired
+      self.accountSuspended = accountSuspended
       self.profileDetails = profileDetails
       self.selectedBadgeID = selectedBadgeID
       self.startedTestCount = startedTestCount
@@ -717,6 +728,7 @@ public actor AuthStore {
       leaderboardRestricted = try values.decodeIfPresent(Bool.self, forKey: .leaderboardRestricted) ?? false
       displayNameChangeRequired =
         try values.decodeIfPresent(Bool.self, forKey: .displayNameChangeRequired) ?? false
+      accountSuspended = try values.decodeIfPresent(Bool.self, forKey: .accountSuspended) ?? false
       profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
       selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
       startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
@@ -1259,6 +1271,7 @@ public actor AuthStore {
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
@@ -1303,6 +1316,7 @@ public actor AuthStore {
       passwordHash: nil, createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.passwordResetTokens.removeAll { $0.userID == user.id }
@@ -1590,6 +1604,7 @@ public actor AuthStore {
       createdAt: user.createdAt, emailVerified: user.emailVerified,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.sessions.removeAll { $0.userID == user.id }
@@ -1650,6 +1665,7 @@ public actor AuthStore {
       passwordHash: user.passwordHash, createdAt: user.createdAt, emailVerified: true,
       leaderboardOptedOut: user.leaderboardOptedOut, leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.emailVerificationTokens.removeAll { $0.userID == user.id }
@@ -1753,6 +1769,7 @@ public actor AuthStore {
       leaderboardOptedOut: user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
       startedTestCount: user.startedTestCount
@@ -1793,6 +1810,7 @@ public actor AuthStore {
       leaderboardOptedOut: user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
       startedTestCount: user.startedTestCount
@@ -1894,6 +1912,7 @@ public actor AuthStore {
       throw AuthStoreError.invalidAccessToken
     }
     let user = state.users[index]
+    guard !user.accountSuspended else { throw AuthStoreError.accountSuspended }
     if let currentPassword = request.currentPassword {
       guard let passwordHash = user.passwordHash,
         try Bcrypt.verify(currentPassword, created: passwordHash)
@@ -1907,7 +1926,8 @@ public actor AuthStore {
       id: user.id, email: user.email, displayName: user.displayName,
       passwordHash: user.passwordHash, createdAt: user.createdAt,
       emailVerified: user.emailVerified, leaderboardRestricted: user.leaderboardRestricted,
-      displayNameChangeRequired: user.displayNameChangeRequired)
+      displayNameChangeRequired: user.displayNameChangeRequired,
+      accountSuspended: user.accountSuspended)
     state.users[index] = resetUser
     state.developerAccessKeys.removeAll { $0.userID == user.id }
     state.syncRecords.removeAll { $0.userID == user.id }
@@ -1927,6 +1947,7 @@ public actor AuthStore {
       throw AuthStoreError.invalidAccessToken
     }
     let user = state.users[index]
+    guard !user.accountSuspended else { throw AuthStoreError.accountSuspended }
     let displayName = try request.displayName.map(validatedDisplayName) ?? user.displayName
     let profileDetails = try request.profileDetails.map(validatedProfileDetails) ?? user.profileDetails
     let selectedBadgeID = try validatedSelectedBadgeID(
@@ -1937,6 +1958,7 @@ public actor AuthStore {
       leaderboardOptedOut: request.leaderboardOptedOut ?? user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired && displayName == user.displayName,
+      accountSuspended: user.accountSuspended,
       profileDetails: profileDetails, selectedBadgeID: selectedBadgeID,
       startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
@@ -1983,6 +2005,7 @@ public actor AuthStore {
     _ request: SetStreakDayBoundaryRequest, accessToken: String, now: Date = .now
   ) throws -> AuthUserResponse {
     let user = try authenticatedUser(for: accessToken, now: now)
+    guard !user.accountSuspended else { throw AuthStoreError.accountSuspended }
     let offset = request.offsetHours
     guard offset.isFinite, (-11...12).contains(offset), offset * 2 == (offset * 2).rounded()
     else { throw AuthStoreError.invalidStreakDayBoundary }
@@ -2286,6 +2309,7 @@ public actor AuthStore {
           profile: publicProfile(for: profile),
           isLeaderboardRestricted: profile.leaderboardRestricted,
           isDisplayNameChangeRequired: profile.displayNameChangeRequired,
+          isAccountSuspended: profile.accountSuspended,
           reason: report.reason,
           note: report.note,
           status: report.status,
@@ -2312,6 +2336,7 @@ public actor AuthStore {
       id: report.id, profile: publicProfile(for: profile),
       isLeaderboardRestricted: profile.leaderboardRestricted,
       isDisplayNameChangeRequired: profile.displayNameChangeRequired,
+      isAccountSuspended: profile.accountSuspended,
       reason: report.reason, note: report.note,
       status: report.status,
       submittedAt: report.submittedAt)
@@ -2347,6 +2372,22 @@ public actor AuthStore {
       try persist()
     }
     return .init(userID: userID, isRequired: required)
+  }
+
+  /// Reversibly applies the reference project's bounded account-ban behavior.
+  /// Results remain stored, but shared leaderboard eligibility disappears and
+  /// profile mutation or account reset cannot rewrite the suspended account.
+  public func setAccountSuspended(userID: UUID, suspended: Bool) throws
+    -> AccountSuspensionResponse
+  {
+    guard let index = state.users.firstIndex(where: { $0.id == userID }) else {
+      throw AuthStoreError.profileNotFound
+    }
+    if state.users[index].accountSuspended != suspended {
+      state.users[index].accountSuspended = suspended
+      try persist()
+    }
+    return .init(userID: userID, isSuspended: suspended)
   }
 
   public func submitQuoteReport(
@@ -2602,7 +2643,7 @@ public actor AuthStore {
 
   private func detailedPublicProfile(for user: StoredUser, now: Date) -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
-    let shouldShowActivity = user.profileDetails.showActivity
+    let shouldShowActivity = !user.accountSuspended && user.profileDetails.showActivity
     let dayBoundaryOffsetHours = state.streakDayBoundaryOffsets[user.id] ?? 0
     return publicProfile(
       for: user, results: results,
@@ -2624,6 +2665,7 @@ public actor AuthStore {
     return .init(
       id: user.id,
       displayName: user.displayName,
+      accountSuspended: user.accountSuspended,
       joinedAt: user.createdAt,
       completedResultCount: results.count,
       startedTestCount: user.startedTestCount,
@@ -2634,9 +2676,9 @@ public actor AuthStore {
       activity: activity,
       streak: streak,
       totalExperience: experience(for: user.id),
-      profileDetails: user.profileDetails,
-      discordAvatar: publicDiscordAvatar(for: user),
-      selectedBadge: selectedPublicBadge(for: user)
+      profileDetails: user.accountSuspended ? .init() : user.profileDetails,
+      discordAvatar: user.accountSuspended ? nil : publicDiscordAvatar(for: user),
+      selectedBadge: user.accountSuspended ? nil : selectedPublicBadge(for: user)
     )
   }
 
@@ -2770,12 +2812,13 @@ public actor AuthStore {
     let total = typingSeconds ?? totalTypingSecondsByUser()[user.id, default: 0]
     let completedSeconds = max(0, Int(total.rounded(.down)))
     return .init(
-      isEligible: !user.leaderboardRestricted && !user.displayNameChangeRequired
+      isEligible: !user.accountSuspended && !user.leaderboardRestricted && !user.displayNameChangeRequired
         && total > Double(minimumLeaderboardTypingSeconds),
       completedPracticeSeconds: completedSeconds,
       minimumPracticeSeconds: minimumLeaderboardTypingSeconds,
       isLeaderboardRestricted: user.leaderboardRestricted,
-      isDisplayNameChangeRequired: user.displayNameChangeRequired)
+      isDisplayNameChangeRequired: user.displayNameChangeRequired,
+      isAccountSuspended: user.accountSuspended)
   }
 
   private func leaderboardEligibility(for userID: UUID) -> LeaderboardEligibility {
@@ -2784,7 +2827,8 @@ public actor AuthStore {
         isEligible: false, completedPracticeSeconds: 0,
         minimumPracticeSeconds: minimumLeaderboardTypingSeconds,
         isLeaderboardRestricted: false,
-        isDisplayNameChangeRequired: false)
+        isDisplayNameChangeRequired: false,
+        isAccountSuspended: false)
     }
     return leaderboardEligibility(for: user)
   }
@@ -3441,6 +3485,7 @@ public actor AuthStore {
       totalExperience: experience(for: user.id), leaderboardOptedOut: user.leaderboardOptedOut,
       leaderboardRestricted: user.leaderboardRestricted,
       displayNameChangeRequired: user.displayNameChangeRequired,
+      accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       authenticationMethods: authenticationMethods(for: user.id), availableBadges: availableBadges,
       selectedBadgeID: selectedBadgeID,

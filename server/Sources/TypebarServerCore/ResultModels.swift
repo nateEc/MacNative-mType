@@ -250,16 +250,21 @@ public struct LeaderboardEligibility: Content, Equatable, Sendable {
     /// True only for the authenticated account when it must update its display
     /// name before it can submit another shared result.
     public let isDisplayNameChangeRequired: Bool
+    /// True only for the authenticated account when the deployment has applied
+    /// the bounded account suspension used by the reference project.
+    public let isAccountSuspended: Bool
 
     public init(
         isEligible: Bool, completedPracticeSeconds: Int, minimumPracticeSeconds: Int,
-        isLeaderboardRestricted: Bool = false, isDisplayNameChangeRequired: Bool = false
+        isLeaderboardRestricted: Bool = false, isDisplayNameChangeRequired: Bool = false,
+        isAccountSuspended: Bool = false
     ) {
         self.isEligible = isEligible
         self.completedPracticeSeconds = completedPracticeSeconds
         self.minimumPracticeSeconds = minimumPracticeSeconds
         self.isLeaderboardRestricted = isLeaderboardRestricted
         self.isDisplayNameChangeRequired = isDisplayNameChangeRequired
+        self.isAccountSuspended = isAccountSuspended
     }
 }
 

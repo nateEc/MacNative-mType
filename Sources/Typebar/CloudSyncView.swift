@@ -186,7 +186,11 @@ struct CloudSyncView: View {
                         Text(leaderboardMessage).font(.caption).foregroundStyle(.secondary)
                     }
                     if let user = account.currentUser, leaderboardMessage != nil {
-                        if user.displayNameChangeRequired
+                        if user.accountSuspended
+                            || leaderboardEligibility?.isAccountSuspended == true
+                        {
+                            AccountSuspensionLabel()
+                        } else if user.displayNameChangeRequired
                             || leaderboardEligibility?.isDisplayNameChangeRequired == true
                         {
                             DisplayNameRequirementLabel()
@@ -280,7 +284,11 @@ struct CloudSyncView: View {
                         Text(experienceMessage).font(.caption).foregroundStyle(.secondary)
                     }
                     if let user = account.currentUser, experienceMessage != nil {
-                        if user.displayNameChangeRequired
+                        if user.accountSuspended
+                            || experienceLeaderboardEligibility?.isAccountSuspended == true
+                        {
+                            AccountSuspensionLabel()
+                        } else if user.displayNameChangeRequired
                             || experienceLeaderboardEligibility?.isDisplayNameChangeRequired == true
                         {
                             DisplayNameRequirementLabel()
@@ -739,6 +747,16 @@ private struct LeaderboardRestrictionLabel: View {
     }
 }
 
+private struct AccountSuspensionLabel: View {
+    var body: some View {
+        Label(
+            "此账户处于部署方封禁状态，成绩可保留但不会参与共享排行榜。",
+            systemImage: "lock.shield")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+}
+
 private struct DisplayNameRequirementLabel: View {
     var body: some View {
         Label(
@@ -985,6 +1003,14 @@ struct PublicProfileView: View {
                     .foregroundStyle(.secondary)
             }
             Text(profile.displayName).font(.title2.weight(.semibold))
+            if profile.accountSuspended {
+                Label(
+                    "此账户处于部署方封禁状态；公开详情、活动、徽章和头像已隐藏。",
+                    systemImage: "lock.shield")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             if let badge = profile.selectedBadge {
                 Label(badge.title, systemImage: badge.systemImage)
                     .font(.caption.weight(.medium))

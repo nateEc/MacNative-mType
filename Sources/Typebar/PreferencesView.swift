@@ -58,6 +58,8 @@ struct PreferencesView: View {
   @State private var moderationQuotes: [RemoteModerationQuote] = []
   @State private var profileModerationStatus: RemoteProfileModerationStatus = .open
   @State private var moderationProfileReports: [RemoteModerationProfileReport] = []
+  @State private var pendingAccountSuspension: RemoteModerationProfileReport?
+  @State private var showingAccountSuspensionConfirmation = false
   @State private var announcementMessage = ""
   @State private var announcementLevel: RemoteAnnouncementLevel = .notice
   @State private var announcementSticky = false
@@ -1072,11 +1074,13 @@ struct PreferencesView: View {
             TextField("公开显示名", text: $updatedDisplayName)
               .onAppear { updatedDisplayName = user.displayName }
               .onChange(of: user.displayName) { _, value in updatedDisplayName = value }
+              .disabled(user.accountSuspended)
             Button("更新显示名") {
               Task { await account.updateDisplayName(updatedDisplayName) }
             }
             .disabled(
               account.isWorking
+                || user.accountSuspended
                 || updatedDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2
                 || updatedDisplayName == user.displayName)
             Text("显示名会出现在公开资料、基础排行榜与好友列表；邮箱不会公开。")
@@ -1089,6 +1093,13 @@ struct PreferencesView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
+            if user.accountSuspended {
+              Label(
+                "此账户已被部署方封禁：服务端成绩仍可保存但不会参与共享排行榜；不能更改公开资料或重置服务端账户。登录、同步、本机练习、成绩历史、密码与删号不受影响。",
+                systemImage: "lock.shield")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             Toggle(
               "从 WPM 和 XP 排行榜隐藏我",
               isOn: Binding(
@@ -1096,7 +1107,7 @@ struct PreferencesView: View {
                 set: { value in Task { await account.setLeaderboardOptOut(value) } }
               )
             )
-            .disabled(account.isWorking)
+            .disabled(account.isWorking || user.accountSuspended)
             Text("隐藏后不会出现在全局或好友排行榜；已保存的服务端成绩、XP、本机历史与同步不受影响。")
               .font(.caption)
               .foregroundStyle(.secondary)
@@ -1115,11 +1126,13 @@ struct PreferencesView: View {
                   Text(streakDayBoundaryLabel(for: offset)).tag(offset)
                 }
               }
-              .disabled(user.streakDayBoundaryOffsetHours != nil || account.isWorking)
+              .disabled(
+                user.streakDayBoundaryOffsetHours != nil || account.isWorking || user.accountSuspended)
               Button("固定公开日界") {
                 showingPublicStreakDayBoundaryConfirmation = true
               }
-              .disabled(user.streakDayBoundaryOffsetHours != nil || account.isWorking)
+              .disabled(
+                user.streakDayBoundaryOffsetHours != nil || account.isWorking || user.accountSuspended)
               Text(
                 user.streakDayBoundaryOffsetHours.map {
                   "此账户已固定为 \(streakDayBoundaryLabel(for: $0))；公开活动日历与当前/最长连续天数使用该分界。"
@@ -1215,7 +1228,7 @@ struct PreferencesView: View {
                 }
               }
               .disabled(
-                account.isWorking || profileBio.count > 250 || profileKeyboard.count > 75
+                account.isWorking || user.accountSuspended || profileBio.count > 250 || profileKeyboard.count > 75
                   || profileGitHub.count > 39 || profileSocialHandle.count > 15
                   || profileWebsiteURL.count > 200)
               Text("简介、键盘说明与链接会出现在公开资料；邮箱、令牌和本机练习内容永不公开。关闭活动后，资料页不再展示每日练习日历；Discord 头像仅在你主动开启后显示。公开徽章只来自服务端已接受的成绩。")
@@ -1503,9 +1516,11 @@ struct PreferencesView: View {
               showingAccountResetConfirmation = true
             }
             .disabled(
-              account.isWorking || (user.authenticationMethods.contains(.password)
+              account.isWorking || user.accountSuspended || (user.authenticationMethods.contains(.password)
                 && accountResetPassword.isEmpty))
-            Text("永久清除当前账户的成绩、XP、个人最佳、资料、开发者密钥、同步档案，以及这台 Mac 上的练习历史、预设、保存文本、设置、背景和字体。登录身份、会话、好友、屏蔽、投稿与统计日边界会保留。建议先导出数据。")
+            Text(user.accountSuspended
+              ? "部署方封禁期间不能重置账户数据；要彻底离开仍可删除自建账户，本机练习也始终可用。"
+              : "永久清除当前账户的成绩、XP、个人最佳、资料、开发者密钥、同步档案，以及这台 Mac 上的练习历史、预设、保存文本、设置、背景和字体。登录身份、会话、好友、屏蔽、投稿与统计日边界会保留。建议先导出数据。")
               .font(.caption)
               .foregroundStyle(.secondary)
             Divider()
@@ -1808,7 +1823,7 @@ struct PreferencesView: View {
           .disabled(
             moderationIsWorking
               || moderationKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          Text("“标为已处理/驳回”只更新审核状态。排行榜限制只影响共享榜单且可恢复；显示名整改会拒绝新的服务端成绩，直到用户实际更新有效显示名。两者都不会修改资料、删除账户、通知被举报者或透露举报者身份。")
+          Text("“标为已处理/驳回”只更新审核状态。排行榜限制只影响共享榜单；显示名整改会拒绝新的服务端成绩；账户封禁会隐藏扩展公开资料、排除共享榜单并阻止资料更新与账户重置。三者均可撤销，不会删除账户或成绩、通知被举报者或透露举报者身份。")
             .font(.caption)
             .foregroundStyle(.secondary)
           ForEach(moderationProfileReports) { report in
@@ -1854,6 +1869,24 @@ struct PreferencesView: View {
                   Task {
                     await setDisplayNameRequirement(
                       report, required: !report.isDisplayNameChangeRequired)
+                  }
+                }
+                .buttonStyle(.bordered)
+              }
+              .disabled(
+                moderationIsWorking
+                  || moderationKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+              HStack {
+                Text(report.isAccountSuspended ? "账户：已封禁" : "账户：正常")
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+                Spacer()
+                Button(report.isAccountSuspended ? "解除账户封禁" : "封禁账户") {
+                  if report.isAccountSuspended {
+                    Task { await setAccountSuspension(report, suspended: false) }
+                  } else {
+                    pendingAccountSuspension = report
+                    showingAccountSuspensionConfirmation = true
                   }
                 }
                 .buttonStyle(.bordered)
@@ -1990,6 +2023,19 @@ struct PreferencesView: View {
       }
     } message: {
       Text("你将立即在这台 Mac 和所有其他设备退出自建 Typebar 服务。")
+    }
+    .confirmationDialog(
+      "封禁 \(pendingAccountSuspension?.profile.displayName ?? "此账户")？",
+      isPresented: $showingAccountSuspensionConfirmation, titleVisibility: .visible
+    ) {
+      Button("封禁账户", role: .destructive) {
+        guard let report = pendingAccountSuspension else { return }
+        pendingAccountSuspension = nil
+        Task { await setAccountSuspension(report, suspended: true) }
+      }
+      Button("取消", role: .cancel) { pendingAccountSuspension = nil }
+    } message: {
+      Text("封禁会立即排除共享 WPM 与 XP 榜、隐藏扩展公开资料，并阻止资料更新与账户重置；登录、同步、本机练习、成绩历史、密码和删号保持可用。")
     }
     .fileImporter(isPresented: $showingCustomBackgroundImporter, allowedContentTypes: [.image]) { result in
       switch result {
@@ -2453,6 +2499,25 @@ struct PreferencesView: View {
       moderationMessage = isRequired
         ? "已要求该账户更换显示名；完成前不会接受新的服务端成绩。"
         : "已撤销显示名整改要求；该账户可再次提交服务端成绩。"
+    } catch {
+      moderationMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func setAccountSuspension(
+    _ report: RemoteModerationProfileReport, suspended: Bool
+  ) async {
+    moderationIsWorking = true
+    defer { moderationIsWorking = false }
+    do {
+      let isSuspended = try await account.setAccountSuspended(
+        report.profile.id, key: moderationKey, suspended: suspended)
+      moderationProfileReports = try await account.moderationProfileReports(
+        key: moderationKey, status: profileModerationStatus)
+      moderationMessage = isSuspended
+        ? "已封禁该账户：共享榜单与扩展公开资料已隐藏，资料更新和账户重置已暂停。"
+        : "已解除账户封禁：现有合格成绩与公开资料将重新可见。"
     } catch {
       moderationMessage = error.localizedDescription
     }

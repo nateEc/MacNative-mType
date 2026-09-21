@@ -41,6 +41,8 @@ public struct ModerationProfileReportResponse: Content, Equatable {
     public let isLeaderboardRestricted: Bool
     /// Deployment-only account state; never exposed from public profile routes.
     public let isDisplayNameChangeRequired: Bool
+    /// Deployment-only account state exposed only to the reviewer workbench.
+    public let isAccountSuspended: Bool
     public let reason: ProfileReportReason
     public let note: String?
     public let status: ProfileReportModerationStatus
@@ -80,4 +82,15 @@ public struct DisplayNameRequirementRequest: Content, Equatable {
 public struct DisplayNameRequirementResponse: Content, Equatable {
   public let userID: UUID
   public let isRequired: Bool
+}
+
+/// A reversible deployment decision that preserves account access and stored
+/// results while applying the reference project's bounded suspension behavior.
+public struct AccountSuspensionRequest: Content, Equatable {
+  public let isSuspended: Bool
+}
+
+public struct AccountSuspensionResponse: Content, Equatable {
+  public let userID: UUID
+  public let isSuspended: Bool
 }

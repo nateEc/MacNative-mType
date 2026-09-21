@@ -2412,6 +2412,163 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(resetUser.displayNameChangeRequired)
   }
 
+  func testAccountSuspensionKeepsPracticeButBlocksSharedVisibilityAndMutableProfile() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let now = Date(timeIntervalSince1970: 50_000)
+    let session = try await store.register(
+      .init(
+        email: "suspended-account@example.com", password: "a secure password",
+        displayName: "Suspended Account"), now: now)
+    let query = LeaderboardQuery(mode: "time", language: "english", period: "all")
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 100, durationSeconds: 30, finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    let initialSpeedEntries = try await store.leaderboard(query, now: now).entries
+    let initialExperienceEntries = try await store.experienceLeaderboard(now: now).entries
+    XCTAssertEqual(initialSpeedEntries.map(\.userID), [session.user.id])
+    XCTAssertEqual(initialExperienceEntries.map(\.userID), [session.user.id])
+
+    let suspension = try await store.setAccountSuspended(userID: session.user.id, suspended: true)
+    XCTAssertEqual(suspension, .init(userID: session.user.id, isSuspended: true))
+    let suspendedUser = try await store.authenticatedUser(for: session.accessToken, now: now)
+    XCTAssertTrue(suspendedUser.accountSuspended)
+    let suspendedSpeedEntries = try await store.leaderboard(query, now: now).entries
+    let suspendedExperienceEntries = try await store.experienceLeaderboard(now: now).entries
+    XCTAssertTrue(suspendedSpeedEntries.isEmpty)
+    XCTAssertTrue(suspendedExperienceEntries.isEmpty)
+    let suspendedRank = try await store.leaderboardRank(
+      query, accessToken: session.accessToken, now: now)
+    XCTAssertNil(suspendedRank.entry)
+    XCTAssertEqual(suspendedRank.eligibility, .init(
+      isEligible: false, completedPracticeSeconds: 30, minimumPracticeSeconds: 0,
+      isAccountSuspended: true))
+
+    let retainedResult = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 81, accuracy: 100, durationSeconds: 30,
+        finishedAt: now.addingTimeInterval(30)), accessToken: session.accessToken,
+      now: now.addingTimeInterval(30))
+    XCTAssertTrue(retainedResult.accepted)
+    XCTAssertFalse(retainedResult.leaderboardEligible)
+    let suspendedProfile = try await store.publicProfile(
+      id: session.user.id, now: now.addingTimeInterval(30))
+    XCTAssertTrue(suspendedProfile.accountSuspended)
+    XCTAssertEqual(suspendedProfile.profileDetails, .init())
+    XCTAssertNil(suspendedProfile.activity)
+    XCTAssertNil(suspendedProfile.streak)
+    XCTAssertNil(suspendedProfile.selectedBadge)
+
+    do {
+      _ = try await store.updateProfile(
+        .init(displayName: "New Suspended Name"), accessToken: session.accessToken, now: now)
+      XCTFail("A suspended account must not update its public profile")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .accountSuspended)
+    }
+    do {
+      _ = try await store.resetAccount(
+        .init(currentPassword: "a secure password"), accessToken: session.accessToken, now: now)
+      XCTFail("A suspended account must not reset its server data")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .accountSuspended)
+    }
+    do {
+      _ = try await store.setStreakDayBoundary(
+        .init(offsetHours: 1), accessToken: session.accessToken, now: now)
+      XCTFail("A suspended account must not change its public streak day boundary")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .accountSuspended)
+    }
+
+    _ = try await store.setAccountSuspended(userID: session.user.id, suspended: false)
+    let restored = try await store.updateProfile(
+      .init(displayName: "Restored Account"), accessToken: session.accessToken, now: now)
+    XCTAssertFalse(restored.accountSuspended)
+    let restoredSpeedEntries = try await store.leaderboard(query, now: now).entries
+    XCTAssertEqual(restoredSpeedEntries.map(\.userID), [session.user.id])
+  }
+
+  func testAccountSuspensionRouteRequiresDeploymentKeyAndIsReversible() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    do {
+      try configure(app, authStore: store, moderationKey: "test-account-suspension-key")
+      let target = try await store.register(
+        .init(
+          email: "suspended-route@example.com", password: "a secure password",
+          displayName: "Suspended Route"))
+      let route = "v1/moderation/profiles/\(target.user.id.uuidString)/account-suspension"
+
+      try await app.test(.PATCH, route) { response async in
+        XCTAssertEqual(response.status, .forbidden)
+      }
+      try await app.test(
+        .PATCH,
+        route,
+        beforeRequest: { request async throws in
+          request.headers.add(
+            name: "X-Typebar-Moderation-Key", value: "test-account-suspension-key")
+          try request.content.encode(AccountSuspensionRequest(isSuspended: true))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            try response.content.decode(AccountSuspensionResponse.self),
+            .init(userID: target.user.id, isSuspended: true))
+        })
+      let suspendedUser = try await store.authenticatedUser(for: target.accessToken)
+      XCTAssertTrue(suspendedUser.accountSuspended)
+
+      try await app.test(
+        .PATCH,
+        route,
+        beforeRequest: { request async throws in
+          request.headers.add(
+            name: "X-Typebar-Moderation-Key", value: "test-account-suspension-key")
+          try request.content.encode(AccountSuspensionRequest(isSuspended: false))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            try response.content.decode(AccountSuspensionResponse.self),
+            .init(userID: target.user.id, isSuspended: false))
+        })
+      let restoredUser = try await store.authenticatedUser(for: target.accessToken)
+      XCTAssertFalse(restoredUser.accountSuspended)
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
+  func testAccountSuspensionPersistsAndPreventsAccountReset() async throws {
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-account-suspension-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let initialStore = try AuthStore(
+      fileURL: fileURL, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let initialSession = try await initialStore.register(
+      .init(
+        email: "suspended-persistence@example.com", password: "a secure password",
+        displayName: "Persistent Suspension"))
+    _ = try await initialStore.setAccountSuspended(userID: initialSession.user.id, suspended: true)
+
+    let reloadedStore = try AuthStore(
+      fileURL: fileURL, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let reloadedSession = try await reloadedStore.login(
+      .init(email: "suspended-persistence@example.com", password: "a secure password"))
+    XCTAssertTrue(reloadedSession.user.accountSuspended)
+    do {
+      _ = try await reloadedStore.resetAccount(
+        .init(currentPassword: "a secure password"), accessToken: reloadedSession.accessToken)
+      XCTFail("A reloaded suspended account must not reset its server data")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .accountSuspended)
+    }
+  }
+
   func testLeaderboardMinimumPracticeConfigurationUsesSafeDefaultsAndRejectsInvalidValues() throws {
     XCTAssertEqual(
       try TypebarLeaderboardEligibilityPolicy.minimumPracticeSeconds(from: nil),

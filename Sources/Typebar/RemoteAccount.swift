@@ -104,6 +104,9 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     /// Deployment-controlled requirement to choose a new display name before
     /// submitting another server-side result. Older deployments omit it.
     let displayNameChangeRequired: Bool
+    /// Deployment-controlled bounded account suspension. Older deployments
+    /// omit it, which safely means the account is not known to be suspended.
+    let accountSuspended: Bool
     let profileDetails: RemoteProfileDetails
     let authenticationMethods: [RemoteAuthenticationMethod]
     let availableBadges: [RemotePublicProfileBadge]
@@ -113,7 +116,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut,
-            leaderboardRestricted, displayNameChangeRequired, profileDetails,
+            leaderboardRestricted, displayNameChangeRequired, accountSuspended, profileDetails,
             authenticationMethods, availableBadges, selectedBadgeID, streakDayBoundaryOffsetHours,
             personalBestResetAt
     }
@@ -127,6 +130,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         leaderboardOptedOut: Bool = false,
         leaderboardRestricted: Bool = false,
         displayNameChangeRequired: Bool = false,
+        accountSuspended: Bool = false,
         profileDetails: RemoteProfileDetails = .init(),
         authenticationMethods: [RemoteAuthenticationMethod] = [.password],
         availableBadges: [RemotePublicProfileBadge] = [], selectedBadgeID: String? = nil,
@@ -140,6 +144,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         self.leaderboardOptedOut = leaderboardOptedOut
         self.leaderboardRestricted = leaderboardRestricted
         self.displayNameChangeRequired = displayNameChangeRequired
+        self.accountSuspended = accountSuspended
         self.profileDetails = profileDetails
         self.authenticationMethods = authenticationMethods
         self.availableBadges = availableBadges
@@ -159,6 +164,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         leaderboardRestricted = try values.decodeIfPresent(Bool.self, forKey: .leaderboardRestricted) ?? false
         displayNameChangeRequired =
             try values.decodeIfPresent(Bool.self, forKey: .displayNameChangeRequired) ?? false
+        accountSuspended = try values.decodeIfPresent(Bool.self, forKey: .accountSuspended) ?? false
         profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
         authenticationMethods = try values.decodeIfPresent([RemoteAuthenticationMethod].self, forKey: .authenticationMethods) ?? [.password]
         availableBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .availableBadges) ?? []
@@ -783,24 +789,27 @@ struct RemoteLeaderboardEligibility: Codable, Equatable, Sendable {
     let minimumPracticeSeconds: Int
     let isLeaderboardRestricted: Bool
     let isDisplayNameChangeRequired: Bool
+    let isAccountSuspended: Bool
 
     init(
         isEligible: Bool,
         completedPracticeSeconds: Int,
         minimumPracticeSeconds: Int,
         isLeaderboardRestricted: Bool = false,
-        isDisplayNameChangeRequired: Bool = false
+        isDisplayNameChangeRequired: Bool = false,
+        isAccountSuspended: Bool = false
     ) {
         self.isEligible = isEligible
         self.completedPracticeSeconds = completedPracticeSeconds
         self.minimumPracticeSeconds = minimumPracticeSeconds
         self.isLeaderboardRestricted = isLeaderboardRestricted
         self.isDisplayNameChangeRequired = isDisplayNameChangeRequired
+        self.isAccountSuspended = isAccountSuspended
     }
 
     private enum CodingKeys: String, CodingKey {
         case isEligible, completedPracticeSeconds, minimumPracticeSeconds, isLeaderboardRestricted,
-            isDisplayNameChangeRequired
+            isDisplayNameChangeRequired, isAccountSuspended
     }
 
     init(from decoder: Decoder) throws {
@@ -812,6 +821,7 @@ struct RemoteLeaderboardEligibility: Codable, Equatable, Sendable {
             Bool.self, forKey: .isLeaderboardRestricted) ?? false
         isDisplayNameChangeRequired = try values.decodeIfPresent(
             Bool.self, forKey: .isDisplayNameChangeRequired) ?? false
+        isAccountSuspended = try values.decodeIfPresent(Bool.self, forKey: .isAccountSuspended) ?? false
     }
 }
 
@@ -872,6 +882,7 @@ struct RemoteExperienceLeaderboardRankResponse: Codable, Sendable {
 struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let id: UUID
     let displayName: String
+    let accountSuspended: Bool
     let joinedAt: Date
     let completedResultCount: Int
     let startedTestCount: Int
@@ -887,7 +898,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let selectedBadge: RemotePublicProfileBadge?
 
     private enum CodingKeys: String, CodingKey {
-        case id, displayName, joinedAt, completedResultCount, startedTestCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
+        case id, displayName, accountSuspended, joinedAt, completedResultCount, startedTestCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
             activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge
     }
 
@@ -895,6 +906,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
         displayName = try values.decode(String.self, forKey: .displayName)
+        accountSuspended = try values.decodeIfPresent(Bool.self, forKey: .accountSuspended) ?? false
         joinedAt = try values.decode(Date.self, forKey: .joinedAt)
         completedResultCount = try values.decode(Int.self, forKey: .completedResultCount)
         startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
@@ -1025,13 +1037,15 @@ struct RemoteModerationProfileReport: Codable, Identifiable, Sendable {
     let isLeaderboardRestricted: Bool
     /// Older deployments omit this deployment-only account state.
     let isDisplayNameChangeRequired: Bool
+    /// Older deployments omit this deployment-only account state.
+    let isAccountSuspended: Bool
     let reason: RemoteProfileReportReason
     let note: String?
     let status: RemoteProfileModerationStatus
     let submittedAt: Date
 
     private enum CodingKeys: String, CodingKey {
-        case id, profile, isLeaderboardRestricted, isDisplayNameChangeRequired, reason, note, status,
+        case id, profile, isLeaderboardRestricted, isDisplayNameChangeRequired, isAccountSuspended, reason, note, status,
             submittedAt
     }
 
@@ -1043,6 +1057,7 @@ struct RemoteModerationProfileReport: Codable, Identifiable, Sendable {
             Bool.self, forKey: .isLeaderboardRestricted) ?? false
         isDisplayNameChangeRequired = try values.decodeIfPresent(
             Bool.self, forKey: .isDisplayNameChangeRequired) ?? false
+        isAccountSuspended = try values.decodeIfPresent(Bool.self, forKey: .isAccountSuspended) ?? false
         reason = try values.decode(RemoteProfileReportReason.self, forKey: .reason)
         note = try values.decodeIfPresent(String.self, forKey: .note)
         status = try values.decode(RemoteProfileModerationStatus.self, forKey: .status)
@@ -1059,8 +1074,13 @@ private struct RemoteLeaderboardRestrictionResponse: Codable, Sendable {
 }
 private struct RemoteDisplayNameRequirementRequest: Codable, Sendable { let isRequired: Bool }
 private struct RemoteDisplayNameRequirementResponse: Codable, Sendable {
-    let userID: UUID
-    let isRequired: Bool
+  let userID: UUID
+  let isRequired: Bool
+}
+private struct RemoteAccountSuspensionRequest: Codable, Sendable { let isSuspended: Bool }
+private struct RemoteAccountSuspensionResponse: Codable, Sendable {
+  let userID: UUID
+  let isSuspended: Bool
 }
 
 private struct RemoteProfileReportRequest: Codable, Sendable {
@@ -1910,6 +1930,7 @@ final class AccountSession {
                 leaderboardOptedOut: user.leaderboardOptedOut,
                 leaderboardRestricted: user.leaderboardRestricted,
                 displayNameChangeRequired: user.displayNameChangeRequired,
+                accountSuspended: user.accountSuspended,
                 profileDetails: user.profileDetails,
                 authenticationMethods: user.authenticationMethods,
                 streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
@@ -1949,6 +1970,7 @@ final class AccountSession {
                 leaderboardOptedOut: user.leaderboardOptedOut,
                 leaderboardRestricted: user.leaderboardRestricted,
                 displayNameChangeRequired: user.displayNameChangeRequired,
+                accountSuspended: user.accountSuspended,
                 profileDetails: user.profileDetails,
                 authenticationMethods: user.authenticationMethods,
                 availableBadges: user.availableBadges, selectedBadgeID: user.selectedBadgeID,
@@ -2146,6 +2168,21 @@ final class AccountSession {
         return response.isRequired
     }
 
+    func setAccountSuspended(_ profileID: UUID, key: String, suspended: Bool) async throws -> Bool {
+        let normalizedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedKey.isEmpty else {
+            throw RemoteAccountError.serverMessage("请输入部署者配置的审核密钥。")
+        }
+        let response = try await RemoteAccountAPI(endpoint: endpoint).request(
+            path: "v1/moderation/profiles/\(profileID.uuidString)/account-suspension",
+            method: "PATCH", token: nil,
+            body: RemoteAccountSuspensionRequest(isSuspended: suspended),
+            headers: ["X-Typebar-Moderation-Key": normalizedKey],
+            response: RemoteAccountSuspensionResponse.self)
+        guard response.userID == profileID else { throw RemoteAccountError.unexpectedResponse }
+        return response.isSuspended
+    }
+
     func publicQuotes(language: TypingLanguage) async throws -> [RemotePublicQuote] {
         try await RemoteAccountAPI(endpoint: endpoint).request(
             path: "v1/quotes", method: "GET", token: tokenStore.load(),
@@ -2314,6 +2351,7 @@ final class AccountSession {
                 leaderboardOptedOut: user.leaderboardOptedOut,
                 leaderboardRestricted: user.leaderboardRestricted,
                 displayNameChangeRequired: user.displayNameChangeRequired,
+                accountSuspended: user.accountSuspended,
                 authenticationMethods: user.authenticationMethods
             )
         }
