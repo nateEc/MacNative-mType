@@ -974,6 +974,16 @@ enum TestModifierPolicy {
     return modifiers.filter { !incompatible.contains($0) }
   }
 
+  /// Interactive mode changes are rejected by the reference while an active
+  /// funbox requires a different mode. Imports use `modifiersCompatibleWithMode`
+  /// to sanitize persisted data instead.
+  static func acceptsModeSelection(_ mode: TestMode, modifiers: [TestModifier]) -> Bool {
+    guard !modifiers.contains(.memory) || MemoryFunboxModePolicy.allowedModes.contains(mode) else {
+      return false
+    }
+    return modifiersCompatibleWithMode(modifiers, mode: mode) == modifiers
+  }
+
   /// Returns whether a group would be accepted by the fixed reference
   /// metadata validator. This is deliberately visible to the package so tests
   /// can assert the user-facing combination boundary directly.
@@ -2123,8 +2133,10 @@ struct TestConfiguration: Codable, Equatable {
       copy.duration = nil
       copy.wordLimit = copy.wordLimit ?? MemoryFunboxModePolicy.fallbackWordLimit
     }
+    let modeCompatibleModifiers = TestModifierPolicy.modifiersCompatibleWithMode(
+      normalizedModifiers, mode: copy.mode)
     copy.modifiers = copy.isInfinite
-      ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
+      ? TestModifierPolicy.compatibleWithInfiniteTest(modeCompatibleModifiers) : modeCompatibleModifiers
     copy.contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
       copy.contentOptions, modifiers: copy.modifiers)
     return copy

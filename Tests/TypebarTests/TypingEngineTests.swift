@@ -16267,6 +16267,8 @@ final class TypingEngineTests: XCTestCase {
         [.uppercase, .arrowStream, .referenceStream, .pseudolangStream, .weakSpot, .zipf],
         mode: .custom),
       [.uppercase])
+    XCTAssertFalse(TestModifierPolicy.acceptsModeSelection(.custom, modifiers: [.arrowStream]))
+    XCTAssertTrue(TestModifierPolicy.acceptsModeSelection(.words, modifiers: [.arrowStream]))
     var customText = TestSessionFactory.make(
       configuration: customArrowConfiguration, customText: "amber harbor")
     XCTAssertEqual(customText.prompt, "amber harbor")
@@ -16277,6 +16279,11 @@ final class TypingEngineTests: XCTestCase {
       mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
       modifiers: [.arrowStream])
     XCTAssertEqual(quoteArrowConfiguration.modifiers, [])
+    XCTAssertEqual(
+      TestConfiguration(
+        mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()
+      ).with(modifiers: [.arrowStream]).modifiers,
+      [])
     var encodedArrowConfiguration = try! JSONSerialization.jsonObject(
       with: JSONEncoder().encode(TestConfiguration.words(4).with(modifiers: [.arrowStream])))
       as! [String: Any]

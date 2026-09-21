@@ -682,6 +682,7 @@ private struct ContentView: View {
   @State private var lastClockTickSecond = 0
   @State private var timerHealth = TimerHealthState()
   @State private var restartLockMessage: String?
+  @State private var modeCompatibilityMessage: String?
   @State private var currentRestartCount = 0
   @State private var weakSpotScores = WeakSpotScores()
   @State private var lastCompletedWpm: Int?
@@ -1033,7 +1034,7 @@ private struct ContentView: View {
     .sheet(isPresented: $showingCustomTimeEditor) {
       TestLimitEditor(kind: .time, initialValue: duration) { value in
         activeChallengeID = nil
-        mode = .time
+        guard selectMode(.time) else { return }
         duration = value
         reset()
       }
@@ -1041,7 +1042,7 @@ private struct ContentView: View {
     .sheet(isPresented: $showingCustomWordsEditor) {
       TestLimitEditor(kind: .words, initialValue: wordLimit) { value in
         activeChallengeID = nil
-        mode = .words
+        guard selectMode(.words) else { return }
         wordLimit = value
         reset()
       }
@@ -1302,7 +1303,10 @@ private struct ContentView: View {
         Text("离线、专注的 Mac 打字练习").foregroundStyle(.secondary)
       }
       Spacer()
-      Picker("模式", selection: $mode) {
+      Picker("模式", selection: Binding(
+        get: { mode },
+        set: { _ = selectMode($0) }
+      )) {
         ForEach(TestMode.allCases, id: \.self) { mode in
           Text(mode.displayName).tag(mode)
         }
@@ -2509,6 +2513,11 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .offset(y: 24)
+      } else if let modeCompatibilityMessage {
+        Label(modeCompatibilityMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
       } else if let customBackgroundCommandMessage {
         Label(customBackgroundCommandMessage, systemImage: "exclamationmark.triangle.fill")
           .font(.caption)
@@ -2529,6 +2538,17 @@ private struct ContentView: View {
       return
     }
     reset(restarting: true)
+  }
+
+  @discardableResult
+  private func selectMode(_ requested: TestMode) -> Bool {
+    guard TestModifierPolicy.acceptsModeSelection(requested, modifiers: settings.testModifiers) else {
+      modeCompatibilityMessage = "当前修饰器不支持“\(requested.displayName)”模式；请先关闭不兼容的趣味模式。"
+      return false
+    }
+    modeCompatibilityMessage = nil
+    mode = requested
+    return true
   }
 
   private var restartInstruction: String {
@@ -2779,7 +2799,7 @@ private struct ContentView: View {
   }
 
   private func loadSavedCustomText(_ selection: SavedCustomTextSelection) {
-    mode = .custom
+    guard selectMode(.custom) else { return }
     guard selection.isLong else {
       activeLongSavedText = nil
       customText = selection.text
@@ -2806,10 +2826,10 @@ private struct ContentView: View {
     let separator = existing.isEmpty ? "" : " "
     let nextText = CustomTextPolicy.clamped(existing + separator + generatedText)
     guard CustomTextPolicy.isValid(nextText) else { return }
+    guard selectMode(.custom) else { return }
     activeChallengeID = nil
     activeLongSavedText = nil
     practiceReturnPreset = nil
-    mode = .custom
     customText = nextText
     customTextCompletion = .finish
     customTextOrdering = .inOrder
@@ -2968,13 +2988,13 @@ private struct ContentView: View {
   private func startWeakSpotPractice(
     prompt weakSpotPrompt: String, language weakSpotLanguage: TypingLanguage
   ) {
+    guard selectMode(.custom) else { return }
     activeChallengeID = nil
     language = weakSpotLanguage
     customText = weakSpotPrompt
     customTextCompletion = .words
     customTextWordLimit = weakSpotPrompt.split(separator: " ").count
     customTextOrdering = .inOrder
-    mode = .custom
     reset()
   }
 
@@ -3134,8 +3154,8 @@ private struct ContentView: View {
     if let action = CommandPaletteUtilityCatalog.action(for: item.id) {
       switch action {
       case .editCustomText:
+        guard selectMode(.custom) else { return }
         activeChallengeID = nil
-        mode = .custom
         reset()
       case .shareTestSettings:
         showingTestShare = true
@@ -3347,8 +3367,8 @@ private struct ContentView: View {
     }
     if let target = QuoteCommandCatalog.target(for: item.id) {
       if target == .favorites, !hasFavoriteQuotesInCurrentSource { return }
+      guard selectMode(.quote) else { return }
       activeChallengeID = nil
-      mode = .quote
       quoteQueue.reset()
       switch target {
       case .lengths(let lengths):
@@ -3381,10 +3401,10 @@ private struct ContentView: View {
     if let target = QuickTestParameterCommandCatalog.target(for: item.id) {
       switch target {
       case .timed(let seconds):
-        mode = .time
+        guard selectMode(.time) else { return }
         duration = seconds
       case .words(let count):
-        mode = .words
+        guard selectMode(.words) else { return }
         wordLimit = count
       case .customTime:
         return
@@ -3469,20 +3489,15 @@ private struct ContentView: View {
     switch item.id {
     case "restart": attemptRestart()
     case "mode.time":
-      mode = .time
-      reset()
+      if selectMode(.time) { reset() }
     case "mode.words":
-      mode = .words
-      reset()
+      if selectMode(.words) { reset() }
     case "mode.quote":
-      mode = .quote
-      reset()
+      if selectMode(.quote) { reset() }
     case "mode.zen":
-      mode = .zen
-      reset()
+      if selectMode(.zen) { reset() }
     case "mode.custom":
-      mode = .custom
-      reset()
+      if selectMode(.custom) { reset() }
     case "history": showingHistory = true
     case "weakSpots": showingWeakSpots = true
     case "presets": showingPresets = true
@@ -3972,12 +3987,12 @@ private struct ContentView: View {
     guard let practice = WordPracticeText.sectionedPractice(
       segments: words, selectedTargetCount: selectedTargetCount)
     else { return }
+    guard selectMode(.custom) else { return }
     if practiceReturnPreset == nil { practiceReturnPreset = presetDefinition }
     customText = practice.text
     customTextCompletion = .sections
     customTextSectionLimit = practice.sectionCount
     customTextOrdering = .inOrder
-    mode = .custom
     completedResult = nil
     reset()
   }
