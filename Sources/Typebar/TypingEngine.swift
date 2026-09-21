@@ -1330,17 +1330,14 @@ enum EarthquakeOffsetPolicy {
 }
 
 enum RandomCasePolicy {
-  /// Keeps punctuation and non-Latin characters untouched while independently
-  /// choosing the case of each ASCII letter. The injectable source makes the
-  /// user-facing randomness testable without copying a reference implementation.
+  /// Mirrors the source funbox's per-Unicode-scalar random choice. Punctuation
+  /// and spacing remain visually unchanged but still consume a choice, so later
+  /// letters receive the same independent treatment as the web generator.
   static func transformed(
     _ value: String, nextBit: () -> Bool = { Bool.random() }
   ) -> String {
-    value.reduce(into: "") { output, character in
-      guard character.isASCII, character.isLetter else {
-        output.append(character)
-        return
-      }
+    value.unicodeScalars.reduce(into: "") { output, scalar in
+      let character = String(scalar)
       output += nextBit() ? character.uppercased() : character.lowercased()
     }
   }

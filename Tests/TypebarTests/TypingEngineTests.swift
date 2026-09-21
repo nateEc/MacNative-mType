@@ -17560,10 +17560,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(noSpaceLazySession.typed, "amber")
   }
 
-  func testRandomCaseModifierChangesOnlyAsciiLetterCaseAndConflictsWithOtherCaseModes() {
-    var bits = [true, false, false, true]
-    let transformed = RandomCasePolicy.transformed("Ab-cD 7") { bits.removeFirst() }
-    XCTAssertEqual(transformed, "Ab-cD 7")
+  func testRandomCaseModifierTransformsUnicodeAndConsumesEverySourceCharacter() {
+    var bits = [false, true, false, true, false, true, false]
+    let transformed = RandomCasePolicy.transformed("Äb-cD 7") { bits.removeFirst() }
+    XCTAssertEqual(transformed, "äB-Cd 7")
+    XCTAssertTrue(bits.isEmpty, "source-compatible random case also consumes punctuation and spaces")
 
     let randomCase = TestModifierPolicy.transformed("amber bay!", modifiers: [.randomCase])
     XCTAssertEqual(randomCase.lowercased(), "amber bay!")
@@ -18039,6 +18040,7 @@ final class TypingEngineTests: XCTestCase {
               : CharacterSet.punctuationCharacters
         let normalized = token.trimmingCharacters(
           in: punctuation)
+        if normalized.isEmpty { return nil }
         let baseTokens: [String]
         switch language {
         case .turkish:
