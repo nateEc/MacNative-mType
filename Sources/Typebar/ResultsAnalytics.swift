@@ -958,8 +958,10 @@ enum ResultPromptText {
       return ResultInputText.make(for: result)
     }
 
+    let needsLegacyNoSpaceParsing = result.configuration.language.usesCJKWordStream
+      && !result.prompt.contains(where: \.isWhitespace)
     if result.configuration.language.usesSpaceDelimitedWords,
-      !result.configuration.modifiers.contains(.noSpaces)
+      !result.configuration.modifiers.contains(.noSpaces), !needsLegacyNoSpaceParsing
     {
       let targets = reviews.map(\.target)
       return targets.isEmpty ? nil : targets.joined(separator: " ")

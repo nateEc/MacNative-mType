@@ -2712,8 +2712,10 @@ private struct ContentView: View {
         liveContentMessage = "已获取\(content.attribution)，为避免打断输入，本轮仍使用现有提示。"
         return
       }
+      let livePrompt = content.promptDescriptor(for: configuration)
       session = TestSessionFactory.make(
-        configuration: configuration, streamPrompt: content.prompt(for: configuration))
+        configuration: configuration, streamPrompt: livePrompt.text,
+        streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource)
       liveContentMessage = "已载入\(content.attribution)。"
       if configuration.modifiers.contains(.listening) {
         NativeSpeech.shared.speak(session.prompt, language: configuration.language)

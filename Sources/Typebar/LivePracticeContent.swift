@@ -32,6 +32,13 @@ enum LivePracticeContentSource: Equatable {
   }
 }
 
+struct LivePracticePrompt: Equatable {
+  let text: String
+  /// Original system-tokenizer boundaries for a visible prompt that contains
+  /// no separators, such as Chinese encyclopedia text.
+  let noSpaceBoundarySource: String?
+}
+
 struct LivePracticeContent: Equatable {
   let source: LivePracticeContentSource
   let title: String
@@ -58,7 +65,13 @@ struct LivePracticeContent: Equatable {
   }
 
   func prompt(for configuration: TestConfiguration) -> String {
-    guard !tokens.isEmpty else { return text }
+    promptDescriptor(for: configuration).text
+  }
+
+  func promptDescriptor(for configuration: TestConfiguration) -> LivePracticePrompt {
+    guard !tokens.isEmpty else {
+      return .init(text: text, noSpaceBoundarySource: nil)
+    }
     let targetCount: Int
     switch configuration.mode {
     case .time, .words:
@@ -66,7 +79,10 @@ struct LivePracticeContent: Equatable {
     case .quote, .zen, .custom:
       targetCount = tokens.count
     }
-    return (0..<targetCount).map { tokens[$0 % tokens.count] }.joined(separator: separator)
+    let selectedTokens = (0..<targetCount).map { tokens[$0 % tokens.count] }
+    return .init(
+      text: selectedTokens.joined(separator: separator),
+      noSpaceBoundarySource: separator.isEmpty ? selectedTokens.joined(separator: " ") : nil)
   }
 }
 
@@ -316,7 +332,7 @@ private extension TypingLanguage {
   /// its pinned `zh-Hant` encyclopedia stream is Chinese source text and must
   /// preserve the system tokenizer's no-space boundaries.
   var usesNoSpaceLiveText: Bool {
-    isNoSpaceLanguage || self == .jyutping
+    usesCJKWordStream || self == .jyutping
   }
 
   /// Japanese native variants, Ukrainian Latin, Serbian Latin, and Greeklish are intentionally excluded:
@@ -329,6 +345,7 @@ private extension TypingLanguage {
     !rawValue.hasPrefix("greeklish") && self != .ukrainianLatin
       && self != .ukrainianLatynka1k && self != .ukrainianLatynka10k
       && self != .ukrainianLatynka50k && self != .serbianLatin && self != .serbianLatin10k
+      && self != .japaneseHiragana && self != .japaneseKatakana
       && self != .japaneseRomaji && self != .japaneseRomaji1k
       && (usesSpaceDelimitedWords || self == .simplifiedChinese || self == .traditionalChinese)
   }

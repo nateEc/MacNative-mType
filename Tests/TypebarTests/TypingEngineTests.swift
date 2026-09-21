@@ -868,7 +868,8 @@ final class TypingEngineTests: XCTestCase {
 
   func testIncrementalNoSpaceWordTestStopsAtConfiguredLimitInsteadOfFirstChunk() {
     var session = TypingSession(
-      configuration: .words(3, language: .simplifiedChinese), prompt: "甲乙",
+      configuration: .words(3, language: .simplifiedChinese).with(modifiers: [.noSpaces]),
+      prompt: "甲乙",
       repeatingPrompt: "甲乙", noSpaceWordEndIndices: [1, 2],
       noSpaceTargetWords: ["甲", "乙"], repeatingNoSpaceWordLengths: [1, 1],
       repeatingNoSpaceTargetWords: ["甲", "乙"])
@@ -3037,14 +3038,14 @@ final class TypingEngineTests: XCTestCase {
       TypingReplay.typedText(events: session.result()?.replayEvents ?? [], through: 2), "amber bay")
   }
 
-  func testClearCurrentWordOnErrorModifierDoesNotClearChineseInput() {
+  func testClearCurrentWordOnErrorModifierClearsCJKSourceWord() {
     var session = TypingSession(
       configuration: .timed(seconds: 30, language: .simplifiedChinese)
         .with(modifiers: [.clearCurrentWordOnError]),
       prompt: "你好")
     session.insert("你", at: start)
     session.insert("x", at: start.addingTimeInterval(1))
-    XCTAssertEqual(session.typed, "你x")
+    XCTAssertEqual(session.typed, "")
   }
 
   func testTimeWarningsUseTheSelectedCountdownOffsetAndNeverRepeatWithinOneSecond() {
@@ -10583,7 +10584,7 @@ final class TypingEngineTests: XCTestCase {
         "繁體中文 · \(rawValue.dropFirst("traditionalChinese".count)) · Typebar")
       XCTAssertFalse(language.usesRightToLeftPrompt)
       XCTAssertFalse(language.usesJoiningScriptPrompt)
-      XCTAssertFalse(language.usesSpaceDelimitedWords)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
       XCTAssertFalse(language.supportsLazyLatinInput)
       XCTAssertFalse(language.supportsCapsLockWarning)
       XCTAssertEqual(language.zipfFrequencySupport, .supported)
@@ -10622,12 +10623,13 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(
         try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
       let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
-      XCTAssertFalse(prompt.contains(" "))
-      XCTAssertGreaterThanOrEqual(prompt.count, 25)
-      let boundarySource = [words[0], words[1], words[2], words[count - 1]].joined()
+      XCTAssertEqual(prompt.split(separator: " ").count, 25)
+      let boundarySource = [words[0], words[1], words[2], words[count - 1]].joined(separator: " ")
+      let flattenedBoundarySource = TestModifierPolicy.transformed(
+        boundarySource, modifiers: [.noSpaces], language: language)
       let boundaryLengths = NoSpaceWordBoundaryPolicy.wordLengths(
-        source: boundarySource, language: language, modifiers: [],
-        transformedPrompt: boundarySource)
+        source: boundarySource, language: language, modifiers: [.noSpaces],
+        transformedPrompt: flattenedBoundarySource)
       XCTAssertEqual(boundaryLengths, [words[0], words[1], words[2], words[count - 1]].map(\.count))
       for length in [QuoteLength.short, .medium, .long, .extended] {
         XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
@@ -12879,7 +12881,7 @@ final class TypingEngineTests: XCTestCase {
         "简体中文 · \(rawValue.dropFirst("simplifiedChinese".count)) · Typebar")
       XCTAssertFalse(language.usesRightToLeftPrompt)
       XCTAssertFalse(language.usesJoiningScriptPrompt)
-      XCTAssertFalse(language.usesSpaceDelimitedWords)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
       XCTAssertFalse(language.supportsLazyLatinInput)
       XCTAssertFalse(language.supportsCapsLockWarning)
       XCTAssertEqual(language.zipfFrequencySupport, .unknown)
@@ -12913,12 +12915,13 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(
         try TestConfigurationShare.preset(from: TestConfigurationShare.link(for: preset)), preset)
       let prompt = OfflineContent.generatedPrompt(wordCount: 25, language: language)
-      XCTAssertFalse(prompt.contains(" "))
-      XCTAssertGreaterThanOrEqual(prompt.count, 50)
-      let boundarySource = [words[0], words[1], words[2], words[count - 1]].joined()
+      XCTAssertEqual(prompt.split(separator: " ").count, 25)
+      let boundarySource = [words[0], words[1], words[2], words[count - 1]].joined(separator: " ")
+      let flattenedBoundarySource = TestModifierPolicy.transformed(
+        boundarySource, modifiers: [.noSpaces], language: language)
       let boundaryLengths = NoSpaceWordBoundaryPolicy.wordLengths(
-        source: boundarySource, language: language, modifiers: [],
-        transformedPrompt: boundarySource)
+        source: boundarySource, language: language, modifiers: [.noSpaces],
+        transformedPrompt: flattenedBoundarySource)
       XCTAssertEqual(boundaryLengths, [words[0], words[1], words[2], words[count - 1]].map(\.count))
       for length in [QuoteLength.short, .medium, .long, .extended] {
         XCTAssertEqual(OfflineContent.quotes(for: language, length: length).first?.language, language)
@@ -15242,7 +15245,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(custom.prompt, "own text")
   }
 
-  func testNoSpaceLanguagesUseOriginalTermsAndFinishAtLimit() {
+  func testCJKWordsUseOriginalTermsWithSourceSpacesAndFinishAtLimit() {
     for (language, lexicon) in [
       (TypingLanguage.simplifiedChinese, StarterLexicon.simplifiedChineseWords),
       (.traditionalChinese, StarterLexicon.traditionalChineseWords),
@@ -15251,9 +15254,9 @@ final class TypingEngineTests: XCTestCase {
     ] {
       let configuration = TestConfiguration.words(10, language: language)
       var session = TestSessionFactory.make(configuration: configuration)
-      XCTAssertFalse(session.prompt.contains(" "))
+      XCTAssertEqual(session.prompt.split(separator: " ").count, 10)
       XCTAssertFalse(lexicon.isEmpty)
-      XCTAssertFalse(language.usesSpaceDelimitedWords)
+      XCTAssertTrue(language.usesSpaceDelimitedWords)
       XCTAssertTrue(language.supportsQuotes)
       for length in [QuoteLength.short, .medium, .long, .extended] {
         XCTAssertFalse(OfflineContent.quotes(for: language, length: length).isEmpty)
@@ -15264,7 +15267,7 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testNoSpaceLanguagesTrackOwnedWordBoundariesForProgressAndResults() {
+  func testNoSpaceModifierTracksCJKOwnedWordBoundariesForProgressAndResults() {
     for (language, lexicon) in [
       (TypingLanguage.simplifiedChinese, StarterLexicon.simplifiedChineseWords),
       (.traditionalChinese, StarterLexicon.traditionalChineseWords),
@@ -15273,13 +15276,14 @@ final class TypingEngineTests: XCTestCase {
     ] {
       let configuration = TestConfiguration.words(
         4, language: language,
-        contentOptions: .init(includePunctuation: true, includeNumbers: true))
-      let source = ["1", lexicon[0], lexicon[1], lexicon[2]].joined()
+        contentOptions: .init(includePunctuation: true, includeNumbers: true)
+      ).with(modifiers: [.noSpaces])
+      let source = ["1", lexicon[0], lexicon[1], lexicon[2]].joined(separator: " ")
       var session = TestSessionFactory.make(configuration: configuration, streamPrompt: source)
       guard let firstWord = lexicon.sorted(by: { $0.count > $1.count }).first(where: {
         session.prompt.dropFirst().hasPrefix($0)
       }) else {
-        XCTFail("无空格提示未在独立数字后接续 Typebar 自有词库项：\(language.displayName)")
+        XCTFail("无空格修饰未在独立数字后接续 Typebar 自有词库项：\(language.displayName)")
         continue
       }
       let firstTarget = "1"
@@ -15299,20 +15303,58 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
-  func testNoSpaceLanguageBoundariesKeepGeneratedSuffixesAndStopOnErrorWord() {
-    let source = "晨光1，窗边"
-    let modifiers: [TestModifier] = [.backwards]
+  func testCJKSourcePromptsUseSpacesAndNoSpaceModifierRetainsWordBoundaries() {
+    let cases: [(TypingLanguage, String, String)] = [
+      (.simplifiedChinese, "晨光", "窗边"),
+      (.traditionalChinese, "晨霧", "海灣"),
+      (.japaneseHiragana, "あさ", "まど"),
+      (.japaneseKatakana, "カメラ", "メモ"),
+    ]
+
+    for (language, first, second) in cases {
+      XCTAssertTrue(language.usesSpaceDelimitedWords, language.displayName)
+      let generated = OfflineContent.generatedPrompt(
+        wordCount: 2, language: language,
+        contentOptions: .init(includePunctuation: true, includeNumbers: true))
+      XCTAssertEqual(generated.filter { $0 == " " }.count, 1, language.displayName)
+
+      let source = "\(first) \(second)"
+      let configuration = TestConfiguration.words(2, language: language)
+      var session = TestSessionFactory.make(configuration: configuration, streamPrompt: source)
+      XCTAssertEqual(session.prompt, source, language.displayName)
+      session.insert(first + " ", at: start)
+      XCTAssertEqual(session.completedWordCount, 1, language.displayName)
+      session.insert(second, at: start.addingTimeInterval(1))
+      XCTAssertEqual(session.outcome, .completed, language.displayName)
+      XCTAssertEqual(session.wordReviews.map(\.target), [first, second], language.displayName)
+
+      let noSpaceConfiguration = configuration.with(modifiers: [.noSpaces])
+      var noSpaceSession = TestSessionFactory.make(
+        configuration: noSpaceConfiguration, streamPrompt: source)
+      XCTAssertEqual(noSpaceSession.prompt, first + second, language.displayName)
+      noSpaceSession.insert(first, at: start)
+      XCTAssertEqual(noSpaceSession.completedWordCount, 1, language.displayName)
+      noSpaceSession.insert(second, at: start.addingTimeInterval(1))
+      XCTAssertEqual(noSpaceSession.outcome, .completed, language.displayName)
+      XCTAssertEqual(noSpaceSession.wordReviews.map(\.target), [first, second], language.displayName)
+    }
+  }
+
+  func testNoSpaceModifierBoundariesKeepGeneratedSuffixesAndStopOnErrorWord() {
+    let source = "晨光 1， 窗边"
+    let modifiers: [TestModifier] = [.noSpaces, .backwards]
     let transformed = TestModifierPolicy.transformed(source, modifiers: modifiers)
     let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
       source: source, language: .simplifiedChinese, modifiers: modifiers,
       transformedPrompt: transformed)
     XCTAssertEqual(transformed, "边窗，1光晨")
-    XCTAssertEqual(lengths, [2, 4])
+    XCTAssertEqual(lengths, [2, 2, 2])
     XCTAssertEqual(
-      NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: transformed), ["边窗", "，1光晨"])
+      NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: transformed), ["边窗", "，1", "光晨"])
 
     let configuration = TestConfiguration.words(
-      2, rules: .init(stopOnErrorMode: .word), language: .simplifiedChinese)
+      2, rules: .init(stopOnErrorMode: .word), language: .simplifiedChinese
+    ).with(modifiers: [.noSpaces])
     var session = TypingSession(
       configuration: configuration, prompt: "晨光窗边", noSpaceWordEndIndices: [2, 4],
       noSpaceTargetWords: ["晨光", "窗边"])
@@ -16902,11 +16944,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(jyutpingEncyclopedia.text, "書在早上打開")
     XCTAssertEqual(
       jyutpingEncyclopedia.prompt(for: .words(3, language: .jyutping)), "書在早上")
-    let chinesePrompt = chineseEncyclopedia.prompt(for: chineseConfiguration)
+    let chineseLivePrompt = chineseEncyclopedia.promptDescriptor(for: chineseConfiguration)
+    let chinesePrompt = chineseLivePrompt.text
     XCTAssertFalse(chinesePrompt.contains(" "))
     XCTAssertFalse(chinesePrompt.isEmpty)
+    XCTAssertEqual(chineseLivePrompt.noSpaceBoundarySource?.split(separator: " ").count, 5)
     var chineseSession = TestSessionFactory.make(
-      configuration: chineseConfiguration, streamPrompt: chinesePrompt)
+      configuration: chineseConfiguration, streamPrompt: chinesePrompt,
+      streamNoSpaceBoundarySource: chineseLivePrompt.noSpaceBoundarySource)
     chineseSession.insert(chineseSession.prompt, at: .now)
     XCTAssertEqual(chineseSession.outcome, .completed)
     let ukrainianData = Data("""
@@ -17674,7 +17719,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CustomTextPolicy.sections(in: "one|| two | "), ["one", "two"])
   }
 
-  func testSectionedPracticeCyclesWeightedCandidatesAndPreservesChineseSpacing() throws {
+  func testSectionedPracticeCyclesWeightedCandidatesAndUsesCJKCommitSpaces() throws {
     let practice = try XCTUnwrap(
       WordPracticeText.sectionedPractice(
         segments: ["amber", "amber", "cabin"], selectedTargetCount: 2, random: { 0 }))
@@ -17691,7 +17736,7 @@ final class TypingEngineTests: XCTestCase {
       language: .simplifiedChinese, customTextCompletion: .sections, customTextSectionLimit: 2)
     let chineseSession = TestSessionFactory.make(
       configuration: chineseConfiguration, customText: "晨光 | 窗边 | 纸张")
-    XCTAssertEqual(chineseSession.prompt, "晨光窗边")
+    XCTAssertEqual(chineseSession.prompt, "晨光 窗边")
   }
 
   func testCustomTextOrderingUsesOnlyUserSuppliedTokens() {

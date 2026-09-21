@@ -3090,7 +3090,9 @@ struct TypingSession {
   /// order. The count survives backspaces and repeated mistakes at the same
   /// position so local practice can use it as a weight.
   var missedWordErrorCounts: [MissedWordErrorCount] {
-    if configuration.language.isNoSpaceLanguage {
+    if configuration.language.usesCJKWordStream,
+      !prompt.contains(where: \.isWhitespace), !hasNoSpaceWordSegmentation
+    {
       return missedNoSpaceWordErrorCounts
     }
     let targetWords = resultTargetWords
@@ -3847,10 +3849,7 @@ struct TypingSession {
   }
 
   private var tracksNoSpaceWordBursts: Bool {
-    (configuration.language.isNoSpaceLanguage
-      || (configuration.language.usesSpaceDelimitedWords
-        && configuration.modifiers.contains(.noSpaces)))
-      && !noSpaceWordEndIndices.isEmpty
+    !noSpaceWordEndIndices.isEmpty
   }
 
   private var noSpaceCommittedWordIndex: Int? {
@@ -4205,7 +4204,7 @@ struct TypingSession {
         {
           complete(at: date)
         }
-      } else if !configuration.language.usesSpaceDelimitedWords
+      } else if hasNoSpaceWordSegmentation || !configuration.language.usesSpaceDelimitedWords
         || configuration.modifiers.contains(.noSpaces)
       {
         if reachedConfiguredWordLimit
@@ -11680,7 +11679,7 @@ enum StarterLexicon {
   }
 
   static func cjkPrompt(
-    tokens: Int, lexicon: [String], usesChineseMarks: Bool, separator: String = "",
+    tokens: Int, lexicon: [String], usesChineseMarks: Bool, separator: String = " ",
     contentOptions: ContentOptions, usesZipfFrequency: Bool
   ) -> String {
     cjkPrompt(
@@ -11689,7 +11688,7 @@ enum StarterLexicon {
   }
 
   static func cjkPrompt(
-    tokens: Int, lexicon: IndexedLexicon, usesChineseMarks: Bool, separator: String = "",
+    tokens: Int, lexicon: IndexedLexicon, usesChineseMarks: Bool, separator: String = " ",
     contentOptions: ContentOptions, usesZipfFrequency: Bool
   ) -> String {
     let generated = (0..<tokens).map { _ in
@@ -12944,11 +12943,11 @@ extension TypingLanguage {
   }
 
   var usesSpaceDelimitedWords: Bool {
-    !isNoSpaceLanguage && !isCodeLanguage
+    !isCodeLanguage
   }
 
   var polyglotPunctuation: [String] {
-    if isNoSpaceLanguage { return ["，", "。", "！", "？"] }
+    if usesCJKWordStream { return ["，", "。", "！", "？"] }
     if usesRightToLeftPrompt { return ["،", "؛", "؟", "."] }
     return [",", ".", "!", "?"]
   }
@@ -12977,7 +12976,9 @@ extension TypingLanguage {
     }
   }
 
-  var isNoSpaceLanguage: Bool {
+  /// Current source-compatible CJK word streams use commit spaces, but this
+  /// group remains available to parse pre-migration results and external text.
+  var usesCJKWordStream: Bool {
     switch self {
     case .simplifiedChinese, .simplifiedChinese1k, .simplifiedChinese5k,
       .simplifiedChinese10k, .simplifiedChinese50k, .traditionalChinese,
