@@ -1074,9 +1074,11 @@ enum TestModifierPolicy {
 enum AlternatingCasePolicy {
   static func transformed(_ source: String) -> String {
     source.split(separator: " ", omittingEmptySubsequences: false).map { word in
-      word.enumerated().reduce(into: "") { output, entry in
-        let (index, character) = entry
-        output += index.isMultiple(of: 2) ? character.lowercased() : character.uppercased()
+      var utf16Offset = 0
+      return word.unicodeScalars.reduce(into: "") { output, scalar in
+        let character = String(scalar)
+        output += utf16Offset.isMultiple(of: 2) ? character.lowercased() : character.uppercased()
+        utf16Offset += scalar.value > 0xFFFF ? 2 : 1
       }
     }.joined(separator: " ")
   }
