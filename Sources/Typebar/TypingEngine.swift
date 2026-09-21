@@ -896,8 +896,119 @@ enum TestModifierPolicy {
     .pseudolangStream, .morseStream,
   ]
 
+  /// The fixed source declares compatibility through funbox metadata rather
+  /// than one hand-written conflict list. These sets retain that observable
+  /// contract while keeping Typebar's native-only modifiers independent.
+  private static let sourceWordGeneratorModifiers: Set<TestModifier> = [
+    .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream,
+    .asciiStream, .specialCharacterStream, .gibberishStream, .poetryStream,
+    .referenceStream, .arrowStream, .ipv4Stream, .ipv6Stream,
+    .pseudolangStream, .weakSpot,
+  ]
+  private static let sourceLayoutChangingModifiers: Set<TestModifier> = [
+    .layoutFluid, .mirrorKeyboard,
+  ]
+  private static let sourceLayoutRestrictedModifiers: Set<TestModifier> = [
+    .accountingStream, .arrowStream, .ipv4Stream, .ipv6Stream,
+    .binaryStream, .hexadecimalStream, .morseStream, .underscoreSeparators,
+    .simonSays,
+  ]
+  private static let sourceNoSpaceOrPushModifiers: Set<TestModifier> = [
+    .noSpaces, .underscoreSeparators, .arrowStream, .morseStream,
+    .focusCurrentWord, .focusNextWord, .focusTwoWords, .focusThreeWords,
+  ]
+  /// These funboxes do not append the normal inter-word commit character in
+  /// the reference generator. `underscoreSeparators` supplies its own `_`
+  /// token; the others concatenate their transformed word targets directly.
+  private static let sourceNoSpaceInputModifiers: Set<TestModifier> = [
+    .noSpaces, .underscoreSeparators, .arrowStream, .morseStream,
+  ]
+  private static let sourceWordVisibilityModifiers: Set<TestModifier> = [
+    .listening, .simonSays, .memory,
+    .focusCurrentWord, .focusNextWord, .focusTwoWords, .focusThreeWords,
+    .readAheadEasy, .readAhead, .readAheadHard,
+  ]
+  private static let sourceFrequencyModifiers: Set<TestModifier> = [.zipf, .weakSpot]
+  private static let sourceCapitalisationModifiers: Set<TestModifier> = [
+    .uppercase, .titleCase, .alternatingCase, .randomCase, .messagingStyle,
+  ]
+  private static let sourceNoLetterModifiers: Set<TestModifier> = [
+    .accountingStream, .arrowStream, .asciiStream, .specialCharacterStream,
+    .ipv4Stream, .ipv6Stream, .binaryStream, .hexadecimalStream, .morseStream,
+  ]
+  private static let sourceSymmetricCharacterModifiers: Set<TestModifier> = [.arrowStream]
+  private static let sourceSymmetricConflictModifiers: Set<TestModifier> = [
+    .chooVisual, .backwards,
+  ]
+  private static let sourceCSSModifierGroups: [Set<TestModifier>] = [
+    [.mirrorVisual, .upsideDownVisual],
+    [.nauseaVisual, .roundVisual],
+    [.listening, .chooVisual, .earthquakeVisual, .backwards, .aslVisual],
+    [.crtVisual, .spaceVisual],
+  ]
+
+  /// Returns whether a group would be accepted by the fixed reference
+  /// metadata validator. This is deliberately visible to the package so tests
+  /// can assert the user-facing combination boundary directly.
+  static func isSourceCompatible(_ modifiers: [TestModifier]) -> Bool {
+    let selected = Set(modifiers)
+    func hasAtMostOne(_ candidates: Set<TestModifier>) -> Bool {
+      selected.intersection(candidates).count <= 1
+    }
+
+    guard hasAtMostOne(sourceWordGeneratorModifiers),
+      hasAtMostOne(sourceNoSpaceOrPushModifiers),
+      hasAtMostOne(sourceWordVisibilityModifiers),
+      hasAtMostOne(sourceFrequencyModifiers),
+      hasAtMostOne(sourceCapitalisationModifiers),
+      sourceCSSModifierGroups.allSatisfy({ hasAtMostOne($0) })
+    else { return false }
+
+    let changesLayout = !selected.intersection(sourceLayoutChangingModifiers).isEmpty
+    let hasLayoutRestriction = !selected.intersection(sourceLayoutRestrictedModifiers).isEmpty
+    guard !(changesLayout && hasLayoutRestriction) else { return false }
+
+    let changesCapitalisation = !selected.intersection(sourceCapitalisationModifiers).isEmpty
+    let hasNoLetters = !selected.intersection(sourceNoLetterModifiers).isEmpty
+    guard !(changesCapitalisation && hasNoLetters) else { return false }
+
+    let usesSymmetricCharacters = !selected.intersection(sourceSymmetricCharacterModifiers).isEmpty
+    let conflictsWithSymmetricCharacters =
+      !selected.intersection(sourceSymmetricConflictModifiers).isEmpty
+    guard !(usesSymmetricCharacters && conflictsWithSymmetricCharacters) else { return false }
+
+    let changesFrequency = !selected.intersection(sourceFrequencyModifiers).isEmpty
+    let ignoresLanguage = !selected.intersection(languageIndependentResultModifiers).isEmpty
+    guard !(changesFrequency && ignoresLanguage) else { return false }
+
+    let speaks = selected.contains(.listening)
+    guard !(speaks && ignoresLanguage) else { return false }
+
+    let pushesWords = selected.contains(.focusCurrentWord)
+      || selected.contains(.focusNextWord)
+      || selected.contains(.focusTwoWords)
+      || selected.contains(.focusThreeWords)
+    let pullsSection = selected.contains(.poetryStream) || selected.contains(.referenceStream)
+    return !(pushesWords && pullsSection)
+  }
+
+  /// `polyglot` is represented by Typebar's language selection rather than a
+  /// modifier. The source still treats it as a word provider that ignores its
+  /// current language, so selecting it clears only incompatible modifiers.
+  static func modifiersCompatibleWithPolyglot(_ modifiers: [TestModifier]) -> [TestModifier] {
+    let incompatible = sourceWordGeneratorModifiers.union(sourceFrequencyModifiers).union([.listening])
+    return normalized(modifiers.filter { !incompatible.contains($0) })
+  }
+
   static func compatibleWithInfiniteTest(_ modifiers: [TestModifier]) -> [TestModifier] {
     normalized(modifiers).filter { !finiteDurationOnly.contains($0) }
+  }
+
+  /// Whether the reference generator removes the ordinary inter-word commit
+  /// space for this modifier set. Keep this separate from visibility funboxes
+  /// that merely push the viewport forward.
+  static func usesNoSpaceInput(_ modifiers: [TestModifier]) -> Bool {
+    !sourceNoSpaceInputModifiers.isDisjoint(with: modifiers)
   }
 
   static func normalized(_ modifiers: [TestModifier]) -> [TestModifier] {
@@ -960,10 +1071,8 @@ enum TestModifierPolicy {
             ? .ipv4Stream
             : modifiers.contains(.ipv6Stream)
               ? .ipv6Stream
-              : modifiers.contains(.pseudolangStream)
-                ? .pseudolangStream
-                : modifiers.contains(.morseStream) ? .morseStream : nil
-    return [
+              : modifiers.contains(.pseudolangStream) ? .pseudolangStream : nil
+    let candidates = [
       boundaryModifier, caseModifier, messagingModifier, modifiers.contains(.rot13) ? .rot13 : nil,
       modifiers.contains(.backwards) ? .backwards : nil,
       modifiers.contains(.doubleCharacters) ? .doubleCharacters : nil, concealmentModifier,
@@ -985,7 +1094,9 @@ enum TestModifierPolicy {
       modifiers.contains(.aslVisual) ? .aslVisual : nil,
       modifiers.contains(.noQuit) ? .noQuit : nil, streamModifier,
       modifiers.contains(.mirrorKeyboard) ? .mirrorKeyboard : nil,
+      modifiers.contains(.morseStream) ? .morseStream : nil,
     ].compactMap { $0 }
+    return canonicalSourceCompatible(candidates)
   }
 
   static func toggling(_ modifier: TestModifier, in modifiers: [TestModifier]) -> [TestModifier] {
@@ -1017,22 +1128,46 @@ enum TestModifierPolicy {
       .poetryStream,
       .referenceStream,
       .arrowStream, .ipv4Stream, .ipv6Stream,
-      .pseudolangStream, .morseStream:
+      .pseudolangStream:
       conflicts = [
         .weakSpot, .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream, .asciiStream, .specialCharacterStream,
         .gibberishStream,
         .poetryStream,
         .referenceStream,
         .arrowStream, .ipv4Stream, .ipv6Stream,
-        .pseudolangStream, .morseStream,
+        .pseudolangStream,
       ]
     case .rot13, .backwards, .doubleCharacters, .correctBeforeAdvance, .clearCurrentWordOnError,
       .lazyLatin, .zipf, .mirrorVisual, .upsideDownVisual, .crtVisual, .earthquakeVisual, .spaceVisual,
       .nauseaVisual, .roundVisual, .chooVisual, .layoutFluid, .aslVisual,
-      .noQuit, .mirrorKeyboard:
+      .noQuit, .mirrorKeyboard, .morseStream:
       conflicts = []
     }
-    return normalized(modifiers.filter { !conflicts.contains($0) } + [modifier])
+    let afterExistingConflicts = modifiers.filter { !conflicts.contains($0) }
+    let sourceConflicts = sourceCompatibilityConflicts(
+      for: modifier, current: afterExistingConflicts)
+    return normalized(afterExistingConflicts.filter { !sourceConflicts.contains($0) } + [modifier])
+  }
+
+  private static func canonicalSourceCompatible(_ candidates: [TestModifier]) -> [TestModifier] {
+    candidates.reduce(into: [TestModifier]()) { accepted, candidate in
+      if isSourceCompatible(accepted + [candidate]) {
+        accepted.append(candidate)
+      }
+    }
+  }
+
+  private static func sourceCompatibilityConflicts(
+    for modifier: TestModifier, current: [TestModifier]
+  ) -> Set<TestModifier> {
+    var retained = normalized(current)
+    while !isSourceCompatible(retained + [modifier]) {
+      guard let conflict = retained.reversed().first(where: {
+        !isSourceCompatible([$0, modifier])
+      }) else { break }
+      retained.removeAll { $0 == conflict }
+    }
+    return Set(current).subtracting(retained)
   }
 
   static func transformed(
@@ -1095,7 +1230,46 @@ enum TestModifierPolicy {
     if modifiers.contains(.lazyLatin) {
       transformed = TypingTextNormalizer.lazyLatin(transformed, language: language)
     }
+    if modifiers.contains(.morseStream) {
+      transformed = MorseTextPolicy.transformed(transformed)
+    }
+    if modifiers.contains(.arrowStream) || modifiers.contains(.morseStream) {
+      transformed.removeAll(where: \.isWhitespace)
+    }
     return transformed
+  }
+}
+
+/// A Typebar-authored implementation of International Morse encoding. The
+/// reference funbox transforms its active word source instead of replacing it;
+/// this policy preserves that composition while keeping the mapping local.
+enum MorseTextPolicy {
+  private static let codeByCharacter: [Character: String] = [
+    "a": ".-", "b": "-...", "c": "-.-.", "d": "-..", "e": ".", "f": "..-.",
+    "g": "--.", "h": "....", "i": "..", "j": ".---", "k": "-.-", "l": ".-..",
+    "m": "--", "n": "-.", "o": "---", "p": ".--.", "q": "--.-", "r": ".-.",
+    "s": "...", "t": "-", "u": "..-", "v": "...-", "w": ".--", "x": "-..-",
+    "y": "-.--", "z": "--..", "0": "-----", "1": ".----", "2": "..---",
+    "3": "...--", "4": "....-", "5": ".....", "6": "-....", "7": "--...",
+    "8": "---..", "9": "----.", ".": ".-.-.-", ",": "--..--", "?": "..--..",
+    "'": ".----.", "/": "-..-.", "(": "-.--.", ")": "-.--.-", "&": ".-...",
+    ":": "---...", ";": "-.-.-.", "=": "-...-", "+": ".-.-.", "-": "-....-",
+    "_": "..--.-", "\"": ".-..-.", "$": "...-..-", "!": "-.-.--", "@": ".--.-.",
+  ]
+
+  static func transformed(_ text: String) -> String {
+    text.reduce(into: "") { output, character in
+      guard !character.isWhitespace else { return }
+      let normalized = String(character)
+        .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+        .lowercased()
+      for scalarCharacter in normalized {
+        if let code = codeByCharacter[scalarCharacter] {
+          output += code
+          output.append("/")
+        }
+      }
+    }
   }
 }
 
@@ -2881,7 +3055,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
 enum PromptHighlightAvailabilityPolicy {
   static let characterOnlyModifiers: Set<TestModifier> = [
     .noSpaces, .underscoreSeparators, .listening, .simonSays, .memory,
-    .readAheadEasy, .readAhead, .readAheadHard, .arrowStream,
+    .readAheadEasy, .readAhead, .readAheadHard, .arrowStream, .morseStream,
   ]
 
   static func allowsWordRanges(
@@ -3139,7 +3313,7 @@ struct TypingSession {
     }
     guard configuration.language.usesSpaceDelimitedWords,
       !configuration.language.isCodeLanguage,
-      !configuration.modifiers.contains(.noSpaces)
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else {
       return max(0, typed.count - errors)
     }
@@ -3294,7 +3468,7 @@ struct TypingSession {
       return bursts
     }
     guard configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces), !typed.isEmpty
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), !typed.isEmpty
     else { return [] }
     var bursts: [Int?] = []
     var wordStart = 0
@@ -3739,7 +3913,7 @@ struct TypingSession {
     // The reference input accepts several platform space characters as the
     // regular word separator, but no-space rejects every one of them before
     // it can reach validation or result statistics.
-    if configuration.modifiers.contains(.noSpaces), isReferenceInputSpace(character) {
+    if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), isReferenceInputSpace(character) {
       return false
     }
     if character == "\n", !prompt.contains("\n") {
@@ -3799,7 +3973,7 @@ struct TypingSession {
       with: inputCharacter, forceError: forceError)
     if configuration.modifiers.contains(.correctBeforeAdvance),
       (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts),
-      ((isPromptWordSeparator(inputCharacter) && !configuration.modifiers.contains(.noSpaces)
+      ((isPromptWordSeparator(inputCharacter) && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
         && !currentWordIsCorrect)
         || blocksNoSpaceWordAdvance)
     {
@@ -3807,7 +3981,7 @@ struct TypingSession {
     }
     if configuration.rules.stopOnErrorMode == .word,
       (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts),
-      ((isPromptWordSeparator(inputCharacter) && !configuration.modifiers.contains(.noSpaces)
+      ((isPromptWordSeparator(inputCharacter) && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
         && !currentWordIsCorrect)
         || blocksNoSpaceWordAdvance)
     {
@@ -3831,7 +4005,8 @@ struct TypingSession {
       return false
     }
     if !isCorrect && configuration.modifiers.contains(.clearCurrentWordOnError),
-      configuration.language.usesSpaceDelimitedWords, !configuration.modifiers.contains(.noSpaces)
+      configuration.language.usesSpaceDelimitedWords,
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     {
       clearCurrentWord(at: date)
       return false
@@ -3936,7 +4111,7 @@ struct TypingSession {
 
     if mode.returnsToPreviousWordAtStart && activeWordWasEmpty,
       ((configuration.language.usesSpaceDelimitedWords
-        && !configuration.modifiers.contains(.noSpaces)) || tracksNoSpaceWordBursts), !typed.isEmpty
+        && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)) || tracksNoSpaceWordBursts), !typed.isEmpty
     {
       removePreviousWordForHardDelete(
         clearingWord: mode.clearsWholeWord, automatic: true, at: date)
@@ -4079,7 +4254,7 @@ struct TypingSession {
       commitsWord = noSpaceCommittedWordIndex != nil
     } else {
       commitsWord = isPromptWordSeparator(character) && configuration.language.usesSpaceDelimitedWords
-        && !configuration.modifiers.contains(.noSpaces)
+        && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     }
     // Monkeytype computes minBurst only after goToNextWord has actually
     // advanced its active-word index. A terminal finite word completes the
@@ -4209,7 +4384,7 @@ struct TypingSession {
     configuration.mode != .zen
       && configuration.language.usesSpaceDelimitedWords
       && !configuration.language.isCodeLanguage
-      && !configuration.modifiers.contains(.noSpaces)
+      && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       && !inputWordIsEmpty
   }
 
@@ -4223,7 +4398,7 @@ struct TypingSession {
     guard configuration.mode != .zen,
       configuration.language.usesSpaceDelimitedWords,
       !configuration.language.isCodeLanguage,
-      !configuration.modifiers.contains(.noSpaces), !prompt.isEmpty
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), !prompt.isEmpty
     else { return nil }
     let targetCharacters = Array(prompt)
     let targetIndex = min(nextTargetIndex, targetCharacters.count - 1)
@@ -4260,7 +4435,7 @@ struct TypingSession {
       (!inputWordIsEmpty || (character == "\n" && shouldCommitLeadingNewline)),
       configuration.language.usesSpaceDelimitedWords,
       !configuration.language.isCodeLanguage,
-      !configuration.modifiers.contains(.noSpaces)
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return nil }
     let targetCharacters = Array(prompt)
     guard targetCharacters.indices.contains(currentTargetIndex),
@@ -4394,7 +4569,7 @@ struct TypingSession {
   private var resultTargetWords: [String] {
     if hasNoSpaceWordSegmentation { return noSpaceTargetWords }
     guard configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces)
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return [] }
     return splitPromptWords(prompt, omittingEmptySubsequences: true).map(String.init)
   }
@@ -4488,7 +4663,7 @@ struct TypingSession {
           complete(at: date)
         }
       } else if hasNoSpaceWordSegmentation || !configuration.language.usesSpaceDelimitedWords
-        || configuration.modifiers.contains(.noSpaces)
+        || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       {
         if reachedConfiguredWordLimit
           || (!usesIncrementalPromptExtension && nextTargetIndex >= prompt.count)
@@ -4519,7 +4694,7 @@ struct TypingSession {
   private mutating func extendPromptIfNeeded() {
     guard nextTargetIndex >= prompt.count, let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
     let usesNoSpaceSeparator = !configuration.language.usesSpaceDelimitedWords
-      || configuration.modifiers.contains(.noSpaces)
+      || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
     let previousEnd = prompt.count + separator.count
     prompt += separator + repeatingPrompt
@@ -4570,7 +4745,7 @@ struct TypingSession {
   private var shouldFinishFiniteSpaceDelimitedTest: Bool {
     guard nextTargetIndex >= prompt.count else { return false }
     guard configuration.language.usesSpaceDelimitedWords,
-      !configuration.modifiers.contains(.noSpaces)
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return true }
     if currentWordIsCorrect || typed.last.map(isPromptWordSeparator) == true { return true }
     guard configuration.rules.quickEnd,

@@ -2649,8 +2649,11 @@ private struct ContentView: View {
     let effectiveMemoryMode = MemoryFunboxModePolicy.effectiveMode(
       requested: mode, modifiers: settings.testModifiers)
     if mode != effectiveMemoryMode { mode = effectiveMemoryMode }
+    let languageCompatibleModifiers = language == .mixedLanguages
+      ? TestModifierPolicy.modifiersCompatibleWithPolyglot(settings.testModifiers)
+      : settings.testModifiers
     let joiningSafeModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
-      settings.testModifiers, language: language,
+      languageCompatibleModifiers, language: language,
       mixedLanguageComponents: mixedLanguageComponents)
     if settings.testModifiers != joiningSafeModifiers {
       settings.testModifiers = joiningSafeModifiers
@@ -3272,7 +3275,13 @@ private struct ContentView: View {
       switch target {
       case .polyglot:
         activeChallengeID = nil
-        language = language == .mixedLanguages ? .english : .mixedLanguages
+        if language == .mixedLanguages {
+          language = .english
+        } else {
+          settings.testModifiers = TestModifierPolicy.modifiersCompatibleWithPolyglot(
+            settings.testModifiers)
+          language = .mixedLanguages
+        }
         reset()
       case .clear, .modifier:
         let previousModifiers = settings.testModifiers
@@ -3596,8 +3605,11 @@ private struct ContentView: View {
     mixedLanguageComponents: [TypingLanguage]? = nil, baseModifiers: [TestModifier]? = nil
   ) -> [TestModifier] {
     let components = mixedLanguageComponents ?? self.mixedLanguageComponents
+    let languageCompatibleModifiers = selectedLanguage == .mixedLanguages
+      ? TestModifierPolicy.modifiersCompatibleWithPolyglot(baseModifiers ?? settings.testModifiers)
+      : (baseModifiers ?? settings.testModifiers)
     let lazyInputModifiers = ArabicLazyInputPolicy.effectiveModifiers(
-      baseModifiers ?? settings.testModifiers, language: selectedLanguage, mode: mode,
+      languageCompatibleModifiers, language: selectedLanguage, mode: mode,
       mixedLanguageComponents: components,
       automaticallyEnabled: settings.prefersArabicLazyInput)
     return JoiningScriptFunboxPolicy.effectiveModifiers(

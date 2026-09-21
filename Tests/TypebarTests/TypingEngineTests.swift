@@ -16252,9 +16252,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(reference.prompt.split(separator: " ").count, 6)
     XCTAssertTrue(reference.prompt.allSatisfy { $0.isLetter || $0 == " " })
     XCTAssertEqual(TestModifierPolicy.toggling(.referenceStream, in: [.poetryStream]), [.referenceStream])
-    let arrows = TestSessionFactory.make(
+    var arrows = TestSessionFactory.make(
       configuration: TestConfiguration.words(4).with(modifiers: [.arrowStream]))
-    XCTAssertEqual(arrows.prompt.split(separator: " ").map(String.init), ["↑", "→", "↓", "←"])
+    XCTAssertEqual(arrows.prompt, "↑→↓←")
+    arrows.insert(arrows.prompt, at: start)
+    XCTAssertTrue(arrows.isFinished)
+    XCTAssertEqual(arrows.completedWordCount, 4)
     XCTAssertEqual(ArrowKeyInputPolicy.character(forKeyCode: 126), "↑")
     XCTAssertEqual(ArrowKeyInputPolicy.character(forKeyCode: 124), "→")
     XCTAssertEqual(ArrowKeyInputPolicy.character(forKeyCode: 125), "↓")
@@ -16275,9 +16278,76 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(pseudolang.prompt.split(separator: " ").allSatisfy { $0.allSatisfy(\.isLetter) })
     let morse = TestSessionFactory.make(
       configuration: TestConfiguration.words(2).with(modifiers: [.morseStream]))
-    XCTAssertTrue(morse.prompt.allSatisfy { ".-/ ".contains($0) })
+    XCTAssertTrue(morse.prompt.allSatisfy { ".-/".contains($0) })
     XCTAssertEqual(
-      TestModifierPolicy.toggling(.morseStream, in: [.pseudolangStream]), [.morseStream])
+      TestModifierPolicy.toggling(.morseStream, in: [.pseudolangStream]),
+      [.pseudolangStream, .morseStream])
+  }
+
+  func testFunboxCompatibilityRejectsSourceConflictsAndComposesMorseWithWordSources() {
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.layoutFluid, .arrowStream]), [.layoutFluid])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.simonSays, .mirrorKeyboard]), [.simonSays])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.focusNextWord, .listening]), [.listening])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.listening, .gibberishStream]), [.listening])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.zipf, .weakSpot]), [.zipf])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.arrowStream, .chooVisual]), [.chooVisual])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.arrowStream, .backwards]), [.backwards])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.uppercase, .morseStream]), [.uppercase])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.mirrorVisual, .upsideDownVisual]), [.mirrorVisual])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.nauseaVisual, .roundVisual]), [.nauseaVisual])
+    XCTAssertEqual(
+      TestModifierPolicy.normalized([.crtVisual, .spaceVisual]), [.crtVisual])
+
+    XCTAssertEqual(
+      TestModifierPolicy.toggling(.arrowStream, in: [.layoutFluid]), [.arrowStream])
+    XCTAssertEqual(
+      TestModifierPolicy.toggling(.layoutFluid, in: [.arrowStream]), [.layoutFluid])
+    XCTAssertEqual(
+      TestModifierPolicy.toggling(.zipf, in: [.weakSpot]), [.zipf])
+    XCTAssertEqual(
+      TestModifierPolicy.toggling(.weakSpot, in: [.zipf]), [.weakSpot])
+    XCTAssertEqual(
+      TestModifierPolicy.toggling(.morseStream, in: [.gibberishStream]),
+      [.gibberishStream, .morseStream])
+    XCTAssertEqual(
+      TestModifierPolicy.toggling(.gibberishStream, in: [.morseStream]),
+      [.gibberishStream, .morseStream])
+    XCTAssertEqual(
+      TestModifierPolicy.modifiersCompatibleWithPolyglot(
+        [.rot13, .gibberishStream, .morseStream]),
+      [.rot13, .morseStream])
+
+    let morse = TestSessionFactory.make(
+      configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        modifiers: [.morseStream]),
+      customText: "sos")
+    XCTAssertEqual(morse.prompt, ".../---/.../")
+
+    let gibberishMorse = TestSessionFactory.make(
+      configuration: .words(2).with(modifiers: [.gibberishStream, .morseStream]))
+    XCTAssertTrue(gibberishMorse.prompt.allSatisfy { ".-/".contains($0) })
+    XCTAssertFalse(gibberishMorse.prompt.contains(where: \.isWhitespace))
+    XCTAssertEqual(
+      NoSpaceWordBoundaryPolicy.wordLengths(
+        source: "sos sos", modifiers: [.morseStream],
+        transformedPrompt: ".../---/.../.../---/.../"),
+      [12, 12])
+    var completedGibberishMorse = gibberishMorse
+    completedGibberishMorse.insert(gibberishMorse.prompt, at: start)
+    XCTAssertTrue(completedGibberishMorse.isFinished)
+    XCTAssertEqual(completedGibberishMorse.completedWordCount, 2)
+    XCTAssertEqual(completedGibberishMorse.wordReviews.count, 2)
   }
 
   func testLivePracticeContentParsesSanitizesAndExpandsPublicSources() throws {
@@ -17579,9 +17649,12 @@ final class TypingEngineTests: XCTestCase {
     let underscoreConfiguration = TestConfiguration(
       mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
       modifiers: [.underscoreSeparators])
-    let underscoreSession = TestSessionFactory.make(
+    var underscoreSession = TestSessionFactory.make(
       configuration: underscoreConfiguration, customText: "amber harbor")
     XCTAssertEqual(underscoreSession.prompt, "amber_harbor")
+    underscoreSession.insert(underscoreSession.prompt, at: start)
+    XCTAssertEqual(underscoreSession.outcome, .completed)
+    XCTAssertEqual(underscoreSession.wordReviews.map(\.target), ["amber_", "harbor"])
 
     XCTAssertEqual(TestModifierPolicy.normalized([.noSpaces, .underscoreSeparators]), [.noSpaces])
     XCTAssertEqual(

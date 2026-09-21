@@ -5082,15 +5082,20 @@ enum NoSpaceWordBoundaryPolicy {
     source: String, language: TypingLanguage = .english, modifiers: [TestModifier],
     transformedPrompt: String, preservesNoSpaceBoundaries: Bool = false
   ) -> [Int] {
-    guard modifiers.contains(.noSpaces) || preservesNoSpaceBoundaries else { return [] }
+    guard TestModifierPolicy.usesNoSpaceInput(modifiers) || preservesNoSpaceBoundaries else {
+      return []
+    }
     var words = source.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
     // `backwards` runs after space removal in the native transform, so the
     // flattened output contains source words in reverse order.
     if modifiers.contains(.backwards) { words.reverse() }
-    let lengths = words.map {
-      language.presentationText(
-        TestModifierPolicy.transformed($0, modifiers: modifiers, language: language)
-      ).count
+    let lengths = words.enumerated().map { index, word in
+      var transformed = language.presentationText(
+        TestModifierPolicy.transformed(word, modifiers: modifiers, language: language))
+      if modifiers.contains(.underscoreSeparators), index < words.count - 1 {
+        transformed.append("_")
+      }
+      return transformed.count
     }
     guard lengths.reduce(0, +) == transformedPrompt.count else { return [] }
     return lengths
@@ -5213,7 +5218,9 @@ struct TestSessionFactory {
           }
           noSpaceBoundarySource = sections.prefix(limit).joined(separator: " ")
           let separator =
-            !configuration.language.usesSpaceDelimitedWords || configuration.modifiers.contains(.noSpaces)
+            !configuration.language.usesSpaceDelimitedWords
+              || (TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+                && !configuration.modifiers.contains(.underscoreSeparators))
             ? "" : configuration.modifiers.contains(.underscoreSeparators) ? "_" : " "
           prompt = transformedSections.joined(separator: separator)
           var length = 0
@@ -5248,7 +5255,7 @@ struct TestSessionFactory {
     let initialNoSpaceWordEndIndices: [Int]
     let initialNoSpaceTargetWords: [String]
     if primesRepeatedPrompt {
-      let separator = configuration.modifiers.contains(.noSpaces) ? "" : " "
+      let separator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? "" : " "
       initialPrompt = transformedPrompt + separator + transformedPrompt
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
         for: noSpaceWordLengths + noSpaceWordLengths)
@@ -5381,17 +5388,6 @@ enum TypebarStreamContent {
         let vowel = vowels[(index * 3 + 1) % vowels.count]
         let end = ends[(index * 5 + 2) % ends.count]
         return start + vowel + end
-      }
-    } else if configuration.modifiers.contains(.morseStream) {
-      let codes: [Character: String] = [
-        "a": ".-", "b": "-...", "c": "-.-.", "d": "-..", "e": ".", "f": "..-.", "g": "--.",
-        "h": "....", "i": "..", "j": ".---", "k": "-.-", "l": ".-..", "m": "--", "n": "-.",
-        "o": "---", "p": ".--.", "q": "--.-", "r": ".-.", "s": "...", "t": "-", "u": "..-",
-        "v": "...-", "w": ".--", "x": "-..-", "y": "-.--", "z": "--..",
-      ]
-      let source = StarterLexicon.words
-      tokens = (0..<count).map { index in
-        source[index % source.count].compactMap { codes[$0] }.joined(separator: "/")
       }
     } else {
       return nil
