@@ -23,6 +23,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onBailout: () -> Void
     let onFinishZen: () -> Void
     let onFocusChanged: (Bool) -> Void
+    let onWindowFocusChanged: (Bool) -> Void
     let onCompositionChanged: (String) -> Void
     let onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void
     let onPhysicalKey: (UInt16, Bool, Bool) -> Void
@@ -58,9 +59,11 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onBailout = onBailout
         view.onFinishZen = onFinishZen
         view.onFocusChanged = onFocusChanged
+        view.onWindowFocusChanged = onWindowFocusChanged
         view.onCompositionChanged = onCompositionChanged
         view.onModifierFlagsChanged = onModifierFlagsChanged
         view.onPhysicalKey = onPhysicalKey
+        view.refreshWindowFocusState()
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
         context.coordinator.appliedFocusRequest = focusRequest
         view.resetBailoutAttempt()
@@ -89,6 +92,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var finishesOnShiftEnter = false
     var onFinishZen: () -> Void = {}
     var onFocusChanged: (Bool) -> Void = { _ in }
+    var onWindowFocusChanged: (Bool) -> Void = { _ in }
     var onCompositionChanged: (String) -> Void = { _ in }
     var onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void = { _ in }
     var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
@@ -98,6 +102,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     private var rightShiftPressed = false
     private var pendingForcedError = false
     private var lastBailoutAttempt: Date?
+    private weak var observedWindow: NSWindow?
     var bailoutClock: () -> Date = { .now }
 
     override init(frame frameRect: NSRect) {
@@ -109,7 +114,48 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
 
     required init?(coder: NSCoder) { nil }
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+      removeWindowFocusObservers()
+      super.viewWillMove(toWindow: newWindow)
+    }
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      removeWindowFocusObservers()
+      guard let window else { return }
+      let center = NotificationCenter.default
+      center.addObserver(
+        self, selector: #selector(windowDidBecomeKey(_:)),
+        name: NSWindow.didBecomeKeyNotification, object: window)
+      center.addObserver(
+        self, selector: #selector(windowDidResignKey(_:)),
+        name: NSWindow.didResignKeyNotification, object: window)
+      observedWindow = window
+      onWindowFocusChanged(window.isKeyWindow)
+    }
+
     override var acceptsFirstResponder: Bool { true }
+
+    func refreshWindowFocusState() {
+      guard let window else { return }
+      onWindowFocusChanged(window.isKeyWindow)
+    }
+
+    private func removeWindowFocusObservers() {
+      guard let observedWindow else { return }
+      let center = NotificationCenter.default
+      center.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: observedWindow)
+      center.removeObserver(self, name: NSWindow.didResignKeyNotification, object: observedWindow)
+      self.observedWindow = nil
+    }
+
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+      onWindowFocusChanged(true)
+    }
+
+    @objc private func windowDidResignKey(_ notification: Notification) {
+      onWindowFocusChanged(false)
+    }
 
     override func becomeFirstResponder() -> Bool {
         guard super.becomeFirstResponder() else { return false }

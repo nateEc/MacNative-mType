@@ -2571,11 +2571,13 @@ enum TypedCharacterEffectPolicy {
 
 enum TypingAttentionWarning: Equatable {
   case inputUnfocused
+  case windowUnfocused
   case capsLockEnabled
 
   var message: String {
     switch self {
     case .inputUnfocused: "输入框未聚焦，点击练习区继续"
+    case .windowUnfocused: "窗口未聚焦，点击窗口继续"
     case .capsLockEnabled: "大写锁定已开启"
     }
   }
@@ -2583,6 +2585,7 @@ enum TypingAttentionWarning: Equatable {
   var systemImage: String {
     switch self {
     case .inputUnfocused: "cursorarrow.click"
+    case .windowUnfocused: "macwindow"
     case .capsLockEnabled: "capslock"
     }
   }
@@ -2591,6 +2594,7 @@ enum TypingAttentionWarning: Equatable {
 enum TypingAttentionPolicy {
   static func warnings(
     isInputFocused: Bool,
+    isWindowFocused: Bool = true,
     focusWarningDelayElapsed: Bool = true,
     capsLockEnabled: Bool,
     language: TypingLanguage,
@@ -2600,8 +2604,12 @@ enum TypingAttentionPolicy {
   ) -> [TypingAttentionWarning] {
     guard !isFinished else { return [] }
     var warnings: [TypingAttentionWarning] = []
-    if showFocusWarning, !isInputFocused, focusWarningDelayElapsed {
-      warnings.append(.inputUnfocused)
+    if showFocusWarning, focusWarningDelayElapsed {
+      if !isWindowFocused {
+        warnings.append(.windowUnfocused)
+      } else if !isInputFocused {
+        warnings.append(.inputUnfocused)
+      }
     }
     if showCapsLockWarning, capsLockEnabled, language.supportsCapsLockWarning {
       warnings.append(.capsLockEnabled)

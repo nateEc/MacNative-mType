@@ -695,6 +695,7 @@ private struct ContentView: View {
   @State private var activeChallengeID: String?
   @State private var focusRequest = 0
   @State private var inputHasFocus = false
+  @State private var typingWindowHasFocus = true
   @State private var focusWarningDelayElapsed = false
   @State private var focusWarningSequence = 0
   @State private var capsLockEnabled = false
@@ -1942,6 +1943,10 @@ private struct ContentView: View {
           if !isFocused { typingCompanionHands.reset() }
           handleTypingFocusChange(isFocused)
         },
+        onWindowFocusChanged: { isFocused in
+          if !isFocused { typingCompanionHands.reset() }
+          handleTypingWindowFocusChange(isFocused)
+        },
         onCompositionChanged: { compositionText = $0 },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
         onPhysicalKey: { keyCode, isKeyDown, isRepeat in
@@ -2477,6 +2482,7 @@ private struct ContentView: View {
   private var attentionWarnings: [TypingAttentionWarning] {
     TypingAttentionPolicy.warnings(
       isInputFocused: inputHasFocus,
+      isWindowFocused: typingWindowHasFocus,
       focusWarningDelayElapsed: focusWarningDelayElapsed,
       capsLockEnabled: capsLockEnabled,
       language: language,
@@ -2745,8 +2751,17 @@ private struct ContentView: View {
 
   private func handleTypingFocusChange(_ hasFocus: Bool) {
     inputHasFocus = hasFocus
+    updateFocusWarningDelay()
+  }
+
+  private func handleTypingWindowFocusChange(_ hasFocus: Bool) {
+    typingWindowHasFocus = hasFocus
+    updateFocusWarningDelay()
+  }
+
+  private func updateFocusWarningDelay() {
     focusWarningSequence &+= 1
-    guard !hasFocus else {
+    guard !inputHasFocus || !typingWindowHasFocus else {
       focusWarningDelayElapsed = false
       return
     }
@@ -2756,7 +2771,7 @@ private struct ContentView: View {
     let sequence = focusWarningSequence
     Task { @MainActor in
       try? await Task.sleep(nanoseconds: 1_000_000_000)
-      guard !inputHasFocus, focusWarningSequence == sequence else { return }
+      guard (!inputHasFocus || !typingWindowHasFocus), focusWarningSequence == sequence else { return }
       focusWarningDelayElapsed = true
     }
   }
