@@ -2917,16 +2917,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(KeyboardGuideCommandCatalog.target(for: "keyboard.keymapKeys.minimum"))
   }
 
-  func testKeyboardGuideCommandsPreserveRestartAndChallengePolicies() {
+  func testKeyboardGuideCommandsRemainImmediateAndPreserveChallenges() {
     XCTAssertTrue(KeyboardGuideCommandCatalog.items.allSatisfy { item in
       guard let target = KeyboardGuideCommandCatalog.target(for: item.id) else { return false }
       return !target.requiresRestart
-        && TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
-          == target.exitsChallenge
+        && !target.exitsChallenge
+        && !TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id)
         && CommandPaletteSearch.results(items: KeyboardGuideCommandCatalog.items, query: item.id)
           .contains(where: { $0.id == item.id })
     })
-    XCTAssertTrue(
+    XCTAssertFalse(
       TestConfigurationCommandChallengePolicy.exitsChallenge(for: "keyboard.keymapMode.next"))
     XCTAssertFalse(
       TestConfigurationCommandChallengePolicy.exitsChallenge(
@@ -2934,9 +2934,9 @@ final class TypingEngineTests: XCTestCase {
     for item in KeyboardGuideLayoutCommandCatalog.items {
       let target = KeyboardGuideLayoutCommandCatalog.target(for: item.id)
       XCTAssertNotNil(target, item.id)
-      XCTAssertEqual(target?.requiresRestart, true, item.id)
-      XCTAssertEqual(target?.exitsChallenge, true, item.id)
-      XCTAssertTrue(
+      XCTAssertEqual(target?.requiresRestart, false, item.id)
+      XCTAssertEqual(target?.exitsChallenge, false, item.id)
+      XCTAssertFalse(
         TestConfigurationCommandChallengePolicy.exitsChallenge(for: item.id), item.id)
       XCTAssertTrue(
         CommandPaletteSearch.results(

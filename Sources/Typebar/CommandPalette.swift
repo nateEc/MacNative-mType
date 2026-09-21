@@ -1308,10 +1308,7 @@ enum KeyboardGuideCommandTarget: Equatable {
 
     var requiresRestart: Bool { false }
 
-    var exitsChallenge: Bool {
-        if case .mode = self { return true }
-        return false
-    }
+    var exitsChallenge: Bool { false }
 
     @MainActor
     func apply(to settings: AppSettings) {
@@ -1385,8 +1382,8 @@ enum KeyboardGuideLayoutCommandTarget: Equatable {
     case inputSync
     case builtIn(KeyboardLayout)
 
-    var requiresRestart: Bool { true }
-    var exitsChallenge: Bool { true }
+    var requiresRestart: Bool { false }
+    var exitsChallenge: Bool { false }
 
     @MainActor
     func apply(to settings: AppSettings) {
@@ -1409,7 +1406,7 @@ enum KeyboardGuideLayoutCommandCatalog {
     static let items: [CommandPaletteItem] = {
         let sync = CommandPaletteItem(
             id: "\(keymapPrefix)overrideSync", title: "键盘图布局：跟随输入模拟",
-            subtitle: "持续同步输入布局并立即重开", systemImage: "keyboard.badge.ellipsis",
+            subtitle: "持续同步输入布局并立即更新", systemImage: "keyboard.badge.ellipsis",
             keywords: [
                 "\(keymapPrefix)overrideSync", "keyboard", "keymap", "keymapLayout",
                 "overrideSync", "default", "emulator sync",
@@ -1421,7 +1418,7 @@ enum KeyboardGuideLayoutCommandCatalog {
             return CommandPaletteItem(
                 id: identifier,
                 title: item.title.replacingOccurrences(of: "模拟布局：", with: "键盘图布局："),
-                subtitle: "只切换屏幕键盘并立即重开", systemImage: "keyboard.fill",
+                subtitle: "只切换屏幕键盘并立即更新", systemImage: "keyboard.fill",
                 keywords: item.keywords
                     + [identifier, "keyboard", "keymap", "keymapLayout", officialName],
                 group: .settings)
