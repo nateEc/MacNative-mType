@@ -744,10 +744,17 @@ final class TypingEngineTests: XCTestCase {
       RemoteLeaderboardRankResponse.self, from: Data(#"{"entry":null}"#.utf8))
     let experience = try JSONDecoder().decode(
       RemoteExperienceLeaderboardRankResponse.self, from: Data(#"{"entry":null}"#.utf8))
+    let qualified = try JSONDecoder().decode(
+      RemoteLeaderboardRankResponse.self,
+      from: Data(#"{"entry":null,"eligibility":{"isEligible":false,"completedPracticeSeconds":60,"minimumPracticeSeconds":120}}"#.utf8))
 
     XCTAssertNil(wpm.entry)
+    XCTAssertNil(wpm.eligibility)
     XCTAssertNil(experience.entry)
     XCTAssertNil(experience.period)
+    XCTAssertNil(experience.eligibility)
+    XCTAssertEqual(qualified.eligibility, .init(
+      isEligible: false, completedPracticeSeconds: 60, minimumPracticeSeconds: 120))
     XCTAssertEqual(RemoteExperienceLeaderboardPeriod.lastWeek.displayName, "上周")
     XCTAssertTrue(RemoteExperienceLeaderboardPeriod.week.isConfirmed(by: nil))
     XCTAssertTrue(RemoteExperienceLeaderboardPeriod.lastWeek.isConfirmed(by: "lastWeek"))

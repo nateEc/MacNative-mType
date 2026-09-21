@@ -2070,6 +2070,106 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(response.previousRank, 9)
   }
 
+  func testLeaderboardQualificationRequiresPracticeBeyondConfiguredThreshold() async throws {
+    let store = try AuthStore(
+      fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 120)
+    let now = Date(timeIntervalSince1970: 39_000)
+    let session = try await store.register(
+      .init(email: "qualification@example.com", password: "a secure password", displayName: "Qualifier"),
+      now: now)
+
+    let first = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 100, durationSeconds: 60, finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    let firstSpeedRank = try await store.leaderboardRank(
+      .init(mode: "time", language: "english", period: "all"), accessToken: session.accessToken,
+      now: now)
+    let firstExperienceRank = try await store.experienceLeaderboardRank(
+      accessToken: session.accessToken, now: now)
+    let firstSpeedPage = try await store.leaderboard(
+      .init(mode: "time", language: "english", period: "all"), now: now)
+    let firstExperiencePage = try await store.experienceLeaderboard(now: now)
+    XCTAssertFalse(first.leaderboardEligible)
+    XCTAssertTrue(firstSpeedPage.entries.isEmpty)
+    XCTAssertTrue(firstExperiencePage.entries.isEmpty)
+    XCTAssertNil(firstSpeedRank.entry)
+    XCTAssertNil(firstExperienceRank.entry)
+    XCTAssertEqual(firstSpeedRank.eligibility, .init(
+      isEligible: false, completedPracticeSeconds: 60, minimumPracticeSeconds: 120))
+    XCTAssertEqual(firstExperienceRank.eligibility, firstSpeedRank.eligibility)
+
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 81, accuracy: 100, durationSeconds: 60,
+        finishedAt: now.addingTimeInterval(60)),
+      accessToken: session.accessToken, now: now.addingTimeInterval(60))
+    let boundarySpeedPage = try await store.leaderboard(
+      .init(mode: "time", language: "english", period: "all"), now: now.addingTimeInterval(60))
+    XCTAssertTrue(boundarySpeedPage.entries.isEmpty)
+
+    let qualifying = try await store.submitResult(
+      result(id: UUID(), wpm: 82, accuracy: 100, durationSeconds: 5,
+        finishedAt: now.addingTimeInterval(65)),
+      accessToken: session.accessToken, now: now.addingTimeInterval(65))
+    let speedRank = try await store.leaderboardRank(
+      .init(mode: "time", language: "english", period: "all"), accessToken: session.accessToken,
+      now: now.addingTimeInterval(65))
+    let experienceRank = try await store.experienceLeaderboardRank(
+      accessToken: session.accessToken, now: now.addingTimeInterval(65))
+    let speedPage = try await store.leaderboard(
+      .init(mode: "time", language: "english", period: "all"), now: now.addingTimeInterval(65))
+    let experiencePage = try await store.experienceLeaderboard(now: now.addingTimeInterval(65))
+    XCTAssertTrue(qualifying.leaderboardEligible)
+    XCTAssertEqual(speedPage.entries.map(\.userID), [session.user.id])
+    XCTAssertEqual(experiencePage.entries.map(\.userID), [session.user.id])
+    XCTAssertEqual(speedRank.entry?.userID, session.user.id)
+    XCTAssertEqual(experienceRank.entry?.userID, session.user.id)
+    XCTAssertEqual(speedRank.eligibility, .init(
+      isEligible: true, completedPracticeSeconds: 125, minimumPracticeSeconds: 120))
+  }
+
+  func testLeaderboardQualificationUsesFractionalAcceptedPracticeTimeForItsStrictBoundary()
+    async throws
+  {
+    let store = try AuthStore(
+      fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 120)
+    let now = Date(timeIntervalSince1970: 39_000)
+    let session = try await store.register(
+      .init(email: "fractional-qualification@example.com", password: "a secure password", displayName: "Fraction"),
+      now: now)
+
+    let receipt = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 80, accuracy: 100, durationSeconds: 120, elapsedSeconds: 120.5,
+        finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    let rank = try await store.leaderboardRank(
+      .init(mode: "time", language: "english", period: "all"), accessToken: session.accessToken,
+      now: now)
+
+    XCTAssertTrue(receipt.leaderboardEligible)
+    XCTAssertEqual(rank.entry?.userID, session.user.id)
+    XCTAssertEqual(rank.eligibility, .init(
+      isEligible: true, completedPracticeSeconds: 120, minimumPracticeSeconds: 120))
+  }
+
+  func testLeaderboardMinimumPracticeConfigurationUsesSafeDefaultsAndRejectsInvalidValues() throws {
+    XCTAssertEqual(
+      try TypebarLeaderboardEligibilityPolicy.minimumPracticeSeconds(from: nil),
+      TypebarLeaderboardEligibilityPolicy.defaultMinimumPracticeSeconds)
+    XCTAssertEqual(
+      try TypebarLeaderboardEligibilityPolicy.minimumPracticeSeconds(from: " 120 "), 120)
+
+    for value in ["-1", "not-a-number", "31536001"] {
+      XCTAssertThrowsError(
+        try TypebarLeaderboardEligibilityPolicy.minimumPracticeSeconds(from: value)
+      ) { error in
+        XCTAssertEqual(
+          error as? TypebarLeaderboardEligibilityConfigurationError,
+          .invalidMinimumPracticeSeconds)
+      }
+    }
+  }
+
   func testPublicProfileDetailsValidateAndControlActivityVisibility() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let now = Date(timeIntervalSince1970: 36_000)
@@ -4912,11 +5012,12 @@ final class HealthRouteTests: XCTestCase {
   private func result(
     id: UUID, wpm: Int, accuracy: Int, consistency: Double = 0, mode: String = "time",
     durationSeconds: Int? = 30, wordLimit: Int? = nil, restartCount: Int = 0,
-    language: String = "english", timingEvidence: ResultTimingEvidence? = nil, finishedAt: Date
+    language: String = "english", timingEvidence: ResultTimingEvidence? = nil,
+    elapsedSeconds: Double? = nil, finishedAt: Date
   )
     -> ResultSubmissionRequest
   {
-    let elapsed = Double(durationSeconds ?? 30)
+    let elapsed = elapsedSeconds ?? Double(durationSeconds ?? 30)
     let correctCharacters = max(1, Int((Double(wpm) * 5 * elapsed / 60).rounded()))
     let lowerBound = max(correctCharacters, 1)
     let eventCount =

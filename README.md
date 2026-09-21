@@ -26,7 +26,7 @@ swift run TypebarServer serve --hostname 127.0.0.1 --port 8080
 ```
 
 服务能力可从 `http://127.0.0.1:8080/v1/capabilities` 查询；该入口会如实标示未实现模块。
-若要暂时停止一切服务端写入而继续提供状态和只读查询，可在启动前设置 `TYPEBAR_MAINTENANCE_MODE=true`；客户端会提示用户本机离线练习不受影响。
+若要暂时停止一切服务端写入而继续提供状态和只读查询，可在启动前设置 `TYPEBAR_MAINTENANCE_MODE=true`；客户端会提示用户本机离线练习不受影响。共享排行榜默认要求账户累计已接受练习超过 2 小时；部署者可在启动前用 `TYPEBAR_LEADERBOARD_MIN_PRACTICE_SECONDS` 设为 0 至 31,536,000 的整数秒。该门槛只影响公开 WPM/XP 榜及个人名次，不删除成绩、XP 或本机历史；设置非法值会拒绝启动，避免悄悄改变竞赛规则。
 
 ### 发布服务公告
 

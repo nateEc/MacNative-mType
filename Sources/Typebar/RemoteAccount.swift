@@ -760,6 +760,13 @@ struct RemoteLeaderboardPage: Codable, Sendable {
 
 struct RemoteLeaderboardRankResponse: Codable, Sendable {
     let entry: RemoteLeaderboardEntry?
+    let eligibility: RemoteLeaderboardEligibility?
+}
+
+struct RemoteLeaderboardEligibility: Codable, Equatable, Sendable {
+    let isEligible: Bool
+    let completedPracticeSeconds: Int
+    let minimumPracticeSeconds: Int
 }
 
 private struct RemoteLeaderboardRankMemoryRequest: Codable, Sendable {
@@ -813,6 +820,7 @@ struct RemoteExperienceLeaderboardPage: Codable, Sendable {
 struct RemoteExperienceLeaderboardRankResponse: Codable, Sendable {
     let entry: RemoteExperienceLeaderboardEntry?
     let period: String?
+    let eligibility: RemoteLeaderboardEligibility?
 }
 
 struct RemotePublicProfile: Codable, Identifiable, Sendable {
@@ -2238,6 +2246,16 @@ final class AccountSession {
         durationSeconds: Int? = nil, wordLimit: Int? = nil,
         scope: RemoteLeaderboardScope = .global
     ) async throws -> RemoteLeaderboardEntry? {
+        try await leaderboardRankStatus(
+            mode: mode, language: language, period: period, durationSeconds: durationSeconds,
+            wordLimit: wordLimit, scope: scope).entry
+    }
+
+    func leaderboardRankStatus(
+        mode: TestMode?, language: TypingLanguage?, period: RemoteLeaderboardPeriod,
+        durationSeconds: Int? = nil, wordLimit: Int? = nil,
+        scope: RemoteLeaderboardScope = .global
+    ) async throws -> RemoteLeaderboardRankResponse {
         var queryItems = [URLQueryItem(name: "period", value: period.rawValue)]
         if let mode { queryItems.append(.init(name: "mode", value: mode.rawValue)) }
         if let language { queryItems.append(.init(name: "language", value: language.rawValue)) }
@@ -2253,7 +2271,7 @@ final class AccountSession {
             queryItems: queryItems,
             response: RemoteLeaderboardRankResponse.self
         )
-        return response.entry
+        return response
     }
 
     func recordSpeedLeaderboardRankMemory(
@@ -2298,6 +2316,13 @@ final class AccountSession {
         period: RemoteExperienceLeaderboardPeriod = .week,
         scope: RemoteLeaderboardScope = .global
     ) async throws -> RemoteExperienceLeaderboardEntry? {
+        try await experienceLeaderboardRankStatus(period: period, scope: scope).entry
+    }
+
+    func experienceLeaderboardRankStatus(
+        period: RemoteExperienceLeaderboardPeriod = .week,
+        scope: RemoteLeaderboardScope = .global
+    ) async throws -> RemoteExperienceLeaderboardRankResponse {
         let response = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: scope == .friends
                 ? "v1/leaderboards/experience/friends/rank" : "v1/leaderboards/experience/rank",
@@ -2308,7 +2333,7 @@ final class AccountSession {
             response: RemoteExperienceLeaderboardRankResponse.self
         )
         try requireConfirmedExperienceLeaderboardPeriod(period, responsePeriod: response.period)
-        return response.entry
+        return response
     }
 
     func recordExperienceLeaderboardRankMemory(

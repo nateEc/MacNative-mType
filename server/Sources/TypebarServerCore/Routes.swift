@@ -32,7 +32,17 @@ public func configure(
     oauthProviderClient: OAuthProviderClient? = nil,
     maintenanceMode: Bool = TypebarMaintenanceMode.environmentEnabled
 ) throws {
-    let authStore = try authStore ?? AuthStore(fileURL: TypebarServerStorage.defaultUserStoreURL(for: app))
+    let resolvedAuthStore: AuthStore
+    if let authStore {
+        resolvedAuthStore = authStore
+    } else {
+        let minimumPracticeSeconds = try TypebarLeaderboardEligibilityPolicy.minimumPracticeSeconds(
+            from: Environment.get("TYPEBAR_LEADERBOARD_MIN_PRACTICE_SECONDS"))
+        resolvedAuthStore = try AuthStore(
+            fileURL: TypebarServerStorage.defaultUserStoreURL(for: app),
+            minimumLeaderboardTypingSeconds: minimumPracticeSeconds)
+    }
+    let authStore = resolvedAuthStore
     app.middleware.use(TypebarMaintenanceMiddleware(isEnabled: maintenanceMode))
     app.middleware.use(TypebarRateLimitMiddleware(limiter: RequestRateLimiter()))
 

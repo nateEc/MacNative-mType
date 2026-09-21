@@ -1047,10 +1047,17 @@ public actor AuthStore {
   private var state: PersistedState
   private let fileURL: URL?
   private let bcryptCost: Int
+  private let minimumLeaderboardTypingSeconds: Int
 
-  public init(fileURL: URL?, bcryptCost: Int = 12) throws {
+  public init(
+    fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0
+  ) throws {
+    guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
+      minimumLeaderboardTypingSeconds)
+    else { throw TypebarLeaderboardEligibilityConfigurationError.invalidMinimumPracticeSeconds }
     self.fileURL = fileURL
     self.bcryptCost = bcryptCost
+    self.minimumLeaderboardTypingSeconds = minimumLeaderboardTypingSeconds
     guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
       state = .init()
       return
@@ -2683,6 +2690,32 @@ public actor AuthStore {
     }
   }
 
+  private func totalTypingSecondsByUser() -> [UUID: Double] {
+    state.results.reduce(into: [:]) { totals, result in
+      totals[result.userID, default: 0] += max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+    }
+  }
+
+  private func leaderboardEligibility(
+    for user: StoredUser, typingSeconds: Double? = nil
+  ) -> LeaderboardEligibility {
+    let total = typingSeconds ?? totalTypingSecondsByUser()[user.id, default: 0]
+    let completedSeconds = max(0, Int(total.rounded(.down)))
+    return .init(
+      isEligible: total > Double(minimumLeaderboardTypingSeconds),
+      completedPracticeSeconds: completedSeconds,
+      minimumPracticeSeconds: minimumLeaderboardTypingSeconds)
+  }
+
+  private func leaderboardEligibility(for userID: UUID) -> LeaderboardEligibility {
+    guard let user = state.users.first(where: { $0.id == userID }) else {
+      return .init(
+        isEligible: false, completedPracticeSeconds: 0,
+        minimumPracticeSeconds: minimumLeaderboardTypingSeconds)
+    }
+    return leaderboardEligibility(for: user)
+  }
+
   private func publicStreak(
     from results: [StoredResult], endingAt now: Date, dayBoundaryOffsetHours: Double
   )
@@ -2777,7 +2810,9 @@ public actor AuthStore {
   private func resultSubmissionResponse(
     for request: ResultSubmissionRequest, userID: UUID, now: Date
   ) throws -> ResultSubmissionResponse {
-    let isLeaderboardEligible = !state.users.first(where: { $0.id == userID })!.leaderboardOptedOut
+    let user = state.users.first(where: { $0.id == userID })!
+    let isLeaderboardEligible = !user.leaderboardOptedOut
+      && leaderboardEligibility(for: user).isEligible
     let weeklyEntries = experienceLeaderboardEntries(now: now)
     let isToday = request.finishedAt >= Calendar.current.startOfDay(for: now)
     let dailyRank = isLeaderboardEligible && isToday
@@ -3041,7 +3076,8 @@ public actor AuthStore {
     let user = try authenticatedUser(for: accessToken, now: now)
     return .init(
       entry: try leaderboardEntries(query, eligibleUserIDs: nil, now: now)
-        .first(where: { $0.userID == user.id }))
+        .first(where: { $0.userID == user.id }),
+      eligibility: leaderboardEligibility(for: user.id))
   }
 
   public func friendLeaderboard(_ query: LeaderboardQuery, accessToken: String, now: Date = .now)
@@ -3067,7 +3103,8 @@ public actor AuthStore {
     return .init(
       entry: try leaderboardEntries(
         query, eligibleUserIDs: acceptedFriendIDs(for: current.id), now: now
-      ).first(where: { $0.userID == current.id }))
+      ).first(where: { $0.userID == current.id }),
+      eligibility: leaderboardEligibility(for: current.id))
   }
 
   public func experienceLeaderboard(
@@ -3093,7 +3130,7 @@ public actor AuthStore {
     return .init(
       entry: experienceLeaderboardEntries(period: resolvedPeriod, now: now)
         .first(where: { $0.userID == user.id }),
-      period: resolvedPeriod.rawValue)
+      period: resolvedPeriod.rawValue, eligibility: leaderboardEligibility(for: user.id))
   }
 
   public func friendExperienceLeaderboard(
@@ -3117,7 +3154,7 @@ public actor AuthStore {
       entry: experienceLeaderboardEntries(
         eligibleUserIDs: acceptedFriendIDs(for: current.id), period: resolvedPeriod, now: now
       ).first(where: { $0.userID == current.id }),
-      period: resolvedPeriod.rawValue)
+      period: resolvedPeriod.rawValue, eligibility: leaderboardEligibility(for: current.id))
   }
 
   private func acceptedFriendIDs(for userID: UUID) -> Set<UUID> {
@@ -3155,8 +3192,10 @@ public actor AuthStore {
         ?? currentWeekStart
       upperBound = currentWeekStart
     }
+    let typingSecondsByUser = totalTypingSecondsByUser()
     return state.users.compactMap { user -> (StoredUser, Int)? in
       guard !user.leaderboardOptedOut,
+        leaderboardEligibility(for: user, typingSeconds: typingSecondsByUser[user.id] ?? 0).isEligible,
         eligibleUserIDs == nil || eligibleUserIDs!.contains(user.id)
       else { return nil }
       let weeklyPoints = experience(for: user.id, since: lowerBound, before: upperBound)
@@ -3221,9 +3260,13 @@ public actor AuthStore {
       upperBound = nil
     }
     let users = Dictionary(uniqueKeysWithValues: state.users.map { ($0.id, $0) })
+    let typingSecondsByUser = totalTypingSecondsByUser()
     let records = state.results.filter { result in
       (eligibleUserIDs == nil || eligibleUserIDs!.contains(result.userID))
         && users[result.userID]?.leaderboardOptedOut == false
+        && users[result.userID].map {
+          leaderboardEligibility(for: $0, typingSeconds: typingSecondsByUser[$0.id] ?? 0).isEligible
+        } == true
         && (query.mode == nil || result.mode == query.mode)
         && (query.language == nil || result.language == query.language)
         && (query.durationSeconds == nil || result.durationSeconds == query.durationSeconds)

@@ -22,6 +22,7 @@ struct CloudSyncView: View {
     @State private var isLoadingLeaderboard = false
     @State private var leaderboardMessage: String?
     @State private var leaderboardRank: RemoteLeaderboardEntry?
+    @State private var leaderboardEligibility: RemoteLeaderboardEligibility?
     @State private var leaderboardRankChange: LeaderboardRankChange?
     @State private var loadedLeaderboardRank = false
     @State private var leaderboardPage: RemoteLeaderboardPage?
@@ -38,6 +39,7 @@ struct CloudSyncView: View {
     @State private var isLoadingExperience = false
     @State private var experienceMessage: String?
     @State private var experienceRank: RemoteExperienceLeaderboardEntry?
+    @State private var experienceLeaderboardEligibility: RemoteLeaderboardEligibility?
     @State private var experienceRankChange: LeaderboardRankChange?
     @State private var loadedExperienceRank = false
     @State private var experienceLeaderboardPage: RemoteExperienceLeaderboardPage?
@@ -198,6 +200,8 @@ struct CloudSyncView: View {
                                     LeaderboardRankChangeLabel(change: leaderboardRankChange)
                                 }
                             }
+                        } else if let leaderboardEligibility, !leaderboardEligibility.isEligible {
+                            LeaderboardEligibilityLabel(eligibility: leaderboardEligibility)
                         } else if loadedLeaderboardRank {
                             Text("当前筛选没有你的有效成绩。")
                                 .font(.caption)
@@ -280,6 +284,10 @@ struct CloudSyncView: View {
                                     LeaderboardRankChangeLabel(change: experienceRankChange)
                                 }
                             }
+                        } else if let experienceLeaderboardEligibility,
+                            !experienceLeaderboardEligibility.isEligible
+                        {
+                            LeaderboardEligibilityLabel(eligibility: experienceLeaderboardEligibility)
                         } else if loadedExperienceRank {
                             Text("\(experiencePeriod.displayName)还没有你的有效 XP 成绩。")
                                 .font(.caption)
@@ -442,6 +450,7 @@ struct CloudSyncView: View {
         requestedLeaderboardPage = 1
         leaderboardMessage = nil
         leaderboardRank = nil
+        leaderboardEligibility = nil
         leaderboardRankChange = nil
         loadedLeaderboardRank = false
     }
@@ -499,6 +508,7 @@ struct CloudSyncView: View {
                         leaderboard = []
                         leaderboardPage = nil
                         leaderboardRank = nil
+                        leaderboardEligibility = nil
                         loadedLeaderboardRank = false
                         shouldReloadWithParameterFilter = true
                         return
@@ -507,20 +517,22 @@ struct CloudSyncView: View {
                 leaderboard = page.entries
                 leaderboardPage = page
                 leaderboardRank = nil
+                leaderboardEligibility = nil
                 leaderboardRankChange = nil
                 loadedLeaderboardRank = false
                 if let user = account.currentUser, !user.leaderboardOptedOut {
                     do {
-                        let rank = try await account.leaderboardRank(
+                        let rankStatus = try await account.leaderboardRankStatus(
                             mode: selection.mode, language: selection.language,
                             period: selection.period, durationSeconds: selection.durationSeconds,
                             wordLimit: selection.wordLimit, scope: scope)
                         guard requestGeneration == leaderboardRequestGeneration,
                             account.resultPublicationScope == accountScope
                         else { return }
-                        leaderboardRank = rank
+                        leaderboardRank = rankStatus.entry
+                        leaderboardEligibility = rankStatus.eligibility
                         loadedLeaderboardRank = true
-                        if let rank, page.rankMemorySupported == true {
+                        if let rank = rankStatus.entry, page.rankMemorySupported == true {
                             leaderboardRankChange = try? await account.recordSpeedLeaderboardRankMemory(
                                 rank: rank.rank, mode: selection.mode, language: selection.language,
                                 period: selection.period, durationSeconds: selection.durationSeconds,
@@ -550,6 +562,7 @@ struct CloudSyncView: View {
                 leaderboard = []
                 leaderboardPage = nil
                 leaderboardRank = nil
+                leaderboardEligibility = nil
                 leaderboardRankChange = nil
                 loadedLeaderboardRank = false
                 leaderboardMessage = error.localizedDescription
@@ -576,6 +589,7 @@ struct CloudSyncView: View {
         requestedExperiencePage = 1
         experienceMessage = nil
         experienceRank = nil
+        experienceLeaderboardEligibility = nil
         experienceRankChange = nil
         loadedExperienceRank = false
     }
@@ -607,18 +621,20 @@ struct CloudSyncView: View {
                 experienceLeaderboard = page.entries
                 experienceLeaderboardPage = page
                 experienceRank = nil
+                experienceLeaderboardEligibility = nil
                 experienceRankChange = nil
                 loadedExperienceRank = false
                 if let user = account.currentUser, !user.leaderboardOptedOut {
                     do {
-                        let rank = try await account.experienceLeaderboardRank(
+                        let rankStatus = try await account.experienceLeaderboardRankStatus(
                             period: period, scope: scope)
                         guard requestGeneration == experienceRequestGeneration,
                             account.resultPublicationScope == accountScope
                         else { return }
-                        experienceRank = rank
+                        experienceRank = rankStatus.entry
+                        experienceLeaderboardEligibility = rankStatus.eligibility
                         loadedExperienceRank = true
-                        if let rank, page.rankMemorySupported == true {
+                        if let rank = rankStatus.entry, page.rankMemorySupported == true {
                             experienceRankChange = try? await account.recordExperienceLeaderboardRankMemory(
                                 rank: rank.rank, period: period, scope: scope)
                             guard requestGeneration == experienceRequestGeneration,
@@ -643,6 +659,7 @@ struct CloudSyncView: View {
                 experienceLeaderboard = []
                 experienceLeaderboardPage = nil
                 experienceRank = nil
+                experienceLeaderboardEligibility = nil
                 experienceRankChange = nil
                 loadedExperienceRank = false
                 experienceMessage = error.localizedDescription
@@ -674,6 +691,20 @@ private struct LeaderboardRankChangeLabel: View {
     var body: some View {
         Label(change.displayName, systemImage: change.systemImage)
             .font(.caption2)
+            .foregroundStyle(.secondary)
+    }
+}
+
+private struct LeaderboardEligibilityLabel: View {
+    let eligibility: RemoteLeaderboardEligibility
+
+    var body: some View {
+        let remaining = max(
+            0, eligibility.minimumPracticeSeconds - eligibility.completedPracticeSeconds + 1)
+        Label(
+            "还需累计练习 \(Duration.seconds(Double(remaining)).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated))) 才能进入排行榜。",
+            systemImage: "timer")
+            .font(.caption)
             .foregroundStyle(.secondary)
     }
 }

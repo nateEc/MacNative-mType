@@ -237,11 +237,55 @@ public struct LeaderboardResponse: Content, Equatable {
     }
 }
 
+/// Account-private practice-time qualification returned only from authenticated
+/// personal-rank routes. It explains an absent rank without exposing another
+/// account's practice history.
+public struct LeaderboardEligibility: Content, Equatable, Sendable {
+    public let isEligible: Bool
+    public let completedPracticeSeconds: Int
+    public let minimumPracticeSeconds: Int
+
+    public init(
+        isEligible: Bool, completedPracticeSeconds: Int, minimumPracticeSeconds: Int
+    ) {
+        self.isEligible = isEligible
+        self.completedPracticeSeconds = completedPracticeSeconds
+        self.minimumPracticeSeconds = minimumPracticeSeconds
+    }
+}
+
+/// Startup configuration for the account practice-time gate used by Typebar's
+/// own shared leaderboards. The value never changes persisted results; it only
+/// changes which existing accepted results may be ranked.
+public enum TypebarLeaderboardEligibilityPolicy {
+    public static let defaultMinimumPracticeSeconds = 2 * 60 * 60
+    public static let maximumMinimumPracticeSeconds = 365 * 24 * 60 * 60
+
+    public static func minimumPracticeSeconds(from environmentValue: String?) throws -> Int {
+        guard let environmentValue else { return defaultMinimumPracticeSeconds }
+        let trimmed = environmentValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Int(trimmed), (0...maximumMinimumPracticeSeconds).contains(value) else {
+            throw TypebarLeaderboardEligibilityConfigurationError.invalidMinimumPracticeSeconds
+        }
+        return value
+    }
+}
+
+public enum TypebarLeaderboardEligibilityConfigurationError: Error, Equatable, LocalizedError {
+    case invalidMinimumPracticeSeconds
+
+    public var errorDescription: String? {
+        "TYPEBAR_LEADERBOARD_MIN_PRACTICE_SECONDS must be an integer from 0 to \(TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds)."
+    }
+}
+
 public struct LeaderboardRankResponse: Content, Equatable {
     public let entry: LeaderboardEntry?
+    public let eligibility: LeaderboardEligibility?
 
-    public init(entry: LeaderboardEntry?) {
+    public init(entry: LeaderboardEntry?, eligibility: LeaderboardEligibility? = nil) {
         self.entry = entry
+        self.eligibility = eligibility
     }
 }
 
@@ -291,10 +335,15 @@ public struct ExperienceLeaderboardResponse: Content, Equatable {
 public struct ExperienceLeaderboardRankResponse: Content, Equatable {
     public let entry: ExperienceLeaderboardEntry?
     public let period: String
+    public let eligibility: LeaderboardEligibility?
 
-    public init(entry: ExperienceLeaderboardEntry?, period: String) {
+    public init(
+        entry: ExperienceLeaderboardEntry?, period: String,
+        eligibility: LeaderboardEligibility? = nil
+    ) {
         self.entry = entry
         self.period = period
+        self.eligibility = eligibility
     }
 }
 
