@@ -42,6 +42,31 @@ enum TestMode: String, CaseIterable, Codable {
   case custom
 }
 
+/// The reference memory funbox only runs in word, quote, and custom tests.
+/// It remembers a disallowed source mode while active so the next funbox
+/// change can restore it.
+enum MemoryFunboxModePolicy {
+  static let allowedModes: Set<TestMode> = [.words, .quote, .custom]
+  /// Imported configurations do not carry the live control's separate word
+  /// count. Use the native control's default when memory forces a new mode.
+  static let fallbackWordLimit = 25
+
+  static func effectiveMode(requested: TestMode, modifiers: [TestModifier]) -> TestMode {
+    guard modifiers.contains(.memory), !allowedModes.contains(requested) else { return requested }
+    return .words
+  }
+
+  static func restoredMode(
+    rememberedMode: TestMode?, currentMode: TestMode,
+    previousModifiers: [TestModifier], updatedModifiers: [TestModifier]
+  ) -> TestMode {
+    guard previousModifiers.contains(.memory), !updatedModifiers.contains(.memory) else {
+      return currentMode
+    }
+    return rememberedMode ?? currentMode
+  }
+}
+
 enum Difficulty: String, CaseIterable, Codable {
   case normal
   case expert
@@ -1843,11 +1868,16 @@ struct TestConfiguration: Codable, Equatable {
       mixedLanguageComponents)
     self.mixedLanguageComponents = normalizedMixedLanguageComponents
     let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
-      modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents).filter {
-      mode != .zen || $0 != .memory
+      modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents)
+    let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
+      requested: mode, modifiers: normalizedModifiers)
+    if effectiveMode != mode {
+      self.mode = effectiveMode
+      self.duration = nil
+      self.wordLimit = wordLimit ?? MemoryFunboxModePolicy.fallbackWordLimit
     }
     self.modifiers = Self.usesInfiniteLimit(
-      mode: mode, duration: duration, wordLimit: wordLimit,
+      mode: self.mode, duration: self.duration, wordLimit: self.wordLimit,
       customTextCompletion: customTextCompletion)
       ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
     self.contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
@@ -1882,8 +1912,13 @@ struct TestConfiguration: Codable, Equatable {
   func with(modifiers: [TestModifier]) -> Self {
     var copy = self
     let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
-      modifiers, language: copy.language, mixedLanguageComponents: copy.mixedLanguageComponents).filter {
-      copy.mode != .zen || $0 != .memory
+      modifiers, language: copy.language, mixedLanguageComponents: copy.mixedLanguageComponents)
+    let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
+      requested: copy.mode, modifiers: normalizedModifiers)
+    if effectiveMode != copy.mode {
+      copy.mode = effectiveMode
+      copy.duration = nil
+      copy.wordLimit = copy.wordLimit ?? MemoryFunboxModePolicy.fallbackWordLimit
     }
     copy.modifiers = copy.isInfinite
       ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
@@ -1951,10 +1986,16 @@ struct TestConfiguration: Codable, Equatable {
       try values.decodeIfPresent([TypingLanguage].self, forKey: .mixedLanguageComponents)
         ?? TypingLanguage.defaultMixedComponents)
     let normalizedModifiers = TestModifierPolicy.normalized(
-      try values.decodeIfPresent([TestModifier].self, forKey: .modifiers) ?? []
-    ).filter { decodedMode != .zen || $0 != .memory }
+      try values.decodeIfPresent([TestModifier].self, forKey: .modifiers) ?? [])
+    let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
+      requested: decodedMode, modifiers: normalizedModifiers)
+    if effectiveMode != decodedMode {
+      mode = effectiveMode
+      duration = nil
+      wordLimit = wordLimit ?? MemoryFunboxModePolicy.fallbackWordLimit
+    }
     modifiers = Self.usesInfiniteLimit(
-      mode: decodedMode, duration: duration, wordLimit: wordLimit,
+      mode: mode, duration: duration, wordLimit: wordLimit,
       customTextCompletion: customTextCompletion)
       ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
     let decodedContentOptions =

@@ -687,7 +687,8 @@ enum FunboxCommandPolicy {
         guard target == .modifier(.memory), !currentModifiers.contains(.memory) else {
             return currentMode
         }
-        return [.words, .quote, .custom].contains(currentMode) ? currentMode : .words
+        return MemoryFunboxModePolicy.effectiveMode(
+            requested: currentMode, modifiers: [.memory])
     }
 }
 

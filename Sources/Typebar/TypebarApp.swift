@@ -597,6 +597,7 @@ private struct ContentView: View {
     [TestPresetRecord]
   @State private var session = TestSessionFactory.make(configuration: .timed(seconds: 30))
   @State private var mode: TestMode = .time
+  @State private var rememberedMemoryFunboxMode: TestMode?
   @State private var language: TypingLanguage = .english
   @State private var mixedLanguageComponents = TypingLanguage.defaultMixedComponents
   @State private var mixedLanguageSearch = ""
@@ -2649,6 +2650,9 @@ private struct ContentView: View {
   }
 
   private func reset(restarting: Bool = false) {
+    let effectiveMemoryMode = MemoryFunboxModePolicy.effectiveMode(
+      requested: mode, modifiers: settings.testModifiers)
+    if mode != effectiveMemoryMode { mode = effectiveMemoryMode }
     let joiningSafeModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
       settings.testModifiers, language: language,
       mixedLanguageComponents: mixedLanguageComponents)
@@ -3275,7 +3279,8 @@ private struct ContentView: View {
         language = language == .mixedLanguages ? .english : .mixedLanguages
         reset()
       case .clear, .modifier:
-        let updatedMode = FunboxCommandPolicy.mode(
+        let previousModifiers = settings.testModifiers
+        let commandMode = FunboxCommandPolicy.mode(
           afterToggling: target, currentMode: mode, currentModifiers: settings.testModifiers)
         guard let updated = FunboxCommandPolicy.updatedModifiers(
           for: target, current: settings.testModifiers,
@@ -3283,6 +3288,15 @@ private struct ContentView: View {
         else {
           restartLockMessage = "当前无限测试不支持这个修饰器；请先选择有限时长或字数。"
           return
+        }
+        if !previousModifiers.contains(.memory), updated.contains(.memory) {
+          rememberedMemoryFunboxMode = mode
+        }
+        let updatedMode = MemoryFunboxModePolicy.restoredMode(
+          rememberedMode: rememberedMemoryFunboxMode, currentMode: commandMode,
+          previousModifiers: previousModifiers, updatedModifiers: updated)
+        if previousModifiers.contains(.memory), !updated.contains(.memory) {
+          rememberedMemoryFunboxMode = nil
         }
         settings.testModifiers = updated
         mode = updatedMode
@@ -3629,6 +3643,7 @@ private struct ContentView: View {
     appliesGlobalSettings: Bool = true
   ) {
     practiceReturnPreset = nil
+    rememberedMemoryFunboxMode = nil
     let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID)
     activeChallengeID = challenge?.id
     let configuration = challenge?.preset.configuration ?? preset.configuration

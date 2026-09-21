@@ -896,9 +896,15 @@ final class TypingEngineTests: XCTestCase {
   func testInfiniteTestsDropOnlyFiniteDurationModifiersAndRoundTripSharing() throws {
     let finiteOnly = Array(TestModifierPolicy.finiteDurationOnly)
     let infinite = TestConfiguration.timed(seconds: 0).with(
-      modifiers: finiteOnly + [.uppercase, .noSpaces])
+      modifiers: finiteOnly.filter { $0 != .memory } + [.uppercase, .noSpaces])
     XCTAssertEqual(Set(infinite.modifiers), [.uppercase, .noSpaces])
     XCTAssertTrue(TestConfiguration.timed(seconds: 30).with(modifiers: finiteOnly).modifiers.count > 0)
+
+    let memoryForcedFinite = TestConfiguration.timed(seconds: 0).with(modifiers: [.memory])
+    XCTAssertEqual(memoryForcedFinite.mode, .words)
+    XCTAssertEqual(memoryForcedFinite.wordLimit, MemoryFunboxModePolicy.fallbackWordLimit)
+    XCTAssertFalse(memoryForcedFinite.isInfinite)
+    XCTAssertEqual(memoryForcedFinite.modifiers, [.memory])
 
     let custom = TestConfiguration(
       mode: .custom, duration: nil, wordLimit: 0, difficulty: .normal, rules: .init(),
@@ -17850,6 +17856,28 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testMemoryModifierHidesPromptOnlyAfterTheFirstAcceptedInput() {
+    XCTAssertEqual(
+      MemoryFunboxModePolicy.allowedModes,
+      Set<TestMode>([.words, .quote, .custom]))
+    XCTAssertEqual(
+      MemoryFunboxModePolicy.effectiveMode(requested: .time, modifiers: [.memory]), .words)
+    XCTAssertEqual(
+      MemoryFunboxModePolicy.effectiveMode(requested: .zen, modifiers: [.memory]), .words)
+    XCTAssertEqual(
+      MemoryFunboxModePolicy.effectiveMode(requested: .quote, modifiers: [.memory]), .quote)
+    XCTAssertEqual(
+      MemoryFunboxModePolicy.restoredMode(
+        rememberedMode: .time, currentMode: .words,
+        previousModifiers: [.memory], updatedModifiers: []), .time)
+    XCTAssertEqual(
+      MemoryFunboxModePolicy.restoredMode(
+        rememberedMode: .zen, currentMode: .words,
+        previousModifiers: [.memory], updatedModifiers: [.crtVisual]), .zen)
+    XCTAssertEqual(
+      MemoryFunboxModePolicy.restoredMode(
+        rememberedMode: .time, currentMode: .quote,
+        previousModifiers: [.memory], updatedModifiers: [.memory, .crtVisual]), .quote)
+
     let configuration = TestConfiguration.words(2).with(modifiers: [.memory])
     var session = TypingSession(configuration: configuration, prompt: "amber harbor")
 
@@ -17862,11 +17890,34 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(
       TestModifierPolicy.toggling(.memory, in: [.listening, .focusNextWord]), [.memory])
-    XCTAssertFalse(
-      TestConfiguration(
-        mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
-        modifiers: [.memory]
-      ).modifiers.contains(.memory))
+  }
+
+  func testMemoryFunboxNormalizesUnsupportedConfigurationModesToFiniteWords() throws {
+    let timed = TestConfiguration.timed(seconds: 60).with(modifiers: [.memory])
+    XCTAssertEqual(timed.mode, .words)
+    XCTAssertNil(timed.duration)
+    XCTAssertEqual(timed.wordLimit, MemoryFunboxModePolicy.fallbackWordLimit)
+    XCTAssertEqual(timed.modifiers, [.memory])
+
+    let zen = TestConfiguration(
+      mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      modifiers: [.memory]
+    )
+    XCTAssertEqual(zen.mode, .words)
+    XCTAssertNil(zen.duration)
+    XCTAssertEqual(zen.wordLimit, MemoryFunboxModePolicy.fallbackWordLimit)
+    XCTAssertEqual(zen.modifiers, [.memory])
+
+    let encodedTimed = try JSONEncoder().encode(TestConfiguration.timed(seconds: 60))
+    var serializedTimed = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encodedTimed) as? [String: Any])
+    serializedTimed["modifiers"] = [TestModifier.memory.rawValue]
+    let restored = try JSONDecoder().decode(
+      TestConfiguration.self, from: JSONSerialization.data(withJSONObject: serializedTimed))
+    XCTAssertEqual(restored.mode, .words)
+    XCTAssertNil(restored.duration)
+    XCTAssertEqual(restored.wordLimit, MemoryFunboxModePolicy.fallbackWordLimit)
+    XCTAssertEqual(restored.modifiers, [.memory])
   }
 
   func testSimonSaysHidesPendingCharactersButKeepsTheNextExpectedInputAvailable() {
@@ -20890,8 +20941,8 @@ final class TypingEngineTests: XCTestCase {
 
   func testChallengeEvaluatorReportsEverySupportedReferenceCondition() {
     let configuration = TestConfiguration(
-      mode: .time,
-      duration: 60,
+      mode: .quote,
+      duration: nil,
       wordLimit: nil,
       difficulty: .master,
       rules: .init(),
