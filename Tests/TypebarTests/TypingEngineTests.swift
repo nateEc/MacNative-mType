@@ -17553,6 +17553,10 @@ final class TypingEngineTests: XCTestCase {
       configuration: doubledConfiguration, customText: "amber bay")
     XCTAssertEqual(doubledSession.prompt, "AAMMBBEERR BBAAYY")
     XCTAssertEqual(
+      TestModifierPolicy.transformed("a\u{301} 😀", modifiers: [.doubleCharacters]),
+      "aa\u{301}\u{301} 😀😀",
+      "ddoouubblleedd repeats Unicode scalars, not extended grapheme clusters")
+    XCTAssertEqual(
       TestModifierPolicy.normalized([.noSpaces, .doubleCharacters]), [.noSpaces, .doubleCharacters])
 
     var focusSession = TypingSession(

@@ -1056,9 +1056,12 @@ enum TestModifierPolicy {
         .joined(separator: " ")
     }
     if modifiers.contains(.doubleCharacters) {
-      transformed = transformed.reduce(into: "") { output, character in
-        output.append(character)
-        if character != " " { output.append(character) }
+      // The reference's Unicode-aware regexp visits scalar values rather
+      // than extended grapheme clusters. Keep combining marks separate, but
+      // leave the generated word separator untouched.
+      transformed = transformed.unicodeScalars.reduce(into: "") { output, scalar in
+        output.unicodeScalars.append(scalar)
+        if scalar.value != 0x20 { output.unicodeScalars.append(scalar) }
       }
     }
     if modifiers.contains(.lazyLatin) {
