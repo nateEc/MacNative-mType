@@ -29,6 +29,7 @@ Typebar 同时以自有 Swift/Vapor 实现补齐正常显示名的可用性与�
 - 持久化与防绕过：`swift test --filter HealthRouteTests.testDisplayNameRequirementPersistsAndSurvivesAccountReset`，覆盖服务重载与账户重置。
 - 可用性、冷却与迁移：`swift test --filter HealthRouteTests.testDisplayNameAvailabilityAndCooldownPersistWithoutBlockingRequiredRename`，覆盖大小写/重音等价的密码与 OAuth 注册拒绝、无关资料更新不刷新冷却、重载后仍生效、30 天边界和整改要求的优先改名。
 - 可用性预检：`swift test --filter HealthRouteTests.testDisplayNameAvailabilityRouteSupportsPublicAndAuthenticatedChecks`，覆盖匿名占用/空闲查询、当前账户大小写变体的可用例外与非法名称拒绝。
+- 原生预检状态：`swift test --filter TypingEngineTests.testDisplayNameAvailabilityStateBlocksOnlyKnownUnavailablePreflight`，覆盖检查中/已占用时阻止提交，以及旧服务或临时失败时保留最终写入机会。
 - HTTP 契约：`swift test --filter HealthRouteTests.testProfileRouteReportsDisplayNameCooldownAsConflict`，覆盖第二次改名返回明确的 `409`。
 - 原生协议兼容：`swift test --filter 'TypingEngineTests.test(RemoteAccountUserDefaultsLegacyServersToPasswordAndDecodesOAuthMethods|LeaderboardRankResponsesDecodeAnAbsentStanding|ModerationProfileReportDefaultsAndDecodesDeploymentAccountControls)'`，覆盖账户、资格和审核队列的旧字段回退及新字段解码。
-- 已串行验收：服务端 `swift test` 100 项、0 失败（1.242 秒）；原生 `swift test` 650 项、0 失败（161.909 秒）。全程未启动 Typebar 图形程序，结束时未留下 Typebar、xctest 或 Swift 测试进程。
+- 已串行验收：服务端 `swift test` 100 项、0 失败（1.242 秒）；原生 `swift test` 651 项、0 失败（160.958 秒）。全程未启动 Typebar 图形程序，结束时未留下 Typebar、xctest 或 Swift 测试进程。

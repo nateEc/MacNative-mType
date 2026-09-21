@@ -2734,36 +2734,3 @@ private enum AccountMode: Hashable {
   case register
   case passwordReset
 }
-
-private struct DisplayNameAvailabilityCheck: Hashable {
-  let endpoint: String
-  let name: String
-}
-
-private enum DisplayNameAvailabilityState: Equatable {
-  case idle
-  case checking
-  case available
-  case unavailable
-  case unavailableToCheck
-
-  init(available: Bool?) {
-    switch available {
-    case true:
-      self = .available
-    case false:
-      self = .unavailable
-    case nil:
-      self = .unavailableToCheck
-    }
-  }
-
-  var preventsSubmission: Bool {
-    switch self {
-    case .checking, .unavailable:
-      true
-    case .idle, .available, .unavailableToCheck:
-      false
-    }
-  }
-}

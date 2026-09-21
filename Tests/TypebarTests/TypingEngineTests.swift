@@ -8,6 +8,18 @@ import XCTest
 final class TypingEngineTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 10_000)
 
+  func testDisplayNameAvailabilityStateBlocksOnlyKnownUnavailablePreflight() {
+    XCTAssertEqual(DisplayNameAvailabilityState(available: true), .available)
+    XCTAssertEqual(DisplayNameAvailabilityState(available: false), .unavailable)
+    XCTAssertEqual(DisplayNameAvailabilityState(available: nil), .unavailableToCheck)
+
+    XCTAssertFalse(DisplayNameAvailabilityState.idle.preventsSubmission)
+    XCTAssertTrue(DisplayNameAvailabilityState.checking.preventsSubmission)
+    XCTAssertFalse(DisplayNameAvailabilityState.available.preventsSubmission)
+    XCTAssertTrue(DisplayNameAvailabilityState.unavailable.preventsSubmission)
+    XCTAssertFalse(DisplayNameAvailabilityState.unavailableToCheck.preventsSubmission)
+  }
+
   func testNetworkConnectivityStateOnlyAnnouncesARealOfflineRecovery() {
     var state = NetworkConnectivityState()
     var initiallyOffline = NetworkConnectivityState()
