@@ -21237,8 +21237,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(points.map(\.errorCount), [0, 1, 0, 0])
     XCTAssertEqual(
       ResultPerformanceTrace.points(
-        prompt: "amber", events: [.init(offset: 0, kind: .insert, text: "a")], duration: 121),
+        prompt: "amber", events: [.init(offset: 0, kind: .insert, text: "a")], duration: 122).count,
+      122)
+    XCTAssertEqual(
+      ResultPerformanceTrace.points(
+        prompt: "amber", events: [.init(offset: 0, kind: .insert, text: "a")], duration: 123),
       [])
+  }
+
+  func testResultPerformanceChartAvailabilityMatchesTheSavedReplayBoundary() {
+    let events: [TypingReplayEvent] = [.init(offset: 0, kind: .insert, text: "a")]
+
+    XCTAssertTrue(
+      ResultPerformanceChartAvailability.isAvailable(
+        prompt: "amber", events: events, duration: 122))
+    XCTAssertFalse(
+      ResultPerformanceChartAvailability.isAvailable(
+        prompt: "amber", events: events, duration: 123))
+    XCTAssertFalse(
+      ResultPerformanceChartAvailability.isAvailable(
+        prompt: "", events: events, duration: 20))
+    XCTAssertFalse(
+      ResultPerformanceChartAvailability.isAvailable(
+        prompt: "amber", events: [], duration: 20))
   }
 
   func testResultPerformanceInspectionSnapsToASecondAndFindsItsTouchedWords() throws {

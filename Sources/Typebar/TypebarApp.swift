@@ -5774,7 +5774,7 @@ private struct ResultPerformanceChart: View {
   }
 
   var body: some View {
-    if points.count >= 2 {
+    if !points.isEmpty {
       VStack(alignment: .leading, spacing: 7) {
         HStack {
           Label("本次速度轨迹", systemImage: "chart.xyaxis.line")
@@ -7504,6 +7504,7 @@ private struct ResultDetailView: View {
   let isPersonalBest: Bool
   let typingSpeedUnit: TypingSpeedUnit
   let settings: AppSettings
+  @State private var showingPerformanceChart = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
@@ -7517,8 +7518,20 @@ private struct ResultDetailView: View {
             .foregroundStyle(.orange)
         }
       }
-      Text(result.finishedAt, format: .dateTime.year().month().day().hour().minute())
-        .foregroundStyle(.secondary)
+      HStack {
+        Text(result.finishedAt, format: .dateTime.year().month().day().hour().minute())
+          .foregroundStyle(.secondary)
+        Spacer()
+        Button {
+          showingPerformanceChart = true
+        } label: {
+          Label("查看速度图", systemImage: "chart.xyaxis.line")
+        }
+        .buttonStyle(.bordered)
+        .disabled(!hasPerformanceChart)
+        .accessibilityHint(performanceChartHelp)
+        .help(performanceChartHelp)
+      }
       Grid(alignment: .leading, horizontalSpacing: 40, verticalSpacing: 14) {
         GridRow {
           Text("模式")
@@ -7635,6 +7648,28 @@ private struct ResultDetailView: View {
     }
     .padding(32)
     .frame(width: 460, height: 620)
+    .sheet(isPresented: $showingPerformanceChart) {
+      HistoricalResultPerformanceChart(result: result, typingSpeedUnit: typingSpeedUnit, settings: settings)
+    }
+  }
+
+  private var elapsedDuration: TimeInterval {
+    max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+  }
+
+  private var hasPerformanceChart: Bool {
+    ResultPerformanceChartAvailability.isAvailable(
+      prompt: result.prompt, events: result.replayEvents, duration: elapsedDuration)
+  }
+
+  private var performanceChartHelp: String {
+    if hasPerformanceChart {
+      return "从本机输入回放重建每秒 WPM、Raw、Burst 和错误轨迹"
+    }
+    if elapsedDuration > ResultPerformanceTrace.maximumChartDuration {
+      return "超过 \(Int(ResultPerformanceTrace.maximumChartDuration)) 秒的记录不提供速度图"
+    }
+    return "此记录没有可用于重建速度图的本机输入回放"
   }
 
   private var consistency: ResultConsistency {
@@ -7663,6 +7698,47 @@ private struct ResultDetailView: View {
     return "\(percentage.formatted(.number.precision(.fractionLength(0...2))))%"
   }
 
+}
+
+private struct HistoricalResultPerformanceChart: View {
+  @Environment(\.dismiss) private var dismiss
+  let result: TestResultRecord
+  let typingSpeedUnit: TypingSpeedUnit
+  let settings: AppSettings
+
+  private var elapsedDuration: TimeInterval {
+    max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack(alignment: .firstTextBaseline) {
+        Label("历史成绩速度图", systemImage: "chart.xyaxis.line")
+          .font(.headline)
+        Spacer()
+        Button("完成") { dismiss() }
+      }
+      Text("按秒从本机输入回放重建；与当前结果页共用图表显示偏好。")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      ResultPerformanceChart(
+        prompt: result.prompt,
+        events: result.replayEvents,
+        duration: elapsedDuration,
+        reviews: [],
+        typingSpeedUnit: typingSpeedUnit,
+        startsAtZero: settings.startGraphsAtZero,
+        visibility: settings.resultPerformanceVisibility,
+        resultPersonalBestFeedback: nil,
+        tagPersonalBestFeedback: [],
+        onVisibilityChange: { settings.resultPerformanceVisibility = $0 },
+        onScaleChange: { settings.startGraphsAtZero = $0 },
+        onInspectionChange: { _ in },
+        accent: .accentColor)
+    }
+    .padding(24)
+    .frame(width: 680, height: 360)
+  }
 }
 
 private struct FlowLayout: Layout {

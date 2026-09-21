@@ -1082,10 +1082,11 @@ enum ResultConsistencyPolicy {
 
 /// Rebuilds a compact, local-only result trace from the input replay that is
 /// already saved with a completed test. It uses Typebar's own incremental
-/// character accounting and deliberately has a conservative duration cap so
-/// a long practice session cannot create an impractically dense result chart.
+/// character accounting and caps the trace at the same 122-second boundary
+/// used by the fixed reference's result-history graph, so a long practice
+/// session cannot create an impractically dense result chart.
 enum ResultPerformanceTrace {
-  static let maximumChartDuration: TimeInterval = 120
+  static let maximumChartDuration: TimeInterval = 122
 
   static func point(
     prompt: String,
@@ -1210,6 +1211,19 @@ enum ResultPerformanceTrace {
     guard elapsed > 0 else { return 0 }
     let characters = wordEnd - wordStart + 1 + (typed[wordEnd] == " " ? 0 : 1)
     return wpm(characters: characters, elapsed: elapsed)
+  }
+}
+
+/// Keeps history-row graph availability tied to the same replay requirements
+/// that construct the chart, rather than assuming every saved result has a
+/// usable, short input trace.
+enum ResultPerformanceChartAvailability {
+  static func isAvailable(
+    prompt: String,
+    events: [TypingReplayEvent],
+    duration: TimeInterval
+  ) -> Bool {
+    !ResultPerformanceTrace.points(prompt: prompt, events: events, duration: duration).isEmpty
   }
 }
 
