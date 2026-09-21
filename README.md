@@ -1,6 +1,6 @@
 # Typebar
 
-一个从零实现的 macOS 打字应用。目标是对 Monkeytype 做功能兼容的纯重写，但不使用其代码、后端、资产或广告。完整范围、实现边界和进度见 [REWRITE_SPEC.md](REWRITE_SPEC.md)。
+一个从零实现的 macOS 打字应用。目标是对 Monkeytype 做功能兼容的纯重写，但不使用其代码、后端、资产或广告。完整范围、实现边界和进度见 [REWRITE_SPEC.md](REWRITE_SPEC.md)。原创性边界、允许的参考元数据及可执行护栏见 [ORIGINALITY_BOUNDARY.md](ORIGINALITY_BOUNDARY.md)。
 
 远程功能的自建服务范围与 API 草案见 [SERVICE_SCOPE.md](SERVICE_SCOPE.md) 和 [SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md)。
 
@@ -16,6 +16,12 @@ swift run
 
 ```sh
 zsh Scripts/package-macos-app.sh
+```
+
+检查参考源码隔离与生产服务边界：
+
+```zsh
+zsh Scripts/check-originality-boundaries.sh --self-test
 ```
 
 运行自建服务的最小健康检查（服务能力仍在建设中）：
