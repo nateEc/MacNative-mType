@@ -14030,6 +14030,30 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingCaretStyle.allCases.contains(.monkey))
   }
 
+  func testIndependentCaretLayoutAnchorsMarkerAtTrailingEdgeForRTLPrompts() throws {
+    let text = AttributedString("سلام بيت")
+    let ltrRect = try XCTUnwrap(
+      PromptCaretLayout.rect(
+        in: text, characterOffset: 0, containerSize: .init(width: 360, height: 200),
+        font: PracticeFont.monospaced.nsFont(size: 28), lineSpacing: 8))
+    let rect = try XCTUnwrap(
+      PromptCaretLayout.rect(
+        in: text, characterOffset: 0, containerSize: .init(width: 360, height: 200),
+        font: PracticeFont.monospaced.nsFont(size: 28), lineSpacing: 8,
+        isRightToLeft: true))
+
+    XCTAssertGreaterThan(rect.minX, ltrRect.minX)
+    XCTAssertEqual(
+      PromptCaretPlacementPolicy.horizontalAnchor(
+        for: rect, style: .bar, isRightToLeft: false), rect.minX)
+    XCTAssertEqual(
+      PromptCaretPlacementPolicy.horizontalAnchor(
+        for: rect, style: .bar, isRightToLeft: true), rect.maxX)
+    XCTAssertEqual(
+      PromptCaretPlacementPolicy.horizontalAnchor(
+        for: rect, style: .block, isRightToLeft: true), rect.midX)
+  }
+
   @MainActor
   func testInstalledPracticeFontResolvesLocalNamesAndSafelyFallsBack() {
     let installedName = NativePracticeFont.fallbackPostScriptName

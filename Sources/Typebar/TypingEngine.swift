@@ -1648,8 +1648,9 @@ struct TestConfiguration: Codable, Equatable {
       && mixedLanguageComponents.allSatisfy(\.usesRightToLeftPrompt)
   }
 
-  /// Character-position overlays stay off for any prompt containing an RTL
-  /// run, including a mixed-direction polyglot prompt.
+  /// Character-position overlays support a wholly RTL paragraph. Mixed-direction
+  /// polyglots remain on the glyph-attached fallback to avoid guessing an
+  /// inline edge across Unicode bidirectional runs.
   var containsRightToLeftPromptRun: Bool {
     language.usesRightToLeftPrompt
       || (language == .mixedLanguages

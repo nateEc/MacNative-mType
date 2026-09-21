@@ -2030,6 +2030,7 @@ private struct ContentView: View {
                 font: settings.practiceFont.nsFont(
                   size: settings.fontSize, installedFontName: settings.installedPracticeFontName),
                 lineSpacing: usesJoiningScript ? 8 : 12,
+                isRightToLeft: isRightToLeft,
                 accent: activeTheme.caret,
                 motion: settings.smoothCaretMotion)
             }
@@ -2142,12 +2143,13 @@ private struct ContentView: View {
 
   private var usesNativeCaretOverlay: Bool {
     guard settings.caretStyle.drawsMarker || settings.paceCaretStyle.drawsMarker else { return false }
-    guard !session.configuration.containsRightToLeftPromptRun, !usesTapePractice,
-      !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo
+    guard !usesTapePractice, !practiceVisualEffect.usesASL, !practiceVisualEffect.usesChoo
     else {
       return false
     }
-    return !session.configuration.modifiers.contains(.listening)
+    guard !session.configuration.modifiers.contains(.listening) else { return false }
+    return !session.configuration.containsRightToLeftPromptRun
+      || session.configuration.usesRightToLeftPrompt
   }
 
   private func paceCaretCharacterOffset(in rendering: PromptRendering) -> Int? {

@@ -62,6 +62,17 @@ private struct PromptCaretPlacement: Identifiable {
   var id: String { marker.id }
 }
 
+/// The reference caret enters an RTL target glyph from its trailing visual
+/// edge. Full-width markers still center on the glyph in either direction.
+enum PromptCaretPlacementPolicy {
+  static func horizontalAnchor(
+    for rect: CGRect, style: TypingCaretStyle, isRightToLeft: Bool
+  ) -> CGFloat {
+    if style.usesFullGlyphWidth { return rect.midX }
+    return isRightToLeft ? rect.maxX : rect.minX
+  }
+}
+
 /// A separate, code-drawn caret layer. TextKit computes each target glyph's
 /// frame from the same attributed text and wrapping width shown by SwiftUI.
 struct PromptCaretOverlay: View {
@@ -72,6 +83,7 @@ struct PromptCaretOverlay: View {
   let paceStyle: TypingCaretStyle
   let font: NSFont
   let lineSpacing: CGFloat
+  let isRightToLeft: Bool
   let accent: Color
   let motion: SmoothCaretMotion
 
@@ -85,8 +97,9 @@ struct PromptCaretOverlay: View {
             accent: accent.opacity(placement.marker.opacity),
             rect: placement.rect)
           .position(
-            x: placement.marker.style.usesFullGlyphWidth
-              ? placement.rect.midX : placement.rect.minX,
+            x: PromptCaretPlacementPolicy.horizontalAnchor(
+              for: placement.rect, style: placement.marker.style,
+              isRightToLeft: isRightToLeft),
             y: placement.rect.midY)
           .animation(
             motion.duration.map { .easeInOut(duration: $0) }, value: placement.rect)
@@ -110,7 +123,7 @@ struct PromptCaretOverlay: View {
     return markers.compactMap { marker in
       guard let rect = PromptCaretLayout.rect(
         in: text, characterOffset: marker.characterOffset, containerSize: size,
-        font: font, lineSpacing: lineSpacing)
+        font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
       else { return nil }
       return PromptCaretPlacement(marker: marker, rect: rect)
     }
@@ -206,7 +219,8 @@ enum PromptCaretLayout {
     characterOffset: Int,
     containerSize: CGSize,
     font: NSFont,
-    lineSpacing: CGFloat
+    lineSpacing: CGFloat,
+    isRightToLeft: Bool = false
   ) -> CGRect? {
     guard containerSize.width > 0, characterOffset >= 0 else { return nil }
     let storage = NSTextStorage(attributedString: NSAttributedString(attributedText))
@@ -215,6 +229,8 @@ enum PromptCaretLayout {
     let paragraphStyle = NSMutableParagraphStyle()
     paragraphStyle.lineSpacing = lineSpacing
     paragraphStyle.lineBreakMode = .byWordWrapping
+    paragraphStyle.alignment = isRightToLeft ? .right : .left
+    paragraphStyle.baseWritingDirection = isRightToLeft ? .rightToLeft : .leftToRight
     let fullRange = NSRange(location: 0, length: storage.length)
     var rangesMissingFont: [NSRange] = []
     storage.enumerateAttribute(.font, in: fullRange) { existingFont, range, _ in

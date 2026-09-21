@@ -201,7 +201,7 @@
 | `playSoundOnError` | `playErrorBeep`、`errorSoundStyle` | 已映射；关闭开关加四种可持久化的 macOS 系统音型，覆盖固定 schema 的 off/1/2/3/4 五档契约。 |
 | `playTimeWarning` | `timeWarningOffset`、`timeWarningSoundStyle` | 已映射；关闭、结束前 1/3/5/10 秒五档与固定 schema 精确对应，并额外提供四种可持久化原生音型。 |
 | `smoothCaret` | `smoothCaretMotion` | 已映射。 |
-| `caretStyle` | `caretStyle` | 已映射；off/default/block/outline/underline/carrot/banana/monkey 八档逐项映射到关闭、条形及七种 Typebar 原创原生矢量呈现，旧存储 ID 保持不变。 |
+| `caretStyle` | `caretStyle` | 已映射；off/default/block/outline/underline/carrot/banana/monkey 八档逐项映射到关闭、条形及七种 Typebar 原创原生矢量呈现，旧存储 ID 保持不变。非卷带、非特殊视觉／听写模式的全 RTL 提示会以原生 TextKit 右向段落测量，并把窄光标锚定在目标字形的右缘；混合双向提示保留字形附着回退，不猜测跨方向的插入边。 |
 | `paceCaret` | `paceGuideMode` | 已映射；含 custom/PB/tag PB/average/daily/last。 |
 | `paceCaretCustomSpeed` | `paceGuideCustomWpm` | 已映射。 |
 | `paceCaretStyle` | `paceCaretStyle` | 已映射；与主光标共用完整八档原生样式目录和独立绘制层，不复制网页样式或资产。 |
