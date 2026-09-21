@@ -29,7 +29,7 @@
 | 自定义练习：`CustomText`、`SaveCustomText`、`SavedTexts`、`CustomGenerator`、`WordFilter`、`CustomTestDuration`、`CustomWordAmount`、`ShareTestSettings` | `CustomTextGenerator.swift`、`SavedTexts.swift`、`WordFilter.swift`、`TestLimitEditor.swift`、`TestConfigurationShare.swift` | 已覆盖：输入、保存、筛选、时长／词数、自定义生成与可分享测试选择均是本机数据。 |
 | 预设：`AddPreset`、`EditPreset`、完整／部分应用 | `TestPresets.swift`、`ActiveTestSelectionStore.swift` | 已覆盖：创建、编辑、应用和同步冲突处理使用版本化原生选择。 |
 | 成绩：`AddTag`、`EditResultTags`、`PbTables`、`LastSignedOutResult` | `ActiveResultTagEditor.swift`、`PersonalBestTable.swift`、`ResultPersistence.swift`、`CloudSyncView.swift` | 已覆盖且本机优先。官方仅在登出后暂存一局、认证成功后询问是否上传；Typebar 始终先保存本机，用户开启发布后才发送，网络／认证可恢复失败会按账户与服务端范围持久化排队重试。 |
-| 社区引语：`QuoteSearch`、`QuoteRate`、`QuoteReport`、`QuoteSubmit`、`QuoteApprove` | `QuoteSearch.swift`、`QuoteRatings.swift`、`QuoteResultFeedback.swift`、`RemoteAccount.swift` | 已覆盖：搜索、投稿、撤回、评分、举报及自建审核队列均有独立模型和 API。 |
+| 社区引语：`QuoteSearch`、`QuoteRate`、`QuoteReport`、`QuoteSubmit`、`QuoteApprove` | `QuoteSearch.swift`、`QuoteRatings.swift`、`QuoteResultFeedback.swift`、`RemoteAccount.swift` | 已覆盖：搜索、投稿、撤回、评分、举报及自建审核队列均有独立模型和 API；投稿和举报的外部 CAPTCHA 单列为 `SEC-01`。 |
 | 账户：`GoogleSignUp`、`ForgotPassword`、`EditProfile`、更新名字／邮箱／密码、添加／移除身份方式、重新认证、Ape key | `PreferencesView.swift`、`RemoteAccount.swift`、`OAuthWebAuthenticationSession.swift` | 已覆盖，身份／会话与密钥只进入 Typebar 自建服务。Google、GitHub 和 Discord 是可配置 OAuth 提供方，而不是复用参考服务。`RegisterCaptcha` 和同一官方验证码机制覆盖的忘记密码／举报路径单列为 `SEC-01`。 |
 | 社交与治理：`UserReport`、`StreakHourOffset`、`EditProfile` | `ProfileReportView.swift`、`RemoteAccount.swift`、`AppSettings.swift` | 已覆盖：私有举报、审核状态、排行榜限制、显示名整改、封禁、连续天数日界线和资料编辑均由原生界面表达。 |
 | 版本、联系、支持 | `ReleaseHistory.swift`、`AboutTypebar.swift` | 已覆盖为 Typebar 自己的版本信息、仓库／反馈入口；不链接或冒充 Monkeytype 的邮箱、资助或品牌。 |
@@ -46,11 +46,11 @@
 
 ## 未关闭缺口：SEC-01 外部人机验证
 
-官方在 `RegisterCaptchaModal` 中要求用户完成验证码；`CreateUserRequest` 传递不透明 token，服务端 `verifyCaptcha` 使用部署私密的 `RECAPTCHA_SECRET` 验证。相同验证还用于找回密码和用户举报。这是公开写入入口的防滥用能力，不能用当前进程内速率限制替代，也不能标为网页专属。
+官方在 `RegisterCaptchaModal` 中要求用户完成验证码；`CreateUserRequest` 传递不透明 token，服务端 `verifyCaptcha` 使用部署私密的 `RECAPTCHA_SECRET` 验证。相同验证还用于找回密码、用户举报、社区引语投稿和引语举报。这是公开写入入口的防滥用能力，不能用当前进程内速率限制替代，也不能标为网页专属。
 
 Typebar 当前已有每来源／令牌的固定窗口限速、最小化公开资料、私有举报和失败可重试的本机成绩发布，但**尚未提供可部署的外部人机验证提供方或原生验证流程**。因此本审计将其保留为唯一明确的页面／模态安全兼容缺口；不得据此文件宣称页面与账户流程已 100% 功能等价。
 
-下一步需要以安全设计审查决定并实现一个不绑定 Monkeytype 的协议：部署者配置独立的人机验证提供方，原生客户端通过安全的认证会话取得一次性证明，服务端按用途验证并防重放。验证范围至少包括注册、密码重置请求和资料／引语举报；缺失配置、验证服务故障和重放 token 必须有可测试、不会放行写入的失败语义。
+设计审查见 [SECURITY_HUMAN_VERIFICATION_DECISION.md](SECURITY_HUMAN_VERIFICATION_DECISION.md)：部署者配置独立的 Turnstile 提供方，原生客户端通过安全的认证会话取得一次性证明，服务端按用途验证并防重放。验证范围包括注册、密码重置请求、资料举报、引语投稿和引语举报；缺失配置、验证服务故障和重放 token 必须有可测试、不会放行写入的失败语义。
 
 ## 验收规则
 
