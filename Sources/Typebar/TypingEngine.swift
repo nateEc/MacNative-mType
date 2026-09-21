@@ -2060,6 +2060,15 @@ enum TypingPromptPresentation {
 }
 
 enum TypedCharacterEffectPolicy {
+  /// Dot replacement is a completed-word effect. Joining scripts follow the
+  /// same rule: the entire submitted word is already stable before any of its
+  /// glyphs are replaced, so native shaping is not interrupted mid-word.
+  static func replacesCommittedCharacterWithDot(
+    isCompleted: Bool, character: Character, effect: TypedCharacterEffect
+  ) -> Bool {
+    effect == .dots && isCompleted && !character.isWhitespace
+  }
+
   /// Returns target-character positions belonging to words already submitted
   /// with a space or line break. Deliberately independent from correctness: this is an
   /// appearance preference, not an input rule.

@@ -2173,10 +2173,9 @@ private struct ContentView: View {
     for (index, glyph) in session.promptGlyphs.enumerated() {
       glyphCharacterOffsets[index] = output.characters.count
       let replacesTypo = glyph.state == .incorrect && settings.typoIndicatorStyle.replacesTarget
-      let turnsIntoDot = completedCharacterIndices.contains(index)
-        && settings.typedCharacterEffect == .dots
-        && !session.configuration.usesJoiningScriptPrompt
-        && !glyph.character.isWhitespace
+      let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
+        isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
+        effect: settings.typedCharacterEffect)
       let replacesCurrentWithComposition = glyph.state == .current
         && settings.compositionDisplayStyle == .replace
         && !compositionText.isEmpty

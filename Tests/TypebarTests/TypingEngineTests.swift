@@ -15189,6 +15189,24 @@ final class TypingEngineTests: XCTestCase {
         target: "amber bay", typed: "amber", isFinished: false).isEmpty)
   }
 
+  func testTypedDotsApplyToCommittedJoiningScriptWords() {
+    var session = TypingSession(
+      configuration: .timed(seconds: 30, language: .arabic), prompt: "سلام بيت")
+    session.insert("سلام ", at: start)
+
+    let completed = session.completedPromptCharacterIndices
+    XCTAssertEqual(completed, Set(0..<4))
+    XCTAssertTrue(
+      TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
+        isCompleted: completed.contains(0), character: "س", effect: .dots))
+    XCTAssertFalse(
+      TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
+        isCompleted: completed.contains(4), character: " ", effect: .dots))
+    XCTAssertFalse(
+      TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
+        isCompleted: false, character: "ب", effect: .dots))
+  }
+
   func testAttentionWarningsRespectFocusLanguageCompletionAndPreferences() {
     XCTAssertEqual(
       TypingAttentionPolicy.warnings(

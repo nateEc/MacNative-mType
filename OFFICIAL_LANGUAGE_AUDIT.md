@@ -74,9 +74,9 @@
 - Maltese 审计只读取 `maltese.json` 与 `maltese_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 `bcp47: mt`，不定义 RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的 Maltese 内容与 LTR 空格分词，知识短文和朗读均精确使用 `mt`。保留手动简化输入与明确的 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - toki pona 审计只读取 `toki_pona.json`、`toki_pona_ku_suli.json` 与 `toki_pona_ku_lili.json` 的元数据，不读取其中词表或引语文本。三者定义 `noLazyMode: true`，不定义 BCP-47、RTL、连写或词频排序；Typebar 提供三个独立选择：ku suli 在自有基础集合上增加 15 个独立整理的核心词，ku lili 使用与其互斥的 20 个扩展词，四档文本只从 Typebar 自有文本派生独立身份。三者均使用 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径；普通练习移除简化输入、自定义文本保留例外，Zipf 走未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - Xhosa 审计只读取 `xhosa.json` 与 `xhosa_3k.json` 的元数据，不读取其中词表或引语文本。主组定义 `rightToLeft: false` 与 `bcp47: xh`，3k 组不定义这些可选字段；参考代码按当前词组读取，故主组使用 `xh`、3k 组回退 `en`／`en-US`。Typebar 以独立自写的 isiXhosa 内容与 LTR 空格分词呈现用户可见主选择，并精确使用 `xh`；不导入任一参考词表或引语。保留手动简化输入与 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
-- Tibetan 审计只读取 `tibetan.json` 与 `tibetan_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 `rightToLeft: false`、`joiningScript: true`、`noLazyMode: true` 与 `bcp47: bo-TI`，不定义词频排序；实现以独立自写的 Tibetan 内容和 LTR 空格分词处理，并在单语或混有 Tibetan 的提示中保留 macOS 原生塑形、较紧行距和圆点逐字替换保护。知识短文与朗读分别精确使用 `bo` 与 `bo-TI`；普通练习移除简化输入而自定义文本保留例外。它进入默认／自选多语混排、社区投稿、成绩及排行榜。
+- Tibetan 审计只读取 `tibetan.json` 与 `tibetan_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 `rightToLeft: false`、`joiningScript: true`、`noLazyMode: true` 与 `bcp47: bo-TI`，不定义词频排序；实现以独立自写的 Tibetan 内容和 LTR 空格分词处理，并在单语或混有 Tibetan 的提示中保留 macOS 原生塑形、较紧行距和已提交整词的圆点替代；活动连写词保持原字形。知识短文与朗读分别精确使用 `bo` 与 `bo-TI`；普通练习移除简化输入而自定义文本保留例外。它进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - Kyrgyz 审计只读取 `kyrgyz.json` 与 `kyrgyz_1k.json` 的元数据，不读取其中词表或引语文本。两者定义 `bcp47: ky-KY`，不定义 RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的 Kyrgyz 内容与 LTR 空格分词，知识短文按 BCP 首段使用 `ky`，朗读精确使用 `ky-KY`。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
-- Yiddish 审计只读取 `yiddish.json` 的元数据，不读取其中词表或引语文本。它定义 `rightToLeft: true`、`joiningScript: true` 与 `bcp47: yi`，不定义 `noLazyMode` 或词频排序；实现因此使用独立自写的 Yiddish 内容、RTL 空格分词及原生塑形／圆点逐字替换保护，知识短文和朗读均精确使用 `yi`。保留手动简化输入和 Zipf 未知提示，并进入社区投稿、成绩及排行榜；尚未完成专门交互验收的双向多语混排明确排除。
+- Yiddish 审计只读取 `yiddish.json` 的元数据，不读取其中词表或引语文本。它定义 `rightToLeft: true`、`joiningScript: true` 与 `bcp47: yi`，不定义 `noLazyMode` 或词频排序；实现因此使用独立自写的 Yiddish 内容、RTL 空格分词及原生塑形，已提交整词会替代为圆点而活动连写词保持原字形，知识短文和朗读均精确使用 `yi`。保留手动简化输入和 Zipf 未知提示，并进入社区投稿、成绩及排行榜；尚未完成专门交互验收的双向多语混排明确排除。
 - Udmurt 审计只读取 `udmurt.json` 的元数据，不读取其中词表或引语文本。它只定义名称，不定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的 Udmurt 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - Yoruba 审计只读取 `yoruba_1k.json` 的元数据，不读取其中词表或引语文本。它只定义名称，不定义 BCP-47、RTL、连写、`noLazyMode` 或词频排序；实现因此使用独立自写的含声调 Yoruba 内容与 LTR 空格分词，知识短文和朗读严格使用 `en`／`en-US` 缺省路径。保留手动简化输入和 Zipf 未知提示，并进入默认／自选多语混排、社区投稿、成绩及排行榜。
 - 2026-09-05 更正：当前单语总数为一百一十二种、默认／自选 LTR 多语候选为一百零二种。Swahili 审计只读取 `swahili_1k.json` 的元数据，不读取其中词表或引语文本；它定义 `noLazyMode: true`，不定义 BCP-47、RTL、连写或词频排序。因此 Typebar 以独立自写的 Swahili 内容走 LTR 空格分词和 `en`／`en-US` 缺省在线/朗读路径；普通练习移除简化输入而自定义文本保留例外，Zipf 使用未知提示，并已覆盖多语轮转、社区投稿、成绩和排行榜。
@@ -179,3 +179,5 @@
 - 2026-09-09 `customPolyglot` 更正：上述历史快照中的“默认／自选 LTR 多语候选仍为一百五十三种”和“不加入多语混排”仅描述当时状态，现统一由“153 项默认组合、446 项可搜索自选候选”取代。固定 schema 的每个语言 ID 都映射到独立原生候选；全 RTL、双向、无空格及代码组合使用 Typebar 自有内容和 macOS 原生排版，规模词流按需取样，不复制或物化参考词表。
 
 - 2026-09-21 词界更正：固定生成器的 `appendCommitCharacter` 在未启用 `nospace` 时为所有词项（包括中文与假名）附加提交空格。Typebar 的常规 CJK 词流已遵循该规则；`noSpaces`、在线中文系统分词与历史连续成绩分别保留显式边界或旧解析，以免迁移破坏进行中会话和既有结果。
+
+- 2026-09-21 连写文字圆点更正：固定 UI 在 `typedEffect=dots` 时仅对已提交词启用圆点替代，连写文字同样适用；当前词在提交前保持完整原字形。Typebar 将该判定收敛为独立原生策略，保留 macOS 塑形和较紧行距，不导入网页 DOM、CSS 或资产。
