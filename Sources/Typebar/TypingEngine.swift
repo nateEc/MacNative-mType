@@ -1412,6 +1412,33 @@ enum JoiningScriptFunboxPolicy {
   }
 }
 
+/// Mirrors the reference's `noInfiniteDuration` activation fallback. The
+/// setter rejects changing an active finite-only funbox to zero, while
+/// activating one from an infinite test changes that active limit to the
+/// reference's finite default.
+enum FiniteFunboxLimitPolicy {
+  static let timeFallback = 15
+  static let wordsFallback = 10
+
+  static func fallbackLimit(
+    for mode: TestMode, customTextCompletion: CustomTextCompletion,
+    modifiers: [TestModifier]
+  ) -> Int? {
+    guard !TestModifierPolicy.finiteDurationOnly.isDisjoint(with: modifiers) else { return nil }
+    switch mode {
+    case .time: return timeFallback
+    case .words: return wordsFallback
+    case .custom:
+      switch customTextCompletion {
+      case .time: return timeFallback
+      case .words: return wordsFallback
+      case .finish, .sections: return nil
+      }
+    case .quote, .zen: return nil
+    }
+  }
+}
+
 struct PracticeVisualTransform: Equatable {
   let horizontalScale: Double
   let rotationDegrees: Double

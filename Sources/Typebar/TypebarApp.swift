@@ -2864,6 +2864,24 @@ private struct ContentView: View {
       })
   }
 
+  private func applyFiniteFunboxLimitIfNeeded(for modifiers: [TestModifier]) {
+    guard let fallback = FiniteFunboxLimitPolicy.fallbackLimit(
+      for: mode, customTextCompletion: customTextCompletion, modifiers: modifiers)
+    else { return }
+    switch mode {
+    case .time where duration == 0:
+      duration = fallback
+    case .words where wordLimit == 0:
+      wordLimit = fallback
+    case .custom where customTextCompletion == .time && customTextDuration == 0:
+      customTextDuration = fallback
+    case .custom where customTextCompletion == .words && customTextWordLimit == 0:
+      customTextWordLimit = fallback
+    default:
+      break
+    }
+  }
+
   private func loadSavedCustomText(_ selection: SavedCustomTextSelection) {
     guard selectMode(.custom) else { return }
     guard selection.isLong else {
@@ -3381,13 +3399,14 @@ private struct ContentView: View {
         }
         guard let updated = FunboxCommandPolicy.updatedModifiers(
           for: target, current: settings.testModifiers,
-          isInfinite: session.configuration.isInfinite, hasStarted: session.hasStarted)
+          hasStarted: session.hasStarted)
         else {
           restartLockMessage = "当前无限测试不支持这个修饰器；请先选择有限时长或字数。"
           return
         }
         guard acceptsFunboxConfiguration(updated) else { return }
         settings.testModifiers = updated
+        applyFiniteFunboxLimitIfNeeded(for: updated)
         if target == .clear && language == .mixedLanguages { language = .english }
         activeChallengeID = nil
         reset()

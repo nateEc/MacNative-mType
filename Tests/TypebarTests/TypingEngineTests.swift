@@ -2290,34 +2290,35 @@ final class TypingEngineTests: XCTestCase {
       FunboxCommandPolicy.updatedModifiers(
         for: .clear,
         current: [.uppercase, .rot13, .symbolStream, .correctBeforeAdvance, .lazyLatin],
-        isInfinite: false, hasStarted: false),
+        hasStarted: false),
       [.symbolStream, .correctBeforeAdvance, .lazyLatin])
     XCTAssertEqual(
       FunboxCommandPolicy.updatedModifiers(
-        for: .modifier(.titleCase), current: [.uppercase, .rot13], isInfinite: false,
+        for: .modifier(.titleCase), current: [.uppercase, .rot13],
         hasStarted: false),
       nil)
     XCTAssertEqual(
       FunboxCommandPolicy.updatedModifiers(
-        for: .modifier(.titleCase), current: [.titleCase, .rot13], isInfinite: false,
+        for: .modifier(.titleCase), current: [.titleCase, .rot13],
         hasStarted: false),
       [.rot13])
-    XCTAssertNil(
-      FunboxCommandPolicy.updatedModifiers(
-        for: .modifier(.layoutFluid), current: [], isInfinite: true, hasStarted: false))
     XCTAssertEqual(
       FunboxCommandPolicy.updatedModifiers(
-        for: .modifier(.layoutFluid), current: [.layoutFluid], isInfinite: true,
+        for: .modifier(.layoutFluid), current: [], hasStarted: false),
+      [.layoutFluid])
+    XCTAssertEqual(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.layoutFluid), current: [.layoutFluid],
         hasStarted: false),
       [])
     XCTAssertNil(
       FunboxCommandPolicy.updatedModifiers(
-        for: .clear, current: [.noQuit, .rot13], isInfinite: false, hasStarted: true))
+        for: .clear, current: [.noQuit, .rot13], hasStarted: true))
     XCTAssertNil(
       FunboxCommandPolicy.updatedModifiers(
-        for: .modifier(.noQuit), current: [.noQuit], isInfinite: false, hasStarted: true))
+        for: .modifier(.noQuit), current: [.noQuit], hasStarted: true))
     let memory = try! XCTUnwrap(FunboxCommandPolicy.updatedModifiers(
-      for: .modifier(.memory), current: [], isInfinite: false, hasStarted: false))
+      for: .modifier(.memory), current: [], hasStarted: false))
     XCTAssertEqual(memory, [.memory])
     XCTAssertFalse(TestModifierPolicy.acceptsModeSelection(.time, modifiers: memory))
     XCTAssertTrue(TestModifierPolicy.acceptsModeSelection(.quote, modifiers: memory))
@@ -2329,7 +2330,7 @@ final class TypingEngineTests: XCTestCase {
       TestModifierPolicy.acceptsInteractiveModifierAddition(.titleCase, to: textCaseSelection))
     XCTAssertNil(
       FunboxCommandPolicy.updatedModifiers(
-        for: .modifier(.titleCase), current: textCaseSelection, isInfinite: false,
+        for: .modifier(.titleCase), current: textCaseSelection,
         hasStarted: false))
     XCTAssertEqual(textCaseSelection, [.uppercase, .rot13])
 
@@ -2338,7 +2339,7 @@ final class TypingEngineTests: XCTestCase {
       TestModifierPolicy.acceptsInteractiveModifierAddition(.arrowStream, to: layoutSelection))
     XCTAssertNil(
       FunboxCommandPolicy.updatedModifiers(
-        for: .modifier(.arrowStream), current: layoutSelection, isInfinite: false,
+        for: .modifier(.arrowStream), current: layoutSelection,
         hasStarted: false))
     XCTAssertEqual(layoutSelection, [.layoutFluid])
 
@@ -2346,9 +2347,34 @@ final class TypingEngineTests: XCTestCase {
       TestModifierPolicy.acceptsInteractiveModifierAddition(.morseStream, to: [.gibberishStream]))
     XCTAssertEqual(
       FunboxCommandPolicy.updatedModifiers(
-        for: .modifier(.morseStream), current: [.gibberishStream], isInfinite: false,
+        for: .modifier(.morseStream), current: [.gibberishStream],
         hasStarted: false),
       [.gibberishStream, .morseStream])
+  }
+
+  func testFunboxCommandPolicyActivatesFiniteOnlyModifiersFromAnInfiniteTest() {
+    XCTAssertEqual(
+      FunboxCommandPolicy.updatedModifiers(
+        for: .modifier(.layoutFluid), current: [], hasStarted: false),
+      [.layoutFluid])
+    XCTAssertEqual(
+      FiniteFunboxLimitPolicy.fallbackLimit(
+        for: .time, customTextCompletion: .finish, modifiers: [.layoutFluid]),
+      FiniteFunboxLimitPolicy.timeFallback)
+    XCTAssertEqual(
+      FiniteFunboxLimitPolicy.fallbackLimit(
+        for: .words, customTextCompletion: .finish, modifiers: [.referenceStream]),
+      FiniteFunboxLimitPolicy.wordsFallback)
+    XCTAssertEqual(
+      FiniteFunboxLimitPolicy.fallbackLimit(
+        for: .custom, customTextCompletion: .time, modifiers: [.focusNextWord]),
+      FiniteFunboxLimitPolicy.timeFallback)
+    XCTAssertNil(
+      FiniteFunboxLimitPolicy.fallbackLimit(
+        for: .custom, customTextCompletion: .finish, modifiers: [.layoutFluid]))
+    XCTAssertNil(
+      FiniteFunboxLimitPolicy.fallbackLimit(
+        for: .time, customTextCompletion: .finish, modifiers: [.rot13]))
   }
 
   @MainActor

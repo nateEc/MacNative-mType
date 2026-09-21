@@ -659,8 +659,7 @@ enum FunboxCommandCatalog {
 
 enum FunboxCommandPolicy {
     static func updatedModifiers(
-        for target: FunboxCommandTarget, current: [TestModifier], isInfinite: Bool,
-        hasStarted: Bool
+        for target: FunboxCommandTarget, current: [TestModifier], hasStarted: Bool
     ) -> [TestModifier]? {
         guard !(hasStarted && current.contains(.noQuit)) else { return nil }
         switch target {
@@ -670,9 +669,6 @@ enum FunboxCommandPolicy {
         case .modifier(let modifier):
             if current.contains(modifier) {
                 return current.filter { $0 != modifier }
-            }
-            guard !(isInfinite && TestModifierPolicy.finiteDurationOnly.contains(modifier)) else {
-                return nil
             }
             guard TestModifierPolicy.acceptsInteractiveModifierAddition(modifier, to: current) else {
                 return nil
