@@ -18807,7 +18807,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       SettingsSearch.preferenceCatalog.first(where: { $0.id == "lazyMode" })?.section,
       .test)
-    XCTAssertEqual(TypingTextNormalizer.lazyLatin("árvore Straße cœur Łódź"), "arvore Strasse coeur Lodz")
+    XCTAssertEqual(TypingTextNormalizer.lazyLatin("Łódź"), "Lodz")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("árvore Straße cœur Łódź"),
+      "arvore Strasse coeur lodz",
+      "Reference casing is indexed against the whole uppercased string, including earlier expansions")
     XCTAssertEqual(
       TypingTextNormalizer.lazyLatin("أَإِآ كِتابٌ مُدَرِّسْ"), "ااا كتاب مدرس")
     XCTAssertEqual(
@@ -18906,6 +18910,30 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(session.prompt.contains("ä"))
     XCTAssertFalse(session.prompt.contains("ü"))
     XCTAssertFalse(session.prompt.contains("ß"))
+  }
+
+  func testLazyLatinModifierUsesTheReferenceReplacementTableInsteadOfGenericFolding() {
+    XCTAssertEqual(TypingTextNormalizer.lazyLatin("áéíóú"), "aeiou")
+    XCTAssertEqual(TypingTextNormalizer.lazyLatin("ńçřďťṃ"), "ncrdtm")
+    XCTAssertEqual(TypingTextNormalizer.lazyLatin("æœẅĝĥĵ"), "aeoewghj")
+    XCTAssertEqual(TypingTextNormalizer.lazyLatin("ŝßżÿł"), "ssszyl")
+    XCTAssertEqual(TypingTextNormalizer.lazyLatin("ёάέίύόήώ"), "еαειυοηω")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("ẞ Æ"),
+      "SS Ae",
+      "The reference uses the following source position when expanding a capital ligature")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("mañana"),
+      "mañana",
+      "The reference leaves accents that are absent from its lazy-mode table intact")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("g\u{0303}"),
+      "gG",
+      "The reference applies its table to each combining scalar and propagates that scalar's case")
+    XCTAssertEqual(
+      TypingTextNormalizer.lazyLatin("Đường", language: .vietnamese),
+      "Duong",
+      "Vietnamese supplies a language-specific replacement for đ and horned vowels")
   }
 
   func testLazyLatinModifierExpandsIcelandicThornWithCasePreserved() {

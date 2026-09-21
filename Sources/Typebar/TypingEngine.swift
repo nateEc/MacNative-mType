@@ -1385,102 +1385,156 @@ enum MessagingTextPolicy {
 
 enum TypingTextNormalizer {
   static func lazyLatin(_ value: String, language: TypingLanguage? = nil) -> String {
-    let ligatures: [(String, String)] = [
-      ("ß", "ss"), ("ẞ", "SS"), ("æ", "ae"), ("Æ", "AE"),
-      ("œ", "oe"), ("Œ", "OE"), ("ø", "o"), ("Ø", "O"),
-      ("ł", "l"), ("Ł", "L"), ("đ", "d"), ("Đ", "D"), ("ı", "i"),
-    ]
-    let languageExpanded = expandLanguageSpecificMappings(in: value, language: language)
-    let thornExpanded = expandThorn(in: languageExpanded)
-    let expanded = ligatures.reduce(thornExpanded) { text, replacement in
-      text.replacingOccurrences(of: replacement.0, with: replacement.1)
-    }
-    let latinSimplified = expanded.folding(
-      options: [.diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
-    return simplifyArabicMarks(in: latinSimplified)
+    replaceAccents(in: value, replacements: replacements(for: language))
   }
 
-  /// Thorn expands to the two-key sequence used by simplified Icelandic input.
-  /// When it starts an all-caps word, the second replacement letter follows
-  /// the casing of the next source character as well.
-  private static func expandThorn(in value: String) -> String {
-    let characters = Array(value)
-    return characters.enumerated().reduce(into: "") { output, entry in
-      let (index, character) = entry
-      switch character {
-      case "þ":
-        output += "th"
-      case "Þ":
-        let nextIndex = index + 1
-        let secondLetterIsUppercase =
-          nextIndex < characters.count
-          && String(characters[nextIndex]) == String(characters[nextIndex]).uppercased()
-        output += secondLetterIsUppercase ? "TH" : "Th"
-      default:
-        output.append(character)
+  /// Lazy input is a deliberately finite replacement table, not generic
+  /// Unicode accent folding. This preserves glyphs that the reference leaves
+  /// literal (for example, Spanish ñ) while retaining its combining-mark
+  /// behavior and casing for multi-character expansions.
+  private static func replaceAccents(in value: String, replacements: [String: String]) -> String {
+    guard !value.isEmpty else { return value }
+
+    let uppercasedUnits = Array(value.uppercased().utf16)
+    let sourceScalars = Array(value.unicodeScalars)
+    let caseFlags = sourceScalars.enumerated().map { index, scalar in
+      guard index < uppercasedUnits.count,
+        let uppercasedScalar = UnicodeScalar(UInt32(uppercasedUnits[index]))
+      else { return false }
+      return scalar == uppercasedScalar
+    }
+    let units = Array(value.utf16)
+    var output = ""
+    var index = 0
+
+    while index < units.count {
+      let unit = units[index]
+      if (0xD800...0xDBFF).contains(unit), index + 1 < units.count,
+        (0xDC00...0xDFFF).contains(units[index + 1])
+      {
+        output += String(decoding: units[index...index + 1], as: UTF16.self)
+        index += 2
+        continue
+      }
+
+      guard let scalar = UnicodeScalar(UInt32(unit)) else {
+        output += String(decoding: [unit], as: UTF16.self)
+        index += 1
+        continue
+      }
+
+      let lookup = String(scalar).lowercased().unicodeScalars.first.map(String.init)
+      guard let lookup, let replacement = replacements[lookup] else {
+        let source = String(scalar)
+        output += isUppercase(caseFlags, at: index) ? source.uppercased() : source
+        index += 1
+        continue
+      }
+
+      for (offset, replacementScalar) in replacement.unicodeScalars.enumerated() {
+        let replacementCharacter = String(replacementScalar)
+        output += isUppercase(caseFlags, at: index + offset)
+          ? replacementCharacter.uppercased()
+          : replacementCharacter
+      }
+      index += 1
+    }
+
+    return output
+  }
+
+  private static func isUppercase(_ flags: [Bool], at index: Int) -> Bool {
+    index < flags.count && flags[index]
+  }
+
+  private static let commonReplacements = replacementMap(from: [
+    ("áàâäåãą\u{0301}ā\u{0304}ă", "a"),
+    ("éèêëẽę\u{0301}ē\u{0304}ėě", "e"),
+    ("íìîïĩį\u{0301}ī\u{0304}ı", "i"),
+    ("óòôöøõōǫ\u{0301}ǭő", "o"),
+    ("úùûüŭũūůű", "u"),
+    ("ńňṇṅ", "n"),
+    ("çĉčć", "c"),
+    ("řŕṛ", "r"),
+    ("ďđḍ", "d"),
+    ("ťțṭ", "t"),
+    ("ṃ", "m"),
+    ("æ", "ae"),
+    ("œ", "oe"),
+    ("ẅŵ", "w"),
+    ("ĝğg\u{0303}", "g"),
+    ("ĥ", "h"),
+    ("ĵ", "j"),
+    ("ŝśšșşṣ", "s"),
+    ("ß", "ss"),
+    ("żźž", "z"),
+    ("ÿỹýŷ", "y"),
+    ("łľĺ", "l"),
+    ("أإآ", "ا"),
+    ("ًٌٍَُِّْ", ""),
+    ("ё", "е"),
+    ("ά", "α"),
+    ("έ", "ε"),
+    ("ί", "ι"),
+    ("ύ", "υ"),
+    ("ό", "ο"),
+    ("ή", "η"),
+    ("ώ", "ω"),
+    ("þ", "th"),
+  ])
+
+  private static func replacements(for language: TypingLanguage?) -> [String: String] {
+    var replacements = commonReplacements
+    for rule in languageSpecificRules(for: language) {
+      for scalar in rule.0.unicodeScalars {
+        replacements[String(scalar)] = rule.1
       }
     }
+    return replacements
   }
 
-  /// Monkeytype assigns a few replacement sequences to specific word-list
-  /// languages. Keep them scoped: globally simplifying these characters would
-  /// make the prompt differ from other languages that share the same glyphs.
-  private static func expandLanguageSpecificMappings(
-    in value: String, language: TypingLanguage?
-  ) -> String {
-    let replacements: [String: String]
+  /// Language-specific sequences overlay the common table character by
+  /// character. This is important for the reference's combined-script rules:
+  /// their later scalar entries intentionally take precedence.
+  private static func languageSpecificRules(for language: TypingLanguage?) -> [(String, String)] {
     switch language {
     case .german, .german1k, .german10k, .german250k:
-      replacements = ["ä": "ae", "ö": "oe", "ü": "ue"]
+      return [("ä", "ae"), ("ö", "oe"), ("ü", "ue")]
     case .serbianLatin, .serbianLatin10k:
-      replacements = ["đ": "dj"]
+      return [("đ", "dj")]
     case .pinyin, .pinyin1k, .pinyin10k:
-      replacements = ["ü": "v", "ǖ": "v", "ǘ": "v", "ǚ": "v", "ǜ": "v"]
+      return [
+        ("āáǎà", "a"), ("ōóǒò", "o"), ("ēéěè", "e"), ("īíǐì", "i"),
+        ("ūúǔù", "u"), ("üǖǘǚǜ", "v"),
+      ]
     case .quenya:
-      replacements = ["χ": "x", "þ": "p"]
+      return [
+        ("äá", "a"), ("öó", "o"), ("ëé", "e"), ("í", "i"),
+        ("Úú", "u"), ("χ", "x"), ("þ", "p"),
+      ]
     case .yiddish:
-      replacements = [
-        "א": "א", "ַ": "יי", "ָ": "א", "ב": "ב", "ּ": "ת", "ֿ": "פ",
-        "ו": "ו", "ֹ": "ו", "י": "י", "ִ": "י", "כ": "כ", "פ": "פ",
-        "ש": "ש", "ׂ": "ש", "ת": "ת", "ײ": "יי", "ױ": "וי", "װ": "וו",
+      return [
+        ("אַ", "א"), ("אָ", "א"), ("בּ", "ב"), ("בֿ", "ב"),
+        ("וּ", "ו"), ("וֹ", "ו"), ("יִ", "י"), ("כּ", "כ"),
+        ("פּ", "פ"), ("פֿ", "פ"), ("שׂ", "ש"), ("תּ", "ת"),
+        ("ײַ", "יי"), ("ײ", "יי"), ("ױ", "וי"), ("װ", "וו"),
+      ]
+    case .vietnamese, .vietnamese1k, .vietnamese5k:
+      return [
+        ("áàăắằẵẳâấầẫẩãảạặậ", "a"), ("đ", "d"),
+        ("éèêếềễểẽẻẹệ", "e"), ("íìĩỉị", "i"),
+        ("óòôốồỗổõỏơớờỡởợọộ", "o"), ("úùũủưứừữửựụ", "u"),
+        ("ýỳỹỷỵ", "y"),
       ]
     default:
-      return value
-    }
-
-    let sourceCharacters = value.unicodeScalars.map(String.init)
-    return sourceCharacters.enumerated().reduce(into: "") { output, entry in
-      let (index, source) = entry
-      guard let replacement = replacements[source.lowercased()] else {
-        output += source
-        return
-      }
-
-      for (offset, replacementCharacter) in replacement.enumerated() {
-        let sourceIndex = index + offset
-        let replacementFollowsUppercaseSource =
-          sourceIndex < sourceCharacters.count
-          && sourceCharacters[sourceIndex] == sourceCharacters[sourceIndex].uppercased()
-        output += replacementFollowsUppercaseSource
-          ? replacementCharacter.uppercased()
-          : String(replacementCharacter)
-      }
+      return []
     }
   }
 
-  /// Arabic simplified input deliberately removes only short-vowel, tanwin,
-  /// shadda and sukun marks that Typebar's own Arabic practice content uses.
-  /// It also normalizes the common hamza-on-alef variants so the generated
-  /// target can be entered without those extra key sequences.
-  private static func simplifyArabicMarks(in value: String) -> String {
-    value.unicodeScalars.reduce(into: "") { output, scalar in
-      switch scalar.value {
-      case 0x0622, 0x0623, 0x0625:
-        output.unicodeScalars.append(UnicodeScalar(0x0627)!)
-      case 0x064B...0x0652:
-        break
-      default:
-        output.unicodeScalars.append(scalar)
+  private static func replacementMap(from rules: [(String, String)]) -> [String: String] {
+    rules.reduce(into: [:]) { map, rule in
+      for scalar in rule.0.unicodeScalars {
+        map[String(scalar)] = rule.1
       }
     }
   }
