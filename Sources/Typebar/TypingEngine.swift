@@ -3566,7 +3566,20 @@ struct TypingSession {
   private mutating func insertCharacter(
     _ character: Character, forceError: Bool, at date: Date, evaluatesTerminalRules: Bool
   ) -> Bool {
+    // `forceError` also supports deterministic engine tests that intentionally
+    // retain a wrong character. Only the physical opposite-Shift path has the
+    // reference behavior of immediately rejecting its text.
+    let rejectsOppositeShiftInput = forceError && configuration.rules.oppositeShiftMode != .off
     if configuration.mode == .zen {
+      // The reference still starts a Zen test when opposite Shift rejects a
+      // key, but Zen has no target character to score as incorrect. The key
+      // therefore leaves neither accepted text nor a replay action behind.
+      if rejectsOppositeShiftInput {
+        beginIfNeeded(at: date)
+        recordInputAttempt(isCorrect: true)
+        recordWeakSpotInput(character, isCorrect: true, at: date)
+        return false
+      }
       let accepted = insertZenCharacter(character, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
       if accepted {
         recordInputAttempt(isCorrect: true)
@@ -3624,6 +3637,15 @@ struct TypingSession {
     recordInputAttempt(isCorrect: isCorrect)
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
     if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
+    // Opposite Shift records a failed physical attempt, but the reference
+    // immediately removes its text and does not run stop/delete-on-error
+    // recovery. Master difficulty still fails on that rejected mistake.
+    if rejectsOppositeShiftInput {
+      if evaluatesTerminalRules, configuration.difficulty == .master {
+        fail(at: date)
+      }
+      return false
+    }
     let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
       with: inputCharacter, forceError: forceError)
     if configuration.modifiers.contains(.correctBeforeAdvance),

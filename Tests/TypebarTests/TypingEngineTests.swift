@@ -9658,21 +9658,50 @@ final class TypingEngineTests: XCTestCase {
         rightShiftPressed: false))
   }
 
-  func testForcedPhysicalInputErrorRetainsTypedTextButChangesMetricsReviewsAndReplay() {
-    var session = TypingSession(configuration: .words(2), prompt: "a b ")
+  func testForcedPhysicalInputErrorIsCountedWithoutRetainingTextOrReplayAction() throws {
+    let oppositeShiftRules = InputRules(oppositeShiftMode: .on)
+    var session = TypingSession(configuration: .words(2, rules: oppositeShiftRules), prompt: "a b ")
     let start = Date(timeIntervalSince1970: 1_000)
     session.insert("a", forceError: true, at: start)
-    session.insert(" ", at: start.addingTimeInterval(0.2))
-    session.insert("b", at: start.addingTimeInterval(0.4))
 
-    XCTAssertEqual(session.typed, "a b")
-    XCTAssertEqual(session.errors, 1)
-    XCTAssertEqual(session.accuracy, 67)
-    XCTAssertEqual(session.promptGlyphs[0].state, .incorrect)
-    XCTAssertEqual(session.wordReviews.first?.typed, "a")
-    XCTAssertFalse(session.wordReviews.first?.isCorrect ?? true)
-    XCTAssertTrue(session.missedWords.contains("a"))
-    XCTAssertTrue(session.result(at: start.addingTimeInterval(1))?.replayEvents.first?.forceError ?? false)
+    XCTAssertEqual(session.typed, "")
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertEqual(session.accuracy, 0)
+    XCTAssertEqual(session.promptGlyphs[0].state, .current)
+    session.bailOut(at: start.addingTimeInterval(0.1))
+    XCTAssertTrue(try XCTUnwrap(session.result()?.replayEvents).isEmpty)
+
+    var correctedSession = TypingSession(
+      configuration: .words(2, rules: oppositeShiftRules), prompt: "a b ")
+    correctedSession.insert("a", forceError: true, at: start)
+    correctedSession.insert("a", at: start.addingTimeInterval(0.2))
+    correctedSession.insert(" ", at: start.addingTimeInterval(0.4))
+    correctedSession.insert("b", at: start.addingTimeInterval(0.6))
+
+    XCTAssertEqual(correctedSession.typed, "a b")
+    XCTAssertEqual(correctedSession.errors, 0)
+    XCTAssertEqual(correctedSession.accuracy, 75)
+    XCTAssertEqual(correctedSession.wordReviews.first?.typed, "a")
+    XCTAssertFalse(correctedSession.wordReviews.first?.isCorrect ?? true)
+    XCTAssertTrue(correctedSession.missedWords.contains("a"))
+    XCTAssertFalse(
+      correctedSession.result(at: start.addingTimeInterval(1))?.replayEvents.contains(where: \.forceError)
+        ?? true)
+
+    var masterSession = TypingSession(
+      configuration: .timed(seconds: 30, difficulty: .master, rules: oppositeShiftRules), prompt: "a")
+    masterSession.insert("a", forceError: true, at: start)
+    XCTAssertEqual(masterSession.typed, "")
+    XCTAssertEqual(masterSession.outcome, .failed)
+
+    var zenSession = TypingSession(
+      configuration: .init(
+        mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: oppositeShiftRules),
+      prompt: "")
+    zenSession.insert("A", forceError: true, at: start)
+    XCTAssertEqual(zenSession.startedAt, start)
+    XCTAssertEqual(zenSession.typed, "")
+    XCTAssertEqual(zenSession.errors, 0)
   }
 
   func testCodePracticeAutoIndentsUnindentsReplaysAndFinishesWordMode() {
