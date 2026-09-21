@@ -1882,6 +1882,12 @@ final class TypingEngineTests: XCTestCase {
       String(repeating: "界", count: 40))
   }
 
+  func testConnectionActionPolicyOffersRejectionOnlyForIncomingRequests() {
+    XCTAssertTrue(ConnectionActionPolicy.canReject(.incomingRequest))
+    XCTAssertFalse(ConnectionActionPolicy.canReject(.outgoingRequest))
+    XCTAssertFalse(ConnectionActionPolicy.canReject(.friend))
+  }
+
   func testCurrentThemeFavoriteCommandsExposeOnlyTheValidFixedAction() {
     let add = CurrentThemeFavoriteCommandCatalog.item(theme: .paper, isFavorite: false)
     XCTAssertEqual(add.id, "addThemeToFavorite")

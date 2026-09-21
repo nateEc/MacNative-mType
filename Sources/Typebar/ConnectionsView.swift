@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum ConnectionActionPolicy {
+    static func canReject(_ relation: RemoteConnectionRelation) -> Bool {
+        relation == .incomingRequest
+    }
+}
+
 struct ConnectionsView: View {
     @Environment(\.dismiss) private var dismiss
     let account: AccountSession
@@ -104,6 +110,9 @@ struct ConnectionsView: View {
                     }
                     Spacer()
                     Button(buttonTitle) { action(connection) }
+                    if ConnectionActionPolicy.canReject(connection.relation) {
+                        Button("拒绝", role: .destructive) { remove(connection) }
+                    }
                     if connection.relation == .friend {
                         Button("消息") { selectedConversation = connection.profile }
                     }

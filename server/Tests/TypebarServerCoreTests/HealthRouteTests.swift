@@ -2437,6 +2437,28 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(bobAfterRemoval.connections.isEmpty)
   }
 
+  func testIncomingConnectionCanBeRejectedWithoutBlocking() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let alice = try await store.register(
+      .init(email: "reject-alice@example.com", password: "a secure password", displayName: "Reject Alice"))
+    let bob = try await store.register(
+      .init(email: "reject-bob@example.com", password: "a secure password", displayName: "Reject Bob"))
+
+    _ = try await store.sendConnection(
+      .init(recipientID: bob.user.id), accessToken: alice.accessToken)
+    let bobIncomingConnections = try await store.connections(accessToken: bob.accessToken)
+    XCTAssertEqual(bobIncomingConnections.connections.first?.relation, .incomingRequest)
+
+    try await store.removeConnection(otherUserID: alice.user.id, accessToken: bob.accessToken)
+
+    let aliceConnections = try await store.connections(accessToken: alice.accessToken)
+    let bobConnections = try await store.connections(accessToken: bob.accessToken)
+    let bobBlockedUsers = try await store.blockedUsers(accessToken: bob.accessToken)
+    XCTAssertTrue(aliceConnections.connections.isEmpty)
+    XCTAssertTrue(bobConnections.connections.isEmpty)
+    XCTAssertTrue(bobBlockedUsers.profiles.isEmpty)
+  }
+
   func testConnectionEventsCreateUserScopedReadableNotifications() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let alice = try await store.register(
