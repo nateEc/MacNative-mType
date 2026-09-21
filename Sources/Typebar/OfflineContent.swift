@@ -5177,13 +5177,18 @@ struct TestSessionFactory {
     let prompt: String
     var sectionEndIndices: [Int] = []
     var noSpaceBoundarySource: String?
+    let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
       noSpaceBoundarySource = streamNoSpaceBoundarySource
-    } else if configuration.mode != .custom,
-      let streamPrompt = TypebarStreamContent.prompt(configuration: configuration)
+    } else if let streamWordCount,
+      let streamPrompt = TypebarStreamContent.prompt(
+        configuration: configuration, wordCount: streamWordCount)
     {
       prompt = streamPrompt
+    } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
+      prompt = weakSpotPrompt(
+        configuration: configuration, wordCount: streamWordCount, scores: weakSpotScores)
     } else {
       switch configuration.mode {
       case .time:
@@ -5294,17 +5299,20 @@ struct TestSessionFactory {
       contentOptions: configuration.contentOptions,
       usesZipfFrequency: configuration.modifiers.contains(.zipf))
   }
+
+  private static func streamWordCount(for configuration: TestConfiguration) -> Int? {
+    switch configuration.mode {
+    case .time, .words:
+      return GeneratedPromptChunkPolicy.wordCount(for: configuration)
+    case .quote, .zen, .custom:
+      return nil
+    }
+  }
 }
 
 enum TypebarStreamContent {
-  static func prompt(configuration: TestConfiguration) -> String? {
-    let count: Int
-    switch configuration.mode {
-    case .time, .words: count = GeneratedPromptChunkPolicy.wordCount(for: configuration)
-    case .quote: count = 60
-    case .zen: count = 10_000
-    case .custom: return nil
-    }
+  static func prompt(configuration: TestConfiguration, wordCount: Int) -> String? {
+    let count = max(1, wordCount)
     let tokens: [String]
     if configuration.modifiers.contains(.binaryStream) {
       tokens = (0..<count).map { index in

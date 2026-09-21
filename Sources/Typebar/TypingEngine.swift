@@ -946,6 +946,33 @@ enum TestModifierPolicy {
     [.listening, .chooVisual, .earthquakeVisual, .backwards, .aslVisual],
     [.crtVisual, .spaceVisual],
   ]
+  private static let sourceZenIncompatibleModifiers: Set<TestModifier> =
+    sourceWordGeneratorModifiers
+    .union(sourceLayoutChangingModifiers)
+    .union(sourceNoSpaceOrPushModifiers)
+    .union(sourceWordVisibilityModifiers)
+    .union(sourceFrequencyModifiers)
+    .union(sourceCapitalisationModifiers)
+    .union([.rot13, .backwards, .doubleCharacters, .morseStream])
+
+  /// Mirrors the fixed source's mode gate before it accepts a funbox. Quote
+  /// and custom tests retain text transformations but reject modes that supply
+  /// or replace a word source; Zen additionally rejects transformations that
+  /// require a generated target or constrained input.
+  static func modifiersCompatibleWithMode(
+    _ modifiers: [TestModifier], mode: TestMode
+  ) -> [TestModifier] {
+    let incompatible: Set<TestModifier>
+    switch mode {
+    case .time, .words:
+      incompatible = []
+    case .quote, .custom:
+      incompatible = sourceWordGeneratorModifiers.union(sourceFrequencyModifiers)
+    case .zen:
+      incompatible = sourceZenIncompatibleModifiers
+    }
+    return modifiers.filter { !incompatible.contains($0) }
+  }
 
   /// Returns whether a group would be accepted by the fixed reference
   /// metadata validator. This is deliberately visible to the package so tests
@@ -2050,10 +2077,12 @@ struct TestConfiguration: Codable, Equatable {
       self.duration = nil
       self.wordLimit = wordLimit ?? MemoryFunboxModePolicy.fallbackWordLimit
     }
+    let modeCompatibleModifiers = TestModifierPolicy.modifiersCompatibleWithMode(
+      normalizedModifiers, mode: self.mode)
     self.modifiers = Self.usesInfiniteLimit(
       mode: self.mode, duration: self.duration, wordLimit: self.wordLimit,
       customTextCompletion: customTextCompletion)
-      ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
+      ? TestModifierPolicy.compatibleWithInfiniteTest(modeCompatibleModifiers) : modeCompatibleModifiers
     self.contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
       contentOptions, modifiers: self.modifiers)
     self.challengeID = challengeID
@@ -2168,10 +2197,12 @@ struct TestConfiguration: Codable, Equatable {
       duration = nil
       wordLimit = wordLimit ?? MemoryFunboxModePolicy.fallbackWordLimit
     }
+    let modeCompatibleModifiers = TestModifierPolicy.modifiersCompatibleWithMode(
+      normalizedModifiers, mode: mode)
     modifiers = Self.usesInfiniteLimit(
       mode: mode, duration: duration, wordLimit: wordLimit,
       customTextCompletion: customTextCompletion)
-      ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
+      ? TestModifierPolicy.compatibleWithInfiniteTest(modeCompatibleModifiers) : modeCompatibleModifiers
     let decodedContentOptions =
       try values.decodeIfPresent(ContentOptions.self, forKey: .contentOptions) ?? .init()
     contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(

@@ -3612,8 +3612,10 @@ private struct ContentView: View {
       languageCompatibleModifiers, language: selectedLanguage, mode: mode,
       mixedLanguageComponents: components,
       automaticallyEnabled: settings.prefersArabicLazyInput)
+    let modeCompatibleModifiers = TestModifierPolicy.modifiersCompatibleWithMode(
+      lazyInputModifiers, mode: mode)
     return JoiningScriptFunboxPolicy.effectiveModifiers(
-      lazyInputModifiers, language: selectedLanguage, mixedLanguageComponents: components)
+      modeCompatibleModifiers, language: selectedLanguage, mixedLanguageComponents: components)
   }
 
   private func refreshZipfNotice() {

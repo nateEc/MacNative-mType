@@ -16258,6 +16258,41 @@ final class TypingEngineTests: XCTestCase {
     arrows.insert(arrows.prompt, at: start)
     XCTAssertTrue(arrows.isFinished)
     XCTAssertEqual(arrows.completedWordCount, 4)
+    let customArrowConfiguration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      modifiers: [.arrowStream])
+    XCTAssertEqual(customArrowConfiguration.modifiers, [])
+    XCTAssertEqual(
+      TestModifierPolicy.modifiersCompatibleWithMode(
+        [.uppercase, .arrowStream, .referenceStream, .pseudolangStream, .weakSpot, .zipf],
+        mode: .custom),
+      [.uppercase])
+    var customText = TestSessionFactory.make(
+      configuration: customArrowConfiguration, customText: "amber harbor")
+    XCTAssertEqual(customText.prompt, "amber harbor")
+    customText.insert(customText.prompt, at: start)
+    XCTAssertTrue(customText.isFinished)
+    XCTAssertEqual(customText.completedWordCount, 2)
+    let quoteArrowConfiguration = TestConfiguration(
+      mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      modifiers: [.arrowStream])
+    XCTAssertEqual(quoteArrowConfiguration.modifiers, [])
+    var encodedArrowConfiguration = try! JSONSerialization.jsonObject(
+      with: JSONEncoder().encode(TestConfiguration.words(4).with(modifiers: [.arrowStream])))
+      as! [String: Any]
+    encodedArrowConfiguration["mode"] = TestMode.custom.rawValue
+    let decodedCustomArrowConfiguration = try! JSONDecoder().decode(
+      TestConfiguration.self,
+      from: JSONSerialization.data(withJSONObject: encodedArrowConfiguration))
+    XCTAssertEqual(decodedCustomArrowConfiguration.modifiers, [])
+    let zenArrowConfiguration = TestConfiguration(
+      mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      modifiers: [.arrowStream, .uppercase, .morseStream])
+    XCTAssertEqual(zenArrowConfiguration.modifiers, [])
+    XCTAssertEqual(
+      TestModifierPolicy.modifiersCompatibleWithMode(
+        [.mirrorVisual, .arrowStream, .uppercase, .morseStream, .zipf], mode: .zen),
+      [.mirrorVisual])
     XCTAssertEqual(ArrowKeyInputPolicy.character(forKeyCode: 126), "↑")
     XCTAssertEqual(ArrowKeyInputPolicy.character(forKeyCode: 124), "→")
     XCTAssertEqual(ArrowKeyInputPolicy.character(forKeyCode: 125), "↓")
