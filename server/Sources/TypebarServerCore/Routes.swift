@@ -79,9 +79,18 @@ public func configure(
                 "directMessages": .partial,
                 "experience": .partial,
                 "announcements": .available,
+                "publicPracticeStatistics": .available,
                 "quotes": .partial
             ]
         )
+    }
+
+    app.get("v1", "public", "practice-stats") { _ async -> PublicPracticeStatsResponse in
+        await authStore.publicPracticeStats()
+    }
+
+    app.get("v1", "public", "speed-distribution") { _ async -> PublicSpeedDistributionResponse in
+        await authStore.publicEnglishMinuteSpeedDistribution()
     }
 
     app.post("v1", "human-verification", "challenges") { request async throws -> HumanVerificationChallengeStartResponse in

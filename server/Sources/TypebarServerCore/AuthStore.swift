@@ -2892,6 +2892,17 @@ public actor AuthStore {
     }
   }
 
+  private static let publicSpeedDistributionBucketSize = 10
+
+  private func publiclyAggregatedUsers() -> [StoredUser] {
+    state.users.filter {
+      !$0.leaderboardOptedOut
+        && !$0.leaderboardRestricted
+        && !$0.displayNameChangeRequired
+        && !$0.accountSuspended
+    }
+  }
+
   private func totalTypingSecondsByUser() -> [UUID: Double] {
     state.results.reduce(into: [:]) { totals, result in
       totals[result.userID, default: 0] += max(0, result.finishedAt.timeIntervalSince(result.startedAt))
@@ -3170,6 +3181,45 @@ public actor AuthStore {
     _ request: ResultSubmissionRequest, accessToken: String, now: Date = .now
   ) throws -> ResultSubmissionResponse {
     try submitResult(request, credential: .accessToken(accessToken), now: now)
+  }
+
+  /// Returns anonymous aggregate totals. A user's explicit leaderboard opt-out
+  /// and every moderation state that removes public ranking visibility also
+  /// removes that user's contribution here.
+  public func publicPracticeStats() -> PublicPracticeStatsResponse {
+    let users = publiclyAggregatedUsers()
+    let userIDs = Set(users.map(\.id))
+    let results = state.results.filter { userIDs.contains($0.userID) }
+    return .init(
+      completedResultCount: results.count,
+      startedTestCount: users.reduce(0) { $0 + $1.startedTestCount },
+      totalTypingSeconds: Int(totalTypingSeconds(from: results).rounded()))
+  }
+
+  /// Returns one public personal best per account for the same English
+  /// sixty-second time configuration shown by the native About window.
+  public func publicEnglishMinuteSpeedDistribution() -> PublicSpeedDistributionResponse {
+    let userIDs = Set(publiclyAggregatedUsers().map(\.id))
+    let candidates = state.results.filter {
+      userIDs.contains($0.userID)
+        && $0.mode == "time"
+        && $0.language == "english"
+        && $0.durationSeconds == 60
+        && $0.eventCount > 0
+    }
+    var personalBests: [UUID: Int] = [:]
+    for result in candidates {
+      personalBests[result.userID] = max(personalBests[result.userID] ?? result.wpm, result.wpm)
+    }
+    var counts: [Int: Int] = [:]
+    for wpm in personalBests.values {
+      let lowerBound = wpm / Self.publicSpeedDistributionBucketSize
+        * Self.publicSpeedDistributionBucketSize
+      counts[lowerBound, default: 0] += 1
+    }
+    return .init(
+      bucketSize: Self.publicSpeedDistributionBucketSize,
+      buckets: counts.keys.sorted().map { .init(lowerBound: $0, count: counts[$0] ?? 0) })
   }
 
   /// Removes only the authenticated account's submitted results after a fresh

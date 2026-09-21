@@ -28,7 +28,7 @@ struct TypebarApp: App {
     }
 
     Window("关于 Typebar", id: "about") {
-      AboutTypebarView(metadata: .current)
+      AboutTypebarView(metadata: .current, account: account)
     }
     .windowResizability(.contentSize)
 

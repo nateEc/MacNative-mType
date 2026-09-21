@@ -2482,6 +2482,31 @@ final class AccountSession {
         }
     }
 
+    /// Reads only anonymous, service-wide practice aggregates. It deliberately
+    /// does not require the local account or send an access token.
+    func publicPracticeOverview() async throws -> RemotePublicPracticeOverview {
+        let requestEndpoint = endpoint
+        let api = RemoteAccountAPI(endpoint: requestEndpoint)
+        let stats = try await api.request(
+            path: "v1/public/practice-stats",
+            method: "GET",
+            token: nil,
+            body: Optional<String>.none,
+            response: RemotePublicPracticeStats.self
+        )
+        let speedDistribution = try await api.request(
+            path: "v1/public/speed-distribution",
+            method: "GET",
+            token: nil,
+            body: Optional<String>.none,
+            response: RemotePublicSpeedDistribution.self
+        )
+        guard endpoint == requestEndpoint else {
+            throw RemoteAccountError.accountScopeChanged
+        }
+        return .init(stats: stats, speedDistribution: speedDistribution)
+    }
+
     func submitCompletedResult(
         _ result: CompletedTestResult,
         for expectedScope: ResultPublicationScope

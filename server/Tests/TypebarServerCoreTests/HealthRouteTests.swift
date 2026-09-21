@@ -73,6 +73,85 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["directMessages"], .partial)
         XCTAssertEqual(capabilities.capabilities["experience"], .partial)
         XCTAssertEqual(capabilities.capabilities["announcements"], .available)
+        XCTAssertEqual(capabilities.capabilities["publicPracticeStatistics"], .available)
+      }
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
+  func testPublicPracticeStatsExposeShareableSummaryAndEnglishMinutePersonalBestBuckets() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let alice = try await store.register(
+      .init(email: "public-alice@example.com", password: "a secure password", displayName: "Alice"),
+      now: now)
+    let bob = try await store.register(
+      .init(email: "public-bob@example.com", password: "a secure password", displayName: "Bob"),
+      now: now)
+    let optedOut = try await store.register(
+      .init(email: "private-user@example.com", password: "a secure password", displayName: "Private"),
+      now: now)
+    let restricted = try await store.register(
+      .init(email: "restricted-user@example.com", password: "a secure password", displayName: "Restricted"),
+      now: now)
+    let requiresRename = try await store.register(
+      .init(email: "rename-user@example.com", password: "a secure password", displayName: "Rename"),
+      now: now)
+    let suspended = try await store.register(
+      .init(email: "suspended-user@example.com", password: "a secure password", displayName: "Suspended"),
+      now: now)
+
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 64, accuracy: 100, durationSeconds: 60, restartCount: 2,
+        elapsedSeconds: 60.5, finishedAt: now), accessToken: alice.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 88, accuracy: 100, durationSeconds: 60, elapsedSeconds: 60,
+        finishedAt: now), accessToken: alice.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 83, accuracy: 100, durationSeconds: 60, elapsedSeconds: 60,
+        finishedAt: now), accessToken: bob.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 120, accuracy: 100, durationSeconds: 60, elapsedSeconds: 60,
+        finishedAt: now), accessToken: optedOut.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 130, accuracy: 100, durationSeconds: 60, elapsedSeconds: 60,
+        finishedAt: now), accessToken: restricted.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 140, accuracy: 100, durationSeconds: 60, elapsedSeconds: 60,
+        finishedAt: now), accessToken: requiresRename.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 150, accuracy: 100, durationSeconds: 60, elapsedSeconds: 60,
+        finishedAt: now), accessToken: suspended.accessToken, now: now)
+    _ = try await store.updateProfile(
+      .init(leaderboardOptedOut: true), accessToken: optedOut.accessToken, now: now)
+    _ = try await store.setLeaderboardRestricted(userID: restricted.user.id, restricted: true)
+    _ = try await store.setDisplayNameChangeRequired(userID: requiresRename.user.id, required: true)
+    _ = try await store.setAccountSuspended(userID: suspended.user.id, suspended: true)
+
+    do {
+      try configure(app, authStore: store)
+      try await app.test(.GET, "v1/public/practice-stats") { response async in
+        XCTAssertEqual(response.status, .ok)
+        XCTAssertEqual(
+          try? response.content.decode(PublicPracticeStatsResponse.self),
+          .init(completedResultCount: 3, startedTestCount: 5, totalTypingSeconds: 181))
+      }
+      try await app.test(.GET, "v1/public/speed-distribution") { response async in
+        XCTAssertEqual(response.status, .ok)
+        XCTAssertEqual(
+          try? response.content.decode(PublicSpeedDistributionResponse.self),
+          .init(bucketSize: 10, buckets: [.init(lowerBound: 80, count: 2)]))
       }
       try await app.asyncShutdown()
     } catch {

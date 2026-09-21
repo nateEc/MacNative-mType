@@ -18,7 +18,7 @@
 | `profile`／`profile search` | `RemoteAccount.swift`、`ConnectionsView.swift`、`ProfileReportView.swift` | 已覆盖。公开资料只暴露最小公开字段，搜索、关系、屏蔽与举报均通过自建服务。 |
 | `friends` | `ConnectionsView.swift`、`DirectConversationView.swift`、`NotificationsView.swift` | 已覆盖。好友请求、接受、解除、屏蔽、通知和已接受好友间受控私信由自建 API 提供。 |
 | `leaderboards` | `CloudSyncView.swift`、`LeaderboardParameterFilter.swift`、`LeaderboardPagination.swift`、`LeaderboardRankStanding.swift` | 已覆盖。全局／好友 WPM 和 XP 范围、个人名次与隐身选择均是原生界面与自建 API。 |
-| `about`／版本历史 | `AboutTypebar.swift`、`ReleaseHistory.swift` | 已覆盖，以 Typebar 自己的产品资料、许可和版本信息取代参考品牌内容。 |
+| `about`／版本历史 | `AboutTypebar.swift`、`ReleaseHistory.swift`、`PublicPracticeStatistics.swift` | 已覆盖，以 Typebar 自己的产品资料、许可和版本信息取代参考品牌内容；About 打开时还可无令牌读取自建服务的匿名全局练习总览与 English 60 秒个人最佳速度分布。旧服务不可用时明确降级，不使用本机成绩伪造全局数据；完整来源、隐私与验收见 [OFFICIAL_PUBLIC_PRACTICE_STATISTICS_AUDIT.md](OFFICIAL_PUBLIC_PRACTICE_STATISTICS_AUDIT.md)。 |
 | `login` | `PreferencesView.swift`、`OAuthWebAuthenticationSession.swift`、`RemoteHumanVerification.swift` | 已覆盖。完整配置自建 Turnstile 后，密码注册、OAuth 新用户注册及密码重置请求会通过系统认证会话完成一次性验证；未配置旧服务保留已有请求契约并如实报告能力未启用。 |
 | `404` | 无 URL 路由 | 不适用。原生应用没有用户可访问的网页路由；导航错误由本机命令和工作表状态处理。 |
 

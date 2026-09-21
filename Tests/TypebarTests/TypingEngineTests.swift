@@ -96,6 +96,38 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testPublicSpeedDistributionFillsOnlyGapsBetweenReportedBuckets() {
+    let distribution = RemotePublicSpeedDistribution(
+      bucketSize: 10,
+      buckets: [
+        .init(lowerBound: 50, count: 2),
+        .init(lowerBound: 80, count: 1),
+      ])
+
+    XCTAssertEqual(
+      distribution.chartBuckets,
+      [
+        .init(lowerBound: 50, count: 2),
+        .init(lowerBound: 60, count: 0),
+        .init(lowerBound: 70, count: 0),
+        .init(lowerBound: 80, count: 1),
+      ])
+    XCTAssertEqual(distribution.participantCount, 3)
+  }
+
+  func testPublicPracticeStatsDecodeAnonymousSummaryAndFormatElapsedTime() throws {
+    let stats = try JSONDecoder().decode(
+      RemotePublicPracticeStats.self,
+      from: Data(
+        #"{"completedResultCount":34,"startedTestCount":41,"totalTypingSeconds":3661}"#.utf8))
+
+    XCTAssertEqual(stats.completedResultCount, 34)
+    XCTAssertEqual(stats.startedTestCount, 41)
+    XCTAssertEqual(stats.totalTypingSeconds, 3_661)
+    XCTAssertEqual(PublicPracticeStatisticsPresentation.durationLabel(seconds: 3_661), "1 小时 1 分钟")
+    XCTAssertEqual(PublicPracticeStatisticsPresentation.durationLabel(seconds: -1), "0 秒")
+  }
+
   func testReleaseHistoryDecodesOnlyPublishedStableReleasesAndFallsBackToTag() throws {
     let payload = Data(
       #"[{"name":"Typebar 1.2","tag_name":"v1.2.0","body":"New practice modes.","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.2.0","draft":false,"prerelease":false,"published_at":"2026-09-06T08:30:00Z"},{"name":"","tag_name":"v1.1.0","body":null,"html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.1.0","draft":false,"prerelease":false,"published_at":"2026-09-05T08:30:00Z"},{"name":"Draft","tag_name":"v2.0.0","body":"hidden","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v2.0.0","draft":true,"prerelease":false,"published_at":null},{"name":"Beta","tag_name":"v1.3.0-beta","body":"hidden","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.3.0-beta","draft":false,"prerelease":true,"published_at":"2026-09-07T08:30:00Z"}]"#.utf8)

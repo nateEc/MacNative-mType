@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct TypebarAboutMetadata: Equatable, Sendable {
@@ -53,8 +54,12 @@ struct TypebarAboutCommands: Commands {
 
 struct AboutTypebarView: View {
   let metadata: TypebarAboutMetadata
+  let account: AccountSession
 
   @Environment(\.openWindow) private var openWindow
+  @State private var publicPracticeOverview: RemotePublicPracticeOverview?
+  @State private var isLoadingPublicPracticeStatistics = false
+  @State private var publicPracticeStatisticsUnavailable = false
 
   private let sourceURL = URL(string: "https://github.com/nateEc/MacNative-mType")!
   private let issuesURL = URL(string: "https://github.com/nateEc/MacNative-mType/issues")!
@@ -66,13 +71,17 @@ struct AboutTypebarView: View {
         identity
         principles
         metrics
+        publicPracticeStatistics
         compatibility
         links
       }
       .padding(32)
     }
-    .frame(width: 560, height: 620)
+    .frame(width: 620, height: 760)
     .background(Color(nsColor: .windowBackgroundColor))
+    .task(id: account.endpoint) {
+      await loadPublicPracticeStatistics()
+    }
   }
 
   private var identity: some View {
@@ -129,6 +138,111 @@ struct AboutTypebarView: View {
     }
   }
 
+  private var publicPracticeStatistics: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack {
+        sectionTitle("自建服务公开练习统计", systemImage: "chart.bar.xaxis")
+        Spacer()
+        Button("重新读取") {
+          Task { await loadPublicPracticeStatistics() }
+        }
+        .buttonStyle(.link)
+        .disabled(isLoadingPublicPracticeStatistics)
+      }
+
+      if let overview = publicPracticeOverview {
+        HStack(spacing: 10) {
+          publicPracticeMetric("已完成练习", value: overview.stats.completedResultCount.formatted())
+          publicPracticeMetric("已开始练习", value: overview.stats.startedTestCount.formatted())
+          publicPracticeMetric(
+            "总练习时长",
+            value: PublicPracticeStatisticsPresentation.durationLabel(
+              seconds: overview.stats.totalTypingSeconds))
+        }
+        publicSpeedDistribution(overview.speedDistribution)
+      } else if isLoadingPublicPracticeStatistics {
+        HStack(spacing: 8) {
+          ProgressView().controlSize(.small)
+          Text("正在读取匿名汇总…")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      } else if publicPracticeStatisticsUnavailable {
+        Label(
+          "当前自建服务尚未提供公开练习统计，或暂时无法连接。",
+          systemImage: "network.slash")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      Text("仅汇总允许公开统计的账户；不传输账号、提示文本、输入内容或回放。")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private func publicPracticeMetric(_ title: String, value: String) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Text(title)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Text(value)
+        .font(.title3.monospacedDigit().weight(.semibold))
+        .foregroundStyle(.orange)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 12))
+  }
+
+  private func publicSpeedDistribution(_ distribution: RemotePublicSpeedDistribution) -> some View {
+    let buckets = distribution.chartBuckets
+    let maximumCount = max(buckets.map(\.count).max() ?? 1, 1)
+
+    return VStack(alignment: .leading, spacing: 8) {
+      if buckets.isEmpty {
+        Text("暂无可显示的 English · 60 秒速度分布。")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      } else {
+        ScrollView(.horizontal) {
+          HStack(alignment: .bottom, spacing: 6) {
+            ForEach(buckets) { bucket in
+              VStack(spacing: 5) {
+                Text(bucket.count.formatted())
+                  .font(.caption2.monospacedDigit())
+                  .foregroundStyle(.secondary)
+                RoundedRectangle(cornerRadius: 3)
+                  .fill(.orange.gradient)
+                  .frame(
+                    width: 34,
+                    height: max(6, 106 * CGFloat(bucket.count) / CGFloat(maximumCount)))
+                Text("\(bucket.lowerBound)")
+                  .font(.caption2.monospacedDigit())
+                  .foregroundStyle(.secondary)
+              }
+              .accessibilityElement(children: .ignore)
+              .accessibilityLabel("\(bucket.rangeLabel(bucketSize: distribution.bucketSize)) WPM")
+              .accessibilityValue("\(bucket.count) 个账户")
+            }
+          }
+          .padding(.vertical, 2)
+        }
+        .frame(height: 146)
+        Text(
+          "English · 60 秒；\(distribution.participantCount) 个允许公开统计的账户各计入 1 次最高 WPM。")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .padding(12)
+    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 12))
+  }
+
   private var links: some View {
     VStack(alignment: .leading, spacing: 10) {
       sectionTitle("项目", systemImage: "chevron.left.forwardslash.chevron.right")
@@ -174,6 +288,23 @@ struct AboutTypebarView: View {
       Text(detail)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  @MainActor
+  private func loadPublicPracticeStatistics() async {
+    isLoadingPublicPracticeStatistics = true
+    defer { isLoadingPublicPracticeStatistics = false }
+
+    do {
+      let overview = try await account.publicPracticeOverview()
+      guard !Task.isCancelled else { return }
+      publicPracticeOverview = overview
+      publicPracticeStatisticsUnavailable = false
+    } catch {
+      guard !Task.isCancelled else { return }
+      publicPracticeOverview = nil
+      publicPracticeStatisticsUnavailable = true
     }
   }
 }
