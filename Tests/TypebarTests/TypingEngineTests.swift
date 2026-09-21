@@ -17700,6 +17700,36 @@ final class TypingEngineTests: XCTestCase {
       LayoutFluidPolicy.normalizedLayouts(KeyboardLayout.allCases + [.ansiQwerty]),
       Array(KeyboardLayout.allCases.prefix(LayoutFluidPolicy.maximumLayouts)))
     XCTAssertEqual(
+      VisualFunboxReducedMotionPolicy.ignoringSystemMotionModifiers,
+      Set<TestModifier>([
+        .nauseaVisual, .roundVisual, .chooVisual, .earthquakeVisual, .spaceVisual,
+      ]))
+    XCTAssertFalse(
+      VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+        modifiers: [.earthquakeVisual], typebarRequested: false, systemRequested: true))
+    XCTAssertFalse(
+      VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+        modifiers: [.nauseaVisual], typebarRequested: false, systemRequested: true))
+    XCTAssertFalse(
+      VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+        modifiers: [.roundVisual], typebarRequested: false, systemRequested: true))
+    XCTAssertFalse(
+      VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+        modifiers: [.chooVisual], typebarRequested: false, systemRequested: true))
+    XCTAssertTrue(
+      VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+        modifiers: [.crtVisual], typebarRequested: false, systemRequested: true))
+    XCTAssertTrue(
+      VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+        modifiers: [.earthquakeVisual], typebarRequested: true, systemRequested: false),
+      "Typebar's explicit reduce-motion preference remains available")
+    let animatedMoment = start.addingTimeInterval(1)
+    let earthquakeSystemMotion = VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+      modifiers: [.earthquakeVisual], typebarRequested: false, systemRequested: true)
+    XCTAssertNotEqual(
+      EarthquakeOffsetPolicy.offset(
+        at: animatedMoment, isEnabled: true, reducesMotion: earthquakeSystemMotion).x, 0)
+    XCTAssertEqual(
       EarthquakeOffsetPolicy.offset(at: start, isEnabled: true, reducesMotion: true).x, 0)
     XCTAssertEqual(EarthquakeOffsetPolicy.offset(at: start, isEnabled: false, reducesMotion: false).y, 0)
         let firstStar = StarfieldPolicy.point(index: 0, in: .init(width: 100, height: 100))
@@ -17709,12 +17739,22 @@ final class TypingEngineTests: XCTestCase {
       NauseaVisualPolicy.transform(at: start, isEnabled: false, reducesMotion: false), .identity)
     XCTAssertEqual(
       NauseaVisualPolicy.transform(at: start, isEnabled: true, reducesMotion: true), .identity)
+    let nauseaSystemMotion = VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+      modifiers: [.nauseaVisual], typebarRequested: false, systemRequested: true)
+    XCTAssertNotEqual(
+      NauseaVisualPolicy.transform(
+        at: animatedMoment, isEnabled: true, reducesMotion: nauseaSystemMotion), .identity)
     let nauseaTransform = NauseaVisualPolicy.transform(at: start, isEnabled: true, reducesMotion: false)
     XCTAssertNotEqual(nauseaTransform, .identity)
     XCTAssertGreaterThan(nauseaTransform.horizontalScale, 0)
     XCTAssertGreaterThan(nauseaTransform.verticalScale, 0)
     XCTAssertEqual(RoundVisualPolicy.rotationDegrees(at: start, isEnabled: false, reducesMotion: false), 0)
     XCTAssertEqual(RoundVisualPolicy.rotationDegrees(at: start, isEnabled: true, reducesMotion: true), 0)
+    let roundSystemMotion = VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+      modifiers: [.roundVisual], typebarRequested: false, systemRequested: true)
+    XCTAssertNotEqual(
+      RoundVisualPolicy.rotationDegrees(
+        at: animatedMoment, isEnabled: true, reducesMotion: roundSystemMotion), 0)
     XCTAssertGreaterThanOrEqual(
       RoundVisualPolicy.rotationDegrees(at: start, isEnabled: true, reducesMotion: false), 0)
     XCTAssertLessThan(
@@ -17725,6 +17765,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ChooVisualPolicy.rotationDegrees(
         at: start, glyphIndex: 4, isEnabled: true, reducesMotion: true), 0)
+    let chooSystemMotion = VisualFunboxReducedMotionPolicy.shouldReduceMotion(
+      modifiers: [.chooVisual], typebarRequested: false, systemRequested: true)
+    XCTAssertNotEqual(
+      ChooVisualPolicy.rotationDegrees(
+        at: animatedMoment, glyphIndex: 4, isEnabled: true, reducesMotion: chooSystemMotion), 0)
     XCTAssertNotEqual(
       ChooVisualPolicy.rotationDegrees(
         at: start, glyphIndex: 4, isEnabled: true, reducesMotion: false), 0)

@@ -1208,6 +1208,22 @@ struct PracticeVisualEffect: Equatable {
   }
 }
 
+/// Keeps the reference's `ignoreReducedMotion` metadata explicit. These
+/// deliberate visual modes bypass only the operating-system preference; a
+/// user can still opt into Typebar's own reduce-motion setting.
+enum VisualFunboxReducedMotionPolicy {
+  static let ignoringSystemMotionModifiers: Set<TestModifier> = [
+    .nauseaVisual, .roundVisual, .chooVisual, .earthquakeVisual, .spaceVisual,
+  ]
+
+  static func shouldReduceMotion(
+    modifiers: [TestModifier], typebarRequested: Bool, systemRequested: Bool
+  ) -> Bool {
+    typebarRequested || (
+      systemRequested && ignoringSystemMotionModifiers.isDisjoint(with: modifiers))
+  }
+}
+
 struct NauseaVisualTransform: Equatable {
   let rotationDegrees: Double
   let horizontalScale: Double

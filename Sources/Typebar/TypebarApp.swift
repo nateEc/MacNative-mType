@@ -225,6 +225,7 @@ private struct CRTPracticeOverlay: View {
 private struct EarthquakePracticeContent<Content: View>: View {
   let isEnabled: Bool
   let reducesMotion: Bool
+  let ignoresSystemReducedMotion: Bool
   @ViewBuilder let content: Content
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
@@ -235,7 +236,7 @@ private struct EarthquakePracticeContent<Content: View>: View {
     ) { timeline in
       let offset = EarthquakeOffsetPolicy.offset(
         at: timeline.date, isEnabled: isEnabled,
-        reducesMotion: reducesMotion || systemReduceMotion)
+        reducesMotion: reducesMotion || (systemReduceMotion && !ignoresSystemReducedMotion))
       content.offset(x: offset.x, y: offset.y)
     }
   }
@@ -244,6 +245,7 @@ private struct EarthquakePracticeContent<Content: View>: View {
 private struct NauseaPracticeContent<Content: View>: View {
   let isEnabled: Bool
   let reducesMotion: Bool
+  let ignoresSystemReducedMotion: Bool
   @ViewBuilder let content: Content
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
@@ -254,7 +256,7 @@ private struct NauseaPracticeContent<Content: View>: View {
     ) { timeline in
       let transform = NauseaVisualPolicy.transform(
         at: timeline.date, isEnabled: isEnabled,
-        reducesMotion: reducesMotion || systemReduceMotion)
+        reducesMotion: reducesMotion || (systemReduceMotion && !ignoresSystemReducedMotion))
       content
         .scaleEffect(x: transform.horizontalScale, y: transform.verticalScale, anchor: .center)
         .rotation3DEffect(.degrees(transform.rotationDegrees), axis: (x: 0.45, y: 0.9, z: 0.12))
@@ -265,6 +267,7 @@ private struct NauseaPracticeContent<Content: View>: View {
 private struct RoundPracticeContent<Content: View>: View {
   let isEnabled: Bool
   let reducesMotion: Bool
+  let ignoresSystemReducedMotion: Bool
   @ViewBuilder let content: Content
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
@@ -275,7 +278,7 @@ private struct RoundPracticeContent<Content: View>: View {
     ) { timeline in
       content.rotationEffect(.degrees(RoundVisualPolicy.rotationDegrees(
         at: timeline.date, isEnabled: isEnabled,
-        reducesMotion: reducesMotion || systemReduceMotion)))
+        reducesMotion: reducesMotion || (systemReduceMotion && !ignoresSystemReducedMotion))))
     }
   }
 }
@@ -376,6 +379,7 @@ private struct ChooPracticePrompt: View {
   let accent: Color
   let isEnabled: Bool
   let reducesMotion: Bool
+  let ignoresSystemReducedMotion: Bool
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
@@ -396,7 +400,7 @@ private struct ChooPracticePrompt: View {
               .rotation3DEffect(
                 .degrees(ChooVisualPolicy.rotationDegrees(
                   at: timeline.date, glyphIndex: index, isEnabled: isEnabled,
-                  reducesMotion: reducesMotion || systemReduceMotion)),
+                  reducesMotion: reducesMotion || (systemReduceMotion && !ignoresSystemReducedMotion))),
                 axis: (x: 0, y: 1, z: 0))
           }
         }
@@ -1773,18 +1777,23 @@ private struct ContentView: View {
   }
 
   private var typingPanel: some View {
-    ZStack(alignment: .topLeading) {
+    let ignoresSystemReducedMotion = !VisualFunboxReducedMotionPolicy
+      .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers)
+    return ZStack(alignment: .topLeading) {
       RoundPracticeContent(
         isEnabled: practiceVisualEffect.usesRound,
-        reducesMotion: settings.reducePracticeMotion
+        reducesMotion: settings.reducePracticeMotion,
+        ignoresSystemReducedMotion: ignoresSystemReducedMotion
       ) {
         NauseaPracticeContent(
           isEnabled: practiceVisualEffect.usesNausea,
-          reducesMotion: settings.reducePracticeMotion
+          reducesMotion: settings.reducePracticeMotion,
+          ignoresSystemReducedMotion: ignoresSystemReducedMotion
         ) {
           EarthquakePracticeContent(
             isEnabled: practiceVisualEffect.usesEarthquake,
-            reducesMotion: settings.reducePracticeMotion
+            reducesMotion: settings.reducePracticeMotion,
+            ignoresSystemReducedMotion: ignoresSystemReducedMotion
           ) {
             Group {
               if showsAllPracticeLines {
@@ -2003,7 +2012,9 @@ private struct ContentView: View {
           font: settings.practiceFont.font(
             size: settings.fontSize, installedFontName: settings.installedPracticeFontName),
           fontSize: settings.fontSize, accent: activeTheme.accent,
-          isEnabled: true, reducesMotion: settings.reducePracticeMotion)
+          isEnabled: true, reducesMotion: settings.reducePracticeMotion,
+          ignoresSystemReducedMotion: !VisualFunboxReducedMotionPolicy
+            .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers))
       } else if usesTapePractice {
         TapePracticePrompt(
           prompt: rendering.text, typed: session.typed, mode: settings.practiceTapeMode,
