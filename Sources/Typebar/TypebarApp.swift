@@ -598,6 +598,7 @@ private struct ContentView: View {
   @State private var session = TestSessionFactory.make(configuration: .timed(seconds: 30))
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
+  @State private var polyglotReturnLanguage: TypingLanguage?
   @State private var mixedLanguageComponents = TypingLanguage.defaultMixedComponents
   @State private var mixedLanguageSearch = ""
   @State private var contentOptions = ContentOptions()
@@ -3380,10 +3381,12 @@ private struct ContentView: View {
       case .polyglot:
         activeChallengeID = nil
         if language == .mixedLanguages {
-          language = .english
+          language = PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage) ?? .english
+          polyglotReturnLanguage = nil
         } else {
           settings.testModifiers = TestModifierPolicy.modifiersCompatibleWithPolyglot(
             settings.testModifiers)
+          polyglotReturnLanguage = PolyglotReturnLanguagePolicy.validated(language)
           language = .mixedLanguages
         }
         reset()
@@ -3407,7 +3410,12 @@ private struct ContentView: View {
         guard acceptsFunboxConfiguration(updated) else { return }
         settings.testModifiers = updated
         applyFiniteFunboxLimitIfNeeded(for: updated)
-        if target == .clear && language == .mixedLanguages { language = .english }
+        if target == .clear,
+           let returnLanguage = PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage)
+        {
+          language = returnLanguage
+          polyglotReturnLanguage = nil
+        }
         activeChallengeID = nil
         reset()
       }
@@ -3440,6 +3448,7 @@ private struct ContentView: View {
       guard availableLanguages.contains(selectedLanguage) else { return }
       activeChallengeID = nil
       let changed = language != selectedLanguage
+      polyglotReturnLanguage = nil
       language = selectedLanguage
       if !changed {
         languageChanged(to: selectedLanguage)
@@ -3751,7 +3760,8 @@ private struct ContentView: View {
   private func apply(
     _ preset: SavedTestPreset,
     overwritesParameterMemory: Bool = true,
-    appliesGlobalSettings: Bool = true
+    appliesGlobalSettings: Bool = true,
+    polyglotReturnLanguage: TypingLanguage? = nil
   ) {
     practiceReturnPreset = nil
     let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID)
@@ -3782,6 +3792,8 @@ private struct ContentView: View {
       customTextSectionLimit = sectionLimit
     }
     customTextOrdering = configuration.customTextOrdering
+    self.polyglotReturnLanguage = configuration.language == .mixedLanguages
+      ? PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage) : nil
     language = configuration.language
     constrainQuoteSource(for: language)
     mixedLanguageComponents = configuration.mixedLanguageComponents
@@ -3826,7 +3838,8 @@ private struct ContentView: View {
     apply(
       preset,
       overwritesParameterMemory: false,
-      appliesGlobalSettings: false)
+      appliesGlobalSettings: false,
+      polyglotReturnLanguage: document.polyglotReturnLanguage)
     if mode == .quote, quoteSource == .community {
       refreshCommunityQuotes()
     }
@@ -3866,7 +3879,9 @@ private struct ContentView: View {
         wordLimit: wordLimit,
         customTextDuration: customTextDuration,
         customTextWordLimit: customTextWordLimit,
-        customTextSectionLimit: customTextSectionLimit)))
+        customTextSectionLimit: customTextSectionLimit),
+      polyglotReturnLanguage: session.configuration.language == .mixedLanguages
+        ? polyglotReturnLanguage : nil))
   }
 
   private var activeChallenge: TypebarChallenge? {

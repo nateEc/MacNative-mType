@@ -13732,6 +13732,37 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testActiveTestSelectionStorePreservesPolyglotReturnLanguageAndReadsOlderDocuments() throws {
+    let suiteName = "TypebarTests.active-selection-polyglot.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = ActiveTestSelectionStore(defaults: defaults)
+    let document = ActiveTestSelectionDocument(
+      preset: .init(configuration: .words(25, language: .mixedLanguages)),
+      testParameterMemory: .defaults,
+      polyglotReturnLanguage: .german)
+
+    XCTAssertTrue(store.save(document))
+    XCTAssertEqual(store.load()?.polyglotReturnLanguage, .german)
+
+    var legacyObject = try XCTUnwrap(
+      JSONSerialization.jsonObject(
+        with: try XCTUnwrap(defaults.data(forKey: ActiveTestSelectionStore.storageKey)))
+        as? [String: Any])
+    legacyObject.removeValue(forKey: "polyglotReturnLanguage")
+    defaults.set(
+      try JSONSerialization.data(withJSONObject: legacyObject),
+      forKey: ActiveTestSelectionStore.storageKey)
+    XCTAssertNil(store.load()?.polyglotReturnLanguage)
+  }
+
+  func testPolyglotReturnLanguagePolicyOnlyKeepsSingleLanguageSelections() {
+    XCTAssertEqual(PolyglotReturnLanguagePolicy.validated(.german), .german)
+    XCTAssertNil(PolyglotReturnLanguagePolicy.validated(.mixedLanguages))
+    XCTAssertNil(PolyglotReturnLanguagePolicy.validated(nil))
+  }
+
+  @MainActor
   func testActiveTestSelectionStoreRejectsInvalidWritesAndUnsupportedOrCorruptDocuments() throws {
     let suiteName = "TypebarTests.active-selection-invalid.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!

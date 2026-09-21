@@ -15,12 +15,17 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
   let preset: SavedTestPreset
   let quoteSource: QuoteSource
   let testParameterMemory: TypebarTestParameterMemory
+  /// The ordinary language selected before the native Polyglot command
+  /// substituted the mixed-language prompt. This mirrors the reference
+  /// configuration, which leaves its selected language intact under Polyglot.
+  let polyglotReturnLanguage: TypingLanguage?
 
   init(
     version: Int = ActiveTestSelectionDocument.currentVersion,
     preset: SavedTestPreset,
     quoteSource: QuoteSource = .builtIn,
-    testParameterMemory: TypebarTestParameterMemory
+    testParameterMemory: TypebarTestParameterMemory,
+    polyglotReturnLanguage: TypingLanguage? = nil
   ) {
     self.version = version
     self.preset = .init(
@@ -30,6 +35,35 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
       activeResultTags: nil)
     self.quoteSource = quoteSource
     self.testParameterMemory = testParameterMemory
+    self.polyglotReturnLanguage = PolyglotReturnLanguagePolicy.validated(
+      polyglotReturnLanguage)
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case version
+    case preset
+    case quoteSource
+    case testParameterMemory
+    case polyglotReturnLanguage
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      version: try container.decode(Int.self, forKey: .version),
+      preset: try container.decode(SavedTestPreset.self, forKey: .preset),
+      quoteSource: try container.decode(QuoteSource.self, forKey: .quoteSource),
+      testParameterMemory: try container.decode(
+        TypebarTestParameterMemory.self, forKey: .testParameterMemory),
+      polyglotReturnLanguage: try container.decodeIfPresent(
+        TypingLanguage.self, forKey: .polyglotReturnLanguage))
+  }
+}
+
+enum PolyglotReturnLanguagePolicy {
+  static func validated(_ language: TypingLanguage?) -> TypingLanguage? {
+    guard let language, language != .mixedLanguages else { return nil }
+    return language
   }
 }
 
@@ -57,7 +91,9 @@ enum ActiveTestSelectionPolicy {
       version: document.version,
       preset: document.preset,
       quoteSource: document.quoteSource,
-      testParameterMemory: document.testParameterMemory)
+      testParameterMemory: document.testParameterMemory,
+      polyglotReturnLanguage: document.preset.configuration.language == .mixedLanguages
+        ? document.polyglotReturnLanguage : nil)
   }
 }
 
