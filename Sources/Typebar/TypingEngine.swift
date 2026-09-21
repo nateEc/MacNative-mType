@@ -1730,6 +1730,32 @@ struct ContentOptions: Codable, Equatable {
   var includeNumbers = false
 }
 
+/// Fixed funbox metadata can constrain the source content options. Keep this
+/// separate from stream generation so configurations, saved presets, results,
+/// and imported links describe the same effective test.
+enum FunboxForcedContentOptionsPolicy {
+  static let punctuationDisabledModifiers: Set<TestModifier> = [
+    .arrowStream, .asciiStream, .specialCharacterStream, .poetryStream, .referenceStream,
+    .binaryStream,
+  ]
+
+  static let numbersDisabledModifiers: Set<TestModifier> = [
+    .accountingStream, .arrowStream, .asciiStream, .specialCharacterStream, .poetryStream,
+    .referenceStream, .ipv4Stream, .ipv6Stream, .binaryStream, .hexadecimalStream,
+  ]
+
+  static func effectiveOptions(
+    _ selected: ContentOptions, modifiers: [TestModifier]
+  ) -> ContentOptions {
+    let activeModifiers = Set(modifiers)
+    return .init(
+      includePunctuation: selected.includePunctuation
+        && punctuationDisabledModifiers.isDisjoint(with: activeModifiers),
+      includeNumbers: selected.includeNumbers
+        && numbersDisabledModifiers.isDisjoint(with: activeModifiers))
+  }
+}
+
 struct TestConfiguration: Codable, Equatable {
   var mode: TestMode
   var duration: TimeInterval?
@@ -1824,7 +1850,8 @@ struct TestConfiguration: Codable, Equatable {
       mode: mode, duration: duration, wordLimit: wordLimit,
       customTextCompletion: customTextCompletion)
       ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
-    self.contentOptions = contentOptions
+    self.contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
+      contentOptions, modifiers: self.modifiers)
     self.challengeID = challengeID
   }
 
@@ -1860,6 +1887,8 @@ struct TestConfiguration: Codable, Equatable {
     }
     copy.modifiers = copy.isInfinite
       ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
+    copy.contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
+      copy.contentOptions, modifiers: copy.modifiers)
     return copy
   }
 
@@ -1928,8 +1957,10 @@ struct TestConfiguration: Codable, Equatable {
       mode: decodedMode, duration: duration, wordLimit: wordLimit,
       customTextCompletion: customTextCompletion)
       ? TestModifierPolicy.compatibleWithInfiniteTest(normalizedModifiers) : normalizedModifiers
-    contentOptions =
+    let decodedContentOptions =
       try values.decodeIfPresent(ContentOptions.self, forKey: .contentOptions) ?? .init()
+    contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
+      decodedContentOptions, modifiers: modifiers)
     challengeID = try values.decodeIfPresent(String.self, forKey: .challengeID)
   }
 

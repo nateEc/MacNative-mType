@@ -923,6 +923,53 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(migrated.modifiers, [.uppercase])
   }
 
+  func testFunboxForcedContentOptionsFollowReferenceMetadata() throws {
+    let enabled = ContentOptions(includePunctuation: true, includeNumbers: true)
+    XCTAssertEqual(
+      FunboxForcedContentOptionsPolicy.punctuationDisabledModifiers,
+      Set<TestModifier>([
+        .arrowStream, .asciiStream, .specialCharacterStream, .poetryStream, .referenceStream,
+        .binaryStream,
+      ]))
+    XCTAssertEqual(
+      FunboxForcedContentOptionsPolicy.numbersDisabledModifiers,
+      Set<TestModifier>([
+        .accountingStream, .arrowStream, .asciiStream, .specialCharacterStream, .poetryStream,
+        .referenceStream, .ipv4Stream, .ipv6Stream, .binaryStream, .hexadecimalStream,
+      ]))
+
+    XCTAssertEqual(
+      TestConfiguration.timed(seconds: 30, contentOptions: enabled).contentOptions, enabled)
+    XCTAssertEqual(
+      TestConfiguration.timed(seconds: 30, contentOptions: enabled)
+        .with(modifiers: [.accountingStream]).contentOptions,
+      .init(includePunctuation: true, includeNumbers: false))
+
+    for modifier in FunboxForcedContentOptionsPolicy.punctuationDisabledModifiers {
+      XCTAssertEqual(
+        TestConfiguration.timed(seconds: 30, contentOptions: enabled)
+          .with(modifiers: [modifier]).contentOptions,
+        .init(), "\(modifier) forces punctuation and numbers off")
+    }
+    for modifier in FunboxForcedContentOptionsPolicy.numbersDisabledModifiers
+      where !FunboxForcedContentOptionsPolicy.punctuationDisabledModifiers.contains(modifier)
+    {
+      XCTAssertEqual(
+        TestConfiguration.timed(seconds: 30, contentOptions: enabled)
+          .with(modifiers: [modifier]).contentOptions,
+        .init(includePunctuation: true, includeNumbers: false),
+        "\(modifier) forces numbers off without changing punctuation")
+    }
+
+    let decoded = try JSONDecoder().decode(
+      TestConfiguration.self,
+      from: Data(
+        """
+        {"mode":"time","duration":30,"wordLimit":null,"difficulty":"normal","rules":{},"modifiers":["arrowStream"],"contentOptions":{"includePunctuation":true,"includeNumbers":true}}
+        """.utf8))
+    XCTAssertEqual(decoded.contentOptions, .init())
+  }
+
   func testFlashProgressStylesMatchReferenceTimerVisibility() {
     XCTAssertEqual(LiveProgressStyle.flashText.metricStyle, .text)
     XCTAssertEqual(LiveProgressStyle.flashMini.metricStyle, .mini)
@@ -21401,20 +21448,20 @@ final class TypingEngineTests: XCTestCase {
     let filter = ResultHistoryFilter.currentSettings(configuration, activeTags: ["focus"])
     let matching = ResultHistoryEntry(
       id: UUID(), mode: .time, language: .spanish, tags: ["focus"],
-      difficulty: .expert, includesPunctuation: true, includesNumbers: false,
+      difficulty: .expert, includesPunctuation: false, includesNumbers: false,
       duration: 60, modifiers: [.crtVisual])
     let untagged = ResultHistoryEntry(
       id: UUID(), mode: .time, language: .spanish, tags: [], difficulty: .expert,
-      includesPunctuation: true, includesNumbers: false, duration: 60, modifiers: [.crtVisual])
+      includesPunctuation: false, includesNumbers: false, duration: 60, modifiers: [.crtVisual])
     let wrongDuration = ResultHistoryEntry(
       id: UUID(), mode: .time, language: .spanish, tags: [], difficulty: .expert,
-      includesPunctuation: true, includesNumbers: false, duration: 30, modifiers: [.crtVisual])
+      includesPunctuation: false, includesNumbers: false, duration: 30, modifiers: [.crtVisual])
     let missingModifier = ResultHistoryEntry(
       id: UUID(), mode: .time, language: .spanish, tags: [], difficulty: .expert,
-      includesPunctuation: true, includesNumbers: false, duration: 60, modifiers: [])
+      includesPunctuation: false, includesNumbers: false, duration: 60, modifiers: [])
     let wrongLanguage = ResultHistoryEntry(
       id: UUID(), mode: .time, language: .english, tags: [], difficulty: .expert,
-      includesPunctuation: true, includesNumbers: false, duration: 60, modifiers: [.crtVisual])
+      includesPunctuation: false, includesNumbers: false, duration: 60, modifiers: [.crtVisual])
 
     XCTAssertEqual(
       filter.matchingIDs(
