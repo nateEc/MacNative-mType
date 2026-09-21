@@ -23,28 +23,52 @@ public actor RequestRateLimiter {
     }
 
     private struct Bucket: Sendable {
-        var startedAt: Date
+        let expiresAt: Date
         var count: Int
     }
 
     private var buckets: [String: Bucket] = [:]
+    private var nextExpiration: Date?
 
     public init() {}
 
     public func evaluate(policy: Policy, key: String, now: Date = .now) -> Decision {
+        discardExpiredBuckets(now: now)
         let bucketKey = "\(policy.id):\(key)"
-        var bucket = buckets[bucketKey] ?? .init(startedAt: now, count: 0)
-        if now.timeIntervalSince(bucket.startedAt) >= policy.window {
-            bucket = .init(startedAt: now, count: 0)
-        }
-        let retryAfter = max(1, Int(ceil(policy.window - now.timeIntervalSince(bucket.startedAt))))
+        let bucket = buckets[bucketKey] ?? .init(expiresAt: now.addingTimeInterval(policy.window), count: 0)
+        let retryAfter = max(1, Int(ceil(bucket.expiresAt.timeIntervalSince(now))))
         guard bucket.count < policy.maximumRequests else {
             buckets[bucketKey] = bucket
+            recordExpiration(bucket.expiresAt)
             return .init(allowed: false, retryAfter: retryAfter, remaining: 0)
         }
-        bucket.count += 1
-        buckets[bucketKey] = bucket
-        return .init(allowed: true, retryAfter: 0, remaining: policy.maximumRequests - bucket.count)
+        let updatedBucket = Bucket(expiresAt: bucket.expiresAt, count: bucket.count + 1)
+        buckets[bucketKey] = updatedBucket
+        recordExpiration(updatedBucket.expiresAt)
+        return .init(allowed: true, retryAfter: 0, remaining: policy.maximumRequests - updatedBucket.count)
+    }
+
+    /// Testable lifecycle observation for the in-memory limiter. This also
+    /// clears expired buckets when an otherwise idle service is inspected.
+    func activeBucketCount(now: Date = .now) -> Int {
+        discardExpiredBuckets(now: now)
+        return buckets.count
+    }
+
+    private func recordExpiration(_ expiration: Date) {
+        guard let nextExpiration else {
+            nextExpiration = expiration
+            return
+        }
+        if expiration < nextExpiration {
+            self.nextExpiration = expiration
+        }
+    }
+
+    private func discardExpiredBuckets(now: Date) {
+        guard let nextExpiration, nextExpiration <= now else { return }
+        buckets = buckets.filter { $0.value.expiresAt > now }
+        self.nextExpiration = buckets.values.map(\.expiresAt).min()
     }
 }
 

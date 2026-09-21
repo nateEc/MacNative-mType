@@ -130,7 +130,8 @@ final class HealthRouteTests: XCTestCase {
         .POST,
         "v1/human-verification/challenges/\(challengeResponse.id.uuidString)/complete",
         beforeRequest: { request async throws in
-          try request.content.encode(HumanVerificationChallengeCompletionRequest(token: "provider-token"))
+          try request.content.encode(
+            HumanVerificationChallengeCompletionRequest(token: "provider-token"), as: .urlEncodedForm)
         },
         afterResponse: { response async in
           XCTAssertEqual(response.status, .found)
@@ -571,6 +572,20 @@ final class HealthRouteTests: XCTestCase {
       policy: policy, key: "account-a", now: start.addingTimeInterval(60))
     XCTAssertTrue(otherAccount.allowed)
     XCTAssertTrue(reset.allowed)
+  }
+
+  func testRateLimiterDiscardsExpiredBuckets() async throws {
+    let limiter = RequestRateLimiter()
+    let policy = RequestRateLimiter.Policy(id: "ephemeral", maximumRequests: 2, window: 60)
+    let start = Date(timeIntervalSince1970: 1_000)
+
+    _ = await limiter.evaluate(policy: policy, key: "first-source", now: start)
+    _ = await limiter.evaluate(policy: policy, key: "second-source", now: start)
+
+    let activeAtStart = await limiter.activeBucketCount(now: start)
+    let activeAfterExpiry = await limiter.activeBucketCount(now: start.addingTimeInterval(60))
+    XCTAssertEqual(activeAtStart, 2)
+    XCTAssertEqual(activeAfterExpiry, 0)
   }
 
   func testAuthenticationRoutesReturnRetryAfterWhenRateLimited() async throws {
