@@ -33,7 +33,23 @@ enum TypingInputAutofocusPolicy {
             return .ignore
         }
         return discardsAutofocusInput ? .focusAndDiscard : .focusAndForward
-    }
+  }
+}
+
+enum TypingInputEditingCommand: CaseIterable {
+  case copy
+  case cut
+  case paste
+  case selectAll
+}
+
+/// Practice input has no editable backing buffer. These commands must stay
+/// local to the responder instead of reaching a SwiftUI editor or inserting
+/// clipboard content into a scored session.
+enum TypingInputEditingPolicy {
+  static func shouldIntercept(_ command: TypingInputEditingCommand) -> Bool {
+    true
+  }
 }
 
 struct NativeTypingInput: NSViewRepresentable {
@@ -395,9 +411,37 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         onBailout()
     }
 
+    @objc func copy(_ sender: Any?) {
+      guard !interceptsEditingCommand(.copy) else { return }
+    }
+
+    @objc func cut(_ sender: Any?) {
+      guard !interceptsEditingCommand(.cut) else { return }
+    }
+
+    @objc func paste(_ sender: Any?) {
+      guard !interceptsEditingCommand(.paste) else { return }
+    }
+
+    override func selectAll(_ sender: Any?) {
+      guard !interceptsEditingCommand(.selectAll) else { return }
+    }
+
+    private func interceptsEditingCommand(_ command: TypingInputEditingCommand) -> Bool {
+      TypingInputEditingPolicy.shouldIntercept(command)
+    }
+
     override func doCommand(by selector: Selector) {
-        pendingForcedError = false
-        switch selector {
+      pendingForcedError = false
+      switch selector {
+        case #selector(copy(_:)):
+          guard !interceptsEditingCommand(.copy) else { return }
+        case #selector(cut(_:)):
+          guard !interceptsEditingCommand(.cut) else { return }
+        case #selector(paste(_:)):
+          guard !interceptsEditingCommand(.paste) else { return }
+        case #selector(selectAll(_:)):
+          guard !interceptsEditingCommand(.selectAll) else { return }
         case #selector(NSResponder.deleteWordBackward(_:)):
             onDeleteWord()
         case #selector(deleteBackward(_:)):

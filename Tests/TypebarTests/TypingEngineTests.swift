@@ -17419,6 +17419,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(accepted.isEmpty)
   }
 
+  func testTypingInputEditingPolicyBlocksClipboardAndSelectionCommands() {
+    for command in TypingInputEditingCommand.allCases {
+      XCTAssertTrue(TypingInputEditingPolicy.shouldIntercept(command))
+    }
+  }
+
   @MainActor
   func testNativeInputBridgeReportsPhysicalKeyDownRepeatAndKeyUp() throws {
     var events = [String]()
