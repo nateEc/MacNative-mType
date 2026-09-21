@@ -692,6 +692,18 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LeaderboardRankChange(previousRank: 7, currentRank: 7), .unchanged)
   }
 
+  func testLeaderboardRankStandingUsesOnlyTheConfirmedFilteredPopulation() {
+    XCTAssertEqual(
+      LeaderboardRankStanding(rank: 1, total: 124), .leader)
+    XCTAssertEqual(
+      LeaderboardRankStanding(rank: 5, total: 124)?.displayName, "前 4.03%")
+    XCTAssertEqual(
+      LeaderboardRankStanding(rank: 124, total: 124)?.displayName, "前 100.00%")
+    XCTAssertNil(LeaderboardRankStanding(rank: 5, total: nil))
+    XCTAssertNil(LeaderboardRankStanding(rank: 0, total: 124))
+    XCTAssertNil(LeaderboardRankStanding(rank: 125, total: 124))
+  }
+
   func testLeaderboardParameterFilterKeepsTimeAndWordBucketsMutuallyExclusive() {
     XCTAssertEqual(
       LeaderboardParameterFilterPolicy.filter(

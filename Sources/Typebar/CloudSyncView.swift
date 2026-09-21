@@ -191,9 +191,11 @@ struct CloudSyncView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else if let leaderboardRank {
+                            let standing = LeaderboardRankStanding(
+                                rank: leaderboardRank.rank, total: leaderboardPage?.total)
                             VStack(alignment: .leading, spacing: 3) {
                                 Label(
-                                    "你的排名 #\(leaderboardRank.rank) · \(leaderboardRank.wpm) WPM",
+                                    "你的排名 #\(leaderboardRank.rank) · \(leaderboardRank.wpm) WPM\(standing.map { " · \($0.displayName)" } ?? "")",
                                     systemImage: "person.fill")
                                     .font(.caption.weight(.medium))
                                 if let leaderboardRankChange {
@@ -275,9 +277,11 @@ struct CloudSyncView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else if let experienceRank {
+                            let standing = LeaderboardRankStanding(
+                                rank: experienceRank.rank, total: experienceLeaderboardPage?.total)
                             VStack(alignment: .leading, spacing: 3) {
                                 Label(
-                                    "你的\(experiencePeriod.displayName) XP 排名 #\(experienceRank.rank) · \(experienceRank.totalExperience) XP",
+                                    "你的\(experiencePeriod.displayName) XP 排名 #\(experienceRank.rank) · \(experienceRank.totalExperience) XP\(standing.map { " · \($0.displayName)" } ?? "")",
                                     systemImage: "person.fill")
                                     .font(.caption.weight(.medium))
                                 if let experienceRankChange {
