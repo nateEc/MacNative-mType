@@ -1143,6 +1143,39 @@ enum ArabicLazyInputPolicy {
   }
 }
 
+/// Mirrors the fixed reference's `noJoiningScript` funbox guard. When the
+/// selected language uses native glyph joining, activating any listed funbox
+/// clears the entire funbox selection. Polyglot keeps its selected base
+/// language semantics; the reference does not inspect every component here.
+enum JoiningScriptFunboxPolicy {
+  static let unsupportedModifiers: Set<TestModifier> = [
+    .chooVisual, .earthquakeVisual, .crtVisual, .doubleCharacters, .aslVisual,
+  ]
+
+  static func shouldClearAll(
+    modifiers: [TestModifier], language: TypingLanguage,
+    mixedLanguageComponents: [TypingLanguage] = []
+  ) -> Bool {
+    // `mixedLanguageComponents` deliberately remains part of the public
+    // policy signature so callers document the polyglot context. The source
+    // guard checks only the selected language at activation time.
+    _ = mixedLanguageComponents
+    guard language != .mixedLanguages, language.usesJoiningScriptPrompt else { return false }
+    return !unsupportedModifiers.isDisjoint(with: modifiers)
+  }
+
+  static func effectiveModifiers(
+    _ modifiers: [TestModifier], language: TypingLanguage,
+    mixedLanguageComponents: [TypingLanguage] = []
+  ) -> [TestModifier] {
+    guard !shouldClearAll(
+      modifiers: modifiers, language: language,
+      mixedLanguageComponents: mixedLanguageComponents)
+    else { return [] }
+    return TestModifierPolicy.normalized(modifiers)
+  }
+}
+
 struct PracticeVisualTransform: Equatable {
   let horizontalScale: Double
   let rotationDegrees: Double
@@ -1764,8 +1797,11 @@ struct TestConfiguration: Codable, Equatable {
     self.customTextCompletion = customTextCompletion
     self.customTextSectionLimit = customTextSectionLimit
     self.customTextOrdering = customTextOrdering
-    self.mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(mixedLanguageComponents)
-    let normalizedModifiers = TestModifierPolicy.normalized(modifiers).filter {
+    let normalizedMixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
+      mixedLanguageComponents)
+    self.mixedLanguageComponents = normalizedMixedLanguageComponents
+    let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
+      modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents).filter {
       mode != .zen || $0 != .memory
     }
     self.modifiers = Self.usesInfiniteLimit(
@@ -1802,7 +1838,8 @@ struct TestConfiguration: Codable, Equatable {
 
   func with(modifiers: [TestModifier]) -> Self {
     var copy = self
-    let normalizedModifiers = TestModifierPolicy.normalized(modifiers).filter {
+    let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
+      modifiers, language: copy.language, mixedLanguageComponents: copy.mixedLanguageComponents).filter {
       copy.mode != .zen || $0 != .memory
     }
     copy.modifiers = copy.isInfinite

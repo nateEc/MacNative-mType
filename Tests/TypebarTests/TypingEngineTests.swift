@@ -17475,6 +17475,32 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testTextBoundaryModifiersTransformPromptsFinishWordsAndRemainMutuallyExclusive() {
+    XCTAssertEqual(
+      JoiningScriptFunboxPolicy.unsupportedModifiers,
+      Set<TestModifier>([.chooVisual, .earthquakeVisual, .crtVisual, .doubleCharacters, .aslVisual]))
+    XCTAssertTrue(
+      JoiningScriptFunboxPolicy.shouldClearAll(
+        modifiers: [.uppercase, .doubleCharacters], language: .arabic))
+    XCTAssertTrue(
+      JoiningScriptFunboxPolicy.shouldClearAll(
+        modifiers: [.aslVisual], language: .tibetan))
+    XCTAssertFalse(
+      JoiningScriptFunboxPolicy.shouldClearAll(
+        modifiers: [.uppercase, .doubleCharacters], language: .english))
+    XCTAssertFalse(
+      JoiningScriptFunboxPolicy.shouldClearAll(
+        modifiers: [.doubleCharacters], language: .mixedLanguages,
+        mixedLanguageComponents: [.english, .tibetan]),
+      "The reference checks the selected language rather than each polyglot component")
+    XCTAssertTrue(
+      TestConfiguration.words(2, language: .arabic)
+        .with(modifiers: [.uppercase, .doubleCharacters]).modifiers.isEmpty,
+      "A joining-script language clears the complete funbox selection, not only the unsafe mode")
+    XCTAssertEqual(
+      TestConfiguration.words(2, language: .english)
+        .with(modifiers: [.uppercase, .doubleCharacters]).modifiers,
+      [.uppercase, .doubleCharacters])
+
     let noSpaceConfiguration = TestConfiguration.words(2).with(modifiers: [.noSpaces])
     var noSpaceSession = TestSessionFactory.make(configuration: noSpaceConfiguration)
     XCTAssertFalse(noSpaceSession.prompt.contains(" "))

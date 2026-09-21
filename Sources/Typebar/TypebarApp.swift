@@ -2638,6 +2638,12 @@ private struct ContentView: View {
   }
 
   private func reset(restarting: Bool = false) {
+    let joiningSafeModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
+      settings.testModifiers, language: language,
+      mixedLanguageComponents: mixedLanguageComponents)
+    if settings.testModifiers != joiningSafeModifiers {
+      settings.testModifiers = joiningSafeModifiers
+    }
     let shouldCountRestart = session.hasStarted && !session.isFinished
     absorbLiveWeakSpotScores(from: session)
     restartLockMessage = nil
@@ -3568,10 +3574,13 @@ private struct ContentView: View {
     for selectedLanguage: TypingLanguage, mode: TestMode,
     mixedLanguageComponents: [TypingLanguage]? = nil, baseModifiers: [TestModifier]? = nil
   ) -> [TestModifier] {
-    ArabicLazyInputPolicy.effectiveModifiers(
+    let components = mixedLanguageComponents ?? self.mixedLanguageComponents
+    let lazyInputModifiers = ArabicLazyInputPolicy.effectiveModifiers(
       baseModifiers ?? settings.testModifiers, language: selectedLanguage, mode: mode,
-      mixedLanguageComponents: mixedLanguageComponents ?? self.mixedLanguageComponents,
+      mixedLanguageComponents: components,
       automaticallyEnabled: settings.prefersArabicLazyInput)
+    return JoiningScriptFunboxPolicy.effectiveModifiers(
+      lazyInputModifiers, language: selectedLanguage, mixedLanguageComponents: components)
   }
 
   private func refreshZipfNotice() {
