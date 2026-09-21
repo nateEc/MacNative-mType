@@ -1025,7 +1025,7 @@ enum TestModifierPolicy {
       transformed = transformed.split(separator: " ", omittingEmptySubsequences: false).map {
         word in
         guard let first = word.first else { return "" }
-        return first.uppercased() + word.dropFirst().lowercased()
+        return first.uppercased() + word.dropFirst()
       }.joined(separator: " ")
     } else if modifiers.contains(.alternatingCase) {
       transformed = AlternatingCasePolicy.transformed(transformed)
@@ -11696,16 +11696,19 @@ enum StarterLexicon {
 
   static func cjkPrompt(
     tokens: Int, lexicon: [String], usesChineseMarks: Bool, separator: String = " ",
-    contentOptions: ContentOptions, usesZipfFrequency: Bool
+    contentOptions: ContentOptions, usesZipfFrequency: Bool,
+    contentRandom: () -> Double = { Double.random(in: 0..<1) }
   ) -> String {
     cjkPrompt(
       tokens: tokens, lexicon: IndexedLexicon(lexicon), usesChineseMarks: usesChineseMarks,
-      separator: separator, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
+      separator: separator, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency,
+      contentRandom: contentRandom)
   }
 
   static func cjkPrompt(
     tokens: Int, lexicon: IndexedLexicon, usesChineseMarks: Bool, separator: String = " ",
-    contentOptions: ContentOptions, usesZipfFrequency: Bool
+    contentOptions: ContentOptions, usesZipfFrequency: Bool,
+    contentRandom: () -> Double = { Double.random(in: 0..<1) }
   ) -> String {
     let generated = (0..<tokens).map { _ in
       let index = usesZipfFrequency
@@ -11719,7 +11722,7 @@ enum StarterLexicon {
     return CJKPunctuationPolicy.generatedPrompt(
       generated, usesChineseMarks: usesChineseMarks,
       includesPunctuation: contentOptions.includePunctuation,
-      includesNumbers: contentOptions.includeNumbers
+      includesNumbers: contentOptions.includeNumbers, random: contentRandom
     ).joined(separator: separator)
   }
 

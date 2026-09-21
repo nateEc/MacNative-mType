@@ -16053,7 +16053,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       StarterLexicon.cjkPrompt(
         tokens: 2, lexicon: ["kaze"], usesChineseMarks: false, separator: " ",
-        contentOptions: .init(includePunctuation: true), usesZipfFrequency: false),
+        contentOptions: .init(includePunctuation: true), usesZipfFrequency: false,
+        contentRandom: { 0 }),
       "kaze kaze。")
   }
 
@@ -17470,7 +17471,7 @@ final class TypingEngineTests: XCTestCase {
         modifiers: [.titleCase]),
       customText: "amber HARBOR 9lives"
     )
-    XCTAssertEqual(titleCase.prompt, "Amber Harbor 9lives")
+    XCTAssertEqual(titleCase.prompt, "Amber HARBOR 9lives")
     let alternatingCase = TestSessionFactory.make(
       configuration: .init(
         mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
