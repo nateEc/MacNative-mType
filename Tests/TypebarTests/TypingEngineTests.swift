@@ -17419,6 +17419,80 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(accepted.isEmpty)
   }
 
+  @MainActor
+  func testNativeInputBridgeIgnoresRepeatedShortcutAndArrowActions() throws {
+    var restarts = 0
+    var arrows = [String]()
+    var armedBailouts = 0
+    var bailouts = 0
+    var now = start
+    let view = TypingInputView()
+    view.quickRestartKey = .escape
+    view.mapsArrowKeysToInput = true
+    view.enablesLongTestBailout = true
+    view.onRestart = { restarts += 1 }
+    view.onInsert = { text, _ in arrows.append(text) }
+    view.onBailoutArmed = { armedBailouts += 1 }
+    view.onBailout = { bailouts += 1 }
+    view.bailoutClock = { now }
+
+    let commandR = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.command], timestamp: 0,
+        windowNumber: 0, context: nil, characters: "r", charactersIgnoringModifiers: "r",
+        isARepeat: false, keyCode: 15))
+    let repeatedCommandR = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.command], timestamp: 0.1,
+        windowNumber: 0, context: nil, characters: "r", charactersIgnoringModifiers: "r",
+        isARepeat: true, keyCode: 15))
+    let escape = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0.2,
+        windowNumber: 0, context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}",
+        isARepeat: false, keyCode: 53))
+    let repeatedEscape = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0.3,
+        windowNumber: 0, context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}",
+        isARepeat: true, keyCode: 53))
+    let up = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0.4,
+        windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "",
+        isARepeat: false, keyCode: 126))
+    let repeatedUp = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0.5,
+        windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "",
+        isARepeat: true, keyCode: 126))
+    let shiftEnter = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0.6,
+        windowNumber: 0, context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
+        isARepeat: false, keyCode: 36))
+    let repeatedShiftEnter = try XCTUnwrap(
+      NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.shift], timestamp: 0.7,
+        windowNumber: 0, context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
+        isARepeat: true, keyCode: 36))
+
+    view.keyDown(with: commandR)
+    view.keyDown(with: repeatedCommandR)
+    view.keyDown(with: escape)
+    view.keyDown(with: repeatedEscape)
+    view.keyDown(with: up)
+    view.keyDown(with: repeatedUp)
+    view.keyDown(with: shiftEnter)
+    now = start.addingTimeInterval(0.1)
+    view.keyDown(with: repeatedShiftEnter)
+
+    XCTAssertEqual(restarts, 2)
+    XCTAssertEqual(arrows, ["↑"])
+    XCTAssertEqual(armedBailouts, 1)
+    XCTAssertEqual(bailouts, 0)
+  }
+
   func testTypingInputEditingPolicyBlocksClipboardAndSelectionCommands() {
     for command in TypingInputEditingCommand.allCases {
       XCTAssertTrue(TypingInputEditingPolicy.shouldIntercept(command))

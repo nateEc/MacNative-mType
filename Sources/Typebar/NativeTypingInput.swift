@@ -290,25 +290,25 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         onPhysicalKey(event.keyCode, true, event.isARepeat)
         onModifierFlagsChanged(event.modifierFlags)
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {
-            onRestart()
+            if !event.isARepeat { onRestart() }
             return
         }
         if enablesLongTestBailout,
            event.modifierFlags.contains(.shift),
            event.charactersIgnoringModifiers == "\r" || event.charactersIgnoringModifiers == "\n" {
-            handleLongTestBailout()
+            if !event.isARepeat { handleLongTestBailout() }
             return
         }
         if acceptsNewlineInput,
            event.charactersIgnoringModifiers == "\r" || event.charactersIgnoringModifiers == "\n" {
             if finishesOnShiftEnter, event.modifierFlags.contains(.shift) {
-                onFinishZen()
+                if !event.isARepeat { onFinishZen() }
                 return
             }
             if quickRestartKey == .enter,
                !disablesQuickRestart,
                event.modifierFlags.contains(.shift) {
-                onRestart()
+                if !event.isARepeat { onRestart() }
                 return
             }
             onInsert("\n", false)
@@ -316,13 +316,14 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
         }
         if acceptsTabInput, event.charactersIgnoringModifiers == "\t" {
             if quickRestartKey == .tab, event.modifierFlags.contains(.shift) {
-                onRestart()
+                if !event.isARepeat { onRestart() }
                 return
             }
             onInsert("\t", false)
             return
         }
         if quickRestartKey.matches(charactersIgnoringModifiers: event.charactersIgnoringModifiers) {
+            guard !event.isARepeat else { return }
             if disablesQuickRestart {
                 onQuickRestartProtectionRequired()
                 return
@@ -335,6 +336,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             return
         }
         if mapsArrowKeysToInput, let arrow = ArrowKeyInputPolicy.character(forKeyCode: event.keyCode) {
+            guard !event.isARepeat else { return }
             onInsert(String(arrow), false)
             return
         }
