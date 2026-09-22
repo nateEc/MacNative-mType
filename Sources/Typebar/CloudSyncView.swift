@@ -17,6 +17,7 @@ struct CloudSyncView: View {
     private let resultTombstones = ResultTombstoneStore()
     private let presetTombstones = PresetTombstoneStore()
     private let savedTextTombstones = SavedTextTombstoneStore()
+    private let customizationTombstones = CustomizationTombstoneStore()
     private let resultFilterPresetTombstones = ResultFilterPresetTombstoneStore()
     @State private var message: String?
     @State private var conflictAudit: [SyncConflictAuditEntry] = []
@@ -430,6 +431,7 @@ struct CloudSyncView: View {
                         savedTexts: savedTexts, resultTombstoneStore: resultTombstones,
                         presetTombstoneStore: presetTombstones,
                         savedTextTombstoneStore: savedTextTombstones,
+                        customizationTombstoneStore: customizationTombstones,
                         resultFilterPresets: resultFilterPresets,
                         tombstoneStore: resultFilterPresetTombstones, source: .cloudSync,
                         modelContext: modelContext)
@@ -477,6 +479,7 @@ struct CloudSyncView: View {
                     resultTombstoneStore: resultTombstones,
                     presetTombstoneStore: presetTombstones,
                     savedTextTombstoneStore: savedTextTombstones,
+                    customizationTombstoneStore: customizationTombstones,
                     resultFilterPresets: resultFilterPresets, tombstoneStore: resultFilterPresetTombstones,
                     source: .cloudSync, modelContext: modelContext)
                 account.confirmPulledArchive(pulled)
@@ -725,6 +728,8 @@ struct CloudSyncView: View {
         return .init(
             exportedAt: .now,
             settings: settings.snapshot,
+            deletedCustomThemeIDs: customizationTombstones.deletedThemeIDs,
+            deletedCustomKeyboardLayoutIDs: customizationTombstones.deletedKeyboardLayoutIDs,
             results: portableResults,
             deletedResultIDs: resultTombstones.deletedIDs,
             presets: namedPresets,

@@ -527,6 +527,64 @@ struct SavedTextTombstoneStore {
   }
 }
 
+/// Persists deletions for user-authored settings collections that live inside
+/// an AppSettings snapshot. Both collections use stable UUIDs in v9 archives.
+struct CustomizationTombstoneStore {
+  private enum Kind: String {
+    case theme = "customTheme"
+    case keyboardLayout = "customKeyboardLayout"
+  }
+
+  private let defaults: UserDefaults
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  var deletedThemeIDs: [UUID] { deletedIDs(for: .theme) }
+  var deletedKeyboardLayoutIDs: [UUID] { deletedIDs(for: .keyboardLayout) }
+
+  func containsDeletedTheme(_ id: UUID) -> Bool { deletedThemeIDs.contains(id) }
+  func containsDeletedKeyboardLayout(_ id: UUID) -> Bool {
+    deletedKeyboardLayoutIDs.contains(id)
+  }
+
+  func markDeletedTheme(_ id: UUID) { record([id], for: .theme) }
+  func markDeletedKeyboardLayout(_ id: UUID) { record([id], for: .keyboardLayout) }
+  func replaceDeletedThemeIDs(_ ids: some Sequence<UUID>) { replace(ids, for: .theme) }
+  func replaceDeletedKeyboardLayoutIDs(_ ids: some Sequence<UUID>) {
+    replace(ids, for: .keyboardLayout)
+  }
+
+  func removeAll() {
+    for kind in [Kind.theme, .keyboardLayout] { defaults.removeObject(forKey: storageKey(for: kind)) }
+  }
+
+  private func deletedIDs(for kind: Kind) -> [UUID] {
+    guard let data = defaults.data(forKey: storageKey(for: kind)),
+      let rawIDs = try? JSONDecoder().decode([UUID].self, from: data)
+    else { return [] }
+    return Array(Set(rawIDs)).sorted { $0.uuidString < $1.uuidString }
+  }
+
+  private func record(_ ids: some Sequence<UUID>, for kind: Kind) {
+    replace(Set(deletedIDs(for: kind)).union(ids), for: kind)
+  }
+
+  private func replace(_ ids: some Sequence<UUID>, for kind: Kind) {
+    let uniqueIDs = Set(ids)
+    guard !uniqueIDs.isEmpty else {
+      defaults.removeObject(forKey: storageKey(for: kind))
+      return
+    }
+    let sorted = uniqueIDs.sorted { $0.uuidString < $1.uuidString }
+    guard let data = try? JSONEncoder().encode(sorted) else { return }
+    defaults.set(data, forKey: storageKey(for: kind))
+  }
+
+  private func storageKey(for kind: Kind) -> String { "customization.\(kind.rawValue).deletedIDs.v1" }
+}
+
 @Model
 final class ResultFilterPresetRecord {
   @Attribute(.unique) var id: UUID

@@ -251,10 +251,12 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    static let currentVersion = 8
+    static let currentVersion = 9
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
+    let deletedCustomThemeIDs: [UUID]
+    let deletedCustomKeyboardLayoutIDs: [UUID]
     let results: [CompletedTestResult]
     let deletedResultIDs: [UUID]
     let presets: [NamedPreset]
@@ -269,6 +271,8 @@ struct TypebarArchive: Codable, Equatable {
         version: Int = TypebarArchive.currentVersion,
         exportedAt: Date,
         settings: AppSettingsSnapshot,
+        deletedCustomThemeIDs: [UUID] = [],
+        deletedCustomKeyboardLayoutIDs: [UUID] = [],
         results: [CompletedTestResult],
         deletedResultIDs: [UUID] = [],
         presets: [NamedPreset],
@@ -281,7 +285,14 @@ struct TypebarArchive: Codable, Equatable {
     ) {
         self.version = version
         self.exportedAt = exportedAt
-        self.settings = settings
+        let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
+        let deletedKeyboardLayouts = version >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
+        self.deletedCustomThemeIDs = deletedThemes.sorted { $0.uuidString < $1.uuidString }
+        self.deletedCustomKeyboardLayoutIDs = deletedKeyboardLayouts.sorted {
+            $0.uuidString < $1.uuidString
+        }
+        self.settings = Self.sanitizedSettings(
+            settings, deletedThemeIDs: deletedThemes, deletedKeyboardLayoutIDs: deletedKeyboardLayouts)
         let deletedResults = version >= 6 ? Set(deletedResultIDs) : []
         self.deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         self.results = results.filter { !deletedResults.contains($0.id) }
@@ -314,7 +325,8 @@ struct TypebarArchive: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, exportedAt, settings, results, deletedResultIDs, presets, deletedPresetIDs, savedTexts, deletedSavedTextIDs, resultFilterPresets,
+        case version, exportedAt, settings, deletedCustomThemeIDs, deletedCustomKeyboardLayoutIDs,
+            results, deletedResultIDs, presets, deletedPresetIDs, savedTexts, deletedSavedTextIDs, resultFilterPresets,
             deletedResultFilterPresetIDs, activeTestSelection
     }
 
@@ -322,7 +334,19 @@ struct TypebarArchive: Codable, Equatable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
         exportedAt = try values.decode(Date.self, forKey: .exportedAt)
-        settings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+        let decodedSettings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
+        let deletedThemes = version >= 9
+            ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedCustomThemeIDs) ?? [])
+            : []
+        let deletedKeyboardLayouts = version >= 9
+            ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedCustomKeyboardLayoutIDs) ?? [])
+            : []
+        deletedCustomThemeIDs = deletedThemes.sorted { $0.uuidString < $1.uuidString }
+        deletedCustomKeyboardLayoutIDs = deletedKeyboardLayouts.sorted {
+            $0.uuidString < $1.uuidString
+        }
+        settings = Self.sanitizedSettings(
+            decodedSettings, deletedThemeIDs: deletedThemes, deletedKeyboardLayoutIDs: deletedKeyboardLayouts)
         let decodedResults = try values.decode([CompletedTestResult].self, forKey: .results)
         let deletedResults = version >= 6
             ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedResultIDs) ?? [])
@@ -366,6 +390,29 @@ struct TypebarArchive: Codable, Equatable {
                 .decodeIfPresent(ActiveTestSelectionDocument.self, forKey: .activeTestSelection)
                 .flatMap(ActiveTestSelectionPolicy.validated)
             : nil
+    }
+
+    static func sanitizedSettings(
+        _ settings: AppSettingsSnapshot,
+        deletedThemeIDs: Set<UUID>,
+        deletedKeyboardLayoutIDs: Set<UUID>
+    ) -> AppSettingsSnapshot {
+        var sanitized = settings
+        sanitized.customThemes.removeAll { deletedThemeIDs.contains($0.id) }
+        if let activeThemeID = sanitized.activeCustomThemeID,
+           !sanitized.customThemes.contains(where: { $0.id == activeThemeID }) {
+            sanitized.activeCustomThemeID = nil
+        }
+        sanitized.favoriteThemeIDs = ThemeFavoritePolicy.normalized(
+            sanitized.favoriteThemeIDs, customThemes: sanitized.customThemes)
+        sanitized.customKeyboardLayouts.removeAll { deletedKeyboardLayoutIDs.contains($0.id) }
+        if let selectedLayoutID = sanitized.customKeyboardLayoutID,
+           !sanitized.customKeyboardLayouts.contains(where: { $0.id == selectedLayoutID }) {
+            sanitized.customKeyboardLayoutID = nil
+            if sanitized.keyboardInputLayout == .custom { sanitized.keyboardInputLayout = .system }
+            if sanitized.keyboardGuideLayoutSource == .custom { sanitized.keyboardGuideLayoutSource = .builtIn }
+        }
+        return sanitized
     }
 }
 
@@ -716,6 +763,8 @@ enum SettingsJSONCommandImport {
 enum TypebarDataTransfer {
     static func exportArchive(
         settings: AppSettingsSnapshot,
+        deletedCustomThemeIDs: [UUID] = [],
+        deletedCustomKeyboardLayoutIDs: [UUID] = [],
         results: [CompletedTestResult],
         deletedResultIDs: [UUID] = [],
         presets: [NamedPreset],
@@ -731,6 +780,8 @@ enum TypebarDataTransfer {
             version: TypebarArchive.currentVersion,
             exportedAt: date,
             settings: settings,
+            deletedCustomThemeIDs: deletedCustomThemeIDs,
+            deletedCustomKeyboardLayoutIDs: deletedCustomKeyboardLayoutIDs,
             results: results,
             deletedResultIDs: deletedResultIDs,
             presets: presets,
@@ -944,13 +995,20 @@ enum TypebarArchiveConflictMerge {
         remote: TypebarArchive,
         makeID: () -> UUID = UUID.init
     ) -> TypebarArchiveConflictMergeResult {
-        var settings = local.settings
+        let deletedCustomThemeIDs = Set(local.deletedCustomThemeIDs)
+            .union(remote.deletedCustomThemeIDs)
+        let deletedCustomKeyboardLayoutIDs = Set(local.deletedCustomKeyboardLayoutIDs)
+            .union(remote.deletedCustomKeyboardLayoutIDs)
+        var settings = TypebarArchive.sanitizedSettings(
+            local.settings,
+            deletedThemeIDs: deletedCustomThemeIDs,
+            deletedKeyboardLayoutIDs: deletedCustomKeyboardLayoutIDs)
         var conflicts: [SyncConflictCopy] = []
         var occupiedIDs = Set(settings.customThemes.map(\.id))
         occupiedIDs.formUnion(settings.customKeyboardLayouts.map(\.id))
         var remappedThemeIDs: [UUID: UUID] = [:]
 
-        for remoteTheme in remote.settings.customThemes {
+        for remoteTheme in remote.settings.customThemes where !deletedCustomThemeIDs.contains(remoteTheme.id) {
             if let localTheme = settings.customThemes.first(where: { $0.id == remoteTheme.id }) {
                 guard localTheme != remoteTheme else { continue }
                 let copy = copyTheme(
@@ -975,7 +1033,8 @@ enum TypebarArchiveConflictMerge {
             }
         }
 
-        for remoteLayout in remote.settings.customKeyboardLayouts {
+        for remoteLayout in remote.settings.customKeyboardLayouts
+        where !deletedCustomKeyboardLayoutIDs.contains(remoteLayout.id) {
             if let localLayout = settings.customKeyboardLayouts.first(where: { $0.id == remoteLayout.id }) {
                 guard localLayout != remoteLayout else { continue }
                 var copy = remoteLayout
@@ -1113,6 +1172,8 @@ enum TypebarArchiveConflictMerge {
                 version: max(local.version, remote.version),
                 exportedAt: max(local.exportedAt, remote.exportedAt),
                 settings: settings,
+                deletedCustomThemeIDs: Array(deletedCustomThemeIDs),
+                deletedCustomKeyboardLayoutIDs: Array(deletedCustomKeyboardLayoutIDs),
                 results: (local.results + remote.results.filter { remoteResult in
                     !local.results.contains(where: { $0.id == remoteResult.id })
                 }).filter { !deletedResultIDs.contains($0.id) },
@@ -1246,6 +1307,7 @@ enum LocalArchiveImport {
         resultTombstoneStore: ResultTombstoneStore = .init(),
         presetTombstoneStore: PresetTombstoneStore = .init(),
         savedTextTombstoneStore: SavedTextTombstoneStore = .init(),
+        customizationTombstoneStore: CustomizationTombstoneStore = .init(),
         resultFilterPresets: [ResultFilterPresetRecord] = [],
         tombstoneStore: ResultFilterPresetTombstoneStore = .init(),
         source: ArchiveImportSource = .localFile,
@@ -1254,6 +1316,37 @@ enum LocalArchiveImport {
         guard settings.allowsRestartingConfigurationChange else {
             throw LocalArchiveImportError.noQuitConfigurationLocked
         }
+        let storedDeletedCustomThemeIDs = Set(customizationTombstoneStore.deletedThemeIDs)
+        let archiveDeletedCustomThemeIDs = Set(archive.deletedCustomThemeIDs)
+        let storedDeletedCustomKeyboardLayoutIDs = Set(
+            customizationTombstoneStore.deletedKeyboardLayoutIDs)
+        let archiveDeletedCustomKeyboardLayoutIDs = Set(archive.deletedCustomKeyboardLayoutIDs)
+        let resultingDeletedCustomThemeIDs: Set<UUID>
+        let effectiveDeletedCustomThemeIDs: Set<UUID>
+        let resultingDeletedCustomKeyboardLayoutIDs: Set<UUID>
+        let effectiveDeletedCustomKeyboardLayoutIDs: Set<UUID>
+        switch source {
+        case .localFile:
+            resultingDeletedCustomThemeIDs = storedDeletedCustomThemeIDs
+                .subtracting(archive.settings.customThemes.map(\.id))
+                .union(archiveDeletedCustomThemeIDs)
+            effectiveDeletedCustomThemeIDs = archiveDeletedCustomThemeIDs
+            resultingDeletedCustomKeyboardLayoutIDs = storedDeletedCustomKeyboardLayoutIDs
+                .subtracting(archive.settings.customKeyboardLayouts.map(\.id))
+                .union(archiveDeletedCustomKeyboardLayoutIDs)
+            effectiveDeletedCustomKeyboardLayoutIDs = archiveDeletedCustomKeyboardLayoutIDs
+        case .cloudSync:
+            resultingDeletedCustomThemeIDs = storedDeletedCustomThemeIDs
+                .union(archiveDeletedCustomThemeIDs)
+            effectiveDeletedCustomThemeIDs = resultingDeletedCustomThemeIDs
+            resultingDeletedCustomKeyboardLayoutIDs = storedDeletedCustomKeyboardLayoutIDs
+                .union(archiveDeletedCustomKeyboardLayoutIDs)
+            effectiveDeletedCustomKeyboardLayoutIDs = resultingDeletedCustomKeyboardLayoutIDs
+        }
+        let importedSettings = TypebarArchive.sanitizedSettings(
+            archive.settings,
+            deletedThemeIDs: effectiveDeletedCustomThemeIDs,
+            deletedKeyboardLayoutIDs: effectiveDeletedCustomKeyboardLayoutIDs)
         let storedDeletedResultIDs = Set(resultTombstoneStore.deletedIDs)
         let archiveDeletedResultIDs = Set(archive.deletedResultIDs)
         let resultingDeletedResultIDs: Set<UUID>
@@ -1374,8 +1467,11 @@ enum LocalArchiveImport {
         resultTombstoneStore.replaceDeletedIDs(resultingDeletedResultIDs)
         presetTombstoneStore.replaceDeletedIDs(resultingDeletedPresetIDs)
         savedTextTombstoneStore.replaceDeletedIDs(resultingDeletedSavedTextIDs)
+        customizationTombstoneStore.replaceDeletedThemeIDs(resultingDeletedCustomThemeIDs)
+        customizationTombstoneStore.replaceDeletedKeyboardLayoutIDs(
+            resultingDeletedCustomKeyboardLayoutIDs)
         tombstoneStore.replaceDeletedIDs(resultingDeletedFilterPresetIDs)
-        settings.apply(archive.settings)
+        settings.apply(importedSettings)
         let restoredActiveTestSelection = archive.activeTestSelection.map(
             settings.importActiveTestSelection) ?? false
         return .init(
@@ -1409,6 +1505,8 @@ struct TypebarArchiveDocument: FileDocument {
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: try TypebarDataTransfer.exportArchive(
             settings: archive.settings,
+            deletedCustomThemeIDs: archive.deletedCustomThemeIDs,
+            deletedCustomKeyboardLayoutIDs: archive.deletedCustomKeyboardLayoutIDs,
             results: archive.results,
             deletedResultIDs: archive.deletedResultIDs,
             presets: archive.presets,

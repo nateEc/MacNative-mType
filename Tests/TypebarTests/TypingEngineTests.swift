@@ -14618,6 +14618,19 @@ final class TypingEngineTests: XCTestCase {
     let savedTextTombstones = SavedTextTombstoneStore(defaults: defaults)
     let deletedSavedTextID = UUID()
     savedTextTombstones.markDeleted(deletedSavedTextID)
+    let customizationTombstones = CustomizationTombstoneStore(defaults: defaults)
+    let deletedThemeID = UUID()
+    let deletedKeyboardLayoutID = UUID()
+    customizationTombstones.markDeletedTheme(deletedThemeID)
+    customizationTombstones.markDeletedKeyboardLayout(deletedKeyboardLayoutID)
+    let theme = CustomThemeDefinition(
+      id: UUID(), name: "Harbour", background: .init(red: 0.1, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.2, green: 0.3, blue: 0.4),
+      accent: .init(red: 0.7, green: 0.4, blue: 0.2), prefersDark: true)
+    let layout = CustomKeyboardGuideLayout(
+      id: UUID(), name: "Board", numberRow: "123", topRow: "qwe", homeRow: "asd", bottomRow: "zxc")
+    settings.customThemes = [theme]
+    settings.customKeyboardLayouts = [layout]
     let tombstones = ResultFilterPresetTombstoneStore(defaults: defaults)
     let deletedFilterPresetID = UUID()
     tombstones.markDeleted(deletedFilterPresetID)
@@ -14653,6 +14666,7 @@ final class TypingEngineTests: XCTestCase {
         resultTombstoneStore: resultTombstones,
         presetTombstoneStore: presetTombstones,
         savedTextTombstoneStore: savedTextTombstones,
+        customizationTombstoneStore: customizationTombstones,
         tombstoneStore: tombstones,
         removeBackground: {},
         removePracticeFont: {
@@ -14670,6 +14684,7 @@ final class TypingEngineTests: XCTestCase {
       resultTombstoneStore: resultTombstones,
       presetTombstoneStore: presetTombstones,
       savedTextTombstoneStore: savedTextTombstones,
+      customizationTombstoneStore: customizationTombstones,
       tombstoneStore: tombstones,
       removeBackground: { removedBackground = true },
       removePracticeFont: { removedPracticeFont = true },
@@ -14683,6 +14698,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(resultTombstones.contains(deletedResultID))
     XCTAssertFalse(presetTombstones.contains(deletedPresetID))
     XCTAssertFalse(savedTextTombstones.contains(deletedSavedTextID))
+    XCTAssertFalse(customizationTombstones.containsDeletedTheme(deletedThemeID))
+    XCTAssertFalse(customizationTombstones.containsDeletedKeyboardLayout(deletedKeyboardLayoutID))
     XCTAssertFalse(tombstones.contains(deletedFilterPresetID))
     XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
     XCTAssertTrue(removedBackground)
@@ -14707,6 +14724,28 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
     XCTAssertEqual(AppSettings(defaults: defaults).snapshot, AppSettingsSnapshot())
+  }
+
+  @MainActor
+  func testRestoreDefaultsRecordsRemovedCustomizationTombstones() {
+    let suiteName = "TypebarTests.restore-customizations.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    let tombstones = CustomizationTombstoneStore(defaults: defaults)
+    let theme = CustomThemeDefinition(
+      id: UUID(), name: "Harbour", background: .init(red: 0.1, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.2, green: 0.3, blue: 0.4),
+      accent: .init(red: 0.7, green: 0.4, blue: 0.2), prefersDark: true)
+    let layout = CustomKeyboardGuideLayout(
+      id: UUID(), name: "Board", numberRow: "123", topRow: "qwe", homeRow: "asd", bottomRow: "zxc")
+    settings.customThemes = [theme]
+    settings.customKeyboardLayouts = [layout]
+
+    settings.restoreDefaults(customizationTombstoneStore: tombstones)
+
+    XCTAssertTrue(tombstones.containsDeletedTheme(theme.id))
+    XCTAssertTrue(tombstones.containsDeletedKeyboardLayout(layout.id))
   }
 
   @MainActor
@@ -22538,7 +22577,20 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testArchiveRoundTripsIndependentLocalData() throws {
-    let settings = AppSettingsSnapshot(fontSize: 32)
+    let archivedTheme = CustomThemeDefinition(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000449")!,
+      name: "Harbour", background: .init(red: 0.1, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.2, green: 0.3, blue: 0.4),
+      accent: .init(red: 0.7, green: 0.4, blue: 0.2), prefersDark: true)
+    let archivedKeyboardLayout = CustomKeyboardGuideLayout(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000450")!,
+      name: "Board", numberRow: "123", topRow: "qwe", homeRow: "asd", bottomRow: "zxc")
+    let settings = AppSettingsSnapshot(
+      fontSize: 32, customThemes: [archivedTheme], activeCustomThemeID: archivedTheme.id,
+      favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: archivedTheme.id)],
+      keyboardInputLayout: .custom, keyboardGuideLayoutSource: .custom,
+      customKeyboardLayouts: [archivedKeyboardLayout],
+      customKeyboardLayoutID: archivedKeyboardLayout.id)
     let result = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 30), outcome: .completed, startedAt: start,
       finishedAt: start.addingTimeInterval(30), afkDuration: 7, typedCharacterCount: 50,
@@ -22570,6 +22622,10 @@ final class TypingEngineTests: XCTestCase {
       uuidString: "00000000-0000-0000-0000-000000000699")!
     let deletedSavedTextID = UUID(
       uuidString: "00000000-0000-0000-0000-000000000799")!
+    let deletedCustomThemeID = UUID(
+      uuidString: "00000000-0000-0000-0000-000000000899")!
+    let deletedCustomKeyboardLayoutID = UUID(
+      uuidString: "00000000-0000-0000-0000-000000000900")!
     let activeTestSelection = ActiveTestSelectionDocument(
       preset: .init(configuration: .words(83, language: .german)),
       quoteSource: .community,
@@ -22577,14 +22633,17 @@ final class TypingEngineTests: XCTestCase {
         duration: 47, wordLimit: 83, customTextDuration: 61,
         customTextWordLimit: 73, customTextSectionLimit: 4))
     let data = try TypebarDataTransfer.exportArchive(
-      settings: settings, results: [result], deletedResultIDs: [deletedResultID],
+      settings: settings,
+      deletedCustomThemeIDs: [deletedCustomThemeID],
+      deletedCustomKeyboardLayoutIDs: [deletedCustomKeyboardLayoutID],
+      results: [result], deletedResultIDs: [deletedResultID],
       presets: [preset], deletedPresetIDs: [deletedPresetID], savedTexts: savedTexts,
       deletedSavedTextIDs: [deletedSavedTextID],
       resultFilterPresets: [resultFilterPreset],
       deletedResultFilterPresetIDs: [deletedResultFilterPresetID],
       activeTestSelection: activeTestSelection, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(archive.version, 8)
+    XCTAssertEqual(archive.version, 9)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
@@ -22594,11 +22653,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(archive.deletedResultIDs, [deletedResultID])
     XCTAssertEqual(archive.deletedPresetIDs, [deletedPresetID])
     XCTAssertEqual(archive.deletedSavedTextIDs, [deletedSavedTextID])
+    XCTAssertEqual(archive.deletedCustomThemeIDs, [deletedCustomThemeID])
+    XCTAssertEqual(archive.deletedCustomKeyboardLayoutIDs, [deletedCustomKeyboardLayoutID])
     XCTAssertEqual(archive.activeTestSelection, activeTestSelection)
+
+    var legacyVersionEightPayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
+    legacyVersionEightPayload["version"] = 8
+    legacyVersionEightPayload.removeValue(forKey: "deletedCustomThemeIDs")
+    legacyVersionEightPayload.removeValue(forKey: "deletedCustomKeyboardLayoutIDs")
+    let legacyVersionEightData = try JSONSerialization.data(
+      withJSONObject: legacyVersionEightPayload)
+    let legacyVersionEightArchive = try TypebarDataTransfer.importArchive(
+      from: legacyVersionEightData)
+    XCTAssertEqual(legacyVersionEightArchive.version, 8)
+    XCTAssertEqual(legacyVersionEightArchive.settings, settings)
+    XCTAssertTrue(legacyVersionEightArchive.deletedCustomThemeIDs.isEmpty)
+    XCTAssertTrue(legacyVersionEightArchive.deletedCustomKeyboardLayoutIDs.isEmpty)
 
     var legacyVersionSevenPayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     legacyVersionSevenPayload["version"] = 7
+    legacyVersionSevenPayload.removeValue(forKey: "deletedCustomThemeIDs")
+    legacyVersionSevenPayload.removeValue(forKey: "deletedCustomKeyboardLayoutIDs")
     legacyVersionSevenPayload.removeValue(forKey: "deletedSavedTextIDs")
     let legacyVersionSevenData = try JSONSerialization.data(
       withJSONObject: legacyVersionSevenPayload)
@@ -22613,6 +22690,8 @@ final class TypingEngineTests: XCTestCase {
     var legacyVersionSixPayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     legacyVersionSixPayload["version"] = 6
+    legacyVersionSixPayload.removeValue(forKey: "deletedCustomThemeIDs")
+    legacyVersionSixPayload.removeValue(forKey: "deletedCustomKeyboardLayoutIDs")
     legacyVersionSixPayload.removeValue(forKey: "deletedPresetIDs")
     legacyVersionSixPayload.removeValue(forKey: "deletedSavedTextIDs")
     let legacyVersionSixData = try JSONSerialization.data(
@@ -22628,6 +22707,8 @@ final class TypingEngineTests: XCTestCase {
     var legacyVersionFivePayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     legacyVersionFivePayload["version"] = 5
+    legacyVersionFivePayload.removeValue(forKey: "deletedCustomThemeIDs")
+    legacyVersionFivePayload.removeValue(forKey: "deletedCustomKeyboardLayoutIDs")
     legacyVersionFivePayload.removeValue(forKey: "deletedResultIDs")
     legacyVersionFivePayload.removeValue(forKey: "deletedPresetIDs")
     legacyVersionFivePayload.removeValue(forKey: "deletedSavedTextIDs")
@@ -22642,6 +22723,8 @@ final class TypingEngineTests: XCTestCase {
     var legacyVersionFourPayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     legacyVersionFourPayload["version"] = 4
+    legacyVersionFourPayload.removeValue(forKey: "deletedCustomThemeIDs")
+    legacyVersionFourPayload.removeValue(forKey: "deletedCustomKeyboardLayoutIDs")
     legacyVersionFourPayload.removeValue(forKey: "deletedResultFilterPresetIDs")
     legacyVersionFourPayload.removeValue(forKey: "deletedResultIDs")
     legacyVersionFourPayload.removeValue(forKey: "deletedPresetIDs")
@@ -22657,6 +22740,8 @@ final class TypingEngineTests: XCTestCase {
     var legacyVersionThreePayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     legacyVersionThreePayload["version"] = 3
+    legacyVersionThreePayload.removeValue(forKey: "deletedCustomThemeIDs")
+    legacyVersionThreePayload.removeValue(forKey: "deletedCustomKeyboardLayoutIDs")
     legacyVersionThreePayload.removeValue(forKey: "activeTestSelection")
     legacyVersionThreePayload.removeValue(forKey: "resultFilterPresets")
     legacyVersionThreePayload.removeValue(forKey: "deletedResultFilterPresetIDs")
@@ -22674,6 +22759,8 @@ final class TypingEngineTests: XCTestCase {
     var versionTwoPayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     versionTwoPayload["version"] = 2
+    versionTwoPayload.removeValue(forKey: "deletedCustomThemeIDs")
+    versionTwoPayload.removeValue(forKey: "deletedCustomKeyboardLayoutIDs")
     versionTwoPayload.removeValue(forKey: "activeTestSelection")
     versionTwoPayload.removeValue(forKey: "resultFilterPresets")
     versionTwoPayload.removeValue(forKey: "deletedResultFilterPresetIDs")
@@ -22702,10 +22789,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(
       try TypebarDataTransfer.importArchive(from: invalidSelectionData).activeTestSelection)
 
-    versionTwoPayload["version"] = 9
+    versionTwoPayload["version"] = 10
     let futureData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
     XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: futureData)) { error in
-      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(9))
+      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(10))
     }
   }
 
@@ -22971,6 +23058,67 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testCloudArchiveCustomizationDeletionDoesNotResurrectAndManualImportCanRestore() throws {
+    let suiteName = "TypebarTests.customization-deletion.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    let tombstones = CustomizationTombstoneStore(defaults: defaults)
+    let theme = CustomThemeDefinition(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000901")!,
+      name: "Harbour", background: .init(red: 0.1, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.2, green: 0.3, blue: 0.4),
+      accent: .init(red: 0.7, green: 0.4, blue: 0.2), prefersDark: true)
+    let layout = CustomKeyboardGuideLayout(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000902")!,
+      name: "Board", numberRow: "123", topRow: "qwe", homeRow: "asd", bottomRow: "zxc")
+    settings.customThemes = [theme]
+    settings.activeCustomThemeID = theme.id
+    settings.favoriteThemeIDs = [ThemeFavoritePolicy.customID(for: theme.id)]
+    settings.customKeyboardLayouts = [layout]
+    settings.customKeyboardLayoutID = layout.id
+    settings.keyboardInputLayout = .custom
+    settings.keyboardGuideLayoutSource = .custom
+    let activeSnapshot = settings.snapshot
+    let container = try ModelContainer(
+      for: TestResultRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let deletionArchive = TypebarArchive(
+      exportedAt: start, settings: activeSnapshot,
+      deletedCustomThemeIDs: [theme.id], deletedCustomKeyboardLayoutIDs: [layout.id],
+      results: [], presets: [])
+
+    _ = try LocalArchiveImport.apply(
+      deletionArchive, settings: settings, results: [], presets: [], savedTexts: [],
+      customizationTombstoneStore: tombstones, source: .cloudSync, modelContext: container.mainContext)
+    XCTAssertTrue(settings.customThemes.isEmpty)
+    XCTAssertNil(settings.activeCustomThemeID)
+    XCTAssertTrue(settings.favoriteThemeIDs.isEmpty)
+    XCTAssertTrue(settings.customKeyboardLayouts.isEmpty)
+    XCTAssertNil(settings.customKeyboardLayoutID)
+    XCTAssertEqual(settings.keyboardInputLayout, .system)
+    XCTAssertEqual(settings.keyboardGuideLayoutSource, .builtIn)
+    XCTAssertTrue(tombstones.containsDeletedTheme(theme.id))
+    XCTAssertTrue(tombstones.containsDeletedKeyboardLayout(layout.id))
+
+    let staleArchive = TypebarArchive(
+      exportedAt: start, settings: activeSnapshot, results: [], presets: [])
+    _ = try LocalArchiveImport.apply(
+      staleArchive, settings: settings, results: [], presets: [], savedTexts: [],
+      customizationTombstoneStore: tombstones, source: .cloudSync, modelContext: container.mainContext)
+    XCTAssertTrue(settings.customThemes.isEmpty)
+    XCTAssertTrue(settings.customKeyboardLayouts.isEmpty)
+
+    _ = try LocalArchiveImport.apply(
+      staleArchive, settings: settings, results: [], presets: [], savedTexts: [],
+      customizationTombstoneStore: tombstones, source: .localFile, modelContext: container.mainContext)
+    XCTAssertEqual(settings.customThemes, [theme])
+    XCTAssertEqual(settings.customKeyboardLayouts, [layout])
+    XCTAssertFalse(tombstones.containsDeletedTheme(theme.id))
+    XCTAssertFalse(tombstones.containsDeletedKeyboardLayout(layout.id))
+  }
+
+  @MainActor
   func testLocalArchiveImportRestoresOnlyAValidDifferentActiveTestSelection() throws {
     let suiteName = "TypebarTests.archive-active-selection.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
@@ -23163,6 +23311,42 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(merged.resultFilterPresets.map(\.name), ["Focus", "Focus（同步冲突）"])
     XCTAssertEqual(merged.resultFilterPresets.last?.filter, remoteFilterPreset.filter)
     XCTAssertEqual(merged.activeTestSelection, localSelection)
+  }
+
+  func testArchiveConflictMergeKeepsCustomizationDeletionOverAnOlderActiveSnapshot() {
+    let theme = CustomThemeDefinition(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000921")!,
+      name: "Harbour", background: .init(red: 0.1, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.2, green: 0.3, blue: 0.4),
+      accent: .init(red: 0.7, green: 0.4, blue: 0.2), prefersDark: true)
+    let layout = CustomKeyboardGuideLayout(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000922")!,
+      name: "Board", numberRow: "123", topRow: "qwe", homeRow: "asd", bottomRow: "zxc")
+    let olderActiveSettings = AppSettingsSnapshot(
+      customThemes: [theme], activeCustomThemeID: theme.id,
+      favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: theme.id)],
+      keyboardInputLayout: .custom, keyboardGuideLayoutSource: .custom,
+      customKeyboardLayouts: [layout], customKeyboardLayoutID: layout.id)
+    let localDeletion = TypebarArchive(
+      exportedAt: start, settings: olderActiveSettings,
+      deletedCustomThemeIDs: [theme.id], deletedCustomKeyboardLayoutIDs: [layout.id],
+      results: [], presets: [])
+    let remoteOlderSnapshot = TypebarArchive(
+      exportedAt: start.addingTimeInterval(1), settings: olderActiveSettings,
+      results: [], presets: [])
+
+    let merged = TypebarArchiveConflictMerge.merge(
+      local: localDeletion, remote: remoteOlderSnapshot)
+
+    XCTAssertTrue(merged.settings.customThemes.isEmpty)
+    XCTAssertNil(merged.settings.activeCustomThemeID)
+    XCTAssertTrue(merged.settings.favoriteThemeIDs.isEmpty)
+    XCTAssertTrue(merged.settings.customKeyboardLayouts.isEmpty)
+    XCTAssertNil(merged.settings.customKeyboardLayoutID)
+    XCTAssertEqual(merged.settings.keyboardInputLayout, .system)
+    XCTAssertEqual(merged.settings.keyboardGuideLayoutSource, .builtIn)
+    XCTAssertEqual(merged.deletedCustomThemeIDs, [theme.id])
+    XCTAssertEqual(merged.deletedCustomKeyboardLayoutIDs, [layout.id])
   }
 
   func testArchiveConflictMergeReportsOnlyRenamedCopies() throws {

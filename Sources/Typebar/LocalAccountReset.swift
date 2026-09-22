@@ -8,6 +8,7 @@ enum LocalAccountReset {
     resultTombstoneStore: ResultTombstoneStore = .init(),
     presetTombstoneStore: PresetTombstoneStore = .init(),
     savedTextTombstoneStore: SavedTextTombstoneStore = .init(),
+    customizationTombstoneStore: CustomizationTombstoneStore = .init(),
     tombstoneStore: ResultFilterPresetTombstoneStore = .init(),
     removeBackground: (() throws -> Void)? = nil,
     removePracticeFont: (() throws -> Void)? = nil,
@@ -27,6 +28,7 @@ enum LocalAccountReset {
     savedTextTombstoneStore.removeAll()
     tombstoneStore.removeAll()
     (clearPendingPublications ?? { PendingResultPublicationStore().removeAll() })()
-    settings.restoreDefaults()
+    settings.restoreDefaults(customizationTombstoneStore: customizationTombstoneStore)
+    customizationTombstoneStore.removeAll()
   }
 }

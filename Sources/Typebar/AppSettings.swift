@@ -1692,7 +1692,9 @@ final class AppSettings {
       hasSetStreakDayBoundary: hasSetStreakDayBoundary)
   }
 
-  func restoreDefaults() {
+  func restoreDefaults(customizationTombstoneStore: CustomizationTombstoneStore = .init()) {
+    for theme in customThemes { customizationTombstoneStore.markDeletedTheme(theme.id) }
+    for layout in customKeyboardLayouts { customizationTombstoneStore.markDeletedKeyboardLayout(layout.id) }
     if TypebarLocalBackgroundStore.hasImage {
       try? TypebarLocalBackgroundStore.remove()
       localBackgroundRevision &+= 1
@@ -1887,6 +1889,7 @@ final class AppSettings {
 
   func deleteCustomKeyboardLayout(_ id: UUID) {
     guard customKeyboardLayouts.contains(where: { $0.id == id }) else { return }
+    CustomizationTombstoneStore().markDeletedKeyboardLayout(id)
     customKeyboardLayouts.removeAll(where: { $0.id == id })
     if customKeyboardLayoutID == id {
       customKeyboardLayoutID = nil
@@ -2164,6 +2167,8 @@ final class AppSettings {
   }
 
   func deleteCustomTheme(_ id: UUID) {
+    guard customThemes.contains(where: { $0.id == id }) else { return }
+    CustomizationTombstoneStore().markDeletedTheme(id)
     customThemes.removeAll { $0.id == id }
     favoriteThemeIDs.removeAll { $0 == ThemeFavoritePolicy.customID(for: id) }
     if activeCustomThemeID == id { activeCustomThemeID = nil }
