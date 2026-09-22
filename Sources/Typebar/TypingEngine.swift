@@ -12339,7 +12339,11 @@ enum StarterLexicon {
       let index = usesZipfFrequency
         ? ZipfWordSelection.index(in: lexicon.count)
         : Int.random(in: lexicon.indices)
-      return lexicon[index]
+      // Scale lexicons preserve aggregate shape metadata, including a small
+      // number of entries with whitespace. A generated practice "word" must
+      // still yield exactly one typeable token, matching the generic and
+      // polyglot generation paths.
+      return PolyglotTokenPolicy.token(from: lexicon[index], selectionIndex: index)
     }
     guard contentOptions.includePunctuation || contentOptions.includeNumbers else {
       return generated.joined(separator: separator)

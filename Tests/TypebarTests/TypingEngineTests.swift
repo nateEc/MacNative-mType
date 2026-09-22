@@ -10177,6 +10177,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(prompt.contains("  "))
   }
 
+  func testCJKPromptsNormalizeWhitespaceMetadataToRequestedTokenCount() {
+    let prompt = StarterLexicon.cjkPrompt(
+      tokens: 3, lexicon: IndexedLexicon(["  sakura valley  "]), usesChineseMarks: false,
+      contentOptions: .init(), usesZipfFrequency: false)
+
+    XCTAssertEqual(prompt, "sakura sakura sakura")
+    XCTAssertEqual(prompt.split(whereSeparator: \Character.isWhitespace).count, 3)
+  }
+
   func testEveryOfficialCodeLanguageHasAnOriginalPromptAndCompletesCodeMode() {
     let languages = TypingLanguage.allCases.filter(\.isCodeLanguage)
     let expectedDisplayNames: Set<String> = [
