@@ -49,6 +49,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let officialCount: Int
     let officialSurfaces: [String]
     let mapped: [String: String]
+    let nativeEvidenceFiles: [String: [String]]
     let notApplicable: [String: String]
     let unimplemented: [String: String]
     let sourceFiles: [String]
@@ -378,6 +379,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(officialSurfaces.count, fixture.officialCount)
     XCTAssertEqual(fixture.mapped.count, 46)
     XCTAssertEqual(fixture.notApplicable.count, 6)
+    XCTAssertEqual(Set(fixture.nativeEvidenceFiles.keys), mappedSurfaces)
     XCTAssertTrue(unimplementedSurfaces.isEmpty)
     XCTAssertTrue(mappedSurfaces.isDisjoint(with: notApplicableSurfaces))
     XCTAssertTrue(mappedSurfaces.isDisjoint(with: unimplementedSurfaces))
@@ -388,6 +390,15 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       (Array(fixture.mapped.values) + Array(fixture.notApplicable.values)
         + Array(fixture.unimplemented.values))
         .allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+    for (surface, paths) in fixture.nativeEvidenceFiles {
+      XCTAssertFalse(paths.isEmpty, "\(surface) 缺少可验证的原生证据路径")
+      for path in paths {
+        XCTAssertTrue(path.hasPrefix("Sources/Typebar/"), "\(surface) 使用了范围外路径：\(path)")
+        XCTAssertTrue(
+          FileManager.default.fileExists(atPath: repositoryRoot.appendingPathComponent(path).path),
+          "\(surface) 声明的原生证据文件不存在：\(path)")
+      }
+    }
     XCTAssertEqual(
       fixture.sourceFiles,
       [
