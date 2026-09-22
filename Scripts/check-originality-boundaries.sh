@@ -48,6 +48,51 @@ normalise_long_lines() {
   ' "$@"
 }
 
+list_files_null() {
+  local root="$1"
+
+  if command -v rg >/dev/null 2>&1; then
+    rg --files -0 "$root"
+  else
+    find "$root" -path "$root/.git" -prune -o -type f -print0
+  fi
+}
+
+is_swift_source_path() {
+  [[ "${1:l}" == *.swift ]]
+}
+
+is_reference_source_path() {
+  case "${1:l}" in
+    *.ts|*.tsx|*.js|*.jsx)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+production_source_contacts_reference_service() {
+  local source_root source_file
+
+  if command -v rg >/dev/null 2>&1; then
+    rg -n -i '([[:alnum:]-]+\.)?monkeytype\.com' "$project_root/Sources" "$project_root/server/Sources"
+    return
+  fi
+
+  for source_root in "$project_root/Sources" "$project_root/server/Sources"; do
+    while IFS= read -r -d "" source_file; do
+      is_swift_source_path "$source_file" || continue
+      if grep -n -i -E '([[:alnum:]-]+\.)?monkeytype\.com' "$source_file"; then
+        return 0
+      fi
+    done < <(list_files_null "$source_root")
+  done
+
+  return 1
+}
+
 is_candidate_asset_path() {
   case "${1:l}" in
     *.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.pdf|*.ico|*.icns|*.woff|*.woff2|*.ttf|*.otf|*.mp3|*.m4a|*.wav|*.ogg|*.aiff|*.json|*.txt|*.csv|*.xml|*.yaml|*.yml|*.html|*.css)
@@ -71,11 +116,11 @@ scan_native_assets_for_reference_overlap() {
 
   while IFS= read -r -d "" asset_path; do
     is_candidate_asset_path "$asset_path" && native_asset_files+=("$asset_path")
-  done < <(rg --files -0 "$native_asset_root")
+  done < <(list_files_null "$native_asset_root")
 
   while IFS= read -r -d "" asset_path; do
     is_candidate_asset_path "$asset_path" && reference_asset_files+=("$asset_path")
-  done < <(rg --files -0 "$reference_asset_root")
+  done < <(list_files_null "$reference_asset_root")
 
   (( ${#reference_asset_files[@]} > 0 )) || fail \
     "reference checkout contains no supported image, font, or audio assets"
@@ -104,8 +149,8 @@ scan_native_sources_for_reference_overlap() {
   [[ -d "$native_source_root" ]] || fail "missing native source directory: $native_source_root"
 
   while IFS= read -r -d "" source_file; do
-    native_source_files+=("$source_file")
-  done < <(rg --files -0 -g '*.swift' "$native_source_root")
+    is_swift_source_path "$source_file" && native_source_files+=("$source_file")
+  done < <(list_files_null "$native_source_root")
 
   for reference_source_directory in \
     "$reference_source_root/frontend" \
@@ -113,13 +158,8 @@ scan_native_sources_for_reference_overlap() {
     "$reference_source_root/packages"; do
     [[ -d "$reference_source_directory" ]] || continue
     while IFS= read -r -d "" source_file; do
-      reference_source_files+=("$source_file")
-    done < <(rg --files -0 \
-      -g '*.ts' \
-      -g '*.tsx' \
-      -g '*.js' \
-      -g '*.jsx' \
-      "$reference_source_directory")
+      is_reference_source_path "$source_file" && reference_source_files+=("$source_file")
+    done < <(list_files_null "$reference_source_directory")
   done
 
   (( ${#native_source_files[@]} > 0 )) || fail \
@@ -249,7 +289,7 @@ typeset -a tracked_paths
 tracked_paths=("${(@f)$(git -C "$project_root" ls-files)}")
 reject_reference_paths "${tracked_paths[@]}"
 
-if rg -n -i '([[:alnum:]-]+\.)?monkeytype\.com' "$project_root/Sources" "$project_root/server/Sources"; then
+if production_source_contacts_reference_service; then
   fail "production Swift source must not contact the Monkeytype service"
 fi
 

@@ -24,6 +24,8 @@ zsh Scripts/check-originality-boundaries.sh --self-test
 
 它检查已追踪文件，拒绝参考 Web 工程的 `backend/`、`frontend/`、`packages/` 树，拒绝其前端包清单及 TypeScript／网页组件文件，并扫描客户端和自建服务的 Swift 源码，阻止其直接指向 `monkeytype.com`。`--self-test` 还会验证护栏确实能拒绝一组模拟的违规路径及一条刻意复制的长源码行。
 
+文件枚举优先使用 `rg`；在最小 macOS/CI 环境没有 ripgrep 时，自动使用 `find` 和 `grep`，不以额外包管理器或网络安装作为验证前提。
+
 在本机已有固定参考检出时，再运行：
 
 ```zsh
