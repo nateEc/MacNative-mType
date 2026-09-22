@@ -25214,6 +25214,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(ResultCelebrationPolicy.launchDuration, 0.125, accuracy: 0.000_001)
   }
 
+  func testResultTagsRemainVisibleWhenTerminalResultsAreNotSaved() {
+    func result(outcome: TestOutcome) -> CompletedTestResult {
+      .init(
+        id: UUID(), configuration: .words(10), outcome: outcome,
+        startedAt: start, finishedAt: start.addingTimeInterval(8), typedCharacterCount: 30,
+        correctCharacterCount: 29, errorCount: 1, wpm: 40, rawWpm: 42, accuracy: 96,
+        tags: ["  morning ", "MORNING", "focus", ""])
+    }
+
+    XCTAssertEqual(
+      ResultTagPresentationPolicy.visibleTags(for: result(outcome: .completed)),
+      ["morning", "focus"])
+    XCTAssertEqual(
+      ResultTagPresentationPolicy.visibleTags(for: result(outcome: .invalidAFK)),
+      ["morning", "focus"])
+    XCTAssertTrue(ResultTagPresentationPolicy.visibleTags(for: .init(
+      id: UUID(), configuration: .words(10), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(8), typedCharacterCount: 30,
+      correctCharacterCount: 30, errorCount: 0, wpm: 40, rawWpm: 40, accuracy: 100)).isEmpty)
+  }
+
   func testCompletedResultPreservesExactMetricsForResultPageDecimalPresentation() throws {
     let result = CompletedTestResult(
       id: UUID(), configuration: .words(1), outcome: .completed,

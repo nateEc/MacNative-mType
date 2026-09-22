@@ -382,6 +382,16 @@ enum ResultConfigurationSummaryPolicy {
   }
 }
 
+/// Keeps the tag snapshot visible on every terminal result, including results
+/// that remain reviewable but cannot be written to local history. This mirrors
+/// the reference result page's tag readout while leaving editing to persisted
+/// records only.
+enum ResultTagPresentationPolicy {
+  static func visibleTags(for result: CompletedTestResult) -> [String] {
+    ResultTagPolicy.normalized(result.tags)
+  }
+}
+
 /// Controls the four independently visible traces in the local history view.
 /// The defaults mirror the reference account history's initially enabled set,
 /// while the native chart keeps its data entirely on this Mac.

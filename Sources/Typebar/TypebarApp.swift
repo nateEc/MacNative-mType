@@ -4827,6 +4827,26 @@ private struct CompletedResultView: View {
           .accessibilityLabel("引语来源，\(quoteSource.displayText)")
       }
 
+      if !visibleResultTags.isEmpty {
+        VStack(alignment: .leading, spacing: 6) {
+          Label("本轮标签", systemImage: "tag")
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+          FlowLayout(spacing: 6) {
+            ForEach(visibleResultTags, id: \.self) { tag in
+              Text(tag)
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(panel.opacity(0.72), in: Capsule())
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("本轮标签，\(visibleResultTags.joined(separator: "、"))")
+      }
+
       ResultPerformanceChart(
         prompt: result.prompt,
         events: result.replayEvents,
@@ -5038,6 +5058,10 @@ private struct CompletedResultView: View {
   private var characterStatsText: String {
     let stats = result.characterStats
     return "\(stats.matched)/\(stats.incorrect)/\(stats.extra)/\(stats.missed)"
+  }
+
+  private var visibleResultTags: [String] {
+    ResultTagPresentationPolicy.visibleTags(for: result)
   }
 
   private var wordHistoryExpansion: Binding<Bool> {
