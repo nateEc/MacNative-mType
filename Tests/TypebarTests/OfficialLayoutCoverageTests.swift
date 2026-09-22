@@ -184,6 +184,13 @@ final class OfficialLayoutCoverageTests: XCTestCase {
         contentsOf: repositoryRoot.appendingPathComponent(name), encoding: .utf8)
       XCTAssertTrue(document.contains(currentSummary), "\(name) 缺少当前语言目录摘要")
     }
+
+    let rewriteSpec = try String(
+      contentsOf: repositoryRoot.appendingPathComponent("REWRITE_SPEC.md"), encoding: .utf8)
+    XCTAssertTrue(
+      rewriteSpec.contains(
+        "当前盘点为 376 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。"))
+    XCTAssertFalse(rewriteSpec.contains("当前的 210 个单语与 153 个 LTR 多语候选取代"))
   }
 
   func testPinnedOfficialLanguageCoverageIsPartitionedAndResolvable() throws {
