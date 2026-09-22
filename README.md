@@ -60,6 +60,12 @@ zsh Scripts/check-reference-service-behavior-alignment.sh /absolute/path/to/monk
 zsh Scripts/check-reference-metadata-audits.sh /absolute/path/to/monkeytype-reference
 ```
 
+核验固定参考的全部命名键盘布局均有 Typebar 独立精确映射，并拒绝快照、库存或测试证据漂移：
+
+```zsh
+zsh Scripts/check-layout-compatibility-audit.sh /absolute/path/to/monkeytype-reference
+```
+
 核验固定参考的客户端、后端 controller 与包级规格测试均已分类，且每个直接用户行为都有 Typebar 原生证据：
 
 ```zsh
