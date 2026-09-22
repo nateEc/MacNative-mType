@@ -45,6 +45,9 @@
     {"source": "backend/__tests__/api/controllers/quotes.spec.ts", "kind": "direct", "nativeEvidence": ["server/Sources/TypebarServerCore/Routes.swift", "server/Sources/TypebarServerCore/AuthStore.swift", "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"], "nativeTests": ["testQuoteSubmissionRequiresValidContentAndStartsPending", "testOnlyApprovedQuotesAreExposedPubliclyAndCanBeModerated"]},
     {"source": "backend/__tests__/api/controllers/result.spec.ts", "kind": "direct", "nativeEvidence": ["server/Sources/TypebarServerCore/Routes.swift", "server/Sources/TypebarServerCore/AuthStore.swift", "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"], "nativeTests": ["testResultsAreIdempotentAndLeaderboardOrdersEligibleScores", "testResultRoutesRequireAuthenticationAndReturnLeaderboard"]},
     {"source": "backend/__tests__/api/controllers/user.spec.ts", "kind": "direct", "nativeEvidence": ["server/Sources/TypebarServerCore/Routes.swift", "server/Sources/TypebarServerCore/AuthStore.swift", "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"], "nativeTests": ["testRegisterAndLoginCreateDistinctSecureSessions", "testAccountDeletionRequiresPasswordAndCascadesOwnedData"]},
+    {"source": "packages/contracts/__test__/validation/validation.spec.ts", "kind": "direct", "nativeEvidence": ["server/Sources/TypebarServerCore/Routes.swift", "server/Sources/TypebarServerCore/ResultModels.swift", "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"], "nativeTests": ["testResultsRejectImpossibleOrMalformedValues", "testResultTimingEvidenceIsValidatedButRemainsOptionalForOldClients"]},
+    {"source": "packages/funbox/__test__/validation.spec.ts", "kind": "direct", "nativeEvidence": ["Sources/Typebar/TypingEngine.swift", "Tests/TypebarTests/TypingEngineTests.swift"], "nativeTests": ["testFunboxCommandPolicyRejectsConflictingAdditionsWithoutReplacingCurrentSelection", "testFunboxCompatibilityRejectsSourceConflictsAndComposesMorseWithWordSources"]},
+    {"source": "packages/schemas/__tests__/config.spec.ts", "kind": "direct", "nativeEvidence": ["Sources/Typebar/AppSettings.swift", "Sources/Typebar/CommandPalette.swift", "Tests/TypebarTests/TypingEngineTests.swift"], "nativeTests": ["testPracticePreferenceCommandsCoverReferenceChoicesAndRejectMalformedIDs", "testSettingsJSONCommandRoundTripsAllSettingsAndRejectsUnknownVersionWithoutMutation"]},
     {"source": "frontend/__tests__/hooks/createEvent.spec.ts", "kind": "support", "nativeEvidence": []},
     {"source": "frontend/__tests__/hooks/createSignalWithSetters.spec.ts", "kind": "support", "nativeEvidence": []},
     {"source": "frontend/__tests__/utils/local-storage-with-schema.spec.ts", "kind": "support", "nativeEvidence": []},
@@ -53,6 +56,14 @@
     {"source": "frontend/__tests__/utils/zod.spec.ts", "kind": "support", "nativeEvidence": []},
     {"source": "backend/__tests__/api/controllers/configuration.spec.ts", "kind": "support", "nativeEvidence": []},
     {"source": "backend/__tests__/api/controllers/dev.spec.ts", "kind": "support", "nativeEvidence": []},
-    {"source": "backend/__tests__/api/controllers/webhooks.spec.ts", "kind": "support", "nativeEvidence": []}
+    {"source": "backend/__tests__/api/controllers/webhooks.spec.ts", "kind": "support", "nativeEvidence": []},
+    {"source": "packages/schemas/__tests__/util.spec.ts", "kind": "support", "nativeEvidence": []},
+    {"source": "packages/util/__test__/arrays.spec.ts", "kind": "support", "nativeEvidence": []},
+    {"source": "packages/util/__test__/date-and-time.spec.ts", "kind": "support", "nativeEvidence": []},
+    {"source": "packages/util/__test__/json.spec.ts", "kind": "support", "nativeEvidence": []},
+    {"source": "packages/util/__test__/numbers.spec.ts", "kind": "support", "nativeEvidence": []},
+    {"source": "packages/util/__test__/predicates.spec.ts", "kind": "support", "nativeEvidence": []},
+    {"source": "packages/util/__test__/strings.spec.ts", "kind": "support", "nativeEvidence": []},
+    {"source": "packages/util/__test__/trycatch.spec.ts", "kind": "support", "nativeEvidence": []}
   ]
 }

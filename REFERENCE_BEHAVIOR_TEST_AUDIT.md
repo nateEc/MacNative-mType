@@ -3,9 +3,9 @@
 ## 目的与边界
 
 - 固定参考提交为 `91bd24bb8513785c7364cbea29296ff7adafac41`。
-- 本文盘点参考前端 `frontend/__tests__` 的 39 个规格测试文件，以及后端 `backend/__tests__/api/controllers` 的 14 个 controller 规格测试文件：合计 44 个直接约束用户可见的练习、配置、展示、账户或远端数据行为，9 个只是网页/服务运行时内部或运营专用测试。
+- 本文盘点参考前端 `frontend/__tests__` 的 39 个规格测试文件、后端 `backend/__tests__/api/controllers` 的 14 个 controller 规格测试文件，以及 `packages/contracts`、`packages/funbox`、`packages/schemas`、`packages/util` 的 11 个包级规格测试：合计 47 个直接约束用户可见的练习、配置、展示、账户或远端数据行为，17 个只是网页/服务运行时内部或运营专用测试。
 - 清单只保留路径、领域、Typebar 证据路径和原生测试函数名；不复制测试步骤、参考代码、词表、视觉资产或线上数据。
-- `Compatibility/official-reference-behavior-specs.json` 是机器可读来源；每个直接规格都附有可定位的 `nativeTests` 函数名。`zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference` 会核对固定提交、53 个路径的完备分类、直接行为的原生证据路径和函数符号，以及本文覆盖。
+- `Compatibility/official-reference-behavior-specs.json` 是机器可读来源；每个直接规格都附有可定位的 `nativeTests` 函数名。`zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference` 会核对固定提交、64 个路径的完备分类、直接行为的原生证据路径和函数符号，以及本文覆盖。
 
 ## 直接用户行为规格
 
@@ -44,9 +44,17 @@
 | `backend/__tests__/api/controllers/result.spec.ts` | 成绩提交、历史和榜单写入 | 自建结果路由和测试守护认证、幂等提交、资格排序和榜单响应。 |
 | `backend/__tests__/api/controllers/user.spec.ts` | 注册、登录与删除账户 | 自建身份路由和测试守护独立会话、密码验证及级联清理。 |
 
+## 包级可观察行为规格
+
+| 参考规格路径 | 可观察领域 | Typebar 原生证据 |
+| --- | --- | --- |
+| `packages/contracts/__test__/validation/validation.spec.ts` | 远端请求值、成绩与时间证据的有效边界 | 自建结果模型和路由拒绝不可能或格式错误的成绩；旧客户端仍可省略可选时间证据。 |
+| `packages/funbox/__test__/validation.spec.ts` | Funbox 组合与冲突规则 | 原生输入引擎以独立矩阵拒绝冲突项、保留当前有效组合并覆盖词源组合。 |
+| `packages/schemas/__tests__/config.spec.ts` | 设置 ID、枚举值和归档配置边界 | 原生命令面板与设置归档拒绝未知值，并守护全部可用选择的往返。 |
+
 ## 网页运行时支持规格
 
-以下文件被完整枚举但不直接映射为独立 macOS 用户任务：`frontend/__tests__/hooks/createEvent.spec.ts`、`frontend/__tests__/hooks/createSignalWithSetters.spec.ts`、`frontend/__tests__/utils/local-storage-with-schema.spec.ts`、`frontend/__tests__/utils/sanitize.spec.ts`、`frontend/__tests__/utils/tag-builder.spec.ts`、`frontend/__tests__/utils/zod.spec.ts`，以及 `backend/__tests__/api/controllers/configuration.spec.ts`、`dev.spec.ts`、`webhooks.spec.ts`。前六项验证 Solid/DOM/Zod/LocalStorage 的网页内部实现，后三项是部署配置、开发接口或上游发布 webhook；Typebar 以 Swift observation、SwiftData、Codable、自建部署配置与版本资料替代，没有复制这些实现。任何未来从这些支持层暴露为新用户任务的行为，都必须移入上表、添加原生证据并更新验收。
+以下文件被完整枚举但不直接映射为独立 macOS 用户任务：`frontend/__tests__/hooks/createEvent.spec.ts`、`frontend/__tests__/hooks/createSignalWithSetters.spec.ts`、`frontend/__tests__/utils/local-storage-with-schema.spec.ts`、`frontend/__tests__/utils/sanitize.spec.ts`、`frontend/__tests__/utils/tag-builder.spec.ts`、`frontend/__tests__/utils/zod.spec.ts`，以及 `backend/__tests__/api/controllers/configuration.spec.ts`、`backend/__tests__/api/controllers/dev.spec.ts`、`backend/__tests__/api/controllers/webhooks.spec.ts`、`packages/schemas/__tests__/util.spec.ts`、`packages/util/__test__/arrays.spec.ts`、`packages/util/__test__/date-and-time.spec.ts`、`packages/util/__test__/json.spec.ts`、`packages/util/__test__/numbers.spec.ts`、`packages/util/__test__/predicates.spec.ts`、`packages/util/__test__/strings.spec.ts`、`packages/util/__test__/trycatch.spec.ts`。前六项验证 Solid/DOM/Zod/LocalStorage 的网页内部实现，后三项是部署配置、开发接口或上游发布 webhook，余下八项是可由 Swift 标准库/SwiftData 原生替代的 schema 或通用工具；Typebar 以 Swift observation、SwiftData、Codable、自建部署配置与版本资料替代，没有复制这些实现。任何未来从这些支持层暴露为新用户任务的行为，都必须移入上表、添加原生证据并更新验收。
 
 ## 验收结论
 

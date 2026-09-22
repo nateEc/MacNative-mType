@@ -32,10 +32,14 @@ fi
 actual_specs="$(cd "$reference_root" && {
   find frontend/__tests__ -type f -name '*.spec.ts' -print
   find backend/__tests__/api/controllers -type f -name '*.spec.ts' -print
+  find packages/contracts/__test__ -type f -name '*.spec.ts' -print
+  find packages/funbox/__test__ -type f -name '*.spec.ts' -print
+  find packages/schemas/__tests__ -type f -name '*.spec.ts' -print
+  find packages/util/__test__ -type f -name '*.spec.ts' -print
 } | LC_ALL=C sort)"
 fixture_specs="$(jq -er '.specs[].source' "$fixture" | LC_ALL=C sort)"
 if ! diff -u <(print -r -- "$actual_specs") <(print -r -- "$fixture_specs"); then
-  fail "fixture differs from the fixed reference client and controller test inventory"
+  fail "fixture differs from the fixed reference client, controller, and package test inventory"
 fi
 
 while IFS= read -r evidence; do
