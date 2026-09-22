@@ -48,6 +48,52 @@ normalise_long_lines() {
   ' "$@"
 }
 
+is_candidate_asset_path() {
+  case "${1:l}" in
+    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.pdf|*.ico|*.icns|*.woff|*.woff2|*.ttf|*.otf|*.mp3|*.m4a|*.wav|*.ogg|*.aiff)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+scan_native_assets_for_reference_overlap() {
+  local native_asset_root="$1"
+  local reference_asset_root="$2"
+  local asset_path shared_count
+  local -a native_asset_files=()
+  local -a reference_asset_files=()
+
+  [[ -d "$native_asset_root" ]] || fail "missing native asset root: $native_asset_root"
+  [[ -d "$reference_asset_root" ]] || fail "missing reference asset root: $reference_asset_root"
+
+  while IFS= read -r -d "" asset_path; do
+    is_candidate_asset_path "$asset_path" && native_asset_files+=("$asset_path")
+  done < <(rg --files -0 "$native_asset_root")
+
+  while IFS= read -r -d "" asset_path; do
+    is_candidate_asset_path "$asset_path" && reference_asset_files+=("$asset_path")
+  done < <(rg --files -0 "$reference_asset_root")
+
+  (( ${#reference_asset_files[@]} > 0 )) || fail \
+    "reference checkout contains no supported image, font, or audio assets"
+  (( ${#native_asset_files[@]} > 0 )) || return 0
+
+  shared_count="$(
+    LC_ALL=C comm -12 \
+      <(for asset_path in "${native_asset_files[@]}"; do shasum -a 256 "$asset_path" | awk '{print $1}'; done | LC_ALL=C sort -u) \
+      <(for asset_path in "${reference_asset_files[@]}"; do shasum -a 256 "$asset_path" | awk '{print $1}'; done | LC_ALL=C sort -u) \
+      | wc -l | tr -d '[:space:]'
+  )"
+
+  if (( shared_count > 0 )); then
+    print -u2 -- "detected $shared_count duplicate image, font, or audio SHA-256 value(s) across the rewrite boundary"
+    return 1
+  fi
+}
+
 scan_native_sources_for_reference_overlap() {
   local native_source_root="$1"
   local reference_source_root="$2"
@@ -144,6 +190,22 @@ run_self_test() {
   if ! scan_native_sources_for_reference_overlap "$native_source_directory" "$self_test_directory/reference"; then
     fail "the overlap guard rejected a short common phrase"
   fi
+
+  local native_asset_directory="$self_test_directory/native-assets"
+  local reference_asset_directory="$self_test_directory/reference-assets"
+  mkdir -p "$native_asset_directory" "$reference_asset_directory"
+  print -r -- "deliberately duplicated asset bytes for the originality guard" > "$native_asset_directory/copy-probe.png"
+  print -r -- "deliberately duplicated asset bytes for the originality guard" > "$reference_asset_directory/copy-probe.png"
+
+  if scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory" >/dev/null 2>&1; then
+    fail "the asset overlap guard did not reject duplicate bytes"
+  fi
+
+  print -r -- "independent asset bytes for the originality guard" > "$native_asset_directory/copy-probe.png"
+
+  if ! scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory"; then
+    fail "the asset overlap guard rejected independent bytes"
+  fi
 }
 
 typeset -i run_self_test_requested=0
@@ -182,7 +244,8 @@ if [[ -n "$reference_root" ]]; then
   verify_reference_checkout
   scan_native_sources_for_reference_overlap "$project_root/Sources" "$reference_root"
   scan_native_sources_for_reference_overlap "$project_root/server/Sources" "$reference_root"
-  print -- "originality boundary check passed (no long literal source overlap at $reference_commit)"
+  scan_native_assets_for_reference_overlap "$project_root" "$reference_root"
+  print -- "originality boundary check passed (no long literal source or asset overlap at $reference_commit)"
 else
   print -- "originality boundary check passed"
 fi
