@@ -54,7 +54,7 @@
 
 Typebar 现已提供可部署的 Cloudflare Turnstile 适配：服务端创建 5 分钟、单用途挑战，提供自写的最小网页容器并在服务器侧验证 `success`、action、cData 与允许 hostname；成功后才签发不持久化的一次性 callback proof。原生客户端只接受 `https` 服务地址返回的相对挑战路径和固定 `typebar://human-verification/callback` 回调，再把 proof 附到相应写请求。服务端在业务写入之前的 actor 临界区消费 proof，缺失、错误用途、过期、重放、验证拒绝和提供方不可达均不放行。
 
-服务端测试覆盖五个用途、六条具体写入路径（密码注册、OAuth 新用户注册、密码重置请求、资料举报、引语投稿、引语举报）的缺 proof、成功、重放／用途替换、到期与 provider 失败；原生测试覆盖能力协商、相对 HTTPS URL 与固定 callback 解析；完整服务端 109 项和原生 670 项套件验证已有功能无回归。设计审查见 [SECURITY_HUMAN_VERIFICATION_DECISION.md](SECURITY_HUMAN_VERIFICATION_DECISION.md)。这不是对第三方服务的“已上线”声明：部署者仍须使用自己的密钥和真实 HTTPS hostname 进行一次手工部署验收，并且当前实现只支持单服务进程；多副本前需引入共享、原子 TTL 挑战存储。
+服务端测试覆盖五个用途、六条具体写入路径（密码注册、OAuth 新用户注册、密码重置请求、资料举报、引语投稿、引语举报）的缺 proof、成功、重放／用途替换、到期与 provider 失败；原生测试覆盖能力协商、相对 HTTPS URL 与固定 callback 解析；完整服务端 114 项和原生 704 项套件验证已有功能无回归。设计审查见 [SECURITY_HUMAN_VERIFICATION_DECISION.md](SECURITY_HUMAN_VERIFICATION_DECISION.md)。这不是对第三方服务的“已上线”声明：部署者仍须使用自己的密钥和真实 HTTPS hostname 进行一次手工部署验收，并且当前实现只支持单服务进程；多副本前需引入共享、原子 TTL 挑战存储。
 
 ## 验收规则
 

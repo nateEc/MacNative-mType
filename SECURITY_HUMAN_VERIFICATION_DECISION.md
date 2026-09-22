@@ -90,7 +90,7 @@ macOS                    Typebar service                   Turnstile
 3. 已实现原生能力协商、仅 HTTPS endpoint 的相对挑战路径解析、固定 callback 三元组校验和各受保护请求的 proof 携带。旧服务或能力缺失时不会调用新路由。
 4. 自动化验收必须以单个串行会话完成服务端完整套件与原生完整套件，且不得启动 GUI。真实部署仍须由部署者使用自己的 Turnstile 密钥和 HTTPS hostname 手工验证一次；配置说明只列环境变量和失败语义，绝不提交真实密钥。
 5. 后续代码风险复核确认网页回调必须按浏览器的 URL 编码表单格式验收，服务端用该格式完成端到端测试；同时修正固定窗口限流桶未回收的问题。每个桶现在携带到期时间，只在最早到期时清理失效状态；注册、重置与人机验证入口的配额本身不变。
-6. 固定参考源码复核确认 `GoogleSignUpModal` 在调用 `Ape.users.create` 前要求 captcha；因此 Typebar 的 OAuth 新用户注册不能因其统一提供方流程而绕开既有 `registration` proof。完整服务端 109 项与原生 670 项串行套件均已通过，且未启动 GUI。
+6. 固定参考源码复核确认 `GoogleSignUpModal` 在调用 `Ape.users.create` 前要求 captcha；因此 Typebar 的 OAuth 新用户注册不能因其统一提供方流程而绕开既有 `registration` proof。完整服务端 114 项与原生 704 项串行套件均已通过，且未启动 GUI。
 
 ## 残余风险
 
