@@ -40,8 +40,8 @@ final class TestPresetRecord {
     var definitionData: Data
     var createdAt: Date
 
-    init(name: String, definition: SavedTestPreset) {
-        id = UUID()
+    init(id: UUID = UUID(), name: String, definition: SavedTestPreset) {
+        self.id = id
         self.name = name
         definitionData = (try? JSONEncoder().encode(definition)) ?? Data()
         createdAt = .now
@@ -59,6 +59,7 @@ struct PresetLibraryView: View {
 
     let currentPreset: SavedTestPreset
     let onApply: (SavedTestPreset) -> Void
+    private let tombstones = PresetTombstoneStore()
     @State private var name = ""
 
     var body: some View {
@@ -115,6 +116,9 @@ struct PresetLibraryView: View {
     }
 
     private func delete(at offsets: IndexSet) {
-        for index in offsets { modelContext.delete(presets[index]) }
+        for index in offsets {
+            tombstones.markDeleted(presets[index].id)
+            modelContext.delete(presets[index])
+        }
     }
 }

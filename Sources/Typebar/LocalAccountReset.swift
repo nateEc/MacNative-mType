@@ -6,6 +6,7 @@ enum LocalAccountReset {
     modelContext: ModelContext,
     settings: AppSettings,
     resultTombstoneStore: ResultTombstoneStore = .init(),
+    presetTombstoneStore: PresetTombstoneStore = .init(),
     tombstoneStore: ResultFilterPresetTombstoneStore = .init(),
     removeBackground: (() throws -> Void)? = nil,
     removePracticeFont: (() throws -> Void)? = nil,
@@ -21,6 +22,7 @@ enum LocalAccountReset {
     try modelContext.save()
 
     resultTombstoneStore.removeAll()
+    presetTombstoneStore.removeAll()
     tombstoneStore.removeAll()
     (clearPendingPublications ?? { PendingResultPublicationStore().removeAll() })()
     settings.restoreDefaults()

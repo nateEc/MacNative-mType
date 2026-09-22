@@ -15,6 +15,7 @@ struct CloudSyncView: View {
     let initialLeaderboard: RemoteLeaderboardSelection?
     private let conflictAuditStore = SyncConflictAuditStore()
     private let resultTombstones = ResultTombstoneStore()
+    private let presetTombstones = PresetTombstoneStore()
     private let resultFilterPresetTombstones = ResultFilterPresetTombstoneStore()
     @State private var message: String?
     @State private var conflictAudit: [SyncConflictAuditEntry] = []
@@ -426,6 +427,7 @@ struct CloudSyncView: View {
                     let summary = try LocalArchiveImport.apply(
                         mergeResult.archive, settings: settings, results: results, presets: presets,
                         savedTexts: savedTexts, resultTombstoneStore: resultTombstones,
+                        presetTombstoneStore: presetTombstones,
                         resultFilterPresets: resultFilterPresets,
                         tombstoneStore: resultFilterPresetTombstones, source: .cloudSync,
                         modelContext: modelContext)
@@ -435,7 +437,7 @@ struct CloudSyncView: View {
                     }
                     account.confirmPulledArchive(pulled)
                     let cursor = try await account.pushArchive(mergeResult.archive)
-                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置与测试选择，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩和 \(summary.deletedResultFilterPresets) 个成绩筛选预设；另存 \(mergeResult.conflicts.count) 个冲突副本。"
+                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置与测试选择，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩、\(summary.deletedPresets) 个预设和 \(summary.deletedResultFilterPresets) 个成绩筛选预设；另存 \(mergeResult.conflicts.count) 个冲突副本。"
                 } catch {
                     message = "已停止冲突覆盖：\(error.localizedDescription)"
                 }
@@ -471,11 +473,12 @@ struct CloudSyncView: View {
                 let summary = try LocalArchiveImport.apply(
                     archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts,
                     resultTombstoneStore: resultTombstones,
+                    presetTombstoneStore: presetTombstones,
                     resultFilterPresets: resultFilterPresets, tombstoneStore: resultFilterPresetTombstones,
                     source: .cloudSync, modelContext: modelContext)
                 account.confirmPulledArchive(pulled)
                 let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
-                message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩和 \(summary.deletedResultFilterPresets) 个成绩筛选预设\(selectionDetail)。"
+                message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩、\(summary.deletedPresets) 个预设和 \(summary.deletedResultFilterPresets) 个成绩筛选预设\(selectionDetail)。"
             } catch {
                 message = error.localizedDescription
             }
@@ -710,7 +713,7 @@ struct CloudSyncView: View {
     private var localArchive: TypebarArchive {
         let portableResults = results.compactMap(\.portableResult)
         let namedPresets = presets.compactMap { record in
-            record.definition.map { NamedPreset(name: record.name, definition: $0) }
+            record.definition.map { NamedPreset(id: record.id, name: record.name, definition: $0) }
         }
         let namedSavedTexts = savedTexts.map {
             NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
@@ -722,6 +725,7 @@ struct CloudSyncView: View {
             results: portableResults,
             deletedResultIDs: resultTombstones.deletedIDs,
             presets: namedPresets,
+            deletedPresetIDs: presetTombstones.deletedIDs,
             savedTexts: namedSavedTexts,
             resultFilterPresets: namedResultFilterPresets,
             deletedResultFilterPresetIDs: resultFilterPresetTombstones.deletedIDs,

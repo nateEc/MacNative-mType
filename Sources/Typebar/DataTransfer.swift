@@ -251,13 +251,14 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    static let currentVersion = 6
+    static let currentVersion = 7
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
     let results: [CompletedTestResult]
     let deletedResultIDs: [UUID]
     let presets: [NamedPreset]
+    let deletedPresetIDs: [UUID]
     let savedTexts: [NamedSavedText]
     let resultFilterPresets: [NamedResultFilterPreset]
     let deletedResultFilterPresetIDs: [UUID]
@@ -270,6 +271,7 @@ struct TypebarArchive: Codable, Equatable {
         results: [CompletedTestResult],
         deletedResultIDs: [UUID] = [],
         presets: [NamedPreset],
+        deletedPresetIDs: [UUID] = [],
         savedTexts: [NamedSavedText] = [],
         resultFilterPresets: [NamedResultFilterPreset] = [],
         deletedResultFilterPresetIDs: [UUID] = [],
@@ -281,7 +283,14 @@ struct TypebarArchive: Codable, Equatable {
         let deletedResults = version >= 6 ? Set(deletedResultIDs) : []
         self.deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         self.results = results.filter { !deletedResults.contains($0.id) }
-        self.presets = presets
+        let deletedPresets = version >= 7 ? Set(deletedPresetIDs) : []
+        self.deletedPresetIDs = deletedPresets.sorted { $0.uuidString < $1.uuidString }
+        self.presets = version >= 7
+            ? presets.filter { preset in
+                guard let id = preset.id else { return true }
+                return !deletedPresets.contains(id)
+            }
+            : presets.map { .init(name: $0.name, definition: $0.definition) }
         self.savedTexts = savedTexts
         let deletedIDs = version >= 5 ? Set(deletedResultFilterPresetIDs) : []
         self.deletedResultFilterPresetIDs = deletedIDs.sorted { $0.uuidString < $1.uuidString }
@@ -294,7 +303,7 @@ struct TypebarArchive: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, exportedAt, settings, results, deletedResultIDs, presets, savedTexts, resultFilterPresets,
+        case version, exportedAt, settings, results, deletedResultIDs, presets, deletedPresetIDs, savedTexts, resultFilterPresets,
             deletedResultFilterPresetIDs, activeTestSelection
     }
 
@@ -309,7 +318,17 @@ struct TypebarArchive: Codable, Equatable {
             : []
         deletedResultIDs = deletedResults.sorted { $0.uuidString < $1.uuidString }
         results = decodedResults.filter { !deletedResults.contains($0.id) }
-        presets = try values.decode([NamedPreset].self, forKey: .presets)
+        let decodedPresets = try values.decode([NamedPreset].self, forKey: .presets)
+        let deletedPresets = version >= 7
+            ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedPresetIDs) ?? [])
+            : []
+        deletedPresetIDs = deletedPresets.sorted { $0.uuidString < $1.uuidString }
+        presets = version >= 7
+            ? decodedPresets.filter { preset in
+                guard let id = preset.id else { return true }
+                return !deletedPresets.contains(id)
+            }
+            : decodedPresets.map { .init(name: $0.name, definition: $0.definition) }
         savedTexts = try values.decodeIfPresent([NamedSavedText].self, forKey: .savedTexts) ?? []
         let deletedIDs = version >= 5
             ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedResultFilterPresetIDs) ?? [])
@@ -328,8 +347,30 @@ struct TypebarArchive: Codable, Equatable {
 }
 
 struct NamedPreset: Codable, Equatable {
+    var id: UUID?
     let name: String
     let definition: SavedTestPreset
+
+    init(id: UUID? = nil, name: String, definition: SavedTestPreset) {
+        self.id = id
+        self.name = name
+        self.definition = definition
+    }
+
+    func hasSameContent(as other: Self) -> Bool {
+        name == other.name && definition == other.definition
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, definition
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decodeIfPresent(UUID.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        definition = try values.decode(SavedTestPreset.self, forKey: .definition)
+    }
 }
 
 struct NamedSavedText: Codable, Equatable {
@@ -648,6 +689,7 @@ enum TypebarDataTransfer {
         results: [CompletedTestResult],
         deletedResultIDs: [UUID] = [],
         presets: [NamedPreset],
+        deletedPresetIDs: [UUID] = [],
         savedTexts: [NamedSavedText] = [],
         resultFilterPresets: [NamedResultFilterPreset] = [],
         deletedResultFilterPresetIDs: [UUID] = [],
@@ -661,6 +703,7 @@ enum TypebarDataTransfer {
             results: results,
             deletedResultIDs: deletedResultIDs,
             presets: presets,
+            deletedPresetIDs: deletedPresetIDs,
             savedTexts: savedTexts,
             resultFilterPresets: resultFilterPresets,
             deletedResultFilterPresetIDs: deletedResultFilterPresetIDs,
@@ -683,8 +726,32 @@ enum TypebarArchiveMerge {
         archive.results.filter { !existingIDs.contains($0.id) && !deletedIDs.contains($0.id) }
     }
 
-    static func presetsToInsert(from archive: TypebarArchive, existing: [NamedPreset]) -> [NamedPreset] {
-        archive.presets.filter { !existing.contains($0) }
+    static func presetsToInsert(
+        from archive: TypebarArchive,
+        existing: [NamedPreset],
+        deletedIDs: Set<UUID> = [],
+        makeID: () -> UUID = UUID.init
+    ) -> [NamedPreset] {
+        var occupiedIDs = Set(existing.compactMap(\.id))
+        var knownPresets = existing
+        var additions: [NamedPreset] = []
+        for remotePreset in archive.presets
+        where remotePreset.id.map({ !deletedIDs.contains($0) }) ?? true {
+            guard !knownPresets.contains(where: { $0.hasSameContent(as: remotePreset) }) else {
+                continue
+            }
+            var copy = remotePreset
+            if let id = copy.id {
+                if occupiedIDs.contains(id) {
+                    copy.id = freshPresetID(occupied: &occupiedIDs, makeID: makeID)
+                } else {
+                    occupiedIDs.insert(id)
+                }
+            }
+            knownPresets.append(copy)
+            additions.append(copy)
+        }
+        return additions
     }
 
     static func savedTextsToInsert(from archive: TypebarArchive, existing: [NamedSavedText]) -> [NamedSavedText] {
@@ -724,6 +791,15 @@ enum TypebarArchiveMerge {
     }
 
     private static func freshResultFilterPresetID(
+        occupied: inout Set<UUID>, makeID: () -> UUID
+    ) -> UUID {
+        var candidate = makeID()
+        while occupied.contains(candidate) { candidate = makeID() }
+        occupied.insert(candidate)
+        return candidate
+    }
+
+    private static func freshPresetID(
         occupied: inout Set<UUID>, makeID: () -> UUID
     ) -> UUID {
         var candidate = makeID()
@@ -869,14 +945,35 @@ enum TypebarArchiveConflictMerge {
             settings.favoriteThemeIDs + remoteFavorites,
             customThemes: settings.customThemes)
 
-        var presets = local.presets
-        for remotePreset in remote.presets where !presets.contains(remotePreset) {
-            if presets.contains(where: { $0.name == remotePreset.name }) {
-                let name = conflictName(for: remotePreset.name, occupied: Set(presets.map(\.name)))
-                presets.append(.init(name: name, definition: remotePreset.definition))
-                conflicts.append(.init(kind: .preset, displayName: name))
-            } else {
-                presets.append(remotePreset)
+        let deletedPresetIDs = Set(local.deletedPresetIDs).union(remote.deletedPresetIDs)
+        var presets = local.presets.filter { preset in
+            guard let id = preset.id else { return true }
+            return !deletedPresetIDs.contains(id)
+        }
+        var presetIDs = Set(presets.compactMap(\.id))
+        for remotePreset in remote.presets
+        where remotePreset.id.map({ !deletedPresetIDs.contains($0) }) ?? true {
+            guard !presets.contains(where: { $0.hasSameContent(as: remotePreset) }) else { continue }
+            var copy = remotePreset
+            var changed = false
+            if let id = copy.id {
+                if presetIDs.contains(id) {
+                    copy.id = freshID(occupied: &presetIDs, makeID: makeID)
+                    changed = true
+                } else {
+                    presetIDs.insert(id)
+                }
+            }
+            if presets.contains(where: { $0.name == copy.name }) {
+                copy = .init(
+                    id: copy.id,
+                    name: conflictName(for: copy.name, occupied: Set(presets.map(\.name))),
+                    definition: copy.definition)
+                changed = true
+            }
+            presets.append(copy)
+            if changed {
+                conflicts.append(.init(kind: .preset, displayName: copy.name))
             }
         }
 
@@ -941,6 +1038,7 @@ enum TypebarArchiveConflictMerge {
                 }).filter { !deletedResultIDs.contains($0.id) },
                 deletedResultIDs: Array(deletedResultIDs),
                 presets: presets,
+                deletedPresetIDs: Array(deletedPresetIDs),
                 savedTexts: savedTexts,
                 resultFilterPresets: resultFilterPresets,
                 deletedResultFilterPresetIDs: Array(deletedResultFilterPresetIDs),
@@ -1032,6 +1130,7 @@ struct ArchiveImportSummary: Equatable {
     let insertedResults: Int
     let deletedResults: Int
     let insertedPresets: Int
+    let deletedPresets: Int
     let insertedSavedTexts: Int
     let insertedResultFilterPresets: Int
     let deletedResultFilterPresets: Int
@@ -1063,6 +1162,7 @@ enum LocalArchiveImport {
         presets: [TestPresetRecord],
         savedTexts: [SavedCustomTextRecord],
         resultTombstoneStore: ResultTombstoneStore = .init(),
+        presetTombstoneStore: PresetTombstoneStore = .init(),
         resultFilterPresets: [ResultFilterPresetRecord] = [],
         tombstoneStore: ResultFilterPresetTombstoneStore = .init(),
         source: ArchiveImportSource = .localFile,
@@ -1090,10 +1190,30 @@ enum LocalArchiveImport {
             from: archive,
             existingIDs: Set(results.map(\.id)),
             deletedIDs: effectiveDeletedResultIDs)
-        let existingPresets = presets.compactMap { record in
-            record.definition.map { NamedPreset(name: record.name, definition: $0) }
+        let storedDeletedPresetIDs = Set(presetTombstoneStore.deletedIDs)
+        let archiveDeletedPresetIDs = Set(archive.deletedPresetIDs)
+        let resultingDeletedPresetIDs: Set<UUID>
+        let effectiveDeletedPresetIDs: Set<UUID>
+        switch source {
+        case .localFile:
+            resultingDeletedPresetIDs = storedDeletedPresetIDs
+                .subtracting(archive.presets.compactMap(\.id))
+                .union(archiveDeletedPresetIDs)
+            effectiveDeletedPresetIDs = archiveDeletedPresetIDs
+        case .cloudSync:
+            resultingDeletedPresetIDs = storedDeletedPresetIDs.union(archiveDeletedPresetIDs)
+            effectiveDeletedPresetIDs = resultingDeletedPresetIDs
         }
-        let newPresets = TypebarArchiveMerge.presetsToInsert(from: archive, existing: existingPresets)
+        let presetRecordsToDelete = presets.filter {
+            effectiveDeletedPresetIDs.contains($0.id)
+        }
+        let existingPresets = presets.compactMap { record in
+            record.definition.map { NamedPreset(id: record.id, name: record.name, definition: $0) }
+        }
+        let newPresets = TypebarArchiveMerge.presetsToInsert(
+            from: archive,
+            existing: existingPresets,
+            deletedIDs: effectiveDeletedPresetIDs)
         let newSavedTexts = TypebarArchiveMerge.savedTextsToInsert(
             from: archive,
             existing: savedTexts.map {
@@ -1126,7 +1246,11 @@ enum LocalArchiveImport {
 
         for result in newResults { modelContext.insert(TestResultRecord(result: result)) }
         for result in resultRecordsToDelete { modelContext.delete(result) }
-        for preset in newPresets { modelContext.insert(TestPresetRecord(name: preset.name, definition: preset.definition)) }
+        for preset in newPresets {
+            modelContext.insert(TestPresetRecord(
+                id: preset.id ?? UUID(), name: preset.name, definition: preset.definition))
+        }
+        for preset in presetRecordsToDelete { modelContext.delete(preset) }
         for savedText in newSavedTexts {
             modelContext.insert(SavedCustomTextRecord(
                 title: savedText.title, text: savedText.text, longProgress: savedText.longProgress))
@@ -1144,6 +1268,7 @@ enum LocalArchiveImport {
             throw error
         }
         resultTombstoneStore.replaceDeletedIDs(resultingDeletedResultIDs)
+        presetTombstoneStore.replaceDeletedIDs(resultingDeletedPresetIDs)
         tombstoneStore.replaceDeletedIDs(resultingDeletedFilterPresetIDs)
         settings.apply(archive.settings)
         let restoredActiveTestSelection = archive.activeTestSelection.map(
@@ -1152,6 +1277,7 @@ enum LocalArchiveImport {
             insertedResults: newResults.count,
             deletedResults: resultRecordsToDelete.count,
             insertedPresets: newPresets.count,
+            deletedPresets: presetRecordsToDelete.count,
             insertedSavedTexts: newSavedTexts.count,
             insertedResultFilterPresets: newResultFilterPresetRecords.count,
             deletedResultFilterPresets: filterPresetRecordsToDelete.count,
@@ -1180,6 +1306,7 @@ struct TypebarArchiveDocument: FileDocument {
             results: archive.results,
             deletedResultIDs: archive.deletedResultIDs,
             presets: archive.presets,
+            deletedPresetIDs: archive.deletedPresetIDs,
             savedTexts: archive.savedTexts,
             resultFilterPresets: archive.resultFilterPresets,
             deletedResultFilterPresetIDs: archive.deletedResultFilterPresetIDs,
