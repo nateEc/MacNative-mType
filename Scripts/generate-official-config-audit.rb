@@ -15,6 +15,111 @@ EXPECTED_COUNTS = {
   untracked: 0,
 }.freeze
 
+# These groups describe Typebar's independently authored implementation
+# surfaces. They are kept here rather than inferred from the compatibility
+# table so the generated fixture remains the single, reproducible contract
+# consumed by the native coverage tests.
+NATIVE_EVIDENCE_GROUPS = {
+  "test" => {
+    "keys" => %w[punctuation numbers words time mode quoteLength language burstHeatmap],
+    "nativeFiles" => %w[
+      Sources/Typebar/TypingEngine.swift
+      Sources/Typebar/TypebarApp.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+  "behavior" => {
+    "keys" => %w[
+      difficulty quickRestart repeatQuotes resultSaving blindMode
+      alwaysShowWordsHistory singleListCommandLine minWpm minWpmCustomSpeed
+      minAcc minAccCustom minBurst minBurstCustomSpeed britishEnglish funbox
+      customLayoutfluid customPolyglot
+    ],
+    "nativeFiles" => %w[
+      Sources/Typebar/AppSettings.swift
+      Sources/Typebar/TypingEngine.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+  "input" => {
+    "keys" => %w[
+      freedomMode strictSpace oppositeShiftMode stopOnError deleteOnError
+      confidenceMode quickEnd indicateTypos compositionDisplay hideExtraLetters
+      lazyMode layout codeUnindentOnBackspace
+    ],
+    "nativeFiles" => %w[
+      Sources/Typebar/AppSettings.swift
+      Sources/Typebar/NativeTypingInput.swift
+      Sources/Typebar/KeyboardGuide.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+  "sound" => {
+    "keys" => %w[soundVolume playSoundOnClick playSoundOnError playTimeWarning],
+    "nativeFiles" => %w[
+      Sources/Typebar/AppSettings.swift
+      Sources/Typebar/TypingFeedbackSound.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+  "caret" => {
+    "keys" => %w[
+      smoothCaret caretStyle paceCaret paceCaretCustomSpeed paceCaretStyle repeatedPace
+    ],
+    "nativeFiles" => %w[
+      Sources/Typebar/AppSettings.swift
+      Sources/Typebar/PromptCaretOverlay.swift
+      Sources/Typebar/PaceGuide.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+  "appearance" => {
+    "keys" => %w[
+      timerStyle liveSpeedStyle liveAccStyle liveBurstStyle timerColor timerOpacity
+      highlightMode typedEffect tapeMode tapeMargin smoothLineScroll showAllLines
+      alwaysShowDecimalPlaces typingSpeedUnit startGraphsAtZero maxLineWidth
+      fontSize fontFamily keymapMode keymapLayout keymapStyle keymapLegendStyle
+      keymapKeys keymapSize
+    ],
+    "nativeFiles" => %w[
+      Sources/Typebar/AppSettings.swift
+      Sources/Typebar/TypebarApp.swift
+      Sources/Typebar/KeyboardGuide.swift
+      Sources/Typebar/NativePracticeFont.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+  "theme" => {
+    "keys" => %w[
+      flipTestColors colorfulMode customBackground customBackgroundSize
+      customBackgroundFilter autoSwitchTheme themeLight themeDark randomTheme
+      favThemes theme customTheme customThemeColors
+    ],
+    "nativeFiles" => %w[
+      Sources/Typebar/AppSettings.swift
+      Sources/Typebar/AppTheme.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+  "hideElements" => {
+    "keys" => %w[showKeyTips showOutOfFocusWarning capsLockWarning showAverage showPb],
+    "nativeFiles" => %w[
+      Sources/Typebar/AppSettings.swift
+      Sources/Typebar/TypebarApp.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+  "hidden" => {
+    "keys" => %w[accountChart monkey monkeyPowerLevel],
+    "nativeFiles" => %w[
+      Sources/Typebar/AppSettings.swift
+      Sources/Typebar/ResultsAnalytics.swift
+      Sources/Typebar/TypingCompanion.swift
+      Sources/Typebar/PresetApplicationPolicy.swift
+    ],
+  },
+}.freeze
+
 def fail_audit(message)
   warn "config audit failed: #{message}"
   exit 1
@@ -31,8 +136,10 @@ fail_audit("could not read reference commit") unless status.success?
 fail_audit("reference must be pinned to #{PINNED_COMMIT}") unless commit.strip == PINNED_COMMIT
 
 schema_relative_path = "packages/schemas/src/configs.ts"
+font_schema_relative_path = "packages/schemas/src/fonts.ts"
 audit_relative_path = "OFFICIAL_CONFIG_AUDIT.md"
 schema_source = reference_root.join(schema_relative_path).read
+font_schema_source = reference_root.join(font_schema_relative_path).read
 audit_source = repository_root.join(audit_relative_path).read
 
 schema_match = schema_source.match(
@@ -79,6 +186,14 @@ fail_audit("QuoteLengthSchema choices are not unique") unless
   quote_length_choices.uniq.length == quote_length_choices.length
 official_choices["quoteLength"] = quote_length_choices
 official_choice_counts = official_choices.transform_values(&:length)
+
+font_schema_match = font_schema_source.match(
+  /export const KnownFontNameSchema = z\s*\.enum\(\s*\[(.*?)\]\s*,/m)
+fail_audit("could not locate KnownFontNameSchema enum") unless font_schema_match
+official_known_font_family_ids = font_schema_match[1].scan(/"([^"]+)"/).flatten
+fail_audit("KnownFontNameSchema choices are empty") if official_known_font_family_ids.empty?
+fail_audit("KnownFontNameSchema choices are not unique") unless
+  official_known_font_family_ids.uniq.length == official_known_font_family_ids.length
 
 official_boolean_keys = [
   "smoothLineScroll",
@@ -135,6 +250,21 @@ actual_counts = {
 }
 fail_audit("unexpected classification counts: #{actual_counts}") unless actual_counts == EXPECTED_COUNTS
 
+native_evidence_keys = NATIVE_EVIDENCE_GROUPS.values.flat_map { |group| group.fetch("keys") }
+fail_audit("native evidence keys are not unique") unless
+  native_evidence_keys.uniq.length == native_evidence_keys.length
+expected_native_evidence_keys = partitions.fetch(:mapped).keys + partitions.fetch(:partial).keys
+fail_audit("native evidence groups do not cover every mapped or partial key") unless
+  native_evidence_keys.sort == expected_native_evidence_keys.sort
+NATIVE_EVIDENCE_GROUPS.each do |group_name, group|
+  native_files = group.fetch("nativeFiles")
+  fail_audit("#{group_name} has no native evidence files") if native_files.empty?
+  native_files.each do |native_file|
+    fail_audit("#{group_name} references a missing native file: #{native_file}") unless
+      repository_root.join(native_file).file?
+  end
+end
+
 fixture = {
   referenceRepository: "monkeytypegame/monkeytype",
   referenceCommit: PINNED_COMMIT,
@@ -145,11 +275,13 @@ fixture = {
   notApplicable: partitions.fetch(:not_applicable),
   unimplemented: partitions.fetch(:unimplemented),
   untrackedOfficialKeys: untracked,
+  nativeEvidenceGroups: NATIVE_EVIDENCE_GROUPS,
   officialChoices: official_choices,
   officialChoiceCounts: official_choice_counts,
   officialBooleanKeys: official_boolean_keys,
-  sourceFiles: [schema_relative_path, audit_relative_path],
-  method: "metadata only; official keys, selected enum choices, and selected boolean types come from ConfigSchema, while statuses, mapping labels, and evidence remain in the compatibility table",
+  officialKnownFontFamilyIDs: official_known_font_family_ids,
+  sourceFiles: [schema_relative_path, font_schema_relative_path, audit_relative_path],
+  method: "metadata only; official keys, selected enum choices, selected boolean types, and known font family IDs come from ConfigSchema or KnownFontNameSchema, while statuses, mapping labels, and evidence remain in the compatibility table",
 }
 
 output_path.write(JSON.pretty_generate(fixture) + "\n")

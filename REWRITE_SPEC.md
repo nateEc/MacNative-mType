@@ -370,7 +370,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 2. 每个远程模块必须具备等价的自建 API 和客户端流程；不能依赖 Monkeytype 的生产接口、账号、排行榜或内容。
 3. 每条矩阵能力要关联：需求编号、独立测试、人工验收、实现位置与完成状态。
 4. 上述条目全数验收前，项目保持进行中，不以“核心功能可用”作为完整重写的结论。
-5. 每次合并前必须通过 `zsh Scripts/check-originality-boundaries.sh --self-test`、固定参考的原创性/页面模态/行为审计，以及 `ruby Scripts/check-manual-acceptance-audit.rb` 与其 `--self-test`；CI 对 `main` 与 pull request 执行同一组门禁。人工验收审计只守护场景 ID、状态与单实例规则，不会把“待验收”或“部分验收”改写为已验收。
+5. 每次合并前必须通过 `zsh Scripts/check-originality-boundaries.sh --self-test`、固定参考的原创性/配置与语言元数据/页面模态/行为审计，以及 `ruby Scripts/check-manual-acceptance-audit.rb` 与其 `--self-test`；CI 对 `main` 与 pull request 执行同一组门禁。元数据审计会以固定参考零差异重建配置、字体标识、语言目录和 Typebar 自有证据契约。人工验收审计只守护场景 ID、状态与单实例规则，不会把“待验收”或“部分验收”改写为已验收。
 6. 新增内容、资产和数据仍须人工确认其独立性或再分发授权；机械检查是结构与联网边界护栏，不替代人工原创性审查。
 
 ## 现有验证证据
@@ -391,7 +391,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 | 公开活动日历 | `Tests/TypebarTests/TypingEngineTests.swift`、原生公开资料卡 | 紧凑服务端每日计数安全展开为日期格；负计数不会进入近 12 个月总数。五档强度由当前可见日的已知完成数（含零）派生，并裁剪极端值；离散阈值保留低频完成日的参考色阶，因此单次异常导入不会压平日常活跃度；公开资料显示图例、与周列对齐的星期/月定位，以及逐格 VoiceOver 日期和完成次数。只消费已返回的匿名聚合计数，不改变账户日界、成绩或隐私边界 |
 | 挑战验收 | `Tests/TypebarTests/TypingEngineTests.swift` | 原创离线挑战的最低/精确指标、时长、默认或自定义 AFK 上限、顺序无关精确 funbox 集合、结果配置与不可变显示快照均可独立验证；缺快照的旧结果会明确失败，全部未满足条件会同时报告，挑战标记可随测试配置编码并与历史配置兼容 |
 | 构建 | `swift test`、`swift build` | macOS Swift 包能编译且 704 项客户端测试通过；独立 Vapor 服务的 115 项自动化测试通过 |
-| 重写交付门禁 | `.github/workflows/native-rewrite-gate.yml`、`Scripts/check-manual-acceptance-audit.rb` | CI 固定读取参考提交，执行原创性、页面/模态、参考行为和人工验收追溯审计；人工验收清单当前含 555 个唯一场景。该门禁不替代真实 macOS、IME、辅助功能、HTTPS/OAuth 或多设备的待执行验收。 |
+| 重写交付门禁 | `.github/workflows/native-rewrite-gate.yml`、`Scripts/check-reference-metadata-audits.sh`、`Scripts/check-manual-acceptance-audit.rb` | CI 固定读取参考提交，执行原创性、配置与语言 fixture 零差异重建、页面/模态、参考行为和人工验收追溯审计；人工验收清单当前含 555 个唯一场景。该门禁不替代真实 macOS、IME、辅助功能、HTTPS/OAuth 或多设备的待执行验收。 |
 | 运行时 UI | 打包的 `Typebar.app` 辅助功能树与截图 | 焦点输入、时间/字数模式、实时指标、可滚动长文本区，以及正确输入/错误/退格/Esc 重开；2026-09-02 已人工切换“光晕”背景，确认减少动态效果开关状态和练习页主题色光晕绘制，检查后恢复为纯色 |
 
 ## 2026-09-03 审计更正
