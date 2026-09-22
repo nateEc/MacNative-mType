@@ -15652,14 +15652,30 @@ final class TypingEngineTests: XCTestCase {
     store.record(second)
     let restored = SignedOutResultClaimStore(defaults: defaults)
     XCTAssertEqual(restored.claim?.resultID, second)
-    XCTAssertNil(SignedOutResultClaimPolicy.presentation(
-      claim: restored.claim, isAuthenticatedForResultPublishing: false, localResultIDs: [second]))
-    XCTAssertNil(SignedOutResultClaimPolicy.presentation(
-      claim: restored.claim, isAuthenticatedForResultPublishing: true, localResultIDs: [first]))
     XCTAssertEqual(
-      SignedOutResultClaimPolicy.presentation(
-        claim: restored.claim, isAuthenticatedForResultPublishing: true, localResultIDs: [second]),
-      .init(resultID: second))
+      SignedOutResultClaimPolicy.disposition(
+        claim: restored.claim,
+        isAuthenticatedForResultPublishing: false,
+        localRecordAvailability: .present),
+      .hidden)
+    XCTAssertEqual(
+      SignedOutResultClaimPolicy.disposition(
+        claim: restored.claim,
+        isAuthenticatedForResultPublishing: true,
+        localRecordAvailability: .absent),
+      .discard)
+    XCTAssertEqual(
+      SignedOutResultClaimPolicy.disposition(
+        claim: restored.claim,
+        isAuthenticatedForResultPublishing: true,
+        localRecordAvailability: .unavailable),
+      .hidden)
+    XCTAssertEqual(
+      SignedOutResultClaimPolicy.disposition(
+        claim: restored.claim,
+        isAuthenticatedForResultPublishing: true,
+        localRecordAvailability: .present),
+      .present(.init(resultID: second)))
 
     restored.clear()
     XCTAssertNil(SignedOutResultClaimStore(defaults: defaults).claim)

@@ -720,7 +720,7 @@ private struct ContentView: View {
   @State private var publicationResultID: UUID?
   @State private var pendingPublications = PendingResultPublicationStore()
   @State private var signedOutResultClaimStore = SignedOutResultClaimStore()
-  @State private var signedOutResultClaim: SignedOutResultClaim?
+  @State private var signedOutResultClaimSheetState: SignedOutResultClaimSheetState?
   @State private var isRetryingPendingPublications = false
   @State private var terminalNotice: TestTerminalNotice?
   @State private var bailoutConfirmationMessage: String?
@@ -915,6 +915,9 @@ private struct ContentView: View {
     .task { await runClock() }
     .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
     .task(id: account.resultPublicationScope) { presentSignedOutResultClaimIfPossible() }
+    .onChange(of: savedResults.map(\.id)) { _, _ in
+      presentSignedOutResultClaimIfPossible()
+    }
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear(perform: contentAppeared)
     .onChange(of: settings.activeTestSelectionGeneration) { _, _ in
@@ -1117,14 +1120,12 @@ private struct ContentView: View {
     }) {
       NotificationsView(account: account) { unreadNotificationCount = $0 }
     }
-    .sheet(item: $signedOutResultClaim) { claim in
-      if let result = savedResults.first(where: { $0.id == claim.resultID })?.portableResult {
-        SignedOutResultClaimView(
-          result: result,
-          onKeepLocal: keepSignedOutResultLocally,
-          onUpload: { try await uploadSignedOutResultClaim(result) }
-        )
-      }
+    .sheet(item: $signedOutResultClaimSheetState) { state in
+      SignedOutResultClaimView(
+        result: state.result,
+        onKeepLocal: keepSignedOutResultLocally,
+        onUpload: { try await uploadSignedOutResultClaim(state.result) }
+      )
     }
     .sheet(isPresented: $showingCommandPalette, onDismiss: {
       commandThemePreviewTarget = nil
@@ -4584,28 +4585,49 @@ private struct ContentView: View {
   }
 
   private func presentSignedOutResultClaimIfPossible() {
-    let claim = SignedOutResultClaimPolicy.presentation(
-      claim: signedOutResultClaimStore.claim,
-      isAuthenticatedForResultPublishing: account.resultPublicationScope != nil,
-      localResultIDs: Set(savedResults.compactMap { record in
-        record.portableResult == nil ? nil : record.id
-      })
-    )
-    if account.resultPublicationScope != nil,
-      signedOutResultClaimStore.claim != nil,
-      claim == nil
-    {
-      // A deleted or unreadable local record cannot be uploaded. Forget only
-      // the small candidate pointer; the existing SwiftData record is never
-      // modified here.
-      signedOutResultClaimStore.clear()
+    guard let claim = signedOutResultClaimStore.claim else {
+      signedOutResultClaimSheetState = nil
+      return
     }
-    signedOutResultClaim = claim
+    guard account.resultPublicationScope != nil else {
+      signedOutResultClaimSheetState = nil
+      return
+    }
+
+    let resultID = claim.resultID
+    let descriptor = FetchDescriptor<TestResultRecord>(
+      predicate: #Predicate { $0.id == resultID })
+    do {
+      let localResult = try modelContext.fetch(descriptor).first?.portableResult
+      let availability: SignedOutResultClaimLocalRecordAvailability =
+        localResult == nil ? .absent : .present
+      switch SignedOutResultClaimPolicy.disposition(
+        claim: claim,
+        isAuthenticatedForResultPublishing: true,
+        localRecordAvailability: availability
+      ) {
+      case .present(let claim):
+        guard let localResult else { return }
+        signedOutResultClaimSheetState = .init(claim: claim, result: localResult)
+      case .discard:
+        // A deleted or malformed local record cannot be uploaded. Forget only
+        // the small candidate pointer; no SwiftData record is modified here.
+        signedOutResultClaimStore.clear()
+        signedOutResultClaimSheetState = nil
+      case .hidden:
+        signedOutResultClaimSheetState = nil
+      }
+    } catch {
+      // Fetch errors are not evidence that the local record is gone. Retain
+      // the candidate and let a subsequent SwiftData update or app launch try
+      // again instead of silently losing the user's upload choice.
+      signedOutResultClaimSheetState = nil
+    }
   }
 
   private func keepSignedOutResultLocally() {
     signedOutResultClaimStore.clear()
-    signedOutResultClaim = nil
+    signedOutResultClaimSheetState = nil
   }
 
   private func uploadSignedOutResultClaim(_ result: CompletedTestResult) async throws {
@@ -4614,7 +4636,7 @@ private struct ContentView: View {
     }
     _ = try await account.submitCompletedResult(result, for: scope)
     signedOutResultClaimStore.clear()
-    signedOutResultClaim = nil
+    signedOutResultClaimSheetState = nil
   }
 
   private func publishIfEnabled(_ result: CompletedTestResult) {

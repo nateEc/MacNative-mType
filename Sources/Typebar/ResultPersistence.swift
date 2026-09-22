@@ -240,6 +240,33 @@ struct SignedOutResultClaim: Codable, Equatable, Identifiable {
   var id: UUID { resultID }
 }
 
+/// The complete local snapshot supplied to the explicit claim sheet. Keeping
+/// the decoded result together with its candidate prevents the view from
+/// depending on a second, asynchronously populated SwiftData query.
+struct SignedOutResultClaimSheetState: Identifiable {
+  let claim: SignedOutResultClaim
+  let result: CompletedTestResult
+
+  var id: UUID { claim.resultID }
+}
+
+/// Whether the single SwiftData record named by a signed-out claim can be
+/// read at the moment a user signs in.
+enum SignedOutResultClaimLocalRecordAvailability: Equatable {
+  case present
+  case absent
+  case unavailable
+}
+
+/// The non-destructive decision the app makes before presenting an explicit
+/// upload choice. A transient store failure must never be treated as proof
+/// that the user's locally saved result was deleted.
+enum SignedOutResultClaimDisposition: Equatable {
+  case hidden
+  case present(SignedOutResultClaim)
+  case discard
+}
+
 /// Decides when an offline result can be offered for an explicit, one-time
 /// upload after sign-in. This is intentionally separate from automatic result
 /// publication: the user's global publication preference is never changed.
@@ -252,16 +279,20 @@ enum SignedOutResultClaimPolicy {
     outcome == .completed && localSaveState.isSaved && !isAuthenticatedForResultPublishing
   }
 
-  static func presentation(
+  static func disposition(
     claim: SignedOutResultClaim?,
     isAuthenticatedForResultPublishing: Bool,
-    localResultIDs: Set<UUID>
-  ) -> SignedOutResultClaim? {
-    guard isAuthenticatedForResultPublishing,
-      let claim,
-      localResultIDs.contains(claim.resultID)
-    else { return nil }
-    return claim
+    localRecordAvailability: SignedOutResultClaimLocalRecordAvailability
+  ) -> SignedOutResultClaimDisposition {
+    guard let claim, isAuthenticatedForResultPublishing else { return .hidden }
+    switch localRecordAvailability {
+    case .present:
+      return .present(claim)
+    case .absent:
+      return .discard
+    case .unavailable:
+      return .hidden
+    }
   }
 }
 
