@@ -15630,6 +15630,41 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(PendingResultPublicationStore(defaults: defaults).resultIDs(for: scope), [resultID])
   }
 
+  func testSignedOutResultClaimKeepsOnlyTheLatestEligibleLocalResultUntilUserDecides() {
+    let suiteName = "TypebarTests.signed-out-result-claim.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let first = UUID()
+    let second = UUID()
+    let store = SignedOutResultClaimStore(defaults: defaults)
+
+    XCTAssertTrue(SignedOutResultClaimPolicy.shouldRecord(
+      outcome: .completed, localSaveState: .saved, isAuthenticatedForResultPublishing: false))
+    XCTAssertFalse(SignedOutResultClaimPolicy.shouldRecord(
+      outcome: .completed, localSaveState: .saved, isAuthenticatedForResultPublishing: true))
+    XCTAssertFalse(SignedOutResultClaimPolicy.shouldRecord(
+      outcome: .failed, localSaveState: .saved, isAuthenticatedForResultPublishing: false))
+    XCTAssertFalse(SignedOutResultClaimPolicy.shouldRecord(
+      outcome: .completed, localSaveState: .failed("磁盘空间不足"),
+      isAuthenticatedForResultPublishing: false))
+
+    store.record(first)
+    store.record(second)
+    let restored = SignedOutResultClaimStore(defaults: defaults)
+    XCTAssertEqual(restored.claim?.resultID, second)
+    XCTAssertNil(SignedOutResultClaimPolicy.presentation(
+      claim: restored.claim, isAuthenticatedForResultPublishing: false, localResultIDs: [second]))
+    XCTAssertNil(SignedOutResultClaimPolicy.presentation(
+      claim: restored.claim, isAuthenticatedForResultPublishing: true, localResultIDs: [first]))
+    XCTAssertEqual(
+      SignedOutResultClaimPolicy.presentation(
+        claim: restored.claim, isAuthenticatedForResultPublishing: true, localResultIDs: [second]),
+      .init(resultID: second))
+
+    restored.clear()
+    XCTAssertNil(SignedOutResultClaimStore(defaults: defaults).claim)
+  }
+
   func testResultPublicationRetryPolicyQueuesOnlyRecoverableFailures() {
     XCTAssertTrue(ResultPublicationRetryPolicy.shouldQueue(URLError(.notConnectedToInternet)))
     XCTAssertTrue(ResultPublicationRetryPolicy.shouldQueue(RemoteAccountError.accountScopeChanged))

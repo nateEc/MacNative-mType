@@ -719,6 +719,8 @@ private struct ContentView: View {
   @State private var publicationState: ResultPublicationState = .idle
   @State private var publicationResultID: UUID?
   @State private var pendingPublications = PendingResultPublicationStore()
+  @State private var signedOutResultClaimStore = SignedOutResultClaimStore()
+  @State private var signedOutResultClaim: SignedOutResultClaim?
   @State private var isRetryingPendingPublications = false
   @State private var terminalNotice: TestTerminalNotice?
   @State private var bailoutConfirmationMessage: String?
@@ -912,6 +914,7 @@ private struct ContentView: View {
         session: session, settings: settings, ownerID: noQuitConfigurationLockOwnerID))
     .task { await runClock() }
     .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
+    .task(id: account.resultPublicationScope) { presentSignedOutResultClaimIfPossible() }
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear(perform: contentAppeared)
     .onChange(of: settings.activeTestSelectionGeneration) { _, _ in
@@ -978,6 +981,13 @@ private struct ContentView: View {
         if savesResult {
           saveCompletedResultLocally(result)
           priorAttemptLedger.clearAfterPersistingResult()
+          if SignedOutResultClaimPolicy.shouldRecord(
+            outcome: result.outcome,
+            localSaveState: localResultSaveState,
+            isAuthenticatedForResultPublishing: account.resultPublicationScope != nil
+          ) {
+            signedOutResultClaimStore.record(result.id)
+          }
         } else {
           priorAttemptLedger.recordTerminalAttempt(
             engagedDuration: result.engagedDuration, outcome: result.outcome, eligibility: eligibility,
@@ -1106,6 +1116,15 @@ private struct ContentView: View {
       Task { await refreshNotificationSummary() }
     }) {
       NotificationsView(account: account) { unreadNotificationCount = $0 }
+    }
+    .sheet(item: $signedOutResultClaim) { claim in
+      if let result = savedResults.first(where: { $0.id == claim.resultID })?.portableResult {
+        SignedOutResultClaimView(
+          result: result,
+          onKeepLocal: keepSignedOutResultLocally,
+          onUpload: { try await uploadSignedOutResultClaim(result) }
+        )
+      }
     }
     .sheet(isPresented: $showingCommandPalette, onDismiss: {
       commandThemePreviewTarget = nil
@@ -4562,6 +4581,40 @@ private struct ContentView: View {
     practiceReturnPreset = nil
     apply(preset)
     return true
+  }
+
+  private func presentSignedOutResultClaimIfPossible() {
+    let claim = SignedOutResultClaimPolicy.presentation(
+      claim: signedOutResultClaimStore.claim,
+      isAuthenticatedForResultPublishing: account.resultPublicationScope != nil,
+      localResultIDs: Set(savedResults.compactMap { record in
+        record.portableResult == nil ? nil : record.id
+      })
+    )
+    if account.resultPublicationScope != nil,
+      signedOutResultClaimStore.claim != nil,
+      claim == nil
+    {
+      // A deleted or unreadable local record cannot be uploaded. Forget only
+      // the small candidate pointer; the existing SwiftData record is never
+      // modified here.
+      signedOutResultClaimStore.clear()
+    }
+    signedOutResultClaim = claim
+  }
+
+  private func keepSignedOutResultLocally() {
+    signedOutResultClaimStore.clear()
+    signedOutResultClaim = nil
+  }
+
+  private func uploadSignedOutResultClaim(_ result: CompletedTestResult) async throws {
+    guard let scope = account.resultPublicationScope else {
+      throw RemoteAccountError.accountScopeChanged
+    }
+    _ = try await account.submitCompletedResult(result, for: scope)
+    signedOutResultClaimStore.clear()
+    signedOutResultClaim = nil
   }
 
   private func publishIfEnabled(_ result: CompletedTestResult) {

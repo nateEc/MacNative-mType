@@ -230,6 +230,69 @@ struct ResultPublicationScope: Codable, Equatable, Hashable, Sendable {
   }
 }
 
+/// A locally saved result that was completed before a user authenticated with
+/// a result-publishing account. The value deliberately carries only the local
+/// SwiftData record identifier: it never caches a result payload, endpoint,
+/// account identity, or credential.
+struct SignedOutResultClaim: Codable, Equatable, Identifiable {
+  let resultID: UUID
+
+  var id: UUID { resultID }
+}
+
+/// Decides when an offline result can be offered for an explicit, one-time
+/// upload after sign-in. This is intentionally separate from automatic result
+/// publication: the user's global publication preference is never changed.
+enum SignedOutResultClaimPolicy {
+  static func shouldRecord(
+    outcome: TestOutcome,
+    localSaveState: LocalResultSaveState,
+    isAuthenticatedForResultPublishing: Bool
+  ) -> Bool {
+    outcome == .completed && localSaveState.isSaved && !isAuthenticatedForResultPublishing
+  }
+
+  static func presentation(
+    claim: SignedOutResultClaim?,
+    isAuthenticatedForResultPublishing: Bool,
+    localResultIDs: Set<UUID>
+  ) -> SignedOutResultClaim? {
+    guard isAuthenticatedForResultPublishing,
+      let claim,
+      localResultIDs.contains(claim.resultID)
+    else { return nil }
+    return claim
+  }
+}
+
+/// Persists only the most recent local result identifier awaiting an explicit
+/// signed-in upload decision. Replacing the candidate preserves the reference
+/// behavior's "last result" scope without duplicating sensitive result data.
+final class SignedOutResultClaimStore {
+  static let storageKey = "resultPublication.signedOutClaim.v1"
+
+  private let defaults: UserDefaults
+  private(set) var claim: SignedOutResultClaim?
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+    claim = defaults.data(forKey: Self.storageKey).flatMap {
+      try? JSONDecoder().decode(SignedOutResultClaim.self, from: $0)
+    }
+  }
+
+  func record(_ resultID: UUID) {
+    claim = .init(resultID: resultID)
+    guard let data = try? JSONEncoder().encode(claim) else { return }
+    defaults.set(data, forKey: Self.storageKey)
+  }
+
+  func clear() {
+    claim = nil
+    defaults.removeObject(forKey: Self.storageKey)
+  }
+}
+
 private struct PendingResultPublication: Codable, Equatable, Hashable {
   let resultID: UUID
   let scope: ResultPublicationScope
