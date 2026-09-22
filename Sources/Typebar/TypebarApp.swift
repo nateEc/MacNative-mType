@@ -1267,11 +1267,16 @@ private struct ContentView: View {
   @ViewBuilder
   private func completedResultSheet(_ result: CompletedResultPresentation) -> some View {
     if usesNoStressResultPresentation {
-      NoStressResultView(onRestart: {
-        completedResult = nil
-        if restoreWordPracticeIfNeeded() { return }
-        attemptRestart()
-      })
+      NoStressResultView(
+        isNewPersonalBest: result.savesResult && result.resultPersonalBestFeedback?.isNewPersonalBest == true,
+        hasZeroSpeedFeedback: result.zeroSpeedFeedback != nil,
+        reducesMotion: settings.reducePracticeMotion,
+        accent: activeTheme.accent,
+        onRestart: {
+          completedResult = nil
+          if restoreWordPracticeIfNeeded() { return }
+          attemptRestart()
+        })
     } else {
       CompletedResultView(
         result: result.result,
@@ -4600,6 +4605,10 @@ private struct CompletedResultPresentation: Identifiable {
 }
 
 private struct NoStressResultView: View {
+  let isNewPersonalBest: Bool
+  let hasZeroSpeedFeedback: Bool
+  let reducesMotion: Bool
+  let accent: Color
   let onRestart: () -> Void
   @Environment(\.dismiss) private var dismiss
 
@@ -4624,6 +4633,15 @@ private struct NoStressResultView: View {
     }
     .padding(32)
     .frame(width: 380)
+    .overlay {
+      ResultCelebrationView(
+        isNewPersonalBest: isNewPersonalBest,
+        hasZeroSpeedFeedback: hasZeroSpeedFeedback,
+        reducesMotion: reducesMotion,
+        accent: accent,
+        text: .primary,
+        subduedText: .secondary)
+    }
     .accessibilityElement(children: .combine)
     .accessibilityLabel("本轮已完成。无压力结果模式已隐藏本轮的详细结果。")
   }
@@ -4975,6 +4993,15 @@ private struct CompletedResultView: View {
     }
     .padding(32)
     .frame(width: 390)
+    .overlay {
+      ResultCelebrationView(
+        isNewPersonalBest: savesResult && resultPersonalBestFeedback?.isNewPersonalBest == true,
+        hasZeroSpeedFeedback: zeroSpeedFeedback != nil,
+        reducesMotion: settings.reducePracticeMotion,
+        accent: accent,
+        text: .primary,
+        subduedText: .secondary)
+    }
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onAppear {
       communityRating = initialCommunityRating

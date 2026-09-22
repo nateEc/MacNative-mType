@@ -25197,6 +25197,23 @@ final class TypingEngineTests: XCTestCase {
         wpm: 0, elapsedDuration: 12, outcome: .bailedOut))
   }
 
+  func testResultCelebrationUsesReferenceTriggersAndRespectsReducedMotion() {
+    XCTAssertFalse(
+      ResultCelebrationPolicy.shouldEmit(
+        isNewPersonalBest: false, hasZeroSpeedFeedback: false, reducesMotion: false))
+    XCTAssertTrue(
+      ResultCelebrationPolicy.shouldEmit(
+        isNewPersonalBest: true, hasZeroSpeedFeedback: false, reducesMotion: false))
+    XCTAssertTrue(
+      ResultCelebrationPolicy.shouldEmit(
+        isNewPersonalBest: false, hasZeroSpeedFeedback: true, reducesMotion: false))
+    XCTAssertFalse(
+      ResultCelebrationPolicy.shouldEmit(
+        isNewPersonalBest: true, hasZeroSpeedFeedback: true, reducesMotion: true))
+    XCTAssertEqual(ResultCelebrationPolicy.particlesPerSide, 5)
+    XCTAssertEqual(ResultCelebrationPolicy.launchDuration, 0.125, accuracy: 0.000_001)
+  }
+
   func testCompletedResultPreservesExactMetricsForResultPageDecimalPresentation() throws {
     let result = CompletedTestResult(
       id: UUID(), configuration: .words(1), outcome: .completed,
