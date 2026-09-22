@@ -3018,14 +3018,18 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(resetUser.displayNameChangeRequired)
   }
 
-  func testAccountSuspensionKeepsPracticeButBlocksSharedVisibilityAndMutableProfile() async throws {
+  func testAccountSuspensionPurgesRollingLeaderboardsButKeepsPracticeAndMutableProfileBlocked() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
-    let now = Date(timeIntervalSince1970: 50_000)
+    let now = Date(timeIntervalSince1970: 1_788_825_600)
+    let suspendedAt = now.addingTimeInterval(10)
+    let resumedAt = now.addingTimeInterval(60)
+    let resumedResultAt = now.addingTimeInterval(90)
     let session = try await store.register(
       .init(
         email: "suspended-account@example.com", password: "a secure password",
         displayName: "Suspended Account"), now: now)
     let query = LeaderboardQuery(mode: "time", language: "english", period: "all")
+    let dayQuery = LeaderboardQuery(mode: "time", language: "english", period: "day")
 
     _ = try await store.submitResult(
       result(id: UUID(), wpm: 80, accuracy: 100, durationSeconds: 30, finishedAt: now),
@@ -3035,7 +3039,8 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(initialSpeedEntries.map(\.userID), [session.user.id])
     XCTAssertEqual(initialExperienceEntries.map(\.userID), [session.user.id])
 
-    let suspension = try await store.setAccountSuspended(userID: session.user.id, suspended: true)
+    let suspension = try await store.setAccountSuspended(
+      userID: session.user.id, suspended: true, now: suspendedAt)
     XCTAssertEqual(suspension, .init(userID: session.user.id, isSuspended: true))
     let suspendedUser = try await store.authenticatedUser(for: session.accessToken, now: now)
     XCTAssertTrue(suspendedUser.accountSuspended)
@@ -3087,12 +3092,27 @@ final class HealthRouteTests: XCTestCase {
       XCTAssertEqual(error, .accountSuspended)
     }
 
-    _ = try await store.setAccountSuspended(userID: session.user.id, suspended: false)
+    _ = try await store.setAccountSuspended(
+      userID: session.user.id, suspended: false, now: resumedAt)
     let restored = try await store.updateProfile(
       .init(displayName: "Restored Account"), accessToken: session.accessToken, now: now)
     XCTAssertFalse(restored.accountSuspended)
     let restoredSpeedEntries = try await store.leaderboard(query, now: now).entries
     XCTAssertEqual(restoredSpeedEntries.map(\.userID), [session.user.id])
+    let restoredRollingSpeedEntries = try await store.leaderboard(dayQuery, now: resumedAt).entries
+    let restoredExperienceEntries = try await store.experienceLeaderboard(now: resumedAt).entries
+    XCTAssertTrue(restoredRollingSpeedEntries.isEmpty)
+    XCTAssertTrue(restoredExperienceEntries.isEmpty)
+
+    let resumed = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 82, accuracy: 100, durationSeconds: 30,
+        finishedAt: now), accessToken: session.accessToken, now: resumedResultAt)
+    XCTAssertTrue(resumed.leaderboardEligible)
+    let resumedRollingSpeedEntries = try await store.leaderboard(dayQuery, now: resumedResultAt).entries
+    let resumedExperienceEntries = try await store.experienceLeaderboard(now: resumedResultAt).entries
+    XCTAssertEqual(resumedRollingSpeedEntries.map(\.wpm), [82])
+    XCTAssertEqual(resumedExperienceEntries.map(\.totalExperience), [resumed.experienceGained])
   }
 
   func testAccountSuspensionRouteRequiresDeploymentKeyAndIsReversible() async throws {
@@ -3173,6 +3193,48 @@ final class HealthRouteTests: XCTestCase {
     } catch let error as AuthStoreError {
       XCTAssertEqual(error, .accountSuspended)
     }
+  }
+
+  func testAccountSuspensionRollingLeaderboardBoundaryPersistsAcrossRestart() async throws {
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-account-suspension-leaderboard-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let now = Date(timeIntervalSince1970: 1_788_825_600)
+    let suspendedAt = now.addingTimeInterval(10)
+    let restoredAt = now.addingTimeInterval(20)
+    let resumedResultAt = now.addingTimeInterval(30)
+    let initialStore = try AuthStore(
+      fileURL: fileURL, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let initialSession = try await initialStore.register(
+      .init(
+        email: "resumed-leaderboard@example.com", password: "a secure password",
+        displayName: "Resumed Leaderboard"), now: now)
+    _ = try await initialStore.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 100, durationSeconds: 30, finishedAt: now),
+      accessToken: initialSession.accessToken, now: now)
+    _ = try await initialStore.setAccountSuspended(
+      userID: initialSession.user.id, suspended: true, now: suspendedAt)
+    _ = try await initialStore.setAccountSuspended(
+      userID: initialSession.user.id, suspended: false, now: restoredAt)
+
+    let reloadedStore = try AuthStore(
+      fileURL: fileURL, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let reloadedSession = try await reloadedStore.login(
+      .init(email: "resumed-leaderboard@example.com", password: "a secure password"), now: restoredAt)
+    let dayQuery = LeaderboardQuery(mode: "time", language: "english", period: "day")
+    let restoredDailyEntries = try await reloadedStore.leaderboard(dayQuery, now: restoredAt).entries
+    let restoredExperienceEntries = try await reloadedStore.experienceLeaderboard(now: restoredAt).entries
+    XCTAssertTrue(restoredDailyEntries.isEmpty)
+    XCTAssertTrue(restoredExperienceEntries.isEmpty)
+
+    _ = try await reloadedStore.submitResult(
+      result(
+        id: UUID(), wpm: 81, accuracy: 100, durationSeconds: 30,
+        finishedAt: resumedResultAt), accessToken: reloadedSession.accessToken, now: resumedResultAt)
+    let resumedDailyEntries = try await reloadedStore.leaderboard(dayQuery, now: resumedResultAt).entries
+    let resumedExperienceEntries = try await reloadedStore.experienceLeaderboard(now: resumedResultAt).entries
+    XCTAssertEqual(resumedDailyEntries.map(\.wpm), [81])
+    XCTAssertEqual(resumedExperienceEntries.count, 1)
   }
 
   func testLeaderboardMinimumPracticeConfigurationUsesSafeDefaultsAndRejectsInvalidValues() throws {

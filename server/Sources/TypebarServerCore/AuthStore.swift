@@ -731,13 +731,15 @@ public actor AuthStore {
     var displayNameChangeRequired: Bool
     var lastDisplayNameChangeAt: Date?
     var accountSuspended: Bool
+    var rollingLeaderboardResumedAt: Date?
     let profileDetails: ProfileDetails
     let selectedBadgeID: String?
     var startedTestCount: Int
 
     private enum CodingKeys: String, CodingKey {
       case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut,
-        leaderboardRestricted, displayNameChangeRequired, lastDisplayNameChangeAt, accountSuspended, profileDetails, selectedBadgeID,
+        leaderboardRestricted, displayNameChangeRequired, lastDisplayNameChangeAt, accountSuspended,
+        rollingLeaderboardResumedAt, profileDetails, selectedBadgeID,
         startedTestCount
     }
 
@@ -749,6 +751,7 @@ public actor AuthStore {
       displayNameChangeRequired: Bool = false,
       lastDisplayNameChangeAt: Date? = nil,
       accountSuspended: Bool = false,
+      rollingLeaderboardResumedAt: Date? = nil,
       profileDetails: ProfileDetails = .init(), selectedBadgeID: String? = nil,
       startedTestCount: Int = 0
     ) {
@@ -763,6 +766,7 @@ public actor AuthStore {
       self.displayNameChangeRequired = displayNameChangeRequired
       self.lastDisplayNameChangeAt = lastDisplayNameChangeAt
       self.accountSuspended = accountSuspended
+      self.rollingLeaderboardResumedAt = rollingLeaderboardResumedAt
       self.profileDetails = profileDetails
       self.selectedBadgeID = selectedBadgeID
       self.startedTestCount = startedTestCount
@@ -782,6 +786,8 @@ public actor AuthStore {
         try values.decodeIfPresent(Bool.self, forKey: .displayNameChangeRequired) ?? false
       lastDisplayNameChangeAt = try values.decodeIfPresent(Date.self, forKey: .lastDisplayNameChangeAt)
       accountSuspended = try values.decodeIfPresent(Bool.self, forKey: .accountSuspended) ?? false
+      rollingLeaderboardResumedAt = try values.decodeIfPresent(
+        Date.self, forKey: .rollingLeaderboardResumedAt)
       profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
       selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
       startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
@@ -1328,6 +1334,7 @@ public actor AuthStore {
       displayNameChangeRequired: user.displayNameChangeRequired,
       lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
+      rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
@@ -1374,6 +1381,7 @@ public actor AuthStore {
       displayNameChangeRequired: user.displayNameChangeRequired,
       lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
+      rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.passwordResetTokens.removeAll { $0.userID == user.id }
@@ -1664,6 +1672,7 @@ public actor AuthStore {
       displayNameChangeRequired: user.displayNameChangeRequired,
       lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
+      rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.sessions.removeAll { $0.userID == user.id }
@@ -1726,6 +1735,7 @@ public actor AuthStore {
       displayNameChangeRequired: user.displayNameChangeRequired,
       lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
+      rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
     state.emailVerificationTokens.removeAll { $0.userID == user.id }
@@ -1831,6 +1841,7 @@ public actor AuthStore {
       displayNameChangeRequired: user.displayNameChangeRequired,
       lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
+      rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
       startedTestCount: user.startedTestCount
@@ -1873,6 +1884,7 @@ public actor AuthStore {
       displayNameChangeRequired: user.displayNameChangeRequired,
       lastDisplayNameChangeAt: user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
+      rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
       startedTestCount: user.startedTestCount
@@ -2035,6 +2047,7 @@ public actor AuthStore {
       displayNameChangeRequired: user.displayNameChangeRequired && displayName == user.displayName,
       lastDisplayNameChangeAt: isChangingDisplayName ? now : user.lastDisplayNameChangeAt,
       accountSuspended: user.accountSuspended,
+      rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: profileDetails, selectedBadgeID: selectedBadgeID,
       startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
@@ -2469,7 +2482,7 @@ public actor AuthStore {
   /// Reversibly applies the reference project's bounded account-ban behavior.
   /// Results remain stored, but shared leaderboard eligibility disappears and
   /// profile mutation or account reset cannot rewrite the suspended account.
-  public func setAccountSuspended(userID: UUID, suspended: Bool) throws
+  public func setAccountSuspended(userID: UUID, suspended: Bool, now: Date = .now) throws
     -> AccountSuspensionResponse
   {
     guard let index = state.users.firstIndex(where: { $0.id == userID }) else {
@@ -2477,6 +2490,12 @@ public actor AuthStore {
     }
     if state.users[index].accountSuspended != suspended {
       state.users[index].accountSuspended = suspended
+      if !suspended {
+        // Monkeytype removes Redis-backed daily and weekly XP entries on ban.
+        // Typebar derives those views from retained results, so reopening an
+        // account records the equivalent boundary without deleting practice.
+        state.users[index].rollingLeaderboardResumedAt = now
+      }
       try persist()
     }
     return .init(userID: userID, isSuspended: suspended)
@@ -3005,12 +3024,17 @@ public actor AuthStore {
     }
   }
 
-  private func experience(for userID: UUID, since: Date? = nil, before: Date? = nil) -> Int {
+  private func experience(
+    for userID: UUID, since: Date? = nil, before: Date? = nil,
+    acceptedOnOrAfter rollingLeaderboardResumedAt: Date? = nil
+  ) -> Int {
     state.results
       .filter {
         $0.userID == userID
           && (since == nil || $0.finishedAt >= since!)
           && (before == nil || $0.finishedAt < before!)
+          && (rollingLeaderboardResumedAt == nil
+            || $0.acceptedAt.map { $0 >= rollingLeaderboardResumedAt! } == true)
       }
       .reduce(0) { total, record in
         total + TypebarExperiencePolicy.points(for: resultRequest(from: record))
@@ -3460,7 +3484,9 @@ public actor AuthStore {
         leaderboardEligibility(for: user, typingSeconds: typingSecondsByUser[user.id] ?? 0).isEligible,
         eligibleUserIDs == nil || eligibleUserIDs!.contains(user.id)
       else { return nil }
-      let weeklyPoints = experience(for: user.id, since: lowerBound, before: upperBound)
+      let weeklyPoints = experience(
+        for: user.id, since: lowerBound, before: upperBound,
+        acceptedOnOrAfter: user.rollingLeaderboardResumedAt)
       return weeklyPoints > 0 ? (user, weeklyPoints) : nil
     }
     .sorted {
@@ -3503,6 +3529,7 @@ public actor AuthStore {
     }
     let period = query.period ?? "all"
     guard periods.contains(period) else { throw ResultStoreError.invalidResult }
+    let usesDailyLeaderboardCache = period == "day" || period == "yesterday"
     let calendar = Calendar.current
     let todayStart = calendar.startOfDay(for: now)
     let lowerBound: Date?
@@ -3529,6 +3556,11 @@ public actor AuthStore {
         && users[result.userID].map {
           leaderboardEligibility(for: $0, typingSeconds: typingSecondsByUser[$0.id] ?? 0).isEligible
         } == true
+        && (!usesDailyLeaderboardCache
+          || users[result.userID].map {
+            guard let resumedAt = $0.rollingLeaderboardResumedAt else { return true }
+            return result.acceptedAt.map { $0 >= resumedAt } == true
+          } == true)
         && (query.mode == nil || result.mode == query.mode)
         && (query.language == nil || result.language == query.language)
         && (query.durationSeconds == nil || result.durationSeconds == query.durationSeconds)
