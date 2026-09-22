@@ -29,10 +29,13 @@ if ! jq -e '(.specs | length) > 0 and (([.specs[].source] | length) == ([.specs[
   fail "fixture has duplicate paths, an unknown category, or direct behavior without native evidence or test symbols"
 fi
 
-actual_specs="$(cd "$reference_root" && find frontend/__tests__ -type f -name '*.spec.ts' -print | LC_ALL=C sort)"
+actual_specs="$(cd "$reference_root" && {
+  find frontend/__tests__ -type f -name '*.spec.ts' -print
+  find backend/__tests__/api/controllers -type f -name '*.spec.ts' -print
+} | LC_ALL=C sort)"
 fixture_specs="$(jq -er '.specs[].source' "$fixture" | LC_ALL=C sort)"
 if ! diff -u <(print -r -- "$actual_specs") <(print -r -- "$fixture_specs"); then
-  fail "fixture differs from the fixed reference frontend test inventory"
+  fail "fixture differs from the fixed reference client and controller test inventory"
 fi
 
 while IFS= read -r evidence; do
@@ -44,7 +47,9 @@ done < <(jq -r '.specs[] | select(.kind == "direct") | .nativeEvidence[]' "$fixt
 while IFS=$'\t' read -r source symbol; do
   [[ -n "$source" && -n "$symbol" ]] || fail "direct behavior has an empty native test symbol"
   [[ "$symbol" == test* ]] || fail "native test symbol for $source must start with test: $symbol"
-  grep -RFq -- "func $symbol(" "$project_root/Tests/TypebarTests" || fail "missing native test symbol for $source: $symbol"
+  grep -RFq -- "func $symbol(" \
+    "$project_root/Tests/TypebarTests" "$project_root/server/Tests" \
+    || fail "missing native test symbol for $source: $symbol"
 done < <(jq -r '.specs[] | select(.kind == "direct") | .source as $source | .nativeTests[] | "\($source)\t\(.)"' "$fixture")
 
 while IFS= read -r source; do

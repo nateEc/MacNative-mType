@@ -48,7 +48,7 @@ zsh Scripts/check-page-modal-surface-audit.sh /absolute/path/to/monkeytype-refer
 zsh Scripts/check-reference-metadata-audits.sh /absolute/path/to/monkeytype-reference
 ```
 
-核验固定参考的前端规格测试均已分类，且每个直接用户行为都有 Typebar 原生证据：
+核验固定参考的客户端与后端 controller 规格测试均已分类，且每个直接用户行为都有 Typebar 原生证据：
 
 ```zsh
 zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference

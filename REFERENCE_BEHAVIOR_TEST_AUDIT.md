@@ -3,9 +3,9 @@
 ## 目的与边界
 
 - 固定参考提交为 `91bd24bb8513785c7364cbea29296ff7adafac41`。
-- 本文盘点参考前端 `frontend/__tests__` 的 39 个规格测试文件：33 个直接约束用户可见的练习、配置、展示或数据行为，6 个只是网页运行时内部的通用工具测试。
+- 本文盘点参考前端 `frontend/__tests__` 的 39 个规格测试文件，以及后端 `backend/__tests__/api/controllers` 的 14 个 controller 规格测试文件：合计 44 个直接约束用户可见的练习、配置、展示、账户或远端数据行为，9 个只是网页/服务运行时内部或运营专用测试。
 - 清单只保留路径、领域、Typebar 证据路径和原生测试函数名；不复制测试步骤、参考代码、词表、视觉资产或线上数据。
-- `Compatibility/official-reference-behavior-specs.json` 是机器可读来源；每个直接规格都附有可定位的 `nativeTests` 函数名。`zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference` 会核对固定提交、39 个路径的完备分类、直接行为的原生证据路径和函数符号，以及本文覆盖。
+- `Compatibility/official-reference-behavior-specs.json` 是机器可读来源；每个直接规格都附有可定位的 `nativeTests` 函数名。`zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference` 会核对固定提交、53 个路径的完备分类、直接行为的原生证据路径和函数符号，以及本文覆盖。
 
 ## 直接用户行为规格
 
@@ -29,9 +29,24 @@
 | `frontend/__tests__/utils/generate.spec.ts`、`frontend/__tests__/utils/ip-addresses.spec.ts` | 生成的符号流、IPv4/IPv6 格式 | `OfflineContent.swift`、`TypingEngineTests.swift` 的原创符号流、CIDR 网络位与 IPv6 压缩格式回归。 |
 | `frontend/__tests__/utils/strings.spec.ts` | Unicode 词界、RTL 和视觉等价输入 | `TypingEngine.swift`、`TypingEngineTests.swift` 的组合文本、等价标点、空白、俄语和双向文本回归。 |
 
+## 自建服务的 controller 行为规格
+
+| 参考规格路径 | 可观察领域 | Typebar 原生证据 |
+| --- | --- | --- |
+| `backend/__tests__/api/controllers/admin.spec.ts` | 审核队列、资料/账户治理与权限边界 | `Routes.swift`、`AuthStore.swift` 与 `HealthRouteTests.swift` 的审核部署密钥、资料审核和账户暂停回归。 |
+| `backend/__tests__/api/controllers/ape-key.spec.ts` | 开发者访问密钥的创建、作用域和撤销 | 同一自建服务路由与测试守护哈希保存、仅限本人结果、撤销后失效。 |
+| `backend/__tests__/api/controllers/config.spec.ts`、`backend/__tests__/api/controllers/preset.spec.ts` | 账户配置和预设的版本化保存/同步 | 自建同步路由以用户作用域版本和分页 cursor 同步归档；测试守护无跳页和隔离。 |
+| `backend/__tests__/api/controllers/connections.spec.ts` | 好友请求、接受、删除与屏蔽 | 自建连接路由和测试守护关系状态、用户隔离及屏蔽时的清理。 |
+| `backend/__tests__/api/controllers/leaderboard.spec.ts` | 全局/好友榜、分页和个人可见范围 | 自建榜单路由和测试守护稳定分页、总数、offset 与仅已接受好友的范围。 |
+| `backend/__tests__/api/controllers/psa.spec.ts` | 服务公告的公开读取和部署者发布/撤销 | 自建公告路由和测试守护公开读取、部署密钥与删除。 |
+| `backend/__tests__/api/controllers/public.spec.ts` | 匿名公开资料和公共练习统计 | 自建公开路由只返回允许字段，测试守护邮箱隐藏和可分享的聚合统计。 |
+| `backend/__tests__/api/controllers/quotes.spec.ts` | 社区引语提交、审核和公开读取 | 自建引语路由和测试守护内容校验、待审状态、审核与仅公开已批准条目。 |
+| `backend/__tests__/api/controllers/result.spec.ts` | 成绩提交、历史和榜单写入 | 自建结果路由和测试守护认证、幂等提交、资格排序和榜单响应。 |
+| `backend/__tests__/api/controllers/user.spec.ts` | 注册、登录与删除账户 | 自建身份路由和测试守护独立会话、密码验证及级联清理。 |
+
 ## 网页运行时支持规格
 
-以下文件被完整枚举但不直接映射为独立 macOS 用户任务：`frontend/__tests__/hooks/createEvent.spec.ts`、`frontend/__tests__/hooks/createSignalWithSetters.spec.ts`、`frontend/__tests__/utils/local-storage-with-schema.spec.ts`、`frontend/__tests__/utils/sanitize.spec.ts`、`frontend/__tests__/utils/tag-builder.spec.ts`、`frontend/__tests__/utils/zod.spec.ts`。它们验证 Solid/DOM/Zod/LocalStorage 的网页内部实现；Typebar 以 Swift observation、SwiftData、Codable 与原生 UI 替代，没有复制这些实现。任何未来从这些支持层暴露为新用户任务的行为，都必须移入上表、添加原生证据并更新验收。
+以下文件被完整枚举但不直接映射为独立 macOS 用户任务：`frontend/__tests__/hooks/createEvent.spec.ts`、`frontend/__tests__/hooks/createSignalWithSetters.spec.ts`、`frontend/__tests__/utils/local-storage-with-schema.spec.ts`、`frontend/__tests__/utils/sanitize.spec.ts`、`frontend/__tests__/utils/tag-builder.spec.ts`、`frontend/__tests__/utils/zod.spec.ts`，以及 `backend/__tests__/api/controllers/configuration.spec.ts`、`dev.spec.ts`、`webhooks.spec.ts`。前六项验证 Solid/DOM/Zod/LocalStorage 的网页内部实现，后三项是部署配置、开发接口或上游发布 webhook；Typebar 以 Swift observation、SwiftData、Codable、自建部署配置与版本资料替代，没有复制这些实现。任何未来从这些支持层暴露为新用户任务的行为，都必须移入上表、添加原生证据并更新验收。
 
 ## 验收结论
 
