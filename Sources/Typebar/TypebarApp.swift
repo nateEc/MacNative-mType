@@ -3904,7 +3904,8 @@ private struct ContentView: View {
       configuration: configuration,
       quoteID: mode == .quote ? selectedQuoteID : nil,
       customText: mode == .custom ? customText : nil,
-      activeResultTags: settings.activeResultTags
+      activeResultTags: settings.activeResultTags,
+      settingsSnapshot: settings.snapshot
     )
   }
 
@@ -3915,18 +3916,22 @@ private struct ContentView: View {
     polyglotReturnLanguage: TypingLanguage? = nil
   ) {
     guard acceptsRestartingConfigurationChange() else { return }
+    guard preset.settingGroups?.isEmpty != true else { return }
     practiceReturnPreset = nil
-    let challenge = TypebarChallengeLibrary.challenge(id: preset.configuration.challengeID)
-    activeChallengeID = challenge?.id
-    let configuration = challenge?.preset.configuration ?? preset.configuration
+    let appliesTest = !preset.isPartial || (preset.settingGroups?.contains(.test) == true)
+    let appliedPreset = PresetApplicationPolicy.applying(current: presetDefinition, preset: preset)
+    let challenge = appliesTest
+      ? TypebarChallengeLibrary.challenge(id: appliedPreset.configuration.challengeID) : nil
+    if appliesTest { activeChallengeID = challenge?.id }
+    let configuration = challenge?.preset.configuration ?? appliedPreset.configuration
     mode = configuration.mode
     if overwritesParameterMemory {
       if let duration = configuration.duration { self.duration = Int(duration) }
       if let wordLimit = configuration.wordLimit { self.wordLimit = wordLimit }
     }
-    let requestedQuoteID = preset.quoteID
+    let requestedQuoteID = appliedPreset.quoteID
     if let requestedQuoteID { selectedQuoteID = requestedQuoteID }
-    if let customText = preset.customText { self.customText = customText }
+    if let customText = appliedPreset.customText { self.customText = customText }
     customTextCompletion = configuration.customTextCompletion
     if overwritesParameterMemory, configuration.customTextCompletion == .time,
       let duration = configuration.duration
@@ -3958,8 +3963,15 @@ private struct ContentView: View {
     }
     quoteQueue.reset()
     contentOptions = configuration.contentOptions
-    if appliesGlobalSettings { settings.apply(configuration) }
-    if let activeResultTags = preset.activeResultTags {
+    if appliesGlobalSettings {
+      if let settingsSnapshot = appliedPreset.settingsSnapshot {
+        settings.apply(settingsSnapshot)
+      } else {
+        settings.apply(configuration)
+      }
+    }
+    let appliesActiveTags = !preset.isPartial || (preset.settingGroups?.contains(.behavior) == true)
+    if appliesActiveTags, let activeResultTags = appliedPreset.activeResultTags {
       settings.activeResultTags = activeResultTags
     }
     ensureSelectedQuote()

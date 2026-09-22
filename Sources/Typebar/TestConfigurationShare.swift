@@ -29,8 +29,9 @@ enum TestConfigurationShare {
     }
 
     static func link(for preset: SavedTestPreset) throws -> String {
-        guard isValid(preset) else { throw TestConfigurationShareError.invalidConfiguration }
-        let data = try JSONEncoder().encode(Payload(version: version, preset: preset))
+        let sharedPreset = testConfigurationOnly(preset)
+        guard isValid(sharedPreset) else { throw TestConfigurationShareError.invalidConfiguration }
+        let data = try JSONEncoder().encode(Payload(version: version, preset: sharedPreset))
         let token = data.base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
@@ -58,8 +59,17 @@ enum TestConfigurationShare {
             throw TestConfigurationShareError.invalidPayload
         }
         guard payload.version == version else { throw TestConfigurationShareError.unsupportedVersion(payload.version) }
-        guard isValid(payload.preset) else { throw TestConfigurationShareError.invalidConfiguration }
-        return payload.preset
+        let sharedPreset = testConfigurationOnly(payload.preset)
+        guard isValid(sharedPreset) else { throw TestConfigurationShareError.invalidConfiguration }
+        return sharedPreset
+    }
+
+    /// A `typebar://test` URL is intentionally portable test selection only.
+    /// Preset scope, tags and global settings remain local to the originating
+    /// Mac even when a caller hands this API a saved full or partial preset.
+    private static func testConfigurationOnly(_ preset: SavedTestPreset) -> SavedTestPreset {
+        .init(
+            configuration: preset.configuration, quoteID: preset.quoteID, customText: preset.customText)
     }
 
     private static func isValid(_ preset: SavedTestPreset) -> Bool {

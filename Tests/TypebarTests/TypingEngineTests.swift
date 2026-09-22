@@ -21163,6 +21163,184 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(configuration.contentOptions, ContentOptions())
   }
 
+  func testPartialPresetMergesOnlyItsSelectedGroups() {
+    var currentRules = InputRules()
+    currentRules.strictSpace = false
+    currentRules.minimumWpm = 30
+    let currentConfiguration = TestConfiguration.words(
+      25, difficulty: .normal, rules: currentRules, language: .german)
+    var currentSettings = AppSettingsSnapshot()
+    currentSettings.theme = .paper
+    currentSettings.activeResultTags = ["focus"]
+    currentSettings.soundVolume = 0.2
+
+    var presetRules = InputRules()
+    presetRules.strictSpace = true
+    presetRules.stopOnErrorMode = .word
+    presetRules.minimumWpm = 90
+    let presetConfiguration = TestConfiguration.timed(
+      seconds: 60, difficulty: .master, rules: presetRules, language: .korean)
+    var presetSettings = AppSettingsSnapshot()
+    presetSettings.theme = .midnight
+    presetSettings.activeResultTags = ["review"]
+    presetSettings.soundVolume = 0.9
+
+    let applied = PresetApplicationPolicy.applying(
+      current: .init(
+        configuration: currentConfiguration, quoteID: "current-quote", customText: "current text",
+        activeResultTags: ["focus"], settingsSnapshot: currentSettings),
+      preset: .init(
+        configuration: presetConfiguration, quoteID: "preset-quote", customText: "preset text",
+        activeResultTags: ["review"], settingsSnapshot: presetSettings,
+        settingGroups: [.input]))
+
+    XCTAssertEqual(applied.configuration.mode, .words)
+    XCTAssertEqual(applied.configuration.wordLimit, 25)
+    XCTAssertEqual(applied.configuration.language, .german)
+    XCTAssertEqual(applied.configuration.difficulty, .normal)
+    XCTAssertTrue(applied.configuration.rules.strictSpace)
+    XCTAssertEqual(applied.configuration.rules.stopOnErrorMode, .word)
+    XCTAssertEqual(applied.configuration.rules.minimumWpm, 30)
+    XCTAssertEqual(applied.quoteID, "current-quote")
+    XCTAssertEqual(applied.customText, "current text")
+    XCTAssertEqual(applied.activeResultTags, ["focus"])
+    XCTAssertEqual(applied.settingsSnapshot?.theme, .paper)
+    XCTAssertEqual(applied.settingsSnapshot?.soundVolume, 0.2)
+  }
+
+  func testPartialBehaviorPresetAppliesTagsWithoutChangingTestOrInput() {
+    var currentRules = InputRules()
+    currentRules.strictSpace = true
+    let currentConfiguration = TestConfiguration.words(
+      50, difficulty: .normal, rules: currentRules, language: .spanish)
+    var currentSettings = AppSettingsSnapshot()
+    currentSettings.activeResultTags = ["focus"]
+    currentSettings.repeatQuotes = false
+
+    var presetRules = InputRules()
+    presetRules.strictSpace = false
+    presetRules.blindMode = true
+    presetRules.minimumAccuracy = 98
+    let presetConfiguration = TestConfiguration.timed(
+      seconds: 15, difficulty: .master, rules: presetRules, language: .korean)
+    var presetSettings = AppSettingsSnapshot()
+    presetSettings.activeResultTags = ["review", "speed"]
+    presetSettings.repeatQuotes = true
+
+    let applied = PresetApplicationPolicy.applying(
+      current: .init(
+        configuration: currentConfiguration, quoteID: nil, customText: nil,
+        activeResultTags: ["focus"], settingsSnapshot: currentSettings),
+      preset: .init(
+        configuration: presetConfiguration, quoteID: nil, customText: nil,
+        activeResultTags: ["review", "speed"], settingsSnapshot: presetSettings,
+        settingGroups: [.behavior]))
+
+    XCTAssertEqual(applied.configuration.mode, .words)
+    XCTAssertEqual(applied.configuration.wordLimit, 50)
+    XCTAssertEqual(applied.configuration.language, .spanish)
+    XCTAssertEqual(applied.configuration.difficulty, .master)
+    XCTAssertTrue(applied.configuration.rules.strictSpace)
+    XCTAssertTrue(applied.configuration.rules.blindMode)
+    XCTAssertEqual(applied.configuration.rules.minimumAccuracy, 98)
+    XCTAssertEqual(applied.activeResultTags, ["review", "speed"])
+    XCTAssertTrue(applied.settingsSnapshot?.repeatQuotes == true)
+  }
+
+  func testPartialPresetAppliesEveryNonConfigurationSettingGroupIndependently() {
+    let currentConfiguration = TestConfiguration.words(25, language: .german)
+    var currentSettings = AppSettingsSnapshot()
+    currentSettings.showWordBurstHeatmap = false
+    currentSettings.soundVolume = 0.2
+    currentSettings.caretStyle = .bar
+    currentSettings.fontSize = 24
+    currentSettings.theme = .paper
+    currentSettings.showKeyTips = true
+    currentSettings.showTypingCompanion = false
+    currentSettings.activeResultTags = ["focus"]
+
+    let presetConfiguration = TestConfiguration.timed(seconds: 60, language: .korean)
+    var presetSettings = AppSettingsSnapshot()
+    presetSettings.showWordBurstHeatmap = true
+    presetSettings.soundVolume = 0.9
+    presetSettings.caretStyle = .outline
+    presetSettings.fontSize = 36
+    presetSettings.theme = .midnight
+    presetSettings.showKeyTips = false
+    presetSettings.showTypingCompanion = true
+    presetSettings.activeResultTags = ["review"]
+
+    let applied = PresetApplicationPolicy.applying(
+      current: .init(
+        configuration: currentConfiguration, quoteID: nil, customText: nil,
+        activeResultTags: ["focus"], settingsSnapshot: currentSettings),
+      preset: .init(
+        configuration: presetConfiguration, quoteID: nil, customText: nil,
+        activeResultTags: ["review"], settingsSnapshot: presetSettings,
+        settingGroups: [.test, .sound, .caret, .appearance, .theme, .hideElements, .hidden]))
+
+    XCTAssertEqual(applied.configuration.mode, .time)
+    XCTAssertEqual(applied.configuration.duration, 60)
+    XCTAssertEqual(applied.configuration.language, .korean)
+    XCTAssertEqual(applied.activeResultTags, ["focus"])
+    XCTAssertTrue(applied.settingsSnapshot?.showWordBurstHeatmap == true)
+    XCTAssertEqual(applied.settingsSnapshot?.soundVolume, 0.9)
+    XCTAssertEqual(applied.settingsSnapshot?.caretStyle, .outline)
+    XCTAssertEqual(applied.settingsSnapshot?.fontSize, 36)
+    XCTAssertEqual(applied.settingsSnapshot?.theme, .midnight)
+    XCTAssertFalse(applied.settingsSnapshot?.showKeyTips == true)
+    XCTAssertTrue(applied.settingsSnapshot?.showTypingCompanion == true)
+  }
+
+  func testFullPresetAndLegacyPresetRemainCompatible() throws {
+    let current = SavedTestPreset(configuration: .words(10), quoteID: nil, customText: nil)
+    var snapshot = AppSettingsSnapshot()
+    snapshot.theme = .midnight
+    let full = SavedTestPreset(
+      configuration: .timed(seconds: 60, difficulty: .expert), quoteID: "quote-1", customText: nil,
+      activeResultTags: ["focus"], settingsSnapshot: snapshot)
+
+    XCTAssertEqual(PresetApplicationPolicy.applying(current: current, preset: full), full)
+
+    var legacyJSON = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(full)) as? [String: Any])
+    legacyJSON.removeValue(forKey: "settingsSnapshot")
+    legacyJSON.removeValue(forKey: "settingGroups")
+    let decoded = try JSONDecoder().decode(
+      SavedTestPreset.self, from: JSONSerialization.data(withJSONObject: legacyJSON))
+    XCTAssertNil(decoded.settingsSnapshot)
+    XCTAssertNil(decoded.settingGroups)
+    XCTAssertFalse(decoded.isPartial)
+  }
+
+  func testTestConfigurationShareOmitsPresetScopeAndGlobalSettings() throws {
+    var snapshot = AppSettingsSnapshot()
+    snapshot.theme = .midnight
+    let localPreset = SavedTestPreset(
+      configuration: .timed(seconds: 60, difficulty: .expert), quoteID: "quote-1", customText: nil,
+      activeResultTags: ["focus"], settingsSnapshot: snapshot, settingGroups: [.test, .theme])
+
+    let restored = try TestConfigurationShare.preset(
+      from: TestConfigurationShare.link(for: localPreset))
+
+    XCTAssertEqual(restored.configuration, localPreset.configuration)
+    XCTAssertEqual(restored.quoteID, "quote-1")
+    XCTAssertNil(restored.activeResultTags)
+    XCTAssertNil(restored.settingsSnapshot)
+    XCTAssertNil(restored.settingGroups)
+  }
+
+  func testEmptyPartialPresetIsAStatePreservingNoOp() {
+    let current = SavedTestPreset(
+      configuration: .words(25, difficulty: .expert), quoteID: "current", customText: "current text",
+      activeResultTags: ["focus"], settingsSnapshot: .init(theme: .midnight))
+    let malformed = SavedTestPreset(
+      configuration: .timed(seconds: 15), quoteID: "other", customText: "other text",
+      activeResultTags: ["review"], settingsSnapshot: .init(theme: .paper), settingGroups: [])
+
+    XCTAssertEqual(PresetApplicationPolicy.applying(current: current, preset: malformed), current)
+  }
+
   @MainActor
   func testPresetRoundTripsWithAllSessionInputs() throws {
     let container = try ModelContainer(
