@@ -1008,8 +1008,8 @@ public actor AuthStore {
     let id: UUID
     let userID: UUID
     let language: String
-    let text: String
-    let attribution: String?
+    var text: String
+    var attribution: String?
     var status: String
     let submittedAt: Date
   }
@@ -2658,11 +2658,24 @@ public actor AuthStore {
   /// The caller is authenticated by the deployment-level moderation key in
   /// the route layer. Keeping that key outside the persisted user store
   /// prevents ordinary accounts from granting themselves review access.
-  public func moderateQuote(_ id: UUID, status: String) throws -> QuoteSubmissionResponse {
-    guard Set(["approved", "rejected"]).contains(status),
+  public func moderateQuote(
+    _ id: UUID, status: String, text: String? = nil, attribution: String? = nil
+  ) throws -> QuoteSubmissionResponse {
+    let normalizedText = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalizedAttribution = attribution?.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      Set(["approved", "rejected"]).contains(status),
+      (status == "approved" || (text == nil && attribution == nil)),
+      normalizedText.map({ (10...500).contains($0.count) }) ?? true,
+      normalizedAttribution.map({ $0.count <= 80 }) ?? true,
       let index = state.quoteSubmissions.firstIndex(where: { $0.id == id })
     else { throw AuthStoreError.invalidQuoteSubmission }
     state.quoteSubmissions[index].status = status
+    if let normalizedText { state.quoteSubmissions[index].text = normalizedText }
+    if attribution != nil {
+      state.quoteSubmissions[index].attribution =
+        normalizedAttribution?.isEmpty == true ? nil : normalizedAttribution
+    }
     try persist()
     let quote = state.quoteSubmissions[index]
     return .init(id: quote.id, status: quote.status, submittedAt: quote.submittedAt)

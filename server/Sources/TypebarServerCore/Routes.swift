@@ -768,7 +768,12 @@ public func configure(
             throw Abort(.forbidden, reason: "A configured Typebar moderation key is required.")
         }
         guard let rawID = request.parameters.get("id"), let id = UUID(uuidString: rawID) else { throw Abort(.badRequest, reason: "The quote identifier was invalid.") }
-        do { return try await authStore.moderateQuote(id, status: try request.content.decode(QuoteModerationRequest.self).status) }
+        do {
+            let moderation = try request.content.decode(QuoteModerationRequest.self)
+            return try await authStore.moderateQuote(
+                id, status: moderation.status, text: moderation.text,
+                attribution: moderation.attribution)
+        }
         catch let error as AuthStoreError { throw error.abort }
     }
 

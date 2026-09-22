@@ -59,6 +59,9 @@ struct PreferencesView: View {
   @State private var moderationKey = ""
   @State private var moderationStatus: RemoteQuoteModerationStatus = .pending
   @State private var moderationQuotes: [RemoteModerationQuote] = []
+  @State private var editingModerationQuoteID: UUID?
+  @State private var editedModerationQuoteText = ""
+  @State private var editedModerationQuoteAttribution = ""
   @State private var profileModerationStatus: RemoteProfileModerationStatus = .open
   @State private var moderationProfileReports: [RemoteModerationProfileReport] = []
   @State private var pendingAccountSuspension: RemoteModerationProfileReport?
@@ -1852,9 +1855,20 @@ struct PreferencesView: View {
                   .font(.caption2)
                   .foregroundStyle(.secondary)
               }
-              Text(quote.text)
-              if let attribution = quote.attribution {
-                Text(attribution).font(.caption).foregroundStyle(.secondary)
+              if editingModerationQuoteID == quote.id {
+                TextField("引语正文（10–500 字符）", text: $editedModerationQuoteText, axis: .vertical)
+                  .lineLimit(3...6)
+                TextField("署名或来源（可选，最多 80 字）", text: $editedModerationQuoteAttribution)
+                Text(
+                  "\(editedModerationQuoteText.trimmingCharacters(in: .whitespacesAndNewlines).count)/500 · \(editedModerationQuoteAttribution.trimmingCharacters(in: .whitespacesAndNewlines).count)/80"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+              } else {
+                Text(quote.text)
+                if let attribution = quote.attribution {
+                  Text(attribution).font(.caption).foregroundStyle(.secondary)
+                }
               }
               if !quote.reports.isEmpty {
                 ForEach(quote.reports) { report in
@@ -1865,9 +1879,29 @@ struct PreferencesView: View {
               }
               if quote.status == RemoteQuoteModerationStatus.pending.rawValue {
                 HStack {
-                  Button("批准") { Task { await moderate(quote, as: .approved) } }
+                  if editingModerationQuoteID == quote.id {
+                    Button("取消编辑") { cancelModerationEdit() }
+                    Button("编辑后批准") {
+                      Task {
+                        await moderate(
+                          quote, as: .approved, text: editedModerationQuoteText,
+                          attribution: editedModerationQuoteAttribution)
+                      }
+                    }
                     .buttonStyle(.borderedProminent)
-                  Button("拒绝", role: .destructive) { Task { await moderate(quote, as: .rejected) } }
+                    .disabled(
+                      moderationIsWorking
+                        || !(10...500).contains(
+                          editedModerationQuoteText.trimmingCharacters(
+                            in: .whitespacesAndNewlines).count)
+                        || editedModerationQuoteAttribution.trimmingCharacters(
+                          in: .whitespacesAndNewlines).count > 80)
+                  } else {
+                    Button("批准") { Task { await moderate(quote, as: .approved) } }
+                      .buttonStyle(.borderedProminent)
+                    Button("编辑后批准") { beginModerationEdit(quote) }
+                    Button("拒绝", role: .destructive) { Task { await moderate(quote, as: .rejected) } }
+                  }
                 }
                 .disabled(moderationIsWorking)
               }
@@ -2445,6 +2479,7 @@ struct PreferencesView: View {
     do {
       moderationQuotes = try await account.moderationQuotes(
         key: moderationKey, status: moderationStatus)
+      cancelModerationEdit()
       moderationMessage =
         moderationQuotes.isEmpty ? "当前筛选没有审核内容。" : "已读取 \(moderationQuotes.count) 条审核内容。"
     } catch {
@@ -2454,15 +2489,36 @@ struct PreferencesView: View {
   }
 
   @MainActor
-  private func moderate(_ quote: RemoteModerationQuote, as status: RemoteQuoteModerationStatus)
+  private func beginModerationEdit(_ quote: RemoteModerationQuote) {
+    editingModerationQuoteID = quote.id
+    editedModerationQuoteText = quote.text
+    editedModerationQuoteAttribution = quote.attribution ?? ""
+  }
+
+  @MainActor
+  private func cancelModerationEdit() {
+    editingModerationQuoteID = nil
+    editedModerationQuoteText = ""
+    editedModerationQuoteAttribution = ""
+  }
+
+  @MainActor
+  private func moderate(
+    _ quote: RemoteModerationQuote, as status: RemoteQuoteModerationStatus, text: String? = nil,
+    attribution: String? = nil
+  )
     async
   {
     moderationIsWorking = true
     defer { moderationIsWorking = false }
     do {
-      try await account.moderateQuote(quote.id, key: moderationKey, status: status)
-      moderationMessage = "已将内容标为\(status.displayName)。"
+      try await account.moderateQuote(
+        quote.id, key: moderationKey, status: status, text: text, attribution: attribution)
+      moderationMessage = text == nil && attribution == nil
+        ? "已将内容标为\(status.displayName)。"
+        : "已编辑并批准内容。"
       moderationQuotes.removeAll { $0.id == quote.id }
+      cancelModerationEdit()
     } catch {
       moderationMessage = error.localizedDescription
     }

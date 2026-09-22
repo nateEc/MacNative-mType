@@ -485,7 +485,11 @@ struct RemoteModerationQuote: Codable, Identifiable, Sendable {
 }
 
 private struct RemoteModerationQuoteListResponse: Codable, Sendable { let quotes: [RemoteModerationQuote] }
-private struct RemoteQuoteModerationRequest: Codable, Sendable { let status: String }
+private struct RemoteQuoteModerationRequest: Codable, Sendable {
+    let status: String
+    let text: String?
+    let attribution: String?
+}
 
 struct RemotePublicQuote: Codable, Identifiable, Sendable {
     let id: UUID
@@ -2272,12 +2276,16 @@ final class AccountSession {
         ).quotes
     }
 
-    func moderateQuote(_ id: UUID, key: String, status: RemoteQuoteModerationStatus) async throws {
+    func moderateQuote(
+        _ id: UUID, key: String, status: RemoteQuoteModerationStatus, text: String? = nil,
+        attribution: String? = nil
+    ) async throws {
         let normalizedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedKey.isEmpty else { throw RemoteAccountError.serverMessage("请输入部署者配置的审核密钥。") }
         _ = try await RemoteAccountAPI(endpoint: endpoint).request(
             path: "v1/moderation/quotes/\(id.uuidString)", method: "PATCH", token: nil,
-            body: RemoteQuoteModerationRequest(status: status.rawValue),
+            body: RemoteQuoteModerationRequest(
+                status: status.rawValue, text: text, attribution: attribution),
             headers: ["X-Typebar-Moderation-Key": normalizedKey], response: RemoteQuoteSubmissionResponse.self
         )
     }

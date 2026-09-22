@@ -1514,6 +1514,82 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(afterRejection.quotes.isEmpty)
   }
 
+  func testModeratorCanEditQuoteTextAndAttributionWhileApproving() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let author = try await store.register(
+      .init(
+        email: "quote-editor@example.com", password: "a secure password",
+        displayName: "Quote Editor"))
+    let submitted = try await store.submitQuote(
+      .init(
+        language: "english", text: "A submitted quotation may need a careful editorial pass.",
+        attribution: "Original source"), accessToken: author.accessToken)
+    let editedText =
+      "A patient editor turns an imprecise draft into a quotation that readers can trust and return to when practicing their craft."
+
+    _ = try await store.moderateQuote(
+      submitted.id, status: "approved", text: "  \(editedText)  ",
+      attribution: "  Verified practice collection  ")
+
+    let publicQuote = try await store.publicQuotes(language: "english", limit: 10).quotes.first
+    XCTAssertEqual(publicQuote?.id, submitted.id)
+    XCTAssertEqual(publicQuote?.text, editedText)
+    XCTAssertEqual(publicQuote?.attribution, "Verified practice collection")
+    let moderationQuote = try await store.moderationQuotes(status: "approved", limit: 10).quotes.first
+    XCTAssertEqual(
+      moderationQuote?.submittedAt, submitted.submittedAt)
+
+    let rejected = try await store.submitQuote(
+      .init(
+        language: "english", text: "A rejected quotation must never accept editorial replacement text.",
+        attribution: nil), accessToken: author.accessToken)
+    do {
+      _ = try await store.moderateQuote(
+        rejected.id, status: "rejected", text: editedText, attribution: nil)
+      XCTFail("Editorial content must only be accepted with approval")
+    } catch let error as AuthStoreError { XCTAssertEqual(error, .invalidQuoteSubmission) }
+  }
+
+  func testQuoteModerationRouteCarriesEditedApprovalContent() async throws {
+    let app = try await Application.make(.testing)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let moderationKey = "test-quote-editing-key"
+    let author = try await store.register(
+      .init(
+        email: "quote-route-editor@example.com", password: "a secure password",
+        displayName: "Quote Route Editor"))
+    let submitted = try await store.submitQuote(
+      .init(
+        language: "english", text: "A review route should carry the editor's approved wording.",
+        attribution: "Initial source"), accessToken: author.accessToken)
+    let editedText = "A review route carries the editor's approved wording to every future reader."
+
+    do {
+      try configure(app, authStore: store, moderationKey: moderationKey)
+      try await app.test(
+        .PATCH, "v1/moderation/quotes/\(submitted.id.uuidString)",
+        beforeRequest: { request async throws in
+          request.headers.add(name: "X-Typebar-Moderation-Key", value: moderationKey)
+          try request.content.encode(
+            QuoteModerationRequest(
+              status: "approved", text: "  \(editedText)  ",
+              attribution: "  Edited source  "))
+        },
+        afterResponse: { response async in
+          XCTAssertEqual(response.status, .ok)
+          XCTAssertEqual(
+            try response.content.decode(QuoteSubmissionResponse.self).status, "approved")
+        })
+      let publicQuote = try await store.publicQuotes(language: "english", limit: 10).quotes.first
+      XCTAssertEqual(publicQuote?.text, editedText)
+      XCTAssertEqual(publicQuote?.attribution, "Edited source")
+      try await app.asyncShutdown()
+    } catch {
+      try? await app.asyncShutdown()
+      throw error
+    }
+  }
+
   func testQuoteSubmissionRouteRequiresAuthentication() async throws {
     let app = try await Application.make(.testing)
     do {

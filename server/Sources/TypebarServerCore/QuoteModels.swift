@@ -30,6 +30,16 @@ public struct QuoteSubmissionListResponse: Content, Equatable {
 
 public struct QuoteModerationRequest: Content, Equatable {
     public let status: String
+    /// Optional replacement values are accepted only when approving. Omitted
+    /// fields preserve the submitted content; an empty attribution removes it.
+    public let text: String?
+    public let attribution: String?
+
+    public init(status: String, text: String? = nil, attribution: String? = nil) {
+        self.status = status
+        self.text = text
+        self.attribution = attribution
+    }
 }
 
 /// Deployment-only moderation data. It deliberately excludes reporter IDs and
