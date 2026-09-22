@@ -1672,6 +1672,9 @@ private struct ContentView: View {
           VStack(alignment: .leading, spacing: 10) {
             TextField("输入你自己的练习文本", text: $customText, axis: .vertical)
               .lineLimit(2...4)
+              .font(settings.practiceFont.font(
+                size: 15, installedFontName: settings.installedPracticeFontName,
+                language: language))
               .disabled(activeLongSavedText != nil)
               .onChange(of: customText) { _, value in
                 let clamped = CustomTextPolicy.clamped(value)
