@@ -25047,6 +25047,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       ResultMetricPresentation.accuracy(
         result.preciseAccuracy, alwaysShowDecimalPlaces: true), "12.75%")
+    XCTAssertEqual(
+      ResultMetricPresentation.percentage(12.5, alwaysShowDecimalPlaces: false), "13%")
+    XCTAssertEqual(
+      ResultMetricPresentation.percentage(12.5, alwaysShowDecimalPlaces: true), "12.50%")
 
     let decoded = try JSONDecoder().decode(
       CompletedTestResult.self, from: JSONEncoder().encode(result))

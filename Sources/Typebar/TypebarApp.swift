@@ -4667,8 +4667,10 @@ private struct CompletedResultView: View {
           metric("输入字符", "\(result.typedCharacterCount)")
         }
         GridRow {
-          metric("稳定度", "\(consistencyText(consistency.typing))%")
-          metric("按键稳定度", "\(consistencyText(consistency.key))%")
+          metric("稳定度", ResultMetricPresentation.percentage(
+            consistency.typing, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
+          metric("按键稳定度", ResultMetricPresentation.percentage(
+            consistency.key, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
         }
         if result.afkDuration > 0 {
           GridRow {
@@ -5194,10 +5196,6 @@ private struct CompletedResultView: View {
 
   private var consistency: ResultConsistency {
     ResultConsistencyPolicy.metrics(events: result.replayEvents, duration: result.elapsedDuration)
-  }
-
-  private func consistencyText(_ value: Double) -> String {
-    value.formatted(.number.precision(.fractionLength(0...2)))
   }
 
   private func metric(_ title: String, _ value: String) -> some View {

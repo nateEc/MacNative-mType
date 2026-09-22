@@ -669,7 +669,7 @@ struct PreferencesView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("结果页固定显示两位小数", isOn: $settings.alwaysShowDecimalPlaces)
-          Text("只影响完成结果页的速度和准确率显示；本机成绩、统计和同步仍以 WPM 保存。")
+          Text("只影响完成结果页的速度、准确率和稳定度显示；本机成绩、统计和同步仍以 WPM 保存。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("速度图从零开始", isOn: $settings.startGraphsAtZero)

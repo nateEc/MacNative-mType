@@ -17,6 +17,14 @@ enum ResultMetricPresentation {
     return "\(Int(normalized.rounded(.down)))%"
   }
 
+  static func percentage(_ value: Double, alwaysShowDecimalPlaces: Bool) -> String {
+    let normalized = normalized(value).clamped(to: 0...100)
+    if alwaysShowDecimalPlaces {
+      return String(format: "%.2f%%", normalized)
+    }
+    return "\(Int(normalized.rounded()))%"
+  }
+
   private static func normalized(_ value: Double) -> Double {
     value.isFinite ? max(0, value) : 0
   }
