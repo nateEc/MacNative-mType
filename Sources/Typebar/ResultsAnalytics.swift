@@ -9,6 +9,16 @@ enum ResultMetricPresentation {
     unit.formatted(wpm: normalized(wpm), alwaysShowDecimalPlaces: alwaysShowDecimalPlaces)
   }
 
+  static func primaryTypingSpeed(
+    wpm: Double, unit: TypingSpeedUnit, alwaysShowDecimalPlaces: Bool
+  ) -> String {
+    if normalized(wpm) >= 1_000 {
+      return "无限"
+    }
+    return typingSpeed(
+      wpm: wpm, unit: unit, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces)
+  }
+
   static func accuracy(_ value: Double, alwaysShowDecimalPlaces: Bool) -> String {
     let normalized = normalized(value).clamped(to: 0...100)
     if normalized == 100 {

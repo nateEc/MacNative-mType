@@ -4644,7 +4644,7 @@ private struct CompletedResultView: View {
       }
 
       HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Text(ResultMetricPresentation.typingSpeed(
+        Text(ResultMetricPresentation.primaryTypingSpeed(
           wpm: result.preciseWpm, unit: typingSpeedUnit,
           alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
           .font(.system(size: 72, weight: .bold, design: .rounded))

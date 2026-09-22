@@ -25045,6 +25045,18 @@ final class TypingEngineTests: XCTestCase {
       ResultMetricPresentation.accuracy(99.995, alwaysShowDecimalPlaces: true), "100.00%")
   }
 
+  func testResultPrimarySpeedUsesInfinitePresentationAtReferenceThreshold() {
+    XCTAssertEqual(
+      ResultMetricPresentation.primaryTypingSpeed(
+        wpm: 999.99, unit: .wpm, alwaysShowDecimalPlaces: false), "1000")
+    XCTAssertEqual(
+      ResultMetricPresentation.primaryTypingSpeed(
+        wpm: 1_000, unit: .cpm, alwaysShowDecimalPlaces: true), "无限")
+    XCTAssertEqual(
+      ResultMetricPresentation.typingSpeed(
+        wpm: 1_000, unit: .cpm, alwaysShowDecimalPlaces: true), "5000.00")
+  }
+
   func testCompletedResultPreservesExactMetricsForResultPageDecimalPresentation() throws {
     let result = CompletedTestResult(
       id: UUID(), configuration: .words(1), outcome: .completed,
