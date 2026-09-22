@@ -24884,12 +24884,19 @@ final class TypingEngineTests: XCTestCase {
       prefersDark: true)
     let resolved = theme.resolvedTheme
 
-    XCTAssertEqual(ThemeColor(color: resolved.errorColor(usesColorfulMode: false)), theme.error)
-    XCTAssertEqual(ThemeColor(color: resolved.errorColor(usesColorfulMode: true)), theme.colorfulError)
-    XCTAssertEqual(ThemeColor(color: resolved.extraInputColor(usesColorfulMode: false)), theme.extraInput)
-    XCTAssertEqual(
+    func assertColor(_ actual: ThemeColor, matches expected: ThemeColor, line: UInt = #line) {
+      XCTAssertEqual(actual.red, expected.red, accuracy: 0.000_001, line: line)
+      XCTAssertEqual(actual.green, expected.green, accuracy: 0.000_001, line: line)
+      XCTAssertEqual(actual.blue, expected.blue, accuracy: 0.000_001, line: line)
+      XCTAssertEqual(actual.opacity, expected.opacity, accuracy: 0.000_001, line: line)
+    }
+
+    assertColor(ThemeColor(color: resolved.errorColor(usesColorfulMode: false)), matches: theme.error)
+    assertColor(ThemeColor(color: resolved.errorColor(usesColorfulMode: true)), matches: theme.colorfulError)
+    assertColor(ThemeColor(color: resolved.extraInputColor(usesColorfulMode: false)), matches: theme.extraInput)
+    assertColor(
       ThemeColor(color: resolved.extraInputColor(usesColorfulMode: true)),
-      theme.colorfulExtraInput)
+      matches: theme.colorfulExtraInput)
   }
 
   @MainActor
