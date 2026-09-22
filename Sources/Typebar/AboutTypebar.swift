@@ -153,9 +153,17 @@ struct AboutTypebarView: View {
       }
 
       if let overview = publicPracticeOverview {
+        let completed = PublicPracticeStatisticsPresentation.countMagnitude(
+          count: overview.stats.completedResultCount)
+        let started = PublicPracticeStatisticsPresentation.countMagnitude(
+          count: overview.stats.startedTestCount)
         HStack(spacing: 10) {
-          publicPracticeMetric("已完成练习", value: overview.stats.completedResultCount.formatted())
-          publicPracticeMetric("已开始练习", value: overview.stats.startedTestCount.formatted())
+          publicPracticeMetric(
+            "已完成练习", value: completed.value, detail: completed.unit,
+            accessibilityValue: "\(completed.exactCount) 次")
+          publicPracticeMetric(
+            "已开始练习", value: started.value, detail: started.unit,
+            accessibilityValue: "\(started.exactCount) 次")
           publicPracticeMetric(
             "总练习时长",
             value: PublicPracticeStatisticsPresentation.durationLabel(
@@ -185,20 +193,36 @@ struct AboutTypebarView: View {
     }
   }
 
-  private func publicPracticeMetric(_ title: String, value: String) -> some View {
+  private func publicPracticeMetric(
+    _ title: String,
+    value: String,
+    detail: String? = nil,
+    accessibilityValue: String? = nil
+  ) -> some View {
     VStack(alignment: .leading, spacing: 5) {
       Text(title)
         .font(.caption)
         .foregroundStyle(.secondary)
-      Text(value)
-        .font(.title3.monospacedDigit().weight(.semibold))
-        .foregroundStyle(.orange)
-        .lineLimit(1)
-        .minimumScaleFactor(0.72)
+      HStack(alignment: .firstTextBaseline, spacing: 4) {
+        Text(value)
+          .font(.title3.monospacedDigit().weight(.semibold))
+          .foregroundStyle(.orange)
+          .lineLimit(1)
+          .minimumScaleFactor(0.72)
+        if let detail {
+          Text(detail)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+      }
     }
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 12))
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(title)
+    .accessibilityValue(accessibilityValue ?? value)
   }
 
   private func publicSpeedDistribution(_ distribution: RemotePublicSpeedDistribution) -> some View {

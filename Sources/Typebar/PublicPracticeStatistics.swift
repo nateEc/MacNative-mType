@@ -61,7 +61,41 @@ struct RemotePublicPracticeOverview: Equatable, Sendable {
   let speedDistribution: RemotePublicSpeedDistribution
 }
 
+/// Readable public-count card data. The compact value is presentation-only;
+/// callers retain the unmodified integer for accessibility and data handling.
+struct PublicPracticeCountMagnitude: Equatable, Sendable {
+  let value: String
+  let unit: String
+  let exactCount: Int
+}
+
 enum PublicPracticeStatisticsPresentation {
+  static func countMagnitude(count: Int) -> PublicPracticeCountMagnitude {
+    let exactCount = max(0, count)
+    let units = ["次", "千次", "百万次", "十亿次", "万亿次", "千万亿次", "百京次"]
+    var scaled = Double(exactCount)
+    var unitIndex = 0
+
+    while scaled >= 1_000, unitIndex < units.count - 1 {
+      scaled /= 1_000
+      unitIndex += 1
+    }
+
+    let rounded = scaled.rounded(.toNearestOrAwayFromZero)
+    let value: String
+    if rounded < 10, unitIndex > 0 {
+      var decimal = String(
+        format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), scaled)
+      while decimal.last == "0" { decimal.removeLast() }
+      if decimal.last == "." { decimal.removeLast() }
+      value = decimal
+    } else {
+      value = "\(Int(rounded))"
+    }
+
+    return .init(value: value, unit: units[unitIndex], exactCount: exactCount)
+  }
+
   static func durationLabel(seconds: Int) -> String {
     let safeSeconds = max(0, seconds)
     let hours = safeSeconds / 3_600

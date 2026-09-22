@@ -128,6 +128,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(PublicPracticeStatisticsPresentation.durationLabel(seconds: -1), "0 秒")
   }
 
+  func testPublicPracticeStatisticCountsUseReadableMagnitudeCards() {
+    XCTAssertEqual(
+      PublicPracticeStatisticsPresentation.countMagnitude(count: -1),
+      .init(value: "0", unit: "次", exactCount: 0))
+    XCTAssertEqual(
+      PublicPracticeStatisticsPresentation.countMagnitude(count: 999),
+      .init(value: "999", unit: "次", exactCount: 999))
+    XCTAssertEqual(
+      PublicPracticeStatisticsPresentation.countMagnitude(count: 1_000),
+      .init(value: "1", unit: "千次", exactCount: 1_000))
+    XCTAssertEqual(
+      PublicPracticeStatisticsPresentation.countMagnitude(count: 1_234),
+      .init(value: "1.23", unit: "千次", exactCount: 1_234))
+    XCTAssertEqual(
+      PublicPracticeStatisticsPresentation.countMagnitude(count: 9_999),
+      .init(value: "10", unit: "千次", exactCount: 9_999))
+    XCTAssertEqual(
+      PublicPracticeStatisticsPresentation.countMagnitude(count: 1_234_567),
+      .init(value: "1.23", unit: "百万次", exactCount: 1_234_567))
+  }
+
   func testReleaseHistoryDecodesOnlyPublishedStableReleasesAndFallsBackToTag() throws {
     let payload = Data(
       #"[{"name":"Typebar 1.2","tag_name":"v1.2.0","body":"New practice modes.","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.2.0","draft":false,"prerelease":false,"published_at":"2026-09-06T08:30:00Z"},{"name":"","tag_name":"v1.1.0","body":null,"html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.1.0","draft":false,"prerelease":false,"published_at":"2026-09-05T08:30:00Z"},{"name":"Draft","tag_name":"v2.0.0","body":"hidden","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v2.0.0","draft":true,"prerelease":false,"published_at":null},{"name":"Beta","tag_name":"v1.3.0-beta","body":"hidden","html_url":"https://github.com/nateEc/MacNative-mType/releases/tag/v1.3.0-beta","draft":false,"prerelease":true,"published_at":"2026-09-07T08:30:00Z"}]"#.utf8)
