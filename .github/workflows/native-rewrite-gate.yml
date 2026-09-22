@@ -38,10 +38,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zsh Scripts/check-originality-boundaries.sh --self-test
-          zsh Scripts/check-originality-boundaries.sh --reference "${{ steps.reference.outputs.path }}"
-          zsh Scripts/check-page-modal-surface-audit.sh "${{ steps.reference.outputs.path }}"
-          git diff --check
+          run_check() {
+            local label="$1"
+            shift
+            if ! "$@"; then
+              printf '::error title=Native rewrite gate failed::%s failed\n' "$label"
+              exit 1
+            fi
+          }
+          run_check "originality self-test" zsh Scripts/check-originality-boundaries.sh --self-test
+          run_check "originality reference scan" zsh Scripts/check-originality-boundaries.sh --reference "${{ steps.reference.outputs.path }}"
+          run_check "page and modal audit" zsh Scripts/check-page-modal-surface-audit.sh "${{ steps.reference.outputs.path }}"
+          run_check "working-tree whitespace check" git diff --check
 
       - name: Verify no Typebar app is already running
         shell: bash
