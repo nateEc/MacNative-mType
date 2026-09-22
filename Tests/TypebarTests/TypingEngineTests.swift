@@ -15188,6 +15188,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .invalidAFK, enabled: true))
   }
 
+  func testResultPresentationKeepsFailedAttemptsVisibleWithoutSavingThem() {
+    XCTAssertTrue(ResultPresentationPolicy.shouldPresent(outcome: .completed))
+    XCTAssertTrue(ResultPresentationPolicy.shouldPresent(outcome: .failed))
+    XCTAssertTrue(ResultPresentationPolicy.shouldPresent(outcome: .bailedOut))
+    XCTAssertTrue(ResultPresentationPolicy.shouldPresent(outcome: .invalidAFK))
+    XCTAssertFalse(ResultPresentationPolicy.shouldPresent(outcome: .abandoned))
+    XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .failed, enabled: true))
+  }
+
   func testLocalResultSaveAttemptDistinguishesSavedAndRetryableFailure() {
     var attempts = 0
     let saved = LocalResultSaveAttempt.perform {

@@ -917,8 +917,10 @@ private struct ContentView: View {
         if outcome != .active { timerHealth = .init() }
       }
       switch outcome {
-      case .completed, .bailedOut, .invalidAFK:
+      case .completed, .failed, .bailedOut, .invalidAFK:
+        guard ResultPresentationPolicy.shouldPresent(outcome: outcome) else { return }
         let restartCount = currentRestartCount
+        let failureReason = session.failureReason
         let challengePresentation = activeChallengeID == nil
           ? nil
           : ChallengePresentationSnapshot(
@@ -968,6 +970,7 @@ private struct ContentView: View {
         completedResult = .init(
           result: result,
           savesResult: savesResult,
+          failureReason: failureReason,
           quoteFeedback: activeQuoteFeedback,
           resultPersonalBestFeedback: resultPersonalBestFeedback,
           tagPersonalBestFeedback: tagPersonalBestFeedback,
@@ -1000,14 +1003,14 @@ private struct ContentView: View {
           publicationResultID = nil
           publicationState = .notice(
             "检测到结束前持续闲置；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。")
+        } else if result.outcome == .failed {
+          publicationResultID = nil
+          publicationState = .notice(
+            (failureReason?.resultSummary ?? "本次测试失败") + "；结果只在当前窗口显示，不会保存、本机统计、同步或发布。")
         } else {
           publicationResultID = nil
           publicationState = .notice("练习模式：本次成绩不会保存、本机统计、同步或发布。")
         }
-      case .failed:
-        terminalNotice = .failed(
-          savedLongTextProgress: updateLongSavedTextProgress(for: outcome),
-          reason: session.failureReason)
       case .abandoned:
         terminalNotice = .abandoned
       case .active:
@@ -1251,6 +1254,7 @@ private struct ContentView: View {
       CompletedResultView(
         result: result.result,
         savesResult: result.savesResult,
+        failureReason: result.failureReason,
         typingSpeedUnit: settings.typingSpeedUnit,
         alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
         alwaysShowWordsHistory: settings.alwaysShowWordsHistory,
@@ -4499,33 +4503,29 @@ private struct ContentView: View {
 }
 
 private enum TestTerminalNotice: Hashable, Identifiable {
-  case failed(savedLongTextProgress: Bool, reason: TestFailureReason?)
   case abandoned
 
   var id: Self { self }
 
   var title: String {
     switch self {
-    case .failed: "本次测试失败"
     case .abandoned: "已放弃本次测试"
     }
   }
 
   var message: String {
     switch self {
-    case .failed(let savedLongTextProgress, let reason):
-      let progressMessage = savedLongTextProgress ? "长文本进度已保存；" : ""
-      switch reason {
-      case .timerHealth:
-        return progressMessage + "检测到计时调度持续延迟，为避免不准确的成绩，已停止本次测试。"
-      case .minimumWpm:
-        return progressMessage + "当前整体速度低于设定的最低速度，本次没有保存为完成成绩。"
-      case .minimumAccuracy:
-        return progressMessage + "当前准确率低于设定的最低准确率，本次没有保存为完成成绩。"
-      case nil:
-        return progressMessage + "本次没有保存为完成成绩。"
-      }
     case .abandoned: return "本次没有保存为完成成绩。"
+    }
+  }
+}
+
+private extension TestFailureReason {
+  var resultSummary: String {
+    switch self {
+    case .timerHealth: "计时调度持续延迟，为避免不准确的成绩已停止测试"
+    case .minimumWpm: "整体速度低于设定的最低速度"
+    case .minimumAccuracy: "准确率低于设定的最低准确率"
     }
   }
 }
@@ -4547,6 +4547,7 @@ extension TestOutcome {
 private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
   let savesResult: Bool
+  let failureReason: TestFailureReason?
   let quoteFeedback: QuoteResultFeedbackTarget?
   let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   let tagPersonalBestFeedback: [TagPersonalBestFeedback]
@@ -4567,6 +4568,7 @@ private struct CompletedResultPresentation: Identifiable {
 private struct CompletedResultView: View {
   let result: CompletedTestResult
   let savesResult: Bool
+  let failureReason: TestFailureReason?
   let typingSpeedUnit: TypingSpeedUnit
   let alwaysShowDecimalPlaces: Bool
   let alwaysShowWordsHistory: Bool
@@ -5178,7 +5180,8 @@ private struct CompletedResultView: View {
     switch result.outcome {
     case .bailedOut: "已中止"
     case .invalidAFK: "闲置无效"
-    case .active, .completed, .failed, .abandoned: "完成"
+    case .failed: "本次测试失败"
+    case .active, .completed, .abandoned: "完成"
     }
   }
 
@@ -5186,7 +5189,10 @@ private struct CompletedResultView: View {
     switch result.outcome {
     case .bailedOut: "中止结果只在当前窗口显示，不保存成绩"
     case .invalidAFK: "结束前连续约 5 秒没有文本输入；结果只在当前窗口显示，不保存成绩"
-    case .active, .completed, .failed, .abandoned:
+    case .failed:
+      (failureReason?.resultSummary ?? "本次没有保存为完成成绩")
+        + "；结果只在当前窗口显示，不保存成绩"
+    case .active, .completed, .abandoned:
       savesResult
         ? (localResultSaveState.isSaved ? "已保存到这台 Mac" : "尚未保存到这台 Mac")
         : "练习模式：不保存成绩"

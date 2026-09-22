@@ -83,6 +83,20 @@ enum ResultMetricPresentation {
   }
 }
 
+/// A terminal attempt can be useful to review even when it is ineligible for
+/// local history. The reference result surface keeps failed threshold attempts
+/// visible so people can inspect the metric that caused the stop.
+enum ResultPresentationPolicy {
+  static func shouldPresent(outcome: TestOutcome) -> Bool {
+    switch outcome {
+    case .completed, .failed, .bailedOut, .invalidAFK:
+      true
+    case .active, .abandoned:
+      false
+    }
+  }
+}
+
 struct ResultMetric: Equatable, Identifiable {
     let id: UUID
     let finishedAt: Date
