@@ -50,7 +50,7 @@ normalise_long_lines() {
 
 is_candidate_asset_path() {
   case "${1:l}" in
-    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.pdf|*.ico|*.icns|*.woff|*.woff2|*.ttf|*.otf|*.mp3|*.m4a|*.wav|*.ogg|*.aiff)
+    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.pdf|*.ico|*.icns|*.woff|*.woff2|*.ttf|*.otf|*.mp3|*.m4a|*.wav|*.ogg|*.aiff|*.json|*.txt|*.csv|*.xml|*.yaml|*.yml|*.html|*.css)
       return 0
       ;;
     *)
@@ -89,7 +89,7 @@ scan_native_assets_for_reference_overlap() {
   )"
 
   if (( shared_count > 0 )); then
-    print -u2 -- "detected $shared_count duplicate image, font, or audio SHA-256 value(s) across the rewrite boundary"
+    print -u2 -- "detected $shared_count duplicate protected-resource SHA-256 value(s) across the rewrite boundary"
     return 1
   fi
 }
@@ -206,6 +206,19 @@ run_self_test() {
   if ! scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory"; then
     fail "the asset overlap guard rejected independent bytes"
   fi
+
+  print -r -- '{"probe":"duplicated textual resource"}' > "$native_asset_directory/content-probe.json"
+  print -r -- '{"probe":"duplicated textual resource"}' > "$reference_asset_directory/content-probe.json"
+
+  if scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory" >/dev/null 2>&1; then
+    fail "the resource overlap guard did not reject duplicate textual bytes"
+  fi
+
+  print -r -- '{"probe":"independent textual resource"}' > "$native_asset_directory/content-probe.json"
+
+  if ! scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory"; then
+    fail "the resource overlap guard rejected independent textual bytes"
+  fi
 }
 
 typeset -i run_self_test_requested=0
@@ -244,8 +257,12 @@ if [[ -n "$reference_root" ]]; then
   verify_reference_checkout
   scan_native_sources_for_reference_overlap "$project_root/Sources" "$reference_root"
   scan_native_sources_for_reference_overlap "$project_root/server/Sources" "$reference_root"
-  scan_native_assets_for_reference_overlap "$project_root" "$reference_root"
-  print -- "originality boundary check passed (no long literal source or asset overlap at $reference_commit)"
+  scan_native_assets_for_reference_overlap "$project_root/Sources" "$reference_root"
+  scan_native_assets_for_reference_overlap "$project_root/server/Sources" "$reference_root"
+  if [[ -d "$project_root/Resources" ]]; then
+    scan_native_assets_for_reference_overlap "$project_root/Resources" "$reference_root"
+  fi
+  print -- "originality boundary check passed (no long literal source or protected-resource overlap at $reference_commit)"
 else
   print -- "originality boundary check passed"
 fi
