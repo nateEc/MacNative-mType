@@ -2147,6 +2147,69 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(ThemeCommandCatalog.target(for: "theme.custom.not-a-uuid"))
   }
 
+  func testThemeQuickSwitchPolicyKeepsTheIndicatorAndShiftToggleDeterministic() {
+    let dawnID = UUID(uuidString: "8A692C7B-0F0F-42C6-916D-A5A82F0B99FE")!
+    let duskID = UUID(uuidString: "B2256572-0768-4B05-AF5C-F9F61D42973E")!
+    let dawn = CustomThemeDefinition(
+      id: dawnID, name: "Dawn", background: .init(red: 0.1, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.2, green: 0.3, blue: 0.4), accent: .init(red: 0.7, green: 0.4, blue: 0.2),
+      prefersDark: true)
+    let dusk = CustomThemeDefinition(
+      id: duskID, name: "Dusk", background: .init(red: 0.2, green: 0.2, blue: 0.3),
+      panel: .init(red: 0.3, green: 0.3, blue: 0.4), accent: .init(red: 0.4, green: 0.7, blue: 0.2),
+      prefersDark: true)
+
+    XCTAssertEqual(
+      ThemeQuickSwitchPolicy.presentation(
+        builtInTheme: .paper, activeCustomThemeID: dawnID, customThemes: [dawn, dusk],
+        favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: dawnID)]),
+      .init(name: "Dawn", isCustom: true, isFavorite: true))
+    XCTAssertEqual(
+      ThemeQuickSwitchPolicy.presentation(
+        builtInTheme: .midnight, activeCustomThemeID: UUID(), customThemes: [dawn],
+        favoriteThemeIDs: [ThemeFavoritePolicy.builtInID(for: .midnight)]),
+      .init(name: AppTheme.midnight.displayName, isCustom: false, isFavorite: true))
+
+    XCTAssertEqual(
+      ThemeQuickSwitchPolicy.shiftClickAction(
+        activeCustomThemeID: dawnID, customThemes: [dawn, dusk]),
+      .selectBuiltIn)
+    XCTAssertEqual(
+      ThemeQuickSwitchPolicy.shiftClickAction(activeCustomThemeID: nil, customThemes: []),
+      .noCustomThemes)
+    XCTAssertEqual(
+      ThemeQuickSwitchPolicy.shiftClickAction(activeCustomThemeID: nil, customThemes: [dawn]),
+      .selectCustom(dawnID))
+    XCTAssertEqual(
+      ThemeQuickSwitchPolicy.shiftClickAction(activeCustomThemeID: nil, customThemes: [dawn, dusk]),
+      .chooseCustom)
+  }
+
+  @MainActor
+  func testThemeQuickPickerTargetTracksTheEffectiveSystemAndRandomTheme() throws {
+    let suiteName = "TypebarTests.theme-quick-picker.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+
+    settings.selectBuiltInTheme(.grove)
+    XCTAssertEqual(settings.currentThemeQuickPickerTarget(for: .dark), .builtIn(.grove))
+
+    let custom = try XCTUnwrap(settings.addCustomTheme(
+      name: "Dawn", background: .white, panel: .gray, accent: .orange, prefersDark: false))
+    settings.selectCustomTheme(custom.id)
+    XCTAssertEqual(settings.currentThemeQuickPickerTarget(for: .dark), .custom(custom.id))
+
+    settings.selectBuiltInTheme(.midnight)
+    settings.randomThemeMode = .custom
+    settings.randomizeTheme(for: .dark, using: 0)
+    XCTAssertEqual(settings.currentThemeQuickPickerTarget(for: .dark), .custom(custom.id))
+
+    settings.systemDarkTheme = .paper
+    settings.followSystemTheme = true
+    XCTAssertEqual(settings.currentThemeQuickPickerTarget(for: .dark), .builtIn(.paper))
+  }
+
   func testThemeCommandPreviewPolicyPreviewsOnlyResolvableThemeRows() throws {
     let customID = UUID(uuidString: "8A692C7B-0F0F-42C6-916D-A5A82F0B99FE")!
     let custom = CustomThemeDefinition(

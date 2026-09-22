@@ -730,6 +730,8 @@ private struct ContentView: View {
   @State private var showingNotifications = false
   @State private var unreadNotificationCount: Int?
   @State private var showingCommandPalette = false
+  @State private var themeQuickPickerScope: ThemeQuickPickerScope?
+  @State private var themeQuickSwitchMessage: String?
   @State private var commandThemePreviewTarget: ThemeCommandTarget?
   @State private var showingProfileSearchCommandEditor = false
   @State private var showingActiveResultTagEditor = false
@@ -1115,6 +1117,12 @@ private struct ContentView: View {
           commandThemePreviewTarget = ThemeCommandPreviewPolicy.target(for: item)
         })
     }
+    .sheet(item: $themeQuickPickerScope) { scope in
+      ThemeQuickPickerView(
+        scope: scope, customThemes: settings.customThemes,
+        favoriteThemeIDs: settings.favoriteThemeIDs, selectedTheme: selectedThemeQuickPickerTarget,
+        onSelect: applyThemeQuickPickerSelection)
+    }
     .sheet(isPresented: $showingProfileSearchCommandEditor) {
       ProfileSearchCommandView(account: account)
     }
@@ -1472,6 +1480,10 @@ private struct ContentView: View {
         Text("离线、专注的 Mac 打字练习").foregroundStyle(.secondary)
       }
       Spacer()
+      ThemeIndicatorButton(
+        presentation: themeIndicatorPresentation,
+        onActivate: handleThemeIndicatorActivation)
+      .frame(maxWidth: 180)
       Picker("模式", selection: Binding(
         get: { mode },
         set: { _ = selectMode($0) }
@@ -2767,7 +2779,66 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .offset(y: 24)
+      } else if let themeQuickSwitchMessage {
+        Label(themeQuickSwitchMessage, systemImage: "paintpalette")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
       }
+    }
+  }
+
+  private var themeIndicatorPresentation: ThemeIndicatorPresentation {
+    switch selectedThemeQuickPickerTarget {
+    case .builtIn(let theme):
+      ThemeQuickSwitchPolicy.presentation(
+        builtInTheme: theme, activeCustomThemeID: nil, customThemes: settings.customThemes,
+        favoriteThemeIDs: settings.favoriteThemeIDs)
+    case .custom(let id):
+      ThemeQuickSwitchPolicy.presentation(
+        builtInTheme: settings.theme, activeCustomThemeID: id, customThemes: settings.customThemes,
+        favoriteThemeIDs: settings.favoriteThemeIDs)
+    }
+  }
+
+  private var selectedThemeQuickPickerTarget: ThemeCommandTarget {
+    settings.currentThemeQuickPickerTarget(for: systemColorScheme)
+  }
+
+  private var activeCustomThemeQuickPickerID: UUID? {
+    guard case .custom(let id) = selectedThemeQuickPickerTarget else { return nil }
+    return id
+  }
+
+  private func handleThemeIndicatorActivation() {
+    themeQuickSwitchMessage = nil
+    guard NSEvent.modifierFlags.contains(.shift) else {
+      themeQuickPickerScope = .all
+      return
+    }
+    switch ThemeQuickSwitchPolicy.shiftClickAction(
+      activeCustomThemeID: activeCustomThemeQuickPickerID,
+      customThemes: settings.customThemes)
+    {
+    case .selectBuiltIn:
+      applyThemeQuickPickerSelection(.builtIn(settings.theme))
+    case .selectCustom(let id):
+      applyThemeQuickPickerSelection(.custom(id))
+    case .chooseCustom:
+      themeQuickPickerScope = .custom
+    case .noCustomThemes:
+      themeQuickSwitchMessage = "还没有自定义主题；可在设置中创建或导入。"
+    }
+  }
+
+  private func applyThemeQuickPickerSelection(_ target: ThemeCommandTarget) {
+    themeQuickSwitchMessage = nil
+    settings.followSystemTheme = false
+    switch target {
+    case .builtIn(let theme):
+      settings.selectBuiltInTheme(theme)
+    case .custom(let id):
+      settings.selectCustomTheme(id)
     }
   }
 

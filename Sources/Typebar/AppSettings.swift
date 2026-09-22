@@ -2055,6 +2055,30 @@ final class AppSettings {
     return theme
   }
 
+  /// Identifies the theme currently rendered by the practice view without
+  /// mutating the user's saved selection or the ephemeral random-theme state.
+  func currentThemeQuickPickerTarget(for systemColorScheme: ColorScheme) -> ThemeCommandTarget {
+    if followSystemTheme {
+      return .builtIn(systemColorScheme == .dark ? systemDarkTheme : systemLightTheme)
+    }
+    if let randomThemeTarget {
+      switch randomThemeTarget {
+      case .builtIn(let theme):
+        return .builtIn(theme)
+      case .custom(let id) where customThemes.contains(where: { $0.id == id }):
+        return .custom(id)
+      case .custom:
+        break
+      }
+    }
+    if let activeCustomThemeID,
+      customThemes.contains(where: { $0.id == activeCustomThemeID })
+    {
+      return .custom(activeCustomThemeID)
+    }
+    return .builtIn(theme)
+  }
+
   var hasLocalBackground: Bool { TypebarLocalBackgroundStore.hasImage }
 
   var localPracticeFontInfo: LocalPracticeFontInfo? {
