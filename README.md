@@ -24,6 +24,12 @@ zsh Scripts/package-macos-app.sh
 zsh Scripts/check-originality-boundaries.sh --self-test
 ```
 
+对已克隆的固定 Monkeytype 参考源码，核验页面与模态盘点只覆盖其标识级表面：
+
+```zsh
+zsh Scripts/check-page-modal-surface-audit.sh /absolute/path/to/monkeytype-reference
+```
+
 运行自建服务的最小健康检查（服务能力仍在建设中）：
 
 ```sh

@@ -6,6 +6,7 @@
 - 本表审计官方 `frontend/src/ts/components/pages` 与 `frontend/src/ts/components/modals` 中面向用户的领域能力；通用按钮、布局、异步包装器和网页样式组件不单独计数。
 - 配置键的逐项守恒另见 [OFFICIAL_CONFIG_AUDIT.md](OFFICIAL_CONFIG_AUDIT.md)。本表不以组件同名、DOM 结构或网页视觉作为重写目标，只追踪用户能完成的任务及其重要失败路径。
 - `Compatibility/official-page-modal-surfaces.json` 固定这两个目录中 52 个根页面或用户模态的标识、分类和 Typebar 原生证据；`OfficialLayoutCoverageTests` 验证数量、唯一性、分类互斥和覆盖完整性。该快照只保留允许的标识级元数据，不复制参考代码、文本、样式或资产。
+- 使用 `zsh Scripts/check-page-modal-surface-audit.sh /absolute/path/to/monkeytype-reference` 可针对固定提交重新读取参考目录名，并与该清单逐项比较；脚本是只读的，遇到提交或表面差异会失败。
 - Typebar 只使用独立编写的 Swift/SwiftUI/SwiftData 代码、原创或授权内容和自建服务；不导入参考的代码、词表、引语或资产。
 
 ## 根页面与练习界面
