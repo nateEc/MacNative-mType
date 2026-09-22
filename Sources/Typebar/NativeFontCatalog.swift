@@ -59,6 +59,26 @@ struct NativeFontFamilyPicker: View {
     NativeFontCatalog.filteredFamilies(families, query: query)
   }
 
+  private func previewFont(for family: String) -> Font {
+    guard let font = NativePracticeFont.nsFont(named: family, size: 15) else {
+      return .system(size: 15)
+    }
+    return Font(font)
+  }
+
+  private func previewLabel(for family: String) -> some View {
+    let font = previewFont(for: family)
+    return VStack(alignment: .leading, spacing: 2) {
+      Text(family)
+        .font(font)
+        .foregroundStyle(.primary)
+      Text("Aa 123 · 字体预览")
+        .font(font)
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+    }
+  }
+
   var body: some View {
     NavigationStack {
       Group {
@@ -71,8 +91,7 @@ struct NativeFontFamilyPicker: View {
               dismiss()
             } label: {
               HStack {
-                Text(family)
-                  .foregroundStyle(.primary)
+                previewLabel(for: family)
                 Spacer()
                 if family == selection {
                   Image(systemName: "checkmark")
