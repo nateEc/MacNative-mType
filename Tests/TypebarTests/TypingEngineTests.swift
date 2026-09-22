@@ -15842,6 +15842,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(summary.formattedDuration, "1 分 40 秒")
   }
 
+  func testCurrentProcessPracticeRecordsEveryFinishedReferenceAttempt() {
+    XCTAssertTrue(CurrentProcessPracticePolicy.shouldRecord(outcome: .completed))
+    XCTAssertTrue(CurrentProcessPracticePolicy.shouldRecord(outcome: .failed))
+    XCTAssertTrue(CurrentProcessPracticePolicy.shouldRecord(outcome: .bailedOut))
+    XCTAssertTrue(CurrentProcessPracticePolicy.shouldRecord(outcome: .invalidAFK))
+    XCTAssertFalse(CurrentProcessPracticePolicy.shouldRecord(outcome: .active))
+    XCTAssertFalse(CurrentProcessPracticePolicy.shouldRecord(outcome: .abandoned))
+  }
+
   @MainActor
   func testResultSnapshotImageRendersThemedHighResolutionPng() throws {
     let result = CompletedTestResult(

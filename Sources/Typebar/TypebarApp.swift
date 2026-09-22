@@ -966,8 +966,10 @@ private struct ContentView: View {
         savedResultRecord = nil
         publicationResultID = result.id
         publicationState = .idle
-        if result.outcome == .completed {
+        if CurrentProcessPracticePolicy.shouldRecord(outcome: result.outcome) {
           currentProcessPractice.append(.init(result: result))
+        }
+        if result.outcome == .completed {
           settings.randomizeTheme(for: systemColorScheme)
         }
         if savesResult {

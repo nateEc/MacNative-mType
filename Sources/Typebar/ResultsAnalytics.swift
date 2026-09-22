@@ -478,7 +478,21 @@ enum HistoryChartSelectionPolicy {
   }
 }
 
-/// Completed practice that belongs to the current running app process. It
+/// Decides which terminal attempts contribute their engaged duration to the
+/// current app process's daily summary. Persistent-history eligibility is a
+/// separate concern, so invalid terminal results remain visible here.
+enum CurrentProcessPracticePolicy {
+  static func shouldRecord(outcome: TestOutcome) -> Bool {
+    switch outcome {
+    case .completed, .failed, .bailedOut, .invalidAFK:
+      true
+    case .active, .abandoned:
+      false
+    }
+  }
+}
+
+/// Terminal practice that belongs to the current running app process. It
 /// keeps the daily result summary truthful even when the user opted out of
 /// persisting a completed test to SwiftData.
 struct CurrentProcessPractice: Equatable, Identifiable {
