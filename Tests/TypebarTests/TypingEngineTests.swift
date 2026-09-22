@@ -10212,6 +10212,35 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testNativeCompositionCancellationDoesNotEnterReplayBeforeLaterConfirmation() throws {
+    var session = TypingSession(configuration: .words(1), prompt: "拼")
+    let input = TypingInputView(frame: .zero)
+    var now = start.addingTimeInterval(2)
+    var markedText = [String]()
+    input.onCompositionStarted = { session.beginComposition(at: now) }
+    input.onCompositionChanged = { markedText.append($0) }
+    input.onInsert = { text, forceError in session.insertBatch(text, forceError: forceError, at: now) }
+
+    input.setMarkedText("p", selectedRange: NSRange(location: 0, length: 1), replacementRange: .init())
+    now = start.addingTimeInterval(3)
+    input.unmarkText()
+
+    XCTAssertEqual(markedText, ["p", ""])
+    XCTAssertEqual(session.startedAt, start.addingTimeInterval(2))
+    XCTAssertTrue(session.typed.isEmpty)
+    XCTAssertNil(session.result(at: now))
+
+    now = start.addingTimeInterval(5)
+    input.setMarkedText("pin", selectedRange: NSRange(location: 0, length: 3), replacementRange: .init())
+    input.insertText("拼", replacementRange: .init())
+
+    let result = try XCTUnwrap(session.result(at: now))
+    XCTAssertEqual(result.elapsedDuration, 3, accuracy: 0.000_001)
+    XCTAssertEqual(result.replayEvents.map(\.text), ["拼"])
+    XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents, through: result.elapsedDuration), "拼")
+  }
+
+  @MainActor
   func testNativeInputSignalsOnlyTheFirstMarkedUpdateOfEachComposition() {
     let input = TypingInputView(frame: .zero)
     var compositionStarts = 0
