@@ -982,6 +982,7 @@ private struct ContentView: View {
       Button("弱项", systemImage: "scope") { showingWeakSpots = true }
       Button("数据", systemImage: "externaldrive") { showingDataMigration = true }
       Button("同步", systemImage: "arrow.triangle.2.circlepath") {
+        guard acceptsLeavingPracticeNavigation() else { return }
         syncInitialLeaderboard = nil
         showingSync = true
       }
@@ -3802,7 +3803,9 @@ private struct ContentView: View {
     case "challenges": showingChallenges = true
     case "savedTexts": showingSavedTexts = true
     case "data": showingDataMigration = true
-    case "sync": showingSync = true
+    case "sync":
+      guard acceptsLeavingPracticeNavigation() else { return }
+      showingSync = true
     case "friends":
       guard acceptsLeavingPracticeNavigation() else { return }
       showingConnections = true
