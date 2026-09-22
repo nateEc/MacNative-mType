@@ -48,6 +48,13 @@ zsh Scripts/check-page-modal-surface-audit.sh /absolute/path/to/monkeytype-refer
 zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference
 ```
 
+核验人工验收清单保留唯一场景 ID、可识别状态和单实例执行规则：
+
+```zsh
+ruby Scripts/check-manual-acceptance-audit.rb
+ruby Scripts/check-manual-acceptance-audit.rb --self-test
+```
+
 运行自建服务的最小健康检查（服务能力仍在建设中）：
 
 ```sh
