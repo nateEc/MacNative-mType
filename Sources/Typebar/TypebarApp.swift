@@ -2992,6 +2992,9 @@ private struct ContentView: View {
       settings.testModifiers = joiningSafeModifiers
     }
     let shouldCountRestart = session.hasStarted && !session.isFinished
+    let restartedSessionEngagedDuration = shouldCountRestart
+      ? session.activeEngagedDuration()
+      : 0
     absorbLiveWeakSpotScores(from: session)
     restartLockMessage = nil
     bailoutConfirmationMessage = nil
@@ -3033,7 +3036,7 @@ private struct ContentView: View {
     persistActiveTestSelection()
     if shouldCountRestart {
       priorAttemptLedger.recordRestart(
-        engagedDuration: session.activeEngagedDuration(), savingEnabled: settings.saveCompletedResults)
+        engagedDuration: restartedSessionEngagedDuration, savingEnabled: settings.saveCompletedResults)
     }
     isSamePromptRepeatAttempt = false
     isRepeatedPaceAttempt = false
