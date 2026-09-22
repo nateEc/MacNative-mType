@@ -24444,6 +24444,36 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(markers.map { calendar.component(.month, from: $0.month) }, [1, 2])
   }
 
+  func testActivityHeatmapWeekColumnsFollowCalendarFirstWeekday() throws {
+    var sundayFirstCalendar = Calendar(identifier: .gregorian)
+    sundayFirstCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    sundayFirstCalendar.firstWeekday = 1
+    var mondayFirstCalendar = sundayFirstCalendar
+    mondayFirstCalendar.firstWeekday = 2
+    let endingAt = sundayFirstCalendar.date(from: .init(year: 2024, month: 4, day: 1))!
+    let cells = ActivityHeatmap.cells(
+      activity: [], days: 2, endingAt: endingAt, calendar: sundayFirstCalendar)
+
+    let firstDay = try XCTUnwrap(cells.first).day
+    let sundayLeading = ActivityHeatmapWeekLayout.leadingFillerCount(
+      for: firstDay, calendar: sundayFirstCalendar)
+    let mondayLeading = ActivityHeatmapWeekLayout.leadingFillerCount(
+      for: firstDay, calendar: mondayFirstCalendar)
+    XCTAssertEqual(sundayLeading, 0)
+    XCTAssertEqual(mondayLeading, 6)
+    XCTAssertEqual(
+      ActivityHeatmapWeekLayout.columnCount(cellCount: cells.count, leading: sundayLeading), 1)
+    XCTAssertEqual(
+      ActivityHeatmapWeekLayout.columnCount(cellCount: cells.count, leading: mondayLeading), 2)
+
+    XCTAssertEqual(
+      ActivityHeatmap.monthMarkers(cells: cells, calendar: sundayFirstCalendar).map(\.column), [0])
+    let mondayMarkers = ActivityHeatmap.monthMarkers(cells: cells, calendar: mondayFirstCalendar)
+    XCTAssertEqual(mondayMarkers.map(\.column), [0, 1])
+    XCTAssertEqual(
+      mondayMarkers.map { mondayFirstCalendar.component(.month, from: $0.month) }, [3, 4])
+  }
+
   func testActivityHeatmapBuildsPublicActivityCellsWithSafeTotals() {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!

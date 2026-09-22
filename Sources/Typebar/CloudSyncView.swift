@@ -1239,16 +1239,16 @@ private struct PublicProfileActivityCalendar: View {
 
     private var leadingFillerCount: Int {
         guard let first = cells.first else { return 0 }
-        return (calendar.component(.weekday, from: first.day) - calendar.firstWeekday + 7) % 7
+        return ActivityHeatmapWeekLayout.leadingFillerCount(for: first.day, calendar: calendar)
     }
 
     private var trailingFillerCount: Int {
-        guard !cells.isEmpty else { return 0 }
-        return (7 - (leadingFillerCount + cells.count) % 7) % 7
+        ActivityHeatmapWeekLayout.trailingFillerCount(
+            cellCount: cells.count, leading: leadingFillerCount)
     }
 
     private var weekColumnCount: Int {
-        (leadingFillerCount + cells.count + trailingFillerCount) / 7
+        ActivityHeatmapWeekLayout.columnCount(cellCount: cells.count, leading: leadingFillerCount)
     }
 
     private var monthByColumn: [Int: Date] {

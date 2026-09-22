@@ -2455,6 +2455,25 @@ enum ActivityHeatmapPeriod: Hashable, Identifiable {
     }
 }
 
+/// Defines the visible seven-day grid from the system calendar's week start.
+/// Keeping this separate from activity aggregation lets local and public
+/// profiles share the same regional column alignment.
+enum ActivityHeatmapWeekLayout {
+    static func leadingFillerCount(for firstDay: Date, calendar: Calendar) -> Int {
+        (calendar.component(.weekday, from: firstDay) - calendar.firstWeekday + 7) % 7
+    }
+
+    static func trailingFillerCount(cellCount: Int, leading: Int) -> Int {
+        guard cellCount > 0 else { return 0 }
+        return (7 - (leading + cellCount) % 7) % 7
+    }
+
+    static func columnCount(cellCount: Int, leading: Int) -> Int {
+        guard cellCount > 0 else { return 0 }
+        return (leading + cellCount + trailingFillerCount(cellCount: cellCount, leading: leading)) / 7
+    }
+}
+
 enum ActivityHeatmap {
     static func completedTestCount(in cells: [ActivityHeatmapCell]) -> Int {
         cells.reduce(0) { count, cell in
@@ -2507,9 +2526,9 @@ enum ActivityHeatmap {
         cells: [ActivityHeatmapCell], calendar: Calendar = .current
     ) -> [ActivityHeatmapMonthMarker] {
         guard let first = cells.first else { return [] }
-        let leading =
-            (calendar.component(.weekday, from: first.day) - calendar.firstWeekday + 7) % 7
-        let lastColumn = (leading + cells.count - 1) / 7
+        let leading = ActivityHeatmapWeekLayout.leadingFillerCount(for: first.day, calendar: calendar)
+        let lastColumn = ActivityHeatmapWeekLayout.columnCount(
+            cellCount: cells.count, leading: leading) - 1
         var previousYear: Int?
         var previousMonth: Int?
         var markers: [ActivityHeatmapMonthMarker] = []
