@@ -391,7 +391,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 | 公开活动日历 | `Tests/TypebarTests/TypingEngineTests.swift`、原生公开资料卡 | 紧凑服务端每日计数安全展开为日期格；负计数不会进入近 12 个月总数。五档强度由当前可见日的已知完成数（含零）派生，并裁剪极端值；离散阈值保留低频完成日的参考色阶，因此单次异常导入不会压平日常活跃度；公开资料显示图例、与周列对齐的星期/月定位，以及逐格 VoiceOver 日期和完成次数。只消费已返回的匿名聚合计数，不改变账户日界、成绩或隐私边界 |
 | 挑战验收 | `Tests/TypebarTests/TypingEngineTests.swift` | 原创离线挑战的最低/精确指标、时长、默认或自定义 AFK 上限、顺序无关精确 funbox 集合、结果配置与不可变显示快照均可独立验证；缺快照的旧结果会明确失败，全部未满足条件会同时报告，挑战标记可随测试配置编码并与历史配置兼容 |
 | 构建 | `swift test`、`swift build` | macOS Swift 包能编译且 704 项客户端测试通过；独立 Vapor 服务的 115 项自动化测试通过 |
-| 重写交付门禁 | `.github/workflows/native-rewrite-gate.yml`、`Scripts/check-reference-metadata-audits.sh`、`Scripts/check-manual-acceptance-audit.rb` | CI 固定读取参考提交，执行原创性、配置与语言 fixture 零差异重建、页面/模态、参考行为和人工验收追溯审计；人工验收清单当前含 555 个唯一场景。该门禁不替代真实 macOS、IME、辅助功能、HTTPS/OAuth 或多设备的待执行验收。 |
+| 重写交付门禁 | `.github/workflows/native-rewrite-gate.yml`、`Scripts/check-reference-metadata-audits.sh`、`Scripts/check-reference-service-behavior-alignment.sh`、`Scripts/check-manual-acceptance-audit.rb` | CI 固定读取参考提交，执行原创性、配置与语言 fixture 零差异重建、页面/模态、参考行为、服务表面与 controller 行为分类一致性，以及人工验收追溯审计；人工验收清单当前含 555 个唯一场景。该门禁不替代真实 macOS、IME、辅助功能、HTTPS/OAuth 或多设备的待执行验收。 |
 | 运行时 UI | 打包的 `Typebar.app` 辅助功能树与截图 | 焦点输入、时间/字数模式、实时指标、可滚动长文本区，以及正确输入/错误/退格/Esc 重开；2026-09-02 已人工切换“光晕”背景，确认减少动态效果开关状态和练习页主题色光晕绘制，检查后恢复为纯色 |
 
 ## 2026-09-03 审计更正

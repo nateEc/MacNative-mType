@@ -48,6 +48,12 @@ zsh Scripts/check-page-modal-surface-audit.sh /absolute/path/to/monkeytype-refer
 zsh Scripts/check-reference-service-surface-audit.sh /absolute/path/to/monkeytype-reference
 ```
 
+核验后端 controller 行为与 route registry 的映射使用同一服务分区，且直接用户行为不会被归为不适用或未实现：
+
+```zsh
+zsh Scripts/check-reference-service-behavior-alignment.sh /absolute/path/to/monkeytype-reference
+```
+
 核验配置和语言 fixture 可从固定参考重新生成，同时保持 Typebar 自有证据分组与原生选择契约：
 
 ```zsh
