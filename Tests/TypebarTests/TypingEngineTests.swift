@@ -660,8 +660,9 @@ final class TypingEngineTests: XCTestCase {
     let result = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 30), outcome: .completed,
       startedAt: start, finishedAt: start.addingTimeInterval(30),
-      typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
-      wpm: 2, rawWpm: 2, accuracy: 100,
+      afkDuration: 7, typedCharacterCount: 5, correctCharacterCount: 5, errorCount: 0,
+      wpm: 2, rawWpm: 2, accuracy: 100, restartCount: 1,
+      priorAttemptEngagedDuration: 9,
       keyDurationSamples: [0.08, 0.12], keySpacingSamples: [0.1, 0.2],
       keyOverlapDuration: 0.03, prompt: "private prompt",
       replayEvents: [.init(offset: 0.1, kind: .insert, text: "secret")])
@@ -675,15 +676,22 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(encoded.contains("private prompt"))
     XCTAssertFalse(encoded.contains("secret"))
     XCTAssertFalse(encoded.contains("keyCode"))
+    let practiceTiming = try XCTUnwrap(RemoteResultPracticeTiming(result: result))
+    XCTAssertEqual(practiceTiming.version, 1)
+    XCTAssertEqual(practiceTiming.terminalEngagedMilliseconds, 23_000)
+    XCTAssertEqual(practiceTiming.priorAttemptEngagedMilliseconds, 9_000)
     let negotiatedSubmission = String(
       decoding: try JSONEncoder().encode(
-        RemoteResultSubmission(result: result, includesTimingEvidence: true)), as: UTF8.self)
+        RemoteResultSubmission(
+          result: result, includesTimingEvidence: true, includesPracticeTiming: true)), as: UTF8.self)
     XCTAssertTrue(negotiatedSubmission.contains("timingEvidence"))
+    XCTAssertTrue(negotiatedSubmission.contains("practiceTiming"))
     XCTAssertFalse(negotiatedSubmission.contains("private prompt"))
     XCTAssertFalse(negotiatedSubmission.contains("secret"))
     let legacySubmission = String(
       decoding: try JSONEncoder().encode(RemoteResultSubmission(result: result)), as: UTF8.self)
     XCTAssertFalse(legacySubmission.contains("timingEvidence"))
+    XCTAssertFalse(legacySubmission.contains("practiceTiming"))
 
     let negotiatedCapabilities = try JSONDecoder().decode(
       RemoteServiceCapabilities.self,
@@ -691,6 +699,13 @@ final class TypingEngineTests: XCTestCase {
         #"{"apiVersion":"v1","service":"typebar","capabilities":{"resultTimingEvidence":"available"}}"#
           .utf8))
     XCTAssertTrue(negotiatedCapabilities.supportsResultTimingEvidence)
+    XCTAssertFalse(negotiatedCapabilities.supportsResultPracticeTiming)
+    let practiceTimingCapabilities = try JSONDecoder().decode(
+      RemoteServiceCapabilities.self,
+      from: Data(
+        #"{"apiVersion":"v1","service":"typebar","capabilities":{"resultPracticeTiming":"available"}}"#
+          .utf8))
+    XCTAssertTrue(practiceTimingCapabilities.supportsResultPracticeTiming)
     let legacyCapabilities = try JSONDecoder().decode(
       RemoteServiceCapabilities.self,
       from: Data(#"{"apiVersion":"v1","service":"typebar","capabilities":{}}"#.utf8))
@@ -15651,7 +15666,7 @@ final class TypingEngineTests: XCTestCase {
   func testRemoteResultCSVExportLoadsEveryStablePageAndRejectsAChangingSnapshot() async throws {
     let payload = #"""
       [
-        {"id":"00000000-0000-0000-0000-000000000001","mode":"time","language":"english","durationSeconds":30,"wordLimit":null,"wpm":61,"rawWpm":66,"accuracy":97,"consistency":88.5,"errorCount":2,"eventCount":140,"tags":["focus, \"steady\""],"startedAt":"1970-01-01T00:00:00Z","finishedAt":"1970-01-01T00:00:30Z"},
+        {"id":"00000000-0000-0000-0000-000000000001","mode":"time","language":"english","durationSeconds":30,"wordLimit":null,"wpm":61,"rawWpm":66,"accuracy":97,"consistency":88.5,"errorCount":2,"eventCount":140,"tags":["focus, \"steady\""],"practiceTiming":{"version":1,"terminalEngagedMilliseconds":23000,"priorAttemptEngagedMilliseconds":9000},"startedAt":"1970-01-01T00:00:00Z","finishedAt":"1970-01-01T00:00:30Z"},
         {"id":"00000000-0000-0000-0000-000000000002","mode":"words","language":"french","durationSeconds":null,"wordLimit":25,"wpm":54,"rawWpm":58,"accuracy":95,"consistency":80,"errorCount":3,"eventCount":125,"tags":[],"startedAt":"1970-01-02T00:00:00Z","finishedAt":"1970-01-02T00:00:40Z"},
         {"id":"00000000-0000-0000-0000-000000000003","mode":"quote","language":"german","durationSeconds":null,"wordLimit":null,"wpm":49,"rawWpm":52,"accuracy":94,"consistency":76.25,"errorCount":4,"eventCount":180,"tags":["café"],"startedAt":"1970-01-03T00:00:00Z","finishedAt":"1970-01-03T00:01:00Z"}
       ]
@@ -15674,6 +15689,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(csv.hasPrefix(RemoteResultCSVExport.columns.joined(separator: ",") + "\r\n"))
     XCTAssertTrue(csv.contains("00000000-0000-0000-0000-000000000001,time,30,,english,61,66,97,88.50,2,140"))
     XCTAssertTrue(csv.contains("\"focus, \"\"steady\"\"\""))
+    XCTAssertTrue(csv.contains("23.00,9.00,32.00"))
     XCTAssertFalse(csv.localizedCaseInsensitiveContains("prompt"))
     XCTAssertFalse(csv.localizedCaseInsensitiveContains("replay"))
     XCTAssertEqual(

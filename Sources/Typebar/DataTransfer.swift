@@ -150,6 +150,7 @@ enum RemoteResultCSVExport {
     static let columns = [
         "id", "mode", "duration_seconds", "word_limit", "language", "wpm", "raw_wpm",
         "accuracy_percent", "consistency_percent", "errors", "event_count", "tags",
+        "terminal_engaged_seconds", "prior_attempt_engaged_seconds", "total_engaged_seconds",
         "started_at", "finished_at",
     ]
 
@@ -219,7 +220,13 @@ enum RemoteResultCSVExport {
             result.durationSeconds.map(String.init) ?? "", result.wordLimit.map(String.init) ?? "",
             result.language, String(result.wpm), String(result.rawWpm), String(result.accuracy),
             decimal(result.consistency), String(result.errorCount), String(result.eventCount),
-            result.tags.joined(separator: ";"), iso8601Date(result.startedAt),
+            result.tags.joined(separator: ";"),
+            result.practiceTiming.map { decimal(Double($0.terminalEngagedMilliseconds) / 1_000) } ?? "",
+            result.practiceTiming.map { decimal(Double($0.priorAttemptEngagedMilliseconds) / 1_000) } ?? "",
+            result.practiceTiming.map {
+                decimal(Double($0.terminalEngagedMilliseconds + $0.priorAttemptEngagedMilliseconds) / 1_000)
+            } ?? "",
+            iso8601Date(result.startedAt),
             iso8601Date(result.finishedAt),
         ]
     }

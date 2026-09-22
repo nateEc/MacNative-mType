@@ -20,6 +20,23 @@ public struct ResultTimingEvidence: Content, Equatable, Sendable {
     }
 }
 
+/// Optional effective-time metadata reported by a capability-negotiating
+/// native client. It is separate from timing evidence: it improves profile
+/// accounting but is not proof for competitive leaderboard eligibility.
+public struct ResultPracticeTiming: Content, Equatable, Sendable {
+    public let version: Int
+    public let terminalEngagedMilliseconds: Int
+    public let priorAttemptEngagedMilliseconds: Int
+
+    public init(
+        version: Int, terminalEngagedMilliseconds: Int, priorAttemptEngagedMilliseconds: Int
+    ) {
+        self.version = version
+        self.terminalEngagedMilliseconds = terminalEngagedMilliseconds
+        self.priorAttemptEngagedMilliseconds = priorAttemptEngagedMilliseconds
+    }
+}
+
 public struct ResultSubmissionRequest: Content, Equatable {
     public let id: UUID
     public let mode: String
@@ -35,6 +52,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let restartCount: Int
     public let tags: [String]
     public let timingEvidence: ResultTimingEvidence?
+    public let practiceTiming: ResultPracticeTiming?
     public let startedAt: Date
     public let finishedAt: Date
 
@@ -42,6 +60,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
         rawWpm: Int, accuracy: Int, consistency: Double = 0, errorCount: Int, eventCount: Int,
         restartCount: Int = 0, tags: [String] = [], timingEvidence: ResultTimingEvidence? = nil,
+        practiceTiming: ResultPracticeTiming? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -58,6 +77,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.restartCount = restartCount
         self.tags = tags
         self.timingEvidence = timingEvidence
+        self.practiceTiming = practiceTiming
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }
@@ -66,6 +86,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
             errorCount, eventCount, restartCount, tags, startedAt, finishedAt
         case timingEvidence
+        case practiceTiming
     }
 
     public init(from decoder: Decoder) throws {
@@ -84,6 +105,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         timingEvidence = try values.decodeIfPresent(ResultTimingEvidence.self, forKey: .timingEvidence)
+        practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
         startedAt = try values.decode(Date.self, forKey: .startedAt)
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
     }
@@ -114,13 +136,14 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let errorCount: Int
     public let eventCount: Int
     public let tags: [String]
+    public let practiceTiming: ResultPracticeTiming?
     public let startedAt: Date
     public let finishedAt: Date
 
     public init(
         id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
         rawWpm: Int, accuracy: Int, consistency: Double, errorCount: Int, eventCount: Int,
-        tags: [String], startedAt: Date, finishedAt: Date
+        tags: [String], practiceTiming: ResultPracticeTiming? = nil, startedAt: Date, finishedAt: Date
     ) {
         self.id = id
         self.mode = mode
@@ -134,6 +157,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.errorCount = errorCount
         self.eventCount = eventCount
         self.tags = tags
+        self.practiceTiming = practiceTiming
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }

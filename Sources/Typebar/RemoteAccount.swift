@@ -371,12 +371,16 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let errorCount: Int
     let eventCount: Int
     let tags: [String]
+    /// Optional effective-time metadata added by newer self-hosted servers.
+    /// Older services omit it, so historical exports preserve their original
+    /// wall-clock semantics instead of inventing an AFK estimate.
+    let practiceTiming: RemoteResultPracticeTiming?
     let startedAt: Date
     let finishedAt: Date
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, startedAt, finishedAt
+            errorCount, eventCount, tags, practiceTiming, startedAt, finishedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -393,6 +397,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         errorCount = try values.decode(Int.self, forKey: .errorCount)
         eventCount = try values.decode(Int.self, forKey: .eventCount)
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+        practiceTiming = try values.decodeIfPresent(RemoteResultPracticeTiming.self, forKey: .practiceTiming)
         startedAt = try values.decode(Date.self, forKey: .startedAt)
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
     }
@@ -694,10 +699,14 @@ struct RemoteResultSubmission: Codable, Sendable {
     let restartCount: Int
     let tags: [String]
     let timingEvidence: RemoteResultTimingEvidence?
+    let practiceTiming: RemoteResultPracticeTiming?
     let startedAt: Date
     let finishedAt: Date
 
-    init(result: CompletedTestResult, includesTimingEvidence: Bool = false) {
+    init(
+        result: CompletedTestResult, includesTimingEvidence: Bool = false,
+        includesPracticeTiming: Bool = false
+    ) {
         id = result.id
         mode = result.configuration.mode.rawValue
         language = result.configuration.language.rawValue
@@ -714,6 +723,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         restartCount = result.restartCount
         tags = result.tags
         timingEvidence = includesTimingEvidence ? RemoteResultTimingEvidence(result: result) : nil
+        practiceTiming = includesPracticeTiming ? RemoteResultPracticeTiming(result: result) : nil
         startedAt = result.startedAt
         finishedAt = result.finishedAt
     }
@@ -728,6 +738,12 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
         apiVersion == "v1"
             && service == "typebar"
             && capabilities["resultTimingEvidence"] == "available"
+    }
+
+    var supportsResultPracticeTiming: Bool {
+        apiVersion == "v1"
+            && service == "typebar"
+            && capabilities["resultPracticeTiming"] == "available"
     }
 
     var supportsHumanVerification: Bool {
@@ -766,6 +782,38 @@ struct RemoteResultTimingEvidence: Codable, Equatable, Sendable {
 
     private static func milliseconds(_ samples: [TimeInterval]) -> [Int] {
         samples.map { Int(($0 * 1_000).rounded()) }
+    }
+}
+
+/// A versioned, bounded effective-duration report for account statistics.
+/// It deliberately contains no prompt, event log, or keystroke content. The
+/// server treats it as profile metadata, never as leaderboard qualification.
+struct RemoteResultPracticeTiming: Codable, Equatable, Sendable {
+    static let currentVersion = 1
+    static let maximumTerminalEngagedMilliseconds = 3_600_000
+    static let maximumRestartCount = 1_000
+
+    let version: Int
+    let terminalEngagedMilliseconds: Int
+    let priorAttemptEngagedMilliseconds: Int
+
+    init?(result: CompletedTestResult) {
+        guard result.restartCount <= Self.maximumRestartCount,
+            let terminal = Self.milliseconds(result.engagedDuration),
+            let prior = Self.milliseconds(result.priorAttemptEngagedDuration),
+            (0...Self.maximumTerminalEngagedMilliseconds).contains(terminal),
+            (0...(result.restartCount * Self.maximumTerminalEngagedMilliseconds)).contains(prior)
+        else { return nil }
+        version = Self.currentVersion
+        terminalEngagedMilliseconds = terminal
+        priorAttemptEngagedMilliseconds = prior
+    }
+
+    private static func milliseconds(_ duration: TimeInterval) -> Int? {
+        guard duration.isFinite, duration >= 0 else { return nil }
+        let milliseconds = (duration * 1_000).rounded()
+        guard milliseconds <= Double(Int.max) else { return nil }
+        return Int(milliseconds)
     }
 }
 
@@ -2543,7 +2591,8 @@ final class AccountSession {
             token: token,
             body: RemoteResultSubmission(
                 result: result,
-                includesTimingEvidence: capabilities?.supportsResultTimingEvidence == true),
+                includesTimingEvidence: capabilities?.supportsResultTimingEvidence == true,
+                includesPracticeTiming: capabilities?.supportsResultPracticeTiming == true),
             response: RemoteResultSubmissionResponse.self
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }

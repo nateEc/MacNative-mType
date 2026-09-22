@@ -63,6 +63,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["synchronization"], .partial)
         XCTAssertEqual(capabilities.capabilities["resultSubmission"], .partial)
         XCTAssertEqual(capabilities.capabilities["resultTimingEvidence"], .available)
+        XCTAssertEqual(capabilities.capabilities["resultPracticeTiming"], .available)
         XCTAssertEqual(capabilities.capabilities["resultHistory"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboards"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboardRankMemory"], .available)
@@ -4447,6 +4448,71 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(request.consistency, 0)
     XCTAssertEqual(request.restartCount, 0)
     XCTAssertNil(request.timingEvidence)
+    XCTAssertNil(request.practiceTiming)
+  }
+
+  func testResultPracticeTimingUsesEngagedSecondsAndRetainsLegacyWallClockRecords() async throws {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let session = try await store.register(
+      .init(email: "practice-timing@example.com", password: "a secure password", displayName: "Practice Timing"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let timedID = UUID()
+
+    _ = try await store.submitResult(
+      result(
+        id: timedID, wpm: 72, accuracy: 98, restartCount: 1,
+        practiceTiming: .init(
+          version: 1, terminalEngagedMilliseconds: 22_000,
+          priorAttemptEngagedMilliseconds: 9_000),
+        finishedAt: now), accessToken: session.accessToken, now: now)
+    _ = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 74, accuracy: 99, durationSeconds: 40, elapsedSeconds: 40,
+        finishedAt: now.addingTimeInterval(-60)),
+      accessToken: session.accessToken, now: now)
+
+    let profile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(profile.totalTypingSeconds, 71)
+    XCTAssertEqual(profile.startedTestCount, 3)
+    let accountResults = try await store.results(
+      .init(), credential: .accessToken(session.accessToken), now: now)
+    XCTAssertEqual(accountResults.results.first(where: { $0.id == timedID })?.practiceTiming,
+                   .init(version: 1, terminalEngagedMilliseconds: 22_000, priorAttemptEngagedMilliseconds: 9_000))
+  }
+
+  func testResultPracticeTimingCannotChangeLeaderboardQualificationOrExceedBounds() async throws {
+    let store = try AuthStore(
+      fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 900)
+    let session = try await store.register(
+      .init(email: "practice-boundary@example.com", password: "a secure password", displayName: "Practice Boundary"))
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let accepted = try await store.submitResult(
+      result(
+        id: UUID(), wpm: 72, accuracy: 98, restartCount: 1,
+        practiceTiming: .init(
+          version: 1, terminalEngagedMilliseconds: 30_000,
+          priorAttemptEngagedMilliseconds: 3_600_000),
+        finishedAt: now), accessToken: session.accessToken, now: now)
+    XCTAssertFalse(accepted.leaderboardEligible)
+
+    let invalidTimings: [(timing: ResultPracticeTiming, restartCount: Int)] = [
+      (.init(version: 2, terminalEngagedMilliseconds: 30_000, priorAttemptEngagedMilliseconds: 0), 0),
+      (.init(version: 1, terminalEngagedMilliseconds: 30_001, priorAttemptEngagedMilliseconds: 0), 0),
+      (.init(version: 1, terminalEngagedMilliseconds: 30_000, priorAttemptEngagedMilliseconds: 1), 0),
+      (.init(version: 1, terminalEngagedMilliseconds: 30_000, priorAttemptEngagedMilliseconds: 3_600_001), 1),
+    ]
+    for invalid in invalidTimings {
+      do {
+        _ = try await store.submitResult(
+          result(
+            id: UUID(), wpm: 72, accuracy: 98, restartCount: invalid.restartCount,
+            practiceTiming: invalid.timing, finishedAt: now),
+          accessToken: session.accessToken, now: now)
+        XCTFail("Invalid effective-time metadata must not be stored")
+      } catch let error as ResultStoreError {
+        XCTAssertEqual(error, .invalidResult)
+      }
+    }
   }
 
   func testSubmittedResultsTrackRestartCountsWithoutDoubleCountingRetries() async throws {
@@ -6220,6 +6286,7 @@ final class HealthRouteTests: XCTestCase {
     id: UUID, wpm: Int, accuracy: Int, consistency: Double = 0, mode: String = "time",
     durationSeconds: Int? = 30, wordLimit: Int? = nil, restartCount: Int = 0,
     language: String = "english", timingEvidence: ResultTimingEvidence? = nil,
+    practiceTiming: ResultPracticeTiming? = nil,
     elapsedSeconds: Double? = nil, finishedAt: Date
   )
     -> ResultSubmissionRequest
@@ -6236,7 +6303,7 @@ final class HealthRouteTests: XCTestCase {
       id: id, mode: mode, language: language, durationSeconds: durationSeconds, wordLimit: wordLimit,
       wpm: wpm, rawWpm: rawWpm, accuracy: accuracy, consistency: consistency,
       errorCount: eventCount - correctCharacters, eventCount: eventCount,
-      restartCount: restartCount, timingEvidence: timingEvidence,
+      restartCount: restartCount, timingEvidence: timingEvidence, practiceTiming: practiceTiming,
       startedAt: finishedAt.addingTimeInterval(-elapsed),
       finishedAt: finishedAt)
   }

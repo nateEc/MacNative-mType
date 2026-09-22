@@ -69,6 +69,7 @@ public func configure(
                 "synchronization": .partial,
                 "resultSubmission": .partial,
                 "resultTimingEvidence": .available,
+                "resultPracticeTiming": .available,
                 "resultHistory": .partial,
                 "leaderboards": .partial,
                 "leaderboardRankMemory": .available,

@@ -930,19 +930,20 @@ public actor AuthStore {
     let errorCount: Int
     let eventCount: Int
     var tags: [String]
+    let practiceTiming: ResultPracticeTiming?
     let startedAt: Date
     let finishedAt: Date
     let acceptedAt: Date?
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, tags, startedAt, finishedAt, acceptedAt
+        errorCount, eventCount, tags, practiceTiming, startedAt, finishedAt, acceptedAt
     }
 
     init(
       id: UUID, userID: UUID, mode: String, language: String, durationSeconds: Int?,
       wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, consistency: Double,
-      errorCount: Int, eventCount: Int, tags: [String],
+      errorCount: Int, eventCount: Int, tags: [String], practiceTiming: ResultPracticeTiming? = nil,
       startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil
     ) {
       self.id = id
@@ -958,6 +959,7 @@ public actor AuthStore {
       self.errorCount = errorCount
       self.eventCount = eventCount
       self.tags = tags
+      self.practiceTiming = practiceTiming
       self.startedAt = startedAt
       self.finishedAt = finishedAt
       self.acceptedAt = acceptedAt
@@ -978,6 +980,7 @@ public actor AuthStore {
       errorCount = try values.decode(Int.self, forKey: .errorCount)
       eventCount = try values.decode(Int.self, forKey: .eventCount)
       tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+      practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
       finishedAt = try values.decode(Date.self, forKey: .finishedAt)
       let legacyDuration =
         durationSeconds.map(TimeInterval.init)
@@ -993,6 +996,7 @@ public actor AuthStore {
         id: id, mode: mode, language: language, durationSeconds: durationSeconds,
         wordLimit: wordLimit, wpm: wpm, rawWpm: rawWpm, accuracy: accuracy,
         consistency: consistency, errorCount: errorCount, eventCount: eventCount, tags: tags,
+        practiceTiming: practiceTiming,
         startedAt: startedAt, finishedAt: finishedAt)
     }
   }
@@ -2820,9 +2824,7 @@ public actor AuthStore {
       $0.accuracy >= 98 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 15
     }
     let bestWPM = results.map(\.wpm).max() ?? 0
-    let totalTypingSeconds = results.reduce(0.0) { partial, result in
-      partial + max(0, result.finishedAt.timeIntervalSince(result.startedAt))
-    }
+    let totalTypingSeconds = totalTypingSeconds(from: results)
     let perfectMinuteExists = results.contains {
       $0.accuracy == 100 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 60
     }
@@ -2920,8 +2922,15 @@ public actor AuthStore {
 
   private func totalTypingSeconds(from results: [StoredResult]) -> Double {
     results.reduce(0) { total, result in
-      total + max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+      total + effectiveTypingSeconds(for: result)
     }
+  }
+
+  private func effectiveTypingSeconds(for result: StoredResult) -> Double {
+    guard let timing = result.practiceTiming else {
+      return max(0, result.finishedAt.timeIntervalSince(result.startedAt))
+    }
+    return Double(timing.terminalEngagedMilliseconds + timing.priorAttemptEngagedMilliseconds) / 1_000
   }
 
   private static let publicSpeedDistributionBucketSize = 10
@@ -3197,7 +3206,7 @@ public actor AuthStore {
         durationSeconds: request.durationSeconds, wordLimit: request.wordLimit,
         wpm: request.wpm, rawWpm: request.rawWpm, accuracy: request.accuracy,
         consistency: request.consistency, errorCount: request.errorCount, eventCount: request.eventCount,
-        tags: tags,
+        tags: tags, practiceTiming: request.practiceTiming,
         startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
       ))
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
@@ -3895,6 +3904,9 @@ public actor AuthStore {
     if let evidence = result.timingEvidence {
       try validate(timingEvidence: evidence, elapsed: elapsed)
     }
+    if let practiceTiming = result.practiceTiming {
+      try validate(practiceTiming: practiceTiming, elapsed: elapsed, restartCount: result.restartCount)
+    }
     if result.mode == "time", let configuredDuration = result.durationSeconds {
       guard abs(elapsed - Double(configuredDuration)) <= 1 else {
         throw ResultStoreError.invalidResult
@@ -3932,6 +3944,18 @@ public actor AuthStore {
       }),
       (0...maximumEventMilliseconds).contains(timingEvidence.keyOverlapMilliseconds),
       timingEvidence.keySpacingMilliseconds.reduce(0, +) <= maximumEventMilliseconds
+    else { throw ResultStoreError.invalidResult }
+  }
+
+  private func validate(
+    practiceTiming: ResultPracticeTiming, elapsed: TimeInterval, restartCount: Int
+  ) throws {
+    let maximumAttemptMilliseconds = 3_600_000
+    let elapsedMilliseconds = Int((elapsed * 1_000).rounded())
+    guard practiceTiming.version == 1,
+      (0...elapsedMilliseconds).contains(practiceTiming.terminalEngagedMilliseconds),
+      (0...(restartCount * maximumAttemptMilliseconds)).contains(
+        practiceTiming.priorAttemptEngagedMilliseconds)
     else { throw ResultStoreError.invalidResult }
   }
 
