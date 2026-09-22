@@ -1938,7 +1938,7 @@ struct PreferencesView: View {
                 .font(.caption)
                 .foregroundStyle(.orange)
               Text(
-                "公开资料：\(report.profile.completedResultCount) 次完成 · 最佳 \(report.profile.bestWPM) WPM · \(report.profile.totalExperience) XP"
+                "公开资料：\(report.profile.completedResultCount) 次完成 · 最佳 \(report.profile.bestWPM) WPM · \(ExperiencePresentation.compact(report.profile.totalExperience)) XP"
               )
               .font(.caption2)
               .foregroundStyle(.secondary)

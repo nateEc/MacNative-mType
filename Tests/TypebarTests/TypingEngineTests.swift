@@ -24929,6 +24929,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingSpeedUnit.wpm.canonicalWpm(fromDisplayedValue: 1e100), 1_000_000)
   }
 
+  func testExperiencePresentationCompactsLargeXPForRankings() {
+    XCTAssertEqual(ExperiencePresentation.compact(0), "0")
+    XCTAssertEqual(ExperiencePresentation.compact(999), "999")
+    XCTAssertEqual(ExperiencePresentation.compact(1_000), "1.0k")
+    XCTAssertEqual(ExperiencePresentation.compact(12_345), "12.3k")
+    XCTAssertEqual(ExperiencePresentation.compact(1_999_999), "2.0m")
+    XCTAssertEqual(ExperiencePresentation.compact(-12_345), "-12.3k")
+  }
+
   func testReferenceCompatiblePaceGuideUsesRecentTenAndRollingDayBest() {
     let now = Date(timeIntervalSinceReferenceDate: 20_000_000)
     let configuration = TestConfiguration.timed(seconds: 30, language: .english)

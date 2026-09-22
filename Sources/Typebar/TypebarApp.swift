@@ -4492,8 +4492,8 @@ private struct ContentView: View {
     let rank = response.weeklyExperienceRank.map { " · 本周 XP #\($0)" } ?? ""
     return .init(
       message: response.leaderboardEligible
-        ? "已发送至自建服务 · +\(response.experienceGained) XP · 总计 \(response.totalExperience) XP\(rank)"
-        : "已发送至自建服务 · +\(response.experienceGained) XP",
+        ? "已发送至自建服务 · +\(ExperiencePresentation.compact(response.experienceGained)) XP · 总计 \(ExperiencePresentation.compact(response.totalExperience)) XP\(rank)"
+        : "已发送至自建服务 · +\(ExperiencePresentation.compact(response.experienceGained)) XP",
       dailyLeaderboardRank: response.dailyLeaderboardRank)
   }
 }

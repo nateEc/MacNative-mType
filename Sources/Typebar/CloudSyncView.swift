@@ -81,7 +81,7 @@ struct CloudSyncView: View {
                     if let user = account.currentUser {
                         LabeledContent("已登录", value: user.displayName)
                         Text(user.email).font(.caption).foregroundStyle(.secondary)
-                        LabeledContent("总 XP", value: "\(user.totalExperience)")
+                        LabeledContent("总 XP", value: ExperiencePresentation.compact(user.totalExperience))
                     } else {
                         Text("请先在“设置 → 自建账户”中登录自己的 Typebar 服务。").foregroundStyle(.secondary)
                     }
@@ -313,7 +313,7 @@ struct CloudSyncView: View {
                                 rank: experienceRank.rank, total: experienceLeaderboardPage?.total)
                             VStack(alignment: .leading, spacing: 3) {
                                 Label(
-                                    "你的\(experiencePeriod.displayName) XP 排名 #\(experienceRank.rank) · \(experienceRank.totalExperience) XP\(standing.map { " · \($0.displayName)" } ?? "")",
+                                    "你的\(experiencePeriod.displayName) XP 排名 #\(experienceRank.rank) · \(ExperiencePresentation.compact(experienceRank.totalExperience)) XP\(standing.map { " · \($0.displayName)" } ?? "")",
                                     systemImage: "person.fill")
                                     .font(.caption.weight(.medium))
                                 if let experienceRankChange {
@@ -358,7 +358,9 @@ struct CloudSyncView: View {
                                 .buttonStyle(.plain)
                                 .lineLimit(1)
                             Spacer()
-                            Text("\(entry.totalExperience) XP").monospacedDigit()
+                            Text("\(ExperiencePresentation.compact(entry.totalExperience)) XP")
+                                .monospacedDigit()
+                                .accessibilityLabel("\(entry.totalExperience) XP")
                         }
                     }
                     Text(experienceScope == .friends ? "好友 XP 榜仅包含你和已接受好友，并按当前 ISO 周的服务端验证成绩累计。" : "XP 由服务端根据完成成绩的时长、准确率和模式重算；禅模式不奖励 XP。")
@@ -1050,7 +1052,7 @@ struct PublicProfileView: View {
                 GridRow { metric("完成成绩", "\(profile.completedResultCount)"); metric("最佳 WPM", "\(profile.bestWPM)") }
                 GridRow {
                     metric("最高稳定度", "\(profile.highestConsistency.formatted(.number.precision(.fractionLength(0...2))))%")
-                    metric("总 XP", "\(profile.totalExperience)")
+                    metric("总 XP", ExperiencePresentation.compact(profile.totalExperience))
                 }
                 if let streak = profile.streak {
                     GridRow {
