@@ -9,6 +9,7 @@
 - 当前语言目录：376 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
 - `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：446 个独立原生选择、0 个兼容代指、0 个未映射配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 - `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：92 个已映射、1 个部分、1 个不适用、0 个未实现或漏记；声音、主／节奏光标、实时指标、键盘提示与键入能量档位会提取固定枚举值，节奏伙伴会校验固定布尔类型，再与本机语义逐项对账。
+- 同一清单的 `nativeEvidenceGroups` 将 93 个已映射或部分映射键按固定 `ConfigSchema` 的九个非广告组分区，并为每组记录 Typebar 源文件路径；测试校验组名、逐键归属、无重复、完整覆盖，以及所有路径均存在于 `Sources/Typebar/`。这些代码路径是可审计的实现证据，不替代设备上的端到端行为验收。
 
 - Catalan、Indonesian 与 Malay 的自动化测试覆盖各自的自创词流、四档原创引语、完整多语混排轮转、`ca-ES` / `id-ID` / `ms-MY` 朗读 locale 与仅在明示启用时使用的 `ca` / `id` / `ms` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 

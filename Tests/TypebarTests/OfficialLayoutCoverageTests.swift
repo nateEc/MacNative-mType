@@ -41,6 +41,12 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let officialBooleanKeys: [String]
     let sourceFiles: [String]
     let method: String
+    let nativeEvidenceGroups: [String: ConfigEvidenceGroup]
+  }
+
+  private struct ConfigEvidenceGroup: Decodable {
+    let keys: [String]
+    let nativeFiles: [String]
   }
 
   private struct PageModalFixture: Decodable {
@@ -242,6 +248,44 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let notApplicableKeys = Set(fixture.notApplicable.keys)
     let unimplementedKeys = Set(fixture.unimplemented.keys)
     let untrackedKeys = Set(fixture.untrackedOfficialKeys)
+    let expectedKeysByGroup: [String: Set<String>] = [
+      "test": [
+        "punctuation", "numbers", "words", "time", "mode", "quoteLength", "language",
+        "burstHeatmap",
+      ],
+      "behavior": [
+        "difficulty", "quickRestart", "repeatQuotes", "resultSaving", "blindMode",
+        "alwaysShowWordsHistory", "singleListCommandLine", "minWpm", "minWpmCustomSpeed",
+        "minAcc", "minAccCustom", "minBurst", "minBurstCustomSpeed", "britishEnglish",
+        "funbox", "customLayoutfluid", "customPolyglot",
+      ],
+      "input": [
+        "freedomMode", "strictSpace", "oppositeShiftMode", "stopOnError", "deleteOnError",
+        "confidenceMode", "quickEnd", "indicateTypos", "compositionDisplay", "hideExtraLetters",
+        "lazyMode", "layout", "codeUnindentOnBackspace",
+      ],
+      "sound": ["soundVolume", "playSoundOnClick", "playSoundOnError", "playTimeWarning"],
+      "caret": [
+        "smoothCaret", "caretStyle", "paceCaret", "paceCaretCustomSpeed", "paceCaretStyle",
+        "repeatedPace",
+      ],
+      "appearance": [
+        "timerStyle", "liveSpeedStyle", "liveAccStyle", "liveBurstStyle", "timerColor",
+        "timerOpacity", "highlightMode", "typedEffect", "tapeMode", "tapeMargin",
+        "smoothLineScroll", "showAllLines", "alwaysShowDecimalPlaces", "typingSpeedUnit",
+        "startGraphsAtZero", "maxLineWidth", "fontSize", "fontFamily", "keymapMode",
+        "keymapLayout", "keymapStyle", "keymapLegendStyle", "keymapKeys", "keymapSize",
+      ],
+      "theme": [
+        "flipTestColors", "colorfulMode", "customBackground", "customBackgroundSize",
+        "customBackgroundFilter", "autoSwitchTheme", "themeLight", "themeDark", "randomTheme",
+        "favThemes", "theme", "customTheme", "customThemeColors",
+      ],
+      "hideElements": [
+        "showKeyTips", "showOutOfFocusWarning", "capsLockWarning", "showAverage", "showPb",
+      ],
+      "hidden": ["accountChart", "monkey", "monkeyPowerLevel"],
+    ]
 
     XCTAssertEqual(fixture.referenceRepository, "monkeytypegame/monkeytype")
     XCTAssertEqual(fixture.referenceCommit, "91bd24bb8513785c7364cbea29296ff7adafac41")
@@ -348,6 +392,28 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(
       mappedKeys.union(partialKeys).union(notApplicableKeys).union(unimplementedKeys)
         .union(untrackedKeys), officialKeys)
+    XCTAssertEqual(
+      Set(fixture.nativeEvidenceGroups.keys),
+      Set(PresetSettingGroup.allCases.map(\.rawValue)))
+    XCTAssertEqual(Set(fixture.nativeEvidenceGroups.keys), Set(expectedKeysByGroup.keys))
+    XCTAssertEqual(
+      Set(fixture.nativeEvidenceGroups.values.flatMap(\.keys)),
+      mappedKeys.union(partialKeys))
+    XCTAssertEqual(
+      fixture.nativeEvidenceGroups.values.flatMap(\.keys).count,
+      mappedKeys.union(partialKeys).count)
+    for (group, expectedKeys) in expectedKeysByGroup {
+      let evidence = try XCTUnwrap(fixture.nativeEvidenceGroups[group])
+      XCTAssertEqual(Set(evidence.keys), expectedKeys, "\(group) 键分组与固定 ConfigSchema 不一致")
+      XCTAssertEqual(evidence.keys.count, expectedKeys.count, "\(group) 存在重复键")
+      XCTAssertFalse(evidence.nativeFiles.isEmpty, "\(group) 缺少可验证的原生证据路径")
+      for path in evidence.nativeFiles {
+        XCTAssertTrue(path.hasPrefix("Sources/Typebar/"), "\(group) 使用了范围外路径：\(path)")
+        XCTAssertTrue(
+          FileManager.default.fileExists(atPath: repositoryRoot.appendingPathComponent(path).path),
+          "\(group) 声明的原生证据文件不存在：\(path)")
+      }
+    }
     XCTAssertTrue(
       (Array(fixture.mapped.values) + Array(fixture.partial.values)
         + Array(fixture.notApplicable.values) + Array(fixture.unimplemented.values))
@@ -356,6 +422,10 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       fixture.sourceFiles,
       ["packages/schemas/src/configs.ts", "OFFICIAL_CONFIG_AUDIT.md"])
     XCTAssertTrue(fixture.method.contains("metadata only"))
+    let audit = try String(
+      contentsOf: repositoryRoot.appendingPathComponent("OFFICIAL_CONFIG_AUDIT.md"),
+      encoding: .utf8)
+    XCTAssertTrue(audit.contains("`nativeEvidenceGroups`"))
   }
 
   func testPinnedOfficialPageAndModalCoverageIsPartitionedWithNativeEvidence() throws {

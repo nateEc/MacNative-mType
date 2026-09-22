@@ -203,6 +203,187 @@
   "untrackedOfficialKeys": [
 
   ],
+  "nativeEvidenceGroups": {
+    "test": {
+      "keys": [
+        "punctuation",
+        "numbers",
+        "words",
+        "time",
+        "mode",
+        "quoteLength",
+        "language",
+        "burstHeatmap"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/TypingEngine.swift",
+        "Sources/Typebar/TypebarApp.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    },
+    "behavior": {
+      "keys": [
+        "difficulty",
+        "quickRestart",
+        "repeatQuotes",
+        "resultSaving",
+        "blindMode",
+        "alwaysShowWordsHistory",
+        "singleListCommandLine",
+        "minWpm",
+        "minWpmCustomSpeed",
+        "minAcc",
+        "minAccCustom",
+        "minBurst",
+        "minBurstCustomSpeed",
+        "britishEnglish",
+        "funbox",
+        "customLayoutfluid",
+        "customPolyglot"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/AppSettings.swift",
+        "Sources/Typebar/TypingEngine.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    },
+    "input": {
+      "keys": [
+        "freedomMode",
+        "strictSpace",
+        "oppositeShiftMode",
+        "stopOnError",
+        "deleteOnError",
+        "confidenceMode",
+        "quickEnd",
+        "indicateTypos",
+        "compositionDisplay",
+        "hideExtraLetters",
+        "lazyMode",
+        "layout",
+        "codeUnindentOnBackspace"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/AppSettings.swift",
+        "Sources/Typebar/NativeTypingInput.swift",
+        "Sources/Typebar/KeyboardGuide.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    },
+    "sound": {
+      "keys": [
+        "soundVolume",
+        "playSoundOnClick",
+        "playSoundOnError",
+        "playTimeWarning"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/AppSettings.swift",
+        "Sources/Typebar/TypingFeedbackSound.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    },
+    "caret": {
+      "keys": [
+        "smoothCaret",
+        "caretStyle",
+        "paceCaret",
+        "paceCaretCustomSpeed",
+        "paceCaretStyle",
+        "repeatedPace"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/AppSettings.swift",
+        "Sources/Typebar/PromptCaretOverlay.swift",
+        "Sources/Typebar/PaceGuide.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    },
+    "appearance": {
+      "keys": [
+        "timerStyle",
+        "liveSpeedStyle",
+        "liveAccStyle",
+        "liveBurstStyle",
+        "timerColor",
+        "timerOpacity",
+        "highlightMode",
+        "typedEffect",
+        "tapeMode",
+        "tapeMargin",
+        "smoothLineScroll",
+        "showAllLines",
+        "alwaysShowDecimalPlaces",
+        "typingSpeedUnit",
+        "startGraphsAtZero",
+        "maxLineWidth",
+        "fontSize",
+        "fontFamily",
+        "keymapMode",
+        "keymapLayout",
+        "keymapStyle",
+        "keymapLegendStyle",
+        "keymapKeys",
+        "keymapSize"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/AppSettings.swift",
+        "Sources/Typebar/TypebarApp.swift",
+        "Sources/Typebar/KeyboardGuide.swift",
+        "Sources/Typebar/NativePracticeFont.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    },
+    "theme": {
+      "keys": [
+        "flipTestColors",
+        "colorfulMode",
+        "customBackground",
+        "customBackgroundSize",
+        "customBackgroundFilter",
+        "autoSwitchTheme",
+        "themeLight",
+        "themeDark",
+        "randomTheme",
+        "favThemes",
+        "theme",
+        "customTheme",
+        "customThemeColors"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/AppSettings.swift",
+        "Sources/Typebar/AppTheme.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    },
+    "hideElements": {
+      "keys": [
+        "showKeyTips",
+        "showOutOfFocusWarning",
+        "capsLockWarning",
+        "showAverage",
+        "showPb"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/AppSettings.swift",
+        "Sources/Typebar/TypebarApp.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    },
+    "hidden": {
+      "keys": [
+        "accountChart",
+        "monkey",
+        "monkeyPowerLevel"
+      ],
+      "nativeFiles": [
+        "Sources/Typebar/AppSettings.swift",
+        "Sources/Typebar/ResultsAnalytics.swift",
+        "Sources/Typebar/TypingCompanion.swift",
+        "Sources/Typebar/PresetApplicationPolicy.swift"
+      ]
+    }
+  },
   "officialChoices": {
     "playSoundOnClick": [
       "off",
