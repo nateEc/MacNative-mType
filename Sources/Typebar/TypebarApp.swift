@@ -985,7 +985,10 @@ private struct ContentView: View {
         syncInitialLeaderboard = nil
         showingSync = true
       }
-      Button("好友", systemImage: "person.2") { showingConnections = true }
+      Button("好友", systemImage: "person.2") {
+        guard acceptsLeavingPracticeNavigation() else { return }
+        showingConnections = true
+      }
       Button { showingNotifications = true } label: {
         HStack(spacing: 4) {
           Label("通知", systemImage: "bell")
@@ -2665,6 +2668,15 @@ private struct ContentView: View {
     reset(restarting: true)
   }
 
+  @discardableResult
+  private func acceptsLeavingPracticeNavigation() -> Bool {
+    guard NoQuitNavigationPolicy.allowsLeavingPractice(for: session) else {
+      restartLockMessage = "锁定重开已开启：请完成或放弃本次测试后再离开练习。"
+      return false
+    }
+    return true
+  }
+
   private var isRestartingConfigurationChangeLocked: Bool {
     !settings.allowsRestartingConfigurationChange
   }
@@ -3791,7 +3803,9 @@ private struct ContentView: View {
     case "savedTexts": showingSavedTexts = true
     case "data": showingDataMigration = true
     case "sync": showingSync = true
-    case "friends": showingConnections = true
+    case "friends":
+      guard acceptsLeavingPracticeNavigation() else { return }
+      showingConnections = true
     case "notifications": showingNotifications = true
     case ReleaseHistoryCommand.identifier: openWindow(id: "release-history")
     case "bailout": showingCommandBailoutConfirmation = true

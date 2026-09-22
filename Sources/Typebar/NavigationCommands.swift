@@ -63,6 +63,10 @@ enum NoQuitNavigationPolicy {
     allows(target, whenLocked: TypingRestartPolicy.isLocked(session))
   }
 
+  static func allowsLeavingPractice(for session: TypingSession) -> Bool {
+    !TypingRestartPolicy.isLocked(session)
+  }
+
   static func allows(_ target: NavigationCommandTarget, whenLocked: Bool) -> Bool {
     guard whenLocked else { return true }
     return switch target {

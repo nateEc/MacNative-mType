@@ -18933,11 +18933,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(NavigationCommandTarget.allCases.allSatisfy {
       NoQuitNavigationPolicy.allows($0, for: session)
     })
+    XCTAssertTrue(NoQuitNavigationPolicy.allowsLeavingPractice(for: session))
 
     session.insert("a", at: start)
 
     XCTAssertTrue(NoQuitNavigationPolicy.allows(.typingPage, for: session))
     XCTAssertTrue(NoQuitNavigationPolicy.allows(.fullscreen, for: session))
+    XCTAssertFalse(NoQuitNavigationPolicy.allowsLeavingPractice(for: session))
     for target in [
       NavigationCommandTarget.leaderboards, .about, .settings, .account, .profileSearch,
     ] {
@@ -18948,6 +18950,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(NavigationCommandTarget.allCases.allSatisfy {
       NoQuitNavigationPolicy.allows($0, for: session)
     })
+    XCTAssertTrue(NoQuitNavigationPolicy.allowsLeavingPractice(for: session))
   }
 
   func testNoQuitConfigurationLockRegistryBlocksUntilEveryActiveOwnerReleases() {
