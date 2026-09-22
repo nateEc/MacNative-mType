@@ -25038,6 +25038,13 @@ final class TypingEngineTests: XCTestCase {
       ResultMetricPresentation.duration(61.5, alwaysShowDecimalPlaces: true), "01:01.5")
   }
 
+  func testResultAccuracyKeepsTheReferenceFullScorePresentationWithDecimalsEnabled() {
+    XCTAssertEqual(
+      ResultMetricPresentation.accuracy(100, alwaysShowDecimalPlaces: true), "100%")
+    XCTAssertEqual(
+      ResultMetricPresentation.accuracy(99.995, alwaysShowDecimalPlaces: true), "100.00%")
+  }
+
   func testCompletedResultPreservesExactMetricsForResultPageDecimalPresentation() throws {
     let result = CompletedTestResult(
       id: UUID(), configuration: .words(1), outcome: .completed,

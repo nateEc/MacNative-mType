@@ -11,6 +11,9 @@ enum ResultMetricPresentation {
 
   static func accuracy(_ value: Double, alwaysShowDecimalPlaces: Bool) -> String {
     let normalized = normalized(value).clamped(to: 0...100)
+    if normalized == 100 {
+      return "100%"
+    }
     if alwaysShowDecimalPlaces {
       return String(format: "%.2f%%", normalized)
     }
