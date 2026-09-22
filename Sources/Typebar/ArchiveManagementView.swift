@@ -13,6 +13,7 @@ struct ArchiveManagementView: View {
     let settings: AppSettings
     private let resultTombstones = ResultTombstoneStore()
     private let presetTombstones = PresetTombstoneStore()
+    private let savedTextTombstones = SavedTextTombstoneStore()
     private let resultFilterPresetTombstones = ResultFilterPresetTombstoneStore()
     @State private var exportDocument: TypebarArchiveDocument?
     @State private var showingImporter = false
@@ -83,7 +84,7 @@ struct ArchiveManagementView: View {
             record.definition.map { NamedPreset(id: record.id, name: record.name, definition: $0) }
         }
         let namedSavedTexts = savedTexts.map {
-            NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
+            NamedSavedText(id: $0.id, title: $0.title, text: $0.text, longProgress: $0.longProgress)
         }
         let namedResultFilterPresets = resultFilterPresets.compactMap(\.portablePreset)
         exportDocument = TypebarArchiveDocument(archive: .init(
@@ -95,6 +96,7 @@ struct ArchiveManagementView: View {
             presets: namedPresets,
             deletedPresetIDs: presetTombstones.deletedIDs,
             savedTexts: namedSavedTexts,
+            deletedSavedTextIDs: savedTextTombstones.deletedIDs,
             resultFilterPresets: namedResultFilterPresets,
             deletedResultFilterPresetIDs: resultFilterPresetTombstones.deletedIDs,
             activeTestSelection: settings.activeTestSelection
@@ -113,10 +115,11 @@ struct ArchiveManagementView: View {
                 archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts,
                 resultTombstoneStore: resultTombstones,
                 presetTombstoneStore: presetTombstones,
+                savedTextTombstoneStore: savedTextTombstones,
                 resultFilterPresets: resultFilterPresets, tombstoneStore: resultFilterPresetTombstones,
                 source: .localFile, modelContext: modelContext)
             let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
-            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩、\(summary.deletedPresets) 个预设和 \(summary.deletedResultFilterPresets) 个成绩筛选预设，已应用文件中的设置\(selectionDetail)。")
+            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩、\(summary.deletedPresets) 个预设、\(summary.deletedSavedTexts) 篇文本和 \(summary.deletedResultFilterPresets) 个成绩筛选预设，已应用文件中的设置\(selectionDetail)。")
         } catch {
             message = .init(title: "无法导入", detail: error.localizedDescription)
         }

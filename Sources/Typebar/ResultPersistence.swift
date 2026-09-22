@@ -493,6 +493,40 @@ struct PresetTombstoneStore {
   }
 }
 
+/// Persists explicit saved-text removals until the synced archive has
+/// propagated them. A stale archive cannot silently restore deleted text.
+struct SavedTextTombstoneStore {
+  private static let storageKey = "savedText.deletedIDs.v1"
+  private let defaults: UserDefaults
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  var deletedIDs: [UUID] {
+    guard let data = defaults.data(forKey: Self.storageKey),
+      let rawIDs = try? JSONDecoder().decode([UUID].self, from: data)
+    else { return [] }
+    return Array(Set(rawIDs)).sorted { $0.uuidString < $1.uuidString }
+  }
+
+  func contains(_ id: UUID) -> Bool { deletedIDs.contains(id) }
+  func markDeleted(_ id: UUID) { recordDeletedIDs([id]) }
+  func recordDeletedIDs(_ ids: some Sequence<UUID>) { save(Set(deletedIDs).union(ids)) }
+  func replaceDeletedIDs(_ ids: some Sequence<UUID>) { save(Set(ids)) }
+  func removeAll() { defaults.removeObject(forKey: Self.storageKey) }
+
+  private func save(_ ids: Set<UUID>) {
+    guard !ids.isEmpty else {
+      defaults.removeObject(forKey: Self.storageKey)
+      return
+    }
+    let sorted = ids.sorted { $0.uuidString < $1.uuidString }
+    guard let data = try? JSONEncoder().encode(sorted) else { return }
+    defaults.set(data, forKey: Self.storageKey)
+  }
+}
+
 @Model
 final class ResultFilterPresetRecord {
   @Attribute(.unique) var id: UUID

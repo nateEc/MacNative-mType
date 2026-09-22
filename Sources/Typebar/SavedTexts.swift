@@ -94,8 +94,8 @@ final class SavedCustomTextRecord {
     /// long text and is optional to keep existing SwiftData rows compatible.
     var longProgress: Int?
 
-    init(title: String, text: String, longProgress: Int? = nil) {
-        id = UUID()
+    init(id: UUID = UUID(), title: String, text: String, longProgress: Int? = nil) {
+        self.id = id
         self.title = title
         self.text = text
         createdAt = .now
@@ -118,6 +118,7 @@ struct SavedTextsView: View {
     @Query(sort: \SavedCustomTextRecord.createdAt, order: .reverse) private var savedTexts: [SavedCustomTextRecord]
 
     let onUse: (SavedCustomTextSelection) -> Void
+    private let tombstones = SavedTextTombstoneStore()
 
     private var ordinaryTexts: [SavedCustomTextRecord] { savedTexts.filter { !$0.isLong } }
     private var longTexts: [SavedCustomTextRecord] { savedTexts.filter(\.isLong) }
@@ -184,7 +185,10 @@ struct SavedTextsView: View {
         }
         .buttonStyle(.plain)
         .swipeActions {
-            Button(role: .destructive) { modelContext.delete(item) } label: {
+            Button(role: .destructive) {
+                tombstones.markDeleted(item.id)
+                modelContext.delete(item)
+            } label: {
                 Label("删除", systemImage: "trash")
             }
         }

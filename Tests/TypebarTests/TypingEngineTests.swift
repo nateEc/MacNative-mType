@@ -14615,6 +14615,9 @@ final class TypingEngineTests: XCTestCase {
     let presetTombstones = PresetTombstoneStore(defaults: defaults)
     let deletedPresetID = UUID()
     presetTombstones.markDeleted(deletedPresetID)
+    let savedTextTombstones = SavedTextTombstoneStore(defaults: defaults)
+    let deletedSavedTextID = UUID()
+    savedTextTombstones.markDeleted(deletedSavedTextID)
     let tombstones = ResultFilterPresetTombstoneStore(defaults: defaults)
     let deletedFilterPresetID = UUID()
     tombstones.markDeleted(deletedFilterPresetID)
@@ -14649,6 +14652,7 @@ final class TypingEngineTests: XCTestCase {
         settings: settings,
         resultTombstoneStore: resultTombstones,
         presetTombstoneStore: presetTombstones,
+        savedTextTombstoneStore: savedTextTombstones,
         tombstoneStore: tombstones,
         removeBackground: {},
         removePracticeFont: {
@@ -14665,6 +14669,7 @@ final class TypingEngineTests: XCTestCase {
       settings: settings,
       resultTombstoneStore: resultTombstones,
       presetTombstoneStore: presetTombstones,
+      savedTextTombstoneStore: savedTextTombstones,
       tombstoneStore: tombstones,
       removeBackground: { removedBackground = true },
       removePracticeFont: { removedPracticeFont = true },
@@ -14677,6 +14682,7 @@ final class TypingEngineTests: XCTestCase {
       try container.mainContext.fetch(FetchDescriptor<ResultFilterPresetRecord>()).isEmpty)
     XCTAssertFalse(resultTombstones.contains(deletedResultID))
     XCTAssertFalse(presetTombstones.contains(deletedPresetID))
+    XCTAssertFalse(savedTextTombstones.contains(deletedSavedTextID))
     XCTAssertFalse(tombstones.contains(deletedFilterPresetID))
     XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
     XCTAssertTrue(removedBackground)
@@ -22542,8 +22548,12 @@ final class TypingEngineTests: XCTestCase {
       id: UUID(uuidString: "00000000-0000-0000-0000-000000000299")!,
       name: "Short", definition: .init(configuration: .words(10), quoteID: nil, customText: nil))
     let savedTexts = [
-      NamedSavedText(title: "Notes", text: "An original text for focused practice."),
-      NamedSavedText(title: "Chapter", text: "amber harbor willow", longProgress: 6),
+      NamedSavedText(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000349")!,
+        title: "Notes", text: "An original text for focused practice."),
+      NamedSavedText(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000350")!,
+        title: "Chapter", text: "amber harbor willow", longProgress: 6),
     ]
     let resultFilterPreset = NamedResultFilterPreset(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000000401")!,
@@ -22558,6 +22568,8 @@ final class TypingEngineTests: XCTestCase {
       uuidString: "00000000-0000-0000-0000-000000000599")!
     let deletedPresetID = UUID(
       uuidString: "00000000-0000-0000-0000-000000000699")!
+    let deletedSavedTextID = UUID(
+      uuidString: "00000000-0000-0000-0000-000000000799")!
     let activeTestSelection = ActiveTestSelectionDocument(
       preset: .init(configuration: .words(83, language: .german)),
       quoteSource: .community,
@@ -22567,11 +22579,12 @@ final class TypingEngineTests: XCTestCase {
     let data = try TypebarDataTransfer.exportArchive(
       settings: settings, results: [result], deletedResultIDs: [deletedResultID],
       presets: [preset], deletedPresetIDs: [deletedPresetID], savedTexts: savedTexts,
+      deletedSavedTextIDs: [deletedSavedTextID],
       resultFilterPresets: [resultFilterPreset],
       deletedResultFilterPresetIDs: [deletedResultFilterPresetID],
       activeTestSelection: activeTestSelection, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(archive.version, 7)
+    XCTAssertEqual(archive.version, 8)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
@@ -22580,12 +22593,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(archive.deletedResultFilterPresetIDs, [deletedResultFilterPresetID])
     XCTAssertEqual(archive.deletedResultIDs, [deletedResultID])
     XCTAssertEqual(archive.deletedPresetIDs, [deletedPresetID])
+    XCTAssertEqual(archive.deletedSavedTextIDs, [deletedSavedTextID])
     XCTAssertEqual(archive.activeTestSelection, activeTestSelection)
+
+    var legacyVersionSevenPayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
+    legacyVersionSevenPayload["version"] = 7
+    legacyVersionSevenPayload.removeValue(forKey: "deletedSavedTextIDs")
+    let legacyVersionSevenData = try JSONSerialization.data(
+      withJSONObject: legacyVersionSevenPayload)
+    let legacyVersionSevenArchive = try TypebarDataTransfer.importArchive(
+      from: legacyVersionSevenData)
+    XCTAssertEqual(legacyVersionSevenArchive.version, 7)
+    XCTAssertEqual(legacyVersionSevenArchive.savedTexts, savedTexts.map {
+      .init(title: $0.title, text: $0.text, longProgress: $0.longProgress)
+    })
+    XCTAssertTrue(legacyVersionSevenArchive.deletedSavedTextIDs.isEmpty)
 
     var legacyVersionSixPayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     legacyVersionSixPayload["version"] = 6
     legacyVersionSixPayload.removeValue(forKey: "deletedPresetIDs")
+    legacyVersionSixPayload.removeValue(forKey: "deletedSavedTextIDs")
     let legacyVersionSixData = try JSONSerialization.data(
       withJSONObject: legacyVersionSixPayload)
     let legacyVersionSixArchive = try TypebarDataTransfer.importArchive(
@@ -22601,6 +22630,7 @@ final class TypingEngineTests: XCTestCase {
     legacyVersionFivePayload["version"] = 5
     legacyVersionFivePayload.removeValue(forKey: "deletedResultIDs")
     legacyVersionFivePayload.removeValue(forKey: "deletedPresetIDs")
+    legacyVersionFivePayload.removeValue(forKey: "deletedSavedTextIDs")
     let legacyVersionFiveData = try JSONSerialization.data(
       withJSONObject: legacyVersionFivePayload)
     let legacyVersionFiveArchive = try TypebarDataTransfer.importArchive(
@@ -22615,6 +22645,7 @@ final class TypingEngineTests: XCTestCase {
     legacyVersionFourPayload.removeValue(forKey: "deletedResultFilterPresetIDs")
     legacyVersionFourPayload.removeValue(forKey: "deletedResultIDs")
     legacyVersionFourPayload.removeValue(forKey: "deletedPresetIDs")
+    legacyVersionFourPayload.removeValue(forKey: "deletedSavedTextIDs")
     let legacyVersionFourData = try JSONSerialization.data(
       withJSONObject: legacyVersionFourPayload)
     let legacyVersionFourArchive = try TypebarDataTransfer.importArchive(
@@ -22631,6 +22662,7 @@ final class TypingEngineTests: XCTestCase {
     legacyVersionThreePayload.removeValue(forKey: "deletedResultFilterPresetIDs")
     legacyVersionThreePayload.removeValue(forKey: "deletedResultIDs")
     legacyVersionThreePayload.removeValue(forKey: "deletedPresetIDs")
+    legacyVersionThreePayload.removeValue(forKey: "deletedSavedTextIDs")
     let legacyVersionThreeData = try JSONSerialization.data(
       withJSONObject: legacyVersionThreePayload)
     let legacyVersionThreeArchive = try TypebarDataTransfer.importArchive(
@@ -22647,6 +22679,7 @@ final class TypingEngineTests: XCTestCase {
     versionTwoPayload.removeValue(forKey: "deletedResultFilterPresetIDs")
     versionTwoPayload.removeValue(forKey: "deletedResultIDs")
     versionTwoPayload.removeValue(forKey: "deletedPresetIDs")
+    versionTwoPayload.removeValue(forKey: "deletedSavedTextIDs")
     var versionTwoResults = try XCTUnwrap(versionTwoPayload["results"] as? [[String: Any]])
     versionTwoResults[0].removeValue(forKey: "restartCount")
     versionTwoPayload["results"] = versionTwoResults
@@ -22669,10 +22702,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(
       try TypebarDataTransfer.importArchive(from: invalidSelectionData).activeTestSelection)
 
-    versionTwoPayload["version"] = 8
+    versionTwoPayload["version"] = 9
     let futureData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
     XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: futureData)) { error in
-      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(8))
+      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(9))
     }
   }
 
@@ -22875,6 +22908,66 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertTrue(merged.presets.isEmpty)
     XCTAssertEqual(merged.deletedPresetIDs, [presetID])
+  }
+
+  @MainActor
+  func testCloudArchiveSavedTextDeletionDoesNotResurrectAndManualImportCanRestore() throws {
+    let suiteName = "TypebarTests.saved-text-deletion.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    let tombstones = SavedTextTombstoneStore(defaults: defaults)
+    let container = try ModelContainer(
+      for: SavedCustomTextRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let existing = SavedCustomTextRecord(title: "Morning", text: "A deliberate beginning.")
+    container.mainContext.insert(existing)
+    try container.mainContext.save()
+    let portable = NamedSavedText(id: existing.id, title: existing.title, text: existing.text)
+    let deletionArchive = TypebarArchive(
+      exportedAt: start, settings: settings.snapshot, results: [], presets: [], savedTexts: [],
+      deletedSavedTextIDs: [existing.id])
+
+    let deletionSummary = try LocalArchiveImport.apply(
+      deletionArchive, settings: settings, results: [], presets: [], savedTexts: [existing],
+      savedTextTombstoneStore: tombstones, source: .cloudSync, modelContext: container.mainContext)
+    XCTAssertEqual(deletionSummary.deletedSavedTexts, 1)
+    XCTAssertTrue(tombstones.contains(existing.id))
+    XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<SavedCustomTextRecord>()).isEmpty)
+
+    let staleArchive = TypebarArchive(
+      exportedAt: start, settings: settings.snapshot, results: [], presets: [], savedTexts: [portable])
+    let staleSummary = try LocalArchiveImport.apply(
+      staleArchive, settings: settings, results: [], presets: [], savedTexts: [],
+      savedTextTombstoneStore: tombstones, source: .cloudSync, modelContext: container.mainContext)
+    XCTAssertEqual(staleSummary.insertedSavedTexts, 0)
+    XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<SavedCustomTextRecord>()).isEmpty)
+
+    let restoreSummary = try LocalArchiveImport.apply(
+      staleArchive, settings: settings, results: [], presets: [], savedTexts: [],
+      savedTextTombstoneStore: tombstones, source: .localFile, modelContext: container.mainContext)
+    XCTAssertEqual(restoreSummary.insertedSavedTexts, 1)
+    XCTAssertFalse(tombstones.contains(existing.id))
+    let restored = try XCTUnwrap(
+      container.mainContext.fetch(FetchDescriptor<SavedCustomTextRecord>()).first)
+    XCTAssertEqual(restored.id, existing.id)
+    XCTAssertEqual(restored.title, existing.title)
+    XCTAssertEqual(restored.text, existing.text)
+  }
+
+  func testArchiveConflictMergeKeepsSavedTextDeletionOverAnOlderActiveSnapshot() {
+    let textID = UUID(uuidString: "00000000-0000-0000-0000-000000000841")!
+    let savedText = NamedSavedText(id: textID, title: "Focus", text: "steady words")
+    let local = TypebarArchive(
+      exportedAt: start.addingTimeInterval(1), settings: .init(), results: [], presets: [],
+      savedTexts: [], deletedSavedTextIDs: [textID])
+    let remote = TypebarArchive(
+      exportedAt: start, settings: .init(), results: [], presets: [], savedTexts: [savedText])
+
+    let merged = TypebarArchiveConflictMerge.merge(local: local, remote: remote)
+
+    XCTAssertTrue(merged.savedTexts.isEmpty)
+    XCTAssertEqual(merged.deletedSavedTextIDs, [textID])
   }
 
   @MainActor

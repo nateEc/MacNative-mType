@@ -251,7 +251,7 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    static let currentVersion = 7
+    static let currentVersion = 8
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -260,6 +260,7 @@ struct TypebarArchive: Codable, Equatable {
     let presets: [NamedPreset]
     let deletedPresetIDs: [UUID]
     let savedTexts: [NamedSavedText]
+    let deletedSavedTextIDs: [UUID]
     let resultFilterPresets: [NamedResultFilterPreset]
     let deletedResultFilterPresetIDs: [UUID]
     let activeTestSelection: ActiveTestSelectionDocument?
@@ -273,6 +274,7 @@ struct TypebarArchive: Codable, Equatable {
         presets: [NamedPreset],
         deletedPresetIDs: [UUID] = [],
         savedTexts: [NamedSavedText] = [],
+        deletedSavedTextIDs: [UUID] = [],
         resultFilterPresets: [NamedResultFilterPreset] = [],
         deletedResultFilterPresetIDs: [UUID] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil
@@ -291,7 +293,16 @@ struct TypebarArchive: Codable, Equatable {
                 return !deletedPresets.contains(id)
             }
             : presets.map { .init(name: $0.name, definition: $0.definition) }
-        self.savedTexts = savedTexts
+        let deletedSavedTexts = version >= 8 ? Set(deletedSavedTextIDs) : []
+        self.deletedSavedTextIDs = deletedSavedTexts.sorted { $0.uuidString < $1.uuidString }
+        self.savedTexts = version >= 8
+            ? savedTexts.filter { savedText in
+                guard let id = savedText.id else { return true }
+                return !deletedSavedTexts.contains(id)
+            }
+            : savedTexts.map {
+                .init(title: $0.title, text: $0.text, longProgress: $0.longProgress)
+            }
         let deletedIDs = version >= 5 ? Set(deletedResultFilterPresetIDs) : []
         self.deletedResultFilterPresetIDs = deletedIDs.sorted { $0.uuidString < $1.uuidString }
         self.resultFilterPresets = version >= 4
@@ -303,7 +314,7 @@ struct TypebarArchive: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, exportedAt, settings, results, deletedResultIDs, presets, deletedPresetIDs, savedTexts, resultFilterPresets,
+        case version, exportedAt, settings, results, deletedResultIDs, presets, deletedPresetIDs, savedTexts, deletedSavedTextIDs, resultFilterPresets,
             deletedResultFilterPresetIDs, activeTestSelection
     }
 
@@ -329,7 +340,19 @@ struct TypebarArchive: Codable, Equatable {
                 return !deletedPresets.contains(id)
             }
             : decodedPresets.map { .init(name: $0.name, definition: $0.definition) }
-        savedTexts = try values.decodeIfPresent([NamedSavedText].self, forKey: .savedTexts) ?? []
+        let decodedSavedTexts = try values.decodeIfPresent([NamedSavedText].self, forKey: .savedTexts) ?? []
+        let deletedSavedTexts = version >= 8
+            ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedSavedTextIDs) ?? [])
+            : []
+        deletedSavedTextIDs = deletedSavedTexts.sorted { $0.uuidString < $1.uuidString }
+        savedTexts = version >= 8
+            ? decodedSavedTexts.filter { savedText in
+                guard let id = savedText.id else { return true }
+                return !deletedSavedTexts.contains(id)
+            }
+            : decodedSavedTexts.map {
+                .init(title: $0.title, text: $0.text, longProgress: $0.longProgress)
+            }
         let deletedIDs = version >= 5
             ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedResultFilterPresetIDs) ?? [])
             : []
@@ -374,20 +397,26 @@ struct NamedPreset: Codable, Equatable {
 }
 
 struct NamedSavedText: Codable, Equatable {
+    var id: UUID?
     let title: String
     let text: String
     /// `nil` preserves the ordinary saved-text behavior used by archives made
     /// before long-text progress tracking was added.
     let longProgress: Int?
 
-    init(title: String, text: String, longProgress: Int? = nil) {
+    init(id: UUID? = nil, title: String, text: String, longProgress: Int? = nil) {
+        self.id = id
         self.title = title
         self.text = text
         self.longProgress = longProgress.map { LongSavedTextProgress.normalized($0, in: text) }
     }
 
+    func hasSameContent(as other: Self) -> Bool {
+        title == other.title && text == other.text && longProgress == other.longProgress
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case title, text, longProgress
+        case id, title, text, longProgress
     }
 
     init(from decoder: Decoder) throws {
@@ -395,6 +424,7 @@ struct NamedSavedText: Codable, Equatable {
         let decodedTitle = try values.decode(String.self, forKey: .title)
         let decodedText = try values.decode(String.self, forKey: .text)
         let decodedProgress = try values.decodeIfPresent(Int.self, forKey: .longProgress)
+        id = try values.decodeIfPresent(UUID.self, forKey: .id)
         title = decodedTitle
         text = decodedText
         longProgress = decodedProgress.map {
@@ -691,6 +721,7 @@ enum TypebarDataTransfer {
         presets: [NamedPreset],
         deletedPresetIDs: [UUID] = [],
         savedTexts: [NamedSavedText] = [],
+        deletedSavedTextIDs: [UUID] = [],
         resultFilterPresets: [NamedResultFilterPreset] = [],
         deletedResultFilterPresetIDs: [UUID] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil,
@@ -705,6 +736,7 @@ enum TypebarDataTransfer {
             presets: presets,
             deletedPresetIDs: deletedPresetIDs,
             savedTexts: savedTexts,
+            deletedSavedTextIDs: deletedSavedTextIDs,
             resultFilterPresets: resultFilterPresets,
             deletedResultFilterPresetIDs: deletedResultFilterPresetIDs,
             activeTestSelection: activeTestSelection))
@@ -754,10 +786,34 @@ enum TypebarArchiveMerge {
         return additions
     }
 
-    static func savedTextsToInsert(from archive: TypebarArchive, existing: [NamedSavedText]) -> [NamedSavedText] {
-        archive.savedTexts.filter {
-            CustomTextPolicy.isValidSavedText(title: $0.title, text: $0.text) && !existing.contains($0)
+    static func savedTextsToInsert(
+        from archive: TypebarArchive,
+        existing: [NamedSavedText],
+        deletedIDs: Set<UUID> = [],
+        makeID: () -> UUID = UUID.init
+    ) -> [NamedSavedText] {
+        var occupiedIDs = Set(existing.compactMap(\.id))
+        var knownSavedTexts = existing
+        var additions: [NamedSavedText] = []
+        for remoteText in archive.savedTexts
+        where CustomTextPolicy.isValidSavedText(title: remoteText.title, text: remoteText.text)
+            && (remoteText.id.map({ !deletedIDs.contains($0) }) ?? true)
+        {
+            guard !knownSavedTexts.contains(where: { $0.hasSameContent(as: remoteText) }) else {
+                continue
+            }
+            var copy = remoteText
+            if let id = copy.id {
+                if occupiedIDs.contains(id) {
+                    copy.id = freshSavedTextID(occupied: &occupiedIDs, makeID: makeID)
+                } else {
+                    occupiedIDs.insert(id)
+                }
+            }
+            knownSavedTexts.append(copy)
+            additions.append(copy)
         }
+        return additions
     }
 
     static func resultFilterPresetsToInsert(
@@ -800,6 +856,15 @@ enum TypebarArchiveMerge {
     }
 
     private static func freshPresetID(
+        occupied: inout Set<UUID>, makeID: () -> UUID
+    ) -> UUID {
+        var candidate = makeID()
+        while occupied.contains(candidate) { candidate = makeID() }
+        occupied.insert(candidate)
+        return candidate
+    }
+
+    private static func freshSavedTextID(
         occupied: inout Set<UUID>, makeID: () -> UUID
     ) -> UUID {
         var candidate = makeID()
@@ -977,22 +1042,37 @@ enum TypebarArchiveConflictMerge {
             }
         }
 
-        var savedTexts = local.savedTexts
+        let deletedSavedTextIDs = Set(local.deletedSavedTextIDs).union(remote.deletedSavedTextIDs)
+        var savedTexts = local.savedTexts.filter { savedText in
+            guard let id = savedText.id else { return true }
+            return !deletedSavedTextIDs.contains(id)
+        }
+        var savedTextIDs = Set(savedTexts.compactMap(\.id))
         for remoteText in remote.savedTexts
         where CustomTextPolicy.isValidSavedText(title: remoteText.title, text: remoteText.text)
-            && !savedTexts.contains(remoteText)
+            && (remoteText.id.map({ !deletedSavedTextIDs.contains($0) }) ?? true)
         {
-            if savedTexts.contains(where: { $0.title == remoteText.title }) {
+            guard !savedTexts.contains(where: { $0.hasSameContent(as: remoteText) }) else { continue }
+            var copy = remoteText
+            var changed = false
+            if let id = copy.id {
+                if savedTextIDs.contains(id) {
+                    copy.id = freshID(occupied: &savedTextIDs, makeID: makeID)
+                    changed = true
+                } else {
+                    savedTextIDs.insert(id)
+                }
+            }
+            if savedTexts.contains(where: { $0.title == copy.title }) {
                 let title = conflictName(
-                    for: remoteText.title, occupied: Set(savedTexts.map(\.title)),
+                    for: copy.title, occupied: Set(savedTexts.map(\.title)),
                     maximumLength: CustomTextPolicy.maximumTitleLength)
-                savedTexts.append(.init(
-                    title: title,
-                    text: remoteText.text,
-                    longProgress: remoteText.longProgress))
-                conflicts.append(.init(kind: .savedText, displayName: title))
-            } else {
-                savedTexts.append(remoteText)
+                copy = .init(id: copy.id, title: title, text: copy.text, longProgress: copy.longProgress)
+                changed = true
+            }
+            savedTexts.append(copy)
+            if changed {
+                conflicts.append(.init(kind: .savedText, displayName: copy.title))
             }
         }
 
@@ -1040,6 +1120,7 @@ enum TypebarArchiveConflictMerge {
                 presets: presets,
                 deletedPresetIDs: Array(deletedPresetIDs),
                 savedTexts: savedTexts,
+                deletedSavedTextIDs: Array(deletedSavedTextIDs),
                 resultFilterPresets: resultFilterPresets,
                 deletedResultFilterPresetIDs: Array(deletedResultFilterPresetIDs),
                 activeTestSelection: local.activeTestSelection),
@@ -1132,6 +1213,7 @@ struct ArchiveImportSummary: Equatable {
     let insertedPresets: Int
     let deletedPresets: Int
     let insertedSavedTexts: Int
+    let deletedSavedTexts: Int
     let insertedResultFilterPresets: Int
     let deletedResultFilterPresets: Int
     let restoredActiveTestSelection: Bool
@@ -1163,6 +1245,7 @@ enum LocalArchiveImport {
         savedTexts: [SavedCustomTextRecord],
         resultTombstoneStore: ResultTombstoneStore = .init(),
         presetTombstoneStore: PresetTombstoneStore = .init(),
+        savedTextTombstoneStore: SavedTextTombstoneStore = .init(),
         resultFilterPresets: [ResultFilterPresetRecord] = [],
         tombstoneStore: ResultFilterPresetTombstoneStore = .init(),
         source: ArchiveImportSource = .localFile,
@@ -1214,12 +1297,31 @@ enum LocalArchiveImport {
             from: archive,
             existing: existingPresets,
             deletedIDs: effectiveDeletedPresetIDs)
+        let storedDeletedSavedTextIDs = Set(savedTextTombstoneStore.deletedIDs)
+        let archiveDeletedSavedTextIDs = Set(archive.deletedSavedTextIDs)
+        let resultingDeletedSavedTextIDs: Set<UUID>
+        let effectiveDeletedSavedTextIDs: Set<UUID>
+        switch source {
+        case .localFile:
+            resultingDeletedSavedTextIDs = storedDeletedSavedTextIDs
+                .subtracting(archive.savedTexts.compactMap(\.id))
+                .union(archiveDeletedSavedTextIDs)
+            effectiveDeletedSavedTextIDs = archiveDeletedSavedTextIDs
+        case .cloudSync:
+            resultingDeletedSavedTextIDs = storedDeletedSavedTextIDs
+                .union(archiveDeletedSavedTextIDs)
+            effectiveDeletedSavedTextIDs = resultingDeletedSavedTextIDs
+        }
+        let savedTextRecordsToDelete = savedTexts.filter {
+            effectiveDeletedSavedTextIDs.contains($0.id)
+        }
         let newSavedTexts = TypebarArchiveMerge.savedTextsToInsert(
             from: archive,
             existing: savedTexts.map {
-                NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
-            }
-        )
+                NamedSavedText(
+                    id: $0.id, title: $0.title, text: $0.text, longProgress: $0.longProgress)
+            },
+            deletedIDs: effectiveDeletedSavedTextIDs)
         let storedDeletedFilterPresetIDs = Set(tombstoneStore.deletedIDs)
         let archiveDeletedFilterPresetIDs = Set(archive.deletedResultFilterPresetIDs)
         let resultingDeletedFilterPresetIDs: Set<UUID>
@@ -1253,8 +1355,10 @@ enum LocalArchiveImport {
         for preset in presetRecordsToDelete { modelContext.delete(preset) }
         for savedText in newSavedTexts {
             modelContext.insert(SavedCustomTextRecord(
+                id: savedText.id ?? UUID(),
                 title: savedText.title, text: savedText.text, longProgress: savedText.longProgress))
         }
+        for savedText in savedTextRecordsToDelete { modelContext.delete(savedText) }
         for resultFilterPreset in newResultFilterPresetRecords {
             modelContext.insert(resultFilterPreset)
         }
@@ -1269,6 +1373,7 @@ enum LocalArchiveImport {
         }
         resultTombstoneStore.replaceDeletedIDs(resultingDeletedResultIDs)
         presetTombstoneStore.replaceDeletedIDs(resultingDeletedPresetIDs)
+        savedTextTombstoneStore.replaceDeletedIDs(resultingDeletedSavedTextIDs)
         tombstoneStore.replaceDeletedIDs(resultingDeletedFilterPresetIDs)
         settings.apply(archive.settings)
         let restoredActiveTestSelection = archive.activeTestSelection.map(
@@ -1279,6 +1384,7 @@ enum LocalArchiveImport {
             insertedPresets: newPresets.count,
             deletedPresets: presetRecordsToDelete.count,
             insertedSavedTexts: newSavedTexts.count,
+            deletedSavedTexts: savedTextRecordsToDelete.count,
             insertedResultFilterPresets: newResultFilterPresetRecords.count,
             deletedResultFilterPresets: filterPresetRecordsToDelete.count,
             restoredActiveTestSelection: restoredActiveTestSelection)
@@ -1308,6 +1414,7 @@ struct TypebarArchiveDocument: FileDocument {
             presets: archive.presets,
             deletedPresetIDs: archive.deletedPresetIDs,
             savedTexts: archive.savedTexts,
+            deletedSavedTextIDs: archive.deletedSavedTextIDs,
             resultFilterPresets: archive.resultFilterPresets,
             deletedResultFilterPresetIDs: archive.deletedResultFilterPresetIDs,
             activeTestSelection: archive.activeTestSelection,
