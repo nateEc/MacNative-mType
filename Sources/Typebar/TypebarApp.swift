@@ -769,6 +769,7 @@ private struct ContentView: View {
   @State private var weakSpotScores = WeakSpotScores()
   @State private var lastCompletedWpm: Int?
   @State private var currentProcessPractice: [CurrentProcessPractice] = []
+  @State private var isSamePromptRepeatAttempt = false
   @State private var isRepeatedPaceAttempt = false
   @State private var activePaceTargetWpm: Int?
   @State private var compositionText = ""
@@ -941,7 +942,11 @@ private struct ContentView: View {
           candidateWpm: result.wpm,
           outcome: result.outcome,
           isPaceRepeat: isRepeatedPaceAttempt)
-        let savesResult = result.outcome == .completed && settings.saveCompletedResults
+        let eligibility = ResultEligibilityPolicy.assessment(
+          for: result, samePromptRepeat: isSamePromptRepeatAttempt,
+          allowsReducedAccuracyThreshold: account.currentUser?.leaderboardOptedOut == true)
+        let savesResult = ResultSavingPolicy.shouldPersist(
+          outcome: result.outcome, enabled: settings.saveCompletedResults, eligibility: eligibility)
         let resultPersonalBestFeedback = savesResult
           ? ResultPersonalBestPolicy.feedback(
             for: result, previousResults: savedResults.compactMap(\.portableResult))
@@ -965,7 +970,7 @@ private struct ContentView: View {
           currentProcessPractice.append(.init(result: result))
           settings.randomizeTheme(for: systemColorScheme)
         }
-        if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
+        if savesResult {
           saveCompletedResultLocally(result)
         }
         let zeroSpeedFeedback = ZeroSpeedResultFeedbackPolicy.feedback(
@@ -973,6 +978,7 @@ private struct ContentView: View {
         completedResult = .init(
           result: result,
           savesResult: savesResult,
+          eligibility: eligibility,
           failureReason: failureReason,
           zeroSpeedFeedback: zeroSpeedFeedback,
           quoteFeedback: activeQuoteFeedback,
@@ -1011,6 +1017,10 @@ private struct ContentView: View {
           publicationResultID = nil
           publicationState = .notice(
             (failureReason?.resultSummary ?? "本次测试失败") + "；结果只在当前窗口显示，不会保存、本机统计、同步或发布。")
+        } else if case .ineligible(let reason) = eligibility {
+          publicationResultID = nil
+          publicationState = .notice(
+            "本次结果无效（\(reason.resultSummary)）；结果只在当前窗口显示，不会写入本机历史、同步或发布。")
         } else {
           publicationResultID = nil
           publicationState = .notice("练习模式：本次成绩不会保存、本机统计、同步或发布。")
@@ -1266,6 +1276,7 @@ private struct ContentView: View {
       CompletedResultView(
         result: result.result,
         savesResult: result.savesResult,
+        eligibility: result.eligibility,
         failureReason: result.failureReason,
         zeroSpeedFeedback: result.zeroSpeedFeedback,
         typingSpeedUnit: settings.typingSpeedUnit,
@@ -3011,6 +3022,7 @@ private struct ContentView: View {
     synchronizeNoQuitConfigurationLock()
     persistActiveTestSelection()
     if shouldCountRestart { currentRestartCount += 1 }
+    isSamePromptRepeatAttempt = false
     isRepeatedPaceAttempt = false
     activePaceTargetWpm = paceGuideTarget()
     if session.configuration.modifiers.contains(.listening) {
@@ -3233,6 +3245,7 @@ private struct ContentView: View {
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
     session = repeatedSession
+    isSamePromptRepeatAttempt = true
     isRepeatedPaceAttempt = settings.repeatedPace
     let shouldUseRepeatedPace = isRepeatedPaceAttempt && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
@@ -4566,6 +4579,7 @@ extension TestOutcome {
 private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
   let savesResult: Bool
+  let eligibility: ResultEligibility
   let failureReason: TestFailureReason?
   let zeroSpeedFeedback: ZeroSpeedResultFeedback?
   let quoteFeedback: QuoteResultFeedbackTarget?
@@ -4618,6 +4632,7 @@ private struct NoStressResultView: View {
 private struct CompletedResultView: View {
   let result: CompletedTestResult
   let savesResult: Bool
+  let eligibility: ResultEligibility
   let failureReason: TestFailureReason?
   let zeroSpeedFeedback: ZeroSpeedResultFeedback?
   let typingSpeedUnit: TypingSpeedUnit
@@ -5259,13 +5274,16 @@ private struct CompletedResultView: View {
 
   private var resultOutcomeSubtitle: String {
     switch result.outcome {
-    case .bailedOut: "中止结果只在当前窗口显示，不保存成绩"
-    case .invalidAFK: "结束前连续约 5 秒没有文本输入；结果只在当前窗口显示，不保存成绩"
+    case .bailedOut: return "中止结果只在当前窗口显示，不保存成绩"
+    case .invalidAFK: return "结束前连续约 5 秒没有文本输入；结果只在当前窗口显示，不保存成绩"
     case .failed:
-      (failureReason?.resultSummary ?? "本次没有保存为完成成绩")
+      return (failureReason?.resultSummary ?? "本次没有保存为完成成绩")
         + "；结果只在当前窗口显示，不保存成绩"
     case .active, .completed, .abandoned:
-      savesResult
+      if case .ineligible(let reason) = eligibility {
+        return "本次结果无效（\(reason.resultSummary)）；结果只在当前窗口显示，不保存成绩"
+      }
+      return savesResult
         ? (localResultSaveState.isSaved ? "已保存到这台 Mac" : "尚未保存到这台 Mac")
         : "练习模式：不保存成绩"
     }

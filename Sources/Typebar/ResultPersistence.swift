@@ -1,9 +1,133 @@
 import Foundation
 import SwiftData
 
+/// A completed run can remain useful for immediate review while being
+/// ineligible for local history and remote publication. This mirrors the
+/// reference result flow, which renders invalid results but deliberately
+/// excludes them from saved result collections.
+enum ResultEligibility: Equatable {
+  case eligible
+  case ineligible(ResultIneligibilityReason)
+
+  var isEligible: Bool {
+    if case .eligible = self { return true }
+    return false
+  }
+}
+
+enum ResultIneligibilityReason: Equatable {
+  case tooShort
+  case samePromptRepeat
+  case typingSpeed
+  case rawTypingSpeed
+  case accuracy
+
+  var resultSummary: String {
+    switch self {
+    case .tooShort: "测试时长或题量过短"
+    case .samePromptRepeat: "使用同一提示词重测"
+    case .typingSpeed: "速度超出可保存范围"
+    case .rawTypingSpeed: "原始速度超出可保存范围"
+    case .accuracy: "准确率未达到可保存范围"
+    }
+  }
+}
+
+/// Derives saving eligibility from the same observable result constraints as
+/// Monkeytype's `TestLogic.finish()`. Typebar keeps the result sheet open in
+/// every case; this policy controls only persistent local history, sync, and
+/// publication side effects. The current-session practice total remains a
+/// separate, non-persistent summary just as it does in the reference flow.
+enum ResultEligibilityPolicy {
+  private static let minimumTimedDuration: TimeInterval = 15
+  private static let minimumWordLimit = 10
+  private static let minimumMeasuredDuration: TimeInterval = 1
+  private static let normalMinimumAccuracy = 75.0
+  private static let reducedMinimumAccuracy = 50.0
+  private static let standardMaximumWpm = 350.0
+  private static let tenWordMaximumWpm = 420.0
+
+  static func assessment(
+    for result: CompletedTestResult, samePromptRepeat: Bool,
+    allowsReducedAccuracyThreshold: Bool = false
+  ) -> ResultEligibility {
+    // Terminal failures have their own result presentation and saving rules.
+    guard result.outcome == .completed else { return .eligible }
+    guard !isTooShort(result) else { return .ineligible(.tooShort) }
+    if samePromptRepeat, result.configuration.mode != .quote {
+      return .ineligible(.samePromptRepeat)
+    }
+
+    let maximumWpm = maximumSavedWpm(for: result.configuration)
+    if roundedToTwo(result.preciseWpm) < 0 || roundedToTwo(result.preciseWpm) > maximumWpm {
+      return .ineligible(.typingSpeed)
+    }
+    if roundedToTwo(result.preciseRawWpm) < 0 || roundedToTwo(result.preciseRawWpm) > maximumWpm {
+      return .ineligible(.rawTypingSpeed)
+    }
+
+    let minimumAccuracy = allowsReducedAccuracyThreshold
+      ? reducedMinimumAccuracy : normalMinimumAccuracy
+    let roundedAccuracy = roundedToTwo(result.preciseAccuracy)
+    if roundedAccuracy < minimumAccuracy || roundedAccuracy > 100 {
+      return .ineligible(.accuracy)
+    }
+    return .eligible
+  }
+
+  private static func isTooShort(_ result: CompletedTestResult) -> Bool {
+    guard result.elapsedDuration.isFinite, result.elapsedDuration >= minimumMeasuredDuration else {
+      return true
+    }
+    switch result.configuration.mode {
+    case .time:
+      guard let duration = result.configuration.duration else { return true }
+      return duration == 0
+        ? result.elapsedDuration < minimumTimedDuration
+        : duration < minimumTimedDuration
+    case .words:
+      guard let wordLimit = result.configuration.wordLimit else { return true }
+      return wordLimit == 0
+        ? result.elapsedDuration < minimumTimedDuration
+        : wordLimit < minimumWordLimit
+    case .custom:
+      switch result.configuration.customTextCompletion {
+      case .finish:
+        return false
+      case .time:
+        return (result.configuration.duration ?? 0) < minimumTimedDuration
+      case .words:
+        return (result.configuration.wordLimit ?? 0) < minimumWordLimit
+      case .sections:
+        return (result.configuration.customTextSectionLimit ?? 0) < minimumWordLimit
+      }
+    case .zen:
+      return result.elapsedDuration < minimumTimedDuration
+    case .quote:
+      return false
+    }
+  }
+
+  private static func maximumSavedWpm(for configuration: TestConfiguration) -> Double {
+    configuration.mode == .words && configuration.wordLimit == 10
+      ? tenWordMaximumWpm : standardMaximumWpm
+  }
+
+  private static func roundedToTwo(_ value: Double) -> Double {
+    guard value.isFinite else { return .infinity }
+    return (value * 100).rounded(.toNearestOrAwayFromZero) / 100
+  }
+}
+
 enum ResultSavingPolicy {
   static func shouldPersist(outcome: TestOutcome, enabled: Bool) -> Bool {
     enabled && outcome == .completed
+  }
+
+  static func shouldPersist(
+    outcome: TestOutcome, enabled: Bool, eligibility: ResultEligibility
+  ) -> Bool {
+    shouldPersist(outcome: outcome, enabled: enabled) && eligibility.isEligible
   }
 
   static func shouldPublish(localSaveState: LocalResultSaveState) -> Bool {

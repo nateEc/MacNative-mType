@@ -15208,6 +15208,91 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: .invalidAFK, enabled: true))
   }
 
+  func testResultEligibilityKeepsInvalidReferenceResultsVisibleButOutOfSavedHistory() {
+    func makeResult(
+      configuration: TestConfiguration = .timed(seconds: 30), elapsed: TimeInterval = 30,
+      wpm: Int = 60, rawWpm: Int = 64, accuracy: Int = 96,
+      preciseWpm: Double? = nil, preciseRawWpm: Double? = nil, preciseAccuracy: Double? = nil
+    ) -> CompletedTestResult {
+      .init(
+        id: UUID(), configuration: configuration, outcome: .completed, startedAt: start,
+        finishedAt: start.addingTimeInterval(elapsed), typedCharacterCount: 120,
+        correctCharacterCount: 115, errorCount: 5, wpm: wpm, rawWpm: rawWpm, accuracy: accuracy,
+        preciseWpm: preciseWpm, preciseRawWpm: preciseRawWpm, preciseAccuracy: preciseAccuracy)
+    }
+
+    let standard = makeResult()
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(for: standard, samePromptRepeat: false), .eligible)
+    XCTAssertTrue(ResultSavingPolicy.shouldPersist(
+      outcome: standard.outcome, enabled: true, eligibility: .eligible))
+
+    let shortTimed = makeResult(configuration: .timed(seconds: 10), elapsed: 10)
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(for: shortTimed, samePromptRepeat: false),
+      .ineligible(.tooShort))
+
+    let shortWords = makeResult(configuration: .words(9))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(for: shortWords, samePromptRepeat: false),
+      .ineligible(.tooShort))
+
+    let shortCustomTime = makeResult(configuration: .init(
+      mode: .custom, duration: 10, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .time))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(for: shortCustomTime, samePromptRepeat: false),
+      .ineligible(.tooShort))
+    let shortCustomSections = makeResult(configuration: .init(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .sections, customTextSectionLimit: 9))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(for: shortCustomSections, samePromptRepeat: false),
+      .ineligible(.tooShort))
+
+    let shortZen = makeResult(
+      configuration: .init(mode: .zen, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
+      elapsed: 14.9)
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(for: shortZen, samePromptRepeat: false),
+      .ineligible(.tooShort))
+
+    let repeated = makeResult()
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(for: repeated, samePromptRepeat: true),
+      .ineligible(.samePromptRepeat))
+    let repeatedQuote = makeResult(configuration: .init(
+      mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(for: repeatedQuote, samePromptRepeat: true), .eligible)
+
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(
+        for: makeResult(wpm: 351), samePromptRepeat: false), .ineligible(.typingSpeed))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(
+        for: makeResult(configuration: .words(10), wpm: 420), samePromptRepeat: false), .eligible)
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(
+        for: makeResult(configuration: .words(10), wpm: 421), samePromptRepeat: false),
+      .ineligible(.typingSpeed))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(
+        for: makeResult(rawWpm: 351), samePromptRepeat: false), .ineligible(.rawTypingSpeed))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(
+        for: makeResult(accuracy: 75, preciseAccuracy: 74.99), samePromptRepeat: false),
+      .ineligible(.accuracy))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(
+        for: makeResult(accuracy: 50, preciseAccuracy: 49.99), samePromptRepeat: false,
+        allowsReducedAccuracyThreshold: true), .ineligible(.accuracy))
+    XCTAssertEqual(
+      ResultEligibilityPolicy.assessment(
+        for: makeResult(accuracy: 50, preciseAccuracy: 50), samePromptRepeat: false,
+        allowsReducedAccuracyThreshold: true), .eligible)
+  }
+
   func testResultPresentationKeepsFailedAttemptsVisibleWithoutSavingThem() {
     XCTAssertTrue(ResultPresentationPolicy.shouldPresent(outcome: .completed))
     XCTAssertTrue(ResultPresentationPolicy.shouldPresent(outcome: .failed))
