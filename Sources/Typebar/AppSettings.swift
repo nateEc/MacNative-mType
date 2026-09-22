@@ -2043,7 +2043,9 @@ final class AppSettings {
     return TypebarLocalPracticeFontStore.activeInfo
   }
 
-  var hasLocalPracticeFont: Bool { localPracticeFontInfo != nil }
+  var hasLocalPracticeFont: Bool { TypebarLocalPracticeFontStore.hasStoredFont }
+
+  var isUsingLocalPracticeFont: Bool { localPracticeFontInfo != nil }
 
   func importLocalBackground(data: Data) throws {
     try TypebarLocalBackgroundStore.save(data)
@@ -2057,6 +2059,18 @@ final class AppSettings {
 
   func importLocalPracticeFont(data: Data, originalFilename: String) throws {
     _ = try TypebarLocalPracticeFontStore.save(data, originalFilename: originalFilename)
+    localPracticeFontRevision &+= 1
+  }
+
+  @discardableResult
+  func activateLocalPracticeFont() -> Bool {
+    let activated = TypebarLocalPracticeFontStore.activate()
+    if activated { localPracticeFontRevision &+= 1 }
+    return activated
+  }
+
+  func deactivateLocalPracticeFont() {
+    TypebarLocalPracticeFontStore.deactivate()
     localPracticeFontRevision &+= 1
   }
 

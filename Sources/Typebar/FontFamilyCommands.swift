@@ -8,6 +8,7 @@ enum FontFamilyCommandTarget: Equatable {
   case customName
   case browseInstalled
   case localFile
+  case useLocalFile
   case removeLocalFile
 }
 
@@ -25,15 +26,23 @@ enum FontFamilyCommandCatalog {
 
   @MainActor
   static func items(hasLocalFont: Bool) -> [CommandPaletteItem] {
+    items(
+      hasLocalFont: hasLocalFont, usesLocalFont: TypebarLocalPracticeFontStore.isActive)
+  }
+
+  @MainActor
+  static func items(hasLocalFont: Bool, usesLocalFont: Bool) -> [CommandPaletteItem] {
     let installedFamilies = NativeFontCatalog.installedFamilies
     let available = Set(fixedKnownFontIDs.filter {
       NativePracticeFont.isAvailable($0, installedFamilies: installedFamilies)
     })
-    return items(hasLocalFont: hasLocalFont, availableKnownFontIDs: available)
+    return items(
+      hasLocalFont: hasLocalFont, usesLocalFont: usesLocalFont,
+      availableKnownFontIDs: available)
   }
 
   static func items(
-    hasLocalFont: Bool, availableKnownFontIDs: Set<String>
+    hasLocalFont: Bool, usesLocalFont: Bool = true, availableKnownFontIDs: Set<String>
   ) -> [CommandPaletteItem] {
     var items = PracticeFont.allCases.map { font in
       let identifier = "fontFamily.native.\(font.rawValue)"
@@ -67,6 +76,12 @@ enum FontFamilyCommandCatalog {
         "browseInstalledFonts", "installed font", "字体", "浏览", "搜索",
       ], group: .appearance))
     if hasLocalFont {
+      if !usesLocalFont {
+        items.append(CommandPaletteItem(
+          id: "useLocalFont", title: "使用本地字体", subtitle: "重新启用已保留的本地字体文件",
+          systemImage: "textformat", keywords: ["useLocalFont", "local font", "字体", "使用"],
+          group: .appearance))
+      }
       items.append(CommandPaletteItem(
         id: "removeLocalFont", title: "移除本地字体", subtitle: "恢复名称字体或系统设计",
         systemImage: "trash", keywords: ["removeLocalFont", "remove font", "字体", "移除"],
@@ -96,6 +111,7 @@ enum FontFamilyCommandCatalog {
     case "customFontName": return .customName
     case "browseInstalledFonts": return .browseInstalled
     case "customLocalFont": return .localFile
+    case "useLocalFont": return .useLocalFile
     case "removeLocalFont": return .removeLocalFile
     default: return nil
     }
@@ -110,22 +126,26 @@ enum FontFamilyCommandApplication {
   @MainActor
   static func apply(
     _ target: FontFamilyCommandTarget, to settings: AppSettings,
-    isFontAvailable: (String) -> Bool = NativePracticeFont.isAvailable
+    isFontAvailable: (String) -> Bool = NativePracticeFont.isAvailable,
+    deactivateLocalFont: () -> Void = TypebarLocalPracticeFontStore.deactivate
   ) -> Bool {
     switch target {
     case .systemDesign(let font):
+      deactivateLocalFont()
       settings.installedPracticeFontName = ""
       settings.practiceFont = font
       return true
     case .knownIdentifier(let identifier):
       guard FontFamilyCommandCatalog.fixedKnownFontIDs.contains(identifier) else { return false }
+      deactivateLocalFont()
       settings.installedPracticeFontName = identifier
       return true
     case .installedName(let name):
       guard isFontAvailable(name) else { return false }
+      deactivateLocalFont()
       settings.installedPracticeFontName = name
       return true
-    case .customName, .browseInstalled, .localFile, .removeLocalFile:
+    case .customName, .browseInstalled, .localFile, .useLocalFile, .removeLocalFile:
       return false
     }
   }
@@ -141,8 +161,12 @@ enum FontFamilyNameCommandPolicy {
   }
 
   @MainActor
-  static func apply(_ rawValue: String, to settings: AppSettings) -> Bool {
+  static func apply(
+    _ rawValue: String, to settings: AppSettings,
+    deactivateLocalFont: () -> Void = TypebarLocalPracticeFontStore.deactivate
+  ) -> Bool {
     guard let value = normalized(rawValue) else { return false }
+    deactivateLocalFont()
     settings.installedPracticeFontName = value
     return true
   }

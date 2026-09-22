@@ -14588,6 +14588,19 @@ final class TypingEngineTests: XCTestCase {
     })
   }
 
+  func testFontFamilyCommandsKeepStoredLocalFontReactivatable() {
+    let inactiveLocal = FontFamilyCommandCatalog.items(
+      hasLocalFont: true, usesLocalFont: false, availableKnownFontIDs: [])
+    XCTAssertTrue(inactiveLocal.map(\.id).contains("useLocalFont"))
+    XCTAssertTrue(inactiveLocal.map(\.id).contains("removeLocalFont"))
+    XCTAssertEqual(FontFamilyCommandCatalog.target(for: "useLocalFont"), .useLocalFile)
+
+    let activeLocal = FontFamilyCommandCatalog.items(
+      hasLocalFont: true, usesLocalFont: true, availableKnownFontIDs: [])
+    XCTAssertFalse(activeLocal.map(\.id).contains("useLocalFont"))
+    XCTAssertTrue(activeLocal.map(\.id).contains("removeLocalFont"))
+  }
+
   @MainActor
   func testFontFamilyCommandPolicyValidatesAndAppliesWithoutRestarting() {
     XCTAssertEqual(FontFamilyNameCommandPolicy.normalized("  Élan Mono  "), "Élan Mono")
@@ -14604,32 +14617,49 @@ final class TypingEngineTests: XCTestCase {
     let settings = AppSettings(defaults: defaults)
     settings.practiceFont = .rounded
     settings.installedPracticeFontName = "Existing Font"
+    var localFontDeactivationCount = 0
 
     XCTAssertTrue(FontFamilyCommandApplication.apply(
-      .systemDesign(.serif), to: settings, isFontAvailable: { _ in false }))
+      .systemDesign(.serif), to: settings, isFontAvailable: { _ in false },
+      deactivateLocalFont: { localFontDeactivationCount += 1 }))
     XCTAssertEqual(settings.practiceFont, .serif)
     XCTAssertEqual(settings.installedPracticeFontName, "")
+    XCTAssertEqual(localFontDeactivationCount, 1)
     XCTAssertFalse(FontFamilyCommandApplication.apply(
-      .installedName("Missing Font"), to: settings, isFontAvailable: { _ in false }))
+      .installedName("Missing Font"), to: settings, isFontAvailable: { _ in false },
+      deactivateLocalFont: { localFontDeactivationCount += 1 }))
     XCTAssertEqual(settings.installedPracticeFontName, "")
+    XCTAssertEqual(localFontDeactivationCount, 1)
     XCTAssertTrue(FontFamilyCommandApplication.apply(
-      .knownIdentifier("Roboto_Mono"), to: settings, isFontAvailable: { _ in false }))
+      .knownIdentifier("Roboto_Mono"), to: settings, isFontAvailable: { _ in false },
+      deactivateLocalFont: { localFontDeactivationCount += 1 }))
     XCTAssertEqual(settings.installedPracticeFontName, "Roboto_Mono")
+    XCTAssertEqual(localFontDeactivationCount, 2)
     XCTAssertFalse(FontFamilyCommandApplication.apply(
-      .knownIdentifier("Unknown"), to: settings, isFontAvailable: { _ in true }))
+      .knownIdentifier("Unknown"), to: settings, isFontAvailable: { _ in true },
+      deactivateLocalFont: { localFontDeactivationCount += 1 }))
+    XCTAssertEqual(localFontDeactivationCount, 2)
     XCTAssertTrue(FontFamilyCommandApplication.apply(
-      .installedName("Local Sans"), to: settings, isFontAvailable: { $0 == "Local Sans" }))
+      .installedName("Local Sans"), to: settings, isFontAvailable: { $0 == "Local Sans" },
+      deactivateLocalFont: { localFontDeactivationCount += 1 }))
     XCTAssertEqual(settings.installedPracticeFontName, "Local Sans")
-    XCTAssertTrue(FontFamilyNameCommandPolicy.apply("  Élan Mono  ", to: settings))
+    XCTAssertEqual(localFontDeactivationCount, 3)
+    XCTAssertTrue(FontFamilyNameCommandPolicy.apply(
+      "  Élan Mono  ", to: settings,
+      deactivateLocalFont: { localFontDeactivationCount += 1 }))
     XCTAssertEqual(settings.installedPracticeFontName, "Élan Mono")
-    XCTAssertFalse(FontFamilyNameCommandPolicy.apply("Bad\nName", to: settings))
+    XCTAssertEqual(localFontDeactivationCount, 4)
+    XCTAssertFalse(FontFamilyNameCommandPolicy.apply(
+      "Bad\nName", to: settings,
+      deactivateLocalFont: { localFontDeactivationCount += 1 }))
     XCTAssertEqual(settings.installedPracticeFontName, "Élan Mono")
+    XCTAssertEqual(localFontDeactivationCount, 4)
     settings.installedPracticeFontName = "Bad\tName"
     XCTAssertEqual(settings.installedPracticeFontName, "")
 
     for identifier in [
       "fontFamily.native.monospaced", "setFontFamilyCourier", "customFontName",
-      "browseInstalledFonts", "customLocalFont", "removeLocalFont",
+      "browseInstalledFonts", "customLocalFont", "useLocalFont", "removeLocalFont",
     ] {
       XCTAssertFalse(TestConfigurationCommandChallengePolicy.exitsChallenge(for: identifier))
     }

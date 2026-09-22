@@ -1037,7 +1037,8 @@ private struct ContentView: View {
     .sheet(isPresented: $showingFontFamilyNameCommandEditor) {
       FontFamilyNameCommandEditor(initialName: settings.installedPracticeFontName) { name in
         if FontFamilyNameCommandPolicy.apply(name, to: settings) {
-          fontFamilyCommandMessage = nil
+          fontFamilyCommandMessage = settings.hasLocalPracticeFont
+            ? "已保存所选字体；本地字体文件已保留但未启用。" : nil
         }
       }
     }
@@ -1045,7 +1046,10 @@ private struct ContentView: View {
       NativeFontFamilyPicker(
         selection: Binding(
           get: { settings.installedPracticeFontName },
-          set: { settings.installedPracticeFontName = $0 }),
+          set: {
+            settings.deactivateLocalPracticeFont()
+            settings.installedPracticeFontName = $0
+          }),
         families: installedFontCommandFamilies)
     }
     .sheet(item: $customBackgroundCommandEditorKind) { kind in
@@ -3361,7 +3365,8 @@ private struct ContentView: View {
     items.append(KeyboardGuideSizeCommand.item)
     items.append(contentsOf: KeyboardGuideLayoutCommandCatalog.items)
     items.append(contentsOf: FontFamilyCommandCatalog.items(
-      hasLocalFont: settings.hasLocalPracticeFont))
+      hasLocalFont: settings.hasLocalPracticeFont,
+      usesLocalFont: settings.isUsingLocalPracticeFont))
     items.append(contentsOf: ThemeCommandCatalog.items(
       customThemes: settings.customThemes, favoriteThemeIDs: settings.favoriteThemeIDs))
     if let theme = settings.currentBuiltInThemeForFavoriteCommand(for: systemColorScheme) {
@@ -3677,6 +3682,8 @@ private struct ContentView: View {
       case .systemDesign, .knownIdentifier, .installedName:
         if !FontFamilyCommandApplication.apply(target, to: settings) {
           fontFamilyCommandMessage = "此 Mac 当前无法使用所选字体。"
+        } else if settings.hasLocalPracticeFont {
+          fontFamilyCommandMessage = "已保存所选字体；本地字体文件已保留但未启用。"
         } else if case .knownIdentifier(let identifier) = target,
           !NativePracticeFont.isAvailable(identifier)
         {
@@ -3689,6 +3696,10 @@ private struct ContentView: View {
         showingInstalledFontCommandPicker = true
       case .localFile:
         showingLocalFontCommandImporter = true
+      case .useLocalFile:
+        if !settings.activateLocalPracticeFont() {
+          fontFamilyCommandMessage = "无法重新启用本地字体文件。"
+        }
       case .removeLocalFile:
         do {
           try settings.removeLocalPracticeFont()

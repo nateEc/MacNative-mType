@@ -27,9 +27,14 @@ enum LocalPracticeFontFilePolicy {
 enum TypebarLocalPracticeFontStore {
   private static let directoryName = "Typebar"
   private static let filenamePrefix = "local-practice-font"
+  private static let enabledDefaultsKey = "typebar.local-practice-font-enabled"
+
+  static var hasStoredFont: Bool { storedFontURL != nil }
+
+  static var isActive: Bool { hasStoredFont && isEnabled }
 
   static var activeInfo: LocalPracticeFontInfo? {
-    guard let url = storedFontURL else { return nil }
+    guard isActive, let url = storedFontURL else { return nil }
     return registerAndRead(url: url)
   }
 
@@ -59,7 +64,24 @@ enum TypebarLocalPracticeFontStore {
       throw LocalPracticeFontError.couldNotLoad
     }
     removeOtherStoredFonts(except: destinationURL)
+    setEnabled(true)
     return info
+  }
+
+  /// Re-enables a font file that was deliberately retained after switching
+  /// back to a system or named font.
+  @discardableResult
+  static func activate() -> Bool {
+    guard let url = storedFontURL, registerAndRead(url: url) != nil else { return false }
+    setEnabled(true)
+    return true
+  }
+
+  /// Keeps the local file private and intact while allowing an explicit font
+  /// choice to take effect.
+  static func deactivate() {
+    guard hasStoredFont else { return }
+    setEnabled(false)
   }
 
   static func remove() throws {
@@ -67,6 +89,7 @@ enum TypebarLocalPracticeFontStore {
       unregister(url)
       try FileManager.default.removeItem(at: url)
     }
+    UserDefaults.standard.removeObject(forKey: enabledDefaultsKey)
   }
 
   private static var storedFontURL: URL? {
@@ -87,6 +110,15 @@ enum TypebarLocalPracticeFontStore {
     for url in storedFontURLs where url != retainedURL {
       try? FileManager.default.removeItem(at: url)
     }
+  }
+
+  private static var isEnabled: Bool {
+    if UserDefaults.standard.object(forKey: enabledDefaultsKey) == nil { return true }
+    return UserDefaults.standard.bool(forKey: enabledDefaultsKey)
+  }
+
+  private static func setEnabled(_ enabled: Bool) {
+    UserDefaults.standard.set(enabled, forKey: enabledDefaultsKey)
   }
 
   private static func registerAndRead(url: URL) -> LocalPracticeFontInfo? {

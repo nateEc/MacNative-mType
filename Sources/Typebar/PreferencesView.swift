@@ -512,9 +512,15 @@ struct PreferencesView: View {
               Text(font.displayName).tag(font)
             }
           }
+          .onChange(of: settings.practiceFont) { _, _ in
+            settings.deactivateLocalPracticeFont()
+          }
           HStack {
             TextField("本机字体名称（可选）", text: $settings.installedPracticeFontName)
               .textFieldStyle(.roundedBorder)
+              .onChange(of: settings.installedPracticeFontName) { _, _ in
+                settings.deactivateLocalPracticeFont()
+              }
             Button("浏览…") {
               installedFontFamilies = NativeFontCatalog.installedFamilies
               showingInstalledFontPicker = true
@@ -525,11 +531,18 @@ struct PreferencesView: View {
               showingLocalPracticeFontImporter = true
             }
             if settings.hasLocalPracticeFont {
+              if !settings.isUsingLocalPracticeFont {
+                Button("使用本地字体") { activateLocalPracticeFont() }
+              }
               Button("移除本地字体", role: .destructive) { removeLocalPracticeFont() }
             }
           }
           if let localFont = settings.localPracticeFontInfo {
             Text("本地字体正在覆盖上方名称：\(localFont.displayName)")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          } else if settings.hasLocalPracticeFont {
+            Text("本地字体文件已保留但未启用；可随时重新启用或移除。")
               .font(.caption)
               .foregroundStyle(.secondary)
           } else if settings.installedPracticeFontName.isEmpty {
@@ -2099,7 +2112,12 @@ struct PreferencesView: View {
     }
     .sheet(isPresented: $showingInstalledFontPicker) {
       NativeFontFamilyPicker(
-        selection: $settings.installedPracticeFontName,
+        selection: Binding(
+          get: { settings.installedPracticeFontName },
+          set: {
+            settings.deactivateLocalPracticeFont()
+            settings.installedPracticeFontName = $0
+          }),
         families: installedFontFamilies)
     }
     .onAppear { customBackgroundURLDraft = settings.customBackgroundURL }
@@ -2202,6 +2220,14 @@ struct PreferencesView: View {
     } catch {
       localPracticeFontMessage = error.localizedDescription
     }
+  }
+
+  private func activateLocalPracticeFont() {
+    guard settings.activateLocalPracticeFont() else {
+      localPracticeFontMessage = "无法重新启用本地字体文件。"
+      return
+    }
+    localPracticeFontMessage = nil
   }
 
   private func beginEditingCustomTheme(_ theme: CustomThemeDefinition) {
