@@ -26,8 +26,8 @@ expected_commit="$(jq -er '.referenceCommit' "$fixture")"
 actual_commit="$(git -C "$reference_root" rev-parse HEAD)"
 [[ "$actual_commit" == "$expected_commit" ]] || fail "reference commit is $actual_commit; expected $expected_commit"
 
-if ! jq -e '(.specs | length) > 0 and (([.specs[].source] | length) == ([.specs[].source] | unique | length)) and ([.specs[].kind] | all(. == "direct" or . == "support")) and ([.specs[] | select(.kind == "direct") | (.nativeEvidence | length > 0)] | all)' "$fixture" >/dev/null; then
-  fail "fixture has duplicate paths, an unknown category, or direct behavior without native evidence"
+if ! jq -e '(.specs | length) > 0 and (([.specs[].source] | length) == ([.specs[].source] | unique | length)) and ([.specs[].kind] | all(. == "direct" or . == "support")) and ([.specs[] | select(.kind == "direct") | ((.nativeEvidence | length > 0) and ((.nativeTests | type) == "array") and (.nativeTests | length > 0))] | all)' "$fixture" >/dev/null; then
+  fail "fixture has duplicate paths, an unknown category, or direct behavior without native evidence or test symbols"
 fi
 
 actual_specs="$(cd "$reference_root" && rg --files frontend/__tests__ -g '*.spec.ts' | LC_ALL=C sort)"
@@ -42,6 +42,12 @@ while IFS= read -r evidence; do
   [[ -f "$project_root/$evidence" ]] || fail "missing native evidence: $evidence"
 done < <(jq -r '.specs[] | select(.kind == "direct") | .nativeEvidence[]' "$fixture")
 
+while IFS=$'\t' read -r source symbol; do
+  [[ -n "$source" && -n "$symbol" ]] || fail "direct behavior has an empty native test symbol"
+  [[ "$symbol" == test* ]] || fail "native test symbol for $source must start with test: $symbol"
+  rg -Fq -- "func $symbol(" "$project_root/Tests/TypebarTests" || fail "missing native test symbol for $source: $symbol"
+done < <(jq -r '.specs[] | select(.kind == "direct") | .source as $source | .nativeTests[] | "\($source)\t\(.)"' "$fixture")
+
 while IFS= read -r source; do
   [[ -n "$source" ]] || continue
   grep -Fq -- "$source" "$audit" || fail "audit omits direct behavior spec: $source"
@@ -51,4 +57,5 @@ grep -Fq -- '`Compatibility/official-reference-behavior-specs.json`' "$audit" ||
 
 direct_count="$(jq -r '[.specs[] | select(.kind == "direct")] | length' "$fixture")"
 support_count="$(jq -r '[.specs[] | select(.kind == "support")] | length' "$fixture")"
-print -- "reference behavior audit check passed ($direct_count direct, $support_count supporting specs at $actual_commit)"
+native_test_count="$(jq -r '[.specs[] | select(.kind == "direct") | .nativeTests[]] | length' "$fixture")"
+print -- "reference behavior audit check passed ($direct_count direct, $native_test_count native test symbols, $support_count supporting specs at $actual_commit)"

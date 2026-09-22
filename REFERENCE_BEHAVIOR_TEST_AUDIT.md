@@ -4,8 +4,8 @@
 
 - 固定参考提交为 `91bd24bb8513785c7364cbea29296ff7adafac41`。
 - 本文盘点参考前端 `frontend/__tests__` 的 39 个规格测试文件：33 个直接约束用户可见的练习、配置、展示或数据行为，6 个只是网页运行时内部的通用工具测试。
-- 清单只保留路径、领域与 Typebar 证据路径；不复制测试步骤、参考代码、词表、视觉资产或线上数据。
-- `Compatibility/official-reference-behavior-specs.json` 是机器可读来源；`zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference` 会核对固定提交、39 个路径的完备分类、直接行为的原生证据路径及本文覆盖。
+- 清单只保留路径、领域、Typebar 证据路径和原生测试函数名；不复制测试步骤、参考代码、词表、视觉资产或线上数据。
+- `Compatibility/official-reference-behavior-specs.json` 是机器可读来源；每个直接规格都附有可定位的 `nativeTests` 函数名。`zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference` 会核对固定提交、39 个路径的完备分类、直接行为的原生证据路径和函数符号，以及本文覆盖。
 
 ## 直接用户行为规格
 
@@ -34,4 +34,4 @@
 
 ## 验收结论
 
-该盘点补充页面/模态、配置、输入、Funbox、语言和服务面审计：它证明固定参考的测试证据面没有被只按文件名的 UI 盘点遗漏。它不替代真实 macOS 窗口、IME、辅助功能、网络或多设备手工验收；这些仍按 `MANUAL_ACCEPTANCE.md` 和各专项审计保持未完成状态。
+该盘点补充页面/模态、配置、输入、Funbox、语言和服务面审计：它证明固定参考的测试证据面没有被只按文件名的 UI 盘点遗漏，并拒绝指向不存在原生测试函数的伪证据。它不替代真实 macOS 窗口、IME、辅助功能、网络或多设备手工验收；这些仍按 `MANUAL_ACCEPTANCE.md` 和各专项审计保持未完成状态。
