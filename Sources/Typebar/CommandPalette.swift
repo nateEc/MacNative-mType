@@ -477,6 +477,43 @@ enum BehaviorCommandCatalog {
     }
 }
 
+/// The source exposes its result-suppression switch only through a transient
+/// developer hook. Typebar makes the equivalent behavior discoverable in the
+/// command palette, but keeps it out of persisted settings and test data.
+enum NoStressResultCommandTarget: Equatable {
+    case enabled
+    case disabled
+
+    var isEnabled: Bool { self == .enabled }
+}
+
+enum NoStressResultCommandCatalog {
+    static let items: [CommandPaletteItem] = [
+        .init(
+            id: "result.noStress.on", title: "无压力结果模式：开启",
+            subtitle: "本次启动期间的新结果只显示完成标记", systemImage: "checkmark.seal",
+            keywords: [
+                "result", "noStress", "result.noStress.on", "glarses", "无压力", "结果", "隐藏", "on",
+            ],
+            group: .activity),
+        .init(
+            id: "result.noStress.off", title: "无压力结果模式：关闭",
+            subtitle: "恢复完整的成绩、图表、回放与导出", systemImage: "chart.line.uptrend.xyaxis",
+            keywords: [
+                "result", "noStress", "result.noStress.off", "glarses", "无压力", "结果", "显示", "off",
+            ],
+            group: .activity),
+    ]
+
+    static func target(for identifier: String) -> NoStressResultCommandTarget? {
+        switch identifier {
+        case "result.noStress.on": .enabled
+        case "result.noStress.off": .disabled
+        default: nil
+        }
+    }
+}
+
 enum PracticeThresholdCommandTarget: Equatable {
     case minimumWpmOff
     case minimumWpmCustom

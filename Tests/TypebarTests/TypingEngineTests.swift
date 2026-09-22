@@ -2413,6 +2413,26 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testNoStressResultCommandsExposeOnlyTheVolatileDetailToggle() {
+    XCTAssertEqual(
+      NoStressResultCommandCatalog.items.map(\.id),
+      ["result.noStress.on", "result.noStress.off"])
+    XCTAssertTrue(NoStressResultCommandCatalog.items.allSatisfy { $0.group == .activity })
+    XCTAssertEqual(
+      NoStressResultCommandCatalog.target(for: "result.noStress.on"), .enabled)
+    XCTAssertEqual(
+      NoStressResultCommandCatalog.target(for: "result.noStress.off"), .disabled)
+    XCTAssertTrue(NoStressResultCommandTarget.enabled.isEnabled)
+    XCTAssertFalse(NoStressResultCommandTarget.disabled.isEnabled)
+    XCTAssertNil(NoStressResultCommandCatalog.target(for: "result.noStress.yes"))
+    XCTAssertNil(NoStressResultCommandCatalog.target(for: "result.noStress.on.extra"))
+    for item in NoStressResultCommandCatalog.items {
+      XCTAssertTrue(
+        CommandPaletteSearch.results(items: NoStressResultCommandCatalog.items, query: item.id)
+          .contains(item), item.id)
+    }
+  }
+
   func testThresholdCommandsCoverFixedReferenceModesAndInputSemantics() {
     XCTAssertEqual(
       PracticeThresholdCommandCatalog.items.map(\.id),
