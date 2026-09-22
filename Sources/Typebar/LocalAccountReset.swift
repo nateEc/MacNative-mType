@@ -5,6 +5,7 @@ enum LocalAccountReset {
   static func eraseCurrentMacData(
     modelContext: ModelContext,
     settings: AppSettings,
+    resultTombstoneStore: ResultTombstoneStore = .init(),
     tombstoneStore: ResultFilterPresetTombstoneStore = .init(),
     removeBackground: (() throws -> Void)? = nil,
     removePracticeFont: (() throws -> Void)? = nil,
@@ -19,6 +20,7 @@ enum LocalAccountReset {
     try modelContext.delete(model: ResultFilterPresetRecord.self)
     try modelContext.save()
 
+    resultTombstoneStore.removeAll()
     tombstoneStore.removeAll()
     (clearPendingPublications ?? { PendingResultPublicationStore().removeAll() })()
     settings.restoreDefaults()

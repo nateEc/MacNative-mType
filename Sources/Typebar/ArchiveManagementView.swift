@@ -11,6 +11,7 @@ struct ArchiveManagementView: View {
     private var resultFilterPresets: [ResultFilterPresetRecord]
 
     let settings: AppSettings
+    private let resultTombstones = ResultTombstoneStore()
     private let resultFilterPresetTombstones = ResultFilterPresetTombstoneStore()
     @State private var exportDocument: TypebarArchiveDocument?
     @State private var showingImporter = false
@@ -89,6 +90,7 @@ struct ArchiveManagementView: View {
             exportedAt: .now,
             settings: settings.snapshot,
             results: portableResults,
+            deletedResultIDs: resultTombstones.deletedIDs,
             presets: namedPresets,
             savedTexts: namedSavedTexts,
             resultFilterPresets: namedResultFilterPresets,
@@ -107,10 +109,11 @@ struct ArchiveManagementView: View {
             let archive = try TypebarDataTransfer.importArchive(from: Data(contentsOf: url))
             let summary = try LocalArchiveImport.apply(
                 archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts,
+                resultTombstoneStore: resultTombstones,
                 resultFilterPresets: resultFilterPresets, tombstoneStore: resultFilterPresetTombstones,
                 source: .localFile, modelContext: modelContext)
             let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
-            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设，移除 \(summary.deletedResultFilterPresets) 个成绩筛选预设，已应用文件中的设置\(selectionDetail)。")
+            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；移除 \(summary.deletedResults) 条成绩和 \(summary.deletedResultFilterPresets) 个成绩筛选预设，已应用文件中的设置\(selectionDetail)。")
         } catch {
             message = .init(title: "无法导入", detail: error.localizedDescription)
         }

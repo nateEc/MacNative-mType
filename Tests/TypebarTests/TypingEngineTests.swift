@@ -14609,6 +14609,9 @@ final class TypingEngineTests: XCTestCase {
     let settings = AppSettings(defaults: defaults)
     settings.theme = .midnight
     settings.difficulty = .master
+    let resultTombstones = ResultTombstoneStore(defaults: defaults)
+    let deletedResultID = UUID()
+    resultTombstones.markDeleted(deletedResultID)
     let tombstones = ResultFilterPresetTombstoneStore(defaults: defaults)
     let deletedFilterPresetID = UUID()
     tombstones.markDeleted(deletedFilterPresetID)
@@ -14641,6 +14644,7 @@ final class TypingEngineTests: XCTestCase {
       try LocalAccountReset.eraseCurrentMacData(
         modelContext: container.mainContext,
         settings: settings,
+        resultTombstoneStore: resultTombstones,
         tombstoneStore: tombstones,
         removeBackground: {},
         removePracticeFont: {
@@ -14655,6 +14659,7 @@ final class TypingEngineTests: XCTestCase {
     try LocalAccountReset.eraseCurrentMacData(
       modelContext: container.mainContext,
       settings: settings,
+      resultTombstoneStore: resultTombstones,
       tombstoneStore: tombstones,
       removeBackground: { removedBackground = true },
       removePracticeFont: { removedPracticeFont = true },
@@ -14665,6 +14670,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<SavedCustomTextRecord>()).isEmpty)
     XCTAssertTrue(
       try container.mainContext.fetch(FetchDescriptor<ResultFilterPresetRecord>()).isEmpty)
+    XCTAssertFalse(resultTombstones.contains(deletedResultID))
     XCTAssertFalse(tombstones.contains(deletedFilterPresetID))
     XCTAssertEqual(settings.snapshot, AppSettingsSnapshot())
     XCTAssertTrue(removedBackground)
@@ -22541,6 +22547,8 @@ final class TypingEngineTests: XCTestCase {
       createdAt: start)
     let deletedResultFilterPresetID = UUID(
       uuidString: "00000000-0000-0000-0000-000000000499")!
+    let deletedResultID = UUID(
+      uuidString: "00000000-0000-0000-0000-000000000599")!
     let activeTestSelection = ActiveTestSelectionDocument(
       preset: .init(configuration: .words(83, language: .german)),
       quoteSource: .community,
@@ -22548,24 +22556,39 @@ final class TypingEngineTests: XCTestCase {
         duration: 47, wordLimit: 83, customTextDuration: 61,
         customTextWordLimit: 73, customTextSectionLimit: 4))
     let data = try TypebarDataTransfer.exportArchive(
-      settings: settings, results: [result], presets: [preset], savedTexts: savedTexts,
+      settings: settings, results: [result], deletedResultIDs: [deletedResultID],
+      presets: [preset], savedTexts: savedTexts,
       resultFilterPresets: [resultFilterPreset],
       deletedResultFilterPresetIDs: [deletedResultFilterPresetID],
       activeTestSelection: activeTestSelection, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(archive.version, 5)
+    XCTAssertEqual(archive.version, 6)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
     XCTAssertEqual(archive.savedTexts, savedTexts)
     XCTAssertEqual(archive.resultFilterPresets, [resultFilterPreset])
     XCTAssertEqual(archive.deletedResultFilterPresetIDs, [deletedResultFilterPresetID])
+    XCTAssertEqual(archive.deletedResultIDs, [deletedResultID])
     XCTAssertEqual(archive.activeTestSelection, activeTestSelection)
+
+    var legacyVersionFivePayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
+    legacyVersionFivePayload["version"] = 5
+    legacyVersionFivePayload.removeValue(forKey: "deletedResultIDs")
+    let legacyVersionFiveData = try JSONSerialization.data(
+      withJSONObject: legacyVersionFivePayload)
+    let legacyVersionFiveArchive = try TypebarDataTransfer.importArchive(
+      from: legacyVersionFiveData)
+    XCTAssertEqual(legacyVersionFiveArchive.version, 5)
+    XCTAssertEqual(legacyVersionFiveArchive.results, [result])
+    XCTAssertTrue(legacyVersionFiveArchive.deletedResultIDs.isEmpty)
 
     var legacyVersionFourPayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     legacyVersionFourPayload["version"] = 4
     legacyVersionFourPayload.removeValue(forKey: "deletedResultFilterPresetIDs")
+    legacyVersionFourPayload.removeValue(forKey: "deletedResultIDs")
     let legacyVersionFourData = try JSONSerialization.data(
       withJSONObject: legacyVersionFourPayload)
     let legacyVersionFourArchive = try TypebarDataTransfer.importArchive(
@@ -22580,6 +22603,7 @@ final class TypingEngineTests: XCTestCase {
     legacyVersionThreePayload.removeValue(forKey: "activeTestSelection")
     legacyVersionThreePayload.removeValue(forKey: "resultFilterPresets")
     legacyVersionThreePayload.removeValue(forKey: "deletedResultFilterPresetIDs")
+    legacyVersionThreePayload.removeValue(forKey: "deletedResultIDs")
     let legacyVersionThreeData = try JSONSerialization.data(
       withJSONObject: legacyVersionThreePayload)
     let legacyVersionThreeArchive = try TypebarDataTransfer.importArchive(
@@ -22594,6 +22618,7 @@ final class TypingEngineTests: XCTestCase {
     versionTwoPayload.removeValue(forKey: "activeTestSelection")
     versionTwoPayload.removeValue(forKey: "resultFilterPresets")
     versionTwoPayload.removeValue(forKey: "deletedResultFilterPresetIDs")
+    versionTwoPayload.removeValue(forKey: "deletedResultIDs")
     var versionTwoResults = try XCTUnwrap(versionTwoPayload["results"] as? [[String: Any]])
     versionTwoResults[0].removeValue(forKey: "restartCount")
     versionTwoPayload["results"] = versionTwoResults
@@ -22616,10 +22641,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(
       try TypebarDataTransfer.importArchive(from: invalidSelectionData).activeTestSelection)
 
-    versionTwoPayload["version"] = 6
+    versionTwoPayload["version"] = 7
     let futureData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
     XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: futureData)) { error in
-      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(6))
+      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(7))
     }
   }
 
@@ -22711,6 +22736,53 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(tombstones.contains(portable.id))
     XCTAssertEqual(
       try container.mainContext.fetch(FetchDescriptor<ResultFilterPresetRecord>()).compactMap(\.portablePreset),
+      [portable])
+  }
+
+  @MainActor
+  func testCloudArchiveResultDeletionDoesNotResurrectAndManualImportCanRestore() throws {
+    let suiteName = "TypebarTests.result-deletion.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    let tombstones = ResultTombstoneStore(defaults: defaults)
+    let container = try ModelContainer(
+      for: TestResultRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let portable = CompletedTestResult(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000404")!,
+      configuration: .words(10), outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(10), typedCharacterCount: 15,
+      correctCharacterCount: 15, errorCount: 0, wpm: 90, rawWpm: 90, accuracy: 100)
+    let existing = TestResultRecord(result: portable)
+    container.mainContext.insert(existing)
+    try container.mainContext.save()
+    let deletionArchive = TypebarArchive(
+      exportedAt: start, settings: settings.snapshot, results: [],
+      deletedResultIDs: [portable.id], presets: [])
+
+    let deletionSummary = try LocalArchiveImport.apply(
+      deletionArchive, settings: settings, results: [existing], presets: [], savedTexts: [],
+      resultTombstoneStore: tombstones, source: .cloudSync, modelContext: container.mainContext)
+    XCTAssertEqual(deletionSummary.deletedResults, 1)
+    XCTAssertTrue(tombstones.contains(portable.id))
+    XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).isEmpty)
+
+    let staleArchive = TypebarArchive(
+      exportedAt: start, settings: settings.snapshot, results: [portable], presets: [])
+    let staleSummary = try LocalArchiveImport.apply(
+      staleArchive, settings: settings, results: [], presets: [], savedTexts: [],
+      resultTombstoneStore: tombstones, source: .cloudSync, modelContext: container.mainContext)
+    XCTAssertEqual(staleSummary.insertedResults, 0)
+    XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).isEmpty)
+
+    let restoreSummary = try LocalArchiveImport.apply(
+      staleArchive, settings: settings, results: [], presets: [], savedTexts: [],
+      resultTombstoneStore: tombstones, source: .localFile, modelContext: container.mainContext)
+    XCTAssertEqual(restoreSummary.insertedResults, 1)
+    XCTAssertFalse(tombstones.contains(portable.id))
+    XCTAssertEqual(
+      try container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).compactMap(\.portableResult),
       [portable])
   }
 

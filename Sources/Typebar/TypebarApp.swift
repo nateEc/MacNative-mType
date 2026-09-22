@@ -6049,6 +6049,7 @@ private struct ResultsHistoryView: View {
     [TestResultRecord]
   @Query(sort: \ResultFilterPresetRecord.createdAt, order: .reverse) private var filterPresets:
     [ResultFilterPresetRecord]
+  private let resultTombstones = ResultTombstoneStore()
   private let resultFilterPresetTombstones = ResultFilterPresetTombstoneStore()
   @State private var selectedResult: TestResultRecord?
   @State private var modeFilter = Set(TestMode.allCases)
@@ -6718,7 +6719,10 @@ private struct ResultsHistoryView: View {
     if let selectedID = selectedHistoryMetric?.id, deletedIDs.contains(selectedID) {
       selectedHistoryDate = nil
     }
-    for index in offsets { modelContext.delete(visibleResults[index]) }
+    for index in offsets {
+      resultTombstones.markDeleted(visibleResults[index].id)
+      modelContext.delete(visibleResults[index])
+    }
   }
 
   private func exportFilteredResultsCSV() {
