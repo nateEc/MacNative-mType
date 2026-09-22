@@ -4,7 +4,7 @@
 
 官方 48 项 funbox 的逐项来源、映射与未实现缺口见 `OFFICIAL_FUNBOX_AUDIT.md`；该审计是本表 FUN-01/FUN-02 的细化证据。
 
-官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 239 项精确原生、0 项相关替代、0 项系统输入或自定义回退均由自动化测试守恒校验。
+官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 239 项精确原生、0 项相关替代、0 项系统输入或自定义回退均由自动化测试守恒校验。`Scripts/check-layout-compatibility-audit.sh` 会从固定参考的 `LayoutNameSchema` 重建名称集合，并同时拒绝快照、原生精确映射、主库存声明或可执行覆盖证据漂移。
 
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
