@@ -18926,6 +18926,30 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TestModifierPolicy.normalized([.noQuit, .uppercase]).contains(.noQuit))
   }
 
+  func testNoQuitNavigationPolicyKeepsTheActivePracticeInPlace() {
+    var session = TypingSession(
+      configuration: TestConfiguration.words(2).with(modifiers: [.noQuit]), prompt: "amber harbor")
+
+    XCTAssertTrue(NavigationCommandTarget.allCases.allSatisfy {
+      NoQuitNavigationPolicy.allows($0, for: session)
+    })
+
+    session.insert("a", at: start)
+
+    XCTAssertTrue(NoQuitNavigationPolicy.allows(.typingPage, for: session))
+    XCTAssertTrue(NoQuitNavigationPolicy.allows(.fullscreen, for: session))
+    for target in [
+      NavigationCommandTarget.leaderboards, .about, .settings, .account, .profileSearch,
+    ] {
+      XCTAssertFalse(NoQuitNavigationPolicy.allows(target, for: session))
+    }
+
+    session.abandon(at: start)
+    XCTAssertTrue(NavigationCommandTarget.allCases.allSatisfy {
+      NoQuitNavigationPolicy.allows($0, for: session)
+    })
+  }
+
   func testNoQuitConfigurationLockRegistryBlocksUntilEveryActiveOwnerReleases() {
     var registry = NoQuitConfigurationLockRegistry()
     let firstOwner = UUID()

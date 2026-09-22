@@ -19,8 +19,9 @@ struct TypebarApp: App {
     }
     .windowResizability(.contentMinSize)
     .commands {
-      TypebarAboutCommands()
+      TypebarAboutCommands(navigationLocked: !settings.allowsRestartingConfigurationChange)
       CommandPaletteCommands()
+      TypebarSettingsCommands(navigationLocked: !settings.allowsRestartingConfigurationChange)
     }
 
     Settings {
@@ -84,6 +85,19 @@ struct TypebarApp: App {
         ResultFilterPresetRecord.self,
         configurations: modelConfiguration)
     }
+}
+
+struct TypebarSettingsCommands: Commands {
+  @Environment(\.openSettings) private var openSettings
+  let navigationLocked: Bool
+
+  var body: some Commands {
+    CommandGroup(replacing: .appSettings) {
+      Button("设置…") { openSettings() }
+        .keyboardShortcut(",", modifiers: .command)
+        .disabled(!NoQuitNavigationPolicy.allows(.settings, whenLocked: navigationLocked))
+    }
+  }
 }
 
 struct DataStoreStartupRecovery: Error, Equatable, Sendable {
@@ -3442,6 +3456,10 @@ private struct ContentView: View {
       return
     }
     if let target = NavigationCommandCatalog.target(for: item.id) {
+      guard NoQuitNavigationPolicy.allows(target, for: session) else {
+        restartLockMessage = "锁定重开已开启：请完成或放弃本次测试后再离开练习。"
+        return
+      }
       switch target {
       case .typingPage:
         focusRequest &+= 1

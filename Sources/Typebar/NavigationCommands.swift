@@ -55,6 +55,25 @@ enum NavigationCommandCatalog {
   }
 }
 
+/// The reference keeps an active `no_quit` test on its current route. Native
+/// commands that only return focus to the test or change the current window's
+/// fullscreen state remain available.
+enum NoQuitNavigationPolicy {
+  static func allows(_ target: NavigationCommandTarget, for session: TypingSession) -> Bool {
+    allows(target, whenLocked: TypingRestartPolicy.isLocked(session))
+  }
+
+  static func allows(_ target: NavigationCommandTarget, whenLocked: Bool) -> Bool {
+    guard whenLocked else { return true }
+    return switch target {
+    case .typingPage, .fullscreen:
+      true
+    case .leaderboards, .about, .settings, .account, .profileSearch:
+      false
+    }
+  }
+}
+
 enum ProfileSearchCommandPolicy {
   static func normalized(_ rawValue: String) -> String? {
     let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)

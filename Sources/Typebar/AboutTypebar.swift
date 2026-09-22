@@ -43,10 +43,12 @@ enum AboutCommand {
 
 struct TypebarAboutCommands: Commands {
   @Environment(\.openWindow) private var openWindow
+  let navigationLocked: Bool
 
   var body: some Commands {
     CommandGroup(replacing: .appInfo) {
       Button("关于 Typebar") { openWindow(id: "about") }
+        .disabled(!NoQuitNavigationPolicy.allows(.about, whenLocked: navigationLocked))
       Button("版本历史") { openWindow(id: "release-history") }
     }
   }
