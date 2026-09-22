@@ -12,11 +12,11 @@ enum DisplayNameAvailabilityState: Equatable {
 
   init(available: Bool?) {
     switch available {
-    case true:
+    case .some(true):
       self = .available
-    case false:
+    case .some(false):
       self = .unavailable
-    case nil:
+    case .none:
       self = .unavailableToCheck
     }
   }
