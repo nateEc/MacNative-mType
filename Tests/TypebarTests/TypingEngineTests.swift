@@ -2562,6 +2562,34 @@ final class TypingEngineTests: XCTestCase {
       [.gibberishStream, .morseStream])
   }
 
+  @MainActor
+  func testInteractiveFunboxSelectionKeepsConflictingPreferenceSelectionUntouched() {
+    let existing: [TestModifier] = [.layoutFluid, .rot13]
+    XCTAssertNil(
+      InteractiveFunboxSelectionPolicy.updatedModifiers(
+        toggling: .arrowStream, current: existing))
+    XCTAssertEqual(existing, [.layoutFluid, .rot13])
+    XCTAssertEqual(
+      InteractiveFunboxSelectionPolicy.updatedModifiers(
+        toggling: .layoutFluid, current: existing),
+      [.rot13])
+    XCTAssertEqual(
+      InteractiveFunboxSelectionPolicy.updatedModifiers(
+        toggling: .morseStream, current: [.gibberishStream]),
+      [.gibberishStream, .morseStream])
+
+    let suiteName = "InteractiveFunboxSelection-\(UUID().uuidString)"
+    let defaults = try! XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    settings.testModifiers = existing
+
+    XCTAssertFalse(settings.toggleTestModifier(.arrowStream))
+    XCTAssertEqual(settings.testModifiers, existing)
+    XCTAssertTrue(settings.toggleTestModifier(.layoutFluid))
+    XCTAssertEqual(settings.testModifiers, [.rot13])
+  }
+
   func testFunboxCommandPolicyActivatesFiniteOnlyModifiersFromAnInfiniteTest() {
     XCTAssertEqual(
       FunboxCommandPolicy.updatedModifiers(

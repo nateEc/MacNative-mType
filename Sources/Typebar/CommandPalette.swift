@@ -667,13 +667,8 @@ enum FunboxCommandPolicy {
             let officialModifiers = Set(FunboxCommandCatalog.targets.compactMap(\.modifier))
             return current.filter { !officialModifiers.contains($0) }
         case .modifier(let modifier):
-            if current.contains(modifier) {
-                return current.filter { $0 != modifier }
-            }
-            guard TestModifierPolicy.acceptsInteractiveModifierAddition(modifier, to: current) else {
-                return nil
-            }
-            return current + [modifier]
+            return InteractiveFunboxSelectionPolicy.updatedModifiers(
+                toggling: modifier, current: current)
         case .polyglot:
             return nil
         }

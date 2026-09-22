@@ -105,6 +105,7 @@ struct PreferencesView: View {
   @State private var installedFontFamilies: [String] = []
   @State private var showingInstalledFontPicker = false
   @State private var showingNoQuitConfigurationLockAlert = false
+  @State private var funboxSelectionMessage: String?
 
   var body: some View {
     @Bindable var settings = settings
@@ -321,6 +322,11 @@ struct PreferencesView: View {
           Section("趣味修饰器") {
             ForEach(TestModifier.funboxPreferenceCases) { modifier in
               Toggle(modifier.displayName, isOn: modifierBinding(modifier, settings: settings))
+            }
+            if let funboxSelectionMessage {
+              Label(funboxSelectionMessage, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
             }
             Text("边界、大小写和字符流各自互斥；记忆模式与听写/预读模式互斥。其余可兼容修饰器可以组合。")
               .font(.caption)
@@ -2403,7 +2409,11 @@ struct PreferencesView: View {
       set: { enabled in
         guard enabled != settings.testModifiers.contains(modifier) else { return }
         guard acceptsRestartingConfigurationChange() else { return }
-        settings.toggleTestModifier(modifier)
+        guard settings.toggleTestModifier(modifier) else {
+          funboxSelectionMessage = "\(modifier.displayName) 与当前趣味修饰器组合不兼容；已保留现有选择。"
+          return
+        }
+        funboxSelectionMessage = nil
       }
     )
   }

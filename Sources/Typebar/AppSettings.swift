@@ -2372,7 +2372,12 @@ final class AppSettings {
     activeResultTags = []
   }
 
-  func toggleTestModifier(_ modifier: TestModifier) {
-    testModifiers = TestModifierPolicy.toggling(modifier, in: testModifiers)
+  @discardableResult
+  func toggleTestModifier(_ modifier: TestModifier) -> Bool {
+    guard let updated = InteractiveFunboxSelectionPolicy.updatedModifiers(
+      toggling: modifier, current: testModifiers)
+    else { return false }
+    testModifiers = updated
+    return true
   }
 }

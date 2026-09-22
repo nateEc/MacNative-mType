@@ -1277,6 +1277,24 @@ enum TestModifierPolicy {
   }
 }
 
+/// Keeps direct Funbox controls consistent with the fixed source: a newly
+/// requested conflicting modifier is rejected, rather than silently replacing
+/// the user's existing selection. Persisted imports still use the separate
+/// normalization path above.
+enum InteractiveFunboxSelectionPolicy {
+  static func updatedModifiers(
+    toggling modifier: TestModifier, current: [TestModifier]
+  ) -> [TestModifier]? {
+    if current.contains(modifier) {
+      return current.filter { $0 != modifier }
+    }
+    guard TestModifierPolicy.acceptsInteractiveModifierAddition(modifier, to: current) else {
+      return nil
+    }
+    return current + [modifier]
+  }
+}
+
 /// A Typebar-authored implementation of International Morse encoding. The
 /// reference funbox transforms its active word source instead of replacing it;
 /// this policy preserves that composition while keeping the mapping local.
