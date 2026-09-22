@@ -24928,6 +24928,32 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(PracticeLineWidth.fluid.maximumWidth(fontSize: 20))
   }
 
+  @MainActor
+  func testPracticeFontSizePreservesPositiveImportsAndNormalizesInvalidValues() throws {
+    XCTAssertEqual(AppSettingsSnapshot(fontSize: 46).fontSize, 46)
+    XCTAssertEqual(AppSettingsSnapshot(fontSize: 0).fontSize, 1)
+    XCTAssertEqual(AppSettingsSnapshot(fontSize: -4).fontSize, 1)
+    XCTAssertEqual(AppSettingsSnapshot(fontSize: .infinity).fontSize, 28)
+
+    let decoded = try JSONDecoder().decode(
+      AppSettingsSnapshot.self, from: Data("{\"fontSize\":-8}".utf8))
+    XCTAssertEqual(decoded.fontSize, 1)
+
+    let suiteName = "TypebarTests.font-size-policy.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = AppSettings(defaults: defaults)
+    settings.fontSize = 34.5
+    XCTAssertEqual(settings.fontSize, 34.5)
+    settings.fontSize = 0
+    XCTAssertEqual(settings.fontSize, 1)
+    settings.fontSize = .nan
+    XCTAssertEqual(settings.fontSize, 28)
+
+    XCTAssertEqual(AppSettings(defaults: defaults).fontSize, 28)
+  }
+
   func testTypingSpeedUnitsFormatCanonicalWpmPresentation() {
     XCTAssertEqual(TypingSpeedUnit.wpm.formatted(wpm: 72), "72")
     XCTAssertEqual(TypingSpeedUnit.cpm.formatted(wpm: 72), "360")

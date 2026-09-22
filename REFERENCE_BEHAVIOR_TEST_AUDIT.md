@@ -18,7 +18,7 @@
 | `frontend/__tests__/controllers/preset-controller.spec.ts` | 完整/部分预设与标签作用域 | `PresetApplicationPolicy.swift`、`TypingEngineTests.swift` 的分组应用、标签和旧格式回归。 |
 | `frontend/__tests__/controllers/url-handler.spec.ts` | 可分享测试选择及非法链接拒绝 | `TestConfigurationShare.swift`、`TypingEngineTests.swift` 的链接往返和拒绝回归。 |
 | `frontend/__tests__/input/handlers/insert-text.spec.ts`、`frontend/__tests__/input/helpers/fail-or-finish.spec.ts`、`frontend/__tests__/input/helpers/util.spec.ts`、`frontend/__tests__/input/helpers/validation.spec.ts` | 输入接受、错误策略、完成/失败、词边界 | `TypingEngine.swift`、`TypingEngineTests.swift` 的逐字符状态、难度、停止/删除错误、阈值和完成回归。 |
-| `frontend/__tests__/root/config.spec.ts`、`frontend/__tests__/utils/config.spec.ts` | 设置写入、冲突归一化、持久化和旧值迁移 | `AppSettings.swift`、`TypingEngineTests.swift` 的快照、JSON、配置锁与迁移回归。 |
+| `frontend/__tests__/root/config.spec.ts`、`frontend/__tests__/utils/config.spec.ts` | 设置写入、冲突归一化、持久化和旧值迁移 | `AppSettings.swift`、`TypingEngineTests.swift` 的快照、JSON、配置锁、迁移，以及字体大小保留有限正数、将非正或非有限导入值归一化的回归。 |
 | `frontend/__tests__/stores/notifications.spec.ts` | 连接状态与短暂状态提示 | `TypebarApp.swift`、`TypingEngineTests.swift` 的离线横幅、真实恢复提示和终止状态回归；网页 Toast 内部历史不作为 macOS UI 架构目标。 |
 | `frontend/__tests__/test/british-english.spec.ts`、`frontend/__tests__/test/lazy-mode.spec.ts` | 专项英语与简化输入 | `OfflineContent.swift`、`TypingEngine.swift`、`TypingEngineTests.swift` 的独立词流、语言特例和 Unicode 简化回归。 |
 | `frontend/__tests__/test/events/data.spec.ts`、`frontend/__tests__/test/events/helpers.spec.ts`、`frontend/__tests__/test/events/stats.spec.ts`、`frontend/__tests__/test/test-words.spec.ts` | 输入事件、统计、提示词段和提交分隔符 | `TypingEngine.swift`、`TypingEngineTests.swift` 的重放、WPM/Raw/准确率、文本段和完成回归。 |

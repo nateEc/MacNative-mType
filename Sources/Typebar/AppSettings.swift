@@ -75,6 +75,19 @@ enum StreakDayBoundaryPolicy {
   }
 }
 
+/// Keeps persisted practice type sizes compatible with the reference product's
+/// positive-number contract without imposing Typebar's preference-slider range
+/// on imported settings.
+enum PracticeFontSizePolicy {
+  static let defaultSize = 28.0
+  static let minimumSize = 1.0
+
+  static func normalized(_ value: Double) -> Double {
+    guard value.isFinite else { return defaultSize }
+    return max(value, minimumSize)
+  }
+}
+
 /// A small set of native caret treatments for the active prompt character.
 /// They use SwiftUI text attributes only and do not depend on copied CSS.
 enum TypingCaretStyle: String, CaseIterable, Codable, Equatable, Identifiable {
@@ -537,7 +550,14 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var deleteOnErrorMode: DeleteOnErrorMode = .off
   var hideExtraLetters = false
   var blindMode = false
-  var fontSize: Double = 28
+  var fontSize: Double = PracticeFontSizePolicy.defaultSize {
+    didSet {
+      let normalized = PracticeFontSizePolicy.normalized(fontSize)
+      if fontSize != normalized {
+        fontSize = normalized
+      }
+    }
+  }
   var practiceFont: PracticeFont = .monospaced
   var installedPracticeFontName = ""
   var theme: AppTheme = .paper
@@ -751,7 +771,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.deleteOnError = self.deleteOnErrorMode.isEnabled
     self.hideExtraLetters = hideExtraLetters
     self.blindMode = blindMode
-    self.fontSize = fontSize
+    self.fontSize = PracticeFontSizePolicy.normalized(fontSize)
     self.practiceFont = practiceFont
     self.installedPracticeFontName = NativePracticeFont.normalizedName(installedPracticeFontName)
     self.theme = theme
@@ -902,7 +922,8 @@ struct AppSettingsSnapshot: Codable, Equatable {
     deleteOnError = deleteOnErrorMode.isEnabled
     hideExtraLetters = try values.decodeIfPresent(Bool.self, forKey: .hideExtraLetters) ?? false
     blindMode = try values.decodeIfPresent(Bool.self, forKey: .blindMode) ?? false
-    fontSize = try values.decodeIfPresent(Double.self, forKey: .fontSize) ?? 28
+    fontSize = PracticeFontSizePolicy.normalized(
+      try values.decodeIfPresent(Double.self, forKey: .fontSize) ?? PracticeFontSizePolicy.defaultSize)
     practiceFont =
       try values.decodeIfPresent(PracticeFont.self, forKey: .practiceFont) ?? .monospaced
     installedPracticeFontName = NativePracticeFont.normalizedName(
@@ -1182,7 +1203,16 @@ final class AppSettings {
   }
   var hideExtraLetters = false { didSet { persist() } }
   var blindMode = false { didSet { persist() } }
-  var fontSize: Double = 28 { didSet { persist() } }
+  var fontSize: Double = PracticeFontSizePolicy.defaultSize {
+    didSet {
+      let normalized = PracticeFontSizePolicy.normalized(fontSize)
+      if fontSize != normalized {
+        fontSize = normalized
+      } else {
+        persist()
+      }
+    }
+  }
   var practiceFont: PracticeFont = .monospaced { didSet { persist() } }
   var installedPracticeFontName = "" {
     didSet {
