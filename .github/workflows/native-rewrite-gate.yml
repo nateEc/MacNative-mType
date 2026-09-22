@@ -75,7 +75,7 @@ jobs:
             else
               diagnosis="$(tail -n 30 "$test_log")"
             fi
-            diagnosis="$(printf '%s' "$diagnosis" | tr '\n' ' ' | cut -c1-1200)"
+            diagnosis="$(printf '%s' "$diagnosis" | tr '\n' ' ' | tail -c 1200)"
             printf '::error title=Native client test failed::swift test exited %s; %s\n' "$test_status" "$diagnosis"
             exit "$test_status"
           fi
