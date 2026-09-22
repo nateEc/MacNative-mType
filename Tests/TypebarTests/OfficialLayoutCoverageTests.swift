@@ -43,6 +43,18 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let method: String
   }
 
+  private struct PageModalFixture: Decodable {
+    let referenceRepository: String
+    let referenceCommit: String
+    let officialCount: Int
+    let officialSurfaces: [String]
+    let mapped: [String: String]
+    let notApplicable: [String: String]
+    let unimplemented: [String: String]
+    let sourceFiles: [String]
+    let method: String
+  }
+
   func testPinnedOfficialLayoutCoverageIsCompleteUniqueAndResolvable() throws {
     let repositoryRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
@@ -343,5 +355,51 @@ final class OfficialLayoutCoverageTests: XCTestCase {
       fixture.sourceFiles,
       ["packages/schemas/src/configs.ts", "OFFICIAL_CONFIG_AUDIT.md"])
     XCTAssertTrue(fixture.method.contains("metadata only"))
+  }
+
+  func testPinnedOfficialPageAndModalCoverageIsPartitionedWithNativeEvidence() throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let data = try Data(
+      contentsOf: repositoryRoot.appendingPathComponent(
+        "Compatibility/official-page-modal-surfaces.json"))
+    let fixture = try JSONDecoder().decode(PageModalFixture.self, from: data)
+    let officialSurfaces = Set(fixture.officialSurfaces)
+    let mappedSurfaces = Set(fixture.mapped.keys)
+    let notApplicableSurfaces = Set(fixture.notApplicable.keys)
+    let unimplementedSurfaces = Set(fixture.unimplemented.keys)
+
+    XCTAssertEqual(fixture.referenceRepository, "monkeytypegame/monkeytype")
+    XCTAssertEqual(fixture.referenceCommit, "91bd24bb8513785c7364cbea29296ff7adafac41")
+    XCTAssertEqual(fixture.officialCount, 52)
+    XCTAssertEqual(fixture.officialSurfaces.count, fixture.officialCount)
+    XCTAssertEqual(officialSurfaces.count, fixture.officialCount)
+    XCTAssertEqual(fixture.mapped.count, 46)
+    XCTAssertEqual(fixture.notApplicable.count, 6)
+    XCTAssertTrue(unimplementedSurfaces.isEmpty)
+    XCTAssertTrue(mappedSurfaces.isDisjoint(with: notApplicableSurfaces))
+    XCTAssertTrue(mappedSurfaces.isDisjoint(with: unimplementedSurfaces))
+    XCTAssertTrue(notApplicableSurfaces.isDisjoint(with: unimplementedSurfaces))
+    XCTAssertEqual(
+      mappedSurfaces.union(notApplicableSurfaces).union(unimplementedSurfaces), officialSurfaces)
+    XCTAssertTrue(
+      (Array(fixture.mapped.values) + Array(fixture.notApplicable.values)
+        + Array(fixture.unimplemented.values))
+        .allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+    XCTAssertEqual(
+      fixture.sourceFiles,
+      [
+        "frontend/src/ts/components/pages",
+        "frontend/src/ts/components/modals",
+        "OFFICIAL_PAGE_MODAL_AUDIT.md",
+      ])
+    XCTAssertTrue(fixture.method.contains("metadata only"))
+
+    let audit = try String(
+      contentsOf: repositoryRoot.appendingPathComponent("OFFICIAL_PAGE_MODAL_AUDIT.md"),
+      encoding: .utf8)
+    XCTAssertTrue(audit.contains("`Compatibility/official-page-modal-surfaces.json`"))
   }
 }
