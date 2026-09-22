@@ -25066,6 +25066,32 @@ final class TypingEngineTests: XCTestCase {
         wpm: 1_000, unit: .cpm, alwaysShowDecimalPlaces: true), "5000.00")
   }
 
+  func testZeroSpeedResultFeedbackUsesReferenceDurationAndFailureGates() {
+    XCTAssertNil(
+      ZeroSpeedResultFeedbackPolicy.feedback(
+        wpm: 0, elapsedDuration: 4.99, outcome: .completed))
+    XCTAssertNil(
+      ZeroSpeedResultFeedbackPolicy.feedback(
+        wpm: 1, elapsedDuration: 12, outcome: .completed))
+    XCTAssertNil(
+      ZeroSpeedResultFeedbackPolicy.feedback(
+        wpm: 0, elapsedDuration: 12, outcome: .failed))
+
+    XCTAssertEqual(
+      ZeroSpeedResultFeedbackPolicy.feedback(
+        wpm: 0, elapsedDuration: 5, outcome: .completed),
+      .init(
+        title: "准备好再试一次",
+        message: "本轮持续 5 秒，但没有记录到有效速度。"))
+    XCTAssertEqual(
+      ZeroSpeedResultFeedbackPolicy.feedback(
+        wpm: 0, elapsedDuration: 5.5, outcome: .invalidAFK)?.message,
+      "本轮持续 6 秒，但没有记录到有效速度。")
+    XCTAssertNotNil(
+      ZeroSpeedResultFeedbackPolicy.feedback(
+        wpm: 0, elapsedDuration: 12, outcome: .bailedOut))
+  }
+
   func testCompletedResultPreservesExactMetricsForResultPageDecimalPresentation() throws {
     let result = CompletedTestResult(
       id: UUID(), configuration: .words(1), outcome: .completed,

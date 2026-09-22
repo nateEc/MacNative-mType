@@ -97,6 +97,34 @@ enum ResultPresentationPolicy {
   }
 }
 
+/// Original native result-page feedback for a completed terminal attempt that
+/// lasted long enough to measure but never produced a typing speed.
+struct ZeroSpeedResultFeedback: Equatable {
+  let title: String
+  let message: String
+}
+
+/// Preserves the reference result feedback gates while keeping its copy and
+/// visuals native to Typebar. A difficulty failure has its own explanation,
+/// so it deliberately does not receive this secondary feedback.
+enum ZeroSpeedResultFeedbackPolicy {
+  static func feedback(
+    wpm: Int, elapsedDuration: TimeInterval, outcome: TestOutcome
+  ) -> ZeroSpeedResultFeedback? {
+    guard
+      wpm == 0,
+      elapsedDuration.isFinite,
+      elapsedDuration >= 5,
+      outcome != .failed
+    else { return nil }
+
+    let seconds = Int(elapsedDuration.rounded(.toNearestOrAwayFromZero))
+    return .init(
+      title: "准备好再试一次",
+      message: "本轮持续 \(seconds) 秒，但没有记录到有效速度。")
+  }
+}
+
 struct ResultMetric: Equatable, Identifiable {
     let id: UUID
     let finishedAt: Date

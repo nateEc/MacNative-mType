@@ -967,10 +967,13 @@ private struct ContentView: View {
         if ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: savesResult) {
           saveCompletedResultLocally(result)
         }
+        let zeroSpeedFeedback = ZeroSpeedResultFeedbackPolicy.feedback(
+          wpm: result.wpm, elapsedDuration: result.elapsedDuration, outcome: result.outcome)
         completedResult = .init(
           result: result,
           savesResult: savesResult,
           failureReason: failureReason,
+          zeroSpeedFeedback: zeroSpeedFeedback,
           quoteFeedback: activeQuoteFeedback,
           resultPersonalBestFeedback: resultPersonalBestFeedback,
           tagPersonalBestFeedback: tagPersonalBestFeedback,
@@ -1255,6 +1258,7 @@ private struct ContentView: View {
         result: result.result,
         savesResult: result.savesResult,
         failureReason: result.failureReason,
+        zeroSpeedFeedback: result.zeroSpeedFeedback,
         typingSpeedUnit: settings.typingSpeedUnit,
         alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces,
         alwaysShowWordsHistory: settings.alwaysShowWordsHistory,
@@ -4548,6 +4552,7 @@ private struct CompletedResultPresentation: Identifiable {
   let result: CompletedTestResult
   let savesResult: Bool
   let failureReason: TestFailureReason?
+  let zeroSpeedFeedback: ZeroSpeedResultFeedback?
   let quoteFeedback: QuoteResultFeedbackTarget?
   let resultPersonalBestFeedback: ResultPersonalBestFeedback?
   let tagPersonalBestFeedback: [TagPersonalBestFeedback]
@@ -4569,6 +4574,7 @@ private struct CompletedResultView: View {
   let result: CompletedTestResult
   let savesResult: Bool
   let failureReason: TestFailureReason?
+  let zeroSpeedFeedback: ZeroSpeedResultFeedback?
   let typingSpeedUnit: TypingSpeedUnit
   let alwaysShowDecimalPlaces: Bool
   let alwaysShowWordsHistory: Bool
@@ -4643,6 +4649,27 @@ private struct CompletedResultView: View {
           .lineLimit(3)
           .accessibilityLabel(
             "测试类型，\(ResultConfigurationSummaryPolicy.text(for: result))")
+      }
+
+      if let zeroSpeedFeedback {
+        HStack(spacing: 10) {
+          Image(systemName: "sparkles")
+            .font(.title3.weight(.semibold))
+            .symbolEffect(.bounce, value: zeroSpeedFeedback)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(zeroSpeedFeedback.title)
+              .font(.subheadline.weight(.semibold))
+            Text(zeroSpeedFeedback.message)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(zeroSpeedFeedback.title)，\(zeroSpeedFeedback.message)")
       }
 
       HStack(alignment: .firstTextBaseline, spacing: 8) {
