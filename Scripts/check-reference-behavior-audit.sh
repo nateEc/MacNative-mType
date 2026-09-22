@@ -20,7 +20,6 @@ git -C "$reference_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail
 [[ -f "$fixture" ]] || fail "missing compatibility fixture"
 [[ -f "$audit" ]] || fail "missing behavior audit"
 command -v jq >/dev/null || fail "jq is required to read the compatibility fixture"
-command -v rg >/dev/null || fail "rg is required to read the reference test inventory"
 
 expected_commit="$(jq -er '.referenceCommit' "$fixture")"
 actual_commit="$(git -C "$reference_root" rev-parse HEAD)"
@@ -30,7 +29,7 @@ if ! jq -e '(.specs | length) > 0 and (([.specs[].source] | length) == ([.specs[
   fail "fixture has duplicate paths, an unknown category, or direct behavior without native evidence or test symbols"
 fi
 
-actual_specs="$(cd "$reference_root" && rg --files frontend/__tests__ -g '*.spec.ts' | LC_ALL=C sort)"
+actual_specs="$(cd "$reference_root" && find frontend/__tests__ -type f -name '*.spec.ts' -print | LC_ALL=C sort)"
 fixture_specs="$(jq -er '.specs[].source' "$fixture" | LC_ALL=C sort)"
 if ! diff -u <(print -r -- "$actual_specs") <(print -r -- "$fixture_specs"); then
   fail "fixture differs from the fixed reference frontend test inventory"
@@ -45,7 +44,7 @@ done < <(jq -r '.specs[] | select(.kind == "direct") | .nativeEvidence[]' "$fixt
 while IFS=$'\t' read -r source symbol; do
   [[ -n "$source" && -n "$symbol" ]] || fail "direct behavior has an empty native test symbol"
   [[ "$symbol" == test* ]] || fail "native test symbol for $source must start with test: $symbol"
-  rg -Fq -- "func $symbol(" "$project_root/Tests/TypebarTests" || fail "missing native test symbol for $source: $symbol"
+  grep -RFq -- "func $symbol(" "$project_root/Tests/TypebarTests" || fail "missing native test symbol for $source: $symbol"
 done < <(jq -r '.specs[] | select(.kind == "direct") | .source as $source | .nativeTests[] | "\($source)\t\(.)"' "$fixture")
 
 while IFS= read -r source; do
