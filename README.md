@@ -18,6 +18,12 @@ swift run
 zsh Scripts/package-macos-app.sh
 ```
 
+无启动地构建、验签并检查应用包的关键元数据：
+
+```sh
+zsh Scripts/check-macos-app-package.sh
+```
+
 检查参考源码隔离与生产服务边界：
 
 ```zsh
