@@ -64,8 +64,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TYPEBAR_QA_IN_MEMORY_STORE=1 swift test
+          test_log="$(mktemp "${RUNNER_TEMP}/typebar-client-tests.XXXXXX.log")"
+          test_status=0
+          TYPEBAR_QA_IN_MEMORY_STORE=1 swift test >"$test_log" 2>&1 || test_status=$?
+          cat "$test_log"
+          if [[ "$test_status" -ne 0 ]]; then
+            xctest_failures="$(grep -E 'Test Case .+ (failed|threw an error)' "$test_log" | tail -n 5 || true)"
+            if [[ -n "$xctest_failures" ]]; then
+              diagnosis="$xctest_failures"
+            else
+              diagnosis="$(tail -n 30 "$test_log")"
+            fi
+            diagnosis="$(printf '%s' "$diagnosis" | tr '\n' ' ' | cut -c1-1200)"
+            printf '::error title=Native client test failed::swift test exited %s; %s\n' "$test_status" "$diagnosis"
+            exit "$test_status"
+          fi
           if pgrep -x Typebar >/dev/null; then
+            printf '%s\n' '::error title=Native app launch detected::Typebar was unexpectedly launched by the client test suite'
             printf '%s\n' "Typebar was unexpectedly launched by the test suite" >&2
             exit 1
           fi
