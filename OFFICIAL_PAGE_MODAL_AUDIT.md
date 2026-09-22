@@ -24,6 +24,8 @@
 | `login` | `PreferencesView.swift`、`OAuthWebAuthenticationSession.swift`、`RemoteHumanVerification.swift` | 已覆盖。完整配置自建 Turnstile 后，密码注册、OAuth 新用户注册及密码重置请求会通过系统认证会话完成一次性验证；未配置旧服务保留已有请求契约并如实报告能力未启用。 |
 | `404` | 无 URL 路由 | 不适用。原生应用没有用户可访问的网页路由；导航错误由本机命令和工作表状态处理。 |
 
+固定参考还会在活动长测试离开网页前阻止关闭。Typebar 以 `WindowCloseProtection.swift` 的 AppKit 窗口代理表达相同的用户保护：仅活动、未完成且达到既有长测试阈值的练习会显示原生确认；取消保留当前窗口和输入，确认才关闭。代理会转发 SwiftUI 已安装的窗口委托，避免将此保护作为网页生命周期或替换现有原生窗口行为的借口；短、未开始、完成和放弃的练习照常关闭。实际窗口代理与工作表交互列为 `TST-WIN-01` 的手工验收。
+
 ## 模态与工作表能力
 
 | 官方组件族 | Typebar 原生等价能力 | 状态 |

@@ -1994,6 +1994,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(for: savedLongText, savedLongText: true))
   }
 
+  func testLongTestCloseProtectionOnlyPromptsForAnActiveProtectedTest() {
+    var shortSession = TypingSession(configuration: .words(999), prompt: "amber")
+    shortSession.insert("a", at: start)
+    XCTAssertFalse(LongTestCloseProtectionPolicy.requiresConfirmation(for: shortSession))
+
+    var longSession = TypingSession(configuration: .words(1_000), prompt: "amber")
+    XCTAssertFalse(LongTestCloseProtectionPolicy.requiresConfirmation(for: longSession))
+    longSession.insert("a", at: start)
+    XCTAssertTrue(LongTestCloseProtectionPolicy.requiresConfirmation(for: longSession))
+    longSession.abandon(at: start)
+    XCTAssertFalse(LongTestCloseProtectionPolicy.requiresConfirmation(for: longSession))
+
+    var savedLongText = TypingSession(
+      configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+        customTextCompletion: .finish), prompt: "amber")
+    savedLongText.insert("a", at: start)
+    XCTAssertFalse(LongTestCloseProtectionPolicy.requiresConfirmation(for: savedLongText))
+    XCTAssertTrue(
+      LongTestCloseProtectionPolicy.requiresConfirmation(for: savedLongText, savedLongText: true))
+  }
+
   func testCommandBailoutPolicyMatchesReferenceAvailability() {
     XCTAssertTrue(CommandBailoutPolicy.isAvailable(for: .timed(seconds: 3_600)))
     XCTAssertFalse(CommandBailoutPolicy.isAvailable(for: .timed(seconds: 900)))

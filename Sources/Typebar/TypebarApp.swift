@@ -808,6 +808,11 @@ private struct ContentView: View {
         filter: settings.customBackgroundFilter,
         localImageRevision: settings.localBackgroundRevision)
     )
+    .background(
+      WindowCloseConfirmationBridge(
+        requiresConfirmation: LongTestCloseProtectionPolicy.requiresConfirmation(
+          for: session, savedLongText: activeLongSavedText != nil))
+    )
     .environment(\.typebarAnimationFrameRate, effectiveAnimationFrameRate)
     .overlay(alignment: .top) {
       if network.showsOfflineBanner, !session.hasStarted {
