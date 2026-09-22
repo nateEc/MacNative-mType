@@ -1,0 +1,37 @@
+# 固定参考行为测试盘点
+
+## 目的与边界
+
+- 固定参考提交为 `91bd24bb8513785c7364cbea29296ff7adafac41`。
+- 本文盘点参考前端 `frontend/__tests__` 的 39 个规格测试文件：33 个直接约束用户可见的练习、配置、展示或数据行为，6 个只是网页运行时内部的通用工具测试。
+- 清单只保留路径、领域与 Typebar 证据路径；不复制测试步骤、参考代码、词表、视觉资产或线上数据。
+- `Compatibility/official-reference-behavior-specs.json` 是机器可读来源；`zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference` 会核对固定提交、39 个路径的完备分类、直接行为的原生证据路径及本文覆盖。
+
+## 直接用户行为规格
+
+| 参考规格路径 | 可观察领域 | Typebar 原生证据 |
+| --- | --- | --- |
+| `frontend/__tests__/commandline/util.spec.ts`、`frontend/__tests__/root/config-metadata.spec.ts` | 命令面板目录、可搜索设置、枚举和输入约束 | `CommandPalette.swift` 与 `TypingEngineTests.swift` 的命令目录、严格 ID、数值输入和设置路由回归。 |
+| `frontend/__tests__/components/pages/account/utils.spec.ts`、`frontend/__tests__/elements/test-activity-calendar.spec.ts`、`frontend/__tests__/utils/date-and-time.spec.ts` | 历史指标、活动日历、首日和跨月/年边界 | `ResultsAnalytics.swift` 与 `TypingEngineTests.swift` 的活动、趋势、连续天数和日界回归。 |
+| `frontend/__tests__/components/pages/test/keymapConverter.spec.ts`、`frontend/__tests__/test/layout-emulator.spec.ts`、`frontend/__tests__/utils/key-converter.spec.ts` | 键盘图、物理键位、ISO/ANSI 和布局模拟 | `KeyboardGuide.swift`、`KeyboardLayoutEmulator.swift` 与 `TypingEngineTests.swift` 的 239 项布局、层、反查和输入模拟回归。 |
+| `frontend/__tests__/components/ui/form/utils.spec.ts` | 自定义参数的有效性与提示 | `TestLimitEditor.swift`、`TypingEngineTests.swift` 的安全整数、边界和取消/确认策略回归。 |
+| `frontend/__tests__/controllers/preset-controller.spec.ts` | 完整/部分预设与标签作用域 | `PresetApplicationPolicy.swift`、`TypingEngineTests.swift` 的分组应用、标签和旧格式回归。 |
+| `frontend/__tests__/controllers/url-handler.spec.ts` | 可分享测试选择及非法链接拒绝 | `TestConfigurationShare.swift`、`TypingEngineTests.swift` 的链接往返和拒绝回归。 |
+| `frontend/__tests__/input/handlers/insert-text.spec.ts`、`frontend/__tests__/input/helpers/fail-or-finish.spec.ts`、`frontend/__tests__/input/helpers/util.spec.ts`、`frontend/__tests__/input/helpers/validation.spec.ts` | 输入接受、错误策略、完成/失败、词边界 | `TypingEngine.swift`、`TypingEngineTests.swift` 的逐字符状态、难度、停止/删除错误、阈值和完成回归。 |
+| `frontend/__tests__/root/config.spec.ts`、`frontend/__tests__/utils/config.spec.ts` | 设置写入、冲突归一化、持久化和旧值迁移 | `AppSettings.swift`、`TypingEngineTests.swift` 的快照、JSON、配置锁与迁移回归。 |
+| `frontend/__tests__/stores/notifications.spec.ts` | 连接状态与短暂状态提示 | `TypebarApp.swift`、`TypingEngineTests.swift` 的离线横幅、真实恢复提示和终止状态回归；网页 Toast 内部历史不作为 macOS UI 架构目标。 |
+| `frontend/__tests__/test/british-english.spec.ts`、`frontend/__tests__/test/lazy-mode.spec.ts` | 专项英语与简化输入 | `OfflineContent.swift`、`TypingEngine.swift`、`TypingEngineTests.swift` 的独立词流、语言特例和 Unicode 简化回归。 |
+| `frontend/__tests__/test/events/data.spec.ts`、`frontend/__tests__/test/events/helpers.spec.ts`、`frontend/__tests__/test/events/stats.spec.ts`、`frontend/__tests__/test/test-words.spec.ts` | 输入事件、统计、提示词段和提交分隔符 | `TypingEngine.swift`、`TypingEngineTests.swift` 的重放、WPM/Raw/准确率、文本段和完成回归。 |
+| `frontend/__tests__/test/funbox.spec.ts`、`frontend/__tests__/test/funbox/funbox-validation.spec.ts` | Funbox 注册、冲突和配置限制 | `CommandPalette.swift`、`TypingEngine.swift`、`TypingEngineTests.swift` 的 48 项目录、互斥和归一化回归。 |
+| `frontend/__tests__/utils/colors.spec.ts` | 自定义主题颜色解析和显示 | `AppTheme.swift`、`TypingEngineTests.swift` 的颜色、主题持久化和回退回归。 |
+| `frontend/__tests__/utils/format.spec.ts`、`frontend/__tests__/utils/misc.spec.ts`、`frontend/__tests__/utils/numbers.spec.ts` | WPM、准确率、计数与数字呈现 | `TypingEngine.swift`、`TypingEngineTests.swift` 的指标单位、舍入、计数和结果摘要回归。 |
+| `frontend/__tests__/utils/generate.spec.ts`、`frontend/__tests__/utils/ip-addresses.spec.ts` | 生成的符号流、IPv4/IPv6 格式 | `TypingEngine.swift`、`TypingEngineTests.swift` 的原创符号流与地址有效性回归。 |
+| `frontend/__tests__/utils/strings.spec.ts` | Unicode 词界、RTL 和视觉等价输入 | `TypingEngine.swift`、`TypingEngineTests.swift` 的组合文本、等价标点、空白、俄语和双向文本回归。 |
+
+## 网页运行时支持规格
+
+以下文件被完整枚举但不直接映射为独立 macOS 用户任务：`frontend/__tests__/hooks/createEvent.spec.ts`、`frontend/__tests__/hooks/createSignalWithSetters.spec.ts`、`frontend/__tests__/utils/local-storage-with-schema.spec.ts`、`frontend/__tests__/utils/sanitize.spec.ts`、`frontend/__tests__/utils/tag-builder.spec.ts`、`frontend/__tests__/utils/zod.spec.ts`。它们验证 Solid/DOM/Zod/LocalStorage 的网页内部实现；Typebar 以 Swift observation、SwiftData、Codable 与原生 UI 替代，没有复制这些实现。任何未来从这些支持层暴露为新用户任务的行为，都必须移入上表、添加原生证据并更新验收。
+
+## 验收结论
+
+该盘点补充页面/模态、配置、输入、Funbox、语言和服务面审计：它证明固定参考的测试证据面没有被只按文件名的 UI 盘点遗漏。它不替代真实 macOS 窗口、IME、辅助功能、网络或多设备手工验收；这些仍按 `MANUAL_ACCEPTANCE.md` 和各专项审计保持未完成状态。

@@ -811,4 +811,6 @@ INP-04 的“按键位图”档用所选 Typebar 布局的原创映射，将 QMK
 
 ## 可追溯性规则
 
+2026-09-22 `GOV-01` 行为测试盘点补充：`Compatibility/official-reference-behavior-specs.json` 现固定参考前端全部 39 个规格测试路径；33 个直接用户行为必须在 `REFERENCE_BEHAVIOR_TEST_AUDIT.md` 中连接到存在的 Typebar 原生源与测试证据，6 个 Solid/DOM/Zod/LocalStorage 内部规格明确列为平台替换。`Scripts/check-reference-behavior-audit.sh` 会重新读取固定提交，拒绝路径增删、重复分类、缺失原生证据或文档遗漏；它只审计路径和证据，不读取或复制参考测试步骤、代码、词表或资产。该门禁补强系统性覆盖证明，不替代真实 macOS GUI、IME、辅助功能、网络或多设备验收。
+
 每个实现 PR/提交必须至少写出一个本表 ID。完成时还要补充：测试文件、人工验收步骤、数据迁移策略和隐私/离线行为。任何 ID 为“未开始”或“部分实现”时，完整重写仍未完成。

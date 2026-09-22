@@ -42,6 +42,12 @@ zsh Scripts/check-originality-boundaries.sh --reference /absolute/path/to/monkey
 zsh Scripts/check-page-modal-surface-audit.sh /absolute/path/to/monkeytype-reference
 ```
 
+核验固定参考的前端规格测试均已分类，且每个直接用户行为都有 Typebar 原生证据：
+
+```zsh
+zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference
+```
+
 运行自建服务的最小健康检查（服务能力仍在建设中）：
 
 ```sh
