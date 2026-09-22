@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 @main
 struct TypebarApp: App {
+  @NSApplicationDelegateAdaptor(TypebarApplicationDelegate.self) private var applicationDelegate
   @State private var settings = AppSettings()
   @State private var account = AccountSession()
   @State private var announcements = RemoteAnnouncementCenter()
@@ -85,6 +86,46 @@ struct TypebarApp: App {
         ResultFilterPresetRecord.self,
         configurations: modelConfiguration)
     }
+}
+
+/// Supplies the document-modal termination reply required by AppKit when an
+/// active long practice needs confirmation before the whole app exits.
+@MainActor
+final class TypebarApplicationDelegate: NSObject, NSApplicationDelegate {
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    let registry = LongTestTerminationProtectionRegistry.shared
+    guard registry.requiresConfirmation, !registry.permitsCurrentTermination else {
+      return .terminateNow
+    }
+    if registry.isConfirmationInFlight {
+      return .terminateLater
+    }
+    guard registry.beginConfirmation() else {
+      return .terminateCancel
+    }
+
+    let alert = terminationConfirmationAlert()
+    guard let window = registry.confirmationWindow() else {
+      let approved = alert.runModal() == .alertFirstButtonReturn
+      registry.resolveConfirmation(approved: approved)
+      return approved ? .terminateNow : .terminateCancel
+    }
+    alert.beginSheetModal(for: window) { response in
+      let approved = response == .alertFirstButtonReturn
+      registry.resolveConfirmation(approved: approved)
+      sender.reply(toApplicationShouldTerminate: approved)
+    }
+    return .terminateLater
+  }
+
+  private func terminationConfirmationAlert() -> NSAlert {
+    let alert = NSAlert()
+    alert.messageText = "退出长测试？"
+    alert.informativeText = "退出 Typebar 会丢失本次尚未完成的输入。"
+    alert.addButton(withTitle: "退出 Typebar")
+    alert.addButton(withTitle: "取消")
+    return alert
+  }
 }
 
 struct TypebarSettingsCommands: Commands {

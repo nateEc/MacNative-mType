@@ -2016,6 +2016,37 @@ final class TypingEngineTests: XCTestCase {
       LongTestCloseProtectionPolicy.requiresConfirmation(for: savedLongText, savedLongText: true))
   }
 
+  func testLongTestTerminationProtectionAggregatesWindowsAndRequiresAnExplicitReply() {
+    final class WindowToken {}
+    let first = WindowToken()
+    let second = WindowToken()
+    var state = LongTestTerminationProtectionState()
+
+    XCTAssertFalse(state.requiresConfirmation)
+    XCTAssertFalse(state.beginConfirmation())
+    XCTAssertFalse(state.isConfirmationInFlight)
+
+    state.update(windowIdentifier: ObjectIdentifier(first), requiresConfirmation: true)
+    state.update(windowIdentifier: ObjectIdentifier(second), requiresConfirmation: true)
+    XCTAssertTrue(state.requiresConfirmation)
+    XCTAssertTrue(state.beginConfirmation())
+    XCTAssertTrue(state.isConfirmationInFlight)
+    XCTAssertFalse(state.beginConfirmation())
+
+    state.resolveConfirmation(approved: false)
+    XCTAssertFalse(state.permitsCurrentTermination)
+    XCTAssertFalse(state.isConfirmationInFlight)
+
+    state.update(windowIdentifier: ObjectIdentifier(first), requiresConfirmation: false)
+    XCTAssertTrue(state.requiresConfirmation)
+    XCTAssertTrue(state.beginConfirmation())
+    state.resolveConfirmation(approved: true)
+    XCTAssertTrue(state.permitsCurrentTermination)
+    state.remove(windowIdentifier: ObjectIdentifier(second))
+    XCTAssertFalse(state.requiresConfirmation)
+    XCTAssertFalse(state.permitsCurrentTermination)
+  }
+
   func testCommandBailoutPolicyMatchesReferenceAvailability() {
     XCTAssertTrue(CommandBailoutPolicy.isAvailable(for: .timed(seconds: 3_600)))
     XCTAssertFalse(CommandBailoutPolicy.isAvailable(for: .timed(seconds: 900)))
