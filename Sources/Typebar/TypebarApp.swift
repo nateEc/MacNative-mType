@@ -4644,8 +4644,9 @@ private struct CompletedResultView: View {
       }
 
       HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Text(typingSpeedUnit.formatted(
-          wpm: result.wpm, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
+        Text(ResultMetricPresentation.typingSpeed(
+          wpm: result.preciseWpm, unit: typingSpeedUnit,
+          alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
           .font(.system(size: 72, weight: .bold, design: .rounded))
         Text(typingSpeedUnit.displayName).foregroundStyle(.secondary)
       }
@@ -4653,8 +4654,9 @@ private struct CompletedResultView: View {
       Grid(horizontalSpacing: 36, verticalSpacing: 14) {
         GridRow {
           metric("准确率", formattedAccuracy)
-          metric("Raw \(typingSpeedUnit.displayName)", typingSpeedUnit.formatted(
-            wpm: result.rawWpm, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
+          metric("Raw \(typingSpeedUnit.displayName)", ResultMetricPresentation.typingSpeed(
+            wpm: result.preciseRawWpm, unit: typingSpeedUnit,
+            alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
         }
         GridRow {
           metric("错误", "\(result.errorCount)")
@@ -5207,9 +5209,8 @@ private struct CompletedResultView: View {
   }
 
   private var formattedAccuracy: String {
-    alwaysShowDecimalPlaces
-      ? String(format: "%.2f%%", Double(result.accuracy))
-      : "\(result.accuracy)%"
+    ResultMetricPresentation.accuracy(
+      result.preciseAccuracy, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces)
   }
 
   private func copyResultText() {

@@ -1,5 +1,27 @@
 import Foundation
 
+/// Applies the reference result-page precision rule without changing the
+/// integer metrics that drive local history, thresholds, or PB comparison.
+enum ResultMetricPresentation {
+  static func typingSpeed(
+    wpm: Double, unit: TypingSpeedUnit, alwaysShowDecimalPlaces: Bool
+  ) -> String {
+    unit.formatted(wpm: normalized(wpm), alwaysShowDecimalPlaces: alwaysShowDecimalPlaces)
+  }
+
+  static func accuracy(_ value: Double, alwaysShowDecimalPlaces: Bool) -> String {
+    let normalized = normalized(value).clamped(to: 0...100)
+    if alwaysShowDecimalPlaces {
+      return String(format: "%.2f%%", normalized)
+    }
+    return "\(Int(normalized.rounded(.down)))%"
+  }
+
+  private static func normalized(_ value: Double) -> Double {
+    value.isFinite ? max(0, value) : 0
+  }
+}
+
 struct ResultMetric: Equatable, Identifiable {
     let id: UUID
     let finishedAt: Date

@@ -180,6 +180,9 @@ final class TestResultRecord {
   var wpm: Int
   var rawWpm: Int
   var accuracy: Int
+  var preciseWpm: Double?
+  var preciseRawWpm: Double?
+  var preciseAccuracy: Double?
   var storedRestartCount: Int?
   var characterStatsData: Data?
   var keyDurationSamplesData: Data?
@@ -204,6 +207,9 @@ final class TestResultRecord {
     wpm = result.wpm
     rawWpm = result.rawWpm
     accuracy = result.accuracy
+    preciseWpm = result.preciseWpm
+    preciseRawWpm = result.preciseRawWpm
+    preciseAccuracy = result.preciseAccuracy
     storedRestartCount = result.restartCount
     characterStatsData = try? JSONEncoder().encode(result.characterStats)
     keyDurationSamplesData = try? JSONEncoder().encode(result.keyDurationSamples)
@@ -296,6 +302,9 @@ final class TestResultRecord {
       wpm: wpm,
       rawWpm: rawWpm,
       accuracy: accuracy,
+      preciseWpm: preciseWpm,
+      preciseRawWpm: preciseRawWpm,
+      preciseAccuracy: preciseAccuracy,
       restartCount: restartCount,
       characterStats: characterStats,
       keyDurationSamples: keyDurationSamples,

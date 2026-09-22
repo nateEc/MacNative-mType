@@ -286,22 +286,18 @@ enum TypingSpeedUnit: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 
   func formatted(wpm: Int, alwaysShowDecimalPlaces: Bool = false) -> String {
-    switch self {
-    case .wpm:
-      return alwaysShowDecimalPlaces ? String(format: "%.2f", Double(wpm)) : "\(wpm)"
-    case .cpm:
-      let cpm = wpm * 5
-      return alwaysShowDecimalPlaces ? String(format: "%.2f", Double(cpm)) : "\(cpm)"
-    case .wps:
-      let wps = Double(wpm) / 60
-      return alwaysShowDecimalPlaces ? String(format: "%.2f", wps) : String(format: "%.1f", wps)
-    case .cps:
-      let cps = Double(wpm * 5) / 60
-      return alwaysShowDecimalPlaces ? String(format: "%.2f", cps) : String(format: "%.1f", cps)
-    case .wph:
-      let wph = wpm * 60
-      return alwaysShowDecimalPlaces ? String(format: "%.2f", Double(wph)) : "\(wph)"
+    formatted(wpm: Double(wpm), alwaysShowDecimalPlaces: alwaysShowDecimalPlaces)
+  }
+
+  /// Formats a canonical speed after conversion, matching the reference rule:
+  /// ordinary presentation rounds the converted value while the result-page
+  /// decimal option preserves two decimal places.
+  func formatted(wpm: Double, alwaysShowDecimalPlaces: Bool = false) -> String {
+    let value = converted(wpm: wpm)
+    if alwaysShowDecimalPlaces {
+      return String(format: "%.2f", value)
     }
+    return String(Int(value.rounded()))
   }
 }
 

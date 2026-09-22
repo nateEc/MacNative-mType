@@ -24987,11 +24987,11 @@ final class TypingEngineTests: XCTestCase {
   func testTypingSpeedUnitsFormatCanonicalWpmPresentation() {
     XCTAssertEqual(TypingSpeedUnit.wpm.formatted(wpm: 72), "72")
     XCTAssertEqual(TypingSpeedUnit.cpm.formatted(wpm: 72), "360")
-    XCTAssertEqual(TypingSpeedUnit.wps.formatted(wpm: 72), "1.2")
+    XCTAssertEqual(TypingSpeedUnit.wps.formatted(wpm: 72), "1")
     XCTAssertEqual(TypingSpeedUnit.wpm.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "72.00")
     XCTAssertEqual(TypingSpeedUnit.cpm.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "360.00")
     XCTAssertEqual(TypingSpeedUnit.wps.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "1.20")
-    XCTAssertEqual(TypingSpeedUnit.cps.formatted(wpm: 72), "6.0")
+    XCTAssertEqual(TypingSpeedUnit.cps.formatted(wpm: 72), "6")
     XCTAssertEqual(TypingSpeedUnit.wph.formatted(wpm: 72), "4320")
     XCTAssertEqual(TypingSpeedUnit.cps.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "6.00")
     XCTAssertEqual(TypingSpeedUnit.wph.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "4320.00")
@@ -25004,6 +25004,80 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingSpeedUnit.wph.canonicalWpm(fromDisplayedValue: 4_320), 72)
     XCTAssertEqual(TypingSpeedUnit.wpm.canonicalWpm(fromDisplayedValue: .infinity), 0)
     XCTAssertEqual(TypingSpeedUnit.wpm.canonicalWpm(fromDisplayedValue: 1e100), 1_000_000)
+  }
+
+  func testTypingSpeedUnitsRoundConvertedValuesUnlessResultDecimalsAreEnabled() {
+    XCTAssertEqual(TypingSpeedUnit.wpm.formatted(wpm: 12.5), "13")
+    XCTAssertEqual(TypingSpeedUnit.cpm.formatted(wpm: 12.5), "63")
+    XCTAssertEqual(TypingSpeedUnit.wps.formatted(wpm: 72), "1")
+    XCTAssertEqual(TypingSpeedUnit.cps.formatted(wpm: 72), "6")
+    XCTAssertEqual(TypingSpeedUnit.wph.formatted(wpm: 12.5), "750")
+
+    XCTAssertEqual(
+      TypingSpeedUnit.wpm.formatted(wpm: 12.5, alwaysShowDecimalPlaces: true), "12.50")
+    XCTAssertEqual(
+      TypingSpeedUnit.cpm.formatted(wpm: 12.5, alwaysShowDecimalPlaces: true), "62.50")
+    XCTAssertEqual(
+      TypingSpeedUnit.wps.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "1.20")
+    XCTAssertEqual(
+      TypingSpeedUnit.cps.formatted(wpm: 72, alwaysShowDecimalPlaces: true), "6.00")
+    XCTAssertEqual(
+      TypingSpeedUnit.wph.formatted(wpm: 12.5, alwaysShowDecimalPlaces: true), "750.00")
+  }
+
+  func testCompletedResultPreservesExactMetricsForResultPageDecimalPresentation() throws {
+    let result = CompletedTestResult(
+      id: UUID(), configuration: .words(1), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(8), typedCharacterCount: 5,
+      correctCharacterCount: 5, errorCount: 1, wpm: 13, rawWpm: 13, accuracy: 13,
+      preciseWpm: 12.5, preciseRawWpm: 12.5, preciseAccuracy: 12.75)
+
+    XCTAssertEqual(result.preciseWpm, 12.5, accuracy: 0.000_001)
+    XCTAssertEqual(result.preciseRawWpm, 12.5, accuracy: 0.000_001)
+    XCTAssertEqual(result.preciseAccuracy, 12.75, accuracy: 0.000_001)
+    XCTAssertEqual(
+      ResultMetricPresentation.typingSpeed(
+        wpm: result.preciseWpm, unit: .wpm, alwaysShowDecimalPlaces: false), "13")
+    XCTAssertEqual(
+      ResultMetricPresentation.typingSpeed(
+        wpm: result.preciseWpm, unit: .cpm, alwaysShowDecimalPlaces: true), "62.50")
+    XCTAssertEqual(
+      ResultMetricPresentation.accuracy(
+        result.preciseAccuracy, alwaysShowDecimalPlaces: false), "12%")
+    XCTAssertEqual(
+      ResultMetricPresentation.accuracy(
+        result.preciseAccuracy, alwaysShowDecimalPlaces: true), "12.75%")
+
+    let decoded = try JSONDecoder().decode(
+      CompletedTestResult.self, from: JSONEncoder().encode(result))
+    XCTAssertEqual(decoded.preciseWpm, 12.5, accuracy: 0.000_001)
+    XCTAssertEqual(decoded.preciseRawWpm, 12.5, accuracy: 0.000_001)
+    XCTAssertEqual(decoded.preciseAccuracy, 12.75, accuracy: 0.000_001)
+
+    var legacyPayload = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any])
+    legacyPayload.removeValue(forKey: "preciseWpm")
+    legacyPayload.removeValue(forKey: "preciseRawWpm")
+    legacyPayload.removeValue(forKey: "preciseAccuracy")
+    let legacy = try JSONDecoder().decode(
+      CompletedTestResult.self, from: JSONSerialization.data(withJSONObject: legacyPayload))
+    XCTAssertEqual(legacy.preciseWpm, 13, accuracy: 0.000_001)
+    XCTAssertEqual(legacy.preciseRawWpm, 13, accuracy: 0.000_001)
+    XCTAssertEqual(legacy.preciseAccuracy, 13, accuracy: 0.000_001)
+
+    let persisted = try XCTUnwrap(TestResultRecord(result: result).portableResult)
+    XCTAssertEqual(persisted.preciseWpm, 12.5, accuracy: 0.000_001)
+    XCTAssertEqual(persisted.preciseRawWpm, 12.5, accuracy: 0.000_001)
+    XCTAssertEqual(persisted.preciseAccuracy, 12.75, accuracy: 0.000_001)
+
+    var session = TypingSession(configuration: .words(1), prompt: "hello")
+    session.insert("h", at: start)
+    session.insert("ello", at: start.addingTimeInterval(8))
+    let measured = try XCTUnwrap(session.result(at: start.addingTimeInterval(8)))
+    XCTAssertEqual(measured.wpm, 8)
+    XCTAssertEqual(measured.rawWpm, 8)
+    XCTAssertEqual(measured.preciseWpm, 7.5, accuracy: 0.000_001)
+    XCTAssertEqual(measured.preciseRawWpm, 7.5, accuracy: 0.000_001)
   }
 
   func testExperiencePresentationCompactsLargeXPForRankings() {

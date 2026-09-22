@@ -3094,6 +3094,9 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let wpm: Int
   let rawWpm: Int
   let accuracy: Int
+  let preciseWpm: Double
+  let preciseRawWpm: Double
+  let preciseAccuracy: Double
   let restartCount: Int
   let characterStats: ResultCharacterStats
   let keyDurationSamples: [TimeInterval]
@@ -3118,6 +3121,9 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     wpm: Int,
     rawWpm: Int,
     accuracy: Int,
+    preciseWpm: Double? = nil,
+    preciseRawWpm: Double? = nil,
+    preciseAccuracy: Double? = nil,
     restartCount: Int = 0,
     characterStats: ResultCharacterStats? = nil,
     keyDurationSamples: [TimeInterval] = [],
@@ -3141,6 +3147,9 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.wpm = wpm
     self.rawWpm = rawWpm
     self.accuracy = accuracy
+    self.preciseWpm = Self.normalizedMetricPrecision(preciseWpm, fallback: wpm)
+    self.preciseRawWpm = Self.normalizedMetricPrecision(preciseRawWpm, fallback: rawWpm)
+    self.preciseAccuracy = Self.normalizedAccuracyPrecision(preciseAccuracy, fallback: accuracy)
     self.restartCount = max(0, restartCount)
     self.characterStats = characterStats ?? .legacy(
       typedCharacterCount: typedCharacterCount,
@@ -3179,8 +3188,9 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   private enum CodingKeys: String, CodingKey {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
-      restartCount, keyDurationSamples, keySpacingSamples, keyOverlapDuration, tags, prompt,
-      quoteSource, replayEvents, challengePresentation
+      preciseWpm, preciseRawWpm, preciseAccuracy, restartCount, keyDurationSamples,
+      keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
+      challengePresentation
   }
 
   init(from decoder: Decoder) throws {
@@ -3197,6 +3207,12 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     wpm = try values.decode(Int.self, forKey: .wpm)
     rawWpm = try values.decode(Int.self, forKey: .rawWpm)
     accuracy = try values.decode(Int.self, forKey: .accuracy)
+    preciseWpm = Self.normalizedMetricPrecision(
+      try values.decodeIfPresent(Double.self, forKey: .preciseWpm), fallback: wpm)
+    preciseRawWpm = Self.normalizedMetricPrecision(
+      try values.decodeIfPresent(Double.self, forKey: .preciseRawWpm), fallback: rawWpm)
+    preciseAccuracy = Self.normalizedAccuracyPrecision(
+      try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy), fallback: accuracy)
     restartCount = max(0, try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0)
     characterStats = try values.decodeIfPresent(ResultCharacterStats.self, forKey: .characterStats)
       ?? .legacy(
@@ -3221,6 +3237,16 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? [])
     challengePresentation = try values.decodeIfPresent(
       ChallengePresentationSnapshot.self, forKey: .challengePresentation)
+  }
+
+  private static func normalizedMetricPrecision(_ value: Double?, fallback: Int) -> Double {
+    guard let value, value.isFinite, value >= 0 else { return Double(fallback) }
+    return value
+  }
+
+  private static func normalizedAccuracyPrecision(_ value: Double?, fallback: Int) -> Double {
+    guard let value, value.isFinite else { return Double(fallback) }
+    return value.clamped(to: 0...100)
   }
 }
 
@@ -3590,6 +3616,8 @@ struct TypingSession {
     return Int((liveAccuracy * 100).rounded())
   }
 
+  var preciseAccuracy: Double { liveAccuracy * 100 }
+
   func wpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
@@ -3597,10 +3625,23 @@ struct TypingSession {
     return wpm(characters: characters, seconds: end.timeIntervalSince(startedAt))
   }
 
+  func preciseWpm(at date: Date) -> Double {
+    guard let startedAt else { return 0 }
+    let end = finishedAt ?? date
+    let characters = finishedAt == nil ? liveScoredCorrectCharacters : scoredCorrectCharacters
+    return wpmValue(characters: characters, seconds: end.timeIntervalSince(startedAt))
+  }
+
   func rawWpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
     return wpm(characters: typed.count, seconds: end.timeIntervalSince(startedAt))
+  }
+
+  func preciseRawWpm(at date: Date) -> Double {
+    guard let startedAt else { return 0 }
+    let end = finishedAt ?? date
+    return wpmValue(characters: typed.count, seconds: end.timeIntervalSince(startedAt))
   }
 
   /// Word burst is the WPM for the latest completed word, or the currently
@@ -3842,6 +3883,9 @@ struct TypingSession {
       wpm: wpm(at: date),
       rawWpm: rawWpm(at: date),
       accuracy: accuracy,
+      preciseWpm: preciseWpm(at: date),
+      preciseRawWpm: preciseRawWpm(at: date),
+      preciseAccuracy: preciseAccuracy,
       restartCount: restartCount,
       characterStats: characterStats,
       keyDurationSamples: completedPhysicalKeyDurations,
@@ -4830,8 +4874,12 @@ struct TypingSession {
   }
 
   private func wpm(characters: Int, seconds: TimeInterval) -> Int {
+    Int(wpmValue(characters: characters, seconds: seconds).rounded())
+  }
+
+  private func wpmValue(characters: Int, seconds: TimeInterval) -> Double {
     guard seconds.isFinite, seconds > 0 else { return 0 }
-    return Int((Double(characters) / 5 / seconds * 60).rounded())
+    return Double(characters) / 5 / seconds * 60
   }
 
   private mutating func finishIfNeeded(at date: Date) {
