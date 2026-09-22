@@ -10099,6 +10099,36 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingReplay.typedText(events: replayEvents, through: 2), session.typed)
   }
 
+  func testEveryStandaloneLanguageGeneratesAndCompletesAnOwnedWordsSession() {
+    let languages = TypingLanguage.allCases.filter(\.supportsQuotes)
+    XCTAssertEqual(languages.count, 376)
+
+    let start = Date(timeIntervalSince1970: 2_500)
+    for language in languages {
+      let prompt = OfflineContent.generatedPrompt(
+        wordCount: 3, language: language, contentOptions: .init())
+      XCTAssertFalse(prompt.isEmpty, language.displayName)
+      XCTAssertFalse(language.ownedPracticeLexicon().isEmpty, language.displayName)
+      XCTAssertTrue(language.usesSpaceDelimitedWords, language.displayName)
+
+      var session = TypingSession(configuration: .words(3, language: language), prompt: prompt)
+      session.insert(prompt, at: start)
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+  }
+
+  func testGeneratedWordsNormalizeWhitespaceInsideCatalogEntries() {
+    let prompt = StarterLexicon.prompt(
+      tokens: 3, lexicon: IndexedLexicon(["  alpha beta  "]), separator: " ",
+      punctuation: ["."], contentOptions: .init(), usesZipfFrequency: false)
+
+    XCTAssertEqual(prompt, "alpha alpha alpha")
+    XCTAssertFalse(prompt.hasPrefix(" "))
+    XCTAssertFalse(prompt.contains("  "))
+  }
+
   func testEveryOfficialCodeLanguageHasAnOriginalPromptAndCompletesCodeMode() {
     let languages = TypingLanguage.allCases.filter(\.isCodeLanguage)
     let expectedDisplayNames: Set<String> = [

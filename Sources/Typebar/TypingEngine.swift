@@ -12871,7 +12871,12 @@ enum StarterLexicon {
       // Jyutping, whose lexical tone markers are already decimal digits.
       return String(index / 9 + 1)
     }
-    var token = lexicon[tokenIndex]
+    // Catalog scale entries retain their own aggregate-shape metadata, which
+    // may include whitespace. A generated *word* prompt must nevertheless
+    // expose one directly typeable token per requested word: the input engine
+    // rejects leading and repeated separators just like the web reference.
+    var token = PolyglotTokenPolicy.token(
+      from: lexicon[tokenIndex], selectionIndex: tokenIndex)
     if contentOptions.includePunctuation, index.isMultiple(of: 7) {
       token += punctuation[index / 7 % punctuation.count]
     }
