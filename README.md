@@ -24,6 +24,12 @@ zsh Scripts/package-macos-app.sh
 zsh Scripts/check-macos-app-package.sh
 ```
 
+对固定参考源码执行串行的重写验收总门禁：它会检查原创性与兼容矩阵、完整运行原生客户端和自建服务测试、再无启动地验签临时应用包。它在每个编译或测试步骤前拒绝已有的 Typebar、测试或 Swift 编译进程，且自身绝不启动 Typebar：
+
+```zsh
+zsh Scripts/check-native-rewrite-readiness.sh /absolute/path/to/monkeytype-reference
+```
+
 检查参考源码隔离与生产服务边界：
 
 ```zsh
