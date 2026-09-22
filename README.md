@@ -30,6 +30,12 @@ zsh Scripts/check-macos-app-package.sh
 zsh Scripts/check-originality-boundaries.sh --self-test
 ```
 
+对已克隆的固定 Monkeytype 参考源码，再检查生产 Swift 没有与其 JS／TS 源码发生长文本的字面重合：
+
+```zsh
+zsh Scripts/check-originality-boundaries.sh --reference /absolute/path/to/monkeytype-reference
+```
+
 对已克隆的固定 Monkeytype 参考源码，核验页面与模态盘点只覆盖其标识级表面：
 
 ```zsh

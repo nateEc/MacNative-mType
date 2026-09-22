@@ -22,9 +22,17 @@ Typebar 以固定版本的 Monkeytype 作为功能盘点参考，而不是实现
 zsh Scripts/check-originality-boundaries.sh --self-test
 ```
 
-它检查已追踪文件，拒绝参考 Web 工程的 `backend/`、`frontend/`、`packages/` 树，拒绝其前端包清单及 TypeScript／网页组件文件，并扫描客户端和自建服务的 Swift 源码，阻止其直接指向 `monkeytype.com`。`--self-test` 还会验证护栏确实能拒绝一组模拟的违规路径。
+它检查已追踪文件，拒绝参考 Web 工程的 `backend/`、`frontend/`、`packages/` 树，拒绝其前端包清单及 TypeScript／网页组件文件，并扫描客户端和自建服务的 Swift 源码，阻止其直接指向 `monkeytype.com`。`--self-test` 还会验证护栏确实能拒绝一组模拟的违规路径及一条刻意复制的长源码行。
 
-这不是“原创性的数学证明”：它不能比较两段不同语言的语义，也不能判断第三方内容授权。因此合并前仍须进行人工审查：确认实现为原生重写、内容来源独立、兼容性快照只含允许的元数据，并为受影响的功能 ID 补充自动化和人工验收证据。
+在本机已有固定参考检出时，再运行：
+
+```zsh
+zsh Scripts/check-originality-boundaries.sh --reference /absolute/path/to/monkeytype-reference
+```
+
+该模式会先将参考检出严格固定到兼容性快照记录的提交，再将 Typebar 的生产 `Sources/**/*.swift` 与 `server/Sources/**/*.swift` 同参考项目的 `frontend`、`backend`、`packages` 中 JS／TS 源码逐行做空白归一化。任一边界两侧出现相同、至少 120 字节的行即失败；输出只报告数量，不回显参考源码。它有意不扫描文档、兼容性 ID 快照或测试夹具，以免把允许的名称和枚举对照误作实现复制。
+
+这不是“原创性的数学证明”：它不能比较两段不同语言的语义、跨行或改写后的复制，也不能判断第三方内容授权。因此合并前仍须进行人工审查：确认实现为原生重写、内容来源独立、兼容性快照只含允许的元数据，并为受影响的功能 ID 补充自动化和人工验收证据。
 
 ## 证据链
 
