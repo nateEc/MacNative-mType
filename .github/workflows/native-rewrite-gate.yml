@@ -24,7 +24,7 @@ jobs:
 
       - name: Check out the pinned Monkeytype reference
         id: reference
-        shell: zsh
+        shell: bash
         run: |
           set -euo pipefail
           reference_directory="$(mktemp -d "${RUNNER_TEMP}/monkeytype-reference.XXXXXX")"
@@ -32,10 +32,10 @@ jobs:
           git -C "$reference_directory" remote add origin https://github.com/monkeytypegame/monkeytype.git
           git -C "$reference_directory" fetch --depth=1 origin 91bd24bb8513785c7364cbea29296ff7adafac41
           git -C "$reference_directory" checkout --quiet --detach FETCH_HEAD
-          print -r -- "path=$reference_directory" >> "$GITHUB_OUTPUT"
+          printf 'path=%s\n' "$reference_directory" >> "$GITHUB_OUTPUT"
 
       - name: Verify source, resource, and reference boundaries
-        shell: zsh
+        shell: bash
         run: |
           set -euo pipefail
           zsh Scripts/check-originality-boundaries.sh --self-test
@@ -44,28 +44,28 @@ jobs:
           git diff --check
 
       - name: Verify no Typebar app is already running
-        shell: zsh
+        shell: bash
         run: |
           set -euo pipefail
           if pgrep -x Typebar >/dev/null; then
-            print -u2 -- "Typebar must not be launched by the verification workflow"
+            printf '%s\n' "Typebar must not be launched by the verification workflow" >&2
             exit 1
           fi
 
       - name: Run native client tests without launching the app
-        shell: zsh
+        shell: bash
         run: |
           set -euo pipefail
           TYPEBAR_QA_IN_MEMORY_STORE=1 swift test
           if pgrep -x Typebar >/dev/null; then
-            print -u2 -- "Typebar was unexpectedly launched by the test suite"
+            printf '%s\n' "Typebar was unexpectedly launched by the test suite" >&2
             exit 1
           fi
 
       - name: Verify the signed macOS app bundle without launching it
-        shell: zsh
+        shell: bash
         run: zsh Scripts/check-macos-app-package.sh
 
       - name: Run self-hosted service tests
-        shell: zsh
+        shell: bash
         run: swift test --package-path server
