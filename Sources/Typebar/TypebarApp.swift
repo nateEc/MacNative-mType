@@ -2084,7 +2084,8 @@ private struct ContentView: View {
           Text(compositionText)
             .font(settings.practiceFont.font(
               size: max(14, settings.fontSize * 0.58),
-              installedFontName: settings.installedPracticeFontName))
+              installedFontName: settings.installedPracticeFontName,
+              language: session.configuration.language))
             .foregroundStyle(activeTheme.accent)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -2110,7 +2111,8 @@ private struct ContentView: View {
         ChooPracticePrompt(
           glyphs: session.promptGlyphs,
           font: settings.practiceFont.font(
-            size: settings.fontSize, installedFontName: settings.installedPracticeFontName),
+            size: settings.fontSize, installedFontName: settings.installedPracticeFontName,
+            language: session.configuration.language),
           fontSize: settings.fontSize, accent: activeTheme.accent,
           isEnabled: true, reducesMotion: settings.reducePracticeMotion,
           ignoresSystemReducedMotion: !VisualFunboxReducedMotionPolicy
@@ -2120,7 +2122,8 @@ private struct ContentView: View {
           prompt: rendering.text, typed: session.typed, mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
           font: settings.practiceFont.font(
-            size: settings.fontSize, installedFontName: settings.installedPracticeFontName),
+            size: settings.fontSize, installedFontName: settings.installedPracticeFontName,
+            language: session.configuration.language),
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll)
       } else {
         Text(rendering.text)
@@ -2139,7 +2142,8 @@ private struct ContentView: View {
                 paceCharacterOffset: paceCaretCharacterOffset(in: rendering),
                 paceStyle: settings.paceCaretStyle,
                 font: settings.practiceFont.nsFont(
-                  size: settings.fontSize, installedFontName: settings.installedPracticeFontName),
+                  size: settings.fontSize, installedFontName: settings.installedPracticeFontName,
+                  language: session.configuration.language),
                 lineSpacing: usesJoiningScript ? 8 : 12,
                 isRightToLeft: isRightToLeft,
                 accent: activeTheme.caret,
@@ -2149,7 +2153,8 @@ private struct ContentView: View {
       }
     }
     .font(settings.practiceFont.font(
-      size: settings.fontSize, installedFontName: settings.installedPracticeFontName))
+      size: settings.fontSize, installedFontName: settings.installedPracticeFontName,
+      language: session.configuration.language))
     .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
     .frame(
       maxWidth: settings.practiceLineWidth.maximumWidth(

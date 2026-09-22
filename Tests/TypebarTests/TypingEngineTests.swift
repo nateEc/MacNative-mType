@@ -14620,6 +14620,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(NativePracticeFont.matchingFamily(for: "Roboto_Mono", in: ["Courier"]))
   }
 
+  func testLanguagePracticeFontFallbacksUseOnlyAvailableScriptFonts() {
+    let available: (String) -> String? = { identifier in
+      switch identifier {
+      case "Noto_Sans_Lao": "Noto Sans Lao"
+      case "Noto_Naskh_Arabic": "Noto Naskh Arabic"
+      default: nil
+      }
+    }
+
+    XCTAssertEqual(
+      LanguagePracticeFontFallback.preferredPostScriptNames(for: .lao, resolve: available),
+      ["Noto Sans Lao"])
+    XCTAssertEqual(
+      LanguagePracticeFontFallback.preferredPostScriptNames(for: .sindhi, resolve: available),
+      ["Noto Naskh Arabic"])
+    XCTAssertTrue(
+      LanguagePracticeFontFallback.preferredPostScriptNames(for: .english, resolve: available).isEmpty)
+    XCTAssertTrue(
+      LanguagePracticeFontFallback.preferredPostScriptNames(for: .lao, resolve: { _ in nil }).isEmpty)
+  }
+
   func testNativeFontCatalogNormalizesAndFiltersInjectedFamilies() {
     let families = NativeFontCatalog.normalizedFamilies([
       "  Zeta Sans  ", "alpha serif", "", "ALPHA SERIF", "Élan Mono", "\nBeta UI\t",

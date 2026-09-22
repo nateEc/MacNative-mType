@@ -276,11 +276,13 @@ enum PromptCaretLayout {
 }
 
 extension PracticeFont {
-  func nsFont(size: CGFloat, installedFontName: String = "") -> NSFont {
+  func nsFont(
+    size: CGFloat, installedFontName: String = "", language: TypingLanguage = .english
+  ) -> NSFont {
     if let font = NativePracticeFont.nsFont(named: installedFontName, size: size) {
-      return font
+      return LanguagePracticeFontFallback.applying(to: font, language: language)
     }
-    return switch self {
+    let systemFont: NSFont = switch self {
     case .monospaced:
       NSFont.monospacedSystemFont(ofSize: size, weight: .medium)
     case .rounded:
@@ -290,6 +292,7 @@ extension PracticeFont {
     case .defaultSystem:
       NSFont.systemFont(ofSize: size, weight: .medium)
     }
+    return LanguagePracticeFontFallback.applying(to: systemFont, language: language)
   }
 
   private func nativeFont(size: CGFloat, design: NSFontDescriptor.SystemDesign) -> NSFont {

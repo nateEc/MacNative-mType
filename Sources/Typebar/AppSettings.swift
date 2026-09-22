@@ -492,19 +492,12 @@ enum PracticeFont: String, CaseIterable, Codable, Equatable, Identifiable {
     }
   }
 
-  func font(size: Double, installedFontName: String = "") -> Font {
-    if let font = NativePracticeFont.font(named: installedFontName, size: size) {
-      return font
-    }
-    let design: Font.Design
-    switch self {
-    case .monospaced: design = .monospaced
-    case .rounded: design = .rounded
-    case .serif: design = .serif
-    case .defaultSystem: design = .default
-    }
-    return .system(size: size, weight: .medium, design: design)
+  func font(
+    size: Double, installedFontName: String = "", language: TypingLanguage = .english
+  ) -> Font {
+    Font(nsFont(size: CGFloat(size), installedFontName: installedFontName, language: language))
   }
+
 }
 
 enum ThemeFavoritePolicy {
