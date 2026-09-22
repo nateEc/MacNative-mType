@@ -14655,6 +14655,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(NativeFontCatalog.containsFamily("Missing Sans", in: families))
   }
 
+  func testNativeFontCatalogMarksTheEffectiveFamilyForPostScriptSelections() {
+    let families = ["OpenDyslexic", "System Sans"]
+
+    XCTAssertEqual(
+      NativeFontCatalog.selectedFamily(
+        for: "OpenDyslexic-Regular", in: families,
+        resolveFamily: { requestedName in
+          requestedName == "OpenDyslexic-Regular" ? "OpenDyslexic" : nil
+        }),
+      "OpenDyslexic")
+    XCTAssertEqual(
+      NativeFontCatalog.selectedFamily(
+        for: "Open_Dyslexic", in: families,
+        resolveFamily: { _ in nil }),
+      "OpenDyslexic")
+    XCTAssertNil(
+      NativeFontCatalog.selectedFamily(
+        for: "Missing-Regular", in: families,
+        resolveFamily: { _ in nil }))
+  }
+
   func testLocalPracticeFontFilePolicyAcceptsCoreTextFormatsOnly() {
     XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "practice.ttf"))
     XCTAssertTrue(LocalPracticeFontFilePolicy.supports(filename: "PRACTICE.OTF"))

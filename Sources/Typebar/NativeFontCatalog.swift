@@ -42,6 +42,29 @@ enum NativeFontCatalog {
     return families.contains { comparisonKey($0) == identity }
   }
 
+  /// Finds the visible family row for a stored name. A name can be either a
+  /// family or a PostScript name, so resolving the latter prevents the picker
+  /// from losing its checkmark after a user typed it directly.
+  static func selectedFamily(
+    for selection: String, in families: [String], resolveFamily: (String) -> String?
+  ) -> String? {
+    if let directFamily = NativePracticeFont.matchingFamily(for: selection, in: families) {
+      return directFamily
+    }
+    guard let resolvedFamily = resolveFamily(selection) else { return nil }
+    return NativePracticeFont.matchingFamily(for: resolvedFamily, in: families)
+  }
+
+  static func selectedFamily(for selection: String, in families: [String]) -> String? {
+    selectedFamily(for: selection, in: families) { requestedName in
+      guard
+        let postScriptName = NativePracticeFont.postScriptName(for: requestedName),
+        let font = NSFont(name: postScriptName, size: 1)
+      else { return nil }
+      return font.familyName
+    }
+  }
+
   @MainActor
   static var installedFamilies: [String] {
     normalizedFamilies(NSFontManager.shared.availableFontFamilies)
@@ -57,6 +80,10 @@ struct NativeFontFamilyPicker: View {
 
   private var filteredFamilies: [String] {
     NativeFontCatalog.filteredFamilies(families, query: query)
+  }
+
+  private var selectedFamily: String? {
+    NativeFontCatalog.selectedFamily(for: selection, in: families)
   }
 
   private func previewFont(for family: String) -> Font {
@@ -93,7 +120,7 @@ struct NativeFontFamilyPicker: View {
               HStack {
                 previewLabel(for: family)
                 Spacer()
-                if family == selection {
+                if family == selectedFamily {
                   Image(systemName: "checkmark")
                     .foregroundStyle(.tint)
                 }
