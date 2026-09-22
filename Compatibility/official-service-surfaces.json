@@ -19,6 +19,7 @@
     "connections"
   ],
   "mapped": {
+    "admin": "部署者审核工作台与账户治理",
     "apeKeys": "受限开发者密钥",
     "configs": "版本化账户配置同步",
     "presets": "版本化测试预设同步",
@@ -32,6 +33,12 @@
     "connections": "好友、屏蔽、关系通知与受控私信"
   },
   "nativeEvidenceFiles": {
+    "admin": [
+      "Sources/Typebar/ProfileReportView.swift",
+      "Sources/Typebar/RemoteAccount.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
     "apeKeys": [
       "Sources/Typebar/RemoteAccount.swift",
       "server/Sources/TypebarServerCore/AuthStore.swift",
@@ -96,7 +103,6 @@
     ]
   },
   "notApplicable": {
-    "admin": "参考后台运营工具不属于普通练习用户的功能；Typebar 仅提供自建审核工作台。",
     "dev": "参考开发环境接口不属于终端用户功能。",
     "webhooks": "参考部署接收 GitHub 发布事件的入口不属于终端用户功能。"
   },

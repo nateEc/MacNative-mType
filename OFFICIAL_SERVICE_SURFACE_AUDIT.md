@@ -20,14 +20,15 @@
 | `public` | 匿名全局练习统计与速度分布 | `AboutTypebar.swift`、`PublicPracticeStatistics.swift` 和无认证的 `/v1/public/practice-stats`、`/v1/public/speed-distribution` 实现。只返回去标识聚合；隐身、治理限制、整改与封禁账户不贡献数据。 |
 | `psas` | 接收公开服务公告 | `RemoteAnnouncements.swift` 与 `/v1/announcements` 实现。公告仅来自 Typebar 部署者，不使用或镜像参考公告。 |
 | `ape-keys` | 管理受限的程序化访问密钥 | `RemoteAccount.swift` 与 `/v1/developer-keys` 实现。明文只在创建时返回，服务端保存哈希；密钥不能读取资料、同步或其他账户数据。 |
-| `configuration` | 获取服务能力和处理服务端维护状态 | `/v1/capabilities`、`MaintenanceMode.swift`、`RemoteHumanVerification.swift` 与原生本地设置实现。原生应用不复制参考的网页全局配置/Schema 编辑页；本机设置由 SwiftData、UserDefaults 和归档负责。 |
+| `configuration` | 获取服务能力和处理服务端维护状态 | `/v1/capabilities`、`RemoteAccount.swift`、`RemoteHumanVerification.swift` 与原生本地设置实现。原生应用不复制参考的网页全局配置/Schema 编辑页；本机设置由 SwiftData、UserDefaults 和归档负责。 |
+| `admin` | 部署者审核引语/资料举报、发布公告与账户治理 | `PreferencesView.swift`、`ProfileReportView.swift`、`RemoteAccount.swift` 与自建审核路由提供明确的部署密钥工作台；审核密钥只保留在当前内存会话，队列不披露举报者身份。它不复用参考后台、权限或数据。 |
 
 ## 明确不作为用户兼容目标的服务表面
 
 | 固定参考路由族 | 判定 | 原因 |
 | --- | --- | --- |
 | `webhooks` | 不适用 | 这是参考部署接收 GitHub 事件的入口，不是终端用户执行的产品任务。Typebar 版本历史只读取自己的 GitHub Releases；任何部署 webhook 都必须由 Typebar 部署者另行配置。 |
-| `admin`、`dev` | 不适用 | 参考运维者/开发环境工具不属于普通练习用户的可见能力。Typebar 的审核密钥只用于自建服务的明确审核工作台；不复用参考后台、权限或数据。 |
+| `dev` | 不适用 | 参考开发环境接口不属于终端用户功能。 |
 | `/docs` 与 Express/Swagger 配置 | 不适用 | 它们是参考 API 的运维/开发资料面。Typebar 的公开契约由 [SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md) 描述，不要求复制网页文档生成器。 |
 
 ## 结论与未验证运行条件
