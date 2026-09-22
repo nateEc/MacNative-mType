@@ -370,7 +370,7 @@ Typebar 是一个独立的原生 macOS 应用及其配套服务，目标是覆�
 2. 每个远程模块必须具备等价的自建 API 和客户端流程；不能依赖 Monkeytype 的生产接口、账号、排行榜或内容。
 3. 每条矩阵能力要关联：需求编号、独立测试、人工验收、实现位置与完成状态。
 4. 上述条目全数验收前，项目保持进行中，不以“核心功能可用”作为完整重写的结论。
-5. 每次合并前必须通过 `zsh Scripts/check-originality-boundaries.sh --self-test`、固定参考的原创性/配置与语言元数据/页面模态/行为审计，以及 `ruby Scripts/check-manual-acceptance-audit.rb` 与其 `--self-test`；CI 对 `main` 与 pull request 执行同一组门禁。元数据审计会以固定参考零差异重建配置、字体标识、语言目录和 Typebar 自有证据契约。人工验收审计只守护场景 ID、状态与单实例规则，不会把“待验收”或“部分验收”改写为已验收。
+5. 每次合并前必须通过 `zsh Scripts/check-originality-boundaries.sh --self-test`、固定参考的原创性/配置与语言元数据/服务路由/页面模态/行为审计，以及 `ruby Scripts/check-manual-acceptance-audit.rb` 与其 `--self-test`；CI 对 `main` 与 pull request 执行同一组门禁。元数据审计会以固定参考零差异重建配置、字体标识、语言目录和 Typebar 自有证据契约；服务路由审计会固定检查每个 `ts-rest` 模块的分类和自建路径。人工验收审计只守护场景 ID、状态与单实例规则，不会把“待验收”或“部分验收”改写为已验收。
 6. 新增内容、资产和数据仍须人工确认其独立性或再分发授权；机械检查是结构与联网边界护栏，不替代人工原创性审查。
 
 ## 现有验证证据

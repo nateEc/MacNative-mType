@@ -5,6 +5,7 @@
 - 固定参考：`monkeytypegame/monkeytype` 提交 `91bd24bb8513785c7364cbea29296ff7adafac41`。
 - 直接检查的主证据为 `backend/src/api/routes/index.ts`，以及其中注册的 `users`、`configs`、`presets`、`quotes`、`results`、`connections`、`leaderboards`、`configuration`、`ape-keys`、`public`、`psas`、`webhooks`、`admin` 与 `dev` 路由模块。
 - 本表审计用户能完成的远程任务，**不**把 URL、JSON 字段、Firebase/Express/TypeScript 实现或参考线上数据当作兼容目标。Typebar 的服务仅使用自己的 Vapor 路由、数据模型和凭据。
+- `Compatibility/official-service-surfaces.json` 固定 `ts-rest` route registry 的 14 个模块标识、分区和 Typebar 自有证据路径。`zsh Scripts/check-reference-service-surface-audit.sh /absolute/path/to/monkeytype-reference` 会重新读取固定提交的 registry，检查总数、唯一性、分类互斥、完整覆盖和所有证据路径；它只保存标识级元数据，不复制参考路由、payload、内容或资产。
 
 ## 用户服务能力映射
 

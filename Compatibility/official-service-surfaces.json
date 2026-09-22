@@ -1,0 +1,109 @@
+{
+  "referenceRepository": "monkeytypegame/monkeytype",
+  "referenceCommit": "91bd24bb8513785c7364cbea29296ff7adafac41",
+  "officialCount": 14,
+  "officialRouteModules": [
+    "admin",
+    "apeKeys",
+    "configs",
+    "presets",
+    "psas",
+    "public",
+    "leaderboards",
+    "results",
+    "configuration",
+    "dev",
+    "users",
+    "quotes",
+    "webhooks",
+    "connections"
+  ],
+  "mapped": {
+    "apeKeys": "受限开发者密钥",
+    "configs": "版本化账户配置同步",
+    "presets": "版本化测试预设同步",
+    "psas": "公开服务公告",
+    "public": "匿名公开资料与练习统计",
+    "leaderboards": "全局、好友、日/周 WPM 与 XP 榜",
+    "results": "成绩提交、读取、标签与删除",
+    "configuration": "服务能力、维护状态与人机验证协商",
+    "users": "身份、资料、连续天数、通知与举报",
+    "quotes": "社区引语的浏览、提交、审核、评分与举报",
+    "connections": "好友、屏蔽、关系通知与受控私信"
+  },
+  "nativeEvidenceFiles": {
+    "apeKeys": [
+      "Sources/Typebar/RemoteAccount.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "configs": [
+      "Sources/Typebar/AppSettings.swift",
+      "Sources/Typebar/RemoteAccount.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "presets": [
+      "Sources/Typebar/TestPresets.swift",
+      "Sources/Typebar/RemoteAccount.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "psas": [
+      "Sources/Typebar/RemoteAnnouncements.swift",
+      "server/Sources/TypebarServerCore/Routes.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "public": [
+      "Sources/Typebar/PublicPracticeStatistics.swift",
+      "server/Sources/TypebarServerCore/Routes.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "leaderboards": [
+      "Sources/Typebar/CloudSyncView.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "results": [
+      "Sources/Typebar/ResultPersistence.swift",
+      "Sources/Typebar/RemoteAccount.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "configuration": [
+      "Sources/Typebar/RemoteAccount.swift",
+      "Sources/Typebar/RemoteHumanVerification.swift",
+      "server/Sources/TypebarServerCore/Routes.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "users": [
+      "Sources/Typebar/RemoteAccount.swift",
+      "Sources/Typebar/ConnectionsView.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "quotes": [
+      "Sources/Typebar/QuoteRatings.swift",
+      "Sources/Typebar/RemoteAccount.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ],
+    "connections": [
+      "Sources/Typebar/ConnectionsView.swift",
+      "Sources/Typebar/DirectConversationView.swift",
+      "server/Sources/TypebarServerCore/AuthStore.swift",
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+    ]
+  },
+  "notApplicable": {
+    "admin": "参考后台运营工具不属于普通练习用户的功能；Typebar 仅提供自建审核工作台。",
+    "dev": "参考开发环境接口不属于终端用户功能。",
+    "webhooks": "参考部署接收 GitHub 发布事件的入口不属于终端用户功能。"
+  },
+  "unimplemented": {},
+  "sourceFiles": [
+    "backend/src/api/routes/index.ts",
+    "OFFICIAL_SERVICE_SURFACE_AUDIT.md"
+  ],
+  "method": "Identifier-level metadata only: fixed ts-rest route module identifiers are partitioned against independently written Typebar client, service, and test evidence; no reference route implementation, payload, content, or asset is stored."
+}

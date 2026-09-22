@@ -49,6 +49,7 @@ jobs:
           run_check "originality self-test" zsh Scripts/check-originality-boundaries.sh --self-test
           run_check "originality reference scan" zsh Scripts/check-originality-boundaries.sh --reference "${{ steps.reference.outputs.path }}"
           run_check "reference metadata audit" zsh Scripts/check-reference-metadata-audits.sh "${{ steps.reference.outputs.path }}"
+          run_check "service surface audit" zsh Scripts/check-reference-service-surface-audit.sh "${{ steps.reference.outputs.path }}"
           run_check "page and modal audit" zsh Scripts/check-page-modal-surface-audit.sh "${{ steps.reference.outputs.path }}"
           run_check "reference behavior audit" zsh Scripts/check-reference-behavior-audit.sh "${{ steps.reference.outputs.path }}"
           run_check "manual acceptance audit self-test" ruby Scripts/check-manual-acceptance-audit.rb --self-test

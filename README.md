@@ -42,6 +42,12 @@ zsh Scripts/check-originality-boundaries.sh --reference /absolute/path/to/monkey
 zsh Scripts/check-page-modal-surface-audit.sh /absolute/path/to/monkeytype-reference
 ```
 
+核验固定参考的后端 route registry 已由自建服务功能分区与证据路径完整覆盖：
+
+```zsh
+zsh Scripts/check-reference-service-surface-audit.sh /absolute/path/to/monkeytype-reference
+```
+
 核验配置和语言 fixture 可从固定参考重新生成，同时保持 Typebar 自有证据分组与原生选择契约：
 
 ```zsh
