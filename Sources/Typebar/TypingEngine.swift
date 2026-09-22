@@ -3098,6 +3098,10 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let preciseRawWpm: Double
   let preciseAccuracy: Double
   let restartCount: Int
+  /// Effective native typing time accumulated before the terminal attempt.
+  /// The result sheet keeps `engagedDuration` scoped to the terminal attempt;
+  /// history and exports use `totalEngagedDuration` when they need the full run.
+  let priorAttemptEngagedDuration: TimeInterval
   let characterStats: ResultCharacterStats
   let keyDurationSamples: [TimeInterval]
   let keySpacingSamples: [TimeInterval]
@@ -3125,6 +3129,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     preciseRawWpm: Double? = nil,
     preciseAccuracy: Double? = nil,
     restartCount: Int = 0,
+    priorAttemptEngagedDuration: TimeInterval = 0,
     characterStats: ResultCharacterStats? = nil,
     keyDurationSamples: [TimeInterval] = [],
     keySpacingSamples: [TimeInterval] = [],
@@ -3151,6 +3156,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.preciseRawWpm = Self.normalizedMetricPrecision(preciseRawWpm, fallback: rawWpm)
     self.preciseAccuracy = Self.normalizedAccuracyPrecision(preciseAccuracy, fallback: accuracy)
     self.restartCount = max(0, restartCount)
+    self.priorAttemptEngagedDuration = Self.normalizedDuration(priorAttemptEngagedDuration)
     self.characterStats = characterStats ?? .legacy(
       typedCharacterCount: typedCharacterCount,
       correctCharacterCount: correctCharacterCount)
@@ -3172,6 +3178,10 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     max(0, elapsedDuration - afkDuration)
   }
 
+  var totalEngagedDuration: TimeInterval {
+    engagedDuration + priorAttemptEngagedDuration
+  }
+
   var afkPercentage: Double {
     guard elapsedDuration > 0 else { return 0 }
     return afkDuration / elapsedDuration * 100
@@ -3189,7 +3199,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
       preciseWpm, preciseRawWpm, preciseAccuracy, restartCount, keyDurationSamples,
-      keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
+      priorAttemptEngagedDuration, keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
       challengePresentation
   }
 
@@ -3214,6 +3224,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     preciseAccuracy = Self.normalizedAccuracyPrecision(
       try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy), fallback: accuracy)
     restartCount = max(0, try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0)
+    priorAttemptEngagedDuration = Self.normalizedDuration(
+      try values.decodeIfPresent(TimeInterval.self, forKey: .priorAttemptEngagedDuration) ?? 0)
     characterStats = try values.decodeIfPresent(ResultCharacterStats.self, forKey: .characterStats)
       ?? .legacy(
         typedCharacterCount: typedCharacterCount,
@@ -3247,6 +3259,11 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   private static func normalizedAccuracyPrecision(_ value: Double?, fallback: Int) -> Double {
     guard let value, value.isFinite else { return Double(fallback) }
     return value.clamped(to: 0...100)
+  }
+
+  private static func normalizedDuration(_ value: TimeInterval) -> TimeInterval {
+    guard value.isFinite else { return 0 }
+    return max(0, value)
   }
 }
 
@@ -3396,6 +3413,19 @@ struct TypingSession {
     return TestInactivityPolicy.inactiveDuration(
       activityDates: keyboardActivityDates, startedAt: startedAt, endedAt: finishedAt,
       includesFractionalTail: configuration.duration == nil)
+  }
+
+  /// Measures a still-active attempt without changing its terminal state.
+  /// This lets a restart account for only engaged time while leaving the view's
+  /// result observer untouched.
+  func activeEngagedDuration(at date: Date = .now) -> TimeInterval {
+    guard let startedAt, !isFinished else { return 0 }
+    let endedAt = max(startedAt, date)
+    let elapsed = max(0, endedAt.timeIntervalSince(startedAt))
+    let inactive = TestInactivityPolicy.inactiveDuration(
+      activityDates: keyboardActivityDates, startedAt: startedAt, endedAt: endedAt,
+      includesFractionalTail: configuration.duration == nil)
+    return max(0, elapsed - inactive)
   }
 
   mutating func recordKeyboardActivity(at date: Date = .now) {
@@ -3866,6 +3896,7 @@ struct TypingSession {
 
   func result(
     at date: Date = .now, tags: [String] = [], restartCount: Int = 0,
+    priorAttemptEngagedDuration: TimeInterval = 0,
     quoteSource: ResultQuoteSource? = nil,
     challengePresentation: ChallengePresentationSnapshot? = nil
   ) -> CompletedTestResult? {
@@ -3887,6 +3918,7 @@ struct TypingSession {
       preciseRawWpm: preciseRawWpm(at: date),
       preciseAccuracy: preciseAccuracy,
       restartCount: restartCount,
+      priorAttemptEngagedDuration: priorAttemptEngagedDuration,
       characterStats: characterStats,
       keyDurationSamples: completedPhysicalKeyDurations,
       keySpacingSamples: physicalKeySpacingSamples,

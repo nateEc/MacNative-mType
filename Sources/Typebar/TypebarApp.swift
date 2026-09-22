@@ -765,7 +765,7 @@ private struct ContentView: View {
   @State private var modeCompatibilityMessage: String?
   @State private var funboxConfigurationMessage: String?
   @State private var restoringPromptHighlightAfterFunboxConflict = false
-  @State private var currentRestartCount = 0
+  @State private var priorAttemptLedger = PriorAttemptLedger()
   @State private var weakSpotScores = WeakSpotScores()
   @State private var lastCompletedWpm: Int?
   @State private var currentProcessPractice: [CurrentProcessPractice] = []
@@ -921,7 +921,7 @@ private struct ContentView: View {
       switch outcome {
       case .completed, .failed, .bailedOut, .invalidAFK:
         guard ResultPresentationPolicy.shouldPresent(outcome: outcome) else { return }
-        let restartCount = currentRestartCount
+        let resultPriorAttemptLedger = priorAttemptLedger
         let failureReason = session.failureReason
         let challengePresentation = activeChallengeID == nil
           ? nil
@@ -931,11 +931,11 @@ private struct ContentView: View {
             tapeMode: settings.practiceTapeMode)
         guard let result = session.result(
           tags: activeSessionTags,
-          restartCount: restartCount,
+          restartCount: resultPriorAttemptLedger.restartCount,
+          priorAttemptEngagedDuration: resultPriorAttemptLedger.priorAttemptEngagedDuration,
           quoteSource: activeQuoteSource,
           challengePresentation: challengePresentation
         ) else { return }
-        currentRestartCount = 0
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
         lastCompletedWpm = LastTestPacePolicy.updatedWpm(
           previousWpm: lastCompletedWpm,
@@ -972,6 +972,11 @@ private struct ContentView: View {
         }
         if savesResult {
           saveCompletedResultLocally(result)
+          priorAttemptLedger.clearAfterPersistingResult()
+        } else {
+          priorAttemptLedger.recordTerminalAttempt(
+            engagedDuration: result.engagedDuration, outcome: result.outcome, eligibility: eligibility,
+            savingEnabled: settings.saveCompletedResults)
         }
         let zeroSpeedFeedback = ZeroSpeedResultFeedbackPolicy.feedback(
           wpm: result.wpm, elapsedDuration: result.elapsedDuration, outcome: result.outcome)
@@ -3026,7 +3031,10 @@ private struct ContentView: View {
     )
     synchronizeNoQuitConfigurationLock()
     persistActiveTestSelection()
-    if shouldCountRestart { currentRestartCount += 1 }
+    if shouldCountRestart {
+      priorAttemptLedger.recordRestart(
+        engagedDuration: session.activeEngagedDuration(), savingEnabled: settings.saveCompletedResults)
+    }
     isSamePromptRepeatAttempt = false
     isRepeatedPaceAttempt = false
     activePaceTargetWpm = paceGuideTarget()

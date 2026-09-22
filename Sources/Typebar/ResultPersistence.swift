@@ -135,6 +135,48 @@ enum ResultSavingPolicy {
   }
 }
 
+/// Keeps the restart history that should become part of the next persisted
+/// result. It is deliberately ephemeral: completed records retain the value,
+/// while active practice can still be discarded without creating a database row.
+struct PriorAttemptLedger: Equatable {
+  private(set) var restartCount = 0
+  private(set) var priorAttemptEngagedDuration: TimeInterval = 0
+
+  mutating func recordRestart(engagedDuration: TimeInterval, savingEnabled: Bool) {
+    guard savingEnabled else { return }
+    append(engagedDuration: engagedDuration)
+  }
+
+  mutating func recordTerminalAttempt(
+    engagedDuration: TimeInterval, outcome: TestOutcome, eligibility: ResultEligibility,
+    savingEnabled: Bool
+  ) {
+    guard savingEnabled, shouldCarryTerminalAttempt(outcome: outcome, eligibility: eligibility) else {
+      return
+    }
+    append(engagedDuration: engagedDuration)
+  }
+
+  mutating func clearAfterPersistingResult() {
+    restartCount = 0
+    priorAttemptEngagedDuration = 0
+  }
+
+  private mutating func append(engagedDuration: TimeInterval) {
+    restartCount += 1
+    guard engagedDuration.isFinite else { return }
+    priorAttemptEngagedDuration += max(0, engagedDuration)
+  }
+
+  private func shouldCarryTerminalAttempt(
+    outcome: TestOutcome, eligibility: ResultEligibility
+  ) -> Bool {
+    if outcome == .failed { return true }
+    guard case .ineligible(.samePromptRepeat) = eligibility else { return false }
+    return outcome == .completed
+  }
+}
+
 enum LocalResultSaveState: Equatable {
   case notRequested
   case saved
@@ -308,6 +350,8 @@ final class TestResultRecord {
   var preciseRawWpm: Double?
   var preciseAccuracy: Double?
   var storedRestartCount: Int?
+  /// Optional so existing SwiftData stores expand without requiring a backfill.
+  var storedPriorAttemptEngagedDuration: TimeInterval?
   var characterStatsData: Data?
   var keyDurationSamplesData: Data?
   var keySpacingSamplesData: Data?
@@ -335,6 +379,7 @@ final class TestResultRecord {
     preciseRawWpm = result.preciseRawWpm
     preciseAccuracy = result.preciseAccuracy
     storedRestartCount = result.restartCount
+    storedPriorAttemptEngagedDuration = result.priorAttemptEngagedDuration
     characterStatsData = try? JSONEncoder().encode(result.characterStats)
     keyDurationSamplesData = try? JSONEncoder().encode(result.keyDurationSamples)
     keySpacingSamplesData = try? JSONEncoder().encode(result.keySpacingSamples)
@@ -376,6 +421,13 @@ final class TestResultRecord {
     max(0, storedRestartCount ?? 0)
   }
 
+  var priorAttemptEngagedDuration: TimeInterval {
+    guard let storedPriorAttemptEngagedDuration, storedPriorAttemptEngagedDuration.isFinite else {
+      return 0
+    }
+    return max(0, storedPriorAttemptEngagedDuration)
+  }
+
   var characterStats: ResultCharacterStats {
     characterStatsData.flatMap { try? JSONDecoder().decode(ResultCharacterStats.self, from: $0) }
       ?? .legacy(
@@ -395,6 +447,10 @@ final class TestResultRecord {
 
   var engagedDuration: TimeInterval {
     max(0, finishedAt.timeIntervalSince(startedAt) - afkDuration)
+  }
+
+  var totalEngagedDuration: TimeInterval {
+    engagedDuration + priorAttemptEngagedDuration
   }
 
   var afkPercentage: Double {
@@ -430,6 +486,7 @@ final class TestResultRecord {
       preciseRawWpm: preciseRawWpm,
       preciseAccuracy: preciseAccuracy,
       restartCount: restartCount,
+      priorAttemptEngagedDuration: priorAttemptEngagedDuration,
       characterStats: characterStats,
       keyDurationSamples: keyDurationSamples,
       keySpacingSamples: keySpacingSamples,

@@ -159,7 +159,7 @@ struct ResultMetric: Equatable, Identifiable {
             wpm: record.wpm,
             rawWpm: record.rawWpm,
             accuracy: record.accuracy,
-            typingSeconds: record.engagedDuration,
+            typingSeconds: record.totalEngagedDuration,
             elapsedSeconds: max(0, record.finishedAt.timeIntervalSince(record.startedAt)),
             consistency: ResultConsistencyPolicy.metrics(
                 events: record.replayEvents,

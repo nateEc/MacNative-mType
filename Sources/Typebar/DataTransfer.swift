@@ -46,6 +46,7 @@ enum ResultCSVExport {
         "afk_seconds",
         "engaged_seconds",
         "restart_count",
+        "prior_attempt_engaged_seconds",
     ]
 
     static func data(for results: [CompletedTestResult]) -> Data {
@@ -105,6 +106,7 @@ enum ResultCSVExport {
             decimal(result.afkDuration),
             decimal(result.engagedDuration),
             String(result.restartCount),
+            decimal(result.priorAttemptEngagedDuration),
         ]
     }
 

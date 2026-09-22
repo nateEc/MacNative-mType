@@ -539,6 +539,17 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(keyboardOnlyResult.afkDuration, 6)
   }
 
+  func testActiveEngagedDurationExcludesIdleTimeWithoutFinishingTheSession() {
+    var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor")
+    session.insert("a", at: start)
+    session.recordKeyboardActivity(at: start.addingTimeInterval(2.2))
+
+    XCTAssertFalse(session.isFinished)
+    XCTAssertNil(session.result(at: start.addingTimeInterval(4.6)))
+    XCTAssertEqual(
+      session.activeEngagedDuration(at: start.addingTimeInterval(4.6)), 2.6, accuracy: 0.000_001)
+  }
+
   func testAfkPercentageUsesTheCompletedWallClockDuration() {
     let result = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 30), outcome: .completed, startedAt: start,
@@ -15611,7 +15622,7 @@ final class TypingEngineTests: XCTestCase {
       startedAt: Date(timeIntervalSince1970: 0),
       finishedAt: Date(timeIntervalSince1970: 2.5), afkDuration: 0.5,
       typedCharacterCount: 12, correctCharacterCount: 11, errorCount: 1, wpm: 60, rawWpm: 66,
-      accuracy: 92, restartCount: 3,
+      accuracy: 92, restartCount: 3, priorAttemptEngagedDuration: 4.25,
       characterStats: .init(matched: 9, incorrect: 1, extra: 2, missed: 3),
       keyDurationSamples: [0.08, 0.12],
       keySpacingSamples: [0.1, 0.2], keyOverlapDuration: 0.03,
@@ -15622,12 +15633,13 @@ final class TypingEngineTests: XCTestCase {
     let csv = ResultCSVExport.csvString(for: [result])
     XCTAssertTrue(csv.hasPrefix(ResultCSVExport.columns.joined(separator: ",") + "\r\n"))
     XCTAssertTrue(ResultCSVExport.columns.contains("restart_count"))
+    XCTAssertTrue(ResultCSVExport.columns.contains("prior_attempt_engaged_seconds"))
     XCTAssertTrue(csv.contains("00000000-0000-0000-0000-000000000007,completed,60,66,92,"))
     XCTAssertTrue(
       csv.contains(",11,12,1,9,1,2,3,100.00,20.00,2,150.00,50.00,2,30.00,time,"))
     XCTAssertTrue(csv.contains(",true,true,expert,uppercase;rot13,\"focus, \"\"deep\"\";café\","))
     XCTAssertTrue(csv.contains("1970-01-01T00:00:00"))
-    XCTAssertTrue(csv.hasSuffix("2.50,0.50,2.00,3\r\n"))
+    XCTAssertTrue(csv.hasSuffix("2.50,0.50,2.00,3,4.25\r\n"))
     XCTAssertFalse(csv.contains("private prompt"))
     XCTAssertTrue(csv.hasSuffix("\r\n"))
     XCTAssertEqual(ResultCSVExport.csvString(for: []), ResultCSVExport.columns.joined(separator: ",") + "\r\n")
@@ -22003,6 +22015,35 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(emptyStatistics.restartsPerCompletedTest, 0)
   }
 
+  func testPriorAttemptLedgerCarriesOnlyReferenceEligiblePriorAttempts() {
+    var ledger = PriorAttemptLedger()
+    ledger.recordRestart(engagedDuration: 4.6, savingEnabled: true)
+    XCTAssertEqual(ledger.restartCount, 1)
+    XCTAssertEqual(ledger.priorAttemptEngagedDuration, 4.6, accuracy: 0.000_001)
+
+    ledger.recordTerminalAttempt(
+      engagedDuration: 7, outcome: .completed, eligibility: .ineligible(.tooShort),
+      savingEnabled: true)
+    XCTAssertEqual(ledger.restartCount, 1)
+    XCTAssertEqual(ledger.priorAttemptEngagedDuration, 4.6, accuracy: 0.000_001)
+
+    ledger.recordTerminalAttempt(
+      engagedDuration: 3.25, outcome: .failed, eligibility: .eligible, savingEnabled: true)
+    ledger.recordTerminalAttempt(
+      engagedDuration: 2.5, outcome: .completed, eligibility: .ineligible(.samePromptRepeat),
+      savingEnabled: true)
+    XCTAssertEqual(ledger.restartCount, 3)
+    XCTAssertEqual(ledger.priorAttemptEngagedDuration, 10.35, accuracy: 0.000_001)
+
+    ledger.clearAfterPersistingResult()
+    XCTAssertEqual(ledger, .init())
+
+    ledger.recordRestart(engagedDuration: 8, savingEnabled: false)
+    ledger.recordTerminalAttempt(
+      engagedDuration: 5, outcome: .failed, eligibility: .eligible, savingEnabled: false)
+    XCTAssertEqual(ledger, .init())
+  }
+
   func testRecentTestAverageUsesTheLatestTenMatchingCurrentSettings() {
     let current = TestConfiguration.words(
       25, difficulty: .expert, language: .english,
@@ -23954,23 +23995,29 @@ final class TypingEngineTests: XCTestCase {
     let result = CompletedTestResult(
       id: UUID(), configuration: .timed(seconds: 30), outcome: .completed, startedAt: start,
       finishedAt: start.addingTimeInterval(30), afkDuration: 7, typedCharacterCount: 50,
-      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96)
+      correctCharacterCount: 48, errorCount: 2, wpm: 19, rawWpm: 20, accuracy: 96,
+      priorAttemptEngagedDuration: 9)
     let encoded = try JSONEncoder().encode(result)
     var legacyPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     legacyPayload.removeValue(forKey: "afkDuration")
     legacyPayload.removeValue(forKey: "restartCount")
+    legacyPayload.removeValue(forKey: "priorAttemptEngagedDuration")
     let legacyData = try JSONSerialization.data(withJSONObject: legacyPayload)
 
     let restored = try JSONDecoder().decode(CompletedTestResult.self, from: legacyData)
     XCTAssertEqual(restored.afkDuration, 0)
     XCTAssertEqual(restored.restartCount, 0)
+    XCTAssertEqual(restored.priorAttemptEngagedDuration, 0)
     XCTAssertEqual(restored.engagedDuration, 30)
+    XCTAssertEqual(restored.totalEngagedDuration, 30)
     XCTAssertEqual(restored.afkPercentage, 0)
 
     legacyPayload["restartCount"] = -2
+    legacyPayload["priorAttemptEngagedDuration"] = -4
     let invalidRestartData = try JSONSerialization.data(withJSONObject: legacyPayload)
-    XCTAssertEqual(
-      try JSONDecoder().decode(CompletedTestResult.self, from: invalidRestartData).restartCount, 0)
+    let invalidValues = try JSONDecoder().decode(CompletedTestResult.self, from: invalidRestartData)
+    XCTAssertEqual(invalidValues.restartCount, 0)
+    XCTAssertEqual(invalidValues.priorAttemptEngagedDuration, 0)
   }
 
   func testArchiveMergeSkipsExistingResultsAndPresets() {
@@ -25645,10 +25692,14 @@ final class TypingEngineTests: XCTestCase {
       tapeMode: .letter
     )
     let result = try XCTUnwrap(
-      session.result(restartCount: 4, challengePresentation: challengePresentation)
+      session.result(
+        restartCount: 4, priorAttemptEngagedDuration: 11,
+        challengePresentation: challengePresentation)
     )
     XCTAssertEqual(result.afkDuration, 4)
     XCTAssertEqual(result.engagedDuration, 2)
+    XCTAssertEqual(result.priorAttemptEngagedDuration, 11)
+    XCTAssertEqual(result.totalEngagedDuration, 13)
     XCTAssertEqual(result.restartCount, 4)
     XCTAssertEqual(CurrentProcessPractice(result: result).typingSeconds, 2)
     container.mainContext.insert(TestResultRecord(result: result))
@@ -25662,6 +25713,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(stored.accuracy, 100)
     XCTAssertEqual(stored.afkDuration, 4)
     XCTAssertEqual(stored.restartCount, 4)
+    XCTAssertEqual(stored.priorAttemptEngagedDuration, 11)
+    XCTAssertEqual(stored.totalEngagedDuration, 13)
+    XCTAssertEqual(ResultMetric(record: stored).typingSeconds, 13)
     XCTAssertEqual(stored.keyDurationSamples.count, 2)
     XCTAssertEqual(stored.keyDurationSamples[0], 0.1, accuracy: 0.000_001)
     XCTAssertEqual(
