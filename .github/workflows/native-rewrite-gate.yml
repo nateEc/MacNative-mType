@@ -1,0 +1,71 @@
+name: Native Rewrite Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-rewrite-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-native-rewrite:
+    name: Verify native rewrite
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out Typebar
+        uses: actions/checkout@v6
+
+      - name: Check out the pinned Monkeytype reference
+        id: reference
+        shell: zsh
+        run: |
+          set -euo pipefail
+          reference_directory="$(mktemp -d "${RUNNER_TEMP}/monkeytype-reference.XXXXXX")"
+          git init --quiet "$reference_directory"
+          git -C "$reference_directory" remote add origin https://github.com/monkeytypegame/monkeytype.git
+          git -C "$reference_directory" fetch --depth=1 origin 91bd24bb8513785c7364cbea29296ff7adafac41
+          git -C "$reference_directory" checkout --quiet --detach FETCH_HEAD
+          print -r -- "path=$reference_directory" >> "$GITHUB_OUTPUT"
+
+      - name: Verify source, resource, and reference boundaries
+        shell: zsh
+        run: |
+          set -euo pipefail
+          zsh Scripts/check-originality-boundaries.sh --self-test
+          zsh Scripts/check-originality-boundaries.sh --reference "${{ steps.reference.outputs.path }}"
+          zsh Scripts/check-page-modal-surface-audit.sh "${{ steps.reference.outputs.path }}"
+          git diff --check
+
+      - name: Verify no Typebar app is already running
+        shell: zsh
+        run: |
+          set -euo pipefail
+          if pgrep -x Typebar >/dev/null; then
+            print -u2 -- "Typebar must not be launched by the verification workflow"
+            exit 1
+          fi
+
+      - name: Run native client tests without launching the app
+        shell: zsh
+        run: |
+          set -euo pipefail
+          TYPEBAR_QA_IN_MEMORY_STORE=1 swift test
+          if pgrep -x Typebar >/dev/null; then
+            print -u2 -- "Typebar was unexpectedly launched by the test suite"
+            exit 1
+          fi
+
+      - name: Verify the signed macOS app bundle without launching it
+        shell: zsh
+        run: zsh Scripts/check-macos-app-package.sh
+
+      - name: Run self-hosted service tests
+        shell: zsh
+        run: swift test --package-path server
