@@ -366,11 +366,12 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(legacy.leaderboardRestricted)
     XCTAssertFalse(legacy.displayNameChangeRequired)
     XCTAssertFalse(legacy.accountSuspended)
+    XCTAssertFalse(legacy.showAllBadges)
 
     let modern = try JSONDecoder().decode(
       RemoteAccountUser.self,
       from: Data(
-        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"leaderboardRestricted":true,"displayNameChangeRequired":true,"accountSuspended":true,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","personalBestResetAt":100,"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
+        #"{"id":"00000000-0000-0000-0000-000000000002","email":"oauth@example.com","emailVerified":true,"displayName":"OAuth","totalExperience":12,"leaderboardRestricted":true,"displayNameChangeRequired":true,"accountSuspended":true,"authenticationMethods":["google","password","discord"],"availableBadges":[{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"}],"selectedBadgeID":"swift-line","showAllBadges":true,"personalBestResetAt":100,"profileDetails":{"bio":"Native first","keyboard":"ANSI","github":"typebar","socialHandle":"typist","websiteURL":"https://example.com","showActivity":false}}"#
           .utf8))
     XCTAssertTrue(modern.emailVerified)
     XCTAssertEqual(modern.authenticationMethods, [.google, .password, .discord])
@@ -385,6 +386,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(modern.leaderboardRestricted)
     XCTAssertTrue(modern.displayNameChangeRequired)
     XCTAssertTrue(modern.accountSuspended)
+    XCTAssertTrue(modern.showAllBadges)
 
     let leaderboardEntry = try JSONDecoder().decode(
       RemoteLeaderboardEntry.self,
@@ -976,15 +978,24 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(profile.startedTestCount, 0)
     XCTAssertEqual(profile.totalTypingSeconds, 0)
     XCTAssertFalse(profile.accountSuspended)
+    XCTAssertTrue(profile.earnedBadges.isEmpty)
 
     let modernPayload = """
-      {"id":"\(id.uuidString)","displayName":"Local","accountSuspended":true,"joinedAt":\(joinedAt.timeIntervalSinceReferenceDate),"completedResultCount":3,"startedTestCount":5,"totalTypingSeconds":135.5,"bestWPM":80,"totalExperience":42,"streak":{"currentDays":2,"longestDays":4}}
+      {"id":"\(id.uuidString)","displayName":"Local","accountSuspended":true,"joinedAt":\(joinedAt.timeIntervalSinceReferenceDate),"completedResultCount":3,"startedTestCount":5,"totalTypingSeconds":135.5,"bestWPM":80,"totalExperience":42,"streak":{"currentDays":2,"longestDays":4},"selectedBadge":{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"},"earnedBadges":[{"id":"first-finish","title":"首次完成","systemImage":"flag.checkered"},{"id":"swift-line","title":"迅捷一行","systemImage":"bolt"},{"id":"first-finish","title":"首次完成","systemImage":"flag.checkered"}]}
       """
     let modern = try JSONDecoder().decode(RemotePublicProfile.self, from: Data(modernPayload.utf8))
     XCTAssertEqual(modern.streak, .init(currentDays: 2, longestDays: 4))
     XCTAssertEqual(modern.startedTestCount, 5)
     XCTAssertEqual(modern.totalTypingSeconds, 135.5)
     XCTAssertTrue(modern.accountSuspended)
+    XCTAssertEqual(modern.earnedBadges.map(\.id), ["first-finish", "swift-line", "first-finish"])
+    XCTAssertEqual(
+      PublicBadgeDisclosurePolicy.additionalBadges(
+        earnedBadges: modern.earnedBadges,
+        selectedBadge: modern.selectedBadge
+      ).map(\.id),
+      ["first-finish"]
+    )
   }
 
   func testRemoteAccountAndActivityDecodeStreakDayBoundaryCompatibly() throws {

@@ -111,13 +111,16 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
     let authenticationMethods: [RemoteAuthenticationMethod]
     let availableBadges: [RemotePublicProfileBadge]
     let selectedBadgeID: String?
+    /// Explicit public-profile opt-in. Older self-hosted services omit it.
+    let showAllBadges: Bool
     let streakDayBoundaryOffsetHours: Double?
     let personalBestResetAt: Date?
 
     private enum CodingKeys: String, CodingKey {
         case id, email, emailVerified, displayName, totalExperience, leaderboardOptedOut,
             leaderboardRestricted, displayNameChangeRequired, accountSuspended, profileDetails,
-            authenticationMethods, availableBadges, selectedBadgeID, streakDayBoundaryOffsetHours,
+            authenticationMethods, availableBadges, selectedBadgeID, showAllBadges,
+            streakDayBoundaryOffsetHours,
             personalBestResetAt
     }
 
@@ -134,6 +137,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         profileDetails: RemoteProfileDetails = .init(),
         authenticationMethods: [RemoteAuthenticationMethod] = [.password],
         availableBadges: [RemotePublicProfileBadge] = [], selectedBadgeID: String? = nil,
+        showAllBadges: Bool = false,
         streakDayBoundaryOffsetHours: Double? = nil, personalBestResetAt: Date? = nil
     ) {
         self.id = id
@@ -149,6 +153,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         self.authenticationMethods = authenticationMethods
         self.availableBadges = availableBadges
         self.selectedBadgeID = selectedBadgeID
+        self.showAllBadges = showAllBadges
         self.streakDayBoundaryOffsetHours = streakDayBoundaryOffsetHours
         self.personalBestResetAt = personalBestResetAt
     }
@@ -169,6 +174,7 @@ struct RemoteAccountUser: Codable, Equatable, Sendable {
         authenticationMethods = try values.decodeIfPresent([RemoteAuthenticationMethod].self, forKey: .authenticationMethods) ?? [.password]
         availableBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .availableBadges) ?? []
         selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
+        showAllBadges = try values.decodeIfPresent(Bool.self, forKey: .showAllBadges) ?? false
         streakDayBoundaryOffsetHours = try values.decodeIfPresent(
             Double.self, forKey: .streakDayBoundaryOffsetHours)
         personalBestResetAt = try values.decodeIfPresent(Date.self, forKey: .personalBestResetAt)
@@ -317,6 +323,7 @@ private struct RemoteUpdateProfileRequest: Codable, Sendable {
     let leaderboardOptedOut: Bool?
     let profileDetails: RemoteProfileDetails?
     let selectedBadgeID: String?
+    let showAllBadges: Bool?
 }
 
 private struct RemoteDisplayNameAvailabilityResponse: Codable, Sendable {
@@ -1025,10 +1032,12 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let profileDetails: RemoteProfileDetails
     let discordAvatar: RemoteDiscordAvatar?
     let selectedBadge: RemotePublicProfileBadge?
+    let earnedBadges: [RemotePublicProfileBadge]
 
     private enum CodingKeys: String, CodingKey {
         case id, displayName, accountSuspended, joinedAt, completedResultCount, startedTestCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
-            activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge
+            activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge,
+            earnedBadges
     }
 
     init(from decoder: Decoder) throws {
@@ -1049,6 +1058,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         profileDetails = try values.decodeIfPresent(RemoteProfileDetails.self, forKey: .profileDetails) ?? .init()
         discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
         selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
+        earnedBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .earnedBadges) ?? []
     }
 }
 
@@ -1056,6 +1066,20 @@ struct RemotePublicProfileBadge: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let title: String
     let systemImage: String
+}
+
+/// Keeps a profile's primary badge separate from the owner's explicit
+/// all-earned-badges disclosure. Leaderboards continue to use only the former.
+enum PublicBadgeDisclosurePolicy {
+    static func additionalBadges(
+        earnedBadges: [RemotePublicProfileBadge],
+        selectedBadge: RemotePublicProfileBadge?
+    ) -> [RemotePublicProfileBadge] {
+        var shownIDs = Set<String>()
+        return earnedBadges.filter { badge in
+            badge.id != selectedBadge?.id && shownIDs.insert(badge.id).inserted
+        }
+    }
 }
 
 struct RemoteDiscordAvatar: Codable, Equatable, Sendable {
@@ -1953,7 +1977,7 @@ final class AccountSession {
                 body: RemoteUpdateProfileRequest(
                     displayName: displayName,
                     leaderboardOptedOut: currentUser?.leaderboardOptedOut ?? false,
-                    profileDetails: nil, selectedBadgeID: nil),
+                    profileDetails: nil, selectedBadgeID: nil, showAllBadges: nil),
                 response: RemoteAccountUser.self
             )
             statusMessage = "显示名已更新。"
@@ -1976,7 +2000,7 @@ final class AccountSession {
                 token: token,
                 body: RemoteUpdateProfileRequest(
                     displayName: nil, leaderboardOptedOut: optedOut, profileDetails: nil,
-                    selectedBadgeID: nil),
+                    selectedBadgeID: nil, showAllBadges: nil),
                 response: RemoteAccountUser.self
             )
             statusMessage = optedOut
@@ -2001,7 +2025,7 @@ final class AccountSession {
                 token: token,
                 body: RemoteUpdateProfileRequest(
                     displayName: nil, leaderboardOptedOut: nil, profileDetails: details,
-                    selectedBadgeID: selectedBadgeID),
+                    selectedBadgeID: selectedBadgeID, showAllBadges: nil),
                 response: RemoteAccountUser.self
             )
             statusMessage = "公开资料已更新。"
@@ -2009,6 +2033,31 @@ final class AccountSession {
         } catch {
             statusMessage = error.localizedDescription
             return false
+        }
+    }
+
+    func setShowAllBadges(_ showAllBadges: Bool) async {
+        guard let token = tokenStore.load(), currentUser != nil else {
+            statusMessage = "请先登录自建 Typebar 服务。"
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            currentUser = try await RemoteAccountAPI(endpoint: endpoint).request(
+                path: "v1/profiles/me",
+                method: "PATCH",
+                token: token,
+                body: RemoteUpdateProfileRequest(
+                    displayName: nil, leaderboardOptedOut: nil, profileDetails: nil,
+                    selectedBadgeID: nil, showAllBadges: showAllBadges),
+                response: RemoteAccountUser.self
+            )
+            statusMessage = showAllBadges
+                ? "已允许公开资料显示全部已获得的 Typebar 徽章。"
+                : "公开资料将只显示你选定的一枚徽章。"
+        } catch {
+            statusMessage = error.localizedDescription
         }
     }
 
@@ -2134,6 +2183,7 @@ final class AccountSession {
                 accountSuspended: user.accountSuspended,
                 profileDetails: user.profileDetails,
                 authenticationMethods: user.authenticationMethods,
+                showAllBadges: user.showAllBadges,
                 streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
                 personalBestResetAt: user.personalBestResetAt)
             statusMessage = "已清除 (response.removedCount) 条服务端成绩；本机练习历史未受影响。"
@@ -2175,6 +2225,7 @@ final class AccountSession {
                 profileDetails: user.profileDetails,
                 authenticationMethods: user.authenticationMethods,
                 availableBadges: user.availableBadges, selectedBadgeID: user.selectedBadgeID,
+                showAllBadges: user.showAllBadges,
                 streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
                 personalBestResetAt: response.resetAt)
             statusMessage = "服务端公开个人最佳已重置；成绩、XP、徽章和本机历史未受影响。"
@@ -2607,7 +2658,13 @@ final class AccountSession {
                 leaderboardRestricted: user.leaderboardRestricted,
                 displayNameChangeRequired: user.displayNameChangeRequired,
                 accountSuspended: user.accountSuspended,
-                authenticationMethods: user.authenticationMethods
+                profileDetails: user.profileDetails,
+                authenticationMethods: user.authenticationMethods,
+                availableBadges: user.availableBadges,
+                selectedBadgeID: user.selectedBadgeID,
+                showAllBadges: user.showAllBadges,
+                streakDayBoundaryOffsetHours: user.streakDayBoundaryOffsetHours,
+                personalBestResetAt: user.personalBestResetAt
             )
         }
         return response

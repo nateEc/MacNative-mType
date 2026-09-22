@@ -1011,6 +1011,13 @@ struct PublicProfileView: View {
     @State private var isSendingRequest = false
     @State private var showingReport = false
 
+    private var additionalEarnedBadges: [RemotePublicProfileBadge] {
+        PublicBadgeDisclosurePolicy.additionalBadges(
+            earnedBadges: profile.earnedBadges,
+            selectedBadge: profile.selectedBadge
+        )
+    }
+
     var body: some View {
         ScrollView {
           VStack(spacing: 20) {
@@ -1047,6 +1054,25 @@ struct PublicProfileView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.tint)
                     .accessibilityLabel("公开徽章：\(badge.title)")
+            }
+            if !additionalEarnedBadges.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("已获得徽章")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 108), spacing: 6)],
+                        alignment: .leading, spacing: 6
+                    ) {
+                        ForEach(additionalEarnedBadges) { badge in
+                            Label(badge.title, systemImage: badge.systemImage)
+                                .font(.caption2)
+                                .foregroundStyle(.tint)
+                                .accessibilityLabel("已获得徽章：\(badge.title)")
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             Grid(horizontalSpacing: 28, verticalSpacing: 12) {
                 GridRow { metric("完成成绩", "\(profile.completedResultCount)"); metric("最佳 WPM", "\(profile.bestWPM)") }

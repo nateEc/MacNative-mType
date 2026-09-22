@@ -3630,8 +3630,22 @@ final class HealthRouteTests: XCTestCase {
       .init(mode: nil, language: nil, period: "all", limit: 25), now: now)
     let experienceLeaderboard = try await store.experienceLeaderboard(now: now)
     XCTAssertEqual(selectedPublicProfile.selectedBadge?.id, "swift-line")
+    XCTAssertTrue(selectedPublicProfile.earnedBadges.isEmpty)
     XCTAssertEqual(wpmLeaderboard.entries.first?.selectedBadge?.id, "swift-line")
     XCTAssertEqual(experienceLeaderboard.entries.first?.selectedBadge?.id, "swift-line")
+
+    let optedIn = try await store.updateProfile(
+      .init(showAllBadges: true), accessToken: session.accessToken, now: now)
+    XCTAssertTrue(optedIn.showAllBadges)
+    let optedInPublicProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(
+      optedInPublicProfile.earnedBadges.map(\.id),
+      ["first-finish", "clear-key", "swift-line", "steady-room"])
+
+    _ = try await store.setAccountSuspended(userID: session.user.id, suspended: true, now: now)
+    let suspendedPublicProfile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertTrue(suspendedPublicProfile.earnedBadges.isEmpty)
+    _ = try await store.setAccountSuspended(userID: session.user.id, suspended: false, now: now)
 
     let legacyProfileUpdate = try JSONDecoder().decode(
       UpdateProfileRequest.self,
@@ -3639,6 +3653,7 @@ final class HealthRouteTests: XCTestCase {
     let preserved = try await store.updateProfile(
       legacyProfileUpdate, accessToken: session.accessToken, now: now)
     XCTAssertEqual(preserved.selectedBadgeID, "swift-line")
+    XCTAssertTrue(preserved.showAllBadges)
 
     let hidden = try await store.updateProfile(
       .init(selectedBadgeID: ""), accessToken: session.accessToken, now: now)
@@ -3655,6 +3670,44 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(afterDeletion.availableBadges.isEmpty)
     XCTAssertNil(afterDeletion.selectedBadgeID)
     XCTAssertNil(deletedPublicProfile.selectedBadge)
+    XCTAssertTrue(deletedPublicProfile.earnedBadges.isEmpty)
+  }
+
+  func testBadgeDisclosurePersistsAndPreDisclosureStoreDefaultsToPrivate() async throws {
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-badge-disclosure-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let now = Date(timeIntervalSince1970: 38_250)
+    let initialStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let session = try await initialStore.register(
+      .init(
+        email: "disclosure@example.com", password: "a secure password",
+        displayName: "Disclosure User"), now: now)
+    _ = try await initialStore.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 98, durationSeconds: 15 * 60, finishedAt: now),
+      accessToken: session.accessToken, now: now)
+    _ = try await initialStore.updateProfile(
+      .init(showAllBadges: true), accessToken: session.accessToken, now: now)
+
+    let persistedStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let persistedUser = try await persistedStore.authenticatedUser(
+      for: session.accessToken, now: now)
+    XCTAssertTrue(persistedUser.showAllBadges)
+    let persistedProfile = try await persistedStore.publicProfile(id: session.user.id, now: now)
+    XCTAssertFalse(persistedProfile.earnedBadges.isEmpty)
+
+    var state = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: fileURL)) as? [String: Any])
+    var users = try XCTUnwrap(state["users"] as? [[String: Any]])
+    users[0].removeValue(forKey: "showAllBadges")
+    state["users"] = users
+    try JSONSerialization.data(withJSONObject: state).write(to: fileURL, options: .atomic)
+
+    let legacyStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let legacyUser = try await legacyStore.authenticatedUser(for: session.accessToken, now: now)
+    XCTAssertFalse(legacyUser.showAllBadges)
+    let legacyProfile = try await legacyStore.publicProfile(id: session.user.id, now: now)
+    XCTAssertTrue(legacyProfile.earnedBadges.isEmpty)
   }
 
   func testNewlyEarnedBadgesCreatePrivateIdempotentRewardNotifications() async throws {

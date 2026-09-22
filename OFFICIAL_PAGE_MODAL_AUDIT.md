@@ -17,7 +17,7 @@
 | `settings`（可搜索设置、快捷导航和自定义设置编辑器） | `PreferencesView.swift`、`SettingsSearch.swift`、`CommandPalette.swift` 及各设置编辑器 | 已覆盖。94 个参考配置键的 92 项映射、1 项原生字体适配和 1 项无广告不适用由 `OfficialLayoutCoverageTests` 守护。 |
 | `account`（历史、统计、图表、个人最佳、资料） | `ArchiveManagementView.swift`、`ResultsAnalytics.swift`、`PersonalBestTable.swift`、`RemoteAccount.swift` | 已覆盖。本机成绩是权威副本；远端服务是显式可选发布与同步目标。固定官方路径与速度／准确率、10／100 次均值、PB 轨迹、单局分析、直方图及日活动的原生等价实现见 [OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md](OFFICIAL_ACCOUNT_ANALYTICS_AUDIT.md)。 |
 | `account settings`（身份方法、邮箱／密码／显示名、密钥、拉黑、危险操作） | `PreferencesView.swift`、`RemoteAccount.swift`、`LocalAccountReset.swift` | 已覆盖。密码、OAuth、邮箱验证、密码重置、账号删除、开发者密钥及展示名预检均有自建契约；显示名实际写入仍由服务端权威校验。官方“重置个人最佳但保留成绩”的入口以受重新认证保护的服务端公开 PB 新纪元实现，详见 [OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md](OFFICIAL_PERSONAL_BEST_RESET_AUDIT.md)。 |
-| `profile`／`profile search` | `RemoteAccount.swift`、`ConnectionsView.swift`、`ProfileReportView.swift` | 已覆盖。公开资料只暴露最小公开字段，搜索、关系、屏蔽与举报均通过自建服务。 |
+| `profile`／`profile search` | `RemoteAccount.swift`、`CloudSyncView.swift`、`ConnectionsView.swift`、`ProfileReportView.swift` | 已覆盖。公开资料只暴露最小公开字段；固定源码的资料页可呈现拥有但未选中的徽章，Typebar 以默认关闭、账户所有者明确开启的“公开显示全部已获得徽章”作隐私等价，资料卡会去重所选徽章，榜单仍只呈现所选一枚。搜索、关系、屏蔽与举报均通过自建服务。 |
 | `friends` | `ConnectionsView.swift`、`DirectConversationView.swift`、`NotificationsView.swift` | 已覆盖。好友请求、接受、解除、屏蔽、通知和已接受好友间受控私信由自建 API 提供。 |
 | `leaderboards` | `CloudSyncView.swift`、`LeaderboardParameterFilter.swift`、`LeaderboardPagination.swift`、`LeaderboardRankStanding.swift` | 已覆盖。全局／好友 WPM 和 XP 范围、个人名次与隐身选择均是原生界面与自建 API。 |
 | `about`／版本历史 | `AboutTypebar.swift`、`ReleaseHistory.swift`、`PublicPracticeStatistics.swift` | 已覆盖，以 Typebar 自己的产品资料、许可和版本信息取代参考品牌内容；About 打开时还可无令牌读取自建服务的匿名全局练习总览与 English 60 秒个人最佳速度分布。旧服务不可用时明确降级，不使用本机成绩伪造全局数据；完整来源、隐私与验收见 [OFFICIAL_PUBLIC_PRACTICE_STATISTICS_AUDIT.md](OFFICIAL_PUBLIC_PRACTICE_STATISTICS_AUDIT.md)。 |
@@ -54,7 +54,7 @@
 
 Typebar 现已提供可部署的 Cloudflare Turnstile 适配：服务端创建 5 分钟、单用途挑战，提供自写的最小网页容器并在服务器侧验证 `success`、action、cData 与允许 hostname；成功后才签发不持久化的一次性 callback proof。原生客户端只接受 `https` 服务地址返回的相对挑战路径和固定 `typebar://human-verification/callback` 回调，再把 proof 附到相应写请求。服务端在业务写入之前的 actor 临界区消费 proof，缺失、错误用途、过期、重放、验证拒绝和提供方不可达均不放行。
 
-服务端测试覆盖五个用途、六条具体写入路径（密码注册、OAuth 新用户注册、密码重置请求、资料举报、引语投稿、引语举报）的缺 proof、成功、重放／用途替换、到期与 provider 失败；原生测试覆盖能力协商、相对 HTTPS URL 与固定 callback 解析；完整服务端 114 项和原生 704 项套件验证已有功能无回归。设计审查见 [SECURITY_HUMAN_VERIFICATION_DECISION.md](SECURITY_HUMAN_VERIFICATION_DECISION.md)。这不是对第三方服务的“已上线”声明：部署者仍须使用自己的密钥和真实 HTTPS hostname 进行一次手工部署验收，并且当前实现只支持单服务进程；多副本前需引入共享、原子 TTL 挑战存储。
+服务端测试覆盖五个用途、六条具体写入路径（密码注册、OAuth 新用户注册、密码重置请求、资料举报、引语投稿、引语举报）的缺 proof、成功、重放／用途替换、到期与 provider 失败；原生测试覆盖能力协商、相对 HTTPS URL 与固定 callback 解析；完整服务端 115 项和原生 704 项套件验证已有功能无回归。设计审查见 [SECURITY_HUMAN_VERIFICATION_DECISION.md](SECURITY_HUMAN_VERIFICATION_DECISION.md)。这不是对第三方服务的“已上线”声明：部署者仍须使用自己的密钥和真实 HTTPS hostname 进行一次手工部署验收，并且当前实现只支持单服务进程；多副本前需引入共享、原子 TTL 挑战存储。
 
 ## 验收规则
 

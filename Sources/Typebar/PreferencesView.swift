@@ -1238,8 +1238,20 @@ struct PreferencesView: View {
                   Label(badge.title, systemImage: badge.systemImage).tag(badge.id)
                 }
               }
+              Toggle(
+                "公开显示全部已获得徽章",
+                isOn: Binding(
+                  get: { user.showAllBadges },
+                  set: { value in Task { await account.setShowAllBadges(value) } }
+                )
+              )
+              .disabled(account.isWorking || user.accountSuspended || user.availableBadges.isEmpty)
               if user.availableBadges.isEmpty {
                 Text("完成并同步服务端接受的练习后，可在这里选择公开展示的原创徽章。")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              } else {
+                Text("默认只公开上方选定的一枚。开启后，资料页会额外显示其他已获得的 Typebar 原创徽章；排行榜仍只显示选定的一枚。")
                   .font(.caption)
                   .foregroundStyle(.secondary)
               }

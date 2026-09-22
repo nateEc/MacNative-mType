@@ -189,15 +189,20 @@ public struct UpdateProfileRequest: Content, Equatable {
   /// Omitted by older clients, which preserves the existing badge. An empty
   /// string explicitly clears the public badge selection.
   public let selectedBadgeID: String?
+  /// Omitted by older clients, which preserves the account's current opt-in.
+  /// When enabled, the public profile may show all earned Typebar badges.
+  public let showAllBadges: Bool?
 
   public init(
     displayName: String? = nil, leaderboardOptedOut: Bool? = nil,
-    profileDetails: ProfileDetails? = nil, selectedBadgeID: String? = nil
+    profileDetails: ProfileDetails? = nil, selectedBadgeID: String? = nil,
+    showAllBadges: Bool? = nil
   ) {
     self.displayName = displayName
     self.leaderboardOptedOut = leaderboardOptedOut
     self.profileDetails = profileDetails
     self.selectedBadgeID = selectedBadgeID
+    self.showAllBadges = showAllBadges
   }
 }
 
@@ -403,6 +408,8 @@ public struct AuthUserResponse: Content, Equatable {
   public let authenticationMethods: [AuthenticationMethod]
   public let availableBadges: [PublicProfileBadge]
   public let selectedBadgeID: String?
+  /// The owner must explicitly opt in before this is true.
+  public let showAllBadges: Bool
   /// Nil until the account makes its one permitted explicit choice. Zero is
   /// therefore distinct from an older account that still uses the default.
   public let streakDayBoundaryOffsetHours: Double?
@@ -428,6 +435,8 @@ public struct PublicProfileResponse: Content, Equatable {
   public let profileDetails: ProfileDetails
   public let discordAvatar: PublicDiscordAvatarResponse?
   public let selectedBadge: PublicProfileBadge?
+  /// Typebar-owned earned badges, returned only after the owner opts in.
+  public let earnedBadges: [PublicProfileBadge]
 }
 
 /// A Typebar-owned badge that can be selected for public profiles and
@@ -734,12 +743,13 @@ public actor AuthStore {
     var rollingLeaderboardResumedAt: Date?
     let profileDetails: ProfileDetails
     let selectedBadgeID: String?
+    let showAllBadges: Bool
     var startedTestCount: Int
 
     private enum CodingKeys: String, CodingKey {
       case id, email, displayName, passwordHash, createdAt, emailVerified, leaderboardOptedOut,
         leaderboardRestricted, displayNameChangeRequired, lastDisplayNameChangeAt, accountSuspended,
-        rollingLeaderboardResumedAt, profileDetails, selectedBadgeID,
+        rollingLeaderboardResumedAt, profileDetails, selectedBadgeID, showAllBadges,
         startedTestCount
     }
 
@@ -753,6 +763,7 @@ public actor AuthStore {
       accountSuspended: Bool = false,
       rollingLeaderboardResumedAt: Date? = nil,
       profileDetails: ProfileDetails = .init(), selectedBadgeID: String? = nil,
+      showAllBadges: Bool = false,
       startedTestCount: Int = 0
     ) {
       self.id = id
@@ -769,6 +780,7 @@ public actor AuthStore {
       self.rollingLeaderboardResumedAt = rollingLeaderboardResumedAt
       self.profileDetails = profileDetails
       self.selectedBadgeID = selectedBadgeID
+      self.showAllBadges = showAllBadges
       self.startedTestCount = startedTestCount
     }
 
@@ -790,6 +802,7 @@ public actor AuthStore {
         Date.self, forKey: .rollingLeaderboardResumedAt)
       profileDetails = try values.decodeIfPresent(ProfileDetails.self, forKey: .profileDetails) ?? .init()
       selectedBadgeID = try values.decodeIfPresent(String.self, forKey: .selectedBadgeID)
+      showAllBadges = try values.decodeIfPresent(Bool.self, forKey: .showAllBadges) ?? false
       startedTestCount = try values.decodeIfPresent(Int.self, forKey: .startedTestCount) ?? 0
     }
   }
@@ -1340,7 +1353,8 @@ public actor AuthStore {
       accountSuspended: user.accountSuspended,
       rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
+      selectedBadgeID: user.selectedBadgeID, showAllBadges: user.showAllBadges,
+      startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
     try persist()
     return try userResponse(for: updatedUser.id)
@@ -1387,7 +1401,8 @@ public actor AuthStore {
       accountSuspended: user.accountSuspended,
       rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
+      selectedBadgeID: user.selectedBadgeID, showAllBadges: user.showAllBadges,
+      startedTestCount: user.startedTestCount)
     state.passwordResetTokens.removeAll { $0.userID == user.id }
     let currentTokenHash = Self.tokenHash(accessToken)
     state.sessions.removeAll { $0.userID == user.id && $0.tokenHash != currentTokenHash }
@@ -1678,7 +1693,8 @@ public actor AuthStore {
       accountSuspended: user.accountSuspended,
       rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
+      selectedBadgeID: user.selectedBadgeID, showAllBadges: user.showAllBadges,
+      startedTestCount: user.startedTestCount)
     state.sessions.removeAll { $0.userID == user.id }
     state.passwordResetTokens.removeAll { $0.userID == user.id }
     try persist()
@@ -1741,7 +1757,8 @@ public actor AuthStore {
       accountSuspended: user.accountSuspended,
       rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
-      selectedBadgeID: user.selectedBadgeID, startedTestCount: user.startedTestCount)
+      selectedBadgeID: user.selectedBadgeID, showAllBadges: user.showAllBadges,
+      startedTestCount: user.startedTestCount)
     state.emailVerificationTokens.removeAll { $0.userID == user.id }
     try persist()
   }
@@ -1848,6 +1865,7 @@ public actor AuthStore {
       rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
+      showAllBadges: user.showAllBadges,
       startedTestCount: user.startedTestCount
     )
     state.users[index] = updatedUser
@@ -1891,6 +1909,7 @@ public actor AuthStore {
       rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: user.profileDetails,
       selectedBadgeID: user.selectedBadgeID,
+      showAllBadges: user.showAllBadges,
       startedTestCount: user.startedTestCount
     )
     state.users[index] = updatedUser
@@ -2053,6 +2072,7 @@ public actor AuthStore {
       accountSuspended: user.accountSuspended,
       rollingLeaderboardResumedAt: user.rollingLeaderboardResumedAt,
       profileDetails: profileDetails, selectedBadgeID: selectedBadgeID,
+      showAllBadges: request.showAllBadges ?? user.showAllBadges,
       startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
     try persist()
@@ -2806,7 +2826,9 @@ public actor AuthStore {
       totalExperience: experience(for: user.id),
       profileDetails: user.accountSuspended ? .init() : user.profileDetails,
       discordAvatar: user.accountSuspended ? nil : publicDiscordAvatar(for: user),
-      selectedBadge: user.accountSuspended ? nil : selectedPublicBadge(for: user)
+      selectedBadge: user.accountSuspended ? nil : selectedPublicBadge(for: user),
+      earnedBadges: user.accountSuspended || !user.showAllBadges
+        ? [] : availablePublicBadges(for: user.id)
     )
   }
 
@@ -3684,7 +3706,7 @@ public actor AuthStore {
       accountSuspended: user.accountSuspended,
       profileDetails: user.profileDetails,
       authenticationMethods: authenticationMethods(for: user.id), availableBadges: availableBadges,
-      selectedBadgeID: selectedBadgeID,
+      selectedBadgeID: selectedBadgeID, showAllBadges: user.showAllBadges,
       streakDayBoundaryOffsetHours: state.streakDayBoundaryOffsets[user.id],
       personalBestResetAt: state.personalBestResetDates[user.id])
   }
