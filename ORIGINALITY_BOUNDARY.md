@@ -24,6 +24,8 @@ zsh Scripts/check-originality-boundaries.sh --self-test
 
 它检查已追踪文件，拒绝参考 Web 工程的 `backend/`、`frontend/`、`packages/` 树，拒绝其前端包清单及 TypeScript／网页组件文件，并扫描客户端和自建服务的 Swift 源码，阻止其直接指向 `monkeytype.com`。`--self-test` 还会验证护栏确实能拒绝一组模拟的违规路径及一条刻意复制的长源码行。
 
+用户主动粘贴的历史主题链接是一个离线序列化载体：Typebar 仅从 HTTPS URL 的 `customTheme` 查询项解码有限大小的颜色和可选背景资料，不解析其主机为服务身份、不发起网页访问，也不下载主题资源。这样可保留已拥有链接的本机迁移路径，同时不构成对参考服务的运行时依赖；生产 Swift 中仍不得包含该服务域名或联网路径。
+
 文件枚举优先使用 `rg`；在最小 macOS/CI 环境没有 ripgrep 时，自动使用 `find` 和 `grep`，不以额外包管理器或网络安装作为验证前提。
 
 在本机已有固定参考检出时，再运行：

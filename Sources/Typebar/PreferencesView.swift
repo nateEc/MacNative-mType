@@ -89,6 +89,7 @@ struct PreferencesView: View {
   @State private var customThemePrefersDark = true
   @State private var editingCustomThemeID: UUID?
   @State private var customThemeMessage: String?
+  @State private var customThemeImportLink = ""
   @State private var customKeyboardLayoutName = ""
   @State private var customKeyboardNumberRow = "1234567890-="
   @State private var customKeyboardTopRow = "QWERTYUIOP[]"
@@ -981,6 +982,14 @@ struct PreferencesView: View {
       if customThemeSectionVisible {
         Section("自定义主题") {
           TextField("主题名称", text: $customThemeName)
+          TextField("网页自定义主题链接", text: $customThemeImportLink, axis: .vertical)
+            .lineLimit(2...4)
+            .textFieldStyle(.roundedBorder)
+          Button("导入网页主题链接") { importWebThemeLink() }
+            .disabled(customThemeImportLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          Text("可在本机解析兼容主题链接中的十色配置；链接主机不会被访问。若链接同时提供安全的 HTTP(S) 图片 URL、适配方式和滤镜，会在你点击导入后一起应用；不会读取网页代码或原项目资源。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
           ColorPicker("背景", selection: $customThemeBackground)
           ColorPicker("面板", selection: $customThemePanel)
           ColorPicker("强调色", selection: $customThemeAccent)
@@ -2330,6 +2339,38 @@ struct PreferencesView: View {
       customThemeMessage = "已保存并应用自定义主题。"
     }
     resetCustomThemeEditor(keepingMessage: true)
+  }
+
+  private func importWebThemeLink() {
+    let name = suggestedImportedThemeName
+    do {
+      let imported = try LegacyCustomThemeLinkImporter.theme(
+        from: customThemeImportLink, name: name)
+      guard let applied = settings.applyImportedWebTheme(imported) else {
+        customThemeMessage = "无法保存导入的主题。"
+        return
+      }
+      customThemeImportLink = ""
+      if let backgroundURL = imported.remoteBackgroundURL {
+        customBackgroundURLDraft = backgroundURL
+        customBackgroundMessage = nil
+      }
+      resetCustomThemeEditor(keepingMessage: true)
+      customThemeMessage = imported.skippedBackground
+        ? "已导入并应用“\(applied.name)”。链接中的背景图片不符合本机安全限制，未导入。"
+        : "已导入并应用“\(applied.name)”。"
+    } catch {
+      customThemeMessage = (error as? LocalizedError)?.errorDescription ?? "无法读取主题链接。"
+    }
+  }
+
+  private var suggestedImportedThemeName: String {
+    let requestedName = customThemeName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard requestedName.isEmpty else { return requestedName }
+    let existingNames = Set(settings.customThemes.map(\.name))
+    var ordinal = settings.customThemes.count + 1
+    while existingNames.contains("网页主题 \(ordinal)") { ordinal += 1 }
+    return "网页主题 \(ordinal)"
   }
 
   private func resetCustomThemeEditor(keepingMessage: Bool = false) {

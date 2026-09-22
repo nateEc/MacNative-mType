@@ -2144,6 +2144,34 @@ final class AppSettings {
     return custom
   }
 
+  /// Persists a theme that was already validated from a user-pasted public
+  /// link. Background settings are applied only as one complete, normalized
+  /// tuple so an incomplete import cannot disturb an existing background.
+  @discardableResult
+  func applyImportedWebTheme(
+    _ imported: LegacyCustomThemeLinkImporter.ImportedTheme
+  ) -> CustomThemeDefinition? {
+    let theme = imported.theme
+    let trimmedName = theme.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard theme.name == trimmedName, (1...40).contains(trimmedName.count),
+      !customThemes.contains(where: { $0.id == theme.id })
+    else { return nil }
+
+    customThemes.append(theme)
+    selectCustomTheme(theme.id)
+
+    if let rawURL = imported.remoteBackgroundURL,
+      let remoteURL = CustomBackgroundURLPolicy.normalizedRemoteURL(rawURL), !remoteURL.isEmpty,
+      let backgroundFit = imported.backgroundFit,
+      let backgroundFilter = imported.backgroundFilter
+    {
+      customBackgroundURL = remoteURL
+      customBackgroundFit = backgroundFit
+      customBackgroundFilter = backgroundFilter.normalized
+    }
+    return theme
+  }
+
   @discardableResult
   func updateCustomTheme(
     id: UUID, name: String, background: Color, panel: Color, accent: Color, text: Color? = nil,

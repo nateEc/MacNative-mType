@@ -15194,6 +15194,78 @@ final class TypingEngineTests: XCTestCase {
       try TestConfigurationShare.preset(from: "typebar://test?preset=not-base64"))
   }
 
+  @MainActor
+  func testLegacyCustomThemeLinkImportsColorsAndSafeBackgroundSettings() throws {
+    let payload = """
+      {"c":["#123456","#abcdef","#010203","#333333","#444444","#eeeeee","#aa0000","#bb0000","#cc0000","#dd0000"],"i":"https://assets.example.test/scene.png","s":"contain","f":[2,1.2,0.8,0.6]}
+      """
+    var components = try XCTUnwrap(URLComponents(string: "https://theme-link.example.test"))
+    components.queryItems = [
+      .init(name: "customTheme", value: Data(payload.utf8).base64EncodedString())
+    ]
+
+    let imported = try LegacyCustomThemeLinkImporter.theme(
+      from: try XCTUnwrap(components.url?.absoluteString), name: "Harbour import")
+
+    XCTAssertEqual(imported.theme.name, "Harbour import")
+    XCTAssertEqual(imported.theme.background, .init(red: 0x12 / 255, green: 0x34 / 255, blue: 0x56 / 255))
+    XCTAssertEqual(imported.theme.accent, .init(red: 0xab / 255, green: 0xcd / 255, blue: 0xef / 255))
+    XCTAssertEqual(imported.theme.caret, .init(red: 0x01 / 255, green: 0x02 / 255, blue: 0x03 / 255))
+    XCTAssertEqual(imported.theme.secondaryText, .init(red: 0x33 / 255, green: 0x33 / 255, blue: 0x33 / 255))
+    XCTAssertEqual(imported.theme.fadedText, .init(red: 0x44 / 255, green: 0x44 / 255, blue: 0x44 / 255))
+    XCTAssertEqual(imported.theme.text, .init(red: 0xee / 255, green: 0xee / 255, blue: 0xee / 255))
+    XCTAssertEqual(imported.theme.error, .init(red: 0xaa / 255, green: 0, blue: 0))
+    XCTAssertEqual(imported.theme.extraInput, .init(red: 0xbb / 255, green: 0, blue: 0))
+    XCTAssertEqual(imported.theme.colorfulError, .init(red: 0xcc / 255, green: 0, blue: 0))
+    XCTAssertEqual(imported.theme.colorfulExtraInput, .init(red: 0xdd / 255, green: 0, blue: 0))
+    XCTAssertEqual(imported.remoteBackgroundURL, "https://assets.example.test/scene.png")
+    XCTAssertEqual(imported.backgroundFit, .contain)
+    XCTAssertEqual(imported.backgroundFilter, .init(blur: 2, brightness: 1.2, saturation: 0.8, opacity: 0.6))
+
+    let suiteName = "TypebarTests.imported-theme-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    XCTAssertEqual(settings.applyImportedWebTheme(imported), imported.theme)
+    XCTAssertEqual(settings.activeCustomThemeID, imported.theme.id)
+    XCTAssertEqual(settings.customBackgroundURL, imported.remoteBackgroundURL)
+    XCTAssertEqual(settings.customBackgroundFit, .contain)
+    XCTAssertEqual(settings.customBackgroundFilter, imported.backgroundFilter)
+
+    var legacyComponents = try XCTUnwrap(URLComponents(string: "https://archive.example.test"))
+    legacyComponents.queryItems = [
+      .init(name: "customTheme", value: Data("[\"#000\",\"#111\",\"#222\",\"#333\",\"#444\",\"#555\",\"#666\",\"#777\",\"#888\",\"#999\"]".utf8).base64EncodedString())
+    ]
+    let legacy = try LegacyCustomThemeLinkImporter.theme(
+      from: try XCTUnwrap(legacyComponents.url?.absoluteString), name: "Legacy import")
+    XCTAssertEqual(legacy.theme.background, .init(red: 0, green: 0, blue: 0))
+    XCTAssertNil(legacy.remoteBackgroundURL)
+    XCTAssertFalse(legacy.skippedBackground)
+
+    let unsafePayload = payload.replacingOccurrences(
+      of: "https://assets.example.test/scene.png", with: "https://assets.example.test/not-an-image")
+    var unsafeComponents = try XCTUnwrap(URLComponents(string: "https://unsafe-theme-link.example.test"))
+    unsafeComponents.queryItems = [
+      .init(name: "customTheme", value: Data(unsafePayload.utf8).base64EncodedString())
+    ]
+    let unsafe = try LegacyCustomThemeLinkImporter.theme(
+      from: try XCTUnwrap(unsafeComponents.url?.absoluteString), name: "Safe import")
+    XCTAssertTrue(unsafe.skippedBackground)
+    XCTAssertNil(unsafe.remoteBackgroundURL)
+    let backgroundSuiteName = "TypebarTests.imported-theme-background-\(UUID().uuidString)"
+    let backgroundDefaults = UserDefaults(suiteName: backgroundSuiteName)!
+    defer { backgroundDefaults.removePersistentDomain(forName: backgroundSuiteName) }
+    let backgroundSettings = AppSettings(defaults: backgroundDefaults)
+    backgroundSettings.customBackgroundURL = "https://assets.example.test/original.png"
+    XCTAssertNotNil(backgroundSettings.applyImportedWebTheme(unsafe))
+    XCTAssertEqual(backgroundSettings.customBackgroundURL, "https://assets.example.test/original.png")
+
+    XCTAssertThrowsError(try LegacyCustomThemeLinkImporter.theme(
+      from: "http://example.com/?customTheme=ignored", name: "Not secure")) { error in
+      XCTAssertEqual(error as? LegacyCustomThemeLinkImporter.ImportError, .invalidLink)
+    }
+  }
+
   func testOfficialTestLimitInputAcceptsNonnegativeSafeIntegers() {
     XCTAssertEqual(OfficialTestLimitInput.value(from: "0"), 0)
     XCTAssertEqual(OfficialTestLimitInput.value(from: "2"), 2)
