@@ -251,13 +251,14 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    static let currentVersion = 3
+    static let currentVersion = 4
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
     let results: [CompletedTestResult]
     let presets: [NamedPreset]
     let savedTexts: [NamedSavedText]
+    let resultFilterPresets: [NamedResultFilterPreset]
     let activeTestSelection: ActiveTestSelectionDocument?
 
     init(
@@ -267,6 +268,7 @@ struct TypebarArchive: Codable, Equatable {
         results: [CompletedTestResult],
         presets: [NamedPreset],
         savedTexts: [NamedSavedText] = [],
+        resultFilterPresets: [NamedResultFilterPreset] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil
     ) {
         self.version = version
@@ -275,13 +277,15 @@ struct TypebarArchive: Codable, Equatable {
         self.results = results
         self.presets = presets
         self.savedTexts = savedTexts
+        self.resultFilterPresets = version >= 4 ? resultFilterPresets.filter(\.isValid) : []
         self.activeTestSelection = version >= 3
             ? activeTestSelection.flatMap(ActiveTestSelectionPolicy.validated)
             : nil
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, exportedAt, settings, results, presets, savedTexts, activeTestSelection
+        case version, exportedAt, settings, results, presets, savedTexts, resultFilterPresets,
+            activeTestSelection
     }
 
     init(from decoder: Decoder) throws {
@@ -292,6 +296,10 @@ struct TypebarArchive: Codable, Equatable {
         results = try values.decode([CompletedTestResult].self, forKey: .results)
         presets = try values.decode([NamedPreset].self, forKey: .presets)
         savedTexts = try values.decodeIfPresent([NamedSavedText].self, forKey: .savedTexts) ?? []
+        resultFilterPresets = version >= 4
+            ? (try values.decodeIfPresent([NamedResultFilterPreset].self, forKey: .resultFilterPresets) ?? [])
+                .filter(\.isValid)
+            : []
         activeTestSelection = version >= 3
             ? try values
                 .decodeIfPresent(ActiveTestSelectionDocument.self, forKey: .activeTestSelection)
@@ -332,6 +340,28 @@ struct NamedSavedText: Codable, Equatable {
         longProgress = decodedProgress.map {
             LongSavedTextProgress.normalized($0, in: decodedText)
         }
+    }
+}
+
+struct NamedResultFilterPreset: Codable, Equatable, Identifiable {
+    var id: UUID
+    var name: String
+    let filter: ResultHistoryFilter
+    let createdAt: Date
+
+    init(id: UUID, name: String, filter: ResultHistoryFilter, createdAt: Date) {
+        self.id = id
+        self.name = name
+        self.filter = filter
+        self.createdAt = createdAt
+    }
+
+    var isValid: Bool {
+        ResultFilterPresetPolicy.normalizedName(name) == name
+    }
+
+    func hasSameContent(as other: Self) -> Bool {
+        name == other.name && filter == other.filter
     }
 }
 
@@ -599,6 +629,7 @@ enum TypebarDataTransfer {
         results: [CompletedTestResult],
         presets: [NamedPreset],
         savedTexts: [NamedSavedText] = [],
+        resultFilterPresets: [NamedResultFilterPreset] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil,
         at date: Date = .now
     ) throws -> Data {
@@ -609,6 +640,7 @@ enum TypebarDataTransfer {
             results: results,
             presets: presets,
             savedTexts: savedTexts,
+            resultFilterPresets: resultFilterPresets,
             activeTestSelection: activeTestSelection))
     }
 
@@ -633,6 +665,56 @@ enum TypebarArchiveMerge {
             CustomTextPolicy.isValidSavedText(title: $0.title, text: $0.text) && !existing.contains($0)
         }
     }
+
+    static func resultFilterPresetsToInsert(
+        from archive: TypebarArchive,
+        existing: [NamedResultFilterPreset],
+        makeID: () -> UUID = UUID.init
+    ) -> [NamedResultFilterPreset] {
+        var occupiedIDs = Set(existing.map(\.id))
+        var occupiedNames = Set(existing.map(\.name))
+        var knownPresets = existing
+        var additions: [NamedResultFilterPreset] = []
+
+        for remotePreset in archive.resultFilterPresets where remotePreset.isValid {
+            guard !knownPresets.contains(where: { $0.hasSameContent(as: remotePreset) }) else { continue }
+            var copy = remotePreset
+            if occupiedIDs.contains(copy.id) {
+                copy.id = freshResultFilterPresetID(occupied: &occupiedIDs, makeID: makeID)
+            } else {
+                occupiedIDs.insert(copy.id)
+            }
+            if occupiedNames.contains(copy.name) {
+                copy.name = resultFilterPresetConflictName(for: copy.name, occupied: occupiedNames)
+            }
+            occupiedNames.insert(copy.name)
+            knownPresets.append(copy)
+            additions.append(copy)
+        }
+        return additions
+    }
+
+    private static func freshResultFilterPresetID(
+        occupied: inout Set<UUID>, makeID: () -> UUID
+    ) -> UUID {
+        var candidate = makeID()
+        while occupied.contains(candidate) { candidate = makeID() }
+        occupied.insert(candidate)
+        return candidate
+    }
+
+    private static func resultFilterPresetConflictName(for name: String, occupied: Set<String>) -> String {
+        let suffix = "（导入冲突）"
+        var index = 1
+        while true {
+            let numberedSuffix = index == 1 ? suffix : "（导入冲突 \(index)）"
+            let candidate = String(
+                name.prefix(max(0, ResultFilterPresetPolicy.maximumNameLength - numberedSuffix.count)))
+                + numberedSuffix
+            if !occupied.contains(candidate) { return candidate }
+            index += 1
+        }
+    }
 }
 
 /// Resolves an archive version race without discarding either device's
@@ -643,6 +725,7 @@ enum SyncConflictKind: String, Codable, Equatable, Sendable {
     case customKeyboardLayout
     case preset
     case savedText
+    case resultFilterPreset
 
     var displayName: String {
         switch self {
@@ -650,6 +733,7 @@ enum SyncConflictKind: String, Codable, Equatable, Sendable {
         case .customKeyboardLayout: "自定义键盘布局"
         case .preset: "测试预设"
         case .savedText: "自定义文本"
+        case .resultFilterPreset: "成绩筛选预设"
         }
     }
 
@@ -659,6 +743,7 @@ enum SyncConflictKind: String, Codable, Equatable, Sendable {
         case .customKeyboardLayout: "keyboard"
         case .preset: "slider.horizontal.3"
         case .savedText: "doc.text"
+        case .resultFilterPreset: "line.3.horizontal.decrease.circle"
         }
     }
 }
@@ -785,6 +870,32 @@ enum TypebarArchiveConflictMerge {
             }
         }
 
+        var resultFilterPresets = local.resultFilterPresets
+        var resultFilterPresetIDs = Set(resultFilterPresets.map(\.id))
+        for remotePreset in remote.resultFilterPresets where remotePreset.isValid {
+            guard !resultFilterPresets.contains(where: { $0.hasSameContent(as: remotePreset) })
+            else { continue }
+            var copy = remotePreset
+            var changed = false
+            if resultFilterPresetIDs.contains(copy.id) {
+                copy.id = freshID(occupied: &resultFilterPresetIDs, makeID: makeID)
+                changed = true
+            } else {
+                resultFilterPresetIDs.insert(copy.id)
+            }
+            if resultFilterPresets.contains(where: { $0.name == copy.name }) {
+                copy.name = conflictName(
+                    for: copy.name,
+                    occupied: Set(resultFilterPresets.map(\.name)),
+                    maximumLength: ResultFilterPresetPolicy.maximumNameLength)
+                changed = true
+            }
+            resultFilterPresets.append(copy)
+            if changed {
+                conflicts.append(.init(kind: .resultFilterPreset, displayName: copy.name))
+            }
+        }
+
         return .init(
             archive: .init(
                 version: max(local.version, remote.version),
@@ -795,6 +906,7 @@ enum TypebarArchiveConflictMerge {
                 },
                 presets: presets,
                 savedTexts: savedTexts,
+                resultFilterPresets: resultFilterPresets,
                 activeTestSelection: local.activeTestSelection),
             conflicts: conflicts)
     }
@@ -883,6 +995,7 @@ struct ArchiveImportSummary: Equatable {
     let insertedResults: Int
     let insertedPresets: Int
     let insertedSavedTexts: Int
+    let insertedResultFilterPresets: Int
     let restoredActiveTestSelection: Bool
 }
 
@@ -905,6 +1018,7 @@ enum LocalArchiveImport {
         results: [TestResultRecord],
         presets: [TestPresetRecord],
         savedTexts: [SavedCustomTextRecord],
+        resultFilterPresets: [ResultFilterPresetRecord] = [],
         modelContext: ModelContext
     ) throws -> ArchiveImportSummary {
         guard settings.allowsRestartingConfigurationChange else {
@@ -921,12 +1035,19 @@ enum LocalArchiveImport {
                 NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
             }
         )
+        let newResultFilterPresetRecords = TypebarArchiveMerge.resultFilterPresetsToInsert(
+            from: archive,
+            existing: resultFilterPresets.compactMap(\.portablePreset)
+        ).compactMap(ResultFilterPresetRecord.init(portablePreset:))
 
         for result in newResults { modelContext.insert(TestResultRecord(result: result)) }
         for preset in newPresets { modelContext.insert(TestPresetRecord(name: preset.name, definition: preset.definition)) }
         for savedText in newSavedTexts {
             modelContext.insert(SavedCustomTextRecord(
                 title: savedText.title, text: savedText.text, longProgress: savedText.longProgress))
+        }
+        for resultFilterPreset in newResultFilterPresetRecords {
+            modelContext.insert(resultFilterPreset)
         }
         do {
             try modelContext.save()
@@ -941,6 +1062,7 @@ enum LocalArchiveImport {
             insertedResults: newResults.count,
             insertedPresets: newPresets.count,
             insertedSavedTexts: newSavedTexts.count,
+            insertedResultFilterPresets: newResultFilterPresetRecords.count,
             restoredActiveTestSelection: restoredActiveTestSelection)
     }
 }
@@ -966,6 +1088,7 @@ struct TypebarArchiveDocument: FileDocument {
             results: archive.results,
             presets: archive.presets,
             savedTexts: archive.savedTexts,
+            resultFilterPresets: archive.resultFilterPresets,
             activeTestSelection: archive.activeTestSelection,
             at: archive.exportedAt
         ))

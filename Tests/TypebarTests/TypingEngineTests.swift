@@ -22526,6 +22526,13 @@ final class TypingEngineTests: XCTestCase {
       NamedSavedText(title: "Notes", text: "An original text for focused practice."),
       NamedSavedText(title: "Chapter", text: "amber harbor willow", longProgress: 6),
     ]
+    let resultFilterPreset = NamedResultFilterPreset(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000401")!,
+      name: "Focused English",
+      filter: .init(
+        modes: [.time, .words], languages: [.english],
+        tagFilter: .init(isUnrestricted: false, includesNoTags: true, tags: ["focus"])),
+      createdAt: start)
     let activeTestSelection = ActiveTestSelectionDocument(
       preset: .init(configuration: .words(83, language: .german)),
       quoteSource: .community,
@@ -22534,29 +22541,35 @@ final class TypingEngineTests: XCTestCase {
         customTextWordLimit: 73, customTextSectionLimit: 4))
     let data = try TypebarDataTransfer.exportArchive(
       settings: settings, results: [result], presets: [preset], savedTexts: savedTexts,
+      resultFilterPresets: [resultFilterPreset],
       activeTestSelection: activeTestSelection, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(archive.version, 3)
+    XCTAssertEqual(archive.version, 4)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
     XCTAssertEqual(archive.savedTexts, savedTexts)
+    XCTAssertEqual(archive.resultFilterPresets, [resultFilterPreset])
     XCTAssertEqual(archive.activeTestSelection, activeTestSelection)
 
     var legacyVersionThreePayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
+    legacyVersionThreePayload["version"] = 3
     legacyVersionThreePayload.removeValue(forKey: "activeTestSelection")
+    legacyVersionThreePayload.removeValue(forKey: "resultFilterPresets")
     let legacyVersionThreeData = try JSONSerialization.data(
       withJSONObject: legacyVersionThreePayload)
     let legacyVersionThreeArchive = try TypebarDataTransfer.importArchive(
       from: legacyVersionThreeData)
     XCTAssertEqual(legacyVersionThreeArchive.version, 3)
+    XCTAssertTrue(legacyVersionThreeArchive.resultFilterPresets.isEmpty)
     XCTAssertNil(legacyVersionThreeArchive.activeTestSelection)
 
     var versionTwoPayload = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     versionTwoPayload["version"] = 2
     versionTwoPayload.removeValue(forKey: "activeTestSelection")
+    versionTwoPayload.removeValue(forKey: "resultFilterPresets")
     var versionTwoResults = try XCTUnwrap(versionTwoPayload["results"] as? [[String: Any]])
     versionTwoResults[0].removeValue(forKey: "restartCount")
     versionTwoPayload["results"] = versionTwoResults
@@ -22579,11 +22592,51 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(
       try TypebarDataTransfer.importArchive(from: invalidSelectionData).activeTestSelection)
 
-    versionTwoPayload["version"] = 4
+    versionTwoPayload["version"] = 5
     let futureData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
     XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: futureData)) { error in
-      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(4))
+      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(5))
     }
+  }
+
+  @MainActor
+  func testLocalArchiveImportAddsResultFilterPresetsWithoutDuplicatingExistingRecords() throws {
+    let suiteName = "TypebarTests.result-filter-archive.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let settings = AppSettings(defaults: defaults)
+    let container = try ModelContainer(
+      for: ResultFilterPresetRecord.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let existing = try XCTUnwrap(ResultFilterPresetRecord(
+      name: "Existing", filter: .init(modes: [.quote])))
+    container.mainContext.insert(existing)
+    try container.mainContext.save()
+
+    let imported = NamedResultFilterPreset(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000402")!,
+      name: "Focused English",
+      filter: .init(modes: [.time, .words], languages: [.english]),
+      createdAt: start)
+    let existingPortable = try XCTUnwrap(existing.portablePreset)
+    let archive = TypebarArchive(
+      exportedAt: start, settings: settings.snapshot, results: [], presets: [],
+      resultFilterPresets: [existingPortable, imported])
+
+    let firstSummary = try LocalArchiveImport.apply(
+      archive, settings: settings, results: [], presets: [], savedTexts: [],
+      resultFilterPresets: [existing], modelContext: container.mainContext)
+    XCTAssertEqual(firstSummary.insertedResultFilterPresets, 1)
+    let restored = try container.mainContext.fetch(
+      FetchDescriptor<ResultFilterPresetRecord>(sortBy: [SortDescriptor(\.createdAt)]))
+    XCTAssertEqual(restored.compactMap(\.portablePreset), [imported, existingPortable])
+
+    let secondSummary = try LocalArchiveImport.apply(
+      archive, settings: settings, results: [], presets: [], savedTexts: [],
+      resultFilterPresets: restored, modelContext: container.mainContext)
+    XCTAssertEqual(secondSummary.insertedResultFilterPresets, 0)
+    XCTAssertEqual(
+      try container.mainContext.fetch(FetchDescriptor<ResultFilterPresetRecord>()).count, 2)
   }
 
   @MainActor
@@ -22735,6 +22788,12 @@ final class TypingEngineTests: XCTestCase {
       name: "Daily", definition: .init(configuration: .timed(seconds: 60), quoteID: nil, customText: nil))
     let localText = NamedSavedText(title: "Drill", text: "local words")
     let remoteText = NamedSavedText(title: "Drill", text: "remote words")
+    let localFilterPreset = NamedResultFilterPreset(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000103")!,
+      name: "Focus", filter: .init(modes: [.words]), createdAt: start)
+    let remoteFilterPreset = NamedResultFilterPreset(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000104")!,
+      name: "Focus", filter: .init(modes: [.time]), createdAt: start)
     let localSelection = ActiveTestSelectionDocument(
       preset: .init(configuration: .words(25)), testParameterMemory: .defaults)
     let remoteSelection = ActiveTestSelectionDocument(
@@ -22745,6 +22804,7 @@ final class TypingEngineTests: XCTestCase {
         fontSize: 31, customThemes: [localTheme], activeCustomThemeID: sharedThemeID,
         favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: sharedThemeID)]),
       results: [], presets: [localPreset], savedTexts: [localText],
+      resultFilterPresets: [localFilterPreset],
       activeTestSelection: localSelection)
     let remote = TypebarArchive(
       exportedAt: start.addingTimeInterval(1),
@@ -22752,6 +22812,7 @@ final class TypingEngineTests: XCTestCase {
         fontSize: 46, customThemes: [remoteTheme], activeCustomThemeID: sharedThemeID,
         favoriteThemeIDs: [ThemeFavoritePolicy.customID(for: sharedThemeID)]),
       results: [], presets: [remotePreset], savedTexts: [remoteText],
+      resultFilterPresets: [remoteFilterPreset],
       activeTestSelection: remoteSelection)
 
     let merged = TypebarArchiveConflictMerge.merge(
@@ -22768,6 +22829,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(merged.presets.last?.definition, remotePreset.definition)
     XCTAssertEqual(merged.savedTexts.map(\.title), ["Drill", "Drill（同步冲突）"])
     XCTAssertEqual(merged.savedTexts.last?.text, remoteText.text)
+    XCTAssertEqual(merged.resultFilterPresets.map(\.name), ["Focus", "Focus（同步冲突）"])
+    XCTAssertEqual(merged.resultFilterPresets.last?.filter, remoteFilterPreset.filter)
     XCTAssertEqual(merged.activeTestSelection, localSelection)
   }
 
@@ -22797,7 +22860,12 @@ final class TypingEngineTests: XCTestCase {
       presets: [
         .init(name: "Daily", definition: .init(configuration: .words(25), quoteID: nil, customText: nil))
       ],
-      savedTexts: [.init(title: "Drill", text: "local words")])
+      savedTexts: [.init(title: "Drill", text: "local words")],
+      resultFilterPresets: [
+        .init(
+          id: UUID(uuidString: "00000000-0000-0000-0000-000000000116")!,
+          name: "Review", filter: .init(modes: [.time]), createdAt: start),
+      ])
     let remote = TypebarArchive(
       exportedAt: start,
       settings: .init(customThemes: [remoteTheme], customKeyboardLayouts: [remoteLayout]),
@@ -22809,6 +22877,11 @@ final class TypingEngineTests: XCTestCase {
       savedTexts: [
         .init(title: "Drill", text: "remote words"),
         .init(title: "Unique", text: "new words"),
+      ],
+      resultFilterPresets: [
+        .init(
+          id: UUID(uuidString: "00000000-0000-0000-0000-000000000115")!,
+          name: "Review", filter: .init(modes: [.words]), createdAt: start),
       ])
     var generatedIDs = [clonedThemeID, clonedLayoutID].makeIterator()
 
@@ -22816,11 +22889,13 @@ final class TypingEngineTests: XCTestCase {
       local: local, remote: remote, makeID: { generatedIDs.next()! })
 
     XCTAssertEqual(result.archive.presets.map(\.name), ["Daily", "Daily（同步冲突）", "Unique"])
+    XCTAssertEqual(result.archive.resultFilterPresets.map(\.name), ["Review", "Review（同步冲突）"])
     XCTAssertEqual(result.conflicts, [
       .init(kind: .customTheme, displayName: "Focus（同步冲突）"),
       .init(kind: .customKeyboardLayout, displayName: "Board（同步冲突）"),
       .init(kind: .preset, displayName: "Daily（同步冲突）"),
       .init(kind: .savedText, displayName: "Drill（同步冲突）"),
+      .init(kind: .resultFilterPreset, displayName: "Review（同步冲突）"),
     ])
   }
 

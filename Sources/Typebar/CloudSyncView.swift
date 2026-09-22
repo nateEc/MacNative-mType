@@ -7,6 +7,8 @@ struct CloudSyncView: View {
     @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var results: [TestResultRecord]
     @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var presets: [TestPresetRecord]
     @Query(sort: \SavedCustomTextRecord.createdAt, order: .reverse) private var savedTexts: [SavedCustomTextRecord]
+    @Query(sort: \ResultFilterPresetRecord.createdAt, order: .reverse)
+    private var resultFilterPresets: [ResultFilterPresetRecord]
 
     let settings: AppSettings
     let account: AccountSession
@@ -84,6 +86,7 @@ struct CloudSyncView: View {
                     LabeledContent("成绩", value: "\(results.count) 条")
                     LabeledContent("预设", value: "\(presets.count) 个")
                     LabeledContent("自定义文本", value: "\(savedTexts.count) 篇")
+                    LabeledContent("成绩筛选预设", value: "\(resultFilterPresets.count) 个")
                     Text("上传会创建包含当前测试选择的版本化归档变更；普通下载会去重合并并应用远端设置和有效测试选择。若上传发现并发冲突，则保留本机设置与测试选择，并将双方不同的内容另存为带标记副本后重试。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -420,14 +423,15 @@ struct CloudSyncView: View {
                         local: archive, remote: remoteArchive)
                     let summary = try LocalArchiveImport.apply(
                         mergeResult.archive, settings: settings, results: results, presets: presets,
-                        savedTexts: savedTexts, modelContext: modelContext)
+                        savedTexts: savedTexts, resultFilterPresets: resultFilterPresets,
+                        modelContext: modelContext)
                     if let scope = account.resultPublicationScope {
                         conflictAuditStore.append(mergeResult.conflicts, for: scope)
                         reloadConflictAudit()
                     }
                     account.confirmPulledArchive(pulled)
                     let cursor = try await account.pushArchive(mergeResult.archive)
-                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置与测试选择，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本；另存 \(mergeResult.conflicts.count) 个冲突副本。"
+                    message = "冲突已安全合并并重新上传（游标 \(cursor)）：保留本机设置与测试选择，新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设；另存 \(mergeResult.conflicts.count) 个冲突副本。"
                 } catch {
                     message = "已停止冲突覆盖：\(error.localizedDescription)"
                 }
@@ -460,10 +464,12 @@ struct CloudSyncView: View {
                     message = "没有新的远端归档。"
                     return
                 }
-                let summary = try LocalArchiveImport.apply(archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts, modelContext: modelContext)
+                let summary = try LocalArchiveImport.apply(
+                    archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts,
+                    resultFilterPresets: resultFilterPresets, modelContext: modelContext)
                 account.confirmPulledArchive(pulled)
                 let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
-                message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本\(selectionDetail)。"
+                message = "已合并 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设\(selectionDetail)。"
             } catch {
                 message = error.localizedDescription
             }
@@ -703,12 +709,14 @@ struct CloudSyncView: View {
         let namedSavedTexts = savedTexts.map {
             NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
         }
+        let namedResultFilterPresets = resultFilterPresets.compactMap(\.portablePreset)
         return .init(
             exportedAt: .now,
             settings: settings.snapshot,
             results: portableResults,
             presets: namedPresets,
             savedTexts: namedSavedTexts,
+            resultFilterPresets: namedResultFilterPresets,
             activeTestSelection: settings.activeTestSelection)
     }
 }

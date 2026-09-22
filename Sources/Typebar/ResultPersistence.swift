@@ -360,7 +360,22 @@ final class ResultFilterPresetRecord {
     createdAt = .now
   }
 
+  init?(portablePreset: NamedResultFilterPreset) {
+    guard portablePreset.isValid,
+      let filterData = try? JSONEncoder().encode(portablePreset.filter)
+    else { return nil }
+    id = portablePreset.id
+    name = portablePreset.name
+    self.filterData = filterData
+    createdAt = portablePreset.createdAt
+  }
+
   var filter: ResultHistoryFilter? {
     try? JSONDecoder().decode(ResultHistoryFilter.self, from: filterData)
+  }
+
+  var portablePreset: NamedResultFilterPreset? {
+    guard let filter else { return nil }
+    return .init(id: id, name: name, filter: filter, createdAt: createdAt)
   }
 }

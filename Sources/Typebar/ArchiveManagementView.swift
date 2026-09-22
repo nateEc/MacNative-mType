@@ -7,6 +7,8 @@ struct ArchiveManagementView: View {
     @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var results: [TestResultRecord]
     @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var presets: [TestPresetRecord]
     @Query(sort: \SavedCustomTextRecord.createdAt, order: .reverse) private var savedTexts: [SavedCustomTextRecord]
+    @Query(sort: \ResultFilterPresetRecord.createdAt, order: .reverse)
+    private var resultFilterPresets: [ResultFilterPresetRecord]
 
     let settings: AppSettings
     @State private var exportDocument: TypebarArchiveDocument?
@@ -20,6 +22,7 @@ struct ArchiveManagementView: View {
                     LabeledContent("已保存成绩", value: "\(results.count) 条")
                     LabeledContent("测试预设", value: "\(presets.count) 个")
                     LabeledContent("自定义文本", value: "\(savedTexts.count) 篇")
+                    LabeledContent("成绩筛选预设", value: "\(resultFilterPresets.count) 个")
                     LabeledContent(
                         "当前测试选择",
                         value: settings.activeTestSelection == nil ? "尚未生成" : "会迁移")
@@ -31,7 +34,7 @@ struct ArchiveManagementView: View {
                 Section("迁移") {
                     Button("导出本机数据…", systemImage: "square.and.arrow.up") { beginExport() }
                     Button("导入本机数据…", systemImage: "square.and.arrow.down") { showingImporter = true }
-                    Text("导入会合并新成绩、预设和自定义文本；相同内容不会重复写入。导入文件中的设置和有效测试选择会应用到本机。旧版备份不会改变当前测试。")
+                    Text("导入会合并新成绩、预设、自定义文本和成绩筛选预设；相同内容不会重复写入。导入文件中的设置和有效测试选择会应用到本机。旧版备份不会改变当前测试。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -79,6 +82,7 @@ struct ArchiveManagementView: View {
         let namedSavedTexts = savedTexts.map {
             NamedSavedText(title: $0.title, text: $0.text, longProgress: $0.longProgress)
         }
+        let namedResultFilterPresets = resultFilterPresets.compactMap(\.portablePreset)
         exportDocument = TypebarArchiveDocument(archive: .init(
             version: TypebarArchive.currentVersion,
             exportedAt: .now,
@@ -86,6 +90,7 @@ struct ArchiveManagementView: View {
             results: portableResults,
             presets: namedPresets,
             savedTexts: namedSavedTexts,
+            resultFilterPresets: namedResultFilterPresets,
             activeTestSelection: settings.activeTestSelection
         ))
     }
@@ -98,9 +103,11 @@ struct ArchiveManagementView: View {
 
         do {
             let archive = try TypebarDataTransfer.importArchive(from: Data(contentsOf: url))
-            let summary = try LocalArchiveImport.apply(archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts, modelContext: modelContext)
+            let summary = try LocalArchiveImport.apply(
+                archive, settings: settings, results: results, presets: presets, savedTexts: savedTexts,
+                resultFilterPresets: resultFilterPresets, modelContext: modelContext)
             let selectionDetail = summary.restoredActiveTestSelection ? "，并已恢复测试选择" : ""
-            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设和 \(summary.insertedSavedTexts) 篇文本，已应用文件中的设置\(selectionDetail)。")
+            message = .init(title: "导入完成", detail: "新增 \(summary.insertedResults) 条成绩、\(summary.insertedPresets) 个预设、\(summary.insertedSavedTexts) 篇文本和 \(summary.insertedResultFilterPresets) 个成绩筛选预设，已应用文件中的设置\(selectionDetail)。")
         } catch {
             message = .init(title: "无法导入", detail: error.localizedDescription)
         }
