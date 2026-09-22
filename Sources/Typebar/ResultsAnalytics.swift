@@ -25,6 +25,46 @@ enum ResultMetricPresentation {
     return "\(Int(normalized.rounded()))%"
   }
 
+  static func duration(_ value: TimeInterval, alwaysShowDecimalPlaces: Bool) -> String {
+    let original = min(normalized(value), 8_000_000_000_000_000)
+    let displayed = alwaysShowDecimalPlaces ? roundedToTwo(original) : original.rounded()
+    if original > 61 {
+      return clockDuration(displayed)
+    }
+    if alwaysShowDecimalPlaces {
+      return String(format: "%.2f 秒", displayed)
+    }
+    return "\(Int(displayed)) 秒"
+  }
+
+  private static func clockDuration(_ value: TimeInterval) -> String {
+    let hours = Int(value / 3_600)
+    let minutes = Int(value.truncatingRemainder(dividingBy: 3_600) / 60)
+    let seconds = roundedToTwo(value.truncatingRemainder(dividingBy: 60))
+    let secondsValue = compactDecimal(seconds)
+    let secondsText = (hours > 0 || minutes > 0) && seconds < 10
+      ? "0\(secondsValue)"
+      : secondsValue
+    if hours > 0 {
+      return "\(padded(hours)):\(padded(minutes)):\(secondsText)"
+    }
+    return "\(padded(minutes)):\(secondsText)"
+  }
+
+  private static func padded(_ value: Int) -> String {
+    value < 10 ? "0\(value)" : "\(value)"
+  }
+
+  private static func compactDecimal(_ value: Double) -> String {
+    String(format: "%.2f", value)
+      .replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression)
+      .replacingOccurrences(of: #"\.$"#, with: "", options: .regularExpression)
+  }
+
+  private static func roundedToTwo(_ value: Double) -> Double {
+    (value * 100).rounded() / 100
+  }
+
   private static func normalized(_ value: Double) -> Double {
     value.isFinite ? max(0, value) : 0
   }

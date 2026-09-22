@@ -25025,6 +25025,19 @@ final class TypingEngineTests: XCTestCase {
       TypingSpeedUnit.wph.formatted(wpm: 12.5, alwaysShowDecimalPlaces: true), "750.00")
   }
 
+  func testResultDurationPresentationMatchesReferenceThresholdAndPrecision() {
+    XCTAssertEqual(
+      ResultMetricPresentation.duration(12.5, alwaysShowDecimalPlaces: false), "13 秒")
+    XCTAssertEqual(
+      ResultMetricPresentation.duration(12.5, alwaysShowDecimalPlaces: true), "12.50 秒")
+    XCTAssertEqual(
+      ResultMetricPresentation.duration(61, alwaysShowDecimalPlaces: false), "61 秒")
+    XCTAssertEqual(
+      ResultMetricPresentation.duration(61.5, alwaysShowDecimalPlaces: false), "01:02")
+    XCTAssertEqual(
+      ResultMetricPresentation.duration(61.5, alwaysShowDecimalPlaces: true), "01:01.5")
+  }
+
   func testCompletedResultPreservesExactMetricsForResultPageDecimalPresentation() throws {
     let result = CompletedTestResult(
       id: UUID(), configuration: .words(1), outcome: .completed,

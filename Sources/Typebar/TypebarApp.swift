@@ -4660,7 +4660,10 @@ private struct CompletedResultView: View {
         }
         GridRow {
           metric("错误", "\(result.errorCount)")
-          metric("总用时", "\(Int(result.elapsedDuration)) 秒")
+          metric(
+            "总用时",
+            ResultMetricPresentation.duration(
+              result.elapsedDuration, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
         }
         GridRow {
           metric("字符（匹配/错位/额外/跳过）", characterStatsText)

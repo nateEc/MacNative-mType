@@ -219,7 +219,7 @@
 | `tapeMargin` | `practiceTapeMargin` | 已映射；以 0–1 原生比例保存。 |
 | `smoothLineScroll` | `smoothPracticeLineScroll` | 已映射。 |
 | `showAllLines` | `showAllPracticeLines` | 已映射。 |
-| `alwaysShowDecimalPlaces` | `alwaysShowDecimalPlaces` | 已映射。完成结果页保留未取整的速度与准确率；关闭时按参考规则展示换算后整数、向下取整准确率和四舍五入稳定度，开启时速度、准确率与两类稳定度展示两位小数；旧本机记录安全回退为原整数值。 |
+| `alwaysShowDecimalPlaces` | `alwaysShowDecimalPlaces` | 已映射。完成结果页保留未取整的速度与准确率；关闭时按参考规则展示换算后整数、向下取整准确率、四舍五入稳定度及四舍五入总用时，开启时速度、准确率与两类稳定度展示两位小数，短时总用时展示两位小数、超过 61 秒切换为时钟格式；旧本机记录安全回退为原整数值。 |
 | `typingSpeedUnit` | `typingSpeedUnit` | 已映射。 |
 | `startGraphsAtZero` | `startGraphsAtZero` | 已映射。 |
 
