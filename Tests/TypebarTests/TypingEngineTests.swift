@@ -15194,6 +15194,80 @@ final class TypingEngineTests: XCTestCase {
       try TestConfigurationShare.preset(from: "typebar://test?preset=not-base64"))
   }
 
+  func testLegacyTestSettingsLinkImportsCompressedSettingsAndRejectsInvalidLinksAtomically() throws {
+    let current = SavedTestPreset(
+      configuration: .timed(seconds: 30, difficulty: .normal, language: .german),
+      quoteID: nil, customText: nil)
+    let wordsLink =
+      "https://share.example.test/practice?testSettings=NoIg7g9gTgJgziANAVgAyIHYFcA2PEAuUWApogGYCGOcZIJGA5jgJZwAWSIAtpXASShcAxlAIBiYewgQA+lJkgAukA"
+
+    let words = try LegacyTestSettingsLinkImporter.preset(from: wordsLink, current: current)
+
+    XCTAssertEqual(words.configuration.mode, .words)
+    XCTAssertNil(words.configuration.duration)
+    XCTAssertEqual(words.configuration.wordLimit, 50)
+    XCTAssertEqual(words.configuration.language, .english)
+    XCTAssertEqual(words.configuration.difficulty, .master)
+    XCTAssertEqual(words.configuration.contentOptions, .init(includePunctuation: true, includeNumbers: false))
+    XCTAssertEqual(words.configuration.modifiers, [.crtVisual, .chooVisual])
+    XCTAssertNil(words.quoteID)
+    XCTAssertNil(words.customText)
+
+    let formEncodedWords = try LegacyTestSettingsLinkImporter.preset(
+      from: wordsLink.replacingOccurrences(of: "+", with: "%20"), current: current)
+    XCTAssertEqual(formEncodedWords, words)
+
+    let customLink =
+      "https://share.example.test/practice?testSettings=NoIgxgrgzgLg9gWxAGgHYQDYeQbxDAUwA8YQAuUAJwIBMACAIwwgJRAHNqDU724MaIALrIQCODVZkQUABYQAZgoytRGAJYJ1pMngBuAQ2ZSATKPGTyMgmBjq4qEAF9RAB3WuCAEQIathSnIYShYXdCw0TGxw6KjIrCEgA"
+    let custom = try LegacyTestSettingsLinkImporter.preset(from: customLink, current: current)
+
+    XCTAssertEqual(custom.configuration.mode, .custom)
+    XCTAssertNil(custom.configuration.duration)
+    XCTAssertNil(custom.configuration.wordLimit)
+    XCTAssertEqual(custom.configuration.customTextCompletion, .sections)
+    XCTAssertEqual(custom.configuration.customTextSectionLimit, 2)
+    XCTAssertEqual(custom.configuration.customTextOrdering, .shuffled)
+    XCTAssertEqual(custom.customText, "red blue|green gold")
+
+    let legacyCustom = try LegacyTestSettingsLinkImporter.preset(
+      from: "https://share.example.test/practice?testSettings=NoIgxgrgzgLg9gWxAGgHYQDYeQbxDAUwA8YQAuUAQwQCMCAnFEAC0vprkYF1kQBLKAHVOAEwBKlVCMTkY9CAV4B3UeQCsvEQQx8EfQozIgAPiAC+aTNnRZLtm9atcgA",
+      current: current)
+    XCTAssertEqual(legacyCustom.configuration.mode, .custom)
+    XCTAssertEqual(legacyCustom.configuration.customTextCompletion, .words)
+    XCTAssertEqual(legacyCustom.configuration.wordLimit, 5)
+    XCTAssertEqual(legacyCustom.customText, "amber|harbor")
+
+    let currentCustomText = LegacyTestSettingsLinkImporter.CustomTextFallback(
+      text: "harbor lantern cedar", completion: .words, duration: nil, wordLimit: 13,
+      sectionLimit: nil, ordering: .random)
+    let partialCustom = try LegacyTestSettingsLinkImporter.preset(
+      from: "https://share.example.test/practice?testSettings=NoIgxgrgzgLg9gWxAGgHYQDYbZ76s4H566EYC6QA",
+      current: current, customTextFallback: currentCustomText)
+    XCTAssertEqual(partialCustom.configuration.mode, .custom)
+    XCTAssertEqual(partialCustom.configuration.customTextCompletion, .words)
+    XCTAssertEqual(partialCustom.configuration.wordLimit, 13)
+    XCTAssertEqual(partialCustom.configuration.customTextOrdering, .random)
+    XCTAssertEqual(partialCustom.customText, "harbor lantern cedar")
+
+    let time = try LegacyTestSettingsLinkImporter.preset(
+      from: "https://share.example.test/practice?testSettings=NoIgLglgtgpiA0IAsBWBA7ArgG2-Lu+OeBJx8wAupUA",
+      current: current)
+    XCTAssertEqual(time.configuration.mode, .time)
+    XCTAssertEqual(time.configuration.duration, 45)
+    XCTAssertNil(time.configuration.wordLimit)
+    XCTAssertEqual(time.configuration.modifiers, [])
+
+    XCTAssertThrowsError(try LegacyTestSettingsLinkImporter.preset(
+      from: "https://share.example.test/practice?testSettings=not-a-valid-payload", current: current))
+    XCTAssertThrowsError(try LegacyTestSettingsLinkImporter.preset(
+      from: "https://share.example.test/practice?testSettings=NoIg7g9gTgJgziANAVkQOwK4Bsvu7zHPIw3UNCAFwH0oBTAQyxAF0Wg", current: current))
+    XCTAssertThrowsError(try LegacyTestSettingsLinkImporter.preset(
+      from: "typebar://test?testSettings=NoIg7g9gTgJgziANAVgAyIHYFcA2PEAuUWApogGYCGOcZIJGA5jgJZwAWSIAtpXASShcAxlAIBiYewgQA+lJkgAukA", current: current))
+    XCTAssertEqual(current, SavedTestPreset(
+      configuration: .timed(seconds: 30, difficulty: .normal, language: .german),
+      quoteID: nil, customText: nil))
+  }
+
   @MainActor
   func testLegacyCustomThemeLinkImportsColorsAndSafeBackgroundSettings() throws {
     let payload = """

@@ -1199,7 +1199,16 @@ private struct ContentView: View {
       Text("结果不会保存、本机统计、同步或发布。")
     }
     .sheet(isPresented: $showingTestShare) {
-      TestConfigurationShareView(currentPreset: presetDefinition) { apply($0) }
+      TestConfigurationShareView(
+        currentPreset: presetDefinition,
+        legacyCustomTextFallback: .init(
+          text: customText, completion: customTextCompletion,
+          duration: customTextCompletion == .time ? TimeInterval(customTextDuration) : nil,
+          wordLimit: customTextCompletion == .words ? customTextWordLimit : nil,
+          sectionLimit: customTextCompletion == .sections
+            ? min(customTextSectionLimit, max(1, customTextSections.count)) : nil,
+          ordering: customTextOrdering)
+      ) { apply($0) }
     }
     .sheet(item: $settingsJSONCommand) { presentation in
       SettingsJSONCommandView(presentation: presentation) { json in

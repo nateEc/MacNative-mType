@@ -113,13 +113,24 @@ enum TestConfigurationShare {
 }
 
 struct TestConfigurationShareView: View {
-    @Environment(\.dismiss) private var dismiss
-    let currentPreset: SavedTestPreset
+  @Environment(\.dismiss) private var dismiss
+  let currentPreset: SavedTestPreset
+  let legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback?
     let onApply: (SavedTestPreset) -> Void
     @State private var pastedLink = ""
     @State private var status: String?
 
     private var currentLink: String? { try? TestConfigurationShare.link(for: currentPreset) }
+
+  init(
+        currentPreset: SavedTestPreset,
+        legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback? = nil,
+        onApply: @escaping (SavedTestPreset) -> Void
+    ) {
+        self.currentPreset = currentPreset
+        self.legacyCustomTextFallback = legacyCustomTextFallback
+        self.onApply = onApply
+    }
 
     var body: some View {
         NavigationStack {
@@ -137,7 +148,10 @@ struct TestConfigurationShareView: View {
                 }
 
                 Section("导入测试链接") {
-                    TextField("粘贴 typebar://test 链接", text: $pastedLink, axis: .vertical)
+                    Text("支持自有 typebar://test 链接，以及网页端导出的 testSettings 链接。网页链接只在本机解码，不会访问其中的主机。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("粘贴测试设置链接", text: $pastedLink, axis: .vertical)
                         .lineLimit(2...4)
                     Button("应用导入的测试") { applyPastedLink() }
                         .disabled(pastedLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -163,7 +177,16 @@ struct TestConfigurationShareView: View {
 
     private func applyPastedLink() {
         do {
-            onApply(try TestConfigurationShare.preset(from: pastedLink))
+            let trimmed = pastedLink.trimmingCharacters(in: .whitespacesAndNewlines)
+            let preset: SavedTestPreset
+            if URLComponents(string: trimmed)?.scheme?.lowercased() == "typebar" {
+                preset = try TestConfigurationShare.preset(from: trimmed)
+            } else {
+                preset = try LegacyTestSettingsLinkImporter.preset(
+                    from: trimmed, current: currentPreset,
+                    customTextFallback: legacyCustomTextFallback)
+            }
+            onApply(preset)
             dismiss()
         } catch {
             status = (error as? LocalizedError)?.errorDescription ?? "无法导入该测试链接。"
