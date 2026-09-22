@@ -343,6 +343,60 @@ enum ResultFilterPresetPolicy {
   }
 }
 
+/// Persists explicit filter-preset removals until every synced archive has
+/// observed them. This prevents a stale device snapshot from resurrecting an
+/// item the user intentionally deleted on another Mac.
+struct ResultFilterPresetTombstoneStore {
+  private static let storageKey = "resultFilterPreset.deletedIDs.v1"
+  private let defaults: UserDefaults
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  var deletedIDs: [UUID] {
+    guard let data = defaults.data(forKey: Self.storageKey),
+      let rawIDs = try? JSONDecoder().decode([UUID].self, from: data)
+    else { return [] }
+    return Array(Set(rawIDs)).sorted { $0.uuidString < $1.uuidString }
+  }
+
+  func contains(_ id: UUID) -> Bool {
+    deletedIDs.contains(id)
+  }
+
+  func markDeleted(_ id: UUID) {
+    recordDeletedIDs([id])
+  }
+
+  func recordDeletedIDs(_ ids: some Sequence<UUID>) {
+    let combined = Set(deletedIDs).union(ids)
+    save(combined)
+  }
+
+  func restore(_ ids: some Sequence<UUID>) {
+    save(Set(deletedIDs).subtracting(ids))
+  }
+
+  func replaceDeletedIDs(_ ids: some Sequence<UUID>) {
+    save(Set(ids))
+  }
+
+  func removeAll() {
+    defaults.removeObject(forKey: Self.storageKey)
+  }
+
+  private func save(_ ids: Set<UUID>) {
+    guard !ids.isEmpty else {
+      defaults.removeObject(forKey: Self.storageKey)
+      return
+    }
+    let sorted = ids.sorted { $0.uuidString < $1.uuidString }
+    guard let data = try? JSONEncoder().encode(sorted) else { return }
+    defaults.set(data, forKey: Self.storageKey)
+  }
+}
+
 @Model
 final class ResultFilterPresetRecord {
   @Attribute(.unique) var id: UUID

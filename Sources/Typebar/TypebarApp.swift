@@ -6049,6 +6049,7 @@ private struct ResultsHistoryView: View {
     [TestResultRecord]
   @Query(sort: \ResultFilterPresetRecord.createdAt, order: .reverse) private var filterPresets:
     [ResultFilterPresetRecord]
+  private let resultFilterPresetTombstones = ResultFilterPresetTombstoneStore()
   @State private var selectedResult: TestResultRecord?
   @State private var modeFilter = Set(TestMode.allCases)
   @State private var languageFilter = Set(TypingLanguage.allCases)
@@ -6239,6 +6240,7 @@ private struct ResultsHistoryView: View {
                         .buttonStyle(.borderless)
                       Spacer()
                       Button(role: .destructive) {
+                        resultFilterPresetTombstones.markDeleted(preset.id)
                         modelContext.delete(preset)
                       } label: {
                         Image(systemName: "trash")

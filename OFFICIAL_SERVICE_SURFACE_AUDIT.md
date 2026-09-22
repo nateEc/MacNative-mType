@@ -10,7 +10,7 @@
 
 | 固定参考路由族 | 可观察的用户任务 | Typebar 独立实现与边界 |
 | --- | --- | --- |
-| `users` | 注册、账户资料、展示名、账户重置/删除、个人最佳、标签、主题、收藏、结果筛选、连续天数、收件箱与举报 | `RemoteAccount.swift`、`AppSettings.swift`、`ActiveResultTagEditor.swift`、`LocalAccountReset.swift` 与自建 `auth`／`profiles`／`notifications`／`reports` 路由覆盖账户、资料、个人最佳、标签、收藏、本机设置及公共资料任务。配置、主题、预设、收藏与筛选保持本机优先；其中成绩筛选预设作为 v4 归档字段随导出、导入和 Typebar 同步携带，而非复制参考的按资源 API。 |
+| `users` | 注册、账户资料、展示名、账户重置/删除、个人最佳、标签、主题、收藏、结果筛选、连续天数、收件箱与举报 | `RemoteAccount.swift`、`AppSettings.swift`、`ActiveResultTagEditor.swift`、`LocalAccountReset.swift` 与自建 `auth`／`profiles`／`notifications`／`reports` 路由覆盖账户、资料、个人最佳、标签、收藏、本机设置及公共资料任务。配置、主题、预设、收藏与筛选保持本机优先；其中成绩筛选预设作为 v4 活跃字段、并从 v5 起携带显式删除标记，随导出、导入和 Typebar 同步传输，而非复制参考的按资源 API。 |
 | `configs`、`presets` | 跨设备保存、读取、编辑或删除配置与预设 | `DataTransfer.swift`、`TestPresets.swift`、`RemoteAccount.swift` 与 `GET/POST /v1/sync` 传输版本化 Typebar 归档；冲突显式保留本机标量并另存冲突副本。 |
 | `results` | 提交、读取、查看单条、编辑标签和删除自己成绩 | `ResultPersistence.swift`、`RemoteAccount.swift` 与 `/v1/results`、`/v1/results/{id}`、`/v1/results/{id}/tags` 实现。所有练习先保留在本机；远端发布是用户选择，令牌与受限开发者密钥均只限自己的元数据。 |
 | `quotes` | 浏览、提交、审核、评分和举报社区引语 | `OfflineContent.swift`、`QuoteSearch.swift`、`QuoteRatings.swift`、`QuoteResultFeedback.swift` 与 `/v1/quotes`、`/v1/reports/quotes`、审核路由实现。内置词流和引语始终是 Typebar 自有内容；社区内容只在用户明确选择时从自建服务读取。 |
