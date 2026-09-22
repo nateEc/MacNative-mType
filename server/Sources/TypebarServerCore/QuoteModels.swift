@@ -79,6 +79,12 @@ public struct PublicQuoteResponse: Content, Equatable {
     public let upvotes: Int
     public let downvotes: Int
     public let viewerRating: Int?
+    /// Five-point aggregate fields added without removing the legacy
+    /// approve/disapprove projection consumed by older native clients.
+    public let ratingCount: Int
+    public let ratingTotal: Int
+    public let viewerScore: Int?
+    public let ratingScale: QuoteRatingScale
 }
 
 public struct PublicQuoteListResponse: Content, Equatable {
@@ -90,8 +96,21 @@ public struct QuoteListQuery: Content, Equatable {
     public let limit: Int?
 }
 
+/// The request opt-in prevents an older client sending `1` for a binary
+/// approval from being reinterpreted as the lowest five-point score.
+public enum QuoteRatingScale: String, Content, Equatable {
+    case fivePoint
+}
+
 public struct QuoteRatingRequest: Content, Equatable {
     public let value: Int
+    /// Omitted requests retain the original `-1` / `0` / `1` contract.
+    public let scale: QuoteRatingScale?
+
+    public init(value: Int, scale: QuoteRatingScale? = nil) {
+        self.value = value
+        self.scale = scale
+    }
 }
 
 public struct QuoteRatingResponse: Content, Equatable {
@@ -99,4 +118,8 @@ public struct QuoteRatingResponse: Content, Equatable {
     public let upvotes: Int
     public let downvotes: Int
     public let viewerRating: Int?
+    public let ratingCount: Int
+    public let ratingTotal: Int
+    public let viewerScore: Int?
+    public let ratingScale: QuoteRatingScale
 }

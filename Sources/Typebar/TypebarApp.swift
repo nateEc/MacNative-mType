@@ -4296,7 +4296,9 @@ private struct ContentView: View {
               $0.id,
               .init(
                 quoteID: $0.id, upvotes: $0.upvotes, downvotes: $0.downvotes,
-                viewerRating: $0.viewerRating)
+                viewerRating: $0.viewerRating, ratingCount: $0.ratingCount,
+                ratingTotal: $0.ratingTotal, viewerScore: $0.viewerScore,
+                ratingScale: $0.ratingScale)
             )
           })
         communityQuotes = remoteQuotes.map { quote in
@@ -4346,18 +4348,36 @@ private struct ContentView: View {
   private var communityRatingControls: some View {
     HStack(spacing: 8) {
       let rating = selectedCommunityQuoteID.flatMap { communityQuoteRatings[$0] }
-      Text("社区评价：支持 \(rating?.upvotes ?? 0) · 不适合 \(rating?.downvotes ?? 0)")
+      Text(communityRatingSummary(rating))
         .font(.caption).foregroundStyle(.secondary)
       if account.currentUser != nil, let quoteID = selectedCommunityQuoteID {
-        Button("不适合") { rateCommunityQuote(quoteID, value: .down) }
-          .buttonStyle(.bordered)
-          .tint(rating?.viewerRating == RemoteQuoteRatingValue.down.rawValue ? .red : .secondary)
-        Button("不错") { rateCommunityQuote(quoteID, value: .up) }
-          .buttonStyle(.bordered)
-          .tint(rating?.viewerRating == RemoteQuoteRatingValue.up.rawValue ? .green : .secondary)
-        if rating?.viewerRating != nil {
-          Button("撤销评价") { rateCommunityQuote(quoteID, value: .neutral) }
+        if let rating, RemoteQuoteRatingPresentation.usesFivePointScale(for: rating) {
+          ForEach(1...5, id: \.self) { score in
+            Button {
+              guard let value = RemoteQuoteRatingValue.score(score) else { return }
+              rateCommunityQuote(quoteID, value: value)
+            } label: {
+              Image(systemName: score <= (RemoteQuoteRatingPresentation.viewerScore(for: rating) ?? 0)
+                ? "star.fill" : "star")
+            }
             .buttonStyle(.borderless)
+            .accessibilityLabel("给社区引语评 \(score) 星")
+          }
+          if RemoteQuoteRatingPresentation.viewerScore(for: rating) != nil {
+            Button("清除评分") { rateCommunityQuote(quoteID, value: .neutral) }
+              .buttonStyle(.borderless)
+          }
+        } else {
+          Button("不适合") { rateCommunityQuote(quoteID, value: .down) }
+            .buttonStyle(.bordered)
+            .tint(rating?.viewerRating == RemoteQuoteRatingValue.down.rawValue ? .red : .secondary)
+          Button("不错") { rateCommunityQuote(quoteID, value: .up) }
+            .buttonStyle(.bordered)
+            .tint(rating?.viewerRating == RemoteQuoteRatingValue.up.rawValue ? .green : .secondary)
+          if rating?.viewerRating != nil {
+            Button("撤销评价") { rateCommunityQuote(quoteID, value: .neutral) }
+              .buttonStyle(.borderless)
+          }
         }
       } else {
         Text("登录后可评价").font(.caption).foregroundStyle(.secondary)
@@ -4375,6 +4395,16 @@ private struct ContentView: View {
         communityQuoteMessage = "无法更新社区评价：\(error.localizedDescription)"
       }
     }
+  }
+
+  private func communityRatingSummary(_ rating: RemoteQuoteRatingResponse?) -> String {
+    guard let rating else { return "社区评价：支持 0 · 不适合 0" }
+    if let average = RemoteQuoteRatingPresentation.average(for: rating),
+        let count = rating.ratingCount
+    {
+      return "社区评分：\(average.formatted(.number.precision(.fractionLength(1)))) / 5 · \(count) 人"
+    }
+    return "社区评价：支持 \(rating.upvotes) · 不适合 \(rating.downvotes)"
   }
 
   private var customTextSections: [String] {
@@ -5257,18 +5287,34 @@ private struct CompletedResultView: View {
       VStack(alignment: .leading, spacing: 8) {
         Label("本轮社区引语", systemImage: "quote.bubble")
           .font(.headline)
-        Text("社区评价：支持 \(communityRating?.upvotes ?? 0) · 不适合 \(communityRating?.downvotes ?? 0)")
+        Text(communityRatingSummary)
           .font(.caption)
           .foregroundStyle(.secondary)
         if isSignedIn {
           HStack(spacing: 8) {
-            Button("不适合") { rateCommunityQuote(quoteID, value: .down) }
-              .buttonStyle(.bordered)
-              .tint(communityRating?.viewerRating == RemoteQuoteRatingValue.down.rawValue ? .red : .secondary)
-            Button("不错") { rateCommunityQuote(quoteID, value: .up) }
-              .buttonStyle(.bordered)
-              .tint(communityRating?.viewerRating == RemoteQuoteRatingValue.up.rawValue ? .green : .secondary)
-            if communityRating?.viewerRating != nil {
+            if let communityRating,
+                RemoteQuoteRatingPresentation.usesFivePointScale(for: communityRating)
+            {
+              ForEach(1...5, id: \.self) { score in
+                Button {
+                  guard let value = RemoteQuoteRatingValue.score(score) else { return }
+                  rateCommunityQuote(quoteID, value: value)
+                } label: {
+                  Image(systemName: score <= (RemoteQuoteRatingPresentation.viewerScore(for: communityRating) ?? 0)
+                    ? "star.fill" : "star")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("给社区引语评 \(score) 星")
+              }
+            } else {
+              Button("不适合") { rateCommunityQuote(quoteID, value: .down) }
+                .buttonStyle(.bordered)
+                .tint(communityRating?.viewerRating == RemoteQuoteRatingValue.down.rawValue ? .red : .secondary)
+              Button("不错") { rateCommunityQuote(quoteID, value: .up) }
+                .buttonStyle(.bordered)
+                .tint(communityRating?.viewerRating == RemoteQuoteRatingValue.up.rawValue ? .green : .secondary)
+            }
+            if communityRating?.viewerRating != nil || communityRating.flatMap(RemoteQuoteRatingPresentation.viewerScore) != nil {
               Button("撤销评价") { rateCommunityQuote(quoteID, value: .neutral) }
                 .buttonStyle(.borderless)
             }
@@ -5318,6 +5364,16 @@ private struct CompletedResultView: View {
         quoteFeedbackStatus = "无法更新社区评价：\(error.localizedDescription)"
       }
     }
+  }
+
+  private var communityRatingSummary: String {
+    guard let communityRating else { return "社区评价：支持 0 · 不适合 0" }
+    if let average = RemoteQuoteRatingPresentation.average(for: communityRating),
+        let count = communityRating.ratingCount
+    {
+      return "社区评分：\(average.formatted(.number.precision(.fractionLength(1)))) / 5 · \(count) 人"
+    }
+    return "社区评价：支持 \(communityRating.upvotes) · 不适合 \(communityRating.downvotes)"
   }
 
   private func reportCommunityQuote(_ quoteID: UUID) {

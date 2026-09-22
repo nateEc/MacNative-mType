@@ -21827,6 +21827,39 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(QuoteRatingStore(defaults: defaults).rating(for: "craft"), .neutral)
   }
 
+  func testFivePointCommunityQuotePresentationRequiresAnExplicitServerScale() throws {
+    let legacyPublicQuote = try JSONDecoder().decode(
+      RemotePublicQuote.self,
+      from: Data(#"{"id":"00000000-0000-0000-0000-000000000801","language":"english","text":"A native practice line.","submittedAt":0,"upvotes":3,"downvotes":1,"viewerRating":1}"#.utf8))
+    let legacy = try JSONDecoder().decode(
+      RemoteQuoteRatingResponse.self,
+      from: Data(#"{"quoteID":"00000000-0000-0000-0000-000000000801","upvotes":3,"downvotes":1,"viewerRating":1}"#.utf8))
+    let fivePoint = try JSONDecoder().decode(
+      RemoteQuoteRatingResponse.self,
+      from: Data(#"{"quoteID":"00000000-0000-0000-0000-000000000801","upvotes":2,"downvotes":1,"viewerRating":1,"ratingCount":3,"ratingTotal":11,"viewerScore":4,"ratingScale":"fivePoint"}"#.utf8))
+    let malformed = try JSONDecoder().decode(
+      RemoteQuoteRatingResponse.self,
+      from: Data(#"{"quoteID":"00000000-0000-0000-0000-000000000801","upvotes":2,"downvotes":1,"viewerRating":1,"ratingCount":3,"ratingTotal":19,"viewerScore":6,"ratingScale":"fivePoint"}"#.utf8))
+
+    XCTAssertNil(legacyPublicQuote.ratingScale)
+    XCTAssertNil(legacyPublicQuote.ratingCount)
+    XCTAssertNil(legacyPublicQuote.ratingTotal)
+    XCTAssertNil(legacyPublicQuote.viewerScore)
+    XCTAssertFalse(RemoteQuoteRatingPresentation.usesFivePointScale(for: legacy))
+    XCTAssertNil(RemoteQuoteRatingPresentation.average(for: legacy))
+    XCTAssertTrue(RemoteQuoteRatingPresentation.usesFivePointScale(for: fivePoint))
+    XCTAssertEqual(RemoteQuoteRatingPresentation.average(for: fivePoint), 11.0 / 3.0)
+    XCTAssertEqual(RemoteQuoteRatingPresentation.viewerScore(for: fivePoint), 4)
+    XCTAssertNil(RemoteQuoteRatingPresentation.average(for: malformed))
+    XCTAssertNil(RemoteQuoteRatingPresentation.viewerScore(for: malformed))
+
+    let lowestScore = try XCTUnwrap(RemoteQuoteRatingValue.score(1))
+    XCTAssertEqual(lowestScore.rawValue, 1)
+    XCTAssertEqual(lowestScore.requestScale, "fivePoint")
+    XCTAssertNil(RemoteQuoteRatingValue.score(0))
+    XCTAssertNil(RemoteQuoteRatingValue.score(6))
+  }
+
   func testResultQuoteFeedbackCapturesOnlyTheCompletedQuoteSource() {
     let communityID = UUID()
     XCTAssertEqual(

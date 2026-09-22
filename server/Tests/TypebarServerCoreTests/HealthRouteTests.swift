@@ -1515,6 +1515,110 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(afterRejection.quotes.isEmpty)
   }
 
+  func testFivePointQuoteRatingsRequireAnExplicitScaleAndPreserveLegacySentiment()
+    async throws
+  {
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let author = try await store.register(
+      .init(
+        email: "five-point-author@example.com", password: "a secure password",
+        displayName: "Five Point Author"))
+    let legacyRater = try await store.register(
+      .init(
+        email: "five-point-legacy@example.com", password: "a secure password",
+        displayName: "Legacy Rater"))
+    let starRater = try await store.register(
+      .init(
+        email: "five-point-stars@example.com", password: "a secure password",
+        displayName: "Star Rater"))
+    let submitted = try await store.submitQuote(
+      .init(
+        language: "english", text: "A well considered rating keeps shared practice useful.",
+        attribution: nil), accessToken: author.accessToken)
+    _ = try await store.moderateQuote(submitted.id, status: "approved")
+
+    let legacy = try await store.rateQuote(
+      submitted.id, request: .init(value: 1), accessToken: legacyRater.accessToken)
+    XCTAssertEqual(legacy.upvotes, 1)
+    XCTAssertEqual(legacy.downvotes, 0)
+    XCTAssertEqual(legacy.viewerRating, 1)
+    XCTAssertEqual(legacy.viewerScore, 5)
+    XCTAssertEqual(legacy.ratingCount, 1)
+    XCTAssertEqual(legacy.ratingTotal, 5)
+    XCTAssertEqual(legacy.ratingScale, .fivePoint)
+
+    let star = try await store.rateQuote(
+      submitted.id,
+      request: .init(value: 2, scale: .fivePoint), accessToken: starRater.accessToken)
+    XCTAssertEqual(star.upvotes, 1)
+    XCTAssertEqual(star.downvotes, 1)
+    XCTAssertEqual(star.viewerRating, -1)
+    XCTAssertEqual(star.viewerScore, 2)
+    XCTAssertEqual(star.ratingCount, 2)
+    XCTAssertEqual(star.ratingTotal, 7)
+    XCTAssertEqual(star.ratingScale, .fivePoint)
+
+    let updated = try await store.rateQuote(
+      submitted.id,
+      request: .init(value: 4, scale: .fivePoint), accessToken: starRater.accessToken)
+    XCTAssertEqual(updated.upvotes, 2)
+    XCTAssertEqual(updated.downvotes, 0)
+    XCTAssertEqual(updated.viewerRating, 1)
+    XCTAssertEqual(updated.viewerScore, 4)
+    XCTAssertEqual(updated.ratingCount, 2)
+    XCTAssertEqual(updated.ratingTotal, 9)
+
+    do {
+      _ = try await store.rateQuote(
+        submitted.id,
+        request: .init(value: 6, scale: .fivePoint), accessToken: starRater.accessToken)
+      XCTFail("Five-point ratings must remain within the declared scale")
+    } catch let error as AuthStoreError {
+      XCTAssertEqual(error, .invalidQuoteSubmission)
+    }
+  }
+
+  func testLegacyQuoteRatingsWithoutScaleFieldSurviveStoreReload() async throws {
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-legacy-quote-rating-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    let store = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let author = try await store.register(
+      .init(
+        email: "legacy-json-author@example.com", password: "a secure password",
+        displayName: "Legacy JSON Author"))
+    let rater = try await store.register(
+      .init(
+        email: "legacy-json-rater@example.com", password: "a secure password",
+        displayName: "Legacy JSON Rater"))
+    let submitted = try await store.submitQuote(
+      .init(
+        language: "english", text: "A legacy record should remain useful after an upgrade.",
+        attribution: nil), accessToken: author.accessToken)
+    _ = try await store.moderateQuote(submitted.id, status: "approved")
+    _ = try await store.rateQuote(
+      submitted.id, request: .init(value: 1), accessToken: rater.accessToken)
+
+    var state = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: Data(contentsOf: fileURL)) as? [String: Any])
+    var ratings = try XCTUnwrap(state["quoteRatings"] as? [[String: Any]])
+    XCTAssertEqual(ratings.count, 1)
+    ratings[0].removeValue(forKey: "scale")
+    state["quoteRatings"] = ratings
+    try JSONSerialization.data(withJSONObject: state).write(to: fileURL, options: .atomic)
+
+    let reloaded = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let quote = try await reloaded.publicQuotes(
+      language: "english", limit: 10, accessToken: rater.accessToken).quotes.first
+    XCTAssertEqual(quote?.upvotes, 1)
+    XCTAssertEqual(quote?.downvotes, 0)
+    XCTAssertEqual(quote?.viewerRating, 1)
+    XCTAssertEqual(quote?.viewerScore, 5)
+    XCTAssertEqual(quote?.ratingCount, 1)
+    XCTAssertEqual(quote?.ratingTotal, 5)
+    XCTAssertEqual(quote?.ratingScale, .fivePoint)
+  }
+
   func testModeratorCanEditQuoteTextAndAttributionWhileApproving() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let author = try await store.register(

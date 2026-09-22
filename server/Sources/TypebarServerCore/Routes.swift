@@ -75,6 +75,7 @@ public func configure(
                 "leaderboardRankMemory": .available,
                 "profiles": .partial,
                 "connections": .partial,
+                "quoteFivePointRatings": .available,
                 "notifications": .partial,
                 "profileReports": .partial,
                 "directMessages": .partial,

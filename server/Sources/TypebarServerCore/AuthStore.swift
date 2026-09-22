@@ -1035,6 +1035,9 @@ public actor AuthStore {
     let userID: UUID
     let quoteID: UUID
     var value: Int
+    /// Nil distinguishes records created by the original binary API from
+    /// explicitly opted-in five-point records without rewriting stored JSON.
+    var scale: QuoteRatingScale?
   }
 
   private struct StoredNotification: Codable {
@@ -2709,10 +2712,14 @@ public actor AuthStore {
     _ id: UUID, request: QuoteRatingRequest, accessToken: String, now: Date = .now
   ) throws -> QuoteRatingResponse {
     let user = try authenticatedUser(for: accessToken, now: now)
+    let usesFivePointScale = request.scale == .fivePoint
+    let isValidValue = usesFivePointScale
+      ? (0...5).contains(request.value)
+      : [-1, 0, 1].contains(request.value)
     guard
       let quote = state.quoteSubmissions.first(where: { $0.id == id && $0.status == "approved" }),
       quote.userID != user.id,
-      [-1, 0, 1].contains(request.value)
+      isValidValue
     else { throw AuthStoreError.invalidQuoteSubmission }
     if let index = state.quoteRatings.firstIndex(where: { $0.userID == user.id && $0.quoteID == id }
     ) {
@@ -2720,15 +2727,19 @@ public actor AuthStore {
         state.quoteRatings.remove(at: index)
       } else {
         state.quoteRatings[index].value = request.value
+        state.quoteRatings[index].scale = request.scale
       }
     } else if request.value != 0 {
-      state.quoteRatings.append(.init(userID: user.id, quoteID: id, value: request.value))
+      state.quoteRatings.append(
+        .init(userID: user.id, quoteID: id, value: request.value, scale: request.scale))
     }
     try persist()
     let response = publicQuoteResponse(for: quote, viewerID: user.id)
     return .init(
       quoteID: id, upvotes: response.upvotes, downvotes: response.downvotes,
-      viewerRating: response.viewerRating)
+      viewerRating: response.viewerRating, ratingCount: response.ratingCount,
+      ratingTotal: response.ratingTotal, viewerScore: response.viewerScore,
+      ratingScale: response.ratingScale)
   }
 
   public func publicQuotes(
@@ -2751,15 +2762,34 @@ public actor AuthStore {
     -> PublicQuoteResponse
   {
     let ratings = state.quoteRatings.filter { $0.quoteID == quote.id }
+    let viewerEntry = viewerID.flatMap { viewer in
+      ratings.first(where: { $0.userID == viewer })
+    }
     return .init(
       id: quote.id, language: quote.language, text: quote.text, attribution: quote.attribution,
       submittedAt: quote.submittedAt,
-      upvotes: ratings.filter { $0.value == 1 }.count,
-      downvotes: ratings.filter { $0.value == -1 }.count,
-      viewerRating: viewerID.flatMap { viewer in
-        ratings.first(where: { $0.userID == viewer })?.value
-      }
+      upvotes: ratings.filter { quoteRatingScore($0) >= 4 }.count,
+      downvotes: ratings.filter { quoteRatingScore($0) <= 2 }.count,
+      viewerRating: viewerEntry.flatMap(quoteRatingSentiment),
+      ratingCount: ratings.count,
+      ratingTotal: ratings.reduce(0) { $0 + quoteRatingScore($1) },
+      viewerScore: viewerEntry.map(quoteRatingScore),
+      ratingScale: .fivePoint
     )
+  }
+
+  private func quoteRatingScore(_ rating: StoredQuoteRating) -> Int {
+    if rating.scale == .fivePoint { return rating.value }
+    return rating.value > 0 ? 5 : 1
+  }
+
+  private func quoteRatingSentiment(_ rating: StoredQuoteRating) -> Int? {
+    if rating.scale != .fivePoint { return rating.value }
+    switch rating.value {
+    case 1, 2: return -1
+    case 4, 5: return 1
+    default: return nil
+    }
   }
 
   public func connections(accessToken: String, now: Date = .now) throws -> ConnectionsResponse {

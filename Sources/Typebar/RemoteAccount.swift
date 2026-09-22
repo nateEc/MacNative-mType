@@ -512,22 +512,90 @@ struct RemotePublicQuote: Codable, Identifiable, Sendable {
     let upvotes: Int
     let downvotes: Int
     let viewerRating: Int?
+    let ratingCount: Int?
+    let ratingTotal: Int?
+    let viewerScore: Int?
+    let ratingScale: String?
 }
 
 private struct RemotePublicQuoteListResponse: Codable, Sendable { let quotes: [RemotePublicQuote] }
 
-enum RemoteQuoteRatingValue: Int, Sendable {
-    case down = -1
-    case neutral = 0
-    case up = 1
+enum RemoteQuoteRatingValue: Equatable, Sendable {
+    case binary(Int)
+    case fivePoint(Int)
+
+    static let down = Self.binary(-1)
+    static let neutral = Self.binary(0)
+    static let up = Self.binary(1)
+
+    static func score(_ value: Int) -> Self? {
+        guard (1...5).contains(value) else { return nil }
+        return .fivePoint(value)
+    }
+
+    var rawValue: Int {
+        switch self {
+        case .binary(let value), .fivePoint(let value): value
+        }
+    }
+
+    var requestScale: String? {
+        if case .fivePoint = self { return "fivePoint" }
+        return nil
+    }
 }
 
-private struct RemoteQuoteRatingRequest: Codable, Sendable { let value: Int }
+private struct RemoteQuoteRatingRequest: Codable, Sendable {
+    let value: Int
+    let scale: String?
+}
 struct RemoteQuoteRatingResponse: Codable, Sendable {
     let quoteID: UUID
     let upvotes: Int
     let downvotes: Int
     let viewerRating: Int?
+    let ratingCount: Int?
+    let ratingTotal: Int?
+    let viewerScore: Int?
+    let ratingScale: String?
+
+    init(
+        quoteID: UUID, upvotes: Int, downvotes: Int, viewerRating: Int?,
+        ratingCount: Int? = nil, ratingTotal: Int? = nil, viewerScore: Int? = nil,
+        ratingScale: String? = nil
+    ) {
+        self.quoteID = quoteID
+        self.upvotes = upvotes
+        self.downvotes = downvotes
+        self.viewerRating = viewerRating
+        self.ratingCount = ratingCount
+        self.ratingTotal = ratingTotal
+        self.viewerScore = viewerScore
+        self.ratingScale = ratingScale
+    }
+}
+
+enum RemoteQuoteRatingPresentation {
+    private static let fivePointScale = "fivePoint"
+
+    static func usesFivePointScale(for rating: RemoteQuoteRatingResponse) -> Bool {
+        rating.ratingScale == fivePointScale
+    }
+
+    static func average(for rating: RemoteQuoteRatingResponse) -> Double? {
+        guard usesFivePointScale(for: rating), let count = rating.ratingCount,
+            let total = rating.ratingTotal, count > 0, count <= Int.max / 5,
+            total >= count, total <= count * 5
+        else { return nil }
+        return Double(total) / Double(count)
+    }
+
+    static func viewerScore(for rating: RemoteQuoteRatingResponse) -> Int? {
+        guard usesFivePointScale(for: rating), let score = rating.viewerScore,
+            (1...5).contains(score)
+        else { return nil }
+        return score
+    }
 }
 
 enum RemoteQuoteReportReason: String, CaseIterable, Codable, Sendable {
@@ -2467,7 +2535,8 @@ final class AccountSession {
         let token = try accessToken()
         return try await RemoteAccountAPI(endpoint: endpoint).request(
             path: "v1/quotes/\(quoteID.uuidString)/rating", method: "PUT", token: token,
-            body: RemoteQuoteRatingRequest(value: value.rawValue), response: RemoteQuoteRatingResponse.self
+            body: RemoteQuoteRatingRequest(value: value.rawValue, scale: value.requestScale),
+            response: RemoteQuoteRatingResponse.self
         )
     }
 
