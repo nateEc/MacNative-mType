@@ -1,6 +1,6 @@
 # 自建服务范围
 
-Typebar 的远程功能必须使用自建身份、数据库和 API，不能访问或代理 Monkeytype 的服务。
+Typebar 的远程功能必须使用自建身份、数据库和 API，不能访问或代理 Monkeytype 的服务。固定参考的后端路由族、可观察用户任务和 Typebar 自建映射见 [OFFICIAL_SERVICE_SURFACE_AUDIT.md](OFFICIAL_SERVICE_SURFACE_AUDIT.md)。
 
 第一批契约：
 
