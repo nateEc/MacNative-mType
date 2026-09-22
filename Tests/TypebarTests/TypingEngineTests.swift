@@ -10119,6 +10119,28 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testEveryStandaloneLanguageCompletesWordsWithNumbersAndPunctuation() {
+    let languages = TypingLanguage.allCases.filter(\.supportsQuotes)
+    let contentOptions = ContentOptions(includePunctuation: true, includeNumbers: true)
+    XCTAssertEqual(languages.count, 376)
+
+    let start = Date(timeIntervalSince1970: 3_000)
+    for language in languages {
+      let configuration = TestConfiguration.words(
+        10, language: language, contentOptions: contentOptions)
+      var session = TestSessionFactory.make(configuration: configuration)
+      let prompt = session.prompt
+
+      XCTAssertEqual(
+        prompt.split(whereSeparator: \Character.isWhitespace).count, 10,
+        "Unexpected token count for \(language.rawValue)")
+      session.insert(prompt, at: start)
+      XCTAssertTrue(session.isFinished, "Numbers/punctuation did not finish for \(language.rawValue)")
+      XCTAssertEqual(session.typed, prompt, "Numbers/punctuation changed input for \(language.rawValue)")
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+    }
+  }
+
   func testGeneratedWordsNormalizeWhitespaceInsideCatalogEntries() {
     let prompt = StarterLexicon.prompt(
       tokens: 3, lexicon: IndexedLexicon(["  alpha beta  "]), separator: " ",
