@@ -20828,6 +20828,34 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testEveryStandaloneLanguageQuoteLengthCompletesWhenTyped() throws {
+    let languages = TypingLanguage.allCases.filter(\.supportsQuotes)
+    let lengths = QuoteLength.allCases.filter { $0 != .all }
+    XCTAssertEqual(languages.count, 376)
+    XCTAssertEqual(Set(lengths), [.short, .medium, .long, .extended])
+
+    let start = Date(timeIntervalSince1970: 4_500)
+    for language in languages {
+      for length in lengths {
+        let quote = try XCTUnwrap(
+          OfflineContent.quotes(for: language, length: length).first,
+          "\\(language.displayName) / \\(length.rawValue)")
+        XCTAssertEqual(quote.language, language)
+        XCTAssertEqual(quote.length, length)
+
+        var session = TestSessionFactory.make(
+          configuration: .init(
+            mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
+            language: language, quoteLength: length),
+          quote: quote)
+        session.insert(quote.text, at: start)
+        XCTAssertTrue(session.isFinished, "\\(language.displayName) / \\(length.rawValue)")
+        XCTAssertEqual(session.typed, quote.text, "\\(language.displayName) / \\(length.rawValue)")
+        XCTAssertEqual(session.result(at: start)?.prompt, quote.text)
+      }
+    }
+  }
+
   func testKoineGreekPigLatinAndLoremIpsumCoverTheirPinnedLanguageSemantics() throws {
     let languages: [TypingLanguage] = [.greekKoine, .pigLatin, .loremIpsum]
     for language in languages {
