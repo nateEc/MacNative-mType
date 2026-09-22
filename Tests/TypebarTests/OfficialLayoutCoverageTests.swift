@@ -39,6 +39,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let officialChoices: [String: [String]]
     let officialChoiceCounts: [String: Int]
     let officialBooleanKeys: [String]
+    let officialKnownFontFamilyIDs: [String]
     let sourceFiles: [String]
     let method: String
     let nativeEvidenceGroups: [String: ConfigEvidenceGroup]
@@ -296,6 +297,13 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.mapped["language"], "`TypingLanguage`、`mixedLanguageComponents`")
     XCTAssertEqual(fixture.partial.count, 1)
     XCTAssertEqual(fixture.partial["fontFamily"], "`practiceFont`、可搜索的本机字体目录、名称/导入")
+    XCTAssertEqual(fixture.officialKnownFontFamilyIDs.count, 43)
+    XCTAssertEqual(
+      Set(fixture.officialKnownFontFamilyIDs),
+      Set(FontFamilyCommandCatalog.fixedKnownFontIDs))
+    XCTAssertEqual(
+      fixture.officialKnownFontFamilyIDs.count,
+      Set(fixture.officialKnownFontFamilyIDs).count)
     XCTAssertEqual(fixture.notApplicable.count, 1)
     XCTAssertEqual(fixture.notApplicable["ads"], "无")
     XCTAssertEqual(
@@ -420,7 +428,10 @@ final class OfficialLayoutCoverageTests: XCTestCase {
         .allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
     XCTAssertEqual(
       fixture.sourceFiles,
-      ["packages/schemas/src/configs.ts", "OFFICIAL_CONFIG_AUDIT.md"])
+      [
+        "packages/schemas/src/configs.ts", "packages/schemas/src/fonts.ts",
+        "OFFICIAL_CONFIG_AUDIT.md",
+      ])
     XCTAssertTrue(fixture.method.contains("metadata only"))
     let audit = try String(
       contentsOf: repositoryRoot.appendingPathComponent("OFFICIAL_CONFIG_AUDIT.md"),

@@ -3,6 +3,7 @@ import SwiftUI
 
 enum FontFamilyCommandTarget: Equatable {
   case systemDesign(PracticeFont)
+  case knownIdentifier(String)
   case installedName(String)
   case customName
   case browseInstalled
@@ -26,7 +27,7 @@ enum FontFamilyCommandCatalog {
   static func items(hasLocalFont: Bool) -> [CommandPaletteItem] {
     let installedFamilies = NativeFontCatalog.installedFamilies
     let available = Set(fixedKnownFontIDs.filter {
-      NativeFontCatalog.containsFamily(installedName(forKnownID: $0), in: installedFamilies)
+      NativePracticeFont.isAvailable($0, installedFamilies: installedFamilies)
     })
     return items(hasLocalFont: hasLocalFont, availableKnownFontIDs: available)
   }
@@ -43,14 +44,15 @@ enum FontFamilyCommandCatalog {
         group: .appearance)
     }
     items.append(contentsOf: fixedKnownFontIDs
-      .filter(availableKnownFontIDs.contains)
       .sorted { installedName(forKnownID: $0).localizedStandardCompare(
         installedName(forKnownID: $1)) == .orderedAscending }
       .map { identifier in
         let name = installedName(forKnownID: identifier)
         return CommandPaletteItem(
-          id: "setFontFamily\(identifier)", title: "本机字体：\(name)",
-          subtitle: "此 Mac 已安装", systemImage: "textformat",
+          id: "setFontFamily\(identifier)", title: "固定字体：\(name)",
+          subtitle: availableKnownFontIDs.contains(identifier)
+            ? "此 Mac 已安装" : "未安装时使用系统字体回退",
+          systemImage: "textformat",
           keywords: ["setFontFamily\(identifier)", "font", "字体", name, identifier],
           group: .appearance)
       })
@@ -88,7 +90,7 @@ enum FontFamilyCommandCatalog {
     if identifier.hasPrefix("setFontFamily") {
       let fixedID = String(identifier.dropFirst("setFontFamily".count))
       guard fixedKnownFontIDs.contains(fixedID) else { return nil }
-      return .installedName(installedName(forKnownID: fixedID))
+      return .knownIdentifier(fixedID)
     }
     switch identifier {
     case "customFontName": return .customName
@@ -114,6 +116,10 @@ enum FontFamilyCommandApplication {
     case .systemDesign(let font):
       settings.installedPracticeFontName = ""
       settings.practiceFont = font
+      return true
+    case .knownIdentifier(let identifier):
+      guard FontFamilyCommandCatalog.fixedKnownFontIDs.contains(identifier) else { return false }
+      settings.installedPracticeFontName = identifier
       return true
     case .installedName(let name):
       guard isFontAvailable(name) else { return false }

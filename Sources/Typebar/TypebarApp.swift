@@ -3674,9 +3674,13 @@ private struct ContentView: View {
     if let target = FontFamilyCommandCatalog.target(for: item.id) {
       fontFamilyCommandMessage = nil
       switch target {
-      case .systemDesign, .installedName:
+      case .systemDesign, .knownIdentifier, .installedName:
         if !FontFamilyCommandApplication.apply(target, to: settings) {
           fontFamilyCommandMessage = "此 Mac 当前无法使用所选字体。"
+        } else if case .knownIdentifier(let identifier) = target,
+          !NativePracticeFont.isAvailable(identifier)
+        {
+          fontFamilyCommandMessage = "已保存所选字体；此 Mac 未安装时会暂时使用系统字体。"
         }
       case .customName:
         showingFontFamilyNameCommandEditor = true

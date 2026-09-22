@@ -14493,6 +14493,18 @@ final class TypingEngineTests: XCTestCase {
       installedName)
   }
 
+  func testKnownFontIdentifiersResolveEquivalentNativeFamilyNames() {
+    XCTAssertEqual(
+      NativePracticeFont.matchingFamily(
+        for: "Open_Dyslexic", in: ["OpenDyslexic", "System Sans"]),
+      "OpenDyslexic")
+    XCTAssertEqual(
+      NativePracticeFont.matchingFamily(
+        for: "Noto_Naskh_Arabic", in: ["Noto Naskh Arabic"]),
+      "Noto Naskh Arabic")
+    XCTAssertNil(NativePracticeFont.matchingFamily(for: "Roboto_Mono", in: ["Courier"]))
+  }
+
   func testNativeFontCatalogNormalizesAndFiltersInjectedFamilies() {
     let families = NativeFontCatalog.normalizedFamilies([
       "  Zeta Sans  ", "alpha serif", "", "ALPHA SERIF", "Élan Mono", "\nBeta UI\t",
@@ -14522,7 +14534,7 @@ final class TypingEngineTests: XCTestCase {
     })
   }
 
-  func testFontFamilyCommandsExposeNativeAvailableAndConditionalLocalActions() {
+  func testFontFamilyCommandsExposeEveryOfficialChoiceAndConditionalLocalActions() {
     XCTAssertEqual(FontFamilyCommandCatalog.fixedKnownFontIDs.count, 43)
     XCTAssertEqual(
       Set(FontFamilyCommandCatalog.fixedKnownFontIDs).count,
@@ -14537,8 +14549,20 @@ final class TypingEngineTests: XCTestCase {
       "fontFamily.native.monospaced", "fontFamily.native.rounded",
       "fontFamily.native.serif", "fontFamily.native.defaultSystem",
     ]))
+    let officialFontIDs = withoutLocalIDs.compactMap { identifier -> String? in
+      guard identifier.hasPrefix("setFontFamily") else { return nil }
+      return String(identifier.dropFirst("setFontFamily".count))
+    }
+    XCTAssertEqual(Set(officialFontIDs), Set(FontFamilyCommandCatalog.fixedKnownFontIDs))
+    XCTAssertEqual(officialFontIDs.count, FontFamilyCommandCatalog.fixedKnownFontIDs.count)
     XCTAssertTrue(withoutLocalIDs.contains("setFontFamilyCourier"))
     XCTAssertTrue(withoutLocalIDs.contains("setFontFamilyRoboto_Mono"))
+    XCTAssertEqual(
+      withoutLocal.first { $0.id == "setFontFamilyRoboto_Mono" }?.subtitle,
+      "此 Mac 已安装")
+    XCTAssertEqual(
+      withoutLocal.first { $0.id == "setFontFamilyNoto_Naskh_Arabic" }?.subtitle,
+      "未安装时使用系统字体回退")
     XCTAssertTrue(withoutLocalIDs.contains("customFontName"))
     XCTAssertTrue(withoutLocalIDs.contains("browseInstalledFonts"))
     XCTAssertTrue(withoutLocalIDs.contains("customLocalFont"))
@@ -14553,7 +14577,7 @@ final class TypingEngineTests: XCTestCase {
       .systemDesign(.serif))
     XCTAssertEqual(
       FontFamilyCommandCatalog.target(for: "setFontFamilyRoboto_Mono"),
-      .installedName("Roboto Mono"))
+      .knownIdentifier("Roboto_Mono"))
     XCTAssertEqual(FontFamilyCommandCatalog.target(for: "customFontName"), .customName)
     XCTAssertEqual(FontFamilyCommandCatalog.target(for: "customLocalFont"), .localFile)
     XCTAssertEqual(FontFamilyCommandCatalog.target(for: "removeLocalFont"), .removeLocalFile)
@@ -14588,6 +14612,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(FontFamilyCommandApplication.apply(
       .installedName("Missing Font"), to: settings, isFontAvailable: { _ in false }))
     XCTAssertEqual(settings.installedPracticeFontName, "")
+    XCTAssertTrue(FontFamilyCommandApplication.apply(
+      .knownIdentifier("Roboto_Mono"), to: settings, isFontAvailable: { _ in false }))
+    XCTAssertEqual(settings.installedPracticeFontName, "Roboto_Mono")
+    XCTAssertFalse(FontFamilyCommandApplication.apply(
+      .knownIdentifier("Unknown"), to: settings, isFontAvailable: { _ in true }))
     XCTAssertTrue(FontFamilyCommandApplication.apply(
       .installedName("Local Sans"), to: settings, isFontAvailable: { $0 == "Local Sans" }))
     XCTAssertEqual(settings.installedPracticeFontName, "Local Sans")
