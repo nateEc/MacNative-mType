@@ -17100,8 +17100,7 @@ final class TypingEngineTests: XCTestCase {
       ipv4.prompt.split(separator: " ").allSatisfy { $0.split(separator: ".").count == 4 })
     let ipv6 = TestSessionFactory.make(
       configuration: TestConfiguration.words(2).with(modifiers: [.ipv6Stream]))
-    XCTAssertTrue(
-      ipv6.prompt.split(separator: " ").allSatisfy { $0.split(separator: ":").count == 4 })
+    XCTAssertTrue(ipv6.prompt.split(separator: " ").allSatisfy { $0.contains(":") })
     XCTAssertEqual(TestModifierPolicy.toggling(.ipv6Stream, in: [.ipv4Stream]), [.ipv6Stream])
     let pseudolang = TestSessionFactory.make(
       configuration: TestConfiguration.words(2).with(modifiers: [.pseudolangStream]))
@@ -17112,6 +17111,97 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       TestModifierPolicy.toggling(.morseStream, in: [.pseudolangStream]),
       [.pseudolangStream, .morseStream])
+  }
+
+  func testNetworkFunboxStreamsEmitCIDRAndCompressedIPv6Tokens() {
+    func networkOctets(_ token: String) -> ([Int], Int)? {
+      let components = token.split(separator: "/", omittingEmptySubsequences: false)
+      guard components.count == 2, let prefix = Int(components[1]), (8...32).contains(prefix) else {
+        return nil
+      }
+      let octets = components[0].split(separator: ".", omittingEmptySubsequences: false).compactMap {
+        Int($0)
+      }
+      guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) else { return nil }
+      return (octets, prefix)
+    }
+
+    func hasZeroedIPv4HostBits(octets: [Int], prefix: Int) -> Bool {
+      octets.enumerated().allSatisfy { index, octet in
+        let bitsBeforeOctet = index * 8
+        if prefix >= bitsBeforeOctet + 8 { return true }
+        if prefix <= bitsBeforeOctet { return octet == 0 }
+        let hostBits = 8 - (prefix - bitsBeforeOctet)
+        return octet & ((1 << hostBits) - 1) == 0
+      }
+    }
+
+    func expandedIPv6(_ token: String) -> ([UInt16], Int?)? {
+      let addressAndPrefix = token.split(separator: "/", omittingEmptySubsequences: false)
+      guard (1...2).contains(addressAndPrefix.count), let addressPart = addressAndPrefix.first else {
+        return nil
+      }
+      let prefix: Int?
+      if addressAndPrefix.count == 2 {
+        guard let value = Int(addressAndPrefix[1]), (64...128).contains(value),
+          value.isMultiple(of: 4)
+        else { return nil }
+        prefix = value
+      } else {
+        prefix = nil
+      }
+
+      func groups(in section: String) -> [UInt16]? {
+        guard !section.isEmpty else { return [] }
+        let fields = section.split(separator: ":", omittingEmptySubsequences: false)
+        guard fields.allSatisfy({ (1...4).contains($0.count) && UInt16($0, radix: 16) != nil }) else {
+          return nil
+        }
+        return fields.compactMap { UInt16($0, radix: 16) }
+      }
+
+      let sections = String(addressPart).components(separatedBy: "::")
+      guard sections.count <= 2, let leading = groups(in: sections[0]) else { return nil }
+      if sections.count == 1 {
+        guard leading.count == 8 else { return nil }
+        return (leading, prefix)
+      }
+      guard let trailing = groups(in: sections[1]), leading.count + trailing.count < 8 else {
+        return nil
+      }
+      return (leading + Array(repeating: 0, count: 8 - leading.count - trailing.count) + trailing, prefix)
+    }
+
+    func hasZeroedIPv6HostBits(groups: [UInt16], prefix: Int) -> Bool {
+      groups.enumerated().allSatisfy { index, group in
+        let bitsBeforeGroup = index * 16
+        if prefix >= bitsBeforeGroup + 16 { return true }
+        if prefix <= bitsBeforeGroup { return group == 0 }
+        let retainedBits = prefix - bitsBeforeGroup
+        return group & (UInt16.max >> retainedBits) == 0
+      }
+    }
+
+    let ipv4 = TestSessionFactory.make(
+      configuration: TestConfiguration.words(8).with(modifiers: [.ipv4Stream]))
+    let ipv4CIDR = ipv4.prompt.split(separator: " ").compactMap { networkOctets(String($0)) }
+    XCTAssertEqual(ipv4CIDR.count, 2)
+    XCTAssertTrue(ipv4CIDR.allSatisfy { hasZeroedIPv4HostBits(octets: $0.0, prefix: $0.1) })
+
+    let ipv6 = TestSessionFactory.make(
+      configuration: TestConfiguration.words(8).with(modifiers: [.ipv6Stream]))
+    let ipv6Tokens = ipv6.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(ipv6Tokens.count, 8)
+    XCTAssertEqual(ipv6Tokens.filter { $0.contains("/") }.count, 2)
+    XCTAssertTrue(ipv6Tokens.contains { $0.contains("::") })
+    let parsedIPv6 = ipv6Tokens.compactMap(expandedIPv6)
+    XCTAssertEqual(parsedIPv6.count, ipv6Tokens.count)
+    let ipv6CIDR = parsedIPv6.filter { $0.1 != nil }
+    XCTAssertEqual(ipv6CIDR.count, 2)
+    XCTAssertTrue(ipv6CIDR.allSatisfy {
+      guard let prefix = $0.1 else { return false }
+      return hasZeroedIPv6HostBits(groups: $0.0, prefix: prefix)
+    })
   }
 
   func testFunboxCompatibilityRejectsSourceConflictsAndComposesMorseWithWordSources() {

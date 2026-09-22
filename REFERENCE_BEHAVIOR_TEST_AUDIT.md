@@ -25,7 +25,7 @@
 | `frontend/__tests__/test/funbox.spec.ts`、`frontend/__tests__/test/funbox/funbox-validation.spec.ts` | Funbox 注册、冲突和配置限制 | `CommandPalette.swift`、`TypingEngine.swift`、`TypingEngineTests.swift` 的 48 项目录、互斥和归一化回归。 |
 | `frontend/__tests__/utils/colors.spec.ts` | 自定义主题颜色解析和显示 | `AppTheme.swift`、`TypingEngineTests.swift` 的颜色、主题持久化和回退回归。 |
 | `frontend/__tests__/utils/format.spec.ts`、`frontend/__tests__/utils/misc.spec.ts`、`frontend/__tests__/utils/numbers.spec.ts` | WPM、准确率、计数与数字呈现 | `TypingEngine.swift`、`TypingEngineTests.swift` 的指标单位、舍入、计数和结果摘要回归。 |
-| `frontend/__tests__/utils/generate.spec.ts`、`frontend/__tests__/utils/ip-addresses.spec.ts` | 生成的符号流、IPv4/IPv6 格式 | `TypingEngine.swift`、`TypingEngineTests.swift` 的原创符号流与地址有效性回归。 |
+| `frontend/__tests__/utils/generate.spec.ts`、`frontend/__tests__/utils/ip-addresses.spec.ts` | 生成的符号流、IPv4/IPv6 格式 | `OfflineContent.swift`、`TypingEngineTests.swift` 的原创符号流、CIDR 网络位与 IPv6 压缩格式回归。 |
 | `frontend/__tests__/utils/strings.spec.ts` | Unicode 词界、RTL 和视觉等价输入 | `TypingEngine.swift`、`TypingEngineTests.swift` 的组合文本、等价标点、空白、俄语和双向文本回归。 |
 
 ## 网页运行时支持规格

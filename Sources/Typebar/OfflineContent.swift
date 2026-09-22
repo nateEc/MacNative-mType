@@ -5310,6 +5310,101 @@ struct TestSessionFactory {
   }
 }
 
+enum TypebarNetworkAddressStream {
+  static func ipv4Token(at index: Int) -> String {
+    let octets = [
+      (index * 53 + 11) % 256,
+      (index * 97 + 37) % 256,
+      (index * 29 + 101) % 256,
+      (index * 71 + 19) % 256,
+    ]
+    guard index % 4 == 3 else {
+      return octets.map(String.init).joined(separator: ".")
+    }
+    let prefix = 8 + ((index * 7 + 5) % 25)
+    return maskedIPv4(octets, prefix: prefix).map(String.init).joined(separator: ".") + "/\(prefix)"
+  }
+
+  static func ipv6Token(at index: Int) -> String {
+    let base = index % 65_536
+    var groups: [UInt16] = (0..<8).map { offset in
+      let value = (base + offset * 9_973 + 31) % 65_536
+      return UInt16(value)
+    }
+    switch index % 4 {
+    case 1:
+      groups[2] = 0
+      groups[3] = 0
+    case 2:
+      groups[5] = 0
+      groups[6] = 0
+    default:
+      break
+    }
+
+    guard index % 4 == 3 else { return compressedIPv6(groups) }
+    let prefix = 64 + ((index * 5 + 3) % 17) * 4
+    return "\(compressedIPv6(maskedIPv6(groups, prefix: prefix)))/\(prefix)"
+  }
+
+  private static func maskedIPv4(_ octets: [Int], prefix: Int) -> [Int] {
+    octets.enumerated().map { index, octet in
+      let bitsBeforeOctet = index * 8
+      if prefix >= bitsBeforeOctet + 8 { return octet }
+      if prefix <= bitsBeforeOctet { return 0 }
+      let hostBits = 8 - (prefix - bitsBeforeOctet)
+      return octet & ~((1 << hostBits) - 1)
+    }
+  }
+
+  private static func maskedIPv6(_ groups: [UInt16], prefix: Int) -> [UInt16] {
+    groups.enumerated().map { index, group in
+      let bitsBeforeGroup = index * 16
+      if prefix >= bitsBeforeGroup + 16 { return group }
+      if prefix <= bitsBeforeGroup { return 0 }
+      let retainedBits = prefix - bitsBeforeGroup
+      return group & (UInt16.max << (16 - retainedBits))
+    }
+  }
+
+  private static func compressedIPv6(_ groups: [UInt16]) -> String {
+    var longestStart: Int?
+    var longestLength = 0
+    var runStart: Int?
+
+    for index in groups.indices {
+      if groups[index] == 0 {
+        if runStart == nil { runStart = index }
+        continue
+      }
+      if let start = runStart, index - start > longestLength {
+        longestStart = start
+        longestLength = index - start
+      }
+      runStart = nil
+    }
+    if let start = runStart, groups.count - start > longestLength {
+      longestStart = start
+      longestLength = groups.count - start
+    }
+    if longestLength < 2 { longestStart = nil }
+
+    var output = ""
+    var index = 0
+    while index < groups.count {
+      if index == longestStart {
+        output += "::"
+        index += longestLength
+        continue
+      }
+      if !output.isEmpty && !output.hasSuffix(":") { output += ":" }
+      output += String(groups[index], radix: 16)
+      index += 1
+    }
+    return output
+  }
+}
+
 enum TypebarStreamContent {
   static func prompt(configuration: TestConfiguration, wordCount: Int) -> String? {
     let count = max(1, wordCount)
@@ -5377,16 +5472,9 @@ enum TypebarStreamContent {
       let directions = ["↑", "→", "↓", "←", "→", "↑", "←", "↓"]
       tokens = (0..<count).map { directions[$0 % directions.count] }
     } else if configuration.modifiers.contains(.ipv4Stream) {
-      tokens = (0..<count).map { index in
-        "10.\((index * 17 + 3) % 256).\((index * 43 + 29) % 256).\((index * 71 + 7) % 256)"
-      }
+      tokens = (0..<count).map(TypebarNetworkAddressStream.ipv4Token)
     } else if configuration.modifiers.contains(.ipv6Stream) {
-      tokens = (0..<count).map { index in
-        let base = index * 4099 + 31
-        return (0..<4).map { offset in
-          String((base + offset * 257) % 65_536, radix: 16, uppercase: true)
-        }.joined(separator: ":")
-      }
+      tokens = (0..<count).map(TypebarNetworkAddressStream.ipv6Token)
     } else if configuration.modifiers.contains(.pseudolangStream) {
       let starts = ["br", "cl", "dr", "fr", "gl", "pr", "sh", "tr"]
       let vowels = ["a", "e", "i", "o", "u", "ae", "ou", "ia"]
