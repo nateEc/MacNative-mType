@@ -57,6 +57,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     let officialSurfaces: [String]
     let mapped: [String: String]
     let nativeEvidenceFiles: [String: [String]]
+    let nativeTestSymbols: [String: [String]]
     let notApplicable: [String: String]
     let unimplemented: [String: String]
     let sourceFiles: [String]
@@ -468,6 +469,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.mapped.count, 46)
     XCTAssertEqual(fixture.notApplicable.count, 6)
     XCTAssertEqual(Set(fixture.nativeEvidenceFiles.keys), mappedSurfaces)
+    XCTAssertEqual(Set(fixture.nativeTestSymbols.keys), mappedSurfaces)
     XCTAssertTrue(unimplementedSurfaces.isEmpty)
     XCTAssertTrue(mappedSurfaces.isDisjoint(with: notApplicableSurfaces))
     XCTAssertTrue(mappedSurfaces.isDisjoint(with: unimplementedSurfaces))
@@ -485,6 +487,24 @@ final class OfficialLayoutCoverageTests: XCTestCase {
         XCTAssertTrue(
           FileManager.default.fileExists(atPath: repositoryRoot.appendingPathComponent(path).path),
           "\(surface) 声明的原生证据文件不存在：\(path)")
+      }
+    }
+    let clientTests = try String(
+      contentsOf: repositoryRoot.appendingPathComponent(
+        "Tests/TypebarTests/TypingEngineTests.swift"),
+      encoding: .utf8)
+    let serverTests = try String(
+      contentsOf: repositoryRoot.appendingPathComponent(
+        "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"),
+      encoding: .utf8)
+    let nativeTests = clientTests + "\n" + serverTests
+    for (surface, symbols) in fixture.nativeTestSymbols {
+      XCTAssertFalse(symbols.isEmpty, "\(surface) 缺少可执行的原生测试符号")
+      for symbol in symbols {
+        XCTAssertTrue(symbol.hasPrefix("test"), "\(surface) 使用了无效测试符号：\(symbol)")
+        XCTAssertTrue(
+          nativeTests.contains("func \(symbol)("),
+          "\(surface) 声明的原生测试符号不存在：\(symbol)")
       }
     }
     XCTAssertEqual(

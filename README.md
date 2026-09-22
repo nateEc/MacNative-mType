@@ -36,7 +36,7 @@ zsh Scripts/check-originality-boundaries.sh --self-test
 zsh Scripts/check-originality-boundaries.sh --reference /absolute/path/to/monkeytype-reference
 ```
 
-对已克隆的固定 Monkeytype 参考源码，核验页面与模态盘点只覆盖其标识级表面：
+对已克隆的固定 Monkeytype 参考源码，核验页面与模态盘点只覆盖其标识级表面，并要求每个已映射表面关联至少一个可执行的原生测试符号：
 
 ```zsh
 zsh Scripts/check-page-modal-surface-audit.sh /absolute/path/to/monkeytype-reference

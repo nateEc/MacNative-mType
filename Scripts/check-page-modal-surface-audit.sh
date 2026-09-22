@@ -82,4 +82,25 @@ if ! diff -u "$expected_surfaces" "$fixture_surfaces"; then
   fail "fixture differs from the fixed reference page/modal surface inventory"
 fi
 
+if ! jq -e '
+  ((.mapped | keys) == (.nativeEvidenceFiles | keys))
+  and ((.mapped | keys) == (.nativeTestSymbols | keys))
+  and ([.nativeEvidenceFiles[] | type == "array" and length > 0] | all)
+  and ([.nativeTestSymbols[] | type == "array" and length > 0] | all)
+  and ([.nativeTestSymbols[][] | type == "string" and startswith("test")] | all)
+' "$fixture" >/dev/null; then
+  fail "fixture has missing, empty, or malformed native evidence/test declarations"
+fi
+
+while IFS= read -r symbol; do
+  [[ -n "$symbol" ]] || continue
+  grep -RFq -- "func $symbol(" \
+    "$project_root/Tests/TypebarTests" "$project_root/server/Tests" \
+    || fail "missing native test symbol: $symbol"
+done < <(jq -r '.nativeTestSymbols[][]' "$fixture")
+
+audit="$project_root/OFFICIAL_PAGE_MODAL_AUDIT.md"
+grep -Fq -- '`nativeTestSymbols`' "$audit" \
+  || fail "page/modal audit does not name its executable evidence fixture"
+
 print -- "page/modal audit check passed ($declared_count surfaces at $actual_commit)"
