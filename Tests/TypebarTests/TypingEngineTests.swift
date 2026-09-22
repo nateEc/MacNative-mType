@@ -14570,6 +14570,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(FontFamilyNameCommandPolicy.normalized(""))
     XCTAssertNil(FontFamilyNameCommandPolicy.normalized("Line\nBreak"))
     XCTAssertNil(FontFamilyNameCommandPolicy.normalized(String(repeating: "a", count: 51)))
+    XCTAssertEqual(NativePracticeFont.normalizedName("  Élan Mono  "), "Élan Mono")
+    XCTAssertEqual(NativePracticeFont.normalizedName("Bad\tName"), "")
+    XCTAssertEqual(NativePracticeFont.normalizedName("Bad\u{0000}Name"), "")
 
     let suiteName = "TypebarTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
@@ -14592,6 +14595,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(settings.installedPracticeFontName, "Élan Mono")
     XCTAssertFalse(FontFamilyNameCommandPolicy.apply("Bad\nName", to: settings))
     XCTAssertEqual(settings.installedPracticeFontName, "Élan Mono")
+    settings.installedPracticeFontName = "Bad\tName"
+    XCTAssertEqual(settings.installedPracticeFontName, "")
 
     for identifier in [
       "fontFamily.native.monospaced", "setFontFamilyCourier", "customFontName",

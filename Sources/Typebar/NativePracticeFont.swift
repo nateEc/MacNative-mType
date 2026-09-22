@@ -11,7 +11,9 @@ enum NativePracticeFont {
   }
 
   static func normalizedName(_ name: String) -> String {
-    String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maximumNameLength))
+    let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard normalized.rangeOfCharacter(from: .controlCharacters) == nil else { return "" }
+    return String(normalized.prefix(maximumNameLength))
   }
 
   static func postScriptName(for requestedName: String) -> String? {

@@ -225,7 +225,7 @@
 2026-09-10 `CFG-03` 命令入口补充：固定元数据中无需数值输入的 48 个显示命令已接入原生命令面板，覆盖 `timerStyle`、三种实时指标样式、`timerColor`、`timerOpacity`、`highlightMode`、`typedEffect`、`tapeMode`、四个布尔显示项及命令中可见的四种速度单位。全部直接写入既有持久设置且不重开；`highlightMode` 与 `showAllLines` 按固定挑战控制器清除活动挑战。`wph` 保留为设置页能力，但固定命令元数据明确隐藏该值，因此不伪装成命令选项。机器总账现同时固定这些枚举与布尔键，不复制参考显示代码、样式或资产。
 | `maxLineWidth` | `practiceLineWidth`、`customPracticeLineColumns` | 已映射；以原生列宽/自适应表达。 |
 | `fontSize` | `fontSize` | 已映射。 |
-| `fontFamily` | `practiceFont`、可搜索的本机字体目录、名称/导入 | 部分；可浏览当前 macOS 已安装字体家族，也可手填 PostScript 名，或导入用户拥有的 TTF、OTF、WOFF、WOFF2。四种格式都经原生 Core Text 读取描述符并实际注册后才替换旧文件，不复用或打包网页字体资产；状态仍为部分，因为官方 Web 字体目录不会被复制进纯原生重写。 |
+| `fontFamily` | `practiceFont`、可搜索的本机字体目录、名称/导入 | 部分；可浏览当前 macOS 已安装字体家族，也可手填 PostScript 名，或导入用户拥有的 TTF、OTF、WOFF、WOFF2。名称统一去首尾空白、限制 50 个字符并拒绝控制字符，保留 macOS 字体家族所需的 Unicode 名称；命令面板、偏好页和旧归档共用此边界。四种格式都经原生 Core Text 读取描述符并实际注册后才替换旧文件，不复用或打包网页字体资产；状态仍为部分，因为官方 Web 字体目录不会被复制进纯原生重写。 |
 | `keymapMode` | `keyboardGuideMode` | 已映射；四个固定值均进入命令面板，切换会退出挑战但不重开。 |
 | `keymapLayout` | `keyboardGuideLayoutSource`、`keyboardLayout`、自定义图 | 已映射；命令面板严格提供 `overrideSync + 239` 个固定值。同步态持续解析当前输入模拟的内置、系统或自定义来源；显式布局只改变视觉键盘。全部布局命令退出挑战并重开。官方命名资产不打包，逐项证据见 `OFFICIAL_LAYOUT_AUDIT.md` 与机器清单 `Compatibility/official-layouts.json`。 |
 | `keymapStyle` | `keyboardGuideStyle` | 已映射；七个固定值均可即时命令切换。 |
