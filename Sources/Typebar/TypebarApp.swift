@@ -776,6 +776,7 @@ private struct ContentView: View {
   @State private var keyboardGuideFeedback: KeyboardGuideFeedback?
   @State private var keyboardGuideFeedbackSequence = 0
   @State private var keyboardModifierFlags: NSEvent.ModifierFlags = []
+  @State private var konamiSequenceTracker = KonamiSequenceTracker()
   @State private var typingCompanionHands = TypingCompanionHands()
   @State private var typingPowerParticles: [TypingPowerParticle] = []
   @State private var typingPowerGeneration = 0
@@ -2082,6 +2083,16 @@ private struct ContentView: View {
         onCompositionStarted: { session.beginComposition() },
         onCompositionChanged: { compositionText = $0 },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
+        onKeyDown: { keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
+          if konamiSequenceTracker.consume(
+            keyCode: keyCode,
+            charactersIgnoringModifiers: charactersIgnoringModifiers,
+            modifierFlags: modifierFlags,
+            isRepeat: isRepeat)
+          {
+            NSWorkspace.shared.open(KonamiSequenceTracker.destination)
+          }
+        },
         onPhysicalKey: { keyCode, isKeyDown, isRepeat in
           session.recordPhysicalKeyEvent(
             keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)

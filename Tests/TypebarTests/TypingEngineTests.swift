@@ -18594,6 +18594,51 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testNativeInputBridgeRecognizesKonamiOnceWithoutSwallowingTypedLetters() throws {
+    var tracker = KonamiSequenceTracker()
+    var openedURLs = [URL]()
+    var accepted = [String]()
+    let view = TypingInputView()
+    view.onInsert = { text, _ in accepted.append(text) }
+    view.onKeyDown = { keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
+      if tracker.consume(
+        keyCode: keyCode,
+        charactersIgnoringModifiers: charactersIgnoringModifiers,
+        modifierFlags: modifierFlags,
+        isRepeat: isRepeat)
+      {
+        openedURLs.append(KonamiSequenceTracker.destination)
+      }
+    }
+
+    func key(
+      _ keyCode: UInt16,
+      _ characters: String,
+      modifiers: NSEvent.ModifierFlags = [],
+      isRepeat: Bool = false
+    ) throws -> NSEvent {
+      try XCTUnwrap(
+        NSEvent.keyEvent(
+          with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+          windowNumber: 0, context: nil, characters: characters,
+          charactersIgnoringModifiers: characters, isARepeat: isRepeat, keyCode: keyCode))
+    }
+
+    view.keyDown(with: try key(126, "", isRepeat: true))
+    view.keyDown(with: try key(126, "", modifiers: [.command]))
+    for event in [
+      try key(126, ""), try key(126, ""), try key(125, ""), try key(125, ""),
+      try key(123, ""), try key(124, ""), try key(123, ""), try key(124, ""),
+      try key(11, "b"), try key(0, "a"),
+    ] {
+      view.keyDown(with: event)
+    }
+
+    XCTAssertEqual(openedURLs, [KonamiSequenceTracker.destination])
+    XCTAssertEqual(accepted, ["b", "a"])
+  }
+
+  @MainActor
   func testNativeInputBridgeOpensCommandPaletteWithCommandShiftPWithoutTyping() throws {
     var opens = 0
     var accepted = [String]()

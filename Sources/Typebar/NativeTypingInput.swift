@@ -136,6 +136,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onCompositionStarted: () -> Void
     let onCompositionChanged: (String) -> Void
     let onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void
+    let onKeyDown: (UInt16, String?, NSEvent.ModifierFlags, Bool) -> Void
     let onPhysicalKey: (UInt16, Bool, Bool) -> Void
 
     final class Coordinator {
@@ -175,6 +176,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onCompositionStarted = onCompositionStarted
         view.onCompositionChanged = onCompositionChanged
         view.onModifierFlagsChanged = onModifierFlagsChanged
+        view.onKeyDown = onKeyDown
         view.onPhysicalKey = onPhysicalKey
         view.refreshWindowFocusState()
         guard context.coordinator.appliedFocusRequest != focusRequest else { return }
@@ -211,6 +213,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onCompositionStarted: () -> Void = {}
     var onCompositionChanged: (String) -> Void = { _ in }
     var onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void = { _ in }
+    var onKeyDown: (UInt16, String?, NSEvent.ModifierFlags, Bool) -> Void = { _, _, _, _ in }
     var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
 
     private var composition = NSAttributedString()
@@ -347,6 +350,11 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             return
         }
         onPhysicalKey(event.keyCode, true, event.isARepeat)
+        onKeyDown(
+            event.keyCode,
+            event.charactersIgnoringModifiers,
+            event.modifierFlags,
+            event.isARepeat)
         onModifierFlagsChanged(event.modifierFlags)
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {
             if !event.isARepeat { onRestart() }
