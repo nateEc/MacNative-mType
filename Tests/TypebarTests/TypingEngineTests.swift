@@ -16381,6 +16381,26 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testEveryCustomPolyglotComponentCompletesWhenItsPromptIsTyped() {
+    let languages = TypingLanguage.mixableLanguages
+    XCTAssertEqual(languages.count, 446)
+
+    let start = Date(timeIntervalSince1970: 5_000)
+    for language in languages {
+      let partner: TypingLanguage = language == .english ? .spanish : .english
+      let configuration = TestConfiguration.words(
+        2, language: .mixedLanguages, mixedLanguageComponents: [language, partner])
+      var session = TestSessionFactory.make(configuration: configuration)
+      let prompt = session.prompt
+
+      XCTAssertFalse(prompt.isEmpty, "Custom polyglot prompt is empty for \(language.rawValue)")
+      session.insert(prompt, at: start)
+      XCTAssertTrue(session.isFinished, "Custom polyglot did not finish for \(language.rawValue)")
+      XCTAssertEqual(session.typed, prompt, "Custom polyglot changed typed content for \(language.rawValue)")
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+    }
+  }
+
   func testContentOptionsGenerateAndPersistNumbersAndPunctuation() {
     let options = ContentOptions(includePunctuation: true, includeNumbers: true)
     let configuration = TestConfiguration.words(10, language: .english, contentOptions: options)
