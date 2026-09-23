@@ -2,8 +2,29 @@
 set -euo pipefail
 
 project_root="${0:A:h:h}"
+reference_root=""
 temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/typebar-package-check.XXXXXX")"
 app_path="$temporary_directory/Typebar.app"
+
+fail() {
+  print -u2 -- "package check failed: $1"
+  exit 1
+}
+
+while (( $# > 0 )); do
+  case "$1" in
+    --reference)
+      shift
+      (( $# > 0 )) || fail "usage: $0 [--reference /absolute/path/to/monkeytype-reference]"
+      [[ -z "$reference_root" ]] || fail "reference checkout may be specified only once"
+      reference_root="$1"
+      ;;
+    *)
+      fail "usage: $0 [--reference /absolute/path/to/monkeytype-reference]"
+      ;;
+  esac
+  shift
+done
 
 cleanup() {
   rm -rf -- "$temporary_directory"
@@ -33,4 +54,9 @@ bundle_value() {
   || { print -u2 -- "package check failed: QA store marker missing"; exit 1; }
 
 codesign --verify --deep --strict "$app_path"
+if [[ -n "$reference_root" ]]; then
+  zsh "$project_root/Scripts/check-originality-boundaries.sh" \
+    --reference "$reference_root" \
+    --bundle "$app_path"
+fi
 print -- "macOS app package check passed"

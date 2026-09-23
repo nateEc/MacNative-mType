@@ -24,7 +24,13 @@ zsh Scripts/package-macos-app.sh
 zsh Scripts/check-macos-app-package.sh
 ```
 
-对固定参考源码执行串行的重写验收总门禁：它会检查原创性与兼容矩阵、完整运行原生客户端和自建服务测试、再无启动地验签临时应用包。它在每个编译或测试步骤前拒绝已有的 Typebar、测试或 Swift 编译进程，且自身绝不启动 Typebar：
+若本机已有固定的 Monkeytype 参考检出，可在同一次未启动的临时打包检查中额外扫描 `.app` 内所有受保护资源类型，拒绝与参考资源字节相同的文件：
+
+```zsh
+zsh Scripts/check-macos-app-package.sh --reference /absolute/path/to/monkeytype-reference
+```
+
+对固定参考源码执行串行的重写验收总门禁：它会检查原创性与兼容矩阵、完整运行原生客户端和自建服务测试、再无启动地验签并扫描临时应用包。它在每个编译或测试步骤前拒绝已有的 Typebar、测试或 Swift 编译进程，且自身绝不启动 Typebar：
 
 ```zsh
 zsh Scripts/check-native-rewrite-readiness.sh /absolute/path/to/monkeytype-reference
@@ -36,7 +42,7 @@ zsh Scripts/check-native-rewrite-readiness.sh /absolute/path/to/monkeytype-refer
 zsh Scripts/check-originality-boundaries.sh --self-test
 ```
 
-对已克隆的固定 Monkeytype 参考源码，再检查生产 Swift 与参考 JS／TS 的长文本重合，以及图像、字体、音频和打包文本资源的字节重合：
+对已克隆的固定 Monkeytype 参考源码，再检查生产 Swift 与参考 JS／TS 的长文本重合，以及生产资源中的图像、字体、音频和文本资源的字节重合：
 
 ```zsh
 zsh Scripts/check-originality-boundaries.sh --reference /absolute/path/to/monkeytype-reference

@@ -94,7 +94,7 @@ jobs:
 
       - name: Verify the signed macOS app bundle without launching it
         shell: bash
-        run: zsh Scripts/check-macos-app-package.sh
+        run: zsh Scripts/check-macos-app-package.sh --reference "${{ steps.reference.outputs.path }}"
 
       - name: Run self-hosted service tests
         shell: bash

@@ -6,6 +6,7 @@ reference_fixture="$project_root/Compatibility/official-page-modal-surfaces.json
 minimum_overlap_length=120
 reference_root=""
 reference_commit=""
+bundle_root=""
 self_test_directory=""
 
 fail() {
@@ -95,7 +96,7 @@ production_source_contacts_reference_service() {
 
 is_candidate_asset_path() {
   case "${1:l}" in
-    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.pdf|*.ico|*.icns|*.woff|*.woff2|*.ttf|*.otf|*.mp3|*.m4a|*.wav|*.ogg|*.aiff|*.json|*.txt|*.csv|*.xml|*.yaml|*.yml|*.html|*.css)
+    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.pdf|*.ico|*.icns|*.woff|*.woff2|*.ttf|*.otf|*.mp3|*.m4a|*.wav|*.ogg|*.aiff|*.json|*.plist|*.txt|*.csv|*.xml|*.yaml|*.yml|*.html|*.css)
       return 0
       ;;
     *)
@@ -137,6 +138,17 @@ scan_native_assets_for_reference_overlap() {
     print -u2 -- "detected $shared_count duplicate protected-resource SHA-256 value(s) across the rewrite boundary"
     return 1
   fi
+}
+
+scan_native_bundle_assets_for_reference_overlap() {
+  local native_bundle_root="$1"
+  local reference_asset_root="$2"
+
+  [[ "$native_bundle_root" = /* ]] || fail "packaged application path must be absolute"
+  [[ "${native_bundle_root:e}" == "app" ]] || fail "packaged application path must end in .app"
+  [[ -d "$native_bundle_root" ]] || fail "missing packaged application bundle: $native_bundle_root"
+
+  scan_native_assets_for_reference_overlap "$native_bundle_root" "$reference_asset_root"
 }
 
 scan_native_sources_for_reference_overlap() {
@@ -231,33 +243,34 @@ run_self_test() {
     fail "the overlap guard rejected a short common phrase"
   fi
 
-  local native_asset_directory="$self_test_directory/native-assets"
+  local native_bundle_directory="$self_test_directory/Typebar.app"
+  local native_asset_directory="$native_bundle_directory/Contents/Resources"
   local reference_asset_directory="$self_test_directory/reference-assets"
   mkdir -p "$native_asset_directory" "$reference_asset_directory"
   print -r -- "deliberately duplicated asset bytes for the originality guard" > "$native_asset_directory/copy-probe.png"
   print -r -- "deliberately duplicated asset bytes for the originality guard" > "$reference_asset_directory/copy-probe.png"
 
-  if scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory" >/dev/null 2>&1; then
-    fail "the asset overlap guard did not reject duplicate bytes"
+  if scan_native_bundle_assets_for_reference_overlap "$native_bundle_directory" "$reference_asset_directory" >/dev/null 2>&1; then
+    fail "the packaged-asset overlap guard did not reject duplicate bytes"
   fi
 
   print -r -- "independent asset bytes for the originality guard" > "$native_asset_directory/copy-probe.png"
 
-  if ! scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory"; then
-    fail "the asset overlap guard rejected independent bytes"
+  if ! scan_native_bundle_assets_for_reference_overlap "$native_bundle_directory" "$reference_asset_directory"; then
+    fail "the packaged-asset overlap guard rejected independent bytes"
   fi
 
-  print -r -- '{"probe":"duplicated textual resource"}' > "$native_asset_directory/content-probe.json"
-  print -r -- '{"probe":"duplicated textual resource"}' > "$reference_asset_directory/content-probe.json"
+  print -r -- '<?xml version="1.0"?><plist><string>duplicated textual resource</string></plist>' > "$native_asset_directory/content-probe.plist"
+  print -r -- '<?xml version="1.0"?><plist><string>duplicated textual resource</string></plist>' > "$reference_asset_directory/content-probe.plist"
 
-  if scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory" >/dev/null 2>&1; then
-    fail "the resource overlap guard did not reject duplicate textual bytes"
+  if scan_native_bundle_assets_for_reference_overlap "$native_bundle_directory" "$reference_asset_directory" >/dev/null 2>&1; then
+    fail "the packaged-resource overlap guard did not reject duplicate textual bytes"
   fi
 
-  print -r -- '{"probe":"independent textual resource"}' > "$native_asset_directory/content-probe.json"
+  print -r -- '<?xml version="1.0"?><plist><string>independent textual resource</string></plist>' > "$native_asset_directory/content-probe.plist"
 
-  if ! scan_native_assets_for_reference_overlap "$native_asset_directory" "$reference_asset_directory"; then
-    fail "the resource overlap guard rejected independent textual bytes"
+  if ! scan_native_bundle_assets_for_reference_overlap "$native_bundle_directory" "$reference_asset_directory"; then
+    fail "the packaged-resource overlap guard rejected independent textual bytes"
   fi
 }
 
@@ -270,12 +283,18 @@ while (( $# > 0 )); do
       ;;
     --reference)
       shift
-      (( $# > 0 )) || fail "usage: $0 [--self-test] [--reference /absolute/path/to/monkeytype-reference]"
+      (( $# > 0 )) || fail "usage: $0 [--self-test] [--reference /absolute/path/to/monkeytype-reference] [--bundle /absolute/path/to/Typebar.app]"
       [[ -z "$reference_root" ]] || fail "reference checkout may be specified only once"
       reference_root="$1"
       ;;
+    --bundle)
+      shift
+      (( $# > 0 )) || fail "usage: $0 [--self-test] [--reference /absolute/path/to/monkeytype-reference] [--bundle /absolute/path/to/Typebar.app]"
+      [[ -z "$bundle_root" ]] || fail "packaged application bundle may be specified only once"
+      bundle_root="$1"
+      ;;
     *)
-      fail "usage: $0 [--self-test] [--reference /absolute/path/to/monkeytype-reference]"
+      fail "usage: $0 [--self-test] [--reference /absolute/path/to/monkeytype-reference] [--bundle /absolute/path/to/Typebar.app]"
       ;;
   esac
   shift
@@ -293,6 +312,10 @@ if production_source_contacts_reference_service; then
   fail "production Swift source must not contact the Monkeytype service"
 fi
 
+if [[ -n "$bundle_root" && -z "$reference_root" ]]; then
+  fail "a packaged application bundle requires a fixed reference checkout"
+fi
+
 if [[ -n "$reference_root" ]]; then
   verify_reference_checkout
   scan_native_sources_for_reference_overlap "$project_root/Sources" "$reference_root"
@@ -301,6 +324,10 @@ if [[ -n "$reference_root" ]]; then
   scan_native_assets_for_reference_overlap "$project_root/server/Sources" "$reference_root"
   if [[ -d "$project_root/Resources" ]]; then
     scan_native_assets_for_reference_overlap "$project_root/Resources" "$reference_root"
+  fi
+  if [[ -n "$bundle_root" ]]; then
+    scan_native_bundle_assets_for_reference_overlap "$bundle_root" "$reference_root"
+    print -- "packaged application resource boundary check passed: $bundle_root"
   fi
   print -- "originality boundary check passed (no long literal source or protected-resource overlap at $reference_commit)"
 else

@@ -111,6 +111,6 @@ run_logged_check "running self-hosted service test suite" "$temporary_directory/
 require_no_conflicting_processes || fail "stop the listed process before packaging"
 run_logged_check "building and validating the unopened macOS application package" \
   "$temporary_directory/package-check.log" \
-  zsh "$project_root/Scripts/check-macos-app-package.sh"
+  zsh "$project_root/Scripts/check-macos-app-package.sh" --reference "$reference_root"
 
 print -- "native rewrite readiness check passed at $actual_commit (no Typebar process was started)"

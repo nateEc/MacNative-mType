@@ -38,7 +38,13 @@ zsh Scripts/check-originality-boundaries.sh --reference /absolute/path/to/monkey
 
 该模式会先将参考检出严格固定到兼容性快照记录的提交，再将 Typebar 的生产 `Sources/**/*.swift` 与 `server/Sources/**/*.swift` 同参考项目的 `frontend`、`backend`、`packages` 中 JS／TS 源码逐行做空白归一化。任一边界两侧出现相同、至少 120 字节的行即失败；输出只报告数量，不回显参考源码。它有意不扫描文档、兼容性 ID 快照或测试夹具，以免把允许的名称和枚举对照误作实现复制。
 
-同一模式还会对生产资源目录中的 PNG/JPEG/GIF/WebP/SVG/PDF/图标、WOFF/TTF/OTF 字体、常见音频，以及 JSON/TXT/CSV/XML/YAML/HTML/CSS 文件，与固定参考检出中的同类文件比较 SHA-256。只要存在完全相同的字节就失败，且仅报告重复哈希数量。`Compatibility/`、测试和文档不在此范围，避免把允许的标识级快照误作资源；当前 Typebar 的生产资源目录没有此类打包文件。该检查确保后续新增的自制或已授权资源不会悄悄变成参考副本。
+同一模式还会对生产资源目录中的 PNG/JPEG/GIF/WebP/SVG/PDF/图标、WOFF/TTF/OTF 字体、常见音频，以及 JSON/PLIST/TXT/CSV/XML/YAML/HTML/CSS 文件，与固定参考检出中的同类文件比较 SHA-256。只要存在完全相同的字节就失败，且仅报告重复哈希数量。`Compatibility/`、测试和文档不在此范围，避免把允许的标识级快照误作资源；当前 Typebar 的生产资源目录没有此类打包文件。该检查确保后续新增的自制或已授权资源不会悄悄变成参考副本。
+
+打包输出是独立的一层边界：运行下面的命令会在临时目录构建、验签但不启动 `Typebar.app`，并将签名后的整个包传给原创性检查器。它会扫描包内相同的一组受保护资源类型；任何后来被打包脚本意外带入的参考图像、字体、声音或文本资源，都会与固定参考检出按 SHA-256 比较并失败。二进制本身由前述 Swift 源码重合检查覆盖，避免把已编译的自有代码字符串误作资源复制。
+
+```zsh
+zsh Scripts/check-macos-app-package.sh --reference /absolute/path/to/monkeytype-reference
+```
 
 这不是“原创性的数学证明”：它不能比较两段不同语言的语义、跨行或改写后的复制，也不能判断第三方内容授权，哈希也不能识别变形后的资产。因此合并前仍须进行人工审查：确认实现为原生重写、内容来源独立、兼容性快照只含允许的元数据，并为受影响的功能 ID 补充自动化和人工验收证据。
 
