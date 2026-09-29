@@ -1757,12 +1757,16 @@ private struct ContentView: View {
             Text("计时器正向累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
               .font(.caption).foregroundStyle(.secondary)
           } else {
-            Stepper(
-              value: restartingConfigurationBinding($duration),
-              in: 1...OfficialTestLimitInput.maximumValue,
-              step: 1
-            ) {
-              LabeledContent("时长", value: "\(duration) 秒")
+            HStack {
+              Stepper(
+                value: restartingConfigurationBinding($duration),
+                in: 1...OfficialTestLimitInput.maximumValue,
+                step: 1
+              ) {
+                LabeledContent("时长", value: "\(duration) 秒")
+              }
+              Button("自定义…") { showingCustomTimeEditor = true }
+                .buttonStyle(.borderless)
             }
             .onChange(of: duration) { _, _ in reset() }
           }
@@ -1773,8 +1777,12 @@ private struct ContentView: View {
             Text("词数持续累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
               .font(.caption).foregroundStyle(.secondary)
           } else {
-            Stepper(value: restartingConfigurationBinding($wordLimit), in: 1...OfficialTestLimitInput.maximumValue) {
-              LabeledContent("字数", value: "\(wordLimit) 词")
+            HStack {
+              Stepper(value: restartingConfigurationBinding($wordLimit), in: 1...OfficialTestLimitInput.maximumValue) {
+                LabeledContent("字数", value: "\(wordLimit) 词")
+              }
+              Button("自定义…") { showingCustomWordsEditor = true }
+                .buttonStyle(.borderless)
             }
             .onChange(of: wordLimit) { _, _ in reset() }
           }
