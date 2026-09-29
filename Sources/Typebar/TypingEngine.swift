@@ -5550,6 +5550,57 @@ struct IndexedLexicon: RandomAccessCollection {
   }
 }
 
+/// A virtual pool of Typebar-owned words. Large indexed lexicons stay lazy.
+struct PolyglotWordPool {
+  let sources: [(lexicon: IndexedLexicon, punctuation: [String])]
+  let count: Int
+
+  init(sources: [(IndexedLexicon, [String])]) {
+    self.sources = sources.filter { !$0.0.isEmpty }
+    count = self.sources.reduce(0) { $0 + $1.lexicon.count }
+  }
+
+  func entry(at index: Int) -> (word: String, punctuation: [String]) {
+    precondition((0..<count).contains(index))
+    var remainder = index
+    for source in sources {
+      if remainder < source.lexicon.count {
+        return (source.lexicon[remainder], source.punctuation)
+      }
+      remainder -= source.lexicon.count
+    }
+    preconditionFailure("Polyglot pool index fell outside its sources")
+  }
+
+  /// A session-stable permutation keeps Zipf's preferred ranks from favoring
+  /// the first selected language without allocating a shuffled word array.
+  func zipfPermutation() -> (offset: Int, step: Int) {
+    guard count > 1 else { return (0, 1) }
+    let offset = Int.random(in: 0..<count)
+    var step: Int
+    repeat {
+      step = Int.random(in: 1..<count)
+    } while Self.gcd(step, count) != 1
+    return (offset, step)
+  }
+
+  func index(for unit: Double, zipf: Bool, offset: Int = 0, step: Int = 1) -> Int {
+    precondition(count > 0)
+    let bounded = min(max(unit, 0), 0.999_999_999_999)
+    guard zipf else { return min(count - 1, Int(bounded * Double(count))) }
+    // A continuous harmonic approximation avoids O(pool size) work per word.
+    let rank = min(count - 1, Int(expm1(bounded * log1p(Double(count)))))
+    return (rank * step + offset) % count
+  }
+
+  private static func gcd(_ left: Int, _ right: Int) -> Int {
+    var a = left
+    var b = right
+    while b != 0 { (a, b) = (b, a % b) }
+    return a
+  }
+}
+
 /// Recreates the visible English contraction behavior used when punctuation is
 /// enabled without depending on the reference generator or its word lists.
 enum EnglishPunctuationPolicy {
@@ -12497,11 +12548,21 @@ enum StarterLexicon {
       let sources = TypingLanguage.normalizedMixedComponents(mixedLanguageComponents).map {
         polyglotSource(for: $0, englishVariant: englishVariant)
       }
+      let pool = PolyglotWordPool(sources: sources)
+      guard pool.count > 0 else { return "" }
+      let permutation = usesZipfFrequency ? pool.zipfPermutation() : (offset: 0, step: 1)
       return (0..<count).map { index in
-        let source = sources[index % sources.count]
-        return decoratedToken(
-          from: source.0, punctuation: source.1, index: index, contentOptions: contentOptions,
-          usesZipfFrequency: usesZipfFrequency)
+        let selected = pool.index(
+          for: Double.random(in: 0..<1), zipf: usesZipfFrequency,
+          offset: permutation.offset, step: permutation.step)
+        let entry = pool.entry(at: selected)
+        if contentOptions.includeNumbers, index.isMultiple(of: 9) {
+          return String(index / 9 + 1)
+        }
+        if contentOptions.includePunctuation, index.isMultiple(of: 7) {
+          return entry.word + entry.punctuation[index / 7 % entry.punctuation.count]
+        }
+        return entry.word
       }.joined(separator: " ")
     default:
       return prompt(

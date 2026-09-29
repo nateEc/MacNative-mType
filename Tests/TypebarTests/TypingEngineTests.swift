@@ -16868,7 +16868,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.outcome, .completed)
   }
 
-  func testMixedLanguagesCyclesOnlyTypebarOwnedCorporaAndCompletesByWords() {
+  func testMixedLanguagesPoolUsesOnlyTypebarOwnedCorporaAndCompletesByWords() {
     let configuration = TestConfiguration.words(
       TypingLanguage.defaultMixedComponents.count, language: .mixedLanguages, englishVariant: .british,
       mixedLanguageComponents: TypingLanguage.defaultMixedComponents)
@@ -17001,8 +17001,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 153)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
-    XCTAssertTrue(
-      tokens.enumerated().allSatisfy { corpora[$0.offset % corpora.count].contains($0.element) })
+    XCTAssertTrue(tokens.allSatisfy { token in corpora.contains { $0.contains(token) } })
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
     XCTAssertFalse(TypingLanguage.mixedLanguages.supportsQuotes)
     session.insert(session.prompt, at: start)
@@ -17014,10 +17013,9 @@ final class TypingEngineTests: XCTestCase {
     let customTokens = TestSessionFactory.make(configuration: customConfiguration).prompt.split(
       separator: " "
     ).map(String.init)
-    XCTAssertTrue(
-      customTokens.enumerated().allSatisfy { index, token in
-        [StarterLexicon.italianWords, StarterLexicon.frenchWords][index % 2].contains(token)
-      })
+    XCTAssertTrue(customTokens.allSatisfy {
+      StarterLexicon.italianWords.contains($0) || StarterLexicon.frenchWords.contains($0)
+    })
     XCTAssertEqual(customConfiguration.mixedLanguageComponents, selected)
     XCTAssertEqual(
       TypingLanguage.normalizedMixedComponents([.english]),
@@ -17047,6 +17045,54 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(decodedSaved.mixedLanguageComponents.count, 153)
   }
 
+  func testPolyglotSamplesLanguagesFromOnePoolInsteadOfForcingAlternation() {
+    let configuration = TestConfiguration.words(
+      64, language: .mixedLanguages, mixedLanguageComponents: [.english, .yiddish])
+    let words = TestSessionFactory.make(configuration: configuration).prompt
+      .split(separator: " ").map(String.init)
+    XCTAssertEqual(words.count, 64)
+    let languages = words.map { word -> TypingLanguage? in
+      if StarterLexicon.words.contains(word) { return .english }
+      if StarterLexicon.yiddishWords.contains(word) { return .yiddish }
+      return nil
+    }
+    XCTAssertFalse(languages.contains(nil), "Every pooled word must come from a Typebar-owned source")
+    XCTAssertTrue(languages.contains(.english))
+    XCTAssertTrue(languages.contains(.yiddish))
+    XCTAssertTrue(zip(languages, languages.dropFirst()).contains { $0.0 == $0.1 },
+      "The reference samples a pooled wordset; language choice must not be forced to alternate")
+  }
+
+  func testPolyglotVirtualPoolWeightsWordsBySourceSizeAndKeepsLargeSourcesLazy() {
+    var requestedIndices: [Int] = []
+    let large = IndexedLexicon(count: 450_029) { index in
+      requestedIndices.append(index)
+      return "owned\(index)"
+    }
+    let pool = PolyglotWordPool(sources: [
+      (IndexedLexicon(["small"]), ["."]), (large, ["?"])
+    ])
+    XCTAssertEqual(pool.count, 450_030)
+    XCTAssertTrue(requestedIndices.isEmpty)
+    XCTAssertEqual(pool.index(for: 0, zipf: false), 0)
+    XCTAssertEqual(pool.index(for: 0.5, zipf: false), 225_015)
+    XCTAssertEqual(pool.entry(at: 0).word, "small")
+    XCTAssertEqual(pool.entry(at: 0).punctuation, ["."])
+    XCTAssertEqual(pool.entry(at: 225_015).word, "owned225014")
+    XCTAssertEqual(pool.entry(at: 225_015).punctuation, ["?"])
+    XCTAssertEqual(requestedIndices, [225_014, 225_014])
+
+    let permutation = pool.zipfPermutation()
+    XCTAssertTrue((0..<pool.count).contains(permutation.offset))
+    XCTAssertTrue((1..<pool.count).contains(permutation.step))
+    XCTAssertEqual(
+      pool.index(for: 0, zipf: true, offset: permutation.offset, step: permutation.step),
+      permutation.offset)
+    XCTAssertTrue((0..<pool.count).contains(
+      pool.index(for: 0.99, zipf: true, offset: permutation.offset, step: permutation.step)))
+    XCTAssertEqual(requestedIndices, [225_014, 225_014], "Zipf index lookup must not materialize words")
+  }
+
   func testCustomPolyglotOffersEveryNativeSingleLanguageAndHandlesScriptsAndCode() throws {
     let singleLanguages = TypingLanguage.allCases.filter {
       $0 != .mixedEnglishChinese && $0 != .mixedLanguages
@@ -17065,11 +17111,9 @@ final class TypingEngineTests: XCTestCase {
     let rtlTokens = TestSessionFactory.make(configuration: rtlConfiguration).prompt
       .split(separator: " ").map(String.init)
     XCTAssertEqual(rtlTokens.count, 6)
-    XCTAssertTrue(
-      rtlTokens.enumerated().allSatisfy { index, token in
-        (index.isMultiple(of: 2) ? StarterLexicon.arabicWords : StarterLexicon.hebrewWords)
-          .contains(token)
-      })
+    XCTAssertTrue(rtlTokens.allSatisfy {
+      StarterLexicon.arabicWords.contains($0) || StarterLexicon.hebrewWords.contains($0)
+    })
 
     let bidirectional = TestConfiguration.words(
       4, language: .mixedLanguages, mixedLanguageComponents: [.english, .arabic])
