@@ -5011,7 +5011,11 @@ struct TypingSession {
       case .time:
         break
       case .words:
-        if shouldFinishEnglishWordsTest { complete(at: date) }
+        if tracksNoSpaceWordBursts {
+          if reachedConfiguredWordLimit { complete(at: date) }
+        } else if shouldFinishEnglishWordsTest {
+          complete(at: date)
+        }
       case .sections:
         if shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
       }

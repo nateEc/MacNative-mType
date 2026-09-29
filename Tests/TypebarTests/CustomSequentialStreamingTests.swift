@@ -102,4 +102,41 @@ final class CustomSequentialStreamingTests: XCTestCase {
     XCTAssertEqual(session.result()?.outcome, .completed)
     XCTAssertEqual(session.completedWordCount, 101)
   }
+
+  func testFiniteNoSpaceCustomWordsCompleteAtHiddenWordBoundaryForEveryOrdering() {
+    for ordering in [CustomTextOrdering.inOrder, .shuffled, .random] {
+      let configuration = TestConfiguration(
+        mode: .custom, duration: nil, wordLimit: 3, difficulty: .normal,
+        rules: .init(), customTextCompletion: .words,
+        customTextOrdering: ordering, modifiers: [.noSpaces])
+      var session = TestSessionFactory.make(
+        configuration: configuration, customText: "amber harbor quiet lake")
+      let prompt = session.prompt
+      XCTAssertFalse(prompt.contains(" "), String(describing: ordering))
+      session.insert(String(prompt.dropLast()), at: start)
+      XCTAssertEqual(session.completedWordCount, 2, String(describing: ordering))
+      XCTAssertFalse(session.isFinished, String(describing: ordering))
+      session.insert(String(prompt.suffix(1)), at: start.addingTimeInterval(1))
+      XCTAssertEqual(session.completedWordCount, 3, String(describing: ordering))
+      XCTAssertEqual(session.result()?.outcome, .completed, String(describing: ordering))
+    }
+  }
+
+  func testFiniteNoSpaceCustomWordsFinishMidwayThroughNextBatch() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 101, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words,
+      customTextOrdering: .inOrder, modifiers: [.noSpaces])
+    var session = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor quiet lake")
+    let firstBatch = session.prompt
+    session.insert(firstBatch, at: start)
+    XCTAssertEqual(session.completedWordCount, 100)
+    XCTAssertFalse(session.isFinished)
+    XCTAssertTrue(session.prompt.dropFirst(firstBatch.count).hasPrefix("amber"))
+    session.insert("amber", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.completedWordCount, 101)
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
 }
