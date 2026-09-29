@@ -2124,7 +2124,7 @@ struct TestConfiguration: Codable, Equatable {
     quoteSelectionMode: QuoteSelectionMode = .lengths,
     customTextCompletion: CustomTextCompletion = .finish, customTextSectionLimit: Int? = nil,
     customTextOrdering: CustomTextOrdering = .inOrder,
-    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
+    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     modifiers: [TestModifier] = [], contentOptions: ContentOptions = .init(),
     challengeID: String? = nil
   ) {
@@ -2171,7 +2171,7 @@ struct TestConfiguration: Codable, Equatable {
   static func timed(
     seconds: TimeInterval, difficulty: Difficulty = .normal, rules: InputRules = .init(),
     language: TypingLanguage = .english, englishVariant: EnglishVariant = .american,
-    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
+    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     contentOptions: ContentOptions = .init()
   ) -> Self {
     .init(
@@ -2183,7 +2183,7 @@ struct TestConfiguration: Codable, Equatable {
   static func words(
     _ count: Int, difficulty: Difficulty = .normal, rules: InputRules = .init(),
     language: TypingLanguage = .english, englishVariant: EnglishVariant = .american,
-    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
+    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     contentOptions: ContentOptions = .init()
   ) -> Self {
     .init(
@@ -2269,7 +2269,7 @@ struct TestConfiguration: Codable, Equatable {
       try values.decodeIfPresent(CustomTextOrdering.self, forKey: .customTextOrdering) ?? .inOrder
     mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
       try values.decodeIfPresent([TypingLanguage].self, forKey: .mixedLanguageComponents)
-        ?? TypingLanguage.defaultMixedComponents)
+        ?? TypingLanguage.referenceDefaultMixedComponents)
     let normalizedModifiers = TestModifierPolicy.normalized(
       try values.decodeIfPresent([TestModifier].self, forKey: .modifiers) ?? [])
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
@@ -11246,7 +11246,7 @@ enum StarterLexicon {
 
   static func prompt(
     wordCount: Int, language: TypingLanguage, englishVariant: EnglishVariant = .american,
-    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
+    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     contentOptions: ContentOptions, usesZipfFrequency: Bool = false
   ) -> String {
     let count = max(1, wordCount)
@@ -13956,6 +13956,8 @@ extension TypingLanguage {
     }
   }
 
+  /// Historical broad Typebar preset. Explicitly saved selections keep this
+  /// ordering; fresh selections use the pinned reference's four languages.
   static let defaultMixedComponents: [TypingLanguage] = [
     .englishFiveLetter,
     .englishCommonlyMisspelled,
@@ -13977,6 +13979,10 @@ extension TypingLanguage {
     .ukrainianLatin, .ukrainianLatynkaEndings, .japaneseHiragana, .japaneseKatakana,
     .japaneseRomaji,
     .korean, .turkish, .polish,
+  ]
+
+  static let referenceDefaultMixedComponents: [TypingLanguage] = [
+    .english, .spanish, .french, .german,
   ]
 
   /// Every fixed-schema single-language choice is available to custom
@@ -14005,7 +14011,7 @@ extension TypingLanguage {
     ) { result, language in
       if !result.contains(language) { result.append(language) }
     }
-    return selected.count >= 2 ? selected : defaultMixedComponents
+    return selected.count >= 2 ? selected : referenceDefaultMixedComponents
   }
 
   var usesSpaceDelimitedWords: Bool {

@@ -16870,7 +16870,8 @@ final class TypingEngineTests: XCTestCase {
 
   func testMixedLanguagesCyclesOnlyTypebarOwnedCorporaAndCompletesByWords() {
     let configuration = TestConfiguration.words(
-      TypingLanguage.defaultMixedComponents.count, language: .mixedLanguages, englishVariant: .british)
+      TypingLanguage.defaultMixedComponents.count, language: .mixedLanguages, englishVariant: .british,
+      mixedLanguageComponents: TypingLanguage.defaultMixedComponents)
     var session = TestSessionFactory.make(configuration: configuration)
     let tokens = session.prompt.split(separator: " ").map(String.init)
     let corpora = [
@@ -17019,7 +17020,31 @@ final class TypingEngineTests: XCTestCase {
       })
     XCTAssertEqual(customConfiguration.mixedLanguageComponents, selected)
     XCTAssertEqual(
-      TypingLanguage.normalizedMixedComponents([.english]), TypingLanguage.defaultMixedComponents)
+      TypingLanguage.normalizedMixedComponents([.english]),
+      TypingLanguage.referenceDefaultMixedComponents)
+  }
+
+  func testPolyglotDefaultMatchesPinnedReferenceWithoutReplacingSavedSelections() throws {
+    let referenceDefault: [TypingLanguage] = [.english, .spanish, .french, .german]
+    let fresh = TestConfiguration.words(8, language: .mixedLanguages)
+    XCTAssertEqual(fresh.mixedLanguageComponents, referenceDefault)
+    XCTAssertEqual(TypingLanguage.normalizedMixedComponents([.english]), referenceDefault)
+
+    let encodedFresh = try JSONEncoder().encode(fresh)
+    var legacyMissingField = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encodedFresh) as? [String: Any])
+    legacyMissingField.removeValue(forKey: "mixedLanguageComponents")
+    let decodedMissingField = try JSONDecoder().decode(
+      TestConfiguration.self, from: JSONSerialization.data(withJSONObject: legacyMissingField))
+    XCTAssertEqual(decodedMissingField.mixedLanguageComponents, referenceDefault)
+
+    let previouslySaved = TestConfiguration.words(
+      8, language: .mixedLanguages,
+      mixedLanguageComponents: TypingLanguage.defaultMixedComponents)
+    let decodedSaved = try JSONDecoder().decode(
+      TestConfiguration.self, from: JSONEncoder().encode(previouslySaved))
+    XCTAssertEqual(decodedSaved.mixedLanguageComponents, previouslySaved.mixedLanguageComponents)
+    XCTAssertEqual(decodedSaved.mixedLanguageComponents.count, 153)
   }
 
   func testCustomPolyglotOffersEveryNativeSingleLanguageAndHandlesScriptsAndCode() throws {
@@ -17077,7 +17102,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 153)
     XCTAssertEqual(
       TypingLanguage.normalizedMixedComponents([.codeSwift, .codeSwift]),
-      TypingLanguage.defaultMixedComponents)
+      TypingLanguage.referenceDefaultMixedComponents)
     XCTAssertEqual(
       PolyglotTokenPolicy.token(from: "quiet   harbor", selectionIndex: 0), "quiet")
     XCTAssertEqual(

@@ -4954,7 +4954,7 @@ enum OfflineContent {
 
   static func generatedPrompt(
     wordCount: Int, language: TypingLanguage = .english, englishVariant: EnglishVariant = .american,
-    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
+    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     contentOptions: ContentOptions = .init(), usesZipfFrequency: Bool = false
   ) -> String {
     if language.isCodeLanguage {
@@ -4969,7 +4969,7 @@ enum OfflineContent {
   static func timedPrompt(
     seconds: TimeInterval, language: TypingLanguage = .english,
     englishVariant: EnglishVariant = .american,
-    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
+    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     contentOptions: ContentOptions = .init(), usesZipfFrequency: Bool = false
   ) -> String {
     generatedPrompt(

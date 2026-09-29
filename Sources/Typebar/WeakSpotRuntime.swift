@@ -80,7 +80,7 @@ enum WeakSpotWordSelection {
 
   static func prompt(
     wordCount: Int, language: TypingLanguage, englishVariant: EnglishVariant,
-    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.defaultMixedComponents,
+    mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     contentOptions: ContentOptions, scores: WeakSpotScores
   ) -> String? {
     guard !language.isCodeLanguage else { return nil }

@@ -10,6 +10,7 @@
 - `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：446 个独立原生选择、0 个兼容代指、0 个未映射配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界见 `OFFICIAL_LANGUAGE_AUDIT.md`。
 - `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：92 个已映射、1 个部分、1 个不适用、0 个未实现或漏记；声音、主／节奏光标、实时指标、键盘提示与键入能量档位会提取固定枚举值，节奏伙伴会校验固定布尔类型，再与本机语义逐项对账。
 - 同一清单的 `nativeEvidenceGroups` 将 93 个已映射或部分映射键按固定 `ConfigSchema` 的九个非广告组分区，并为每组记录 Typebar 源文件路径；测试校验组名、逐键归属、无重复、完整覆盖，以及所有路径均存在于 `Sources/Typebar/`。这些代码路径是可审计的实现证据，不替代设备上的端到端行为验收。
+- 多语默认值以本表 `customPolyglot` 当前行及固定参考 `frontend/src/ts/constants/default-config.ts` 为准：English、Spanish、French、German。下文按日期保留的“153 项默认组合”是旧 Typebar 行为的历史记录，不再描述新建配置；这些语言仍可自选，旧选择不会被改写。
 
 - Catalan、Indonesian 与 Malay 的自动化测试覆盖各自的自创词流、四档原创引语、完整多语混排轮转、`ca-ES` / `id-ID` / `ms-MY` 朗读 locale 与仅在明示启用时使用的 `ca` / `id` / `ms` 百科入口；服务端测试覆盖投稿、撤回、成绩提交与按语言排行，未读取或导入参考词表/内容。
 
@@ -181,7 +182,7 @@
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。命令面板另按固定名称提供 48 项切换与 `none` 清除入口；`weakspot` 为实时选词修饰器，多语路由到 Typebar 原生工作流，持久化弱项分析保持独立入口。 |
 | `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
-| `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并按选择顺序轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。旧配置缺失或不足两项时回退原有 153 项默认组合。 |
+| `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并按选择顺序轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。新建或缺失／无效配置采用参考默认的 English、Spanish、French、German 四项；已有明确保存的旧 153 项组合继续原样加载，不强制迁移。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
 | `oppositeShiftMode` | `oppositeShiftMode` | 已映射。 |

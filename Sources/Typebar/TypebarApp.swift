@@ -679,7 +679,7 @@ private struct ContentView: View {
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
   @State private var polyglotReturnLanguage: TypingLanguage?
-  @State private var mixedLanguageComponents = TypingLanguage.defaultMixedComponents
+  @State private var mixedLanguageComponents = TypingLanguage.referenceDefaultMixedComponents
   @State private var mixedLanguageSearch = ""
   @State private var contentOptions = ContentOptions()
   @State private var duration = 30
