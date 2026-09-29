@@ -3912,6 +3912,14 @@ struct TypingSession {
       else { return false }
       return isPromptWordSeparator(typedCharacters[typedIndex])
     }.count
+    if outcome == .completed, configuration.mode == .custom,
+      configuration.customTextCompletion == .words,
+      let lastTyped = typedCharacters.last, !isPromptWordSeparator(lastTyped)
+    {
+      // A finite custom test may end on its last required word while a
+      // subsequent generated chunk remains visible but untyped.
+      return committed + 1
+    }
     guard nextTargetIndex >= targetCharacters.count,
       !targetCharacters.isEmpty,
       !isPromptWordSeparator(targetCharacters[targetCharacters.count - 1])
@@ -4023,7 +4031,7 @@ struct TypingSession {
       keyboardActivityDates.append(date)
       insertionActivityDates.append(date)
     }
-    if randomCustomSourceTokens?.isEmpty == false,
+    if usesIncrementalPromptExtension,
       (!configuration.language.usesSpaceDelimitedWords
         || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)),
       nextTargetIndex >= prompt.count, !reachedConfiguredWordLimit
@@ -5008,14 +5016,15 @@ struct TypingSession {
     guard nextTargetIndex >= prompt.count else { return }
     if let randomCustomSourceTokens, !randomCustomSourceTokens.isEmpty {
       let words = CustomTextOrderPolicy.randomWords(
-        from: randomCustomSourceTokens, count: 64, avoiding: randomCustomPreviousWords)
+        from: randomCustomSourceTokens,
+        count: CustomTextOrderPolicy.maximumCompleteRandomWordCount,
+        avoiding: randomCustomPreviousWords)
       randomCustomPreviousWords = Array(words.suffix(2))
       let source = words.joined(separator: " ")
       let chunk = configuration.language.presentationText(
         TestModifierPolicy.transformed(
           source, modifiers: configuration.modifiers, language: configuration.language))
-      let usesNoSpaceSeparator = !configuration.language.usesSpaceDelimitedWords
-        || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+      let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
       let previousEnd = prompt.count + separator.count
       prompt += separator + chunk
@@ -5035,8 +5044,7 @@ struct TypingSession {
       return
     }
     guard let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
-    let usesNoSpaceSeparator = !configuration.language.usesSpaceDelimitedWords
-      || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
     let previousEnd = prompt.count + separator.count
     prompt += separator + repeatingPrompt

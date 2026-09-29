@@ -5251,7 +5251,7 @@ struct TestSessionFactory {
         } else {
           prompt = CustomTextOrderPolicy.prompt(
             from: source, ordering: configuration.customTextOrdering,
-            wordCount: streamsRandomCustomText ? 64
+            wordCount: streamsRandomCustomText ? CustomTextOrderPolicy.maximumCompleteRandomWordCount
               : hasCompleteRandomWordPrompt ? configuration.wordLimit : nil)
           if streamsRandomCustomText {
             randomCustomPreviousWords = Array(
@@ -5517,7 +5517,7 @@ enum TypebarStreamContent {
 }
 
 enum CustomTextOrderPolicy {
-  static let maximumCompleteRandomWordCount = 1_000
+  static let maximumCompleteRandomWordCount = 100
 
   static func randomWords(
     from tokens: [String], count: Int, avoiding previous: [String] = [],
@@ -5558,7 +5558,7 @@ enum CustomTextOrderPolicy {
       let rotation = Int(random().magnitude % UInt(tokens.count))
       return Array(tokens[rotation...] + tokens[..<rotation]).reversed().joined(separator: " ")
     case .random:
-      let count = wordCount.map { max(1, $0) } ?? max(tokens.count, 64)
+      let count = wordCount.map { max(1, $0) } ?? max(tokens.count, 100)
       return randomWords(from: tokens, count: count, random: random).joined(separator: " ")
     }
   }
