@@ -4,6 +4,61 @@ import XCTest
 @testable import Typebar
 
 final class OfficialChallengeCoverageTests: XCTestCase {
+  func testOneHandedChallengeBuildsLayoutSpecificSourceAndDualLimit() throws {
+    for side in OneHandedChallengeSide.allCases {
+      let selection = OneHandedChallengeSelection(layout: .ansiQwerty, side: side)
+      let preset = try XCTUnwrap(OneHandedChallengePolicy.preset(for: selection), "\(side)")
+      XCTAssertEqual(preset.configuration.duration, 3_600)
+      XCTAssertEqual(preset.configuration.wordLimit, 10_000)
+      XCTAssertEqual(preset.configuration.customTextCompletion, .words)
+      XCTAssertEqual(OneHandedChallengePolicy.identify(source: try XCTUnwrap(preset.customText)), selection)
+      XCTAssertGreaterThan(try XCTUnwrap(preset.customText).split(separator: " ").count, 1)
+    }
+  }
+
+  func testOneHandedChallengeRequiresSourceAndEitherTerminalEvidence() throws {
+    let challenge = try officialChallenge("oneArmedBandit")
+    let selection = OneHandedChallengeSelection(layout: .ansiQwerty, side: .right)
+    let preset = try XCTUnwrap(OneHandedChallengePolicy.preset(for: selection))
+    let validWord = try XCTUnwrap(preset.customText?.split(separator: " ").first).description
+    let start = Date(timeIntervalSince1970: 100)
+    func result(duration: TimeInterval, words: Int?, prompt: String,
+      selection: OneHandedChallengeSelection? = selection) -> CompletedTestResult {
+      .init(id: UUID(), configuration: preset.configuration, outcome: .completed,
+        startedAt: start, finishedAt: start.addingTimeInterval(duration),
+        typedCharacterCount: 4, correctCharacterCount: 4, errorCount: 0,
+        wpm: 50, rawWpm: 50, accuracy: 100, prompt: prompt,
+        challengePresentation: .init(liveSpeedStyle: .off, paceCaretStyle: .off,
+          tapeMode: .off, oneHandedSelection: selection, completedWords: words))
+    }
+    XCTAssertTrue(ChallengeEvaluator.evaluate(
+      result(duration: 3_600, words: 3, prompt: validWord), challenge: challenge).passed)
+    XCTAssertTrue(ChallengeEvaluator.evaluate(
+      result(duration: 600, words: 10_000, prompt: validWord), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(duration: 600, words: 9_999, prompt: validWord), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(duration: 3_600, words: 3, prompt: "notahandword"), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(duration: 3_600, words: nil, prompt: validWord, selection: nil), challenge: challenge).passed)
+  }
+
+  func testOneHandedSelectionSurvivesActiveTestArchive() throws {
+    let selection = OneHandedChallengeSelection(layout: .ansiQwerty, side: .left)
+    var preset = try XCTUnwrap(OneHandedChallengePolicy.preset(for: selection))
+    preset.configuration = preset.configuration.with(challengeID: "one-handed-bandit")
+    XCTAssertTrue(SettingsJSONConfigurationPolicy.isValid(preset.configuration))
+    XCTAssertFalse(SettingsJSONConfigurationPolicy.isValid(
+      preset.configuration.with(challengeID: nil)))
+    let document = ActiveTestSelectionDocument(
+      preset: preset, testParameterMemory: .defaults,
+      oneHandedChallengeSelection: selection)
+    let restored = try JSONDecoder().decode(ActiveTestSelectionDocument.self,
+      from: JSONEncoder().encode(document))
+    XCTAssertEqual(ActiveTestSelectionPolicy.validated(restored)?.oneHandedChallengeSelection,
+      selection)
+  }
+
   private struct Fixture: Decodable {
     let referenceRepository: String
     let referenceCommit: String
@@ -32,7 +87,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 41)
+    XCTAssertEqual(mapped.count, 42)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)

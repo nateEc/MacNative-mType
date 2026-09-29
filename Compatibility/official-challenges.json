@@ -105,6 +105,7 @@
     "mouseWarrior": "mouse-warrior",
     "beepBoop": "robot-log",
     "wingdings": "ten-words-of-pain",
+    "oneArmedBandit": "one-handed-bandit",
     "simp": "single-word-thousand",
     "trueSimp": "single-word-ten-thousand",
     "simpLord": "single-word-hundred-thousand",
@@ -126,7 +127,6 @@
     "thumbWarrior",
     "mobileWarrior",
     "upsideDown",
-    "oneArmedBandit",
     "feetWarrior"
   ]
 }

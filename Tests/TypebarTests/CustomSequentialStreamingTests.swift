@@ -6,6 +6,20 @@ import XCTest
 final class CustomSequentialStreamingTests: XCTestCase {
   private let start = Date(timeIntervalSince1970: 100)
 
+  func testCustomWordChallengeEndsAtHourBeforeWordLimit() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: 3_600, wordLimit: 10_000, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words, customTextOrdering: .random)
+    var session = TestSessionFactory.make(configuration: configuration, customText: "amber bay")
+    session.insert(String(session.nextExpectedCharacter!), at: start)
+    session.tick(at: start.addingTimeInterval(3_599))
+    XCTAssertFalse(session.isFinished)
+    session.insert(String(session.nextExpectedCharacter!), at: start.addingTimeInterval(3_599))
+    session.tick(at: start.addingTimeInterval(3_600))
+    XCTAssertEqual(session.result()?.outcome, .completed)
+    XCTAssertLessThan(session.completedWordCount, 10_000)
+  }
+
   func testLongOrderedCustomTextStartsWithOneHundredWordsAndContinuesInOrder() {
     let source = (0..<105).map { "word\($0)" }.joined(separator: " ")
     let configuration = TestConfiguration(
@@ -153,7 +167,7 @@ final class CustomSequentialStreamingTests: XCTestCase {
 
   func testFiniteOrderedCustomTextStreamsTenThousandWordsWithoutLosingPosition() {
     let configuration = TestConfiguration(
-      mode: .custom, duration: nil, wordLimit: 10_000, difficulty: .normal,
+      mode: .custom, duration: 3_600, wordLimit: 10_000, difficulty: .normal,
       rules: .init(), customTextCompletion: .words, customTextOrdering: .inOrder)
     var session = TestSessionFactory.make(configuration: configuration, customText: "typebar")
     for word in 0..<10_000 {

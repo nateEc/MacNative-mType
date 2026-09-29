@@ -19,13 +19,16 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
   /// substituted the mixed-language prompt. This mirrors the reference
   /// configuration, which leaves its selected language intact under Polyglot.
   let polyglotReturnLanguage: TypingLanguage?
+  /// The physical hand side/layout selected for a local one-handed challenge.
+  let oneHandedChallengeSelection: OneHandedChallengeSelection?
 
   init(
     version: Int = ActiveTestSelectionDocument.currentVersion,
     preset: SavedTestPreset,
     quoteSource: QuoteSource = .builtIn,
     testParameterMemory: TypebarTestParameterMemory,
-    polyglotReturnLanguage: TypingLanguage? = nil
+    polyglotReturnLanguage: TypingLanguage? = nil,
+    oneHandedChallengeSelection: OneHandedChallengeSelection? = nil
   ) {
     self.version = version
     self.preset = .init(
@@ -37,6 +40,7 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
     self.testParameterMemory = testParameterMemory
     self.polyglotReturnLanguage = PolyglotReturnLanguagePolicy.validated(
       polyglotReturnLanguage)
+    self.oneHandedChallengeSelection = oneHandedChallengeSelection
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -45,6 +49,7 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
     case quoteSource
     case testParameterMemory
     case polyglotReturnLanguage
+    case oneHandedChallengeSelection
   }
 
   init(from decoder: Decoder) throws {
@@ -56,7 +61,9 @@ struct ActiveTestSelectionDocument: Codable, Equatable {
       testParameterMemory: try container.decode(
         TypebarTestParameterMemory.self, forKey: .testParameterMemory),
       polyglotReturnLanguage: try container.decodeIfPresent(
-        TypingLanguage.self, forKey: .polyglotReturnLanguage))
+        TypingLanguage.self, forKey: .polyglotReturnLanguage),
+      oneHandedChallengeSelection: try container.decodeIfPresent(
+        OneHandedChallengeSelection.self, forKey: .oneHandedChallengeSelection))
   }
 }
 
@@ -93,7 +100,12 @@ enum ActiveTestSelectionPolicy {
       quoteSource: document.quoteSource,
       testParameterMemory: document.testParameterMemory,
       polyglotReturnLanguage: document.preset.configuration.language == .mixedLanguages
-        ? document.polyglotReturnLanguage : nil)
+        ? document.polyglotReturnLanguage : nil,
+      oneHandedChallengeSelection: document.oneHandedChallengeSelection.flatMap { selection in
+        document.preset.configuration.challengeID == "one-handed-bandit"
+          && OneHandedChallengePolicy.source(for: selection) == document.preset.customText
+          ? selection : nil
+      })
   }
 }
 

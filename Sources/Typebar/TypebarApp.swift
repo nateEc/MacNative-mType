@@ -754,8 +754,12 @@ private struct ContentView: View {
   @State private var showingTestShare = false
   @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
   @State private var showingChallenges = false
+  @State private var showingOneHandedChallengeSetup = false
+  @State private var queuedOneHandedChallengeSetup = false
   @State private var showsVirtualKeyboard = false
   @State private var activeChallengeID: String?
+  @State private var oneHandedChallengePreset: SavedTestPreset?
+  @State private var oneHandedChallengeSelection: OneHandedChallengeSelection?
   @State private var wingdingsFontStayedAvailable = true
   @State private var focusRequest = 0
   @State private var inputHasFocus = false
@@ -965,7 +969,11 @@ private struct ContentView: View {
             keyboardGuideMode: activeChallengeID == "ten-words-of-pain"
               ? effectiveKeyboardGuideMode : nil,
             fontStayedAvailable: activeChallengeID == "ten-words-of-pain"
-              ? wingdingsFontStayedAvailable : nil)
+              ? wingdingsFontStayedAvailable : nil,
+            oneHandedSelection: activeChallengeID == "one-handed-bandit"
+              ? oneHandedChallengeSelection : nil,
+            completedWords: activeChallengeID == "one-handed-bandit"
+              ? session.completedWordCount : nil)
         guard let result = session.result(
           tags: activeSessionTags,
           restartCount: resultPriorAttemptLedger.restartCount,
@@ -1130,8 +1138,22 @@ private struct ContentView: View {
     .sheet(isPresented: $showingPresets) {
       PresetLibraryView(currentPreset: presetDefinition) { apply($0) }
     }
-    .sheet(isPresented: $showingChallenges) {
+    .sheet(isPresented: $showingChallenges, onDismiss: {
+      if queuedOneHandedChallengeSetup {
+        queuedOneHandedChallengeSetup = false
+        showingOneHandedChallengeSetup = true
+      }
+    }) {
       ChallengeLibraryView(onSelect: loadChallenge)
+    }
+    .sheet(isPresented: $showingOneHandedChallengeSetup) {
+      OneHandedChallengeSetupView { preset, selection in
+        var selected = preset
+        selected.configuration = selected.configuration.with(challengeID: "one-handed-bandit")
+        apply(selected)
+        oneHandedChallengeSelection = selection
+        persistActiveTestSelection()
+      }
     }
     .sheet(isPresented: $showingDataMigration) {
       ArchiveManagementView(settings: settings)
@@ -1566,6 +1588,11 @@ private struct ContentView: View {
           Text(activeChallenge.requirements.summary)
             .font(.caption)
             .foregroundStyle(.secondary)
+          if activeChallenge.id == "one-handed-bandit" {
+            Text("已完成 \(session.completedWordCount) / 10,000 词；倒计时和词数任一达标即结束")
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
           Button("退出挑战") {
             guard acceptsRestartingConfigurationChange() else { return }
             activeChallengeID = nil
@@ -4169,7 +4196,9 @@ private struct ContentView: View {
 
   private var configuration: TestConfiguration {
     if let activeChallenge {
-      let challengeConfiguration = activeChallenge.preset.configuration.with(challengeID: activeChallenge.id)
+      let challengePreset = activeChallenge.id == "one-handed-bandit"
+        ? (oneHandedChallengePreset ?? activeChallenge.preset) : activeChallenge.preset
+      let challengeConfiguration = challengePreset.configuration.with(challengeID: activeChallenge.id)
       return challengeConfiguration.with(
         modifiers: effectiveTestModifiers(
           for: challengeConfiguration.language, mode: challengeConfiguration.mode,
@@ -4290,9 +4319,21 @@ private struct ContentView: View {
     }
     if appliesTest {
       activeChallengeID = challenge?.id
+      if challenge?.id == "one-handed-bandit" {
+        oneHandedChallengePreset = appliedPreset.customText == nil
+          ? challenge?.preset : appliedPreset
+        oneHandedChallengeSelection = oneHandedChallengePreset?.customText.flatMap {
+          OneHandedChallengePolicy.identify(source: $0)
+        }
+      } else {
+        oneHandedChallengePreset = nil
+        oneHandedChallengeSelection = nil
+      }
       if challenge?.id == "mouse-warrior" { showsVirtualKeyboard = true }
     }
-    let configuration = challenge?.preset.configuration ?? appliedPreset.configuration
+    let configuration = challenge?.id == "one-handed-bandit"
+      ? (oneHandedChallengePreset?.configuration ?? appliedPreset.configuration)
+      : (challenge?.preset.configuration ?? appliedPreset.configuration)
     mode = configuration.mode
     if overwritesParameterMemory {
       if let duration = configuration.duration { self.duration = Int(duration) }
@@ -4373,6 +4414,11 @@ private struct ContentView: View {
       overwritesParameterMemory: false,
       appliesGlobalSettings: false,
       polyglotReturnLanguage: document.polyglotReturnLanguage)
+    if activeChallengeID == "one-handed-bandit" {
+      oneHandedChallengeSelection = document.oneHandedChallengeSelection
+        ?? oneHandedChallengeSelection
+      persistActiveTestSelection()
+    }
     if mode == .quote, quoteSource == .community {
       refreshCommunityQuotes()
     }
@@ -4415,7 +4461,9 @@ private struct ContentView: View {
         customTextWordLimit: customTextWordLimit,
         customTextSectionLimit: customTextSectionLimit),
       polyglotReturnLanguage: selectedConfiguration.language == .mixedLanguages
-        ? polyglotReturnLanguage : nil))
+        ? polyglotReturnLanguage : nil,
+      oneHandedChallengeSelection: activeChallengeID == "one-handed-bandit"
+        ? oneHandedChallengeSelection : nil))
   }
 
   private var activeChallenge: TypebarChallenge? {
@@ -4423,6 +4471,14 @@ private struct ContentView: View {
   }
 
   private func loadChallenge(_ challenge: TypebarChallenge) {
+    if challenge.id == "one-handed-bandit" {
+      if showingChallenges {
+        queuedOneHandedChallengeSetup = true
+      } else {
+        showingOneHandedChallengeSetup = true
+      }
+      return
+    }
     var preset = challenge.preset
     preset.configuration = preset.configuration.with(challengeID: challenge.id)
     apply(preset)

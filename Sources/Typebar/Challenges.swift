@@ -82,6 +82,7 @@ struct ChallengeRequirements: Equatable {
   var requiresVirtualKeyboardOnly = false
   var requiredCustomWordLimit: Int? = nil
   var exactPrompt: String? = nil
+  var requiresOneHandedSource = false
 
   var effectiveMaximumAFKPercentage: Int { min(maximumAFKPercentage ?? 10, 10) }
 
@@ -100,6 +101,7 @@ struct ChallengeRequirements: Equatable {
       requiresVirtualKeyboardOnly ? "仅使用屏幕键盘输入" : nil,
       requiredCustomWordLimit.map { "指定脚本的 \($0) 词完整练习" },
       exactPrompt.map { _ in "使用本挑战的原生脚本" },
+      requiresOneHandedSource ? "所选布局单手词表，最多一小时或一万词" : nil,
     ]
     .compactMap { $0 }
     .joined(separator: " · ")
@@ -252,6 +254,30 @@ enum ChallengeEvaluator {
     if let prompt = requirements.exactPrompt, result.prompt != prompt {
       failedRequirements.append("需要完成本挑战的原生脚本")
     }
+    if requirements.requiresOneHandedSource {
+      let presentation = result.challengePresentation
+      if result.outcome != .completed
+        || result.configuration.mode != .custom
+        || result.configuration.customTextCompletion != .words
+        || result.configuration.wordLimit != 10_000
+        || result.configuration.duration != 3_600
+      {
+        failedRequirements.append("需要一小时或一万词的单手自定义练习")
+      }
+      if result.elapsedDuration < 3_600 && (presentation?.completedWords ?? 0) < 10_000 {
+        failedRequirements.append("需要完成一小时或一万词；旧结果缺少词数证据无法验收")
+      }
+      if let selection = presentation?.oneHandedSelection,
+        let source = OneHandedChallengePolicy.preset(for: selection)?.customText
+      {
+        let allowed = Set(source.split(separator: " ").map(String.init))
+        if result.prompt.isEmpty || !result.prompt.split(separator: " ").allSatisfy({ allowed.contains(String($0)) }) {
+          failedRequirements.append("题目不属于所选布局的单手词表")
+        }
+      } else {
+        failedRequirements.append("缺少单手布局与词表证据，旧结果无法验收")
+      }
+    }
     return .init(
       challenge: challenge, passed: failedRequirements.isEmpty,
       failedRequirements: failedRequirements)
@@ -350,6 +376,108 @@ enum LayoutFluidChallengePolicy {
   }
 }
 
+enum OneHandedChallengeSide: String, CaseIterable, Identifiable, Codable {
+  case left, right
+  var id: Self { self }
+  var title: String { self == .left ? "左手" : "右手" }
+  var filterPreset: LocalWordFilterPreset { self == .left ? .leftHand : .rightHand }
+}
+
+struct OneHandedChallengeSelection: Codable, Equatable {
+  let layout: KeyboardLayout
+  let side: OneHandedChallengeSide
+}
+
+enum OneHandedChallengePolicy {
+  static func source(for selection: OneHandedChallengeSelection) -> String? {
+    let lexicon = StarterLexicon.words + StarterLexicon.englishFiveLetterWords
+      + StarterLexicon.englishDoubleLetterWords
+      + TypingLanguage.englishLegal.ownedPracticeWords()
+      + TypingLanguage.englishMedical.ownedPracticeWords()
+      + TypingLanguage.englishShakespearean.ownedPracticeWords()
+    guard let criteria = selection.side.filterPreset.criteria(layout: selection.layout),
+      case .success(let words) = LocalWordFilter.words(
+        in: lexicon, matching: criteria)
+    else { return nil }
+    var source: [String] = []
+    var length = 0
+    for word in Set(words).sorted() {
+      let nextLength = length + word.count + (source.isEmpty ? 0 : 1)
+      if nextLength > CustomTextPolicy.maximumLength { break }
+      source.append(word)
+      length = nextLength
+    }
+    return source.count >= 2 ? source.joined(separator: " ") : nil
+  }
+
+  static func preset(for selection: OneHandedChallengeSelection) -> SavedTestPreset? {
+    guard let source = source(for: selection) else { return nil }
+    return .init(configuration: .init(
+      mode: .custom, duration: 3_600, wordLimit: 10_000, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words, customTextOrdering: .random),
+      quoteID: nil, customText: source)
+  }
+
+  static func identify(source: String) -> OneHandedChallengeSelection? {
+    for layout in KeyboardLayout.allCases {
+      for side in OneHandedChallengeSide.allCases {
+        let selection = OneHandedChallengeSelection(layout: layout, side: side)
+        if self.source(for: selection) == source { return selection }
+      }
+    }
+    return nil
+  }
+}
+
+struct OneHandedChallengeSetupView: View {
+  let onStart: (SavedTestPreset, OneHandedChallengeSelection) -> Void
+  @Environment(\.dismiss) private var dismiss
+  @State private var layout: KeyboardLayout = .ansiQwerty
+  @State private var side: OneHandedChallengeSide = .left
+
+  private var selection: OneHandedChallengeSelection { .init(layout: layout, side: side) }
+  private var preset: SavedTestPreset? { OneHandedChallengePolicy.preset(for: selection) }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Picker("键盘布局", selection: $layout) {
+          ForEach(KeyboardLayout.allCases) { option in
+            Text(option.displayName).tag(option)
+          }
+        }
+        Picker("使用一侧", selection: $side) {
+          ForEach(OneHandedChallengeSide.allCases) { option in
+            Text(option.title).tag(option)
+          }
+        }
+        Text("从 Typebar 自有英语词库筛选；一小时或一万词先到即结束。请自行遵守只用所选手输入，应用无法证明实际使用了哪只手。")
+          .font(.caption).foregroundStyle(.secondary)
+        if let preset {
+          Text("符合条件的词：\(preset.customText?.split(separator: " ").count ?? 0)")
+        } else {
+          Text("这个布局与手侧在本地词库中不足两个词，请更换。")
+            .foregroundStyle(.orange)
+        }
+      }
+      .navigationTitle("单手万词")
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("取消") { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("开始") {
+            guard let preset else { return }
+            onStart(preset, selection)
+            dismiss()
+          }.disabled(preset == nil)
+        }
+      }
+    }
+    .frame(minWidth: 470, minHeight: 280)
+  }
+}
+
 enum TypebarChallengeLibrary {
   /// Independently authored Typebar text; only the reference's public word count and rules
   /// informed this challenge. No reference script text is read or bundled.
@@ -363,6 +491,13 @@ enum TypebarChallengeLibrary {
   ].joined(separator: " ")
 
   static let all: [TypebarChallenge] = [
+    .init(
+      id: "one-handed-bandit", title: "单手万词",
+      description: "任选内置键盘布局的左手或右手词表；一小时与一万词，先到即结束。",
+      legacyURLNames: ["oneArmedBandit"],
+      preset: OneHandedChallengePolicy.preset(for: .init(layout: .ansiQwerty, side: .left))!,
+      requirements: .init(requiresOneHandedSource: true), dailyEligible: false
+    ),
     .init(
       id: "ten-words-of-pain",
       title: "十词符号挑战",

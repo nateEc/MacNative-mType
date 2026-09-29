@@ -3089,13 +3089,18 @@ struct ChallengePresentationSnapshot: Codable, Equatable {
   let fontFamily: String?
   let keyboardGuideMode: KeyboardGuideMode?
   let fontStayedAvailable: Bool?
+  /// Optional evidence added with the one-handed challenge. Older results stay decodable.
+  let oneHandedSelection: OneHandedChallengeSelection?
+  let completedWords: Int?
 
   init(
     liveSpeedStyle: LiveMetricStyle, paceCaretStyle: TypingCaretStyle,
     tapeMode: PracticeTapeMode, layoutFluidLayouts: [KeyboardLayout]? = nil,
     virtualKeyboardOnly: Bool? = nil, fontFamily: String? = nil,
     keyboardGuideMode: KeyboardGuideMode? = nil,
-    fontStayedAvailable: Bool? = nil
+    fontStayedAvailable: Bool? = nil,
+    oneHandedSelection: OneHandedChallengeSelection? = nil,
+    completedWords: Int? = nil
   ) {
     self.liveSpeedStyle = liveSpeedStyle
     self.paceCaretStyle = paceCaretStyle
@@ -3105,6 +3110,8 @@ struct ChallengePresentationSnapshot: Codable, Equatable {
     self.fontFamily = fontFamily
     self.keyboardGuideMode = keyboardGuideMode
     self.fontStayedAvailable = fontStayedAvailable
+    self.oneHandedSelection = oneHandedSelection
+    self.completedWords = completedWords
   }
 }
 
