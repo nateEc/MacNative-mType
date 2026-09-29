@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 37)
+    XCTAssertEqual(mapped.count, 38)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -116,6 +116,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
       ("antidiseWhat", "antidisestablishmentarianism", 1, 200),
       ("iveGotThePower", "power", 10, 400),
       ("developd", "develop", 1_000, nil),
+      ("whatsThisWebsiteCalledAgain", "monkeytype", 1_000, nil),
     ] as [(String, String, Int, Int?)] {
       let challenge = try officialChallenge(name)
       let configuration = challenge.preset.configuration
