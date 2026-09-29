@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 36)
+    XCTAssertEqual(mapped.count, 37)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -168,6 +168,51 @@ final class OfficialChallengeCoverageTests: XCTestCase {
         at: start.addingTimeInterval(Double(index) * 0.1))
     }
     XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
+  func testBigramSaladDrawsOneHundredShortWordsAndRequiresSpeed() throws {
+    let challenge = try officialChallenge("bigramSalad")
+    let configuration = challenge.preset.configuration
+    XCTAssertEqual(configuration.mode, .custom)
+    XCTAssertEqual(configuration.customTextCompletion, .words)
+    XCTAssertEqual(configuration.customTextOrdering, .random)
+    XCTAssertEqual(configuration.wordLimit, 100)
+    XCTAssertEqual(challenge.requirements.wpm, .minimum(100))
+    XCTAssertFalse(challenge.dailyEligible)
+
+    let source = try XCTUnwrap(challenge.preset.customText)
+    let candidates = source.split(separator: " ").map(String.init)
+    XCTAssertEqual(Set(candidates).count, 20)
+    XCTAssertTrue(candidates.allSatisfy {
+      $0.count == 2 && $0.allSatisfy { $0.isASCII && $0.isLowercase }
+    })
+    var session = TestSessionFactory.make(
+      configuration: configuration.with(challengeID: challenge.id), customText: source)
+    let generated = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(generated.count, 100)
+    XCTAssertTrue(generated.allSatisfy(Set(candidates).contains))
+    XCTAssertFalse(session.usesIncrementalPromptExtension)
+    for index in 2..<generated.count {
+      XCTAssertNotEqual(generated[index], generated[index - 1])
+      XCTAssertNotEqual(generated[index], generated[index - 2])
+    }
+    let start = Date(timeIntervalSince1970: 100)
+    for (index, word) in generated.enumerated() {
+      session.insert(word + (index == generated.count - 1 ? "" : " "),
+        at: start.addingTimeInterval(Double(index) * 0.1))
+    }
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.outcome, .completed)
+    XCTAssertTrue(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
+    let slow = CompletedTestResult(
+      id: result.id, configuration: result.configuration, outcome: result.outcome,
+      startedAt: result.startedAt, finishedAt: result.finishedAt,
+      typedCharacterCount: result.typedCharacterCount,
+      correctCharacterCount: result.correctCharacterCount,
+      errorCount: result.errorCount, wpm: 99, rawWpm: result.rawWpm,
+      accuracy: result.accuracy, prompt: result.prompt,
+      replayEvents: result.replayEvents)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(slow, challenge: challenge).passed)
   }
 
   func testRepeatedWordEnduranceChallengeFamilyKeepsOfficialWordCounts() throws {

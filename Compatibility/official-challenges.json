@@ -103,10 +103,10 @@
     "beLikeWater": "three-layout-flow",
     "simp": "single-word-thousand",
     "trueSimp": "single-word-ten-thousand",
-    "simpLord": "single-word-hundred-thousand"
+    "simpLord": "single-word-hundred-thousand",
+    "bigramSalad": "short-word-random-hundred"
   },
   "pending": [
-    "bigramSalad",
     "whatsThisWebsiteCalledAgain",
     "inAGalaxyFarFarAway",
     "beepBoop",

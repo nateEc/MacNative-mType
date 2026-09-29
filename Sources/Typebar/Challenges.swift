@@ -502,6 +502,21 @@ enum TypebarChallengeLibrary {
       requirements: .init(wpm: .minimum(100)),
       dailyEligible: false
     ),
+    .init(
+      id: "short-word-random-hundred", title: "双字母百词",
+      description: "从二十个 Typebar 自有双字母英语词中随机练习一百词，达到每分钟一百词。",
+      legacyURLNames: ["bigramSalad"],
+      preset: .init(configuration: .init(
+        mode: .custom, duration: nil, wordLimit: 100, difficulty: .normal,
+        rules: .init(), customTextCompletion: .words, customTextOrdering: .random),
+        quoteID: nil,
+        customText: [
+          "am", "an", "as", "at", "be", "by", "do", "go", "he", "hi",
+          "if", "in", "is", "it", "me", "my", "no", "of", "oh", "on",
+        ].joined(separator: " ")),
+      requirements: .init(wpm: .minimum(100)),
+      dailyEligible: false
+    ),
     repeatedWordChallenge("antidiseWhat", id: "long-word-sprint", title: "长词冲刺",
       description: "重复输入一个长英语词，达到每分钟二百词。",
       word: "antidisestablishmentarianism", count: 1, minimumWPM: 200),
