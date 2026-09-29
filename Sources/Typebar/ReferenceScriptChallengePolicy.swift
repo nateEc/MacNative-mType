@@ -97,6 +97,35 @@ enum ReferenceScriptChallengePolicy {
     try .init(text: verifiedText(data, for: specification), specification: specification)
   }
 
+  static func verifiedScript(at url: URL, for specification: Specification) throws -> VerifiedScript {
+    let access = url.startAccessingSecurityScopedResource()
+    defer { if access { url.stopAccessingSecurityScopedResource() } }
+    if let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+      size > maximumImportedBytes
+    {
+      throw ImportError.tooLarge
+    }
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    var data = Data()
+    while data.count <= maximumImportedBytes {
+      let amount = min(64_000, maximumImportedBytes + 1 - data.count)
+      let chunk = try handle.read(upToCount: amount) ?? Data()
+      if chunk.isEmpty { break }
+      data.append(chunk)
+    }
+    return try verifiedScript(data, for: specification)
+  }
+
+  static func matchesNormalizedPrompt(_ prompt: String, for specification: Specification) -> Bool {
+    guard prompt.count == specification.normalizedCharacterCount,
+      normalizedText(prompt) == prompt
+    else { return false }
+    let digest = SHA256.hash(data: Data(prompt.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    return digest == specification.normalizedSHA256
+  }
+
   /// Matches the fixed web loader: trim, replace CR/LF/TAB/space with a
   /// space, then collapse adjacent spaces. No script prose is embedded here.
   static func normalizedText(_ source: String) -> String {

@@ -706,6 +706,7 @@ private struct ContentView: View {
   @State private var customTextSectionLimit = 1
   @State private var customTextOrdering: CustomTextOrdering = .inOrder
   @State private var activeLongSavedText: ActiveLongSavedText?
+  @State private var activeVerifiedScript: ReferenceScriptChallengePolicy.VerifiedScript?
   @State private var activeSessionTags: [String] = []
   @State private var activeResultTagDraft = ""
   @State private var practiceReturnPreset: SavedTestPreset?
@@ -761,6 +762,10 @@ private struct ContentView: View {
   @State private var showingChallenges = false
   @State private var showingOneHandedChallengeSetup = false
   @State private var queuedOneHandedChallengeSetup = false
+  @State private var showingReferenceScriptImport = false
+  @State private var queuedReferenceScriptImport = false
+  @State private var pendingReferenceScriptChallenge: TypebarChallenge?
+  @State private var referenceScriptMessage: String?
   @State private var showsVirtualKeyboard = false
   @State private var activeChallengeID: String?
   @State private var oneHandedChallengePreset: SavedTestPreset?
@@ -1148,8 +1153,22 @@ private struct ContentView: View {
         queuedOneHandedChallengeSetup = false
         showingOneHandedChallengeSetup = true
       }
+      presentQueuedReferenceScriptImport()
     }) {
       ChallengeLibraryView(onSelect: loadChallenge)
+    }
+    .sheet(isPresented: $showingReferenceScriptImport, onDismiss: {
+      pendingReferenceScriptChallenge = nil
+    }) {
+      if let challenge = pendingReferenceScriptChallenge,
+        let specification = challenge.requirements.referenceScriptSpecification
+      {
+        ReferenceScriptChallengeImportView(
+          title: challenge.title, specification: specification
+        ) { verified in
+          startReferenceScriptChallenge(challenge, verified: verified)
+        }
+      }
     }
     .sheet(isPresented: $showingOneHandedChallengeSetup) {
       OneHandedChallengeSetupView { preset, selection in
@@ -1184,6 +1203,7 @@ private struct ContentView: View {
     }
     .sheet(isPresented: $showingCommandPalette, onDismiss: {
       commandThemePreviewTarget = nil
+      presentQueuedReferenceScriptImport()
     }) {
       CommandPaletteView(
         items: commandPaletteItems, listMode: settings.commandPaletteListMode,
@@ -1282,7 +1302,9 @@ private struct ContentView: View {
     } message: {
       Text("结果不会保存、本机统计、同步或发布。")
     }
-    .sheet(isPresented: $showingTestShare) {
+    .sheet(isPresented: $showingTestShare, onDismiss: {
+      presentQueuedReferenceScriptImport()
+    }) {
       TestConfigurationShareView(
         currentPreset: presetDefinition,
         legacyCustomTextFallback: .init(
@@ -1485,6 +1507,7 @@ private struct ContentView: View {
 
   var body: some View {
     presentedContent
+      .onChange(of: activeChallengeID) { _, id in handleActiveChallengeIDChange(to: id) }
   }
 
   private func runClock() async {
@@ -1885,7 +1908,7 @@ private struct ContentView: View {
               .font(settings.practiceFont.font(
                 size: 15, installedFontName: settings.installedPracticeFontName,
                 language: language))
-              .disabled(activeLongSavedText != nil)
+              .disabled(activeLongSavedText != nil || activeVerifiedScript != nil)
               .onChange(of: customText) { _, value in
                 let clamped = CustomTextPolicy.clamped(value)
                 if clamped != value { customText = clamped }
@@ -1895,6 +1918,12 @@ private struct ContentView: View {
                   value != activeLongSavedText.currentChunk
                 {
                   self.activeLongSavedText = nil
+                }
+                if let activeVerifiedScript,
+                  value != LongSavedTextProgress.nextChunk(in: activeVerifiedScript.text, after: 0)
+                {
+                  self.activeVerifiedScript = nil
+                  activeChallengeID = nil
                 }
               }
             Text("\(customText.count) / \(CustomTextPolicy.maximumLength) 个字符")
@@ -1909,6 +1938,22 @@ private struct ContentView: View {
               Button("编辑文本并停止进度跟踪") { self.activeLongSavedText = nil }
                 .buttonStyle(.borderless)
                 .font(.caption)
+            }
+            if let activeVerifiedScript {
+              Label(
+                "固定版本脚本：\(activeVerifiedScript.specification.fileName) · \(activeVerifiedScript.text.count) 字符",
+                systemImage: "doc.text")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Button("退出脚本挑战并编辑普通文本") {
+                guard acceptsRestartingConfigurationChange() else { return }
+                self.activeVerifiedScript = nil
+                activeChallengeID = nil
+                customText = "A calm practice makes the next difficult sentence feel possible."
+                reset()
+              }
+              .buttonStyle(.borderless)
+              .font(.caption)
             }
             Picker("完成方式", selection: restartingConfigurationBinding($customTextCompletion)) {
               ForEach(CustomTextCompletion.allCases) { completion in
@@ -2889,6 +2934,11 @@ private struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .offset(y: 24)
+      } else if let referenceScriptMessage {
+        Label(referenceScriptMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .offset(y: 24)
       } else if let funboxConfigurationMessage {
         Label(funboxConfigurationMessage, systemImage: "exclamationmark.triangle.fill")
           .font(.caption)
@@ -3214,6 +3264,15 @@ private struct ContentView: View {
 
   private func reset(restarting: Bool = false) {
     guard acceptsRestartingConfigurationChange() else { return }
+    if let activeVerifiedScript,
+      activeChallenge?.requirements.referenceScriptSpecification
+        != activeVerifiedScript.specification
+    {
+      self.activeVerifiedScript = nil
+      if customText == LongSavedTextProgress.nextChunk(in: activeVerifiedScript.text, after: 0) {
+        customText = "A calm practice makes the next difficult sentence feel possible."
+      }
+    }
     let effectiveMemoryMode = MemoryFunboxModePolicy.effectiveMode(
       requested: mode, modifiers: settings.testModifiers)
     if mode != effectiveMemoryMode { mode = effectiveMemoryMode }
@@ -3267,6 +3326,8 @@ private struct ContentView: View {
       customText: customText,
       finiteTextSource: activeLongSavedText?.continuous == true
         ? activeLongSavedText?.remainingText : nil,
+      verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
+        == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
       quote: selectedQuote,
       weakSpotScores: weakSpotScores
     )
@@ -3386,6 +3447,8 @@ private struct ContentView: View {
 
   private func loadSavedCustomText(_ selection: SavedCustomTextSelection, continuous: Bool) {
     guard selectMode(.custom) else { return }
+    activeChallengeID = nil
+    activeVerifiedScript = nil
     guard selection.isLong else {
       activeLongSavedText = nil
       customText = selection.text
@@ -4326,6 +4389,24 @@ private struct ContentView: View {
       fontFamilyCommandMessage = "此 Mac 未提供 Wingdings 字体，无法开始该挑战。"
       return
     }
+    if let specification = challenge?.requirements.referenceScriptSpecification,
+      activeVerifiedScript?.specification != specification
+    {
+      referenceScriptMessage = "请从挑战库选择脚本并重新导入固定版本文本。"
+      return
+    }
+    referenceScriptMessage = nil
+    if let activeVerifiedScript,
+      challenge?.requirements.referenceScriptSpecification
+        != activeVerifiedScript.specification
+    {
+      self.activeVerifiedScript = nil
+      if appliedPreset.customText == nil,
+        customText == LongSavedTextProgress.nextChunk(in: activeVerifiedScript.text, after: 0)
+      {
+        customText = "A calm practice makes the next difficult sentence feel possible."
+      }
+    }
     if appliesTest {
       activeChallengeID = challenge?.id
       if challenge?.id == "one-handed-bandit" {
@@ -4455,6 +4536,12 @@ private struct ContentView: View {
   }
 
   private func persistActiveTestSelection(for selectedConfiguration: TestConfiguration? = nil) {
+    // The selected file exists only in this process. Leave the previous safe
+    // selection intact, so relaunch cannot restore a first-chunk impostor.
+    if let activeVerifiedScript,
+      activeChallenge?.requirements.referenceScriptSpecification
+        == activeVerifiedScript.specification
+    { return }
     let selectedConfiguration = selectedConfiguration ?? session.configuration
     let preset = SavedTestPreset(
       configuration: selectedConfiguration,
@@ -4479,7 +4566,29 @@ private struct ContentView: View {
     TypebarChallengeLibrary.challenge(id: activeChallengeID)
   }
 
+  private func handleActiveChallengeIDChange(to id: String?) {
+    let required = TypebarChallengeLibrary.challenge(id: id)?
+      .requirements.referenceScriptSpecification
+    guard let activeVerifiedScript, activeVerifiedScript.specification != required else { return }
+    if id == nil,
+      customText == LongSavedTextProgress.nextChunk(in: activeVerifiedScript.text, after: 0)
+    {
+      customText = "A calm practice makes the next difficult sentence feel possible."
+    }
+    self.activeVerifiedScript = nil
+  }
+
   private func loadChallenge(_ challenge: TypebarChallenge) {
+    guard acceptsRestartingConfigurationChange() else { return }
+    if challenge.requirements.referenceScriptSpecification != nil {
+      pendingReferenceScriptChallenge = challenge
+      if showingChallenges || showingTestShare || showingCommandPalette {
+        queuedReferenceScriptImport = true
+      } else {
+        showingReferenceScriptImport = true
+      }
+      return
+    }
     if challenge.id == "one-handed-bandit" {
       if showingChallenges {
         queuedOneHandedChallengeSetup = true
@@ -4491,6 +4600,38 @@ private struct ContentView: View {
     var preset = challenge.preset
     preset.configuration = preset.configuration.with(challengeID: challenge.id)
     apply(preset)
+  }
+
+  private func presentQueuedReferenceScriptImport() {
+    guard queuedReferenceScriptImport, pendingReferenceScriptChallenge != nil else { return }
+    queuedReferenceScriptImport = false
+    showingReferenceScriptImport = true
+  }
+
+  @discardableResult
+  private func startReferenceScriptChallenge(
+    _ challenge: TypebarChallenge,
+    verified: ReferenceScriptChallengePolicy.VerifiedScript
+  ) -> Bool {
+    guard acceptsRestartingConfigurationChange(),
+      challenge.requirements.referenceScriptSpecification == verified.specification
+    else { return false }
+    let previousText = customText
+    let previousVerifiedScript = activeVerifiedScript
+    let previousLongSavedText = activeLongSavedText
+    activeLongSavedText = nil
+    customText = LongSavedTextProgress.nextChunk(in: verified.text, after: 0)
+    activeVerifiedScript = verified
+    var preset = challenge.preset
+    preset.configuration = preset.configuration.with(challengeID: challenge.id)
+    apply(preset)
+    guard activeChallengeID == challenge.id else {
+      customText = previousText
+      activeVerifiedScript = previousVerifiedScript
+      activeLongSavedText = previousLongSavedText
+      return false
+    }
+    return true
   }
 
   private func languageChanged(to language: TypingLanguage) {

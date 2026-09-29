@@ -85,6 +85,7 @@ struct ChallengeRequirements: Equatable {
   var requiredCustomWordLimit: Int? = nil
   var exactPrompt: String? = nil
   var requiresOneHandedSource = false
+  var referenceScriptSpecification: ReferenceScriptChallengePolicy.Specification? = nil
 
   var effectiveMaximumAFKPercentage: Int { min(maximumAFKPercentage ?? 10, 10) }
 
@@ -104,6 +105,7 @@ struct ChallengeRequirements: Equatable {
       requiredCustomWordLimit.map { "指定脚本的 \($0) 词完整练习" },
       exactPrompt.map { _ in "使用本挑战的原生脚本" },
       requiresOneHandedSource ? "所选布局单手词表，最多一小时或一万词" : nil,
+      referenceScriptSpecification.map { "导入固定版本的 \($0.fileName) 脚本" },
     ]
     .compactMap { $0 }
     .joined(separator: " · ")
@@ -259,6 +261,18 @@ enum ChallengeEvaluator {
     }
     if let prompt = requirements.exactPrompt, result.prompt != prompt {
       failedRequirements.append("需要完成本挑战的原生脚本")
+    }
+    if let specification = requirements.referenceScriptSpecification {
+      if result.outcome != .completed
+        || result.configuration.challengeID != challenge.id
+      {
+        failedRequirements.append("需要在本挑战中完整完成脚本；旧结果无法冒领")
+      }
+      if !ReferenceScriptChallengePolicy.matchesNormalizedPrompt(
+        result.prompt, for: specification)
+      {
+        failedRequirements.append("提示正文与所选固定版本脚本不一致")
+      }
     }
     if requirements.requiresOneHandedSource {
       let presentation = result.challengePresentation
@@ -779,6 +793,7 @@ enum TypebarChallengeLibrary {
       )
     ),
   ] + officialFunboxChallenges + officialMetricAndWordChallenges
+    + ReferenceScriptChallengePolicy.specifications.map(referenceScriptChallenge)
 
   private static let officialMetricAndWordChallenges: [TypebarChallenge] = [
     .init(
@@ -840,6 +855,54 @@ enum TypebarChallengeLibrary {
       description: "重复输入 Typebar 自有练习词十万次。",
       word: "typebar", count: 100_000, minimumWPM: nil),
   ]
+
+  private static func referenceScriptChallenge(
+    _ specification: ReferenceScriptChallengePolicy.Specification
+  ) -> TypebarChallenge {
+    let name = specification.legacyName
+    let isGalaxy = ["inAGalaxyFarFarAway", "whosYourDaddy", "itsATrap"].contains(name)
+    let title: String
+    switch name {
+    case "inAGalaxyFarFarAway": title = "星际剧本 · 第四章"
+    case "whosYourDaddy": title = "星际剧本 · 第五章"
+    case "itsATrap": title = "星际剧本 · 第六章"
+    case "gottaCatchEmAll": title = "全部伙伴名录"
+    case "rapGod": title = "高速歌词脚本"
+    case "navySeal": title = "长篇网络故事"
+    case "littleChef": title = "小厨师剧本"
+    case "crosstalk": title = "交叉发言记录"
+    case "bees": title = "群蜂剧本"
+    case "getOffMySwamp": title = "沼泽剧本"
+    case "lookAtMeIAmTheDeveloperNow": title = "历史源码脚本"
+    default: title = "固定版本脚本"
+    }
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(), customTextCompletion: .finish,
+      modifiers: isGalaxy ? [.spaceVisual] : [])
+    var requirements = ChallengeRequirements(
+      configuration: .init(mode: .custom, customTextCompletion: .finish,
+        difficulty: .normal, tapeMode: isGalaxy ? .off : nil),
+      referenceScriptSpecification: specification)
+    switch name {
+    case "rapGod":
+      requirements.wpm = .minimum(85)
+      requirements.accuracy = .minimum(90)
+      requirements.maximumAFKPercentage = 5
+    case "navySeal":
+      requirements.wpm = .minimum(60)
+      requirements.accuracy = .exact(100)
+      requirements.maximumAFKPercentage = 5
+    default:
+      break
+    }
+    return .init(
+      id: "script-\(specification.fileName.dropLast(4))", title: title,
+      description: "使用你有权使用的固定版本文本；Typebar 不内置脚本正文。",
+      legacyURLNames: [name],
+      preset: .init(configuration: configuration, quoteID: nil, customText: nil),
+      requirements: requirements, dailyEligible: false)
+  }
 
   private static func repeatedWordChallenge(
     _ legacyName: String, id: String, title: String, description: String,

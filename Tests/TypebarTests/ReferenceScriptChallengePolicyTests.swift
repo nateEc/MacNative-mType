@@ -12,6 +12,10 @@ final class ReferenceScriptChallengePolicyTests: XCTestCase {
     let specification = ReferenceScriptChallengePolicy.Specification(
       legacyName: "synthetic", fileName: "synthetic.txt", byteCount: 32,
       normalizedCharacterCount: normalized.count, normalizedSHA256: digest)
+    XCTAssertTrue(ReferenceScriptChallengePolicy.matchesNormalizedPrompt(
+      normalized, for: specification))
+    XCTAssertFalse(ReferenceScriptChallengePolicy.matchesNormalizedPrompt(
+      "amber  harbor willow", for: specification))
 
     XCTAssertEqual(try ReferenceScriptChallengePolicy.verifiedText(
       Data(" \n amber  harbor\r\nwillow \t".utf8), for: specification), normalized)
@@ -28,7 +32,7 @@ final class ReferenceScriptChallengePolicyTests: XCTestCase {
       }
   }
 
-  func testMetadataCoversEachStillPendingReferenceScriptWithoutBundlingItsText() throws {
+  func testMetadataCoversEachPinnedReferenceScriptWithoutBundlingItsText() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let fixture = try JSONDecoder().decode([ReferenceScriptChallengePolicy.Specification].self,
@@ -44,5 +48,21 @@ final class ReferenceScriptChallengePolicyTests: XCTestCase {
     XCTAssertTrue(fixture.allSatisfy { $0.normalizedSHA256.count == 64 })
     XCTAssertEqual(fixture.first { $0.legacyName == "lookAtMeIAmTheDeveloperNow" }?.byteCount,
       798_026)
+  }
+
+  func testFileImportVerifiesContentWithoutRetainingItsPath() throws {
+    let normalized = "amber harbor willow"
+    let digest = SHA256.hash(data: Data(normalized.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let specification = ReferenceScriptChallengePolicy.Specification(
+      legacyName: "synthetic", fileName: "synthetic.txt", byteCount: normalized.utf8.count,
+      normalizedCharacterCount: normalized.count, normalizedSHA256: digest)
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("typebar-script-\(UUID().uuidString).txt")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try Data("  amber\n harbor  willow  ".utf8).write(to: url)
+    let verified = try ReferenceScriptChallengePolicy.verifiedScript(at: url, for: specification)
+    XCTAssertEqual(verified.text, normalized)
+    XCTAssertEqual(verified.specification, specification)
   }
 }

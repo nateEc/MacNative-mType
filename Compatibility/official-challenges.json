@@ -105,6 +105,17 @@
     "mouseWarrior": "mouse-warrior",
     "beepBoop": "robot-log",
     "jolly": "winter-station",
+    "inAGalaxyFarFarAway": "script-episode4",
+    "whosYourDaddy": "script-episode5",
+    "itsATrap": "script-episode6",
+    "gottaCatchEmAll": "script-pokemon",
+    "rapGod": "script-rapgod",
+    "navySeal": "script-navyseal",
+    "littleChef": "script-littlechef",
+    "crosstalk": "script-crosstalk",
+    "bees": "script-bees",
+    "getOffMySwamp": "script-shrek",
+    "lookAtMeIAmTheDeveloperNow": "script-sourcecode",
     "wingdings": "ten-words-of-pain",
     "oneArmedBandit": "one-handed-bandit",
     "thumbWarrior": "thumb-hour",
@@ -116,17 +127,6 @@
     "bigramSalad": "short-word-random-hundred"
   },
   "pending": [
-    "inAGalaxyFarFarAway",
-    "whosYourDaddy",
-    "itsATrap",
-    "gottaCatchEmAll",
-    "rapGod",
-    "navySeal",
-    "littleChef",
-    "crosstalk",
-    "bees",
-    "getOffMySwamp",
-    "lookAtMeIAmTheDeveloperNow",
     "mobileWarrior"
   ]
 }

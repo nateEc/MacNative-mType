@@ -1,9 +1,67 @@
 import Foundation
+import CryptoKit
 import XCTest
 
 @testable import Typebar
 
 final class OfficialChallengeCoverageTests: XCTestCase {
+  func testReferenceScriptChallengeRejectsWrongContentIdentityAndTerminalState() throws {
+    let text = "amber harbor"
+    let digest = SHA256.hash(data: Data(text.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let specification = ReferenceScriptChallengePolicy.Specification(
+      legacyName: "synthetic", fileName: "synthetic.txt", byteCount: text.utf8.count,
+      normalizedCharacterCount: text.count, normalizedSHA256: digest)
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(), customTextCompletion: .finish)
+      .with(challengeID: "synthetic-script")
+    let challenge = TypebarChallenge(
+      id: "synthetic-script", title: "合成脚本", description: "仅用于测试",
+      preset: .init(configuration: configuration, quoteID: nil, customText: nil),
+      requirements: .init(
+        configuration: .init(mode: .custom, customTextCompletion: .finish),
+        referenceScriptSpecification: specification))
+    let start = Date(timeIntervalSince1970: 100)
+    func result(
+      prompt: String = text, configuration: TestConfiguration? = nil,
+      outcome: TestOutcome = .completed
+    ) -> CompletedTestResult {
+      .init(id: UUID(), configuration: configuration ?? challenge.preset.configuration,
+        outcome: outcome, startedAt: start, finishedAt: start.addingTimeInterval(5),
+        typedCharacterCount: text.count, correctCharacterCount: text.count,
+        errorCount: 0, wpm: 100, rawWpm: 100, accuracy: 100, prompt: prompt)
+    }
+    XCTAssertTrue(ChallengeEvaluator.evaluate(result(), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(prompt: "amber willow"), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(configuration: configuration.with(challengeID: nil)), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(outcome: .bailedOut), challenge: challenge).passed)
+    let looping = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 2, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words)
+      .with(challengeID: challenge.id)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(configuration: looping), challenge: challenge).passed)
+  }
+
+  func testPinnedReferenceScriptChallengesRetainPublicRules() throws {
+    let navy = try officialChallenge("navySeal")
+    XCTAssertEqual(navy.requirements.wpm, .minimum(60))
+    XCTAssertEqual(navy.requirements.accuracy, .exact(100))
+    XCTAssertEqual(navy.requirements.maximumAFKPercentage, 5)
+    XCTAssertEqual(navy.requirements.referenceScriptSpecification?.fileName, "navyseal.txt")
+    let episode4 = try officialChallenge("inAGalaxyFarFarAway")
+    XCTAssertEqual(episode4.preset.configuration.modifiers, [.spaceVisual])
+    XCTAssertNil(episode4.requirements.exactFunboxes)
+    XCTAssertEqual(episode4.requirements.configuration?.tapeMode, .off)
+    let sourceCode = try officialChallenge("lookAtMeIAmTheDeveloperNow")
+    XCTAssertEqual(sourceCode.requirements.referenceScriptSpecification?.normalizedCharacterCount,
+      600_270)
+  }
+
   func testJollyNativeScriptRequiresFull86WordsAndSeventyWPM() throws {
     let challenge = try officialChallenge("jolly")
     let source = try XCTUnwrap(challenge.preset.customText)
@@ -169,7 +227,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 46)
+    XCTAssertEqual(mapped.count, 57)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
