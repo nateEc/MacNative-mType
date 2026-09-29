@@ -890,7 +890,7 @@ private struct ContentView: View {
     .background(
       WindowCloseConfirmationBridge(
         requiresConfirmation: LongTestCloseProtectionPolicy.requiresConfirmation(
-          for: session, savedLongText: activeLongSavedText != nil))
+          for: session, savedLongText: hasLockedCustomTextSource))
     )
     .environment(\.typebarAnimationFrameRate, effectiveAnimationFrameRate)
     .overlay(alignment: .top) {
@@ -1908,7 +1908,7 @@ private struct ContentView: View {
               .font(settings.practiceFont.font(
                 size: 15, installedFontName: settings.installedPracticeFontName,
                 language: language))
-              .disabled(activeLongSavedText != nil || activeVerifiedScript != nil)
+              .disabled(hasLockedCustomTextSource)
               .onChange(of: customText) { _, value in
                 let clamped = CustomTextPolicy.clamped(value)
                 if clamped != value { customText = clamped }
@@ -1960,12 +1960,12 @@ private struct ContentView: View {
                 Text(completion.displayName).tag(completion)
               }
             }
-            .disabled(activeLongSavedText != nil)
+            .disabled(hasLockedCustomTextSource)
             .onChange(of: customTextCompletion) { _, _ in reset() }
             if customTextCompletion == .time {
               Toggle("无限循环计时", isOn: infiniteBinding($customTextDuration, fallback: 30))
                 .disabled(
-                  activeLongSavedText != nil
+                  hasLockedCustomTextSource
                     || (customTextDuration != 0 && !infiniteIncompatibleModifiers.isEmpty))
               if customTextDuration == 0 {
                 Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
@@ -1978,14 +1978,14 @@ private struct ContentView: View {
                 ) {
                   LabeledContent("循环时长", value: "\(customTextDuration) 秒")
                 }
-                .disabled(activeLongSavedText != nil)
+                .disabled(hasLockedCustomTextSource)
                 .onChange(of: customTextDuration) { _, _ in reset() }
               }
             }
             if customTextCompletion == .words {
               Toggle("无限循环字数", isOn: infiniteBinding($customTextWordLimit, fallback: 25))
                 .disabled(
-                  activeLongSavedText != nil
+                  hasLockedCustomTextSource
                     || (customTextWordLimit != 0 && !infiniteIncompatibleModifiers.isEmpty))
               if customTextWordLimit == 0 {
                 Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
@@ -1994,7 +1994,7 @@ private struct ContentView: View {
                 Stepper(value: restartingConfigurationBinding($customTextWordLimit), in: 1...1000) {
                   LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
                 }
-                .disabled(activeLongSavedText != nil)
+                .disabled(hasLockedCustomTextSource)
                 .onChange(of: customTextWordLimit) { _, _ in reset() }
               }
             }
@@ -2006,7 +2006,7 @@ private struct ContentView: View {
                 LabeledContent(
                   "完成段数", value: "\(customTextSectionLimit) / \(customTextSections.count) 段")
               }
-              .disabled(activeLongSavedText != nil)
+              .disabled(hasLockedCustomTextSource)
               .onChange(of: customTextSectionLimit) { _, _ in reset() }
               Text("使用竖线 | 分隔段落；练习会按顺序取前面的段落。")
                 .font(.caption)
@@ -2017,7 +2017,7 @@ private struct ContentView: View {
                   Text(ordering.displayName).tag(ordering)
                 }
               }
-              .disabled(activeLongSavedText != nil)
+              .disabled(hasLockedCustomTextSource)
               .onChange(of: customTextOrdering) { _, _ in reset() }
             }
             HStack {
@@ -3393,18 +3393,23 @@ private struct ContentView: View {
     }
   }
 
+  private var hasLockedCustomTextSource: Bool {
+    // Imported challenge files are ephemeral too: protect them like saved long text.
+    activeLongSavedText != nil || activeVerifiedScript != nil
+  }
+
   private var quickRestartRequiresProtection: Bool {
     QuickRestartSafetyPolicy.requiresShift(
-      for: session.configuration, savedLongText: activeLongSavedText != nil)
+      for: session.configuration, savedLongText: hasLockedCustomTextSource)
   }
 
   private var commandBailoutAvailable: Bool {
     CommandBailoutPolicy.isAvailable(
-      for: session.configuration, savedLongText: activeLongSavedText != nil)
+      for: session.configuration, savedLongText: hasLockedCustomTextSource)
   }
 
   private var shouldBailOutFromControls: Bool {
-    activeLongSavedText != nil || session.configuration.isInfinite
+    hasLockedCustomTextSource || session.configuration.isInfinite
   }
 
   private var infiniteIncompatibleModifiers: [TestModifier] {

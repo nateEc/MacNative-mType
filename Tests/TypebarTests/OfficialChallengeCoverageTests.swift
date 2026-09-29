@@ -99,6 +99,21 @@ final class OfficialChallengeCoverageTests: XCTestCase {
       600_270)
   }
 
+  func testImportedScriptUsesProtectedLongTextControlsAfterTypingStarts() throws {
+    let challenge = try officialChallenge("lookAtMeIAmTheDeveloperNow")
+    let configuration = challenge.preset.configuration.with(challengeID: challenge.id)
+    var session = TypingSession(configuration: configuration, prompt: "amber harbor")
+    XCTAssertFalse(LongTestCloseProtectionPolicy.requiresConfirmation(
+      for: session, savedLongText: true))
+    session.insert("a", at: Date(timeIntervalSince1970: 100))
+    XCTAssertTrue(LongTestCloseProtectionPolicy.requiresConfirmation(
+      for: session, savedLongText: true))
+    XCTAssertTrue(QuickRestartSafetyPolicy.requiresShift(
+      for: configuration, savedLongText: true))
+    XCTAssertTrue(CommandBailoutPolicy.isAvailable(
+      for: configuration, savedLongText: true))
+  }
+
   func testJollyNativeScriptRequiresFull86WordsAndSeventyWPM() throws {
     let challenge = try officialChallenge("jolly")
     let source = try XCTUnwrap(challenge.preset.customText)
