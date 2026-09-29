@@ -10,6 +10,7 @@ struct TypebarChallenge: Identifiable, Equatable {
   let legacyURLNames: [String]
   let preset: SavedTestPreset
   let requirements: ChallengeRequirements
+  let dailyEligible: Bool
 
   init(
     id: String,
@@ -17,7 +18,8 @@ struct TypebarChallenge: Identifiable, Equatable {
     description: String,
     legacyURLNames: [String] = [],
     preset: SavedTestPreset,
-    requirements: ChallengeRequirements
+    requirements: ChallengeRequirements,
+    dailyEligible: Bool = true
   ) {
     self.id = id
     self.title = title
@@ -25,6 +27,7 @@ struct TypebarChallenge: Identifiable, Equatable {
     self.legacyURLNames = legacyURLNames
     self.preset = preset
     self.requirements = requirements
+    self.dailyEligible = dailyEligible
   }
 }
 
@@ -433,7 +436,89 @@ enum TypebarChallengeLibrary {
         )
       )
     ),
+  ] + officialFunboxChallenges
+
+  private static let officialFunboxChallenges: [TypebarChallenge] = [
+    hourFunbox("rollercoaster", id: "round-hour", title: "环形一小时",
+      description: "沿着环形提示完成一小时打字。", modifier: .roundVisual,
+      minimumDuration: 3_600),
+    hourFunbox("oneHourMirror", id: "mirror-hour", title: "镜面一小时",
+      description: "面对镜像排列的文字持续练习一小时。", modifier: .mirrorVisual,
+      minimumDuration: 3_600),
+    hourFunbox("chooChoo", id: "choo-hour", title: "列车一小时",
+      description: "跟上列车式文字流，完成整小时输入。", modifier: .chooVisual,
+      minimumDuration: 3_600),
+    .init(
+      id: "mnemonic-twenty-five", title: "记忆二十五",
+      description: "在大师难度下凭短暂预览输入二十五个词，关闭卷带。",
+      legacyURLNames: ["mnemonist"],
+      preset: .init(configuration: TestConfiguration.words(25, difficulty: .master)
+        .with(modifiers: [.memory]), quoteID: nil, customText: nil),
+      requirements: .init(configuration: .init(tapeMode: .off)),
+      dailyEligible: false
+    ),
+    hourFunbox("earfquake", id: "earthquake-hour", title: "震动一小时",
+      description: "在震动的文字提示中完成一小时练习。", modifier: .earthquakeVisual,
+      minimumDuration: 3_600),
+    hourFunbox("simonSez", id: "simon-hour", title: "指令一小时",
+      description: "依照不断变化的输入提示练习一小时。", modifier: .simonSays,
+      minimumDuration: 3_600),
+    hourFunbox("accountant", id: "accounting-hour", title: "数字流一小时",
+      description: "在计算器风格的词流中练习一小时。", modifier: .accountingStream,
+      minimumDuration: 3_600),
+    readAheadChallenge("hidden", id: "read-ahead-sixty", title: "提前阅读",
+      description: "在六十秒提前阅读练习中达到每分钟一百词。", modifier: .readAhead),
+    readAheadChallenge("iCanSeeTheFuture", id: "hard-read-ahead-sixty", title: "远望文字",
+      description: "在更严格的提前阅读练习中保持每分钟一百词。", modifier: .readAheadHard),
+    hourFunbox("whatAreWordsAtThisPoint", id: "gibberish-hour", title: "乱序词流",
+      description: "挑战一小时的乱序词流。", modifier: .gibberishStream,
+      minimumDuration: 60),
+    hourFunbox("specials", id: "specials-hour", title: "特殊字符",
+      description: "在特殊字符词流中进行长时间练习。", modifier: .specialCharacterStream,
+      minimumDuration: 60),
+    hourFunbox("aeiou", id: "listening-hour", title: "听写长跑",
+      description: "听取朗读提示，完成长时间输入练习。", modifier: .listening,
+      minimumDuration: 60),
+    hourFunbox("asciiWarrior", id: "ascii-hour", title: "字符长跑",
+      description: "用 ASCII 字符词流完成长时间练习。", modifier: .asciiStream,
+      minimumDuration: 60),
+    hourFunbox("iKiNdAlIkEhOwInEfFiCiEnTqWeRtYiS", id: "alternating-case-hour",
+      title: "大小写交替", description: "跟随交替大小写的词流长时间输入。",
+      modifier: .alternatingCase, minimumDuration: 60),
+    hourFunbox("oneNauseousMonkey", id: "nausea-hour", title: "晃动一小时",
+      description: "在晃动的文字提示中完成长时间练习。", modifier: .nauseaVisual,
+      minimumDuration: 60),
   ]
+
+  private static func hourFunbox(
+    _ legacyName: String, id: String, title: String, description: String,
+    modifier: TestModifier, minimumDuration: TimeInterval
+  ) -> TypebarChallenge {
+    .init(
+      id: id, title: title, description: description,
+      legacyURLNames: [legacyName],
+      preset: .init(configuration: TestConfiguration.timed(seconds: 3_600)
+        .with(modifiers: [modifier]), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: minimumDuration, exactFunboxes: [modifier]),
+      dailyEligible: false
+    )
+  }
+
+  private static func readAheadChallenge(
+    _ legacyName: String, id: String, title: String, description: String,
+    modifier: TestModifier
+  ) -> TypebarChallenge {
+    .init(
+      id: id, title: title, description: description,
+      legacyURLNames: [legacyName],
+      preset: .init(configuration: TestConfiguration.timed(seconds: 60)
+        .with(modifiers: [modifier]), quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .minimum(100), minimumDuration: 60,
+        exactFunboxes: [modifier], configuration: .init(tapeMode: .off)),
+      dailyEligible: false
+    )
+  }
 
   static func challenge(id: String?) -> TypebarChallenge? {
     guard let id else { return nil }
@@ -445,7 +530,7 @@ enum TypebarChallengeLibrary {
   {
     let day = calendar.ordinality(of: .day, in: .era, for: date) ?? 0
     let dailyChoices = all.filter {
-      !$0.preset.configuration.isInfinite
+      $0.dailyEligible && !$0.preset.configuration.isInfinite
         && ($0.preset.configuration.duration ?? 0) <= 3_600
     }
     return dailyChoices[day % dailyChoices.count]
