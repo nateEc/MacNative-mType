@@ -3079,6 +3079,19 @@ struct ChallengePresentationSnapshot: Codable, Equatable {
   let liveSpeedStyle: LiveMetricStyle
   let paceCaretStyle: TypingCaretStyle
   let tapeMode: PracticeTapeMode
+  /// Optional so archived challenge results from before layout-segment scoring
+  /// remain readable, but cannot claim unrecorded per-layout performance.
+  let layoutFluidLayouts: [KeyboardLayout]?
+
+  init(
+    liveSpeedStyle: LiveMetricStyle, paceCaretStyle: TypingCaretStyle,
+    tapeMode: PracticeTapeMode, layoutFluidLayouts: [KeyboardLayout]? = nil
+  ) {
+    self.liveSpeedStyle = liveSpeedStyle
+    self.paceCaretStyle = paceCaretStyle
+    self.tapeMode = tapeMode
+    self.layoutFluidLayouts = layoutFluidLayouts
+  }
 }
 
 struct CompletedTestResult: Codable, Equatable, Identifiable {

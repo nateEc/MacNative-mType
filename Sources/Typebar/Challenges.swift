@@ -73,6 +73,7 @@ struct ChallengeRequirements: Equatable {
   var minimumDuration: TimeInterval? = nil
   var maximumAFKPercentage: Int? = nil
   var exactFunboxes: [TestModifier]? = nil
+  var layoutFluidMinimumWPM: Int? = nil
   var configuration: ChallengeConfigurationRequirements? = nil
   var maximumErrors: Int? = nil
 
@@ -87,6 +88,7 @@ struct ChallengeRequirements: Equatable {
       minimumDuration.map { "时长至少 \(Int($0.rounded())) 秒" },
       "闲置不超过 \(effectiveMaximumAFKPercentage)%",
       exactFunboxes.map { "趣味模式恰为 \(modifierNames($0))" },
+      layoutFluidMinimumWPM.map { "三种不同布局各至少 \($0) WPM" },
       configuration.map(configurationSummary),
       maximumErrors.map { "错误不超过 \($0)" },
     ]
@@ -184,6 +186,22 @@ enum ChallengeEvaluator {
       }
     }
 
+    if let minimumWPM = requirements.layoutFluidMinimumWPM {
+      if result.configuration.mode != .time || result.configuration.duration != 60 {
+        failedRequirements.append("布局挑战需要六十秒计时配置")
+      } else if let layouts = result.challengePresentation?.layoutFluidLayouts,
+        layouts.count == 3, Set(layouts).count == 3,
+        let speeds = LayoutFluidChallengePolicy.segmentSpeeds(result, layouts: layouts)
+      {
+        for (layout, wpm) in speeds where wpm < minimumWPM {
+          failedRequirements.append(
+            "布局 \(layout.displayName) 需要至少 \(minimumWPM) WPM（本段 \(wpm) WPM）")
+        }
+      } else {
+        failedRequirements.append("需要三种不同布局的本次练习记录，旧结果无法验收")
+      }
+    }
+
     if let required = requirements.configuration {
       evaluateConfiguration(
         result.configuration,
@@ -252,6 +270,29 @@ enum ChallengeEvaluator {
     {
       failures.append(
         "卷带需要为 \(expected.displayName)（本次 \(presentation?.tapeMode.displayName ?? "未知")）")
+    }
+  }
+}
+
+enum LayoutFluidChallengePolicy {
+  static func segmentSpeeds(
+    _ result: CompletedTestResult, layouts: [KeyboardLayout]
+  ) -> [(KeyboardLayout, Int)]? {
+    guard let duration = result.configuration.duration, duration.isFinite,
+      duration > 0, !layouts.isEmpty
+    else { return nil }
+    let segmentDuration = duration / Double(layouts.count)
+    return layouts.enumerated().map { index, layout in
+      let beginning = segmentDuration * Double(index)
+      let ending = segmentDuration * Double(index + 1)
+      let before = TypingReplay.inputGlyphs(
+        prompt: result.prompt, events: result.replayEvents, through: beginning.nextDown)
+        .filter { $0.state == .correct }.count
+      let after = TypingReplay.inputGlyphs(
+        prompt: result.prompt, events: result.replayEvents, through: ending.nextDown)
+        .filter { $0.state == .correct }.count
+      let wpm = Int((Double(after - before) / 5 / segmentDuration * 60).rounded())
+      return (layout, wpm)
     }
   }
 }
@@ -489,6 +530,17 @@ enum TypebarChallengeLibrary {
   }
 
   private static let officialFunboxChallenges: [TypebarChallenge] = [
+    .init(
+      id: "three-layout-flow", title: "三布局流动",
+      description: "在六十秒内轮换三种不同键盘布局，每一段都达到每分钟五十词。",
+      legacyURLNames: ["beLikeWater"],
+      preset: .init(configuration: TestConfiguration.timed(seconds: 60)
+        .with(modifiers: [.layoutFluid]), quoteID: nil, customText: nil),
+      requirements: .init(
+        minimumDuration: 60, exactFunboxes: [.layoutFluid],
+        layoutFluidMinimumWPM: 50),
+      dailyEligible: false
+    ),
     hourFunbox("rollercoaster", id: "round-hour", title: "环形一小时",
       description: "沿着环形提示完成一小时打字。", modifier: .roundVisual,
       minimumDuration: 3_600),

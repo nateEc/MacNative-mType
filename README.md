@@ -78,7 +78,7 @@ zsh Scripts/check-reference-metadata-audits.sh /absolute/path/to/monkeytype-refe
 zsh Scripts/check-layout-compatibility-audit.sh /absolute/path/to/monkeytype-reference
 ```
 
-核验固定参考的 58 个挑战名称：32 项可由网页链接加载本机规则，其余 26 项在兼容矩阵中保持待实现状态：
+核验固定参考的 58 个挑战名称：33 项可由网页链接加载本机规则，其余 25 项在兼容矩阵中保持待实现状态：
 
 ```zsh
 zsh Scripts/check-challenge-compatibility-audit.sh /absolute/path/to/monkeytype-reference

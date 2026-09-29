@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 32)
+    XCTAssertEqual(mapped.count, 33)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -197,6 +197,115 @@ final class OfficialChallengeCoverageTests: XCTestCase {
       configuration: configuration, customText: "amber harbor quiet lake")
     XCTAssertLessThan(session.prompt.split(separator: " ").count, 200)
     XCTAssertTrue(session.usesIncrementalPromptExtension)
+  }
+
+  func testThreeLayoutChallengeRequiresRecordedPerLayoutEvidence() throws {
+    let challenge = try officialChallenge("beLikeWater")
+    XCTAssertEqual(challenge.preset.configuration.mode, .time)
+    XCTAssertEqual(challenge.preset.configuration.duration, 60)
+    XCTAssertEqual(challenge.preset.configuration.modifiers, [.layoutFluid])
+    XCTAssertEqual(challenge.requirements.minimumDuration, 60)
+    XCTAssertEqual(challenge.requirements.exactFunboxes, [.layoutFluid])
+    XCTAssertEqual(challenge.requirements.layoutFluidMinimumWPM, 50)
+    XCTAssertFalse(challenge.dailyEligible)
+
+    let layouts = LayoutFluidPolicy.defaultLayouts
+    let missing = layoutResult(configuration: challenge.preset.configuration, counts: [90, 90, 90])
+    let missingEvaluation = ChallengeEvaluator.evaluate(missing, challenge: challenge)
+    XCTAssertFalse(missingEvaluation.passed)
+    XCTAssertTrue(missingEvaluation.failedRequirements.contains { $0.contains("布局") })
+
+    let passing = layoutResult(
+      configuration: challenge.preset.configuration, counts: [90, 90, 90], layouts: layouts)
+    XCTAssertEqual(LayoutFluidChallengePolicy.segmentSpeeds(passing, layouts: layouts)?.map { $0.1 },
+      [54, 54, 54])
+    XCTAssertTrue(ChallengeEvaluator.evaluate(passing, challenge: challenge).passed)
+
+    let slowMiddle = layoutResult(
+      configuration: challenge.preset.configuration, counts: [90, 80, 100], layouts: layouts)
+    let slowEvaluation = ChallengeEvaluator.evaluate(slowMiddle, challenge: challenge)
+    XCTAssertFalse(slowEvaluation.passed)
+    XCTAssertTrue(slowEvaluation.failedRequirements.contains { $0.contains("Colemak") })
+    let mistypedMiddle = layoutResult(
+      configuration: challenge.preset.configuration, counts: [90, 90, 90],
+      layouts: layouts, forcedErrorSegment: 1)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(mistypedMiddle, challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(layoutResult(
+      configuration: challenge.preset.configuration, counts: [90, 90, 90],
+      layouts: [.ansiQwerty, .ansiQwerty, .ansiDvorak]), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(layoutResult(
+      configuration: challenge.preset.configuration, counts: [90, 90, 90],
+      layouts: [.ansiQwerty, .ansiDvorak]), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(layoutResult(
+      configuration: .timed(seconds: 90).with(modifiers: [.layoutFluid]),
+      counts: [90, 90, 90], layouts: layouts), challenge: challenge).passed)
+
+    let atBoundaries = layoutResult(
+      configuration: challenge.preset.configuration, counts: [90, 90, 90],
+      layouts: layouts, offsets: [10, 20, 40])
+    XCTAssertEqual(LayoutFluidChallengePolicy.segmentSpeeds(atBoundaries, layouts: layouts)?
+      .map { $0.1 }, [54, 54, 54])
+
+    let encoded = try JSONEncoder().encode(passing)
+    let restored = try JSONDecoder().decode(CompletedTestResult.self, from: encoded)
+    XCTAssertEqual(restored.challengePresentation?.layoutFluidLayouts, layouts)
+    XCTAssertTrue(ChallengeEvaluator.evaluate(restored, challenge: challenge).passed)
+    var archived = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    var oldPresentation = try XCTUnwrap(archived["challengePresentation"] as? [String: Any])
+    oldPresentation.removeValue(forKey: "layoutFluidLayouts")
+    archived["challengePresentation"] = oldPresentation
+    let oldResult = try JSONDecoder().decode(
+      CompletedTestResult.self, from: JSONSerialization.data(withJSONObject: archived))
+    XCTAssertNil(oldResult.challengePresentation?.layoutFluidLayouts)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(oldResult, challenge: challenge).passed)
+    let legacySnapshot = try JSONDecoder().decode(
+      ChallengePresentationSnapshot.self,
+      from: Data(#"{"liveSpeedStyle":"off","paceCaretStyle":"off","tapeMode":"off"}"#.utf8))
+    XCTAssertNil(legacySnapshot.layoutFluidLayouts)
+  }
+
+  func testThreeLayoutChallengePassesFromNativeSessionReplay() throws {
+    let challenge = try officialChallenge("beLikeWater")
+    var session = TestSessionFactory.make(
+      configuration: challenge.preset.configuration.with(challengeID: challenge.id))
+    let prompt = Array(session.prompt)
+    XCTAssertGreaterThanOrEqual(prompt.count, 300)
+    let start = Date(timeIntervalSince1970: 100)
+    for second in 0..<60 {
+      let offset = second * 5
+      session.insert(String(prompt[offset..<(offset + 5)]),
+        at: start.addingTimeInterval(Double(second)))
+    }
+    session.tick(at: start.addingTimeInterval(60))
+    let result = try XCTUnwrap(session.result(
+      challengePresentation: .init(
+        liveSpeedStyle: .off, paceCaretStyle: .off, tapeMode: .off,
+        layoutFluidLayouts: LayoutFluidPolicy.defaultLayouts)))
+    XCTAssertEqual(result.outcome, .completed)
+    XCTAssertTrue(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
+  }
+
+  private func layoutResult(
+    configuration: TestConfiguration, counts: [Int], layouts: [KeyboardLayout]? = nil,
+    offsets: [TimeInterval] = [10, 30, 50], forcedErrorSegment: Int? = nil
+  ) -> CompletedTestResult {
+    let start = Date(timeIntervalSince1970: 100)
+    let characters = counts.reduce(0, +)
+    return .init(
+      id: UUID(), configuration: configuration, outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(60),
+      typedCharacterCount: characters, correctCharacterCount: characters,
+      errorCount: 0, wpm: characters / 5, rawWpm: characters / 5, accuracy: 100,
+      prompt: String(repeating: "a", count: max(300, characters)),
+      replayEvents: counts.indices.map { index in
+        .init(offset: offsets[index], kind: .insert,
+          text: String(repeating: "a", count: counts[index]),
+          forceError: index == forcedErrorSegment)
+      },
+      challengePresentation: layouts.map {
+        .init(liveSpeedStyle: .off, paceCaretStyle: .off, tapeMode: .off,
+          layoutFluidLayouts: $0)
+      })
   }
 
   private func officialChallenge(_ name: String) throws -> TypebarChallenge {

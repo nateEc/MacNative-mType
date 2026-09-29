@@ -792,6 +792,7 @@ private struct ContentView: View {
   @State private var zipfNoticeGeneration = 0
   @State private var showsNetworkRecoveryNotice = false
   @State private var didRestoreActiveTestSelection = false
+  @State private var restoringLockedLayoutFluidSelection = false
 
   private var effectiveAnimationFrameRate: Int {
     timerHealth.usesLowFrameRate
@@ -896,6 +897,7 @@ private struct ContentView: View {
       activeChallengeID = nil
     }
     .onChange(of: settings.showAllPracticeLines) { _, _ in activeChallengeID = nil }
+    .onChange(of: settings.layoutFluidLayouts, handleLayoutFluidSelectionChange)
     .onChange(of: settings.testModifiers) { _, _ in refreshZipfNotice() }
     .onChange(of: network.recoveryEventID) { _, eventID in
       guard eventID > 0 else { return }
@@ -937,7 +939,9 @@ private struct ContentView: View {
           : ChallengePresentationSnapshot(
             liveSpeedStyle: settings.liveSpeedStyle,
             paceCaretStyle: settings.paceCaretStyle,
-            tapeMode: settings.practiceTapeMode)
+            tapeMode: settings.practiceTapeMode,
+            layoutFluidLayouts: session.configuration.modifiers.contains(.layoutFluid)
+              ? LayoutFluidPolicy.normalizedLayouts(settings.layoutFluidLayouts) : nil)
         guard let result = session.result(
           tags: activeSessionTags,
           restartCount: resultPriorAttemptLedger.restartCount,
@@ -3094,6 +3098,23 @@ private struct ContentView: View {
     typingPowerGeneration &+= 1
     typingPowerParticles = []
     typingPowerShakeOffset = .zero
+  }
+
+  private func handleLayoutFluidSelectionChange(
+    from previous: [KeyboardLayout], to selected: [KeyboardLayout]
+  ) {
+    guard previous != selected else { return }
+    if restoringLockedLayoutFluidSelection {
+      restoringLockedLayoutFluidSelection = false
+      return
+    }
+    guard session.configuration.modifiers.contains(.layoutFluid) else { return }
+    guard acceptsRestartingConfigurationChange() else {
+      restoringLockedLayoutFluidSelection = true
+      settings.layoutFluidLayouts = previous
+      return
+    }
+    reset()
   }
 
   private func reset(restarting: Bool = false) {
