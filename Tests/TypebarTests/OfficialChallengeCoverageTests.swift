@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 27)
+    XCTAssertEqual(mapped.count, 31)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -100,6 +100,45 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertNil(mnemonist.requirements.accuracy)
     XCTAssertNil(mnemonist.requirements.exactFunboxes)
     XCTAssertFalse(mnemonist.dailyEligible)
+  }
+
+  func testOfficialMetricAndSingleWordCustomChallengesLoadAndPractice() throws {
+    let sixtyNine = try officialChallenge("69")
+    XCTAssertEqual(sixtyNine.preset.configuration.mode, .time)
+    XCTAssertEqual(sixtyNine.preset.configuration.duration, 69)
+    XCTAssertEqual(sixtyNine.requirements.wpm, .exact(69))
+    XCTAssertEqual(sixtyNine.requirements.rawWPM, .exact(69))
+    XCTAssertEqual(sixtyNine.requirements.accuracy, .exact(69))
+    XCTAssertEqual(sixtyNine.requirements.consistency, .exact(69))
+    XCTAssertFalse(sixtyNine.dailyEligible)
+
+    for (name, word, count, minimumWPM) in [
+      ("antidiseWhat", "antidisestablishmentarianism", 1, 200),
+      ("iveGotThePower", "power", 10, 400),
+      ("developd", "develop", 1_000, nil),
+    ] as [(String, String, Int, Int?)] {
+      let challenge = try officialChallenge(name)
+      let configuration = challenge.preset.configuration
+      XCTAssertEqual(configuration.mode, .custom, name)
+      XCTAssertEqual(configuration.customTextCompletion, .words, name)
+      XCTAssertEqual(configuration.customTextOrdering, .inOrder, name)
+      XCTAssertEqual(configuration.wordLimit, count, name)
+      XCTAssertEqual(challenge.preset.customText, word, name)
+      XCTAssertEqual(challenge.requirements.wpm, minimumWPM.map(ChallengeMetricRequirement.minimum), name)
+      XCTAssertFalse(challenge.dailyEligible, name)
+      let session = TestSessionFactory.make(configuration: configuration, customText: word)
+      XCTAssertTrue(session.prompt.hasPrefix(word), name)
+      XCTAssertTrue(session.usesIncrementalPromptExtension, name)
+      var practice = TestSessionFactory.make(
+        configuration: configuration.with(challengeID: challenge.id), customText: word)
+      let start = Date(timeIntervalSince1970: 100)
+      for index in 0..<count {
+        practice.insert(word + (index == count - 1 ? "" : " "),
+          at: start.addingTimeInterval(Double(index) * 0.1))
+      }
+      XCTAssertEqual(practice.result()?.outcome, .completed, name)
+      XCTAssertEqual(practice.result()?.configuration.challengeID, challenge.id, name)
+    }
   }
 
   private func officialChallenge(_ name: String) throws -> TypebarChallenge {

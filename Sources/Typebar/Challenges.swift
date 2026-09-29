@@ -436,7 +436,45 @@ enum TypebarChallengeLibrary {
         )
       )
     ),
-  ] + officialFunboxChallenges
+  ] + officialFunboxChallenges + officialMetricAndWordChallenges
+
+  private static let officialMetricAndWordChallenges: [TypebarChallenge] = [
+    .init(
+      id: "sixty-nine-metrics", title: "四项六十九",
+      description: "在六十九秒练习中，让速度、原始速度、准确率和一致性都恰好为六十九。",
+      legacyURLNames: ["69"],
+      preset: .init(configuration: .timed(seconds: 69), quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .exact(69), rawWPM: .exact(69), accuracy: .exact(69),
+        consistency: .exact(69)),
+      dailyEligible: false
+    ),
+    repeatedWordChallenge("antidiseWhat", id: "long-word-sprint", title: "长词冲刺",
+      description: "重复输入一个长英语词，达到每分钟二百词。",
+      word: "antidisestablishmentarianism", count: 1, minimumWPM: 200),
+    repeatedWordChallenge("iveGotThePower", id: "power-ten", title: "十词极速",
+      description: "连续输入十次短词，达到每分钟四百词。",
+      word: "power", count: 10, minimumWPM: 400),
+    repeatedWordChallenge("developd", id: "develop-thousand", title: "千词重复",
+      description: "重复同一个常见英语词一千次。",
+      word: "develop", count: 1_000, minimumWPM: nil),
+  ]
+
+  private static func repeatedWordChallenge(
+    _ legacyName: String, id: String, title: String, description: String,
+    word: String, count: Int, minimumWPM: Int?
+  ) -> TypebarChallenge {
+    .init(
+      id: id, title: title, description: description,
+      legacyURLNames: [legacyName],
+      preset: .init(configuration: .init(
+        mode: .custom, duration: nil, wordLimit: count, difficulty: .normal,
+        rules: .init(), customTextCompletion: .words, customTextOrdering: .inOrder),
+        quoteID: nil, customText: word),
+      requirements: .init(wpm: minimumWPM.map(ChallengeMetricRequirement.minimum)),
+      dailyEligible: false
+    )
+  }
 
   private static let officialFunboxChallenges: [TypebarChallenge] = [
     hourFunbox("rollercoaster", id: "round-hour", title: "环形一小时",
