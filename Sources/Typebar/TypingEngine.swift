@@ -3334,6 +3334,8 @@ enum PromptHighlightPolicy {
 struct TypingSession {
   let configuration: TestConfiguration
   private(set) var prompt: String
+  private var promptCharacters: [Character]
+  private var requiredWordStartIndex: Int?
   private let initialPrompt: String
   private let repeatingPrompt: String?
   private let randomCustomSourceTokens: [String]?
@@ -3401,6 +3403,9 @@ struct TypingSession {
   ) {
     self.configuration = configuration
     self.prompt = prompt
+    self.promptCharacters = Array(prompt)
+    self.requiredWordStartIndex = Self.wordStartIndex(
+      configuration.wordLimit, in: self.promptCharacters)
     self.initialPrompt = prompt
     self.repeatingPrompt = repeatingPrompt
     self.randomCustomSourceTokens = randomCustomSourceTokens
@@ -3504,8 +3509,8 @@ struct TypingSession {
     return (min(completed, sectionEndIndices.count), sectionEndIndices.count)
   }
   var nextExpectedCharacter: Character? {
-    guard !isFinished, nextTargetIndex < prompt.count else { return nil }
-    return Array(prompt)[nextTargetIndex]
+    guard !isFinished, nextTargetIndex < promptCharacters.count else { return nil }
+    return promptCharacters[nextTargetIndex]
   }
 
   var promptGlyphs: [TypingPromptGlyph] {
@@ -3537,7 +3542,7 @@ struct TypingSession {
 
   var errors: Int {
     let typedCharacters = Array(typed)
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     return typedCharacters.indices.reduce(into: 0) { total, typedIndex in
       guard typedTargetIndices.indices.contains(typedIndex) else { return }
       guard let targetIndex = typedTargetIndices[typedIndex], targetCharacters.indices.contains(targetIndex)
@@ -3644,7 +3649,7 @@ struct TypingSession {
     }
 
     let typedCharacters = Array(typed)
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     var matched = 0
     var incorrect = 0
     var extra = 0
@@ -3802,7 +3807,7 @@ struct TypingSession {
   }
 
   private var missedNoSpaceWordErrorCounts: [MissedWordErrorCount] {
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     let tokens = (StarterLexicon.noSpaceWords(for: configuration.language) ?? []).map {
       (text: $0, characters: Array($0))
     }.sorted { $0.characters.count > $1.characters.count }
@@ -3912,7 +3917,7 @@ struct TypingSession {
     if tracksNoSpaceWordBursts {
       return noSpaceWordEndIndices.filter { typed.count >= $0 }.count
     }
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     let typedCharacters = Array(typed)
     let committed = targetCharacters.indices.filter { targetIndex in
       guard isPromptWordSeparator(targetCharacters[targetIndex]),
@@ -4042,7 +4047,7 @@ struct TypingSession {
     if usesIncrementalPromptExtension,
       (!configuration.language.usesSpaceDelimitedWords
         || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)),
-      nextTargetIndex >= prompt.count, !reachedConfiguredWordLimit
+      nextTargetIndex >= promptCharacters.count, !reachedConfiguredWordLimit
     {
       // No-space input has no separator key to trigger the next chunk. Make
       // the upcoming target visible immediately after its final character.
@@ -4194,8 +4199,8 @@ struct TypingSession {
   private mutating func shouldExpandReferenceEllipsis(_ character: Character) -> Bool {
     guard character == "…" else { return false }
     extendPromptIfNeeded()
-    guard nextTargetIndex < prompt.count else { return true }
-    return Array(prompt)[nextTargetIndex] != character
+    guard nextTargetIndex < promptCharacters.count else { return true }
+    return promptCharacters[nextTargetIndex] != character
   }
 
   /// The fixed reference expands the Dutch IJ ligature through regular `i`
@@ -4206,8 +4211,8 @@ struct TypingSession {
       return false
     }
     extendPromptIfNeeded()
-    guard nextTargetIndex < prompt.count else { return true }
-    return Array(prompt)[nextTargetIndex] != character
+    guard nextTargetIndex < promptCharacters.count else { return true }
+    return promptCharacters[nextTargetIndex] != character
   }
 
   @discardableResult
@@ -4248,14 +4253,14 @@ struct TypingSession {
     let currentTargetIndex = nextTargetIndex
     let inputCharacter = normalizedInputCharacter(
       character,
-      expected: currentTargetIndex < prompt.count ? Array(prompt)[currentTargetIndex] : nil)
+      expected: currentTargetIndex < promptCharacters.count ? promptCharacters[currentTargetIndex] : nil)
     let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !inputWordIsEmpty
     if let inputLimit = currentSpaceDelimitedWordInputLimit,
       activeInputWordLength >= inputLimit, !commitsCurrentWord
     {
       return false
     }
-    if currentTargetIndex >= prompt.count {
+    if currentTargetIndex >= promptCharacters.count {
       beginIfNeeded(at: date)
       recordInputAttempt(isCorrect: false)
       recordWeakSpotInput(inputCharacter, isCorrect: false, at: date)
@@ -4274,7 +4279,7 @@ struct TypingSession {
       return false
     }
     beginIfNeeded(at: date)
-    let expected = Array(prompt)[currentTargetIndex]
+    let expected = promptCharacters[currentTargetIndex]
     let retainsCurrentWordAsExtra = shouldRetainInCurrentWord(
       inputCharacter, expected: expected)
     let earlyWordCommitTargetIndex = incompleteWordCommitTargetIndex(
@@ -4587,7 +4592,7 @@ struct TypingSession {
     // into a failure. Repeating prompts can grow before that navigation, and
     // zen always creates another active word.
     let advancesToAnotherWord = configuration.mode == .zen
-      || nextTargetIndex < prompt.count
+      || nextTargetIndex < promptCharacters.count
       || usesIncrementalPromptExtension
     guard mode != .off, minimum > 0, commitsWord, advancesToAnotherWord,
       let burst = committedWordBursts.last,
@@ -4725,7 +4730,7 @@ struct TypingSession {
       !configuration.language.isCodeLanguage,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), !prompt.isEmpty
     else { return nil }
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     let targetIndex = min(nextTargetIndex, targetCharacters.count - 1)
     let wordStart = targetCharacters[..<targetIndex].lastIndex(where: isPromptWordSeparator)
       .map { $0 + 1 } ?? 0
@@ -4747,10 +4752,11 @@ struct TypingSession {
   /// typing submits an incomplete word with space. All ordinary input keeps
   /// its original one-to-one mapping, including no-space and code prompts.
   private var nextTargetIndex: Int {
-    guard let previousTargetIndex = typedTargetIndices.reversed().compactMap({ $0 }).first else {
+    guard let previousTargetIndex = typedTargetIndices.reversed().first(where: { $0 != nil }) ?? nil
+    else {
       return 0
     }
-    return min(previousTargetIndex + 1, prompt.count)
+    return min(previousTargetIndex + 1, promptCharacters.count)
   }
 
   private func incompleteWordCommitTargetIndex(
@@ -4762,7 +4768,7 @@ struct TypingSession {
       !configuration.language.isCodeLanguage,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return nil }
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     guard targetCharacters.indices.contains(currentTargetIndex),
       !isPromptWordSeparator(targetCharacters[currentTargetIndex])
     else { return nil }
@@ -4801,7 +4807,7 @@ struct TypingSession {
       let range = noSpaceWordRange(for: wordIndex)
     else { return false }
 
-    let promptCharacters = Array(prompt)
+    let promptCharacters = self.promptCharacters
     guard typed.count == range.upperBound - 1, range.upperBound <= promptCharacters.count else { return false }
     return range.contains { index in
       if index == typed.count {
@@ -4843,7 +4849,7 @@ struct TypingSession {
 
   private func isTypedCharacterCorrect(at index: Int) -> Bool {
     let typedCharacters = Array(typed)
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     guard targetCharacters.indices.contains(index),
       let typedIndex = typedTargetIndices.firstIndex(where: { $0 == index }),
       typedCharacters.indices.contains(typedIndex)
@@ -4855,7 +4861,7 @@ struct TypingSession {
     guard character == "\n", configuration.language.isCodeLanguage,
       isTypedCharacterCorrect(at: nextTargetIndex - 1)
     else { return }
-    while nextTargetIndex < prompt.count, Array(prompt)[nextTargetIndex] == "\t" {
+    while nextTargetIndex < promptCharacters.count, promptCharacters[nextTargetIndex] == "\t" {
       recordInputAttempt(isCorrect: true)
       appendTypedCharacter("\t", targetIndex: nextTargetIndex, at: date)
       recordReplayEvent(kind: .insert, text: "\t", automatic: true, at: date)
@@ -4956,7 +4962,7 @@ struct TypingSession {
       guard noSpaceWordRanges.indices.contains(word) else { return nil }
       return noSpaceWordRanges[word]
     }
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     var currentWord = 0
     var start = 0
     for index in targetCharacters.indices {
@@ -4985,7 +4991,7 @@ struct TypingSession {
     switch configuration.mode {
     case .words:
       if configuration.language.isCodeLanguage {
-        if nextTargetIndex >= prompt.count,
+        if nextTargetIndex >= promptCharacters.count,
           !usesIncrementalPromptExtension
             || reachesConfiguredWordLimitWithActiveWord
         {
@@ -4995,7 +5001,7 @@ struct TypingSession {
         || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       {
         if reachedConfiguredWordLimit
-          || (!usesIncrementalPromptExtension && nextTargetIndex >= prompt.count)
+          || (!usesIncrementalPromptExtension && nextTargetIndex >= promptCharacters.count)
         {
           complete(at: date)
         }
@@ -5025,7 +5031,7 @@ struct TypingSession {
   }
 
   private mutating func extendPromptIfNeeded() {
-    guard nextTargetIndex >= prompt.count else { return }
+    guard nextTargetIndex >= promptCharacters.count else { return }
     if let randomCustomSourceTokens, !randomCustomSourceTokens.isEmpty {
       let words = CustomTextOrderPolicy.randomWords(
         from: randomCustomSourceTokens,
@@ -5038,8 +5044,8 @@ struct TypingSession {
           source, modifiers: configuration.modifiers, language: configuration.language))
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
-      let previousEnd = prompt.count + separator.count
-      prompt += separator + chunk
+      let previousEnd = promptCharacters.count + separator.count
+      appendPrompt(separator + chunk)
       if usesNoSpaceSeparator {
         let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
           source: source, language: configuration.language,
@@ -5061,8 +5067,8 @@ struct TypingSession {
       let chunk = configuration.language.presentationText(
         TestModifierPolicy.transformed(
           source, modifiers: configuration.modifiers, language: configuration.language))
-      let previousEnd = prompt.count
-      prompt += chunk
+      let previousEnd = promptCharacters.count
+      appendPrompt(chunk)
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
         let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
           source: source, language: configuration.language,
@@ -5079,8 +5085,8 @@ struct TypingSession {
     guard let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
     let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
-    let previousEnd = prompt.count + separator.count
-    prompt += separator + repeatingPrompt
+    let previousEnd = promptCharacters.count + separator.count
+    appendPrompt(separator + repeatingPrompt)
     guard usesNoSpaceSeparator, !repeatingNoSpaceWordLengths.isEmpty else { return }
     var end = previousEnd
     for length in repeatingNoSpaceWordLengths {
@@ -5089,6 +5095,30 @@ struct TypingSession {
     }
     guard repeatingNoSpaceTargetWords.count == repeatingNoSpaceWordLengths.count else { return }
     noSpaceTargetWords += repeatingNoSpaceTargetWords
+  }
+
+  private mutating func appendPrompt(_ chunk: String) {
+    prompt += chunk
+    // Re-segment the complete string: a chunk can begin with a combining
+    // scalar that joins the final Character of the existing prompt.
+    promptCharacters = Array(prompt)
+    requiredWordStartIndex = Self.wordStartIndex(configuration.wordLimit, in: promptCharacters)
+  }
+
+  private static func wordStartIndex(_ wordLimit: Int?, in characters: [Character]) -> Int? {
+    guard let wordLimit, wordLimit > 0 else { return nil }
+    var word = 0
+    var afterSeparator = true
+    for index in characters.indices {
+      if isPromptWordSeparator(characters[index]) {
+        afterSeparator = true
+      } else if afterSeparator {
+        word += 1
+        if word == wordLimit { return index }
+        afterSeparator = false
+      }
+    }
+    return nil
   }
 
   private var reachedConfiguredWordLimit: Bool {
@@ -5103,6 +5133,9 @@ struct TypingSession {
 
   private var shouldFinishEnglishWordsTest: Bool {
     guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
+    guard let requiredWordStartIndex, nextTargetIndex >= requiredWordStartIndex else {
+      return false
+    }
     let targetWords = Array(
       splitPromptWords(prompt, omittingEmptySubsequences: true).prefix(wordLimit))
     let typedWords = splitPromptWords(typed, omittingEmptySubsequences: true)
@@ -5126,7 +5159,7 @@ struct TypingSession {
   /// word tests: an incorrect word remains editable until its separator is
   /// entered, unless the optional quick-end rule explicitly applies.
   private var shouldFinishFiniteSpaceDelimitedTest: Bool {
-    guard nextTargetIndex >= prompt.count else { return false }
+    guard nextTargetIndex >= promptCharacters.count else { return false }
     guard configuration.language.usesSpaceDelimitedWords,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return true }
@@ -5145,7 +5178,7 @@ struct TypingSession {
   /// characters: a custom prompt can use a newline rather than a space.
   private func targetInputThroughWord(_ word: Int) -> String? {
     guard word >= 0 else { return nil }
-    let targetCharacters = Array(prompt)
+    let targetCharacters = promptCharacters
     var currentWord = 0
     for index in targetCharacters.indices where isPromptWordSeparator(targetCharacters[index]) {
       if currentWord == word {

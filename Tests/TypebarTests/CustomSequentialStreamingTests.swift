@@ -139,4 +139,27 @@ final class CustomSequentialStreamingTests: XCTestCase {
     XCTAssertEqual(session.result()?.outcome, .completed)
   }
 
+  func testFiniteOrderedCustomTextStreamsThreeThousandWordsWithoutLosingPosition() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 3_000, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words, customTextOrdering: .inOrder)
+    var session = TestSessionFactory.make(configuration: configuration, customText: "typebar")
+    for word in 0..<3_000 {
+      session.insert(word == 2_999 ? "typebar" : "typebar ", at: start)
+    }
+    XCTAssertEqual(session.completedWordCount, 3_000)
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
+  func testPromptCacheResegmentsCombiningCharacterAcrossRepeatedChunk() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: 120, wordLimit: nil, difficulty: .normal,
+      rules: .init(), customTextCompletion: .time, modifiers: [.noSpaces])
+    var session = TypingSession(
+      configuration: configuration, prompt: "a", repeatingPrompt: "\u{301}b")
+    session.insert("a", at: start)
+    XCTAssertEqual(session.prompt, "a\u{301}b")
+    XCTAssertEqual(session.nextExpectedCharacter, "b")
+  }
+
 }
