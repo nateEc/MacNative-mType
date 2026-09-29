@@ -5177,6 +5177,17 @@ struct TestSessionFactory {
     let prompt: String
     var sectionEndIndices: [Int] = []
     var noSpaceBoundarySource: String?
+    let hasCompleteRandomWordPrompt = configuration.mode == .custom
+      && configuration.customTextCompletion == .words
+      && configuration.customTextOrdering == .random
+      && (1...CustomTextOrderPolicy.maximumCompleteRandomWordCount)
+        .contains(configuration.wordLimit ?? 0)
+    let streamsRandomCustomText = configuration.mode == .custom
+      && configuration.customTextOrdering == .random
+      && [.time, .words].contains(configuration.customTextCompletion)
+      && !hasCompleteRandomWordPrompt
+    var randomCustomSourceTokens: [String] = []
+    var randomCustomPreviousWords: [String] = []
     let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -5212,6 +5223,9 @@ struct TestSessionFactory {
           !CustomTextPolicy.isValid(customText)
           ? "Write your own text in the configuration panel before starting a custom test."
           : customText
+        if streamsRandomCustomText {
+          randomCustomSourceTokens = source.split(whereSeparator: \.isWhitespace).map(String.init)
+        }
         if configuration.customTextCompletion == .sections {
           let sections = CustomTextPolicy.sections(in: source)
           let limit = min(
@@ -5237,11 +5251,12 @@ struct TestSessionFactory {
         } else {
           prompt = CustomTextOrderPolicy.prompt(
             from: source, ordering: configuration.customTextOrdering,
-            wordCount: configuration.customTextCompletion == .words
-              && configuration.customTextOrdering == .random
-              && (1...CustomTextOrderPolicy.maximumCompleteRandomWordCount)
-                .contains(configuration.wordLimit ?? 0)
-              ? configuration.wordLimit : nil)
+            wordCount: streamsRandomCustomText ? 64
+              : hasCompleteRandomWordPrompt ? configuration.wordLimit : nil)
+          if streamsRandomCustomText {
+            randomCustomPreviousWords = Array(
+              prompt.split(whereSeparator: \.isWhitespace).suffix(2).map(String.init))
+          }
         }
       }
     }
@@ -5257,17 +5272,12 @@ struct TestSessionFactory {
       preservesNoSpaceBoundaries: noSpaceBoundarySource != nil)
     let noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
       for: noSpaceWordLengths, in: transformedPrompt)
-    let hasCompleteRandomWordPrompt = configuration.mode == .custom
-      && configuration.customTextCompletion == .words
-      && configuration.customTextOrdering == .random
-      && (1...CustomTextOrderPolicy.maximumCompleteRandomWordCount)
-        .contains(configuration.wordLimit ?? 0)
     let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
-      && !hasCompleteRandomWordPrompt
-    let primesRepeatedPrompt = configuration.isInfinite
+      && !hasCompleteRandomWordPrompt && !streamsRandomCustomText
+    let primesRepeatedPrompt = !streamsRandomCustomText && (configuration.isInfinite
       || (configuration.mode == .custom
         && [.time, .words].contains(configuration.customTextCompletion)
-        && !hasCompleteRandomWordPrompt)
+        && !hasCompleteRandomWordPrompt))
     let initialPrompt: String
     let initialNoSpaceWordEndIndices: [Int]
     let initialNoSpaceTargetWords: [String]
@@ -5285,6 +5295,8 @@ struct TestSessionFactory {
     return TypingSession(
       configuration: configuration, prompt: initialPrompt,
       repeatingPrompt: repeats ? transformedPrompt : nil, sectionEndIndices: sectionEndIndices,
+      randomCustomSourceTokens: streamsRandomCustomText ? randomCustomSourceTokens : nil,
+      randomCustomPreviousWords: randomCustomPreviousWords,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeats ? noSpaceWordLengths : [],
@@ -5507,6 +5519,30 @@ enum TypebarStreamContent {
 enum CustomTextOrderPolicy {
   static let maximumCompleteRandomWordCount = 1_000
 
+  static func randomWords(
+    from tokens: [String], count: Int, avoiding previous: [String] = [],
+    random: () -> Int = { Int.random(in: Int.min...Int.max) }
+  ) -> [String] {
+    guard !tokens.isEmpty, count > 0 else { return [] }
+    var chosen: [String] = []
+    chosen.reserveCapacity(count)
+    var recent = Array(previous.suffix(2))
+    for _ in 0..<count {
+      var candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
+      if tokens.count >= 4 {
+        var attempts = 0
+        while attempts < 100 && recent.contains(candidate) {
+          attempts += 1
+          candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
+        }
+      }
+      chosen.append(candidate)
+      recent.append(candidate)
+      if recent.count > 2 { recent.removeFirst() }
+    }
+    return chosen
+  }
+
   static func prompt(
     from text: String, ordering: CustomTextOrdering,
     wordCount: Int? = nil,
@@ -5523,23 +5559,7 @@ enum CustomTextOrderPolicy {
       return Array(tokens[rotation...] + tokens[..<rotation]).reversed().joined(separator: " ")
     case .random:
       let count = wordCount.map { max(1, $0) } ?? max(tokens.count, 64)
-      var chosen: [String] = []
-      chosen.reserveCapacity(count)
-      for _ in 0..<count {
-        var candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
-        if tokens.count >= 4 {
-          var attempts = 0
-          while attempts < 100
-            && (candidate == chosen.last
-              || (chosen.count >= 2 && candidate == chosen[chosen.count - 2]))
-          {
-            attempts += 1
-            candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
-          }
-        }
-        chosen.append(candidate)
-      }
-      return chosen.joined(separator: " ")
+      return randomWords(from: tokens, count: count, random: random).joined(separator: " ")
     }
   }
 }

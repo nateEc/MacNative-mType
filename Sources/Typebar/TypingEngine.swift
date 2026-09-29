@@ -3336,6 +3336,9 @@ struct TypingSession {
   private(set) var prompt: String
   private let initialPrompt: String
   private let repeatingPrompt: String?
+  private let randomCustomSourceTokens: [String]?
+  private var randomCustomPreviousWords: [String]
+  private let initialRandomCustomPreviousWords: [String]
   private let sectionEndIndices: [Int]
   /// In no-space tests, the reference product still commits each source word
   /// when its final character is entered. Keep those boundaries separately:
@@ -3387,7 +3390,8 @@ struct TypingSession {
 
   init(
     configuration: TestConfiguration, prompt: String, repeatingPrompt: String? = nil,
-    sectionEndIndices: [Int] = [], noSpaceWordEndIndices: [Int] = [],
+    sectionEndIndices: [Int] = [], randomCustomSourceTokens: [String]? = nil,
+    randomCustomPreviousWords: [String] = [], noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
     repeatingNoSpaceTargetWords: [String] = []
   ) {
@@ -3395,6 +3399,9 @@ struct TypingSession {
     self.prompt = prompt
     self.initialPrompt = prompt
     self.repeatingPrompt = repeatingPrompt
+    self.randomCustomSourceTokens = randomCustomSourceTokens
+    self.randomCustomPreviousWords = randomCustomPreviousWords
+    self.initialRandomCustomPreviousWords = randomCustomPreviousWords
     self.sectionEndIndices = sectionEndIndices
     self.noSpaceWordEndIndices = noSpaceWordEndIndices
     self.initialNoSpaceWordEndIndices = noSpaceWordEndIndices
@@ -3410,7 +3417,10 @@ struct TypingSession {
   func repeatedAttempt() -> TypingSession {
     TypingSession(
       configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
-      sectionEndIndices: sectionEndIndices, noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
+      sectionEndIndices: sectionEndIndices,
+      randomCustomSourceTokens: randomCustomSourceTokens,
+      randomCustomPreviousWords: initialRandomCustomPreviousWords,
+      noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
       repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords)
@@ -3418,7 +3428,9 @@ struct TypingSession {
 
   var isFinished: Bool { outcome != .active }
   var hasStarted: Bool { startedAt != nil }
-  var usesIncrementalPromptExtension: Bool { repeatingPrompt?.isEmpty == false }
+  var usesIncrementalPromptExtension: Bool {
+    repeatingPrompt?.isEmpty == false || randomCustomSourceTokens?.isEmpty == false
+  }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
   var typedCharacterCount: Int { typed.count }
   var afkDuration: TimeInterval {
@@ -4010,6 +4022,15 @@ struct TypingSession {
     if startedAt != nil {
       keyboardActivityDates.append(date)
       insertionActivityDates.append(date)
+    }
+    if randomCustomSourceTokens?.isEmpty == false,
+      (!configuration.language.usesSpaceDelimitedWords
+        || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)),
+      nextTargetIndex >= prompt.count, !reachedConfiguredWordLimit
+    {
+      // No-space input has no separator key to trigger the next chunk. Make
+      // the upcoming target visible immediately after its final character.
+      extendPromptIfNeeded()
     }
     finishIfNeeded(at: date)
   }
@@ -4984,7 +5005,36 @@ struct TypingSession {
   }
 
   private mutating func extendPromptIfNeeded() {
-    guard nextTargetIndex >= prompt.count, let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
+    guard nextTargetIndex >= prompt.count else { return }
+    if let randomCustomSourceTokens, !randomCustomSourceTokens.isEmpty {
+      let words = CustomTextOrderPolicy.randomWords(
+        from: randomCustomSourceTokens, count: 64, avoiding: randomCustomPreviousWords)
+      randomCustomPreviousWords = Array(words.suffix(2))
+      let source = words.joined(separator: " ")
+      let chunk = configuration.language.presentationText(
+        TestModifierPolicy.transformed(
+          source, modifiers: configuration.modifiers, language: configuration.language))
+      let usesNoSpaceSeparator = !configuration.language.usesSpaceDelimitedWords
+        || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+      let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
+      let previousEnd = prompt.count + separator.count
+      prompt += separator + chunk
+      if usesNoSpaceSeparator {
+        let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
+          source: source, language: configuration.language,
+          modifiers: configuration.modifiers, transformedPrompt: chunk,
+          preservesNoSpaceBoundaries: false)
+        var end = previousEnd
+        for length in lengths {
+          end += length
+          noSpaceWordEndIndices.append(end)
+        }
+        noSpaceTargetWords += NoSpaceWordBoundaryPolicy.targetWords(
+          for: lengths, in: chunk)
+      }
+      return
+    }
+    guard let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
     let usesNoSpaceSeparator = !configuration.language.usesSpaceDelimitedWords
       || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
