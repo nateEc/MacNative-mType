@@ -55,6 +55,15 @@ struct PromptRendering {
   }
 }
 
+/// Keep the required Return visible at the end of a code line. The real
+/// newline remains in the rendered text, so following lines retain their
+/// original layout and glyph-to-caret offsets.
+enum PromptControlCharacterPresentation {
+  static func text(for character: Character, state: TypingPromptCharacterState) -> String {
+    character == "\n" && state == .current ? "↵\n" : String(character)
+  }
+}
+
 private struct PromptCaretPlacement: Identifiable {
   let marker: PromptCaretMarker
   let rect: CGRect

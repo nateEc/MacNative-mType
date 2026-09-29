@@ -15122,6 +15122,15 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertGreaterThan(scrollView.contentView.documentVisibleRect.minY, 0)
   }
 
+  func testPendingCodeLineBreakShowsReturnTargetWithoutChangingOtherGlyphs() {
+    XCTAssertEqual(
+      PromptControlCharacterPresentation.text(for: "\n", state: .current), "↵\n")
+    XCTAssertEqual(
+      PromptControlCharacterPresentation.text(for: "\n", state: .correct), "\n")
+    XCTAssertEqual(
+      PromptControlCharacterPresentation.text(for: " ", state: .current), " ")
+  }
+
   @MainActor
   func testNativePromptScrollFollowerBringsAnOffscreenGlyphIntoView() {
     let scrollView = NSScrollView(frame: .init(x: 0, y: 0, width: 360, height: 120))

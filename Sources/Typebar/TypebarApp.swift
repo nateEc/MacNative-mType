@@ -2596,7 +2596,8 @@ private struct ContentView: View {
       } else if replacesTypo {
         displayedText = String(glyph.typedCharacter ?? glyph.character)
       } else {
-        displayedText = String(glyph.character)
+        displayedText = PromptControlCharacterPresentation.text(
+          for: glyph.character, state: glyph.state)
       }
       var character = AttributedString(displayedText)
       if session.configuration.modifiers.contains(.listening) {
