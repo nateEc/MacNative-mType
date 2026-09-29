@@ -11022,6 +11022,46 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(largestItalianScalePrompt.split(separator: " ").count, 25)
   }
 
+  func testOrdinaryWordPromptRedrawsThePreviousTwoWords() {
+    let indices = [0, 0, 1, 1, 0, 2, 0]
+    var draws = 0
+    let prompt = StarterLexicon.prompt(
+      tokens: 4, lexicon: IndexedLexicon(["amber", "harbor", "willow"]),
+      separator: " ", punctuation: ["."], contentOptions: ContentOptions(),
+      usesZipfFrequency: false, wordRandom: {
+        defer { draws += 1 }
+        return (Double(indices[min(draws, indices.count - 1)]) + 0.5) / 3
+      })
+    XCTAssertEqual(prompt, "amber harbor willow amber")
+    XCTAssertEqual(draws, indices.count)
+  }
+
+  func testCJKWordPromptRedrawsThePreviousTwoWords() {
+    let indices = [0, 0, 1, 1, 0, 2]
+    var draws = 0
+    let prompt = StarterLexicon.cjkPrompt(
+      tokens: 3, lexicon: IndexedLexicon(["甲", "乙", "丙"]),
+      usesChineseMarks: true, contentOptions: ContentOptions(), usesZipfFrequency: false,
+      wordRandom: {
+        defer { draws += 1 }
+        return (Double(indices[min(draws, indices.count - 1)]) + 0.5) / 3
+      })
+    XCTAssertEqual(prompt, "甲 乙 丙")
+    XCTAssertEqual(draws, indices.count)
+  }
+
+  func testOrdinaryWordPromptStopsRedrawingAfterOneHundredAttempts() {
+    var draws = 0
+    let prompt = StarterLexicon.prompt(
+      tokens: 3, lexicon: IndexedLexicon(["amber"]), separator: " ", punctuation: ["."],
+      contentOptions: ContentOptions(), usesZipfFrequency: false, wordRandom: {
+        draws += 1
+        return 0
+      })
+    XCTAssertEqual(prompt, "amber amber amber")
+    XCTAssertEqual(draws, 203)
+  }
+
   func testEnglish450kWeakSpotUsesTheIndexedCorpus() throws {
     let target = StarterLexicon.english450kLexicon[2]
     let mistyped = "x" + target.dropFirst()

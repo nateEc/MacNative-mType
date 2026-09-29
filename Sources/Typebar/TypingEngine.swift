@@ -12620,12 +12620,23 @@ enum StarterLexicon {
 
   static func prompt(
     tokens: Int, lexicon: IndexedLexicon, separator: String, punctuation: [String],
-    contentOptions: ContentOptions, usesZipfFrequency: Bool
+    contentOptions: ContentOptions, usesZipfFrequency: Bool,
+    wordRandom: () -> Double = { Double.random(in: 0..<1) }
   ) -> String {
-    (0..<tokens).map { index in
-      decoratedToken(
-        from: lexicon, punctuation: punctuation, index: index, contentOptions: contentOptions,
-        usesZipfFrequency: usesZipfFrequency)
+    var recentWords: [String] = []
+    return (0..<tokens).map { index in
+      let word = RecentWordSelection.sample(
+        from: lexicon, previousWords: recentWords, usesZipfFrequency: usesZipfFrequency,
+        random: wordRandom)
+      let rawWord = contentOptions.includeNumbers && index.isMultiple(of: 9)
+        ? String(index / 9 + 1) : word
+      recentWords.append(rawWord.lowercased())
+      if recentWords.count > 2 { recentWords.removeFirst() }
+      if contentOptions.includeNumbers, index.isMultiple(of: 9) { return rawWord }
+      if contentOptions.includePunctuation, index.isMultiple(of: 7) {
+        return word + punctuation[index / 7 % punctuation.count]
+      }
+      return word
     }.joined(separator: separator)
   }
 
@@ -12821,17 +12832,17 @@ enum StarterLexicon {
   static func cjkPrompt(
     tokens: Int, lexicon: IndexedLexicon, usesChineseMarks: Bool, separator: String = " ",
     contentOptions: ContentOptions, usesZipfFrequency: Bool,
-    contentRandom: () -> Double = { Double.random(in: 0..<1) }
+    contentRandom: () -> Double = { Double.random(in: 0..<1) },
+    wordRandom: () -> Double = { Double.random(in: 0..<1) }
   ) -> String {
+    var recentWords: [String] = []
     let generated = (0..<tokens).map { _ in
-      let index = usesZipfFrequency
-        ? ZipfWordSelection.index(in: lexicon.count)
-        : Int.random(in: lexicon.indices)
-      // Scale lexicons preserve aggregate shape metadata, including a small
-      // number of entries with whitespace. A generated practice "word" must
-      // still yield exactly one typeable token, matching the generic and
-      // polyglot generation paths.
-      return PolyglotTokenPolicy.token(from: lexicon[index], selectionIndex: index)
+      let word = RecentWordSelection.sample(
+        from: lexicon, previousWords: recentWords, usesZipfFrequency: usesZipfFrequency,
+        random: wordRandom)
+      recentWords.append(word.lowercased())
+      if recentWords.count > 2 { recentWords.removeFirst() }
+      return word
     }
     guard contentOptions.includePunctuation || contentOptions.includeNumbers else {
       return generated.joined(separator: separator)
@@ -13381,6 +13392,31 @@ enum PolyglotTokenPolicy {
     let tokens = entry.split(whereSeparator: \Character.isWhitespace)
     guard !tokens.isEmpty else { return entry }
     return String(tokens[abs(selectionIndex) % tokens.count])
+  }
+}
+
+/// Samples only the requested entries of a Typebar-owned lexicon. The fixed
+/// reference redraws words used in the preceding two positions, with a bounded
+/// escape for tiny or degenerate wordsets.
+enum RecentWordSelection {
+  static func sample(
+    from lexicon: IndexedLexicon, previousWords: [String], usesZipfFrequency: Bool,
+    random: () -> Double
+  ) -> String {
+    precondition(!lexicon.isEmpty)
+    func draw() -> String {
+      let index = usesZipfFrequency
+        ? ZipfWordSelection.index(in: lexicon.count, random: random)
+        : min(lexicon.count - 1, Int(min(max(random(), 0), 0.999_999_999_999) * Double(lexicon.count)))
+      return PolyglotTokenPolicy.token(from: lexicon[index], selectionIndex: index)
+    }
+    var word = draw()
+    var redraws = 0
+    while redraws < 100 && previousWords.contains(word.lowercased()) {
+      redraws += 1
+      word = draw()
+    }
+    return word
   }
 }
 
