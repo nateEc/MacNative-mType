@@ -116,21 +116,27 @@ struct TestConfigurationShareView: View {
   @Environment(\.dismiss) private var dismiss
   let currentPreset: SavedTestPreset
   let legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback?
-    let onApply: (SavedTestPreset) -> Void
+  let challengeLibrary: [TypebarChallenge]
+  let onLoadChallenge: (TypebarChallenge) -> Void
+  let onApply: (SavedTestPreset) -> Void
     @State private var pastedLink = ""
     @State private var status: String?
 
     private var currentLink: String? { try? TestConfigurationShare.link(for: currentPreset) }
 
   init(
-        currentPreset: SavedTestPreset,
-        legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback? = nil,
-        onApply: @escaping (SavedTestPreset) -> Void
-    ) {
-        self.currentPreset = currentPreset
-        self.legacyCustomTextFallback = legacyCustomTextFallback
-        self.onApply = onApply
-    }
+    currentPreset: SavedTestPreset,
+    legacyCustomTextFallback: LegacyTestSettingsLinkImporter.CustomTextFallback? = nil,
+    challengeLibrary: [TypebarChallenge] = [],
+    onLoadChallenge: @escaping (TypebarChallenge) -> Void = { _ in },
+    onApply: @escaping (SavedTestPreset) -> Void
+  ) {
+    self.currentPreset = currentPreset
+    self.legacyCustomTextFallback = legacyCustomTextFallback
+    self.challengeLibrary = challengeLibrary
+    self.onLoadChallenge = onLoadChallenge
+    self.onApply = onApply
+  }
 
     var body: some View {
         NavigationStack {
@@ -148,7 +154,7 @@ struct TestConfigurationShareView: View {
                 }
 
                 Section("导入测试链接") {
-                    Text("支持自有 typebar://test 链接，以及网页端导出的 testSettings 链接。网页链接只在本机解码，不会访问其中的主机。")
+                    Text("支持自有 typebar://test、网页 testSettings，以及已映射的网页 challenge 链接。网页链接只在本机解码，不会访问其中的主机。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     TextField("粘贴测试设置链接", text: $pastedLink, axis: .vertical)
@@ -182,6 +188,13 @@ struct TestConfigurationShareView: View {
             if URLComponents(string: trimmed)?.scheme?.lowercased() == "typebar" {
                 preset = try TestConfigurationShare.preset(from: trimmed)
             } else {
+                if let challenge = try LegacyChallengeLinkImporter.challenge(
+                    from: trimmed, challenges: challengeLibrary)
+                {
+                    onLoadChallenge(challenge)
+                    dismiss()
+                    return
+                }
                 preset = try LegacyTestSettingsLinkImporter.preset(
                     from: trimmed, current: currentPreset,
                     customTextFallback: legacyCustomTextFallback)

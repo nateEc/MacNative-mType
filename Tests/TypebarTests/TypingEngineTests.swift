@@ -15360,6 +15360,40 @@ final class TypingEngineTests: XCTestCase {
       quoteID: nil, customText: nil))
   }
 
+  func testLegacyChallengeLinkLoadsRegisteredEquivalentWithoutContactingHost() throws {
+    let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "one-hour-focus"))
+
+    XCTAssertEqual(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "https://share.example.test/practice?challenge=OneHourWarrior",
+        challenges: [challenge])?.id,
+      "one-hour-focus")
+    XCTAssertEqual(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "http://another-host.invalid/?challenge=ONEHOURWARRIOR",
+        challenges: [challenge])?.id,
+      "one-hour-focus")
+    XCTAssertNil(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "https://share.example.test/practice?testSettings=value",
+        challenges: [challenge]))
+    XCTAssertThrowsError(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "https://share.example.test/practice?challenge=unknown", challenges: [challenge]))
+    XCTAssertEqual(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "https://share.example.test/practice?challenge=unknown&challenge=oneHourWarrior",
+        challenges: [challenge])?.id,
+      "one-hour-focus")
+    XCTAssertThrowsError(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "https://share.example.test/practice?challenge=oneHourWarrior&challenge=unknown",
+        challenges: [challenge]))
+    XCTAssertThrowsError(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "typebar://test?challenge=oneHourWarrior", challenges: [challenge]))
+  }
+
   @MainActor
   func testLegacyCustomThemeLinkImportsColorsAndSafeBackgroundSettings() throws {
     let payload = """

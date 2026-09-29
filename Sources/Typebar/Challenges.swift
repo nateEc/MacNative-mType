@@ -4,8 +4,28 @@ struct TypebarChallenge: Identifiable, Equatable {
   let id: String
   let title: String
   let description: String
+  /// Public identifiers accepted from legacy web challenge URLs. They are
+  /// identities only; the local title, description and requirements stay
+  /// independently authored by Typebar.
+  let legacyURLNames: [String]
   let preset: SavedTestPreset
   let requirements: ChallengeRequirements
+
+  init(
+    id: String,
+    title: String,
+    description: String,
+    legacyURLNames: [String] = [],
+    preset: SavedTestPreset,
+    requirements: ChallengeRequirements
+  ) {
+    self.id = id
+    self.title = title
+    self.description = description
+    self.legacyURLNames = legacyURLNames
+    self.preset = preset
+    self.requirements = requirements
+  }
 }
 
 enum ChallengeMetricRequirement: Equatable {
@@ -235,6 +255,14 @@ enum ChallengeEvaluator {
 
 enum TypebarChallengeLibrary {
   static let all: [TypebarChallenge] = [
+    .init(
+      id: "one-hour-focus",
+      title: "一小时专注",
+      description: "在一小时的本机词流中维持舒适、稳定的输入节奏。",
+      legacyURLNames: ["oneHourWarrior"],
+      preset: .init(configuration: .timed(seconds: 3_600), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 3_600, maximumAFKPercentage: 10)
+    ),
     .init(
       id: "calm-thirty",
       title: "沉稳三十",

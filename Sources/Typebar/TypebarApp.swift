@@ -1236,7 +1236,9 @@ private struct ContentView: View {
           wordLimit: customTextCompletion == .words ? customTextWordLimit : nil,
           sectionLimit: customTextCompletion == .sections
             ? min(customTextSectionLimit, max(1, customTextSections.count)) : nil,
-          ordering: customTextOrdering)
+          ordering: customTextOrdering),
+        challengeLibrary: TypebarChallengeLibrary.all,
+        onLoadChallenge: loadChallenge
       ) { apply($0) }
     }
     .sheet(item: $settingsJSONCommand) { presentation in
