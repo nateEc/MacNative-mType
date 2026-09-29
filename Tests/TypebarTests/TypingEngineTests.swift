@@ -1120,6 +1120,47 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNotEqual(Array(words.prefix(batchCount)), Array(words.suffix(batchCount)))
   }
 
+  func testInfiniteBinaryStreamContinuesItsTokenSequenceAcrossThePrimedBatch() {
+    let session = TestSessionFactory.make(
+      configuration: .words(0).with(modifiers: [.binaryStream]))
+    let words = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(words.count, 200)
+    XCTAssertEqual(words[0], "00000000")
+    XCTAssertEqual(words[99], "01100011")
+    XCTAssertEqual(words[100], "01100100")
+    XCTAssertEqual(words[199], "11000111")
+  }
+
+  func testLargeFiniteBinaryStreamContinuesAfterItsInitialBatch() {
+    var session = TestSessionFactory.make(
+      configuration: .words(501).with(modifiers: [.binaryStream]))
+    XCTAssertEqual(session.prompt.split(separator: " ").count, 500)
+    session.insert(session.prompt + " ", at: start)
+    let words = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertGreaterThan(words.count, 500)
+    XCTAssertEqual(words[500], "11110100")
+  }
+
+  func testInfiniteBinaryStreamExtendsAgainAndRestartRestoresItsInitialCursor() {
+    var session = TestSessionFactory.make(
+      configuration: .words(0).with(modifiers: [.binaryStream]))
+    let initialPrompt = session.prompt
+    session.insert(initialPrompt + " ", at: start)
+    let extendedWords = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertGreaterThan(extendedWords.count, 200)
+    XCTAssertEqual(extendedWords[200], "11001000")
+    XCTAssertEqual(session.repeatedAttempt().prompt, initialPrompt)
+  }
+
+  func testInfiniteIPv4StreamDoesNotReplayItsFirstBatch() {
+    let session = TestSessionFactory.make(
+      configuration: .words(0).with(modifiers: [.ipv4Stream]))
+    let words = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(words.count, 200)
+    XCTAssertEqual(words[100], TypebarNetworkAddressStream.ipv4Token(at: 100))
+    XCTAssertNotEqual(Array(words.prefix(100)), Array(words.suffix(100)))
+  }
+
   func testGeneratedWordContinuationRejectsBoundaryRepeatsAndStopsAfterOneHundredRetries() {
     var continuation = GeneratedWordContinuation(
       configuration: .words(0), weakSpotScores: .init(), batchWordCount: 3,

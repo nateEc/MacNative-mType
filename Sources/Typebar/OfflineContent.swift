@@ -5170,6 +5170,18 @@ struct GeneratedWordChunk {
   let transformed: String
   let noSpaceWordLengths: [Int]
   let noSpaceTargetWords: [String]
+
+  init(source: String, configuration: TestConfiguration) {
+    self.source = source
+    transformed = configuration.language.presentationText(
+      TestModifierPolicy.transformed(
+        source, modifiers: configuration.modifiers, language: configuration.language))
+    noSpaceWordLengths = NoSpaceWordBoundaryPolicy.wordLengths(
+      source: source, language: configuration.language, modifiers: configuration.modifiers,
+      transformedPrompt: transformed)
+    noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
+      for: noSpaceWordLengths, in: transformed)
+  }
 }
 
 /// Carries only the two prior source words between bounded, freshly generated
@@ -5207,15 +5219,23 @@ struct GeneratedWordContinuation {
       if !firstRepeats && !secondRepeats { break }
     }
     previousWords = Array(words.suffix(2)).map { $0.lowercased() }
-    let transformed = configuration.language.presentationText(
-      TestModifierPolicy.transformed(
-        source, modifiers: configuration.modifiers, language: configuration.language))
-    let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
-      source: source, language: configuration.language, modifiers: configuration.modifiers,
-      transformedPrompt: transformed)
-    return GeneratedWordChunk(
-      source: source, transformed: transformed, noSpaceWordLengths: lengths,
-      noSpaceTargetWords: NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: transformed))
+    return GeneratedWordChunk(source: source, configuration: configuration)
+  }
+}
+
+/// Native, index-derived funbox content keeps one cursor across prompt batches.
+/// It is independent of external/user-supplied streams and random word sets.
+struct GeneratedStreamContinuation {
+  let configuration: TestConfiguration
+  let batchWordCount: Int
+  private(set) var nextTokenIndex: Int
+
+  mutating func nextChunk() -> GeneratedWordChunk? {
+    guard let source = TypebarStreamContent.prompt(
+      configuration: configuration, wordCount: batchWordCount, startIndex: nextTokenIndex)
+    else { return nil }
+    nextTokenIndex += batchWordCount
+    return GeneratedWordChunk(source: source, configuration: configuration)
   }
 }
 
@@ -5250,6 +5270,7 @@ struct TestSessionFactory {
     var sequentialCustomWordStream: CustomSequentialWordStream?
     var finiteCustomTextStream: CustomFiniteTextStream?
     var usesFreshGeneratedWords = false
+    var usesGeneratedStream = false
     let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -5259,6 +5280,7 @@ struct TestSessionFactory {
         configuration: configuration, wordCount: streamWordCount)
     {
       prompt = streamPrompt
+      usesGeneratedStream = true
     } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
       usesFreshGeneratedWords = !configuration.language.isCodeLanguage
       prompt = weakSpotPrompt(
@@ -5377,6 +5399,12 @@ struct TestSessionFactory {
         batchWordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
         previousSource: prompt)
       : nil
+    var generatedStreamContinuation = repeats && usesGeneratedStream
+      ? GeneratedStreamContinuation(
+        configuration: configuration,
+        batchWordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
+        nextTokenIndex: GeneratedPromptChunkPolicy.wordCount(for: configuration))
+      : nil
     let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
       && (configuration.isInfinite
       || (configuration.mode == .custom
@@ -5388,6 +5416,7 @@ struct TestSessionFactory {
     if primesRepeatedPrompt {
       let separator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? "" : " "
       let nextChunk = generatedWordContinuation?.nextChunk()
+        ?? generatedStreamContinuation?.nextChunk()
       initialPrompt = transformedPrompt + separator + (nextChunk?.transformed ?? transformedPrompt)
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
         for: noSpaceWordLengths + (nextChunk?.noSpaceWordLengths ?? noSpaceWordLengths))
@@ -5399,8 +5428,10 @@ struct TestSessionFactory {
     }
     return TypingSession(
       configuration: configuration, prompt: initialPrompt,
-      repeatingPrompt: repeats && generatedWordContinuation == nil ? transformedPrompt : nil,
+      repeatingPrompt: repeats && generatedWordContinuation == nil
+        && generatedStreamContinuation == nil ? transformedPrompt : nil,
       generatedWordContinuation: generatedWordContinuation,
+      generatedStreamContinuation: generatedStreamContinuation,
       sectionEndIndices: sectionEndIndices,
       randomCustomSourceTokens: streamsRandomCustomText ? randomCustomSourceTokens : nil,
       randomCustomPreviousWords: randomCustomPreviousWords,
@@ -5408,8 +5439,10 @@ struct TestSessionFactory {
       finiteCustomTextStream: finiteCustomTextStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
-      repeatingNoSpaceWordLengths: repeats && generatedWordContinuation == nil ? noSpaceWordLengths : [],
-      repeatingNoSpaceTargetWords: repeats && generatedWordContinuation == nil ? noSpaceTargetWords : [])
+      repeatingNoSpaceWordLengths: repeats && generatedWordContinuation == nil
+        && generatedStreamContinuation == nil ? noSpaceWordLengths : [],
+      repeatingNoSpaceTargetWords: repeats && generatedWordContinuation == nil
+        && generatedStreamContinuation == nil ? noSpaceTargetWords : [])
   }
 
   static func weakSpotPrompt(
@@ -5573,16 +5606,19 @@ enum TypebarNetworkAddressStream {
 }
 
 enum TypebarStreamContent {
-  static func prompt(configuration: TestConfiguration, wordCount: Int) -> String? {
+  static func prompt(
+    configuration: TestConfiguration, wordCount: Int, startIndex: Int = 0
+  ) -> String? {
     let count = max(1, wordCount)
+    let indices = startIndex..<(startIndex + count)
     let tokens: [String]
     if configuration.modifiers.contains(.binaryStream) {
-      tokens = (0..<count).map { index in
+      tokens = indices.map { index in
         let value = String(index % 256, radix: 2)
         return String(repeating: "0", count: max(0, 8 - value.count)) + value
       }
     } else if configuration.modifiers.contains(.accountingStream) {
-      tokens = (0..<count).map { index in
+      tokens = indices.map { index in
         let cents = (index * 7_319 + 4_207) % 9_900_000 + 10_000
         let whole = cents / 100
         let fraction = cents % 100
@@ -5592,14 +5628,14 @@ enum TypebarStreamContent {
         return "\(grouped).\(String(format: "%02d", fraction))"
       }
     } else if configuration.modifiers.contains(.hexadecimalStream) {
-      tokens = (0..<count).map {
+      tokens = indices.map {
         "0x" + String(($0 * 37 + 11) % 65_536, radix: 16, uppercase: true)
       }
     } else if configuration.modifiers.contains(.symbolStream) {
       let patterns = ["!@#", "$%^", "&*+", "=?/", "[]{}", "<>~"]
-      tokens = (0..<count).map { patterns[$0 % patterns.count] }
+      tokens = indices.map { patterns[$0 % patterns.count] }
     } else if configuration.modifiers.contains(.asciiStream) {
-      tokens = (0..<count).map { index in
+      tokens = indices.map { index in
         let length = index % 9 + 1
         return String((0..<length).compactMap { offset in
           UnicodeScalar(33 + ((index * 29 + offset * 17) % 94)).map(Character.init)
@@ -5607,12 +5643,12 @@ enum TypebarStreamContent {
       }
     } else if configuration.modifiers.contains(.specialCharacterStream) {
       let characters = Array("`~!@#$%^&*()-_=+{}[]|\\/?:;,.<>")
-      tokens = (0..<count).map { index in
+      tokens = indices.map { index in
         let length = index % 6 + 1
         return String((0..<length).map { characters[(index * 11 + $0 * 7) % characters.count] })
       }
     } else if configuration.modifiers.contains(.gibberishStream) {
-      tokens = (0..<count).map { index in
+      tokens = indices.map { index in
         let length = index * 5 % 7 + 1
         return String((0..<length).compactMap { offset in
           UnicodeScalar(97 + ((index * 19 + offset * 11 + 3) % 26)).map(Character.init)
@@ -5626,7 +5662,7 @@ enum TypebarStreamContent {
       the window keeps a quiet measure of rain
       each returning line makes the hand less afraid
       """.split(whereSeparator: \.isWhitespace).map(String.init)
-      tokens = (0..<count).map { verses[$0 % verses.count] }
+      tokens = indices.map { verses[$0 % verses.count] }
     } else if configuration.modifiers.contains(.referenceStream) {
       let sections = [
         "A watershed gathers rain from many small places and carries it through streams toward a larger body of water",
@@ -5634,19 +5670,19 @@ enum TypebarStreamContent {
         "A library catalog connects a title with its author subject and location so readers can find a shared record",
       ]
       let words = sections.joined(separator: " ").split(separator: " ").map(String.init)
-      tokens = (0..<count).map { words[$0 % words.count] }
+      tokens = indices.map { words[$0 % words.count] }
     } else if configuration.modifiers.contains(.arrowStream) {
       let directions = ["↑", "→", "↓", "←", "→", "↑", "←", "↓"]
-      tokens = (0..<count).map { directions[$0 % directions.count] }
+      tokens = indices.map { directions[$0 % directions.count] }
     } else if configuration.modifiers.contains(.ipv4Stream) {
-      tokens = (0..<count).map(TypebarNetworkAddressStream.ipv4Token)
+      tokens = indices.map(TypebarNetworkAddressStream.ipv4Token)
     } else if configuration.modifiers.contains(.ipv6Stream) {
-      tokens = (0..<count).map(TypebarNetworkAddressStream.ipv6Token)
+      tokens = indices.map(TypebarNetworkAddressStream.ipv6Token)
     } else if configuration.modifiers.contains(.pseudolangStream) {
       let starts = ["br", "cl", "dr", "fr", "gl", "pr", "sh", "tr"]
       let vowels = ["a", "e", "i", "o", "u", "ae", "ou", "ia"]
       let ends = ["m", "n", "r", "s", "th", "v", "x", "z"]
-      tokens = (0..<count).map { index in
+      tokens = indices.map { index in
         let start = starts[index % starts.count]
         let vowel = vowels[(index * 3 + 1) % vowels.count]
         let end = ends[(index * 5 + 2) % ends.count]

@@ -3367,6 +3367,8 @@ struct TypingSession {
   private let repeatingPrompt: String?
   private var generatedWordContinuation: GeneratedWordContinuation?
   private let initialGeneratedWordContinuation: GeneratedWordContinuation?
+  private var generatedStreamContinuation: GeneratedStreamContinuation?
+  private let initialGeneratedStreamContinuation: GeneratedStreamContinuation?
   private let randomCustomSourceTokens: [String]?
   private var randomCustomPreviousWords: [String]
   private let initialRandomCustomPreviousWords: [String]
@@ -3444,6 +3446,7 @@ struct TypingSession {
   init(
     configuration: TestConfiguration, prompt: String, repeatingPrompt: String? = nil,
     generatedWordContinuation: GeneratedWordContinuation? = nil,
+    generatedStreamContinuation: GeneratedStreamContinuation? = nil,
     sectionEndIndices: [Int] = [], randomCustomSourceTokens: [String]? = nil,
     randomCustomPreviousWords: [String] = [],
     sequentialCustomWordStream: CustomSequentialWordStream? = nil,
@@ -3462,6 +3465,8 @@ struct TypingSession {
     self.repeatingPrompt = repeatingPrompt
     self.generatedWordContinuation = generatedWordContinuation
     self.initialGeneratedWordContinuation = generatedWordContinuation
+    self.generatedStreamContinuation = generatedStreamContinuation
+    self.initialGeneratedStreamContinuation = generatedStreamContinuation
     self.randomCustomSourceTokens = randomCustomSourceTokens
     self.randomCustomPreviousWords = randomCustomPreviousWords
     self.initialRandomCustomPreviousWords = randomCustomPreviousWords
@@ -3485,6 +3490,7 @@ struct TypingSession {
     TypingSession(
       configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
       generatedWordContinuation: initialGeneratedWordContinuation,
+      generatedStreamContinuation: initialGeneratedStreamContinuation,
       sectionEndIndices: sectionEndIndices,
       randomCustomSourceTokens: randomCustomSourceTokens,
       randomCustomPreviousWords: initialRandomCustomPreviousWords,
@@ -3499,7 +3505,8 @@ struct TypingSession {
   var isFinished: Bool { outcome != .active }
   var hasStarted: Bool { startedAt != nil }
   var usesIncrementalPromptExtension: Bool {
-    generatedWordContinuation != nil || repeatingPrompt?.isEmpty == false
+    generatedWordContinuation != nil || generatedStreamContinuation != nil
+      || repeatingPrompt?.isEmpty == false
       || randomCustomSourceTokens?.isEmpty == false
       || sequentialCustomWordStream != nil || finiteCustomTextStream?.hasRemaining == true
   }
@@ -5243,9 +5250,15 @@ struct TypingSession {
       }
       return
     }
+    var generatedChunk: GeneratedWordChunk?
     if var continuation = generatedWordContinuation {
-      let chunk = continuation.nextChunk()
+      generatedChunk = continuation.nextChunk()
       generatedWordContinuation = continuation
+    } else if var continuation = generatedStreamContinuation {
+      generatedChunk = continuation.nextChunk()
+      generatedStreamContinuation = continuation
+    }
+    if let chunk = generatedChunk {
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
       let previousEnd = promptCharacters.count + separator.count
