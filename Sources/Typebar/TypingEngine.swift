@@ -3339,6 +3339,8 @@ struct TypingSession {
   private let randomCustomSourceTokens: [String]?
   private var randomCustomPreviousWords: [String]
   private let initialRandomCustomPreviousWords: [String]
+  private var sequentialCustomWordStream: CustomSequentialWordStream?
+  private let initialSequentialCustomWordStream: CustomSequentialWordStream?
   private let sectionEndIndices: [Int]
   /// In no-space tests, the reference product still commits each source word
   /// when its final character is entered. Keep those boundaries separately:
@@ -3391,7 +3393,9 @@ struct TypingSession {
   init(
     configuration: TestConfiguration, prompt: String, repeatingPrompt: String? = nil,
     sectionEndIndices: [Int] = [], randomCustomSourceTokens: [String]? = nil,
-    randomCustomPreviousWords: [String] = [], noSpaceWordEndIndices: [Int] = [],
+    randomCustomPreviousWords: [String] = [],
+    sequentialCustomWordStream: CustomSequentialWordStream? = nil,
+    noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
     repeatingNoSpaceTargetWords: [String] = []
   ) {
@@ -3402,6 +3406,8 @@ struct TypingSession {
     self.randomCustomSourceTokens = randomCustomSourceTokens
     self.randomCustomPreviousWords = randomCustomPreviousWords
     self.initialRandomCustomPreviousWords = randomCustomPreviousWords
+    self.sequentialCustomWordStream = sequentialCustomWordStream
+    self.initialSequentialCustomWordStream = sequentialCustomWordStream
     self.sectionEndIndices = sectionEndIndices
     self.noSpaceWordEndIndices = noSpaceWordEndIndices
     self.initialNoSpaceWordEndIndices = noSpaceWordEndIndices
@@ -3420,6 +3426,7 @@ struct TypingSession {
       sectionEndIndices: sectionEndIndices,
       randomCustomSourceTokens: randomCustomSourceTokens,
       randomCustomPreviousWords: initialRandomCustomPreviousWords,
+      sequentialCustomWordStream: initialSequentialCustomWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
@@ -3430,6 +3437,7 @@ struct TypingSession {
   var hasStarted: Bool { startedAt != nil }
   var usesIncrementalPromptExtension: Bool {
     repeatingPrompt?.isEmpty == false || randomCustomSourceTokens?.isEmpty == false
+      || sequentialCustomWordStream != nil
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
   var typedCharacterCount: Int { typed.count }
@@ -5040,6 +5048,27 @@ struct TypingSession {
         }
         noSpaceTargetWords += NoSpaceWordBoundaryPolicy.targetWords(
           for: lengths, in: chunk)
+      }
+      return
+    }
+    if var stream = sequentialCustomWordStream {
+      let source = stream.nextWords(count: 100)
+      sequentialCustomWordStream = stream
+      let chunk = configuration.language.presentationText(
+        TestModifierPolicy.transformed(
+          source, modifiers: configuration.modifiers, language: configuration.language))
+      let previousEnd = prompt.count
+      prompt += chunk
+      if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+        let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
+          source: source, language: configuration.language,
+          modifiers: configuration.modifiers, transformedPrompt: chunk)
+        var end = previousEnd
+        for length in lengths {
+          end += length
+          noSpaceWordEndIndices.append(end)
+        }
+        noSpaceTargetWords += NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: chunk)
       }
       return
     }

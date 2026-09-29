@@ -3879,10 +3879,13 @@ final class TypingEngineTests: XCTestCase {
     var session = TestSessionFactory.make(
       configuration: configuration, customText: "amber harbor")
 
-    XCTAssertEqual(session.prompt, "amberharboramberharbor")
-    session.insert(session.prompt, at: start)
+    let firstBatch = session.prompt
+    XCTAssertEqual(firstBatch, String(repeating: "amberharbor", count: 50))
+    session.insert(firstBatch, at: start)
+    XCTAssertEqual(session.completedWordCount, 100)
+    XCTAssertEqual(session.prompt, String(repeating: "amberharbor", count: 100))
     session.insert("a", at: start.addingTimeInterval(1))
-    XCTAssertEqual(session.prompt, "amberharboramberharboramberharbor")
+    XCTAssertEqual(session.prompt, String(repeating: "amberharbor", count: 100))
     XCTAssertFalse(session.prompt.contains(" "))
   }
 
@@ -3930,10 +3933,13 @@ final class TypingEngineTests: XCTestCase {
     var session = TestSessionFactory.make(
       configuration: configuration, customText: "amber harbor")
 
-    session.insert(session.prompt, at: start)
+    let firstBatch = session.prompt
+    session.insert(firstBatch, at: start)
     session.insert("a", at: start.addingTimeInterval(1))
 
-    XCTAssertEqual(session.wordReviews.map(\.target), ["amber", "harbor", "amber", "harbor", "amber"])
+    XCTAssertEqual(session.wordReviews.count, 101)
+    XCTAssertEqual(session.wordReviews.prefix(5).map(\.target),
+      ["amber", "harbor", "amber", "harbor", "amber"])
     XCTAssertEqual(session.wordReviews.last?.typed, "a")
   }
 

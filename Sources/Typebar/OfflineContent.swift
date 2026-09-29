@@ -5186,8 +5186,12 @@ struct TestSessionFactory {
       && configuration.customTextOrdering == .random
       && [.time, .words].contains(configuration.customTextCompletion)
       && !hasCompleteRandomWordPrompt
+    let streamsSequentialCustomText = configuration.mode == .custom
+      && configuration.customTextOrdering != .random
+      && [.time, .words].contains(configuration.customTextCompletion)
     var randomCustomSourceTokens: [String] = []
     var randomCustomPreviousWords: [String] = []
+    var sequentialCustomWordStream: CustomSequentialWordStream?
     let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -5249,13 +5253,25 @@ struct TestSessionFactory {
             return length
           }
         } else {
-          prompt = CustomTextOrderPolicy.prompt(
-            from: source, ordering: configuration.customTextOrdering,
-            wordCount: streamsRandomCustomText ? CustomTextOrderPolicy.maximumCompleteRandomWordCount
-              : hasCompleteRandomWordPrompt ? configuration.wordLimit : nil)
-          if streamsRandomCustomText {
-            randomCustomPreviousWords = Array(
-              prompt.split(whereSeparator: \.isWhitespace).suffix(2).map(String.init))
+          if streamsSequentialCustomText,
+            var stream = CustomSequentialWordStream(
+              source: source, ordering: configuration.customTextOrdering)
+          {
+            let targetWords = configuration.customTextCompletion == .words
+              && (configuration.wordLimit ?? 0) > 0
+              ? min(configuration.wordLimit ?? 100, 100) : 100
+            prompt = stream.nextWords(count: targetWords)
+            sequentialCustomWordStream = stream
+          } else {
+            prompt = CustomTextOrderPolicy.prompt(
+              from: source, ordering: configuration.customTextOrdering,
+              wordCount: streamsRandomCustomText
+                ? CustomTextOrderPolicy.maximumCompleteRandomWordCount
+                : hasCompleteRandomWordPrompt ? configuration.wordLimit : nil)
+            if streamsRandomCustomText {
+              randomCustomPreviousWords = Array(
+                prompt.split(whereSeparator: \.isWhitespace).suffix(2).map(String.init))
+            }
           }
         }
       }
@@ -5274,7 +5290,9 @@ struct TestSessionFactory {
       for: noSpaceWordLengths, in: transformedPrompt)
     let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
       && !hasCompleteRandomWordPrompt && !streamsRandomCustomText
-    let primesRepeatedPrompt = !streamsRandomCustomText && (configuration.isInfinite
+      && !streamsSequentialCustomText
+    let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
+      && (configuration.isInfinite
       || (configuration.mode == .custom
         && [.time, .words].contains(configuration.customTextCompletion)
         && !hasCompleteRandomWordPrompt))
@@ -5297,6 +5315,7 @@ struct TestSessionFactory {
       repeatingPrompt: repeats ? transformedPrompt : nil, sectionEndIndices: sectionEndIndices,
       randomCustomSourceTokens: streamsRandomCustomText ? randomCustomSourceTokens : nil,
       randomCustomPreviousWords: randomCustomPreviousWords,
+      sequentialCustomWordStream: sequentialCustomWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeats ? noSpaceWordLengths : [],
@@ -5516,6 +5535,93 @@ enum TypebarStreamContent {
   }
 }
 
+/// A local word cursor for the two non-random custom orderings. The ordered
+/// path retains the user's whitespace, while shuffle consumes every source
+/// position once before drawing a fresh permutation.
+struct CustomSequentialWordStream {
+  private let words: [String]
+  private let prefixes: [String]
+  private let trailingWhitespace: String
+  private let ordering: CustomTextOrdering
+  private var orderedIndex = 0
+  private var shuffledIndices: [Int] = []
+  private var hasEmittedWord = false
+
+  init?(source: String, ordering: CustomTextOrdering) {
+    guard ordering != .random else { return nil }
+    var words: [String] = []
+    var prefixes: [String] = []
+    var whitespace = ""
+    var word = ""
+    var prefix = ""
+    for character in source {
+      if character.isWhitespace {
+        if !word.isEmpty {
+          words.append(word)
+          prefixes.append(prefix)
+          word = ""
+          prefix = ""
+        }
+        whitespace.append(character)
+      } else {
+        if word.isEmpty {
+          prefix = whitespace
+          whitespace = ""
+        }
+        word.append(character)
+      }
+    }
+    if !word.isEmpty {
+      words.append(word)
+      prefixes.append(prefix)
+    }
+    guard !words.isEmpty else { return nil }
+    self.words = words
+    self.prefixes = prefixes
+    self.trailingWhitespace = whitespace
+    self.ordering = ordering
+  }
+
+  mutating func nextWords(
+    count: Int, random: () -> Int = { Int.random(in: Int.min...Int.max) }
+  ) -> String {
+    guard count > 0 else { return "" }
+    var output = ""
+    for _ in 0..<count {
+      let index: Int
+      let separator: String
+      switch ordering {
+      case .inOrder:
+        index = orderedIndex
+        orderedIndex = (orderedIndex + 1) % words.count
+        if hasEmittedWord && index == 0 {
+          separator = trailingWhitespace
+            + (trailingWhitespace.isEmpty ? " " : "") + prefixes[0]
+        } else {
+          separator = prefixes[index]
+        }
+      case .shuffled:
+        if shuffledIndices.isEmpty {
+          shuffledIndices = Array(words.indices)
+          if shuffledIndices.count > 1 {
+            for position in stride(from: shuffledIndices.count - 1, through: 1, by: -1) {
+              let selection = Int(random().magnitude % UInt(position + 1))
+              shuffledIndices.swapAt(position, selection)
+            }
+          }
+        }
+        index = shuffledIndices.removeLast()
+        separator = hasEmittedWord ? " " : ""
+      case .random:
+        preconditionFailure("Random custom text uses independent word draws")
+      }
+      output += separator + words[index]
+      hasEmittedWord = true
+    }
+    return output
+  }
+}
+
 enum CustomTextOrderPolicy {
   static let maximumCompleteRandomWordCount = 100
 
@@ -5555,8 +5661,8 @@ enum CustomTextOrderPolicy {
       return text
     case .shuffled:
       guard tokens.count > 1 else { return text }
-      let rotation = Int(random().magnitude % UInt(tokens.count))
-      return Array(tokens[rotation...] + tokens[..<rotation]).reversed().joined(separator: " ")
+      var stream = CustomSequentialWordStream(source: text, ordering: .shuffled)!
+      return stream.nextWords(count: tokens.count, random: random)
     case .random:
       let count = wordCount.map { max(1, $0) } ?? max(tokens.count, 100)
       return randomWords(from: tokens, count: count, random: random).joined(separator: " ")

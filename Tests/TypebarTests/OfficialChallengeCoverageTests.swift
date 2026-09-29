@@ -235,7 +235,8 @@ final class OfficialChallengeCoverageTests: XCTestCase {
         configuration: configuration.with(challengeID: challenge.id),
         customText: try XCTUnwrap(challenge.preset.customText))
       XCTAssertTrue(session.usesIncrementalPromptExtension, name)
-      XCTAssertLessThan(session.prompt.count, 100, name)
+      XCTAssertEqual(session.prompt.split(separator: " ").count, 100, name)
+      XCTAssertLessThan(session.prompt.count, 1_000, name)
       session.insert("typebar typebar ", at: Date(timeIntervalSince1970: 100))
       XCTAssertEqual(session.completedWordCount, 2, name)
       XCTAssertFalse(session.isFinished, name)
