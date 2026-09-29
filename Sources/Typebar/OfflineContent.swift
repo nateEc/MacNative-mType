@@ -5165,6 +5165,60 @@ enum GeneratedPromptChunkPolicy {
   }
 }
 
+struct GeneratedWordChunk {
+  let source: String
+  let transformed: String
+  let noSpaceWordLengths: [Int]
+  let noSpaceTargetWords: [String]
+}
+
+/// Carries only the two prior source words between bounded, freshly generated
+/// practice chunks. User-authored custom loops and dedicated content streams
+/// keep their separate continuation rules.
+struct GeneratedWordContinuation {
+  let configuration: TestConfiguration
+  let weakSpotScores: WeakSpotScores
+  let batchWordCount: Int
+  private(set) var previousWords: [String]
+
+  init(
+    configuration: TestConfiguration, weakSpotScores: WeakSpotScores,
+    batchWordCount: Int, previousSource: String
+  ) {
+    self.configuration = configuration
+    self.weakSpotScores = weakSpotScores
+    self.batchWordCount = batchWordCount
+    previousWords = Array(previousSource.split(whereSeparator: \.isWhitespace).suffix(2))
+      .map { $0.lowercased() }
+  }
+
+  mutating func nextChunk(generator: (() -> String)? = nil) -> GeneratedWordChunk {
+    var source = ""
+    var words: [String] = []
+    for _ in 0...100 {
+      source = generator?() ?? TestSessionFactory.weakSpotPrompt(
+        configuration: configuration, wordCount: batchWordCount, scores: weakSpotScores)
+      words = source.split(whereSeparator: \.isWhitespace).map(String.init)
+      guard let first = words.first else { break }
+      let previousLast = previousWords.last
+      let firstRepeats = previousWords.contains(first.lowercased())
+      let secondRepeats = words.count > 1
+        && (previousLast == words[1].lowercased() || first.lowercased() == words[1].lowercased())
+      if !firstRepeats && !secondRepeats { break }
+    }
+    previousWords = Array(words.suffix(2)).map { $0.lowercased() }
+    let transformed = configuration.language.presentationText(
+      TestModifierPolicy.transformed(
+        source, modifiers: configuration.modifiers, language: configuration.language))
+    let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
+      source: source, language: configuration.language, modifiers: configuration.modifiers,
+      transformedPrompt: transformed)
+    return GeneratedWordChunk(
+      source: source, transformed: transformed, noSpaceWordLengths: lengths,
+      noSpaceTargetWords: NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: transformed))
+  }
+}
+
 struct TestSessionFactory {
   static func make(
     configuration: TestConfiguration,
@@ -5195,6 +5249,7 @@ struct TestSessionFactory {
     var randomCustomPreviousWords: [String] = []
     var sequentialCustomWordStream: CustomSequentialWordStream?
     var finiteCustomTextStream: CustomFiniteTextStream?
+    var usesFreshGeneratedWords = false
     let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -5205,15 +5260,18 @@ struct TestSessionFactory {
     {
       prompt = streamPrompt
     } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
+      usesFreshGeneratedWords = !configuration.language.isCodeLanguage
       prompt = weakSpotPrompt(
         configuration: configuration, wordCount: streamWordCount, scores: weakSpotScores)
     } else {
       switch configuration.mode {
       case .time:
+        usesFreshGeneratedWords = !configuration.language.isCodeLanguage
         prompt = weakSpotPrompt(
           configuration: configuration, wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
           scores: weakSpotScores)
       case .words:
+        usesFreshGeneratedWords = !configuration.language.isCodeLanguage
         prompt = weakSpotPrompt(
           configuration: configuration, wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
           scores: weakSpotScores)
@@ -5313,6 +5371,12 @@ struct TestSessionFactory {
     let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
       && !hasCompleteRandomWordPrompt && !streamsRandomCustomText
       && !streamsSequentialCustomText
+    var generatedWordContinuation = repeats && usesFreshGeneratedWords
+      ? GeneratedWordContinuation(
+        configuration: configuration, weakSpotScores: weakSpotScores,
+        batchWordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
+        previousSource: prompt)
+      : nil
     let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
       && (configuration.isInfinite
       || (configuration.mode == .custom
@@ -5323,10 +5387,11 @@ struct TestSessionFactory {
     let initialNoSpaceTargetWords: [String]
     if primesRepeatedPrompt {
       let separator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? "" : " "
-      initialPrompt = transformedPrompt + separator + transformedPrompt
+      let nextChunk = generatedWordContinuation?.nextChunk()
+      initialPrompt = transformedPrompt + separator + (nextChunk?.transformed ?? transformedPrompt)
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
-        for: noSpaceWordLengths + noSpaceWordLengths)
-      initialNoSpaceTargetWords = noSpaceTargetWords + noSpaceTargetWords
+        for: noSpaceWordLengths + (nextChunk?.noSpaceWordLengths ?? noSpaceWordLengths))
+      initialNoSpaceTargetWords = noSpaceTargetWords + (nextChunk?.noSpaceTargetWords ?? noSpaceTargetWords)
     } else {
       initialPrompt = transformedPrompt
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(for: noSpaceWordLengths)
@@ -5334,18 +5399,20 @@ struct TestSessionFactory {
     }
     return TypingSession(
       configuration: configuration, prompt: initialPrompt,
-      repeatingPrompt: repeats ? transformedPrompt : nil, sectionEndIndices: sectionEndIndices,
+      repeatingPrompt: repeats && generatedWordContinuation == nil ? transformedPrompt : nil,
+      generatedWordContinuation: generatedWordContinuation,
+      sectionEndIndices: sectionEndIndices,
       randomCustomSourceTokens: streamsRandomCustomText ? randomCustomSourceTokens : nil,
       randomCustomPreviousWords: randomCustomPreviousWords,
       sequentialCustomWordStream: sequentialCustomWordStream,
       finiteCustomTextStream: finiteCustomTextStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
-      repeatingNoSpaceWordLengths: repeats ? noSpaceWordLengths : [],
-      repeatingNoSpaceTargetWords: repeats ? noSpaceTargetWords : [])
+      repeatingNoSpaceWordLengths: repeats && generatedWordContinuation == nil ? noSpaceWordLengths : [],
+      repeatingNoSpaceTargetWords: repeats && generatedWordContinuation == nil ? noSpaceTargetWords : [])
   }
 
-  private static func weakSpotPrompt(
+  static func weakSpotPrompt(
     configuration: TestConfiguration, wordCount: Int, scores: WeakSpotScores
   ) -> String {
     if configuration.modifiers.contains(.weakSpot),

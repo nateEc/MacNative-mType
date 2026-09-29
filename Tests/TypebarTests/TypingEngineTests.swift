@@ -1104,6 +1104,95 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(custom.progressText(at: start.addingTimeInterval(60)), "60s")
   }
 
+  func testInfiniteWordPracticePrimesASecondFreshWordBatch() {
+    let session = TestSessionFactory.make(configuration: .words(0))
+    let words = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(words.count, 200)
+    XCTAssertNotEqual(Array(words.prefix(100)), Array(words.suffix(100)),
+                      "Infinite practice should extend with new random words, not replay its first batch")
+  }
+
+  func testInfiniteTimedPracticePrimesASecondFreshWordBatch() {
+    let session = TestSessionFactory.make(configuration: .timed(seconds: 0))
+    let words = session.prompt.split(separator: " ").map(String.init)
+    let batchCount = GeneratedPromptChunkPolicy.wordCount(for: session.configuration)
+    XCTAssertEqual(words.count, batchCount * 2)
+    XCTAssertNotEqual(Array(words.prefix(batchCount)), Array(words.suffix(batchCount)))
+  }
+
+  func testGeneratedWordContinuationRejectsBoundaryRepeatsAndStopsAfterOneHundredRetries() {
+    var continuation = GeneratedWordContinuation(
+      configuration: .words(0), weakSpotScores: .init(), batchWordCount: 3,
+      previousSource: "amber harbor")
+    let candidates = ["harbor willow maple", "willow harbor maple", "willow maple canyon"]
+    var draws = 0
+    let accepted = continuation.nextChunk {
+      defer { draws += 1 }
+      return candidates[min(draws, candidates.count - 1)]
+    }
+    XCTAssertEqual(draws, 3)
+    XCTAssertEqual(accepted.transformed, "willow maple canyon")
+    XCTAssertEqual(continuation.previousWords, ["maple", "canyon"])
+
+    var degenerateDraws = 0
+    let degenerate = continuation.nextChunk {
+      degenerateDraws += 1
+      return "canyon canyon canyon"
+    }
+    XCTAssertEqual(degenerateDraws, 101)
+    XCTAssertEqual(degenerate.transformed, "canyon canyon canyon")
+  }
+
+  func testLargeFiniteWordPracticeAppendsFreshWordsWhenFirstBatchIsCompleted() {
+    var session = TestSessionFactory.make(configuration: .words(501))
+    let firstBatch = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(firstBatch.count, 500)
+    session.insert(session.prompt + " ", at: start)
+    let extended = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertFalse(session.isFinished)
+    XCTAssertGreaterThan(extended.count, firstBatch.count)
+    XCTAssertNotEqual(Array(extended.suffix(500)), firstBatch)
+  }
+
+  func testGeneratedNoSpaceContinuationKeepsWordProgressAcrossFreshBatches() {
+    var session = TestSessionFactory.make(
+      configuration: .words(0, language: .simplifiedChinese).with(modifiers: [.noSpaces]))
+    let initialPrompt = session.prompt
+    XCTAssertFalse(initialPrompt.contains(" "))
+    session.insert(initialPrompt, at: start)
+    XCTAssertFalse(session.isFinished)
+    XCTAssertEqual(session.completedWordCount, 200)
+    XCTAssertGreaterThan(session.prompt.count, initialPrompt.count)
+  }
+
+  func testFreshGeneratedContinuationResetsToItsInitialPromptOnRestart() {
+    var session = TestSessionFactory.make(configuration: .words(0))
+    let initialPrompt = session.prompt
+    session.insert(initialPrompt + " ", at: start)
+    XCTAssertGreaterThan(session.prompt.count, initialPrompt.count)
+    let restarted = session.repeatedAttempt()
+    XCTAssertEqual(restarted.prompt, initialPrompt)
+    XCTAssertTrue(restarted.usesIncrementalPromptExtension)
+  }
+
+  func testCustomTimedTextStillRepeatsTheUserProvidedWords() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: 30, wordLimit: nil, difficulty: .normal, rules: .init(),
+      customTextCompletion: .time)
+    var session = TestSessionFactory.make(configuration: configuration, customText: "amber harbor")
+    let initialWords = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(initialWords.count, 100)
+    XCTAssertTrue(initialWords.enumerated().allSatisfy {
+      $0.element == ($0.offset.isMultiple(of: 2) ? "amber" : "harbor")
+    })
+    session.insert(session.prompt + " ", at: start)
+    let extendedWords = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertGreaterThan(extendedWords.count, initialWords.count)
+    XCTAssertTrue(extendedWords.enumerated().allSatisfy {
+      $0.element == ($0.offset.isMultiple(of: 2) ? "amber" : "harbor")
+    })
+  }
+
   func testOnlyStartedInfiniteTimedChallengeCanFinishAsCompletedResult() throws {
     let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "accuracy-ten-minutes"))
     let configuration = challenge.preset.configuration.with(challengeID: challenge.id)
