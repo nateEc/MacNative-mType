@@ -163,6 +163,62 @@ final class CustomSequentialStreamingTests: XCTestCase {
     XCTAssertEqual(session.result()?.outcome, .completed)
   }
 
+  func testTenThousandWordProgressRemainsCorrectWhenReadAfterEveryWord() throws {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 10_000, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words, customTextOrdering: .inOrder)
+    var session = TestSessionFactory.make(configuration: configuration, customText: "typebar")
+    for word in 0..<10_000 {
+      session.insert(word == 9_999 ? "typebar" : "typebar ", at: start)
+      XCTAssertEqual(
+        try XCTUnwrap(session.progressFraction(at: start)), Double(word + 1) / 10_000,
+        accuracy: 0.000_000_1)
+    }
+    XCTAssertEqual(session.completedWordCount, 10_000)
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
+  func testWordProgressRollsBackEarlyCommitAndWordDeletion() {
+    var session = TypingSession(
+      configuration: .words(3, rules: .init(freedomMode: true)),
+      prompt: "amber bay cedar")
+    session.insert("am ", at: start)
+    XCTAssertEqual(session.completedWordCount, 1)
+    session.deleteBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.completedWordCount, 0)
+    session.insert("ber bay ", at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.completedWordCount, 2)
+    session.deleteWordBackward(at: start.addingTimeInterval(3))
+    XCTAssertEqual(session.completedWordCount, 1)
+  }
+
+  func testWordProgressFallsBackAfterNonASCIIInput() {
+    var session = TypingSession(
+      configuration: .words(3, rules: .init(freedomMode: true)),
+      prompt: "café bay cedar")
+    session.insert("café ", at: start)
+    XCTAssertEqual(session.completedWordCount, 1)
+    session.deleteWordBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.completedWordCount, 0)
+    session.insert("café ", at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.completedWordCount, 1)
+  }
+
+  func testNoSpaceHiddenWordProgressTracksEachBoundary() throws {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 1_000, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words,
+      customTextOrdering: .inOrder, modifiers: [.noSpaces])
+    var session = TestSessionFactory.make(configuration: configuration, customText: "ab cd")
+    for word in 0..<1_000 {
+      session.insert(word.isMultiple(of: 2) ? "ab" : "cd", at: start)
+      XCTAssertEqual(
+        try XCTUnwrap(session.progressFraction(at: start)), Double(word + 1) / 1_000,
+        accuracy: 0.000_000_1)
+    }
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
   func testOptionalHundredThousandWordEndurance() throws {
     try XCTSkipUnless(
       ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
@@ -173,6 +229,9 @@ final class CustomSequentialStreamingTests: XCTestCase {
     var session = TestSessionFactory.make(configuration: configuration, customText: "typebar")
     for word in 0..<100_000 {
       session.insert(word == 99_999 ? "typebar" : "typebar ", at: start)
+      if (word + 1).isMultiple(of: 1_000) {
+        XCTAssertEqual(session.completedWordCount, word + 1)
+      }
     }
     XCTAssertEqual(session.completedWordCount, 100_000)
     XCTAssertEqual(session.result()?.outcome, .completed)

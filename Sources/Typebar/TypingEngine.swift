@@ -3358,9 +3358,11 @@ struct TypingSession {
   private let repeatingNoSpaceWordLengths: [Int]
   private let repeatingNoSpaceTargetWords: [String]
   private(set) var typed = ""
-  /// ASCII input keeps one grapheme per accepted key. Retain the full-string
-  /// burst path after any non-ASCII input, even if it is later deleted.
-  private var typedHasNonASCII = false
+  /// Most ASCII input keeps one grapheme per accepted key. A non-ASCII key or
+  /// a CRLF join requires full-string indexing, even if later deleted.
+  private var typedNeedsFullSegmentation = false
+  private var cachedCommittedWordCount = 0
+  private var canUseCachedWordProgress = true
   /// Each accepted input character keeps the target position it advanced to.
   /// A word can be submitted early with space, so this cannot always be
   /// inferred from the input string's character offset.
@@ -3920,23 +3922,25 @@ struct TypingSession {
 
   var completedWordCount: Int {
     if tracksNoSpaceWordBursts {
-      return noSpaceWordEndIndices.filter { typed.count >= $0 }.count
+      let typedLength = typedNeedsFullSegmentation ? typed.count : typedTargetIndices.count
+      var lower = 0
+      var upper = noSpaceWordEndIndices.count
+      while lower < upper {
+        let middle = lower + (upper - lower) / 2
+        if noSpaceWordEndIndices[middle] <= typedLength {
+          lower = middle + 1
+        } else {
+          upper = middle
+        }
+      }
+      return lower
     }
     let targetCharacters = promptCharacters
-    let typedCharacters = Array(typed)
-    var seenSeparatorTargets = Set<Int>()
-    var committed = 0
-    for (typedIndex, targetIndex) in typedTargetIndices.enumerated() {
-      guard let targetIndex, targetCharacters.indices.contains(targetIndex),
-        typedCharacters.indices.contains(typedIndex),
-        isPromptWordSeparator(targetCharacters[targetIndex]),
-        seenSeparatorTargets.insert(targetIndex).inserted
-      else { continue }
-      if isPromptWordSeparator(typedCharacters[typedIndex]) { committed += 1 }
-    }
+    let committed = canUseCachedWordProgress
+      ? cachedCommittedWordCount : scannedCommittedWordCount
     if outcome == .completed, configuration.mode == .custom,
       configuration.customTextCompletion == .words,
-      let lastTyped = typedCharacters.last, !isPromptWordSeparator(lastTyped)
+      let lastTyped = typed.last, !isPromptWordSeparator(lastTyped)
     {
       // A finite custom test may end on its last required word while a
       // subsequent generated chunk remains visible but untyped.
@@ -3947,6 +3951,21 @@ struct TypingSession {
       !isPromptWordSeparator(targetCharacters[targetCharacters.count - 1])
     else { return committed }
     return committed + 1
+  }
+
+  private var scannedCommittedWordCount: Int {
+    let typedCharacters = Array(typed)
+    var seenSeparatorTargets = Set<Int>()
+    var committed = 0
+    for (typedIndex, targetIndex) in typedTargetIndices.enumerated() {
+      guard let targetIndex, promptCharacters.indices.contains(targetIndex),
+        typedCharacters.indices.contains(typedIndex),
+        isPromptWordSeparator(promptCharacters[targetIndex]),
+        seenSeparatorTargets.insert(targetIndex).inserted
+      else { continue }
+      if isPromptWordSeparator(typedCharacters[typedIndex]) { committed += 1 }
+    }
+    return committed
   }
 
   func result(
@@ -4542,7 +4561,7 @@ struct TypingSession {
 
   private mutating func recordWordBurstIfCommitted() {
     guard typed.last.map(isPromptWordSeparator) == true else { return }
-    if !typedHasNonASCII {
+    if !typedNeedsFullSegmentation {
       let end = typedCharacterDates.count - 1
       let wordLength = typed.reversed().dropFirst()
         .prefix { !isPromptWordSeparator($0) }.count
@@ -4803,9 +4822,26 @@ struct TypingSession {
     _ character: Character, targetIndex: Int?, forceError: Bool = false,
     countsAsExtraError: Bool = false, at date: Date
   ) {
-    let typedIndex = typedHasNonASCII ? typed.count : typedTargetIndices.count
+    let typedIndex = typedNeedsFullSegmentation ? typed.count : typedTargetIndices.count
+    let joinsPreviousGrapheme = typed.last == "\r" && character == "\n"
+    if !character.isASCII || joinsPreviousGrapheme {
+      canUseCachedWordProgress = false
+    }
+    if let targetIndex,
+      let previousTargetIndex = typedTargetIndices.reversed().first(where: { $0 != nil }) ?? nil,
+      targetIndex <= previousTargetIndex
+    {
+      canUseCachedWordProgress = false
+    }
+    if canUseCachedWordProgress, let targetIndex,
+      promptCharacters.indices.contains(targetIndex),
+      isPromptWordSeparator(promptCharacters[targetIndex]),
+      isPromptWordSeparator(character)
+    {
+      cachedCommittedWordCount += 1
+    }
     typed.append(character)
-    if !character.isASCII { typedHasNonASCII = true }
+    if !character.isASCII || joinsPreviousGrapheme { typedNeedsFullSegmentation = true }
     typedTargetIndices.append(targetIndex)
     typedCharacterDates.append(date)
     if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
@@ -4815,7 +4851,15 @@ struct TypingSession {
   private mutating func removeLastTypedCharacter() {
     guard !typed.isEmpty else { return }
     let typedIndex = typed.count - 1
+    let removedCharacter = typed.last
     let targetIndex = typedTargetIndices.popLast() ?? nil
+    if canUseCachedWordProgress, let targetIndex,
+      promptCharacters.indices.contains(targetIndex),
+      isPromptWordSeparator(promptCharacters[targetIndex]),
+      removedCharacter.map(isPromptWordSeparator) == true
+    {
+      cachedCommittedWordCount -= 1
+    }
     typed.removeLast()
     typedCharacterDates.removeLast()
     if let targetIndex { forcedErrorIndices.remove(targetIndex) }
@@ -5143,6 +5187,7 @@ struct TypingSession {
     }
     // A chunk may begin with a combining scalar that joins the final
     // Character of the existing prompt; re-segment and rescan in that case.
+    canUseCachedWordProgress = false
     promptCharacters = Array(prompt)
     let wordProgress = Self.wordProgress(configuration.wordLimit, in: promptCharacters)
     requiredWordStartIndex = wordProgress.startIndex
