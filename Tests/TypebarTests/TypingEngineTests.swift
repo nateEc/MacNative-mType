@@ -23187,6 +23187,32 @@ final class TypingEngineTests: XCTestCase {
         TypebarChallengeLibrary.dailyChallenge(on: morning, calendar: calendar)))
   }
 
+  func testOfficialEnduranceChallengesLoadExactDurationsAndStayOutOfDailyRotation() throws {
+    let expected: [(name: String, seconds: Int)] = [
+      ("oneHourWarrior", 3_600), ("doubleDown", 7_200),
+      ("tripleTrouble", 10_800), ("quad", 14_400),
+      ("8Ball", 28_800), ("theBig12", 43_200), ("1Day", 86_400),
+    ]
+    for entry in expected {
+      let challenge = try XCTUnwrap(
+        LegacyChallengeLinkImporter.challenge(
+          from: "https://example.invalid/?challenge=\(entry.name)",
+          challenges: TypebarChallengeLibrary.all), entry.name)
+      XCTAssertEqual(challenge.preset.configuration.duration, Double(entry.seconds), entry.name)
+      XCTAssertEqual(challenge.requirements.minimumDuration, Double(entry.seconds), entry.name)
+      XCTAssertEqual(challenge.preset.configuration.mode, .time, entry.name)
+    }
+
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-01-01T12:00:00Z"))
+    for day in 0..<90 {
+      let date = try XCTUnwrap(calendar.date(byAdding: .day, value: day, to: start))
+      let daily = TypebarChallengeLibrary.dailyChallenge(on: date, calendar: calendar)
+      XCTAssertLessThanOrEqual(daily.preset.configuration.duration ?? 0, 3_600)
+    }
+  }
+
   func testChallengeConfigurationRoundTripsWithoutAffectingLegacyConfiguration() throws {
     let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "long-breath"))
     let encoded = try JSONEncoder().encode(

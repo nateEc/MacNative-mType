@@ -95,6 +95,8 @@ run_check "checking reference service behavior alignment" \
   zsh "$project_root/Scripts/check-reference-service-behavior-alignment.sh" "$reference_root"
 run_check "checking exact keyboard-layout coverage" \
   zsh "$project_root/Scripts/check-layout-compatibility-audit.sh" "$reference_root"
+run_check "checking official challenge identity coverage" \
+  zsh "$project_root/Scripts/check-challenge-compatibility-audit.sh" "$reference_root"
 run_check "checking reference behavior evidence" \
   zsh "$project_root/Scripts/check-reference-behavior-audit.sh" "$reference_root"
 run_check "checking manual acceptance inventory" \

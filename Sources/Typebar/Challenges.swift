@@ -264,6 +264,54 @@ enum TypebarChallengeLibrary {
       requirements: .init(minimumDuration: 3_600, maximumAFKPercentage: 10)
     ),
     .init(
+      id: "two-hour-endurance",
+      title: "两小时耐力",
+      description: "保持两小时连续输入，完成一段长时间练习。",
+      legacyURLNames: ["doubleDown"],
+      preset: .init(configuration: .timed(seconds: 7_200), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 7_200)
+    ),
+    .init(
+      id: "three-hour-endurance",
+      title: "三小时耐力",
+      description: "将稳定输入延续到第三个小时。",
+      legacyURLNames: ["tripleTrouble"],
+      preset: .init(configuration: .timed(seconds: 10_800), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 10_800)
+    ),
+    .init(
+      id: "four-hour-endurance",
+      title: "四小时耐力",
+      description: "完成四小时的长程输入练习。",
+      legacyURLNames: ["quad"],
+      preset: .init(configuration: .timed(seconds: 14_400), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 14_400)
+    ),
+    .init(
+      id: "eight-hour-endurance",
+      title: "八小时耐力",
+      description: "在整段八小时练习中保持节奏。",
+      legacyURLNames: ["8Ball"],
+      preset: .init(configuration: .timed(seconds: 28_800), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 28_800)
+    ),
+    .init(
+      id: "twelve-hour-endurance",
+      title: "十二小时耐力",
+      description: "持续完成十二小时的本机输入练习。",
+      legacyURLNames: ["theBig12"],
+      preset: .init(configuration: .timed(seconds: 43_200), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 43_200)
+    ),
+    .init(
+      id: "one-day-endurance",
+      title: "一日耐力",
+      description: "以一天为长度完成超长输入练习。",
+      legacyURLNames: ["1Day"],
+      preset: .init(configuration: .timed(seconds: 86_400), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 86_400)
+    ),
+    .init(
       id: "calm-thirty",
       title: "沉稳三十",
       description: "在一段短时间练习中保持速度和准确率。",
@@ -335,7 +383,8 @@ enum TypebarChallengeLibrary {
     -> TypebarChallenge
   {
     let day = calendar.ordinality(of: .day, in: .era, for: date) ?? 0
-    return all[day % all.count]
+    let dailyChoices = all.filter { ($0.preset.configuration.duration ?? 0) <= 3_600 }
+    return dailyChoices[day % dailyChoices.count]
   }
 }
 
