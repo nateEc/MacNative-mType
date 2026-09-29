@@ -106,6 +106,9 @@
     "beepBoop": "robot-log",
     "wingdings": "ten-words-of-pain",
     "oneArmedBandit": "one-handed-bandit",
+    "thumbWarrior": "thumb-hour",
+    "feetWarrior": "feet-hour",
+    "upsideDown": "inverted-keyboard-minute",
     "simp": "single-word-thousand",
     "trueSimp": "single-word-ten-thousand",
     "simpLord": "single-word-hundred-thousand",
@@ -124,9 +127,6 @@
     "bees",
     "getOffMySwamp",
     "lookAtMeIAmTheDeveloperNow",
-    "thumbWarrior",
-    "mobileWarrior",
-    "upsideDown",
-    "feetWarrior"
+    "mobileWarrior"
   ]
 }

@@ -56,6 +56,7 @@ enum ChallengeMetricRequirement: Equatable {
 
 struct ChallengeConfigurationRequirements: Equatable {
   var mode: TestMode?
+  var duration: TimeInterval?
   var language: TypingLanguage?
   var difficulty: Difficulty?
   var punctuation: Bool?
@@ -114,6 +115,7 @@ struct ChallengeRequirements: Equatable {
   private func configurationSummary(_ required: ChallengeConfigurationRequirements) -> String {
     var parts: [String] = []
     if let mode = required.mode { parts.append("模式 \(mode.displayName)") }
+    if let duration = required.duration { parts.append("计时 \(Int(duration)) 秒") }
     if let language = required.language { parts.append("语言 \(language.rawValue)") }
     if let difficulty = required.difficulty { parts.append("难度 \(difficulty.rawValue)") }
     if let punctuation = required.punctuation { parts.append(punctuation ? "启用标点" : "关闭标点") }
@@ -295,6 +297,9 @@ enum ChallengeEvaluator {
   ) {
     if let expected = required.mode, actual.mode.rawValue != expected.rawValue {
       failures.append("模式需要为 \(expected.displayName)（本次 \(actual.mode.displayName)）")
+    }
+    if let expected = required.duration, actual.duration != expected {
+      failures.append("计时需要为 \(Int(expected)) 秒（本次 \(actual.duration.map { String(Int($0)) } ?? "未知")）")
     }
     if let expected = required.language, actual.language != expected {
       failures.append("语言需要为 \(expected.rawValue)（本次 \(actual.language.rawValue)）")
@@ -491,6 +496,30 @@ enum TypebarChallengeLibrary {
   ].joined(separator: " ")
 
   static let all: [TypebarChallenge] = [
+    .init(
+      id: "thumb-hour", title: "拇指一小时",
+      description: "自觉只用拇指输入，完成整整一小时；实体手部动作无法由应用自动证明。",
+      legacyURLNames: ["thumbWarrior"],
+      preset: .init(configuration: .timed(seconds: 3_600), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 3_600,
+        configuration: .init(mode: .time, duration: 3_600)), dailyEligible: false
+    ),
+    .init(
+      id: "feet-hour", title: "双脚一小时",
+      description: "自觉只用脚输入，完成整整一小时；实体操作方式无法由应用自动证明。",
+      legacyURLNames: ["feetWarrior"],
+      preset: .init(configuration: .timed(seconds: 3_600), quoteID: nil, customText: nil),
+      requirements: .init(minimumDuration: 3_600,
+        configuration: .init(mode: .time, duration: 3_600)), dailyEligible: false
+    ),
+    .init(
+      id: "inverted-keyboard-minute", title: "倒置键盘一分钟",
+      description: "自觉倒置实体键盘输入，完整练习一分钟并达到至少 60 WPM；应用无法证明键盘朝向。",
+      legacyURLNames: ["upsideDown"],
+      preset: .init(configuration: .timed(seconds: 60), quoteID: nil, customText: nil),
+      requirements: .init(wpm: .minimum(60), minimumDuration: 60,
+        configuration: .init(mode: .time, duration: 60)), dailyEligible: false
+    ),
     .init(
       id: "one-handed-bandit", title: "单手万词",
       description: "任选内置键盘布局的左手或右手词表；一小时与一万词，先到即结束。",

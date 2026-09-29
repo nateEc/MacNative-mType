@@ -4,6 +4,46 @@ import XCTest
 @testable import Typebar
 
 final class OfficialChallengeCoverageTests: XCTestCase {
+  func testPhysicalTechniqueChallengesKeepReferenceDurationsAndHonestScoring() throws {
+    let cases: [(String, TimeInterval, Int?)] = [
+      ("thumbWarrior", 3_600, nil),
+      ("feetWarrior", 3_600, nil),
+      ("upsideDown", 60, 60),
+    ]
+    let start = Date(timeIntervalSince1970: 100)
+    for (legacyName, seconds, minimumWpm) in cases {
+      let challenge = try officialChallenge(legacyName)
+      XCTAssertEqual(challenge.preset.configuration.mode, .time, legacyName)
+      XCTAssertEqual(challenge.preset.configuration.duration, seconds, legacyName)
+      XCTAssertEqual(challenge.requirements.minimumDuration, seconds, legacyName)
+      XCTAssertEqual(challenge.requirements.configuration?.duration, seconds, legacyName)
+      XCTAssertEqual(challenge.requirements.wpm, minimumWpm.map(ChallengeMetricRequirement.minimum), legacyName)
+      XCTAssertTrue(challenge.description.contains("自觉"), legacyName)
+
+      func result(configuration: TestConfiguration, elapsed: TimeInterval, wpm: Int)
+        -> CompletedTestResult {
+        .init(id: UUID(), configuration: configuration, outcome: .completed,
+          startedAt: start, finishedAt: start.addingTimeInterval(elapsed),
+          typedCharacterCount: 200, correctCharacterCount: 200, errorCount: 0,
+          wpm: wpm, rawWpm: wpm, accuracy: 100)
+      }
+      XCTAssertTrue(ChallengeEvaluator.evaluate(result(
+        configuration: challenge.preset.configuration, elapsed: seconds,
+        wpm: minimumWpm ?? 40), challenge: challenge).passed, legacyName)
+      XCTAssertFalse(ChallengeEvaluator.evaluate(result(
+        configuration: challenge.preset.configuration, elapsed: seconds - 1,
+        wpm: minimumWpm ?? 40), challenge: challenge).passed, legacyName)
+      XCTAssertFalse(ChallengeEvaluator.evaluate(result(
+        configuration: .timed(seconds: seconds + 60), elapsed: seconds + 60,
+        wpm: minimumWpm ?? 40), challenge: challenge).passed, legacyName)
+      if let minimumWpm {
+        XCTAssertFalse(ChallengeEvaluator.evaluate(result(
+          configuration: challenge.preset.configuration, elapsed: seconds,
+          wpm: minimumWpm - 1), challenge: challenge).passed, legacyName)
+      }
+    }
+  }
+
   func testOneHandedChallengeBuildsLayoutSpecificSourceAndDualLimit() throws {
     for side in OneHandedChallengeSide.allCases {
       let selection = OneHandedChallengeSelection(layout: .ansiQwerty, side: side)
@@ -87,7 +127,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 42)
+    XCTAssertEqual(mapped.count, 45)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
