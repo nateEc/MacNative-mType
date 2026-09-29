@@ -4,6 +4,48 @@ import XCTest
 @testable import Typebar
 
 final class OfficialChallengeCoverageTests: XCTestCase {
+  func testJollyNativeScriptRequiresFull86WordsAndSeventyWPM() throws {
+    let challenge = try officialChallenge("jolly")
+    let source = try XCTUnwrap(challenge.preset.customText)
+    let configuration = challenge.preset.configuration
+    XCTAssertEqual(source.split(whereSeparator: \.isWhitespace).count, 86)
+    XCTAssertEqual(configuration.mode, .custom)
+    XCTAssertEqual(configuration.customTextCompletion, .finish)
+    XCTAssertEqual(configuration.customTextOrdering, .inOrder)
+    XCTAssertEqual(challenge.requirements.wpm, .minimum(70))
+    XCTAssertEqual(challenge.requirements.exactPrompt, source)
+
+    let start = Date(timeIntervalSince1970: 100)
+    var session = TestSessionFactory.make(
+      configuration: configuration.with(challengeID: challenge.id), customText: source)
+    session.insertBatch(String(source.prefix(10)), at: start)
+    session.insertBatch(String(source.dropFirst(10)), at: start.addingTimeInterval(1))
+    let completed = try XCTUnwrap(session.result())
+    XCTAssertEqual(completed.outcome, .completed)
+    XCTAssertEqual(completed.prompt, source)
+    XCTAssertTrue(ChallengeEvaluator.evaluate(completed, challenge: challenge).passed)
+
+    func result(_ configuration: TestConfiguration, prompt: String, wpm: Int) -> CompletedTestResult {
+      .init(id: UUID(), configuration: configuration, outcome: .completed,
+        startedAt: start, finishedAt: start.addingTimeInterval(60),
+        typedCharacterCount: source.count, correctCharacterCount: source.count,
+        errorCount: 0, wpm: wpm, rawWpm: wpm, accuracy: 100, prompt: prompt)
+    }
+    XCTAssertTrue(ChallengeEvaluator.evaluate(
+      result(configuration, prompt: source, wpm: 70), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(configuration, prompt: source, wpm: 69), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(configuration, prompt: "other text", wpm: 100), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(.words(86), prompt: source, wpm: 100), challenge: challenge).passed)
+    let looping = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 86, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(
+      result(looping, prompt: source, wpm: 100), challenge: challenge).passed)
+  }
+
   func testPhysicalTechniqueChallengesKeepReferenceDurationsAndHonestScoring() throws {
     let cases: [(String, TimeInterval, Int?)] = [
       ("thumbWarrior", 3_600, nil),
@@ -127,7 +169,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 45)
+    XCTAssertEqual(mapped.count, 46)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)

@@ -56,6 +56,7 @@ enum ChallengeMetricRequirement: Equatable {
 
 struct ChallengeConfigurationRequirements: Equatable {
   var mode: TestMode?
+  var customTextCompletion: CustomTextCompletion?
   var duration: TimeInterval?
   var language: TypingLanguage?
   var difficulty: Difficulty?
@@ -115,6 +116,9 @@ struct ChallengeRequirements: Equatable {
   private func configurationSummary(_ required: ChallengeConfigurationRequirements) -> String {
     var parts: [String] = []
     if let mode = required.mode { parts.append("模式 \(mode.displayName)") }
+    if let completion = required.customTextCompletion {
+      parts.append("完成方式 \(completion.displayName)")
+    }
     if let duration = required.duration { parts.append("计时 \(Int(duration)) 秒") }
     if let language = required.language { parts.append("语言 \(language.rawValue)") }
     if let difficulty = required.difficulty { parts.append("难度 \(difficulty.rawValue)") }
@@ -297,6 +301,11 @@ enum ChallengeEvaluator {
   ) {
     if let expected = required.mode, actual.mode.rawValue != expected.rawValue {
       failures.append("模式需要为 \(expected.displayName)（本次 \(actual.mode.displayName)）")
+    }
+    if let expected = required.customTextCompletion,
+      actual.customTextCompletion != expected
+    {
+      failures.append("完成方式需要为 \(expected.displayName)")
     }
     if let expected = required.duration, actual.duration != expected {
       failures.append("计时需要为 \(Int(expected)) 秒（本次 \(actual.duration.map { String(Int($0)) } ?? "未知")）")
@@ -495,6 +504,16 @@ enum TypebarChallengeLibrary {
     "By morning the lamps faded and the workshop remembered another patient night beneath a pale sky",
   ].joined(separator: " ")
 
+  /// An original 86-word story; it never embeds the reference challenge asset.
+  private static let winterStationScript =
+    "On the coldest evening of the year, a small station kept its lamps awake. "
+    + "Travelers arrived with paper maps, warm scarves, and stories from distant roads. "
+    + "The night clerk offered warm tea, then pinned a bright note beside the timetable: "
+    + "every journey deserves a kind welcome. Outside, snow covered the quiet platform, "
+    + "but inside, strangers shared seats and helped one another find the next train. "
+    + "When morning finally reached the windows, they left with lighter bags, steady "
+    + "hands, and the simple promise to meet again someday."
+
   static let all: [TypebarChallenge] = [
     .init(
       id: "thumb-hour", title: "拇指一小时",
@@ -554,6 +573,21 @@ enum TypebarChallengeLibrary {
         requiredCustomWordLimit: 77,
         exactPrompt: TestModifierPolicy.transformed(
           robotLogScript, modifiers: [.noSpaces], language: .english)),
+      dailyEligible: false
+    ),
+    .init(
+      id: "winter-station",
+      title: "冬夜车站",
+      description: "完整输入 Typebar 自写的 86 词短篇，达到至少 70 WPM。",
+      legacyURLNames: ["jolly"],
+      preset: .init(configuration: .init(
+        mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+        rules: .init(), customTextCompletion: .finish),
+        quoteID: nil, customText: winterStationScript),
+      requirements: .init(
+        wpm: .minimum(70),
+        configuration: .init(mode: .custom, customTextCompletion: .finish),
+        exactPrompt: winterStationScript),
       dailyEligible: false
     ),
     .init(
