@@ -622,6 +622,7 @@ private struct ActiveLongSavedText: Equatable {
   let title: String
   let text: String
   var progress: Int
+  let continuous: Bool
 
   var remainingText: String {
     LongSavedTextProgress.remainingText(in: text, after: progress)
@@ -1901,7 +1902,7 @@ private struct ContentView: View {
               .foregroundStyle(.secondary)
             if let activeLongSavedText {
               Label(
-                "继续长文本：\(activeLongSavedText.title) · \(LongSavedTextProgress.progressLabel(in: activeLongSavedText.text, offset: activeLongSavedText.progress))",
+                "\(activeLongSavedText.continuous ? "连续剩余文本" : "分段继续")：\(activeLongSavedText.title) · \(LongSavedTextProgress.progressLabel(in: activeLongSavedText.text, offset: activeLongSavedText.progress))",
                 systemImage: "book.closed")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -3264,6 +3265,8 @@ private struct ContentView: View {
     session = TestSessionFactory.make(
       configuration: configuration,
       customText: customText,
+      finiteTextSource: activeLongSavedText?.continuous == true
+        ? activeLongSavedText?.remainingText : nil,
       quote: selectedQuote,
       weakSpotScores: weakSpotScores
     )
@@ -3381,7 +3384,7 @@ private struct ContentView: View {
     }
   }
 
-  private func loadSavedCustomText(_ selection: SavedCustomTextSelection) {
+  private func loadSavedCustomText(_ selection: SavedCustomTextSelection, continuous: Bool) {
     guard selectMode(.custom) else { return }
     guard selection.isLong else {
       activeLongSavedText = nil
@@ -3396,7 +3399,8 @@ private struct ContentView: View {
       progress = 0
     }
     let active = ActiveLongSavedText(
-      id: selection.id, title: selection.title, text: selection.text, progress: progress)
+      id: selection.id, title: selection.title, text: selection.text,
+      progress: progress, continuous: continuous)
     activeLongSavedText = active
     customText = active.currentChunk
     customTextCompletion = .finish
@@ -3440,7 +3444,7 @@ private struct ContentView: View {
     let nextProgress: Int
     switch outcome {
     case .completed:
-      nextProgress = LongSavedTextProgress.offsetAfterCompletingChunk(
+      nextProgress = active.continuous ? 0 : LongSavedTextProgress.offsetAfterCompletingChunk(
         in: active.text, from: active.progress)
     case .bailedOut, .failed, .invalidAFK:
       nextProgress = LongSavedTextProgress.advancedOffset(

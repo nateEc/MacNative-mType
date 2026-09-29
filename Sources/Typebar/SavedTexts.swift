@@ -151,7 +151,7 @@ struct SavedTextsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \SavedCustomTextRecord.createdAt, order: .reverse) private var savedTexts: [SavedCustomTextRecord]
 
-    let onUse: (SavedCustomTextSelection) -> Void
+    let onUse: (SavedCustomTextSelection, Bool) -> Void
     private let tombstones = SavedTextTombstoneStore()
     @State private var importingLongText = false
     @State private var showingImportError = false
@@ -185,6 +185,12 @@ struct SavedTextsView: View {
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                             Spacer()
+                                            Button("连续输入剩余文本") {
+                                                onUse(item.selection, true)
+                                                dismiss()
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.small)
                                             Button("重置进度") { resetProgress(for: item) }
                                                 .buttonStyle(.bordered)
                                                 .controlSize(.small)
@@ -222,7 +228,7 @@ struct SavedTextsView: View {
 
     private func savedTextButton(_ item: SavedCustomTextRecord) -> some View {
         Button {
-            onUse(item.selection)
+            onUse(item.selection, false)
             dismiss()
         } label: {
             VStack(alignment: .leading, spacing: 5) {

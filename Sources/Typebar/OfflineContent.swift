@@ -5169,6 +5169,7 @@ struct TestSessionFactory {
   static func make(
     configuration: TestConfiguration,
     customText: String = "",
+    finiteTextSource: String? = nil,
     quote: OfflineQuote? = nil,
     streamPrompt: String? = nil,
     streamNoSpaceBoundarySource: String? = nil,
@@ -5192,6 +5193,7 @@ struct TestSessionFactory {
     var randomCustomSourceTokens: [String] = []
     var randomCustomPreviousWords: [String] = []
     var sequentialCustomWordStream: CustomSequentialWordStream?
+    var finiteCustomTextStream: CustomFiniteTextStream?
     let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -5253,7 +5255,13 @@ struct TestSessionFactory {
             return length
           }
         } else {
-          if streamsSequentialCustomText,
+          if configuration.customTextCompletion == .finish,
+            let finiteTextSource,
+            var stream = CustomFiniteTextStream(source: finiteTextSource)
+          {
+            prompt = stream.nextChunk()
+            finiteCustomTextStream = stream
+          } else if streamsSequentialCustomText,
             var stream = CustomSequentialWordStream(
               source: source, ordering: configuration.customTextOrdering)
           {
@@ -5316,6 +5324,7 @@ struct TestSessionFactory {
       randomCustomSourceTokens: streamsRandomCustomText ? randomCustomSourceTokens : nil,
       randomCustomPreviousWords: randomCustomPreviousWords,
       sequentialCustomWordStream: sequentialCustomWordStream,
+      finiteCustomTextStream: finiteCustomTextStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeats ? noSpaceWordLengths : [],
@@ -5350,6 +5359,30 @@ struct TestSessionFactory {
     case .quote, .zen, .custom:
       return nil
     }
+  }
+}
+
+/// A finite, user-owned text cursor. It does not cycle at EOF and keeps the
+/// source's exact whitespace and punctuation across prompt extensions.
+struct CustomFiniteTextStream {
+  private let source: String
+  private var offset = 0
+
+  init?(source: String) {
+    guard source.count > CustomTextPolicy.maximumLength,
+      source.first?.isWhitespace == false,
+      CustomTextPolicy.isValidSavedText(title: "Long text", text: source, longProgress: 0)
+    else { return nil }
+    self.source = source
+  }
+
+  var hasRemaining: Bool { offset < source.count }
+
+  mutating func nextChunk() -> String {
+    guard hasRemaining else { return "" }
+    let chunk = LongSavedTextProgress.nextChunk(in: source, after: offset)
+    offset += chunk.count
+    return chunk
   }
 }
 

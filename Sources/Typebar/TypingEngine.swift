@@ -3370,6 +3370,8 @@ struct TypingSession {
   private let initialRandomCustomPreviousWords: [String]
   private var sequentialCustomWordStream: CustomSequentialWordStream?
   private let initialSequentialCustomWordStream: CustomSequentialWordStream?
+  private var finiteCustomTextStream: CustomFiniteTextStream?
+  private let initialFiniteCustomTextStream: CustomFiniteTextStream?
   private let sectionEndIndices: [Int]
   /// In no-space tests, the reference product still commits each source word
   /// when its final character is entered. Keep those boundaries separately:
@@ -3439,6 +3441,7 @@ struct TypingSession {
     sectionEndIndices: [Int] = [], randomCustomSourceTokens: [String]? = nil,
     randomCustomPreviousWords: [String] = [],
     sequentialCustomWordStream: CustomSequentialWordStream? = nil,
+    finiteCustomTextStream: CustomFiniteTextStream? = nil,
     noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
     repeatingNoSpaceTargetWords: [String] = []
@@ -3456,6 +3459,8 @@ struct TypingSession {
     self.initialRandomCustomPreviousWords = randomCustomPreviousWords
     self.sequentialCustomWordStream = sequentialCustomWordStream
     self.initialSequentialCustomWordStream = sequentialCustomWordStream
+    self.finiteCustomTextStream = finiteCustomTextStream
+    self.initialFiniteCustomTextStream = finiteCustomTextStream
     self.sectionEndIndices = sectionEndIndices
     self.noSpaceWordEndIndices = noSpaceWordEndIndices
     self.initialNoSpaceWordEndIndices = noSpaceWordEndIndices
@@ -3475,6 +3480,7 @@ struct TypingSession {
       randomCustomSourceTokens: randomCustomSourceTokens,
       randomCustomPreviousWords: initialRandomCustomPreviousWords,
       sequentialCustomWordStream: initialSequentialCustomWordStream,
+      finiteCustomTextStream: initialFiniteCustomTextStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
@@ -3485,7 +3491,7 @@ struct TypingSession {
   var hasStarted: Bool { startedAt != nil }
   var usesIncrementalPromptExtension: Bool {
     repeatingPrompt?.isEmpty == false || randomCustomSourceTokens?.isEmpty == false
-      || sequentialCustomWordStream != nil
+      || sequentialCustomWordStream != nil || finiteCustomTextStream?.hasRemaining == true
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
   var typedCharacterCount: Int { typed.count }
@@ -4126,6 +4132,11 @@ struct TypingSession {
       // the upcoming target visible immediately after its final character.
       extendPromptIfNeeded()
     }
+    if finiteCustomTextStream?.hasRemaining == true,
+      nextTargetIndex >= promptCharacters.count
+    {
+      extendPromptIfNeeded()
+    }
     finishIfNeeded(at: date)
   }
 
@@ -4348,7 +4359,8 @@ struct TypingSession {
     // explicitly enables strict space or a hard delete rule needs the key to
     // reach its own recovery path. Other difficulties keep the key as a
     // correctable input error instead of silently skipping it.
-    if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator {
+    if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator,
+      promptCharacters[currentTargetIndex] != " " {
       return false
     }
     beginIfNeeded(at: date)
@@ -5123,7 +5135,11 @@ struct TypingSession {
     case .custom:
       switch configuration.customTextCompletion {
       case .finish:
-        if shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
+        if !usesIncrementalPromptExtension
+          && (typed == prompt || shouldFinishFiniteSpaceDelimitedTest)
+        {
+          complete(at: date)
+        }
       case .time:
         break
       case .words:
@@ -5142,6 +5158,27 @@ struct TypingSession {
 
   private mutating func extendPromptIfNeeded() {
     guard nextTargetIndex >= promptCharacters.count else { return }
+    if var stream = finiteCustomTextStream, stream.hasRemaining {
+      let source = stream.nextChunk()
+      finiteCustomTextStream = stream
+      let chunk = configuration.language.presentationText(
+        TestModifierPolicy.transformed(
+          source, modifiers: configuration.modifiers, language: configuration.language))
+      let previousEnd = promptCharacters.count
+      appendPrompt(chunk)
+      if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+        let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
+          source: source, language: configuration.language,
+          modifiers: configuration.modifiers, transformedPrompt: chunk)
+        var end = previousEnd
+        for length in lengths {
+          end += length
+          noSpaceWordEndIndices.append(end)
+        }
+        noSpaceTargetWords += NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: chunk)
+      }
+      return
+    }
     if let randomCustomSourceTokens, !randomCustomSourceTokens.isEmpty {
       let words = CustomTextOrderPolicy.randomWords(
         from: randomCustomSourceTokens,
