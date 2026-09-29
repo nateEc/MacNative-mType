@@ -11298,7 +11298,8 @@ enum StarterLexicon {
   static func prompt(
     wordCount: Int, language: TypingLanguage, englishVariant: EnglishVariant = .american,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
-    contentOptions: ContentOptions, usesZipfFrequency: Bool = false
+    contentOptions: ContentOptions, usesZipfFrequency: Bool = false,
+    polyglotRandom: () -> Double = { Double.random(in: 0..<1) }
   ) -> String {
     let count = max(1, wordCount)
     if language.isCodeLanguage {
@@ -12551,13 +12552,26 @@ enum StarterLexicon {
       let pool = PolyglotWordPool(sources: sources)
       guard pool.count > 0 else { return "" }
       let permutation = usesZipfFrequency ? pool.zipfPermutation() : (offset: 0, step: 1)
+      var recentWords: [String] = []
       return (0..<count).map { index in
-        let selected = pool.index(
-          for: Double.random(in: 0..<1), zipf: usesZipfFrequency,
+        var selected = pool.index(
+          for: polyglotRandom(), zipf: usesZipfFrequency,
           offset: permutation.offset, step: permutation.step)
-        let entry = pool.entry(at: selected)
+        var entry = pool.entry(at: selected)
+        var redraws = 0
+        while redraws < 100 && recentWords.contains(entry.word.lowercased()) {
+          redraws += 1
+          selected = pool.index(
+            for: polyglotRandom(), zipf: usesZipfFrequency,
+            offset: permutation.offset, step: permutation.step)
+          entry = pool.entry(at: selected)
+        }
+        let rawWord = contentOptions.includeNumbers && index.isMultiple(of: 9)
+          ? String(index / 9 + 1) : entry.word
+        recentWords.append(rawWord.lowercased())
+        if recentWords.count > 2 { recentWords.removeFirst() }
         if contentOptions.includeNumbers, index.isMultiple(of: 9) {
-          return String(index / 9 + 1)
+          return rawWord
         }
         if contentOptions.includePunctuation, index.isMultiple(of: 7) {
           return entry.word + entry.punctuation[index / 7 % entry.punctuation.count]

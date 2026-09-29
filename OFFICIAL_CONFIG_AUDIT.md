@@ -182,7 +182,7 @@
 | `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。命令面板另按固定名称提供 48 项切换与 `none` 清除入口；`weakspot` 为实时选词修饰器，多语路由到 Typebar 原生工作流，持久化弱项分析保持独立入口。 |
 | `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
-| `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并合并为虚拟词池，普通词频从合并池均匀抽取，Zipf 词频从合并池偏向低位抽取；不强制按语言轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。与参考的具体词表、跨语言同形词去重及随机序列不承诺一致。新建或缺失／无效配置采用参考默认的 English、Spanish、French、German 四项；已有明确保存的旧 153 项组合继续原样加载，不强制迁移。 |
+| `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并合并为虚拟词池，普通词频从合并池均匀抽取，Zipf 词频从合并池偏向低位抽取；与前两词重复时最多重抽 100 次，不强制按语言轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。与参考的具体词表、跨语言同形词去重及随机序列不承诺一致。新建或缺失／无效配置采用参考默认的 English、Spanish、French、German 四项；已有明确保存的旧 153 项组合继续原样加载，不强制迁移。 |
 | `freedomMode` | `freedomMode` | 已映射。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
 | `oppositeShiftMode` | `oppositeShiftMode` | 已映射。 |

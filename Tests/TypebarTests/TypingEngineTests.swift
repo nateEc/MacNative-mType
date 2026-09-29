@@ -17063,6 +17063,39 @@ final class TypingEngineTests: XCTestCase {
       "The reference samples a pooled wordset; language choice must not be forced to alternate")
   }
 
+  func testPolyglotRedrawsWordsUsedInThePreviousTwoPositions() {
+    let englishCount = StarterLexicon.words.count
+    let total = Double(englishCount + StarterLexicon.yiddishWords.count)
+    let unitValues = [0.5, 0.5, Double(englishCount) + 0.5,
+                      Double(englishCount) + 0.5, 0.5, 1.5].map { $0 / total }
+    var draws = 0
+    let prompt = StarterLexicon.prompt(
+      wordCount: 3, language: .mixedLanguages,
+      mixedLanguageComponents: [.english, .yiddish], contentOptions: ContentOptions(),
+      polyglotRandom: {
+        defer { draws += 1 }
+        return unitValues[min(draws, unitValues.count - 1)]
+      })
+    XCTAssertEqual(
+      prompt.split(separator: " ").map(String.init),
+      [StarterLexicon.words[0], StarterLexicon.yiddishWords[0], StarterLexicon.words[1]])
+    XCTAssertEqual(draws, 6, "Repeated candidates should be redrawn before output")
+  }
+
+  func testPolyglotRedrawsStopAfterOneHundredAttemptsForDegenerateSelection() {
+    var draws = 0
+    let prompt = StarterLexicon.prompt(
+      wordCount: 3, language: .mixedLanguages,
+      mixedLanguageComponents: [.english, .yiddish], contentOptions: ContentOptions(),
+      polyglotRandom: {
+        draws += 1
+        return 0
+      })
+    XCTAssertEqual(prompt.split(separator: " ").map(String.init),
+                   Array(repeating: StarterLexicon.words[0], count: 3))
+    XCTAssertEqual(draws, 203, "A degenerate random stream must not hang generation")
+  }
+
   func testPolyglotVirtualPoolWeightsWordsBySourceSizeAndKeepsLargeSourcesLazy() {
     var requestedIndices: [Int] = []
     let large = IndexedLexicon(count: 450_029) { index in
