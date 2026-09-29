@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 33)
+    XCTAssertEqual(mapped.count, 36)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -168,6 +168,34 @@ final class OfficialChallengeCoverageTests: XCTestCase {
         at: start.addingTimeInterval(Double(index) * 0.1))
     }
     XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
+  func testRepeatedWordEnduranceChallengeFamilyKeepsOfficialWordCounts() throws {
+    for (name, count) in [
+      ("simp", 1_000),
+      ("trueSimp", 10_000),
+      ("simpLord", 100_000),
+    ] {
+      let challenge = try officialChallenge(name)
+      let configuration = challenge.preset.configuration
+      XCTAssertEqual(configuration.mode, .custom, name)
+      XCTAssertEqual(configuration.customTextCompletion, .words, name)
+      XCTAssertEqual(configuration.customTextOrdering, .inOrder, name)
+      XCTAssertEqual(configuration.wordLimit, count, name)
+      XCTAssertEqual(challenge.preset.customText, "typebar", name)
+      XCTAssertNil(challenge.requirements.wpm, name)
+      XCTAssertFalse(challenge.dailyEligible, name)
+
+      var session = TestSessionFactory.make(
+        configuration: configuration.with(challengeID: challenge.id),
+        customText: try XCTUnwrap(challenge.preset.customText))
+      XCTAssertTrue(session.usesIncrementalPromptExtension, name)
+      XCTAssertLessThan(session.prompt.count, 100, name)
+      session.insert("typebar typebar ", at: Date(timeIntervalSince1970: 100))
+      XCTAssertEqual(session.completedWordCount, 2, name)
+      XCTAssertFalse(session.isFinished, name)
+      XCTAssertTrue(session.prompt.hasPrefix("typebar typebar typebar"), name)
+    }
   }
 
   func testFiniteRandomCustomWordsDoNotCycleAnInitialChunk() {

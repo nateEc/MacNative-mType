@@ -511,6 +511,15 @@ enum TypebarChallengeLibrary {
     repeatedWordChallenge("developd", id: "develop-thousand", title: "千词重复",
       description: "重复同一个常见英语词一千次。",
       word: "develop", count: 1_000, minimumWPM: nil),
+    repeatedWordChallenge("simp", id: "single-word-thousand", title: "单词千次",
+      description: "重复输入 Typebar 自有练习词一千次。",
+      word: "typebar", count: 1_000, minimumWPM: nil),
+    repeatedWordChallenge("trueSimp", id: "single-word-ten-thousand", title: "单词万次",
+      description: "重复输入 Typebar 自有练习词一万次。",
+      word: "typebar", count: 10_000, minimumWPM: nil),
+    repeatedWordChallenge("simpLord", id: "single-word-hundred-thousand", title: "单词十万次",
+      description: "重复输入 Typebar 自有练习词十万次。",
+      word: "typebar", count: 100_000, minimumWPM: nil),
   ]
 
   private static func repeatedWordChallenge(

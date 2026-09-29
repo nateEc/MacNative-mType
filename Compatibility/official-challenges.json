@@ -100,13 +100,13 @@
     "iveGotThePower": "power-ten",
     "developd": "develop-thousand",
     "speedSpacer": "alphabet-random-hundred",
-    "beLikeWater": "three-layout-flow"
+    "beLikeWater": "three-layout-flow",
+    "simp": "single-word-thousand",
+    "trueSimp": "single-word-ten-thousand",
+    "simpLord": "single-word-hundred-thousand"
   },
   "pending": [
-    "trueSimp",
     "bigramSalad",
-    "simp",
-    "simpLord",
     "whatsThisWebsiteCalledAgain",
     "inAGalaxyFarFarAway",
     "beepBoop",
