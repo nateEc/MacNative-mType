@@ -3336,6 +3336,7 @@ struct TypingSession {
   private(set) var prompt: String
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
+  private var promptWordCount: Int
   private let initialPrompt: String
   private let repeatingPrompt: String?
   private let randomCustomSourceTokens: [String]?
@@ -3357,6 +3358,9 @@ struct TypingSession {
   private let repeatingNoSpaceWordLengths: [Int]
   private let repeatingNoSpaceTargetWords: [String]
   private(set) var typed = ""
+  /// ASCII input keeps one grapheme per accepted key. Retain the full-string
+  /// burst path after any non-ASCII input, even if it is later deleted.
+  private var typedHasNonASCII = false
   /// Each accepted input character keeps the target position it advanced to.
   /// A word can be submitted early with space, so this cannot always be
   /// inferred from the input string's character offset.
@@ -3404,8 +3408,9 @@ struct TypingSession {
     self.configuration = configuration
     self.prompt = prompt
     self.promptCharacters = Array(prompt)
-    self.requiredWordStartIndex = Self.wordStartIndex(
-      configuration.wordLimit, in: self.promptCharacters)
+    let wordProgress = Self.wordProgress(configuration.wordLimit, in: self.promptCharacters)
+    self.requiredWordStartIndex = wordProgress.startIndex
+    self.promptWordCount = wordProgress.count
     self.initialPrompt = prompt
     self.repeatingPrompt = repeatingPrompt
     self.randomCustomSourceTokens = randomCustomSourceTokens
@@ -3919,12 +3924,16 @@ struct TypingSession {
     }
     let targetCharacters = promptCharacters
     let typedCharacters = Array(typed)
-    let committed = targetCharacters.indices.filter { targetIndex in
-      guard isPromptWordSeparator(targetCharacters[targetIndex]),
-        let typedIndex = typedTargetIndices.firstIndex(where: { $0 == targetIndex })
-      else { return false }
-      return isPromptWordSeparator(typedCharacters[typedIndex])
-    }.count
+    var seenSeparatorTargets = Set<Int>()
+    var committed = 0
+    for (typedIndex, targetIndex) in typedTargetIndices.enumerated() {
+      guard let targetIndex, targetCharacters.indices.contains(targetIndex),
+        typedCharacters.indices.contains(typedIndex),
+        isPromptWordSeparator(targetCharacters[targetIndex]),
+        seenSeparatorTargets.insert(targetIndex).inserted
+      else { continue }
+      if isPromptWordSeparator(typedCharacters[typedIndex]) { committed += 1 }
+    }
     if outcome == .completed, configuration.mode == .custom,
       configuration.customTextCompletion == .words,
       let lastTyped = typedCharacters.last, !isPromptWordSeparator(lastTyped)
@@ -4532,9 +4541,20 @@ struct TypingSession {
   }
 
   private mutating func recordWordBurstIfCommitted() {
+    guard typed.last.map(isPromptWordSeparator) == true else { return }
+    if !typedHasNonASCII {
+      let end = typedCharacterDates.count - 1
+      let wordLength = typed.reversed().dropFirst()
+        .prefix { !isPromptWordSeparator($0) }.count
+      let start = end - wordLength
+      guard start >= 0, start < end else { return }
+      let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
+      guard elapsed > 0 else { return }
+      committedWordBursts.append(wpm(characters: end - start + 1, seconds: elapsed))
+      return
+    }
     let characters = Array(typed)
-    guard characters.last.map(isPromptWordSeparator) == true,
-      typedCharacterDates.count == characters.count
+    guard typedCharacterDates.count == characters.count
     else { return }
     let end = characters.count - 1
     var start = 0
@@ -4783,8 +4803,9 @@ struct TypingSession {
     _ character: Character, targetIndex: Int?, forceError: Bool = false,
     countsAsExtraError: Bool = false, at date: Date
   ) {
-    let typedIndex = typed.count
+    let typedIndex = typedHasNonASCII ? typed.count : typedTargetIndices.count
     typed.append(character)
+    if !character.isASCII { typedHasNonASCII = true }
     typedTargetIndices.append(targetIndex)
     typedCharacterDates.append(date)
     if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
@@ -5098,27 +5119,52 @@ struct TypingSession {
   }
 
   private mutating func appendPrompt(_ chunk: String) {
+    let startsWithSeparator = chunk.first.map(isPromptWordSeparator) == true
+      && !(prompt.last == "\r" && chunk.first == "\n")
+    let previousCount = promptCharacters.count
     prompt += chunk
-    // Re-segment the complete string: a chunk can begin with a combining
-    // scalar that joins the final Character of the existing prompt.
+    if startsWithSeparator {
+      // An explicit word separator breaks the grapheme boundary with the
+      // previous chunk. Only the new characters need word-boundary scanning.
+      var afterSeparator = true
+      for (offset, character) in chunk.enumerated() {
+        promptCharacters.append(character)
+        if isPromptWordSeparator(character) {
+          afterSeparator = true
+        } else if afterSeparator {
+          promptWordCount += 1
+          if promptWordCount == configuration.wordLimit {
+            requiredWordStartIndex = previousCount + offset
+          }
+          afterSeparator = false
+        }
+      }
+      return
+    }
+    // A chunk may begin with a combining scalar that joins the final
+    // Character of the existing prompt; re-segment and rescan in that case.
     promptCharacters = Array(prompt)
-    requiredWordStartIndex = Self.wordStartIndex(configuration.wordLimit, in: promptCharacters)
+    let wordProgress = Self.wordProgress(configuration.wordLimit, in: promptCharacters)
+    requiredWordStartIndex = wordProgress.startIndex
+    promptWordCount = wordProgress.count
   }
 
-  private static func wordStartIndex(_ wordLimit: Int?, in characters: [Character]) -> Int? {
-    guard let wordLimit, wordLimit > 0 else { return nil }
+  private static func wordProgress(
+    _ wordLimit: Int?, in characters: [Character]
+  ) -> (count: Int, startIndex: Int?) {
     var word = 0
     var afterSeparator = true
+    var requiredStart: Int?
     for index in characters.indices {
       if isPromptWordSeparator(characters[index]) {
         afterSeparator = true
       } else if afterSeparator {
         word += 1
-        if word == wordLimit { return index }
+        if word == wordLimit { requiredStart = index }
         afterSeparator = false
       }
     }
-    return nil
+    return (word, requiredStart)
   }
 
   private var reachedConfiguredWordLimit: Bool {

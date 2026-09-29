@@ -151,6 +151,33 @@ final class CustomSequentialStreamingTests: XCTestCase {
     XCTAssertEqual(session.result()?.outcome, .completed)
   }
 
+  func testFiniteOrderedCustomTextStreamsTenThousandWordsWithoutLosingPosition() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 10_000, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words, customTextOrdering: .inOrder)
+    var session = TestSessionFactory.make(configuration: configuration, customText: "typebar")
+    for word in 0..<10_000 {
+      session.insert(word == 9_999 ? "typebar" : "typebar ", at: start)
+    }
+    XCTAssertEqual(session.completedWordCount, 10_000)
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
+  func testOptionalHundredThousandWordEndurance() throws {
+    try XCTSkipUnless(
+      ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
+      "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 100_000, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words, customTextOrdering: .inOrder)
+    var session = TestSessionFactory.make(configuration: configuration, customText: "typebar")
+    for word in 0..<100_000 {
+      session.insert(word == 99_999 ? "typebar" : "typebar ", at: start)
+    }
+    XCTAssertEqual(session.completedWordCount, 100_000)
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
   func testPromptCacheResegmentsCombiningCharacterAcrossRepeatedChunk() {
     let configuration = TestConfiguration(
       mode: .custom, duration: 120, wordLimit: nil, difficulty: .normal,
@@ -160,6 +187,18 @@ final class CustomSequentialStreamingTests: XCTestCase {
     session.insert("a", at: start)
     XCTAssertEqual(session.prompt, "a\u{301}b")
     XCTAssertEqual(session.nextExpectedCharacter, "b")
+  }
+
+  func testPromptCacheAppendsSeparatorThenCombiningCharacter() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: 120, wordLimit: nil, difficulty: .normal,
+      rules: .init(), customTextCompletion: .time)
+    var session = TypingSession(
+      configuration: configuration, prompt: "a", repeatingPrompt: "b\u{301}")
+    session.insert("a", at: start)
+    session.insert(" ", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.prompt, "a b\u{301}")
+    XCTAssertEqual(session.nextExpectedCharacter, "b\u{301}")
   }
 
 }
