@@ -52,9 +52,10 @@ struct LocalWordFilter {
     }
 
     return .success(lexicon.filter { word in
-      let characters = Array(word)
-      if let minimum = criteria.minimumLength, characters.count < minimum { return false }
-      if let maximum = criteria.maximumLength, characters.count > maximum { return false }
+      let length = word.count
+      if let minimum = criteria.minimumLength, length < minimum { return false }
+      if let maximum = criteria.maximumLength, length > maximum { return false }
+      let characters = Array(word.lowercased())
       if criteria.exactCharactersOnly {
         guard characters.allSatisfy(included.contains) else { return false }
       } else {
@@ -68,7 +69,57 @@ struct LocalWordFilter {
   }
 
   private static func characterSet(from value: String) -> Set<Character> {
-    Set(value.filter { !$0.isWhitespace })
+    Set(value.lowercased().filter { !$0.isWhitespace })
+  }
+}
+
+/// Layout-based word-filter presets. The source uses only each key's primary
+/// output, never shifted/Option glyphs or the number row.
+enum LocalWordFilterPreset: String, CaseIterable, Identifiable {
+  case homeKeys
+  case leftHand
+  case rightHand
+  case homeRow
+  case topRow
+  case bottomRow
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .homeKeys: "主键位"
+    case .leftHand: "左手"
+    case .rightHand: "右手"
+    case .homeRow: "中排"
+    case .topRow: "上排"
+    case .bottomRow: "下排"
+    }
+  }
+
+  func criteria(layout: KeyboardLayout) -> LocalWordFilter.Criteria? {
+    let rows = KeyboardGuideModel.rows(for: layout)
+    guard rows.count >= 4 else { return nil }
+    let top = rows[1]
+    let home = rows[2]
+    let bottom = rows[3]
+    let selected: [KeyboardGuideKey]
+    switch self {
+    case .homeKeys:
+      selected = Array(home.prefix(4)) + Array(home.dropFirst(6).prefix(4))
+    case .leftHand:
+      selected = Array(top.prefix(5)) + Array(home.prefix(5)) + Array(bottom.prefix(5))
+    case .rightHand:
+      selected = Array(top.dropFirst(5)) + Array(home.dropFirst(5))
+        + Array(bottom.dropFirst(4))
+    case .homeRow: selected = home
+    case .topRow: selected = top
+    case .bottomRow: selected = bottom
+    }
+    let labels = selected.compactMap { key -> String? in
+      key.label.count == 1 ? key.label : nil
+    }
+    guard !labels.isEmpty else { return nil }
+    return .init(includeCharacters: labels.joined(separator: " "), exactCharactersOnly: true)
   }
 }
 
@@ -76,6 +127,8 @@ struct WordFilterView: View {
   private let onApply: (String, Bool) -> Void
   @Environment(\.dismiss) private var dismiss
   @State private var language: TypingLanguage
+  @State private var layout: KeyboardLayout
+  @State private var preset: LocalWordFilterPreset = .leftHand
   @State private var includeCharacters = ""
   @State private var excludeCharacters = ""
   @State private var minimumLength = ""
@@ -83,8 +136,12 @@ struct WordFilterView: View {
   @State private var regularExpression = ""
   @State private var exactCharactersOnly = false
 
-  init(language: TypingLanguage, onApply: @escaping (String, Bool) -> Void) {
+  init(
+    language: TypingLanguage, layout: KeyboardLayout,
+    onApply: @escaping (String, Bool) -> Void
+  ) {
     _language = State(initialValue: language.supportsLocalWordFilter ? language : .english)
+    _layout = State(initialValue: layout)
     self.onApply = onApply
   }
 
@@ -122,6 +179,24 @@ struct WordFilterView: View {
             }
           }
           Text("仅筛选 Typebar 自创的离线词表；不会下载或导入第三方词表。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+
+        Section("布局预设") {
+          Picker("内置键盘布局", selection: $layout) {
+            ForEach(KeyboardLayout.allCases) { option in
+              Text(option.displayName).tag(option)
+            }
+          }
+          Picker("预设", selection: $preset) {
+            ForEach(LocalWordFilterPreset.allCases) { option in
+              Text(option.title).tag(option)
+            }
+          }
+          Button("应用到筛选条件") { applyPreset() }
+            .disabled(preset.criteria(layout: layout) == nil)
+          Text("预设只采用所选内置布局键位的主字符；自定义或系统输入源仍可手填字符筛选。")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -179,5 +254,13 @@ struct WordFilterView: View {
   private func apply(appending: Bool) {
     onApply(filteredWords.joined(separator: " "), appending)
     dismiss()
+  }
+
+  private func applyPreset() {
+    guard let generated = preset.criteria(layout: layout) else { return }
+    includeCharacters = generated.includeCharacters
+    excludeCharacters = ""
+    regularExpression = ""
+    exactCharactersOnly = true
   }
 }

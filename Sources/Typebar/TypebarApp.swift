@@ -1294,7 +1294,7 @@ private struct ContentView: View {
       SaveCustomTextView(text: customText)
     }
     .sheet(isPresented: $showingWordFilter) {
-      WordFilterView(language: language) { text, appending in
+      WordFilterView(language: language, layout: effectiveKeyboardLayout) { text, appending in
         applyGeneratedCustomText(text, appending: appending)
       }
     }
