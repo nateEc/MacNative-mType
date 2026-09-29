@@ -5,6 +5,20 @@ import XCTest
 @testable import Typebar
 
 final class ReferenceScriptChallengePolicyTests: XCTestCase {
+  func testFixedScriptLengthCountsUnicodeScalarsRatherThanSwiftGraphemes() throws {
+    let normalized = "cafe\u{301} harbor"
+    XCTAssertNotEqual(normalized.count, normalized.unicodeScalars.count)
+    let digest = SHA256.hash(data: Data(normalized.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let specification = ReferenceScriptChallengePolicy.Specification(
+      legacyName: "synthetic", fileName: "synthetic.txt", byteCount: normalized.utf8.count,
+      normalizedCharacterCount: normalized.unicodeScalars.count, normalizedSHA256: digest)
+    XCTAssertEqual(try ReferenceScriptChallengePolicy.verifiedText(
+      Data(normalized.utf8), for: specification), normalized)
+    XCTAssertTrue(ReferenceScriptChallengePolicy.matchesNormalizedPrompt(
+      normalized, for: specification))
+  }
+
   func testUserProvidedScriptMatchesOnlyItsNormalizedPinnedContent() throws {
     let normalized = "amber harbor willow"
     let digest = SHA256.hash(data: Data(normalized.utf8))

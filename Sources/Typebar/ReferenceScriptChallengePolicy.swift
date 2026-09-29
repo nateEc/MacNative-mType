@@ -82,7 +82,7 @@ enum ReferenceScriptChallengePolicy {
       throw ImportError.invalidEncoding
     }
     let text = normalizedText(source)
-    guard text.count == specification.normalizedCharacterCount else {
+    guard text.unicodeScalars.count == specification.normalizedCharacterCount else {
       throw ImportError.contentMismatch
     }
     let digest = SHA256.hash(data: Data(text.utf8))
@@ -118,7 +118,7 @@ enum ReferenceScriptChallengePolicy {
   }
 
   static func matchesNormalizedPrompt(_ prompt: String, for specification: Specification) -> Bool {
-    guard prompt.count == specification.normalizedCharacterCount,
+    guard prompt.unicodeScalars.count == specification.normalizedCharacterCount,
       normalizedText(prompt) == prompt
     else { return false }
     let digest = SHA256.hash(data: Data(prompt.utf8))

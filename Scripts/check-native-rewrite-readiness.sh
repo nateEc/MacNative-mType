@@ -106,7 +106,7 @@ run_check "checking manual acceptance inventory" \
 
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
 run_logged_check "running native client test suite" "$temporary_directory/client-tests.log" \
-  env TYPEBAR_QA_IN_MEMORY_STORE=1 swift test
+  env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_REFERENCE_ROOT="$reference_root" swift test
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"
 run_logged_check "running self-hosted service test suite" "$temporary_directory/service-tests.log" \

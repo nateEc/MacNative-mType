@@ -5,6 +5,43 @@ import XCTest
 @testable import Typebar
 
 final class OfficialChallengeCoverageTests: XCTestCase {
+  func testPinnedReferenceScriptsCompleteNativeChallengeSessions() throws {
+    guard let referenceRoot = ProcessInfo.processInfo.environment["TYPEBAR_REFERENCE_ROOT"] else {
+      throw XCTSkip("Set TYPEBAR_REFERENCE_ROOT to the pinned local reference checkout")
+    }
+    let challengeDirectory = URL(fileURLWithPath: referenceRoot)
+      .appendingPathComponent("frontend/static/challenges", isDirectory: true)
+    let start = Date(timeIntervalSince1970: 100)
+    for specification in ReferenceScriptChallengePolicy.specifications {
+      do {
+        let challenge = try officialChallenge(specification.legacyName)
+        let file = challengeDirectory.appendingPathComponent(specification.fileName)
+        let verified = try ReferenceScriptChallengePolicy.verifiedScript(
+          at: file, for: specification)
+        let configuration = challenge.preset.configuration.with(challengeID: challenge.id)
+        let first = LongSavedTextProgress.nextChunk(in: verified.text, after: 0)
+        var session = TestSessionFactory.make(
+          configuration: configuration, customText: first, verifiedScript: verified)
+        XCTAssertEqual(session.prompt, first, specification.legacyName)
+        session.insertBatch(String(verified.text.prefix(1)), at: start)
+        let finish = start.addingTimeInterval(1)
+        session.insertBatch(String(verified.text.dropFirst()), at: finish)
+        let completed = try XCTUnwrap(session.result(
+          at: finish,
+          challengePresentation: .init(
+            liveSpeedStyle: .off, paceCaretStyle: .off, tapeMode: .off)),
+          specification.legacyName)
+        XCTAssertEqual(completed.outcome, .completed, specification.legacyName)
+        XCTAssertEqual(completed.prompt, verified.text, specification.legacyName)
+        let evaluation = ChallengeEvaluator.evaluate(completed, challenge: challenge)
+        XCTAssertTrue(evaluation.passed,
+          "\(specification.legacyName): \(evaluation.failedRequirements)")
+      } catch {
+        XCTFail("\(specification.legacyName): \(error)")
+      }
+    }
+  }
+
   func testReferenceScriptChallengeRejectsWrongContentIdentityAndTerminalState() throws {
     let text = "amber harbor"
     let digest = SHA256.hash(data: Data(text.utf8))

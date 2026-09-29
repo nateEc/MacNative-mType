@@ -4326,6 +4326,24 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(singleEvent.wordBurstHistory, [nil])
   }
 
+  func testUnicodeCustomTextKeepsGraphemeCountAndBurstAfterBackspace() {
+    let source = "cafe\u{301} harbor"
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(freedomMode: true), customTextCompletion: .finish)
+    var session = TypingSession(configuration: configuration, prompt: source)
+    session.insert("c", at: start)
+    session.insert("afe\u{301} ", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.typedCharacterCount, 5)
+    XCTAssertEqual(session.wordBurstHistory, [60])
+    session.deleteBackward(at: start.addingTimeInterval(1.2))
+    XCTAssertEqual(session.typedCharacterCount, 4)
+    session.insert(" harbor", at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.typed, source)
+    XCTAssertEqual(session.typedCharacterCount, source.count)
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
   func testMissedWordsIncludesOnlyAttemptedIncorrectSpaceDelimitedTargetsWithoutDuplicates() {
     var session = TypingSession(
       configuration: .timed(seconds: 30), prompt: "amber harbor amber quiet")

@@ -3389,6 +3389,9 @@ struct TypingSession {
   /// Most ASCII input keeps one grapheme per accepted key. A non-ASCII key or
   /// a CRLF join requires full-string indexing, even if later deleted.
   private var typedNeedsFullSegmentation = false
+  /// Keep the grapheme length without resegmenting the entire growing input
+  /// after every key in long Unicode custom-text sessions.
+  private var typedGraphemeCount = 0
   private var cachedCommittedWordCount = 0
   private var canUseCachedWordProgress = true
   /// Each accepted input character keeps the target position it advanced to.
@@ -4629,14 +4632,12 @@ struct TypingSession {
       committedWordBursts.append(wpm(characters: end - start + 1, seconds: elapsed))
       return
     }
-    let characters = Array(typed)
-    guard typedCharacterDates.count == characters.count
+    guard typedCharacterDates.count == typedGraphemeCount
     else { return }
-    let end = characters.count - 1
-    var start = 0
-    if end > 0, let separator = characters[..<end].lastIndex(where: isPromptWordSeparator) {
-      start = separator + 1
-    }
+    let end = typedGraphemeCount - 1
+    let wordLength = typed.reversed().dropFirst()
+      .prefix { !isPromptWordSeparator($0) }.count
+    let start = end - wordLength
     guard start < end else { return }
     let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
     guard elapsed > 0 else { return }
@@ -4645,7 +4646,7 @@ struct TypingSession {
 
   private mutating func recordNoSpaceWordBurstIfCommitted() {
     guard let wordIndex = noSpaceCommittedWordIndex,
-      typedCharacterDates.count == typed.count
+      typedCharacterDates.count == typedGraphemeCount
     else { return }
     let start = wordIndex == 0 ? 0 : noSpaceWordEndIndices[wordIndex - 1]
     let end = noSpaceWordEndIndices[wordIndex] - 1
@@ -4879,7 +4880,7 @@ struct TypingSession {
     _ character: Character, targetIndex: Int?, forceError: Bool = false,
     countsAsExtraError: Bool = false, at date: Date
   ) {
-    let typedIndex = typedNeedsFullSegmentation ? typed.count : typedTargetIndices.count
+    let typedIndex = typedGraphemeCount
     let joinsPreviousGrapheme = typed.last == "\r" && character == "\n"
     if !character.isASCII || joinsPreviousGrapheme {
       canUseCachedWordProgress = false
@@ -4898,6 +4899,11 @@ struct TypingSession {
       cachedCommittedWordCount += 1
     }
     typed.append(character)
+    if !character.isASCII || joinsPreviousGrapheme {
+      typedGraphemeCount = typed.count
+    } else {
+      typedGraphemeCount += 1
+    }
     if !character.isASCII || joinsPreviousGrapheme { typedNeedsFullSegmentation = true }
     typedTargetIndices.append(targetIndex)
     typedCharacterDates.append(date)
@@ -4907,7 +4913,7 @@ struct TypingSession {
 
   private mutating func removeLastTypedCharacter() {
     guard !typed.isEmpty else { return }
-    let typedIndex = typed.count - 1
+    let typedIndex = typedGraphemeCount - 1
     let removedCharacter = typed.last
     let targetIndex = typedTargetIndices.popLast() ?? nil
     if canUseCachedWordProgress, let targetIndex,
@@ -4918,6 +4924,7 @@ struct TypingSession {
       cachedCommittedWordCount -= 1
     }
     typed.removeLast()
+    typedGraphemeCount = typedNeedsFullSegmentation ? typed.count : typedGraphemeCount - 1
     typedCharacterDates.removeLast()
     if let targetIndex { forcedErrorIndices.remove(targetIndex) }
     extraErrorTypedIndices.remove(typedIndex)
