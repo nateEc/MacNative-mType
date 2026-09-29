@@ -754,6 +754,7 @@ private struct ContentView: View {
   @State private var showingTestShare = false
   @State private var settingsJSONCommand: SettingsJSONCommandPresentation?
   @State private var showingChallenges = false
+  @State private var showsVirtualKeyboard = false
   @State private var activeChallengeID: String?
   @State private var focusRequest = 0
   @State private var inputHasFocus = false
@@ -843,6 +844,18 @@ private struct ContentView: View {
           keysMode: settings.keyboardGuideKeysMode,
           style: settings.keyboardGuideStyle,
           modifierFlags: keyboardModifierFlags, capsLockEnabled: capsLockEnabled)
+      }
+      if showsVirtualKeyboard {
+        VirtualKeyboard(
+          layout: effectiveKeyboardLayout,
+          overrideRows: effectiveKeyboardGuideOverrideRows,
+          nextCharacter: session.nextExpectedCharacter,
+          accent: activeTheme.accent, panel: activeTheme.panel,
+          allowsNewline: session.configuration.mode == .zen || session.prompt.contains("\n"),
+          allowsTab: session.configuration.mode == .zen || session.prompt.contains("\t"),
+          isEnabled: !session.isFinished,
+          onInsert: { handleInsertedText($0, forceError: false) },
+          onDelete: { session.deleteBackward() })
       }
       controls
       practiceKeyTips
@@ -2075,29 +2088,7 @@ private struct ContentView: View {
         enablesLongTestBailout: quickRestartRequiresProtection,
         finishesOnShiftEnter: session.configuration.mode == .zen,
         onInsert: { text, forceError in
-          let errorsBefore = session.errors
-          let typedCountBefore = session.typed.count
-          session.insertBatch(
-            settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
-            forceError: forceError)
-          emitTypingPowerEffect(
-            isCorrect: session.errors == errorsBefore,
-            acceptedCharacters: session.typed.count - typedCountBefore)
-          if effectiveKeyboardGuideMode == .react, let pressedCharacter = text.last {
-            keyboardGuideFeedbackSequence &+= 1
-            keyboardGuideFeedback = .init(
-              sequence: keyboardGuideFeedbackSequence,
-              character: pressedCharacter,
-              isCorrect: session.errors == errorsBefore)
-          }
-          if settings.playKeyclickSound, session.typed.count > typedCountBefore {
-            TypingFeedbackSound.shared.playClick(
-              style: settings.clickSoundStyle, volume: settings.soundVolume)
-          }
-          if settings.playErrorBeep, session.errors > errorsBefore {
-            TypingFeedbackSound.shared.playError(
-              style: settings.errorSoundStyle, volume: settings.soundVolume)
-          }
+          handleInsertedText(text, forceError: forceError)
         },
         onDelete: { session.deleteBackward() },
         onDeleteWord: { session.deleteWordBackward() },
@@ -2668,7 +2659,7 @@ private struct ContentView: View {
 
   private var attentionWarnings: [TypingAttentionWarning] {
     TypingAttentionPolicy.warnings(
-      isInputFocused: inputHasFocus,
+      isInputFocused: inputHasFocus || showsVirtualKeyboard,
       isWindowFocused: typingWindowHasFocus,
       focusWarningDelayElapsed: focusWarningDelayElapsed,
       capsLockEnabled: capsLockEnabled,
@@ -2732,6 +2723,32 @@ private struct ContentView: View {
     return .easeInOut(duration: 0.25)
   }
 
+  private func handleInsertedText(_ text: String, forceError: Bool) {
+    let errorsBefore = session.errors
+    let typedCountBefore = session.typed.count
+    session.insertBatch(
+      settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
+      forceError: forceError)
+    emitTypingPowerEffect(
+      isCorrect: session.errors == errorsBefore,
+      acceptedCharacters: session.typed.count - typedCountBefore)
+    if effectiveKeyboardGuideMode == .react, let pressedCharacter = text.last {
+      keyboardGuideFeedbackSequence &+= 1
+      keyboardGuideFeedback = .init(
+        sequence: keyboardGuideFeedbackSequence,
+        character: pressedCharacter,
+        isCorrect: session.errors == errorsBefore)
+    }
+    if settings.playKeyclickSound, session.typed.count > typedCountBefore {
+      TypingFeedbackSound.shared.playClick(
+        style: settings.clickSoundStyle, volume: settings.soundVolume)
+    }
+    if settings.playErrorBeep, session.errors > errorsBefore {
+      TypingFeedbackSound.shared.playError(
+        style: settings.errorSoundStyle, volume: settings.soundVolume)
+    }
+  }
+
   private var controls: some View {
     HStack {
       Text(
@@ -2757,6 +2774,15 @@ private struct ContentView: View {
           }
         }
       }
+      Button {
+        showsVirtualKeyboard.toggle()
+      } label: {
+        Label(
+          showsVirtualKeyboard ? "关闭屏幕键盘" : "屏幕键盘",
+          systemImage: "keyboard")
+      }
+      .buttonStyle(.bordered)
+      .help("用鼠标点击原生键位输入；Shift 和 Option 只影响下一键")
       Button {
         attemptRestart()
       } label: {
