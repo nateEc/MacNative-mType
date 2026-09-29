@@ -77,4 +77,20 @@ final class CustomFiniteStreamingTests: XCTestCase {
     let offset = LongSavedTextProgress.advancedOffset(in: source, from: 0, typed: session.typed)
     XCTAssertEqual(offset, first.count + "amber ".count)
   }
+
+  func testLegacyRemainderStartingWithWhitespaceStillStreamsToTheEnd() {
+    let source = "  " + String(repeating: "amber harbor ", count: 800) + "end"
+    let first = LongSavedTextProgress.nextChunk(in: source, after: 0)
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(), customTextCompletion: .finish)
+    var session = TestSessionFactory.make(
+      configuration: configuration, customText: first, finiteTextSource: source)
+    session.insert(first, at: start)
+    XCTAssertFalse(session.isFinished)
+    XCTAssertGreaterThan(session.prompt.count, first.count)
+    session.insert(String(source.dropFirst(first.count)), at: start)
+    XCTAssertEqual(session.prompt, source)
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
 }

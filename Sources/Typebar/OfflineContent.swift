@@ -5370,7 +5370,6 @@ struct CustomFiniteTextStream {
 
   init?(source: String) {
     guard source.count > CustomTextPolicy.maximumLength,
-      source.first?.isWhitespace == false,
       CustomTextPolicy.isValidSavedText(title: "Long text", text: source, longProgress: 0)
     else { return nil }
     self.source = source
