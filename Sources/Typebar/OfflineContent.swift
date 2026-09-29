@@ -5034,7 +5034,39 @@ enum CodePracticeContent {
       ]
     case .codeSwift:
       ["let total = values.reduce(0, +)", "for item in items {\n\tprint(item)\n}", "if total > limit {\n\treturn total\n}"]
-    case .codeJavaScript, .codeJavaScript1k, .codeJavaScriptReact, .codeTypeScript:
+    case .codeRust:
+      ["fn main() {\n\tlet total = 3;\n\tprintln!(\"total: {total}\");\n}",
+       "let doubled: Vec<i32> = values.iter().map(|value| value * 2).collect();",
+       "if total > limit {\n\treturn Some(total);\n}"]
+    case .codeGo:
+      ["package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"ready\")\n}",
+       "for _, item := range items {\n\tfmt.Println(item)\n}",
+       "if total > limit {\n\treturn total\n}"]
+    case .codeJava:
+      ["class Practice {\n\tstatic int total(int[] values) {\n\t\treturn values.length;\n\t}\n}",
+       "for (String item : items) {\n\tSystem.out.println(item);\n}",
+       "if (total > limit) {\n\treturn total;\n}"]
+    case .codeC:
+      ["#include <stdio.h>\n\nint main(void) {\n\tputs(\"ready\");\n\treturn 0;\n}",
+       "for (int index = 0; index < count; index++) {\n\tprintf(\"%d\", values[index]);\n}",
+       "if (total > limit) {\n\treturn total;\n}"]
+    case .codeCPP:
+      ["#include <iostream>\n\nint main() {\n\tstd::cout << \"ready\";\n\treturn 0;\n}",
+       "for (const auto& item : items) {\n\tstd::cout << item;\n}",
+       "if (total > limit) {\n\treturn total;\n}"]
+    case .codeKotlin:
+      ["fun total(values: List<Int>): Int {\n\treturn values.sum()\n}",
+       "for (item in items) {\n\tprintln(item)\n}",
+       "if (total > limit) {\n\treturn total\n}"]
+    case .codeTypeScript:
+      ["const total: number = values.reduce((sum: number, value: number) => sum + value, 0);",
+       "type Entry = { name: string; score: number };",
+       "function label(entry: Entry): string {\n\treturn entry.name;\n}"]
+    case .codeJavaScriptReact:
+      ["function PracticeCard() {\n\treturn <span>Ready</span>;\n}",
+       "const items = [\"one\", \"two\"].map((name) => <li key={name}>{name}</li>);",
+       "export default PracticeCard;"]
+    case .codeJavaScript, .codeJavaScript1k:
       ["const total = values.reduce((sum, value) => sum + value, 0);", "for (const item of items) {\n\tconsole.log(item);\n}", "if (total > limit) {\n\treturn total;\n}"]
     case .codePython, .codePython1k, .codePython2k, .codePython5k, .codeNim,
       .codeGDScript, .codeGDScript2, .codeYoptaScript:
@@ -5045,7 +5077,11 @@ enum CodePracticeContent {
       [".practice {", "\tdisplay: grid;", "\tgap: 1rem;\n}"]
     case .codeSQL:
       ["SELECT value", "FROM practice_entries", "WHERE active = 1;"]
-    case .codeBash, .codePowerShell, .codeVim, .codeVimscript:
+    case .codePowerShell:
+      ["Get-ChildItem | ForEach-Object {\n\tWrite-Output $_.Name\n}",
+       "$total = ($values | Measure-Object -Sum).Sum",
+       "if ($total -gt $limit) {\n\treturn $total\n}"]
+    case .codeBash, .codeVim, .codeVimscript:
       ["total=0", "for item in \"${items[@]}\"; do\n\techo \"$item\"\ndone", "echo \"$total\""]
     case .codeLaTeX, .codeTypst:
       ["#set text(size: 11pt)", "#align(center)[", "  steady practice\n]"]

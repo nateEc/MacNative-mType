@@ -10642,6 +10642,27 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testCommonCodeChoicesDisplayTheirOwnLanguageSyntax() {
+    let expected: [(TypingLanguage, String)] = [
+      (.codeRust, "fn main()"),
+      (.codeGo, "package main"),
+      (.codeJava, "class Practice"),
+      (.codeC, "#include <stdio.h>"),
+      (.codeCPP, "#include <iostream>"),
+      (.codeKotlin, "fun total("),
+      (.codePowerShell, "Get-ChildItem"),
+      (.codeTypeScript, ": number"),
+      (.codeJavaScriptReact, "<span>"),
+    ]
+    let prompts = expected.map { language, marker in
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 8)
+      XCTAssertTrue(prompt.contains(marker), "Missing \(marker) in \(language.displayName): \(prompt)")
+      return prompt
+    }
+    XCTAssertEqual(Set(prompts).count, expected.count)
+    XCTAssertFalse(prompts[6].contains("${items[@]}"))
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
