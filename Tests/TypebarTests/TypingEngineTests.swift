@@ -14334,6 +14334,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CommandPaletteBrowsePolicy.globalSearchQuery("> theme"), " theme")
   }
 
+  func testCommandPaletteLargeCatalogKeepsLastCommandSearchable() {
+    let items = (0..<1_000).map { index in
+      CommandPaletteItem(
+        id: "command.\(index)", title: "命令 \(index)", subtitle: "完整目录",
+        systemImage: "command", keywords: ["item-\(index)"])
+    }
+
+    XCTAssertEqual(
+      CommandPaletteBrowsePolicy.destination(
+        items: items, listMode: .singleList, selectedGroup: nil, query: ""),
+      .items(items))
+    XCTAssertEqual(
+      CommandPaletteBrowsePolicy.destination(
+        items: items, listMode: .singleList, selectedGroup: nil, query: "item-999"),
+      .items([items[999]]))
+  }
+
   func testCommandPaletteKeyboardSelectionWrapsAndRejectsEmptyLists() {
     XCTAssertEqual(CommandPaletteKeyboardSelection.index(current: 0, count: 3), 0)
     XCTAssertEqual(CommandPaletteKeyboardSelection.index(current: 8, count: 3), 2)

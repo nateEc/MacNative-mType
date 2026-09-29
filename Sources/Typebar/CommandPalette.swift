@@ -2392,22 +2392,26 @@ struct CommandPaletteView: View {
                     .frame(maxHeight: .infinity)
                 } else {
                     ScrollViewReader { proxy in
-                        List {
-                            ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
-                                Button {
-                                    onSelect(item)
-                                    dismiss()
-                                } label: {
-                                    commandRow(item, isSelected: isActiveRow(index))
-                                }
-                                .buttonStyle(.plain)
-                                .id(commandRowID(item))
-                                .onHover { hovering in
-                                    if hovering { activateRow(index) }
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
+                                    Button {
+                                        onSelect(item)
+                                        dismiss()
+                                    } label: {
+                                        commandRow(item, isSelected: isActiveRow(index))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .id(commandRowID(item))
+                                    .onHover { hovering in
+                                        if hovering { activateRow(index) }
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 8)
                         }
-                        .listStyle(.plain)
                         .onChange(of: activeIndex) { _, _ in
                             if let id = activeRowID { proxy.scrollTo(id, anchor: .center) }
                         }
