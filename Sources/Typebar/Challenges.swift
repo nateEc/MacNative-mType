@@ -449,6 +449,18 @@ enum TypebarChallengeLibrary {
         consistency: .exact(69)),
       dailyEligible: false
     ),
+    .init(
+      id: "alphabet-random-hundred", title: "字母随机百词",
+      description: "从英文字母中随机抽取一百个单字符词，达到每分钟一百词。",
+      legacyURLNames: ["speedSpacer"],
+      preset: .init(configuration: .init(
+        mode: .custom, duration: nil, wordLimit: 100, difficulty: .normal,
+        rules: .init(), customTextCompletion: .words, customTextOrdering: .random),
+        quoteID: nil,
+        customText: (97...122).compactMap(UnicodeScalar.init).map(String.init).joined(separator: " ")),
+      requirements: .init(wpm: .minimum(100)),
+      dailyEligible: false
+    ),
     repeatedWordChallenge("antidiseWhat", id: "long-word-sprint", title: "长词冲刺",
       description: "重复输入一个长英语词，达到每分钟二百词。",
       word: "antidisestablishmentarianism", count: 1, minimumWPM: 200),

@@ -5236,7 +5236,12 @@ struct TestSessionFactory {
           }
         } else {
           prompt = CustomTextOrderPolicy.prompt(
-            from: source, ordering: configuration.customTextOrdering)
+            from: source, ordering: configuration.customTextOrdering,
+            wordCount: configuration.customTextCompletion == .words
+              && configuration.customTextOrdering == .random
+              && (1...CustomTextOrderPolicy.maximumCompleteRandomWordCount)
+                .contains(configuration.wordLimit ?? 0)
+              ? configuration.wordLimit : nil)
         }
       }
     }
@@ -5252,10 +5257,17 @@ struct TestSessionFactory {
       preservesNoSpaceBoundaries: noSpaceBoundarySource != nil)
     let noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
       for: noSpaceWordLengths, in: transformedPrompt)
+    let hasCompleteRandomWordPrompt = configuration.mode == .custom
+      && configuration.customTextCompletion == .words
+      && configuration.customTextOrdering == .random
+      && (1...CustomTextOrderPolicy.maximumCompleteRandomWordCount)
+        .contains(configuration.wordLimit ?? 0)
     let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
+      && !hasCompleteRandomWordPrompt
     let primesRepeatedPrompt = configuration.isInfinite
       || (configuration.mode == .custom
-        && [.time, .words].contains(configuration.customTextCompletion))
+        && [.time, .words].contains(configuration.customTextCompletion)
+        && !hasCompleteRandomWordPrompt)
     let initialPrompt: String
     let initialNoSpaceWordEndIndices: [Int]
     let initialNoSpaceTargetWords: [String]
@@ -5493,22 +5505,41 @@ enum TypebarStreamContent {
 }
 
 enum CustomTextOrderPolicy {
+  static let maximumCompleteRandomWordCount = 1_000
+
   static func prompt(
     from text: String, ordering: CustomTextOrdering,
+    wordCount: Int? = nil,
     random: () -> Int = { Int.random(in: Int.min...Int.max) }
   ) -> String {
     let tokens = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-    guard tokens.count > 1 else { return text }
+    guard !tokens.isEmpty else { return text }
     switch ordering {
     case .inOrder:
       return text
     case .shuffled:
+      guard tokens.count > 1 else { return text }
       let rotation = Int(random().magnitude % UInt(tokens.count))
       return Array(tokens[rotation...] + tokens[..<rotation]).reversed().joined(separator: " ")
     case .random:
-      return (0..<max(tokens.count, 64)).map { _ in
-        tokens[Int(random().magnitude % UInt(tokens.count))]
-      }.joined(separator: " ")
+      let count = wordCount.map { max(1, $0) } ?? max(tokens.count, 64)
+      var chosen: [String] = []
+      chosen.reserveCapacity(count)
+      for _ in 0..<count {
+        var candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
+        if tokens.count >= 4 {
+          var attempts = 0
+          while attempts < 100
+            && (candidate == chosen.last
+              || (chosen.count >= 2 && candidate == chosen[chosen.count - 2]))
+          {
+            attempts += 1
+            candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
+          }
+        }
+        chosen.append(candidate)
+      }
+      return chosen.joined(separator: " ")
     }
   }
 }

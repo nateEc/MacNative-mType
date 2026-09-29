@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 31)
+    XCTAssertEqual(mapped.count, 32)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -139,6 +139,64 @@ final class OfficialChallengeCoverageTests: XCTestCase {
       XCTAssertEqual(practice.result()?.outcome, .completed, name)
       XCTAssertEqual(practice.result()?.configuration.challengeID, challenge.id, name)
     }
+  }
+
+  func testSpeedSpacerUsesOneHundredFreshAlphabetSelections() throws {
+    let challenge = try officialChallenge("speedSpacer")
+    let alphabet = (97...122).compactMap(UnicodeScalar.init).map(String.init)
+    let source = alphabet.joined(separator: " ")
+    let configuration = challenge.preset.configuration
+    XCTAssertEqual(configuration.mode, .custom)
+    XCTAssertEqual(configuration.customTextCompletion, .words)
+    XCTAssertEqual(configuration.customTextOrdering, .random)
+    XCTAssertEqual(configuration.wordLimit, 100)
+    XCTAssertEqual(challenge.preset.customText, source)
+    XCTAssertEqual(challenge.requirements.wpm, .minimum(100))
+    XCTAssertFalse(challenge.dailyEligible)
+
+    var session = TestSessionFactory.make(configuration: configuration, customText: source)
+    let generated = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(generated.count, 100)
+    XCTAssertTrue(generated.allSatisfy(Set(alphabet).contains))
+    for index in 2..<generated.count {
+      XCTAssertNotEqual(generated[index], generated[index - 1])
+      XCTAssertNotEqual(generated[index], generated[index - 2])
+    }
+    let start = Date(timeIntervalSince1970: 100)
+    for (index, word) in generated.enumerated() {
+      session.insert(word + (index == generated.count - 1 ? "" : " "),
+        at: start.addingTimeInterval(Double(index) * 0.1))
+    }
+    XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
+  func testFiniteRandomCustomWordsDoNotCycleAnInitialChunk() {
+    let draws = [0, 0, 1, 0, 2, 1, 3]
+    var drawIndex = 0
+    XCTAssertEqual(CustomTextOrderPolicy.prompt(
+      from: "amber harbor quiet lake", ordering: .random, wordCount: 4,
+      random: {
+        defer { drawIndex += 1 }
+        return draws[drawIndex]
+      }), "amber harbor quiet lake")
+
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 100, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words, customTextOrdering: .random)
+    let session = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor quiet lake")
+    XCTAssertEqual(session.prompt.split(separator: " ").count, 100)
+    XCTAssertFalse(session.usesIncrementalPromptExtension)
+  }
+
+  func testLargeImportedRandomWordLimitKeepsBoundedIncrementalPrompt() {
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: 1_001, difficulty: .normal,
+      rules: .init(), customTextCompletion: .words, customTextOrdering: .random)
+    let session = TestSessionFactory.make(
+      configuration: configuration, customText: "amber harbor quiet lake")
+    XCTAssertLessThan(session.prompt.split(separator: " ").count, 200)
+    XCTAssertTrue(session.usesIncrementalPromptExtension)
   }
 
   private func officialChallenge(_ name: String) throws -> TypebarChallenge {
