@@ -2738,6 +2738,10 @@ private struct ContentView: View {
         .foregroundStyle(.secondary)
       Spacer()
       if session.hasStarted && !session.isFinished {
+        if session.canFinishInfiniteChallenge {
+          Button("完成挑战并查看成绩") { session.finishInfiniteChallenge() }
+            .buttonStyle(.bordered)
+        }
         Button(
           shouldBailOutFromControls ? "中止并显示未保存结果" : "放弃本次测试",
           role: .destructive

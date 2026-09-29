@@ -4108,6 +4108,22 @@ struct TypingSession {
     finishedAt = date
   }
 
+  /// Infinite timed challenges need an intentional successful finish. A normal
+  /// long-test bailout remains unsaved and cannot satisfy a challenge.
+  var canFinishInfiniteChallenge: Bool {
+    guard hasStarted, !isFinished,
+      configuration.mode == .time, configuration.duration == 0,
+      let challenge = TypebarChallengeLibrary.challenge(id: configuration.challengeID)
+    else { return false }
+    return challenge.preset.configuration.mode == .time
+      && challenge.preset.configuration.duration == 0
+  }
+
+  mutating func finishInfiniteChallenge(at date: Date = .now) {
+    guard canFinishInfiniteChallenge else { return }
+    complete(at: date)
+  }
+
   /// Zen has no automatic terminal condition. It completes only through its
   /// explicit Shift+Enter command after the user has begun entering text.
   mutating func finishZen(at date: Date = .now) {

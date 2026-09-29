@@ -1104,6 +1104,37 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(custom.progressText(at: start.addingTimeInterval(60)), "60s")
   }
 
+  func testOnlyStartedInfiniteTimedChallengeCanFinishAsCompletedResult() throws {
+    let challenge = try XCTUnwrap(TypebarChallengeLibrary.challenge(id: "accuracy-ten-minutes"))
+    let configuration = challenge.preset.configuration.with(challengeID: challenge.id)
+    var session = TestSessionFactory.make(configuration: configuration)
+    session.finishInfiniteChallenge(at: start)
+    XCTAssertEqual(session.outcome, .active)
+
+    let promptCharacters = Array(session.prompt)
+    session.insert(String(promptCharacters[0]), at: start)
+    session.insert(String(promptCharacters[1]), at: start.addingTimeInterval(599))
+    session.finishInfiniteChallenge(at: start.addingTimeInterval(600))
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.outcome, .completed)
+    XCTAssertEqual(result.elapsedDuration, 600)
+    XCTAssertEqual(result.configuration.challengeID, challenge.id)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
+
+    var ordinary = TestSessionFactory.make(configuration: .timed(seconds: 0))
+    ordinary.insert("a", at: start)
+    ordinary.finishInfiniteChallenge(at: start.addingTimeInterval(20))
+    XCTAssertEqual(ordinary.outcome, .active)
+    ordinary.bailOut(at: start.addingTimeInterval(20))
+    XCTAssertEqual(try XCTUnwrap(ordinary.result()).outcome, .bailedOut)
+
+    var finite = TestSessionFactory.make(
+      configuration: .timed(seconds: 600).with(challengeID: challenge.id))
+    finite.insert("a", at: start)
+    finite.finishInfiniteChallenge(at: start.addingTimeInterval(20))
+    XCTAssertEqual(finite.outcome, .active)
+  }
+
   func testLargeFiniteTestsGenerateBoundedChunksAndExtendOnlyAtTheBoundary() {
     let largeWordConfiguration = TestConfiguration.words(5_001)
     let words = TestSessionFactory.make(configuration: largeWordConfiguration)
@@ -23210,6 +23241,53 @@ final class TypingEngineTests: XCTestCase {
       let date = try XCTUnwrap(calendar.date(byAdding: .day, value: day, to: start))
       let daily = TypebarChallengeLibrary.dailyChallenge(on: date, calendar: calendar)
       XCTAssertLessThanOrEqual(daily.preset.configuration.duration ?? 0, 3_600)
+    }
+  }
+
+  func testOfficialSpeedAccuracyAndEnglishChallengesLoadTheirVisibleRules() throws {
+    let slow = try XCTUnwrap(LegacyChallengeLinkImporter.challenge(
+      from: "https://example.invalid/?challenge=slowAndSteady",
+      challenges: TypebarChallengeLibrary.all))
+    XCTAssertEqual(slow.preset.configuration.duration, 300)
+    XCTAssertEqual(slow.preset.configuration.difficulty, .normal)
+    XCTAssertEqual(slow.requirements.wpm, .exact(60))
+    XCTAssertEqual(slow.requirements.configuration?.liveSpeedStyle, .off)
+    XCTAssertEqual(slow.requirements.configuration?.paceCaretStyle, .off)
+
+    for (name, minimumSeconds) in [
+      ("accuracyExpert", 600), ("accuracyMaster", 1_200), ("accuracyGod", 1_800),
+    ] {
+      let challenge = try XCTUnwrap(LegacyChallengeLinkImporter.challenge(
+        from: "https://example.invalid/?challenge=\(name)",
+        challenges: TypebarChallengeLibrary.all), name)
+      XCTAssertEqual(challenge.preset.configuration.mode, .time, name)
+      XCTAssertEqual(challenge.preset.configuration.duration, 0, name)
+      XCTAssertEqual(challenge.preset.configuration.difficulty, .master, name)
+      XCTAssertEqual(challenge.requirements.minimumDuration, Double(minimumSeconds), name)
+      XCTAssertEqual(challenge.requirements.wpm, .minimum(60), name)
+      XCTAssertEqual(challenge.requirements.accuracy, .exact(100), name)
+      XCTAssertEqual(challenge.requirements.maximumAFKPercentage, 5, name)
+    }
+
+    let english = try XCTUnwrap(LegacyChallengeLinkImporter.challenge(
+      from: "https://example.invalid/?challenge=englishMaster",
+      challenges: TypebarChallengeLibrary.all))
+    XCTAssertEqual(english.preset.configuration.duration, 3_600)
+    XCTAssertEqual(english.preset.configuration.language, .english10k)
+    XCTAssertTrue(english.preset.configuration.contentOptions.includePunctuation)
+    XCTAssertTrue(english.preset.configuration.contentOptions.includeNumbers)
+    XCTAssertEqual(english.requirements.minimumDuration, 3_600)
+    XCTAssertEqual(english.requirements.configuration?.language, .english10k)
+    XCTAssertEqual(english.requirements.configuration?.punctuation, true)
+    XCTAssertEqual(english.requirements.configuration?.numbers, true)
+
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-01-01T12:00:00Z"))
+    for day in 0..<90 {
+      let date = try XCTUnwrap(calendar.date(byAdding: .day, value: day, to: start))
+      XCTAssertFalse(TypebarChallengeLibrary.dailyChallenge(on: date, calendar: calendar)
+        .preset.configuration.isInfinite)
     }
   }
 

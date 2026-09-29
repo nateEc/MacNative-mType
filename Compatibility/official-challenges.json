@@ -74,7 +74,12 @@
     "quad": "four-hour-endurance",
     "8Ball": "eight-hour-endurance",
     "theBig12": "twelve-hour-endurance",
-    "1Day": "one-day-endurance"
+    "1Day": "one-day-endurance",
+    "slowAndSteady": "steady-sixty",
+    "accuracyExpert": "accuracy-ten-minutes",
+    "accuracyMaster": "accuracy-twenty-minutes",
+    "accuracyGod": "accuracy-thirty-minutes",
+    "englishMaster": "english-ten-thousand-hour"
   },
   "pending": [
     "trueSimp",
@@ -84,12 +89,8 @@
     "antidiseWhat",
     "whatsThisWebsiteCalledAgain",
     "developd",
-    "slowAndSteady",
     "speedSpacer",
     "iveGotThePower",
-    "accuracyExpert",
-    "accuracyMaster",
-    "accuracyGod",
     "inAGalaxyFarFarAway",
     "beepBoop",
     "whosYourDaddy",
@@ -125,7 +126,6 @@
     "69",
     "upsideDown",
     "oneArmedBandit",
-    "englishMaster",
     "feetWarrior",
     "wingdings"
   ]

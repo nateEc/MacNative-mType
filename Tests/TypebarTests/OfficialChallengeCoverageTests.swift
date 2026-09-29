@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 7)
+    XCTAssertEqual(mapped.count, 12)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)

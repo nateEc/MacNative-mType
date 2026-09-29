@@ -312,6 +312,67 @@ enum TypebarChallengeLibrary {
       requirements: .init(minimumDuration: 86_400)
     ),
     .init(
+      id: "steady-sixty",
+      title: "稳态六十",
+      description: "在五分钟练习中恰好达到 60 WPM，且关闭实时速度与节奏光标。",
+      legacyURLNames: ["slowAndSteady"],
+      preset: .init(configuration: .timed(seconds: 300), quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .exact(60),
+        configuration: .init(liveSpeedStyle: .off, paceCaretStyle: .off)
+      )
+    ),
+    .init(
+      id: "accuracy-ten-minutes",
+      title: "十分钟精准",
+      description: "在大师模式下保持十分钟，达到 60 WPM 和完全准确。",
+      legacyURLNames: ["accuracyExpert"],
+      preset: .init(configuration: .timed(seconds: 0, difficulty: .master), quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .minimum(60), accuracy: .exact(100),
+        minimumDuration: 600, maximumAFKPercentage: 5
+      )
+    ),
+    .init(
+      id: "accuracy-twenty-minutes",
+      title: "二十分钟精准",
+      description: "在大师模式下保持二十分钟，达到 60 WPM 和完全准确。",
+      legacyURLNames: ["accuracyMaster"],
+      preset: .init(configuration: .timed(seconds: 0, difficulty: .master), quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .minimum(60), accuracy: .exact(100),
+        minimumDuration: 1_200, maximumAFKPercentage: 5
+      )
+    ),
+    .init(
+      id: "accuracy-thirty-minutes",
+      title: "三十分钟精准",
+      description: "在大师模式下保持三十分钟，达到 60 WPM 和完全准确。",
+      legacyURLNames: ["accuracyGod"],
+      preset: .init(configuration: .timed(seconds: 0, difficulty: .master), quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .minimum(60), accuracy: .exact(100),
+        minimumDuration: 1_800, maximumAFKPercentage: 5
+      )
+    ),
+    .init(
+      id: "english-ten-thousand-hour",
+      title: "英语万词一小时",
+      description: "用 Typebar 自有的 English 10k 词库，开启数字和标点，练习一小时。",
+      legacyURLNames: ["englishMaster"],
+      preset: .init(
+        configuration: .timed(
+          seconds: 3_600, language: .english10k,
+          contentOptions: .init(includePunctuation: true, includeNumbers: true)
+        ),
+        quoteID: nil, customText: nil
+      ),
+      requirements: .init(
+        minimumDuration: 3_600,
+        configuration: .init(language: .english10k, punctuation: true, numbers: true)
+      )
+    ),
+    .init(
       id: "calm-thirty",
       title: "沉稳三十",
       description: "在一段短时间练习中保持速度和准确率。",
@@ -383,7 +444,10 @@ enum TypebarChallengeLibrary {
     -> TypebarChallenge
   {
     let day = calendar.ordinality(of: .day, in: .era, for: date) ?? 0
-    let dailyChoices = all.filter { ($0.preset.configuration.duration ?? 0) <= 3_600 }
+    let dailyChoices = all.filter {
+      !$0.preset.configuration.isInfinite
+        && ($0.preset.configuration.duration ?? 0) <= 3_600
+    }
     return dailyChoices[day % dailyChoices.count]
   }
 }

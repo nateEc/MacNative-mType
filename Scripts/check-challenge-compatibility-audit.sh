@@ -37,11 +37,11 @@ jq -e '
   | ($fixture.officialCount == 58)
   and ($fixture.officialNames | length == 58)
   and ($fixture.officialNames | unique | length == 58)
-  and ($fixture.nativeEquivalent | length == 7)
-  and ($fixture.pending | length == 51)
-  and ($fixture.pending | unique | length == 51)
+  and ($fixture.nativeEquivalent | length == 12)
+  and ($fixture.pending | length == 46)
+  and ($fixture.pending | unique | length == 46)
   and (((($fixture.nativeEquivalent | keys) + $fixture.pending) | sort)
     == ($fixture.officialNames | sort))
 ' "$fixture" >/dev/null || fail "mapped and pending names do not partition 58 official identities"
 
-print -- "challenge compatibility audit passed (7 mapped, 51 pending at $actual_commit)"
+print -- "challenge compatibility audit passed (12 mapped, 46 pending at $actual_commit)"
