@@ -1103,7 +1103,10 @@ private struct ContentView: View {
   }
 
   private var presentedContent: some View {
-    lifecycleContent
+    ScrollView(.vertical) {
+      lifecycleContent
+        .frame(maxWidth: .infinity)
+    }
     .toolbar {
       Button("命令", systemImage: "command") { showingCommandPalette = true }
         .keyboardShortcut("k", modifiers: [.command, .shift])
