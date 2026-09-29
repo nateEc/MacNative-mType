@@ -77,6 +77,8 @@ struct ChallengeRequirements: Equatable {
   var configuration: ChallengeConfigurationRequirements? = nil
   var maximumErrors: Int? = nil
   var requiresVirtualKeyboardOnly = false
+  var requiredCustomWordLimit: Int? = nil
+  var exactPrompt: String? = nil
 
   var effectiveMaximumAFKPercentage: Int { min(maximumAFKPercentage ?? 10, 10) }
 
@@ -93,6 +95,8 @@ struct ChallengeRequirements: Equatable {
       configuration.map(configurationSummary),
       maximumErrors.map { "错误不超过 \($0)" },
       requiresVirtualKeyboardOnly ? "仅使用屏幕键盘输入" : nil,
+      requiredCustomWordLimit.map { "指定脚本的 \($0) 词完整练习" },
+      exactPrompt.map { _ in "使用本挑战的原生脚本" },
     ]
     .compactMap { $0 }
     .joined(separator: " · ")
@@ -141,10 +145,17 @@ enum ChallengeEvaluator {
     ) {
       failedRequirements.append(failure)
     }
-    if let failure = requirements.accuracy?.failure(
-      label: "准确率", actual: result.accuracy, suffix: "%"
-    ) {
-      failedRequirements.append(failure)
+    if let accuracy = requirements.accuracy {
+      let actual = result.preciseAccuracy
+      let displayed = String(format: "%.2f", actual)
+      switch accuracy {
+      case .minimum(let expected) where actual < Double(expected):
+        failedRequirements.append("准确率需要至少 \(expected)%（本次 \(displayed)%）")
+      case .exact(let expected) where actual != Double(expected):
+        failedRequirements.append("准确率需要恰为 \(expected)%（本次 \(displayed)%）")
+      default:
+        break
+      }
     }
 
     if let consistencyRequirement = requirements.consistency {
@@ -222,6 +233,16 @@ enum ChallengeEvaluator {
       if result.challengePresentation?.virtualKeyboardOnly != true {
         failedRequirements.append("需要本次仅使用屏幕键盘输入的记录，旧结果无法验收")
       }
+    }
+    if let count = requirements.requiredCustomWordLimit,
+      result.configuration.mode != .custom
+        || result.configuration.customTextCompletion != .words
+        || result.configuration.wordLimit != count
+    {
+      failedRequirements.append("需要指定脚本的 \(count) 词自定义练习")
+    }
+    if let prompt = requirements.exactPrompt, result.prompt != prompt {
+      failedRequirements.append("需要完成本挑战的原生脚本")
     }
     return .init(
       challenge: challenge, passed: failedRequirements.isEmpty,
@@ -308,7 +329,34 @@ enum LayoutFluidChallengePolicy {
 }
 
 enum TypebarChallengeLibrary {
+  /// Independently authored Typebar text; only the reference's public word count and rules
+  /// informed this challenge. No reference script text is read or bundled.
+  private static let robotLogScript = [
+    "The observatory opened before sunrise and a repair robot counted every window",
+    "It polished one lens then checked copper wires for sparks or silence",
+    "Outside rain tapped slowly while distant trains hummed below the empty bridge",
+    "Inside a clock measured each careful step without asking anyone to hurry",
+    "When the first signal arrived the robot answered with a clear steady tone",
+    "By morning the lamps faded and the workshop remembered another patient night beneath a pale sky",
+  ].joined(separator: " ")
+
   static let all: [TypebarChallenge] = [
+    .init(
+      id: "robot-log",
+      title: "机器人日志",
+      description: "完整输入 Typebar 自写的 77 词机器人日志，不输入空格，达到 45 WPM 和完全准确。",
+      legacyURLNames: ["beepBoop"],
+      preset: .init(configuration: .init(
+        mode: .custom, duration: nil, wordLimit: 77, difficulty: .normal,
+        rules: .init(), customTextCompletion: .words, modifiers: [.noSpaces]),
+        quoteID: nil, customText: robotLogScript),
+      requirements: .init(
+        wpm: .minimum(45), accuracy: .exact(100), exactFunboxes: [.noSpaces],
+        requiredCustomWordLimit: 77,
+        exactPrompt: TestModifierPolicy.transformed(
+          robotLogScript, modifiers: [.noSpaces], language: .english)),
+      dailyEligible: false
+    ),
     .init(
       id: "mouse-warrior",
       title: "屏幕键盘勇者",

@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 39)
+    XCTAssertEqual(mapped.count, 40)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -48,6 +48,78 @@ final class OfficialChallengeCoverageTests: XCTestCase {
           challenges: TypebarChallengeLibrary.all)?.id,
         nativeID, officialName)
     }
+  }
+
+  func testBeepBoopUsesIndependentCompleteNoSpaceScriptAndExactScoring() throws {
+    let challenge = try officialChallenge("beepBoop")
+    let source = try XCTUnwrap(challenge.preset.customText)
+    let configuration = challenge.preset.configuration
+    XCTAssertEqual(source.split(separator: " ").count, 77)
+    XCTAssertEqual(configuration.mode, .custom)
+    XCTAssertEqual(configuration.customTextCompletion, .words)
+    XCTAssertEqual(configuration.customTextOrdering, .inOrder)
+    XCTAssertEqual(configuration.wordLimit, 77)
+    XCTAssertEqual(configuration.modifiers, [.noSpaces])
+    XCTAssertEqual(challenge.requirements.wpm, .minimum(45))
+    XCTAssertEqual(challenge.requirements.accuracy, .exact(100))
+    XCTAssertEqual(challenge.requirements.exactFunboxes, [.noSpaces])
+    XCTAssertFalse(challenge.dailyEligible)
+
+    var session = TestSessionFactory.make(
+      configuration: configuration.with(challengeID: challenge.id), customText: source)
+    let prompt = session.prompt
+    XCTAssertFalse(prompt.contains(" "))
+    XCTAssertEqual(challenge.requirements.exactPrompt, prompt)
+    let start = Date(timeIntervalSince1970: 100)
+    session.insertBatch(String(prompt.prefix(10)), at: start)
+    session.insertBatch(String(prompt.dropFirst(10)), at: start.addingTimeInterval(1))
+    let completed = try XCTUnwrap(session.result())
+    XCTAssertEqual(completed.outcome, .completed)
+    let evaluation = ChallengeEvaluator.evaluate(completed, challenge: challenge)
+    XCTAssertTrue(evaluation.passed, "\(evaluation.failedRequirements)")
+
+    let wrongScript = CompletedTestResult(
+      id: UUID(), configuration: configuration, outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(10),
+      typedCharacterCount: 100, correctCharacterCount: 100,
+      errorCount: 0, wpm: 100, rawWpm: 100, accuracy: 100,
+      prompt: String(repeating: "x", count: 100))
+    XCTAssertFalse(ChallengeEvaluator.evaluate(wrongScript, challenge: challenge).passed)
+    let slow = CompletedTestResult(
+      id: UUID(), configuration: configuration, outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(100),
+      typedCharacterCount: prompt.count, correctCharacterCount: prompt.count,
+      errorCount: 0, wpm: 44, rawWpm: 44, accuracy: 100, prompt: prompt)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(slow, challenge: challenge).passed)
+    let inaccurate = CompletedTestResult(
+      id: UUID(), configuration: configuration, outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(10),
+      typedCharacterCount: prompt.count, correctCharacterCount: prompt.count - 1,
+      errorCount: 1, wpm: 100, rawWpm: 100, accuracy: 99, prompt: prompt)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(inaccurate, challenge: challenge).passed)
+    let roundedToHundred = CompletedTestResult(
+      id: UUID(), configuration: configuration, outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(10),
+      typedCharacterCount: prompt.count, correctCharacterCount: prompt.count - 1,
+      errorCount: 1, wpm: 100, rawWpm: 100, accuracy: 100,
+      preciseAccuracy: 99.8, prompt: prompt)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(roundedToHundred, challenge: challenge).passed)
+    let wrongMode = CompletedTestResult(
+      id: UUID(), configuration: .timed(seconds: 60).with(modifiers: [.noSpaces]),
+      outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(10),
+      typedCharacterCount: prompt.count, correctCharacterCount: prompt.count,
+      errorCount: 0, wpm: 100, rawWpm: 100, accuracy: 100, prompt: prompt)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(wrongMode, challenge: challenge).passed)
+    let missingNoSpace = CompletedTestResult(
+      id: UUID(), configuration: TestConfiguration(
+        mode: .custom, duration: nil, wordLimit: 77, difficulty: .normal,
+        rules: .init(), customTextCompletion: .words),
+      outcome: .completed, startedAt: start,
+      finishedAt: start.addingTimeInterval(10),
+      typedCharacterCount: prompt.count, correctCharacterCount: prompt.count,
+      errorCount: 0, wpm: 100, rawWpm: 100, accuracy: 100, prompt: prompt)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(missingNoSpace, challenge: challenge).passed)
   }
 
   func testMouseWarriorRequiresOneHourNoFunboxAndRecordedVirtualInput() throws {

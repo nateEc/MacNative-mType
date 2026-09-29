@@ -103,6 +103,7 @@
     "speedSpacer": "alphabet-random-hundred",
     "beLikeWater": "three-layout-flow",
     "mouseWarrior": "mouse-warrior",
+    "beepBoop": "robot-log",
     "simp": "single-word-thousand",
     "trueSimp": "single-word-ten-thousand",
     "simpLord": "single-word-hundred-thousand",
@@ -110,7 +111,6 @@
   },
   "pending": [
     "inAGalaxyFarFarAway",
-    "beepBoop",
     "whosYourDaddy",
     "itsATrap",
     "jolly",
