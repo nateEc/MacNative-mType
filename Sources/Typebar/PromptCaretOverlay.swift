@@ -73,6 +73,89 @@ enum PromptCaretPlacementPolicy {
   }
 }
 
+/// Follows the active glyph inside the native vertical prompt scroller. It
+/// observes the same TextKit geometry as the independent caret, but does not
+/// replace SwiftUI's attributed text or prevent manual scrolling between keys.
+struct PromptAutoScrollOverlay: NSViewRepresentable {
+  let text: AttributedString
+  let characterOffset: Int?
+  let font: NSFont
+  let lineSpacing: CGFloat
+  let isRightToLeft: Bool
+
+  func makeNSView(context: Context) -> PromptAutoScrollView {
+    PromptAutoScrollView()
+  }
+
+  func updateNSView(_ nsView: PromptAutoScrollView, context: Context) {
+    nsView.update(
+      text: text, characterOffset: characterOffset, font: font,
+      lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
+  }
+}
+
+final class PromptAutoScrollView: NSView {
+  private var text = AttributedString()
+  private var characterOffset: Int?
+  private var font = NSFont.systemFont(ofSize: 16)
+  private var lineSpacing: CGFloat = 12
+  private var isRightToLeft = false
+  private var lastWidth: CGFloat = 0
+  private var isFollowScheduled = false
+
+  override var isFlipped: Bool { true }
+
+  func update(
+    text: AttributedString, characterOffset: Int?, font: NSFont,
+    lineSpacing: CGFloat, isRightToLeft: Bool
+  ) {
+    let needsFollow = self.characterOffset != characterOffset
+      || self.text.characters.count != text.characters.count
+      || self.font != font || self.lineSpacing != lineSpacing
+      || self.isRightToLeft != isRightToLeft
+    self.text = text
+    self.characterOffset = characterOffset
+    self.font = font
+    self.lineSpacing = lineSpacing
+    self.isRightToLeft = isRightToLeft
+    if needsFollow { scheduleFollow() }
+  }
+
+  override func layout() {
+    super.layout()
+    if bounds.width != lastWidth {
+      lastWidth = bounds.width
+      scheduleFollow()
+    }
+  }
+
+  private func scheduleFollow() {
+    guard !isFollowScheduled else { return }
+    isFollowScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.isFollowScheduled = false
+      self.followCurrentGlyph()
+    }
+  }
+
+  private func followCurrentGlyph() {
+    guard let characterOffset, bounds.width > 0, let scrollView = enclosingScrollView,
+      let documentView = scrollView.documentView,
+      let rect = PromptCaretLayout.rect(
+        in: text, characterOffset: characterOffset, containerSize: bounds.size,
+        font: font, lineSpacing: lineSpacing, isRightToLeft: isRightToLeft)
+    else { return }
+    let verticalMargin = min(rect.height, 28)
+    let top = max(bounds.minY, rect.minY - verticalMargin)
+    let bottom = min(bounds.maxY, rect.maxY + verticalMargin)
+    let target = CGRect(x: rect.minX, y: top, width: rect.width, height: bottom - top)
+    guard !scrollView.contentView.documentVisibleRect.contains(convert(target, to: documentView))
+    else { return }
+    _ = scrollToVisible(target)
+  }
+}
+
 /// A separate, code-drawn caret layer. TextKit computes each target glyph's
 /// frame from the same attributed text and wrapping width shown by SwiftUI.
 struct PromptCaretOverlay: View {
@@ -232,14 +315,19 @@ enum PromptCaretLayout {
     paragraphStyle.alignment = isRightToLeft ? .right : .left
     paragraphStyle.baseWritingDirection = isRightToLeft ? .rightToLeft : .leftToRight
     let fullRange = NSRange(location: 0, length: storage.length)
-    var rangesMissingFont: [NSRange] = []
-    storage.enumerateAttribute(.font, in: fullRange) { existingFont, range, _ in
-      if existingFont == nil {
-        rangesMissingFont.append(range)
-      }
+    // AttributedString's AppKit bridge supplies a 12 pt fallback even when
+    // the SwiftUI Text has a larger environment font. That fallback must not
+    // determine wrapping or the caret will point at the wrong line.
+    let swiftUIFontKey = NSAttributedString.Key("SwiftUI.Font")
+    var hintFontRanges: [NSRange] = []
+    storage.enumerateAttribute(swiftUIFontKey, in: fullRange) { explicitFont, range, _ in
+      if explicitFont != nil { hintFontRanges.append(range) }
     }
-    for range in rangesMissingFont {
-      storage.addAttribute(.font, value: font, range: range)
+    storage.addAttribute(.font, value: font, range: fullRange)
+    let hintFont = NSFont.monospacedSystemFont(
+      ofSize: max(9, font.pointSize * 0.48), weight: .semibold)
+    for range in hintFontRanges {
+      storage.addAttribute(.font, value: hintFont, range: range)
     }
     storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
 

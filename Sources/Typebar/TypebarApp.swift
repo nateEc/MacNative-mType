@@ -2387,6 +2387,23 @@ private struct ContentView: View {
           .multilineTextAlignment(isRightToLeft ? .trailing : .leading)
           .environment(\.layoutDirection, isRightToLeft ? .rightToLeft : .leftToRight)
           .foregroundStyle(activeTheme.secondaryText)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(
+            maxWidth: settings.practiceLineWidth.maximumWidth(
+              fontSize: settings.fontSize, customColumns: settings.customPracticeLineColumns),
+            alignment: isRightToLeft ? .trailing : .leading)
+          .overlay {
+            if !showsAllPracticeLines {
+              PromptAutoScrollOverlay(
+                text: rendering.text,
+                characterOffset: rendering.characterOffset(forGlyphAt: currentPromptGlyphIndex),
+                font: practicePromptNSFont(size: settings.fontSize),
+                lineSpacing: usesJoiningScript ? 8 : 12,
+                isRightToLeft: isRightToLeft)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+          }
           .overlay(alignment: isRightToLeft ? .topTrailing : .topLeading) {
             if usesNativeCaretOverlay {
               PromptCaretOverlay(

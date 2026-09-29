@@ -1152,6 +1152,19 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.repeatedAttempt().prompt, initialPrompt)
   }
 
+  func testInfiniteBinaryStreamActiveGlyphTracksCompletedWordsForPromptScrolling() {
+    var session = TestSessionFactory.make(
+      configuration: .words(0).with(modifiers: [.binaryStream]))
+    session.insert(
+      (0..<25).map { index in
+        let value = String(index, radix: 2)
+        return String(repeating: "0", count: 8 - value.count) + value
+      }
+        .joined(separator: " ") + " ", at: start)
+    XCTAssertEqual(session.completedWordCount, 25)
+    XCTAssertEqual(session.promptGlyphs.firstIndex { $0.state == .current }, 225)
+  }
+
   func testInfiniteIPv4StreamDoesNotReplayItsFirstBatch() {
     let session = TestSessionFactory.make(
       configuration: .words(0).with(modifiers: [.ipv4Stream]))
@@ -15016,6 +15029,33 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingCaretStyle.allCases.contains(.monkey))
   }
 
+  func testCaretLayoutPlacesTwentyFifthBinaryWordBelowAThreeLineViewport() throws {
+    let source = (0..<100).map { index in
+      let value = String(index, radix: 2)
+      return String(repeating: "0", count: 8 - value.count) + value
+    }.joined(separator: " ")
+    let rect = try XCTUnwrap(PromptCaretLayout.rect(
+      in: AttributedString(source), characterOffset: 225,
+      containerSize: .init(width: 756, height: 1_518),
+      font: PracticeFont.monospaced.nsFont(size: 28), lineSpacing: 12))
+    XCTAssertGreaterThan(rect.minY, 184)
+  }
+
+  func testCaretLayoutRetainsTheSmallerExplicitTypoHintFont() throws {
+    var text = AttributedString("a")
+    var hint = AttributedString("x")
+    hint.font = .system(size: 13.44, weight: .semibold, design: .monospaced)
+    text += hint
+    let font = PracticeFont.monospaced.nsFont(size: 28)
+    let base = try XCTUnwrap(PromptCaretLayout.rect(
+      in: text, characterOffset: 0, containerSize: .init(width: 360, height: 200),
+      font: font, lineSpacing: 12))
+    let hintRect = try XCTUnwrap(PromptCaretLayout.rect(
+      in: text, characterOffset: 1, containerSize: .init(width: 360, height: 200),
+      font: font, lineSpacing: 12))
+    XCTAssertLessThan(hintRect.width, base.width)
+  }
+
   func testIndependentCaretLayoutAnchorsMarkerAtTrailingEdgeForRTLPrompts() throws {
     let text = AttributedString("سلام بيت")
     let ltrRect = try XCTUnwrap(
@@ -15038,6 +15078,53 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       PromptCaretPlacementPolicy.horizontalAnchor(
         for: rect, style: .block, isRightToLeft: true), rect.midX)
+  }
+
+  @MainActor
+  func testNativePromptScrollFollowerBringsAnOffscreenGlyphIntoView() {
+    let scrollView = NSScrollView(frame: .init(x: 0, y: 0, width: 360, height: 120))
+    scrollView.hasVerticalScroller = true
+    let document = NSView(frame: .init(x: 0, y: 0, width: 360, height: 3_000))
+    scrollView.documentView = document
+    let follower = PromptAutoScrollView(frame: document.bounds)
+    document.addSubview(follower)
+    let text = AttributedString(
+      (0..<100).map { String(format: "%08d", $0) }.joined(separator: " "))
+    follower.update(
+      text: text, characterOffset: 450,
+      font: PracticeFont.monospaced.nsFont(size: 28), lineSpacing: 12,
+      isRightToLeft: false)
+    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    XCTAssertGreaterThan(scrollView.contentView.documentVisibleRect.minY, 0)
+  }
+
+  @MainActor
+  func testSwiftUIPromptScrollFollowerIsEmbeddedInItsScrollView() throws {
+    let text = AttributedString(
+      (0..<100).map { String(format: "%08d", $0) }.joined(separator: " "))
+    let prompt = Text(text)
+      .font(.system(size: 28, design: .monospaced))
+      .fixedSize(horizontal: false, vertical: true)
+      .frame(maxWidth: 360)
+      .overlay {
+        PromptAutoScrollOverlay(
+          text: text, characterOffset: 450,
+          font: PracticeFont.monospaced.nsFont(size: 28), lineSpacing: 12,
+          isRightToLeft: false)
+      }
+    let host = NSHostingView(rootView: ScrollView { prompt }.frame(width: 360, height: 120))
+    let window = NSWindow(
+      contentRect: .init(x: 0, y: 0, width: 360, height: 120),
+      styleMask: [.titled], backing: .buffered, defer: false)
+    window.contentView = host
+    host.layoutSubtreeIfNeeded()
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+
+    func descendants(of view: NSView) -> [NSView] {
+      [view] + view.subviews.flatMap(descendants)
+    }
+    let scrollView = try XCTUnwrap(descendants(of: host).compactMap { $0 as? NSScrollView }.first)
+    XCTAssertGreaterThan(scrollView.contentView.documentVisibleRect.minY, 0)
   }
 
   @MainActor
