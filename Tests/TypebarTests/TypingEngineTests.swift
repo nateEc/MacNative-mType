@@ -15098,6 +15098,31 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testRTLCaretFollowerBringsLaterWordIntoView() throws {
+    let text = AttributedString(Array(repeating: "قلم", count: 100).joined(separator: " "))
+    let font = PracticeFont.monospaced.nsFont(size: 28, language: .arabic)
+    let first = try XCTUnwrap(PromptCaretLayout.rect(
+      in: text, characterOffset: 0, containerSize: .init(width: 360, height: 3_000),
+      font: font, lineSpacing: 12, isRightToLeft: true))
+    let later = try XCTUnwrap(PromptCaretLayout.rect(
+      in: text, characterOffset: 160, containerSize: .init(width: 360, height: 3_000),
+      font: font, lineSpacing: 12, isRightToLeft: true))
+    XCTAssertGreaterThan(first.minX, 180)
+    XCTAssertGreaterThan(later.minY, 120)
+
+    let scrollView = NSScrollView(frame: .init(x: 0, y: 0, width: 360, height: 120))
+    scrollView.hasVerticalScroller = true
+    let document = NSView(frame: .init(x: 0, y: 0, width: 360, height: 3_000))
+    scrollView.documentView = document
+    let follower = PromptAutoScrollView(frame: document.bounds)
+    document.addSubview(follower)
+    follower.update(
+      text: text, characterOffset: 160, font: font, lineSpacing: 12, isRightToLeft: true)
+    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    XCTAssertGreaterThan(scrollView.contentView.documentVisibleRect.minY, 0)
+  }
+
+  @MainActor
   func testNativePromptScrollFollowerBringsAnOffscreenGlyphIntoView() {
     let scrollView = NSScrollView(frame: .init(x: 0, y: 0, width: 360, height: 120))
     scrollView.hasVerticalScroller = true

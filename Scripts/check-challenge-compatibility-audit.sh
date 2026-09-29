@@ -39,6 +39,7 @@ jq -e '
   and ($fixture.officialNames | unique | length == 58)
   and ($fixture.nativeEquivalent | length == 57)
   and ($fixture.pending | length == 1)
+  and ($fixture.pending == ["mobileWarrior"])
   and ($fixture.pending | unique | length == 1)
   and (((($fixture.nativeEquivalent | keys) + $fixture.pending) | sort)
     == ($fixture.officialNames | sort))
