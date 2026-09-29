@@ -3082,16 +3082,25 @@ struct ChallengePresentationSnapshot: Codable, Equatable {
   /// Optional so archived challenge results from before layout-segment scoring
   /// remain readable, but cannot claim unrecorded per-layout performance.
   let layoutFluidLayouts: [KeyboardLayout]?
+  /// Nil on older archives; missing input provenance must never pass a virtual-only challenge.
+  let virtualKeyboardOnly: Bool?
 
   init(
     liveSpeedStyle: LiveMetricStyle, paceCaretStyle: TypingCaretStyle,
-    tapeMode: PracticeTapeMode, layoutFluidLayouts: [KeyboardLayout]? = nil
+    tapeMode: PracticeTapeMode, layoutFluidLayouts: [KeyboardLayout]? = nil,
+    virtualKeyboardOnly: Bool? = nil
   ) {
     self.liveSpeedStyle = liveSpeedStyle
     self.paceCaretStyle = paceCaretStyle
     self.tapeMode = tapeMode
     self.layoutFluidLayouts = layoutFluidLayouts
+    self.virtualKeyboardOnly = virtualKeyboardOnly
   }
+}
+
+enum TypingInputOrigin {
+  case physicalKeyboard
+  case virtualKeyboard
 }
 
 struct CompletedTestResult: Codable, Equatable, Identifiable {
@@ -3377,6 +3386,16 @@ struct TypingSession {
   /// Accuracy is an input-event metric. Unlike the rendered input, it keeps
   /// an incorrect attempt after the user deletes and corrects that character.
   private var inputAttemptCount = 0
+  private(set) var hasAcceptedVirtualKeyboardInput = false
+  private var hasAcceptedPhysicalKeyboardInput = false
+  private var hasPhysicalKeyboardActivityDuringAttempt = false
+  var hasUsedOnlyVirtualKeyboard: Bool {
+    hasAcceptedVirtualKeyboardInput && !hasAcceptedPhysicalKeyboardInput
+      && !hasPhysicalKeyboardActivityDuringAttempt
+  }
+  mutating func recordPhysicalKeyboardActivityDuringAttempt() {
+    if hasStarted && !isFinished { hasPhysicalKeyboardActivityDuringAttempt = true }
+  }
   private var correctInputAttemptCount = 0
   private var forcedErrorIndices = Set<Int>()
   /// Target positions at which the user made an input error during this
@@ -4014,9 +4033,13 @@ struct TypingSession {
   /// confirmed IME composition. The reference processes every character but
   /// delays difficulty and burst terminal checks until the event's final
   /// character.
-  mutating func insertBatch(_ text: String, forceError: Bool = false, at date: Date = .now) {
+  mutating func insertBatch(
+    _ text: String, forceError: Bool = false, at date: Date = .now,
+    origin: TypingInputOrigin = .physicalKeyboard
+  ) {
     insertText(
-      text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true)
+      text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true,
+      origin: origin)
   }
 
   /// A marked-text composition starts the reference attempt before its text is
@@ -4030,7 +4053,8 @@ struct TypingSession {
 
   private mutating func insertText(
     _ text: String, forceError: Bool, at date: Date,
-    evaluatesTerminalRulesOnLastCharacterOnly: Bool
+    evaluatesTerminalRulesOnLastCharacterOnly: Bool,
+    origin: TypingInputOrigin = .physicalKeyboard
   ) {
     guard !isFinished, !text.isEmpty else { return }
     let characters = Array(text)
@@ -4043,7 +4067,7 @@ struct TypingSession {
         // rules match the transformed user input.
         insertText(
           "...", forceError: forceError, at: date,
-          evaluatesTerminalRulesOnLastCharacterOnly: true)
+          evaluatesTerminalRulesOnLastCharacterOnly: true, origin: origin)
         continue
       }
       if shouldExpandDutchLigature(character) {
@@ -4051,7 +4075,7 @@ struct TypingSession {
         // multi-character input path, but preserves a literal ligature target.
         insertText(
           "ij", forceError: forceError, at: date,
-          evaluatesTerminalRulesOnLastCharacterOnly: true)
+          evaluatesTerminalRulesOnLastCharacterOnly: true, origin: origin)
         continue
       }
       let evaluatesTerminalRules = !evaluatesTerminalRulesOnLastCharacterOnly
@@ -4060,6 +4084,10 @@ struct TypingSession {
         character, forceError: forceError, at: date,
         evaluatesTerminalRules: evaluatesTerminalRules)
       {
+        switch origin {
+        case .physicalKeyboard: hasAcceptedPhysicalKeyboardInput = true
+        case .virtualKeyboard: hasAcceptedVirtualKeyboardInput = true
+        }
         recordReplayEvent(kind: .insert, text: String(character), forceError: forceError, at: date)
         insertCodeIndentationIfNeeded(after: character, at: date)
       }

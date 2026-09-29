@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 38)
+    XCTAssertEqual(mapped.count, 39)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -48,6 +48,76 @@ final class OfficialChallengeCoverageTests: XCTestCase {
           challenges: TypebarChallengeLibrary.all)?.id,
         nativeID, officialName)
     }
+  }
+
+  func testMouseWarriorRequiresOneHourNoFunboxAndRecordedVirtualInput() throws {
+    let challenge = try officialChallenge("mouseWarrior")
+    XCTAssertEqual(challenge.preset.configuration.mode, .time)
+    XCTAssertEqual(challenge.preset.configuration.duration, 3_600)
+    XCTAssertEqual(challenge.requirements.minimumDuration, 3_600)
+    XCTAssertEqual(challenge.requirements.exactFunboxes, [])
+    XCTAssertTrue(challenge.requirements.requiresVirtualKeyboardOnly)
+    XCTAssertFalse(challenge.dailyEligible)
+
+    let start = Date(timeIntervalSince1970: 100)
+    var session = TypingSession(configuration: challenge.preset.configuration, prompt: "a b ")
+    session.insertBatch("a", at: start, origin: .virtualKeyboard)
+    XCTAssertTrue(session.hasAcceptedVirtualKeyboardInput)
+    XCTAssertTrue(session.hasUsedOnlyVirtualKeyboard)
+    session.insertBatch("x", at: start.addingTimeInterval(1))
+    XCTAssertFalse(session.hasUsedOnlyVirtualKeyboard)
+    session.deleteBackward(at: start.addingTimeInterval(2))
+    XCTAssertFalse(session.hasUsedOnlyVirtualKeyboard)
+    var physicalKeySession = TypingSession(
+      configuration: challenge.preset.configuration, prompt: "a b ")
+    physicalKeySession.recordPhysicalKeyboardActivityDuringAttempt()
+    physicalKeySession.insertBatch("a", at: start, origin: .virtualKeyboard)
+    XCTAssertTrue(physicalKeySession.hasUsedOnlyVirtualKeyboard)
+    physicalKeySession.recordPhysicalKeyboardActivityDuringAttempt()
+    XCTAssertFalse(physicalKeySession.hasUsedOnlyVirtualKeyboard)
+    physicalKeySession.deleteBackward(at: start.addingTimeInterval(2))
+    XCTAssertFalse(physicalKeySession.hasUsedOnlyVirtualKeyboard)
+
+    let presentation = ChallengePresentationSnapshot(
+      liveSpeedStyle: .off, paceCaretStyle: .off, tapeMode: .off,
+      virtualKeyboardOnly: session.hasUsedOnlyVirtualKeyboard)
+    let encoded = try JSONEncoder().encode(presentation)
+    XCTAssertFalse(try JSONDecoder().decode(
+      ChallengePresentationSnapshot.self, from: encoded).virtualKeyboardOnly ?? true)
+    let old = try JSONDecoder().decode(
+      ChallengePresentationSnapshot.self,
+      from: Data(#"{"liveSpeedStyle":"off","paceCaretStyle":"off","tapeMode":"off"}"#.utf8))
+    XCTAssertNil(old.virtualKeyboardOnly)
+
+    func result(
+      duration: TimeInterval = 3_600, configuration: TestConfiguration? = nil,
+      presentation: ChallengePresentationSnapshot? = nil
+    ) -> CompletedTestResult {
+      .init(
+        id: UUID(), configuration: configuration ?? challenge.preset.configuration,
+        outcome: .completed, startedAt: start,
+        finishedAt: start.addingTimeInterval(duration),
+        typedCharacterCount: 1, correctCharacterCount: 1,
+        errorCount: 0, wpm: 1, rawWpm: 1, accuracy: 100,
+        prompt: "a", replayEvents: [.init(offset: 1, kind: .insert, text: "a")],
+        challengePresentation: presentation)
+    }
+    let virtualPresentation = ChallengePresentationSnapshot(
+      liveSpeedStyle: .off, paceCaretStyle: .off, tapeMode: .off,
+      virtualKeyboardOnly: true)
+    XCTAssertTrue(ChallengeEvaluator.evaluate(
+      result(presentation: virtualPresentation), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(presentation: presentation),
+      challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(duration: 3_599,
+      presentation: virtualPresentation), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(
+      configuration: challenge.preset.configuration.with(modifiers: [.memory]),
+      presentation: virtualPresentation), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(
+      configuration: .timed(seconds: 60), presentation: virtualPresentation),
+      challenge: challenge).passed)
   }
 
   func testOfficialFunboxChallengesPreservePinnedPresetsAndRequirements() throws {

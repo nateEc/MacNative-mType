@@ -76,6 +76,7 @@ struct ChallengeRequirements: Equatable {
   var layoutFluidMinimumWPM: Int? = nil
   var configuration: ChallengeConfigurationRequirements? = nil
   var maximumErrors: Int? = nil
+  var requiresVirtualKeyboardOnly = false
 
   var effectiveMaximumAFKPercentage: Int { min(maximumAFKPercentage ?? 10, 10) }
 
@@ -91,6 +92,7 @@ struct ChallengeRequirements: Equatable {
       layoutFluidMinimumWPM.map { "三种不同布局各至少 \($0) WPM" },
       configuration.map(configurationSummary),
       maximumErrors.map { "错误不超过 \($0)" },
+      requiresVirtualKeyboardOnly ? "仅使用屏幕键盘输入" : nil,
     ]
     .compactMap { $0 }
     .joined(separator: " · ")
@@ -213,6 +215,14 @@ enum ChallengeEvaluator {
     if let maximumErrors = requirements.maximumErrors, result.errorCount > maximumErrors {
       failedRequirements.append("错误需要不超过 \(maximumErrors)（本次 \(result.errorCount)）")
     }
+    if requirements.requiresVirtualKeyboardOnly {
+      if result.configuration.mode != .time || result.configuration.duration != 3_600 {
+        failedRequirements.append("需要一小时计时配置")
+      }
+      if result.challengePresentation?.virtualKeyboardOnly != true {
+        failedRequirements.append("需要本次仅使用屏幕键盘输入的记录，旧结果无法验收")
+      }
+    }
     return .init(
       challenge: challenge, passed: failedRequirements.isEmpty,
       failedRequirements: failedRequirements)
@@ -299,6 +309,16 @@ enum LayoutFluidChallengePolicy {
 
 enum TypebarChallengeLibrary {
   static let all: [TypebarChallenge] = [
+    .init(
+      id: "mouse-warrior",
+      title: "屏幕键盘勇者",
+      description: "只使用屏幕键盘完成一小时计时练习，不启用趣味模式。",
+      legacyURLNames: ["mouseWarrior"],
+      preset: .init(configuration: .timed(seconds: 3_600), quoteID: nil, customText: nil),
+      requirements: .init(
+        minimumDuration: 3_600, exactFunboxes: [], requiresVirtualKeyboardOnly: true),
+      dailyEligible: false
+    ),
     .init(
       id: "one-hour-focus",
       title: "一小时专注",

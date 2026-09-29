@@ -854,7 +854,9 @@ private struct ContentView: View {
           allowsNewline: session.configuration.mode == .zen || session.prompt.contains("\n"),
           allowsTab: session.configuration.mode == .zen || session.prompt.contains("\t"),
           isEnabled: !session.isFinished,
-          onInsert: { handleInsertedText($0, forceError: false) },
+          onInsert: {
+            handleInsertedText($0, forceError: false, origin: .virtualKeyboard)
+          },
           onDelete: { session.deleteBackward() })
       }
       controls
@@ -954,7 +956,9 @@ private struct ContentView: View {
             paceCaretStyle: settings.paceCaretStyle,
             tapeMode: settings.practiceTapeMode,
             layoutFluidLayouts: session.configuration.modifiers.contains(.layoutFluid)
-              ? LayoutFluidPolicy.normalizedLayouts(settings.layoutFluidLayouts) : nil)
+              ? LayoutFluidPolicy.normalizedLayouts(settings.layoutFluidLayouts) : nil,
+            virtualKeyboardOnly: activeChallengeID == "mouse-warrior"
+              ? session.hasUsedOnlyVirtualKeyboard : nil)
         guard let result = session.result(
           tags: activeSessionTags,
           restartCount: resultPriorAttemptLedger.restartCount,
@@ -2088,10 +2092,15 @@ private struct ContentView: View {
         enablesLongTestBailout: quickRestartRequiresProtection,
         finishesOnShiftEnter: session.configuration.mode == .zen,
         onInsert: { text, forceError in
+          guard activeChallengeID != "mouse-warrior" else { return }
           handleInsertedText(text, forceError: forceError)
         },
-        onDelete: { session.deleteBackward() },
-        onDeleteWord: { session.deleteWordBackward() },
+        onDelete: {
+          if activeChallengeID != "mouse-warrior" { session.deleteBackward() }
+        },
+        onDeleteWord: {
+          if activeChallengeID != "mouse-warrior" { session.deleteWordBackward() }
+        },
         onRestart: attemptRestart,
         onOpenCommandPalette: { showingCommandPalette = true },
         onBailoutArmed: armLongTestBailout,
@@ -2109,7 +2118,9 @@ private struct ContentView: View {
           if !isFocused { typingCompanionHands.reset() }
           handleTypingWindowFocusChange(isFocused, hasAttachedSheet: hasAttachedSheet)
         },
-        onCompositionStarted: { session.beginComposition() },
+        onCompositionStarted: {
+          if activeChallengeID != "mouse-warrior" { session.beginComposition() }
+        },
         onCompositionChanged: { compositionText = $0 },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
         onKeyDown: { keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
@@ -2123,6 +2134,9 @@ private struct ContentView: View {
           }
         },
         onPhysicalKey: { keyCode, isKeyDown, isRepeat in
+          if isKeyDown && activeChallengeID == "mouse-warrior" {
+            session.recordPhysicalKeyboardActivityDuringAttempt()
+          }
           session.recordPhysicalKeyEvent(
             keyCode: keyCode, isKeyDown: isKeyDown, isRepeat: isRepeat)
           if isKeyDown { session.recordKeyboardActivity() }
@@ -2723,12 +2737,14 @@ private struct ContentView: View {
     return .easeInOut(duration: 0.25)
   }
 
-  private func handleInsertedText(_ text: String, forceError: Bool) {
+  private func handleInsertedText(
+    _ text: String, forceError: Bool, origin: TypingInputOrigin = .physicalKeyboard
+  ) {
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     session.insertBatch(
       settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
-      forceError: forceError)
+      forceError: forceError, origin: origin)
     emitTypingPowerEffect(
       isCorrect: session.errors == errorsBefore,
       acceptedCharacters: session.typed.count - typedCountBefore)
@@ -2782,6 +2798,7 @@ private struct ContentView: View {
           systemImage: "keyboard")
       }
       .buttonStyle(.bordered)
+      .disabled(activeChallengeID == "mouse-warrior")
       .help("用鼠标点击原生键位输入；Shift 和 Option 只影响下一键")
       Button {
         attemptRestart()
@@ -4244,7 +4261,10 @@ private struct ContentView: View {
     let appliedPreset = PresetApplicationPolicy.applying(current: presetDefinition, preset: preset)
     let challenge = appliesTest
       ? TypebarChallengeLibrary.challenge(id: appliedPreset.configuration.challengeID) : nil
-    if appliesTest { activeChallengeID = challenge?.id }
+    if appliesTest {
+      activeChallengeID = challenge?.id
+      if challenge?.id == "mouse-warrior" { showsVirtualKeyboard = true }
+    }
     let configuration = challenge?.preset.configuration ?? appliedPreset.configuration
     mode = configuration.mode
     if overwritesParameterMemory {
