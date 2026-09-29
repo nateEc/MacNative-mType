@@ -626,6 +626,10 @@ private struct ActiveLongSavedText: Equatable {
   var remainingText: String {
     LongSavedTextProgress.remainingText(in: text, after: progress)
   }
+
+  var currentChunk: String {
+    LongSavedTextProgress.nextChunk(in: text, after: progress)
+  }
 }
 
 private struct PendingPublicationRetryTrigger: Equatable {
@@ -1887,7 +1891,7 @@ private struct ContentView: View {
                 customTextSectionLimit = min(
                   customTextSectionLimit, max(1, CustomTextPolicy.sections(in: clamped).count))
                 if let activeLongSavedText,
-                  value != activeLongSavedText.remainingText
+                  value != activeLongSavedText.currentChunk
                 {
                   self.activeLongSavedText = nil
                 }
@@ -3394,7 +3398,7 @@ private struct ContentView: View {
     let active = ActiveLongSavedText(
       id: selection.id, title: selection.title, text: selection.text, progress: progress)
     activeLongSavedText = active
-    customText = active.remainingText
+    customText = active.currentChunk
     customTextCompletion = .finish
     customTextOrdering = .inOrder
     reset()
@@ -3436,7 +3440,8 @@ private struct ContentView: View {
     let nextProgress: Int
     switch outcome {
     case .completed:
-      nextProgress = 0
+      nextProgress = LongSavedTextProgress.offsetAfterCompletingChunk(
+        in: active.text, from: active.progress)
     case .bailedOut, .failed, .invalidAFK:
       nextProgress = LongSavedTextProgress.advancedOffset(
         in: active.text, from: active.progress, typed: session.typed)
@@ -3447,7 +3452,7 @@ private struct ContentView: View {
     var updated = active
     updated.progress = nextProgress
     activeLongSavedText = updated
-    customText = updated.remainingText
+    customText = updated.currentChunk
     try? modelContext.save()
     return true
   }

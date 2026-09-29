@@ -1,9 +1,12 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum CustomTextPolicy {
     static let maximumLength = 10_000
+    /// Only explicitly saved long texts may exceed the ordinary editor/share limit.
+    static let maximumLongSavedLength = 128_000
     static let maximumTitleLength = 80
 
     static func clamped(_ text: String) -> String {
@@ -21,9 +24,22 @@ enum CustomTextPolicy {
         return values.isEmpty ? [text.trimmingCharacters(in: .whitespacesAndNewlines)] : values
     }
 
-    static func isValidSavedText(title: String, text: String) -> Bool {
+    static func isValidSavedText(
+        title: String, text: String, longProgress: Int? = nil
+    ) -> Bool {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !trimmedTitle.isEmpty && trimmedTitle.count <= maximumTitleLength && isValid(text)
+        guard !trimmedTitle.isEmpty && trimmedTitle.count <= maximumTitleLength else { return false }
+        if longProgress == nil { return isValid(text) }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              text.count <= maximumLongSavedLength,
+              text.utf8.count <= maximumLongSavedLength * 4 else { return false }
+        var offset = 0
+        while offset < text.count {
+            let chunk = LongSavedTextProgress.nextChunk(in: text, after: offset)
+            guard isValid(chunk) else { return false }
+            offset += chunk.count
+        }
+        return true
     }
 }
 
@@ -32,6 +48,24 @@ enum CustomTextPolicy {
 /// fully matched word boundary, so whitespace, line breaks, and the user's
 /// original formatting remain intact when a long text resumes.
 enum LongSavedTextProgress {
+    /// Returns the next complete-word slice without changing any source
+    /// whitespace or punctuation. The ordinary test engine still sees a
+    /// bounded prompt, even when the saved source spans many slices.
+    static func nextChunk(in text: String, after offset: Int) -> String {
+        let remaining = remainingText(in: text, after: offset)
+        guard !remaining.isEmpty else { return "" }
+        if remaining.count <= CustomTextPolicy.maximumLength { return remaining }
+        let prefix = String(remaining.prefix(CustomTextPolicy.maximumLength))
+        guard let boundary = prefix.lastIndex(where: \.isWhitespace) else { return "" }
+        let chunk = String(prefix[...boundary])
+        return chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : chunk
+    }
+
+    static func offsetAfterCompletingChunk(in text: String, from offset: Int) -> Int {
+        let next = normalized(offset, in: text) + nextChunk(in: text, after: offset).count
+        return next >= text.count ? 0 : next
+    }
+
     static func normalized(_ offset: Int, in text: String) -> Int {
         min(max(0, offset), text.count)
     }
@@ -119,6 +153,9 @@ struct SavedTextsView: View {
 
     let onUse: (SavedCustomTextSelection) -> Void
     private let tombstones = SavedTextTombstoneStore()
+    @State private var importingLongText = false
+    @State private var showingImportError = false
+    @State private var importError: String?
 
     private var ordinaryTexts: [SavedCustomTextRecord] { savedTexts.filter { !$0.isLong } }
     private var longTexts: [SavedCustomTextRecord] { savedTexts.filter(\.isLong) }
@@ -162,9 +199,22 @@ struct SavedTextsView: View {
             }
             .navigationTitle("已保存文本")
             .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("导入长文本…", systemImage: "square.and.arrow.down") {
+                        importingLongText = true
+                    }
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("完成") { dismiss() }
                 }
+            }
+            .fileImporter(isPresented: $importingLongText, allowedContentTypes: [.plainText]) {
+                importLongText($0)
+            }
+            .alert("导入失败", isPresented: $showingImportError) {
+                Button("好") { importError = nil }
+            } message: {
+                Text(importError ?? "无法读取此文件。")
             }
         }
         .frame(minWidth: 500, minHeight: 360)
@@ -177,7 +227,7 @@ struct SavedTextsView: View {
         } label: {
             VStack(alignment: .leading, spacing: 5) {
                 Text(item.title)
-                Text(item.text)
+                Text(String(item.text.prefix(160)))
                     .lineLimit(2)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -197,6 +247,61 @@ struct SavedTextsView: View {
     private func resetProgress(for item: SavedCustomTextRecord) {
         item.longProgress = 0
         try? modelContext.save()
+    }
+
+    private func importLongText(_ result: Result<URL, Error>) {
+        do {
+            let url = try result.get()
+            let access = url.startAccessingSecurityScopedResource()
+            defer { if access { url.stopAccessingSecurityScopedResource() } }
+            let maximumBytes = CustomTextPolicy.maximumLongSavedLength * 4
+            if let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+               size > maximumBytes
+            {
+                throw LongTextImportError.tooLarge
+            }
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            var data = Data()
+            while data.count <= maximumBytes {
+                let count = min(64_000, maximumBytes + 1 - data.count)
+                let chunk = try handle.read(upToCount: count) ?? Data()
+                if chunk.isEmpty { break }
+                data.append(chunk)
+            }
+            guard data.count <= maximumBytes else { throw LongTextImportError.tooLarge }
+            guard let text = String(data: data, encoding: .utf8) else {
+                throw LongTextImportError.invalidEncoding
+            }
+            let title = String(url.deletingPathExtension().lastPathComponent.prefix(
+                CustomTextPolicy.maximumTitleLength))
+            guard text.first?.isWhitespace == false,
+                  CustomTextPolicy.isValidSavedText(title: title, text: text, longProgress: 0)
+            else { throw LongTextImportError.invalidContent }
+            let record = SavedCustomTextRecord(title: title, text: text, longProgress: 0)
+            modelContext.insert(record)
+            do {
+                try modelContext.save()
+            } catch {
+                modelContext.delete(record)
+                throw error
+            }
+        } catch {
+            importError = error.localizedDescription
+            showingImportError = true
+        }
+    }
+}
+
+private enum LongTextImportError: LocalizedError {
+    case tooLarge, invalidEncoding, invalidContent
+
+    var errorDescription: String? {
+        switch self {
+        case .tooLarge: "文件太大；长文本最多 128,000 个字符且不超过 512,000 字节。"
+        case .invalidEncoding: "只支持 UTF-8 纯文本文件。"
+        case .invalidContent: "文件为空、以空白开头、超出字符上限，或含有无法按完整词边界切分的片段。"
+        }
     }
 }
 

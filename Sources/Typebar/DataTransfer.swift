@@ -859,7 +859,8 @@ enum TypebarArchiveMerge {
         var knownSavedTexts = existing
         var additions: [NamedSavedText] = []
         for remoteText in archive.savedTexts
-        where CustomTextPolicy.isValidSavedText(title: remoteText.title, text: remoteText.text)
+        where CustomTextPolicy.isValidSavedText(
+            title: remoteText.title, text: remoteText.text, longProgress: remoteText.longProgress)
             && (remoteText.id.map({ !deletedIDs.contains($0) }) ?? true)
         {
             guard !knownSavedTexts.contains(where: { $0.hasSameContent(as: remoteText) }) else {
@@ -1120,7 +1121,8 @@ enum TypebarArchiveConflictMerge {
         }
         var savedTextIDs = Set(savedTexts.compactMap(\.id))
         for remoteText in remote.savedTexts
-        where CustomTextPolicy.isValidSavedText(title: remoteText.title, text: remoteText.text)
+        where CustomTextPolicy.isValidSavedText(
+            title: remoteText.title, text: remoteText.text, longProgress: remoteText.longProgress)
             && (remoteText.id.map({ !deletedSavedTextIDs.contains($0) }) ?? true)
         {
             guard !savedTexts.contains(where: { $0.hasSameContent(as: remoteText) }) else { continue }

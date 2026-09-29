@@ -26360,6 +26360,9 @@ final class TypingEngineTests: XCTestCase {
       SavedCustomTextRecord(title: "Morning", text: "A deliberate beginning."))
     container.mainContext.insert(
       SavedCustomTextRecord(title: "Chapter", text: "amber harbor willow", longProgress: 6))
+    let importedText = String(repeating: "amber harbor ", count: 1_000)
+    container.mainContext.insert(
+      SavedCustomTextRecord(title: "Imported script", text: importedText, longProgress: 0))
     try container.mainContext.save()
 
     let savedTexts = try container.mainContext.fetch(FetchDescriptor<SavedCustomTextRecord>())
@@ -26371,6 +26374,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(longText.isLong)
     XCTAssertEqual(longText.longProgress, 6)
     XCTAssertEqual(longText.selection.longProgress, 6)
+    let imported = try XCTUnwrap(savedTexts.first { $0.title == "Imported script" })
+    XCTAssertEqual(imported.text, importedText)
+    XCTAssertEqual(imported.longProgress, 0)
   }
 
   func testLongSavedTextProgressAdvancesOnlyThroughFullyMatchedWords() {
@@ -26384,5 +26390,76 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       LongSavedTextProgress.remainingText(in: text, after: 14), "willow")
     XCTAssertEqual(LongSavedTextProgress.progressLabel(in: text, offset: 14), "2 / 3 词")
+  }
+
+  func testLongSavedTextChunksPreserveFullUserTextWithoutRelaxingOrdinaryLimit() {
+    let text = String(repeating: "amber  harbor\n", count: 9_000)
+    XCTAssertGreaterThan(text.count, 100_000)
+    XCTAssertFalse(CustomTextPolicy.isValid(text))
+    XCTAssertFalse(CustomTextPolicy.isValidSavedText(title: "Script", text: text))
+    XCTAssertTrue(CustomTextPolicy.isValidSavedText(
+      title: "Script", text: text, longProgress: 0))
+    var offset = 0
+    var chunks: [String] = []
+    while offset < text.count {
+      let chunk = LongSavedTextProgress.nextChunk(in: text, after: offset)
+      XCTAssertFalse(chunk.isEmpty)
+      XCTAssertTrue(CustomTextPolicy.isValid(chunk))
+      XCTAssertLessThanOrEqual(chunk.count, CustomTextPolicy.maximumLength)
+      chunks.append(chunk)
+      offset += chunk.count
+    }
+    XCTAssertEqual(chunks.joined(), text)
+    XCTAssertEqual(offset, text.count)
+    var completedOffset = 0
+    var completedText = ""
+    for chunk in chunks.dropLast() {
+      completedText += chunk
+      completedOffset = LongSavedTextProgress.offsetAfterCompletingChunk(
+        in: text, from: completedOffset)
+      XCTAssertGreaterThan(completedOffset, 0)
+      XCTAssertEqual(String(text.prefix(completedOffset)), completedText)
+    }
+    XCTAssertEqual(LongSavedTextProgress.offsetAfterCompletingChunk(
+      in: text, from: completedOffset), 0)
+    XCTAssertFalse(CustomTextPolicy.isValidSavedText(
+      title: "Script", text: text + text, longProgress: 0))
+  }
+
+  func testLongSavedTextNeverStartsNextChunkWithAnUnenterableSeparator() {
+    let text = String(repeating: "ab ", count: 3_333) + "c delta echo"
+    XCTAssertTrue(CustomTextPolicy.isValidSavedText(
+      title: "Boundary", text: text, longProgress: 0))
+    let first = LongSavedTextProgress.nextChunk(in: text, after: 0)
+    XCTAssertLessThanOrEqual(first.count, CustomTextPolicy.maximumLength)
+    let second = LongSavedTextProgress.nextChunk(in: text, after: first.count)
+    XCTAssertFalse(second.first?.isWhitespace ?? true)
+    XCTAssertEqual(first + second, text)
+  }
+
+  func testLongSavedTextArchiveAcceptsOnlyExplicitBoundedLongRecords() {
+    let text = String(repeating: "amber harbor ", count: 1_000)
+    let longText = NamedSavedText(title: "Script", text: text, longProgress: 0)
+    let ordinaryText = NamedSavedText(title: "Ordinary", text: text)
+    XCTAssertTrue(CustomTextPolicy.isValidSavedText(
+      title: longText.title, text: longText.text, longProgress: longText.longProgress))
+    XCTAssertFalse(CustomTextPolicy.isValidSavedText(
+      title: ordinaryText.title, text: ordinaryText.text,
+      longProgress: ordinaryText.longProgress))
+    let archive = TypebarArchive(
+      exportedAt: start, settings: .init(), results: [], presets: [],
+      savedTexts: [longText, ordinaryText])
+    XCTAssertEqual(TypebarArchiveMerge.savedTextsToInsert(
+      from: archive, existing: []), [longText])
+    let incompatible = String(repeating: "x", count: CustomTextPolicy.maximumLength + 1)
+    XCTAssertFalse(CustomTextPolicy.isValidSavedText(
+      title: "One giant token", text: incompatible, longProgress: 0))
+    let denseUnicode = String(repeating:
+      "a" + String(repeating: "\u{0301}", count: 300) + " ", count: 1_000)
+    XCTAssertLessThan(denseUnicode.count, CustomTextPolicy.maximumLongSavedLength)
+    XCTAssertGreaterThan(denseUnicode.utf8.count,
+      CustomTextPolicy.maximumLongSavedLength * 4)
+    XCTAssertFalse(CustomTextPolicy.isValidSavedText(
+      title: "Oversized Unicode", text: denseUnicode, longProgress: 0))
   }
 }
