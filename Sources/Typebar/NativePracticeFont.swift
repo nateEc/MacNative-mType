@@ -84,3 +84,16 @@ enum NativePracticeFont {
     TypebarLocalPracticeFontStore.activeInfo?.postScriptName ?? postScriptName(for: requestedName)
   }
 }
+
+/// Challenge-local lookup bypasses the user's active imported font. It never
+/// installs or bundles Wingdings, and refuses a system fallback or variant.
+enum WingdingsChallengeFont {
+  static let familyName = "Wingdings"
+
+  static func resolve(size: CGFloat) -> NSFont? {
+    guard let name = NativePracticeFont.postScriptName(for: familyName),
+      let font = NSFont(name: name, size: size), font.familyName == familyName
+    else { return nil }
+    return font
+  }
+}

@@ -756,6 +756,7 @@ private struct ContentView: View {
   @State private var showingChallenges = false
   @State private var showsVirtualKeyboard = false
   @State private var activeChallengeID: String?
+  @State private var wingdingsFontStayedAvailable = true
   @State private var focusRequest = 0
   @State private var inputHasFocus = false
   @State private var typingWindowHasFocus = true
@@ -958,7 +959,13 @@ private struct ContentView: View {
             layoutFluidLayouts: session.configuration.modifiers.contains(.layoutFluid)
               ? LayoutFluidPolicy.normalizedLayouts(settings.layoutFluidLayouts) : nil,
             virtualKeyboardOnly: activeChallengeID == "mouse-warrior"
-              ? session.hasUsedOnlyVirtualKeyboard : nil)
+              ? session.hasUsedOnlyVirtualKeyboard : nil,
+            fontFamily: activeChallengeID == "ten-words-of-pain"
+              ? WingdingsChallengeFont.resolve(size: 12)?.familyName : nil,
+            keyboardGuideMode: activeChallengeID == "ten-words-of-pain"
+              ? effectiveKeyboardGuideMode : nil,
+            fontStayedAvailable: activeChallengeID == "ten-words-of-pain"
+              ? wingdingsFontStayedAvailable : nil)
         guard let result = session.result(
           tags: activeSessionTags,
           restartCount: resultPriorAttemptLedger.restartCount,
@@ -1481,6 +1488,7 @@ private struct ContentView: View {
 
   private func advanceClock(at now: Date) {
     capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
+    verifyChallengeFontAvailability()
     if let startedAt = session.startedAt {
       let dueSeconds = ClockTickPolicy.dueSeconds(
         after: lastClockTickSecond, startedAt: startedAt, now: now)
@@ -2281,9 +2289,7 @@ private struct ContentView: View {
       } else if practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
           glyphs: session.promptGlyphs,
-          font: settings.practiceFont.font(
-            size: settings.fontSize, installedFontName: settings.installedPracticeFontName,
-            language: session.configuration.language),
+          font: Font(practicePromptNSFont(size: settings.fontSize)),
           fontSize: settings.fontSize, accent: activeTheme.accent,
           isEnabled: true, reducesMotion: settings.reducePracticeMotion,
           ignoresSystemReducedMotion: !VisualFunboxReducedMotionPolicy
@@ -2292,9 +2298,7 @@ private struct ContentView: View {
         TapePracticePrompt(
           prompt: rendering.text, typed: session.typed, mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
-          font: settings.practiceFont.font(
-            size: settings.fontSize, installedFontName: settings.installedPracticeFontName,
-            language: session.configuration.language),
+          font: Font(practicePromptNSFont(size: settings.fontSize)),
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll)
       } else {
         Text(rendering.text)
@@ -2312,9 +2316,7 @@ private struct ContentView: View {
                 mainStyle: settings.caretStyle,
                 paceCharacterOffset: paceCaretCharacterOffset(in: rendering),
                 paceStyle: settings.paceCaretStyle,
-                font: settings.practiceFont.nsFont(
-                  size: settings.fontSize, installedFontName: settings.installedPracticeFontName,
-                  language: session.configuration.language),
+                font: practicePromptNSFont(size: settings.fontSize),
                 lineSpacing: usesJoiningScript ? 8 : 12,
                 isRightToLeft: isRightToLeft,
                 accent: activeTheme.caret,
@@ -2323,9 +2325,7 @@ private struct ContentView: View {
           }
       }
     }
-    .font(settings.practiceFont.font(
-      size: settings.fontSize, installedFontName: settings.installedPracticeFontName,
-      language: session.configuration.language))
+    .font(Font(practicePromptNSFont(size: settings.fontSize)))
     .fixedSize(horizontal: false, vertical: showsAllPracticeLines)
     .frame(
       maxWidth: settings.practiceLineWidth.maximumWidth(
@@ -2337,9 +2337,28 @@ private struct ContentView: View {
   }
 
   private var effectiveKeyboardGuideMode: KeyboardGuideMode {
+    if activeChallengeID == "ten-words-of-pain" { return .off }
     if session.configuration.modifiers.contains(.listening) { return .off }
     if session.configuration.modifiers.contains(.simonSays) { return .next }
     return settings.effectiveKeyboardGuideMode
+  }
+
+  private func practicePromptNSFont(size: CGFloat) -> NSFont {
+    if activeChallengeID == "ten-words-of-pain",
+      let font = WingdingsChallengeFont.resolve(size: size)
+    {
+      return font
+    }
+    return settings.practiceFont.nsFont(
+      size: size, installedFontName: settings.installedPracticeFontName,
+      language: session.configuration.language)
+  }
+
+  private func verifyChallengeFontAvailability() {
+    guard activeChallengeID == "ten-words-of-pain", session.hasStarted,
+      WingdingsChallengeFont.resolve(size: 12) == nil
+    else { return }
+    wingdingsFontStayedAvailable = false
   }
 
   private var practiceVisualTransform: PracticeVisualTransform {
@@ -2745,6 +2764,7 @@ private struct ContentView: View {
     session.insertBatch(
       settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
       forceError: forceError, origin: origin)
+    verifyChallengeFontAvailability()
     emitTypingPowerEffect(
       isCorrect: session.errors == errorsBefore,
       acceptedCharacters: session.typed.count - typedCountBefore)
@@ -3175,6 +3195,7 @@ private struct ContentView: View {
       settings.testModifiers = joiningSafeModifiers
     }
     let shouldCountRestart = session.hasStarted && !session.isFinished
+    wingdingsFontStayedAvailable = true
     let restartedSessionEngagedDuration = shouldCountRestart
       ? session.activeEngagedDuration()
       : 0
@@ -4261,6 +4282,12 @@ private struct ContentView: View {
     let appliedPreset = PresetApplicationPolicy.applying(current: presetDefinition, preset: preset)
     let challenge = appliesTest
       ? TypebarChallengeLibrary.challenge(id: appliedPreset.configuration.challengeID) : nil
+    if challenge?.id == "ten-words-of-pain",
+      WingdingsChallengeFont.resolve(size: 12) == nil
+    {
+      fontFamilyCommandMessage = "此 Mac 未提供 Wingdings 字体，无法开始该挑战。"
+      return
+    }
     if appliesTest {
       activeChallengeID = challenge?.id
       if challenge?.id == "mouse-warrior" { showsVirtualKeyboard = true }

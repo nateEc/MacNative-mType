@@ -3084,17 +3084,27 @@ struct ChallengePresentationSnapshot: Codable, Equatable {
   let layoutFluidLayouts: [KeyboardLayout]?
   /// Nil on older archives; missing input provenance must never pass a virtual-only challenge.
   let virtualKeyboardOnly: Bool?
+  /// Optional challenge-local display evidence; historical results cannot
+  /// claim a font or hidden keymap that they never recorded.
+  let fontFamily: String?
+  let keyboardGuideMode: KeyboardGuideMode?
+  let fontStayedAvailable: Bool?
 
   init(
     liveSpeedStyle: LiveMetricStyle, paceCaretStyle: TypingCaretStyle,
     tapeMode: PracticeTapeMode, layoutFluidLayouts: [KeyboardLayout]? = nil,
-    virtualKeyboardOnly: Bool? = nil
+    virtualKeyboardOnly: Bool? = nil, fontFamily: String? = nil,
+    keyboardGuideMode: KeyboardGuideMode? = nil,
+    fontStayedAvailable: Bool? = nil
   ) {
     self.liveSpeedStyle = liveSpeedStyle
     self.paceCaretStyle = paceCaretStyle
     self.tapeMode = tapeMode
     self.layoutFluidLayouts = layoutFluidLayouts
     self.virtualKeyboardOnly = virtualKeyboardOnly
+    self.fontFamily = fontFamily
+    self.keyboardGuideMode = keyboardGuideMode
+    self.fontStayedAvailable = fontStayedAvailable
   }
 }
 

@@ -63,6 +63,9 @@ struct ChallengeConfigurationRequirements: Equatable {
   var liveSpeedStyle: LiveMetricStyle?
   var paceCaretStyle: TypingCaretStyle?
   var tapeMode: PracticeTapeMode?
+  var wordLimit: Int?
+  var fontFamily: String?
+  var keyboardGuideMode: KeyboardGuideMode?
 }
 
 struct ChallengeRequirements: Equatable {
@@ -120,6 +123,11 @@ struct ChallengeRequirements: Equatable {
       parts.append("节奏光标 \(paceCaretStyle.displayName)")
     }
     if let tapeMode = required.tapeMode { parts.append("卷带 \(tapeMode.displayName)") }
+    if let wordLimit = required.wordLimit { parts.append("词数 \(wordLimit)") }
+    if let fontFamily = required.fontFamily { parts.append("字体 \(fontFamily)") }
+    if let keyboardGuideMode = required.keyboardGuideMode {
+      parts.append("键盘图 \(keyboardGuideMode.displayName)")
+    }
     return parts.joined(separator: "、")
   }
 }
@@ -268,6 +276,9 @@ enum ChallengeEvaluator {
     if let expected = required.difficulty, actual.difficulty.rawValue != expected.rawValue {
       failures.append("难度需要为 \(expected.rawValue)（本次 \(actual.difficulty.rawValue)）")
     }
+    if let expected = required.wordLimit, actual.wordLimit != expected {
+      failures.append("词数需要为 \(expected)（本次 \(actual.wordLimit.map(String.init) ?? "未知")）")
+    }
     if let expected = required.punctuation,
       actual.contentOptions.includePunctuation != expected
     {
@@ -279,7 +290,8 @@ enum ChallengeEvaluator {
       failures.append("数字需要\(expected ? "启用" : "关闭")")
     }
     let requiresPresentation = required.liveSpeedStyle != nil || required.paceCaretStyle != nil
-      || required.tapeMode != nil
+      || required.tapeMode != nil || required.fontFamily != nil
+      || required.keyboardGuideMode != nil
     guard !requiresPresentation || presentation != nil else {
       failures.append("缺少挑战显示设置快照，无法验收")
       return
@@ -301,6 +313,16 @@ enum ChallengeEvaluator {
     {
       failures.append(
         "卷带需要为 \(expected.displayName)（本次 \(presentation?.tapeMode.displayName ?? "未知")）")
+    }
+    if let expected = required.fontFamily,
+      presentation?.fontFamily != expected || presentation?.fontStayedAvailable != true
+    {
+      failures.append("需要全程使用 \(expected) 字体，旧结果或字体回退无法验收")
+    }
+    if let expected = required.keyboardGuideMode,
+      presentation?.keyboardGuideMode != expected
+    {
+      failures.append("键盘图需要为 \(expected.displayName)")
     }
   }
 }
@@ -341,6 +363,19 @@ enum TypebarChallengeLibrary {
   ].joined(separator: " ")
 
   static let all: [TypebarChallenge] = [
+    .init(
+      id: "ten-words-of-pain",
+      title: "十词符号挑战",
+      description: "使用本机 Wingdings 字体、关闭键盘图，在大师模式下完成十词练习。",
+      legacyURLNames: ["wingdings"],
+      preset: .init(configuration: .words(10, difficulty: .master),
+        quoteID: nil, customText: nil),
+      requirements: .init(
+        wpm: .minimum(60), accuracy: .exact(100),
+        configuration: .init(mode: .words, difficulty: .master,
+          wordLimit: 10, fontFamily: "Wingdings", keyboardGuideMode: .off)),
+      dailyEligible: false
+    ),
     .init(
       id: "robot-log",
       title: "机器人日志",

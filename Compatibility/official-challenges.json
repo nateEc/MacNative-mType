@@ -104,6 +104,7 @@
     "beLikeWater": "three-layout-flow",
     "mouseWarrior": "mouse-warrior",
     "beepBoop": "robot-log",
+    "wingdings": "ten-words-of-pain",
     "simp": "single-word-thousand",
     "trueSimp": "single-word-ten-thousand",
     "simpLord": "single-word-hundred-thousand",
@@ -126,7 +127,6 @@
     "mobileWarrior",
     "upsideDown",
     "oneArmedBandit",
-    "feetWarrior",
-    "wingdings"
+    "feetWarrior"
   ]
 }

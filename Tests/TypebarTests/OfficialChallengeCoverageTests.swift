@@ -32,7 +32,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 58)
     XCTAssertEqual(fixture.officialNames.count, fixture.officialCount)
     XCTAssertEqual(official.count, fixture.officialCount)
-    XCTAssertEqual(mapped.count, 40)
+    XCTAssertEqual(mapped.count, 41)
     XCTAssertEqual(fixture.pending.count, pending.count)
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
@@ -48,6 +48,82 @@ final class OfficialChallengeCoverageTests: XCTestCase {
           challenges: TypebarChallengeLibrary.all)?.id,
         nativeID, officialName)
     }
+  }
+
+  func testWingdingsChallengeRequiresRealFontHiddenGuideAndTenMasterWords() throws {
+    let challenge = try officialChallenge("wingdings")
+    XCTAssertEqual(challenge.preset.configuration.mode, .words)
+    XCTAssertEqual(challenge.preset.configuration.wordLimit, 10)
+    XCTAssertEqual(challenge.preset.configuration.difficulty, .master)
+    XCTAssertEqual(challenge.requirements.wpm, .minimum(60))
+    XCTAssertEqual(challenge.requirements.accuracy, .exact(100))
+    XCTAssertEqual(challenge.requirements.configuration?.wordLimit, 10)
+    XCTAssertEqual(challenge.requirements.configuration?.fontFamily, "Wingdings")
+    XCTAssertEqual(challenge.requirements.configuration?.keyboardGuideMode, .off)
+    XCTAssertFalse(challenge.dailyEligible)
+
+    let start = Date(timeIntervalSince1970: 100)
+    func result(
+      configuration: TestConfiguration? = nil, wpm: Int = 60,
+      presentation: ChallengePresentationSnapshot? = nil
+    ) -> CompletedTestResult {
+      .init(id: UUID(), configuration: configuration ?? challenge.preset.configuration,
+        outcome: .completed, startedAt: start,
+        finishedAt: start.addingTimeInterval(10),
+        typedCharacterCount: 50, correctCharacterCount: 50,
+        errorCount: 0, wpm: wpm, rawWpm: wpm, accuracy: 100,
+        prompt: "one two three four five six seven eight nine ten",
+        challengePresentation: presentation)
+    }
+    let valid = ChallengePresentationSnapshot(
+      liveSpeedStyle: .off, paceCaretStyle: .off, tapeMode: .off,
+      fontFamily: "Wingdings", keyboardGuideMode: .off,
+      fontStayedAvailable: true)
+    var nativeSession = TestSessionFactory.make(
+      configuration: challenge.preset.configuration.with(challengeID: challenge.id))
+    let nativePrompt = nativeSession.prompt
+    XCTAssertEqual(nativePrompt.split(separator: " ").count, 10)
+    nativeSession.insertBatch(String(nativePrompt.prefix(5)), at: start)
+    nativeSession.insertBatch(String(nativePrompt.dropFirst(5)),
+      at: start.addingTimeInterval(1))
+    let nativeResult = try XCTUnwrap(nativeSession.result(challengePresentation: valid))
+    XCTAssertEqual(nativeResult.outcome, .completed)
+    XCTAssertTrue(ChallengeEvaluator.evaluate(nativeResult, challenge: challenge).passed)
+    if let installedFont = WingdingsChallengeFont.resolve(size: 12) {
+      XCTAssertEqual(installedFont.familyName, "Wingdings")
+    }
+    XCTAssertTrue(ChallengeEvaluator.evaluate(result(presentation: valid),
+      challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(), challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(wpm: 59, presentation: valid),
+      challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(
+      configuration: .words(25, difficulty: .master), presentation: valid),
+      challenge: challenge).passed)
+    XCTAssertFalse(ChallengeEvaluator.evaluate(result(
+      configuration: .words(10), presentation: valid), challenge: challenge).passed)
+    for invalid in [
+      ChallengePresentationSnapshot(liveSpeedStyle: .off, paceCaretStyle: .off,
+        tapeMode: .off, fontFamily: "Wingdings 2", keyboardGuideMode: .off,
+        fontStayedAvailable: true),
+      ChallengePresentationSnapshot(liveSpeedStyle: .off, paceCaretStyle: .off,
+        tapeMode: .off, fontFamily: "Wingdings", keyboardGuideMode: .next,
+        fontStayedAvailable: true),
+      ChallengePresentationSnapshot(liveSpeedStyle: .off, paceCaretStyle: .off,
+        tapeMode: .off, fontFamily: "Wingdings", keyboardGuideMode: .off,
+        fontStayedAvailable: false),
+    ] {
+      XCTAssertFalse(ChallengeEvaluator.evaluate(result(presentation: invalid),
+        challenge: challenge).passed)
+    }
+    let restored = try JSONDecoder().decode(ChallengePresentationSnapshot.self,
+      from: JSONEncoder().encode(valid))
+    XCTAssertEqual(restored.fontFamily, "Wingdings")
+    let old = try JSONDecoder().decode(ChallengePresentationSnapshot.self,
+      from: Data(#"{"liveSpeedStyle":"off","paceCaretStyle":"off","tapeMode":"off"}"#.utf8))
+    XCTAssertNil(old.fontFamily)
+    XCTAssertNil(old.keyboardGuideMode)
+    XCTAssertNil(old.fontStayedAvailable)
   }
 
   func testBeepBoopUsesIndependentCompleteNoSpaceScriptAndExactScoring() throws {
