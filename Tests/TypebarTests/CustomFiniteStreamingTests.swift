@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import XCTest
 
 @testable import Typebar
@@ -92,5 +93,34 @@ final class CustomFiniteStreamingTests: XCTestCase {
     session.insert(String(source.dropFirst(first.count)), at: start)
     XCTAssertEqual(session.prompt, source)
     XCTAssertEqual(session.result()?.outcome, .completed)
+  }
+
+  func testVerifiedReferenceScriptStreamsBeyondSavedTextLimitInOneAttempt() throws {
+    let source = String(repeating: "amber harbor ", count: 46_200) + "end"
+    XCTAssertGreaterThan(source.count, 600_000)
+    XCTAssertNil(CustomFiniteTextStream(source: source))
+    let digest = SHA256.hash(data: Data(source.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let specification = ReferenceScriptChallengePolicy.Specification(
+      legacyName: "synthetic", fileName: "synthetic.txt", byteCount: source.utf8.count,
+      normalizedCharacterCount: source.count, normalizedSHA256: digest)
+    let verified = try ReferenceScriptChallengePolicy.verifiedScript(
+      Data(source.utf8), for: specification)
+    let first = LongSavedTextProgress.nextChunk(in: source, after: 0)
+    let configuration = TestConfiguration(
+      mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(), customTextCompletion: .finish)
+    var session = TestSessionFactory.make(
+      configuration: configuration, customText: first, verifiedScript: verified)
+    XCTAssertEqual(session.prompt, first)
+    session.insert(first, at: start)
+    XCTAssertFalse(session.isFinished)
+    session.insert(String(source.dropFirst(first.count)), at: start.addingTimeInterval(1))
+    let completed = try XCTUnwrap(session.result())
+    XCTAssertEqual(completed.outcome, .completed)
+    XCTAssertEqual(session.prompt, source)
+    let restored = try XCTUnwrap(TestResultRecord(result: completed).portableResult)
+    XCTAssertEqual(restored.prompt, source)
+    XCTAssertEqual(restored.outcome, .completed)
   }
 }

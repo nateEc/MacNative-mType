@@ -5170,6 +5170,7 @@ struct TestSessionFactory {
     configuration: TestConfiguration,
     customText: String = "",
     finiteTextSource: String? = nil,
+    verifiedScript: ReferenceScriptChallengePolicy.VerifiedScript? = nil,
     quote: OfflineQuote? = nil,
     streamPrompt: String? = nil,
     streamNoSpaceBoundarySource: String? = nil,
@@ -5255,7 +5256,20 @@ struct TestSessionFactory {
             return length
           }
         } else {
-          if configuration.customTextCompletion == .finish,
+          if configuration.customTextCompletion == .finish, let verifiedScript {
+            if var stream = CustomFiniteTextStream(
+              source: verifiedScript.text,
+              maximumCharacters: ReferenceScriptChallengePolicy.maximumImportedBytes,
+              maximumBytes: ReferenceScriptChallengePolicy.maximumImportedBytes)
+            {
+              prompt = stream.nextChunk()
+              finiteCustomTextStream = stream
+            } else {
+              // A short verified script fits in one finite prompt. If a future
+              // pinned script has a >10k token, keep it whole, never truncate.
+              prompt = verifiedScript.text
+            }
+          } else if configuration.customTextCompletion == .finish,
             let finiteTextSource,
             var stream = CustomFiniteTextStream(source: finiteTextSource)
           {
@@ -5368,10 +5382,21 @@ struct CustomFiniteTextStream {
   private let source: String
   private var offset = 0
 
-  init?(source: String) {
-    guard source.count > CustomTextPolicy.maximumLength,
-      CustomTextPolicy.isValidSavedText(title: "Long text", text: source, longProgress: 0)
+  init?(
+    source: String,
+    maximumCharacters: Int = CustomTextPolicy.maximumLongSavedLength,
+    maximumBytes: Int = CustomTextPolicy.maximumLongSavedLength * 4
+  ) {
+    let count = source.count
+    guard count > CustomTextPolicy.maximumLength,
+      count <= maximumCharacters, source.utf8.count <= maximumBytes
     else { return nil }
+    var validated = 0
+    while validated < count {
+      let chunk = LongSavedTextProgress.nextChunk(in: source, after: validated)
+      guard CustomTextPolicy.isValid(chunk) else { return nil }
+      validated += chunk.count
+    }
     self.source = source
   }
 

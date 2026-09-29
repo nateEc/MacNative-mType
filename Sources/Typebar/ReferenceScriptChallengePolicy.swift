@@ -14,6 +14,16 @@ enum ReferenceScriptChallengePolicy {
     let normalizedSHA256: String
   }
 
+  struct VerifiedScript {
+    let text: String
+    let specification: Specification
+
+    fileprivate init(text: String, specification: Specification) {
+      self.text = text
+      self.specification = specification
+    }
+  }
+
   enum ImportError: LocalizedError, Equatable {
     case tooLarge, invalidEncoding, contentMismatch
 
@@ -81,6 +91,10 @@ enum ReferenceScriptChallengePolicy {
       throw ImportError.contentMismatch
     }
     return text
+  }
+
+  static func verifiedScript(_ data: Data, for specification: Specification) throws -> VerifiedScript {
+    try .init(text: verifiedText(data, for: specification), specification: specification)
   }
 
   /// Matches the fixed web loader: trim, replace CR/LF/TAB/space with a
