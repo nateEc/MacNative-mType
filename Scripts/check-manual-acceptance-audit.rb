@@ -9,7 +9,7 @@ SCENARIO_ID = /\A[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*\z/
 ALLOWED_STATUS = /\A(?:已验收|待验收|部分验收)(?:（.*）)?\z/
 REQUIRED_SINGLE_INSTANCE_RULES = [
   "一次只运行一个 Typebar 图形实例",
-  "pgrep -alf -x \"$process_name\"",
+  "pgrep -l -x \"$process_name\"",
   "swift-frontend",
   "swift-driver",
   "swiftc"
@@ -73,7 +73,7 @@ def self_test
       # Typebar 人工验收记录
 
       一次只运行一个 Typebar 图形实例。
-      `pgrep -alf -x "$process_name"` 会在启动前检查 Typebar。
+      `pgrep -l -x "$process_name"` 会在启动前检查 Typebar。
       `swift-frontend`、`swift-driver` 和 `swiftc` 也必须全部退出。
 
       | ID | 场景 | 操作 | 期望结果 | 状态 |

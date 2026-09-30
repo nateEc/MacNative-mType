@@ -35,7 +35,7 @@ require_no_conflicting_processes() {
   integer found_conflict=0
 
   for process_name in Typebar xctest swift-test; do
-    if process_output="$(pgrep -alf -x "$process_name")"; then
+    if process_output="$(pgrep -l -x "$process_name")"; then
       print -u2 -- "active $process_name process prevents a single-instance readiness check:"
       print -u2 -- "$process_output"
       found_conflict=1
