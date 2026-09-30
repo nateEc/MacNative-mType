@@ -237,18 +237,24 @@ final class CustomSequentialStreamingTests: XCTestCase {
     try XCTSkipUnless(
       ProcessInfo.processInfo.environment["TYPEBAR_ENDURANCE_TESTS"] == "1",
       "Run explicitly with TYPEBAR_ENDURANCE_TESTS=1")
-    let configuration = TestConfiguration(
-      mode: .custom, duration: nil, wordLimit: 100_000, difficulty: .normal,
-      rules: .init(), customTextCompletion: .words, customTextOrdering: .inOrder)
-    var session = TestSessionFactory.make(configuration: configuration, customText: "typebar")
+    let challenge = try XCTUnwrap(
+      TypebarChallengeLibrary.challenge(id: "single-word-hundred-thousand"))
+    let configuration = challenge.preset.configuration.with(challengeID: challenge.id)
+    var session = TestSessionFactory.make(
+      configuration: configuration,
+      customText: try XCTUnwrap(challenge.preset.customText))
+    XCTAssertEqual(session.prompt.split(separator: " ").count, 100)
     for word in 0..<100_000 {
       session.insert(word == 99_999 ? "typebar" : "typebar ", at: start)
       if (word + 1).isMultiple(of: 1_000) {
         XCTAssertEqual(session.completedWordCount, word + 1)
       }
+      if word == 99_998 { XCTAssertFalse(session.isFinished) }
     }
     XCTAssertEqual(session.completedWordCount, 100_000)
-    XCTAssertEqual(session.result()?.outcome, .completed)
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.outcome, .completed)
+    XCTAssertTrue(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
   }
 
   func testPromptCacheResegmentsCombiningCharacterAcrossRepeatedChunk() {
