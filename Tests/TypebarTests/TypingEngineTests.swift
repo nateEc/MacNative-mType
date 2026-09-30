@@ -10922,6 +10922,60 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testPythonPracticeTiersGrowAsDistinctCompilableUnits() throws {
+    let languages: [TypingLanguage] = [
+      .codePython, .codePython1k, .codePython2k, .codePython5k,
+    ]
+    for language in languages {
+      for target in [1, 25, 100, 800] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let units = prompt.split(separator: "\n").compactMap { line -> String? in
+          guard line.hasPrefix("def practice_unit_") else { return nil }
+          return String(line.prefix(while: { $0 != "(" }))
+        }
+        let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+        XCTAssertEqual(units.count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertEqual(Set(units).count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertFalse(prompt.contains("for item in items:"), language.displayName)
+        XCTAssertFalse(prompt.contains("\t"), language.displayName)
+      }
+
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
+      let start = Date(timeIntervalSince1970: 3_000)
+      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      for character in prompt {
+        session.insert(String(character), at: start)
+      }
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+
+    let tierPrompts = languages.map {
+      CodePracticeContent.prompt(language: $0, targetTokenCount: 100)
+    }
+    XCTAssertEqual(Set(tierPrompts).count, languages.count)
+
+    for language in languages {
+      for target in [25, 100] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let parser = Process()
+        parser.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        parser.arguments = ["-c", "import sys; compile(sys.stdin.read(), '<practice>', 'exec')"]
+        let input = Pipe()
+        let diagnostics = Pipe()
+        parser.standardInput = input
+        parser.standardError = diagnostics
+        try parser.run()
+        input.fileHandleForWriting.write(Data(prompt.utf8))
+        try input.fileHandleForWriting.close()
+        parser.waitUntilExit()
+        let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        XCTAssertEqual(parser.terminationStatus, 0, "\(language.displayName), target=\(target): \(errors)")
+      }
+    }
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")

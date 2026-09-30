@@ -5013,6 +5013,11 @@ enum CodeLanguageCatalog {
 enum CodePracticeContent {
   static func prompt(language: TypingLanguage, targetTokenCount: Int) -> String {
     let blockCount = max(1, Int(ceil(Double(max(targetTokenCount, 1)) / 8)))
+    if language == .codePython || language == .codePython1k
+      || language == .codePython2k || language == .codePython5k
+    {
+      return (0..<blockCount).map { pythonBlock(at: $0, language: language) }.joined(separator: "\n")
+    }
     if language == .codeJavaScript || language == .codeJavaScript1k {
       return (0..<blockCount).map {
         javascriptBlock(at: $0, extended: language == .codeJavaScript1k)
@@ -5026,6 +5031,76 @@ enum CodePracticeContent {
     }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
+  }
+
+  private static func pythonBlock(at index: Int, language: TypingLanguage) -> String {
+    if index == 0 {
+      switch language {
+      case .codePython:
+        return "def practice_unit_0(values):\n    return sum(values)"
+      case .codePython1k:
+        return "def practice_unit_0(values):\n    return {value: value * 2 for value in values}"
+      case .codePython2k:
+        return "def practice_unit_0(records):\n    return [record[\"name\"] for record in records if \"name\" in record]"
+      case .codePython5k:
+        return "from collections import Counter\n\ndef practice_unit_0(values):\n    return Counter(values)"
+      default:
+        preconditionFailure("Only Python code choices may use Python practice blocks")
+      }
+    }
+    let parameter = language == .codePython2k ? "records" : "values"
+    let body: String
+    switch language {
+    case .codePython:
+      switch index % 6 {
+      case 0: body = "return sum(value for value in values if value > \(index))"
+      case 1: body = "return [value + \(index) for value in values]"
+      case 2:
+        body = "total = \(index)\n    for value in values:\n        total += value\n    return total"
+      case 3: body = "return values[:\(index)]"
+      case 4: body = "return any(value == \(index) for value in values)"
+      default: body = "return len(values) + \(index)"
+      }
+    case .codePython1k:
+      switch index % 6 {
+      case 0: body = "return {value for value in values if value > \(index)}"
+      case 1: body = "return {position: value for position, value in enumerate(values, \(index))}"
+      case 2: body = "return [(position, value) for position, value in enumerate(values)] + [(\(index), 0)]"
+      case 3: body = "return tuple(sorted(value + \(index) for value in values))"
+      case 4: body = "return [(left, right) for left in values for right in values if left + right == \(index)]"
+      default: body = "return {position + \(index): value for position, value in enumerate(values)}"
+      }
+    case .codePython2k:
+      switch index % 6 {
+      case 0:
+        body = "return {record[\"id\"]: record.get(\"score\", 0) for record in records if \"id\" in record}"
+      case 1:
+        body = "return sorted(records, key=lambda record: record.get(\"score\", \(index)))"
+      case 2:
+        body = "return [record.get(\"name\", \"\") + str(\(index)) for record in records]"
+      case 3:
+        body = "count = \(index)\n    for record in records:\n        if record.get(\"active\"):\n            count += 1\n    return count"
+      case 4:
+        body = "return all(record.get(\"score\", 0) >= \(index) for record in records)"
+      default:
+        body = "return tuple(record.get(\"id\") for record in records) + (\(index),)"
+      }
+    case .codePython5k:
+      switch index % 6 {
+      case 0: body = "return Counter(value for value in values if value > \(index))"
+      case 1: body = "counts = Counter(values)\n    return counts.most_common(\(index))"
+      case 2:
+        body = "return sum(value * count for value, count in Counter(values).items()) + \(index)"
+      case 3:
+        body = "return {value: count for value, count in Counter(values).items() if count > \(index % 4 + 1)}"
+      case 4: body = "return sum(Counter(values).values()) + \(index)"
+      default:
+        body = "return sorted(Counter(values).items(), key=lambda pair: (-pair[1], pair[0]))[:\(index)]"
+      }
+    default:
+      preconditionFailure("Only Python code choices may use Python practice blocks")
+    }
+    return "def practice_unit_\(index)(\(parameter)):\n    \(body)"
   }
 
   private static func javascriptBlock(at index: Int, extended: Bool) -> String {
@@ -5169,7 +5244,7 @@ enum CodePracticeContent {
     case .codeJavaScript, .codeJavaScript1k:
       (0..<3).map { javascriptBlock(at: $0, extended: language == .codeJavaScript1k) }
     case .codePython, .codePython1k, .codePython2k, .codePython5k:
-      ["total = sum(values)", "for item in items:\n\tprint(item)", "if total > limit:\n\treturn total"]
+      (0..<3).map { pythonBlock(at: $0, language: language) }
     case .codeYoptaScript:
       ["участковый счет = 0 нах",
        "йопта удвоить(значение) {\n\tотвечаю значение * 2 нах\n}",
