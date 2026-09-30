@@ -5066,6 +5066,20 @@ enum CodePracticeContent {
     if language == .codeDart {
       return (0..<blockCount).map(dartBlock).joined(separator: "\n")
     }
+    if language == .codeRust {
+      return (0..<blockCount).map(rustBlock).joined(separator: "\n")
+    }
+    if language == .codeKotlin {
+      return (0..<blockCount).map(kotlinBlock).joined(separator: "\n")
+    }
+    if language == .codeTypeScript {
+      return (0..<blockCount).map(typeScriptBlock).joined(separator: "\n")
+    }
+    if language == .codeJavaScriptReact {
+      return "import React from \"react\";\n"
+        + (0..<blockCount).map(reactBlock).joined(separator: "\n")
+        + "\nexport default PracticeCard0;"
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5449,8 +5463,30 @@ enum CodePracticeContent {
     return "\(header)int practiceUnit\(index)(List<int> values) {\n  \(body)\n}"
   }
 
+  private static func rustBlock(at index: Int) -> String {
+    let header = index == 0 ? "fn main(){println!(\"{}\",practice_unit0(&[2,3,5]));}\n" : ""
+    return "\(header)fn practice_unit\(index)(values:&[i32])->i32{\n  values.iter().sum::<i32>()+\(index)\n}"
+  }
+
+  private static func kotlinBlock(at index: Int) -> String {
+    let header = index == 0 ? "fun main(){println(practiceUnit0(listOf(2,3,5)))}\n" : ""
+    return "\(header)fun practiceUnit\(index)(values:List<Int>):Int{\n  return values.sum()+\(index)\n}"
+  }
+
+  private static func typeScriptBlock(at index: Int) -> String {
+    let header = index == 0 ? "type Entry={score: number};\n" : ""
+    return "\(header)function practiceUnit\(index)(values:number[]):number{\n  return values.reduce((sum,value)=>sum+value,\(index));\n}"
+  }
+
+  private static func reactBlock(at index: Int) -> String {
+    "function PracticeCard\(index)(){return <span>Ready\(index)</span>;}"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
-    let tokens = blocks(for: language).flatMap {
+    let content = language.isCodeLanguage
+      ? [prompt(language: language, targetTokenCount: 24)]
+      : blocks(for: language)
+    let tokens = content.flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
     }
     return tokens.isEmpty ? [language.displayName] : tokens
@@ -5466,10 +5502,6 @@ enum CodePracticeContent {
       ]
     case .codeSwift:
       (0..<3).map(swiftBlock)
-    case .codeRust:
-      ["fn main() {\n\tlet total = 3;\n\tprintln!(\"total: {total}\");\n}",
-       "let doubled: Vec<i32> = values.iter().map(|value| value * 2).collect();",
-       "if total > limit {\n\treturn Some(total);\n}"]
     case .codeGo:
       (0..<3).map(goBlock)
     case .codeJava:
@@ -5478,18 +5510,6 @@ enum CodePracticeContent {
       (0..<3).map(cBlock)
     case .codeCPP:
       (0..<3).map(cppBlock)
-    case .codeKotlin:
-      ["fun total(values: List<Int>): Int {\n\treturn values.sum()\n}",
-       "for (item in items) {\n\tprintln(item)\n}",
-       "if (total > limit) {\n\treturn total\n}"]
-    case .codeTypeScript:
-      ["const total: number = values.reduce((sum: number, value: number) => sum + value, 0);",
-       "type Entry = { name: string; score: number };",
-       "function label(entry: Entry): string {\n\treturn entry.name;\n}"]
-    case .codeJavaScriptReact:
-      ["function PracticeCard() {\n\treturn <span>Ready</span>;\n}",
-       "const items = [\"one\", \"two\"].map((name) => <li key={name}>{name}</li>);",
-       "export default PracticeCard;"]
     case .codeJavaScript, .codeJavaScript1k:
       (0..<3).map { javascriptBlock(at: $0, extended: language == .codeJavaScript1k) }
     case .codePython, .codePython1k, .codePython2k, .codePython5k:

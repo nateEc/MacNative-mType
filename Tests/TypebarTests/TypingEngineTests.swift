@@ -10649,7 +10649,7 @@ final class TypingEngineTests: XCTestCase {
       (.codeJava, "class Practice"),
       (.codeC, "#include <stdio.h>"),
       (.codeCPP, "#include <iostream>"),
-      (.codeKotlin, "fun total("),
+      (.codeKotlin, "fun practiceUnit0("),
       (.codePowerShell, "Get-ChildItem"),
       (.codeTypeScript, ": number"),
       (.codeJavaScriptReact, "<span>"),
@@ -11312,6 +11312,64 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(session.isFinished)
     XCTAssertEqual(session.typed, prompt)
     XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
+  func testTypedCodePracticeChoicesGrowWithoutReplayingTopLevelFragments() {
+    let choices: [(TypingLanguage, String, String, String)] = [
+      (.codeRust, "fn main()", "fn practice_unit", "fn practice_unit0"),
+      (.codeKotlin, "fun main()", "fun practiceUnit", "fun practiceUnit0"),
+      (.codeTypeScript, "type Entry=", "function practiceUnit", "function practiceUnit0"),
+      (.codeJavaScriptReact, "import React from", "function PracticeCard", "function PracticeCard0"),
+    ]
+    for (language, opening, unitPrefix, firstUnit) in choices {
+      for target in [1, 25, 100, 800] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let units = prompt.split(separator: "\n").compactMap { line -> String? in
+          guard line.hasPrefix(unitPrefix) else { return nil }
+          return String(line.prefix(while: { $0 != "(" }))
+        }
+        let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+        XCTAssertEqual(prompt.components(separatedBy: opening).count - 1, 1, "\(language), target=\(target)")
+        XCTAssertEqual(units.count, expectedCount, "\(language), target=\(target)")
+        XCTAssertEqual(Set(units).count, expectedCount, "\(language), target=\(target)")
+        XCTAssertTrue(prompt.contains(firstUnit), "\(language), target=\(target)")
+        XCTAssertFalse(prompt.contains("for (item in items)"), "\(language), target=\(target)")
+        XCTAssertFalse(prompt.contains("if (total > limit)"), "\(language), target=\(target)")
+        if language == .codeJavaScriptReact {
+          XCTAssertEqual(prompt.components(separatedBy: "export default PracticeCard0;").count - 1, 1)
+          XCTAssertTrue(prompt.hasSuffix("export default PracticeCard0;"))
+        }
+      }
+
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
+      let start = Date(timeIntervalSince1970: 3_000)
+      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      for character in prompt {
+        session.insert(String(character), at: start)
+      }
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+  }
+
+  func testGeneratedCodeChoicesKeepTheirSyntaxInMixedLanguageTokens() {
+    let choices: [(TypingLanguage, String)] = [
+      (.codeDart, "practiceUnit0"),
+      (.codeRust, "practice_unit0"),
+      (.codeKotlin, "practiceUnit0"),
+      (.codeTypeScript, "practiceUnit0"),
+      (.codeJavaScriptReact, "PracticeCard0"),
+    ]
+    for (language, marker) in choices {
+      let tokens = CodePracticeContent.polyglotTokens(for: language).joined(separator: " ")
+      XCTAssertTrue(tokens.contains(marker), language.displayName)
+      XCTAssertFalse(tokens.contains("collect(values)"), language.displayName)
+    }
+    for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
+      let tokens = CodePracticeContent.polyglotTokens(for: language).joined(separator: " ")
+      XCTAssertFalse(tokens.contains("collect(values)"), language.displayName)
+    }
   }
 
   func testVimscriptPracticeGrowsAsDistinctRunnableFunctions() throws {
