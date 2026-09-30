@@ -1,5 +1,6 @@
 import AppKit
 import Charts
+import QuartzCore
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
@@ -456,8 +457,7 @@ private struct TapePracticePrompt: View {
 
 private struct ChooPracticePrompt: View {
   let glyphs: [TypingPromptGlyph]
-  let font: Font
-  let fontSize: Double
+  let font: NSFont
   let accent: Color
   let isEnabled: Bool
   let reducesMotion: Bool
@@ -470,56 +470,177 @@ private struct ChooPracticePrompt: View {
       isEnabled: isEnabled, reducesMotion: reducesMotion,
       systemReducedMotion: systemReduceMotion,
       ignoresSystemReducedMotion: ignoresSystemReducedMotion)
-    return Group {
-      if animates {
-        TimelineView(
-          .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
-        ) { timeline in
-          prompt(at: timeline.date, animates: true)
-        }
-      } else {
-        prompt(at: .distantPast, animates: false)
+    return ChooLayerPrompt(glyphs: glyphs, font: font, accent: NSColor(accent),
+                           animates: animates, frameRate: animationFrameRate)
+      .accessibilityLabel("旋转文字练习提示")
+  }
+}
+
+private struct ChooLayerPrompt: NSViewRepresentable {
+  let glyphs: [TypingPromptGlyph]
+  let font: NSFont
+  let accent: NSColor
+  let animates: Bool
+  let frameRate: Int
+
+  func makeNSView(context: Context) -> ChooLayerView { ChooLayerView() }
+
+  func updateNSView(_ view: ChooLayerView, context: Context) {
+    view.configure(glyphs: glyphs, font: font, accent: accent,
+                   animates: animates, frameRate: frameRate)
+  }
+
+  func sizeThatFits(_ proposal: ProposedViewSize, nsView: ChooLayerView, context: Context) -> CGSize? {
+    let width = max(1, proposal.width ?? nsView.bounds.width)
+    return CGSize(width: width, height: ChooLayerView.measure(glyphs: glyphs, font: font, width: width))
+  }
+}
+
+private final class ChooLayerView: NSView {
+  private var glyphs: [TypingPromptGlyph] = []
+  private var glyphLayers: [CATextLayer?] = []
+  private var promptFont = NSFont.monospacedSystemFont(ofSize: 18, weight: .regular)
+  private var accent = NSColor.controlAccentColor
+  private var animates = false
+  private var frameRate = AnimationFrameRatePolicy.nativeFrameRate
+  private var appearanceName: NSAppearance.Name?
+
+  override var isFlipped: Bool { true }
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    wantsLayer = true
+    layer?.isGeometryFlipped = true
+    setAccessibilityElement(true)
+    setAccessibilityRole(.staticText)
+  }
+
+  required init?(coder: NSCoder) { fatalError("ChooLayerView is created in code") }
+
+  func configure(glyphs: [TypingPromptGlyph], font: NSFont, accent: NSColor,
+                 animates: Bool, frameRate: Int) {
+    let needsRebuild = glyphLayers.count != glyphs.count
+      || zip(glyphLayers, glyphs).contains { layer, glyph in
+        (layer == nil) != (glyph.character == "\n")
+      }
+    let changesLayout = needsRebuild || self.glyphs != glyphs || promptFont != font
+    let changesStyle = changesLayout || self.accent != accent || appearanceName != effectiveAppearance.name
+    let changesAnimation = self.animates != animates || self.frameRate != frameRate
+    self.glyphs = glyphs
+    promptFont = font
+    self.accent = accent
+    self.animates = animates
+    self.frameRate = frameRate
+    appearanceName = effectiveAppearance.name
+    if needsRebuild {
+      glyphLayers.forEach { $0?.removeFromSuperlayer() }
+      glyphLayers = glyphs.map { glyph in
+        guard glyph.character != "\n" else { return nil }
+        let text = CATextLayer()
+        text.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        text.alignmentMode = .left
+        text.isWrapped = false
+        layer?.addSublayer(text)
+        return text
       }
     }
+    if changesStyle { applyStyles() }
+    if changesLayout { layoutGlyphs() }
+    if changesAnimation || needsRebuild { updateAnimations() }
+    setAccessibilityLabel(glyphs.map { String($0.typedCharacter ?? $0.character) }.joined())
   }
 
-  private func prompt(at date: Date, animates: Bool) -> some View {
-    PromptFlowLayout {
-      ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
-        if glyph.character == "\n" {
-          Color.clear.frame(width: 0, height: 0)
-            .layoutValue(key: PromptLineBreakKey.self, value: true)
-        } else {
-          Text(String(glyph.typedCharacter ?? glyph.character))
-            .font(font)
-            .foregroundStyle(color(for: glyph))
-            .background(background(for: glyph))
-            .rotation3DEffect(
-              .degrees(ChooVisualPolicy.rotationDegrees(
-                at: date, glyphIndex: index, isEnabled: animates,
-                reducesMotion: !animates)),
-              axis: (x: 0, y: 1, z: 0))
-        }
+  override func layout() {
+    super.layout()
+    layoutGlyphs()
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    appearanceName = effectiveAppearance.name
+    applyStyles()
+  }
+
+  private func applyStyles() {
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    for (glyph, text) in zip(glyphs, glyphLayers) {
+      guard let text else { continue }
+      text.string = String(glyph.typedCharacter ?? glyph.character)
+      text.font = promptFont
+      text.fontSize = promptFont.pointSize
+      switch glyph.state {
+      case .correct: text.foregroundColor = NSColor.labelColor.cgColor
+      case .incorrect, .extra: text.foregroundColor = NSColor.systemRed.cgColor
+      case .current: text.foregroundColor = accent.cgColor
+      case .pending: text.foregroundColor = NSColor.secondaryLabelColor.withAlphaComponent(0.55).cgColor
+      case .hidden: text.foregroundColor = NSColor.clear.cgColor
+      }
+      switch glyph.state {
+      case .incorrect: text.backgroundColor = NSColor.systemRed.withAlphaComponent(0.16).cgColor
+      case .extra: text.backgroundColor = NSColor.systemRed.withAlphaComponent(0.12).cgColor
+      case .current: text.backgroundColor = accent.withAlphaComponent(0.18).cgColor
+      default: text.backgroundColor = nil
       }
     }
+    CATransaction.commit()
   }
 
-  private func color(for glyph: TypingPromptGlyph) -> Color {
-    switch glyph.state {
-    case .correct: .primary
-    case .incorrect, .extra: .red
-    case .current: accent
-    case .pending: .secondary.opacity(0.55)
-    case .hidden: .clear
+  static func measure(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat) -> CGFloat {
+    layoutFrames(glyphs: glyphs, font: font, width: width).height
+  }
+
+  private func layoutGlyphs() {
+    guard !glyphLayers.isEmpty else { return }
+    let result = Self.layoutFrames(glyphs: glyphs, font: promptFont, width: max(1, bounds.width))
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    for (text, frame) in zip(glyphLayers, result.frames) {
+      if let text, let frame { text.frame = frame }
     }
+    CATransaction.commit()
   }
 
-  @ViewBuilder private func background(for glyph: TypingPromptGlyph) -> some View {
-    switch glyph.state {
-    case .incorrect: Color.red.opacity(0.16)
-    case .extra: Color.red.opacity(0.12)
-    case .current: accent.opacity(0.18)
-    default: Color.clear
+  private static func layoutFrames(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat)
+    -> (frames: [CGRect?], height: CGFloat) {
+    let lineHeight = ceil(font.ascender - font.descender + font.leading)
+    var x: CGFloat = 0
+    var y: CGFloat = 0
+    var frames: [CGRect?] = []
+    for glyph in glyphs {
+      if glyph.character == "\n" {
+        frames.append(nil)
+        x = 0
+        y += lineHeight + 12
+        continue
+      }
+      let value = String(glyph.typedCharacter ?? glyph.character) as NSString
+      let advance = max(1, ceil(value.size(withAttributes: [.font: font]).width))
+      if x > 0 && x + advance > width {
+        x = 0
+        y += lineHeight + 12
+      }
+      frames.append(CGRect(x: x, y: y, width: advance + 2, height: lineHeight))
+      x += advance
+    }
+    return (frames, y + lineHeight)
+  }
+
+  private func updateAnimations() {
+    for text in glyphLayers.compactMap({ $0 }) {
+      text.removeAnimation(forKey: "chooRotation")
+      guard animates else { continue }
+      let animation = CABasicAnimation(keyPath: "transform.rotation.z")
+      animation.fromValue = 0
+      animation.toValue = 2 * Double.pi
+      animation.duration = ChooVisualPolicy.cycleDuration
+      animation.repeatCount = .infinity
+      animation.timingFunction = CAMediaTimingFunction(name: .linear)
+      if frameRate != AnimationFrameRatePolicy.nativeFrameRate {
+        let rate = Float(AnimationFrameRatePolicy.normalized(frameRate))
+        animation.preferredFrameRateRange = CAFrameRateRange(minimum: rate, maximum: rate, preferred: rate)
+      }
+      text.add(animation, forKey: "chooRotation")
     }
   }
 }
@@ -2453,8 +2574,7 @@ private struct ContentView: View {
       } else if practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
           glyphs: session.promptGlyphs,
-          font: Font(practicePromptNSFont(size: settings.fontSize)),
-          fontSize: settings.fontSize, accent: activeTheme.accent,
+          font: practicePromptNSFont(size: settings.fontSize), accent: activeTheme.accent,
           isEnabled: true, reducesMotion: settings.reducePracticeMotion,
           ignoresSystemReducedMotion: !VisualFunboxReducedMotionPolicy
             .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers))

@@ -20995,6 +20995,22 @@ final class TypingEngineTests: XCTestCase {
       systemReducedMotion: false, ignoresSystemReducedMotion: true))
   }
 
+  func testChooRotationMatchesTwoSecondPlanarCycle() {
+    let zero = Date(timeIntervalSinceReferenceDate: 0)
+    for (seconds, expected) in [(0.0, 0.0), (0.5, 90.0), (1.0, 180.0), (1.5, 270.0), (2.0, 0.0)] {
+      XCTAssertEqual(
+        ChooVisualPolicy.rotationDegrees(
+          at: zero.addingTimeInterval(seconds), isEnabled: true, reducesMotion: false),
+        expected, accuracy: 0.000_001)
+    }
+    XCTAssertEqual(
+      ChooVisualPolicy.rotationDegrees(at: zero.addingTimeInterval(1), isEnabled: false, reducesMotion: false),
+      0)
+    XCTAssertEqual(
+      ChooVisualPolicy.rotationDegrees(at: zero.addingTimeInterval(1), isEnabled: true, reducesMotion: true),
+      0)
+  }
+
   func testVisualModifiersApplyOnlyToThePracticePresentation() {
     XCTAssertEqual(PracticeVisualTransform.make(modifiers: []), .init(horizontalScale: 1, rotationDegrees: 0))
     XCTAssertEqual(
@@ -21082,18 +21098,18 @@ final class TypingEngineTests: XCTestCase {
       RoundVisualPolicy.rotationDegrees(at: start, isEnabled: true, reducesMotion: false), 360)
     XCTAssertEqual(
       ChooVisualPolicy.rotationDegrees(
-        at: start, glyphIndex: 4, isEnabled: false, reducesMotion: false), 0)
+        at: start, isEnabled: false, reducesMotion: false), 0)
     XCTAssertEqual(
       ChooVisualPolicy.rotationDegrees(
-        at: start, glyphIndex: 4, isEnabled: true, reducesMotion: true), 0)
+        at: start, isEnabled: true, reducesMotion: true), 0)
     let chooSystemMotion = VisualFunboxReducedMotionPolicy.shouldReduceMotion(
       modifiers: [.chooVisual], typebarRequested: false, systemRequested: true)
     XCTAssertNotEqual(
       ChooVisualPolicy.rotationDegrees(
-        at: animatedMoment, glyphIndex: 4, isEnabled: true, reducesMotion: chooSystemMotion), 0)
+        at: animatedMoment, isEnabled: true, reducesMotion: chooSystemMotion), 0)
     XCTAssertNotEqual(
       ChooVisualPolicy.rotationDegrees(
-        at: start, glyphIndex: 4, isEnabled: true, reducesMotion: false), 0)
+        at: Date(timeIntervalSinceReferenceDate: 0.5), isEnabled: true, reducesMotion: false), 0)
     XCTAssertEqual(
       LayoutFluidPolicy.activeLayout(
         completedWords: 0, wordLimit: 30, layouts: [.ansiQwerty, .ansiColemak, .ansiDvorak]),

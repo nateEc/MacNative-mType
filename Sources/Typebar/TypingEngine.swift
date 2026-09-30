@@ -1542,11 +1542,13 @@ enum PracticeVisualAnimationPolicy {
 }
 
 enum ChooVisualPolicy {
-  static func rotationDegrees(at date: Date, glyphIndex: Int, isEnabled: Bool, reducesMotion: Bool) -> Double {
+  static let cycleDuration: TimeInterval = 2
+
+  static func rotationDegrees(at date: Date, isEnabled: Bool, reducesMotion: Bool) -> Double {
     guard isEnabled && !reducesMotion else { return 0 }
-    let seconds = date.timeIntervalSinceReferenceDate
-    let phase = seconds * .pi + Double(glyphIndex % 7) * 0.42
-    return sin(phase) * 180
+    let phase = date.timeIntervalSinceReferenceDate
+      .truncatingRemainder(dividingBy: cycleDuration)
+    return phase / cycleDuration * 360
   }
 }
 
