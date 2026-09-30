@@ -5035,6 +5035,12 @@ enum CodePracticeContent {
     if language == .codeCPP {
       return (0..<blockCount).map(cppBlock).joined(separator: "\n")
     }
+    if language == .codeGo {
+      return (0..<blockCount).map(goBlock).joined(separator: "\n")
+    }
+    if language == .codeJava {
+      return (0..<blockCount).map(javaBlock).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5238,6 +5244,45 @@ enum CodePracticeContent {
     return "\(header)int practice_unit_\(index)(const std::vector<int>& values) {\n  \(body)\n}"
   }
 
+  private static func goBlock(at index: Int) -> String {
+    let header = index == 0 ? "package main\n\n" : ""
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "total := \(index)\n  for _, value := range values {\n    total += value\n  }\n  return total"
+    case 1:
+      body = "count := 0\n  for _, value := range values {\n    if value > \(index) { count++ }\n  }\n  return count"
+    case 2:
+      body = "result := \(index)\n  for position := len(values) - 1; position >= 0; position-- {\n    result += values[position]\n  }\n  return result"
+    case 3:
+      body = "largest := \(index)\n  for _, value := range values {\n    if value > largest { largest = value }\n  }\n  return largest"
+    case 4:
+      body = "total := 0\n  for position, value := range values {\n    total += position + value*\(index + 1)\n  }\n  return total"
+    default:
+      body = "if len(values) == 0 { return \(index) }\n  return values[len(values)-1] + \(index)"
+    }
+    return "\(header)func practiceUnit\(index)(values []int) int {\n  \(body)\n}"
+  }
+
+  private static func javaBlock(at index: Int) -> String {
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "int total = \(index);\n    for (int value : values) total += value;\n    return total;"
+    case 1:
+      body = "int count = 0;\n    for (int value : values) {\n      if (value > \(index)) count++;\n    }\n    return count;"
+    case 2:
+      body = "int result = \(index);\n    for (int position = values.length - 1; position >= 0; position--) {\n      result += values[position];\n    }\n    return result;"
+    case 3:
+      body = "int largest = \(index);\n    for (int value : values) {\n      largest = Math.max(largest, value);\n    }\n    return largest;"
+    case 4:
+      body = "int total = 0;\n    for (int position = 0; position < values.length; position++) {\n      total += position + values[position] * \(index + 1);\n    }\n    return total;"
+    default:
+      body = "if (values.length == 0) return \(index);\n    return values[values.length - 1] + \(index);"
+    }
+    return "class PracticeUnit\(index) {\n  static int evaluate(int[] values) {\n    \(body)\n  }\n}"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5260,13 +5305,9 @@ enum CodePracticeContent {
        "let doubled: Vec<i32> = values.iter().map(|value| value * 2).collect();",
        "if total > limit {\n\treturn Some(total);\n}"]
     case .codeGo:
-      ["package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"ready\")\n}",
-       "for _, item := range items {\n\tfmt.Println(item)\n}",
-       "if total > limit {\n\treturn total\n}"]
+      (0..<3).map(goBlock)
     case .codeJava:
-      ["class Practice {\n\tstatic int total(int[] values) {\n\t\treturn values.length;\n\t}\n}",
-       "for (String item : items) {\n\tSystem.out.println(item);\n}",
-       "if (total > limit) {\n\treturn total;\n}"]
+      (0..<3).map(javaBlock)
     case .codeC:
       (0..<3).map(cBlock)
     case .codeCPP:

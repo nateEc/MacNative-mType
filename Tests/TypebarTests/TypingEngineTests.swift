@@ -11024,6 +11024,58 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testGoAndJavaPracticeGrowAsDistinctCompilableUnits() throws {
+    for language in [TypingLanguage.codeGo, .codeJava] {
+      for target in [1, 25, 100, 800] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let prefix = language == .codeGo ? "func practiceUnit" : "class PracticeUnit"
+        let units = prompt.split(separator: "\n").compactMap { line -> String? in
+          guard line.hasPrefix(prefix) else { return nil }
+          return String(line.dropFirst(prefix.count).prefix(while: { $0 != "(" && $0 != " " && $0 != "{" }))
+        }
+        let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+        XCTAssertEqual(units.count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertEqual(Set(units).count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertFalse(prompt.contains("\t"), language.displayName)
+        if language == .codeGo {
+          XCTAssertEqual(prompt.components(separatedBy: "package main").count - 1, 1)
+          XCTAssertFalse(prompt.contains("func main()"))
+        }
+      }
+
+      let scratch = FileManager.default.temporaryDirectory
+        .appendingPathComponent("typebar-code-\(UUID().uuidString)", isDirectory: true)
+      try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+      defer { try? FileManager.default.removeItem(at: scratch) }
+      for target in [25, 100] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let source = scratch.appendingPathComponent(language == .codeGo ? "practice.go" : "Practice.java")
+        try Data(prompt.utf8).write(to: source)
+        let compiler = Process()
+        compiler.executableURL = URL(fileURLWithPath: language == .codeGo ? "/usr/bin/env" : "/usr/bin/javac")
+        compiler.arguments = language == .codeGo
+          ? ["go", "tool", "compile", "-o", scratch.appendingPathComponent("practice.o").path, source.path]
+          : ["--release", "17", "-d", scratch.path, source.path]
+        let diagnostics = Pipe()
+        compiler.standardError = diagnostics
+        try compiler.run()
+        compiler.waitUntilExit()
+        let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        XCTAssertEqual(compiler.terminationStatus, 0, "\(language.displayName), target=\(target): \(errors)")
+      }
+
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
+      let start = Date(timeIntervalSince1970: 3_000)
+      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      for character in prompt {
+        session.insert(String(character), at: start)
+      }
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
