@@ -2339,13 +2339,23 @@ enum TestInactivityPolicy {
     let remainder = duration - Double(fullIntervals)
     if includesFractionalTail, remainder >= 0.5 { boundaries.append(duration) }
 
-    return boundaries.enumerated().map { index, boundary in
-      let lowerBound = index == 0 ? -Double.leastNonzeroMagnitude : boundaries[index - 1]
-      return activityDates.reduce(into: 0) { count, date in
-        let offset = date.timeIntervalSince(startedAt)
-        if offset > lowerBound && offset <= boundary { count += 1 }
+    var counts = Array(repeating: 0, count: boundaries.count)
+    for date in activityDates {
+      let offset = date.timeIntervalSince(startedAt)
+      guard offset > -Double.leastNonzeroMagnitude else { continue }
+      var lower = 0
+      var upper = boundaries.count
+      while lower < upper {
+        let middle = lower + (upper - lower) / 2
+        if boundaries[middle] < offset {
+          lower = middle + 1
+        } else {
+          upper = middle
+        }
       }
+      if lower < counts.count { counts[lower] += 1 }
     }
+    return counts
   }
 
   static func inactiveDuration(

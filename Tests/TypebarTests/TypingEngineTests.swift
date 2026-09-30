@@ -566,6 +566,31 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(keyboardOnlyResult.afkDuration, 6)
   }
 
+  func testInactivityPolicyCountsDenseLongPracticeWithoutBlockingResults() {
+    let dates = (0..<200_000).map {
+      start.addingTimeInterval(Double($0 % 100) + 0.25)
+    }
+    let began = ProcessInfo.processInfo.systemUptime
+    let counts = TestInactivityPolicy.intervalCounts(
+      activityDates: dates, startedAt: start, endedAt: start.addingTimeInterval(100),
+      includesFractionalTail: false)
+    let elapsed = ProcessInfo.processInfo.systemUptime - began
+
+    XCTAssertEqual(counts, Array(repeating: 2_000, count: 100))
+    XCTAssertLessThan(elapsed, 0.5, "长练习的闲置统计不应阻塞结果生成")
+  }
+
+  func testInactivityPolicyPreservesBoundaryAndFractionalTailAssignments() {
+    let dates = [4.6, 0, 2, 4.5, 1, -0.1, 4.7, 2.01].map {
+      start.addingTimeInterval($0)
+    }
+    XCTAssertEqual(
+      TestInactivityPolicy.intervalCounts(
+        activityDates: dates, startedAt: start, endedAt: start.addingTimeInterval(4.6),
+        includesFractionalTail: true),
+      [2, 1, 1, 0, 2])
+  }
+
   func testActiveEngagedDurationExcludesIdleTimeWithoutFinishingTheSession() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "amber harbor")
     session.insert("a", at: start)
