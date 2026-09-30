@@ -10789,10 +10789,10 @@ final class TypingEngineTests: XCTestCase {
   func testScriptCodeChoicesUseTheirOwnSyntaxInsteadOfGenericFallback() {
     let expected: [(TypingLanguage, String)] = [
       (.codeRuby, "def practice_unit_0(values)"),
-      (.codeR, "total <- function(values)"),
+      (.codeR, "practice_unit_0 <- function(values)"),
       (.codeR2k, "scores <- c(3, 5, 8)"),
-      (.codeLua, "local function total(values)"),
-      (.codeLuau, "local function total(values: {number}): number"),
+      (.codeLua, "local function practice_unit_0(values)"),
+      (.codeLuau, "local function practice_unit_0(values: {number}): number"),
       (.codePerl, "use strict;"),
       (.codePHP, "<?php"),
     ]
@@ -11409,6 +11409,42 @@ final class TypingEngineTests: XCTestCase {
     let start = Date(timeIntervalSince1970: 3_000)
     for language in [TypingLanguage.codeLaTeX, .codeTypst] {
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
+      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      for character in prompt {
+        session.insert(String(character), at: start)
+      }
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+  }
+
+  func testScriptCodePracticeChoicesGrowWithoutReplayingDeclarations() {
+    let choices: [(TypingLanguage, String, String?)] = [
+      (.codeR, "practice_unit_", nil),
+      (.codeR2k, "practice_unit_", "scores <- c(3, 5, 8)"),
+      (.codeLua, "local function practice_unit_", nil),
+      (.codeLuau, "local function practice_unit_", "type Entry ="),
+      (.codePHP, "function practice_unit_", "<?php"),
+    ]
+    for (language, prefix, header) in choices {
+      for target in [1, 25, 100, 800] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let units = prompt.split(separator: "\n").compactMap { line -> String? in
+          guard line.hasPrefix(prefix) else { return nil }
+          return String(line.prefix(while: { $0 != "(" }))
+        }
+        let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+        XCTAssertEqual(units.count, expectedCount, "\(language), target=\(target)")
+        XCTAssertEqual(Set(units).count, expectedCount, "\(language), target=\(target)")
+        if let header {
+          XCTAssertEqual(prompt.components(separatedBy: header).count - 1, 1, "\(language), target=\(target)")
+        }
+        XCTAssertFalse(prompt.contains("let total = collect(values);"), language.displayName)
+      }
+
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
+      let start = Date(timeIntervalSince1970: 3_000)
       var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)

@@ -5089,6 +5089,11 @@ enum CodePracticeContent {
       return "#set text(size: 11pt)\n"
         + (0..<blockCount).map(typstSection).joined(separator: "\n")
     }
+    if language == .codeR || language == .codeR2k || language == .codeLua
+      || language == .codeLuau || language == .codePHP
+    {
+      return (0..<blockCount).map { scriptBlock(language: language, at: $0) }.joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5499,6 +5504,26 @@ enum CodePracticeContent {
     "= Practice\(index)\n#emph[Type this line with care.]"
   }
 
+  private static func scriptBlock(language: TypingLanguage, at index: Int) -> String {
+    switch language {
+    case .codeR:
+      return "practice_unit_\(index) <- function(values) {\n  sum(values) + \(index)\n}"
+    case .codeR2k:
+      let header = index == 0 ? "scores <- c(3, 5, 8)\n" : ""
+      return "\(header)practice_unit_\(index) <- function(values) {\n  stats::median(values) + \(index)\n}"
+    case .codeLua:
+      return "local function practice_unit_\(index)(values)\n  local total = \(index)\n  for _, value in ipairs(values) do\n    total = total + value\n  end\n  return total\nend"
+    case .codeLuau:
+      let header = index == 0 ? "type Entry = { name: string, score: number }\n" : ""
+      return "\(header)local function practice_unit_\(index)(values: {number}): number\n  local total: number = \(index)\n  for _, value in values do\n    total += value\n  end\n  return total\nend"
+    case .codePHP:
+      let header = index == 0 ? "<?php\n" : ""
+      return "\(header)function practice_unit_\(index)(array $values): int {\n  return array_sum($values) + \(index);\n}"
+    default:
+      preconditionFailure("Only R, Lua, Luau and PHP choices use script practice blocks")
+    }
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let content = language.isCodeLanguage
       ? [prompt(language: language, targetTokenCount: 24)]
@@ -5549,28 +5574,8 @@ enum CodePracticeContent {
        "func double(value: int) -> int:\n\treturn value * 2"]
     case .codeRuby:
       (0..<3).map(rubyBlock)
-    case .codeR:
-      ["total <- function(values) {\n  sum(values)\n}",
-       "values <- c(2, 4, 6)\nprint(total(values))",
-       "doubled <- vapply(values, function(value) value * 2, numeric(1))"]
-    case .codeR2k:
-      ["scores <- c(3, 5, 8)",
-       "centered <- scores - mean(scores)",
-       "summary <- data.frame(score = scores, centered = centered)\nprint(summary)"]
-    case .codeLua:
-      ["local function total(values)\n  local sum = 0\n  for _, value in ipairs(values) do\n    sum = sum + value\n  end\n  return sum\nend",
-       "local values = {2, 3, 5}\nprint(total(values))",
-       "for index, value in ipairs(values) do\n  print(index, value)\nend"]
-    case .codeLuau:
-      ["local function total(values: {number}): number\n  local sum: number = 0\n  for _, value in values do\n    sum += value\n  end\n  return sum\nend",
-       "local values: {number} = {2, 3, 5}\nprint(total(values))",
-       "type Entry = { name: string, score: number }"]
     case .codePerl:
       (0..<3).map(perlBlock)
-    case .codePHP:
-      ["<?php\nfunction total(array $values): int {\n  return array_sum($values);\n}",
-       "$values = [2, 3, 5];\necho total($values), PHP_EOL;",
-       "foreach ($values as $value) {\n  echo $value, PHP_EOL;\n}"]
     case .codeHTML:
       (0..<3).map(htmlSection)
     case .codeCSS:
