@@ -5081,11 +5081,24 @@ enum CodePracticeContent {
       ["Get-ChildItem | ForEach-Object {\n\tWrite-Output $_.Name\n}",
        "$total = ($values | Measure-Object -Sum).Sum",
        "if ($total -gt $limit) {\n\treturn $total\n}"]
-    case .codeBash, .codeVim, .codeVimscript:
+    case .codeVim:
+      [":set number", ":normal! gg", ":write"]
+    case .codeVimscript:
+      ["let g:total = 0", "for item in items\n\techo item\nendfor",
+       "if g:total > 3\n\techo 'ready'\nendif"]
+    case .codeBash:
       ["total=0", "for item in \"${items[@]}\"; do\n\techo \"$item\"\ndone", "echo \"$total\""]
-    case .codeLaTeX, .codeTypst:
+    case .codeLaTeX:
+      ["\\documentclass{article}\n\\begin{document}\nSteady practice.\n\\end{document}",
+       "\\section{Notes}\nA short line for practice.",
+       "\\textbf{Careful typing} keeps the rhythm."]
+    case .codeTypst:
       ["#set text(size: 11pt)", "#align(center)[", "  steady practice\n]"]
-    case .codeBrainfck, .codeOok:
+    case .codeOok:
+      ["Ook. Ook. Ook. Ook. Ook! Ook.",
+       "Ook. Ook? Ook. Ook. Ook? Ook. Ook! Ook.",
+       "Ook! Ook? Ook. Ook. Ook? Ook! Ook! Ook."]
+    case .codeBrainfck:
       ["++[>++<-]", ">.+.", "<[-]"]
     case .codeHaskell, .codeFSharp, .codeOCaml, .codeErlang, .codeElixir,
       .codeGleam, .codeClojure, .codeCommonLisp, .codeScala:

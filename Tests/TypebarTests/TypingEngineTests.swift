@@ -10663,6 +10663,28 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(prompts[6].contains("${items[@]}"))
   }
 
+  func testDocumentAndEditorCodeChoicesDoNotShowAnotherLanguageSyntax() {
+    let latex = CodePracticeContent.prompt(language: .codeLaTeX, targetTokenCount: 24)
+    let typst = CodePracticeContent.prompt(language: .codeTypst, targetTokenCount: 24)
+    let vim = CodePracticeContent.prompt(language: .codeVim, targetTokenCount: 24)
+    let vimscript = CodePracticeContent.prompt(language: .codeVimscript, targetTokenCount: 24)
+    let ook = CodePracticeContent.prompt(language: .codeOok, targetTokenCount: 24)
+
+    XCTAssertTrue(latex.contains("\\documentclass"))
+    XCTAssertFalse(latex.contains("#set text"))
+    XCTAssertTrue(typst.contains("#set text"))
+    XCTAssertFalse(typst.contains("\\documentclass"))
+    XCTAssertTrue(vim.contains(":set number"))
+    XCTAssertFalse(vim.contains("${items[@]}"))
+    XCTAssertTrue(vimscript.contains("let g:total"))
+    XCTAssertFalse(vimscript.contains("${items[@]}"))
+
+    let ookTokens = ook.split(whereSeparator: \.isWhitespace).map(String.init)
+    XCTAssertFalse(ookTokens.isEmpty)
+    XCTAssertTrue(ookTokens.count.isMultiple(of: 2))
+    XCTAssertTrue(ookTokens.allSatisfy { ["Ook.", "Ook?", "Ook!"].contains($0) })
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
