@@ -17702,6 +17702,26 @@ final class TypingEngineTests: XCTestCase {
       "目标字符选择变化仍须更新视觉反馈")
   }
 
+  @MainActor func testReplayCharacterPickerFirstLayoutOfThousandWordsRemainsResponsive() throws {
+    let picker = ReplayCharacterTextView()
+    let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 650, height: 96))
+    scrollView.documentView = picker
+    let prompt = Array(repeating: "typebar", count: 1_000).joined(separator: " ")
+
+    let began = ProcessInfo.processInfo.systemUptime
+    picker.update(text: prompt, reachableIndices: Set(0..<prompt.count), selectedIndex: nil)
+    scrollView.layoutSubtreeIfNeeded()
+    if let layoutManager = picker.layoutManager, let container = picker.textContainer {
+      layoutManager.ensureLayout(for: container)
+    } else {
+      XCTFail("回放目标需要可布局的文本存储")
+    }
+    let elapsed = ProcessInfo.processInfo.systemUptime - began
+
+    XCTAssertEqual(picker.string, prompt)
+    XCTAssertLessThan(elapsed, 1, "千词回放目标首次布局不应阻塞结果页")
+  }
+
   @MainActor func testReplayInputViewPreservesLongHistoryErrorStylesAndRewind() throws {
     let view = ReplayInputTextView()
     let glyphs = Array(repeating: TypingPromptGlyph(character: "t", state: .correct), count: 8_000)
@@ -24386,6 +24406,21 @@ final class TypingEngineTests: XCTestCase {
       ResultPerformanceTrace.points(
         prompt: "amber", events: [.init(offset: 0, kind: .insert, text: "a")], duration: 123),
       [])
+  }
+
+  func testResultPerformanceTraceBuildsThousandWordResultWithoutBlockingPresentation() {
+    let prompt = Array(repeating: "typebar", count: 1_000).joined(separator: " ")
+    let events = prompt.enumerated().map { index, character in
+      TypingReplayEvent(
+        offset: Double(index) / 100, kind: .insert, text: String(character))
+    }
+    let began = ProcessInfo.processInfo.systemUptime
+    let points = ResultPerformanceTrace.points(prompt: prompt, events: events, duration: 80)
+    let elapsed = ProcessInfo.processInfo.systemUptime - began
+
+    XCTAssertEqual(points.count, 80)
+    XCTAssertEqual(points.last?.errorCount, 0)
+    XCTAssertLessThan(elapsed, 1, "千词结果图的数据准备不应阻塞首次呈现")
   }
 
   func testResultPerformanceChartAvailabilityMatchesTheSavedReplayBoundary() {
