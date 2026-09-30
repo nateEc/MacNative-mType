@@ -11289,6 +11289,31 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.result(at: start)?.prompt, prompt)
   }
 
+  func testDartPracticeGrowsAsDistinctFunctions() {
+    for target in [1, 25, 100, 800] {
+      let prompt = CodePracticeContent.prompt(language: .codeDart, targetTokenCount: target)
+      let functions = prompt.split(separator: "\n").compactMap { line -> String? in
+        guard line.hasPrefix("int practiceUnit") else { return nil }
+        return String(line.prefix(while: { $0 != "(" }))
+      }
+      let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+      XCTAssertEqual(prompt.components(separatedBy: "void main()").count - 1, 1, "target=\(target)")
+      XCTAssertEqual(functions.count, expectedCount, "target=\(target)")
+      XCTAssertEqual(Set(functions).count, expectedCount, "target=\(target)")
+      XCTAssertFalse(prompt.contains("for (final value in values) {\n  print(value);"), "target=\(target)")
+    }
+
+    let prompt = CodePracticeContent.prompt(language: .codeDart, targetTokenCount: 25)
+    let start = Date(timeIntervalSince1970: 3_000)
+    var session = TypingSession(configuration: .words(25, language: .codeDart), prompt: prompt)
+    for character in prompt {
+      session.insert(String(character), at: start)
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
   func testVimscriptPracticeGrowsAsDistinctRunnableFunctions() throws {
     for target in [1, 25, 100, 800] {
       let prompt = CodePracticeContent.prompt(language: .codeVimscript, targetTokenCount: target)

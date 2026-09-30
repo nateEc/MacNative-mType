@@ -5063,6 +5063,9 @@ enum CodePracticeContent {
     if language == .codeCSS {
       return (0..<blockCount).map(cssRule).joined(separator: "\n")
     }
+    if language == .codeDart {
+      return (0..<blockCount).map(dartBlock).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5428,6 +5431,24 @@ enum CodePracticeContent {
     return ".practice-unit-\(index) {\n  \(declarations)\n}"
   }
 
+  private static func dartBlock(at index: Int) -> String {
+    let header = index == 0
+      ? "void main() {\n  final values = <int>[2, 3, 5];\n  print(practiceUnit0(values));\n}\n"
+      : ""
+    let body: String
+    switch index % 4 {
+    case 0:
+      body = "var total = \(index);\n  for (final value in values) {\n    total += value;\n  }\n  return total;"
+    case 1:
+      body = "return values.where((value) => value > \(index)).length;"
+    case 2:
+      body = "return values.fold<int>(\(index), (total, value) => total + value * 2);"
+    default:
+      body = "return values.isEmpty ? \(index) : values.first + values.last + \(index);"
+    }
+    return "\(header)int practiceUnit\(index)(List<int> values) {\n  \(body)\n}"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5615,10 +5636,6 @@ enum CodePracticeContent {
       ["LDA #$00\nSTA $0200\nINX\nSTX $0201", "loop:\n\tDEX\n\tBNE loop\n\tRTS"]
     case .codeCSharp:
       (0..<3).map(csharpBlock)
-    case .codeDart:
-      ["void main() {\n  final values = <int>[2, 3, 5];\n  print(values.length);\n}",
-       "int total(List<int> values) {\n  return values.reduce((sum, value) => sum + value);\n}",
-       "for (final value in values) {\n  print(value);\n}"]
     case .codeJule:
       ["fn main() {\n  println(\"steady\")\n}",
        "fn twice(value: int): int {\n  return value * 2\n}",
