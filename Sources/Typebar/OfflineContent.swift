@@ -5041,6 +5041,12 @@ enum CodePracticeContent {
     if language == .codeJava {
       return (0..<blockCount).map(javaBlock).joined(separator: "\n")
     }
+    if language == .codeRuby {
+      return (0..<blockCount).map(rubyBlock).joined(separator: "\n")
+    }
+    if language == .codePerl {
+      return (0..<blockCount).map(perlBlock).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5283,6 +5289,39 @@ enum CodePracticeContent {
     return "class PracticeUnit\(index) {\n  static int evaluate(int[] values) {\n    \(body)\n  }\n}"
   }
 
+  private static func rubyBlock(at index: Int) -> String {
+    let body: String
+    switch index % 6 {
+    case 0: body = "values.sum + \(index)"
+    case 1: body = "values.count { |value| value > \(index) }"
+    case 2: body = "values.map { |value| value * \(index + 1) }"
+    case 3: body = "values.reverse.each_with_index.map { |value, position| value + position + \(index) }"
+    case 4: body = "values.reduce(\(index)) { |total, value| total ^ value }"
+    default: body = "values.empty? ? \(index) : values.last + \(index)"
+    }
+    return "def practice_unit_\(index)(values)\n  \(body)\nend"
+  }
+
+  private static func perlBlock(at index: Int) -> String {
+    let header = index == 0 ? "use strict;\nuse warnings;\n\n" : ""
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "my $total = \(index);\n  for my $value (@{$values}) {\n    $total += $value;\n  }\n  return $total;"
+    case 1:
+      body = "my $count = 0;\n  for my $value (@{$values}) {\n    $count++ if $value > \(index);\n  }\n  return $count;"
+    case 2:
+      body = "my @scaled = map { $_ * \(index + 1) } @{$values};\n  return \\@scaled;"
+    case 3:
+      body = "my $largest = \(index);\n  for my $value (@{$values}) {\n    $largest = $value if $value > $largest;\n  }\n  return $largest;"
+    case 4:
+      body = "my $total = 0;\n  for my $position (0 .. $#{$values}) {\n    $total += $values->[$position] + \(index);\n  }\n  return $total;"
+    default:
+      body = "return \(index) unless @{$values};\n  return $values->[-1] + \(index);"
+    }
+    return "\(header)sub practice_unit_\(index) {\n  my ($values) = @_;\n  \(body)\n}"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5345,9 +5384,7 @@ enum CodePracticeContent {
        "func _ready() -> void:\n\tvar total: int = 0\n\tfor step in range(speed):\n\t\ttotal += step\n\tprint(total)",
        "func double(value: int) -> int:\n\treturn value * 2"]
     case .codeRuby:
-      ["def total(values)\n  values.sum\nend",
-       "values.each { |value| puts value }",
-       "doubled = [1, 2, 3].map { |value| value * 2 }"]
+      (0..<3).map(rubyBlock)
     case .codeR:
       ["total <- function(values) {\n  sum(values)\n}",
        "values <- c(2, 4, 6)\nprint(total(values))",
@@ -5365,9 +5402,7 @@ enum CodePracticeContent {
        "local values: {number} = {2, 3, 5}\nprint(total(values))",
        "type Entry = { name: string, score: number }"]
     case .codePerl:
-      ["use strict;\nuse warnings;\nmy @values = (2, 3, 5);",
-       "my $total = 0;\nfor my $value (@values) {\n  $total += $value;\n}",
-       "print \"$total\\n\";"]
+      (0..<3).map(perlBlock)
     case .codePHP:
       ["<?php\nfunction total(array $values): int {\n  return array_sum($values);\n}",
        "$values = [2, 3, 5];\necho total($values), PHP_EOL;",

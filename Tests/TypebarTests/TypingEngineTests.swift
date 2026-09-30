@@ -10755,7 +10755,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testScriptCodeChoicesUseTheirOwnSyntaxInsteadOfGenericFallback() {
     let expected: [(TypingLanguage, String)] = [
-      (.codeRuby, "def total(values)"),
+      (.codeRuby, "def practice_unit_0(values)"),
       (.codeR, "total <- function(values)"),
       (.codeR2k, "scores <- c(3, 5, 8)"),
       (.codeLua, "local function total(values)"),
@@ -11062,6 +11062,53 @@ final class TypingEngineTests: XCTestCase {
         compiler.waitUntilExit()
         let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         XCTAssertEqual(compiler.terminationStatus, 0, "\(language.displayName), target=\(target): \(errors)")
+      }
+
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
+      let start = Date(timeIntervalSince1970: 3_000)
+      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      for character in prompt {
+        session.insert(String(character), at: start)
+      }
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+  }
+
+  func testRubyAndPerlPracticeGrowAsDistinctParsableUnits() throws {
+    for language in [TypingLanguage.codeRuby, .codePerl] {
+      for target in [1, 25, 100, 800] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let prefix = language == .codeRuby ? "def practice_unit_" : "sub practice_unit_"
+        let units = prompt.split(separator: "\n").compactMap { line -> String? in
+          guard line.hasPrefix(prefix) else { return nil }
+          return String(line.dropFirst(prefix.count).prefix(while: { $0 != "(" && $0 != " " }))
+        }
+        let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+        XCTAssertEqual(units.count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertEqual(Set(units).count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertFalse(prompt.contains("\t"), language.displayName)
+        if language == .codePerl {
+          XCTAssertEqual(prompt.components(separatedBy: "use strict;").count - 1, 1)
+        }
+      }
+
+      for target in [25, 100] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let parser = Process()
+        parser.executableURL = URL(fileURLWithPath: language == .codeRuby ? "/usr/bin/ruby" : "/usr/bin/perl")
+        parser.arguments = ["-c", "-"]
+        let input = Pipe()
+        let diagnostics = Pipe()
+        parser.standardInput = input
+        parser.standardError = diagnostics
+        try parser.run()
+        input.fileHandleForWriting.write(Data(prompt.utf8))
+        try input.fileHandleForWriting.close()
+        parser.waitUntilExit()
+        let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        XCTAssertEqual(parser.terminationStatus, 0, "\(language.displayName), target=\(target): \(errors)")
       }
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
