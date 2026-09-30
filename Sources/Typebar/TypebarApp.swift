@@ -5261,7 +5261,7 @@ private struct CompletedResultView: View {
   @State private var showingCommandPalette = false
   @State private var showingPracticeOptions = false
 
-  var body: some View {
+  private var resultContents: some View {
     VStack(spacing: 28) {
       VStack(spacing: 6) {
         Text(resultOutcomeTitle)
@@ -5561,7 +5561,14 @@ private struct CompletedResultView: View {
       }
     }
     .padding(32)
-    .frame(width: 390)
+  }
+
+  var body: some View {
+    ScrollView {
+      resultContents
+    }
+    .frame(width: 390, height: min(720, (NSScreen.main?.visibleFrame.height ?? 800) * 0.75))
+    .scrollIndicators(.visible)
     .overlay {
       ResultCelebrationView(
         isNewPersonalBest: savesResult && resultPersonalBestFeedback?.isNewPersonalBest == true,
