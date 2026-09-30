@@ -548,7 +548,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(idle.remainingSeconds(at: start.addingTimeInterval(10)), 0)
     XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: invalidResult.outcome, enabled: true))
     XCTAssertEqual(
-      invalidResult.outcome.statusText(savesResult: false), "本次因闲置无效 · 未保存为完成成绩")
+      invalidResult.outcome.statusText(saveState: .notRequested), "本次因闲置无效 · 未保存为完成成绩")
 
     var active = TypingSession(configuration: .timed(seconds: 10), prompt: "amber harbor")
     active.insert("a", at: start)
@@ -17091,10 +17091,11 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testCompletedStatusTextReflectsWhetherResultWasSaved() {
-    XCTAssertEqual(TestOutcome.completed.statusText(savesResult: true), "本次完成 · 已保存到本机")
-    XCTAssertEqual(TestOutcome.completed.statusText(savesResult: false), "本次完成 · 未保存为完成成绩")
-    XCTAssertEqual(TestOutcome.bailedOut.statusText(savesResult: true), "本次已中止 · 未保存为完成成绩")
-    XCTAssertEqual(TestOutcome.invalidAFK.statusText(savesResult: true), "本次因闲置无效 · 未保存为完成成绩")
+    XCTAssertEqual(TestOutcome.completed.statusText(saveState: .saved), "本次完成 · 已保存到本机")
+    XCTAssertEqual(TestOutcome.completed.statusText(saveState: .notRequested), "本次完成 · 未保存为完成成绩")
+    XCTAssertEqual(TestOutcome.completed.statusText(saveState: .failed("磁盘不可写")), "本次完成 · 未保存为完成成绩")
+    XCTAssertEqual(TestOutcome.bailedOut.statusText(saveState: .saved), "本次已中止 · 未保存为完成成绩")
+    XCTAssertEqual(TestOutcome.invalidAFK.statusText(saveState: .saved), "本次因闲置无效 · 未保存为完成成绩")
   }
 
   func testCompletedSessionCreatesPortableResult() throws {

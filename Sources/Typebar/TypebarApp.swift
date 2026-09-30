@@ -2895,7 +2895,7 @@ private struct ContentView: View {
     HStack {
       Text(
         session.isFinished
-          ? session.outcome.statusText(savesResult: settings.saveCompletedResults)
+          ? session.outcome.statusText(saveState: localResultSaveState)
           : restartInstruction
       )
         .foregroundStyle(.secondary)
@@ -5117,11 +5117,11 @@ private extension TestFailureReason {
 }
 
 extension TestOutcome {
-  func statusText(savesResult: Bool) -> String {
+  func statusText(saveState: LocalResultSaveState) -> String {
     switch self {
     case .active: "按任意键开始，Esc 可重新开始"
     case .completed:
-      savesResult ? "本次完成 · 已保存到本机" : "本次完成 · 未保存为完成成绩"
+      saveState.isSaved ? "本次完成 · 已保存到本机" : "本次完成 · 未保存为完成成绩"
     case .failed: "本次失败 · 未保存为完成成绩"
     case .invalidAFK: "本次因闲置无效 · 未保存为完成成绩"
     case .abandoned: "本次已放弃 · 未保存为完成成绩"
