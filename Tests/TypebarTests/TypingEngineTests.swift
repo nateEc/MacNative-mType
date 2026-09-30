@@ -17660,6 +17660,29 @@ final class TypingEngineTests: XCTestCase {
       "目标字符选择变化仍须更新视觉反馈")
   }
 
+  @MainActor func testReplayInputViewPreservesLongHistoryErrorStylesAndRewind() throws {
+    let view = ReplayInputTextView()
+    let glyphs = Array(repeating: TypingPromptGlyph(character: "t", state: .correct), count: 8_000)
+      + [
+        .init(character: "🙂", state: .incorrect),
+        .init(character: "x", state: .extra),
+      ]
+    view.update(glyphs: glyphs)
+    let storage = try XCTUnwrap(view.textStorage)
+    XCTAssertEqual(view.string, String(repeating: "t", count: 8_000) + "🙂x")
+    XCTAssertEqual(
+      storage.attribute(.foregroundColor, at: 8_000, effectiveRange: nil) as? NSColor,
+      NSColor.systemRed)
+    XCTAssertEqual(
+      storage.attribute(.strikethroughStyle, at: 8_002, effectiveRange: nil) as? Int,
+      NSUnderlineStyle.single.rawValue)
+
+    view.update(glyphs: Array(glyphs.prefix(20)))
+    XCTAssertEqual(view.string, String(repeating: "t", count: 20))
+    view.update(glyphs: [])
+    XCTAssertEqual(view.string, "等待播放")
+  }
+
   func testReplayCharacterUTF16IndexKeepsLongAndComposedTargetsAligned() {
     let index = ReplayCharacterUTF16Index("a🙂e\u{301}z")
     XCTAssertEqual(index.range(at: 0), NSRange(location: 0, length: 1))

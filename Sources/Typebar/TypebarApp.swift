@@ -6320,31 +6320,6 @@ private struct ReplayTimelineView: View {
   private var replayedGlyphs: [TypingPromptGlyph] {
     TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed)
   }
-  private var replayedAttributedText: AttributedString {
-    let glyphs = replayedGlyphs
-    guard !glyphs.isEmpty else {
-      var waiting = AttributedString("等待播放")
-      waiting.foregroundColor = .secondary
-      return waiting
-    }
-    return glyphs.reduce(into: AttributedString()) { output, glyph in
-      var character = AttributedString(String(glyph.character))
-      switch glyph.state {
-      case .correct:
-        character.foregroundColor = .primary
-      case .incorrect:
-        character.foregroundColor = .red
-        character.backgroundColor = .red.opacity(0.14)
-      case .extra:
-        character.foregroundColor = .red
-        character.backgroundColor = .red.opacity(0.1)
-        character.strikethroughStyle = .single
-      case .pending, .current, .hidden:
-        character.foregroundColor = .secondary
-      }
-      output += character
-    }
-  }
   private var performance: ResultPerformancePoint {
     ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed)
   }
@@ -6374,19 +6349,8 @@ private struct ReplayTimelineView: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
-      ScrollViewReader { reader in
-        ScrollView {
-          Text(replayedAttributedText)
-            .font(.system(.caption, design: .monospaced))
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .id("replayInput")
-        }
+      ReplayInputView(glyphs: replayedGlyphs)
         .frame(height: 72)
-        .onChange(of: elapsed) { _, _ in
-          reader.scrollTo("replayInput", anchor: .bottom)
-        }
-      }
       .padding(8)
       .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
       VStack(alignment: .leading, spacing: 4) {
