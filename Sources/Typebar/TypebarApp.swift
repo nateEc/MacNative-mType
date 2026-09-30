@@ -455,10 +455,59 @@ private struct TapePracticePrompt: View {
   }
 }
 
+/// Resolve the same practice theme roles as the ordinary prompt before handing
+/// static colors to Core Animation; AppKit's label colors follow the system
+/// appearance, which can differ from the selected Typebar theme.
+struct ChooGlyphPalette: Equatable {
+  let completed: NSColor
+  let future: NSColor
+  let accent: NSColor
+  let error: NSColor
+  let extra: NSColor
+
+  init(theme: ResolvedTheme, flipsCompletionAndFuture: Bool, usesColorfulMode: Bool) {
+    func promptColor(for role: PromptTextRole) -> NSColor {
+      switch PromptTextColorPolicy.tone(
+        for: role, flipsCompletionAndFuture: flipsCompletionAndFuture,
+        usesAccentForCompleted: usesColorfulMode)
+      {
+      case .primary: NSColor(theme.text)
+      case .secondary: NSColor(theme.secondaryText.opacity(0.55))
+      case .accent: NSColor(theme.accent)
+      }
+    }
+    completed = promptColor(for: .completed)
+    future = promptColor(for: .future)
+    accent = NSColor(theme.accent)
+    error = NSColor(theme.errorColor(usesColorfulMode: usesColorfulMode))
+    extra = NSColor(theme.extraInputColor(usesColorfulMode: usesColorfulMode))
+  }
+
+  func foreground(for state: TypingPromptCharacterState) -> NSColor {
+    switch state {
+    case .correct: completed
+    case .incorrect: error
+    case .extra: extra
+    case .current: accent
+    case .pending: future
+    case .hidden: .clear
+    }
+  }
+
+  func background(for state: TypingPromptCharacterState) -> NSColor? {
+    switch state {
+    case .incorrect: error.withAlphaComponent(error.alphaComponent * 0.16)
+    case .extra: extra.withAlphaComponent(extra.alphaComponent * 0.12)
+    case .current: accent.withAlphaComponent(accent.alphaComponent * 0.18)
+    default: nil
+    }
+  }
+}
+
 private struct ChooPracticePrompt: View {
   let glyphs: [TypingPromptGlyph]
   let font: NSFont
-  let accent: Color
+  let palette: ChooGlyphPalette
   let isEnabled: Bool
   let reducesMotion: Bool
   let ignoresSystemReducedMotion: Bool
@@ -470,7 +519,7 @@ private struct ChooPracticePrompt: View {
       isEnabled: isEnabled, reducesMotion: reducesMotion,
       systemReducedMotion: systemReduceMotion,
       ignoresSystemReducedMotion: ignoresSystemReducedMotion)
-    return ChooLayerPrompt(glyphs: glyphs, font: font, accent: NSColor(accent),
+    return ChooLayerPrompt(glyphs: glyphs, font: font, palette: palette,
                            animates: animates, frameRate: animationFrameRate)
       .accessibilityLabel("旋转文字练习提示")
   }
@@ -479,14 +528,14 @@ private struct ChooPracticePrompt: View {
 private struct ChooLayerPrompt: NSViewRepresentable {
   let glyphs: [TypingPromptGlyph]
   let font: NSFont
-  let accent: NSColor
+  let palette: ChooGlyphPalette
   let animates: Bool
   let frameRate: Int
 
   func makeNSView(context: Context) -> ChooLayerView { ChooLayerView() }
 
   func updateNSView(_ view: ChooLayerView, context: Context) {
-    view.configure(glyphs: glyphs, font: font, accent: accent,
+    view.configure(glyphs: glyphs, font: font, palette: palette,
                    animates: animates, frameRate: frameRate)
   }
 
@@ -500,10 +549,11 @@ private final class ChooLayerView: NSView {
   private var glyphs: [TypingPromptGlyph] = []
   private var glyphLayers: [CATextLayer?] = []
   private var promptFont = NSFont.monospacedSystemFont(ofSize: 18, weight: .regular)
-  private var accent = NSColor.controlAccentColor
+  private var palette = ChooGlyphPalette(
+    theme: AppTheme.paper.resolvedTheme,
+    flipsCompletionAndFuture: false, usesColorfulMode: false)
   private var animates = false
   private var frameRate = AnimationFrameRatePolicy.nativeFrameRate
-  private var appearanceName: NSAppearance.Name?
 
   override var isFlipped: Bool { true }
 
@@ -517,21 +567,20 @@ private final class ChooLayerView: NSView {
 
   required init?(coder: NSCoder) { fatalError("ChooLayerView is created in code") }
 
-  func configure(glyphs: [TypingPromptGlyph], font: NSFont, accent: NSColor,
+  func configure(glyphs: [TypingPromptGlyph], font: NSFont, palette: ChooGlyphPalette,
                  animates: Bool, frameRate: Int) {
     let needsRebuild = glyphLayers.count != glyphs.count
       || zip(glyphLayers, glyphs).contains { layer, glyph in
         (layer == nil) != (glyph.character == "\n")
       }
     let changesLayout = needsRebuild || self.glyphs != glyphs || promptFont != font
-    let changesStyle = changesLayout || self.accent != accent || appearanceName != effectiveAppearance.name
+    let changesStyle = changesLayout || self.palette != palette
     let changesAnimation = self.animates != animates || self.frameRate != frameRate
     self.glyphs = glyphs
     promptFont = font
-    self.accent = accent
+    self.palette = palette
     self.animates = animates
     self.frameRate = frameRate
-    appearanceName = effectiveAppearance.name
     if needsRebuild {
       glyphLayers.forEach { $0?.removeFromSuperlayer() }
       glyphLayers = glyphs.map { glyph in
@@ -555,12 +604,6 @@ private final class ChooLayerView: NSView {
     layoutGlyphs()
   }
 
-  override func viewDidChangeEffectiveAppearance() {
-    super.viewDidChangeEffectiveAppearance()
-    appearanceName = effectiveAppearance.name
-    applyStyles()
-  }
-
   private func applyStyles() {
     CATransaction.begin()
     CATransaction.setDisableActions(true)
@@ -569,19 +612,8 @@ private final class ChooLayerView: NSView {
       text.string = String(glyph.typedCharacter ?? glyph.character)
       text.font = promptFont
       text.fontSize = promptFont.pointSize
-      switch glyph.state {
-      case .correct: text.foregroundColor = NSColor.labelColor.cgColor
-      case .incorrect, .extra: text.foregroundColor = NSColor.systemRed.cgColor
-      case .current: text.foregroundColor = accent.cgColor
-      case .pending: text.foregroundColor = NSColor.secondaryLabelColor.withAlphaComponent(0.55).cgColor
-      case .hidden: text.foregroundColor = NSColor.clear.cgColor
-      }
-      switch glyph.state {
-      case .incorrect: text.backgroundColor = NSColor.systemRed.withAlphaComponent(0.16).cgColor
-      case .extra: text.backgroundColor = NSColor.systemRed.withAlphaComponent(0.12).cgColor
-      case .current: text.backgroundColor = accent.withAlphaComponent(0.18).cgColor
-      default: text.backgroundColor = nil
-      }
+      text.foregroundColor = palette.foreground(for: glyph.state).cgColor
+      text.backgroundColor = palette.background(for: glyph.state)?.cgColor
     }
     CATransaction.commit()
   }
@@ -2574,7 +2606,10 @@ private struct ContentView: View {
       } else if practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
           glyphs: session.promptGlyphs,
-          font: practicePromptNSFont(size: settings.fontSize), accent: activeTheme.accent,
+          font: practicePromptNSFont(size: settings.fontSize),
+          palette: ChooGlyphPalette(
+            theme: activeTheme, flipsCompletionAndFuture: settings.flipTestColors,
+            usesColorfulMode: settings.colorfulMode),
           isEnabled: true, reducesMotion: settings.reducePracticeMotion,
           ignoresSystemReducedMotion: !VisualFunboxReducedMotionPolicy
             .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers))

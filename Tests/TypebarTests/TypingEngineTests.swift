@@ -21011,6 +21011,34 @@ final class TypingEngineTests: XCTestCase {
       0)
   }
 
+  func testChooGlyphPaletteUsesPracticeThemeRatherThanSystemAppearance() {
+    let paper = ChooGlyphPalette(
+      theme: AppTheme.paper.resolvedTheme,
+      flipsCompletionAndFuture: false, usesColorfulMode: false)
+    let pending = paper.foreground(for: .pending).usingColorSpace(.sRGB)
+    let correct = paper.foreground(for: .correct).usingColorSpace(.sRGB)
+    XCTAssertEqual(pending?.redComponent ?? -1, 0.38, accuracy: 0.02)
+    XCTAssertEqual(pending?.alphaComponent ?? -1, 0.55, accuracy: 0.02)
+    XCTAssertEqual(correct?.redComponent ?? -1, 0.12, accuracy: 0.02)
+
+    let flipped = ChooGlyphPalette(
+      theme: AppTheme.paper.resolvedTheme,
+      flipsCompletionAndFuture: true, usesColorfulMode: false)
+    XCTAssertEqual(
+      flipped.foreground(for: .pending).usingColorSpace(.sRGB)?.redComponent ?? -1,
+      0.12, accuracy: 0.02)
+    let colorful = ChooGlyphPalette(
+      theme: AppTheme.paper.resolvedTheme,
+      flipsCompletionAndFuture: false, usesColorfulMode: true)
+    XCTAssertEqual(
+      colorful.foreground(for: .correct).usingColorSpace(.sRGB)?.redComponent ?? -1,
+      0.66, accuracy: 0.02)
+    XCTAssertEqual(
+      paper.foreground(for: .incorrect).usingColorSpace(.sRGB)?.redComponent ?? -1,
+      1, accuracy: 0.02)
+    XCTAssertEqual(paper.foreground(for: .hidden).alphaComponent, 0)
+  }
+
   func testVisualModifiersApplyOnlyToThePracticePresentation() {
     XCTAssertEqual(PracticeVisualTransform.make(modifiers: []), .init(horizontalScale: 1, rotationDegrees: 0))
     XCTAssertEqual(
