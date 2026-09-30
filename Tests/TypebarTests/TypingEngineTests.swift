@@ -10682,6 +10682,31 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(disabled.typed, "if ready {\n\t")
   }
 
+  func testFirstLineCodeIndentBackspaceRecordsOnlyActualDeletions() {
+    let configuration = TestConfiguration.words(
+      1, rules: .init(codeUnindentOnBackspace: true), language: .codeSwift)
+    var session = TypingSession(configuration: configuration, prompt: "\tgo()")
+    session.insert("\t\t", at: start)
+    XCTAssertEqual(session.typed, "\t\t")
+
+    session.deleteBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.typed, "")
+    session.insert("\tgo()", at: start.addingTimeInterval(2))
+    XCTAssertTrue(session.isFinished)
+
+    let replay = session.result(at: start.addingTimeInterval(2))?.replayEvents ?? []
+    XCTAssertEqual(replay.filter({ $0.kind == .delete }).count, 2)
+    XCTAssertEqual(TypingReplay.typedText(events: replay, through: 2), "\tgo()")
+
+    var wordDelete = TypingSession(configuration: configuration, prompt: "\tgo()")
+    wordDelete.insert("\t\t", at: start)
+    wordDelete.deleteWordBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(wordDelete.typed, "")
+    wordDelete.insert("\tgo()", at: start.addingTimeInterval(2))
+    let wordReplay = wordDelete.result(at: start.addingTimeInterval(2))?.replayEvents ?? []
+    XCTAssertEqual(wordReplay.filter({ $0.kind == .delete }).count, 2)
+  }
+
   func testEveryStandaloneLanguageGeneratesAndCompletesAnOwnedWordsSession() {
     let languages = TypingLanguage.allCases.filter(\.supportsQuotes)
     XCTAssertEqual(languages.count, 376)

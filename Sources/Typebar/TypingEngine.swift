@@ -5085,7 +5085,9 @@ struct TypingSession {
       removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
     }
-    guard typed.last == "\n" else { return false }
+    // The first word has no previous line. Clearing its indentation already
+    // handled the key, so the caller must not append a phantom delete event.
+    guard typed.last == "\n" else { return true }
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
     return true
