@@ -2687,6 +2687,34 @@ enum TypingWindowRefocusRestartPolicy {
   }
 }
 
+/// NSViewRepresentable reports snapshots as well as key-window notifications.
+/// Only a real key-to-nonkey transition can arm an untouched prompt refresh.
+struct TypingWindowFocusTracker {
+  private var hasBeenKey = false
+  private var wasKey = false
+  private var pendingExternalReturn = false
+
+  mutating func record(isKey: Bool, hasAttachedSheet: Bool) -> Bool {
+    if isKey {
+      let returned = hasBeenKey && !wasKey && pendingExternalReturn
+      hasBeenKey = true
+      wasKey = true
+      pendingExternalReturn = false
+      return returned
+    }
+
+    if wasKey {
+      pendingExternalReturn =
+        TypingWindowRefocusRestartPolicy.shouldRememberWindowResignation(
+          hasAttachedSheet: hasAttachedSheet)
+    } else if hasAttachedSheet {
+      pendingExternalReturn = false
+    }
+    wasKey = false
+    return false
+  }
+}
+
 /// The reference rejects a configuration change when it would restart an
 /// in-progress no-quit test. Preferences that apply live stay outside this
 /// gate.

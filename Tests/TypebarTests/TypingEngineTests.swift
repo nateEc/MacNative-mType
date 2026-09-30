@@ -18157,6 +18157,30 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testWindowFocusTrackerRequiresActualKeyResignationBeforeReturning() {
+    var focus = TypingWindowFocusTracker()
+    XCTAssertFalse(focus.record(isKey: false, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: false, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: true, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: true, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: false, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: false, hasAttachedSheet: false))
+    XCTAssertTrue(focus.record(isKey: true, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: true, hasAttachedSheet: false))
+  }
+
+  func testWindowFocusTrackerIgnoresAttachedSheetAndItsClosingSnapshot() {
+    var focus = TypingWindowFocusTracker()
+    XCTAssertFalse(focus.record(isKey: true, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: false, hasAttachedSheet: true))
+    XCTAssertFalse(focus.record(isKey: false, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: true, hasAttachedSheet: false))
+
+    XCTAssertFalse(focus.record(isKey: false, hasAttachedSheet: false))
+    XCTAssertFalse(focus.record(isKey: false, hasAttachedSheet: true))
+    XCTAssertFalse(focus.record(isKey: true, hasAttachedSheet: false))
+  }
+
   func testSessionFactoryLeavesZenPromptFreeformAndBuildsOtherModePrompts() {
     let timed = TestSessionFactory.make(configuration: .timed(seconds: 120))
     let words = TestSessionFactory.make(configuration: .words(25))
