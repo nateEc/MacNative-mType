@@ -3875,7 +3875,7 @@ struct TypingSession {
   var missedWordErrorCountsByWord: [Int] {
     let targetWords = resultTargetWords
     guard !targetWords.isEmpty else { return [] }
-    return targetWords.indices.map { attemptedInputErrorCount(inWord: $0) }
+    return attemptedInputErrorCountsByWord(targetWordCount: targetWords.count)
   }
 
   private var missedNoSpaceWordErrorCounts: [MissedWordErrorCount] {
@@ -3918,13 +3918,14 @@ struct TypingSession {
     else { return [] }
     let targetWords = resultTargetWords
     guard !targetWords.isEmpty else { return [] }
+    let attemptedErrors = attemptedInputErrorCountsByWord(targetWordCount: targetWords.count)
     if hasNoSpaceWordSegmentation {
-      return noSpaceWordReviews(targetWords: targetWords)
+      return noSpaceWordReviews(targetWords: targetWords, attemptedErrors: attemptedErrors)
     }
     let typedWords = splitPromptWords(typed, omittingEmptySubsequences: false).map(String.init)
     let finalAttemptedCount = typed.last.map(isPromptWordSeparator) == true
       ? max(0, typedWords.count - 1) : typedWords.count
-    let historicalAttemptedCount = targetWords.indices.last(where: hasAttemptedInputError)
+    let historicalAttemptedCount = attemptedErrors.indices.last(where: { attemptedErrors[$0] > 0 })
       .map { $0 + 1 } ?? 0
     let attemptedCount = max(finalAttemptedCount, historicalAttemptedCount)
     return (0..<min(attemptedCount, targetWords.count)).map {
@@ -3932,7 +3933,7 @@ struct TypingSession {
       return TypedWordReview(
         index: $0, target: targetWords[$0], typed: typedWord,
         hasInputError: typedWord == targetWords[$0]
-          && hasAttemptedInputError(inWord: $0))
+          && attemptedErrors[$0] > 0)
     }
   }
 
@@ -5038,10 +5039,6 @@ struct TypingSession {
     hasError(inWord: word, indices: forcedErrorIndices)
   }
 
-  private func hasAttemptedInputError(inWord word: Int) -> Bool {
-    attemptedInputErrorCount(inWord: word) > 0
-  }
-
   /// Word targets for result history and local follow-up practice. A flattened
   /// prompt is eligible only when its saved word slices still exactly match
   /// the current boundary list; otherwise there is no trustworthy word-level
@@ -5069,12 +5066,14 @@ struct TypingSession {
       && noSpaceTargetWords.allSatisfy { !$0.isEmpty }
   }
 
-  private func noSpaceWordReviews(targetWords: [String]) -> [TypedWordReview] {
+  private func noSpaceWordReviews(
+    targetWords: [String], attemptedErrors: [Int]
+  ) -> [TypedWordReview] {
     let typedCharacters = Array(typed)
     let directlyAttemptedCount = noSpaceWordRanges.lastIndex {
       typedCharacters.count > $0.lowerBound
     }.map { $0 + 1 } ?? 0
-    let historicalAttemptedCount = targetWords.indices.last(where: hasAttemptedInputError)
+    let historicalAttemptedCount = attemptedErrors.indices.last(where: { attemptedErrors[$0] > 0 })
       .map { $0 + 1 } ?? 0
     let attemptedCount = max(directlyAttemptedCount, historicalAttemptedCount)
     return (0..<min(attemptedCount, targetWords.count)).map { index in
@@ -5085,18 +5084,44 @@ struct TypingSession {
       return .init(
         index: index, target: targetWords[index], typed: typedWord,
         hasInputError: typedWord == targetWords[index]
-          && hasAttemptedInputError(inWord: index))
+          && attemptedErrors[index] > 0)
     }
+  }
+
+  /// Assign each target position to its result word once, then aggregate the
+  /// sparse historical errors without rescanning the entire prompt per word.
+  private func attemptedInputErrorCountsByWord(targetWordCount: Int) -> [Int] {
+    var counts = Array(repeating: 0, count: targetWordCount)
+    guard !attemptedErrorCounts.isEmpty else { return counts }
+
+    let targetCharacters = promptCharacters
+    var wordByTargetIndex = Array(repeating: -1, count: targetCharacters.count)
+    if hasNoSpaceWordSegmentation {
+      var start = 0
+      for (word, end) in noSpaceWordEndIndices.prefix(targetWordCount).enumerated() {
+        let safeEnd = min(max(end, start), targetCharacters.count)
+        if start < safeEnd {
+          for index in start..<safeEnd { wordByTargetIndex[index] = word }
+        }
+        start = safeEnd
+      }
+    } else {
+      var word = 0
+      for index in targetCharacters.indices {
+        if word < targetWordCount { wordByTargetIndex[index] = word }
+        if isPromptWordSeparator(targetCharacters[index]) { word += 1 }
+      }
+    }
+    for (index, count) in attemptedErrorCounts where wordByTargetIndex.indices.contains(index) {
+      let word = wordByTargetIndex[index]
+      if counts.indices.contains(word) { counts[word] += count }
+    }
+    return counts
   }
 
   private func hasError(inWord word: Int, indices: Set<Int>) -> Bool {
     guard let range = targetRange(forWord: word) else { return false }
     return indices.contains(where: range.contains)
-  }
-
-  private func attemptedInputErrorCount(inWord word: Int) -> Int {
-    guard let range = targetRange(forWord: word) else { return 0 }
-    return attemptedInputErrorCount(in: range)
   }
 
   private func attemptedInputErrorCount(in range: Range<Int>) -> Int {

@@ -4636,6 +4636,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(session.wordReviews[1].isCorrect)
   }
 
+  func testLongWordResultReviewsAndErrorCountsRemainResponsive() {
+    let prompt = Array(repeating: "typebar", count: 2_000).joined(separator: " ")
+    var session = TypingSession(configuration: .timed(seconds: 3_600), prompt: prompt)
+    session.insert(prompt, at: start)
+
+    let began = ProcessInfo.processInfo.systemUptime
+    let reviews = session.wordReviews
+    let errorCounts = session.missedWordErrorCountsByWord
+    let elapsed = ProcessInfo.processInfo.systemUptime - began
+
+    XCTAssertEqual(reviews.count, 2_000)
+    XCTAssertEqual(reviews.last?.typed, "typebar")
+    XCTAssertTrue(reviews.allSatisfy(\.isCorrect))
+    XCTAssertEqual(errorCounts, Array(repeating: 0, count: 2_000))
+    XCTAssertLessThan(elapsed, 2, "长练习结束后构建单词历史不应阻塞结果页")
+  }
+
   func testKeyboardGuideHighlightsOnlySupportedNextKeys() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "a 1，")
     XCTAssertEqual(KeyboardGuideModel.highlightedKey(for: session.nextExpectedCharacter), "home-0")
