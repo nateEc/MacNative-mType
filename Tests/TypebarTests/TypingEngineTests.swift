@@ -11167,6 +11167,58 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.result(at: start)?.prompt, prompt)
   }
 
+  func testBashPracticeGrowsAsDistinctRunnableFunctions() throws {
+    for target in [1, 25, 100, 800] {
+      let prompt = CodePracticeContent.prompt(language: .codeBash, targetTokenCount: target)
+      let functions = prompt.split(separator: "\n").compactMap { line -> String? in
+        guard line.hasPrefix("practice_unit_") else { return nil }
+        return String(line.prefix(while: { $0 != "(" }))
+      }
+      let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+      XCTAssertEqual(functions.count, expectedCount, "target=\(target)")
+      XCTAssertEqual(Set(functions).count, expectedCount, "target=\(target)")
+      XCTAssertFalse(prompt.contains("${items[@]}"), "target=\(target)")
+      XCTAssertFalse(prompt.contains("\t"), "target=\(target)")
+    }
+
+    for target in [25, 100] {
+      let prompt = CodePracticeContent.prompt(language: .codeBash, targetTokenCount: target)
+      let parser = Process()
+      parser.executableURL = URL(fileURLWithPath: "/bin/bash")
+      parser.arguments = ["-n"]
+      let input = Pipe()
+      let diagnostics = Pipe()
+      parser.standardInput = input
+      parser.standardError = diagnostics
+      try parser.run()
+      input.fileHandleForWriting.write(Data(prompt.utf8))
+      try input.fileHandleForWriting.close()
+      parser.waitUntilExit()
+      let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      XCTAssertEqual(parser.terminationStatus, 0, "target=\(target): \(errors)")
+    }
+
+    let prompt = CodePracticeContent.prompt(language: .codeBash, targetTokenCount: 25)
+    let runner = Process()
+    runner.executableURL = URL(fileURLWithPath: "/bin/bash")
+    runner.arguments = ["-c", "\(prompt)\npractice_unit_0 2 3 5"]
+    let output = Pipe()
+    runner.standardOutput = output
+    try runner.run()
+    runner.waitUntilExit()
+    XCTAssertEqual(runner.terminationStatus, 0)
+    XCTAssertEqual(String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self), "10\n")
+
+    let start = Date(timeIntervalSince1970: 3_000)
+    var session = TypingSession(configuration: .words(25, language: .codeBash), prompt: prompt)
+    for character in prompt {
+      session.insert(String(character), at: start)
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")

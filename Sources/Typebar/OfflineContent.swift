@@ -5050,6 +5050,9 @@ enum CodePracticeContent {
     if language == .codeSQL {
       return (0..<blockCount).map(sqlBlock).joined(separator: "\n")
     }
+    if language == .codeBash {
+      return (0..<blockCount).map(bashBlock).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5338,6 +5341,25 @@ enum CodePracticeContent {
     return "WITH practice(value) AS (VALUES (\(index)), (\(index + 1)), (\(index + 2)))\nSELECT \(aggregation) FROM practice;"
   }
 
+  private static func bashBlock(at index: Int) -> String {
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "local total=\(index)\n  local value\n  for value in \"$@\"; do\n    total=$((total + value))\n  done\n  printf '%s\\n' \"$total\""
+    case 1:
+      body = "local count=0\n  local value\n  for value in \"$@\"; do\n    if (( value > \(index) )); then count=$((count + 1)); fi\n  done\n  printf '%s\\n' \"$count\""
+    case 2:
+      body = "local largest=\(index)\n  local value\n  for value in \"$@\"; do\n    if (( value > largest )); then largest=$value; fi\n  done\n  printf '%s\\n' \"$largest\""
+    case 3:
+      body = "local total=\(index)\n  local position=0\n  local value\n  for value in \"$@\"; do\n    total=$((total + value + position))\n    position=$((position + 1))\n  done\n  printf '%s\\n' \"$total\""
+    case 4:
+      body = "local total=0\n  local value\n  for value in \"$@\"; do\n    total=$((total + value * \(index + 1)))\n  done\n  printf '%s\\n' \"$total\""
+    default:
+      body = "local selected=\(index)\n  local value\n  for value in \"$@\"; do selected=$value; done\n  printf '%s\\n' \"$selected\""
+    }
+    return "practice_unit_\(index)() {\n  \(body)\n}"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5439,7 +5461,7 @@ enum CodePracticeContent {
       ["let g:total = 0", "for item in items\n\techo item\nendfor",
        "if g:total > 3\n\techo 'ready'\nendif"]
     case .codeBash:
-      ["total=0", "for item in \"${items[@]}\"; do\n\techo \"$item\"\ndone", "echo \"$total\""]
+      (0..<3).map(bashBlock)
     case .codeLaTeX:
       ["\\documentclass{article}\n\\begin{document}\nSteady practice.\n\\end{document}",
        "\\section{Notes}\nA short line for practice.",
