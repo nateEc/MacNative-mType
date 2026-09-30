@@ -9,6 +9,18 @@ import XCTest
 final class TypingEngineTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 10_000)
 
+  func testFreshTestDefaultsMatchPinnedReferenceWithoutChangingLegacyMemory() {
+    XCTAssertEqual(TypebarTestParameterMemory.defaults.duration, 30)
+    XCTAssertEqual(TypebarTestParameterMemory.defaults.wordLimit, 50)
+    XCTAssertEqual(TypebarInitialTestSelection.configuration.mode, .time)
+    XCTAssertEqual(TypebarInitialTestSelection.configuration.duration, 30)
+    XCTAssertEqual(TypebarInitialTestSelection.configuration.effectiveQuoteLengths, [.medium])
+
+    let legacy = TypebarTestParameterMemory.legacyDefaults(configuration: .timed(seconds: 30))
+    XCTAssertEqual(legacy.wordLimit, 25)
+    XCTAssertEqual(legacy.customTextWordLimit, 25)
+  }
+
   func testDisplayNameAvailabilityStateBlocksOnlyKnownUnavailablePreflight() {
     XCTAssertEqual(DisplayNameAvailabilityState(available: true), .available)
     XCTAssertEqual(DisplayNameAvailabilityState(available: false), .unavailable)

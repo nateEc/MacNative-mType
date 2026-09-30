@@ -2073,6 +2073,14 @@ enum FunboxForcedContentOptionsPolicy {
   }
 }
 
+/// Fresh local selection follows the pinned reference's 30-second test and
+/// medium quote filter. Persisted selections keep their own explicit values.
+enum TypebarInitialTestSelection {
+  static let configuration = TestConfiguration(
+    mode: .time, duration: 30, wordLimit: nil, difficulty: .normal,
+    rules: .init(), quoteLengths: [.medium])
+}
+
 struct TestConfiguration: Codable, Equatable {
   var mode: TestMode
   var duration: TimeInterval?

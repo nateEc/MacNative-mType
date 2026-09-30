@@ -6,6 +6,8 @@
 
 官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 239 项精确原生、0 项相关替代、0 项系统输入或自定义回退均由自动化测试守恒校验。`Scripts/check-layout-compatibility-audit.sh` 会从固定参考的 `LayoutNameSchema` 重建名称集合，并同时拒绝快照、原生精确映射、主库存声明或可执行覆盖证据漂移。
 
+2026-10-01 `TST-01`／`TST-03` 默认值补证：新安装首次进入 30 秒时间模式，字数模式记忆为 50 词，引语长度默认为中等，与固定参考的 `default-config.ts` 对齐。旧 v1 设置归档未带独立参数记忆时仍按旧版 25 词恢复；显式保存的测试选择继续优先，不因新默认值而改写。此项不改变其他测试模式或原创练习内容。
+
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
 | GOV-01 | 独立重写边界 | 固定参考仓库的工程结构与生产域名仅用于隔离核验，不作为实现输入 | ProjectGovernance | 已实现：`ORIGINALITY_BOUNDARY.md` 明确允许的标识级盘点信息和禁止的源码／内容／资产／线上服务范围；`Scripts/check-originality-boundaries.sh --self-test` 拒绝已追踪的参考 Web 工程树、其包清单和网页源文件，并阻断 Typebar 客户端／服务端 Swift 源码访问 `monkeytype.com`。检查通过不替代人工代码、内容授权和行为审查；每次受影响变更仍须按本表 ID 提供原生实现、自动化与人工验收证据。 |

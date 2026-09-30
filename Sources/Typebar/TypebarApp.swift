@@ -940,7 +940,8 @@ private struct ContentView: View {
     [TestResultRecord]
   @Query(sort: \TestPresetRecord.createdAt, order: .reverse) private var savedPresets:
     [TestPresetRecord]
-  @State private var session = TestSessionFactory.make(configuration: .timed(seconds: 30))
+  @State private var session = TestSessionFactory.make(
+    configuration: TypebarInitialTestSelection.configuration)
   @State private var noQuitConfigurationLockOwnerID = UUID()
   @State private var mode: TestMode = .time
   @State private var language: TypingLanguage = .english
@@ -949,9 +950,9 @@ private struct ContentView: View {
   @State private var mixedLanguageSearch = ""
   @State private var contentOptions = ContentOptions()
   @State private var duration = 30
-  @State private var wordLimit = 25
+  @State private var wordLimit = TypebarTestParameterMemory.defaults.wordLimit
   @State private var selectedQuoteID = OfflineContent.quotes(for: .english)[0].id
-  @State private var quoteLengths = QuoteLengthSelection.selectable
+  @State private var quoteLengths = TypebarInitialTestSelection.configuration.effectiveQuoteLengths
   @State private var quoteSelectionMode: QuoteSelectionMode = .lengths
   @State private var quoteQueue = QuoteQueue()
   @State private var quoteSource: QuoteSource = .builtIn
@@ -4854,7 +4855,7 @@ private struct ContentView: View {
     customTextWordLimit = memory.customTextWordLimit
     customTextSectionLimit = memory.customTextSectionLimit
     apply(
-      .init(configuration: .timed(seconds: TimeInterval(memory.duration))),
+      .init(configuration: TypebarInitialTestSelection.configuration),
       overwritesParameterMemory: false,
       appliesGlobalSettings: false)
   }

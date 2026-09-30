@@ -24,10 +24,10 @@
 | `numbers` | `ContentOptions.includeNumbers` | 已映射；进入 `TestConfiguration` 与历史筛选。兼容英文词流会在标点处理后以 10% 概率替换为 1–4 位、首位非零的独立数字 token。 |
 
 2026-09-21 审计更正：固定参考提交 `91bd24bb8513785c7364cbea29296ff7adafac41` 的生成器将全部日语变体（包括罗马字）归入 `japanese` 标点分支，并以普通提交空格分词。Typebar 现已将简体／繁体中文和假名的常规词流同步为该空格语义；`noSpaces` 修饰继续保留原始词界供进度、逐词统计和复盘使用。已保存的无空格 CJK 成绩则继续按旧的本机词界解析，在线中文短文仍使用系统分词；不导入参考词值、代码或资产。
-| `words` | `TestConfiguration.wordLimit` | 已映射；命令面板含 10/25/50/100 标准值与自定义非负安全整数输入，0 表示无限；大型有限值按需扩展提示。 |
+| `words` | `TestConfiguration.wordLimit` | 已映射；新安装的字数模式记忆默认 50，与固定参考一致；旧版 v1 导出缺少独立参数记忆时仍回退到旧值 25，已保存的显式选择不被覆盖。命令面板含 10/25/50/100 标准值与自定义非负安全整数输入，0 表示无限；大型有限值按需扩展提示。 |
 | `time` | `TestConfiguration.duration` | 已映射；命令面板含 15/30/60/120 标准值与自定义非负安全整数秒输入，0 表示无限；大型有限值按需扩展提示。 |
 | `mode` | `TestMode` | 已映射；官方当前五种模式 time/words/quote/zen/custom 均存在，原生代码练习为额外能力。 |
-| `quoteLength` | `quoteLengths`、`quoteSelectionMode`、所选引语 ID | 已映射；`0/1/2/3` 对应短/中/长/超长集合，`-3` 对应忽略长度的收藏模式，`-2` 对应锁定所选 ID 的本机搜索模式；六值由固定 schema 机器校验，不复制引语内容。 |
+| `quoteLength` | `quoteLengths`、`quoteSelectionMode`、所选引语 ID | 已映射；新安装的引语长度默认仅为中等，已保存的显式选择不被覆盖。`0/1/2/3` 对应短/中/长/超长集合，`-3` 对应忽略长度的收藏模式，`-2` 对应锁定所选 ID 的本机搜索模式；六值由固定 schema 机器校验，不复制引语内容。 |
 | `language` | `TypingLanguage`、`mixedLanguageComponents` | 已映射；固定 schema 的 446 个语言 ID 均映射为独立、可搜索的原生选择，使用 Typebar 自有词流与引语而不复制官方目录内容。Arabic、Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi、Hebrew、Persian、Urdu 与 Central Kurdish 使用 macOS 输入源、RTL 提示和原生双向文本排版；固定元数据中的全部 26 个 `joiningScript` 语言使用系统原生塑形、连写行距与逐字隐藏保护。所有 446 项均可用于自选多语组合，RTL 与双向组合交由 macOS Unicode 双向排版；Thai 的空格提交来自参考实际生成器而非自然书写习惯推断。知识短文、朗读、Zipf 与简化输入严格按每项固定配置或其缺省分支处理，完整映射记录在后续审计条目与自动化测试中。Swiss German 复用 Typebar 自有 German 内容并把可见 `ß` 变为 `ss`，可进入成绩和排行榜但不能投稿或选择社区引语。乌克兰语 Latin、日语罗马字、Greeklish 与 Esperanto X/H 均保持所选 ASCII 书写，不让在线原文改写它们；Pig Latin、Lorem Ipsum 和五字母英语的离线内容分别保持原创变换、原创伪拉丁与严格五字母边界；Kokanu 仅从其官方语言资料取词汇与语法边界，练习文本独立编写；Likanu 由自写音节解析器按官方字符规则从这些自有内容确定性派生；专项词流分别保留英语、瑞典语、葡萄牙语、俄语缩略词、两种乌克兰语词尾、Bangla 字符、Git 小写 ASCII 命令／概念、两个独立 toki pona ku 集合、Old English、Bitoduc 科技法语、虚构流媒体表情 token 和原创街机恐怖多词 section 的可见输入约束，均不导入参考词值。 |
 
 2026-09-09 当前更正：上表 `language` 行的数量快照由 162 种单语和 152 个 LTR 多语候选取代；最新增加两个 Русский · Краткие формы独立规模，以 200 条基础和包含基础集的 880 条扩展原创形式覆盖符号、数字、大小写、长度及 section 结构，不导入参考词值、代码或资产。

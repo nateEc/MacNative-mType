@@ -518,6 +518,15 @@ enum DataTransferError: Error, Equatable {
 struct TypebarTestParameterMemory: Codable, Equatable {
     static let defaults = TypebarTestParameterMemory(
         duration: 30,
+        wordLimit: 50,
+        customTextDuration: 30,
+        customTextWordLimit: 25,
+        customTextSectionLimit: 1)
+
+    // V1 exports omitted the separate parameter memory. Preserve the
+    // pre-alignment word-mode choice when reconstructing those old files.
+    private static let legacyBaseline = TypebarTestParameterMemory(
+        duration: 30,
         wordLimit: 25,
         customTextDuration: 30,
         customTextWordLimit: 25,
@@ -530,7 +539,7 @@ struct TypebarTestParameterMemory: Codable, Equatable {
     let customTextSectionLimit: Int
 
     static func legacyDefaults(configuration: TestConfiguration) -> Self {
-        var result = defaults
+        var result = legacyBaseline
         switch configuration.mode {
         case .time:
             if let duration = safeInteger(configuration.duration) {
