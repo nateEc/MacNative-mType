@@ -90,6 +90,8 @@ struct PreferencesView: View {
   @State private var editingCustomThemeID: UUID?
   @State private var customThemeMessage: String?
   @State private var customThemeImportLink = ""
+  @State private var customThemeShareLink = ""
+  @State private var customThemeShareIncludesBackground = false
   @State private var customKeyboardLayoutName = ""
   @State private var customKeyboardNumberRow = "1234567890-="
   @State private var customKeyboardTopRow = "QWERTYUIOP[]"
@@ -981,12 +983,12 @@ struct PreferencesView: View {
       if customThemeSectionVisible {
         Section("自定义主题") {
           TextField("主题名称", text: $customThemeName)
-          TextField("网页自定义主题链接", text: $customThemeImportLink, axis: .vertical)
+          TextField("Typebar 或网页自定义主题链接", text: $customThemeImportLink, axis: .vertical)
             .lineLimit(2...4)
             .textFieldStyle(.roundedBorder)
-          Button("导入网页主题链接") { importWebThemeLink() }
+          Button("导入主题链接") { importWebThemeLink() }
             .disabled(customThemeImportLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          Text("可在本机解析兼容主题链接中的十色配置；链接主机不会被访问。若链接同时提供安全的 HTTP(S) 图片 URL、适配方式和滤镜，会在你点击导入后一起应用；不会读取网页代码或原项目资源。")
+          Text("可在本机解析 Typebar 分享链接或兼容网页主题链接；网页链接主机不会被访问。只有完整的安全 HTTPS 图片、适配方式和滤镜组合才会一起导入；不会读取网页代码或原项目资源。")
             .font(.caption)
             .foregroundStyle(.secondary)
           ColorPicker("背景", selection: $customThemeBackground)
@@ -1020,6 +1022,21 @@ struct PreferencesView: View {
               .foregroundStyle(.secondary)
           }
 
+          Toggle("分享时包含当前远程背景链接和滤镜", isOn: $customThemeShareIncludesBackground)
+          Text("本机图片不会进入分享链接；启用背景分享时必须先设置 HTTPS 图片。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          if !customThemeShareLink.isEmpty {
+            Text(customThemeShareLink)
+              .font(.caption.monospaced())
+              .textSelection(.enabled)
+              .lineLimit(2...4)
+            Button("再次复制主题链接") {
+              NSPasteboard.general.clearContents()
+              NSPasteboard.general.setString(customThemeShareLink, forType: .string)
+            }
+          }
+
           ForEach(settings.customThemes) { theme in
             HStack {
               Circle().fill(theme.accent.color).frame(width: 12, height: 12)
@@ -1028,6 +1045,7 @@ struct PreferencesView: View {
               if settings.activeCustomThemeID == theme.id { Text("当前").foregroundStyle(.secondary) }
               Button("应用") { settings.selectCustomTheme(theme.id) }
               Button("编辑") { beginEditingCustomTheme(theme) }
+              Button("分享") { shareCustomTheme(theme) }
               Button {
                 settings.toggleFavoriteCustomTheme(theme.id)
               } label: {
@@ -1046,7 +1064,7 @@ struct PreferencesView: View {
               }
             }
           }
-          Text("可编辑背景、面板和强调色；编辑会保留主题的收藏、当前选择和归档引用。自定义主题只保存于这台 Mac，并会随 Typebar 归档迁移。")
+          Text("可编辑并分享完整的原生主题配色；编辑会保留主题的收藏、当前选择和归档引用。自定义主题默认只保存于这台 Mac，也可随 Typebar 归档迁移。")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -2343,8 +2361,10 @@ struct PreferencesView: View {
   private func importWebThemeLink() {
     let name = suggestedImportedThemeName
     do {
-      let imported = try LegacyCustomThemeLinkImporter.theme(
-        from: customThemeImportLink, name: name)
+      let imported = customThemeImportLink.trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased().hasPrefix("typebar:")
+        ? try NativeCustomThemeShare.theme(from: customThemeImportLink)
+        : try LegacyCustomThemeLinkImporter.theme(from: customThemeImportLink, name: name)
       guard let applied = settings.applyImportedWebTheme(imported) else {
         customThemeMessage = "无法保存导入的主题。"
         return
@@ -2360,6 +2380,26 @@ struct PreferencesView: View {
         : "已导入并应用“\(applied.name)”。"
     } catch {
       customThemeMessage = (error as? LocalizedError)?.errorDescription ?? "无法读取主题链接。"
+    }
+  }
+
+  private func shareCustomTheme(_ theme: CustomThemeDefinition) {
+    do {
+      let link = try NativeCustomThemeShare.link(
+        for: theme,
+        backgroundURL: customThemeShareIncludesBackground ? settings.customBackgroundURL : nil,
+        backgroundFit: customThemeShareIncludesBackground ? settings.customBackgroundFit : nil,
+        backgroundFilter: customThemeShareIncludesBackground ? settings.customBackgroundFilter : nil)
+      customThemeShareLink = link
+      NSPasteboard.general.clearContents()
+      if NSPasteboard.general.setString(link, forType: .string) {
+        customThemeMessage = "已复制“\(theme.name)”的 Typebar 主题链接。"
+      } else {
+        customThemeMessage = "无法自动复制；请选中下方链接手动复制。"
+      }
+    } catch {
+      customThemeShareLink = ""
+      customThemeMessage = (error as? LocalizedError)?.errorDescription ?? "无法分享主题。"
     }
   }
 
