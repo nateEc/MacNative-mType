@@ -10448,6 +10448,41 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(input.hasMarkedText())
   }
 
+  @MainActor
+  func testNativeArabicCompositionCommitsRTLWordsWithoutPrematureScoring() throws {
+    var session = TypingSession(
+      configuration: .words(2, language: .arabic), prompt: "نافذة طريق")
+    let input = TypingInputView(frame: .zero)
+    var now = start
+    input.onCompositionStarted = { session.beginComposition(at: now) }
+    input.onInsert = { text, forceError in
+      session.insertBatch(text, forceError: forceError, at: now)
+    }
+
+    input.setMarkedText(
+      "ناف", selectedRange: NSRange(location: 3, length: 0), replacementRange: .init())
+    XCTAssertTrue(input.hasMarkedText())
+    XCTAssertTrue(session.typed.isEmpty)
+    XCTAssertEqual(session.errors, 0)
+
+    now = start.addingTimeInterval(1)
+    input.insertText("نافذة", replacementRange: .init())
+    input.insertText(" ", replacementRange: .init())
+    XCTAssertFalse(input.hasMarkedText())
+    XCTAssertEqual(session.typed, "نافذة ")
+    XCTAssertEqual(session.completedWordCount, 1)
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertEqual(session.progressText(at: now), "1/2")
+
+    now = start.addingTimeInterval(2)
+    input.insertText("طريق", replacementRange: .init())
+    let result = try XCTUnwrap(session.result(at: now))
+    XCTAssertEqual(session.completedWordCount, 2)
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertEqual(result.typedCharacterCount, 10)
+    XCTAssertEqual(session.outcome, .completed)
+  }
+
   func testCompositionBeginsSessionBeforeItsTextIsCommitted() throws {
     var session = TypingSession(configuration: .words(1), prompt: "拼")
     let compositionStartedAt = start.addingTimeInterval(2)
