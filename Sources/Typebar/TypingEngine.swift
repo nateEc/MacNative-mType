@@ -4162,6 +4162,7 @@ struct TypingSession {
   ) {
     guard !isFinished, !text.isEmpty else { return }
     let characters = Array(text)
+    let attemptsBeforeEvent = inputAttemptCount
     for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
       if shouldExpandReferenceEllipsis(character) {
@@ -4202,7 +4203,9 @@ struct TypingSession {
     // entirely rejected first event must not begin the timer.
     if startedAt != nil {
       keyboardActivityDates.append(date)
-      insertionActivityDates.append(date)
+      // A key rejected by the pre-insertion guard is still local keyboard
+      // activity, but it has no insertText event for the trailing AFK check.
+      if inputAttemptCount > attemptsBeforeEvent { insertionActivityDates.append(date) }
     }
     if usesIncrementalPromptExtension,
       (!configuration.language.usesSpaceDelimitedWords

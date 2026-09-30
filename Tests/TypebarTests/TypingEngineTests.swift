@@ -602,6 +602,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(keyboardOnlyResult.afkDuration, 6)
   }
 
+  func testRejectedInsertionsDoNotDefeatTrailingInactivity() {
+    var rejected = TypingSession(configuration: .timed(seconds: 10), prompt: "amber harbor")
+    rejected.insert("a", at: start)
+    for second in 6...9 {
+      rejected.insert("\n", at: start.addingTimeInterval(Double(second)))
+    }
+    XCTAssertEqual(rejected.typedCharacterCount, 1)
+    rejected.tick(at: start.addingTimeInterval(10))
+    XCTAssertEqual(rejected.outcome, .invalidAFK)
+
+    var actualInput = TypingSession(configuration: .timed(seconds: 10), prompt: "amber harbor")
+    actualInput.insert("a", at: start)
+    actualInput.insert("x", at: start.addingTimeInterval(8))
+    actualInput.tick(at: start.addingTimeInterval(10))
+    XCTAssertEqual(actualInput.outcome, .completed)
+  }
+
   func testInactivityPolicyCountsDenseLongPracticeWithoutBlockingResults() {
     let dates = (0..<200_000).map {
       start.addingTimeInterval(Double($0 % 100) + 0.25)
