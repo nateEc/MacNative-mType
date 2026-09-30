@@ -7,12 +7,15 @@ enum LegacyChallengeLinkImporter {
     case invalidLink
     case invalidPayload
     case unknownChallenge
+    case requiresMobileDevice
 
     var errorDescription: String? {
       switch self {
       case .invalidLink: "挑战链接无效。"
       case .invalidPayload: "挑战链接必须只包含一个有效的挑战标识。"
       case .unknownChallenge: "此挑战尚未映射到本机 Typebar 挑战。"
+      case .requiresMobileDevice:
+        "原版 mobileWarrior 要求在移动设备上完成一小时测试；Mac 版无法满足移动设备条件，因此不能将它记为本机达成的挑战。"
       }
     }
   }
@@ -45,7 +48,10 @@ enum LegacyChallengeLinkImporter {
     guard let challenge = challenges.first(where: { candidate in
       normalizedIdentifier(candidate.id) == identifier
         || candidate.legacyURLNames.contains { normalizedIdentifier($0) == identifier }
-    }) else { throw ImportError.unknownChallenge }
+    }) else {
+      if identifier == "mobilewarrior" { throw ImportError.requiresMobileDevice }
+      throw ImportError.unknownChallenge
+    }
     return challenge
   }
 

@@ -78,7 +78,7 @@ zsh Scripts/check-reference-metadata-audits.sh /absolute/path/to/monkeytype-refe
 zsh Scripts/check-layout-compatibility-audit.sh /absolute/path/to/monkeytype-reference
 ```
 
-核验固定参考的 58 个挑战名称：57 项映射到本机规则，移动设备专属的 `mobileWarrior` 仍待处理：
+核验固定参考的 58 个挑战名称：57 项映射到本机规则。`mobileWarrior` 要求在移动设备上完成一小时，macOS 无法满足这一设备条件，故仍列为未映射；导入其旧链接时会说明平台限制，不会将其伪装成可达成的本机挑战：
 
 ```zsh
 zsh Scripts/check-challenge-compatibility-audit.sh /absolute/path/to/monkeytype-reference

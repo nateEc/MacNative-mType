@@ -16427,6 +16427,39 @@ final class TypingEngineTests: XCTestCase {
         from: "typebar://test?challenge=oneHourWarrior", challenges: [challenge]))
   }
 
+  func testMobileOnlyLegacyChallengeExplainsItsMacPlatformBoundary() throws {
+    let challenges = TypebarChallengeLibrary.all
+    for identifier in ["mobileWarrior", "MOBILEWARRIOR"] {
+      XCTAssertThrowsError(
+        try LegacyChallengeLinkImporter.challenge(
+          from: "https://reference.example.invalid/?challenge=\(identifier)", challenges: challenges)
+      ) { error in
+        XCTAssertEqual(error as? LegacyChallengeLinkImporter.ImportError, .requiresMobileDevice)
+        XCTAssertTrue((error as? LocalizedError)?.errorDescription?.contains("移动设备") == true)
+      }
+    }
+    XCTAssertThrowsError(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "https://reference.example.invalid/?challenge=mouseWarrior&challenge=mobileWarrior",
+        challenges: challenges)
+    ) { error in
+      XCTAssertEqual(error as? LegacyChallengeLinkImporter.ImportError, .requiresMobileDevice)
+    }
+    XCTAssertEqual(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "https://reference.example.invalid/?challenge=mobileWarrior&challenge=mouseWarrior",
+        challenges: challenges)?.id,
+      "mouse-warrior")
+    XCTAssertThrowsError(
+      try LegacyChallengeLinkImporter.challenge(
+        from: "https://reference.example.invalid/?challenge=notAnOfficialChallenge",
+        challenges: challenges)
+    ) { error in
+      XCTAssertEqual(error as? LegacyChallengeLinkImporter.ImportError, .unknownChallenge)
+    }
+    XCTAssertNil(TypebarChallengeLibrary.challenge(id: "mobile-warrior"))
+  }
+
   @MainActor
   func testLegacyCustomThemeLinkImportsColorsAndSafeBackgroundSettings() throws {
     let payload = """

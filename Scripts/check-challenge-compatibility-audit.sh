@@ -41,6 +41,8 @@ jq -e '
   and ($fixture.pending | length == 1)
   and ($fixture.pending == ["mobileWarrior"])
   and ($fixture.pending | unique | length == 1)
+  and (($fixture.pendingReasons | keys) == $fixture.pending)
+  and ($fixture.pendingReasons.mobileWarrior | type == "string" and length > 0)
   and (((($fixture.nativeEquivalent | keys) + $fixture.pending) | sort)
     == ($fixture.officialNames | sort))
 ' "$fixture" >/dev/null || fail "mapped and pending names do not partition 58 official identities"

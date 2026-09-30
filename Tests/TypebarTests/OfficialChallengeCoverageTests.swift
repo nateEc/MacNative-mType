@@ -259,6 +259,7 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     let officialNames: [String]
     let nativeEquivalent: [String: String]
     let pending: [String]
+    let pendingReasons: [String: String]
   }
 
   func testPinnedChallengeIdentitiesArePartitionedAndNativeLinksResolve() throws {
@@ -281,6 +282,8 @@ final class OfficialChallengeCoverageTests: XCTestCase {
     XCTAssertEqual(official.count, fixture.officialCount)
     XCTAssertEqual(mapped.count, 57)
     XCTAssertEqual(fixture.pending.count, pending.count)
+    XCTAssertEqual(Set(fixture.pendingReasons.keys), pending)
+    XCTAssertTrue(fixture.pendingReasons.values.allSatisfy { !$0.isEmpty })
     XCTAssertTrue(mapped.isDisjoint(with: pending))
     XCTAssertEqual(mapped.union(pending), official)
     XCTAssertEqual(

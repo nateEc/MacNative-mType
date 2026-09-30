@@ -128,5 +128,8 @@
   },
   "pending": [
     "mobileWarrior"
-  ]
+  ],
+  "pendingReasons": {
+    "mobileWarrior": "Requires a one-hour test on a mobile device; macOS cannot satisfy that device condition. Legacy link import explains this limitation instead of awarding a native challenge."
+  }
 }
