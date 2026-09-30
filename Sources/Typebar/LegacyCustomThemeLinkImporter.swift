@@ -77,6 +77,7 @@ enum LegacyCustomThemeLinkImporter {
     guard let rawBackgroundURL = payload.backgroundURL,
       let remoteBackgroundURL = CustomBackgroundURLPolicy.normalizedRemoteURL(rawBackgroundURL),
       !remoteBackgroundURL.isEmpty,
+      URLComponents(string: remoteBackgroundURL)?.scheme?.lowercased() == "https",
       let backgroundFit = payload.backgroundFit.flatMap(CustomBackgroundFit.init(rawValue:)),
       let backgroundFilter = validBackgroundFilter(payload.backgroundFilter)
     else {

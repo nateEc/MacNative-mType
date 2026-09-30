@@ -16969,6 +16969,19 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNotNil(backgroundSettings.applyImportedWebTheme(unsafe))
     XCTAssertEqual(backgroundSettings.customBackgroundURL, "https://assets.example.test/original.png")
 
+    let insecureImagePayload = payload.replacingOccurrences(
+      of: "https://assets.example.test/scene.png", with: "http://assets.example.test/scene.png")
+    var insecureImageComponents = try XCTUnwrap(URLComponents(string: "https://insecure-image-link.example.test"))
+    insecureImageComponents.queryItems = [
+      .init(name: "customTheme", value: Data(insecureImagePayload.utf8).base64EncodedString())
+    ]
+    let insecureImage = try LegacyCustomThemeLinkImporter.theme(
+      from: try XCTUnwrap(insecureImageComponents.url?.absoluteString), name: "No HTTP image")
+    XCTAssertTrue(insecureImage.skippedBackground)
+    XCTAssertNil(insecureImage.remoteBackgroundURL)
+    XCTAssertNotNil(backgroundSettings.applyImportedWebTheme(insecureImage))
+    XCTAssertEqual(backgroundSettings.customBackgroundURL, "https://assets.example.test/original.png")
+
     XCTAssertThrowsError(try LegacyCustomThemeLinkImporter.theme(
       from: "http://example.com/?customTheme=ignored", name: "Not secure")) { error in
       XCTAssertEqual(error as? LegacyCustomThemeLinkImporter.ImportError, .invalidLink)
