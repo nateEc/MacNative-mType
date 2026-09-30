@@ -468,9 +468,8 @@ struct PreferencesView: View {
               Text(style.displayName).tag(style)
             }
           }
-          Toggle("减少练习背景动态效果", isOn: $settings.reducePracticeMotion)
-            .disabled(settings.practiceBackdrop != .halos)
-          Text("未设置自定义图片时，背景由 Typebar 的原生矢量绘制；光晕会遵从 macOS“减少动态效果”辅助功能设置。")
+          Toggle("减少练习动态效果", isOn: $settings.reducePracticeMotion)
+          Text("也会使旋转文字等练习动效静止；不改变输入或计分。未设置自定义图片时，光晕背景也会遵从 macOS“减少动态效果”辅助功能设置。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Stepper(

@@ -20977,6 +20977,24 @@ final class TypingEngineTests: XCTestCase {
       [.noSpaces, .messagingStyle])
   }
 
+  func testPracticeVisualMotionSchedulingStopsWhenDisabledOrReduced() {
+    XCTAssertTrue(PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: true, reducesMotion: false,
+      systemReducedMotion: false, ignoresSystemReducedMotion: true))
+    XCTAssertTrue(PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: true, reducesMotion: false,
+      systemReducedMotion: true, ignoresSystemReducedMotion: true))
+    XCTAssertFalse(PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: true, reducesMotion: true,
+      systemReducedMotion: false, ignoresSystemReducedMotion: true))
+    XCTAssertFalse(PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: true, reducesMotion: false,
+      systemReducedMotion: true, ignoresSystemReducedMotion: false))
+    XCTAssertFalse(PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: false, reducesMotion: false,
+      systemReducedMotion: false, ignoresSystemReducedMotion: true))
+  }
+
   func testVisualModifiersApplyOnlyToThePracticePresentation() {
     XCTAssertEqual(PracticeVisualTransform.make(modifiers: []), .init(horizontalScale: 1, rotationDegrees: 0))
     XCTAssertEqual(

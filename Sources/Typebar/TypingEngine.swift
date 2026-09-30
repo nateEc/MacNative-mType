@@ -1532,6 +1532,15 @@ enum RoundVisualPolicy {
   }
 }
 
+enum PracticeVisualAnimationPolicy {
+  static func shouldAnimate(
+    isEnabled: Bool, reducesMotion: Bool, systemReducedMotion: Bool,
+    ignoresSystemReducedMotion: Bool
+  ) -> Bool {
+    isEnabled && !reducesMotion && (!systemReducedMotion || ignoresSystemReducedMotion)
+  }
+}
+
 enum ChooVisualPolicy {
   static func rotationDegrees(at date: Date, glyphIndex: Int, isEnabled: Bool, reducesMotion: Bool) -> Double {
     guard isEnabled && !reducesMotion else { return 0 }

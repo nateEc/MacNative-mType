@@ -286,13 +286,22 @@ private struct EarthquakePracticeContent<Content: View>: View {
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(
-      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
-    ) { timeline in
-      let offset = EarthquakeOffsetPolicy.offset(
-        at: timeline.date, isEnabled: isEnabled,
-        reducesMotion: reducesMotion || (systemReduceMotion && !ignoresSystemReducedMotion))
-      content.offset(x: offset.x, y: offset.y)
+    let animates = PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: isEnabled, reducesMotion: reducesMotion,
+      systemReducedMotion: systemReduceMotion,
+      ignoresSystemReducedMotion: ignoresSystemReducedMotion)
+    return Group {
+      if animates {
+        TimelineView(
+          .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+        ) { timeline in
+          let offset = EarthquakeOffsetPolicy.offset(
+            at: timeline.date, isEnabled: true, reducesMotion: false)
+          content.offset(x: offset.x, y: offset.y)
+        }
+      } else {
+        content
+      }
     }
   }
 }
@@ -306,15 +315,24 @@ private struct NauseaPracticeContent<Content: View>: View {
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(
-      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
-    ) { timeline in
-      let transform = NauseaVisualPolicy.transform(
-        at: timeline.date, isEnabled: isEnabled,
-        reducesMotion: reducesMotion || (systemReduceMotion && !ignoresSystemReducedMotion))
-      content
-        .scaleEffect(x: transform.horizontalScale, y: transform.verticalScale, anchor: .center)
-        .rotation3DEffect(.degrees(transform.rotationDegrees), axis: (x: 0.45, y: 0.9, z: 0.12))
+    let animates = PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: isEnabled, reducesMotion: reducesMotion,
+      systemReducedMotion: systemReduceMotion,
+      ignoresSystemReducedMotion: ignoresSystemReducedMotion)
+    return Group {
+      if animates {
+        TimelineView(
+          .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+        ) { timeline in
+          let transform = NauseaVisualPolicy.transform(
+            at: timeline.date, isEnabled: true, reducesMotion: false)
+          content
+            .scaleEffect(x: transform.horizontalScale, y: transform.verticalScale, anchor: .center)
+            .rotation3DEffect(.degrees(transform.rotationDegrees), axis: (x: 0.45, y: 0.9, z: 0.12))
+        }
+      } else {
+        content
+      }
     }
   }
 }
@@ -328,12 +346,21 @@ private struct RoundPracticeContent<Content: View>: View {
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(
-      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
-    ) { timeline in
-      content.rotationEffect(.degrees(RoundVisualPolicy.rotationDegrees(
-        at: timeline.date, isEnabled: isEnabled,
-        reducesMotion: reducesMotion || (systemReduceMotion && !ignoresSystemReducedMotion))))
+    let animates = PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: isEnabled, reducesMotion: reducesMotion,
+      systemReducedMotion: systemReduceMotion,
+      ignoresSystemReducedMotion: ignoresSystemReducedMotion)
+    return Group {
+      if animates {
+        TimelineView(
+          .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+        ) { timeline in
+          content.rotationEffect(.degrees(RoundVisualPolicy.rotationDegrees(
+            at: timeline.date, isEnabled: true, reducesMotion: false)))
+        }
+      } else {
+        content
+      }
     }
   }
 }
@@ -439,25 +466,39 @@ private struct ChooPracticePrompt: View {
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
 
   var body: some View {
-    TimelineView(
-      .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
-    ) { timeline in
-      PromptFlowLayout {
-        ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
-          if glyph.character == "\n" {
-            Color.clear.frame(width: 0, height: 0)
-              .layoutValue(key: PromptLineBreakKey.self, value: true)
-          } else {
-            Text(String(glyph.typedCharacter ?? glyph.character))
-              .font(font)
-              .foregroundStyle(color(for: glyph))
-              .background(background(for: glyph))
-              .rotation3DEffect(
-                .degrees(ChooVisualPolicy.rotationDegrees(
-                  at: timeline.date, glyphIndex: index, isEnabled: isEnabled,
-                  reducesMotion: reducesMotion || (systemReduceMotion && !ignoresSystemReducedMotion))),
-                axis: (x: 0, y: 1, z: 0))
-          }
+    let animates = PracticeVisualAnimationPolicy.shouldAnimate(
+      isEnabled: isEnabled, reducesMotion: reducesMotion,
+      systemReducedMotion: systemReduceMotion,
+      ignoresSystemReducedMotion: ignoresSystemReducedMotion)
+    return Group {
+      if animates {
+        TimelineView(
+          .animation(minimumInterval: AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))
+        ) { timeline in
+          prompt(at: timeline.date, animates: true)
+        }
+      } else {
+        prompt(at: .distantPast, animates: false)
+      }
+    }
+  }
+
+  private func prompt(at date: Date, animates: Bool) -> some View {
+    PromptFlowLayout {
+      ForEach(Array(glyphs.enumerated()), id: \.offset) { index, glyph in
+        if glyph.character == "\n" {
+          Color.clear.frame(width: 0, height: 0)
+            .layoutValue(key: PromptLineBreakKey.self, value: true)
+        } else {
+          Text(String(glyph.typedCharacter ?? glyph.character))
+            .font(font)
+            .foregroundStyle(color(for: glyph))
+            .background(background(for: glyph))
+            .rotation3DEffect(
+              .degrees(ChooVisualPolicy.rotationDegrees(
+                at: date, glyphIndex: index, isEnabled: animates,
+                reducesMotion: !animates)),
+              axis: (x: 0, y: 1, z: 0))
         }
       }
     }
