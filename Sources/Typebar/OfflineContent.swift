@@ -5053,6 +5053,10 @@ enum CodePracticeContent {
     if language == .codeBash {
       return (0..<blockCount).map(bashBlock).joined(separator: "\n")
     }
+    if language == .codeHTML {
+      let sections = (0..<blockCount).map(htmlSection).joined(separator: "\n")
+      return "<main class=\"practice\">\n\(sections)\n</main>"
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5360,6 +5364,25 @@ enum CodePracticeContent {
     return "practice_unit_\(index)() {\n  \(body)\n}"
   }
 
+  private static func htmlSection(at index: Int) -> String {
+    let content: String
+    switch index % 6 {
+    case 0:
+      content = "    <h2>Practice \(index)</h2>\n    <p>Type one element at a time.</p>"
+    case 1:
+      content = "    <h2>Steps \(index)</h2>\n    <ol><li>Read the label</li><li>Check the closing tag</li></ol>"
+    case 2:
+      content = "    <blockquote><p>Keep a steady pace for unit \(index).</p></blockquote>"
+    case 3:
+      content = "    <dl><dt>Unit \(index)</dt><dd>A short definition</dd></dl>"
+    case 4:
+      content = "    <table><thead><tr><th>Unit</th><th>Value</th></tr></thead><tbody><tr><td>\(index)</td><td>Ready</td></tr></tbody></table>"
+    default:
+      content = "    <details><summary>Unit \(index)</summary><p>Review the nested elements.</p></details>"
+    }
+    return "  <section id=\"unit-\(index)\">\n\(content)\n  </section>"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5446,7 +5469,7 @@ enum CodePracticeContent {
        "$values = [2, 3, 5];\necho total($values), PHP_EOL;",
        "foreach ($values as $value) {\n  echo $value, PHP_EOL;\n}"]
     case .codeHTML:
-      ["<main class=\"practice\">", "<p>steady typing</p>", "</main>"]
+      (0..<3).map(htmlSection)
     case .codeCSS:
       [".practice {", "\tdisplay: grid;", "\tgap: 1rem;\n}"]
     case .codeSQL:
