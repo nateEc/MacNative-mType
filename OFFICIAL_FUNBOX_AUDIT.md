@@ -92,7 +92,7 @@
 
 ## 审计结论
 
-48 项官方 funbox 均已有用户可见的功能等价实现，0 项部分覆盖、0 项未实现。ASL 指语提示以原创原生矢量而非官方专用字体呈现；其他涉及视觉细节、互动、外部内容源或本地替代策略的实现也会持续审计，不能据此宣称逐像素或逐数据源复刻。Egyptian Arabic、Moroccan Arabic、Pashto、Sindhi 与 Yiddish 的固定参考元数据均为 RTL／连写，因而和其余五个 RTL 单语一样刻意排除在 101 种 LTR 多语混排候选之外；Occitan、Oromo、Macedonian、Kazakh、Vietnamese、Jyutping、Pinyin、Western Armenian、Bashkir、Euskera、Frisian、Zulu、Hawaiian、Kabyle、Maltese、toki pona、Xhosa、Tibetan、Kyrgyz、Udmurt 与 Yoruba 的 LTR 路径均已由混排轮转测试覆盖。
+48 项官方 funbox 均已有用户可见的功能等价实现，0 项部分覆盖、0 项未实现。ASL 指语提示以原创原生矢量而非官方专用字体呈现；其他涉及视觉细节、互动、外部内容源或本地替代策略的实现也会持续审计，不能据此宣称逐像素或逐数据源复刻。固定参考中的 RTL／连写元数据仍逐语言保留；当前 Typebar 的自选多语列表允许全部 446 个固定单语言 ID，包括 RTL。双向混排的真实输入与视觉顺序仍待设备验收，不将选择器覆盖等同于交互验收。
 
 无限测试冲突按固定参考的 `noInfiniteDuration` 元数据独立建模：布局流动、专注当前词、预读下一/后二/后三词、记忆模式、诗性散文和知识短文共八项只允许有限长度。已有这些修饰器时，直接改无限会被拒绝并保留有限值；反向从无限测试启用它们，固定激活流程会将活动时间设为 15 秒或活动字数设为 10 词。带 Memory 的 time/zen 导入会先按固定模式限制转为有限字数，其他旧预设或归档若仍同时包含无限值与冲突项，则保留无限测试并在解码时安全移除冲突修饰器。其余 funbox 可随 Typebar 自有提示批次循环，不导入参考词表或实现。
 
