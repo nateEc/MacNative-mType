@@ -18181,6 +18181,36 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(focus.record(isKey: true, hasAttachedSheet: false))
   }
 
+  @MainActor
+  func testNativeInputWindowNotificationsReachRefocusTracker() {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
+      styleMask: [], backing: .buffered, defer: false)
+    let input = TypingInputView(frame: .zero)
+    var focus = TypingWindowFocusTracker()
+    var returned = [Bool]()
+    input.onWindowFocusChanged = { isKey, hasAttachedSheet in
+      returned.append(focus.record(isKey: isKey, hasAttachedSheet: hasAttachedSheet))
+    }
+    window.contentView?.addSubview(input)
+    defer { input.removeFromSuperview() }
+
+    XCTAssertEqual(returned, [false]) // The initial non-key snapshot is not a return.
+    input.refreshWindowFocusState()
+    XCTAssertEqual(returned, [false, false])
+
+    let center = NotificationCenter.default
+    center.post(name: NSWindow.didBecomeKeyNotification, object: window)
+    center.post(name: NSWindow.didResignKeyNotification, object: window)
+    input.refreshWindowFocusState()
+    center.post(name: NSWindow.didBecomeKeyNotification, object: window)
+    XCTAssertEqual(returned, [false, false, false, false, false, true])
+
+    input.removeFromSuperview()
+    center.post(name: NSWindow.didResignKeyNotification, object: window)
+    XCTAssertEqual(returned.count, 6) // Detached views no longer observe the old window.
+  }
+
   func testSessionFactoryLeavesZenPromptFreeformAndBuildsOtherModePrompts() {
     let timed = TestSessionFactory.make(configuration: .timed(seconds: 120))
     let words = TestSessionFactory.make(configuration: .words(25))
