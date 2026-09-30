@@ -11262,6 +11262,33 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.result(at: start)?.prompt, prompt)
   }
 
+  func testCSSPracticeGrowsAsCompleteDistinctRules() {
+    for target in [1, 25, 100, 800] {
+      let prompt = CodePracticeContent.prompt(language: .codeCSS, targetTokenCount: target)
+      let selectors = prompt.split(separator: "\n").compactMap { line -> String? in
+        guard line.hasPrefix(".practice-unit-") else { return nil }
+        return String(line.prefix(while: { $0 != " " }))
+      }
+      let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+      XCTAssertEqual(selectors.count, expectedCount, "target=\(target)")
+      XCTAssertEqual(Set(selectors).count, expectedCount, "target=\(target)")
+      XCTAssertEqual(prompt.filter { $0 == "{" }.count, expectedCount, "target=\(target)")
+      XCTAssertEqual(prompt.filter { $0 == "}" }.count, expectedCount, "target=\(target)")
+      XCTAssertTrue(prompt.hasSuffix("}"), "target=\(target)")
+      XCTAssertFalse(prompt.contains("\t"), "target=\(target)")
+    }
+
+    let prompt = CodePracticeContent.prompt(language: .codeCSS, targetTokenCount: 25)
+    let start = Date(timeIntervalSince1970: 3_000)
+    var session = TypingSession(configuration: .words(25, language: .codeCSS), prompt: prompt)
+    for character in prompt {
+      session.insert(String(character), at: start)
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
   func testVimscriptPracticeGrowsAsDistinctRunnableFunctions() throws {
     for target in [1, 25, 100, 800] {
       let prompt = CodePracticeContent.prompt(language: .codeVimscript, targetTokenCount: target)

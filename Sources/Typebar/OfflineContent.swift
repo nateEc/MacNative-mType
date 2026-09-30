@@ -5060,6 +5060,9 @@ enum CodePracticeContent {
     if language == .codeVimscript {
       return (0..<blockCount).map(vimscriptBlock).joined(separator: "\n")
     }
+    if language == .codeCSS {
+      return (0..<blockCount).map(cssRule).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5406,6 +5409,25 @@ enum CodePracticeContent {
     return "\(header)function! PracticeUnit\(index)(values) abort\n  \(body)\nendfunction"
   }
 
+  private static func cssRule(at index: Int) -> String {
+    let declarations: String
+    switch index % 6 {
+    case 0:
+      declarations = "display: grid;\n  gap: \(index + 1)px;"
+    case 1:
+      declarations = "color: #253145;\n  background-color: #e8edf2;"
+    case 2:
+      declarations = "padding: \(index + 2)px;\n  border: 1px solid #527392;"
+    case 3:
+      declarations = "display: flex;\n  align-items: center;\n  column-gap: \(index + 1)px;"
+    case 4:
+      declarations = "font-size: \(index + 12)px;\n  line-height: 1.5;"
+    default:
+      declarations = "opacity: 0.8;\n  transform: translateY(\(index)px);"
+    }
+    return ".practice-unit-\(index) {\n  \(declarations)\n}"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5494,7 +5516,7 @@ enum CodePracticeContent {
     case .codeHTML:
       (0..<3).map(htmlSection)
     case .codeCSS:
-      [".practice {", "\tdisplay: grid;", "\tgap: 1rem;\n}"]
+      (0..<3).map(cssRule)
     case .codeSQL:
       (0..<3).map(sqlBlock)
     case .codePowerShell:
