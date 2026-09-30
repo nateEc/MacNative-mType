@@ -1009,6 +1009,8 @@ struct PreferencesView: View {
           ColorPicker("彩色模式错误", selection: $customThemeColorfulError)
           ColorPicker("彩色模式额外输入", selection: $customThemeColorfulExtraInput)
           Toggle("使用深色界面", isOn: $customThemePrefersDark)
+          Button("分享当前编辑配色") { shareCurrentThemeDraft() }
+            .help("只复制当前颜色的主题链接，不保存或应用主题")
           Button(editingCustomThemeID == nil ? "保存并应用自定义主题" : "更新并应用自定义主题") {
             saveCustomTheme()
           }
@@ -2401,6 +2403,25 @@ struct PreferencesView: View {
       customThemeShareLink = ""
       customThemeMessage = (error as? LocalizedError)?.errorDescription ?? "无法分享主题。"
     }
+  }
+
+  private func shareCurrentThemeDraft() {
+    let requestedName = customThemeName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let theme = CustomThemeDefinition(
+      name: requestedName.isEmpty ? "共享主题" : requestedName,
+      background: .init(color: customThemeBackground),
+      panel: .init(color: customThemePanel),
+      accent: .init(color: customThemeAccent),
+      text: .init(color: customThemeText),
+      secondaryText: .init(color: customThemeSecondaryText),
+      error: .init(color: customThemeError),
+      extraInput: .init(color: customThemeExtraInput),
+      caret: .init(color: customThemeCaret),
+      fadedText: .init(color: customThemeFadedText),
+      colorfulError: .init(color: customThemeColorfulError),
+      colorfulExtraInput: .init(color: customThemeColorfulExtraInput),
+      prefersDark: customThemePrefersDark)
+    shareCustomTheme(theme)
   }
 
   private var suggestedImportedThemeName: String {
