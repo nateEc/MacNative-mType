@@ -110,8 +110,8 @@ enum NativeCustomThemeShare {
   }
 
   private static func secureImageURL(_ rawValue: String) -> String? {
-    guard let url = CustomBackgroundURLPolicy.normalizedRemoteURL(rawValue), !url.isEmpty,
-      URLComponents(string: url)?.scheme?.lowercased() == "https"
+    guard let url = CustomBackgroundURLPolicy.normalizedRemoteURL(rawValue),
+      url.isEmpty || URLComponents(string: url)?.scheme?.lowercased() == "https"
     else { return nil }
     return url
   }

@@ -988,7 +988,7 @@ struct PreferencesView: View {
             .textFieldStyle(.roundedBorder)
           Button("导入主题链接") { importWebThemeLink() }
             .disabled(customThemeImportLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          Text("可在本机解析 Typebar 分享链接或兼容网页主题链接；网页链接主机不会被访问。只有完整的安全 HTTPS 图片、适配方式和滤镜组合才会一起导入；不会读取网页代码或原项目资源。")
+          Text("可在本机解析 Typebar 分享链接或兼容网页主题链接；网页链接主机不会被访问。完整背景组合可使用安全 HTTPS 图片，或以空链接清除现有远程背景；不会读取网页代码或原项目资源。")
             .font(.caption)
             .foregroundStyle(.secondary)
           ColorPicker("背景", selection: $customThemeBackground)
@@ -1023,7 +1023,7 @@ struct PreferencesView: View {
           }
 
           Toggle("分享时包含当前远程背景链接和滤镜", isOn: $customThemeShareIncludesBackground)
-          Text("本机图片不会进入分享链接；启用背景分享时必须先设置 HTTPS 图片。")
+          Text("本机图片不会进入分享链接；当前远程 URL 留空时，链接会要求接收方清除已有远程背景。")
             .font(.caption)
             .foregroundStyle(.secondary)
           if !customThemeShareLink.isEmpty {

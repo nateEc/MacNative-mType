@@ -105,4 +105,25 @@ final class CustomThemeShareTests: XCTestCase {
     XCTAssertNotNil(settings.applyImportedWebTheme(imported))
     XCTAssertEqual(settings.customBackgroundURL, "https://images.example.test/original.png")
   }
+
+  @MainActor func testExplicitlySharedEmptyBackgroundClearsPreviousRemoteImage() throws {
+    let link = try NativeCustomThemeShare.link(
+      for: sampleTheme(), backgroundURL: "",
+      backgroundFit: .max,
+      backgroundFilter: .init(blur: 4, brightness: 0.8, saturation: 1.4, opacity: 0.5))
+    let imported = try NativeCustomThemeShare.theme(from: link)
+    XCTAssertEqual(imported.remoteBackgroundURL, "")
+    XCTAssertFalse(imported.skippedBackground)
+
+    let suite = "TypebarTests.theme-share-clear-\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let settings = AppSettings(defaults: defaults)
+    settings.customBackgroundURL = "https://images.example.test/original.png"
+    XCTAssertNotNil(settings.applyImportedWebTheme(imported))
+    XCTAssertEqual(settings.customBackgroundURL, "")
+    XCTAssertEqual(settings.customBackgroundFit, .max)
+    XCTAssertEqual(settings.customBackgroundFilter,
+                   .init(blur: 4, brightness: 0.8, saturation: 1.4, opacity: 0.5))
+  }
 }

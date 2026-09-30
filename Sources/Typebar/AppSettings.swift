@@ -2185,7 +2185,8 @@ final class AppSettings {
     selectCustomTheme(theme.id)
 
     if let rawURL = imported.remoteBackgroundURL,
-      let remoteURL = CustomBackgroundURLPolicy.normalizedRemoteURL(rawURL), !remoteURL.isEmpty,
+      let remoteURL = CustomBackgroundURLPolicy.normalizedRemoteURL(rawURL),
+      remoteURL.isEmpty || URLComponents(string: remoteURL)?.scheme?.lowercased() == "https",
       let backgroundFit = imported.backgroundFit,
       let backgroundFilter = imported.backgroundFilter
     {
