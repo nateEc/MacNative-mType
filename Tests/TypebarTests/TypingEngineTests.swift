@@ -17635,6 +17635,31 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  @MainActor func testReplayCharacterPickerDoesNotRebuildUnchangedLongTarget() throws {
+    let picker = ReplayCharacterTextView()
+    let prompt = String(repeating: "typebar ", count: 1_000)
+    let reachable = Set(0..<prompt.count)
+    picker.update(text: prompt, reachableIndices: reachable, selectedIndex: nil)
+
+    let storage = try XCTUnwrap(picker.textStorage)
+    do {
+      let unexpectedEdit = expectation(description: "未变的回放目标不应重建")
+      unexpectedEdit.isInverted = true
+      let observer = NotificationCenter.default.addObserver(
+        forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: nil
+      ) { _ in unexpectedEdit.fulfill() }
+      defer { NotificationCenter.default.removeObserver(observer) }
+      picker.update(text: prompt, reachableIndices: reachable, selectedIndex: nil)
+      wait(for: [unexpectedEdit], timeout: 0.02)
+    }
+
+    picker.update(text: prompt, reachableIndices: reachable, selectedIndex: 7_999)
+    XCTAssertEqual(
+      storage.attribute(.underlineStyle, at: 7_999, effectiveRange: nil) as? Int,
+      NSUnderlineStyle.single.rawValue,
+      "目标字符选择变化仍须更新视觉反馈")
+  }
+
   func testReplayCharacterUTF16IndexKeepsLongAndComposedTargetsAligned() {
     let index = ReplayCharacterUTF16Index("a🙂e\u{301}z")
     XCTAssertEqual(index.range(at: 0), NSRange(location: 0, length: 1))
@@ -17644,10 +17669,16 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(index.characterIndex(containing: 2), 1)
     XCTAssertEqual(index.characterIndex(containing: 4), 2)
     XCTAssertNil(index.characterIndex(containing: 6))
+    XCTAssertEqual(
+      index.characterIndices(overlapping: NSRange(location: 2, length: 3)), 1..<3)
+    XCTAssertNil(index.characterIndices(overlapping: NSRange(location: 6, length: 0)))
 
     let longIndex = ReplayCharacterUTF16Index(String(repeating: "typebar ", count: 1_000))
     XCTAssertEqual(longIndex.range(at: 7_999), NSRange(location: 7_999, length: 1))
     XCTAssertEqual(longIndex.characterIndex(containing: 7_999), 7_999)
+    XCTAssertEqual(
+      longIndex.characterIndices(overlapping: NSRange(location: 7_900, length: 100)),
+      7_900..<8_000)
   }
 
   func testReplayInputGlyphsRebuildCorrectForcedIncorrectDeletedAndExtraStates() {

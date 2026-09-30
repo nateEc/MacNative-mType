@@ -34,6 +34,14 @@ struct ReplayCharacterUTF16Index {
     }
     return lower
   }
+
+  func characterIndices(overlapping range: NSRange) -> Range<Int>? {
+    guard range.length > 0,
+      let first = characterIndex(containing: range.location),
+      let last = characterIndex(containing: min(NSMaxRange(range) - 1, offsets[offsets.count - 1] - 1))
+    else { return nil }
+    return first..<(last + 1)
+  }
 }
 
 struct ReplayCharacterPicker: NSViewRepresentable {
@@ -64,7 +72,9 @@ struct ReplayCharacterPicker: NSViewRepresentable {
 final class ReplayCharacterTextView: NSTextView {
   var onSelect: (Int) -> Void = { _ in }
   private var utf16Index = ReplayCharacterUTF16Index("")
+  private var renderedText: String?
   private var reachableIndices: Set<Int> = []
+  private var renderedSelection: Int?
 
   override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
     super.init(frame: frameRect, textContainer: container)
@@ -103,8 +113,13 @@ final class ReplayCharacterTextView: NSTextView {
   }
 
   func update(text: String, reachableIndices: Set<Int>, selectedIndex: Int?) {
+    guard renderedText != text || self.reachableIndices != reachableIndices
+      || renderedSelection != selectedIndex
+    else { return }
     utf16Index = ReplayCharacterUTF16Index(text)
+    renderedText = text
     self.reachableIndices = reachableIndices
+    renderedSelection = selectedIndex
     let rendered = NSMutableAttributedString()
     let font = NSFont.monospacedSystemFont(
       ofSize: NSFont.smallSystemFontSize, weight: .regular)
@@ -148,7 +163,15 @@ final class ReplayCharacterTextView: NSTextView {
   override func resetCursorRects() {
     super.resetCursorRects()
     guard let layoutManager, let textContainer else { return }
-    for characterIndex in reachableIndices {
+    let visibleTextRect = visibleRect.offsetBy(
+      dx: -textContainerInset.width, dy: -textContainerInset.height)
+    let visibleGlyphs = layoutManager.glyphRange(
+      forBoundingRect: visibleTextRect, in: textContainer)
+    guard visibleGlyphs.length > 0 else { return }
+    let visibleCharacters = layoutManager.characterRange(
+      forGlyphRange: visibleGlyphs, actualGlyphRange: nil)
+    guard let indices = utf16Index.characterIndices(overlapping: visibleCharacters) else { return }
+    for characterIndex in indices where reachableIndices.contains(characterIndex) {
       guard let utf16Range = utf16Index.range(at: characterIndex) else { continue }
       let glyphRange = layoutManager.glyphRange(
         forCharacterRange: utf16Range, actualCharacterRange: nil)
