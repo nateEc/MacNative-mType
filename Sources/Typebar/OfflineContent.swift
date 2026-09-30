@@ -5136,8 +5136,30 @@ enum CodePracticeContent {
       ["object Practice {\n\tdef total(values: List[Int]): Int = values.sum\n}",
        "items.foreach(item => println(item))",
        "val doubled = List(1, 2, 3).map(_ * 2)"]
-    case .codeVisualBasic, .codeCOBOL, .codeFortran, .codePascal, .codeABAP, .codeABAP1k:
-      ["total = 0", "FOR EACH item IN items\n\tPRINT item\nNEXT item", "PRINT total"]
+    case .codeVisualBasic:
+      ["Module Practice\n\tSub Main()\n\t\tDim total As Integer = 0\n\tEnd Sub\nEnd Module",
+       "For Each value As Integer In values\n\ttotal += value\nNext",
+       "Console.WriteLine(total)"]
+    case .codeCOBOL:
+      ["IDENTIFICATION DIVISION.\nPROGRAM-ID. TYPEBAR-PRACTICE.",
+       "DATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TOTAL PIC 9(4) VALUE ZERO.",
+       "PROCEDURE DIVISION.\n    DISPLAY TOTAL.\n    STOP RUN."]
+    case .codeFortran:
+      ["program practice\n  implicit none\n  integer :: total, value\n  total = 0",
+       "  do value = 1, 3\n    total = total + value\n  end do",
+       "  print *, total\nend program practice"]
+    case .codePascal:
+      ["program Practice;\nvar total, value: Integer;\nbegin\n  total := 0;",
+       "  for value := 1 to 3 do\n    total := total + value;",
+       "  WriteLn(total);\nend."]
+    case .codeABAP:
+      ["REPORT ztypebar_practice.\nDATA total TYPE i VALUE 0.",
+       "DO 3 TIMES.\n  total = total + sy-index.\nENDDO.",
+       "WRITE: / total."]
+    case .codeABAP1k:
+      ["REPORT ztypebar_extended.\nDATA count TYPE i VALUE 0.",
+       "DO 5 TIMES.\n  count = count + 1.\nENDDO.",
+       "WRITE: / count."]
     case .codeVHDL:
       [
         "entity pulse_gate is\n\tport (clock : in bit; enabled : in bit; output : out bit);\nend entity;",

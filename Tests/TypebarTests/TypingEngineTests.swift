@@ -10708,6 +10708,26 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(Set(prompts).count, expected.count)
   }
 
+  func testProceduralCodeChoicesUseDistinctNativeSyntax() {
+    let expected: [(TypingLanguage, String)] = [
+      (.codeVisualBasic, "Module Practice"),
+      (.codeCOBOL, "IDENTIFICATION DIVISION."),
+      (.codeFortran, "program practice"),
+      (.codePascal, "program Practice;"),
+      (.codeABAP, "REPORT ztypebar_practice."),
+      (.codeABAP1k, "REPORT ztypebar_extended."),
+    ]
+    let prompts = expected.map { language, marker in
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 24)
+      XCTAssertTrue(prompt.contains(marker), "Missing \(marker) in \(language.displayName): \(prompt)")
+      if language != .codeVisualBasic {
+        XCTAssertFalse(prompt.contains("FOR EACH item IN items"), language.displayName)
+      }
+      return prompt
+    }
+    XCTAssertEqual(Set(prompts).count, expected.count)
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
