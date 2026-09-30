@@ -10753,6 +10753,27 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(prompt.contains("total = sum(values)"))
   }
 
+  func testScriptCodeChoicesUseTheirOwnSyntaxInsteadOfGenericFallback() {
+    let expected: [(TypingLanguage, String)] = [
+      (.codeRuby, "def total(values)"),
+      (.codeR, "total <- function(values)"),
+      (.codeR2k, "scores <- c(3, 5, 8)"),
+      (.codeLua, "local function total(values)"),
+      (.codeLuau, "local function total(values: {number}): number"),
+      (.codePerl, "use strict;"),
+      (.codePHP, "<?php"),
+    ]
+    let prompts = expected.map { language, marker in
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 24)
+      XCTAssertTrue(prompt.contains(marker), "Missing \(marker) in \(language.displayName): \(prompt)")
+      XCTAssertFalse(prompt.contains("let total = collect(values);"), language.displayName)
+      return prompt
+    }
+    XCTAssertEqual(Set(prompts).count, expected.count)
+    XCTAssertFalse(prompts[3].contains("{number}"))
+    XCTAssertFalse(prompts[4].contains("ipairs(values) do"))
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")

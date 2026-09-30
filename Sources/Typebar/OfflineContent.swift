@@ -5086,6 +5086,34 @@ enum CodePracticeContent {
       ["extends Node\n@export var speed: int = 4\n@onready var label: Label = $Label",
        "func _ready() -> void:\n\tvar total: int = 0\n\tfor step in range(speed):\n\t\ttotal += step\n\tprint(total)",
        "func double(value: int) -> int:\n\treturn value * 2"]
+    case .codeRuby:
+      ["def total(values)\n  values.sum\nend",
+       "values.each { |value| puts value }",
+       "doubled = [1, 2, 3].map { |value| value * 2 }"]
+    case .codeR:
+      ["total <- function(values) {\n  sum(values)\n}",
+       "values <- c(2, 4, 6)\nprint(total(values))",
+       "doubled <- vapply(values, function(value) value * 2, numeric(1))"]
+    case .codeR2k:
+      ["scores <- c(3, 5, 8)",
+       "centered <- scores - mean(scores)",
+       "summary <- data.frame(score = scores, centered = centered)\nprint(summary)"]
+    case .codeLua:
+      ["local function total(values)\n  local sum = 0\n  for _, value in ipairs(values) do\n    sum = sum + value\n  end\n  return sum\nend",
+       "local values = {2, 3, 5}\nprint(total(values))",
+       "for index, value in ipairs(values) do\n  print(index, value)\nend"]
+    case .codeLuau:
+      ["local function total(values: {number}): number\n  local sum: number = 0\n  for _, value in values do\n    sum += value\n  end\n  return sum\nend",
+       "local values: {number} = {2, 3, 5}\nprint(total(values))",
+       "type Entry = { name: string, score: number }"]
+    case .codePerl:
+      ["use strict;\nuse warnings;\nmy @values = (2, 3, 5);",
+       "my $total = 0;\nfor my $value (@values) {\n  $total += $value;\n}",
+       "print \"$total\\n\";"]
+    case .codePHP:
+      ["<?php\nfunction total(array $values): int {\n  return array_sum($values);\n}",
+       "$values = [2, 3, 5];\necho total($values), PHP_EOL;",
+       "foreach ($values as $value) {\n  echo $value, PHP_EOL;\n}"]
     case .codeHTML:
       ["<main class=\"practice\">", "<p>steady typing</p>", "</main>"]
     case .codeCSS:
