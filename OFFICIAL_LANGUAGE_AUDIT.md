@@ -36,7 +36,7 @@
 | Zipf 词频状态 | `orderedByFrequency: true` 时无提示，`false` 时显示七秒“未按频率排序”提示，缺失时显示七秒“可能不支持”提示；提示不移除 Zipf。Bemba 与 Kabyle 使用明确 `false` 路径，Bosnian、Esperanto、Esperanto H、Tatar、Oromo、Bashkir 与 Hawaiian 使用明确 `true` 路径，Esperanto X、Latin、Friulian、Malagasy、Welsh、Hausa、Uzbek、Macedonian、Kazakh、Vietnamese、Jyutping、Pinyin、Euskera、Frisian、Zulu、Western Armenian、Maltese、toki pona、Xhosa、Tibetan、Kyrgyz、Udmurt、Yoruba、Yiddish 与 Swiss German 使用未知路径。 | 使用自有词表排序，不导入参考词表。 |
 | CJK 词界 | 简体／繁体中文及日语平假名／片假名的常规词流按官方生成器使用提交空格；`noSpaces` 修饰保留原始词界。在线中文短文保留无空格显示并传递系统分词边界，历史连续 CJK 成绩继续按旧本机词界解析。 | 空格提交仅来自固定生成器证据；不从自然书写习惯推断。 |
 | 罗马化／替代书写 | Greeklish、Ukrainian Latin、Japanese Romaji 使用原创 ASCII 离线内容，且不会被在线原文替换为另一书写方式。 | 不把参考项目的变体词表纳入应用。 |
-| 代码 | 70 个代码选择以原创短片段覆盖缩进、输入、回放与结果路径；Dockerfile 使用虚构镜像和本地练习路径，保持 `noLazyMode` 的字面输入语义。Rust、Go、Java、C、C++、Kotlin、PowerShell、TypeScript 与 JavaScript React 有各自专属的基础语法片段；LaTeX、Vim、Vimscript、Ook! 也已从原先错误共用的 Typst、Bash、Brainf*ck 片段拆出，自动测试检查可见语法边界。 | 标识可参考公开语言目录；所有片段、标签组合与 UI 均由 Typebar 自写。其余代码入口仍须逐项核查内容是否真正符合所选语言；“可选择、非空、可完成”不等于语法或语料完整等价，短片段也不等于参考语料规模。 |
+| 代码 | 70 个代码选择以原创短片段覆盖缩进、输入、回放与结果路径；Dockerfile 使用虚构镜像和本地练习路径，保持 `noLazyMode` 的字面输入语义。Rust、Go、Java、C、C++、Kotlin、PowerShell、TypeScript 与 JavaScript React 有各自专属的基础语法片段；LaTeX、Vim、Vimscript、Ook! 已从原先错误共用的 Typst、Bash、Brainf*ck 片段拆出；Haskell、F#、OCaml、Erlang、Elixir、Gleam、Clojure、Common Lisp、Scala 九项也已从同一 F# 风格模板拆成各自可辨认的片段。自动测试检查这些可见语法边界。 | 标识可参考公开语言目录；所有片段、标签组合与 UI 均由 Typebar 自写。其余代码入口仍须逐项核查内容是否真正符合所选语言；“可选择、非空、可完成”不等于语法或语料完整等价，短片段也不等于参考语料规模或可编译工程。 |
 
 每个单语均有：Typebar 自有练习词流、四档引语、会话构造测试；能够安全获取在线百科短文的语言还使用对应语言入口和原生朗读 locale。服务端同时验证投稿白名单、撤回、成绩提交和按语言排行榜，不将客户端新语言视为孤立功能；Swiss German 的例外路径明确拒绝投稿但接受成绩与排行榜筛选。
 

@@ -10685,6 +10685,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(ookTokens.allSatisfy { ["Ook.", "Ook?", "Ook!"].contains($0) })
   }
 
+  func testFunctionalCodeChoicesUseDistinctNativeSyntax() {
+    let expected: [(TypingLanguage, String)] = [
+      (.codeHaskell, "total :: [Int] -> Int"),
+      (.codeFSharp, "let total (values: int list)"),
+      (.codeOCaml, "List.fold_left"),
+      (.codeErlang, "-module(practice)."),
+      (.codeElixir, "defmodule Practice do"),
+      (.codeGleam, "pub fn total("),
+      (.codeClojure, "(defn total [values]"),
+      (.codeCommonLisp, "(defun total (values)"),
+      (.codeScala, "object Practice {"),
+    ]
+    let prompts = expected.map { language, marker in
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 24)
+      XCTAssertTrue(prompt.contains(marker), "Missing \(marker) in \(language.displayName): \(prompt)")
+      if language != .codeFSharp {
+        XCTAssertFalse(prompt.contains("items |> List.iter"), language.displayName)
+      }
+      return prompt
+    }
+    XCTAssertEqual(Set(prompts).count, expected.count)
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")

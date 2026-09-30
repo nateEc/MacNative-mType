@@ -5100,9 +5100,42 @@ enum CodePracticeContent {
        "Ook! Ook? Ook. Ook. Ook? Ook! Ook! Ook."]
     case .codeBrainfck:
       ["++[>++<-]", ">.+.", "<[-]"]
-    case .codeHaskell, .codeFSharp, .codeOCaml, .codeErlang, .codeElixir,
-      .codeGleam, .codeClojure, .codeCommonLisp, .codeScala:
-      ["total = sum values", "items |> List.iter (fun item ->\n\tprint item)", "total"]
+    case .codeHaskell:
+      ["total :: [Int] -> Int\ntotal values = sum values",
+       "main :: IO ()\nmain = mapM_ putStrLn [\"steady\", \"practice\"]",
+       "doubled = map (* 2) [1, 2, 3]"]
+    case .codeFSharp:
+      ["let total (values: int list) = List.sum values",
+       "items |> List.iter (fun item -> printfn \"%s\" item)",
+       "let doubled = [1; 2; 3] |> List.map (fun x -> x * 2)"]
+    case .codeOCaml:
+      ["let total values = List.fold_left ( + ) 0 values",
+       "List.iter print_endline [\"steady\"; \"practice\"]",
+       "let doubled = List.map (fun x -> x * 2) [1; 2; 3]"]
+    case .codeErlang:
+      ["-module(practice).\n-export([total/1]).\ntotal(Values) -> lists:sum(Values).",
+       "show(Items) -> lists:foreach(fun(Item) -> io:format(\"~p~n\", [Item]) end, Items).",
+       "choose(Total, Limit) when Total > Limit -> Total."]
+    case .codeElixir:
+      ["defmodule Practice do\n\tdef total(values), do: Enum.sum(values)\nend",
+       "Enum.each(items, fn item -> IO.puts(item) end)",
+       "doubled = Enum.map([1, 2, 3], fn x -> x * 2 end)"]
+    case .codeGleam:
+      ["import gleam/list\n\npub fn total(values: List(Int)) -> Int {\n\tlist.fold(values, 0, fn(sum, value) { sum + value })\n}",
+       "pub fn twice(values: List(Int)) -> List(Int) {\n\tlist.map(values, fn(x) { x * 2 })\n}",
+       "pub fn larger(total: Int, limit: Int) -> Bool {\n\ttotal > limit\n}"]
+    case .codeClojure:
+      ["(defn total [values]\n  (reduce + 0 values))",
+       "(doseq [item items]\n  (println item))",
+       "(map #(* 2 %) [1 2 3])"]
+    case .codeCommonLisp:
+      ["(defun total (values)\n  (reduce #'+ values :initial-value 0))",
+       "(dolist (item items)\n  (format t \"~A~%\" item))",
+       "(mapcar (lambda (x) (* x 2)) '(1 2 3))"]
+    case .codeScala:
+      ["object Practice {\n\tdef total(values: List[Int]): Int = values.sum\n}",
+       "items.foreach(item => println(item))",
+       "val doubled = List(1, 2, 3).map(_ * 2)"]
     case .codeVisualBasic, .codeCOBOL, .codeFortran, .codePascal, .codeABAP, .codeABAP1k:
       ["total = 0", "FOR EACH item IN items\n\tPRINT item\nNEXT item", "PRINT total"]
     case .codeVHDL:
