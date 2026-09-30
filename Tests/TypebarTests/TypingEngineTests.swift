@@ -21148,6 +21148,43 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(CustomTextOrderPolicy.prompt(from: text, ordering: .inOrder), text)
   }
 
+  func testRandomCustomTextAvoidsRecentWordsIgnoringCaseAndPreviousPunctuation() {
+    var caseDraw = 0
+    let caseChoices = [0, 1, 2]
+    let caseWords = CustomTextOrderPolicy.randomWords(
+      from: ["amber", "AMBER", "harbor", "quiet"], count: 2,
+      random: {
+        defer { caseDraw += 1 }
+        return caseChoices[caseDraw % caseChoices.count]
+      })
+    XCTAssertEqual(caseWords, ["amber", "harbor"])
+
+    var punctuationDraw = 0
+    let punctuationChoices = [0, 1]
+    let afterPunctuation = CustomTextOrderPolicy.randomWords(
+      from: ["amber", "harbor", "quiet", "meadow"], count: 1,
+      avoiding: ["Amber,"],
+      random: {
+        defer { punctuationDraw += 1 }
+        return punctuationChoices[punctuationDraw % punctuationChoices.count]
+      })
+    XCTAssertEqual(afterPunctuation, ["harbor"])
+
+    let smallPool = CustomTextOrderPolicy.randomWords(
+      from: ["amber", "harbor", "quiet"], count: 2, random: { 0 })
+    XCTAssertEqual(smallPool, ["amber", "amber"])
+
+    var exhaustedDraws = 0
+    let equivalentPool = CustomTextOrderPolicy.randomWords(
+      from: ["amber", "AMBER", "Amber", "AmBeR"], count: 2,
+      random: {
+        exhaustedDraws += 1
+        return 0
+      })
+    XCTAssertEqual(equivalentPool, ["amber", "amber"])
+    XCTAssertEqual(exhaustedDraws, 102)
+  }
+
   func testBritishEnglishUsesOnlyTypebarOwnedBritishSpellingCorpus() {
     let configuration = TestConfiguration.words(32, language: .english, englishVariant: .british)
     let session = TestSessionFactory.make(configuration: configuration)

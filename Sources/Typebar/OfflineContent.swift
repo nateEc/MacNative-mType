@@ -6432,6 +6432,11 @@ struct CustomSequentialWordStream {
 
 enum CustomTextOrderPolicy {
   static let maximumCompleteRandomWordCount = 100
+  private static let recentWordPunctuation = CharacterSet(charactersIn: ".?!\":-,")
+
+  private static func recentWordKey(_ word: String) -> String {
+    String(word.unicodeScalars.filter { !recentWordPunctuation.contains($0) }).lowercased()
+  }
 
   static func randomWords(
     from tokens: [String], count: Int, avoiding previous: [String] = [],
@@ -6440,18 +6445,18 @@ enum CustomTextOrderPolicy {
     guard !tokens.isEmpty, count > 0 else { return [] }
     var chosen: [String] = []
     chosen.reserveCapacity(count)
-    var recent = Array(previous.suffix(2))
+    var recent = Array(previous.suffix(2)).map(recentWordKey)
     for _ in 0..<count {
       var candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
       if tokens.count >= 4 {
         var attempts = 0
-        while attempts < 100 && recent.contains(candidate) {
+        while attempts < 100 && recent.contains(candidate.lowercased()) {
           attempts += 1
           candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
         }
       }
       chosen.append(candidate)
-      recent.append(candidate)
+      recent.append(recentWordKey(candidate))
       if recent.count > 2 { recent.removeFirst() }
     }
     return chosen
