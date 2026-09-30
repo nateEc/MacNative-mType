@@ -484,6 +484,31 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.finishedAt, start.addingTimeInterval(2))
   }
 
+  func testShortWordPracticeClockStallShowsFailureWithoutSaving() {
+    let now = start.addingTimeInterval(159)
+    let dueSeconds = ClockTickPolicy.dueSeconds(after: 1, startedAt: start, now: now)
+    XCTAssertEqual(dueSeconds.first, 2)
+    let firstExpectedTick = start.addingTimeInterval(Double(dueSeconds[0]))
+    let drift = now.timeIntervalSince(firstExpectedTick)
+
+    let shortWords = TestConfiguration.words(25)
+    var shortHealth = TimerHealthState()
+    shortHealth.observe(drift: drift, configuration: shortWords)
+    XCTAssertTrue(shortHealth.shouldFail)
+
+    var session = TypingSession(configuration: shortWords, prompt: "amber harbor")
+    session.insert("a", at: start)
+    session.failForTimerHealth(at: now)
+    XCTAssertEqual(session.outcome, .failed)
+    XCTAssertEqual(session.failureReason, .timerHealth)
+    XCTAssertEqual(session.result(at: now)?.outcome, .failed)
+    XCTAssertFalse(ResultSavingPolicy.shouldPersist(outcome: session.outcome, enabled: true))
+
+    var longHealth = TimerHealthState()
+    longHealth.observe(drift: drift, configuration: .words(250))
+    XCTAssertFalse(longHealth.shouldFail)
+  }
+
   func testCustomDurationAndWordCountRespectTheirExactConfiguredLimits() {
     var timed = TypingSession(configuration: .timed(seconds: 73), prompt: "amber harbor")
     timed.insert("a", at: start)
