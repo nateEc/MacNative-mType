@@ -17602,6 +17602,33 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(targets[2])
   }
 
+  @MainActor func testReplayCharacterPickerKeepsLongTargetScrollable() {
+    let picker = ReplayCharacterTextView()
+    let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 240, height: 96))
+    scrollView.documentView = picker
+    let prompt = Array(repeating: "amber harbor", count: 80).joined(separator: " ")
+    picker.update(
+      text: prompt, reachableIndices: Set(0..<prompt.count),
+      selectedIndex: nil)
+
+    XCTAssertEqual(picker.textContainer?.maximumNumberOfLines, 0)
+    XCTAssertTrue(picker.isVerticallyResizable)
+    XCTAssertEqual(picker.string, prompt)
+    scrollView.layoutSubtreeIfNeeded()
+    XCTAssertGreaterThan(picker.bounds.width, 200)
+    if let layoutManager = picker.layoutManager, let textContainer = picker.textContainer {
+      layoutManager.ensureLayout(for: textContainer)
+      XCTAssertLessThanOrEqual(
+        layoutManager.usedRect(for: textContainer).width,
+        scrollView.contentSize.width)
+      XCTAssertGreaterThan(
+        layoutManager.usedRect(for: textContainer).height,
+        scrollView.contentSize.height)
+    } else {
+      XCTFail("回放目标需要可布局的文本存储")
+    }
+  }
+
   func testReplayInputGlyphsRebuildCorrectForcedIncorrectDeletedAndExtraStates() {
     let events: [TypingReplayEvent] = [
       .init(offset: 0.1, kind: .insert, text: "a"),

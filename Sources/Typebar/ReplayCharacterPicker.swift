@@ -7,11 +7,17 @@ struct ReplayCharacterPicker: NSViewRepresentable {
   let selectedIndex: Int?
   let onSelect: (Int) -> Void
 
-  func makeNSView(context: Context) -> ReplayCharacterTextView {
-    ReplayCharacterTextView()
+  func makeNSView(context: Context) -> NSScrollView {
+    let scrollView = NSScrollView()
+    scrollView.drawsBackground = false
+    scrollView.hasVerticalScroller = true
+    scrollView.autohidesScrollers = true
+    scrollView.documentView = ReplayCharacterTextView()
+    return scrollView
   }
 
-  func updateNSView(_ view: ReplayCharacterTextView, context: Context) {
+  func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    guard let view = scrollView.documentView as? ReplayCharacterTextView else { return }
     view.onSelect = onSelect
     view.update(
       text: text,
@@ -31,7 +37,12 @@ final class ReplayCharacterTextView: NSTextView {
   }
 
   convenience init() {
-    self.init(frame: .zero, textContainer: nil)
+    let storage = NSTextStorage()
+    let layout = NSLayoutManager()
+    let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+    storage.addLayoutManager(layout)
+    layout.addTextContainer(container)
+    self.init(frame: .zero, textContainer: container)
   }
 
   required init?(coder: NSCoder) { nil }
@@ -39,12 +50,17 @@ final class ReplayCharacterTextView: NSTextView {
   private func configure() {
     isEditable = false
     isSelectable = false
+    isVerticallyResizable = true
+    isHorizontallyResizable = false
+    autoresizingMask = [.width]
+    maxSize = NSSize(
+      width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
     drawsBackground = false
     textContainerInset = NSSize(width: 8, height: 6)
     textContainer?.lineFragmentPadding = 0
     textContainer?.widthTracksTextView = true
-    textContainer?.maximumNumberOfLines = 2
-    textContainer?.lineBreakMode = .byTruncatingTail
+    textContainer?.maximumNumberOfLines = 0
+    textContainer?.lineBreakMode = .byWordWrapping
     setAccessibilityElement(true)
     setAccessibilityRole(.staticText)
     setAccessibilityLabel("回放目标文本")

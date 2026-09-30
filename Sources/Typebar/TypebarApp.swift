@@ -6356,7 +6356,7 @@ private struct ReplayTimelineView: View {
           isPlaying = false
           includesCurrentOffsetOnNextTick = false
         }
-        .frame(height: 38)
+        .frame(height: 96)
         .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
       }
       Slider(
