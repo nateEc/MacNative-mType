@@ -5080,6 +5080,15 @@ enum CodePracticeContent {
         + (0..<blockCount).map(reactBlock).joined(separator: "\n")
         + "\nexport default PracticeCard0;"
     }
+    if language == .codeLaTeX {
+      return "\\documentclass{article}\n\\begin{document}\n"
+        + (0..<blockCount).map(latexSection).joined(separator: "\n")
+        + "\n\\end{document}"
+    }
+    if language == .codeTypst {
+      return "#set text(size: 11pt)\n"
+        + (0..<blockCount).map(typstSection).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5482,6 +5491,14 @@ enum CodePracticeContent {
     "function PracticeCard\(index)(){return <span>Ready\(index)</span>;}"
   }
 
+  private static func latexSection(at index: Int) -> String {
+    "\\section{Practice\(index)}\nType this line with care."
+  }
+
+  private static func typstSection(at index: Int) -> String {
+    "= Practice\(index)\n#emph[Type this line with care.]"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let content = language.isCodeLanguage
       ? [prompt(language: language, targetTokenCount: 24)]
@@ -5570,12 +5587,6 @@ enum CodePracticeContent {
       (0..<3).map(vimscriptBlock)
     case .codeBash:
       (0..<3).map(bashBlock)
-    case .codeLaTeX:
-      ["\\documentclass{article}\n\\begin{document}\nSteady practice.\n\\end{document}",
-       "\\section{Notes}\nA short line for practice.",
-       "\\textbf{Careful typing} keeps the rhythm."]
-    case .codeTypst:
-      ["#set text(size: 11pt)", "#align(center)[", "  steady practice\n]"]
     case .codeOok:
       ["Ook. Ook. Ook. Ook. Ook! Ook.",
        "Ook. Ook? Ook. Ook. Ook? Ook. Ook! Ook.",

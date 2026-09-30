@@ -10642,6 +10642,39 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testEveryCodeWordPracticeCompletesItsWholeGeneratedPrompt() {
+    let start = Date(timeIntervalSince1970: 3_000)
+    for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
+      for wordCount in [25, 100, 800] {
+        let prompt = OfflineContent.generatedPrompt(
+          wordCount: wordCount, language: language, contentOptions: .init())
+        var session = TypingSession(configuration: .words(wordCount, language: language), prompt: prompt)
+        for character in prompt {
+          if character == "\t", session.typed.last == "\t" { continue }
+          session.insert(String(character), at: start)
+        }
+        XCTAssertTrue(session.isFinished, "\(language.displayName), \(wordCount) words")
+        XCTAssertEqual(session.typed, prompt, "\(language.displayName), \(wordCount) words")
+        XCTAssertEqual(session.result(at: start)?.prompt, prompt, "\(language.displayName), \(wordCount) words")
+      }
+    }
+  }
+
+  func testCodeWordPracticeDoesNotStopInsideACompletePrompt() {
+    let prompt = "fn main() { let value = 3; println!(\"{}\", value); }"
+    let start = Date(timeIntervalSince1970: 3_000)
+    var session = TypingSession(configuration: .words(2, language: .codeRust), prompt: prompt)
+    for (index, character) in prompt.enumerated() {
+      session.insert(String(character), at: start)
+      if index < prompt.count - 1 {
+        XCTAssertFalse(session.isFinished, "Stopped before closing the code block at \(index)")
+      }
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
   func testCommonCodeChoicesDisplayTheirOwnLanguageSyntax() {
     let expected: [(TypingLanguage, String)] = [
       (.codeRust, "fn main()"),
@@ -11343,6 +11376,39 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       let start = Date(timeIntervalSince1970: 3_000)
+      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      for character in prompt {
+        session.insert(String(character), at: start)
+      }
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+  }
+
+  func testDocumentCodePracticeChoicesGrowInsideOneCompleteDocument() {
+    for target in [1, 25, 100, 800] {
+      let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+      let latex = CodePracticeContent.prompt(language: .codeLaTeX, targetTokenCount: target)
+      let typst = CodePracticeContent.prompt(language: .codeTypst, targetTokenCount: target)
+      XCTAssertEqual(latex.components(separatedBy: "\\documentclass{article}").count - 1, 1)
+      XCTAssertEqual(latex.components(separatedBy: "\\begin{document}").count - 1, 1)
+      XCTAssertEqual(latex.components(separatedBy: "\\end{document}").count - 1, 1)
+      XCTAssertTrue(latex.hasSuffix("\\end{document}"))
+      XCTAssertEqual(latex.components(separatedBy: "\\section{Practice").count - 1, expectedCount)
+      XCTAssertEqual(typst.components(separatedBy: "#set text(size: 11pt)").count - 1, 1)
+      XCTAssertEqual(typst.components(separatedBy: "= Practice").count - 1, expectedCount)
+      XCTAssertEqual(typst.components(separatedBy: "#emph[").count - 1, expectedCount)
+      XCTAssertEqual(typst.filter { $0 == "[" }.count, typst.filter { $0 == "]" }.count)
+      for index in 0..<expectedCount {
+        XCTAssertTrue(latex.contains("\\section{Practice\(index)}"), "target=\(target)")
+        XCTAssertTrue(typst.contains("= Practice\(index)"), "target=\(target)")
+      }
+    }
+
+    let start = Date(timeIntervalSince1970: 3_000)
+    for language in [TypingLanguage.codeLaTeX, .codeTypst] {
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
