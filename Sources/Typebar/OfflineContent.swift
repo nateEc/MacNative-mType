@@ -5008,16 +5008,41 @@ enum CodeLanguageCatalog {
   ]
 }
 
-/// Short, self-authored fragments keep code input, indentation and replay
-/// observable without importing an upstream corpus or programming-language asset.
+/// Self-authored fragments and generated units keep code input, indentation and
+/// replay observable without importing an upstream corpus or language asset.
 enum CodePracticeContent {
   static func prompt(language: TypingLanguage, targetTokenCount: Int) -> String {
     let blockCount = max(1, Int(ceil(Double(max(targetTokenCount, 1)) / 8)))
+    if language == .codeSwift {
+      return (0..<blockCount).map(swiftBlock).joined(separator: "\n")
+    }
     if language == .codeCSharp {
       return (0..<blockCount).map(csharpBlock).joined(separator: "\n")
     }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
+  }
+
+  private static func swiftBlock(at index: Int) -> String {
+    if index == 0 {
+      return "import Foundation\nfunc practiceUnit0(_ values: [Int]) -> Int {\n  values.reduce(0, +)\n}"
+    }
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "(_ values: [Int]) -> Int {\n  values.filter { $0 > \(index) }.count\n}"
+    case 1:
+      body = "(_ values: [Int]) -> [Int] {\n  values.map { $0 * \(index + 1) }\n}"
+    case 2:
+      body = "(_ text: String) -> String {\n  text.uppercased() + \"\(index)\"\n}"
+    case 3:
+      body = "(_ values: [Int]) -> Int {\n  var sum = \(index)\n  for value in values {\n    sum += value\n  }\n  return sum\n}"
+    case 4:
+      body = "(_ value: Int) -> Bool {\n  if value >= \(index) {\n    return true\n  }\n  return false\n}"
+    default:
+      body = "(_ values: [Int]) -> String {\n  values.map { String($0) }.joined(separator: \", \") + \"\(index)\"\n}"
+    }
+    return "func practiceUnit\(index)\(body)"
   }
 
   private static func csharpBlock(at index: Int) -> String {
@@ -5058,7 +5083,7 @@ enum CodePracticeContent {
         "ENTRYPOINT [\"./typebar-practice\"]",
       ]
     case .codeSwift:
-      ["let total = values.reduce(0, +)", "for item in items {\n\tprint(item)\n}", "if total > limit {\n\treturn total\n}"]
+      (0..<3).map(swiftBlock)
     case .codeRust:
       ["fn main() {\n\tlet total = 3;\n\tprintln!(\"total: {total}\");\n}",
        "let doubled: Vec<i32> = values.iter().map(|value| value * 2).collect();",

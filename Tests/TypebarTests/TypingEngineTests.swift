@@ -10827,6 +10827,48 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.result(at: start)?.prompt, prompt)
   }
 
+  func testSwiftPracticeGrowsWithoutRepeatingAndTypechecks() throws {
+    for target in [1, 25, 100, 800] {
+      let prompt = CodePracticeContent.prompt(language: .codeSwift, targetTokenCount: target)
+      let functions = prompt.split(separator: "\n").compactMap { line -> String? in
+        guard line.hasPrefix("func practiceUnit") else { return nil }
+        return String(line.prefix(while: { $0 != "(" }))
+      }
+      let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+      XCTAssertEqual(prompt.components(separatedBy: "import Foundation").count - 1, 1, "target=\(target)")
+      XCTAssertEqual(functions.count, expectedCount, "target=\(target)")
+      XCTAssertEqual(Set(functions).count, expectedCount, "target=\(target)")
+      XCTAssertFalse(prompt.contains("let total = values.reduce(0, +)"), "target=\(target)")
+    }
+
+    for target in [25, 100] {
+      let prompt = CodePracticeContent.prompt(language: .codeSwift, targetTokenCount: target)
+      let compiler = Process()
+      compiler.executableURL = URL(fileURLWithPath: "/usr/bin/swiftc")
+      compiler.arguments = ["-typecheck", "-"]
+      let input = Pipe()
+      let diagnostics = Pipe()
+      compiler.standardInput = input
+      compiler.standardError = diagnostics
+      try compiler.run()
+      input.fileHandleForWriting.write(Data(prompt.utf8))
+      try input.fileHandleForWriting.close()
+      compiler.waitUntilExit()
+      let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      XCTAssertEqual(compiler.terminationStatus, 0, "target=\(target): \(errors)")
+    }
+
+    let prompt = CodePracticeContent.prompt(language: .codeSwift, targetTokenCount: 25)
+    let start = Date(timeIntervalSince1970: 3_000)
+    var session = TypingSession(configuration: .words(25, language: .codeSwift), prompt: prompt)
+    for character in prompt {
+      session.insert(String(character), at: start)
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
