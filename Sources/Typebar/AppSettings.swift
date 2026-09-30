@@ -605,7 +605,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var minimumWpm = 0.0
   var minimumWordBurstWpm = 0.0
   var minimumWordBurstMode: MinimumWordBurstMode = .off
-  var practiceLineWidth: PracticeLineWidth = .standard
+  var practiceLineWidth: PracticeLineWidth = .fluid
   var customPracticeLineColumns = 60
   var practiceTapeMode: PracticeTapeMode = .off
   var practiceTapeMargin: Double = 0.5
@@ -711,7 +711,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     minimumWpm: Double = 0,
     minimumWordBurstWpm: Double = 0,
     minimumWordBurstMode: MinimumWordBurstMode = .off,
-    practiceLineWidth: PracticeLineWidth = .standard,
+    practiceLineWidth: PracticeLineWidth = .fluid,
     customPracticeLineColumns: Int = 60,
     practiceTapeMode: PracticeTapeMode = .off,
     practiceTapeMargin: Double = 0.5,
@@ -1427,7 +1427,7 @@ final class AppSettings {
       persist()
     }
   }
-  var practiceLineWidth: PracticeLineWidth = .standard { didSet { persist() } }
+  var practiceLineWidth: PracticeLineWidth = .fluid { didSet { persist() } }
   var customPracticeLineColumns = 60 { didSet { persist() } }
   var practiceTapeMode: PracticeTapeMode = .off { didSet { persist() } }
   var practiceTapeMargin: Double = 0.5 { didSet { persist() } }
@@ -1778,7 +1778,7 @@ final class AppSettings {
     minimumWpm = 0
     minimumWordBurstWpm = 0
     minimumWordBurstMode = .off
-    practiceLineWidth = .standard
+    practiceLineWidth = .fluid
     customPracticeLineColumns = 60
     practiceTapeMode = .off
     practiceTapeMargin = 0.5

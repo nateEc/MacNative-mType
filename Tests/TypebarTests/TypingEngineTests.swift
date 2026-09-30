@@ -21,6 +21,29 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(legacy.customTextWordLimit, 25)
   }
 
+  @MainActor
+  func testFreshPracticeWidthUsesContentAreaAndPreservesLegacyWidth() throws {
+    let suiteName = "typebar.width-defaults.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let fresh = AppSettings(defaults: defaults)
+    XCTAssertEqual(fresh.practiceLineWidth, .fluid)
+    XCTAssertNil(fresh.practiceLineWidth.maximumWidth(fontSize: 28))
+    fresh.restoreDefaults()
+    XCTAssertEqual(fresh.practiceLineWidth, .fluid)
+    XCTAssertEqual(AppSettingsSnapshot().practiceLineWidth, .fluid)
+
+    var oldPayload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(AppSettingsSnapshot()))
+        as? [String: Any])
+    oldPayload.removeValue(forKey: "practiceLineWidth")
+    let oldData = try JSONSerialization.data(withJSONObject: oldPayload)
+    let oldSnapshot = try JSONDecoder().decode(AppSettingsSnapshot.self, from: oldData)
+    XCTAssertEqual(oldSnapshot.practiceLineWidth, .standard)
+    XCTAssertNotNil(oldSnapshot.practiceLineWidth.maximumWidth(fontSize: 28))
+  }
+
   func testDisplayNameAvailabilityStateBlocksOnlyKnownUnavailablePreflight() {
     XCTAssertEqual(DisplayNameAvailabilityState(available: true), .available)
     XCTAssertEqual(DisplayNameAvailabilityState(available: false), .unavailable)

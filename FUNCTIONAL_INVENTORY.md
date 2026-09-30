@@ -10,6 +10,8 @@
 
 2026-10-01 `TST-41`／`INP-01` 输入桥补证：固定参考 `frontend/src/ts/input/listeners/misc.ts` 拒绝练习框粘贴，Typebar 原生编辑命令也有相同边界。新增 `NSTextInputClient` 阿拉伯文组合态与确认文本的回归：组合态不写入目标或错误，确认第一个 RTL 词与空格后进度为 `1/2`，第二词确认后自然完成、错误数为零。这是直接调用原生输入桥的自动化，不冒称桌面工具已成功发送 Unicode 实体按键，真人 macOS Arabic 输入源、双向光标与屏幕阅读器仍待验收。
 
+2026-10-01 `VIS-02` 默认行宽补证：固定参考 `default-config.ts` 将 `maxLineWidth` 设为 0，`test-ui.ts` 令提示最大宽度为内容区的 100%。Typebar 新安装与明确恢复默认设置现在选择自适应，宽度随可用区域伸展；旧快照未含字段时维持原有标准 60 列，已存显式选择保留。回归测试覆盖四条路径，不执行数据库迁移。
+
 | ID | 用户能力 | 参考证据（仅用于盘点） | Typebar 目标模块 | 状态 |
 | --- | --- | --- | --- | --- |
 | GOV-01 | 独立重写边界 | 固定参考仓库的工程结构与生产域名仅用于隔离核验，不作为实现输入 | ProjectGovernance | 已实现：`ORIGINALITY_BOUNDARY.md` 明确允许的标识级盘点信息和禁止的源码／内容／资产／线上服务范围；`Scripts/check-originality-boundaries.sh --self-test` 拒绝已追踪的参考 Web 工程树、其包清单和网页源文件，并阻断 Typebar 客户端／服务端 Swift 源码访问 `monkeytype.com`。检查通过不替代人工代码、内容授权和行为审查；每次受影响变更仍须按本表 ID 提供原生实现、自动化与人工验收证据。 |
