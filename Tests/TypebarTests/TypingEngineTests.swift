@@ -11262,6 +11262,56 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.result(at: start)?.prompt, prompt)
   }
 
+  func testVimscriptPracticeGrowsAsDistinctRunnableFunctions() throws {
+    for target in [1, 25, 100, 800] {
+      let prompt = CodePracticeContent.prompt(language: .codeVimscript, targetTokenCount: target)
+      let functions = prompt.split(separator: "\n").compactMap { line -> String? in
+        guard line.hasPrefix("function! PracticeUnit") else { return nil }
+        return String(line.prefix(while: { $0 != "(" }))
+      }
+      let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+      XCTAssertEqual(functions.count, expectedCount, "target=\(target)")
+      XCTAssertEqual(Set(functions).count, expectedCount, "target=\(target)")
+      XCTAssertEqual(prompt.components(separatedBy: "let g:total = 0").count - 1, 1, "target=\(target)")
+      XCTAssertFalse(prompt.contains("for item in items"), "target=\(target)")
+      XCTAssertFalse(prompt.contains("\t"), "target=\(target)")
+    }
+
+    let scratch = FileManager.default.temporaryDirectory
+      .appendingPathComponent("typebar-vimscript-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: scratch) }
+    for target in [25, 100] {
+      let prompt = CodePracticeContent.prompt(language: .codeVimscript, targetTokenCount: target)
+      let source = scratch.appendingPathComponent("practice.vim")
+      try Data(prompt.utf8).write(to: source)
+      let vim = Process()
+      vim.executableURL = URL(fileURLWithPath: "/usr/bin/vim")
+      var arguments = ["-Nu", "NONE", "-i", "NONE", "-n", "-N", "-es", "-S", source.path]
+      if target == 25 {
+        arguments += ["-c", "if PracticeUnit0([2, 3, 5]) != 10 | cquit | endif"]
+      }
+      arguments += ["-c", "qa!"]
+      vim.arguments = arguments
+      let diagnostics = Pipe()
+      vim.standardError = diagnostics
+      try vim.run()
+      vim.waitUntilExit()
+      let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      XCTAssertEqual(vim.terminationStatus, 0, "target=\(target): \(errors)")
+    }
+
+    let prompt = CodePracticeContent.prompt(language: .codeVimscript, targetTokenCount: 25)
+    let start = Date(timeIntervalSince1970: 3_000)
+    var session = TypingSession(configuration: .words(25, language: .codeVimscript), prompt: prompt)
+    for character in prompt {
+      session.insert(String(character), at: start)
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")

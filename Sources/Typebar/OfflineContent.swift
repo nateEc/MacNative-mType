@@ -5057,6 +5057,9 @@ enum CodePracticeContent {
       let sections = (0..<blockCount).map(htmlSection).joined(separator: "\n")
       return "<main class=\"practice\">\n\(sections)\n</main>"
     }
+    if language == .codeVimscript {
+      return (0..<blockCount).map(vimscriptBlock).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5383,6 +5386,26 @@ enum CodePracticeContent {
     return "  <section id=\"unit-\(index)\">\n\(content)\n  </section>"
   }
 
+  private static func vimscriptBlock(at index: Int) -> String {
+    let header = index == 0 ? "let g:total = 0\n" : ""
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "let l:total = \(index)\n  for l:value in a:values\n    let l:total += l:value\n  endfor\n  return l:total"
+    case 1:
+      body = "let l:count = 0\n  for l:value in a:values\n    if l:value > \(index)\n      let l:count += 1\n    endif\n  endfor\n  return l:count"
+    case 2:
+      body = "let l:largest = \(index)\n  for l:value in a:values\n    if l:value > l:largest\n      let l:largest = l:value\n    endif\n  endfor\n  return l:largest"
+    case 3:
+      body = "let l:total = \(index)\n  for l:position in range(len(a:values))\n    let l:total += a:values[l:position] + l:position\n  endfor\n  return l:total"
+    case 4:
+      body = "let l:total = 0\n  for l:value in a:values\n    let l:total += l:value * \(index + 1)\n  endfor\n  return l:total"
+    default:
+      body = "if empty(a:values)\n    return \(index)\n  endif\n  return a:values[-1] + \(index)"
+    }
+    return "\(header)function! PracticeUnit\(index)(values) abort\n  \(body)\nendfunction"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5481,8 +5504,7 @@ enum CodePracticeContent {
     case .codeVim:
       [":set number", ":normal! gg", ":write"]
     case .codeVimscript:
-      ["let g:total = 0", "for item in items\n\techo item\nendfor",
-       "if g:total > 3\n\techo 'ready'\nendif"]
+      (0..<3).map(vimscriptBlock)
     case .codeBash:
       (0..<3).map(bashBlock)
     case .codeLaTeX:
