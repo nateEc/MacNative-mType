@@ -10774,6 +10774,34 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(prompts[4].contains("ipairs(values) do"))
   }
 
+  func testEveryCodeChoiceAvoidsGenericFallback() {
+    let expected: [(TypingLanguage, String)] = [
+      (.codeCSharp, "using System;"),
+      (.codeDart, "void main()"),
+      (.codeJule, "fn main()"),
+      (.codeJulia, "function total(values)"),
+      (.codeNix, "let\n  count = 3;"),
+      (.codeRockstar, "My tempo is 3"),
+      (.codeMATLAB, "function total = sum_values(values)"),
+      (.codeOpenCL, "__kernel void scale_values("),
+      (.codeArduino, "void setup()"),
+      (.codeSystemVerilog, "module pulse_counter ("),
+      (.codeZig, "const std = @import(\"std\");"),
+      (.codeAssembly, ".globl _main"),
+      (.codeV, "fn main()"),
+      (.codeOdin, "package main"),
+    ]
+    XCTAssertEqual(expected.count, 14)
+    for (language, marker) in expected {
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 24)
+      XCTAssertTrue(prompt.contains(marker), "Missing \(marker) in \(language.displayName): \(prompt)")
+    }
+    for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 24)
+      XCTAssertFalse(prompt.contains("let total = collect(values);"), language.displayName)
+    }
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")

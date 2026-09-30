@@ -5215,6 +5215,58 @@ enum CodePracticeContent {
       ]
     case .code6502Assembly:
       ["LDA #$00\nSTA $0200\nINX\nSTX $0201", "loop:\n\tDEX\n\tBNE loop\n\tRTS"]
+    case .codeCSharp:
+      ["using System;\nclass Practice {\n  static void Main() {\n    Console.WriteLine(\"steady\");\n  }\n}",
+       "foreach (int value in values) {\n  Console.WriteLine(value);\n}",
+       "int doubled = 3 * 2;\nConsole.WriteLine(doubled);"]
+    case .codeDart:
+      ["void main() {\n  final values = <int>[2, 3, 5];\n  print(values.length);\n}",
+       "int total(List<int> values) {\n  return values.reduce((sum, value) => sum + value);\n}",
+       "for (final value in values) {\n  print(value);\n}"]
+    case .codeJule:
+      ["fn main() {\n  println(\"steady\")\n}",
+       "fn twice(value: int): int {\n  return value * 2\n}",
+       "println(twice(3))"]
+    case .codeJulia:
+      ["function total(values)\n    return sum(values)\nend",
+       "values = [2, 3, 5]\nprintln(total(values))",
+       "for value in values\n    println(value)\nend"]
+    case .codeNix:
+      ["let\n  count = 3;\n  label = \"steady\";\nin { inherit count label; }",
+       "values: builtins.map (value: value * 2) values",
+       "if 3 > 2 then \"ready\" else \"wait\""]
+    case .codeRockstar:
+      ["My tempo is 3\nSay my tempo",
+       "Put 5 into my tempo\nShout my tempo",
+       "My chorus says steady practice\nWhisper my chorus"]
+    case .codeMATLAB:
+      ["function total = sum_values(values)\n  total = sum(values);\nend",
+       "values = [2, 3, 5];\ndisp(sum_values(values));",
+       "for index = 1:numel(values)\n  disp(values(index));\nend"]
+    case .codeOpenCL:
+      ["__kernel void scale_values(__global int *values) {\n  size_t index = get_global_id(0);\n  values[index] *= 2;\n}",
+       "__kernel void offset_values(__global int *values, int amount) {\n  size_t index = get_global_id(0);\n  values[index] += amount;\n}"]
+    case .codeArduino:
+      ["void setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}",
+       "void loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(250);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(250);\n}"]
+    case .codeSystemVerilog:
+      ["module pulse_counter (input logic clk, output logic [3:0] count);\n  always_ff @(posedge clk) begin\n    count <= count + 1'b1;\n  end\nendmodule",
+       "module pulse_gate (input logic enable, input logic pulse, output logic out);\n  assign out = enable & pulse;\nendmodule"]
+    case .codeZig:
+      ["const std = @import(\"std\");\npub fn main() void {\n    std.debug.print(\"steady\\n\", .{});\n}",
+       "fn twice(value: i32) i32 {\n    return value * 2;\n}",
+       "const numbers = [_]i32{ 2, 3, 5 };"]
+    case .codeAssembly:
+      [".text\n.globl _main\n_main:\n  mov w0, #0\n  ret",
+       "double_value:\n  add w0, w0, w0\n  ret"]
+    case .codeV:
+      ["fn main() {\n  values := [2, 3, 5]\n  println(values.len)\n}",
+       "fn twice(value int) int {\n  return value * 2\n}",
+       "println(twice(3))"]
+    case .codeOdin:
+      ["package main\n\nimport \"core:fmt\"\n\nmain :: proc() {\n  fmt.println(\"steady\")\n}",
+       "twice :: proc(value: int) -> int {\n  return value * 2\n}",
+       "fmt.println(twice(3))"]
     default:
       ["let total = collect(values);", "for item in items {\n\tprint(item);\n}", "return total;"]
     }
