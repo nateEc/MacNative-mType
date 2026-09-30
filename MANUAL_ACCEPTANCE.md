@@ -7,7 +7,7 @@
 ## 当前构建
 
 - 应用：`Typebar.app`
-- 自动化基线：客户端 811 项、其中 1 项跳过、0 失败，服务端 117 项通过（2026-09-30，最近完整门禁）；执行时不启动 Typebar 图形界面。
+- 自动化基线：客户端 818 项、其中 1 项跳过、0 失败，服务端 117 项通过（2026-09-30，最近完整门禁）；执行时不启动 Typebar 图形界面。
 - 参考基线：Monkeytype 官方源码提交 `91bd24bb8513785c7364cbea29296ff7adafac41`，只读盘点使用
 
 ## 单实例执行规则
@@ -29,6 +29,8 @@ pgrep -alf -f '/swiftc ' || true
 若检查显示任何并非检查命令自身的 Typebar 或测试进程，停止启动新实例；先正常退出既有程序，仍无法退出时记录 PID 与场景并由操作者决定后续处理。每次验收记录必须注明：场景 ID、构建版本、开始／结束检查结果，以及是否在单实例中完成。自动化测试和人工验收绝不并行。
 
 ## 待执行场景
+
+2026-09-30 单实例记录：`CNT-CODE-SYNTAX-04` 的菜单与首屏提示部分。隔离内存库构建 `/tmp/typebar-procedural-qa.WCArjd/Typebar.app`，基于 `ea09173`；启动前与退出后均确认 Typebar、xctest、swift-test 和 Swift 编译进程为零，运行期间仅有一个 Typebar PID，未并行运行测试。切换到字数模式后逐一从原生语言菜单选择 Visual Basic、COBOL、Fortran、Pascal、ABAP 和 ABAP 1k；六项均显示各自入口名称及对应的 `Module Practice`、`IDENTIFICATION DIVISION.`、`program practice`、`program Practice;`、`REPORT ztypebar_practice.`、`REPORT ztypebar_extended.` 首屏语法信号，后五项没有显示旧的 `FOR EACH item IN items`。本次没有键入并完成六轮练习，也未验证长提示、代码可编译性或参考语料规模，因此保留“部分验收”。
 
 2026-09-30 单实例记录：`TST-107` 的单语显示与输入边界，隔离内存库构建 `/tmp/typebar-yiddish-qa.lceBjH/Typebar.app`，基于 `522f7c4`。启动前 Typebar 进程为零；仅运行一个 QA 图形实例，期间没有运行测试；退出后 Typebar、xctest、swift-test 和 Swift 编译进程均为零。原生语言菜单可以选择「ייִדיש」，切换 25 词模式后提示显示 Yiddish 词流及 `0/25` 进度；普通 ASCII 按键会启动练习并改变当前提示，证明输入焦点到达引擎。当前桌面自动化接口的 Unicode `typeText` 未改变输入，粘贴等待控件读取剪贴板超时，直接设置 AX 值被拒绝；因此没有验证 Yiddish 字符实际录入、词界提交或计分，不把此场景标为已验收。应用从原生菜单退出，没有留下 Typebar 进程。
 
@@ -455,7 +457,7 @@ pgrep -alf -f '/swiftc ' || true
 | CNT-CODE-SYNTAX-01 | 常用代码语言的可见语法差异 | 分别选择 Rust、Go、Java、C、C++、Kotlin、PowerShell、TypeScript 和 JavaScript React，检查首段提示并尝试输入、完成；再抽查其他代码选择。 | 九项应各显示可辨识的自写语言语法，而不是同一段伪代码、把 Bash 数组语法显示在 PowerShell 中，或把 JSX/类型注解省略；全部 70 项仍能输入到结果。其余入口需逐项审计，不能仅凭非空提示称为完整内容等价。 | 部分验收（九项原生提示差异与全部 70 项输入完成由自动化覆盖；九项 GUI、剩余语言的语法和参考语料规模均未验收） |
 | CNT-CODE-SYNTAX-02 | 文档、编辑器与 Ook! 代码选择 | 分别选择 LaTeX、Typst、Vim、Vimscript、Bash、Ook! 和 Brainf*ck，检查提示的语法与按键输入到结果。 | LaTeX 不显示 Typst `#set`，Typst 不显示 LaTeX 命令；Vim 命令与 Vimscript 脚本不出现 Bash 数组语法；Ook! 只由合法的成对 `Ook.`／`Ook?`／`Ook!` token 组成，不显示 Brainf*ck 字符串；各入口仍可完成。 | 部分验收（语法隔离、Ook! token 结构及全部代码入口完成由自动化覆盖；单实例 GUI 和语料规模尚未验收） |
 | CNT-CODE-SYNTAX-03 | 函数式代码语言逐项区分 | 分别选择 Haskell、F#、OCaml、Erlang、Elixir、Gleam、Clojure、Common Lisp、Scala，查看初始与后续片段并输入到结果。 | 九项均显示 Typebar 自写的本语言语法信号，互不相同；F# 风格的 `items |> List.iter` 不会出现在其他八项，换行和结果路径仍可用。 | 部分验收（九项提示差异、误用 F# 片段的回归及全部 70 项输入完成由自动化覆盖；九项 GUI、代码片段可编译性和参考语料规模未验收） |
-| CNT-CODE-SYNTAX-04 | 过程式代码语言逐项区分 | 分别选择 Visual Basic、COBOL、Fortran、Pascal、ABAP 和 ABAP 1k，查看初始与后续片段并输入到结果。 | 六项各显示 Typebar 自写且可辨识的本语言语法；COBOL、Fortran、Pascal 与 ABAP 不再显示 Visual Basic 风格的 `FOR EACH item IN items`；全部 70 项仍能完成代码模式。 | 部分验收（六项语法信号、提示差异与全部 70 项输入完成由自动化覆盖；六项 GUI、片段可编译性与参考语料规模未验收） |
+| CNT-CODE-SYNTAX-04 | 过程式代码语言逐项区分 | 分别选择 Visual Basic、COBOL、Fortran、Pascal、ABAP 和 ABAP 1k，查看初始与后续片段并输入到结果。 | 六项各显示 Typebar 自写且可辨识的本语言语法；COBOL、Fortran、Pascal 与 ABAP 不再显示 Visual Basic 风格的 `FOR EACH item IN items`；全部 70 项仍能完成代码模式。 | 部分验收（六项语法信号、提示差异与全部 70 项输入完成由自动化覆盖；单实例 GUI 已观察六项菜单与首屏提示。六项 GUI 输入至结果、片段可编译性与参考语料规模未验收） |
 | VIS-03 | 单行卷带与完整行 | 选中英语字数模式，将“单行卷带”切为按词和按字符，调整停靠位置并输入多个词；关闭平滑滚动后再输入；关闭卷带后启用“显示完整提示行”，分别检查计时和无计时的字数/引语/自定义模式 | 当前输入位置分别按词/按字符保持在选定水平位置；关闭平滑后立即跳转；卷带激活时完整行选项不可用；完整行只在无计时字数、引语和自定义模式展开，计时模式保持有限、可滚动练习区；输入与指标不变 | 已验收（隔离 release 候选） |
 | VIS-04 | 实时指标颜色与透明度 | 在设置选择“黑色”和 50% 透明度，开始英语练习并输入一个词；再选择主题强调色和 100%，关闭重开设置 | 进度、速度、Raw、Burst、准确率同步改变颜色/透明度；错误数与段落进度保持默认可读性；设置重开后保留，输入、计分、结果与回放不变 | 待验收（设置归档往返由自动化覆盖） |
 | VIS-05 | 提示高亮范围 | 在常规英语字数测试依次选择“当前字符”“当前词”“当前词加后续 1/2/3 个词”和“关闭”，输入若干字符；再启用卷带、无空格、听写、记忆或任一预读遮挡模式并选择词范围 | 常规提示只突出所选的目标范围；关闭时不突出当前目标；特殊呈现中词范围降级为当前字符，输入、计分、结果与回放不变；设置重开后保留 | 待验收（范围策略与设置归档由自动化覆盖） |
