@@ -5068,9 +5068,24 @@ enum CodePracticeContent {
        "export default PracticeCard;"]
     case .codeJavaScript, .codeJavaScript1k:
       ["const total = values.reduce((sum, value) => sum + value, 0);", "for (const item of items) {\n\tconsole.log(item);\n}", "if (total > limit) {\n\treturn total;\n}"]
-    case .codePython, .codePython1k, .codePython2k, .codePython5k, .codeNim,
-      .codeGDScript, .codeGDScript2, .codeYoptaScript:
+    case .codePython, .codePython1k, .codePython2k, .codePython5k:
       ["total = sum(values)", "for item in items:\n\tprint(item)", "if total > limit:\n\treturn total"]
+    case .codeYoptaScript:
+      ["участковый счет = 0 нах",
+       "йопта удвоить(значение) {\n\tотвечаю значение * 2 нах\n}",
+       "красноглазое.инфо(удвоить(3)) нах"]
+    case .codeNim:
+      ["proc total(values: openArray[int]): int =\n  for value in values:\n    result += value",
+       "let counts = @[2, 3, 5]\necho total(counts)",
+       "for index in 0..<3:\n  echo index"]
+    case .codeGDScript:
+      ["extends Node\nexport var speed = 4\nonready var label = get_node(\"Label\")",
+       "func _ready():\n\tvar total = 0\n\tfor step in range(speed):\n\t\ttotal += step\n\tprint(total)",
+       "func double(value):\n\treturn value * 2"]
+    case .codeGDScript2:
+      ["extends Node\n@export var speed: int = 4\n@onready var label: Label = $Label",
+       "func _ready() -> void:\n\tvar total: int = 0\n\tfor step in range(speed):\n\t\ttotal += step\n\tprint(total)",
+       "func double(value: int) -> int:\n\treturn value * 2"]
     case .codeHTML:
       ["<main class=\"practice\">", "<p>steady typing</p>", "</main>"]
     case .codeCSS:

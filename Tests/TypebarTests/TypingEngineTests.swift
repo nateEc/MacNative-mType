@@ -10728,6 +10728,31 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(Set(prompts).count, expected.count)
   }
 
+  func testNimAndGodotCodeChoicesDoNotReusePythonSyntax() {
+    let nim = CodePracticeContent.prompt(language: .codeNim, targetTokenCount: 24)
+    let godot3 = CodePracticeContent.prompt(language: .codeGDScript, targetTokenCount: 24)
+    let godot4 = CodePracticeContent.prompt(language: .codeGDScript2, targetTokenCount: 24)
+
+    XCTAssertTrue(nim.contains("proc total(values: openArray[int]): int ="))
+    XCTAssertTrue(godot3.contains("export var speed = 4"))
+    XCTAssertTrue(godot4.contains("@export var speed: int = 4"))
+    XCTAssertTrue(godot3.contains("extends Node"))
+    XCTAssertTrue(godot4.contains("extends Node"))
+    XCTAssertFalse(godot3.contains("@export"))
+    XCTAssertFalse(godot4.contains("export var speed = 4"))
+    for prompt in [nim, godot3, godot4] {
+      XCTAssertFalse(prompt.contains("total = sum(values)"))
+    }
+    XCTAssertEqual(Set([nim, godot3, godot4]).count, 3)
+  }
+
+  func testYoptaScriptChoiceUsesItsOwnKeywordsInsteadOfPythonSyntax() {
+    let prompt = CodePracticeContent.prompt(language: .codeYoptaScript, targetTokenCount: 24)
+    XCTAssertTrue(prompt.contains("участковый счет = 0 нах"))
+    XCTAssertTrue(prompt.contains("йопта удвоить(значение)"))
+    XCTAssertFalse(prompt.contains("total = sum(values)"))
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
