@@ -10478,6 +10478,32 @@ final class TypingEngineTests: XCTestCase {
   }
 
   @MainActor
+  func testNativeFrenchCompositionCommitsAccentedWordInLongChooPractice() {
+    let configuration = TestConfiguration.words(250, language: .french)
+      .with(modifiers: [.chooVisual])
+    var session = TypingSession(configuration: configuration, prompt: "écoute, encre")
+    let input = TypingInputView(frame: .zero)
+    let startedAt = start
+    input.onCompositionStarted = { session.beginComposition(at: startedAt) }
+    input.onInsert = { text, forceError in
+      session.insertBatch(text, forceError: forceError, at: startedAt.addingTimeInterval(1))
+    }
+
+    input.setMarkedText("e", selectedRange: NSRange(location: 0, length: 1), replacementRange: .init())
+    XCTAssertTrue(session.typed.isEmpty)
+    XCTAssertEqual(session.completedWordCount, 0)
+    input.insertText("é", replacementRange: .init())
+    input.insertText("coute, ", replacementRange: .init())
+
+    XCTAssertEqual(session.prompt, "écoute, encre")
+    XCTAssertEqual(session.typed, "écoute, ")
+    XCTAssertEqual(session.completedWordCount, 1)
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertEqual(session.progressText(at: start.addingTimeInterval(1)), "1/250")
+    XCTAssertEqual(session.outcome, .active)
+  }
+
+  @MainActor
   func testNativeCompositionCancellationDoesNotEnterReplayBeforeLaterConfirmation() throws {
     var session = TypingSession(configuration: .words(1), prompt: "拼")
     let input = TypingInputView(frame: .zero)
