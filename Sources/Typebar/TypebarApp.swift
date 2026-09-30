@@ -6342,12 +6342,21 @@ private struct ReplayTimelineView: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
-      Text(replayedAttributedText)
-        .font(.system(.caption, design: .monospaced))
-        .lineLimit(3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+      ScrollViewReader { reader in
+        ScrollView {
+          Text(replayedAttributedText)
+            .font(.system(.caption, design: .monospaced))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .id("replayInput")
+        }
+        .frame(height: 72)
+        .onChange(of: elapsed) { _, _ in
+          reader.scrollTo("replayInput", anchor: .bottom)
+        }
+      }
+      .padding(8)
+      .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
       VStack(alignment: .leading, spacing: 4) {
         Text("目标（点按已输入字符定位）")
           .font(.caption2)
