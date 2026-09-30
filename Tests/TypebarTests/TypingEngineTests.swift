@@ -21100,6 +21100,34 @@ final class TypingEngineTests: XCTestCase {
     })
   }
 
+  @MainActor
+  func testChooFrenchAccentsUseSerifFontWithoutLosingTextOrAnimation() throws {
+    let font = PracticeFont.serif.nsFont(size: 28, language: .french)
+    let target = "mémoire lumière fenêtre écoute"
+    let glyphs = target.map { TypingPromptGlyph(character: $0, state: .pending) }
+    let palette = ChooGlyphPalette(
+      theme: AppTheme.paper.resolvedTheme,
+      flipsCompletionAndFuture: false, usesColorfulMode: false)
+    let height = ChooLayerView.measure(glyphs: glyphs, font: font, width: 600)
+    let view = ChooLayerView(frame: CGRect(x: 0, y: 0, width: 600, height: height))
+    view.configure(glyphs: glyphs, font: font, palette: palette, animates: true, frameRate: 30)
+
+    XCTAssertEqual(view.accessibilityLabel(), target)
+    let layers = try XCTUnwrap(view.layer?.sublayers as? [CATextLayer])
+    XCTAssertEqual(layers.count, glyphs.count)
+    XCTAssertTrue(layers.contains { $0.string as? String == "é" })
+    XCTAssertTrue(layers.allSatisfy { $0.frame.minX >= 0 && $0.frame.maxX <= 600 })
+    let first = try XCTUnwrap(layers.first)
+    let beginTime = try XCTUnwrap(first.animation(forKey: "chooRotation")).beginTime
+
+    var afterInput = glyphs
+    afterInput[0] = TypingPromptGlyph(character: "m", state: .correct)
+    view.configure(glyphs: afterInput, font: font, palette: palette, animates: true, frameRate: 30)
+    XCTAssertEqual(view.accessibilityLabel(), target)
+    XCTAssertTrue(view.layer?.sublayers?.first === first)
+    XCTAssertEqual(first.animation(forKey: "chooRotation")?.beginTime, beginTime)
+  }
+
   func testVisualModifiersApplyOnlyToThePracticePresentation() {
     XCTAssertEqual(PracticeVisualTransform.make(modifiers: []), .init(horizontalScale: 1, rotationDegrees: 0))
     XCTAssertEqual(
