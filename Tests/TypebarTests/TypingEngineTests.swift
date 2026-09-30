@@ -17667,6 +17667,19 @@ final class TypingEngineTests: XCTestCase {
       [.correct, .correct, .extra, .correct, .correct, .correct, .correct])
   }
 
+  func testReplayPlaybackTracksMonotonicTimeAcrossDelayedTicksAndResume() {
+    XCTAssertEqual(
+      TypingReplay.playbackElapsed(startedAt: 10, now: 10.35, duration: 2),
+      0.35, accuracy: 0.000_001)
+    XCTAssertEqual(
+      TypingReplay.playbackElapsed(startedAt: 10, now: 13, duration: 2), 2)
+    XCTAssertEqual(
+      TypingReplay.playbackElapsed(startedAt: 20 - 0.35, now: 20.1, duration: 2),
+      0.45, accuracy: 0.000_001)
+    XCTAssertEqual(
+      TypingReplay.playbackElapsed(startedAt: 10, now: 9.9, duration: 2), 0)
+  }
+
   func testReplaySoundCuesOnlyIncludeNewManualEventsInStableOrder() {
     let events: [TypingReplayEvent] = [
       .init(offset: 0.4, kind: .insert, text: "m"),

@@ -6279,6 +6279,7 @@ private struct ReplayTimelineView: View {
   let soundConfiguration: ReplaySoundConfiguration
   @State private var elapsed: TimeInterval = 0
   @State private var isPlaying = false
+  @State private var playbackStartedAt: TimeInterval?
   @State private var selectedPromptIndex: Int?
   @State private var includesCurrentOffsetOnNextTick = true
   private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
@@ -6370,6 +6371,7 @@ private struct ReplayTimelineView: View {
           selectedPromptIndex = index
           elapsed = min(duration, targetOffset)
           isPlaying = false
+          playbackStartedAt = nil
           includesCurrentOffsetOnNextTick = false
         }
         .frame(height: 96)
@@ -6380,6 +6382,7 @@ private struct ReplayTimelineView: View {
         onEditingChanged: { editing in
           if editing {
             isPlaying = false
+            playbackStartedAt = nil
             selectedPromptIndex = nil
             includesCurrentOffsetOnNextTick = false
           }
@@ -6394,11 +6397,14 @@ private struct ReplayTimelineView: View {
           }
           selectedPromptIndex = nil
           isPlaying.toggle()
+          playbackStartedAt = isPlaying
+            ? ProcessInfo.processInfo.systemUptime - elapsed : nil
         }
         .disabled(duration == 0)
         Button("重置") {
           elapsed = 0
           isPlaying = false
+          playbackStartedAt = nil
           selectedPromptIndex = nil
           includesCurrentOffsetOnNextTick = true
         }
@@ -6407,14 +6413,19 @@ private struct ReplayTimelineView: View {
       }
     }
     .onReceive(timer) { _ in
-      guard isPlaying else { return }
+      guard isPlaying, let playbackStartedAt else { return }
       let previousElapsed = elapsed
-      elapsed = min(duration, elapsed + 0.05)
+      elapsed = TypingReplay.playbackElapsed(
+        startedAt: playbackStartedAt, now: ProcessInfo.processInfo.systemUptime,
+        duration: duration)
       let soundLowerBound = includesCurrentOffsetOnNextTick
         ? -Double.leastNonzeroMagnitude : previousElapsed
       includesCurrentOffsetOnNextTick = false
       playSounds(after: soundLowerBound, through: elapsed)
-      if elapsed >= duration { isPlaying = false }
+      if elapsed >= duration {
+        isPlaying = false
+        self.playbackStartedAt = nil
+      }
     }
   }
 

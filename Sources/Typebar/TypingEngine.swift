@@ -2839,6 +2839,12 @@ enum TypingReplay {
     let isSeparator: Bool
   }
 
+  static func playbackElapsed(
+    startedAt: TimeInterval, now: TimeInterval, duration: TimeInterval
+  ) -> TimeInterval {
+    min(max(0, now - startedAt), max(0, duration))
+  }
+
   static func chronologicalEvents(_ events: [TypingReplayEvent]) -> [TypingReplayEvent] {
     guard !zip(events, events.dropFirst()).allSatisfy({ $0.offset <= $1.offset }) else {
       return events
