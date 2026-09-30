@@ -16780,6 +16780,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(OfficialTestLimitInput.value(from: "-1"))
     XCTAssertNil(OfficialTestLimitInput.value(from: "1.5"))
     XCTAssertNil(OfficialTestLimitInput.value(from: "many"))
+    XCTAssertNil(OfficialTestLimitInput.value(from: "0", minimum: 1))
+    XCTAssertEqual(OfficialTestLimitInput.value(from: "100000", minimum: 1), 100_000)
+    XCTAssertEqual(
+      OfficialTestLimitInput.value(from: String(OfficialTestLimitInput.maximumValue), minimum: 1),
+      OfficialTestLimitInput.maximumValue)
     XCTAssertNil(
       OfficialTestLimitInput.value(from: String(OfficialTestLimitInput.maximumValue + 1)))
   }

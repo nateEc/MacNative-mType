@@ -5,9 +5,9 @@ enum OfficialTestLimitInput {
   /// reference configuration's Number semantics through native round trips.
   static let maximumValue = 9_007_199_254_740_991
 
-  static func value(from text: String) -> Int? {
+  static func value(from text: String, minimum: Int = 0) -> Int? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, let value = Int(trimmed), (0...maximumValue).contains(value) else {
+    guard !trimmed.isEmpty, let value = Int(trimmed), (minimum...maximumValue).contains(value) else {
       return nil
     }
     return value
@@ -44,16 +44,23 @@ struct TestLimitEditor: View {
   @Environment(\.dismiss) private var dismiss
   let kind: TestLimitKind
   let onApply: (Int) -> Void
+  let allowsInfinite: Bool
   @State private var text: String
   @FocusState private var inputFocused: Bool
 
-  init(kind: TestLimitKind, initialValue: Int, onApply: @escaping (Int) -> Void) {
+  init(
+    kind: TestLimitKind, initialValue: Int, allowsInfinite: Bool = true,
+    onApply: @escaping (Int) -> Void
+  ) {
     self.kind = kind
     self.onApply = onApply
+    self.allowsInfinite = allowsInfinite
     _text = State(initialValue: String(max(0, initialValue)))
   }
 
-  private var value: Int? { OfficialTestLimitInput.value(from: text) }
+  private var value: Int? {
+    OfficialTestLimitInput.value(from: text, minimum: allowsInfinite ? 0 : 1)
+  }
 
   var body: some View {
     NavigationStack {
@@ -65,12 +72,15 @@ struct TestLimitEditor: View {
             LabeledContent("将应用", value: value == 0 ? "无限" : "\(value) \(kind.unit)")
               .foregroundStyle(.secondary)
           } else {
-            Text("请输入非负整数。")
+            Text(allowsInfinite ? "请输入非负整数。" : "请输入正整数；当前修饰器不支持无限测试。")
               .foregroundStyle(.red)
           }
         }
         Section {
-          Text("0 表示无限；大型有限测试会按需生成文本，不会一次性占用大量内存。应用后会退出挑战并重新开始练习。")
+          Text(
+            (allowsInfinite ? "0 表示无限；" : "")
+              + "大型有限测试会按需生成文本，不会一次性占用大量内存。应用后会退出挑战并重新开始练习。"
+          )
             .font(.caption)
             .foregroundStyle(.secondary)
         }

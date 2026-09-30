@@ -755,6 +755,8 @@ private struct ContentView: View {
   @State private var showingKeyboardGuideScaleEditor = false
   @State private var showingCustomTimeEditor = false
   @State private var showingCustomWordsEditor = false
+  @State private var showingCustomTextTimeEditor = false
+  @State private var showingCustomTextWordsEditor = false
   @State private var practiceThresholdEditorKind: PracticeThresholdEditorKind?
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
@@ -1287,6 +1289,24 @@ private struct ContentView: View {
         activeChallengeID = nil
         wordLimit = value
         reset()
+      }
+    }
+    .sheet(isPresented: $showingCustomTextTimeEditor) {
+      TestLimitEditor(
+        kind: .time, initialValue: customTextDuration,
+        allowsInfinite: infiniteIncompatibleModifiers.isEmpty
+      ) { value in
+        guard acceptsRestartingConfigurationChange() else { return }
+        customTextDuration = value
+      }
+    }
+    .sheet(isPresented: $showingCustomTextWordsEditor) {
+      TestLimitEditor(
+        kind: .words, initialValue: customTextWordLimit,
+        allowsInfinite: infiniteIncompatibleModifiers.isEmpty
+      ) { value in
+        guard acceptsRestartingConfigurationChange() else { return }
+        customTextWordLimit = value
       }
     }
     .sheet(item: $practiceThresholdEditorKind) { kind in
@@ -1982,12 +2002,16 @@ private struct ContentView: View {
                 Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
                   .font(.caption).foregroundStyle(.secondary)
               } else {
-                Stepper(
-                  value: restartingConfigurationBinding($customTextDuration),
-                  in: 5...3600,
-                  step: 5
-                ) {
-                  LabeledContent("循环时长", value: "\(customTextDuration) 秒")
+                HStack {
+                  Stepper(
+                    value: restartingConfigurationBinding($customTextDuration),
+                    in: 1...OfficialTestLimitInput.maximumValue,
+                    step: 5
+                  ) {
+                    LabeledContent("循环时长", value: "\(customTextDuration) 秒")
+                  }
+                  Button("自定义…") { showingCustomTextTimeEditor = true }
+                    .buttonStyle(.borderless)
                 }
                 .disabled(hasLockedCustomTextSource)
                 .onChange(of: customTextDuration) { _, _ in reset() }
@@ -2002,8 +2026,15 @@ private struct ContentView: View {
                 Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
                   .font(.caption).foregroundStyle(.secondary)
               } else {
-                Stepper(value: restartingConfigurationBinding($customTextWordLimit), in: 1...1000) {
-                  LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
+                HStack {
+                  Stepper(
+                    value: restartingConfigurationBinding($customTextWordLimit),
+                    in: 1...OfficialTestLimitInput.maximumValue
+                  ) {
+                    LabeledContent("循环字数", value: "\(customTextWordLimit) 词")
+                  }
+                  Button("自定义…") { showingCustomTextWordsEditor = true }
+                    .buttonStyle(.borderless)
                 }
                 .disabled(hasLockedCustomTextSource)
                 .onChange(of: customTextWordLimit) { _, _ in reset() }
