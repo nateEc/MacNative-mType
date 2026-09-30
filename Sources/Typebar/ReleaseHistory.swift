@@ -162,6 +162,7 @@ struct ReleaseHistoryView: View {
     .frame(width: 680, height: 700)
     .background(ReleaseHistoryPalette.paper)
     .foregroundStyle(ReleaseHistoryPalette.ink)
+    .preferredColorScheme(.light)
     .task {
       if releases.isEmpty { await loadNextPage() }
     }
