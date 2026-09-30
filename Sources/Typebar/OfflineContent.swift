@@ -5013,6 +5013,11 @@ enum CodeLanguageCatalog {
 enum CodePracticeContent {
   static func prompt(language: TypingLanguage, targetTokenCount: Int) -> String {
     let blockCount = max(1, Int(ceil(Double(max(targetTokenCount, 1)) / 8)))
+    if language == .codeJavaScript || language == .codeJavaScript1k {
+      return (0..<blockCount).map {
+        javascriptBlock(at: $0, extended: language == .codeJavaScript1k)
+      }.joined(separator: "\n")
+    }
     if language == .codeSwift {
       return (0..<blockCount).map(swiftBlock).joined(separator: "\n")
     }
@@ -5021,6 +5026,51 @@ enum CodePracticeContent {
     }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
+  }
+
+  private static func javascriptBlock(at index: Int, extended: Bool) -> String {
+    if index == 0 {
+      if extended {
+        return "function practiceUnit0(values) {\n  return Object.fromEntries(values.map((value, position) => [position, value]));\n}"
+      }
+      return "function practiceUnit0(values) {\n  return values.reduce((total, value) => total + value, 0);\n}"
+    }
+    let parameter: String
+    let body: String
+    if extended {
+      parameter = index.isMultiple(of: 6) ? "record" : "values"
+      switch index % 6 {
+      case 0:
+        body = "const result = {};\n  for (const [key, value] of Object.entries(record)) {\n    result[key] = String(value);\n  }\n  return result;"
+      case 1:
+        body = "const [first = 0, ...rest] = values;\n  return first + rest.length + \(index);"
+      case 2:
+        body = "return values.flatMap((value) => [value, value + \(index)]);"
+      case 3:
+        body = "return values.every((value) => Number.isFinite(value));"
+      case 4:
+        body = "return new Map(values.map((value, position) => [position + \(index), value]));"
+      default:
+        body = "return { batch: \(index), values: values.filter(Boolean) };"
+      }
+    } else {
+      parameter = "values"
+      switch index % 6 {
+      case 0:
+        body = "return values.filter((value) => value > \(index));"
+      case 1:
+        body = "return values.map((value) => value * \(index + 1));"
+      case 2:
+        body = "return values.join(\" / \") + \"\(index)\";"
+      case 3:
+        body = "let total = \(index);\n  for (const value of values) {\n    total += value;\n  }\n  return total;"
+      case 4:
+        body = "return values.some((value) => value === \(index));"
+      default:
+        body = "return values.slice(0, \(index)).reverse();"
+      }
+    }
+    return "function practiceUnit\(index)(\(parameter)) {\n  \(body)\n}"
   }
 
   private static func swiftBlock(at index: Int) -> String {
@@ -5117,7 +5167,7 @@ enum CodePracticeContent {
        "const items = [\"one\", \"two\"].map((name) => <li key={name}>{name}</li>);",
        "export default PracticeCard;"]
     case .codeJavaScript, .codeJavaScript1k:
-      ["const total = values.reduce((sum, value) => sum + value, 0);", "for (const item of items) {\n\tconsole.log(item);\n}", "if (total > limit) {\n\treturn total;\n}"]
+      (0..<3).map { javascriptBlock(at: $0, extended: language == .codeJavaScript1k) }
     case .codePython, .codePython1k, .codePython2k, .codePython5k:
       ["total = sum(values)", "for item in items:\n\tprint(item)", "if total > limit:\n\treturn total"]
     case .codeYoptaScript:

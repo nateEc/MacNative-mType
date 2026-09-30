@@ -10869,6 +10869,59 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.result(at: start)?.prompt, prompt)
   }
 
+  func testJavaScriptPracticeVariantsGrowWithoutRepeating() throws {
+    let languages: [TypingLanguage] = [.codeJavaScript, .codeJavaScript1k]
+    for language in languages {
+      for target in [1, 25, 100, 800] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let units = prompt.split(separator: "\n").compactMap { line -> String? in
+          guard line.hasPrefix("function practiceUnit") else { return nil }
+          return String(line.prefix(while: { $0 != "(" }))
+        }
+        let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+        XCTAssertEqual(units.count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertEqual(Set(units).count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertFalse(prompt.contains("const total = values.reduce((sum, value)"), language.displayName)
+        XCTAssertFalse(prompt.contains("\t"), language.displayName)
+      }
+
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
+      let start = Date(timeIntervalSince1970: 3_000)
+      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      for character in prompt {
+        session.insert(String(character), at: start)
+      }
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+
+    XCTAssertNotEqual(
+      CodePracticeContent.prompt(language: .codeJavaScript, targetTokenCount: 25),
+      CodePracticeContent.prompt(language: .codeJavaScript1k, targetTokenCount: 25))
+
+    if let node = ProcessInfo.processInfo.environment["TYPEBAR_NODE_SYNTAX_CHECK"] {
+      for language in languages {
+        for target in [25, 100] {
+          let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+          let checker = Process()
+          checker.executableURL = URL(fileURLWithPath: node)
+          checker.arguments = ["--check", "-"]
+          let input = Pipe()
+          let diagnostics = Pipe()
+          checker.standardInput = input
+          checker.standardError = diagnostics
+          try checker.run()
+          input.fileHandleForWriting.write(Data(prompt.utf8))
+          try input.fileHandleForWriting.close()
+          checker.waitUntilExit()
+          let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+          XCTAssertEqual(checker.terminationStatus, 0, "\(language.displayName), target=\(target): \(errors)")
+        }
+      }
+    }
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
