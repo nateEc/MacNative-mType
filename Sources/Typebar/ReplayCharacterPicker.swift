@@ -1,6 +1,41 @@
 @preconcurrency import AppKit
 import SwiftUI
 
+struct ReplayCharacterUTF16Index {
+  private let offsets: [Int]
+
+  init(_ text: String) {
+    var offsets = [0]
+    offsets.reserveCapacity(text.count + 1)
+    for character in text {
+      offsets.append(offsets[offsets.count - 1] + String(character).utf16.count)
+    }
+    self.offsets = offsets
+  }
+
+  func range(at characterIndex: Int) -> NSRange? {
+    guard (0..<(offsets.count - 1)).contains(characterIndex) else { return nil }
+    return NSRange(
+      location: offsets[characterIndex],
+      length: offsets[characterIndex + 1] - offsets[characterIndex])
+  }
+
+  func characterIndex(containing offset: Int) -> Int? {
+    guard offset >= 0, offset < offsets[offsets.count - 1] else { return nil }
+    var lower = 0
+    var upper = offsets.count - 1
+    while lower + 1 < upper {
+      let middle = (lower + upper) / 2
+      if offsets[middle] <= offset {
+        lower = middle
+      } else {
+        upper = middle
+      }
+    }
+    return lower
+  }
+}
+
 struct ReplayCharacterPicker: NSViewRepresentable {
   let text: String
   let reachableIndices: Set<Int>
@@ -28,7 +63,7 @@ struct ReplayCharacterPicker: NSViewRepresentable {
 
 final class ReplayCharacterTextView: NSTextView {
   var onSelect: (Int) -> Void = { _ in }
-  private var replayText = ""
+  private var utf16Index = ReplayCharacterUTF16Index("")
   private var reachableIndices: Set<Int> = []
 
   override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
@@ -68,7 +103,7 @@ final class ReplayCharacterTextView: NSTextView {
   }
 
   func update(text: String, reachableIndices: Set<Int>, selectedIndex: Int?) {
-    replayText = text
+    utf16Index = ReplayCharacterUTF16Index(text)
     self.reachableIndices = reachableIndices
     let rendered = NSMutableAttributedString()
     let font = NSFont.monospacedSystemFont(
@@ -104,7 +139,7 @@ final class ReplayCharacterTextView: NSTextView {
       forGlyphRange: NSRange(location: glyphIndex, length: 1), in: textContainer)
     guard glyphRect.insetBy(dx: -2, dy: -2).contains(textPoint) else { return }
     let utf16Index = layoutManager.characterIndexForGlyph(at: glyphIndex)
-    guard let characterIndex = characterIndex(containingUTF16Offset: utf16Index),
+    guard let characterIndex = self.utf16Index.characterIndex(containing: utf16Index),
           reachableIndices.contains(characterIndex)
     else { return }
     onSelect(characterIndex)
@@ -114,7 +149,7 @@ final class ReplayCharacterTextView: NSTextView {
     super.resetCursorRects()
     guard let layoutManager, let textContainer else { return }
     for characterIndex in reachableIndices {
-      guard let utf16Range = utf16Range(forCharacterAt: characterIndex) else { continue }
+      guard let utf16Range = utf16Index.range(at: characterIndex) else { continue }
       let glyphRange = layoutManager.glyphRange(
         forCharacterRange: utf16Range, actualCharacterRange: nil)
       let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
@@ -123,23 +158,4 @@ final class ReplayCharacterTextView: NSTextView {
     }
   }
 
-  private func characterIndex(containingUTF16Offset offset: Int) -> Int? {
-    var location = 0
-    for (index, character) in replayText.enumerated() {
-      let length = String(character).utf16.count
-      if (location..<(location + length)).contains(offset) { return index }
-      location += length
-    }
-    return nil
-  }
-
-  private func utf16Range(forCharacterAt targetIndex: Int) -> NSRange? {
-    var location = 0
-    for (index, character) in replayText.enumerated() {
-      let length = String(character).utf16.count
-      if index == targetIndex { return NSRange(location: location, length: length) }
-      location += length
-    }
-    return nil
-  }
 }

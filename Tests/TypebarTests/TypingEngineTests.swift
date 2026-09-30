@@ -17635,6 +17635,21 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testReplayCharacterUTF16IndexKeepsLongAndComposedTargetsAligned() {
+    let index = ReplayCharacterUTF16Index("a🙂e\u{301}z")
+    XCTAssertEqual(index.range(at: 0), NSRange(location: 0, length: 1))
+    XCTAssertEqual(index.range(at: 1), NSRange(location: 1, length: 2))
+    XCTAssertEqual(index.range(at: 2), NSRange(location: 3, length: 2))
+    XCTAssertEqual(index.range(at: 3), NSRange(location: 5, length: 1))
+    XCTAssertEqual(index.characterIndex(containing: 2), 1)
+    XCTAssertEqual(index.characterIndex(containing: 4), 2)
+    XCTAssertNil(index.characterIndex(containing: 6))
+
+    let longIndex = ReplayCharacterUTF16Index(String(repeating: "typebar ", count: 1_000))
+    XCTAssertEqual(longIndex.range(at: 7_999), NSRange(location: 7_999, length: 1))
+    XCTAssertEqual(longIndex.characterIndex(containing: 7_999), 7_999)
+  }
+
   func testReplayInputGlyphsRebuildCorrectForcedIncorrectDeletedAndExtraStates() {
     let events: [TypingReplayEvent] = [
       .init(offset: 0.1, kind: .insert, text: "a"),
