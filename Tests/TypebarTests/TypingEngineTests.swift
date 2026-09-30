@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftData
 import SwiftUI
 import XCTest
@@ -21037,6 +21038,66 @@ final class TypingEngineTests: XCTestCase {
       paper.foreground(for: .incorrect).usingColorSpace(.sRGB)?.redComponent ?? -1,
       1, accuracy: 0.02)
     XCTAssertEqual(paper.foreground(for: .hidden).alphaComponent, 0)
+  }
+
+  @MainActor
+  func testChooLongPromptKeepsFullAccessibilityTextWithBoundedVisibleLayers() {
+    let font = NSFont.monospacedSystemFont(ofSize: 24, weight: .regular)
+    let glyphs = Array(repeating: TypingPromptGlyph(character: "a", state: .pending), count: 3_000)
+    let height = ChooLayerView.measure(glyphs: glyphs, font: font, width: 400)
+    let view = ChooLayerView(frame: CGRect(x: 0, y: 0, width: 400, height: height))
+    let scrollView = NSScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: 240))
+    scrollView.documentView = view
+    view.configure(
+      glyphs: glyphs, font: font,
+      palette: ChooGlyphPalette(
+        theme: AppTheme.paper.resolvedTheme,
+        flipsCompletionAndFuture: false, usesColorfulMode: false),
+      animates: true, frameRate: AnimationFrameRatePolicy.nativeFrameRate)
+    scrollView.layoutSubtreeIfNeeded()
+
+    XCTAssertEqual(view.accessibilityLabel(), String(repeating: "a", count: 3_000))
+    XCTAssertLessThan(view.layer?.sublayers?.count ?? .max, 500)
+    scrollView.contentView.scroll(to: NSPoint(x: 0, y: height - 240))
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+    scrollView.layoutSubtreeIfNeeded()
+    let visibleLayers = view.layer?.sublayers ?? []
+    XCTAssertLessThan(visibleLayers.count, 500)
+    XCTAssertTrue(visibleLayers.contains { $0.frame.minY > height - 400 })
+  }
+
+  @MainActor
+  func testChooStreamingAppendKeepsVisibleAnimationAndRendersNewTail() throws {
+    let font = NSFont.monospacedSystemFont(ofSize: 24, weight: .regular)
+    let original = Array(repeating: TypingPromptGlyph(character: "a", state: .pending), count: 1_000)
+    let palette = ChooGlyphPalette(
+      theme: AppTheme.paper.resolvedTheme,
+      flipsCompletionAndFuture: false, usesColorfulMode: false)
+    let view = ChooLayerView(frame: CGRect(
+      x: 0, y: 0, width: 400,
+      height: ChooLayerView.measure(glyphs: original, font: font, width: 400)))
+    let scrollView = NSScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: 240))
+    scrollView.documentView = view
+    view.configure(glyphs: original, font: font, palette: palette, animates: true, frameRate: 30)
+    let first = try XCTUnwrap(view.layer?.sublayers?.first as? CATextLayer)
+    let beginTime = try XCTUnwrap(first.animation(forKey: "chooRotation")).beginTime
+
+    let expanded = original + Array(
+      repeating: TypingPromptGlyph(character: "b", state: .pending), count: 1_000)
+    let height = ChooLayerView.measure(glyphs: expanded, font: font, width: 400)
+    view.setFrameSize(NSSize(width: 400, height: height))
+    view.configure(glyphs: expanded, font: font, palette: palette, animates: true, frameRate: 30)
+    XCTAssertTrue(first === view.layer?.sublayers?.first)
+    XCTAssertEqual(first.animation(forKey: "chooRotation")?.beginTime, beginTime)
+    XCTAssertLessThan(view.layer?.sublayers?.count ?? .max, 500)
+    XCTAssertEqual(view.accessibilityLabel(), String(repeating: "a", count: 1_000)
+      + String(repeating: "b", count: 1_000))
+
+    scrollView.contentView.scroll(to: NSPoint(x: 0, y: height - 240))
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+    XCTAssertTrue((view.layer?.sublayers ?? []).contains {
+      ($0 as? CATextLayer)?.string as? String == "b"
+    })
   }
 
   func testVisualModifiersApplyOnlyToThePracticePresentation() {

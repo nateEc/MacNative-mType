@@ -545,15 +545,19 @@ private struct ChooLayerPrompt: NSViewRepresentable {
   }
 }
 
-private final class ChooLayerView: NSView {
+final class ChooLayerView: NSView {
   private var glyphs: [TypingPromptGlyph] = []
-  private var glyphLayers: [CATextLayer?] = []
+  private var glyphLayers: [Int: CATextLayer] = [:]
+  private var glyphFrames: [CGRect] = []
+  private var laidOutWidth: CGFloat = 0
   private var promptFont = NSFont.monospacedSystemFont(ofSize: 18, weight: .regular)
   private var palette = ChooGlyphPalette(
     theme: AppTheme.paper.resolvedTheme,
     flipsCompletionAndFuture: false, usesColorfulMode: false)
   private var animates = false
   private var frameRate = AnimationFrameRatePolicy.nativeFrameRate
+  private var animationStartTime = CACurrentMediaTime()
+  private weak var observedClipView: NSClipView?
 
   override var isFlipped: Bool { true }
 
@@ -567,13 +571,43 @@ private final class ChooLayerView: NSView {
 
   required init?(coder: NSCoder) { fatalError("ChooLayerView is created in code") }
 
+  deinit { NotificationCenter.default.removeObserver(self) }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    observeScrollClip()
+    refreshVisibleLayers()
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    observeScrollClip()
+    refreshVisibleLayers()
+  }
+
+  private func observeScrollClip() {
+    let clip = enclosingScrollView?.contentView
+    guard observedClipView !== clip else { return }
+    if let observedClipView {
+      NotificationCenter.default.removeObserver(
+        self, name: NSView.boundsDidChangeNotification, object: observedClipView)
+    }
+    observedClipView = clip
+    clip?.postsBoundsChangedNotifications = true
+    if let clip {
+      NotificationCenter.default.addObserver(
+        self, selector: #selector(scrollClipBoundsChanged),
+        name: NSView.boundsDidChangeNotification, object: clip)
+    }
+  }
+
+  @objc private func scrollClipBoundsChanged() {
+    refreshVisibleLayers()
+  }
+
   func configure(glyphs: [TypingPromptGlyph], font: NSFont, palette: ChooGlyphPalette,
                  animates: Bool, frameRate: Int) {
-    let needsRebuild = glyphLayers.count != glyphs.count
-      || zip(glyphLayers, glyphs).contains { layer, glyph in
-        (layer == nil) != (glyph.character == "\n")
-      }
-    let changesLayout = needsRebuild || self.glyphs != glyphs || promptFont != font
+    let changesLayout = self.glyphs != glyphs || promptFont != font
     let changesStyle = changesLayout || self.palette != palette
     let changesAnimation = self.animates != animates || self.frameRate != frameRate
     self.glyphs = glyphs
@@ -581,69 +615,102 @@ private final class ChooLayerView: NSView {
     self.palette = palette
     self.animates = animates
     self.frameRate = frameRate
-    if needsRebuild {
-      glyphLayers.forEach { $0?.removeFromSuperlayer() }
-      glyphLayers = glyphs.map { glyph in
-        guard glyph.character != "\n" else { return nil }
-        let text = CATextLayer()
-        text.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        text.alignmentMode = .left
-        text.isWrapped = false
-        layer?.addSublayer(text)
-        return text
-      }
-    }
-    if changesStyle { applyStyles() }
-    if changesLayout { layoutGlyphs() }
-    if changesAnimation || needsRebuild { updateAnimations() }
+    if changesLayout { glyphFrames.removeAll(keepingCapacity: true) }
+    if changesAnimation { animationStartTime = CACurrentMediaTime() }
+    refreshVisibleLayers(forceStyle: changesStyle)
+    if changesAnimation { updateAnimations() }
     setAccessibilityLabel(glyphs.map { String($0.typedCharacter ?? $0.character) }.joined())
   }
 
   override func layout() {
     super.layout()
-    layoutGlyphs()
-  }
-
-  private func applyStyles() {
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    for (glyph, text) in zip(glyphs, glyphLayers) {
-      guard let text else { continue }
-      text.string = String(glyph.typedCharacter ?? glyph.character)
-      text.font = promptFont
-      text.fontSize = promptFont.pointSize
-      text.foregroundColor = palette.foreground(for: glyph.state).cgColor
-      text.backgroundColor = palette.background(for: glyph.state)?.cgColor
-    }
-    CATransaction.commit()
+    refreshVisibleLayers()
   }
 
   static func measure(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat) -> CGFloat {
     layoutFrames(glyphs: glyphs, font: font, width: width).height
   }
 
-  private func layoutGlyphs() {
-    guard !glyphLayers.isEmpty else { return }
-    let result = Self.layoutFrames(glyphs: glyphs, font: promptFont, width: max(1, bounds.width))
+  private func refreshVisibleLayers(forceStyle: Bool = false) {
+    guard !glyphs.isEmpty else {
+      glyphLayers.values.forEach { $0.removeFromSuperlayer() }
+      glyphLayers.removeAll()
+      glyphFrames.removeAll()
+      return
+    }
+    let width = max(1, bounds.width)
+    if glyphFrames.count != glyphs.count || laidOutWidth != width {
+      glyphFrames = Self.layoutFrames(glyphs: glyphs, font: promptFont, width: width).frames
+      laidOutWidth = width
+    }
+    // SwiftUI's prompt scroll area clips this document view. Keeping a small
+    // overscan means scrolls do not expose empty rows between notifications.
+    let viewport = visibleRect.isEmpty
+      ? CGRect(x: 0, y: 0, width: width, height: min(bounds.height, 240))
+      : visibleRect
+    let window = viewport.insetBy(dx: 0, dy: -120)
+    var low = 0
+    var high = glyphFrames.count
+    while low < high {
+      let middle = (low + high) / 2
+      if glyphFrames[middle].maxY < window.minY {
+        low = middle + 1
+      } else {
+        high = middle
+      }
+    }
+    var desired: [Int] = []
+    var index = low
+    while index < glyphFrames.count, glyphFrames[index].minY <= window.maxY {
+      if glyphs[index].character != "\n" { desired.append(index) }
+      index += 1
+    }
+    let desiredSet = Set(desired)
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    for (text, frame) in zip(glyphLayers, result.frames) {
-      if let text, let frame { text.frame = frame }
+    for index in Array(glyphLayers.keys) where !desiredSet.contains(index) {
+      glyphLayers.removeValue(forKey: index)?.removeFromSuperlayer()
+    }
+    for index in desired {
+      if let text = glyphLayers[index] {
+        text.frame = glyphFrames[index]
+        if forceStyle { style(text, at: index) }
+      } else {
+        let text = CATextLayer()
+        text.contentsScale = self.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        text.alignmentMode = .left
+        text.isWrapped = false
+        text.frame = glyphFrames[index]
+        style(text, at: index)
+        layer?.addSublayer(text)
+        glyphLayers[index] = text
+        addRotation(to: text)
+      }
     }
     CATransaction.commit()
   }
 
+  private func style(_ text: CATextLayer, at index: Int) {
+    let glyph = glyphs[index]
+    text.string = String(glyph.typedCharacter ?? glyph.character)
+    text.font = promptFont
+    text.fontSize = promptFont.pointSize
+    text.foregroundColor = palette.foreground(for: glyph.state).cgColor
+    text.backgroundColor = palette.background(for: glyph.state)?.cgColor
+  }
+
   private static func layoutFrames(glyphs: [TypingPromptGlyph], font: NSFont, width: CGFloat)
-    -> (frames: [CGRect?], height: CGFloat) {
+    -> (frames: [CGRect], height: CGFloat) {
     let lineHeight = ceil(font.ascender - font.descender + font.leading)
     var x: CGFloat = 0
     var y: CGFloat = 0
-    var frames: [CGRect?] = []
+    var frames: [CGRect] = []
+    frames.reserveCapacity(glyphs.count)
     for glyph in glyphs {
       if glyph.character == "\n" {
-        frames.append(nil)
         x = 0
         y += lineHeight + 12
+        frames.append(CGRect(x: 0, y: y, width: 0, height: 0))
         continue
       }
       let value = String(glyph.typedCharacter ?? glyph.character) as NSString
@@ -659,21 +726,26 @@ private final class ChooLayerView: NSView {
   }
 
   private func updateAnimations() {
-    for text in glyphLayers.compactMap({ $0 }) {
+    for text in glyphLayers.values {
       text.removeAnimation(forKey: "chooRotation")
-      guard animates else { continue }
-      let animation = CABasicAnimation(keyPath: "transform.rotation.z")
-      animation.fromValue = 0
-      animation.toValue = 2 * Double.pi
-      animation.duration = ChooVisualPolicy.cycleDuration
-      animation.repeatCount = .infinity
-      animation.timingFunction = CAMediaTimingFunction(name: .linear)
-      if frameRate != AnimationFrameRatePolicy.nativeFrameRate {
-        let rate = Float(AnimationFrameRatePolicy.normalized(frameRate))
-        animation.preferredFrameRateRange = CAFrameRateRange(minimum: rate, maximum: rate, preferred: rate)
-      }
-      text.add(animation, forKey: "chooRotation")
+      addRotation(to: text)
     }
+  }
+
+  private func addRotation(to text: CATextLayer) {
+    guard animates else { return }
+    let animation = CABasicAnimation(keyPath: "transform.rotation.z")
+    animation.fromValue = 0
+    animation.toValue = 2 * Double.pi
+    animation.duration = ChooVisualPolicy.cycleDuration
+    animation.repeatCount = .infinity
+    animation.beginTime = animationStartTime
+    animation.timingFunction = CAMediaTimingFunction(name: .linear)
+    if frameRate != AnimationFrameRatePolicy.nativeFrameRate {
+      let rate = Float(AnimationFrameRatePolicy.normalized(frameRate))
+      animation.preferredFrameRateRange = CAFrameRateRange(minimum: rate, maximum: rate, preferred: rate)
+    }
+    text.add(animation, forKey: "chooRotation")
   }
 }
 
