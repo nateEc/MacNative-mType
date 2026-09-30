@@ -197,7 +197,7 @@
 | `lazyMode`（Pashto 补充） | `TestModifier.lazyLatin` | 固定参考的 Pashto 定义 `noLazyMode: true`；因此非自定义 Pashto 练习禁用简化输入，自定义文本仍允许用户显式启用，且不继承标准 Arabic 的自动快捷偏好。 |
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
 | `layout` | `KeyboardInputLayout` | 已映射；系统输入源为默认，固定参考的 239 个官方名称全部解析到独立编写的原生物理布局，另支持用户自写四行布局。机器清单 `Compatibility/official-layouts.json` 固定 239 项精确映射与 0 项兼容映射；覆盖测试验证名称唯一、目标存在且无未列项目。Typebar 不读取、打包或运行官方布局 JSON、代码或资产。 |
-| `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射。 |
+| `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射；代码行仅含 Tab 时，普通退格按删除末尾 Tab 后的剩余缩进是否与目标匹配决定是否一并返回上一行，删词键按删除整段缩进后的空前缀处理；多余缩进的修正与完成回放有原生回归。 |
 | `soundVolume` | `soundVolume` | 已映射。 |
 | `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 已映射；提供 26 种可持久化的 Typebar 原创原生音型，其中四种使用 macOS 系统声音、二十二种在内存中独立合成短 WAV，不复制或打包网页端音频资产。 |
 | `playSoundOnError` | `playErrorBeep`、`errorSoundStyle` | 已映射；关闭开关加四种可持久化的 macOS 系统音型，覆盖固定 schema 的 off/1/2/3/4 五档契约。 |

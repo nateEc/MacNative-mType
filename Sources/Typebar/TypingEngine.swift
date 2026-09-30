@@ -4236,7 +4236,7 @@ struct TypingSession {
     guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
-      removeCodeIndentationBeforeLine(at: date)
+      removeCodeIndentationBeforeLine(at: date, deletesWholeIndent: true)
     {
       return
     }
@@ -5067,12 +5067,19 @@ struct TypingSession {
     }
   }
 
-  private mutating func removeCodeIndentationBeforeLine(at date: Date) -> Bool {
+  private mutating func removeCodeIndentationBeforeLine(
+    at date: Date, deletesWholeIndent: Bool = false
+  ) -> Bool {
     let typedCharacters = Array(typed)
     let lineStart = typedCharacters.lastIndex(of: "\n").map { $0 + 1 } ?? 0
     guard lineStart < typedCharacters.count,
       typedCharacters[lineStart...].allSatisfy({ $0 == "\t" }),
-      typedCharacters.indices.filter({ $0 >= lineStart }).allSatisfy(isTypedCharacterCorrect)
+      // The reference checks the indentation after the browser has removed
+      // the requested input. A word deletion leaves an empty indentation,
+      // while ordinary Backspace leaves all tabs except the final one.
+      (deletesWholeIndent
+        || typedCharacters.indices.filter({ $0 >= lineStart && $0 < typedCharacters.count - 1 })
+          .allSatisfy(isTypedCharacterCorrect))
     else { return false }
     while typed.last == "\t" {
       removeLastTypedCharacter()

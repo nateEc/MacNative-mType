@@ -10640,6 +10640,48 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingReplay.typedText(events: replayEvents, through: 2), session.typed)
   }
 
+  func testCodeUnindentUsesIndentationRemainingAfterBackspace() {
+    let prompt = "if ready {\n\tgo()\n}"
+    let configuration = TestConfiguration.words(
+      1, rules: .init(codeUnindentOnBackspace: true), language: .codeSwift)
+    var session = TypingSession(configuration: configuration, prompt: prompt)
+
+    session.insert("if ready {\n", at: start)
+    XCTAssertEqual(session.typed, "if ready {\n\t")
+    session.insert("\t", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.typed, "if ready {\n\t\t")
+
+    session.deleteBackward(at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.typed, "if ready {")
+
+    session.insert("\ngo()\n}", at: start.addingTimeInterval(3))
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    let replayEvents = session.result(at: start.addingTimeInterval(3))?.replayEvents ?? []
+    XCTAssertEqual(TypingReplay.typedText(events: replayEvents, through: 3), prompt)
+
+    var twoExtras = TypingSession(configuration: configuration, prompt: prompt)
+    twoExtras.insert("if ready {\n\t\t", at: start)
+    XCTAssertEqual(twoExtras.typed, "if ready {\n\t\t\t")
+    twoExtras.deleteBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(twoExtras.typed, "if ready {\n\t\t")
+    twoExtras.deleteBackward(at: start.addingTimeInterval(2))
+    XCTAssertEqual(twoExtras.typed, "if ready {")
+
+    var wordDelete = TypingSession(configuration: configuration, prompt: prompt)
+    wordDelete.insert("if ready {\n\t\t", at: start)
+    wordDelete.deleteWordBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(wordDelete.typed, "if ready {")
+
+    var disabled = TypingSession(
+      configuration: .words(
+        1, rules: .init(codeUnindentOnBackspace: false), language: .codeSwift),
+      prompt: prompt)
+    disabled.insert("if ready {\n\t", at: start)
+    disabled.deleteBackward(at: start.addingTimeInterval(1))
+    XCTAssertEqual(disabled.typed, "if ready {\n\t")
+  }
+
   func testEveryStandaloneLanguageGeneratesAndCompletesAnOwnedWordsSession() {
     let languages = TypingLanguage.allCases.filter(\.supportsQuotes)
     XCTAssertEqual(languages.count, 376)
