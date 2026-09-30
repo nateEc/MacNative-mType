@@ -244,7 +244,7 @@
 | `themeDark` | `systemDarkTheme` | 已映射。 |
 | `randomTheme` | `randomThemeMode` | 已映射。 |
 | `favThemes` | `favoriteThemeIDs` | 已映射。 |
-| `theme` | `theme`、`activeCustomThemeID` | 已映射。 |
+| `theme` | `theme`、`activeCustomThemeID` | 已映射（配置键）；仅证明内置／自定义主题的选择和保存。固定 `ThemeNameSchema` 的命名预设目录仍有 187 个待映射身份，不得从本行推断主题视觉全覆盖；见 `OFFICIAL_THEME_AUDIT.md`。 |
 | `customTheme` | `customThemes` | 已映射。 |
 | `customThemeColors` | `CustomThemeDefinition` | 已映射；可创建、编辑、应用和归档原创背景、面板、强调色、提示文字、辅助文字、光标、淡化已输入、错误、额外输入与彩色模式两类反馈色。字段与默认色均为 Typebar 原生定义，不复用网页数组或颜色资产。 |
 | `showKeyTips` | `showKeyTips` | 已映射。 |

@@ -6,6 +6,8 @@
 
 官方 239 个命名键盘布局的逐项状态见 `OFFICIAL_LAYOUT_AUDIT.md`，机器可读快照与原生映射见 `Compatibility/official-layouts.json`；当前 239 项精确原生、0 项相关替代、0 项系统输入或自定义回退均由自动化测试守恒校验。`Scripts/check-layout-compatibility-audit.sh` 会从固定参考的 `LayoutNameSchema` 重建名称集合，并同时拒绝快照、原生精确映射、主库存声明或可执行覆盖证据漂移。
 
+官方主题身份另由 `OFFICIAL_THEME_AUDIT.md` 与 `Compatibility/official-themes.json` 逐项追踪：187 个官方主题身份、0 个已验证精确原生映射、187 个待映射。Typebar 的三个原创内置主题和用户自定义主题保留主题切换功能，却不能当作官方预设目录已完成；配置键映射与目录覆盖是两种不同证据。
+
 2026-10-01 `TST-01`／`TST-03` 默认值补证：新安装首次进入 30 秒时间模式，字数模式记忆为 50 词，引语长度默认为中等，与固定参考的 `default-config.ts` 对齐。旧 v1 设置归档未带独立参数记忆时仍按旧版 25 词恢复；显式保存的测试选择继续优先，不因新默认值而改写。此项不改变其他测试模式或原创练习内容。
 
 2026-10-01 `TST-41`／`INP-01` 输入桥补证：固定参考 `frontend/src/ts/input/listeners/misc.ts` 拒绝练习框粘贴，Typebar 原生编辑命令也有相同边界。新增 `NSTextInputClient` 阿拉伯文组合态与确认文本的回归：组合态不写入目标或错误，确认第一个 RTL 词与空格后进度为 `1/2`，第二词确认后自然完成、错误数为零。这是直接调用原生输入桥的自动化，不冒称桌面工具已成功发送 Unicode 实体按键，真人 macOS Arabic 输入源、双向光标与屏幕阅读器仍待验收。
