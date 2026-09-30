@@ -5012,9 +5012,34 @@ enum CodeLanguageCatalog {
 /// observable without importing an upstream corpus or programming-language asset.
 enum CodePracticeContent {
   static func prompt(language: TypingLanguage, targetTokenCount: Int) -> String {
-    let blocks = blocks(for: language)
     let blockCount = max(1, Int(ceil(Double(max(targetTokenCount, 1)) / 8)))
+    if language == .codeCSharp {
+      return (0..<blockCount).map(csharpBlock).joined(separator: "\n")
+    }
+    let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
+  }
+
+  private static func csharpBlock(at index: Int) -> String {
+    if index == 0 {
+      return "using System;\ninternal static class Practice0 {\n  public static void Main() {\n    Console.WriteLine(\"steady\");\n  }\n}"
+    }
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "public static int Sum(int[] values) {\n    int total = \(index);\n    foreach (int value in values) {\n      total += value;\n    }\n    return total;\n  }"
+    case 1:
+      body = "public static int[] Scale(int[] values) {\n    int[] result = new int[values.Length];\n    for (int position = 0; position < values.Length; position++) {\n      result[position] = values[position] * \(index + 1);\n    }\n    return result;\n  }"
+    case 2:
+      body = "public static string Describe(int value) {\n    return value switch {\n      \(index) => \"exact\",\n      _ => \"other\"\n    };\n  }"
+    case 3:
+      body = "public static int CountAbove(int[] values) {\n    int count = 0;\n    foreach (int value in values) {\n      if (value > \(index)) count++;\n    }\n    return count;\n  }"
+    case 4:
+      body = "public static string Render(int[] values) {\n    return \"batch \(index): \" + string.Join(\", \", values);\n  }"
+    default:
+      body = "public static int Bound(int value) {\n    return Math.Clamp(value, 0, \(index + 10));\n  }"
+    }
+    return "internal static class Practice\(index) {\n  \(body)\n}"
   }
 
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
@@ -5216,9 +5241,7 @@ enum CodePracticeContent {
     case .code6502Assembly:
       ["LDA #$00\nSTA $0200\nINX\nSTX $0201", "loop:\n\tDEX\n\tBNE loop\n\tRTS"]
     case .codeCSharp:
-      ["using System;\nclass Practice {\n  static void Main() {\n    Console.WriteLine(\"steady\");\n  }\n}",
-       "foreach (int value in values) {\n  Console.WriteLine(value);\n}",
-       "int doubled = 3 * 2;\nConsole.WriteLine(doubled);"]
+      (0..<3).map(csharpBlock)
     case .codeDart:
       ["void main() {\n  final values = <int>[2, 3, 5];\n  print(values.length);\n}",
        "int total(List<int> values) {\n  return values.reduce((sum, value) => sum + value);\n}",

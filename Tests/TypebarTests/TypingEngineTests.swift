@@ -10802,6 +10802,31 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testCSharpPracticeDoesNotRestartItsOpeningFragmentAsItGrows() {
+    for target in [1, 25, 100, 800] {
+      let prompt = CodePracticeContent.prompt(language: .codeCSharp, targetTokenCount: target)
+      let unitNames = prompt.split(separator: "\n").compactMap { line -> String? in
+        let prefix = "internal static class Practice"
+        return line.hasPrefix(prefix) ? String(line.dropFirst(prefix.count).split(separator: " ").first ?? "") : nil
+      }
+      let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+      XCTAssertEqual(prompt.components(separatedBy: "using System;").count - 1, 1, "target=\(target)")
+      XCTAssertEqual(unitNames.count, expectedCount, "target=\(target)")
+      XCTAssertEqual(Set(unitNames).count, expectedCount, "target=\(target)")
+      XCTAssertFalse(prompt.contains("Console.WriteLine(value);"), "target=\(target)")
+    }
+
+    let prompt = CodePracticeContent.prompt(language: .codeCSharp, targetTokenCount: 25)
+    let start = Date(timeIntervalSince1970: 3_000)
+    var session = TypingSession(configuration: .words(25, language: .codeCSharp), prompt: prompt)
+    for character in prompt {
+      session.insert(String(character), at: start)
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
