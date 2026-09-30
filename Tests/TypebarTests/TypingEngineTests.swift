@@ -11123,6 +11123,50 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testSQLPracticeGrowsAsIndependentExecutableStatements() throws {
+    for target in [1, 25, 100, 800] {
+      let prompt = CodePracticeContent.prompt(language: .codeSQL, targetTokenCount: target)
+      let statements = prompt.split(separator: ";", omittingEmptySubsequences: true)
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+      XCTAssertEqual(statements.count, expectedCount, "target=\(target)")
+      XCTAssertEqual(Set(statements).count, expectedCount, "target=\(target)")
+      XCTAssertTrue(statements.allSatisfy { $0.hasPrefix("WITH practice") }, "target=\(target)")
+      XCTAssertFalse(prompt.contains("\t"), "target=\(target)")
+    }
+
+    for target in [25, 100] {
+      let prompt = CodePracticeContent.prompt(language: .codeSQL, targetTokenCount: target)
+      let sqlite = Process()
+      sqlite.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+      sqlite.arguments = ["-batch", "-bail", ":memory:"]
+      let input = Pipe()
+      let output = Pipe()
+      let diagnostics = Pipe()
+      sqlite.standardInput = input
+      sqlite.standardOutput = output
+      sqlite.standardError = diagnostics
+      try sqlite.run()
+      input.fileHandleForWriting.write(Data(prompt.utf8))
+      try input.fileHandleForWriting.close()
+      sqlite.waitUntilExit()
+      let results = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      XCTAssertEqual(sqlite.terminationStatus, 0, "target=\(target): \(errors)")
+      XCTAssertEqual(results.split(separator: "\n").count, max(1, Int(ceil(Double(target) / 8))), "target=\(target)")
+    }
+
+    let prompt = CodePracticeContent.prompt(language: .codeSQL, targetTokenCount: 25)
+    let start = Date(timeIntervalSince1970: 3_000)
+    var session = TypingSession(configuration: .words(25, language: .codeSQL), prompt: prompt)
+    for character in prompt {
+      session.insert(String(character), at: start)
+    }
+    XCTAssertTrue(session.isFinished)
+    XCTAssertEqual(session.typed, prompt)
+    XCTAssertEqual(session.result(at: start)?.prompt, prompt)
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")

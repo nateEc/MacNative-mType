@@ -5047,6 +5047,9 @@ enum CodePracticeContent {
     if language == .codePerl {
       return (0..<blockCount).map(perlBlock).joined(separator: "\n")
     }
+    if language == .codeSQL {
+      return (0..<blockCount).map(sqlBlock).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5322,6 +5325,19 @@ enum CodePracticeContent {
     return "\(header)sub practice_unit_\(index) {\n  my ($values) = @_;\n  \(body)\n}"
   }
 
+  private static func sqlBlock(at index: Int) -> String {
+    let aggregation: String
+    switch index % 6 {
+    case 0: aggregation = "SUM(value) AS total_\(index)"
+    case 1: aggregation = "AVG(value) AS average_\(index)"
+    case 2: aggregation = "COUNT(*) AS count_\(index)"
+    case 3: aggregation = "MAX(value) AS maximum_\(index)"
+    case 4: aggregation = "SUM(CASE WHEN value > \(index) THEN 1 ELSE 0 END) AS above_\(index)"
+    default: aggregation = "MIN(value) AS minimum_\(index)"
+    }
+    return "WITH practice(value) AS (VALUES (\(index)), (\(index + 1)), (\(index + 2)))\nSELECT \(aggregation) FROM practice;"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5412,7 +5428,7 @@ enum CodePracticeContent {
     case .codeCSS:
       [".practice {", "\tdisplay: grid;", "\tgap: 1rem;\n}"]
     case .codeSQL:
-      ["SELECT value", "FROM practice_entries", "WHERE active = 1;"]
+      (0..<3).map(sqlBlock)
     case .codePowerShell:
       ["Get-ChildItem | ForEach-Object {\n\tWrite-Output $_.Name\n}",
        "$total = ($values | Measure-Object -Sum).Sum",
