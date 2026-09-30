@@ -1298,6 +1298,8 @@ private struct ContentView: View {
       ) { value in
         guard acceptsRestartingConfigurationChange() else { return }
         customTextDuration = value
+        // The finite-limit control (and its onChange) disappears when zero selects infinity.
+        if value == 0 { reset() }
       }
     }
     .sheet(isPresented: $showingCustomTextWordsEditor) {
@@ -1307,6 +1309,8 @@ private struct ContentView: View {
       ) { value in
         guard acceptsRestartingConfigurationChange() else { return }
         customTextWordLimit = value
+        // Keep the active session in sync when the finite-limit control disappears.
+        if value == 0 { reset() }
       }
     }
     .sheet(item: $practiceThresholdEditorKind) { kind in
