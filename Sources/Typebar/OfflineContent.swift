@@ -5029,6 +5029,12 @@ enum CodePracticeContent {
     if language == .codeCSharp {
       return (0..<blockCount).map(csharpBlock).joined(separator: "\n")
     }
+    if language == .codeC {
+      return (0..<blockCount).map(cBlock).joined(separator: "\n")
+    }
+    if language == .codeCPP {
+      return (0..<blockCount).map(cppBlock).joined(separator: "\n")
+    }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
   }
@@ -5192,6 +5198,46 @@ enum CodePracticeContent {
     return "internal static class Practice\(index) {\n  \(body)\n}"
   }
 
+  private static func cBlock(at index: Int) -> String {
+    let header = index == 0 ? "#include <stdio.h>\n\n" : ""
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "int total = \(index);\n  for (int position = 0; position < count; position++) {\n    total += values[position];\n  }\n  return total;"
+    case 1:
+      body = "int matches = 0;\n  for (int position = 0; position < count; position++) {\n    if (values[position] > \(index)) matches++;\n  }\n  return matches;"
+    case 2:
+      body = "int result = \(index);\n  for (int position = 0; position < count; position++) {\n    result ^= values[position];\n  }\n  return result;"
+    case 3:
+      body = "int highest = \(index);\n  for (int position = 0; position < count; position++) {\n    if (values[position] > highest) highest = values[position];\n  }\n  return highest;"
+    case 4:
+      body = "int total = 0;\n  for (int position = 0; position < count; position++) {\n    total += values[position] * \(index + 1);\n  }\n  return total;"
+    default:
+      body = "int selected = \(index);\n  if (count > 0) selected = values[count - 1];\n  return selected;"
+    }
+    return "\(header)int practice_unit_\(index)(const int *values, int count) {\n  \(body)\n}"
+  }
+
+  private static func cppBlock(at index: Int) -> String {
+    let header = index == 0 ? "#include <iostream>\n#include <vector>\n\n" : ""
+    let body: String
+    switch index % 6 {
+    case 0:
+      body = "int total = \(index);\n  for (int value : values) total += value;\n  return total;"
+    case 1:
+      body = "int matches = 0;\n  for (int value : values) {\n    if (value > \(index)) ++matches;\n  }\n  return matches;"
+    case 2:
+      body = "int total = \(index);\n  for (auto it = values.rbegin(); it != values.rend(); ++it) {\n    total += *it;\n  }\n  return total;"
+    case 3:
+      body = "int result = \(index);\n  for (int value : values) {\n    result = result > value ? result : value;\n  }\n  return result;"
+    case 4:
+      body = "int total = 0;\n  for (std::size_t position = 0; position < values.size(); ++position) {\n    total += values[position] * \(index + 1);\n  }\n  return total;"
+    default:
+      body = "if (values.empty()) return \(index);\n  return values.back() + \(index);"
+    }
+    return "\(header)int practice_unit_\(index)(const std::vector<int>& values) {\n  \(body)\n}"
+  }
+
   static func polyglotTokens(for language: TypingLanguage) -> [String] {
     let tokens = blocks(for: language).flatMap {
       $0.split(whereSeparator: \Character.isWhitespace).map(String.init)
@@ -5222,13 +5268,9 @@ enum CodePracticeContent {
        "for (String item : items) {\n\tSystem.out.println(item);\n}",
        "if (total > limit) {\n\treturn total;\n}"]
     case .codeC:
-      ["#include <stdio.h>\n\nint main(void) {\n\tputs(\"ready\");\n\treturn 0;\n}",
-       "for (int index = 0; index < count; index++) {\n\tprintf(\"%d\", values[index]);\n}",
-       "if (total > limit) {\n\treturn total;\n}"]
+      (0..<3).map(cBlock)
     case .codeCPP:
-      ["#include <iostream>\n\nint main() {\n\tstd::cout << \"ready\";\n\treturn 0;\n}",
-       "for (const auto& item : items) {\n\tstd::cout << item;\n}",
-       "if (total > limit) {\n\treturn total;\n}"]
+      (0..<3).map(cppBlock)
     case .codeKotlin:
       ["fun total(values: List<Int>): Int {\n\treturn values.sum()\n}",
        "for (item in items) {\n\tprintln(item)\n}",

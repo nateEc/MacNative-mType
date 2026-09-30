@@ -10976,6 +10976,54 @@ final class TypingEngineTests: XCTestCase {
     }
   }
 
+  func testCAndCPPPracticeGrowAsDistinctCompilableUnits() throws {
+    let languages: [(TypingLanguage, String, String, String)] = [
+      (.codeC, "/usr/bin/clang", "c11", "#include <stdio.h>"),
+      (.codeCPP, "/usr/bin/clang++", "c++17", "#include <iostream>"),
+    ]
+    for (language, compilerPath, standard, opening) in languages {
+      for target in [1, 25, 100, 800] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let units = prompt.split(separator: "\n").compactMap { line -> String? in
+          guard line.hasPrefix("int practice_unit_") else { return nil }
+          return String(line.prefix(while: { $0 != "(" }))
+        }
+        let expectedCount = max(1, Int(ceil(Double(target) / 8)))
+        XCTAssertEqual(prompt.components(separatedBy: opening).count - 1, 1, "\(language.displayName), target=\(target)")
+        XCTAssertEqual(units.count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertEqual(Set(units).count, expectedCount, "\(language.displayName), target=\(target)")
+        XCTAssertFalse(prompt.contains("\t"), language.displayName)
+      }
+
+      for target in [25, 100] {
+        let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: target)
+        let compiler = Process()
+        compiler.executableURL = URL(fileURLWithPath: compilerPath)
+        compiler.arguments = ["-std=\(standard)", "-fsyntax-only", "-x", language == .codeC ? "c" : "c++", "-"]
+        let input = Pipe()
+        let diagnostics = Pipe()
+        compiler.standardInput = input
+        compiler.standardError = diagnostics
+        try compiler.run()
+        input.fileHandleForWriting.write(Data(prompt.utf8))
+        try input.fileHandleForWriting.close()
+        compiler.waitUntilExit()
+        let errors = String(decoding: diagnostics.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        XCTAssertEqual(compiler.terminationStatus, 0, "\(language.displayName), target=\(target): \(errors)")
+      }
+
+      let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
+      let start = Date(timeIntervalSince1970: 3_000)
+      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      for character in prompt {
+        session.insert(String(character), at: start)
+      }
+      XCTAssertTrue(session.isFinished, language.displayName)
+      XCTAssertEqual(session.typed, prompt, language.displayName)
+      XCTAssertEqual(session.result(at: start)?.prompt, prompt, language.displayName)
+    }
+  }
+
   func testDockerfileIsAnOriginalLiteralCodePracticeChoice() {
     guard let language = TypingLanguage(rawValue: "dockerFile") else {
       XCTFail("Dockerfile must be a selectable typing language")
