@@ -5204,7 +5204,9 @@ struct TypingSession {
       let words = CustomTextOrderPolicy.randomWords(
         from: randomCustomSourceTokens,
         count: CustomTextOrderPolicy.maximumCompleteRandomWordCount,
-        avoiding: randomCustomPreviousWords)
+        avoiding: randomCustomPreviousWords,
+        lazyLanguage: configuration.modifiers.contains(.lazyLatin)
+          ? configuration.language : nil)
       randomCustomPreviousWords = Array(words.suffix(2))
       let source = words.joined(separator: " ")
       let chunk = configuration.language.presentationText(

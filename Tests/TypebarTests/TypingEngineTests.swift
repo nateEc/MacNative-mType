@@ -21185,6 +21185,47 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(exhaustedDraws, 102)
   }
 
+  func testRandomCustomTextAvoidsEquivalentWordsOnlyWhenLazyInputIsEnabled() {
+    let tokens = ["café", "cafe", "harbor", "quiet"]
+    var literalDraw = 0
+    let draws = [0, 1, 2]
+    let literal = CustomTextOrderPolicy.randomWords(
+      from: tokens, count: 2,
+      random: {
+        defer { literalDraw += 1 }
+        return draws[literalDraw % draws.count]
+      })
+    XCTAssertEqual(literal, ["café", "cafe"])
+
+    var lazyDraw = 0
+    let lazy = CustomTextOrderPolicy.randomWords(
+      from: tokens, count: 2, lazyLanguage: .french,
+      random: {
+        defer { lazyDraw += 1 }
+        return draws[lazyDraw % draws.count]
+      })
+    XCTAssertEqual(lazy, ["café", "harbor"])
+
+    var promptDraw = 0
+    let prompt = CustomTextOrderPolicy.prompt(
+      from: "café cafe harbor quiet", ordering: .random, wordCount: 2,
+      lazyLanguage: .french,
+      random: {
+        defer { promptDraw += 1 }
+        return draws[promptDraw % draws.count]
+      })
+    XCTAssertEqual(prompt, "café harbor")
+
+    var continuationDraw = 0
+    let afterBatch = CustomTextOrderPolicy.randomWords(
+      from: tokens, count: 1, avoiding: ["café"], lazyLanguage: .french,
+      random: {
+        defer { continuationDraw += 1 }
+        return draws[(continuationDraw + 1) % draws.count]
+      })
+    XCTAssertEqual(afterBatch, ["harbor"])
+  }
+
   func testBritishEnglishUsesOnlyTypebarOwnedBritishSpellingCorpus() {
     let configuration = TestConfiguration.words(32, language: .english, englishVariant: .british)
     let session = TestSessionFactory.make(configuration: configuration)

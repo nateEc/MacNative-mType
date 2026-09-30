@@ -6017,7 +6017,9 @@ struct TestSessionFactory {
               from: source, ordering: configuration.customTextOrdering,
               wordCount: streamsRandomCustomText
                 ? CustomTextOrderPolicy.maximumCompleteRandomWordCount
-                : hasCompleteRandomWordPrompt ? configuration.wordLimit : nil)
+                : hasCompleteRandomWordPrompt ? configuration.wordLimit : nil,
+              lazyLanguage: configuration.modifiers.contains(.lazyLatin)
+                ? configuration.language : nil)
             if streamsRandomCustomText {
               randomCustomPreviousWords = Array(
                 prompt.split(whereSeparator: \.isWhitespace).suffix(2).map(String.init))
@@ -6434,29 +6436,40 @@ enum CustomTextOrderPolicy {
   static let maximumCompleteRandomWordCount = 100
   private static let recentWordPunctuation = CharacterSet(charactersIn: ".?!\":-,")
 
-  private static func recentWordKey(_ word: String) -> String {
-    String(word.unicodeScalars.filter { !recentWordPunctuation.contains($0) }).lowercased()
+  private static func recentWordKey(_ word: String, lazyLanguage: TypingLanguage?) -> String {
+    let displayed = lazyLanguage.map { TypingTextNormalizer.lazyLatin(word, language: $0) } ?? word
+    return String(displayed.unicodeScalars.filter { !recentWordPunctuation.contains($0) })
+      .lowercased()
+  }
+
+  private static func candidateWordKey(_ word: String, lazyLanguage: TypingLanguage?) -> String {
+    let lowercase = word.lowercased()
+    return lazyLanguage.map { TypingTextNormalizer.lazyLatin(lowercase, language: $0) }
+      ?? lowercase
   }
 
   static func randomWords(
     from tokens: [String], count: Int, avoiding previous: [String] = [],
+    lazyLanguage: TypingLanguage? = nil,
     random: () -> Int = { Int.random(in: Int.min...Int.max) }
   ) -> [String] {
     guard !tokens.isEmpty, count > 0 else { return [] }
     var chosen: [String] = []
     chosen.reserveCapacity(count)
-    var recent = Array(previous.suffix(2)).map(recentWordKey)
+    var recent = Array(previous.suffix(2)).map {
+      recentWordKey($0, lazyLanguage: lazyLanguage)
+    }
     for _ in 0..<count {
       var candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
       if tokens.count >= 4 {
         var attempts = 0
-        while attempts < 100 && recent.contains(candidate.lowercased()) {
+        while attempts < 100 && recent.contains(candidateWordKey(candidate, lazyLanguage: lazyLanguage)) {
           attempts += 1
           candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
         }
       }
       chosen.append(candidate)
-      recent.append(recentWordKey(candidate))
+      recent.append(recentWordKey(candidate, lazyLanguage: lazyLanguage))
       if recent.count > 2 { recent.removeFirst() }
     }
     return chosen
@@ -6465,6 +6478,7 @@ enum CustomTextOrderPolicy {
   static func prompt(
     from text: String, ordering: CustomTextOrdering,
     wordCount: Int? = nil,
+    lazyLanguage: TypingLanguage? = nil,
     random: () -> Int = { Int.random(in: Int.min...Int.max) }
   ) -> String {
     let tokens = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
@@ -6478,7 +6492,9 @@ enum CustomTextOrderPolicy {
       return stream.nextWords(count: tokens.count, random: random)
     case .random:
       let count = wordCount.map { max(1, $0) } ?? max(tokens.count, 100)
-      return randomWords(from: tokens, count: count, random: random).joined(separator: " ")
+      return randomWords(
+        from: tokens, count: count, lazyLanguage: lazyLanguage, random: random
+      ).joined(separator: " ")
     }
   }
 }
