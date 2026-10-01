@@ -1,7 +1,8 @@
 import Foundation
 
 /// Anonymous physical presses, independent of text input and composition.
-/// A press owns its release, so result sample order never depends on release order.
+/// Physical pairing and result-log ordering are separate: simultaneous releases
+/// precede presses in the terminal projection, but samples stay in press order.
 struct PhysicalKeyTiming {
   struct Snapshot {
     var durations: [TimeInterval] = []
@@ -10,8 +11,15 @@ struct PhysicalKeyTiming {
   }
 
   private struct Press {
+    let code: UInt16
     let down: Date
     var up: Date?
+  }
+
+  private struct Edge {
+    let time: TimeInterval
+    /// A sample slot denotes a down edge; nil denotes a release.
+    let sample: Int?
   }
 
   private var presses: [Press] = []
@@ -29,7 +37,7 @@ struct PhysicalKeyTiming {
       close(code: code, at: date)
       active[code] = presses.count
       latestDown[code] = date
-      presses.append(Press(down: date))
+      presses.append(Press(code: code, down: date))
     } else {
       close(code: code, at: date)
     }
@@ -61,40 +69,77 @@ struct PhysicalKeyTiming {
     }
     let estimate = candidates.isEmpty
       ? 0.08 : Self.rounded(candidates.reduce(0, +) / Double(candidates.count))
-    let lastPreStart = presses.lastIndex { $0.down < startedAt }
+    let downTimes = presses.map { offset($0.down) }
+    let end = offset(finishedAt)
+    let lastPreStart = downTimes.lastIndex { $0 < 0 }
+    let postEndCodes = Set(presses.indices.compactMap {
+      downTimes[$0] > end ? presses[$0].code : nil
+    })
     var snapshot = Snapshot()
     var previousDown: TimeInterval?
-    var endpoints: [(time: TimeInterval, change: Int)] = []
-    endpoints.reserveCapacity(presses.count * 2)
+    var edgesByCode: [UInt16: [Edge]] = [:]
 
     for (index, press) in presses.enumerated() {
-      guard press.down <= finishedAt,
-        press.down >= startedAt || index == lastPreStart
-      else { continue }
-      let down = offset(press.down)
-      let up: TimeInterval?
-      if let releasedAt = press.up {
-        up = releasedAt >= startedAt ? offset(releasedAt) : nil
-      } else {
-        up = Self.rounded(down + estimate)
+      let down = downTimes[index]
+      // Filter downs and releases independently. A release belonging to a
+      // discarded pre-start down can still close a later logical press.
+      if down <= end, down >= 0 || index == lastPreStart {
+        edgesByCode[press.code, default: []].append(Edge(time: down, sample: snapshot.durations.count))
+        snapshot.durations.append(0)
+        if let previousDown { snapshot.spacings.append(Self.rounded(down - previousDown)) }
+        previousDown = max(0, down)
       }
-      snapshot.durations.append(up.map { Self.rounded(max(0, $0 - down)) } ?? 0)
-      if let previousDown { snapshot.spacings.append(Self.rounded(down - previousDown)) }
-      previousDown = max(0, down)
-      if let up, up > down {
-        endpoints.append((down, 1))
-        endpoints.append((up, -1))
+      let up = press.up.map(offset) ?? Self.rounded(down + estimate)
+      if up >= 0, up <= end || !postEndCodes.contains(press.code) {
+        edgesByCode[press.code, default: []].append(Edge(time: up, sample: nil))
       }
     }
 
-    // Integrate the portion covered by at least two intervals. This is a
-    // union, not the sum of pairwise intersections (which overcounts 3+ keys).
-    endpoints.sort { $0.time < $1.time }
+    // Resolve each physical code independently into logical presence spans.
+    // Rebinding a down changes the duration's sample owner, not when this code
+    // first became present. Unpaired logical downs keep their zero sample.
+    var endpoints: [(time: TimeInterval, change: Int)] = []
+    endpoints.reserveCapacity(presses.count * 2)
+    for var edges in edgesByCode.values {
+      edges.sort {
+        if $0.time != $1.time { return $0.time < $1.time }
+        return ($0.sample ?? -1) < ($1.sample ?? -1)
+      }
+      var owner: Edge?
+      var presentSince: TimeInterval?
+      for edge in edges {
+        if edge.sample != nil {
+          owner = edge
+          if presentSince == nil { presentSince = edge.time }
+        } else if let current = owner, let sample = current.sample, let since = presentSince {
+          snapshot.durations[sample] = Self.rounded(edge.time - current.time)
+          endpoints.append((since, 1))
+          endpoints.append((edge.time, -1))
+          owner = nil
+          presentSince = nil
+        }
+      }
+      // An open logical span participates in closed overlap episodes, but
+      // does not acquire a fabricated release at the test boundary.
+      if let presentSince { endpoints.append((presentSince, 1)) }
+    }
+
+    // Integrate closed concurrent-presence episodes, without counting pairs
+    // twice or including the final unclosed episode. End edges win ties here
+    // too: a handoff can close one episode and start another at the same tick.
+    endpoints.sort {
+      $0.time == $1.time ? $0.change < $1.change : $0.time < $1.time
+    }
     var held = 0
     var previousTime: TimeInterval?
+    var pendingOverlap: TimeInterval = 0
     for endpoint in endpoints {
-      if held >= 2, let previousTime { snapshot.overlap += endpoint.time - previousTime }
+      if held >= 2, let previousTime { pendingOverlap += endpoint.time - previousTime }
       held += endpoint.change
+      if held < 2 {
+        snapshot.overlap += pendingOverlap
+        pendingOverlap = 0
+      }
       previousTime = endpoint.time
     }
     snapshot.overlap = Self.rounded(snapshot.overlap)
