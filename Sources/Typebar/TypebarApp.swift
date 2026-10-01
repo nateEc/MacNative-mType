@@ -2908,20 +2908,17 @@ private struct ContentView: View {
     return rendering.characterOffset(forGlyphAt: paceGuideIndex)
   }
 
-  private var highlightedPromptIndices: Set<Int> {
-    let currentIndex = session.promptGlyphs.firstIndex { $0.state == .current }
-    return PromptHighlightPolicy.highlightedIndices(
-      in: session.prompt, currentTargetIndex: currentIndex, mode: effectivePromptHighlightMode,
-      allowsWordRanges: promptHighlightAllowsWordRanges)
-  }
-
   private var renderedPrompt: PromptRendering {
     var output = AttributedString()
     var glyphCharacterOffsets: [Int: Int] = [:]
     let completedCharacterIndices = session.completedPromptCharacterIndices
     let promptHighlightMode = effectivePromptHighlightMode
-    let highlightedIndices = highlightedPromptIndices
-    for (index, glyph) in session.promptGlyphs.enumerated() {
+    let glyphs = session.promptGlyphs
+    let appearances = PromptGlyphAppearance.plan(
+      glyphs: glyphs, words: session.promptWordPresentations,
+      mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,
+      typedEffect: settings.typedCharacterEffect)
+    for (index, glyph) in glyphs.enumerated() {
       glyphCharacterOffsets[index] = output.characters.count
       let replacesTypo = glyph.typedCharacter != nil && settings.typoIndicatorStyle.replacesTarget
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
@@ -2947,49 +2944,40 @@ private struct ContentView: View {
         output += character
         continue
       }
-      if promptHighlightMode.futureWordCount != nil,
-        highlightedIndices.contains(index),
-        glyph.state != .hidden
-      {
-        applyWordHighlight(to: &character)
-      }
       if !usesNativeCaretOverlay, index == paceGuideIndex, glyph.state != .current {
         applyPaceCaret(to: &character)
+      }
+      let appearance = appearances[index]
+      switch appearance.color {
+      case .completed: character.foregroundColor = completedPromptColor
+      case .future: character.foregroundColor = futurePromptColor
+      case .error: character.foregroundColor = errorFeedbackColor
+      case .extra: character.foregroundColor = extraInputFeedbackColor
+      case .hidden: character.foregroundColor = .clear
       }
       switch glyph.state {
       case .correct:
         switch settings.typedCharacterEffect {
-        case .keep:
-          character.foregroundColor = completedPromptColor
         case .hide where completedCharacterIndices.contains(index):
           character.foregroundColor = .clear
         case .fade where completedCharacterIndices.contains(index):
           character.foregroundColor = activeTheme.fadedText.opacity(0.24)
         case .dots where turnsIntoDot:
           character.foregroundColor = activeTheme.accent.opacity(0.74)
-        default:
-          character.foregroundColor = completedPromptColor
+        default: break
         }
-      case .incorrect:
-        character.foregroundColor = errorFeedbackColor
-        character.backgroundColor = errorFeedbackColor.opacity(0.16)
       case .current:
-        if promptHighlightMode == .off || !settings.caretStyle.drawsMarker || usesNativeCaretOverlay {
-          character.foregroundColor = futurePromptColor
-        } else {
+        if promptHighlightMode != .off && settings.caretStyle.drawsMarker && !usesNativeCaretOverlay {
           applyCaret(to: &character)
         }
-      case .pending:
-        character.foregroundColor = futurePromptColor
-      case .hidden:
-        character.foregroundColor = .clear
-      case .extra:
-        character.foregroundColor = extraInputFeedbackColor
-        character.backgroundColor = extraInputFeedbackColor.opacity(0.12)
-        character.strikethroughStyle = .single
+      case .incorrect, .pending, .hidden, .extra: break
+      }
+      if settings.typedCharacterEffect != .hide || !completedCharacterIndices.contains(index) {
+        appearance.applyErrorUnderline(to: &character, errorColor: errorFeedbackColor)
       }
       output += character
       if glyph.state == .incorrect,
+        appearance.color != .hidden,
         settings.typoIndicatorStyle.showsHint,
         let enteredCharacter = glyph.typedCharacter
       {
@@ -3065,10 +3053,6 @@ private struct ContentView: View {
     case .carrot, .banana, .monkey:
       character.foregroundColor = activeTheme.caret
     }
-  }
-
-  private func applyWordHighlight(to character: inout AttributedString) {
-    character.backgroundColor = activeTheme.accent.opacity(0.14)
   }
 
   private func applyPaceCaret(to character: inout AttributedString) {

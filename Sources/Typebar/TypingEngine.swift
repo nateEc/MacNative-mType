@@ -3520,6 +3520,9 @@ struct TypingSession {
   /// survives a later blind toggle, but is discarded when the word is reopened.
   /// It is not an input attempt, validation override, or persisted result field.
   private var blindCommittedMissingTargetIndices = Set<Int>()
+  /// A border is created only by an ordinary erroneous commit. Blind mode
+  /// masks an existing border, but cannot create one for a past blind word.
+  private var committedErrorWordStarts = Set<Int>()
   /// Input offsets for extra letters retained in a completed source word.
   /// They have no target character, but remain scoring errors after that word
   /// is submitted and the active input buffer becomes empty.
@@ -3740,6 +3743,56 @@ struct TypingSession {
       concealedCurrentAndFutureWords: hasStarted ? configuration.readAheadConcealedWordCount : nil,
       concealPendingCharacters: configuration.modifiers.contains(.simonSays)
     )
+  }
+
+  /// A linear snapshot of word ownership for presentation, including retained
+  /// no-space boundaries and extra letters that have no target position.
+  var promptWordPresentations: [TypingPromptWordPresentation] {
+    let isZen = configuration.mode == .zen
+    let characters = isZen ? Array(typed + " ") : promptCharacters
+    let usesHiddenBoundaries = !isZen && hasNoSpaceWordSegmentation
+    let ranges = usesHiddenBoundaries ? noSpaceWordRanges
+      : TypingPromptWordPresentation.ranges(in: characters)
+    let cursor = isZen ? typed.count : nextTargetIndex
+    var wordByTarget = Array(repeating: -1, count: characters.count)
+    for (word, range) in ranges.enumerated() {
+      for index in range where characters.indices.contains(index) { wordByTarget[index] = word }
+      if !usesHiddenBoundaries, characters.indices.contains(range.upperBound) {
+        wordByTarget[range.upperBound] = word
+      }
+    }
+    var inputErrors = Set<Int>()
+    var extraGlyphIndices = Array(repeating: [Int](), count: ranges.count)
+    if !isZen {
+      var owner = 0
+      var extraGlyphIndex = characters.count
+      for (typedIndex, character) in typed.enumerated() {
+        let targetIndex = typedTargetIndices.indices.contains(typedIndex)
+          ? typedTargetIndices[typedIndex] : nil
+        if let targetIndex, characters.indices.contains(targetIndex) {
+          owner = wordByTarget[targetIndex]
+          if character != characters[targetIndex] || forcedErrorIndices.contains(targetIndex) {
+            inputErrors.insert(owner)
+          }
+        } else {
+          if extraErrorTypedIndices.contains(typedIndex) { inputErrors.insert(owner) }
+          if !configuration.rules.blindMode, extraGlyphIndices.indices.contains(owner) {
+            extraGlyphIndices[owner].append(extraGlyphIndex)
+            extraGlyphIndex += 1
+          }
+        }
+      }
+    }
+    return ranges.enumerated().map { word, range in
+      let phase: TypingPromptWordPhase
+      if usesHiddenBoundaries ? range.upperBound <= cursor : range.upperBound < cursor {
+        phase = .committed
+      } else if range.lowerBound <= cursor { phase = .active }
+      else { phase = .future }
+      return .init(range: range, phase: phase, hasInputError: inputErrors.contains(word),
+        hasCommitError: committedErrorWordStarts.contains(range.lowerBound),
+        extraGlyphIndices: extraGlyphIndices[word])
+    }
   }
 
   /// Runtime blind-mode changes have their own active-session boundary.
@@ -4601,16 +4654,23 @@ struct TypingSession {
       clearCurrentWord(at: date)
       return false
     }
+    let commitErrorStart = ordinaryCommitErrorStart(for: inputCharacter, targetIndex: targetIndex)
     appendTypedCharacter(
       inputCharacter, targetIndex: targetIndex,
       forceError: forceError || earlyWordCommitTargetIndex != nil,
       countsAsExtraError: retainsCurrentWordAsExtra, at: date)
+    if let commitErrorStart { committedErrorWordStarts.insert(commitErrorStart) }
     if configuration.rules.blindMode, let commitIndex = earlyWordCommitTargetIndex {
       let end = isPromptWordSeparator(promptCharacters[commitIndex]) ? commitIndex : commitIndex + 1
       blindCommittedMissingTargetIndices.formUnion(currentTargetIndex..<end)
     }
     recordWordBurstIfCommitted()
     recordNoSpaceWordBurstIfCommitted()
+    if !configuration.rules.blindMode, committedNoSpaceWordHasError,
+      let word = noSpaceCommittedWordIndex, let range = noSpaceWordRange(for: word)
+    {
+      committedErrorWordStarts.insert(range.lowerBound)
+    }
 
     if evaluatesTerminalRules, configuration.difficulty == .master && !isCorrect {
       fail(at: date)
@@ -4637,6 +4697,22 @@ struct TypingSession {
     let roundedInterval = (interval * 100_000).rounded() / 100_000
     weakSpotInputSamples.append(
       .init(character: character, interval: roundedInterval, isCorrect: isCorrect))
+  }
+
+  private func ordinaryCommitErrorStart(for character: Character, targetIndex: Int?) -> Int? {
+    guard !configuration.rules.blindMode, !tracksNoSpaceWordBursts,
+      isPromptWordSeparator(character), let targetIndex,
+      promptCharacters.indices.contains(targetIndex),
+      isPromptWordSeparator(promptCharacters[targetIndex]) || targetIndex == promptCharacters.count - 1
+    else { return nil }
+    let start = promptCharacters[..<targetIndex].lastIndex(where: isPromptWordSeparator)
+      .map { $0 + 1 } ?? 0
+    let end = isPromptWordSeparator(promptCharacters[targetIndex]) ? targetIndex : targetIndex + 1
+    let input = String(typed.reversed().prefix { !isPromptWordSeparator($0) }.reversed())
+    let target = String(promptCharacters[start..<end])
+    let correct = input == target && promptCharacters[targetIndex] == character
+      && !(start..<end).contains { forcedErrorIndices.contains($0) }
+    return correct ? nil : start
   }
 
   private mutating func recordInputAttempt(
@@ -5127,7 +5203,7 @@ struct TypingSession {
     let typedIndex = typedGraphemeCount - 1
     let removedCharacter = typed.last
     let targetIndex = typedTargetIndices.popLast() ?? nil
-    if !blindCommittedMissingTargetIndices.isEmpty,
+    if !blindCommittedMissingTargetIndices.isEmpty || !committedErrorWordStarts.isEmpty,
       removedCharacter.map(isPromptWordSeparator) == true, let targetIndex,
       promptCharacters.indices.contains(targetIndex)
     {
@@ -5135,7 +5211,12 @@ struct TypingSession {
         .map { $0 + 1 } ?? 0
       let end = isPromptWordSeparator(promptCharacters[targetIndex]) ? targetIndex : targetIndex + 1
       for index in start..<end { blindCommittedMissingTargetIndices.remove(index) }
+      committedErrorWordStarts.remove(start)
     }
+    if tracksNoSpaceWordBursts, let targetIndex,
+      let word = noSpaceWordEndIndices.firstIndex(of: targetIndex + 1),
+      let range = noSpaceWordRange(for: word)
+    { committedErrorWordStarts.remove(range.lowerBound) }
     if canUseCachedWordProgress, let targetIndex,
       promptCharacters.indices.contains(targetIndex),
       isPromptWordSeparator(promptCharacters[targetIndex]),
