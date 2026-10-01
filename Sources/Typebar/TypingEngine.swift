@@ -3894,14 +3894,15 @@ struct TypingSession {
       return TypingPromptPresentation.zenGlyphs(
         typed: typed, isFinished: isFinished, blindMode: configuration.rules.blindMode)
     }
+    let presentation = promptPresentationInput
     return TypingPromptPresentation.glyphs(
       target: prompt,
       typed: typed,
       isFinished: isFinished,
       blindMode: configuration.rules.blindMode,
-      forcedErrorIndices: forcedErrorIndices,
+      forcedErrorIndices: presentation.forcedErrors,
       blindCommittedMissingTargetIndices: blindCommittedMissingTargetIndices,
-      typedTargetIndices: typedTargetIndices,
+      typedTargetIndices: presentation.targets,
       currentTargetIndex: nextTargetIndex,
       hideExtraLetters: configuration.rules.hideExtraLetters,
       visibleFutureWords: usesWordCommitInput
@@ -3910,6 +3911,37 @@ struct TypingSession {
       concealedCurrentAndFutureWords: hasStarted ? configuration.readAheadConcealedWordCount : nil,
       concealPendingCharacters: configuration.modifiers.contains(.simonSays)
     )
+  }
+
+  /// Rendering can match a correct retained newline to its glyph without
+  /// changing the engine's navigation cursor. A later commit at that same
+  /// target is extra input, not a retroactive error on the first correct LF.
+  private var promptPresentationInput: (targets: [Int?], forcedErrors: Set<Int>, extraErrors: Set<Int>) {
+    guard !retainedWordSeparatorTypedIndices.isEmpty else {
+      return (typedTargetIndices, forcedErrorIndices, extraErrorTypedIndices)
+    }
+    var targets = typedTargetIndices
+    var forcedErrors = forcedErrorIndices
+    var extraErrors = extraErrorTypedIndices
+    var retainedTargets = Set<Int>()
+    var cursor = 0
+    for (index, character) in typed.enumerated() where targets.indices.contains(index) {
+      if let target = typedTargetIndices[index] {
+        if retainedTargets.contains(target) {
+          targets[index] = nil
+          if forcedErrorIndices.contains(target) { extraErrors.insert(index) }
+        }
+        cursor = target + 1
+      } else if character == "\n", retainedWordSeparatorTypedIndices.contains(index),
+        !extraErrorTypedIndices.contains(index), promptCharacters.indices.contains(cursor),
+        character == promptCharacters[cursor]
+      {
+        targets[index] = cursor
+        retainedTargets.insert(cursor)
+        forcedErrors.remove(cursor)
+      }
+    }
+    return (targets, forcedErrors, extraErrors)
   }
 
   var promptGlyphsInDisplayOrder: [TypingPromptGlyph] {
@@ -3938,27 +3970,30 @@ struct TypingSession {
     var inputErrors = Set<Int>()
     var extraGlyphIndices = Array(repeating: [Int](), count: ranges.count)
     if !isZen {
+      let presentation = promptPresentationInput
       var owner = 0
       var targetCursor = 0
       var extraGlyphIndex = characters.count
       for (typedIndex, character) in typed.enumerated() {
-        let targetIndex = typedTargetIndices.indices.contains(typedIndex)
-          ? typedTargetIndices[typedIndex] : nil
+        let targetIndex = presentation.targets.indices.contains(typedIndex)
+          ? presentation.targets[typedIndex] : nil
         if let targetIndex, characters.indices.contains(targetIndex) {
           owner = wordByTarget[targetIndex]
-          targetCursor = targetIndex + 1
-          if character != characters[targetIndex] || forcedErrorIndices.contains(targetIndex) {
+          if character != characters[targetIndex] || presentation.forcedErrors.contains(targetIndex) {
             inputErrors.insert(owner)
           }
         } else {
           // Extra input belongs to the field awaiting the next target, not
           // necessarily the word owning the previous committed separator.
           if wordByTarget.indices.contains(targetCursor) { owner = wordByTarget[targetCursor] }
-          if extraErrorTypedIndices.contains(typedIndex) { inputErrors.insert(owner) }
+          if presentation.extraErrors.contains(typedIndex) { inputErrors.insert(owner) }
           if !configuration.rules.blindMode, extraGlyphIndices.indices.contains(owner) {
             extraGlyphIndices[owner].append(extraGlyphIndex)
             extraGlyphIndex += 1
           }
+        }
+        if typedTargetIndices.indices.contains(typedIndex), let actualTarget = typedTargetIndices[typedIndex] {
+          targetCursor = actualTarget + 1
         }
       }
     }
@@ -4319,8 +4354,19 @@ struct TypingSession {
     let historicalAttemptedCount = attemptedErrors.indices.last(where: { attemptedErrors[$0] > 0 })
       .map { $0 + 1 } ?? 0
     let attemptedCount = max(finalAttemptedCount, historicalAttemptedCount)
+    // Review targets omit source commit characters. A single retained LF in
+    // the active blank field matches its source commit, not an extra letter.
+    // A real second commit has already been removed by retainedInputWords;
+    // its surviving LF must remain visible as an incorrect extra instead.
+    let retainsBlankReviewCommit = !lastInputCommitsWord
+      && nextTargetIndex < promptCharacters.count && promptCharacters[nextTargetIndex] == "\n"
     return (0..<min(attemptedCount, targetWords.count)).map {
-      let typedWord = $0 < typedWords.count ? typedWords[$0] : ""
+      var typedWord = $0 < typedWords.count ? typedWords[$0] : ""
+      if retainsBlankReviewCommit, $0 == typedWords.count - 1,
+        targetWords[$0].isEmpty, typedWord == "\n"
+      {
+        typedWord = ""
+      }
       return TypedWordReview(
         index: $0, target: targetWords[$0], typed: typedWord,
         hasInputError: typedWord == targetWords[$0]
@@ -4402,6 +4448,13 @@ struct TypingSession {
     let targetCharacters = promptCharacters
     let committed = canUseCachedWordProgress
       ? cachedCommittedWordCount : scannedCommittedWordCount
+    if outcome == .completed, isAtFinalBlankTarget,
+      retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
+    {
+      // Finishing a matching final blank is independent of navigation: its
+      // retained LF completes one word without becoming a submitted separator.
+      return committed + 1
+    }
     if outcome == .completed, configuration.mode == .custom,
       configuration.customTextCompletion == .words,
       let lastTyped = typed.last, !isPromptWordSeparator(lastTyped)
@@ -4781,12 +4834,16 @@ struct TypingSession {
       character,
       expected: currentTargetIndex < promptCharacters.count ? promptCharacters[currentTargetIndex] : nil)
     let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !inputWordIsEmpty
+    let retainsLeadingSeparator = isPromptWordSeparator(inputCharacter) && inputWordIsEmpty
+      && usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+      && (configuration.rules.strictSpace || configuration.difficulty != .normal)
     // Ignore an ordinary leading space before word-stop can retain it.
     // Strict space and expert/master instead keep it in the current field.
     if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator,
       currentTargetIndex < promptCharacters.count,
       promptCharacters[currentTargetIndex] != " " { return false }
     let retainsStoppedSeparator = configuration.rules.stopOnErrorMode == .word
+      && !retainsLeadingSeparator
       && usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       && isPromptWordSeparator(inputCharacter) && !currentWordIsCorrect
     if let inputLimit = currentSpaceDelimitedWordInputLimit,
@@ -4832,11 +4889,18 @@ struct TypingSession {
       inputCharacter, expected: expected)
     let earlyWordCommitTargetIndex = incompleteWordCommitTargetIndex(
       for: inputCharacter, currentTargetIndex: currentTargetIndex)
-    let targetIndex = retainsCurrentWordAsExtra
+    // A separator-only target has no interior cursor position to consume
+    // while navigation is blocked. Nonempty words still consume their first
+    // character, so the next comparison stays at its word-local position.
+    let retainsEmptySlot = retainsLeadingSeparator && isPromptWordSeparator(expected)
+    let targetIndex = retainsCurrentWordAsExtra || retainsEmptySlot
       ? nil : earlyWordCommitTargetIndex ?? currentTargetIndex
-    let isCorrect = !retainsCurrentWordAsExtra && inputCharacter == expected && !forceError
     let accuracyUnits = inputAccuracyUnits(
       for: inputCharacter, targetIndex: currentTargetIndex, forceError: forceError)
+    let followsRetainedLeadingSeparator = !retainedWordSeparatorTypedIndices.isEmpty
+      && inputWordText().first.map(isPromptWordSeparator) == true
+    let isCorrect = !retainsCurrentWordAsExtra && inputCharacter == expected && !forceError
+      && (!followsRetainedLeadingSeparator || accuracyUnits.lastCorrect)
     recordInputAttempt(inputCharacter, correctUnits: accuracyUnits.correct,
       lastUnitCorrect: accuracyUnits.lastCorrect)
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
@@ -4891,10 +4955,12 @@ struct TypingSession {
       return false
     }
     let commitErrorStart = ordinaryCommitErrorStart(for: inputCharacter, targetIndex: targetIndex)
+    if retainsLeadingSeparator { retainedWordSeparatorTypedIndices.insert(typedGraphemeCount) }
     appendTypedCharacter(
       inputCharacter, targetIndex: targetIndex,
-      forceError: forceError || earlyWordCommitTargetIndex != nil,
-      countsAsExtraError: retainsCurrentWordAsExtra, at: date)
+      forceError: forceError || earlyWordCommitTargetIndex != nil
+        || (followsRetainedLeadingSeparator && !isCorrect && inputCharacter == expected),
+      countsAsExtraError: retainsCurrentWordAsExtra || (retainsEmptySlot && !isCorrect), at: date)
     if let commitErrorStart { committedErrorWordStarts.insert(commitErrorStart) }
     if configuration.rules.blindMode, let commitIndex = earlyWordCommitTargetIndex {
       let end = isPromptWordSeparator(promptCharacters[commitIndex]) ? commitIndex : commitIndex + 1
@@ -5222,7 +5288,7 @@ struct TypingSession {
     } else if tracksNoSpaceWordBursts {
       commitsWord = noSpaceCommittedWordIndex != nil
     } else {
-      commitsWord = isPromptWordSeparator(character) && usesWordCommitInput
+      commitsWord = lastInputCommitsWord && isPromptWordSeparator(character) && usesWordCommitInput
         && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     }
     // Monkeytype computes minBurst only after goToNextWord has actually
@@ -5993,6 +6059,15 @@ struct TypingSession {
     guard usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return reachedTargetEnd }
+    // A final newline-only word can match its complete target without word
+    // navigation. Strict space/difficulty retain that first LF; correctness
+    // (or permitted quick-end) still finishes the last generated word.
+    if isAtFinalBlankTarget, !usesIncrementalPromptExtension {
+      let input = inputWordText()
+      if input == "\n", lastInputWasCorrect == true { return true }
+      if configuration.rules.quickEnd, !configuration.rules.stopOnError,
+        !configuration.rules.deleteOnError, input.utf16.count == 1 { return true }
+    }
     if reachedTargetEnd,
       currentWordIsCorrect || lastInputCommitsWord { return true }
     // UTF-16 length can match before the grapheme cursor reaches target end.
@@ -6008,6 +6083,13 @@ struct TypingSession {
       let targetWord = splitPromptWords(prompt, omittingEmptySubsequences: true).last
     else { return false }
     return typedWord.utf16.count == targetWord.utf16.count
+  }
+
+  private var isAtFinalBlankTarget: Bool {
+    guard let last = promptCharacters.indices.last,
+      nextTargetIndex == last, promptCharacters[last] == "\n"
+    else { return false }
+    return last == 0 || isPromptWordSeparator(promptCharacters[last - 1])
   }
 
   /// The correct final word needs to retain its original preceding commit
