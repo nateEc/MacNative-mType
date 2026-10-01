@@ -161,6 +161,70 @@ final class HealthRouteTests: XCTestCase {
     }
   }
 
+  func testFailedPersistenceDoesNotCommitAnAccountOnlyInMemory() async throws {
+    let blocker = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-store-write-failure-\(UUID().uuidString)")
+    try Data("not a directory".utf8).write(to: blocker)
+    let fileURL = blocker.appendingPathComponent("state.json")
+    defer { try? FileManager.default.removeItem(at: blocker) }
+
+    let store = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    let request = RegisterRequest(
+      email: "rollback@example.com", password: "a secure password", displayName: "Rollback")
+    for _ in 0..<2 {
+      do {
+        _ = try await store.register(request)
+        XCTFail("A blocked state file must reject registration")
+      } catch {
+        XCTAssertNotEqual(error as? AuthStoreError, .emailAlreadyRegistered)
+      }
+    }
+
+    try FileManager.default.removeItem(at: blocker)
+    try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: false)
+    _ = try await store.register(request)
+    let reloaded = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    _ = try await reloaded.login(
+      .init(email: "rollback@example.com", password: "a secure password"))
+    let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+    XCTAssertEqual(attributes[.posixPermissions] as? Int, 0o600)
+  }
+
+  func testFailedPersistenceRetainsPreviouslyCommittedAccounts() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "typebar-store-existing-state-\(UUID().uuidString)")
+    let dataDirectory = root.appendingPathComponent("data")
+    let savedDirectory = root.appendingPathComponent("saved")
+    let fileURL = dataDirectory.appendingPathComponent("state.json")
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let store = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    _ = try await store.register(.init(
+      email: "first@example.com", password: "a secure password", displayName: "First"))
+    try FileManager.default.moveItem(at: dataDirectory, to: savedDirectory)
+    try Data("not a directory".utf8).write(to: dataDirectory)
+
+    let second = RegisterRequest(
+      email: "second@example.com", password: "a secure password", displayName: "Second")
+    do {
+      _ = try await store.register(second)
+      XCTFail("A blocked state file must reject the second registration")
+    } catch {
+      XCTAssertNotEqual(error as? AuthStoreError, .emailAlreadyRegistered)
+    }
+
+    try FileManager.default.removeItem(at: dataDirectory)
+    try FileManager.default.moveItem(at: savedDirectory, to: dataDirectory)
+    _ = try await store.login(.init(
+      email: "first@example.com", password: "a secure password"))
+    _ = try await store.register(second)
+    let reloaded = try AuthStore(fileURL: fileURL, bcryptCost: 4)
+    _ = try await reloaded.login(.init(
+      email: "first@example.com", password: "a secure password"))
+    _ = try await reloaded.login(.init(
+      email: "second@example.com", password: "a secure password"))
+  }
+
   func testConfiguredHumanVerificationRejectsMissingAndReplayedRegistrationProofs() async throws {
     let app = try await Application.make(.testing)
     let humanVerification = HumanVerificationController(

@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Vapor
 
@@ -1151,6 +1152,7 @@ public actor AuthStore {
   }
 
   private var state: PersistedState
+  private var committedState: PersistedState
   private let fileURL: URL?
   private let bcryptCost: Int
   private let minimumLeaderboardTypingSeconds: Int
@@ -1166,10 +1168,12 @@ public actor AuthStore {
     self.minimumLeaderboardTypingSeconds = minimumLeaderboardTypingSeconds
     guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
       state = .init()
+      committedState = state
       return
     }
     state = try JSONDecoder.server.decode(PersistedState.self, from: Data(contentsOf: fileURL))
     state.notifications = Self.cappedNotifications(state.notifications)
+    committedState = state
   }
 
   private static func cappedNotifications(_ notifications: [StoredNotification])
@@ -3803,11 +3807,46 @@ public actor AuthStore {
   }
 
   private func persist() throws {
-    guard let fileURL else { return }
+    guard let fileURL else {
+      committedState = state
+      return
+    }
     let directory = fileURL.deletingLastPathComponent()
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    try JSONEncoder.server.encode(state).write(to: fileURL, options: .atomic)
-    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+    let temporaryURL = directory.appendingPathComponent(
+      ".\(fileURL.lastPathComponent).\(UUID().uuidString).tmp")
+    do {
+      let data = try JSONEncoder.server.encode(state)
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      guard FileManager.default.createFile(
+        atPath: temporaryURL.path, contents: nil,
+        attributes: [.posixPermissions: 0o600])
+      else { throw POSIXError(.EIO) }
+      defer { try? FileManager.default.removeItem(at: temporaryURL) }
+
+      let handle = try FileHandle(forWritingTo: temporaryURL)
+      do {
+        try handle.write(contentsOf: data)
+        try handle.synchronize()
+        try handle.close()
+      } catch {
+        try? handle.close()
+        throw error
+      }
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o600], ofItemAtPath: temporaryURL.path)
+      let renamed = temporaryURL.path.withCString { source in
+        fileURL.path.withCString { destination in Darwin.rename(source, destination) }
+      }
+      guard renamed == 0 else {
+        throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+      }
+      // Rename is the commit point. Nothing after it may throw while the
+      // actor still reports the operation as failed.
+      committedState = state
+    } catch {
+      state = committedState
+      throw error
+    }
   }
 
   private func validatedEmail(_ value: String) throws -> String {
