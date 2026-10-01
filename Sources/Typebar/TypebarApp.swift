@@ -2523,7 +2523,14 @@ private struct ContentView: View {
         onCompositionStarted: {
           if activeChallengeID != "mouse-warrior" { session.beginComposition() }
         },
-        onCompositionChanged: { compositionText = $0 },
+        onCompositionChanged: {
+          let hadMarkedText = !compositionText.isEmpty
+          compositionText = $0
+          if activeChallengeID != "mouse-warrior" {
+            session.refreshLiveAccuracyAfterComposition(
+              hadMarkedText: hadMarkedText, hasMarkedText: !$0.isEmpty)
+          }
+        },
         shouldFinishWithComposition: { text, forceError in
           activeChallengeID != "mouse-warrior"
             && session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
@@ -3061,6 +3068,8 @@ private struct ContentView: View {
 
   private var stats: some View {
     let now = Date.now
+    let live = LiveTypingMetrics(
+      session: session, at: now, blindMode: settings.blindMode, unit: settings.typingSpeedUnit)
     let progressStyle = settings.liveProgressStyle
     let isProgressFlashHidden = !progressStyle.showsProgressValue(
       isTimed: session.configuration.duration != nil,
@@ -3069,18 +3078,15 @@ private struct ContentView: View {
     return HStack(spacing: 0) {
       metric(
         settings.typingSpeedUnit.displayName,
-        value: settings.typingSpeedUnit.formatted(
-          wpm: session.wpm(at: .now)), style: settings.liveSpeedStyle, usesLiveAppearance: true)
+        value: live.speed, style: settings.liveSpeedStyle, usesLiveAppearance: true)
       metric(
         "Raw \(settings.typingSpeedUnit.displayName)",
-        value: settings.typingSpeedUnit.formatted(
-          wpm: session.rawWpm(at: .now)), style: settings.liveSpeedStyle, usesLiveAppearance: true)
+        value: live.rawSpeed, style: settings.liveSpeedStyle, usesLiveAppearance: true)
       metric(
         "Burst \(settings.typingSpeedUnit.displayName)",
-        value: settings.typingSpeedUnit.formatted(
-          wpm: session.burstWpm), style: settings.liveBurstStyle, usesLiveAppearance: true)
+        value: live.burst, style: settings.liveBurstStyle, usesLiveAppearance: true)
       metric(
-        "准确率", value: "\(session.accuracy)%", style: settings.liveAccuracyStyle,
+        "准确率", value: live.accuracy, style: settings.liveAccuracyStyle,
         usesLiveAppearance: true)
       if progressStyle == .bar {
         progressMetricBar
@@ -3096,7 +3102,7 @@ private struct ContentView: View {
       if let sections = session.sectionProgress {
         metric("段落", value: "\(sections.completed)/\(sections.total)")
       }
-      metric("错误", value: "\(session.errors)")
+      if let errorCount = live.errorCount { metric("错误", value: "\(errorCount)") }
     }
     .background(activeTheme.panel, in: RoundedRectangle(cornerRadius: 16))
     .overlay(alignment: .bottomLeading) {

@@ -3522,6 +3522,9 @@ struct TypingSession {
   /// Accuracy is an input-event metric. Unlike the rendered input, it keeps
   /// an incorrect attempt after the user deletes and corrects that character.
   private var inputAttemptCount = 0
+  /// Input/deletion/composition UI publishes hundredths, but a real-second
+  /// timer update publishes the unrounded live cache. Neither alters scoring.
+  private var roundsLiveAccuracyForInputDisplay = true
   private(set) var hasAcceptedVirtualKeyboardInput = false
   private var hasAcceptedPhysicalKeyboardInput = false
   private var hasPhysicalKeyboardActivityDuringAttempt = false
@@ -3854,6 +3857,12 @@ struct TypingSession {
   var preciseAccuracy: Double {
     let percentage = inputAttemptCount == 0 && isFinished ? 0 : liveAccuracy * 100
     return isFinished ? ((percentage + Double.ulpOfOne) * 100).rounded() / 100 : percentage
+  }
+
+  var liveAccuracyForDisplay: Double {
+    let percentage = liveAccuracy * 100
+    return roundsLiveAccuracyForInputDisplay
+      ? ((percentage + Double.ulpOfOne) * 100).rounded() / 100 : percentage
   }
 
   func wpm(at date: Date) -> Int {
@@ -4202,6 +4211,13 @@ struct TypingSession {
     guard !isFinished else { return }
     beginIfNeeded(at: date)
     recordKeyboardActivity(at: date)
+    roundsLiveAccuracyForInputDisplay = true
+  }
+
+  /// Candidate changes refresh display only: marked text never adds attempts.
+  mutating func refreshLiveAccuracyAfterComposition(hadMarkedText: Bool, hasMarkedText: Bool) {
+    guard !isFinished, hadMarkedText || hasMarkedText else { return }
+    roundsLiveAccuracyForInputDisplay = true
   }
 
   private mutating func insertText(
@@ -4256,6 +4272,7 @@ struct TypingSession {
       // activity, but it has no insertText event for the trailing AFK check.
       if inputAttemptCount > attemptsBeforeEvent { insertionActivityDates.append(date) }
     }
+    if inputAttemptCount > attemptsBeforeEvent { roundsLiveAccuracyForInputDisplay = true }
     if usesIncrementalPromptExtension,
       (!configuration.language.usesSpaceDelimitedWords
         || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)),
@@ -4278,6 +4295,7 @@ struct TypingSession {
     recordKeyboardActivity(at: date)
     guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
+    roundsLiveAccuracyForInputDisplay = true
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
       removeCodeIndentationBeforeLine(at: date)
     {
@@ -4295,6 +4313,7 @@ struct TypingSession {
     recordKeyboardActivity(at: date)
     guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
+    roundsLiveAccuracyForInputDisplay = true
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
       removeCodeIndentationBeforeLine(at: date, deletesWholeIndent: true)
     {
@@ -4335,6 +4354,7 @@ struct TypingSession {
   mutating func replaceInput(with value: String, at date: Date = .now) {
     guard !isFinished else { return }
     if value.count < typed.count {
+      roundsLiveAccuracyForInputDisplay = true
       while typed.count > value.count { removeLastTypedCharacter() }
       return
     }
@@ -4352,6 +4372,7 @@ struct TypingSession {
   /// is intentionally deferred until the fifth active word; accuracy is not.
   mutating func enforceLivePracticeThresholds(at date: Date = .now) {
     guard !isFinished, startedAt != nil else { return }
+    roundsLiveAccuracyForInputDisplay = false
     guard let reason = livePracticeThresholdFailure(at: date) else { return }
     fail(at: date, reason: reason)
   }
