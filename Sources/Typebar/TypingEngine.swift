@@ -4600,7 +4600,7 @@ struct TypingSession {
       expected: currentTargetIndex < promptCharacters.count ? promptCharacters[currentTargetIndex] : nil)
     let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !inputWordIsEmpty
     if let inputLimit = currentSpaceDelimitedWordInputLimit,
-      activeInputWordLength >= inputLimit, !commitsCurrentWord
+      activeInputWordUTF16Length >= inputLimit, !commitsCurrentWord
     {
       return false
     }
@@ -5137,12 +5137,14 @@ struct TypingSession {
       && !inputWordIsEmpty
   }
 
-  private var activeInputWordLength: Int {
-    typed.reversed().prefix { !isPromptWordSeparator($0) }.count
+  private var activeInputWordUTF16Length: Int {
+    typed.reversed().prefix { !isPromptWordSeparator($0) }.reduce(0) {
+      $0 + String($1).utf16.count
+    }
   }
 
   /// Mirrors the reference guard of the current word, including its visible
-  /// commit separator when one exists, plus twenty tolerated extra letters.
+  /// commit separator when one exists, plus twenty extra UTF-16 units.
   private var currentSpaceDelimitedWordInputLimit: Int? {
     guard configuration.mode != .zen,
       configuration.language.usesSpaceDelimitedWords,
@@ -5155,7 +5157,8 @@ struct TypingSession {
       .map { $0 + 1 } ?? 0
     let wordEnd = targetCharacters[targetIndex...].firstIndex(where: isPromptWordSeparator)
       ?? targetCharacters.count
-    let targetLength = wordEnd - wordStart + (wordEnd < targetCharacters.count ? 1 : 0)
+    let endWithCommit = wordEnd < targetCharacters.count ? wordEnd + 1 : wordEnd
+    let targetLength = String(targetCharacters[wordStart..<endWithCommit]).utf16.count
     return targetLength + 20
   }
 
@@ -5730,26 +5733,33 @@ struct TypingSession {
       configuration.rules.quickEnd
       && !configuration.rules.stopOnError
       && !configuration.rules.deleteOnError
-    return allowsQuickEnd && typedWords[wordLimit - 1].count == targetWords[wordLimit - 1].count
+    return allowsQuickEnd
+      && typedWords[wordLimit - 1].utf16.count == targetWords[wordLimit - 1].utf16.count
   }
 
   /// Finite quotes and custom text use the same final-word rule as regular
   /// word tests: an incorrect word remains editable until its separator is
   /// entered, unless the optional quick-end rule explicitly applies.
   private var shouldFinishFiniteSpaceDelimitedTest: Bool {
-    guard nextTargetIndex >= promptCharacters.count else { return false }
+    let reachedTargetEnd = nextTargetIndex >= promptCharacters.count
     guard configuration.language.usesSpaceDelimitedWords,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
-    else { return true }
-    if currentWordIsCorrect || typed.last.map(isPromptWordSeparator) == true { return true }
-    guard configuration.rules.quickEnd,
+    else { return reachedTargetEnd }
+    if reachedTargetEnd,
+      currentWordIsCorrect || typed.last.map(isPromptWordSeparator) == true { return true }
+    // UTF-16 length can match before the grapheme cursor reaches target end.
+    // A finite stream edge is not its final word while another chunk remains.
+    let finalWordStart = promptCharacters.lastIndex(where: isPromptWordSeparator)
+      .map { $0 + 1 } ?? 0
+    guard nextTargetIndex >= finalWordStart, !usesIncrementalPromptExtension,
+      configuration.rules.quickEnd,
       !configuration.rules.stopOnError,
       !configuration.rules.deleteOnError
     else { return false }
     guard let typedWord = splitPromptWords(typed, omittingEmptySubsequences: false).last,
       let targetWord = splitPromptWords(prompt, omittingEmptySubsequences: true).last
     else { return false }
-    return typedWord.count == targetWord.count
+    return typedWord.utf16.count == targetWord.utf16.count
   }
 
   /// The correct final word needs to retain its original preceding commit

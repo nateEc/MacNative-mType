@@ -189,7 +189,7 @@
 | `stopOnError` | `stopOnErrorMode` | 已映射；使用明确的 off/word/letter 模式。 |
 | `deleteOnError` | `deleteOnErrorMode` | 已映射；四档及 off 活动同步，只在下一次错误恢复，不追溯清理；开启关闭信心和停止输入并同步旧布尔别名。 |
 | `confidenceMode` | `confidenceMode` | 已映射；off／on／max 活动同步，开启关闭自由回退、停止输入和自动删除，不恢复旧规则。 |
-| `quickEnd` | `quickEnd` | 已映射；活动同步不直接结束，下一次真实输入才判定，错误恢复限制与错误候选不自动确认的边界保留。完整 UTF-16 终词长度仍待补证。 |
+| `quickEnd` | `quickEnd` | 已映射；活动同步不直接结束。普通有限路径的最终词长度与前置词输入上限改用 UTF-16，保留最终词／全部生成、错误恢复限制和候选不误确认的边界，20 项新增覆盖。代码／无空格专用完成及完整 Unicode 恢复仍待单独补证。 |
 | `indicateTypos` | `typoIndicatorStyle` | 已映射。 |
 | `compositionDisplay` | `compositionDisplayStyle` | 已映射。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |
