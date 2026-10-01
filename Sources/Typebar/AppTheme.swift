@@ -295,6 +295,24 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case nebula
     case olive
     case strawberry
+    case blue_dolphin
+    case earthsong
+    case fleuriste
+    case froyo
+    case fruit_chew
+    case hedge
+    case lilac_mist
+    case lime
+    case luna
+    case matcha_moccha
+    case menthol
+    case mizu
+    case nautilus
+    case peach_blossom
+    case peaches
+    case tangerine
+    case tiramisu
+    case terra
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -309,16 +327,18 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         let accent: Color
         let text: Color?
         let secondaryText: Color?
+        let error: Color?
         let colorScheme: ColorScheme
     }
 
     private static func palette(
         _ background: UInt32, _ panel: UInt32, _ accent: UInt32,
-        _ text: UInt32, _ secondaryText: UInt32, light: Bool
+        _ text: UInt32, _ secondaryText: UInt32, light: Bool, error: UInt32? = nil
     ) -> Palette {
         .init(
             background: rgb(background), panel: rgb(panel), accent: rgb(accent),
             text: rgb(text), secondaryText: rgb(secondaryText),
+            error: error.map(rgb),
             colorScheme: light ? .light : .dark)
     }
 
@@ -356,6 +376,24 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .nebula: "星云 · Typebar"
         case .olive: "橄榄 · Typebar"
         case .strawberry: "草莓 · Typebar"
+        case .blue_dolphin: "海豚蓝 · Typebar"
+        case .earthsong: "大地之歌 · Typebar"
+        case .fleuriste: "花店 · Typebar"
+        case .froyo: "冻酸奶 · Typebar"
+        case .fruit_chew: "果糖 · Typebar"
+        case .hedge: "绿篱 · Typebar"
+        case .lilac_mist: "丁香雾 · Typebar"
+        case .lime: "青柠 · Typebar"
+        case .luna: "月夜 · Typebar"
+        case .matcha_moccha: "抹茶摩卡 · Typebar"
+        case .menthol: "薄荷冰 · Typebar"
+        case .mizu: "水蓝 · Typebar"
+        case .nautilus: "鹦鹉螺 · Typebar"
+        case .peach_blossom: "桃花 · Typebar"
+        case .peaches: "蜜桃 · Typebar"
+        case .tangerine: "橘瓣 · Typebar"
+        case .tiramisu: "提拉米苏 · Typebar"
+        case .terra: "陶土 · Typebar"
         }
     }
 
@@ -380,7 +418,7 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         return .init(
             background: colors.background, panel: colors.panel, accent: colors.accent,
             colorScheme: colors.colorScheme, text: colors.text,
-            secondaryText: colors.secondaryText)
+            secondaryText: colors.secondaryText, error: colors.error, extraInput: colors.error)
     }
 
     private var palette: Palette {
@@ -390,19 +428,19 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
                 background: Color(red: 0.96, green: 0.95, blue: 0.91),
                 panel: Color(red: 0.88, green: 0.86, blue: 0.80),
                 accent: Color(red: 0.66, green: 0.28, blue: 0.14),
-                text: nil, secondaryText: nil, colorScheme: .light)
+                text: nil, secondaryText: nil, error: nil, colorScheme: .light)
         case .midnight:
             .init(
                 background: Color(red: 0.07, green: 0.09, blue: 0.13),
                 panel: Color(red: 0.13, green: 0.16, blue: 0.22),
                 accent: Color(red: 0.38, green: 0.73, blue: 1.00),
-                text: nil, secondaryText: nil, colorScheme: .dark)
+                text: nil, secondaryText: nil, error: nil, colorScheme: .dark)
         case .grove:
             .init(
                 background: Color(red: 0.09, green: 0.16, blue: 0.13),
                 panel: Color(red: 0.14, green: 0.25, blue: 0.19),
                 accent: Color(red: 0.48, green: 0.78, blue: 0.52),
-                text: nil, secondaryText: nil, colorScheme: .dark)
+                text: nil, secondaryText: nil, error: nil, colorScheme: .dark)
         case .aurora:
             Self.palette(0x10272C, 0x1E3C41, 0xB8D98B, 0xEDF3E8, 0xB7CFCC, light: false)
         case .beach:
@@ -461,6 +499,42 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x282D20, 0x3D4930, 0xD4CF89, 0xF2F1E4, 0xC9CEB4, light: false)
         case .strawberry:
             Self.palette(0xFBEDEF, 0xF1D5DB, 0x9C3D57, 0x472B35, 0x6B4A55, light: true)
+        case .blue_dolphin:
+            Self.palette(0xC4E4EC, 0xADD0DA, 0x185A76, 0x133244, 0x345661, light: true, error: 0x942C41)
+        case .earthsong:
+            Self.palette(0x32312C, 0x4A4E39, 0xD5C197, 0xF3F0DD, 0xCBD1B5, light: false, error: 0xF3A899)
+        case .fleuriste:
+            Self.palette(0xE6EDDA, 0xCFDDBB, 0x85365C, 0x303E32, 0x445A45, light: true, error: 0x942C41)
+        case .froyo:
+            Self.palette(0xF7E6EB, 0xEACCD5, 0x476B72, 0x3E2D38, 0x684656, light: true, error: 0x942C41)
+        case .fruit_chew:
+            Self.palette(0xEFBBC2, 0xDEA0AD, 0x6A284A, 0x3E2932, 0x513443, light: true, error: 0x942C41)
+        case .hedge:
+            Self.palette(0x22332D, 0x354A3B, 0xD0DAB4, 0xEDF2DF, 0xC3D1BC, light: false, error: 0xF3A899)
+        case .lilac_mist:
+            Self.palette(0xDEE0F0, 0xC6C9E2, 0x65518F, 0x2C3457, 0x484C70, light: true, error: 0x942C41)
+        case .lime:
+            Self.palette(0x26321D, 0x455339, 0xD6EE8D, 0xF0F5D9, 0xCDD7AF, light: false, error: 0xF3A899)
+        case .luna:
+            Self.palette(0x303044, 0x48475E, 0xBDD7EA, 0xF1F0F8, 0xCCD0E1, light: false, error: 0xF3A899)
+        case .matcha_moccha:
+            Self.palette(0x334132, 0x49583F, 0xE5C188, 0xF1EFDA, 0xD7D9BC, light: false, error: 0xF3A899)
+        case .menthol:
+            Self.palette(0xD2EEE9, 0xB4DCD1, 0x216B67, 0x173C3A, 0x335C55, light: true, error: 0x942C41)
+        case .mizu:
+            Self.palette(0x193C50, 0x29566C, 0xEDBE90, 0xEDF5F2, 0xBFD7DD, light: false, error: 0xF3A899)
+        case .nautilus:
+            Self.palette(0x172C46, 0x27445E, 0xEFD498, 0xEFF2F7, 0xBDC9D7, light: false, error: 0xF3A899)
+        case .peach_blossom:
+            Self.palette(0xF6DED9, 0xE9C1B8, 0x8D3D54, 0x432D35, 0x673E44, light: true, error: 0x942C41)
+        case .peaches:
+            Self.palette(0xF1D2AF, 0xDFB88E, 0x6A4D27, 0x3F3225, 0x5C4230, light: true, error: 0x942C41)
+        case .tangerine:
+            Self.palette(0x552D24, 0x764538, 0xFFD393, 0xFFF0DE, 0xF8D2BD, light: false, error: 0xF3A899)
+        case .tiramisu:
+            Self.palette(0xE9D6BE, 0xD9C09F, 0x554825, 0x392F29, 0x5D4E3E, light: true, error: 0x942C41)
+        case .terra:
+            Self.palette(0x3E302C, 0x5B4640, 0xE5B69E, 0xF5EDE1, 0xDACCC1, light: false, error: 0xF3A899)
         }
     }
 }

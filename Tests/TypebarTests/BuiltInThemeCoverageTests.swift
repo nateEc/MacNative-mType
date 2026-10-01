@@ -4,6 +4,35 @@ import XCTest
 @testable import Typebar
 
 final class BuiltInThemeCoverageTests: XCTestCase {
+  func testEighteenNewMaterialThemesAreSelectableReadableAndDistinctFromTheExistingCatalog() throws {
+    let names = [
+      "blue_dolphin", "earthsong", "fleuriste", "froyo", "fruit_chew", "hedge",
+      "lilac_mist", "lime", "luna", "matcha_moccha", "menthol", "mizu", "nautilus",
+      "peach_blossom", "peaches", "tangerine", "tiramisu", "terra",
+    ]
+    let variants = names.compactMap(AppTheme.init(rawValue:))
+    XCTAssertEqual(variants.count, names.count)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .light }.count, 9)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .dark }.count, 9)
+    for theme in variants {
+      XCTAssertEqual(try JSONDecoder().decode(AppTheme.self, from: JSONEncoder().encode(theme)), theme)
+      XCTAssertTrue(theme.displayName.hasSuffix(" · Typebar"))
+      for surface in [theme.background, theme.panel] {
+        let resolved = theme.resolvedTheme
+        XCTAssertGreaterThanOrEqual(contrast(resolved.text, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(contrast(resolved.secondaryText, surface), 4.5, theme.rawValue)
+        for mark in [resolved.accent, resolved.caret, resolved.error, resolved.extraInput,
+          resolved.colorfulError, resolved.colorfulExtraInput] {
+          XCTAssertGreaterThanOrEqual(contrast(mark, surface), 3.0, theme.rawValue)
+        }
+      }
+      for other in AppTheme.allCases where other != theme {
+        XCTAssertNotEqual(ThemeColor(color: theme.background), ThemeColor(color: other.background),
+          "Duplicate background: \(theme.rawValue), \(other.rawValue)")
+      }
+    }
+  }
+
   func testTwelveFurtherOriginalThemesAreSelectableReadableAndDistinct() throws {
     let names = [
       "blueberry_dark", "blueberry_light", "cafe", "cheesecake", "creamsicle", "fire",
