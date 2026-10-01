@@ -5685,6 +5685,7 @@ private struct CompletedResultView: View {
         prompt: result.prompt,
         events: result.replayEvents,
         duration: result.elapsedDuration,
+        configuration: result.configuration,
         reviews: wordReviews,
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: startGraphsAtZero,
@@ -6868,6 +6869,7 @@ private struct ResultPerformanceChart: View {
     prompt: String,
     events: [TypingReplayEvent],
     duration: TimeInterval,
+    configuration: TestConfiguration?,
     reviews: [TypedWordReview],
     typingSpeedUnit: TypingSpeedUnit,
     startsAtZero: Bool,
@@ -6879,7 +6881,8 @@ private struct ResultPerformanceChart: View {
     onInspectionChange: @escaping ([Int]) -> Void,
     accent: Color
   ) {
-    points = ResultPerformanceTrace.points(prompt: prompt, events: events, duration: duration)
+    points = ResultPerformanceTrace.points(
+      prompt: prompt, events: events, duration: duration, configuration: configuration)
     self.reviews = reviews
     self.events = events
     self.typingSpeedUnit = typingSpeedUnit
@@ -8787,7 +8790,8 @@ private struct ResultDetailView: View {
 
   private var hasPerformanceChart: Bool {
     ResultPerformanceChartAvailability.isAvailable(
-      prompt: result.prompt, events: result.replayEvents, duration: elapsedDuration)
+      prompt: result.prompt, events: result.replayEvents, duration: elapsedDuration,
+      configuration: result.configuration)
   }
 
   private var performanceChartHelp: String {
@@ -8853,6 +8857,7 @@ private struct HistoricalResultPerformanceChart: View {
         prompt: result.prompt,
         events: result.replayEvents,
         duration: elapsedDuration,
+        configuration: result.configuration,
         reviews: [],
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: settings.startGraphsAtZero,

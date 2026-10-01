@@ -24813,7 +24813,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(points.map(\.elapsed), [1, 2, 3, 4])
     XCTAssertEqual(points.map(\.wpm), [24, 12, 8, 9])
     XCTAssertEqual(points.map(\.rawWpm), [24, 18, 8, 9])
-    XCTAssertEqual(points.map(\.burstWpm), [36, 24, 36, 12])
+    // Burst is the input activity in each window, independent of corrections.
+    XCTAssertEqual(points.map(\.burstWpm), [24, 12, 0, 12])
     XCTAssertEqual(points.map(\.errorCount), [0, 1, 0, 0])
     XCTAssertEqual(
       ResultPerformanceTrace.points(
@@ -24947,13 +24948,13 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(
       ResultPerformanceTrace.point(prompt: "amber", events: events, elapsed: 121),
-      .init(elapsed: 121, wpm: 0, rawWpm: 0, burstWpm: 48, errorCount: 1))
+      .init(elapsed: 121, wpm: 0, rawWpm: 0, burstWpm: 12, errorCount: 1))
     XCTAssertEqual(
       ResultPerformanceTrace.point(prompt: "amber", events: events, elapsed: 123),
-      .init(elapsed: 123, wpm: 0, rawWpm: 0, burstWpm: 16, errorCount: 0))
+      .init(elapsed: 123, wpm: 0, rawWpm: 0, burstWpm: 12, errorCount: 0))
     XCTAssertEqual(
       ResultPerformanceTrace.point(prompt: "amber", events: events, elapsed: 124),
-      .init(elapsed: 124, wpm: 0, rawWpm: 0, burstWpm: 15, errorCount: 1))
+      .init(elapsed: 124, wpm: 0, rawWpm: 0, burstWpm: 12, errorCount: 1))
     XCTAssertEqual(
       ResultPerformanceTrace.point(
         prompt: "amber", events: Array(events.reversed()), elapsed: 124),

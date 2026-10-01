@@ -2357,10 +2357,9 @@ enum TestFailureReason: Hashable {
 enum TestInactivityPolicy {
   static let trailingInactiveIntervals = 5
 
-  static func intervalCounts(
-    activityDates: [Date], startedAt: Date, endedAt: Date, includesFractionalTail: Bool
-  ) -> [Int] {
-    let duration = max(0, endedAt.timeIntervalSince(startedAt))
+  static func intervalBoundaries(
+    duration: TimeInterval, includesFractionalTail: Bool
+  ) -> [TimeInterval] {
     let fullIntervals = Int(duration.rounded(.down))
     var boundaries = fullIntervals > 0 ? (1...fullIntervals).map(Double.init) : []
     // The reference classifies the tail after rounding seconds to hundredths,
@@ -2368,7 +2367,15 @@ enum TestInactivityPolicy {
     let roundedHundredths = ((duration + Double.ulpOfOne) * 100).rounded()
     let tailHundredths = roundedHundredths.truncatingRemainder(dividingBy: 100)
     if includesFractionalTail, tailHundredths >= 50 { boundaries.append(duration) }
+    return boundaries
+  }
 
+  static func intervalCounts(
+    activityDates: [Date], startedAt: Date, endedAt: Date, includesFractionalTail: Bool
+  ) -> [Int] {
+    let boundaries = intervalBoundaries(
+      duration: max(0, endedAt.timeIntervalSince(startedAt)),
+      includesFractionalTail: includesFractionalTail)
     var counts = Array(repeating: 0, count: boundaries.count)
     for date in activityDates {
       let offset = date.timeIntervalSince(startedAt)

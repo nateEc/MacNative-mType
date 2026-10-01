@@ -1234,6 +1234,8 @@ enum ResultConsistencyPolicy {
 /// character accounting and caps the trace at the same 122-second boundary
 /// used by the fixed reference's result-history graph, so a long practice
 /// session cannot create an impractically dense result chart.
+/// Chart Burst is interval input activity, NOT the word-burst metric used by
+/// live practice and word history. Deletion changes text, not past activity.
 enum ResultPerformanceTrace {
   static let maximumChartDuration: TimeInterval = 122
 
@@ -1243,14 +1245,16 @@ enum ResultPerformanceTrace {
     elapsed: TimeInterval
   ) -> ResultPerformancePoint {
     let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
-    let orderedEvents = TypingReplay.chronologicalEvents(events)
+    let orderedEvents = validOrderedEvents(events)
     var typed: [Character] = []
     var forcedErrors: [Bool] = []
-    var characterTimes: [TimeInterval] = []
+    let windowStart = max(0, safeElapsed.rounded(.up) - 1)
+    var inputUnits = 0
     for event in orderedEvents where event.offset <= safeElapsed {
-      apply(
-        event, typed: &typed, forcedErrors: &forcedErrors,
-        characterTimes: &characterTimes)
+      if event.kind == .insert, windowStart == 0 || event.offset > windowStart {
+        inputUnits += event.text.utf16.count
+      }
+      apply(event, typed: &typed, forcedErrors: &forcedErrors)
     }
     let errors = errorCount(
       typed: typed, prompt: Array(prompt), forcedErrors: forcedErrors)
@@ -1259,74 +1263,78 @@ enum ResultPerformanceTrace {
       elapsed: safeElapsed,
       wpm: wpm(characters: correct, elapsed: safeElapsed),
       rawWpm: wpm(characters: typed.count, elapsed: safeElapsed),
-      burstWpm: burst(typed: typed, dates: characterTimes),
+      burstWpm: intervalBurst(inputUnits: inputUnits, seconds: safeElapsed - windowStart),
       errorCount: errors)
   }
 
   static func points(
     prompt: String,
     events: [TypingReplayEvent],
-    duration: TimeInterval
+    duration: TimeInterval,
+    configuration: TestConfiguration? = nil
   ) -> [ResultPerformancePoint] {
     guard !prompt.isEmpty, !events.isEmpty,
       duration > 0, duration <= maximumChartDuration
     else { return [] }
 
-    let sampleTimes = samplingTimes(for: duration)
-    let orderedEvents = TypingReplay.chronologicalEvents(events)
+    let sampleTimes = samplingTimes(for: duration, configuration: configuration)
+    let orderedEvents = validOrderedEvents(events)
+    guard !orderedEvents.isEmpty else { return [] }
     var eventIndex = 0
     var typed: [Character] = []
     var forcedErrors: [Bool] = []
-    var characterTimes: [TimeInterval] = []
+    var previousBoundary: TimeInterval = 0
 
     return sampleTimes.map { elapsed in
+      var inputUnits = 0
       while eventIndex < orderedEvents.count, orderedEvents[eventIndex].offset <= elapsed {
-        apply(
-          orderedEvents[eventIndex],
-          typed: &typed,
-          forcedErrors: &forcedErrors,
-          characterTimes: &characterTimes)
+        let event = orderedEvents[eventIndex]
+        if event.kind == .insert { inputUnits += event.text.utf16.count }
+        apply(event, typed: &typed, forcedErrors: &forcedErrors)
         eventIndex += 1
       }
       let errors = errorCount(typed: typed, prompt: Array(prompt), forcedErrors: forcedErrors)
       let correct = max(0, typed.count - errors)
+      let interval = elapsed - previousBoundary
+      previousBoundary = elapsed
       return .init(
         elapsed: elapsed,
         wpm: wpm(characters: correct, elapsed: elapsed),
         rawWpm: wpm(characters: typed.count, elapsed: elapsed),
-        burstWpm: burst(typed: typed, dates: characterTimes),
+        burstWpm: intervalBurst(inputUnits: inputUnits, seconds: interval),
         errorCount: errors)
     }
   }
 
-  private static func samplingTimes(for duration: TimeInterval) -> [TimeInterval] {
-    guard duration >= 1 else { return [duration] }
-    let completedSeconds = Int(duration.rounded(.down))
-    var samples = (1...completedSeconds).map(TimeInterval.init)
-    if abs((samples.last ?? 0) - duration) > 0.001 {
-      samples.append(duration)
-    }
-    return samples
+  private static func samplingTimes(
+    for duration: TimeInterval, configuration: TestConfiguration?
+  ) -> [TimeInterval] {
+    let isTimed = configuration.map {
+      $0.mode == .time || $0.isInfinite || ($0.mode == .custom && $0.customTextCompletion == .time)
+    } ?? false
+    return TestInactivityPolicy.intervalBoundaries(
+      duration: duration, includesFractionalTail: !isTimed)
+  }
+
+  private static func validOrderedEvents(_ events: [TypingReplayEvent]) -> [TypingReplayEvent] {
+    TypingReplay.chronologicalEvents(events.filter { $0.offset.isFinite && $0.offset >= 0 })
   }
 
   private static func apply(
     _ event: TypingReplayEvent,
     typed: inout [Character],
-    forcedErrors: inout [Bool],
-    characterTimes: inout [TimeInterval]
+    forcedErrors: inout [Bool]
   ) {
     switch event.kind {
     case .insert:
       for character in event.text {
         typed.append(character)
         forcedErrors.append(event.forceError)
-        characterTimes.append(event.offset)
       }
     case .delete:
       guard !typed.isEmpty else { return }
       typed.removeLast()
       forcedErrors.removeLast()
-      characterTimes.removeLast()
     }
   }
 
@@ -1344,25 +1352,9 @@ enum ResultPerformanceTrace {
     Int((Double(characters) / 5 / max(elapsed, 1) * 60).rounded())
   }
 
-  private static func burst(typed: [Character], dates: [TimeInterval]) -> Int {
-    guard typed.count == dates.count, !typed.isEmpty else { return 0 }
-    let lastCharacter = typed.count - 1
-    let wordEnd: Int
-    let wordStart: Int
-    if isPromptWordSeparator(typed[lastCharacter]) {
-      wordEnd = lastCharacter
-      wordStart = typed[..<wordEnd].lastIndex(where: isPromptWordSeparator).map { $0 + 1 } ?? 0
-    } else {
-      wordEnd = lastCharacter
-      wordStart = typed[..<typed.count].lastIndex(where: isPromptWordSeparator).map { $0 + 1 } ?? 0
-    }
-    let elapsed = dates[wordEnd] - dates[wordStart]
-    guard elapsed > 0 else { return 0 }
-    let units = WordBurstInputUnits.count(typed[wordStart...wordEnd])
-      + (isPromptWordSeparator(typed[wordEnd]) ? 0 : 1)
-    // Unlike whole-test sampling, a word interval must not be clamped to one
-    // second: subsecond words use the same duration as the live burst.
-    let speed = (Double(units) / 5 / elapsed * 60).rounded()
+  private static func intervalBurst(inputUnits: Int, seconds: TimeInterval) -> Int {
+    guard seconds.isFinite, seconds > 0 else { return 0 }
+    let speed = (Double(inputUnits) / 5 / seconds * 60).rounded()
     // Imported replay can contain arbitrarily tiny positive intervals. Keep
     // unrepresentable values neutral rather than trapping on Int conversion.
     guard speed.isFinite, speed < Double(Int.max) else { return 0 }
@@ -1377,9 +1369,11 @@ enum ResultPerformanceChartAvailability {
   static func isAvailable(
     prompt: String,
     events: [TypingReplayEvent],
-    duration: TimeInterval
+    duration: TimeInterval,
+    configuration: TestConfiguration? = nil
   ) -> Bool {
-    !ResultPerformanceTrace.points(prompt: prompt, events: events, duration: duration).isEmpty
+    !ResultPerformanceTrace.points(
+      prompt: prompt, events: events, duration: duration, configuration: configuration).isEmpty
   }
 }
 

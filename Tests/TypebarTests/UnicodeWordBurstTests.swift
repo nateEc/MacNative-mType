@@ -91,7 +91,7 @@ final class UnicodeWordBurstTests: XCTestCase {
     XCTAssertEqual(session.outcome, .active)
   }
 
-  func testReplayChartUsesUTF16AndActualSubsecondWordDuration() {
+  func testReplayChartUsesUTF16AndActualSubsecondWindowDuration() {
     let events: [TypingReplayEvent] = [
       .init(offset: 0, kind: .insert, text: "🦊"),
       .init(offset: 0.25, kind: .insert, text: "a"),
@@ -106,7 +106,7 @@ final class UnicodeWordBurstTests: XCTestCase {
     XCTAssertEqual(point.rawWpm, 36)
   }
 
-  func testReplayChartNewlineEndsAWordAndStartsANewInterval() {
+  func testReplayChartCountsNewlineInItsTimeWindowWithoutWordSubmitCredit() {
     let events: [TypingReplayEvent] = [
       .init(offset: 0, kind: .insert, text: "🦊"),
       .init(offset: 1, kind: .insert, text: "a"),
@@ -114,8 +114,8 @@ final class UnicodeWordBurstTests: XCTestCase {
       .init(offset: 3, kind: .insert, text: "b"),
       .init(offset: 3.5, kind: .insert, text: "y"),
     ]
-    XCTAssertEqual(ResultPerformanceTrace.point(prompt: "🦊a\nby", events: events, elapsed: 2).burstWpm, 24)
-    XCTAssertEqual(ResultPerformanceTrace.point(prompt: "🦊a\nby", events: events, elapsed: 3.5).burstWpm, 72)
+    XCTAssertEqual(ResultPerformanceTrace.point(prompt: "🦊a\nby", events: events, elapsed: 2).burstWpm, 12)
+    XCTAssertEqual(ResultPerformanceTrace.point(prompt: "🦊a\nby", events: events, elapsed: 3.5).burstWpm, 24)
   }
 
   func testReplayChartKeepsUnrepresentableImportedBurstNeutral() {
@@ -123,7 +123,8 @@ final class UnicodeWordBurstTests: XCTestCase {
       .init(offset: 0, kind: .insert, text: "a"),
       .init(offset: Double.leastNormalMagnitude, kind: .insert, text: "b"),
     ]
-    XCTAssertEqual(ResultPerformanceTrace.point(prompt: "ab", events: events, elapsed: 1).burstWpm, 0)
+    XCTAssertEqual(ResultPerformanceTrace.point(
+      prompt: "ab", events: events, elapsed: Double.leastNormalMagnitude).burstWpm, 0)
   }
 
   func testDeleteAndRetypeKeepReplayIndicesAndWordTimingAligned() throws {
