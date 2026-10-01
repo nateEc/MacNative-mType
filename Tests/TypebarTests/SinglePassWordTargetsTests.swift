@@ -146,7 +146,8 @@ final class SinglePassWordTargetsTests: XCTestCase {
   }
 
   func testGeneratedWordContinuationCarriesOneSampleForEachAcceptedSourceWord() {
-    let config = configuration()
+    // Two earlier words plus two newly accepted words must fit the budget.
+    let config = TestConfiguration.words(4).with(modifiers: [.noSpaces, .randomCase])
     var cursor = GeneratedWordContinuation(configuration: config, weakSpotScores: .init(),
       batchWordCount: 2, previousSource: "old older")
     var draws = 0

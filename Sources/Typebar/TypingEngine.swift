@@ -1267,7 +1267,8 @@ enum TestModifierPolicy {
 
   static func transformedBatch(
     _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
-    preservesNoSpaceBoundaries: Bool = false, nextRandomCaseBit: () -> Bool = { Bool.random() }
+    preservesNoSpaceBoundaries: Bool = false, wordOffset: Int = 0, wordBound: Int? = nil,
+    nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> TransformedPromptBatch {
     let presented = language?.presentationText(prompt) ?? prompt
     guard preservesNoSpaceBoundaries || modifiers.contains(where: { canonicalTextAlterations.contains($0)
@@ -1284,9 +1285,16 @@ enum TestModifierPolicy {
     if modifiers.contains(.backwards) { words.reverse() }
     var output = ""
     var targets: [String] = []
+    var generatedWordIndex = wordOffset
     for (index, word) in words.enumerated() {
-      let altered = transformedWord(word, modifiers: modifiers, language: language,
-        wordIndex: index, wordBound: words.count, nextRandomCaseBit: nextRandomCaseBit)
+      // A chunk's leading commit or repeated separators are not generated
+      // words. Keep the standalone finite-text API's legacy behavior unless
+      // a caller supplies the actual generation bound.
+      let altered = word.isEmpty && wordBound != nil ? "" : transformedWord(word,
+        modifiers: modifiers, language: language,
+        wordIndex: wordBound == nil ? index : generatedWordIndex,
+        wordBound: wordBound ?? words.count, nextRandomCaseBit: nextRandomCaseBit)
+      if !word.isEmpty { generatedWordIndex += 1 }
       output += altered
       if capturesTargets, !word.isEmpty { targets.append(altered) }
       if index < words.count - 1, !capturesTargets, !altered.hasSuffix("\n") {
@@ -4370,7 +4378,7 @@ struct TypingSession {
 
   var completedWordCount: Int {
     if tracksNoSpaceWordBursts {
-      let typedLength = typedNeedsFullSegmentation ? typed.count : typedTargetIndices.count
+      let typedLength = typedGraphemeCount
       var lower = 0
       var upper = noSpaceWordEndIndices.count
       while lower < upper {
@@ -5257,24 +5265,25 @@ struct TypingSession {
 
   private var noSpaceCommittedWordIndex: Int? {
     guard tracksNoSpaceWordBursts else { return nil }
-    return noSpaceWordEndIndices.firstIndex(of: typed.count)
+    return noSpaceWordEndIndices.firstIndex(of: typedGraphemeCount)
   }
 
   /// No-space keeps a hidden word boundary after every source word. The final
   /// visible character is therefore the equivalent of an entered separator.
   private var nextNoSpaceCommittedWordIndex: Int? {
     guard tracksNoSpaceWordBursts else { return nil }
-    return noSpaceWordEndIndices.firstIndex(of: typed.count + 1)
+    return noSpaceWordEndIndices.firstIndex(of: typedGraphemeCount + 1)
   }
 
   /// A no-space word remains actionable only when its original boundary is
   /// retained. Unsegmented content deliberately falls through to the legacy
   /// character-level behavior instead of guessing linguistic word breaks.
   private var activeNoSpaceWordRange: Range<Int>? {
-    guard tracksNoSpaceWordBursts,
-      let wordIndex = noSpaceWordEndIndices.firstIndex(where: { typed.count < $0 })
-    else { return nil }
-    return noSpaceWordRange(for: wordIndex)
+    guard tracksNoSpaceWordBursts else { return nil }
+    // The committed count already locates the first end strictly beyond the
+    // input with binary search. Reuse it instead of re-counting a Unicode
+    // string inside every comparison of a linear boundary scan.
+    return noSpaceWordRange(for: completedWordCount)
   }
 
   /// Mirrors the reference product's explicit space set. Keep Return outside
@@ -5496,9 +5505,9 @@ struct TypingSession {
     else { return false }
 
     let promptCharacters = self.promptCharacters
-    guard typed.count == range.upperBound - 1, range.upperBound <= promptCharacters.count else { return false }
+    guard typedGraphemeCount == range.upperBound - 1, range.upperBound <= promptCharacters.count else { return false }
     return range.contains { index in
-      if index == typed.count {
+      if index == typedGraphemeCount {
         return character != promptCharacters[index] || forceError
       }
       return !isTypedCharacterCorrect(at: index)
@@ -5771,7 +5780,8 @@ struct TypingSession {
     if var stream = finiteCustomTextStream, stream.hasRemaining {
       let source = stream.nextChunk()
       finiteCustomTextStream = stream
-      let chunk = GeneratedWordChunk(source: source, configuration: configuration)
+      let chunk = GeneratedWordChunk(source: source, configuration: configuration,
+        wordOffset: noSpaceTargetWords.count)
       let previousEnd = promptCharacters.count
       appendPrompt(chunk.transformed)
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
@@ -5793,7 +5803,8 @@ struct TypingSession {
           ? configuration.language : nil)
       randomCustomPreviousWords = Array(words.suffix(2))
       let source = words.joined(separator: " ")
-      let chunk = GeneratedWordChunk(source: source, configuration: configuration)
+      let chunk = GeneratedWordChunk(source: source, configuration: configuration,
+        wordOffset: noSpaceTargetWords.count)
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
       let previousEnd = promptCharacters.count + separator.count
@@ -5811,7 +5822,8 @@ struct TypingSession {
     if var stream = sequentialCustomWordStream {
       let source = stream.nextWords(count: 100)
       sequentialCustomWordStream = stream
-      let chunk = GeneratedWordChunk(source: source, configuration: configuration)
+      let chunk = GeneratedWordChunk(source: source, configuration: configuration,
+        wordOffset: noSpaceTargetWords.count)
       let previousEnd = promptCharacters.count
       appendPrompt(chunk.transformed)
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
