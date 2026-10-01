@@ -125,7 +125,7 @@ struct AboutTypebarView: View {
       sectionTitle("练习指标", systemImage: "chart.bar")
       metric("WPM", detail: "完整正确词的 UTF-16 输入单位数 ÷ 5，再换算为每分钟；进行中、限时或退出时可计入当前正确前缀。")
       metric("Raw", detail: "按最终保留输入的全部 UTF-16 单位计算原始速度，错误输入也计入；可见字符数仍按完整书写簇统计。")
-      metric("准确率", detail: "输入尝试中正确尝试的比例；退格修正不会抹去此前误键。")
+      metric("准确率", detail: "按 UTF-16 输入单位计算正确尝试比例，精确结果保留两位小数；退格修正不会抹去此前误键。")
       metric("稳定度", detail: "由本机输入回放中的速度离散程度映射为 0–100%。")
     }
   }

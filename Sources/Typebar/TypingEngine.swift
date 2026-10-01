@@ -3843,11 +3843,14 @@ struct TypingSession {
   }
 
   var accuracy: Int {
-    guard inputAttemptCount > 0 else { return 100 }
+    guard inputAttemptCount > 0 else { return isFinished ? 0 : 100 }
     return Int((liveAccuracy * 100).rounded())
   }
 
-  var preciseAccuracy: Double { liveAccuracy * 100 }
+  var preciseAccuracy: Double {
+    let percentage = inputAttemptCount == 0 && isFinished ? 0 : liveAccuracy * 100
+    return isFinished ? ((percentage + Double.ulpOfOne) * 100).rounded() / 100 : percentage
+  }
 
   func wpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
@@ -4435,13 +4438,13 @@ struct TypingSession {
       // therefore leaves neither accepted text nor a replay action behind.
       if rejectsOppositeShiftInput {
         beginIfNeeded(at: date)
-        recordInputAttempt(isCorrect: true)
+        recordInputAttempt(character, correctUnits: String(character).utf16.count)
         recordWeakSpotInput(character, isCorrect: true, at: date)
         return false
       }
       let accepted = insertZenCharacter(character, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
       if accepted {
-        recordInputAttempt(isCorrect: true)
+        recordInputAttempt(character, correctUnits: String(character).utf16.count)
         recordWeakSpotInput(character, isCorrect: true, at: date)
       }
       return accepted
@@ -4468,7 +4471,7 @@ struct TypingSession {
     }
     if currentTargetIndex >= promptCharacters.count {
       beginIfNeeded(at: date)
-      recordInputAttempt(isCorrect: false)
+      recordInputAttempt(inputCharacter, correctUnits: 0)
       recordWeakSpotInput(inputCharacter, isCorrect: false, at: date)
       appendTypedCharacter(
         inputCharacter, targetIndex: nil,
@@ -4494,7 +4497,8 @@ struct TypingSession {
     let targetIndex = retainsCurrentWordAsExtra
       ? nil : earlyWordCommitTargetIndex ?? currentTargetIndex
     let isCorrect = !retainsCurrentWordAsExtra && inputCharacter == expected && !forceError
-    recordInputAttempt(isCorrect: isCorrect)
+    recordInputAttempt(inputCharacter, correctUnits: correctAccuracyUnits(
+      for: inputCharacter, targetIndex: currentTargetIndex, forceError: forceError))
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
     if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
     // Opposite Shift records a failed physical attempt, but the reference
@@ -4582,9 +4586,39 @@ struct TypingSession {
       .init(character: character, interval: roundedInterval, isCorrect: isCorrect))
   }
 
-  private mutating func recordInputAttempt(isCorrect: Bool) {
-    inputAttemptCount += 1
-    if isCorrect { correctInputAttemptCount += 1 }
+  private mutating func recordInputAttempt(_ character: Character, correctUnits: Int) {
+    inputAttemptCount += String(character).utf16.count
+    correctInputAttemptCount += correctUnits
+  }
+
+  /// Accuracy follows input-event units, not the native caret's grapheme
+  /// position. A wrong emoji can share a correct surrogate with its target.
+  /// Deletion changes the next comparison position but never these tallies.
+  private func correctAccuracyUnits(
+    for character: Character, targetIndex: Int, forceError: Bool
+  ) -> Int {
+    guard !forceError, promptCharacters.indices.contains(targetIndex) else { return 0 }
+    let target: String
+    let position: Int
+    if let range = activeNoSpaceWordRange, range.upperBound <= promptCharacters.count {
+      target = String(promptCharacters[range])
+      position = String(typed.suffix(max(0, typed.count - range.lowerBound))).utf16.count
+    } else if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+      // Without hidden boundaries, use the known flattened target only.
+      target = prompt
+      position = typed.utf16.count
+    } else {
+      let start = promptCharacters[..<targetIndex].lastIndex(where: isPromptWordSeparator)
+        .map { $0 + 1 } ?? 0
+      let separator = promptCharacters[targetIndex...].firstIndex(where: isPromptWordSeparator)
+      let end = separator.map { $0 + 1 } ?? promptCharacters.count
+      target = String(promptCharacters[start..<end])
+      position = String(typed.reversed().prefix { !isPromptWordSeparator($0) }.reversed()).utf16.count
+    }
+    let targetUnits = Array(target.utf16)
+    return String(character).utf16.enumerated().filter { index, unit in
+      targetUnits.indices.contains(position + index) && targetUnits[position + index] == unit
+    }.count
   }
 
   /// Zen accepts the user's own text rather than comparing it to a generated
@@ -5107,7 +5141,7 @@ struct TypingSession {
       isTypedCharacterCorrect(at: nextTargetIndex - 1)
     else { return }
     while nextTargetIndex < promptCharacters.count, promptCharacters[nextTargetIndex] == "\t" {
-      recordInputAttempt(isCorrect: true)
+      recordInputAttempt("\t", correctUnits: 1)
       appendTypedCharacter("\t", targetIndex: nextTargetIndex, at: date)
       recordReplayEvent(kind: .insert, text: "\t", automatic: true, at: date)
     }
