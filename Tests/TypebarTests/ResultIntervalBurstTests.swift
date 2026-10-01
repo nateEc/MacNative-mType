@@ -90,7 +90,7 @@ final class ResultIntervalBurstTests: XCTestCase {
   }
 
   func testFiniteTailUsesRoundedHundredthsButKeepsTheRawCutoff() {
-    let cases: [(Double, [Double], [Int])] = [
+    let cases: [(Double, [Double], [Double])] = [
       (4.493, [1, 2, 3, 4], [12, 0, 0, 0]),
       (4.497, [1, 2, 3, 4, 4.497], [12, 0, 0, 0, 24]),
       (4.993, [1, 2, 3, 4, 4.993], [12, 0, 0, 0, 12]),

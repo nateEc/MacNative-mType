@@ -898,38 +898,47 @@ struct ResultPerformancePoint: Equatable, Identifiable {
   let elapsed: TimeInterval
   let wpm: Int
   let rawWpm: Int
-  let burstWpm: Int
+  let burstWpm: Double
   let errorCount: Int
 
   var id: Int { Int((elapsed * 1_000).rounded()) }
 }
 
-/// Produces a presentation-only Burst trace. A short triangular window keeps
-/// local spikes legible without changing the saved result or any other metric.
+/// Smooths nearby, similar values only. The value tolerance is one quarter of
+/// the original series maximum; sharp changes stay visible and means retain
+/// their fractions. No saved metric or other trace is changed.
 enum ResultBurstSmoothingPolicy {
   static func points(
     _ points: [ResultPerformancePoint], enabled: Bool
   ) -> [ResultPerformancePoint] {
     guard enabled, points.count > 1 else { return points }
+    let tolerance = (points.map(\.burstWpm).max() ?? 0) / 4
     return points.indices.map { index in
-      var weightedTotal = points[index].burstWpm * 2
-      var totalWeight = 2
-      if index > points.startIndex {
-        weightedTotal += points[index - 1].burstWpm
-        totalWeight += 1
-      }
-      if index < points.index(before: points.endIndex) {
-        weightedTotal += points[index + 1].burstWpm
-        totalWeight += 1
-      }
       let point = points[index]
+      let neighborhood = points[max(points.startIndex, index - 1)...min(points.count - 1, index + 1)]
+        .map(\.burstWpm).filter { abs($0 - point.burstWpm) <= tolerance }
+      let mean = neighborhood.isEmpty ? point.burstWpm
+        : neighborhood.reduce(0, +) / Double(neighborhood.count)
       return .init(
         elapsed: point.elapsed,
         wpm: point.wpm,
         rawWpm: point.rawWpm,
-        burstWpm: Int((Double(weightedTotal) / Double(totalWeight)).rounded()),
+        burstWpm: mean,
         errorCount: point.errorCount)
     }
+  }
+}
+
+/// The graph and its inspection use the same value: convert the fractional
+/// canonical Burst first, then round the displayed unit to two decimals.
+enum ResultBurstDisplayPolicy {
+  static func value(wpm: Double, unit: TypingSpeedUnit) -> Double {
+    let converted = unit.converted(wpm: wpm)
+    return ((converted + Double.ulpOfOne) * 100).rounded() / 100
+  }
+
+  static func text(wpm: Double, unit: TypingSpeedUnit) -> String {
+    String(format: "%.2f", value(wpm: wpm, unit: unit))
   }
 }
 
@@ -1352,13 +1361,13 @@ enum ResultPerformanceTrace {
     Int((Double(characters) / 5 / max(elapsed, 1) * 60).rounded())
   }
 
-  private static func intervalBurst(inputUnits: Int, seconds: TimeInterval) -> Int {
+  private static func intervalBurst(inputUnits: Int, seconds: TimeInterval) -> Double {
     guard seconds.isFinite, seconds > 0 else { return 0 }
     let speed = (Double(inputUnits) / 5 / seconds * 60).rounded()
-    // Imported replay can contain arbitrarily tiny positive intervals. Keep
-    // unrepresentable values neutral rather than trapping on Int conversion.
+    // Keep the existing Int-range ceiling for raw interval metrics. Fractional
+    // display precision must not expand the imported-speed domain.
     guard speed.isFinite, speed < Double(Int.max) else { return 0 }
-    return Int(speed)
+    return speed
   }
 }
 

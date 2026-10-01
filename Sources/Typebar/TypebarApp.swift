@@ -6928,7 +6928,9 @@ private struct ResultPerformanceChart: View {
           .disabled(!visibility.burst)
           .accessibilityLabel("Burst 曲线")
           .accessibilityValue(visibility.smoothBurst ? "平滑" : "原始")
-          .help(visibility.smoothBurst ? "显示原始 Burst 尖峰" : "平滑 Burst 尖峰")
+          .help(visibility.smoothBurst
+            ? "显示原始 Burst 数据"
+            : "平均相邻且相差不超过本轮最大 Burst 25% 的值；保留大幅变化")
           traceToggle("错误", isOn: visibilityBinding(\.errors), color: .red)
           if resultPersonalBestFeedback != nil {
             traceToggle("本机 PB", isOn: visibilityBinding(\.personalBestLine), color: .secondary)
@@ -6956,7 +6958,8 @@ private struct ResultPerformanceChart: View {
           if visibility.burst {
             LineMark(
               x: .value("秒", point.elapsed),
-              y: .value(typingSpeedUnit.displayName, typingSpeedUnit.converted(wpm: point.burstWpm))
+              y: .value(typingSpeedUnit.displayName,
+                ResultBurstDisplayPolicy.value(wpm: point.burstWpm, unit: typingSpeedUnit))
             )
             .foregroundStyle(.orange)
             .lineStyle(.init(lineWidth: 1))
@@ -7068,7 +7071,7 @@ private struct ResultPerformanceChart: View {
         Text("Raw \(typingSpeedUnit.formatted(wpm: inspection.point.rawWpm))")
       }
       if visibility.burst {
-        Text("Burst \(typingSpeedUnit.formatted(wpm: inspection.point.burstWpm))")
+        Text("Burst \(ResultBurstDisplayPolicy.text(wpm: inspection.point.burstWpm, unit: typingSpeedUnit))")
       }
       if visibility.errors {
         Text("错误 \(inspection.point.errorCount)")

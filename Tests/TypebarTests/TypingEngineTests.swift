@@ -24780,7 +24780,8 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(ResultBurstSmoothingPolicy.points(points, enabled: false), points)
     let smoothed = ResultBurstSmoothingPolicy.points(points, enabled: true)
-    XCTAssertEqual(smoothed.map(\.burstWpm), [47, 60, 40, 20])
+    // The 80-WPM jumps exceed the 25-WPM value window and must stay visible.
+    XCTAssertEqual(smoothed.map(\.burstWpm), [20, 100, 20, 20])
     XCTAssertEqual(smoothed.map(\.wpm), points.map(\.wpm))
     XCTAssertEqual(smoothed.map(\.rawWpm), points.map(\.rawWpm))
     XCTAssertEqual(smoothed.map(\.errorCount), points.map(\.errorCount))
