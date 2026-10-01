@@ -2051,6 +2051,12 @@ private struct ContentView: View {
 
         activeResultTagControls
 
+        if let generationNotice = session.generationNotice {
+          Label(generationNotice, systemImage: "exclamationmark.triangle")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+
         if let liveContentMessage {
           HStack(spacing: 7) {
             if isLoadingLiveContent { ProgressView().controlSize(.small) }
@@ -3701,7 +3707,8 @@ private struct ContentView: View {
       verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
         == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
       quote: selectedQuote,
-      weakSpotScores: weakSpotScores
+      weakSpotScores: weakSpotScores,
+      showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off
     )
     synchronizeNoQuitConfigurationLock()
     persistActiveTestSelection()
@@ -3756,7 +3763,8 @@ private struct ContentView: View {
       let livePrompt = content.promptDescriptor(for: configuration)
       session = TestSessionFactory.make(
         configuration: configuration, streamPrompt: livePrompt.text,
-        streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource)
+        streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource,
+        showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
       liveContentMessage = "已载入\(content.attribution)。"
       if configuration.modifiers.contains(.listening) {
         NativeSpeech.shared.speak(session.prompt, language: configuration.language)
@@ -4303,8 +4311,11 @@ private struct ContentView: View {
       return
     }
     if let target = AppearanceCommandCatalog.target(for: item.id) {
+      guard target.apply(to: settings) else {
+        funboxConfigurationMessage = "卷带模式不支持显示完整提示行。"
+        return
+      }
       if target.exitsChallenge { activeChallengeID = nil }
-      target.apply(to: settings)
       return
     }
     if let target = KeyboardGuideCommandCatalog.target(for: item.id) {

@@ -618,7 +618,7 @@ struct PreferencesView: View {
           }
           Toggle("显示完整提示行", isOn: $settings.showAllPracticeLines)
             .disabled(settings.practiceTapeMode != .off)
-          Text("仅在无计时的词、引语和自定义测试中生效：关闭时长提示保留在可滚动练习区；开启后可展开完整高度。卷带模式不支持此选项。")
+          Text("用于词、引语和自定义测试（含计时自定义）：展开已生成提示的完整高度，不重开当前会话；下一轮有限词测试会预览全部目标，超过 100,000 词时明确提示分批生成。卷带模式不支持此选项。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Picker("平滑光标", selection: $settings.smoothCaretMotion) {

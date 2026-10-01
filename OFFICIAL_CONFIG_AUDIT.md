@@ -1,5 +1,11 @@
 # 官方配置兼容性审计
 
+2026-10-02 当前最终门禁（完整行配置）：最终客户端 1426 项（0 跳过、0 失败，显式十万词耐力已执行）、服务端 131 项、固定参考／原创性、653 场景清单与未开窗应用包通过。新增 18 项最终通过，下文本轮“完整门禁待执行”由此取代；`showAllLines` 从映射下调为部分，94 键分区为 91／2／1，固定生成总账和原生分区断言同步且不丢任何键。首次旧计数门禁失败不计通过，最终重新执行。无格式版本或模型变更、真实库迁移及设备／远端 CI 证据；完整预览差异与整体 goal active 保留。
+
+本轮外部短源扩展：4／25／501 词目标保持可逐键完成，小预算先行同一方法 12 个有效失败断言。四个整批跨终点断言按固定 `input/handlers/insert-text.ts:134–150,342–374` 的末字符判定更正为逐键事件，全部精确词数／完成／记录断言保留，不计产品红测；原有批输入规则、历史结果及外部全预览差异不改写。
+
+2026-10-02 完整行配置更正：固定 `config/metadata.tsx:868–884,904–923` 允许 words/custom/quote（含计时 custom）且不重开；启用 tape 强制完整行关闭，关闭 tape 不恢复，tape 内启用完整行命令被拒绝。命令返回是否成功，拒绝时不主动清除挑战；偏好页沿用禁用／关闭规则。下一轮生成读取既有 `showAllPracticeLines`，当前提示／输入不重建；`words-generator.ts:428–503` 的有限／引语／无限／自定义覆盖已接通。超过 100,000 词及外部短词源明确提示未完整预览并保留预算／原续接，仍为配置行为差异。新增 18 项生成／命令／显示回归，完整门禁本轮待执行，无 GUI 或真实库操作，不新增任何持久字段或外层格式版本，整体等价不提升。
+
 2026-10-02 最终独立分隔补证：新增 23 项、相关 106 项（1 默认跳过）通过；完整客户端 1306 项（1 默认跳过、0 失败）、服务端 131 项、固定参考／原创性审计及未开启 GUI 的原生打包门禁通过。下方本轮“门禁待执行”以本段为准；旧二进制实盘降级、完整界面交互和整体配置等价未获验证。
 
 2026-10-02 独立分隔配置补证：固定 CustomTextModal 的 `pipeDelimiter` 不等于 section limit。原生新增可选 `customTextPipeDelimiter`，缺省按旧完成模式解读，显式 true／false 独立保存、恢复与生成；旧链接显式 Boolean 优先于旧 delimiter 字符串及当前默认。控件、活动选择、预设和四模式分享路径接通，空池拒绝但字面竖线仍可练习。原生分享 v2、设置 JSON v3、归档 v10 防止旧外层读者静默忽略；新读者保留旧支持版本，v2 参数记忆仍必需，旧历史不回填。新增 23 项回归；旧本机客户端／裸配置语义降级和真实磁盘未验证，完整门禁本轮待执行，整体兼容性仍开放。
@@ -16,7 +22,7 @@
 - Typebar 的实现、文案、数据模型和测试均为原创；该表不复制参考实现的代码、资产、词表、布局定义或主题数据。
 - 当前语言目录：376 个可单独练习的语言或书写方式、70 个代码选择和 2 个混合入口。
 - `Compatibility/official-languages.json` 对固定 schema 的 446 个语言 ID 做机器守恒：446 个独立原生选择、0 个兼容代指、0 个未映射配置。该清单只从 schema ID 和本地枚举生成，不读取官方语言词值；完整边界见 `OFFICIAL_LANGUAGE_AUDIT.md`。
-- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：92 个已映射、1 个部分、1 个不适用、0 个未实现或漏记；声音、主／节奏光标、实时指标、键盘提示与键入能量档位会提取固定枚举值，节奏伙伴会校验固定布尔类型，再与本机语义逐项对账。
+- `Compatibility/official-configs.json` 对固定 `ConfigSchema` 的 94 个键做机器守恒：91 个已映射、2 个部分（字体与完整行）、1 个不适用、0 个未实现或漏记；本轮完整行明确下调，机器总账与固定生成审计同步。声音、主／节奏光标、实时指标、键盘提示与键入能量档位会提取固定枚举值，节奏伙伴会校验固定布尔类型，再与本机语义逐项对账。
 - 同一清单的 `nativeEvidenceGroups` 将 93 个已映射或部分映射键按固定 `ConfigSchema` 的九个非广告组分区，并为每组记录 Typebar 源文件路径；测试校验组名、逐键归属、无重复、完整覆盖，以及所有路径均存在于 `Sources/Typebar/`。这些代码路径是可审计的实现证据，不替代设备上的端到端行为验收。
 - 多语默认值以本表 `customPolyglot` 当前行及固定参考 `frontend/src/ts/constants/default-config.ts` 为准：English、Spanish、French、German。出词规则以固定参考 `frontend/src/ts/test/funbox/funbox-functions.ts` 的 `PolyglotWordset` 为准：合并词池后抽取，不按语言轮转。下文按日期保留的“153 项默认组合”和“轮转”是旧 Typebar 行为的历史记录，不再描述当前实现；这些语言仍可自选，旧选择不会被改写。
 
@@ -224,10 +230,10 @@
 | `timerOpacity` | `liveStatsOpacity` | 已映射；四档 25/50/75/100%。 |
 | `highlightMode` | `promptHighlightMode` | 已映射。 |
 | `typedEffect` | `typedCharacterEffect` | 已映射。 |
-| `tapeMode` | `practiceTapeMode` | 已映射。 |
+| `tapeMode` | `practiceTapeMode` | 已映射；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。 |
 | `tapeMargin` | `practiceTapeMargin` | 已映射；以 0–1 原生比例保存。 |
 | `smoothLineScroll` | `smoothPracticeLineScroll` | 已映射。 |
-| `showAllLines` | `showAllPracticeLines` | 已映射。 |
+| `showAllLines` | `showAllPracticeLines` | 部分映射：词／引语／自定义（含计时自定义）展开，不重开，下一轮生成读取；有限 1–100,000 词完整预览，无限／自定义 bound 遵守覆盖。卷带内拒绝启用；更大预算与外部短词源保持可练习并提示未完整预览，仍有差异。 |
 | `alwaysShowDecimalPlaces` | `alwaysShowDecimalPlaces` | 已映射。完成结果页保留未取整的速度与准确率；关闭时按参考规则展示换算后整数、向下取整准确率、四舍五入稳定度及四舍五入总用时，开启时速度、非满分准确率与两类稳定度展示两位小数，满分准确率保留 `100%`，短时总用时展示两位小数、超过 61 秒切换为时钟格式；旧本机记录安全回退为原整数值。 |
 | `typingSpeedUnit` | `typingSpeedUnit` | 已映射。 |
 | `startGraphsAtZero` | `startGraphsAtZero` | 已映射。 |

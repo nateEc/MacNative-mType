@@ -158,7 +158,6 @@
     "tapeMode": "`practiceTapeMode`",
     "tapeMargin": "`practiceTapeMargin`",
     "smoothLineScroll": "`smoothPracticeLineScroll`",
-    "showAllLines": "`showAllPracticeLines`",
     "alwaysShowDecimalPlaces": "`alwaysShowDecimalPlaces`",
     "typingSpeedUnit": "`typingSpeedUnit`",
     "startGraphsAtZero": "`startGraphsAtZero`",
@@ -193,6 +192,7 @@
     "monkeyPowerLevel": "`typingPowerMode`"
   },
   "partial": {
+    "showAllLines": "`showAllPracticeLines`",
     "fontFamily": "`practiceFont`、可搜索的本机字体目录、名称/导入"
   },
   "notApplicable": {

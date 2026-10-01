@@ -301,9 +301,11 @@ final class OfficialLayoutCoverageTests: XCTestCase {
     XCTAssertEqual(fixture.officialCount, 94)
     XCTAssertEqual(fixture.officialKeys.count, fixture.officialCount)
     XCTAssertEqual(officialKeys.count, fixture.officialCount)
-    XCTAssertEqual(fixture.mapped.count, 92)
+    XCTAssertEqual(fixture.mapped.count, 91)
     XCTAssertEqual(fixture.mapped["language"], "`TypingLanguage`、`mixedLanguageComponents`")
-    XCTAssertEqual(fixture.partial.count, 1)
+    XCTAssertEqual(fixture.partial.count, 2)
+    XCTAssertNil(fixture.mapped["showAllLines"], "明确保留超大预算和短外部源的预览差异")
+    XCTAssertEqual(fixture.partial["showAllLines"], "`showAllPracticeLines`")
     XCTAssertEqual(fixture.partial["fontFamily"], "`practiceFont`、可搜索的本机字体目录、名称/导入")
     XCTAssertEqual(fixture.officialKnownFontFamilyIDs.count, 43)
     XCTAssertEqual(

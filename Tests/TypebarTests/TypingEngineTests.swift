@@ -3599,7 +3599,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(settings.typedCharacterEffect, .dots)
     XCTAssertEqual(settings.practiceTapeMode, .letter)
     XCTAssertTrue(settings.smoothPracticeLineScroll)
-    XCTAssertTrue(settings.showAllPracticeLines)
+    XCTAssertFalse(settings.showAllPracticeLines, "卷带模式拒绝启用完整提示行")
     XCTAssertEqual(settings.typingSpeedUnit, .cps)
     XCTAssertTrue(settings.alwaysShowDecimalPlaces)
     XCTAssertFalse(settings.startGraphsAtZero)
@@ -15394,7 +15394,7 @@ final class TypingEngineTests: XCTestCase {
         typed: typed, mode: .off, margin: 0.5, glyphWidth: 10, containerWidth: 100), 0)
   }
 
-  func testPracticeLineDisplayPolicyMatchesSupportedUntimedModes() {
+  func testPracticeLineDisplayPolicyMatchesSupportedModes() {
     XCTAssertTrue(PracticeLineDisplayPolicy.shouldShowAllLines(
       settingEnabled: true, tapeMode: .off, testMode: .words, hasTimeLimit: false))
     XCTAssertTrue(PracticeLineDisplayPolicy.shouldShowAllLines(
@@ -15408,7 +15408,7 @@ final class TypingEngineTests: XCTestCase {
       settingEnabled: true, tapeMode: .letter, testMode: .words, hasTimeLimit: false))
     XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
       settingEnabled: true, tapeMode: .off, testMode: .time, hasTimeLimit: true))
-    XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
+    XCTAssertTrue(PracticeLineDisplayPolicy.shouldShowAllLines(
       settingEnabled: true, tapeMode: .off, testMode: .custom, hasTimeLimit: true))
     XCTAssertFalse(PracticeLineDisplayPolicy.shouldShowAllLines(
       settingEnabled: true, tapeMode: .off, testMode: .zen, hasTimeLimit: false))

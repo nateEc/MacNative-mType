@@ -1200,8 +1200,9 @@ enum AppearanceCommandTarget: Equatable {
         }
     }
 
+    @discardableResult
     @MainActor
-    func apply(to settings: AppSettings) {
+    func apply(to settings: AppSettings) -> Bool {
         switch self {
         case .progress(let style): settings.liveProgressStyle = style
         case .speed(let style): settings.liveSpeedStyle = style
@@ -1211,13 +1212,18 @@ enum AppearanceCommandTarget: Equatable {
         case .opacity(let opacity): settings.liveStatsOpacity = opacity
         case .highlight(let mode): settings.promptHighlightMode = mode
         case .typedEffect(let effect): settings.typedCharacterEffect = effect
-        case .tape(let mode): settings.practiceTapeMode = mode
+        case .tape(let mode):
+            settings.practiceTapeMode = mode
+            if mode != .off { settings.showAllPracticeLines = false }
         case .smoothLineScroll(let enabled): settings.smoothPracticeLineScroll = enabled
-        case .showAllLines(let enabled): settings.showAllPracticeLines = enabled
+        case .showAllLines(let enabled):
+            guard !enabled || settings.practiceTapeMode == .off else { return false }
+            settings.showAllPracticeLines = enabled
         case .speedUnit(let unit): settings.typingSpeedUnit = unit
         case .alwaysShowDecimalPlaces(let enabled): settings.alwaysShowDecimalPlaces = enabled
         case .startGraphsAtZero(let enabled): settings.startGraphsAtZero = enabled
         }
+        return true
     }
 }
 

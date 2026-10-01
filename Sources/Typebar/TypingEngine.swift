@@ -3609,6 +3609,7 @@ enum PromptHighlightPolicy {
 
 struct TypingSession {
   private(set) var configuration: TestConfiguration
+  let generationNotice: String?
   private(set) var prompt: String
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
@@ -3719,9 +3720,10 @@ struct TypingSession {
     customSectionWordStream: CustomSectionWordStream? = nil,
     noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
-    repeatingNoSpaceTargetWords: [String] = []
+    repeatingNoSpaceTargetWords: [String] = [], generationNotice: String? = nil
   ) {
     self.configuration = configuration
+    self.generationNotice = generationNotice
     self.prompt = prompt
     self.promptCharacters = Array(prompt)
     let wordProgress = Self.wordProgress(configuration.wordLimit, in: self.promptCharacters)
@@ -3772,7 +3774,7 @@ struct TypingSession {
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
-      repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords)
+      repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: generationNotice)
   }
 
   var isFinished: Bool { outcome != .active }

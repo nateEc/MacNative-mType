@@ -5802,6 +5802,20 @@ enum NoSpaceWordBoundaryPolicy {
 
 enum GeneratedPromptChunkPolicy {
   static let maximumInitialWordCount = 500
+  /// Whole previews are an explicit memory operation, not a new test limit.
+  /// Larger valid budgets remain playable in chunks with a visible notice.
+  static let maximumWholePreviewWordCount = 100_000
+
+  static func previewsWholeFiniteWords(for configuration: TestConfiguration, showAllLines: Bool) -> Bool {
+    showAllLines && configuration.mode == .words
+      && (1...maximumWholePreviewWordCount).contains(configuration.wordLimit ?? 0)
+  }
+
+  static func previewNotice(for configuration: TestConfiguration, showAllLines: Bool) -> String? {
+    guard showAllLines, configuration.mode == .words,
+      (configuration.wordLimit ?? 0) > maximumWholePreviewWordCount else { return nil }
+    return "完整预览暂支持最多 100,000 词；当前目标保持不变，使用分批生成，未预览全部目标。"
+  }
 
   static func wordCount(forTime seconds: TimeInterval) -> Int {
     let words = seconds / 60 * 240
@@ -5811,12 +5825,15 @@ enum GeneratedPromptChunkPolicy {
     return min(maximumInitialWordCount, max(300, Int(ceil(words))))
   }
 
-  static func wordCount(for configuration: TestConfiguration) -> Int {
+  static func wordCount(for configuration: TestConfiguration, showAllLines: Bool = false) -> Int {
     switch configuration.mode {
     case .time:
       return wordCount(forTime: configuration.duration ?? 30)
     case .words:
       if configuration.isInfinite { return 100 }
+      if previewsWholeFiniteWords(for: configuration, showAllLines: showAllLines) {
+        return configuration.wordLimit ?? 25
+      }
       return min(maximumInitialWordCount, max(1, configuration.wordLimit ?? 25))
     case .quote: return 60
     case .zen: return 10_000
@@ -5824,10 +5841,11 @@ enum GeneratedPromptChunkPolicy {
     }
   }
 
-  static func repeatsPrompt(for configuration: TestConfiguration) -> Bool {
+  static func repeatsPrompt(for configuration: TestConfiguration, showAllLines: Bool = false) -> Bool {
     switch configuration.mode {
     case .time: return true
     case .words:
+      if previewsWholeFiniteWords(for: configuration, showAllLines: showAllLines) { return false }
       return configuration.isInfinite
         || (configuration.wordLimit ?? 0) > maximumInitialWordCount
     case .custom:
@@ -5845,11 +5863,16 @@ enum GeneratedWordBoundPolicy {
     source.unicodeScalars.split(separator: " ").count
   }
 
-  static func bound(for configuration: TestConfiguration, wordOffset: Int, sourceWordCount: Int) -> Int {
+  static func bound(for configuration: TestConfiguration, wordOffset: Int, sourceWordCount: Int,
+    showAllLines: Bool = false) -> Int {
     // Visibility-push funboxes cannot coexist with underscore/no-space
     // alterations; their separate viewport policy remains unchanged.
     if wordOffset > 0 { return 100 }
     var bound = 100
+    if GeneratedPromptChunkPolicy.previewsWholeFiniteWords(for: configuration, showAllLines: showAllLines) {
+      bound = configuration.wordLimit ?? 100
+    }
+    if showAllLines, configuration.mode == .quote { bound = sourceWordCount }
     if configuration.mode == .words,
       let limit = configuration.wordLimit, limit > 0 { bound = min(bound, limit) }
     if configuration.mode == .quote { bound = min(bound, sourceWordCount) }
@@ -5869,13 +5892,14 @@ struct GeneratedWordChunk {
   let noSpaceTargetWords: [String]
 
   init(source: String, configuration: TestConfiguration, wordOffset: Int = 0,
-    preservesNoSpaceBoundaries: Bool = false,
+    preservesNoSpaceBoundaries: Bool = false, showAllLines: Bool = false,
     nextRandomCaseBit: () -> Bool = { Bool.random() }) {
     self.source = source
     let batch = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
       language: configuration.language, preservesNoSpaceBoundaries: preservesNoSpaceBoundaries,
       wordOffset: wordOffset, wordBound: GeneratedWordBoundPolicy.bound(for: configuration,
-        wordOffset: wordOffset, sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source)),
+        wordOffset: wordOffset, sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source),
+        showAllLines: showAllLines),
       nextRandomCaseBit: nextRandomCaseBit)
     transformed = batch.text
     noSpaceWordLengths = batch.noSpaceWordLengths
@@ -5959,14 +5983,17 @@ struct GeneratedStreamContinuation {
 struct GeneratedCodeContinuation {
   let configuration: TestConfiguration
   let batchTokenCount: Int
+  private let previewsWholeFiniteWords: Bool
   private(set) var nextUnitIndex: Int
   private var pendingWords: [String] = []
   private var emittedWords = 0
 
-  init(configuration: TestConfiguration, batchTokenCount: Int, nextUnitIndex: Int) {
+  init(configuration: TestConfiguration, batchTokenCount: Int, nextUnitIndex: Int, showAllLines: Bool = false) {
     self.configuration = configuration
     self.batchTokenCount = batchTokenCount
     self.nextUnitIndex = nextUnitIndex
+    previewsWholeFiniteWords = GeneratedPromptChunkPolicy.previewsWholeFiniteWords(
+      for: configuration, showAllLines: showAllLines)
   }
 
   var hasRemaining: Bool {
@@ -5977,7 +6004,8 @@ struct GeneratedCodeContinuation {
   mutating func nextChunk(nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk {
     let remaining = configuration.mode == .words && !configuration.isInfinite
       ? max(0, (configuration.wordLimit ?? 0) - emittedWords) : 100
-    let count = min(max(1, batchTokenCount), 100, remaining)
+    let chunkLimit = previewsWholeFiniteWords && emittedWords == 0 ? batchTokenCount : 100
+    let count = min(max(1, batchTokenCount), chunkLimit, remaining)
     guard count > 0 else { return .init(source: "", configuration: configuration) }
     while pendingWords.count < count {
       let unit = CodePracticeContent.prompt(language: configuration.language,
@@ -5988,6 +6016,7 @@ struct GeneratedCodeContinuation {
     let source = (emittedWords > 0 ? " " : "") + pendingWords.prefix(count).joined(separator: " ")
     pendingWords.removeFirst(count)
     let chunk = GeneratedWordChunk(source: source, configuration: configuration, wordOffset: emittedWords,
+      showAllLines: previewsWholeFiniteWords,
       nextRandomCaseBit: nextRandomCaseBit)
     emittedWords += count
     return chunk
@@ -6003,7 +6032,8 @@ struct TestSessionFactory {
     quote: OfflineQuote? = nil,
     streamPrompt: String? = nil,
     streamNoSpaceBoundarySource: String? = nil,
-    weakSpotScores: WeakSpotScores = .init(), nextRandomCaseBit: () -> Bool = { Bool.random() }
+    weakSpotScores: WeakSpotScores = .init(), showAllLines: Bool = false,
+    nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> TypingSession {
     let prompt: String
     var sectionEndIndices: [Int] = []
@@ -6036,7 +6066,7 @@ struct TestSessionFactory {
     var usesGeneratedCode = false
     var generatedCodeContinuation: GeneratedCodeContinuation?
     var generatedCodeChunk: GeneratedWordChunk?
-    let streamWordCount = streamWordCount(for: configuration)
+    let streamWordCount = streamWordCount(for: configuration, showAllLines: showAllLines)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
       noSpaceBoundarySource = streamNoSpaceBoundarySource
@@ -6050,7 +6080,7 @@ struct TestSessionFactory {
       configuration.language.isCodeLanguage
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
-        batchTokenCount: min(streamWordCount, 100), nextUnitIndex: 0)
+        batchTokenCount: streamWordCount, nextUnitIndex: 0, showAllLines: showAllLines)
       let chunk = cursor.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
       prompt = chunk.source
       generatedCodeChunk = chunk
@@ -6065,12 +6095,14 @@ struct TestSessionFactory {
       case .time:
         usesFreshGeneratedWords = !configuration.language.isCodeLanguage
         prompt = weakSpotPrompt(
-          configuration: configuration, wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
+          configuration: configuration, wordCount: GeneratedPromptChunkPolicy.wordCount(
+            for: configuration, showAllLines: showAllLines),
           scores: weakSpotScores)
       case .words:
         usesFreshGeneratedWords = !configuration.language.isCodeLanguage
         prompt = weakSpotPrompt(
-          configuration: configuration, wordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
+          configuration: configuration, wordCount: GeneratedPromptChunkPolicy.wordCount(
+            for: configuration, showAllLines: showAllLines),
           scores: weakSpotScores)
       case .quote:
         prompt =
@@ -6143,6 +6175,14 @@ struct TestSessionFactory {
         }
       }
     }
+    // An external provider can supply less than the requested word budget.
+    // Keep its existing continuation instead of treating that short source
+    // as a complete preview (which would finish the attempt prematurely).
+    let hasIncompleteExternalPreview = showAllLines && streamPrompt != nil
+      && configuration.mode == .words && !configuration.isInfinite
+      && GeneratedWordBoundPolicy.wordCount(in: noSpaceBoundarySource ?? prompt)
+        < (configuration.wordLimit ?? 25)
+    let generatesWholeLines = showAllLines && !hasIncompleteExternalPreview
     let batch: TransformedPromptBatch
     if streamsCustomSections {
       batch = .init(text: prompt)
@@ -6151,18 +6191,19 @@ struct TestSessionFactory {
     } else if let boundarySource = noSpaceBoundarySource,
       boundarySource.replacingOccurrences(of: " ", with: "") == prompt {
       let chunk = GeneratedWordChunk(source: boundarySource, configuration: configuration,
-        preservesNoSpaceBoundaries: true,
+        preservesNoSpaceBoundaries: true, showAllLines: generatesWholeLines,
         nextRandomCaseBit: nextRandomCaseBit)
       batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
     } else {
-      let chunk = GeneratedWordChunk(source: prompt, configuration: configuration,
+      let chunk = GeneratedWordChunk(source: prompt, configuration: configuration, showAllLines: generatesWholeLines,
         nextRandomCaseBit: nextRandomCaseBit)
       batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
     }
     let transformedPrompt = batch.text
     let noSpaceWordLengths = customSectionChunk?.noSpaceWordLengths ?? batch.noSpaceWordLengths
     let noSpaceTargetWords = customSectionChunk?.noSpaceTargetWords ?? batch.noSpaceTargetWords
-    let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
+    let repeats = (GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration, showAllLines: generatesWholeLines)
+      || hasIncompleteExternalPreview)
       && !hasCompleteRandomWordPrompt && !streamsRandomCustomText
       && !streamsSequentialCustomText
       && customSectionWordStream == nil
@@ -6180,6 +6221,7 @@ struct TestSessionFactory {
       : nil
     let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
       && !usesGeneratedCode && customSectionWordStream == nil
+      && !(generatesWholeLines && configuration.mode == .words)
       && (configuration.isInfinite
       || (configuration.mode == .custom
         && [.time, .words].contains(configuration.customTextCompletion)
@@ -6223,7 +6265,10 @@ struct TestSessionFactory {
         ? noSpaceWordLengths : [],
       repeatingNoSpaceTargetWords: repeats && generatedWordContinuation == nil
         && generatedStreamContinuation == nil && generatedCodeContinuation == nil
-        ? noSpaceTargetWords : [])
+        ? noSpaceTargetWords : [],
+      generationNotice: GeneratedPromptChunkPolicy.previewNotice(for: configuration, showAllLines: showAllLines)
+        ?? (hasIncompleteExternalPreview
+          ? "当前外部词源仅提供部分目标；当前目标保持不变，保留原有续接方式，未预览全部目标。" : nil))
   }
 
   static func weakSpotPrompt(
@@ -6247,10 +6292,10 @@ struct TestSessionFactory {
       usesZipfFrequency: configuration.modifiers.contains(.zipf))
   }
 
-  private static func streamWordCount(for configuration: TestConfiguration) -> Int? {
+  private static func streamWordCount(for configuration: TestConfiguration, showAllLines: Bool) -> Int? {
     switch configuration.mode {
     case .time, .words:
-      return GeneratedPromptChunkPolicy.wordCount(for: configuration)
+      return GeneratedPromptChunkPolicy.wordCount(for: configuration, showAllLines: showAllLines)
     case .quote, .zen, .custom:
       return nil
     }
