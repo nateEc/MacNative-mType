@@ -757,6 +757,12 @@ enum InputRuleCommandTarget: Equatable {
         case .codeUnindentOnBackspace(let enabled): settings.codeUnindentOnBackspace = enabled
         }
     }
+
+    @MainActor
+    func apply(to settings: AppSettings, session: inout TypingSession) {
+        apply(to: settings)
+        if case .hideExtraLetters(let enabled) = self { session.setHideExtraLetters(enabled) }
+    }
 }
 
 /// Mirrors the fixed reference command metadata and schema values while

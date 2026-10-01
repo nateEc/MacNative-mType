@@ -3808,6 +3808,13 @@ struct TypingSession {
     configuration.rules.blindMode = enabled
   }
 
+  /// Visibility changes do not accept input or erase retained extra errors.
+  /// Finished configurations stay immutable for their result and repeat.
+  mutating func setHideExtraLetters(_ enabled: Bool) {
+    guard !isFinished else { return }
+    configuration.rules.hideExtraLetters = enabled
+  }
+
   var completedPromptCharacterIndices: Set<Int> {
     TypedCharacterEffectPolicy.completedCharacterIndices(
       target: prompt, typed: typed, typedTargetIndices: typedTargetIndices, isFinished: isFinished)

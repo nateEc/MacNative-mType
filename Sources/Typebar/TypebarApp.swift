@@ -1186,6 +1186,7 @@ private struct ContentView: View {
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.blindMode) { _, enabled in session.setBlindMode(enabled) }
+    .onChange(of: settings.hideExtraLetters) { _, enabled in session.setHideExtraLetters(enabled) }
     .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.promptHighlightMode) { previous, selected in
@@ -1607,7 +1608,7 @@ private struct ContentView: View {
       titleVisibility: .visible
     ) {
       Button("中止并显示未保存结果", role: .destructive) {
-        session.setBlindMode(settings.blindMode)
+        synchronizePromptVisibility()
         session.bailOut()
       }
     } message: {
@@ -1848,7 +1849,7 @@ private struct ContentView: View {
   }
 
   private func advanceClock(at now: Date) {
-    session.setBlindMode(settings.blindMode)
+    synchronizePromptVisibility()
     capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
     verifyChallengeFontAvailability()
     if let startedAt = session.startedAt {
@@ -2522,12 +2523,12 @@ private struct ContentView: View {
         onBailoutArmed: armLongTestBailout,
         onBailout: {
           bailoutConfirmationMessage = nil
-          session.setBlindMode(settings.blindMode)
+          synchronizePromptVisibility()
           session.bailOut()
         },
         onQuickRestartProtectionRequired: showQuickRestartProtectionNotice,
         onFinishZen: {
-          session.setBlindMode(settings.blindMode)
+          synchronizePromptVisibility()
           session.finishZen()
         },
         onFocusChanged: { isFocused in
@@ -2540,7 +2541,7 @@ private struct ContentView: View {
         },
         onCompositionStarted: {
           if activeChallengeID != "mouse-warrior" {
-            session.setBlindMode(settings.blindMode)
+            synchronizePromptVisibility()
             session.beginComposition()
           }
         },
@@ -3193,10 +3194,15 @@ private struct ContentView: View {
     settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text
   }
 
+  private func synchronizePromptVisibility() {
+    session.setBlindMode(settings.blindMode)
+    session.setHideExtraLetters(settings.hideExtraLetters)
+  }
+
   private func handleInsertedText(
     _ text: String, forceError: Bool, origin: TypingInputOrigin = .physicalKeyboard
   ) {
-    session.setBlindMode(settings.blindMode)
+    synchronizePromptVisibility()
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     session.insertBatch(
@@ -3217,7 +3223,7 @@ private struct ContentView: View {
   }
 
   private func handleDeletedText(deletesWord: Bool) {
-    session.setBlindMode(settings.blindMode)
+    synchronizePromptVisibility()
     let before = session.typed
     if deletesWord { session.deleteWordBackward() }
     else { session.deleteBackward() }
@@ -3249,7 +3255,7 @@ private struct ContentView: View {
       if session.hasStarted && !session.isFinished {
         if session.canFinishInfiniteChallenge {
           Button("完成挑战并查看成绩") {
-            session.setBlindMode(settings.blindMode)
+            synchronizePromptVisibility()
             session.finishInfiniteChallenge()
           }
             .buttonStyle(.bordered)
@@ -3258,7 +3264,7 @@ private struct ContentView: View {
           shouldBailOutFromControls ? "中止并显示未保存结果" : "放弃本次测试",
           role: .destructive
         ) {
-          session.setBlindMode(settings.blindMode)
+          synchronizePromptVisibility()
           if shouldBailOutFromControls {
             session.bailOut()
           } else {
@@ -4310,7 +4316,7 @@ private struct ContentView: View {
     if let target = InputRuleCommandCatalog.target(for: item.id) {
       if target.requiresRestart, !acceptsRestartingConfigurationChange() { return }
       if target.exitsChallenge { activeChallengeID = nil }
-      target.apply(to: settings)
+      target.apply(to: settings, session: &session)
       if target.requiresRestart { reset() }
       return
     }
