@@ -2514,7 +2514,7 @@ enum TypingPromptPresentation {
   /// locally entered text itself as correct and retain a trailing caret.
   static func zenGlyphs(typed: String, isFinished: Bool, blindMode: Bool) -> [TypingPromptGlyph] {
     var output = typed.map {
-      TypingPromptGlyph(character: $0, state: blindMode ? .hidden : .correct)
+      TypingPromptGlyph(character: $0, state: .correct)
     }
     if !isFinished {
       output.append(.init(character: " ", state: .current))
@@ -2547,11 +2547,11 @@ enum TypingPromptPresentation {
       if let typedIndex = typedIndexByTarget[index] {
         state =
           blindMode
-          ? .hidden
+          ? .correct
           : typedCharacters[typedIndex] == targetCharacters[index] && !forcedErrorIndices.contains(index)
             ? .correct : .incorrect
       } else if index < activeTargetIndex {
-        state = blindMode ? .hidden : .incorrect
+        state = blindMode ? .correct : .incorrect
       } else if index == activeTargetIndex, !isFinished {
         state = .current
       } else {
@@ -2559,7 +2559,10 @@ enum TypingPromptPresentation {
       }
       return TypingPromptGlyph(
         character: targetCharacters[index], state: state,
-        typedCharacter: state == .incorrect ? typedIndexByTarget[index].map { typedCharacters[$0] } : nil)
+        typedCharacter: typedIndexByTarget[index].flatMap {
+          typedCharacters[$0] != targetCharacters[index] || forcedErrorIndices.contains(index)
+            ? typedCharacters[$0] : nil
+        })
     }
 
     if let visibleFutureWords, !isFinished {
@@ -2611,10 +2614,10 @@ enum TypingPromptPresentation {
       else { return nil }
       return character
     }
-    guard !extraCharacters.isEmpty else { return output }
+    guard !blindMode, !extraCharacters.isEmpty else { return output }
     output += extraCharacters.map {
       TypingPromptGlyph(
-        character: $0, state: blindMode || concealAll || hideExtraLetters ? .hidden : .extra)
+        character: $0, state: concealAll || hideExtraLetters ? .hidden : .extra)
     }
     return output
   }
@@ -3466,7 +3469,7 @@ enum PromptHighlightPolicy {
 }
 
 struct TypingSession {
-  let configuration: TestConfiguration
+  private(set) var configuration: TestConfiguration
   private(set) var prompt: String
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
@@ -3522,6 +3525,9 @@ struct TypingSession {
   /// Accuracy is an input-event metric. Unlike the rendered input, it keeps
   /// an incorrect attempt after the user deletes and corrects that character.
   private var inputAttemptCount = 0
+  /// Feedback follows the final attempted UTF-16 unit in one text event,
+  /// including attempts that stop/delete rules do not leave on screen.
+  private(set) var lastInputWasCorrect: Bool?
   /// Input/deletion/composition UI publishes hundredths, but a real-second
   /// timer update publishes the unrounded live cache. Neither alters scoring.
   private var roundsLiveAccuracyForInputDisplay = true
@@ -3728,6 +3734,12 @@ struct TypingSession {
       concealedCurrentAndFutureWords: hasStarted ? configuration.readAheadConcealedWordCount : nil,
       concealPendingCharacters: configuration.modifiers.contains(.simonSays)
     )
+  }
+
+  /// Runtime blind-mode changes have their own active-session boundary.
+  mutating func setBlindMode(_ enabled: Bool) {
+    guard !isFinished else { return }
+    configuration.rules.blindMode = enabled
   }
 
   var completedPromptCharacterIndices: Set<Int> {
@@ -4225,6 +4237,7 @@ struct TypingSession {
     evaluatesTerminalRulesOnLastCharacterOnly: Bool,
     origin: TypingInputOrigin = .physicalKeyboard
   ) {
+    lastInputWasCorrect = nil
     guard !isFinished, !text.isEmpty else { return }
     let characters = Array(text)
     let attemptsBeforeEvent = inputAttemptCount
@@ -4525,8 +4538,10 @@ struct TypingSession {
     let targetIndex = retainsCurrentWordAsExtra
       ? nil : earlyWordCommitTargetIndex ?? currentTargetIndex
     let isCorrect = !retainsCurrentWordAsExtra && inputCharacter == expected && !forceError
-    recordInputAttempt(inputCharacter, correctUnits: correctAccuracyUnits(
-      for: inputCharacter, targetIndex: currentTargetIndex, forceError: forceError))
+    let accuracyUnits = inputAccuracyUnits(
+      for: inputCharacter, targetIndex: currentTargetIndex, forceError: forceError)
+    recordInputAttempt(inputCharacter, correctUnits: accuracyUnits.correct,
+      lastUnitCorrect: accuracyUnits.lastCorrect)
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
     if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
     // Opposite Shift records a failed physical attempt, but the reference
@@ -4614,18 +4629,22 @@ struct TypingSession {
       .init(character: character, interval: roundedInterval, isCorrect: isCorrect))
   }
 
-  private mutating func recordInputAttempt(_ character: Character, correctUnits: Int) {
-    inputAttemptCount += String(character).utf16.count
+  private mutating func recordInputAttempt(
+    _ character: Character, correctUnits: Int, lastUnitCorrect: Bool? = nil
+  ) {
+    let units = String(character).utf16.count
+    inputAttemptCount += units
     correctInputAttemptCount += correctUnits
+    lastInputWasCorrect = lastUnitCorrect ?? (correctUnits == units)
   }
 
   /// Accuracy follows input-event units, not the native caret's grapheme
   /// position. A wrong emoji can share a correct surrogate with its target.
   /// Deletion changes the next comparison position but never these tallies.
-  private func correctAccuracyUnits(
+  private func inputAccuracyUnits(
     for character: Character, targetIndex: Int, forceError: Bool
-  ) -> Int {
-    guard !forceError, promptCharacters.indices.contains(targetIndex) else { return 0 }
+  ) -> (correct: Int, lastCorrect: Bool) {
+    guard !forceError, promptCharacters.indices.contains(targetIndex) else { return (0, false) }
     let target: String
     let position: Int
     if let range = activeNoSpaceWordRange, range.upperBound <= promptCharacters.count {
@@ -4644,9 +4663,13 @@ struct TypingSession {
       position = String(typed.reversed().prefix { !isPromptWordSeparator($0) }.reversed()).utf16.count
     }
     let targetUnits = Array(target.utf16)
-    return String(character).utf16.enumerated().filter { index, unit in
-      targetUnits.indices.contains(position + index) && targetUnits[position + index] == unit
-    }.count
+    var correct = 0
+    var lastCorrect = false
+    for (index, unit) in String(character).utf16.enumerated() {
+      lastCorrect = targetUnits.indices.contains(position + index) && targetUnits[position + index] == unit
+      if lastCorrect { correct += 1 }
+    }
+    return (correct, lastCorrect)
   }
 
   /// Zen accepts the user's own text rather than comparing it to a generated

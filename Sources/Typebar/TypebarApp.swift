@@ -1088,7 +1088,7 @@ private struct ContentView: View {
       : settings.animationFrameRate
   }
 
-  private var lifecycleContent: some View {
+  private var practiceLayout: some View {
     VStack(spacing: 30) {
       header
       RemoteAnnouncementBannerStack(center: announcements)
@@ -1144,7 +1144,7 @@ private struct ContentView: View {
           onInsert: {
             handleInsertedText($0, forceError: false, origin: .virtualKeyboard)
           },
-          onDelete: { session.deleteBackward() })
+          onDelete: { handleDeletedText(deletesWord: false) })
       }
       controls
       practiceKeyTips
@@ -1176,10 +1176,15 @@ private struct ContentView: View {
     }
     .tint(activeTheme.accent)
     .preferredColorScheme(themePreviewPresentation.preferredColorScheme)
+  }
+
+  private var configuredPracticeContent: some View {
+    practiceLayout
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
+    .onChange(of: settings.blindMode) { _, enabled in session.setBlindMode(enabled) }
     .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.promptHighlightMode) { previous, selected in
@@ -1216,6 +1221,10 @@ private struct ContentView: View {
     .modifier(
       NoQuitConfigurationLockSynchronizer(
         session: session, settings: settings, ownerID: noQuitConfigurationLockOwnerID))
+  }
+
+  private var lifecycleContent: some View {
+    configuredPracticeContent
     .task { await runClock() }
     .task(id: pendingPublicationRetryTrigger) { retryPendingPublicationsIfPossible() }
     .task(id: account.resultPublicationScope) { presentSignedOutResultClaimIfPossible() }
@@ -1596,7 +1605,10 @@ private struct ContentView: View {
       "中止当前长测试？", isPresented: $showingCommandBailoutConfirmation,
       titleVisibility: .visible
     ) {
-      Button("中止并显示未保存结果", role: .destructive) { session.bailOut() }
+      Button("中止并显示未保存结果", role: .destructive) {
+        session.setBlindMode(settings.blindMode)
+        session.bailOut()
+      }
     } message: {
       Text("结果不会保存、本机统计、同步或发布。")
     }
@@ -1835,6 +1847,7 @@ private struct ContentView: View {
   }
 
   private func advanceClock(at now: Date) {
+    session.setBlindMode(settings.blindMode)
     capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
     verifyChallengeFontAvailability()
     if let startedAt = session.startedAt {
@@ -2498,20 +2511,24 @@ private struct ContentView: View {
           handleInsertedText(text, forceError: forceError)
         },
         onDelete: {
-          if activeChallengeID != "mouse-warrior" { session.deleteBackward() }
+          if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: false) }
         },
         onDeleteWord: {
-          if activeChallengeID != "mouse-warrior" { session.deleteWordBackward() }
+          if activeChallengeID != "mouse-warrior" { handleDeletedText(deletesWord: true) }
         },
         onRestart: attemptRestart,
         onOpenCommandPalette: { showingCommandPalette = true },
         onBailoutArmed: armLongTestBailout,
         onBailout: {
           bailoutConfirmationMessage = nil
+          session.setBlindMode(settings.blindMode)
           session.bailOut()
         },
         onQuickRestartProtectionRequired: showQuickRestartProtectionNotice,
-        onFinishZen: { session.finishZen() },
+        onFinishZen: {
+          session.setBlindMode(settings.blindMode)
+          session.finishZen()
+        },
         onFocusChanged: { isFocused in
           if !isFocused { typingCompanionHands.reset() }
           handleTypingFocusChange(isFocused)
@@ -2521,14 +2538,20 @@ private struct ContentView: View {
           handleTypingWindowFocusChange(isFocused, hasAttachedSheet: hasAttachedSheet)
         },
         onCompositionStarted: {
-          if activeChallengeID != "mouse-warrior" { session.beginComposition() }
+          if activeChallengeID != "mouse-warrior" {
+            session.setBlindMode(settings.blindMode)
+            session.beginComposition()
+          }
         },
         onCompositionChanged: {
           let hadMarkedText = !compositionText.isEmpty
+          let playsCompositionClick = TypingInputSoundPlan.isAudibleCompositionUpdate(
+            previous: compositionText, current: $0)
           compositionText = $0
           if activeChallengeID != "mouse-warrior" {
             session.refreshLiveAccuracyAfterComposition(
               hadMarkedText: hadMarkedText, hasMarkedText: !$0.isEmpty)
+            if playsCompositionClick { playInputFeedback(inputWasCorrect: true) }
           }
         },
         shouldFinishWithComposition: { text, forceError in
@@ -2900,7 +2923,7 @@ private struct ContentView: View {
     let highlightedIndices = highlightedPromptIndices
     for (index, glyph) in session.promptGlyphs.enumerated() {
       glyphCharacterOffsets[index] = output.characters.count
-      let replacesTypo = glyph.state == .incorrect && settings.typoIndicatorStyle.replacesTarget
+      let replacesTypo = glyph.typedCharacter != nil && settings.typoIndicatorStyle.replacesTarget
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
         isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
         effect: settings.typedCharacterEffect)
@@ -3187,6 +3210,7 @@ private struct ContentView: View {
   private func handleInsertedText(
     _ text: String, forceError: Bool, origin: TypingInputOrigin = .physicalKeyboard
   ) {
+    session.setBlindMode(settings.blindMode)
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     session.insertBatch(
@@ -3203,11 +3227,25 @@ private struct ContentView: View {
         character: pressedCharacter,
         isCorrect: session.errors == errorsBefore)
     }
-    if settings.playKeyclickSound, session.typed.count > typedCountBefore {
+    playInputFeedback(inputWasCorrect: session.lastInputWasCorrect)
+  }
+
+  private func handleDeletedText(deletesWord: Bool) {
+    session.setBlindMode(settings.blindMode)
+    let before = session.typed
+    if deletesWord { session.deleteWordBackward() }
+    else { session.deleteBackward() }
+    if session.typed != before { playInputFeedback(inputWasCorrect: true) }
+  }
+
+  private func playInputFeedback(inputWasCorrect: Bool?) {
+    let plan = TypingInputSoundPlan(inputWasCorrect: inputWasCorrect, blindMode: settings.blindMode,
+      clickEnabled: settings.playKeyclickSound, errorEnabled: settings.playErrorBeep)
+    if plan.playsClick {
       TypingFeedbackSound.shared.playClick(
         style: settings.clickSoundStyle, volume: settings.soundVolume)
     }
-    if settings.playErrorBeep, session.errors > errorsBefore {
+    if plan.playsError {
       TypingFeedbackSound.shared.playError(
         style: settings.errorSoundStyle, volume: settings.soundVolume)
     }
@@ -3224,13 +3262,17 @@ private struct ContentView: View {
       Spacer()
       if session.hasStarted && !session.isFinished {
         if session.canFinishInfiniteChallenge {
-          Button("完成挑战并查看成绩") { session.finishInfiniteChallenge() }
+          Button("完成挑战并查看成绩") {
+            session.setBlindMode(settings.blindMode)
+            session.finishInfiniteChallenge()
+          }
             .buttonStyle(.bordered)
         }
         Button(
           shouldBailOutFromControls ? "中止并显示未保存结果" : "放弃本次测试",
           role: .destructive
         ) {
+          session.setBlindMode(settings.blindMode)
           if shouldBailOutFromControls {
             session.bailOut()
           } else {
@@ -4288,6 +4330,7 @@ private struct ContentView: View {
     }
     if let target = BehaviorCommandCatalog.target(for: item.id) {
       target.apply(to: settings)
+      if case .blindMode(let enabled) = target { session.setBlindMode(enabled) }
       return
     }
     if let target = PracticeThresholdCommandCatalog.target(for: item.id) {

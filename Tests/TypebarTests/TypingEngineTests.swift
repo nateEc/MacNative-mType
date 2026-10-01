@@ -18123,8 +18123,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       blind,
       [
-        .init(character: "a", state: .hidden),
-        .init(character: "x", state: .hidden),
+        .init(character: "a", state: .correct),
       ])
   }
 
