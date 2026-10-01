@@ -127,7 +127,7 @@ final class PromptWordAppearanceTests: XCTestCase {
     var session = TypingSession(configuration: .words(3, rules: .init(stopOnErrorMode: .word)),
       prompt: "abc bay cedar")
     session.insertBatch("a ", at: start)
-    XCTAssertEqual(session.typed, "a")
+    XCTAssertEqual(session.typed, "a ")
     XCTAssertFalse(session.promptWordPresentations[0].hasCommitError)
     XCTAssertTrue(plan(session, .letter).allSatisfy { !$0.hasErrorUnderline })
     XCTAssertEqual(session.preciseAccuracy, 50)

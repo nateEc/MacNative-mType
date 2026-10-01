@@ -9,6 +9,12 @@ import XCTest
 final class TypingEngineTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 10_000)
 
+  /// Complete authored programs are custom text, not a word-count fixture.
+  private func codeTextConfiguration(language: TypingLanguage) -> TestConfiguration {
+    .init(mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
+      rules: .init(), language: language, customTextCompletion: .finish)
+  }
+
   func testFreshTestDefaultsMatchPinnedReferenceWithoutChangingLegacyMemory() {
     XCTAssertEqual(TypebarTestParameterMemory.defaults.duration, 30)
     XCTAssertEqual(TypebarTestParameterMemory.defaults.wordLimit, 50)
@@ -1867,7 +1873,9 @@ final class TypingEngineTests: XCTestCase {
     var session = TypingSession(
       configuration: .timed(seconds: 30, rules: rules), prompt: "amber bay")
     session.insert("amxer ", at: start)
-    XCTAssertEqual(session.typed, "amxer")
+    XCTAssertEqual(session.typed, "amxer ")
+
+    session.deleteBackward(at: start.addingTimeInterval(1))
 
     session.deleteBackward(at: start.addingTimeInterval(1))
     session.deleteBackward(at: start.addingTimeInterval(1))
@@ -10713,7 +10721,7 @@ final class TypingEngineTests: XCTestCase {
 
   func testCodePracticeAutoIndentsUnindentsReplaysAndFinishesWordMode() {
     let configuration = TestConfiguration.words(
-      1, rules: .init(codeUnindentOnBackspace: true), language: .codeSwift)
+      5, rules: .init(codeUnindentOnBackspace: true), language: .codeSwift)
     let start = Date(timeIntervalSince1970: 2_000)
     var session = TypingSession(configuration: configuration, prompt: "if ready {\n\tgo()\n}")
 
@@ -10734,7 +10742,7 @@ final class TypingEngineTests: XCTestCase {
   func testCodeUnindentUsesIndentationRemainingAfterBackspace() {
     let prompt = "if ready {\n\tgo()\n}"
     let configuration = TestConfiguration.words(
-      1, rules: .init(codeUnindentOnBackspace: true), language: .codeSwift)
+      5, rules: .init(codeUnindentOnBackspace: true), language: .codeSwift)
     var session = TypingSession(configuration: configuration, prompt: prompt)
 
     session.insert("if ready {\n", at: start)
@@ -10766,7 +10774,7 @@ final class TypingEngineTests: XCTestCase {
 
     var disabled = TypingSession(
       configuration: .words(
-        1, rules: .init(codeUnindentOnBackspace: false), language: .codeSwift),
+        5, rules: .init(codeUnindentOnBackspace: false), language: .codeSwift),
       prompt: prompt)
     disabled.insert("if ready {\n\t", at: start)
     disabled.deleteBackward(at: start.addingTimeInterval(1))
@@ -10883,7 +10891,7 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertFalse(language.supportsQuotes, language.displayName)
       XCTAssertFalse(language.usesSpaceDelimitedWords, language.displayName)
 
-      var session = TypingSession(configuration: .words(9, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         if character == "\t", session.typed.last == "\t" { continue }
         session.insert(String(character), at: start)
@@ -10898,13 +10906,14 @@ final class TypingEngineTests: XCTestCase {
     let start = Date(timeIntervalSince1970: 3_000)
     for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
       for wordCount in [25, 100, 800] {
-        let prompt = OfflineContent.generatedPrompt(
-          wordCount: wordCount, language: language, contentOptions: .init())
-        var session = TypingSession(configuration: .words(wordCount, language: language), prompt: prompt)
-        for character in prompt {
-          if character == "\t", session.typed.last == "\t" { continue }
-          session.insert(String(character), at: start)
+        var session = TestSessionFactory.make(configuration: .words(wordCount, language: language))
+        let batches = (wordCount + 99) / 100
+        for batch in 0..<batches {
+          let remaining = String(session.prompt.dropFirst(session.typed.count))
+          session.insertBatch(remaining + (batch < batches - 1 ? " " : ""), at: start)
         }
+        let prompt = session.prompt
+        XCTAssertEqual(prompt.split(whereSeparator: \.isWhitespace).count, wordCount)
         XCTAssertTrue(session.isFinished, "\(language.displayName), \(wordCount) words")
         XCTAssertEqual(session.typed, prompt, "\(language.displayName), \(wordCount) words")
         XCTAssertEqual(session.result(at: start)?.prompt, prompt, "\(language.displayName), \(wordCount) words")
@@ -10913,13 +10922,14 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testCodeWordPracticeDoesNotStopInsideACompletePrompt() {
-    let prompt = "fn main() { let value = 3; println!(\"{}\", value); }"
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(2, language: .codeRust), prompt: prompt)
+    var session = TestSessionFactory.make(configuration: .words(2, language: .codeRust))
+    let prompt = session.prompt
+    XCTAssertEqual(prompt.split(separator: " ").count, 2)
     for (index, character) in prompt.enumerated() {
       session.insert(String(character), at: start)
       if index < prompt.count - 1 {
-        XCTAssertFalse(session.isFinished, "Stopped before closing the code block at \(index)")
+        XCTAssertFalse(session.isFinished, "Stopped before the second word ended at \(index)")
       }
     }
     XCTAssertTrue(session.isFinished)
@@ -11103,7 +11113,7 @@ final class TypingEngineTests: XCTestCase {
 
     let prompt = CodePracticeContent.prompt(language: .codeCSharp, targetTokenCount: 25)
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(25, language: .codeCSharp), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: .codeCSharp), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: start)
     }
@@ -11145,7 +11155,7 @@ final class TypingEngineTests: XCTestCase {
 
     let prompt = CodePracticeContent.prompt(language: .codeSwift, targetTokenCount: 25)
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(25, language: .codeSwift), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: .codeSwift), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: start)
     }
@@ -11172,7 +11182,7 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       let start = Date(timeIntervalSince1970: 3_000)
-      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
       }
@@ -11227,7 +11237,7 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       let start = Date(timeIntervalSince1970: 3_000)
-      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
       }
@@ -11299,7 +11309,7 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       let start = Date(timeIntervalSince1970: 3_000)
-      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
       }
@@ -11351,7 +11361,7 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       let start = Date(timeIntervalSince1970: 3_000)
-      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
       }
@@ -11398,7 +11408,7 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       let start = Date(timeIntervalSince1970: 3_000)
-      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
       }
@@ -11443,7 +11453,7 @@ final class TypingEngineTests: XCTestCase {
 
     let prompt = CodePracticeContent.prompt(language: .codeSQL, targetTokenCount: 25)
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(25, language: .codeSQL), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: .codeSQL), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: start)
     }
@@ -11495,7 +11505,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self), "10\n")
 
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(25, language: .codeBash), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: .codeBash), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: start)
     }
@@ -11538,7 +11548,7 @@ final class TypingEngineTests: XCTestCase {
 
     let prompt = CodePracticeContent.prompt(language: .codeHTML, targetTokenCount: 25)
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(25, language: .codeHTML), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: .codeHTML), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: start)
     }
@@ -11565,7 +11575,7 @@ final class TypingEngineTests: XCTestCase {
 
     let prompt = CodePracticeContent.prompt(language: .codeCSS, targetTokenCount: 25)
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(25, language: .codeCSS), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: .codeCSS), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: start)
     }
@@ -11590,7 +11600,7 @@ final class TypingEngineTests: XCTestCase {
 
     let prompt = CodePracticeContent.prompt(language: .codeDart, targetTokenCount: 25)
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(25, language: .codeDart), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: .codeDart), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: start)
     }
@@ -11628,7 +11638,7 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       let start = Date(timeIntervalSince1970: 3_000)
-      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
       }
@@ -11661,7 +11671,7 @@ final class TypingEngineTests: XCTestCase {
     let start = Date(timeIntervalSince1970: 3_000)
     for language in [TypingLanguage.codeLaTeX, .codeTypst] {
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
-      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
       }
@@ -11697,7 +11707,7 @@ final class TypingEngineTests: XCTestCase {
 
       let prompt = CodePracticeContent.prompt(language: language, targetTokenCount: 25)
       let start = Date(timeIntervalSince1970: 3_000)
-      var session = TypingSession(configuration: .words(25, language: language), prompt: prompt)
+      var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
       for character in prompt {
         session.insert(String(character), at: start)
       }
@@ -11767,7 +11777,7 @@ final class TypingEngineTests: XCTestCase {
 
     let prompt = CodePracticeContent.prompt(language: .codeVimscript, targetTokenCount: 25)
     let start = Date(timeIntervalSince1970: 3_000)
-    var session = TypingSession(configuration: .words(25, language: .codeVimscript), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: .codeVimscript), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: start)
     }
@@ -11792,7 +11802,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(prompt.contains("WORKDIR /practice"))
     XCTAssertTrue(prompt.contains("\n"))
 
-    var session = TypingSession(configuration: .words(9, language: language), prompt: prompt)
+    var session = TypingSession(configuration: codeTextConfiguration(language: language), prompt: prompt)
     for character in prompt {
       session.insert(String(character), at: Date(timeIntervalSince1970: 4_000))
     }

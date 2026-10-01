@@ -14,16 +14,18 @@ struct TypingWordCredit {
     return .init(characters: input.count, inputUnits: inputUnits.count)
   }
 
-  static func words(target: String, input: String, creditsActivePrefix: Bool) -> Self {
+  static func words(target: String, input: String, creditsActivePrefix: Bool,
+    retainedSeparatorIndices: Set<Int> = []) -> Self {
     let targets = wordsWithCommits(target)
-    let inputs = wordsWithCommits(input)
+    let inputs = wordsWithCommits(input, retainedSeparatorIndices: retainedSeparatorIndices)
     return inputs.enumerated().reduce(into: Self()) { total, entry in
       let (index, text) = entry
       let credit: Self
       if targets.indices.contains(index) {
         credit = word(target: targets[index], input: text,
           creditsPrefix: creditsActivePrefix && index == inputs.count - 1
-            && text.last.map(isPromptWordSeparator) != true)
+            && (text.last.map(isPromptWordSeparator) != true
+              || retainedSeparatorIndices.contains(input.count - 1)))
       } else {
         // No retained target means self-entered content, not invented errors.
         credit = .init(characters: text.count, inputUnits: text.utf16.count)
@@ -33,12 +35,13 @@ struct TypingWordCredit {
     }
   }
 
-  private static func wordsWithCommits(_ text: String) -> [String] {
+  private static func wordsWithCommits(_ text: String,
+    retainedSeparatorIndices: Set<Int> = []) -> [String] {
     var words: [String] = []
     var current = ""
-    for character in text {
+    for (index, character) in text.enumerated() {
       current.append(character)
-      if isPromptWordSeparator(character) {
+      if isPromptWordSeparator(character), !retainedSeparatorIndices.contains(index) {
         words.append(current)
         current = ""
       }

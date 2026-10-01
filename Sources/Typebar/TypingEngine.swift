@@ -2887,20 +2887,24 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   let text: String
   let forceError: Bool
   let automatic: Bool
+  /// Missing in older archives; false preserves a separator in its input
+  /// field when word-stop accepts the key but prevents navigation.
+  let commitsWord: Bool?
   var id: String { "\(offset)-\(kind.rawValue)-\(text)" }
 
   init(
     offset: TimeInterval, kind: TypingReplayEventKind, text: String, forceError: Bool = false,
-    automatic: Bool = false
+    automatic: Bool = false, commitsWord: Bool? = nil
   ) {
     self.offset = offset
     self.kind = kind
     self.text = text
     self.forceError = forceError
     self.automatic = automatic
+    self.commitsWord = commitsWord
   }
 
-  private enum CodingKeys: String, CodingKey { case offset, kind, text, forceError, automatic }
+  private enum CodingKeys: String, CodingKey { case offset, kind, text, forceError, automatic, commitsWord }
 
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -2909,6 +2913,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     text = try values.decode(String.self, forKey: .text)
     forceError = try values.decodeIfPresent(Bool.self, forKey: .forceError) ?? false
     automatic = try values.decodeIfPresent(Bool.self, forKey: .automatic) ?? false
+    commitsWord = try values.decodeIfPresent(Bool.self, forKey: .commitsWord)
   }
 }
 
@@ -2977,6 +2982,7 @@ enum TypingReplay {
     var output: [TypingPromptGlyph] = []
     var typedWord = 0
     var typedPosition = 0
+    var retainedSeparators = Set<Int>()
     for event in chronologicalEvents(events) {
       guard event.offset <= elapsed else { break }
       switch event.kind {
@@ -2991,15 +2997,20 @@ enum TypingReplay {
           } else {
             state = .extra
           }
+          if isPromptWordSeparator(character), event.commitsWord == false {
+            retainedSeparators.insert(typed.count)
+          }
           typed.append(character)
           output.append(.init(character: character, state: state))
-          advanceCursor(for: character, word: &typedWord, position: &typedPosition)
+          advanceCursor(for: character, word: &typedWord, position: &typedPosition,
+            commitsWord: event.commitsWord)
         }
       case .delete:
         guard !typed.isEmpty else { continue }
+        retainedSeparators.remove(typed.count - 1)
         typed.removeLast()
         output.removeLast()
-        (typedWord, typedPosition) = cursorPosition(after: typed)
+        (typedWord, typedPosition) = cursorPosition(after: typed, retainedSeparators: retainedSeparators)
       }
     }
     return output
@@ -3018,6 +3029,7 @@ enum TypingReplay {
     var typedPosition = 0
     var currentWordContainsError = false
     var cues: [TypingReplaySoundCue] = []
+    var retainedSeparators = Set<Int>()
 
     for event in chronologicalEvents(events) {
       guard event.offset <= upperBound else { break }
@@ -3039,10 +3051,14 @@ enum TypingReplay {
             eventContainsError = true
           }
           eventContainsError = eventContainsError || characterIsIncorrect
+          if isPromptWordSeparator(character), event.commitsWord == false {
+            retainedSeparators.insert(typed.count)
+          }
           typed.append(character)
           typedErrors.append(characterIsIncorrect)
-          advanceCursor(for: character, word: &typedWord, position: &typedPosition)
-          if isPromptWordSeparator(character) {
+          advanceCursor(for: character, word: &typedWord, position: &typedPosition,
+            commitsWord: event.commitsWord)
+          if isPromptWordSeparator(character), event.commitsWord != false {
             currentWordContainsError = false
           } else {
             currentWordContainsError = currentWordContainsError || characterIsIncorrect
@@ -3053,12 +3069,14 @@ enum TypingReplay {
         }
       case .delete:
         if !typed.isEmpty {
+          retainedSeparators.remove(typed.count - 1)
           typed.removeLast()
           typedErrors.removeLast()
-          (typedWord, typedPosition) = cursorPosition(after: typed)
-          currentWordContainsError = zip(typed, typedErrors).reversed()
-            .prefix { !isPromptWordSeparator($0.0) }
-            .contains { $0.1 }
+          (typedWord, typedPosition) = cursorPosition(after: typed, retainedSeparators: retainedSeparators)
+          let lastCommit = typed.indices.last {
+            isPromptWordSeparator(typed[$0]) && !retainedSeparators.contains($0)
+          }.map { $0 + 1 } ?? 0
+          currentWordContainsError = typedErrors[lastCommit...].contains(true)
         }
         cue = .click
       }
@@ -3079,6 +3097,7 @@ enum TypingReplay {
     var typed: [Character] = []
     var typedWord = 0
     var typedPosition = 0
+    var retainedSeparators = Set<Int>()
     for event in chronologicalEvents(events) {
       switch event.kind {
       case .insert:
@@ -3088,14 +3107,19 @@ enum TypingReplay {
           if let promptIndex = promptCoordinates[coordinate], offsets[promptIndex] == nil {
             offsets[promptIndex] = event.offset
           }
+          if isPromptWordSeparator(character), event.commitsWord == false {
+            retainedSeparators.insert(typed.count)
+          }
           typed.append(character)
           advanceCursor(
-            for: character, word: &typedWord, position: &typedPosition)
+            for: character, word: &typedWord, position: &typedPosition,
+            commitsWord: event.commitsWord)
         }
       case .delete:
         guard !typed.isEmpty else { continue }
+        retainedSeparators.remove(typed.count - 1)
         typed.removeLast()
-        (typedWord, typedPosition) = cursorPosition(after: typed)
+        (typedWord, typedPosition) = cursorPosition(after: typed, retainedSeparators: retainedSeparators)
       }
     }
     return offsets
@@ -3121,9 +3145,9 @@ enum TypingReplay {
   }
 
   private static func advanceCursor(
-    for character: Character, word: inout Int, position: inout Int
+    for character: Character, word: inout Int, position: inout Int, commitsWord: Bool? = nil
   ) {
-    if isPromptWordSeparator(character) {
+    if isPromptWordSeparator(character), commitsWord != false {
       word += 1
       position = 0
     } else {
@@ -3131,11 +3155,13 @@ enum TypingReplay {
     }
   }
 
-  private static func cursorPosition(after characters: [Character]) -> (word: Int, position: Int) {
+  private static func cursorPosition(after characters: [Character],
+    retainedSeparators: Set<Int>) -> (word: Int, position: Int) {
     var word = 0
     var position = 0
-    for character in characters {
-      advanceCursor(for: character, word: &word, position: &position)
+    for (index, character) in characters.enumerated() {
+      advanceCursor(for: character, word: &word, position: &position,
+        commitsWord: retainedSeparators.contains(index) ? false : nil)
     }
     return (word, position)
   }
@@ -3516,6 +3542,7 @@ struct TypingSession {
   /// A word can be submitted early with space, so this cannot always be
   /// inferred from the input string's character offset.
   private var typedTargetIndices: [Int?] = []
+  private var retainedWordSeparatorTypedIndices = Set<Int>()
   /// A blind word commit neutralizes its untouched letters. That display
   /// survives a later blind toggle, but is discarded when the word is reopened.
   /// It is not an input attempt, validation override, or persisted result field.
@@ -3630,6 +3657,10 @@ struct TypingSession {
 
   var isFinished: Bool { outcome != .active }
   var hasStarted: Bool { startedAt != nil }
+  /// Code has the same word-commit input rules as ordinary generated words.
+  var usesWordCommitInput: Bool {
+    configuration.language.usesSpaceDelimitedWords || configuration.language.isCodeLanguage
+  }
   /// A matching conversion may confirm the final word without an extra IME
   /// action. Probe the ordinary input path on a value copy, so all finite
   /// limits and difficulty rules remain owned by the engine, not AppKit.
@@ -3650,7 +3681,7 @@ struct TypingSession {
       currentInput = String(Array(typed)[range.lowerBound...])
     } else {
       wordIndex = promptCharacters.prefix(nextTargetIndex).filter(isPromptWordSeparator).count
-      currentInput = String(splitPromptWords(typed, omittingEmptySubsequences: false).last ?? "")
+      currentInput = String(retainedInputWords(omittingEmptySubsequences: false).last ?? "")
     }
     guard let range = targetRange(forWord: wordIndex),
       !hasError(inWord: wordIndex, indices: forcedErrorIndices)
@@ -3671,7 +3702,7 @@ struct TypingSession {
   }
   var usesIncrementalPromptExtension: Bool {
     generatedWordContinuation != nil || generatedStreamContinuation != nil
-      || generatedCodeContinuation != nil
+      || generatedCodeContinuation?.hasRemaining == true
       || repeatingPrompt?.isEmpty == false
       || randomCustomSourceTokens?.isEmpty == false
       || sequentialCustomWordStream != nil || finiteCustomTextStream?.hasRemaining == true
@@ -3737,7 +3768,7 @@ struct TypingSession {
       typedTargetIndices: typedTargetIndices,
       currentTargetIndex: nextTargetIndex,
       hideExtraLetters: configuration.rules.hideExtraLetters,
-      visibleFutureWords: configuration.language.usesSpaceDelimitedWords
+      visibleFutureWords: usesWordCommitInput
         ? configuration.visibleFutureWordCount : nil,
       concealAll: configuration.modifiers.contains(.memory) && hasStarted && !isFinished,
       concealedCurrentAndFutureWords: hasStarted ? configuration.readAheadConcealedWordCount : nil,
@@ -3893,7 +3924,8 @@ struct TypingSession {
       }
       return .init(characters: max(0, typed.count - errors), inputUnits: max(0, typed.utf16.count - errorUnits))
     }
-    return TypingWordCredit.words(target: prompt, input: typed, creditsActivePrefix: countPartialLastWord)
+    return TypingWordCredit.words(target: prompt, input: typed, creditsActivePrefix: countPartialLastWord,
+      retainedSeparatorIndices: retainedWordSeparatorTypedIndices)
   }
 
   /// No-space input visually flattens its prompt but still advances through
@@ -4037,12 +4069,13 @@ struct TypingSession {
       }
       return bursts
     }
-    guard configuration.language.usesSpaceDelimitedWords,
+    guard usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), !typed.isEmpty
     else { return [] }
     var bursts: [Int?] = []
     var wordStart = 0
-    for index in characters.indices where isPromptWordSeparator(characters[index]) {
+    for index in characters.indices where isPromptWordSeparator(characters[index])
+      && !retainedWordSeparatorTypedIndices.contains(index) {
       bursts.append(wordBurst(
         from: wordStart, through: index, in: characters, includesTrailingSpace: true))
       wordStart = index + 1
@@ -4131,7 +4164,7 @@ struct TypingSession {
   /// space delimiters, or with safely reconstructed no-space boundaries.
   var wordReviews: [TypedWordReview] {
     guard (!typed.isEmpty || !attemptedErrorCounts.isEmpty),
-      (configuration.language.usesSpaceDelimitedWords || hasNoSpaceWordSegmentation)
+      (usesWordCommitInput || hasNoSpaceWordSegmentation)
     else { return [] }
     let targetWords = resultTargetWords
     guard !targetWords.isEmpty else { return [] }
@@ -4139,8 +4172,8 @@ struct TypingSession {
     if hasNoSpaceWordSegmentation {
       return noSpaceWordReviews(targetWords: targetWords, attemptedErrors: attemptedErrors)
     }
-    let typedWords = splitPromptWords(typed, omittingEmptySubsequences: false).map(String.init)
-    let finalAttemptedCount = typed.last.map(isPromptWordSeparator) == true
+    let typedWords = retainedInputWords(omittingEmptySubsequences: false).map(String.init)
+    let finalAttemptedCount = lastInputCommitsWord
       ? max(0, typedWords.count - 1) : typedWords.count
     let historicalAttemptedCount = attemptedErrors.indices.last(where: { attemptedErrors[$0] > 0 })
       .map { $0 + 1 } ?? 0
@@ -4174,7 +4207,7 @@ struct TypingSession {
     if configuration.wordLimit == 0 { return "\(completedWordCount)" }
     if let remaining = remainingSeconds(at: date) { return "\(remaining)s" }
     guard let wordLimit = configuration.wordLimit,
-      (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts)
+      (usesWordCommitInput || tracksNoSpaceWordBursts)
     else { return nil }
     return "\(min(wordLimit, completedWordCount))/\(wordLimit)"
   }
@@ -4197,7 +4230,7 @@ struct TypingSession {
       return (1 - Double(elapsedSeconds + 1) / duration).clamped(to: 0...1)
     }
     guard let wordLimit = configuration.wordLimit,
-      (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts)
+      (usesWordCommitInput || tracksNoSpaceWordBursts)
     else { return nil }
     if wordLimit == 0 { return 0 }
     return Double(min(wordLimit, completedWordCount)) / Double(wordLimit)
@@ -4381,7 +4414,7 @@ struct TypingSession {
     }
     if inputAttemptCount > attemptsBeforeEvent { roundsLiveAccuracyForInputDisplay = true }
     if usesIncrementalPromptExtension,
-      (!configuration.language.usesSpaceDelimitedWords
+      (!usesWordCommitInput
         || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)),
       nextTargetIndex >= promptCharacters.count, !reachedConfiguredWordLimit
     {
@@ -4428,16 +4461,16 @@ struct TypingSession {
     }
 
     var removedCurrentWord = false
-    while let last = typed.last, !isPromptWordSeparator(last) {
+    while !typed.isEmpty, !lastInputCommitsWord {
       removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", at: date)
       removedCurrentWord = true
     }
-    guard !removedCurrentWord, typed.last.map(isPromptWordSeparator) == true else { return }
+    guard !removedCurrentWord, lastInputCommitsWord else { return }
 
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", at: date)
-    while let last = typed.last, !isPromptWordSeparator(last) {
+    while !typed.isEmpty, !lastInputCommitsWord {
       removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", at: date)
     }
@@ -4445,12 +4478,11 @@ struct TypingSession {
 
   private var canDeleteBackward: Bool {
     if configuration.rules.confidenceMode == .maximum { return false }
-    guard !configuration.rules.freedomMode, typed.last.map(isPromptWordSeparator) == true else {
+    guard !configuration.rules.freedomMode, lastInputCommitsWord else {
       return true
     }
     if configuration.rules.confidenceMode == .on { return false }
-    let completedWords = splitPromptWords(
-      String(typed.dropLast()), omittingEmptySubsequences: true)
+    let completedWords = retainedInputWords(omittingEmptySubsequences: true)
     guard let typedWord = completedWords.last else { return true }
     let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: true)
     let index = completedWords.count - 1
@@ -4599,10 +4631,39 @@ struct TypingSession {
       character,
       expected: currentTargetIndex < promptCharacters.count ? promptCharacters[currentTargetIndex] : nil)
     let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !inputWordIsEmpty
+    // Ignore an ordinary leading space before word-stop can retain it.
+    // Strict space and expert/master instead keep it in the current field.
+    if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator,
+      currentTargetIndex < promptCharacters.count,
+      promptCharacters[currentTargetIndex] != " " { return false }
+    let retainsStoppedSeparator = configuration.rules.stopOnErrorMode == .word
+      && usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+      && isPromptWordSeparator(inputCharacter) && !currentWordIsCorrect
     if let inputLimit = currentSpaceDelimitedWordInputLimit,
-      activeInputWordUTF16Length >= inputLimit, !commitsCurrentWord
+      activeInputWordUTF16Length >= inputLimit,
+      !commitsCurrentWord || retainsStoppedSeparator
     {
       return false
+    }
+    if retainsStoppedSeparator {
+      beginIfNeeded(at: date)
+      let units = inputAccuracyUnits(for: inputCharacter,
+        targetIndex: currentTargetIndex, forceError: forceError)
+      recordInputAttempt(inputCharacter, correctUnits: units.correct, lastUnitCorrect: units.lastCorrect)
+      recordWeakSpotInput(inputCharacter, isCorrect: units.lastCorrect, at: date)
+      if !units.lastCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
+      if rejectsOppositeShiftInput {
+        if evaluatesTerminalRules, configuration.difficulty == .master { fail(at: date) }
+        return false
+      }
+      retainedWordSeparatorTypedIndices.insert(typedGraphemeCount)
+      appendTypedCharacter(inputCharacter, targetIndex: nil,
+        countsAsExtraError: !units.lastCorrect, at: date)
+      if evaluatesTerminalRules,
+        (configuration.difficulty == .expert && commitsCurrentWord)
+          || (configuration.difficulty == .master && !units.lastCorrect)
+      { fail(at: date) }
+      return true
     }
     if currentTargetIndex >= promptCharacters.count {
       beginIfNeeded(at: date)
@@ -4614,14 +4675,6 @@ struct TypingSession {
       recordWordBurstIfCommitted()
       recordNoSpaceWordBurstIfCommitted()
       return true
-    }
-    // In normal difficulty, a leading separator is ignored unless the user
-    // explicitly enables strict space or a hard delete rule needs the key to
-    // reach its own recovery path. Other difficulties keep the key as a
-    // correctable input error instead of silently skipping it.
-    if inputCharacter == " " && inputWordIsEmpty && shouldRejectLeadingSeparator,
-      promptCharacters[currentTargetIndex] != " " {
-      return false
     }
     beginIfNeeded(at: date)
     let expected = promptCharacters[currentTargetIndex]
@@ -4650,7 +4703,7 @@ struct TypingSession {
     let blocksNoSpaceWordAdvance = shouldBlockNoSpaceWordAdvance(
       with: inputCharacter, forceError: forceError)
     if configuration.modifiers.contains(.correctBeforeAdvance),
-      (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts),
+      (usesWordCommitInput || tracksNoSpaceWordBursts),
       ((isPromptWordSeparator(inputCharacter) && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
         && !currentWordIsCorrect)
         || blocksNoSpaceWordAdvance)
@@ -4658,10 +4711,8 @@ struct TypingSession {
       return false
     }
     if configuration.rules.stopOnErrorMode == .word,
-      (configuration.language.usesSpaceDelimitedWords || tracksNoSpaceWordBursts),
-      ((isPromptWordSeparator(inputCharacter) && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
-        && !currentWordIsCorrect)
-        || blocksNoSpaceWordAdvance)
+      (usesWordCommitInput || tracksNoSpaceWordBursts),
+      blocksNoSpaceWordAdvance
     {
       return false
     }
@@ -4683,7 +4734,7 @@ struct TypingSession {
       return false
     }
     if !isCorrect && configuration.modifiers.contains(.clearCurrentWordOnError),
-      configuration.language.usesSpaceDelimitedWords,
+      usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     {
       clearCurrentWord(at: date)
@@ -4743,7 +4794,7 @@ struct TypingSession {
     let start = promptCharacters[..<targetIndex].lastIndex(where: isPromptWordSeparator)
       .map { $0 + 1 } ?? 0
     let end = isPromptWordSeparator(promptCharacters[targetIndex]) ? targetIndex : targetIndex + 1
-    let input = String(typed.reversed().prefix { !isPromptWordSeparator($0) }.reversed())
+    let input = inputWordText()
     let target = String(promptCharacters[start..<end])
     let correct = input == target && promptCharacters[targetIndex] == character
       && !(start..<end).contains { forcedErrorIndices.contains($0) }
@@ -4781,7 +4832,7 @@ struct TypingSession {
       let separator = promptCharacters[targetIndex...].firstIndex(where: isPromptWordSeparator)
       let end = separator.map { $0 + 1 } ?? promptCharacters.count
       target = String(promptCharacters[start..<end])
-      position = String(typed.reversed().prefix { !isPromptWordSeparator($0) }.reversed()).utf16.count
+      position = activeInputWordUTF16Length
     }
     let targetUnits = Array(target.utf16)
     var correct = 0
@@ -4813,8 +4864,8 @@ struct TypingSession {
 
   private var currentWordIsCorrect: Bool {
     let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: true)
-    let typedWords = splitPromptWords(typed, omittingEmptySubsequences: false)
-    let wordIndex = typed.last.map(isPromptWordSeparator) == true
+    let typedWords = retainedInputWords(omittingEmptySubsequences: false)
+    let wordIndex = lastInputCommitsWord
       ? max(typedWords.count - 1, 0) : typedWords.count - 1
     guard wordIndex >= 0, wordIndex < targetWords.count, wordIndex < typedWords.count else {
       return false
@@ -4833,7 +4884,7 @@ struct TypingSession {
       }
       return
     }
-    while let last = typed.last, !isPromptWordSeparator(last) {
+    while !typed.isEmpty, !lastInputCommitsWord {
       removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
     }
@@ -4853,7 +4904,7 @@ struct TypingSession {
     recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
 
     if mode.returnsToPreviousWordAtStart && activeWordWasEmpty,
-      ((configuration.language.usesSpaceDelimitedWords
+      ((usesWordCommitInput
         && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)) || tracksNoSpaceWordBursts), !typed.isEmpty
     {
       removePreviousWordForHardDelete(
@@ -4893,7 +4944,7 @@ struct TypingSession {
       }
       return
     }
-    guard typed.last.map(isPromptWordSeparator) == true else { return }
+    guard lastInputCommitsWord else { return }
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
     if clearingWord {
@@ -4910,11 +4961,13 @@ struct TypingSession {
     replayEvents.append(
       .init(
         offset: max(0, date.timeIntervalSince(startedAt)), kind: kind, text: text,
-        forceError: forceError, automatic: automatic))
+        forceError: forceError, automatic: automatic,
+        commitsWord: kind == .insert && retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
+          ? false : nil))
   }
 
   private func errorsInCurrentWord() -> Int {
-    let typedWords = splitPromptWords(typed, omittingEmptySubsequences: false)
+    let typedWords = retainedInputWords(omittingEmptySubsequences: false)
     let promptWords = splitPromptWords(prompt, omittingEmptySubsequences: false)
     guard let typedWord = typedWords.dropLast().last, typedWords.count - 2 < promptWords.count
     else { return 0 }
@@ -4922,6 +4975,7 @@ struct TypingSession {
     let typedCharacters = Array(typed)
     let wordStart = typedCharacters.indices.reversed().first(where: {
       $0 < typedCharacters.count - 1 && isPromptWordSeparator(typedCharacters[$0])
+        && !retainedWordSeparatorTypedIndices.contains($0)
     }).map { $0 + 1 } ?? 0
     return zip(typedWord, promptWord).enumerated().reduce(0) { total, pair in
       total + (pair.element.0 == pair.element.1 && !forcedErrorIndices.contains(wordStart + pair.offset) ? 0 : 1)
@@ -4951,11 +5005,12 @@ struct TypingSession {
   }
 
   private mutating func recordWordBurstIfCommitted() {
-    guard typed.last.map(isPromptWordSeparator) == true else { return }
+    guard lastInputCommitsWord else { return }
     if !typedNeedsFullSegmentation {
       let end = typedCharacterDates.count - 1
-      let wordLength = typed.reversed().dropFirst()
-        .prefix { !isPromptWordSeparator($0) }.count
+      let wordLength = retainedWordSeparatorTypedIndices.isEmpty
+        ? typed.reversed().dropFirst().prefix { !isPromptWordSeparator($0) }.count
+        : inputWordText(omittingLastCommit: true).count
       let start = end - wordLength
       guard start >= 0, start < end else { return }
       let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
@@ -4966,8 +5021,9 @@ struct TypingSession {
     guard typedCharacterDates.count == typedGraphemeCount
     else { return }
     let end = typedGraphemeCount - 1
-    let wordLength = typed.reversed().dropFirst()
-      .prefix { !isPromptWordSeparator($0) }.count
+    let wordLength = retainedWordSeparatorTypedIndices.isEmpty
+      ? typed.reversed().dropFirst().prefix { !isPromptWordSeparator($0) }.count
+      : inputWordText(omittingLastCommit: true).count
     let start = end - wordLength
     guard start < end else { return }
     let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
@@ -5014,7 +5070,7 @@ struct TypingSession {
     } else if tracksNoSpaceWordBursts {
       commitsWord = noSpaceCommittedWordIndex != nil
     } else {
-      commitsWord = isPromptWordSeparator(character) && configuration.language.usesSpaceDelimitedWords
+      commitsWord = isPromptWordSeparator(character) && usesWordCommitInput
         && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     }
     // Monkeytype computes minBurst only after goToNextWord has actually
@@ -5048,8 +5104,8 @@ struct TypingSession {
       guard start >= 0, start < end, end <= promptCharacters.count else { return nil }
       return WordBurstInputUnits.count(promptCharacters[start..<end])
     }
-    guard typed.last.map(isPromptWordSeparator) == true else { return nil }
-    let committedWords = splitPromptWords(String(typed.dropLast()), omittingEmptySubsequences: true)
+    guard lastInputCommitsWord else { return nil }
+    let committedWords = retainedInputWords(omittingEmptySubsequences: true)
     let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: true)
     guard committedWords.count > 0, committedWords.count <= targetWords.count else { return nil }
     return targetWords[committedWords.count - 1].utf16.count
@@ -5120,7 +5176,28 @@ struct TypingSession {
   /// `typed` contains every accepted word in this native engine, so either
   /// edge is an empty input buffer for the current source word.
   private var inputWordIsEmpty: Bool {
-    typed.isEmpty || typed.last.map(isPromptWordSeparator) == true
+    typed.isEmpty || lastInputCommitsWord
+  }
+
+  private var lastInputCommitsWord: Bool {
+    typed.last.map(isPromptWordSeparator) == true
+      && !retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
+  }
+
+  private func retainedInputWords(omittingEmptySubsequences: Bool) -> [Substring] {
+    guard !retainedWordSeparatorTypedIndices.isEmpty else {
+      return splitPromptWords(typed, omittingEmptySubsequences: omittingEmptySubsequences)
+    }
+    var words: [Substring] = []
+    var start = typed.startIndex
+    for (offset, index) in typed.indices.enumerated()
+      where isPromptWordSeparator(typed[index]) && !retainedWordSeparatorTypedIndices.contains(offset)
+    {
+      if start != index || !omittingEmptySubsequences { words.append(typed[start..<index]) }
+      start = typed.index(after: index)
+    }
+    if start != typed.endIndex || !omittingEmptySubsequences { words.append(typed[start...]) }
+    return words
   }
 
   /// Delete-on-error hard modes also apply to a retained hidden boundary in
@@ -5131,24 +5208,35 @@ struct TypingSession {
 
   private var hasUncommittedSpaceDelimitedInput: Bool {
     configuration.mode != .zen
-      && configuration.language.usesSpaceDelimitedWords
-      && !configuration.language.isCodeLanguage
+      && usesWordCommitInput
       && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       && !inputWordIsEmpty
   }
 
   private var activeInputWordUTF16Length: Int {
-    typed.reversed().prefix { !isPromptWordSeparator($0) }.reduce(0) {
-      $0 + String($1).utf16.count
+    inputWordText().utf16.count
+  }
+
+  /// Inspect only the current field, even after an older stopped separator
+  /// survives a later real commit. Whole-history splitting here turns long
+  /// custom text into a quadratic scan on each separator.
+  private func inputWordText(omittingLastCommit: Bool = false) -> String {
+    let skipped = omittingLastCommit ? 1 : 0
+    let reversed = typed.reversed().dropFirst(skipped)
+    if retainedWordSeparatorTypedIndices.isEmpty {
+      return String(reversed.prefix { !isPromptWordSeparator($0) }.reversed())
     }
+    return String(reversed.enumerated().prefix { entry in
+      !isPromptWordSeparator(entry.element)
+        || retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1 - skipped - entry.offset)
+    }.map(\.element).reversed())
   }
 
   /// Mirrors the reference guard of the current word, including its visible
   /// commit separator when one exists, plus twenty extra UTF-16 units.
   private var currentSpaceDelimitedWordInputLimit: Int? {
     guard configuration.mode != .zen,
-      configuration.language.usesSpaceDelimitedWords,
-      !configuration.language.isCodeLanguage,
+      usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), !prompt.isEmpty
     else { return nil }
     let targetCharacters = promptCharacters
@@ -5186,8 +5274,7 @@ struct TypingSession {
   ) -> Int? {
     guard isPromptWordSeparator(character),
       (!inputWordIsEmpty || (character == "\n" && shouldCommitLeadingNewline)),
-      configuration.language.usesSpaceDelimitedWords,
-      !configuration.language.isCodeLanguage,
+      usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return nil }
     let targetCharacters = promptCharacters
@@ -5239,6 +5326,7 @@ struct TypingSession {
   private mutating func removeLastTypedCharacter() {
     guard !typed.isEmpty else { return }
     let typedIndex = typedGraphemeCount - 1
+    retainedWordSeparatorTypedIndices.remove(typedIndex)
     let removedCharacter = typed.last
     let targetIndex = typedTargetIndices.popLast() ?? nil
     if !blindCommittedMissingTargetIndices.isEmpty || !committedErrorWordStarts.isEmpty,
@@ -5305,8 +5393,8 @@ struct TypingSession {
   }
 
   private var lastCommittedWordIsCorrect: Bool {
-    guard typed.last.map(isPromptWordSeparator) == true else { return false }
-    let committedWords = splitPromptWords(String(typed.dropLast()), omittingEmptySubsequences: true)
+    guard lastInputCommitsWord else { return false }
+    let committedWords = retainedInputWords(omittingEmptySubsequences: true)
     let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: true)
     guard let submitted = committedWords.last, committedWords.count <= targetWords.count else {
       return false
@@ -5372,7 +5460,7 @@ struct TypingSession {
   /// representation to expose.
   private var resultTargetWords: [String] {
     if hasNoSpaceWordSegmentation { return noSpaceTargetWords }
-    guard configuration.language.usesSpaceDelimitedWords,
+    guard usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return [] }
     return splitPromptWords(prompt, omittingEmptySubsequences: true).map(String.init)
@@ -5491,14 +5579,7 @@ struct TypingSession {
     guard !isFinished else { return }
     switch configuration.mode {
     case .words:
-      if configuration.language.isCodeLanguage {
-        if nextTargetIndex >= promptCharacters.count,
-          !usesIncrementalPromptExtension
-            || reachesConfiguredWordLimitWithActiveWord
-        {
-          complete(at: date)
-        }
-      } else if hasNoSpaceWordSegmentation || !configuration.language.usesSpaceDelimitedWords
+      if hasNoSpaceWordSegmentation || !usesWordCommitInput
         || TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       {
         if reachedConfiguredWordLimit
@@ -5707,11 +5788,6 @@ struct TypingSession {
     return completedWordCount >= wordLimit
   }
 
-  private var reachesConfiguredWordLimitWithActiveWord: Bool {
-    guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
-    return completedWordCount + 1 >= wordLimit
-  }
-
   private var shouldFinishEnglishWordsTest: Bool {
     guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
     guard let requiredWordStartIndex, nextTargetIndex >= requiredWordStartIndex else {
@@ -5719,13 +5795,13 @@ struct TypingSession {
     }
     let targetWords = Array(
       splitPromptWords(prompt, omittingEmptySubsequences: true).prefix(wordLimit))
-    let typedWords = splitPromptWords(typed, omittingEmptySubsequences: true)
+    let typedWords = retainedInputWords(omittingEmptySubsequences: true)
     guard targetWords.count == wordLimit, typedWords.count >= wordLimit
     else { return false }
 
     // A correct final word completes even if an earlier word was submitted
     // with errors. An incorrect final word instead needs its separator.
-    if currentWordIsCorrect || typed.last.map(isPromptWordSeparator) == true { return true }
+    if currentWordIsCorrect || lastInputCommitsWord { return true }
 
     // Quick end only applies at the final generated word and is deliberately
     // disabled when an error rule would reject the same character upstream.
@@ -5742,11 +5818,11 @@ struct TypingSession {
   /// entered, unless the optional quick-end rule explicitly applies.
   private var shouldFinishFiniteSpaceDelimitedTest: Bool {
     let reachedTargetEnd = nextTargetIndex >= promptCharacters.count
-    guard configuration.language.usesSpaceDelimitedWords,
+    guard usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return reachedTargetEnd }
     if reachedTargetEnd,
-      currentWordIsCorrect || typed.last.map(isPromptWordSeparator) == true { return true }
+      currentWordIsCorrect || lastInputCommitsWord { return true }
     // UTF-16 length can match before the grapheme cursor reaches target end.
     // A finite stream edge is not its final word while another chunk remains.
     let finalWordStart = promptCharacters.lastIndex(where: isPromptWordSeparator)
@@ -5756,7 +5832,7 @@ struct TypingSession {
       !configuration.rules.stopOnError,
       !configuration.rules.deleteOnError
     else { return false }
-    guard let typedWord = splitPromptWords(typed, omittingEmptySubsequences: false).last,
+    guard let typedWord = retainedInputWords(omittingEmptySubsequences: false).last,
       let targetWord = splitPromptWords(prompt, omittingEmptySubsequences: true).last
     else { return false }
     return typedWord.utf16.count == targetWord.utf16.count

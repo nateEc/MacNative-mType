@@ -5907,20 +5907,40 @@ struct GeneratedStreamContinuation {
   }
 }
 
-/// Code batches advance by whole authored units, not by whitespace tokens.
-/// Document wrappers and static snippet corpora retain their existing policy.
+/// Word practice consumes only Typebar-authored syntax. Keep unused words
+/// across chunks instead of treating a whole code unit as one practice limit.
 struct GeneratedCodeContinuation {
   let configuration: TestConfiguration
   let batchTokenCount: Int
   private(set) var nextUnitIndex: Int
+  private var pendingWords: [String] = []
+  private var emittedWords = 0
+
+  init(configuration: TestConfiguration, batchTokenCount: Int, nextUnitIndex: Int) {
+    self.configuration = configuration
+    self.batchTokenCount = batchTokenCount
+    self.nextUnitIndex = nextUnitIndex
+  }
+
+  var hasRemaining: Bool {
+    configuration.mode != .words || configuration.isInfinite
+      || emittedWords < (configuration.wordLimit ?? 0)
+  }
 
   mutating func nextChunk() -> GeneratedWordChunk {
-    // Own the join newline so transformations and hidden word boundaries
-    // account for it together; noSpaces removes spaces, not code line feeds.
-    let source = "\n" + CodePracticeContent.prompt(
-      language: configuration.language, targetTokenCount: batchTokenCount,
-      startUnitIndex: nextUnitIndex)
-    nextUnitIndex += CodePracticeContent.unitCount(forTargetTokenCount: batchTokenCount)
+    let remaining = configuration.mode == .words && !configuration.isInfinite
+      ? max(0, (configuration.wordLimit ?? 0) - emittedWords) : 100
+    let count = min(max(1, batchTokenCount), 100, remaining)
+    guard count > 0 else { return .init(source: "", configuration: configuration) }
+    while pendingWords.count < count {
+      let unit = CodePracticeContent.prompt(language: configuration.language,
+        targetTokenCount: 1, startUnitIndex: nextUnitIndex)
+      pendingWords += unit.split(whereSeparator: \.isWhitespace).map(String.init)
+      nextUnitIndex += 1
+    }
+    let source = (emittedWords > 0 ? " " : "") + pendingWords.prefix(count).joined(separator: " ")
+    pendingWords.removeFirst(count)
+    emittedWords += count
     return GeneratedWordChunk(source: source, configuration: configuration)
   }
 }
@@ -5958,6 +5978,7 @@ struct TestSessionFactory {
     var usesFreshGeneratedWords = false
     var usesGeneratedStream = false
     var usesGeneratedCode = false
+    var generatedCodeContinuation: GeneratedCodeContinuation?
     let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -5969,10 +5990,12 @@ struct TestSessionFactory {
       prompt = streamPrompt
       usesGeneratedStream = true
     } else if let streamWordCount,
-      CodePracticeContent.supportsIndexedContinuation(for: configuration.language)
+      configuration.language.isCodeLanguage
     {
-      prompt = CodePracticeContent.prompt(
-        language: configuration.language, targetTokenCount: streamWordCount)
+      var cursor = GeneratedCodeContinuation(configuration: configuration,
+        batchTokenCount: min(streamWordCount, 100), nextUnitIndex: 0)
+      prompt = cursor.nextChunk().source
+      generatedCodeContinuation = cursor.hasRemaining ? cursor : nil
       usesGeneratedCode = true
     } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
       usesFreshGeneratedWords = !configuration.language.isCodeLanguage
@@ -6100,14 +6123,8 @@ struct TestSessionFactory {
         batchWordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
         nextTokenIndex: GeneratedPromptChunkPolicy.wordCount(for: configuration))
       : nil
-    var generatedCodeContinuation = repeats && usesGeneratedCode
-      ? GeneratedCodeContinuation(
-        configuration: configuration,
-        batchTokenCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
-        nextUnitIndex: CodePracticeContent.unitCount(
-          forTargetTokenCount: GeneratedPromptChunkPolicy.wordCount(for: configuration)))
-      : nil
     let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
+      && !usesGeneratedCode
       && (configuration.isInfinite
       || (configuration.mode == .custom
         && [.time, .words].contains(configuration.customTextCompletion)

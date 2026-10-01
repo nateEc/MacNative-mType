@@ -2,6 +2,19 @@ import XCTest
 @testable import Typebar
 
 final class CodePromptStreamingTests: XCTestCase {
+  /// Independent expected sequence from Typebar-authored source units, not
+  /// the production continuation cursor under test.
+  private func ownedWords(_ count: Int, language: TypingLanguage) -> [String] {
+    var words: [String] = []
+    var index = 0
+    while words.count < count {
+      words += CodePracticeContent.prompt(language: language, targetTokenCount: 1,
+        startUnitIndex: index).split(whereSeparator: \.isWhitespace).map(String.init)
+      index += 1
+    }
+    return Array(words.prefix(count))
+  }
+
   func testInfiniteIndexedCodeChoicesPrimeFreshContentInsteadOfReplayingTheOpening() {
     let openings: [(TypingLanguage, String)] = [
       (.codeSwift, "func practiceUnit0("),
@@ -39,14 +52,13 @@ final class CodePromptStreamingTests: XCTestCase {
       var session = TestSessionFactory.make(configuration: .words(0, language: language))
       XCTAssertEqual(session.prompt.components(separatedBy: opening).count - 1, 1,
         "Opening repeated for \(language.displayName)")
-      // A 100-token batch has 13 whole units; infinite practice primes two.
-      XCTAssertEqual(session.prompt, CodePracticeContent.prompt(
-        language: language, targetTokenCount: 26 * 8), language.displayName)
-      session.insert(session.prompt + "\n", at: Date(timeIntervalSince1970: 3_000))
+      XCTAssertEqual(session.prompt, ownedWords(100, language: language).joined(separator: " "),
+        language.displayName)
+      session.insert(session.prompt + " ", at: Date(timeIntervalSince1970: 3_000))
       XCTAssertFalse(session.isFinished)
       XCTAssertEqual(session.errors, 0, language.displayName)
-      XCTAssertEqual(session.prompt, CodePracticeContent.prompt(
-        language: language, targetTokenCount: 39 * 8), language.displayName)
+      XCTAssertEqual(session.prompt, ownedWords(200, language: language).joined(separator: " "),
+        language.displayName)
     }
   }
 
@@ -56,16 +68,13 @@ final class CodePromptStreamingTests: XCTestCase {
       .words(10_000, language: .codeSwift)] {
       var session = TestSessionFactory.make(configuration: configuration)
       let initial = session.prompt
-      session.insert(initial + "\n", at: start)
+      session.insert(initial + " ", at: start)
       XCTAssertFalse(session.isFinished)
       XCTAssertEqual(session.errors, 0)
       XCTAssertGreaterThan(session.prompt.count, initial.count)
       XCTAssertEqual(session.prompt.components(separatedBy: "import Foundation").count - 1, 1)
       XCTAssertEqual(session.prompt.components(separatedBy: "func practiceUnit0(").count - 1, 1)
-      let units = CodePracticeContent.unitCount(
-        forTargetTokenCount: GeneratedPromptChunkPolicy.wordCount(for: configuration))
-      XCTAssertEqual(session.prompt, CodePracticeContent.prompt(
-        language: .codeSwift, targetTokenCount: units * 2 * 8))
+      XCTAssertEqual(session.prompt, ownedWords(200, language: .codeSwift).joined(separator: " "))
     }
   }
 
@@ -74,14 +83,14 @@ final class CodePromptStreamingTests: XCTestCase {
     for language in [TypingLanguage.codeSwift, .codePython] {
       var session = TestSessionFactory.make(configuration: .words(0, language: language))
       let initial = session.prompt
-      session.insert(initial + "\n", at: start)
+      session.insert(initial + " ", at: start)
       let firstExtension = session.prompt
-      session.insert(String(firstExtension.dropFirst(session.typed.count)) + "\n", at: start)
+      session.insert(String(firstExtension.dropFirst(session.typed.count)) + " ", at: start)
       XCTAssertGreaterThan(session.prompt.count, firstExtension.count)
       var restarted = session.repeatedAttempt()
       XCTAssertEqual(restarted.prompt, initial)
       XCTAssertFalse(restarted.hasStarted)
-      restarted.insert(initial + "\n", at: start)
+      restarted.insert(initial + " ", at: start)
       XCTAssertEqual(restarted.prompt, firstExtension)
       XCTAssertEqual(restarted.errors, 0)
     }
@@ -95,16 +104,18 @@ final class CodePromptStreamingTests: XCTestCase {
     let start = Date(timeIntervalSince1970: 3_000)
     session.insert(initial, at: start)
     let completedBeforeExtension = session.completedWordCount
-    session.insert("\nf", at: start)
+    let nextWord = ownedWords(101, language: .codeSwift)[100]
+    session.insert(String(nextWord.dropLast()), at: start)
     XCTAssertEqual(session.completedWordCount, completedBeforeExtension)
-    session.insert("unc", at: start)
+    session.insert(String(nextWord.last!), at: start)
     XCTAssertEqual(session.completedWordCount, completedBeforeExtension + 1)
     XCTAssertFalse(session.isFinished)
     XCTAssertEqual(session.errors, 0)
     XCTAssertGreaterThan(session.completedWordCount, 0)
     XCTAssertFalse(session.prompt.contains(" "))
-    XCTAssertTrue(session.prompt.contains("\nfuncpracticeUnit26("))
-    let source = CodePracticeContent.prompt(language: .codeSwift, targetTokenCount: 39 * 8)
+    XCTAssertFalse(session.prompt.contains("\n"))
+    XCTAssertEqual(completedBeforeExtension, 100)
+    let source = ownedWords(200, language: .codeSwift).joined(separator: " ")
     XCTAssertEqual(session.prompt, TestModifierPolicy.transformed(
       source, modifiers: configuration.modifiers, language: configuration.language))
   }
@@ -114,8 +125,7 @@ final class CodePromptStreamingTests: XCTestCase {
     let external = TestSessionFactory.make(configuration: configuration, streamPrompt: "let custom = 1")
     XCTAssertEqual(external.prompt, "let custom = 1 let custom = 1")
     let document = TestSessionFactory.make(configuration: .words(0, language: .codeLaTeX))
-    let first = CodePracticeContent.prompt(language: .codeLaTeX, targetTokenCount: 100)
-    XCTAssertEqual(document.prompt, first + " " + first)
+    XCTAssertEqual(document.prompt, ownedWords(100, language: .codeLaTeX).joined(separator: " "))
     let funbox = TestSessionFactory.make(configuration: configuration.with(modifiers: [.binaryStream]))
     XCTAssertFalse(funbox.prompt.contains("func practiceUnit"))
     XCTAssertEqual(funbox.prompt.split(separator: " ").count, 200)

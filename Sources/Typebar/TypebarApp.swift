@@ -2883,7 +2883,7 @@ private struct ContentView: View {
 
   private var promptHighlightAllowsWordRanges: Bool {
     PromptHighlightAvailabilityPolicy.allowsWordRanges(
-      languageUsesSpaceDelimitedWords: session.configuration.language.usesSpaceDelimitedWords,
+      languageUsesSpaceDelimitedWords: session.usesWordCommitInput,
       usesTapePractice: usesTapePractice, modifiers: session.configuration.modifiers)
   }
 

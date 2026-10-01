@@ -126,9 +126,12 @@ final class CustomRandomStreamingTests: XCTestCase {
     var session = TestSessionFactory.make(configuration: configuration, customText: source)
     let firstBatch = session.prompt
     XCTAssertTrue(firstBatch.contains(" "))
-    session.insert(firstBatch, at: start)
+    session.insert(firstBatch + " ", at: start)
     XCTAssertGreaterThan(session.prompt.count, firstBatch.count)
     XCTAssertEqual(session.prompt.dropFirst(firstBatch.count).first, " ")
+    XCTAssertEqual(session.completedWordCount, 100)
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertFalse(session.isFinished)
   }
 
   func testCodeLanguageCustomRepeatRetainsSpaceBetweenBatches() {
@@ -138,8 +141,10 @@ final class CustomRandomStreamingTests: XCTestCase {
       customTextCompletion: .time, customTextOrdering: .inOrder)
     var session = TestSessionFactory.make(configuration: configuration, customText: source)
     let firstBatch = session.prompt
-    session.insert(firstBatch, at: start)
+    session.insert(firstBatch + " ", at: start)
     XCTAssertGreaterThan(session.prompt.count, firstBatch.count)
     XCTAssertEqual(session.prompt.dropFirst(firstBatch.count).first, " ")
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertFalse(session.isFinished)
   }
 }

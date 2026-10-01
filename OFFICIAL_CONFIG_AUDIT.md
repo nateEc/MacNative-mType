@@ -186,10 +186,10 @@
 | `freedomMode` | `freedomMode` | 已映射；活动同步不重启，开启按来源关闭信心模式。`RuntimeInputRuleTests` 覆盖下一次删除与真实命令消费。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
 | `oppositeShiftMode` | `oppositeShiftMode` | 已映射；on／keymap／off 活动同步，拒绝尝试沿用原计量／master 规则，实体键盘仍待验收。 |
-| `stopOnError` | `stopOnErrorMode` | 已映射；使用明确的 off/word/letter 模式。 |
+| `stopOnError` | `stopOnErrorMode` | 已映射；off/word/letter。word 接受错误词后的分隔符但不导航，保留同一输入字段及后续文本，仍可删除；不可增加完成词数或词速信用。Expert 在该分隔符失败，回放可选边界标记跟随删除恢复；真实键盘／完整 Unicode 仍待验收。 |
 | `deleteOnError` | `deleteOnErrorMode` | 已映射；四档及 off 活动同步，只在下一次错误恢复，不追溯清理；开启关闭信心和停止输入并同步旧布尔别名。 |
 | `confidenceMode` | `confidenceMode` | 已映射；off／on／max 活动同步，开启关闭自由回退、停止输入和自动删除，不恢复旧规则。 |
-| `quickEnd` | `quickEnd` | 已映射；活动同步不直接结束。普通有限路径的最终词长度与前置词输入上限改用 UTF-16，保留最终词／全部生成、错误恢复限制和候选不误确认的边界，20 项新增覆盖。代码／无空格专用完成及完整 Unicode 恢复仍待单独补证。 |
+| `quickEnd` | `quickEnd` | 已映射；活动同步不直接结束。普通有限路径与代码词流共用最终词 UTF-16 长度及词输入上限，保留最终词／全部生成、错误恢复限制和候选不误确认的边界。`QuickEndUnicodeTests` 与 `CodeWordContractTests` 覆盖；无空格专用完成及完整 Unicode 恢复仍待单独补证。 |
 | `indicateTypos` | `typoIndicatorStyle` | 已映射。 |
 | `compositionDisplay` | `compositionDisplayStyle` | 已映射。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |

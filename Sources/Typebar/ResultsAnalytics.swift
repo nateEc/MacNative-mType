@@ -1290,7 +1290,8 @@ enum ResultPerformanceTrace {
       apply(event, insertedText: insertion.text, typed: &typed, forcedErrors: &forcedErrors)
     }
     let correct = speedCredit(typed: typed, prompt: prompt,
-      forcedErrors: forcedErrors, configuration: configuration)
+      forcedErrors: forcedErrors, configuration: configuration,
+      retainedSeparatorIndices: inputActivity.retainedSeparatorIndices)
     return .init(
       elapsed: safeElapsed,
       wpm: wpm(characters: correct, elapsed: safeElapsed),
@@ -1330,7 +1331,8 @@ enum ResultPerformanceTrace {
         eventIndex += 1
       }
       let correct = speedCredit(typed: typed, prompt: prompt,
-        forcedErrors: forcedErrors, configuration: configuration)
+        forcedErrors: forcedErrors, configuration: configuration,
+        retainedSeparatorIndices: inputActivity.retainedSeparatorIndices)
       let interval = elapsed - previousBoundary
       previousBoundary = elapsed
       return .init(
@@ -1354,6 +1356,7 @@ enum ResultPerformanceTrace {
     var word = 0
     var position = 0
     var checkpoints: [(word: Int, position: Int)] = []
+    var retainedSeparatorIndices = Set<Int>()
 
     init(prompt: String, configuration: TestConfiguration?) {
       language = configuration?.language ?? .english
@@ -1375,6 +1378,7 @@ enum ResultPerformanceTrace {
     mutating func apply(_ event: TypingReplayEvent) -> (errors: Int, text: String) {
       switch event.kind {
       case .delete:
+        retainedSeparatorIndices.remove(checkpoints.count - 1)
         if let checkpoint = checkpoints.popLast() {
           word = checkpoint.word
           position = checkpoint.position
@@ -1384,6 +1388,7 @@ enum ResultPerformanceTrace {
         var errors = 0
         var text = ""
         for originalCharacter in event.text {
+          let inputIndex = checkpoints.count
           checkpoints.append((word, position))
           let expectedUnit = targetUnit(at: position)
           let expectedCharacter = expectedUnit.flatMap(UnicodeScalar.init).map { Character(String($0)) }
@@ -1396,10 +1401,13 @@ enum ResultPerformanceTrace {
               event.forceError || targetUnit(at: position + index) != unit
             }.count
           }
-          if usesWordCommits && isPromptWordSeparator(character) {
+          if usesWordCommits && isPromptWordSeparator(character), event.commitsWord != false {
             word += 1
             position = 0
           } else {
+            if usesWordCommits && isPromptWordSeparator(character) {
+              retainedSeparatorIndices.insert(inputIndex)
+            }
             position += units.count
           }
         }
@@ -1444,7 +1452,8 @@ enum ResultPerformanceTrace {
   }
 
   private static func speedCredit(
-    typed: [Character], prompt: String, forcedErrors: [Bool], configuration: TestConfiguration?
+    typed: [Character], prompt: String, forcedErrors: [Bool], configuration: TestConfiguration?,
+    retainedSeparatorIndices: Set<Int>
   ) -> Int {
     if configuration?.mode == .zen { return String(typed).utf16.count }
     if TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []) {
@@ -1457,7 +1466,8 @@ enum ResultPerformanceTrace {
         }
       }
     }
-    return TypingWordCredit.words(target: prompt, input: String(typed), creditsActivePrefix: true).inputUnits
+    return TypingWordCredit.words(target: prompt, input: String(typed), creditsActivePrefix: true,
+      retainedSeparatorIndices: retainedSeparatorIndices).inputUnits
   }
 
   private static func wpm(characters: Int, elapsed: TimeInterval) -> Int {
