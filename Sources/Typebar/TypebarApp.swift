@@ -6932,6 +6932,7 @@ private struct ResultPerformanceChart: View {
             ? "显示原始 Burst 数据"
             : "平均相邻且相差不超过本轮最大 Burst 25% 的值；保留大幅变化")
           traceToggle("错误", isOn: visibilityBinding(\.errors), color: .red)
+            .help("统计每个采样时间段内的错误输入；退格不抹去已发生的错误")
           if resultPersonalBestFeedback != nil {
             traceToggle("本机 PB", isOn: visibilityBinding(\.personalBestLine), color: .secondary)
           }
@@ -7074,7 +7075,7 @@ private struct ResultPerformanceChart: View {
         Text("Burst \(ResultBurstDisplayPolicy.text(wpm: inspection.point.burstWpm, unit: typingSpeedUnit))")
       }
       if visibility.errors {
-        Text("错误 \(inspection.point.errorCount)")
+        Text("本段错误 \(inspection.point.errorCount)")
       }
       if !inspection.wordIndexes.isEmpty {
         Text("关联单词 \(inspection.wordIndexes.map { String($0 + 1) }.joined(separator: "、"))")

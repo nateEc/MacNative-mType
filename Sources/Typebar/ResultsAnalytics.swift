@@ -1251,7 +1251,8 @@ enum ResultPerformanceTrace {
   static func point(
     prompt: String,
     events: [TypingReplayEvent],
-    elapsed: TimeInterval
+    elapsed: TimeInterval,
+    configuration: TestConfiguration? = nil
   ) -> ResultPerformancePoint {
     let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
     let orderedEvents = validOrderedEvents(events)
@@ -1259,9 +1260,13 @@ enum ResultPerformanceTrace {
     var forcedErrors: [Bool] = []
     let windowStart = max(0, safeElapsed.rounded(.up) - 1)
     var inputUnits = 0
+    var windowErrors = 0
+    var errorActivity = ErrorActivityCursor(prompt: prompt, configuration: configuration)
     for event in orderedEvents where event.offset <= safeElapsed {
+      let insertionErrors = errorActivity.apply(event)
       if event.kind == .insert, windowStart == 0 || event.offset > windowStart {
         inputUnits += event.text.utf16.count
+        windowErrors += insertionErrors
       }
       apply(event, typed: &typed, forcedErrors: &forcedErrors)
     }
@@ -1273,7 +1278,7 @@ enum ResultPerformanceTrace {
       wpm: wpm(characters: correct, elapsed: safeElapsed),
       rawWpm: wpm(characters: typed.count, elapsed: safeElapsed),
       burstWpm: intervalBurst(inputUnits: inputUnits, seconds: safeElapsed - windowStart),
-      errorCount: errors)
+      errorCount: windowErrors)
   }
 
   static func points(
@@ -1293,12 +1298,15 @@ enum ResultPerformanceTrace {
     var typed: [Character] = []
     var forcedErrors: [Bool] = []
     var previousBoundary: TimeInterval = 0
+    var errorActivity = ErrorActivityCursor(prompt: prompt, configuration: configuration)
 
     return sampleTimes.map { elapsed in
       var inputUnits = 0
+      var windowErrors = 0
       while eventIndex < orderedEvents.count, orderedEvents[eventIndex].offset <= elapsed {
         let event = orderedEvents[eventIndex]
         if event.kind == .insert { inputUnits += event.text.utf16.count }
+        windowErrors += errorActivity.apply(event)
         apply(event, typed: &typed, forcedErrors: &forcedErrors)
         eventIndex += 1
       }
@@ -1311,7 +1319,76 @@ enum ResultPerformanceTrace {
         wpm: wpm(characters: correct, elapsed: elapsed),
         rawWpm: wpm(characters: typed.count, elapsed: elapsed),
         burstWpm: intervalBurst(inputUnits: inputUnits, seconds: interval),
-        errorCount: errors)
+        errorCount: windowErrors)
+    }
+  }
+
+  /// Tracks input-time judgments separately from the surviving text. Cursor
+  /// checkpoints follow native characters for deletion, while comparisons use
+  /// UTF-16 units and word-local positions, including real commit characters.
+  /// This cannot restore stopped input or hidden word metadata absent in replay.
+  private struct ErrorActivityCursor {
+    let targets: [[UInt16]]
+    let language: TypingLanguage
+    let usesWordCommits: Bool
+    let hasTargetErrors: Bool
+    var word = 0
+    var position = 0
+    var checkpoints: [(word: Int, position: Int)] = []
+
+    init(prompt: String, configuration: TestConfiguration?) {
+      language = configuration?.language ?? .english
+      usesWordCommits = !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? [])
+      hasTargetErrors = configuration?.mode != .zen
+      var words: [[UInt16]] = []
+      var units: [UInt16] = []
+      for character in prompt {
+        units.append(contentsOf: String(character).utf16)
+        if usesWordCommits && isPromptWordSeparator(character) {
+          words.append(units)
+          units = []
+        }
+      }
+      if !units.isEmpty { words.append(units) }
+      targets = words
+    }
+
+    mutating func apply(_ event: TypingReplayEvent) -> Int {
+      switch event.kind {
+      case .delete:
+        if let checkpoint = checkpoints.popLast() {
+          word = checkpoint.word
+          position = checkpoint.position
+        }
+        return 0
+      case .insert:
+        var errors = 0
+        for originalCharacter in event.text {
+          checkpoints.append((word, position))
+          let expectedUnit = targetUnit(at: position)
+          let expectedCharacter = expectedUnit.flatMap(UnicodeScalar.init).map { Character(String($0)) }
+          let character = InputCharacterEquivalence.normalized(
+            originalCharacter, expected: expectedCharacter, language: language)
+          let units = Array(String(character).utf16)
+          if hasTargetErrors {
+            errors += units.enumerated().filter { index, unit in
+              event.forceError || targetUnit(at: position + index) != unit
+            }.count
+          }
+          if usesWordCommits && isPromptWordSeparator(character) {
+            word += 1
+            position = 0
+          } else {
+            position += units.count
+          }
+        }
+        return errors
+      }
+    }
+
+    private func targetUnit(at position: Int) -> UInt16? {
+      guard targets.indices.contains(word), targets[word].indices.contains(position) else { return nil }
+      return targets[word][position]
     }
   }
 

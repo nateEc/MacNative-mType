@@ -52,7 +52,8 @@ final class ResultIntervalBurstTests: XCTestCase {
         .init(offset: 0.5, kind: .insert, text: "\n", automatic: true),
       ], duration: 2)
     XCTAssertEqual(points.map(\.burstWpm), [72, 0])
-    XCTAssertEqual(points.map(\.errorCount), [1, 1])
+    // The two forced UTF-16 units occur only in the first window.
+    XCTAssertEqual(points.map(\.errorCount), [2, 0])
   }
 
   func testNoSpaceChartDoesNotRequireOrInventWordBoundaries() {

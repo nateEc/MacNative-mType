@@ -14,7 +14,7 @@ private func splitPromptWords(
     whereSeparator: isPromptWordSeparator)
 }
 
-private enum InputCharacterEquivalence {
+enum InputCharacterEquivalence {
   static let sets: [Set<Character>] = [
     ["’", "‘", "'", "ʼ", "׳", "ʻ", "᾽"],
     ["\"", "”", "“", "„"],
@@ -31,6 +31,26 @@ private enum InputCharacterEquivalence {
     }
     return language.usesRussianYoInputEquivalence
       && russianYoSet.contains(first) && russianYoSet.contains(second)
+  }
+
+  static func isReferenceSpace(_ character: Character) -> Bool {
+    [
+      " ", "\u{2002}", "\u{2003}", "\u{2009}", "\u{3000}", "\u{00A0}", "\u{1680}", "\u{202F}",
+      "\u{FEFF}", "\u{2007}", "\u{2008}", "\u{2004}", "\u{200A}", "\u{200B}",
+    ].contains(character)
+  }
+
+  static func normalized(
+    _ character: Character, expected: Character?, language: TypingLanguage
+  ) -> Character {
+    guard let expected else { return isReferenceSpace(character) ? " " : character }
+    if (character == " " || expected == " ")
+      && isReferenceSpace(character) && isReferenceSpace(expected)
+    {
+      return expected
+    }
+    if matches(character, expected, language: language) { return expected }
+    return isReferenceSpace(character) ? " " : character
   }
 }
 
@@ -4888,25 +4908,11 @@ struct TypingSession {
   /// Mirrors the reference product's explicit space set. Keep Return outside
   /// this group because custom prompts and Zen use it as a real newline.
   private func isReferenceInputSpace(_ character: Character) -> Bool {
-    return [
-      " ", "\u{2002}", "\u{2003}", "\u{2009}", "\u{3000}", "\u{00A0}", "\u{1680}", "\u{202F}",
-      "\u{FEFF}", "\u{2007}", "\u{2008}", "\u{2004}", "\u{200A}", "\u{200B}",
-    ].contains(character)
+    InputCharacterEquivalence.isReferenceSpace(character)
   }
 
   private func normalizedInputCharacter(_ character: Character, expected: Character?) -> Character {
-    guard let expected else {
-      return isReferenceInputSpace(character) ? " " : character
-    }
-    if (character == " " || expected == " ")
-      && isReferenceInputSpace(character) && isReferenceInputSpace(expected)
-    {
-      return expected
-    }
-    if InputCharacterEquivalence.matches(character, expected, language: configuration.language) {
-      return expected
-    }
-    return isReferenceInputSpace(character) ? " " : character
+    InputCharacterEquivalence.normalized(character, expected: expected, language: configuration.language)
   }
 
   private var shouldRejectLeadingSeparator: Bool {
