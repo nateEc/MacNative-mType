@@ -2,6 +2,22 @@ import XCTest
 @testable import Typebar
 
 final class ThemeQuickPickerSearchTests: XCTestCase {
+  func testKeyboardTargetsFollowVisibleOrderAndWrapWithoutSelectingEmptyResults() {
+    let custom = customTheme(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", name: "Ocean")
+    let results = ThemeQuickPickerSearch.results(
+      scope: .all, query: "", builtInThemes: [.paper, .grape], customThemes: [custom],
+      favoriteThemeIDs: [ThemeFavoritePolicy.builtInID(for: .grape)])
+    XCTAssertEqual(results.targets, [.builtIn(.grape), .builtIn(.paper), .custom(custom.id)])
+    XCTAssertEqual(CommandPaletteKeyboardSelection.moved(current: 0, count: results.targets.count, offset: -1), 2)
+    XCTAssertEqual(CommandPaletteKeyboardSelection.moved(current: 2, count: results.targets.count, offset: 1), 0)
+
+    let empty = ThemeQuickPickerSearch.results(
+      scope: .custom, query: "missing", builtInThemes: [.paper], customThemes: [custom],
+      favoriteThemeIDs: [])
+    XCTAssertTrue(empty.targets.isEmpty)
+    XCTAssertNil(CommandPaletteKeyboardSelection.index(current: 0, count: empty.targets.count))
+  }
+
   func testBuiltInSearchFindsDisplayNamesAndIDsWithFavoritesFirst() {
     let favorites = [
       ThemeFavoritePolicy.builtInID(for: .grape),

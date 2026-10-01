@@ -28,6 +28,10 @@ struct ThemeQuickPickerResults {
   let customThemes: [CustomThemeDefinition]
 
   var isEmpty: Bool { builtInThemes.isEmpty && customThemes.isEmpty }
+  var targets: [ThemeCommandTarget] {
+    builtInThemes.map(ThemeCommandTarget.builtIn)
+      + customThemes.map { .custom($0.id) }
+  }
 }
 
 enum ThemeQuickPickerSearch {
@@ -133,6 +137,7 @@ struct ThemeQuickPickerView: View {
   @Environment(\.dismiss) private var dismiss
   @FocusState private var searchFocused: Bool
   @State private var searchText = ""
+  @State private var activeIndex = 0
   let scope: ThemeQuickPickerScope
   let customThemes: [CustomThemeDefinition]
   let favoriteThemeIDs: [String]
@@ -152,7 +157,8 @@ struct ThemeQuickPickerView: View {
           .textFieldStyle(.roundedBorder)
           .focused($searchFocused)
           .accessibilityLabel("搜索主题")
-          .onSubmit { chooseFirstSearchResult() }
+          .onSubmit(activateSelection)
+          .onKeyPress(phases: [.down, .repeat], action: handleKeyPress)
           .padding(.horizontal, 16)
           .padding(.top, 12)
 
@@ -161,43 +167,53 @@ struct ThemeQuickPickerView: View {
             "没有匹配的主题", systemImage: "magnifyingglass",
             description: Text("换个名称，或试试主题 ID。"))
         } else {
-          List {
-            if !searchResults.builtInThemes.isEmpty {
-              Section("内置主题") {
-                ForEach(searchResults.builtInThemes, id: \.self) { theme in
-                  themeRow(
-                    name: theme.displayName,
-                    accent: theme.accent,
-                    isFavorite: favoriteThemeIDs.contains(
-                      ThemeFavoritePolicy.builtInID(for: theme)),
-                    isSelected: selectedTheme == .builtIn(theme)
-                  ) {
-                    choose(.builtIn(theme))
+          ScrollViewReader { scrollProxy in
+            List {
+              if !searchResults.builtInThemes.isEmpty {
+                Section("内置主题") {
+                  ForEach(Array(searchResults.builtInThemes.enumerated()), id: \.element) { index, theme in
+                    themeRow(
+                      name: theme.displayName,
+                      accent: theme.accent,
+                      isFavorite: favoriteThemeIDs.contains(
+                        ThemeFavoritePolicy.builtInID(for: theme)),
+                      isSelected: selectedTheme == .builtIn(theme),
+                      isKeyboardSelected: activeIndex == index
+                    ) {
+                      choose(.builtIn(theme))
+                    }
+                    .id(index)
                   }
                 }
               }
-            }
-            if !searchResults.customThemes.isEmpty || customThemes.isEmpty && searchText.isEmpty {
-              Section(scope == .all ? "自定义主题" : "选择自定义主题") {
-                if customThemes.isEmpty {
-                  ContentUnavailableView(
-                    "还没有自定义主题", systemImage: "paintpalette",
-                    description: Text("可在设置的“自定义主题”中创建或导入仅属于这台 Mac 的主题。"))
-                    .frame(maxWidth: .infinity, minHeight: 150)
-                } else {
-                  ForEach(searchResults.customThemes) { theme in
-                    themeRow(
-                      name: theme.name,
-                      accent: theme.accent.color,
-                      isFavorite: favoriteThemeIDs.contains(
-                        ThemeFavoritePolicy.customID(for: theme.id)),
-                      isSelected: selectedTheme == .custom(theme.id)
-                    ) {
-                      choose(.custom(theme.id))
+              if !searchResults.customThemes.isEmpty || customThemes.isEmpty && searchText.isEmpty {
+                Section(scope == .all ? "自定义主题" : "选择自定义主题") {
+                  if customThemes.isEmpty {
+                    ContentUnavailableView(
+                      "还没有自定义主题", systemImage: "paintpalette",
+                      description: Text("可在设置的“自定义主题”中创建或导入仅属于这台 Mac 的主题。"))
+                      .frame(maxWidth: .infinity, minHeight: 150)
+                  } else {
+                    ForEach(Array(searchResults.customThemes.enumerated()), id: \.element.id) { index, theme in
+                      let rowIndex = searchResults.builtInThemes.count + index
+                      themeRow(
+                        name: theme.name,
+                        accent: theme.accent.color,
+                        isFavorite: favoriteThemeIDs.contains(
+                          ThemeFavoritePolicy.customID(for: theme.id)),
+                        isSelected: selectedTheme == .custom(theme.id),
+                        isKeyboardSelected: activeIndex == rowIndex
+                      ) {
+                        choose(.custom(theme.id))
+                      }
+                      .id(rowIndex)
                     }
                   }
                 }
               }
+            }
+            .onChange(of: activeIndex) { _, index in
+              withAnimation { scrollProxy.scrollTo(index) }
             }
           }
         }
@@ -212,19 +228,36 @@ struct ThemeQuickPickerView: View {
     }
     .frame(width: 430, height: 410)
     .onAppear { searchFocused = true }
+    .onChange(of: searchText) { _, _ in activeIndex = 0 }
   }
 
-  private func chooseFirstSearchResult() {
-    guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-    if let theme = searchResults.builtInThemes.first {
-      choose(.builtIn(theme))
-    } else if let theme = searchResults.customThemes.first {
-      choose(.custom(theme.id))
+  private func activateSelection() {
+    guard let index = CommandPaletteKeyboardSelection.index(
+      current: activeIndex, count: searchResults.targets.count) else { return }
+    choose(searchResults.targets[index])
+  }
+
+  private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
+    // macOS reports arrow keys with the .function modifier even without Fn held.
+    guard !press.modifiers.contains(.command), !press.modifiers.contains(.option),
+      !press.modifiers.contains(.control), !press.modifiers.contains(.shift) else { return .ignored }
+    let offset: Int
+    switch press.key {
+    case .upArrow: offset = -1
+    case .downArrow: offset = 1
+    default: return .ignored
     }
+    guard let next = CommandPaletteKeyboardSelection.moved(
+      current: activeIndex, count: searchResults.targets.count, offset: offset) else {
+      return .handled
+    }
+    activeIndex = next
+    return .handled
   }
 
   private func themeRow(
-    name: String, accent: Color, isFavorite: Bool, isSelected: Bool, action: @escaping () -> Void
+    name: String, accent: Color, isFavorite: Bool, isSelected: Bool,
+    isKeyboardSelected: Bool, action: @escaping () -> Void
   ) -> some View {
     Button(action: action) {
       HStack(spacing: 10) {
@@ -245,7 +278,8 @@ struct ThemeQuickPickerView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("\(name)\(isFavorite ? "，已收藏" : "")\(isSelected ? "，当前主题" : "")")
+    .listRowBackground(isKeyboardSelected ? Color.accentColor.opacity(0.14) : Color.clear)
+    .accessibilityLabel("\(name)\(isFavorite ? "，已收藏" : "")\(isSelected ? "，当前主题" : "")\(isKeyboardSelected ? "，键盘选中" : "")")
   }
 
   private func choose(_ target: ThemeCommandTarget) {
