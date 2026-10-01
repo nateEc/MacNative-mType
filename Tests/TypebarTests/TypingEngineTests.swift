@@ -1889,7 +1889,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.progressText(at: start), "1/3")
     XCTAssertEqual(
       Array(session.promptGlyphs.prefix(6).map(\.state)),
-      [.correct, .correct, .incorrect, .incorrect, .incorrect, .incorrect])
+      [.correct, .correct, .pending, .pending, .pending, .incorrect])
     XCTAssertEqual(session.promptGlyphs[6].state, .current)
     XCTAssertEqual(session.completedPromptCharacterIndices, Set(0..<5))
 

@@ -14,7 +14,8 @@ final class BlindModeBehaviorTests: XCTestCase {
 
   func testBlindSkippedTargetsAreNeutralAndPendingTargetsRemainVisible() {
     let glyphs = TypingPromptPresentation.glyphs(target: "abc bay", typed: "a ", isFinished: false,
-      blindMode: true, typedTargetIndices: [0, 3], currentTargetIndex: 4)
+      blindMode: true, blindCommittedMissingTargetIndices: [1, 2],
+      typedTargetIndices: [0, 3], currentTargetIndex: 4)
     XCTAssertEqual(Array(glyphs.prefix(4)).map(\.state), [.correct, .correct, .correct, .correct])
     XCTAssertEqual(glyphs[4].state, .current)
     XCTAssertEqual(glyphs[5].state, .pending)

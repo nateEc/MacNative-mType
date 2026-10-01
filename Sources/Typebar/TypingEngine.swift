@@ -2525,6 +2525,7 @@ enum TypingPromptPresentation {
   static func glyphs(
     target: String, typed: String, isFinished: Bool, blindMode: Bool,
     forcedErrorIndices: Set<Int> = [],
+    blindCommittedMissingTargetIndices: Set<Int> = [],
     typedTargetIndices: [Int?]? = nil, currentTargetIndex: Int? = nil,
     hideExtraLetters: Bool = false,
     visibleFutureWords: Int? = nil, concealAll: Bool = false,
@@ -2551,7 +2552,7 @@ enum TypingPromptPresentation {
           : typedCharacters[typedIndex] == targetCharacters[index] && !forcedErrorIndices.contains(index)
             ? .correct : .incorrect
       } else if index < activeTargetIndex {
-        state = blindMode ? .correct : .incorrect
+        state = blindCommittedMissingTargetIndices.contains(index) ? .correct : .pending
       } else if index == activeTargetIndex, !isFinished {
         state = .current
       } else {
@@ -3515,6 +3516,10 @@ struct TypingSession {
   /// A word can be submitted early with space, so this cannot always be
   /// inferred from the input string's character offset.
   private var typedTargetIndices: [Int?] = []
+  /// A blind word commit neutralizes its untouched letters. That display
+  /// survives a later blind toggle, but is discarded when the word is reopened.
+  /// It is not an input attempt, validation override, or persisted result field.
+  private var blindCommittedMissingTargetIndices = Set<Int>()
   /// Input offsets for extra letters retained in a completed source word.
   /// They have no target character, but remain scoring errors after that word
   /// is submitted and the active input buffer becomes empty.
@@ -3725,6 +3730,7 @@ struct TypingSession {
       isFinished: isFinished,
       blindMode: configuration.rules.blindMode,
       forcedErrorIndices: forcedErrorIndices,
+      blindCommittedMissingTargetIndices: blindCommittedMissingTargetIndices,
       typedTargetIndices: typedTargetIndices,
       currentTargetIndex: nextTargetIndex,
       hideExtraLetters: configuration.rules.hideExtraLetters,
@@ -4599,6 +4605,10 @@ struct TypingSession {
       inputCharacter, targetIndex: targetIndex,
       forceError: forceError || earlyWordCommitTargetIndex != nil,
       countsAsExtraError: retainsCurrentWordAsExtra, at: date)
+    if configuration.rules.blindMode, let commitIndex = earlyWordCommitTargetIndex {
+      let end = isPromptWordSeparator(promptCharacters[commitIndex]) ? commitIndex : commitIndex + 1
+      blindCommittedMissingTargetIndices.formUnion(currentTargetIndex..<end)
+    }
     recordWordBurstIfCommitted()
     recordNoSpaceWordBurstIfCommitted()
 
@@ -5117,6 +5127,15 @@ struct TypingSession {
     let typedIndex = typedGraphemeCount - 1
     let removedCharacter = typed.last
     let targetIndex = typedTargetIndices.popLast() ?? nil
+    if !blindCommittedMissingTargetIndices.isEmpty,
+      removedCharacter.map(isPromptWordSeparator) == true, let targetIndex,
+      promptCharacters.indices.contains(targetIndex)
+    {
+      let start = promptCharacters[..<targetIndex].lastIndex(where: isPromptWordSeparator)
+        .map { $0 + 1 } ?? 0
+      let end = isPromptWordSeparator(promptCharacters[targetIndex]) ? targetIndex : targetIndex + 1
+      for index in start..<end { blindCommittedMissingTargetIndices.remove(index) }
+    }
     if canUseCachedWordProgress, let targetIndex,
       promptCharacters.indices.contains(targetIndex),
       isPromptWordSeparator(promptCharacters[targetIndex]),
