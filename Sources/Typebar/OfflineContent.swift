@@ -5754,14 +5754,15 @@ enum NoSpaceWordBoundaryPolicy {
       return []
     }
     var words = source.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-    // `backwards` runs after space removal in the native transform, so the
-    // flattened output contains source words in reverse order.
+    // Flat finite pools reverse before per-word alteration. Commits, including
+    // a messaging newline, belong to the resulting target at that position.
     if modifiers.contains(.backwards) { words.reverse() }
     let lengths = words.enumerated().map { index, word in
-      var transformed = language.presentationText(
-        TestModifierPolicy.transformed(word, modifiers: modifiers, language: language))
-      if modifiers.contains(.underscoreSeparators), index < words.count - 1 {
-        transformed.append("_")
+      var transformed = TestModifierPolicy.transformedWord(word, modifiers: modifiers,
+        language: language, wordIndex: index, wordBound: words.count)
+      if index == words.count - 1, modifiers.contains(.messagingStyle),
+        transformed.hasSuffix("\n") {
+        transformed.removeLast()
       }
       return transformed.count
     }

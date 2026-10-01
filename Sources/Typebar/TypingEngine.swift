@@ -1238,72 +1238,82 @@ enum TestModifierPolicy {
   static func transformed(
     _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil
   ) -> String {
-    // Language presentation precedes Funbox alteration in the source. In
-    // particular Swiss German expands sharp S before Morse can discard it.
-    var transformed = language?.presentationText(prompt) ?? prompt
-    if modifiers.contains(.noSpaces) {
-      transformed = transformed.replacingOccurrences(of: " ", with: "")
-    } else if modifiers.contains(.underscoreSeparators) {
-      transformed = transformed.replacingOccurrences(of: " ", with: "_")
-    }
-    if modifiers.contains(.uppercase) {
-      transformed = transformed.uppercased()
-    } else if modifiers.contains(.titleCase) {
-      transformed = transformed.split(separator: " ", omittingEmptySubsequences: false).map {
-        word in
-        guard let first = word.first else { return "" }
-        return first.uppercased() + word.dropFirst()
-      }.joined(separator: " ")
-    } else if modifiers.contains(.alternatingCase) {
-      transformed = AlternatingCasePolicy.transformed(transformed)
-    } else if modifiers.contains(.randomCase) {
-      transformed = RandomCasePolicy.transformed(transformed)
-    }
-    if modifiers.contains(.messagingStyle) {
-      transformed = MessagingTextPolicy.transformed(transformed)
-    }
-    if modifiers.contains(.rot13) {
-      transformed = transformed.reduce(into: "") { output, character in
-        guard character.unicodeScalars.count == 1,
-          let scalar = character.unicodeScalars.first,
-          scalar.isASCII,
-          CharacterSet.letters.contains(scalar)
-        else {
-          output.append(character)
-          return
-        }
-        let base: UInt32 = CharacterSet.uppercaseLetters.contains(scalar) ? 65 : 97
-        output.unicodeScalars.append(UnicodeScalar(base + (scalar.value - base + 13) % 26)!)
+    let presented = language?.presentationText(prompt) ?? prompt
+    guard modifiers.contains(where: { canonicalTextAlterations.contains($0)
+      || [.noSpaces, .arrowStream, .lazyLatin].contains($0) }) else { return presented }
+    var words = presented.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+    // A flat finite pool is reversed before words are selected/altered. Pipe
+    // cursors reverse their candidate pool themselves, not its inner words.
+    if modifiers.contains(.backwards) { words.reverse() }
+    var output = ""
+    for (index, word) in words.enumerated() {
+      let altered = transformedWord(word, modifiers: modifiers, language: language,
+        wordIndex: index, wordBound: words.count)
+      output += altered
+      if index < words.count - 1, !usesNoSpaceInput(modifiers), !altered.hasSuffix("\n") {
+        output.append(" ")
       }
     }
-    if modifiers.contains(.backwards) {
-      transformed = transformed.split(separator: " ", omittingEmptySubsequences: false)
-        .reversed()
-        // The reference reverses each word through JavaScript's UTF-16 string
-        // units. Decode reversed units with replacement so combining marks
-        // and non-BMP values produce the same visible text on macOS.
-        .map { String(decoding: $0.utf16.reversed(), as: UTF16.self) }
-        .joined(separator: " ")
+    // This batch API has historically represented a complete prompt. The
+    // streaming word API below keeps newline commits until its caller knows
+    // whether generation is actually complete.
+    if modifiers.contains(.messagingStyle), output.hasSuffix("\n") {
+      output.removeLast()
     }
-    if modifiers.contains(.doubleCharacters) {
-      // The reference's Unicode-aware regexp visits scalar values rather
-      // than extended grapheme clusters. Keep combining marks separate, but
-      // leave the generated word separator untouched.
-      transformed = transformed.unicodeScalars.reduce(into: "") { output, scalar in
-        output.unicodeScalars.append(scalar)
-        if scalar.value != 0x20 { output.unicodeScalars.append(scalar) }
-      }
-    }
+    return output
+  }
+
+  // Direct reference toggles sort official names before applying alterText.
+  // This is execution order, not the persisted native conflict-priority list.
+  private static let canonicalTextAlterations: [TestModifier] = [
+    .uppercase, .backwards, .titleCase, .doubleCharacters, .messagingStyle,
+    .morseStream, .randomCase, .rot13, .alternatingCase, .underscoreSeparators,
+  ]
+
+  static func transformedWord(
+    _ word: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
+    wordIndex: Int = 0, wordBound: Int = 1, nextRandomCaseBit: () -> Bool = { Bool.random() }
+  ) -> String {
+    var output = language?.presentationText(word) ?? word
     if modifiers.contains(.lazyLatin) {
-      transformed = TypingTextNormalizer.lazyLatin(transformed, language: language)
+      output = TypingTextNormalizer.lazyLatin(output, language: language)
     }
-    if modifiers.contains(.morseStream) {
-      transformed = MorseTextPolicy.transformed(transformed)
+    for modifier in canonicalTextAlterations where modifiers.contains(modifier) {
+      switch modifier {
+      case .uppercase: output = output.uppercased()
+      case .backwards: output = String(decoding: output.utf16.reversed(), as: UTF16.self)
+      case .titleCase:
+        // charAt(0) does not capitalize a whole astral letter. A first BMP
+        // scalar may expand under uppercasing; retain all later units intact.
+        if let first = output.unicodeScalars.first, first.value <= 0xFFFF {
+          output = String(first).uppercased() + String(output.unicodeScalars.dropFirst())
+        }
+      case .doubleCharacters:
+        output = output.unicodeScalars.reduce(into: "") { result, scalar in
+          result.unicodeScalars.append(scalar)
+          if ![0x0A, 0x0D, 0x2028, 0x2029].contains(scalar.value) {
+            result.unicodeScalars.append(scalar)
+          }
+        }
+      case .messagingStyle: output = MessagingTextPolicy.transformedWord(output)
+      case .morseStream: output = MorseTextPolicy.transformed(output)
+      case .randomCase: output = RandomCasePolicy.transformed(output, nextBit: nextRandomCaseBit)
+      case .rot13:
+        output = output.unicodeScalars.reduce(into: "") { result, scalar in
+          let base: UInt32
+          if (65...90).contains(scalar.value) { base = 65 }
+          else if (97...122).contains(scalar.value) { base = 97 }
+          else { result.unicodeScalars.append(scalar); return }
+          result.unicodeScalars.append(UnicodeScalar(base + (scalar.value - base + 13) % 26)!)
+        }
+      case .alternatingCase: output = AlternatingCasePolicy.transformed(output)
+      case .underscoreSeparators:
+        if wordIndex != wordBound - 1 { output.append("_") }
+      default: break
+      }
     }
-    if modifiers.contains(.arrowStream) || modifiers.contains(.morseStream) {
-      transformed.removeAll(where: \.isWhitespace)
-    }
-    return transformed
+    if modifiers.contains(.arrowStream) { output.removeAll(where: \.isWhitespace) }
+    return output
   }
 }
 
@@ -1739,16 +1749,17 @@ enum MessagingTextPolicy {
     return collapsingNewlines(in: output).trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  private static func transformedWord(_ source: String) -> String {
+  static func transformedWord(_ source: String) -> String {
     var output = source.lowercased()
     if let terminal = output.last, ".!?".contains(terminal) {
       output.removeLast()
       output.append("\n")
     }
     let removable = CharacterSet(charactersIn: ".()'\"")
-    return output.unicodeScalars.reduce(into: "") { result, scalar in
+    let stripped = output.unicodeScalars.reduce(into: "") { result, scalar in
       if !removable.contains(scalar) { result.unicodeScalars.append(scalar) }
     }
+    return collapsingNewlines(in: stripped)
   }
 
   private static func collapsingNewlines(in value: String) -> String {

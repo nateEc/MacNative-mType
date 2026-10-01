@@ -252,10 +252,10 @@ final class CustomFunboxWordTargetsTests: XCTestCase {
     }
   }
 
-  func testUnderscoreTargetParticipatesInTheFollowingWordAlteration() {
+  func testCanonicalUnderscoreSuffixFollowsOtherWordAlterations() {
     for (modifier, target, words) in [
-      (TestModifier.backwards, "_ab_e_t", ["_a", "b", "_e", "_t"]),
-      (.doubleCharacters, "aa__bbee__tt__", ["aa__", "bb", "ee__", "tt__"]),
+      (TestModifier.backwards, "e_ta_b_", ["e_", "t", "a_", "b_"]),
+      (.doubleCharacters, "aa_bbee_tt_", ["aa_", "bb", "ee_", "tt_"]),
     ] {
       let config = configuration(.sections, modifier: .underscoreSeparators)
         .with(modifiers: [.underscoreSeparators, modifier])

@@ -26,7 +26,8 @@ struct CustomSectionWordStream {
   private var randomState = UInt64.random(in: .min ... .max)
 
   init?(source: String, configuration: TestConfiguration) {
-    let sections = Self.sourceSections(from: source, usesPipe: configuration.usesCustomTextPipeDelimiter)
+    var sections = Self.sourceSections(from: source, usesPipe: configuration.usesCustomTextPipeDelimiter)
+    if configuration.modifiers.contains(.backwards) { sections.reverse() }
     let limit: Int
     switch configuration.customTextCompletion {
     case .sections: limit = configuration.customTextSectionLimit ?? sections.count
@@ -75,25 +76,19 @@ struct CustomSectionWordStream {
         selectedSections += 1
         recentSections = Array((recentSections + [sections[index]]).suffix(2))
       }
-      var word = pendingWords[pendingIndex]
-      // Underscores are target text, not commit characters. The source uses
-      // the opening generation bound, then a bound of 100 with the absolute
-      // word index on continuation; final-target trimming must not remove it.
-      if configuration.modifiers.contains(.underscoreSeparators),
-        emittedWords != alterationBound - 1 {
-        word.append("_")
-      }
+      let altered = TestModifierPolicy.transformedWord(pendingWords[pendingIndex],
+        modifiers: configuration.modifiers, language: configuration.language,
+        wordIndex: emittedWords, wordBound: alterationBound)
       pendingIndex += 1
       emittedWords += 1
       // Commit follows text alteration; reversing a word must not move its
       // separator to the beginning or suppress a newly produced newline.
-      let part = GeneratedWordChunk(source: word, configuration: configuration)
-      let commits = hasSectionWordsRemaining && !part.transformed.hasSuffix("\n")
+      let commits = hasSectionWordsRemaining && !altered.hasSuffix("\n")
         && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       let separator = commits ? " " : ""
-      let transformed = part.transformed + separator
-      lastSeparator = separator
-      recentWords = Array((recentWords + [part.transformed]).suffix(2))
+      let transformed = altered + separator
+      lastSeparator = altered.hasSuffix("\n") ? "\n" : separator
+      recentWords = Array((recentWords + [altered]).suffix(2))
       chunk.text += transformed
       length += transformed.count
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {

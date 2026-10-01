@@ -297,7 +297,7 @@ final class CustomSectionStreamTests: XCTestCase {
       let separator = modifiers.contains(.noSpaces) ? "" : " "
       var session = TestSessionFactory.make(configuration: configuration(2, modifiers: modifiers),
         customText: "amber bay | cedar")
-      let target = ["rebma", "yab", "radec"].joined(separator: separator)
+      let target = ["radec", "rebma", "yab"].joined(separator: separator)
       XCTAssertEqual(session.prompt, target)
       session.insertBatch(target, at: start)
       XCTAssertEqual(session.outcome, .completed)
