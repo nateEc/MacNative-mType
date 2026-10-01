@@ -9,6 +9,40 @@ struct ThemeIndicatorPresentation: Equatable {
   let isFavorite: Bool
 }
 
+/// A read-only overlay shared by theme browsers. Saved, random, and system
+/// selection remain untouched; dropping the preview reads their current state.
+struct ThemePreviewPresentation {
+  let target: ThemeCommandTarget
+  let theme: ResolvedTheme
+  let indicator: ThemeIndicatorPresentation
+  let preferredColorScheme: ColorScheme?
+
+  @MainActor
+  init(settings: AppSettings, systemColorScheme: ColorScheme, previewTarget: ThemeCommandTarget?) {
+    let preview = previewTarget.flatMap {
+      ThemeCommandPreviewPolicy.resolvedTheme(for: $0, customThemes: settings.customThemes)
+    }
+    if let previewTarget, preview != nil {
+      target = previewTarget
+    } else {
+      target = settings.currentThemeQuickPickerTarget(for: systemColorScheme)
+    }
+    let resolved = preview ?? settings.resolvedTheme(for: systemColorScheme)
+    theme = resolved
+    preferredColorScheme = settings.followSystemTheme && preview == nil ? nil : resolved.colorScheme
+    switch target {
+    case .builtIn(let builtIn):
+      indicator = ThemeQuickSwitchPolicy.presentation(
+        builtInTheme: builtIn, activeCustomThemeID: nil, customThemes: settings.customThemes,
+        favoriteThemeIDs: settings.favoriteThemeIDs)
+    case .custom(let id):
+      indicator = ThemeQuickSwitchPolicy.presentation(
+        builtInTheme: settings.theme, activeCustomThemeID: id, customThemes: settings.customThemes,
+        favoriteThemeIDs: settings.favoriteThemeIDs)
+    }
+  }
+}
+
 enum ThemeQuickSwitchAction: Equatable {
   case selectBuiltIn
   case selectCustom(UUID)
@@ -31,6 +65,13 @@ struct ThemeQuickPickerResults {
   var targets: [ThemeCommandTarget] {
     builtInThemes.map(ThemeCommandTarget.builtIn)
       + customThemes.map { .custom($0.id) }
+  }
+
+  func target(at activeIndex: Int) -> ThemeCommandTarget? {
+    let visible = targets
+    guard let index = CommandPaletteKeyboardSelection.index(current: activeIndex, count: visible.count)
+    else { return nil }
+    return visible[index]
   }
 }
 
@@ -143,6 +184,7 @@ struct ThemeQuickPickerView: View {
   let favoriteThemeIDs: [String]
   let selectedTheme: ThemeCommandTarget
   let onSelect: (ThemeCommandTarget) -> Void
+  let onPreview: (ThemeCommandTarget?) -> Void
 
   private var searchResults: ThemeQuickPickerResults {
     ThemeQuickPickerSearch.results(
@@ -183,6 +225,9 @@ struct ThemeQuickPickerView: View {
                       choose(.builtIn(theme))
                     }
                     .id(index)
+                    .onHover { hovering in
+                      if hovering { activeIndex = index; previewSelection() }
+                    }
                   }
                 }
               }
@@ -207,6 +252,9 @@ struct ThemeQuickPickerView: View {
                         choose(.custom(theme.id))
                       }
                       .id(rowIndex)
+                      .onHover { hovering in
+                        if hovering { activeIndex = rowIndex; previewSelection() }
+                      }
                     }
                   }
                 }
@@ -227,14 +275,26 @@ struct ThemeQuickPickerView: View {
       }
     }
     .frame(width: 430, height: 410)
-    .onAppear { searchFocused = true }
-    .onChange(of: searchText) { _, _ in activeIndex = 0 }
+    .onAppear { searchFocused = true; previewSelection() }
+    .onChange(of: activeIndex) { _, _ in previewSelection() }
+    .onChange(of: searchText) { _, _ in
+      activeIndex = 0
+      previewSelection()
+    }
+    .onChange(of: searchResults.targets) { _, _ in
+      activeIndex = 0
+      previewSelection()
+    }
+    .onDisappear { onPreview(nil) }
   }
 
   private func activateSelection() {
-    guard let index = CommandPaletteKeyboardSelection.index(
-      current: activeIndex, count: searchResults.targets.count) else { return }
-    choose(searchResults.targets[index])
+    guard let target = searchResults.target(at: activeIndex) else { return }
+    choose(target)
+  }
+
+  private func previewSelection() {
+    onPreview(searchResults.target(at: activeIndex))
   }
 
   private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {

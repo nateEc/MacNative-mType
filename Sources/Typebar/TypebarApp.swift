@@ -1008,6 +1008,7 @@ private struct ContentView: View {
   @State private var themeQuickPickerScope: ThemeQuickPickerScope?
   @State private var themeQuickSwitchMessage: String?
   @State private var commandThemePreviewTarget: ThemeCommandTarget?
+  @State private var quickPickerThemePreviewTarget: ThemeCommandTarget?
   @State private var showingProfileSearchCommandEditor = false
   @State private var showingActiveResultTagEditor = false
   @State private var showingFontFamilyNameCommandEditor = false
@@ -1172,7 +1173,7 @@ private struct ContentView: View {
       }
     }
     .tint(activeTheme.accent)
-    .preferredColorScheme(settings.followSystemTheme ? nil : activeTheme.colorScheme)
+    .preferredColorScheme(themePreviewPresentation.preferredColorScheme)
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
@@ -1484,11 +1485,12 @@ private struct ContentView: View {
           commandThemePreviewTarget = ThemeCommandPreviewPolicy.target(for: item)
         })
     }
-    .sheet(item: $themeQuickPickerScope) { scope in
+    .sheet(item: $themeQuickPickerScope, onDismiss: { quickPickerThemePreviewTarget = nil }) { scope in
       ThemeQuickPickerView(
         scope: scope, customThemes: settings.customThemes,
         favoriteThemeIDs: settings.favoriteThemeIDs, selectedTheme: selectedThemeQuickPickerTarget,
-        onSelect: applyThemeQuickPickerSelection)
+        onSelect: applyThemeQuickPickerSelection,
+        onPreview: { quickPickerThemePreviewTarget = $0 })
     }
     .sheet(isPresented: $showingProfileSearchCommandEditor) {
       ProfileSearchCommandView(account: account)
@@ -3305,16 +3307,7 @@ private struct ContentView: View {
   }
 
   private var themeIndicatorPresentation: ThemeIndicatorPresentation {
-    switch selectedThemeQuickPickerTarget {
-    case .builtIn(let theme):
-      ThemeQuickSwitchPolicy.presentation(
-        builtInTheme: theme, activeCustomThemeID: nil, customThemes: settings.customThemes,
-        favoriteThemeIDs: settings.favoriteThemeIDs)
-    case .custom(let id):
-      ThemeQuickSwitchPolicy.presentation(
-        builtInTheme: settings.theme, activeCustomThemeID: id, customThemes: settings.customThemes,
-        favoriteThemeIDs: settings.favoriteThemeIDs)
-    }
+    themePreviewPresentation.indicator
   }
 
   private var selectedThemeQuickPickerTarget: ThemeCommandTarget {
@@ -3348,6 +3341,8 @@ private struct ContentView: View {
   }
 
   private func applyThemeQuickPickerSelection(_ target: ThemeCommandTarget) {
+    guard ThemeCommandPreviewPolicy.resolvedTheme(for: target, customThemes: settings.customThemes) != nil
+    else { return }
     themeQuickSwitchMessage = nil
     settings.followSystemTheme = false
     switch target {
@@ -4052,13 +4047,13 @@ private struct ContentView: View {
   }
 
   private var activeTheme: ResolvedTheme {
-    if let commandThemePreviewTarget,
-      let preview = ThemeCommandPreviewPolicy.resolvedTheme(
-        for: commandThemePreviewTarget, customThemes: settings.customThemes)
-    {
-      return preview
-    }
-    return settings.resolvedTheme(for: systemColorScheme)
+    themePreviewPresentation.theme
+  }
+
+  private var themePreviewPresentation: ThemePreviewPresentation {
+    let previewTarget = themeQuickPickerScope != nil ? quickPickerThemePreviewTarget
+      : showingCommandPalette ? commandThemePreviewTarget : nil
+    return .init(settings: settings, systemColorScheme: systemColorScheme, previewTarget: previewTarget)
   }
 
   private var commandPaletteItems: [CommandPaletteItem] {
