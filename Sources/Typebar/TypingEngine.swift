@@ -899,6 +899,28 @@ enum TestModifier: String, CaseIterable, Codable, Equatable, Identifiable {
   }
 }
 
+/// Carries rendered targets, not a recipe that can resample random transforms.
+struct TransformedPromptBatch {
+  let text: String
+  let noSpaceWordLengths: [Int]
+  let noSpaceTargetWords: [String]
+
+  init(text: String, noSpaceTargetWords: [String] = []) {
+    self.text = text
+    let lengths = noSpaceTargetWords.map(\.count)
+    // Joining can fuse graphemes across a word boundary. Do not hand the
+    // grapheme-indexed engine unsafe offsets, or invent missing zero targets.
+    if !lengths.isEmpty, lengths.allSatisfy({ $0 > 0 }),
+      lengths.reduce(0, +) == text.count, noSpaceTargetWords.joined() == text {
+      self.noSpaceWordLengths = lengths
+      self.noSpaceTargetWords = noSpaceTargetWords
+    } else {
+      self.noSpaceWordLengths = []
+      self.noSpaceTargetWords = []
+    }
+  }
+}
+
 enum TestModifierPolicy {
   static let finiteDurationOnly: Set<TestModifier> = [
     .layoutFluid, .focusCurrentWord, .focusNextWord, .focusTwoWords, .focusThreeWords,
@@ -1236,21 +1258,38 @@ enum TestModifierPolicy {
   }
 
   static func transformed(
-    _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil
+    _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
+    nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> String {
+    transformedBatch(prompt, modifiers: modifiers, language: language,
+      nextRandomCaseBit: nextRandomCaseBit).text
+  }
+
+  static func transformedBatch(
+    _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
+    preservesNoSpaceBoundaries: Bool = false, nextRandomCaseBit: () -> Bool = { Bool.random() }
+  ) -> TransformedPromptBatch {
     let presented = language?.presentationText(prompt) ?? prompt
-    guard modifiers.contains(where: { canonicalTextAlterations.contains($0)
-      || [.noSpaces, .arrowStream, .lazyLatin].contains($0) }) else { return presented }
-    var words = presented.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+    guard preservesNoSpaceBoundaries || modifiers.contains(where: { canonicalTextAlterations.contains($0)
+      || [.noSpaces, .arrowStream, .lazyLatin].contains($0) }) else {
+      return .init(text: presented)
+    }
+    let capturesTargets = usesNoSpaceInput(modifiers) || preservesNoSpaceBoundaries
+    // A literal ASCII commit can share a grapheme with a following combining
+    // mark. Split scalars so the mark stays in its word, not in the separator.
+    var words = presented.unicodeScalars.split(separator: " ", omittingEmptySubsequences: false)
+      .map { String(String.UnicodeScalarView($0)) }
     // A flat finite pool is reversed before words are selected/altered. Pipe
     // cursors reverse their candidate pool themselves, not its inner words.
     if modifiers.contains(.backwards) { words.reverse() }
     var output = ""
+    var targets: [String] = []
     for (index, word) in words.enumerated() {
       let altered = transformedWord(word, modifiers: modifiers, language: language,
-        wordIndex: index, wordBound: words.count)
+        wordIndex: index, wordBound: words.count, nextRandomCaseBit: nextRandomCaseBit)
       output += altered
-      if index < words.count - 1, !usesNoSpaceInput(modifiers), !altered.hasSuffix("\n") {
+      if capturesTargets, !word.isEmpty { targets.append(altered) }
+      if index < words.count - 1, !capturesTargets, !altered.hasSuffix("\n") {
         output.append(" ")
       }
     }
@@ -1259,8 +1298,11 @@ enum TestModifierPolicy {
     // whether generation is actually complete.
     if modifiers.contains(.messagingStyle), output.hasSuffix("\n") {
       output.removeLast()
+      if capturesTargets, targets.last?.hasSuffix("\n") == true {
+        targets[targets.count - 1].removeLast()
+      }
     }
-    return output
+    return .init(text: output, noSpaceTargetWords: targets)
   }
 
   // Direct reference toggles sort official names before applying alterText.
@@ -5693,21 +5735,16 @@ struct TypingSession {
     if var stream = finiteCustomTextStream, stream.hasRemaining {
       let source = stream.nextChunk()
       finiteCustomTextStream = stream
-      let chunk = configuration.language.presentationText(
-        TestModifierPolicy.transformed(
-          source, modifiers: configuration.modifiers, language: configuration.language))
+      let chunk = GeneratedWordChunk(source: source, configuration: configuration)
       let previousEnd = promptCharacters.count
-      appendPrompt(chunk)
+      appendPrompt(chunk.transformed)
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
-        let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
-          source: source, language: configuration.language,
-          modifiers: configuration.modifiers, transformedPrompt: chunk)
         var end = previousEnd
-        for length in lengths {
+        for length in chunk.noSpaceWordLengths {
           end += length
           noSpaceWordEndIndices.append(end)
         }
-        noSpaceTargetWords += NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: chunk)
+        noSpaceTargetWords += chunk.noSpaceTargetWords
       }
       return
     }
@@ -5720,46 +5757,34 @@ struct TypingSession {
           ? configuration.language : nil)
       randomCustomPreviousWords = Array(words.suffix(2))
       let source = words.joined(separator: " ")
-      let chunk = configuration.language.presentationText(
-        TestModifierPolicy.transformed(
-          source, modifiers: configuration.modifiers, language: configuration.language))
+      let chunk = GeneratedWordChunk(source: source, configuration: configuration)
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
       let previousEnd = promptCharacters.count + separator.count
-      appendPrompt(separator + chunk)
+      appendPrompt(separator + chunk.transformed)
       if usesNoSpaceSeparator {
-        let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
-          source: source, language: configuration.language,
-          modifiers: configuration.modifiers, transformedPrompt: chunk,
-          preservesNoSpaceBoundaries: false)
         var end = previousEnd
-        for length in lengths {
+        for length in chunk.noSpaceWordLengths {
           end += length
           noSpaceWordEndIndices.append(end)
         }
-        noSpaceTargetWords += NoSpaceWordBoundaryPolicy.targetWords(
-          for: lengths, in: chunk)
+        noSpaceTargetWords += chunk.noSpaceTargetWords
       }
       return
     }
     if var stream = sequentialCustomWordStream {
       let source = stream.nextWords(count: 100)
       sequentialCustomWordStream = stream
-      let chunk = configuration.language.presentationText(
-        TestModifierPolicy.transformed(
-          source, modifiers: configuration.modifiers, language: configuration.language))
+      let chunk = GeneratedWordChunk(source: source, configuration: configuration)
       let previousEnd = promptCharacters.count
-      appendPrompt(chunk)
+      appendPrompt(chunk.transformed)
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
-        let lengths = NoSpaceWordBoundaryPolicy.wordLengths(
-          source: source, language: configuration.language,
-          modifiers: configuration.modifiers, transformedPrompt: chunk)
         var end = previousEnd
-        for length in lengths {
+        for length in chunk.noSpaceWordLengths {
           end += length
           noSpaceWordEndIndices.append(end)
         }
-        noSpaceTargetWords += NoSpaceWordBoundaryPolicy.targetWords(for: lengths, in: chunk)
+        noSpaceTargetWords += chunk.noSpaceTargetWords
       }
       return
     }

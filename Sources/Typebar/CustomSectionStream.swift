@@ -51,7 +51,8 @@ struct CustomSectionWordStream {
     pendingIndex < pendingWords.count || sectionLimit == 0 || selectedSections < sectionLimit
   }
 
-  mutating func nextChunk(random: (() -> Int)? = nil) -> CustomSectionPromptChunk {
+  mutating func nextChunk(random: (() -> Int)? = nil,
+    nextRandomCaseBit: () -> Bool = { Bool.random() }) -> CustomSectionPromptChunk {
     var chunk = CustomSectionPromptChunk()
     var length = 0
     guard hasRemaining else { return chunk }
@@ -78,7 +79,7 @@ struct CustomSectionWordStream {
       }
       let altered = TestModifierPolicy.transformedWord(pendingWords[pendingIndex],
         modifiers: configuration.modifiers, language: configuration.language,
-        wordIndex: emittedWords, wordBound: alterationBound)
+        wordIndex: emittedWords, wordBound: alterationBound, nextRandomCaseBit: nextRandomCaseBit)
       pendingIndex += 1
       emittedWords += 1
       // Commit follows text alteration; reversing a word must not move its

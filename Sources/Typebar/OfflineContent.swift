@@ -5750,6 +5750,9 @@ enum NoSpaceWordBoundaryPolicy {
     source: String, language: TypingLanguage = .english, modifiers: [TestModifier],
     transformedPrompt: String, preservesNoSpaceBoundaries: Bool = false
   ) -> [Int] {
+    // Legacy callers have only text, not the sampled targets. Random case
+    // cannot be safely reconstructed from a new draw, even at equal length.
+    guard !modifiers.contains(.randomCase) else { return [] }
     guard TestModifierPolicy.usesNoSpaceInput(modifiers) || preservesNoSpaceBoundaries else {
       return []
     }
@@ -5840,16 +5843,14 @@ struct GeneratedWordChunk {
   let noSpaceWordLengths: [Int]
   let noSpaceTargetWords: [String]
 
-  init(source: String, configuration: TestConfiguration) {
+  init(source: String, configuration: TestConfiguration,
+    nextRandomCaseBit: () -> Bool = { Bool.random() }) {
     self.source = source
-    transformed = configuration.language.presentationText(
-      TestModifierPolicy.transformed(
-        source, modifiers: configuration.modifiers, language: configuration.language))
-    noSpaceWordLengths = NoSpaceWordBoundaryPolicy.wordLengths(
-      source: source, language: configuration.language, modifiers: configuration.modifiers,
-      transformedPrompt: transformed)
-    noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
-      for: noSpaceWordLengths, in: transformed)
+    let batch = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
+      language: configuration.language, nextRandomCaseBit: nextRandomCaseBit)
+    transformed = batch.text
+    noSpaceWordLengths = batch.noSpaceWordLengths
+    noSpaceTargetWords = batch.noSpaceTargetWords
   }
 }
 
@@ -5873,7 +5874,8 @@ struct GeneratedWordContinuation {
       .map { $0.lowercased() }
   }
 
-  mutating func nextChunk(generator: (() -> String)? = nil) -> GeneratedWordChunk {
+  mutating func nextChunk(generator: (() -> String)? = nil,
+    nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk {
     var source = ""
     var words: [String] = []
     for _ in 0...100 {
@@ -5888,7 +5890,8 @@ struct GeneratedWordContinuation {
       if !firstRepeats && !secondRepeats { break }
     }
     previousWords = Array(words.suffix(2)).map { $0.lowercased() }
-    return GeneratedWordChunk(source: source, configuration: configuration)
+    return GeneratedWordChunk(source: source, configuration: configuration,
+      nextRandomCaseBit: nextRandomCaseBit)
   }
 }
 
@@ -5899,12 +5902,13 @@ struct GeneratedStreamContinuation {
   let batchWordCount: Int
   private(set) var nextTokenIndex: Int
 
-  mutating func nextChunk() -> GeneratedWordChunk? {
+  mutating func nextChunk(nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk? {
     guard let source = TypebarStreamContent.prompt(
       configuration: configuration, wordCount: batchWordCount, startIndex: nextTokenIndex)
     else { return nil }
     nextTokenIndex += batchWordCount
-    return GeneratedWordChunk(source: source, configuration: configuration)
+    return GeneratedWordChunk(source: source, configuration: configuration,
+      nextRandomCaseBit: nextRandomCaseBit)
   }
 }
 
@@ -5928,7 +5932,7 @@ struct GeneratedCodeContinuation {
       || emittedWords < (configuration.wordLimit ?? 0)
   }
 
-  mutating func nextChunk() -> GeneratedWordChunk {
+  mutating func nextChunk(nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk {
     let remaining = configuration.mode == .words && !configuration.isInfinite
       ? max(0, (configuration.wordLimit ?? 0) - emittedWords) : 100
     let count = min(max(1, batchTokenCount), 100, remaining)
@@ -5942,7 +5946,8 @@ struct GeneratedCodeContinuation {
     let source = (emittedWords > 0 ? " " : "") + pendingWords.prefix(count).joined(separator: " ")
     pendingWords.removeFirst(count)
     emittedWords += count
-    return GeneratedWordChunk(source: source, configuration: configuration)
+    return GeneratedWordChunk(source: source, configuration: configuration,
+      nextRandomCaseBit: nextRandomCaseBit)
   }
 }
 
@@ -5955,7 +5960,7 @@ struct TestSessionFactory {
     quote: OfflineQuote? = nil,
     streamPrompt: String? = nil,
     streamNoSpaceBoundarySource: String? = nil,
-    weakSpotScores: WeakSpotScores = .init()
+    weakSpotScores: WeakSpotScores = .init(), nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> TypingSession {
     let prompt: String
     var sectionEndIndices: [Int] = []
@@ -5987,6 +5992,7 @@ struct TestSessionFactory {
     var usesGeneratedStream = false
     var usesGeneratedCode = false
     var generatedCodeContinuation: GeneratedCodeContinuation?
+    var generatedCodeChunk: GeneratedWordChunk?
     let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -6002,7 +6008,9 @@ struct TestSessionFactory {
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
         batchTokenCount: min(streamWordCount, 100), nextUnitIndex: 0)
-      prompt = cursor.nextChunk().source
+      let chunk = cursor.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
+      prompt = chunk.source
+      generatedCodeChunk = chunk
       generatedCodeContinuation = cursor.hasRemaining ? cursor : nil
       usesGeneratedCode = true
     } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
@@ -6039,7 +6047,7 @@ struct TestSessionFactory {
         }
         if streamsCustomSections {
           if var stream = CustomSectionWordStream(source: source, configuration: configuration) {
-            let chunk = stream.nextChunk()
+            let chunk = stream.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
             prompt = chunk.text
             if configuration.customTextCompletion == .sections { sectionEndIndices = chunk.sectionEndOffsets }
             customSectionChunk = chunk
@@ -6092,18 +6100,23 @@ struct TestSessionFactory {
         }
       }
     }
-    let transformedPrompt = configuration.language.presentationText(
-      streamsCustomSections
-        ? prompt
-        : TestModifierPolicy.transformed(
-          prompt, modifiers: configuration.modifiers, language: configuration.language))
-    let noSpaceWordLengths = customSectionChunk?.noSpaceWordLengths ?? NoSpaceWordBoundaryPolicy.wordLengths(
-      source: noSpaceBoundarySource ?? prompt, language: configuration.language,
-      modifiers: configuration.modifiers,
-      transformedPrompt: transformedPrompt,
-      preservesNoSpaceBoundaries: noSpaceBoundarySource != nil)
-    let noSpaceTargetWords = customSectionChunk?.noSpaceTargetWords ?? NoSpaceWordBoundaryPolicy.targetWords(
-      for: noSpaceWordLengths, in: transformedPrompt)
+    let batch: TransformedPromptBatch
+    if streamsCustomSections {
+      batch = .init(text: prompt)
+    } else if let codeChunk = generatedCodeChunk {
+      batch = .init(text: codeChunk.transformed, noSpaceTargetWords: codeChunk.noSpaceTargetWords)
+    } else if let boundarySource = noSpaceBoundarySource,
+      boundarySource.replacingOccurrences(of: " ", with: "") == prompt {
+      batch = TestModifierPolicy.transformedBatch(boundarySource, modifiers: configuration.modifiers,
+        language: configuration.language, preservesNoSpaceBoundaries: true,
+        nextRandomCaseBit: nextRandomCaseBit)
+    } else {
+      batch = TestModifierPolicy.transformedBatch(prompt, modifiers: configuration.modifiers,
+        language: configuration.language, nextRandomCaseBit: nextRandomCaseBit)
+    }
+    let transformedPrompt = batch.text
+    let noSpaceWordLengths = customSectionChunk?.noSpaceWordLengths ?? batch.noSpaceWordLengths
+    let noSpaceTargetWords = customSectionChunk?.noSpaceTargetWords ?? batch.noSpaceTargetWords
     let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
       && !hasCompleteRandomWordPrompt && !streamsRandomCustomText
       && !streamsSequentialCustomText
@@ -6132,9 +6145,9 @@ struct TestSessionFactory {
     if primesRepeatedPrompt {
       let separator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
         || generatedCodeContinuation != nil ? "" : " "
-      let nextChunk = generatedWordContinuation?.nextChunk()
-        ?? generatedStreamContinuation?.nextChunk()
-        ?? generatedCodeContinuation?.nextChunk()
+      let nextChunk = generatedWordContinuation?.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
+        ?? generatedStreamContinuation?.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
+        ?? generatedCodeContinuation?.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
       initialPrompt = transformedPrompt + separator + (nextChunk?.transformed ?? transformedPrompt)
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
         for: noSpaceWordLengths + (nextChunk?.noSpaceWordLengths ?? noSpaceWordLengths))
