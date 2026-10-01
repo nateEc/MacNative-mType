@@ -3500,12 +3500,7 @@ struct TypingSession {
   private var replayEvents: [TypingReplayEvent] = []
   private var weakSpotInputSamples: [WeakSpotInputSample] = []
   private var weakSpotLastInputDate: Date?
-  private var activePhysicalKeyDownDates: [UInt16: Date] = [:]
-  private var completedPhysicalKeyDurations: [TimeInterval] = []
-  private var lastPhysicalKeyDownDate: Date?
-  private var physicalKeySpacingSamples: [TimeInterval] = []
-  private var physicalKeyOverlapStartedAt: Date?
-  private var completedPhysicalKeyOverlapDuration: TimeInterval = 0
+  private var physicalKeyTiming = PhysicalKeyTiming()
   private(set) var startedAt: Date?
   private(set) var finishedAt: Date?
   private(set) var outcome: TestOutcome = .active
@@ -3649,36 +3644,13 @@ struct TypingSession {
     keyboardActivityDates.append(date)
   }
 
-  /// Records anonymous key hold durations from native keyDown/keyUp pairs.
+  /// Records anonymous physical presses for the terminal timing snapshot.
   /// Auto-repeat does not begin a second press, and unmatched releases are ignored.
   mutating func recordPhysicalKeyEvent(
     keyCode: UInt16, isKeyDown: Bool, isRepeat: Bool, at date: Date = .now
   ) {
     guard !isFinished else { return }
-    if isKeyDown {
-      guard !isRepeat, activePhysicalKeyDownDates[keyCode] == nil else { return }
-      if startedAt != nil, let previousDate = lastPhysicalKeyDownDate {
-        let spacing = date.timeIntervalSince(previousDate)
-        if spacing.isFinite, spacing >= 0 { physicalKeySpacingSamples.append(spacing) }
-      }
-      lastPhysicalKeyDownDate = date
-      activePhysicalKeyDownDates[keyCode] = date
-      if startedAt != nil, activePhysicalKeyDownDates.count > 1,
-        physicalKeyOverlapStartedAt == nil
-      {
-        physicalKeyOverlapStartedAt = date
-      }
-      return
-    }
-    guard startedAt != nil, let keyDownDate = activePhysicalKeyDownDates.removeValue(forKey: keyCode)
-    else { return }
-    let duration = date.timeIntervalSince(keyDownDate)
-    if duration.isFinite, duration >= 0 { completedPhysicalKeyDurations.append(duration) }
-    if activePhysicalKeyDownDates.count == 1, let overlapStartedAt = physicalKeyOverlapStartedAt {
-      let overlap = date.timeIntervalSince(overlapStartedAt)
-      if overlap.isFinite, overlap >= 0 { completedPhysicalKeyOverlapDuration += overlap }
-      physicalKeyOverlapStartedAt = nil
-    }
+    physicalKeyTiming.record(code: keyCode, down: isKeyDown, isRepeat: isRepeat, at: date)
   }
 
   var sectionProgress: (completed: Int, total: Int)? {
@@ -4147,6 +4119,7 @@ struct TypingSession {
     challengePresentation: ChallengePresentationSnapshot? = nil
   ) -> CompletedTestResult? {
     guard let startedAt, let finishedAt else { return nil }
+    let keyTiming = physicalKeyTiming.snapshot(startedAt: startedAt, finishedAt: finishedAt)
     return .init(
       id: UUID(),
       configuration: configuration,
@@ -4166,9 +4139,9 @@ struct TypingSession {
       restartCount: restartCount,
       priorAttemptEngagedDuration: priorAttemptEngagedDuration,
       characterStats: characterStats,
-      keyDurationSamples: completedPhysicalKeyDurations,
-      keySpacingSamples: physicalKeySpacingSamples,
-      keyOverlapDuration: completedPhysicalKeyOverlapDuration,
+      keyDurationSamples: keyTiming.durations,
+      keySpacingSamples: keyTiming.spacings,
+      keyOverlapDuration: keyTiming.overlap,
       tags: ResultTagPolicy.normalized(tags),
       quoteSource: quoteSource,
       prompt: prompt,
@@ -4406,7 +4379,6 @@ struct TypingSession {
   private mutating func beginIfNeeded(at date: Date) {
     if startedAt == nil {
       startedAt = date
-      if activePhysicalKeyDownDates.count > 1 { physicalKeyOverlapStartedAt = date }
     }
   }
 

@@ -7,6 +7,8 @@
 - 清单只保留路径、领域、Typebar 证据路径和原生测试函数名；不复制测试步骤、参考代码、词表、视觉资产或线上数据。
 - `Compatibility/official-reference-behavior-specs.json` 是机器可读来源；每个直接规格都附有可定位的 `nativeTests` 函数名。`zsh Scripts/check-reference-behavior-audit.sh /absolute/path/to/monkeytype-reference` 会核对固定提交、64 个路径的完备分类、直接行为的原生证据路径和函数符号，以及本文覆盖。
 
+2026-10-01 按键时序证据更正：`frontend/__tests__/test/events/data.spec.ts` 和 `frontend/__tests__/test/events/stats.spec.ts` 的原生证据增加 `PhysicalKeyTiming.swift` 与 `PhysicalKeyTimingTests.swift`。旧“只统计已释放键”的回归改为包含结束估算，追加默认 80 ms、有效均值、重复非连发同键、按下顺序与三键重叠并集的独立测试。固定参考完整结果链会先补齐释放再计算结果；此处只索引行为证据，不导入参考测试、实现或日志。零时长键的同时间排序和重叠值仍有明确未对齐边界，见 `FUNCTIONAL_INVENTORY.md`，`direct` 分类不代表该规格的所有用例或人工验收已经完成。
+
 ## 直接用户行为规格
 
 | 参考规格路径 | 可观察领域 | Typebar 原生证据 |

@@ -697,7 +697,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(unavailable, .init(typing: 0, key: 0))
   }
 
-  func testPhysicalKeyTimingsUseOnlyClosedNonRepeatEvents() throws {
+  func testPhysicalKeyTimingsIncludeTerminalEstimatesButIgnoreRepeatsAndLateReleases() throws {
     var session = TypingSession(configuration: .timed(seconds: 1), prompt: "amber")
     session.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
     session.insert("a", at: start.addingTimeInterval(0.01))
@@ -718,14 +718,16 @@ final class TypingEngineTests: XCTestCase {
     session.tick(at: start.addingTimeInterval(1.01))
 
     let result = try XCTUnwrap(session.result(at: start.addingTimeInterval(1.01)))
-    XCTAssertEqual(result.keyDurationSamples.count, 2)
+    XCTAssertEqual(result.keyDurationSamples.count, 4)
     XCTAssertEqual(result.keyDurationSamples[0], 0.1, accuracy: 0.000_001)
     XCTAssertEqual(result.keyDurationSamples[1], 0.2, accuracy: 0.000_001)
+    XCTAssertEqual(result.keyDurationSamples[2], 0.15, accuracy: 0.000_001)
+    XCTAssertEqual(result.keyDurationSamples[3], 0.15, accuracy: 0.000_001)
     let stats = try XCTUnwrap(result.keyDurationStats)
     XCTAssertEqual(stats.averageMilliseconds, 150, accuracy: 0.000_001)
-    XCTAssertEqual(stats.standardDeviationMilliseconds, 50, accuracy: 0.000_001)
-    XCTAssertEqual(stats.sampleCount, 2)
-    XCTAssertEqual(result.keyOverlapDuration, 0)
+    XCTAssertEqual(stats.standardDeviationMilliseconds, sqrt(1_250), accuracy: 0.000_001)
+    XCTAssertEqual(stats.sampleCount, 4)
+    XCTAssertEqual(result.keyOverlapDuration, 0.05, accuracy: 0.000_001)
 
     session.recordPhysicalKeyEvent(
       keyCode: 2, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(1.1))
@@ -733,7 +735,7 @@ final class TypingEngineTests: XCTestCase {
       keyCode: 3, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(1.2))
     XCTAssertEqual(
       try XCTUnwrap(session.result(at: start.addingTimeInterval(1.01))).keyDurationSamples.count,
-      2)
+      4)
 
     var overlap = TypingSession(configuration: .timed(seconds: 1), prompt: "amber")
     overlap.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
