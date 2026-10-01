@@ -13,6 +13,7 @@ struct TypebarApp: App {
   @State private var announcements = RemoteAnnouncementCenter()
   @State private var hotkey = GlobalHotkeyMonitor()
   @State private var systemKeyboardGuide = SystemKeyboardGuideMonitor()
+  @State private var systemAppearance = SystemAppearanceMonitor()
   @State private var network = NetworkConnectivityMonitor()
 
   var body: some Scene {
@@ -64,7 +65,7 @@ struct TypebarApp: App {
   private var rootContent: some View {
     ContentView(
       settings: settings, account: account, announcements: announcements, hotkey: hotkey,
-      systemKeyboardGuide: systemKeyboardGuide, network: network)
+      systemKeyboardGuide: systemKeyboardGuide, network: network, systemAppearance: systemAppearance)
       .frame(minWidth: 760, minHeight: 480)
       .task {
         await account.restoreSession()
@@ -931,10 +932,11 @@ private struct ContentView: View {
   let hotkey: GlobalHotkeyMonitor
   let systemKeyboardGuide: SystemKeyboardGuideMonitor
   let network: NetworkConnectivityMonitor
+  let systemAppearance: SystemAppearanceMonitor
   @Environment(\.modelContext) private var modelContext
   @Environment(\.openSettings) private var openSettings
   @Environment(\.openWindow) private var openWindow
-  @Environment(\.colorScheme) private var systemColorScheme
+  private var systemColorScheme: ColorScheme { systemAppearance.colorScheme }
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var savedResults:
     [TestResultRecord]
