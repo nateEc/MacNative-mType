@@ -64,6 +64,7 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(capabilities.capabilities["resultSubmission"], .partial)
         XCTAssertEqual(capabilities.capabilities["resultTimingEvidence"], .available)
         XCTAssertEqual(capabilities.capabilities["resultPracticeTiming"], .available)
+        XCTAssertEqual(capabilities.capabilities["resultInputMetrics"], .available)
         XCTAssertEqual(capabilities.capabilities["resultHistory"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboards"], .partial)
         XCTAssertEqual(capabilities.capabilities["leaderboardRankMemory"], .available)

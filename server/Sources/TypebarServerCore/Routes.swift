@@ -70,6 +70,7 @@ public func configure(
                 "resultSubmission": .partial,
                 "resultTimingEvidence": .available,
                 "resultPracticeTiming": .available,
+                "resultInputMetrics": .available,
                 "resultHistory": .partial,
                 "leaderboards": .partial,
                 "leaderboardRankMemory": .available,

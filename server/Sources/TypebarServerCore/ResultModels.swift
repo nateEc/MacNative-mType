@@ -53,6 +53,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let tags: [String]
     public let timingEvidence: ResultTimingEvidence?
     public let practiceTiming: ResultPracticeTiming?
+    public let inputMetrics: ResultInputMetrics?
     public let startedAt: Date
     public let finishedAt: Date
 
@@ -60,7 +61,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
         rawWpm: Int, accuracy: Int, consistency: Double = 0, errorCount: Int, eventCount: Int,
         restartCount: Int = 0, tags: [String] = [], timingEvidence: ResultTimingEvidence? = nil,
-        practiceTiming: ResultPracticeTiming? = nil,
+        practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -78,6 +79,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.tags = tags
         self.timingEvidence = timingEvidence
         self.practiceTiming = practiceTiming
+        self.inputMetrics = inputMetrics
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }
@@ -87,6 +89,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
             errorCount, eventCount, restartCount, tags, startedAt, finishedAt
         case timingEvidence
         case practiceTiming
+        case inputMetrics
     }
 
     public init(from decoder: Decoder) throws {
@@ -106,6 +109,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         timingEvidence = try values.decodeIfPresent(ResultTimingEvidence.self, forKey: .timingEvidence)
         practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
+        inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
         startedAt = try values.decode(Date.self, forKey: .startedAt)
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
     }
@@ -132,6 +136,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let wpm: Int
     public let rawWpm: Int
     public let accuracy: Int
+    public let preciseAccuracy: Double?
     public let consistency: Double
     public let errorCount: Int
     public let eventCount: Int
@@ -143,7 +148,8 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public init(
         id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
         rawWpm: Int, accuracy: Int, consistency: Double, errorCount: Int, eventCount: Int,
-        tags: [String], practiceTiming: ResultPracticeTiming? = nil, startedAt: Date, finishedAt: Date
+        tags: [String], practiceTiming: ResultPracticeTiming? = nil, preciseAccuracy: Double? = nil,
+        startedAt: Date, finishedAt: Date
     ) {
         self.id = id
         self.mode = mode
@@ -153,6 +159,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.wpm = wpm
         self.rawWpm = rawWpm
         self.accuracy = accuracy
+        self.preciseAccuracy = preciseAccuracy
         self.consistency = consistency
         self.errorCount = errorCount
         self.eventCount = eventCount
@@ -230,6 +237,7 @@ public struct LeaderboardEntry: Content, Equatable, Identifiable {
     public let language: String
     public let wpm: Int
     public let accuracy: Int
+    public var preciseAccuracy: Double? = nil
     public let consistency: Double
     public let finishedAt: Date
     public let selectedBadge: PublicProfileBadge?
@@ -397,9 +405,10 @@ public enum TypebarExperiencePolicy {
             let charactersPerMinute = max(result.rawWpm, 1) * 5
             seconds = max(5, min(900, Double(result.eventCount) / Double(charactersPerMinute) * 60))
         }
-        let accuracyFactor = max(0.25, Double(result.accuracy) / 100)
+        let accuracy = result.inputMetrics?.preciseAccuracy ?? Double(result.accuracy)
+        let accuracyFactor = max(0.25, accuracy / 100)
         let quoteFactor = result.mode == "quote" ? 1.25 : 1
-        let perfectBonus = result.accuracy == 100 ? 1.2 : 1
+        let perfectBonus = accuracy == 100 ? 1.2 : 1
         return max(1, Int((seconds * accuracyFactor * quoteFactor * perfectBonus).rounded()))
     }
 }

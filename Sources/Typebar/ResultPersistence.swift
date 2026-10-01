@@ -443,6 +443,8 @@ final class TestResultRecord {
   var preciseWpm: Double?
   var preciseRawWpm: Double?
   var preciseAccuracy: Double?
+  /// Optional additive snapshot; old records cannot recover stopped attempts.
+  var inputMetricsData: Data?
   var storedRestartCount: Int?
   /// Optional so existing SwiftData stores expand without requiring a backfill.
   var storedPriorAttemptEngagedDuration: TimeInterval?
@@ -472,6 +474,7 @@ final class TestResultRecord {
     preciseWpm = result.preciseWpm
     preciseRawWpm = result.preciseRawWpm
     preciseAccuracy = result.preciseAccuracy
+    inputMetricsData = result.inputMetrics.flatMap { try? JSONEncoder().encode($0) }
     storedRestartCount = result.restartCount
     storedPriorAttemptEngagedDuration = result.priorAttemptEngagedDuration
     characterStatsData = try? JSONEncoder().encode(result.characterStats)
@@ -579,6 +582,7 @@ final class TestResultRecord {
       preciseWpm: preciseWpm,
       preciseRawWpm: preciseRawWpm,
       preciseAccuracy: preciseAccuracy,
+      inputMetrics: inputMetricsData.flatMap { try? JSONDecoder().decode(ResultInputMetrics.self, from: $0) },
       restartCount: restartCount,
       priorAttemptEngagedDuration: priorAttemptEngagedDuration,
       characterStats: characterStats,

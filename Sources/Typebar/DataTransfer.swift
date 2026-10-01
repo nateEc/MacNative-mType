@@ -75,7 +75,7 @@ enum ResultCSVExport {
             result.outcome.rawValue,
             String(result.wpm),
             String(result.rawWpm),
-            String(result.accuracy),
+            accuracyValue(result.preciseAccuracy),
             decimal(consistency.typing),
             decimal(consistency.key),
             String(result.correctCharacterCount),
@@ -120,6 +120,11 @@ enum ResultCSVExport {
 
     private static func decimal(_ value: Double) -> String {
         String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+
+    static func accuracyValue(_ value: Double) -> String {
+        value.rounded() == value
+            ? String(format: "%.0f", locale: Locale(identifier: "en_US_POSIX"), value) : decimal(value)
     }
 
     private static let filenameFormatter: DateFormatter = {
@@ -219,7 +224,8 @@ enum RemoteResultCSVExport {
         [
             result.id.uuidString.lowercased(), result.mode,
             result.durationSeconds.map(String.init) ?? "", result.wordLimit.map(String.init) ?? "",
-            result.language, String(result.wpm), String(result.rawWpm), String(result.accuracy),
+            result.language, String(result.wpm), String(result.rawWpm),
+            ResultCSVExport.accuracyValue(result.preciseAccuracy ?? Double(result.accuracy)),
             decimal(result.consistency), String(result.errorCount), String(result.eventCount),
             result.tags.joined(separator: ";"),
             result.practiceTiming.map { decimal(Double($0.terminalEngagedMilliseconds) / 1_000) } ?? "",

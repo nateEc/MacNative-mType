@@ -262,7 +262,10 @@ struct CloudSyncView: View {
                                 .lineLimit(1)
                             Spacer()
                             Text("\(entry.wpm) WPM").monospacedDigit()
-                            Text("\(entry.accuracy)%").foregroundStyle(.secondary).monospacedDigit()
+                            Text(ResultMetricPresentation.accuracy(
+                                entry.preciseAccuracy ?? Double(entry.accuracy),
+                                alwaysShowDecimalPlaces: entry.preciseAccuracy != nil))
+                                .foregroundStyle(.secondary).monospacedDigit()
                             Text("\(entry.consistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定")
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
@@ -1141,7 +1144,7 @@ struct PublicProfileView: View {
                                     .foregroundStyle(.secondary)
                                 Text("\(best.wpm) WPM")
                                     .font(.headline.monospacedDigit())
-                                Text("\(best.accuracy)% 准确 · \(best.consistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定")
+                                Text("\(ResultMetricPresentation.accuracy(best.preciseAccuracy ?? Double(best.accuracy), alwaysShowDecimalPlaces: best.preciseAccuracy != nil)) 准确 · \(best.consistency.formatted(.number.precision(.fractionLength(0...2))))% 稳定")
                                     .font(.caption2)
                                 Text("\(best.languageLabel) · \(best.finishedAt.formatted(date: .abbreviated, time: .omitted))")
                                     .font(.caption2)

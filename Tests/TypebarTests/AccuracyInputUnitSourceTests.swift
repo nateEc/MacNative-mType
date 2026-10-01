@@ -215,8 +215,8 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
       let row = ResultCSVExport.csvString(for: [decoded]).components(separatedBy: "\r\n")[1]
       let fields = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns,
         row.components(separatedBy: ",")))
-      XCTAssertEqual(fields["accuracy_percent"], String(integer),
-        "The existing integer CSV/protocol boundary is unchanged, not claimed fully equivalent")
+      XCTAssertEqual(fields["accuracy_percent"], precise == 66.67 ? "66.67" : "50",
+        "CSV preserves precision while legacy protocol and aggregate integers remain unchanged")
     }
   }
 

@@ -2881,7 +2881,7 @@ private struct RemoteAccountResultRow: View {
     VStack(alignment: .leading, spacing: 4) {
       HStack {
         Text("\(result.wpm) WPM").font(.subheadline.weight(.semibold))
-        Text("准确率 \(result.accuracy)%")
+        Text("准确率 \(ResultMetricPresentation.accuracy(result.preciseAccuracy ?? Double(result.accuracy), alwaysShowDecimalPlaces: result.preciseAccuracy != nil))")
         Spacer()
         Text(result.finishedAt.formatted(date: .abbreviated, time: .shortened))
           .foregroundStyle(.secondary)

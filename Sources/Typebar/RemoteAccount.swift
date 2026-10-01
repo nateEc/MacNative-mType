@@ -374,6 +374,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let wpm: Int
     let rawWpm: Int
     let accuracy: Int
+    let preciseAccuracy: Double?
     let consistency: Double
     let errorCount: Int
     let eventCount: Int
@@ -387,7 +388,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, practiceTiming, startedAt, finishedAt
+            errorCount, eventCount, tags, practiceTiming, preciseAccuracy, startedAt, finishedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -400,6 +401,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         wpm = try values.decode(Int.self, forKey: .wpm)
         rawWpm = try values.decode(Int.self, forKey: .rawWpm)
         accuracy = try values.decode(Int.self, forKey: .accuracy)
+        preciseAccuracy = try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy)
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
         errorCount = try values.decode(Int.self, forKey: .errorCount)
         eventCount = try values.decode(Int.self, forKey: .eventCount)
@@ -775,12 +777,13 @@ struct RemoteResultSubmission: Codable, Sendable {
     let tags: [String]
     let timingEvidence: RemoteResultTimingEvidence?
     let practiceTiming: RemoteResultPracticeTiming?
+    let inputMetrics: ResultInputMetrics?
     let startedAt: Date
     let finishedAt: Date
 
     init(
         result: CompletedTestResult, includesTimingEvidence: Bool = false,
-        includesPracticeTiming: Bool = false
+        includesPracticeTiming: Bool = false, includesInputMetrics: Bool = false
     ) {
         id = result.id
         mode = result.configuration.mode.rawValue
@@ -800,6 +803,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         tags = result.tags
         timingEvidence = includesTimingEvidence ? RemoteResultTimingEvidence(result: result) : nil
         practiceTiming = includesPracticeTiming ? RemoteResultPracticeTiming(result: result) : nil
+        inputMetrics = includesInputMetrics ? result.inputMetrics : nil
         startedAt = result.startedAt
         finishedAt = result.finishedAt
     }
@@ -820,6 +824,11 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
         apiVersion == "v1"
             && service == "typebar"
             && capabilities["resultPracticeTiming"] == "available"
+    }
+
+    var supportsResultInputMetrics: Bool {
+        apiVersion == "v1" && service == "typebar"
+            && capabilities["resultInputMetrics"] == "available"
     }
 
     var supportsHumanVerification: Bool {
@@ -928,13 +937,14 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
     let language: String
     let wpm: Int
     let accuracy: Int
+    let preciseAccuracy: Double?
     let consistency: Double
     let finishedAt: Date
     let selectedBadge: RemotePublicProfileBadge?
     let discordAvatar: RemoteDiscordAvatar?
 
     private enum CodingKeys: String, CodingKey {
-        case id, rank, userID, displayName, mode, language, wpm, accuracy, consistency, finishedAt, selectedBadge, discordAvatar
+        case id, rank, userID, displayName, mode, language, wpm, accuracy, preciseAccuracy, consistency, finishedAt, selectedBadge, discordAvatar
     }
 
     init(from decoder: Decoder) throws {
@@ -947,6 +957,7 @@ struct RemoteLeaderboardEntry: Codable, Identifiable, Sendable {
         language = try values.decode(String.self, forKey: .language)
         wpm = try values.decode(Int.self, forKey: .wpm)
         accuracy = try values.decode(Int.self, forKey: .accuracy)
+        preciseAccuracy = try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy)
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
         finishedAt = try values.decode(Date.self, forKey: .finishedAt)
         selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
@@ -1175,6 +1186,7 @@ struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
     let language: String
     let wpm: Int
     let accuracy: Int
+    let preciseAccuracy: Double?
     let consistency: Double
     let finishedAt: Date
 
@@ -2713,7 +2725,8 @@ final class AccountSession {
             body: RemoteResultSubmission(
                 result: result,
                 includesTimingEvidence: capabilities?.supportsResultTimingEvidence == true,
-                includesPracticeTiming: capabilities?.supportsResultPracticeTiming == true),
+                includesPracticeTiming: capabilities?.supportsResultPracticeTiming == true,
+                includesInputMetrics: capabilities?.supportsResultInputMetrics == true),
             response: RemoteResultSubmissionResponse.self
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }

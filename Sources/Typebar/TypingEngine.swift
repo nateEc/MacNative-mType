@@ -3240,6 +3240,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let preciseWpm: Double
   let preciseRawWpm: Double
   let preciseAccuracy: Double
+  let inputMetrics: ResultInputMetrics?
   let restartCount: Int
   /// Effective native typing time accumulated before the terminal attempt.
   /// The result sheet keeps `engagedDuration` scoped to the terminal attempt;
@@ -3271,6 +3272,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     preciseWpm: Double? = nil,
     preciseRawWpm: Double? = nil,
     preciseAccuracy: Double? = nil,
+    inputMetrics: ResultInputMetrics? = nil,
     restartCount: Int = 0,
     priorAttemptEngagedDuration: TimeInterval = 0,
     characterStats: ResultCharacterStats? = nil,
@@ -3298,6 +3300,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.preciseWpm = Self.normalizedMetricPrecision(preciseWpm, fallback: wpm)
     self.preciseRawWpm = Self.normalizedMetricPrecision(preciseRawWpm, fallback: rawWpm)
     self.preciseAccuracy = Self.normalizedAccuracyPrecision(preciseAccuracy, fallback: accuracy)
+    self.inputMetrics = inputMetrics
     self.restartCount = max(0, restartCount)
     self.priorAttemptEngagedDuration = Self.normalizedDuration(priorAttemptEngagedDuration)
     self.characterStats = characterStats ?? .legacy(
@@ -3341,7 +3344,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   private enum CodingKeys: String, CodingKey {
     case id, configuration, outcome, startedAt, finishedAt, typedCharacterCount,
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
-      preciseWpm, preciseRawWpm, preciseAccuracy, restartCount, keyDurationSamples,
+      preciseWpm, preciseRawWpm, preciseAccuracy, inputMetrics, restartCount, keyDurationSamples,
       priorAttemptEngagedDuration, keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
       challengePresentation
   }
@@ -3366,6 +3369,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       try values.decodeIfPresent(Double.self, forKey: .preciseRawWpm), fallback: rawWpm)
     preciseAccuracy = Self.normalizedAccuracyPrecision(
       try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy), fallback: accuracy)
+    inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
     restartCount = max(0, try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0)
     priorAttemptEngagedDuration = Self.normalizedDuration(
       try values.decodeIfPresent(TimeInterval.self, forKey: .priorAttemptEngagedDuration) ?? 0)
@@ -4140,6 +4144,7 @@ struct TypingSession {
   ) -> CompletedTestResult? {
     guard let startedAt, let finishedAt else { return nil }
     let keyTiming = physicalKeyTiming.snapshot(startedAt: startedAt, finishedAt: finishedAt)
+    let credit = referenceWordCredit(countPartialLastWord: resultCreditsPartialLastWord)
     return .init(
       id: UUID(),
       configuration: configuration,
@@ -4156,6 +4161,8 @@ struct TypingSession {
       preciseWpm: preciseWpm(at: date),
       preciseRawWpm: preciseRawWpm(at: date),
       preciseAccuracy: preciseAccuracy,
+      inputMetrics: .init(version: 1, correctAttempts: correctInputAttemptCount,
+        totalAttempts: inputAttemptCount, creditedUnits: credit.inputUnits, retainedUnits: typed.utf16.count),
       restartCount: restartCount,
       priorAttemptEngagedDuration: priorAttemptEngagedDuration,
       characterStats: characterStats,

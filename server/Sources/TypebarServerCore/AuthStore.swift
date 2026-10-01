@@ -465,6 +465,7 @@ public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
   public let language: String
   public let wpm: Int
   public let accuracy: Int
+  public var preciseAccuracy: Double? = nil
   public let consistency: Double
   public let finishedAt: Date
 }
@@ -940,6 +941,8 @@ public actor AuthStore {
     let wpm: Int
     let rawWpm: Int
     let accuracy: Int
+    let inputMetrics: ResultInputMetrics?
+    var effectiveAccuracy: Double { inputMetrics?.preciseAccuracy ?? Double(accuracy) }
     let consistency: Double
     let errorCount: Int
     let eventCount: Int
@@ -951,13 +954,14 @@ public actor AuthStore {
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, tags, practiceTiming, startedAt, finishedAt, acceptedAt
+        errorCount, eventCount, tags, practiceTiming, inputMetrics, startedAt, finishedAt, acceptedAt
     }
 
     init(
       id: UUID, userID: UUID, mode: String, language: String, durationSeconds: Int?,
       wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, consistency: Double,
       errorCount: Int, eventCount: Int, tags: [String], practiceTiming: ResultPracticeTiming? = nil,
+      inputMetrics: ResultInputMetrics? = nil,
       startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil
     ) {
       self.id = id
@@ -969,6 +973,7 @@ public actor AuthStore {
       self.wpm = wpm
       self.rawWpm = rawWpm
       self.accuracy = accuracy
+      self.inputMetrics = inputMetrics
       self.consistency = consistency
       self.errorCount = errorCount
       self.eventCount = eventCount
@@ -990,6 +995,7 @@ public actor AuthStore {
       wpm = try values.decode(Int.self, forKey: .wpm)
       rawWpm = try values.decode(Int.self, forKey: .rawWpm)
       accuracy = try values.decode(Int.self, forKey: .accuracy)
+      inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
       consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
       errorCount = try values.decode(Int.self, forKey: .errorCount)
       eventCount = try values.decode(Int.self, forKey: .eventCount)
@@ -1011,6 +1017,7 @@ public actor AuthStore {
         wordLimit: wordLimit, wpm: wpm, rawWpm: rawWpm, accuracy: accuracy,
         consistency: consistency, errorCount: errorCount, eventCount: eventCount, tags: tags,
         practiceTiming: practiceTiming,
+        preciseAccuracy: inputMetrics?.preciseAccuracy,
         startedAt: startedAt, finishedAt: finishedAt)
     }
   }
@@ -2877,12 +2884,12 @@ public actor AuthStore {
   private func availablePublicBadges(for userID: UUID) -> [PublicProfileBadge] {
     let results = state.results.filter { $0.userID == userID && $0.eventCount > 0 }
     let accurateRunExists = results.contains {
-      $0.accuracy >= 98 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 15
+      $0.effectiveAccuracy >= 98 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 15
     }
     let bestWPM = results.map(\.wpm).max() ?? 0
     let totalTypingSeconds = totalTypingSeconds(from: results)
     let perfectMinuteExists = results.contains {
-      $0.accuracy == 100 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 60
+      $0.effectiveAccuracy == 100 && $0.finishedAt.timeIntervalSince($0.startedAt) >= 60
     }
     let practicedLanguages = Set(results.map(\.language)).count
     let practicedModes = Set(results.map(\.mode)).count
@@ -3098,7 +3105,8 @@ public actor AuthStore {
       return .init(
         id: best.id, mode: best.mode, durationSeconds: best.durationSeconds,
         wordLimit: best.wordLimit, language: best.language, wpm: best.wpm,
-        accuracy: best.accuracy, consistency: best.consistency, finishedAt: best.finishedAt)
+        accuracy: best.accuracy, preciseAccuracy: best.inputMetrics?.preciseAccuracy,
+        consistency: best.consistency, finishedAt: best.finishedAt)
     }
   }
 
@@ -3125,7 +3133,8 @@ public actor AuthStore {
       durationSeconds: record.durationSeconds, wordLimit: record.wordLimit, wpm: record.wpm,
       rawWpm: record.rawWpm, accuracy: record.accuracy, consistency: record.consistency,
       errorCount: record.errorCount,
-      eventCount: record.eventCount, tags: record.tags, startedAt: record.startedAt,
+      eventCount: record.eventCount, tags: record.tags, inputMetrics: record.inputMetrics,
+      startedAt: record.startedAt,
       finishedAt: record.finishedAt)
   }
 
@@ -3262,7 +3271,7 @@ public actor AuthStore {
         durationSeconds: request.durationSeconds, wordLimit: request.wordLimit,
         wpm: request.wpm, rawWpm: request.rawWpm, accuracy: request.accuracy,
         consistency: request.consistency, errorCount: request.errorCount, eventCount: request.eventCount,
-        tags: tags, practiceTiming: request.practiceTiming,
+        tags: tags, practiceTiming: request.practiceTiming, inputMetrics: request.inputMetrics,
         startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
       ))
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
@@ -3647,7 +3656,7 @@ public actor AuthStore {
         && (upperBound == nil || result.finishedAt < upperBound!)
     }.sorted {
       if $0.wpm != $1.wpm { return $0.wpm > $1.wpm }
-      if $0.accuracy != $1.accuracy { return $0.accuracy > $1.accuracy }
+      if $0.effectiveAccuracy != $1.effectiveAccuracy { return $0.effectiveAccuracy > $1.effectiveAccuracy }
       return $0.finishedAt > $1.finishedAt
     }
     var representedUsers = Set<UUID>()
@@ -3658,7 +3667,8 @@ public actor AuthStore {
       return .init(
         id: result.id, rank: offset + 1, userID: user.id, displayName: user.displayName,
         mode: result.mode, language: result.language, wpm: result.wpm,
-        accuracy: result.accuracy, consistency: result.consistency, finishedAt: result.finishedAt,
+        accuracy: result.accuracy, preciseAccuracy: result.inputMetrics?.preciseAccuracy,
+        consistency: result.consistency, finishedAt: result.finishedAt,
         selectedBadge: selectedPublicBadge(for: user), discordAvatar: publicDiscordAvatar(for: user))
     }
   }
@@ -3977,7 +3987,7 @@ public actor AuthStore {
       Self.supportedResultLanguageIDs.contains(result.language),
       (0...400).contains(result.wpm), (0...500).contains(result.rawWpm),
       (0...100).contains(result.accuracy), (0...100).contains(result.consistency),
-      result.errorCount >= 0, result.eventCount >= 0,
+      result.errorCount >= 0, (0...1_800_000).contains(result.eventCount),
       (0...1_000).contains(result.restartCount),
       result.rawWpm >= result.wpm, result.errorCount <= result.eventCount,
       result.startedAt <= result.finishedAt,
@@ -4005,12 +4015,22 @@ public actor AuthStore {
     }
 
     let correctCharacters = result.eventCount - result.errorCount
-    let expectedAccuracy =
-      result.eventCount == 0
-      ? 100
-      : Int((Double(correctCharacters) / Double(result.eventCount) * 100).rounded())
-    let expectedWPM = Int((Double(correctCharacters) / 5 / elapsed * 60).rounded())
-    let expectedRawWPM = Int((Double(result.eventCount) / 5 / elapsed * 60).rounded())
+    let expectedAccuracy: Int
+    let expectedWPM: Int
+    let expectedRawWPM: Int
+    if let metrics = result.inputMetrics {
+      guard metrics.isValid, metrics.retainedUnits >= result.eventCount else {
+        throw ResultStoreError.invalidResult
+      }
+      expectedAccuracy = Int(metrics.accuracyPercentage.rounded())
+      expectedWPM = Int((Double(metrics.creditedUnits) / 5 / elapsed * 60).rounded())
+      expectedRawWPM = Int((Double(metrics.retainedUnits) / 5 / elapsed * 60).rounded())
+    } else {
+      expectedAccuracy = result.eventCount == 0 ? 100
+        : Int((Double(correctCharacters) / Double(result.eventCount) * 100).rounded())
+      expectedWPM = Int((Double(correctCharacters) / 5 / elapsed * 60).rounded())
+      expectedRawWPM = Int((Double(result.eventCount) / 5 / elapsed * 60).rounded())
+    }
     guard result.accuracy == expectedAccuracy,
       abs(result.wpm - expectedWPM) <= 1,
       abs(result.rawWpm - expectedRawWPM) <= 1
