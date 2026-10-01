@@ -277,12 +277,37 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case lavender
     case sunset
     case watermelon
+    case breeze
+    case camping
+    case cherry_blossom
+    case desert_oasis
+    case grape
+    case moonlight
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
             red: Double((hex >> 16) & 0xFF) / 255,
             green: Double((hex >> 8) & 0xFF) / 255,
             blue: Double(hex & 0xFF) / 255)
+    }
+
+    private struct Palette {
+        let background: Color
+        let panel: Color
+        let accent: Color
+        let text: Color?
+        let secondaryText: Color?
+        let colorScheme: ColorScheme
+    }
+
+    private static func palette(
+        _ background: UInt32, _ panel: UInt32, _ accent: UInt32,
+        _ text: UInt32, _ secondaryText: UInt32, light: Bool
+    ) -> Palette {
+        .init(
+            background: rgb(background), panel: rgb(panel), accent: rgb(accent),
+            text: rgb(text), secondaryText: rgb(secondaryText),
+            colorScheme: light ? .light : .dark)
     }
 
     var displayName: String {
@@ -301,110 +326,93 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .lavender: "薰衣草 · Typebar"
         case .sunset: "落日 · Typebar"
         case .watermelon: "西瓜 · Typebar"
+        case .breeze: "微风 · Typebar"
+        case .camping: "露营 · Typebar"
+        case .cherry_blossom: "樱花 · Typebar"
+        case .desert_oasis: "沙漠绿洲 · Typebar"
+        case .grape: "葡萄 · Typebar"
+        case .moonlight: "月光 · Typebar"
         }
     }
 
     var background: Color {
-        switch self {
-        case .paper: Color(red: 0.96, green: 0.95, blue: 0.91)
-        case .midnight: Color(red: 0.07, green: 0.09, blue: 0.13)
-        case .grove: Color(red: 0.09, green: 0.16, blue: 0.13)
-        case .aurora: Self.rgb(0x10272C)
-        case .beach: Self.rgb(0xE0F0F3)
-        case .diner: Self.rgb(0x282532)
-        case .alpine: Self.rgb(0xE8F0ED)
-        case .botanical: Self.rgb(0x1B2D25)
-        case .copper: Self.rgb(0x17373C)
-        case .honey: Self.rgb(0xEAD68D)
-        case .iceberg_dark: Self.rgb(0x132B3A)
-        case .lavender: Self.rgb(0xEEE7F6)
-        case .sunset: Self.rgb(0x382434)
-        case .watermelon: Self.rgb(0xE9F3E5)
-        }
+        palette.background
     }
 
     var panel: Color {
-        switch self {
-        case .paper: Color(red: 0.88, green: 0.86, blue: 0.80)
-        case .midnight: Color(red: 0.13, green: 0.16, blue: 0.22)
-        case .grove: Color(red: 0.14, green: 0.25, blue: 0.19)
-        case .aurora: Self.rgb(0x1E3C41)
-        case .beach: Self.rgb(0xC7DEE3)
-        case .diner: Self.rgb(0x45394A)
-        case .alpine: Self.rgb(0xCFDED8)
-        case .botanical: Self.rgb(0x294538)
-        case .copper: Self.rgb(0x2A5154)
-        case .honey: Self.rgb(0xDCC47D)
-        case .iceberg_dark: Self.rgb(0x23485B)
-        case .lavender: Self.rgb(0xDAD0EA)
-        case .sunset: Self.rgb(0x573747)
-        case .watermelon: Self.rgb(0xCFE2C8)
-        }
+        palette.panel
     }
 
     var accent: Color {
-        switch self {
-        case .paper: Color(red: 0.66, green: 0.28, blue: 0.14)
-        case .midnight: Color(red: 0.38, green: 0.73, blue: 1.00)
-        case .grove: Color(red: 0.48, green: 0.78, blue: 0.52)
-        case .aurora: Self.rgb(0xB8D98B)
-        case .beach: Self.rgb(0xA13D38)
-        case .diner: Self.rgb(0xEABF79)
-        case .alpine: Self.rgb(0x2F5F73)
-        case .botanical: Self.rgb(0xD2C59B)
-        case .copper: Self.rgb(0xE2A775)
-        case .honey: Self.rgb(0x5D4128)
-        case .iceberg_dark: Self.rgb(0xA9D6D8)
-        case .lavender: Self.rgb(0x634899)
-        case .sunset: Self.rgb(0xFFBF8D)
-        case .watermelon: Self.rgb(0xA53655)
-        }
+        palette.accent
     }
 
     var colorScheme: ColorScheme {
-        switch self {
-        case .paper, .beach, .alpine, .honey, .lavender, .watermelon: .light
-        default: .dark
-        }
+        palette.colorScheme
     }
 
     var resolvedTheme: ResolvedTheme {
+        let colors = palette
+        return .init(
+            background: colors.background, panel: colors.panel, accent: colors.accent,
+            colorScheme: colors.colorScheme, text: colors.text,
+            secondaryText: colors.secondaryText)
+    }
+
+    private var palette: Palette {
         switch self {
+        case .paper:
+            .init(
+                background: Color(red: 0.96, green: 0.95, blue: 0.91),
+                panel: Color(red: 0.88, green: 0.86, blue: 0.80),
+                accent: Color(red: 0.66, green: 0.28, blue: 0.14),
+                text: nil, secondaryText: nil, colorScheme: .light)
+        case .midnight:
+            .init(
+                background: Color(red: 0.07, green: 0.09, blue: 0.13),
+                panel: Color(red: 0.13, green: 0.16, blue: 0.22),
+                accent: Color(red: 0.38, green: 0.73, blue: 1.00),
+                text: nil, secondaryText: nil, colorScheme: .dark)
+        case .grove:
+            .init(
+                background: Color(red: 0.09, green: 0.16, blue: 0.13),
+                panel: Color(red: 0.14, green: 0.25, blue: 0.19),
+                accent: Color(red: 0.48, green: 0.78, blue: 0.52),
+                text: nil, secondaryText: nil, colorScheme: .dark)
         case .aurora:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0xEDF3E8), secondaryText: Self.rgb(0xB7CFCC))
+            Self.palette(0x10272C, 0x1E3C41, 0xB8D98B, 0xEDF3E8, 0xB7CFCC, light: false)
         case .beach:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0x193D49), secondaryText: Self.rgb(0x48636B))
+            Self.palette(0xE0F0F3, 0xC7DEE3, 0xA13D38, 0x193D49, 0x48636B, light: true)
         case .diner:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0xF3E9DC), secondaryText: Self.rgb(0xCDBFCC))
+            Self.palette(0x282532, 0x45394A, 0xEABF79, 0xF3E9DC, 0xCDBFCC, light: false)
         case .alpine:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0x173B45), secondaryText: Self.rgb(0x3F626B))
+            Self.palette(0xE8F0ED, 0xCFDED8, 0x2F5F73, 0x173B45, 0x3F626B, light: true)
         case .botanical:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0xF0EEE0), secondaryText: Self.rgb(0xC3D0BD))
+            Self.palette(0x1B2D25, 0x294538, 0xD2C59B, 0xF0EEE0, 0xC3D0BD, light: false)
         case .copper:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0xF7EDE2), secondaryText: Self.rgb(0xC8D5D0))
+            Self.palette(0x17373C, 0x2A5154, 0xE2A775, 0xF7EDE2, 0xC8D5D0, light: false)
         case .honey:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0x312D1F), secondaryText: Self.rgb(0x5A4B2C))
+            Self.palette(0xEAD68D, 0xDCC47D, 0x5D4128, 0x312D1F, 0x5A4B2C, light: true)
         case .iceberg_dark:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0xE9F5F6), secondaryText: Self.rgb(0xB6D0D6))
+            Self.palette(0x132B3A, 0x23485B, 0xA9D6D8, 0xE9F5F6, 0xB6D0D6, light: false)
         case .lavender:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0x302746), secondaryText: Self.rgb(0x60546F))
+            Self.palette(0xEEE7F6, 0xDAD0EA, 0x634899, 0x302746, 0x60546F, light: true)
         case .sunset:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0xFFF0E6), secondaryText: Self.rgb(0xE1C5C8))
+            Self.palette(0x382434, 0x573747, 0xFFBF8D, 0xFFF0E6, 0xE1C5C8, light: false)
         case .watermelon:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
-                  text: Self.rgb(0x1E3F36), secondaryText: Self.rgb(0x43675C))
-        case .paper, .midnight, .grove:
-            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme)
+            Self.palette(0xE9F3E5, 0xCFE2C8, 0xA53655, 0x1E3F36, 0x43675C, light: true)
+        case .breeze:
+            Self.palette(0xDCECF0, 0xC1DDE3, 0x276877, 0x173842, 0x42616B, light: true)
+        case .camping:
+            Self.palette(0x2B3025, 0x424A35, 0xE5BA75, 0xF2EBDC, 0xCACDB9, light: false)
+        case .cherry_blossom:
+            Self.palette(0xF7EAF0, 0xE9D4DF, 0x8E3E64, 0x3F2A3A, 0x664C5D, light: true)
+        case .desert_oasis:
+            Self.palette(0xEBDABB, 0xDCC79E, 0x2F6671, 0x3B3525, 0x514A3C, light: true)
+        case .grape:
+            Self.palette(0x302640, 0x493756, 0xDBB7F1, 0xF7ECFA, 0xD4C3DC, light: false)
+        case .moonlight:
+            Self.palette(0x1D2A3E, 0x2C3E53, 0xE6D6A5, 0xEEF2F4, 0xC4D0D8, light: false)
         }
     }
 }

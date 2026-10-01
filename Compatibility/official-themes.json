@@ -206,7 +206,13 @@
     "iceberg_dark",
     "lavender",
     "sunset",
-    "watermelon"
+    "watermelon",
+    "breeze",
+    "camping",
+    "cherry_blossom",
+    "desert_oasis",
+    "grape",
+    "moonlight"
   ],
   "exactMappings": {},
   "relatedMappings": {
@@ -214,12 +220,18 @@
     "aurora": "aurora",
     "beach": "beach",
     "botanical": "botanical",
+    "breeze": "breeze",
+    "camping": "camping",
+    "cherry_blossom": "cherry_blossom",
     "copper": "copper",
+    "desert_oasis": "desert_oasis",
     "diner": "diner",
+    "grape": "grape",
     "honey": "honey",
     "iceberg_dark": "iceberg_dark",
     "lavender": "lavender",
     "midnight": "midnight",
+    "moonlight": "moonlight",
     "paper": "paper",
     "sunset": "sunset",
     "watermelon": "watermelon"
