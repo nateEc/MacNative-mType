@@ -198,14 +198,30 @@
     "grove",
     "aurora",
     "beach",
-    "diner"
+    "diner",
+    "alpine",
+    "botanical",
+    "copper",
+    "honey",
+    "iceberg_dark",
+    "lavender",
+    "sunset",
+    "watermelon"
   ],
   "exactMappings": {},
   "relatedMappings": {
+    "alpine": "alpine",
     "aurora": "aurora",
     "beach": "beach",
+    "botanical": "botanical",
+    "copper": "copper",
     "diner": "diner",
+    "honey": "honey",
+    "iceberg_dark": "iceberg_dark",
+    "lavender": "lavender",
     "midnight": "midnight",
-    "paper": "paper"
+    "paper": "paper",
+    "sunset": "sunset",
+    "watermelon": "watermelon"
   }
 }

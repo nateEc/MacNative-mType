@@ -4,6 +4,34 @@ import XCTest
 @testable import Typebar
 
 final class BuiltInThemeCoverageTests: XCTestCase {
+  func testNextOriginalThemeSetIsSelectableReadableAndBalancedAcrossAppearances() throws {
+    let names = [
+      "alpine", "botanical", "copper", "honey", "iceberg_dark", "lavender", "sunset",
+      "watermelon",
+    ]
+    let variants = names.compactMap(AppTheme.init(rawValue:))
+    XCTAssertEqual(variants.count, names.count)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .light }.count, 4)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .dark }.count, 4)
+
+    for theme in variants {
+      XCTAssertEqual(try JSONDecoder().decode(AppTheme.self, from: JSONEncoder().encode(theme)), theme)
+      for surface in [theme.background, theme.panel] {
+        XCTAssertGreaterThanOrEqual(contrast(theme.resolvedTheme.text, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(
+          contrast(theme.resolvedTheme.secondaryText, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(contrast(theme.accent, surface), 3.0, theme.rawValue)
+      }
+    }
+    for left in variants.indices {
+      for right in variants.indices where left < right {
+        XCTAssertNotEqual(
+          ThemeColor(color: variants[left].background),
+          ThemeColor(color: variants[right].background))
+      }
+    }
+  }
+
   func testOriginalNamedVariantsAreSelectableAndKeepReadableTypingColors() throws {
     let names = ["aurora", "beach", "diner"]
     let variants = names.compactMap(AppTheme.init(rawValue:))
