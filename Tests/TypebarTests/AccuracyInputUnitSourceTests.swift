@@ -187,7 +187,7 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
     XCTAssertEqual(result.replayEvents.map(\.text), ["🦊", "x"])
   }
 
-  func testNewAndLegacyAccuracySurviveArchivesAndExistingIntegerConsumers() throws {
+  func testNewAndLegacyAccuracySurviveArchivesWithPreciseLocalAndLegacyWireConsumers() throws {
     var session = TypingSession(configuration: .timed(seconds: 1), prompt: "🦊a")
     session.insert("🦊", at: start)
     session.insert("x", at: start.addingTimeInterval(0.5))
@@ -204,7 +204,7 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
       XCTAssertEqual(decoded.preciseAccuracy, precise)
       let record = TestResultRecord(result: decoded)
       XCTAssertEqual(try XCTUnwrap(record.portableResult), original)
-      XCTAssertEqual(ResultMetric(record: record).accuracy, integer)
+      XCTAssertEqual(ResultMetric(record: record).accuracy, precise)
       XCTAssertEqual(RemoteResultSubmission(result: decoded).accuracy, integer)
       let challenge = TypebarChallenge(id: "native-accuracy-boundary", title: "准确率边界",
         description: "自有精度夹具",

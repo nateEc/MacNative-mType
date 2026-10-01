@@ -14,6 +14,6 @@ enum ResultShareText {
         case .custom: detail = "自定义文本"
         }
         let source = result.quoteSource.map { "\n引语来源 · \($0.displayText)" } ?? ""
-        return "Typebar\n\(result.wpm) WPM · \(result.accuracy)% 准确率 · \(result.errorCount) 错误\n\(configuration.mode.rawValue) · \(configuration.language.rawValue) · \(detail)\(source)"
+        return "Typebar\n\(result.wpm) WPM · \(ResultMetricPresentation.compactAccuracy(result.preciseAccuracy)) 准确率 · \(result.errorCount) 错误\n\(configuration.mode.rawValue) · \(configuration.language.rawValue) · \(detail)\(source)"
     }
 }

@@ -3924,7 +3924,7 @@ private struct ContentView: View {
       guard let result = record.portableResult else { return nil }
       return .init(
         configuration: result.configuration, prompt: result.prompt, finishedAt: result.finishedAt,
-        wpm: result.wpm, accuracy: result.accuracy, tags: result.tags)
+        wpm: result.wpm, accuracy: result.accuracy, preciseAccuracy: result.preciseAccuracy, tags: result.tags)
     }
     guard let average = RecentTestAveragePolicy.average(
       currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples,
@@ -3939,7 +3939,7 @@ private struct ContentView: View {
         "\(settings.typingSpeedUnit.formatted(wpm: average.wpm)) \(settings.typingSpeedUnit.displayName)")
     }
     if settings.showAverage.showsAccuracy {
-      metrics.append("\(average.accuracy)% 准确率")
+      metrics.append("\(ResultMetricPresentation.accuracy(average.accuracy, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces)) 准确率")
     }
     return "近 \(average.count) 次平均：\(metrics.joined(separator: " · "))"
   }
@@ -3949,6 +3949,7 @@ private struct ContentView: View {
       persisted: savedResults.map {
         ResultMetric(
           id: $0.id, finishedAt: $0.finishedAt, wpm: $0.wpm, accuracy: $0.accuracy,
+          preciseAccuracy: $0.preciseAccuracy,
           typingSeconds: $0.engagedDuration)
       },
       currentProcess: currentProcessPractice)
@@ -3963,7 +3964,7 @@ private struct ContentView: View {
       guard let result = record.portableResult else { return nil }
       return .init(
         configuration: result.configuration, prompt: result.prompt, finishedAt: result.finishedAt,
-        wpm: result.wpm, accuracy: result.accuracy, tags: result.tags)
+        wpm: result.wpm, accuracy: result.accuracy, preciseAccuracy: result.preciseAccuracy, tags: result.tags)
     }
     guard let personalBest = CurrentPersonalBestPolicy.personalBest(
       currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples,
@@ -3971,7 +3972,7 @@ private struct ContentView: View {
     else {
       return "本机个人最佳：暂无符合资格的同类成绩"
     }
-    return "本机个人最佳：\(settings.typingSpeedUnit.formatted(wpm: personalBest.wpm)) \(settings.typingSpeedUnit.displayName) · \(personalBest.accuracy)% 准确率"
+    return "本机个人最佳：\(settings.typingSpeedUnit.formatted(wpm: personalBest.wpm)) \(settings.typingSpeedUnit.displayName) · \(ResultMetricPresentation.accuracy(personalBest.accuracy, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces)) 准确率"
   }
 
   private func startWeakSpotPractice() {
@@ -6444,7 +6445,7 @@ private struct ResultSnapshotCard: View {
   let panel: Color
   let accent: Color
 
-  private var accuracyBlocks: Int { min(10, max(0, Int((Double(result.accuracy) / 10).rounded()))) }
+  private var accuracyBlocks: Int { min(10, max(0, Int((result.preciseAccuracy / 10).rounded()))) }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
@@ -6468,7 +6469,7 @@ private struct ResultSnapshotCard: View {
         }
         Spacer()
         VStack(alignment: .trailing, spacing: 8) {
-          snapshotMetric("准确率", "\(result.accuracy)%")
+          snapshotMetric("准确率", ResultMetricPresentation.compactAccuracy(result.preciseAccuracy))
           snapshotMetric("Raw \(typingSpeedUnit.displayName)", typingSpeedUnit.formatted(wpm: result.rawWpm))
           snapshotMetric("错误", "\(result.errorCount)")
         }
@@ -6478,7 +6479,7 @@ private struct ResultSnapshotCard: View {
           Text("准确度刻度")
             .font(.system(size: 11, weight: .medium, design: .monospaced))
           Spacer()
-          Text("\(result.accuracy)%")
+          Text(ResultMetricPresentation.compactAccuracy(result.preciseAccuracy))
             .font(.system(size: 11, design: .monospaced))
         }
         HStack(spacing: 5) {
@@ -7484,7 +7485,7 @@ private struct ResultsHistoryView: View {
                       .font(.system(size: 30, weight: .bold, design: .rounded))
                       .frame(width: 56, alignment: .trailing)
                     VStack(alignment: .leading, spacing: 3) {
-                      Text("\(rowSummary.modeAndParameter) · \(result.accuracy)% 准确率")
+                      Text("\(rowSummary.modeAndParameter) · \(ResultMetricPresentation.accuracy(CompletedTestResult.normalizedAccuracyPrecision(result.preciseAccuracy, fallback: result.accuracy), alwaysShowDecimalPlaces: true)) 准确率")
                         .lineLimit(1)
                       Text(
                         result.finishedAt, format: .dateTime.year().month().day().hour().minute()
@@ -7552,7 +7553,8 @@ private struct ResultsHistoryView: View {
         typingSpeedUnit: settings.typingSpeedUnit, settings: settings)
     }
     .sheet(isPresented: $showingPersonalBestTable) {
-      LocalPersonalBestTableView(speedUnit: settings.typingSpeedUnit)
+      LocalPersonalBestTableView(
+        speedUnit: settings.typingSpeedUnit, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces)
     }
     .onChange(of: activeFilter) {
       visibleResultLimit = ResultHistoryPagePolicy.pageSize
@@ -7582,7 +7584,7 @@ private struct ResultsHistoryView: View {
 
   private var historyChartPoints: [HistoryChartPoint] {
     let speeds = metrics.map { Double($0.wpm) }
-    let accuracies = metrics.map { Double($0.accuracy) }
+    let accuracies = metrics.map(\.accuracy)
     let speedAverage10 = HistoryChartPolicy.movingAverage(values: speeds, windowSize: 10)
     let speedAverage100 = HistoryChartPolicy.movingAverage(values: speeds, windowSize: 100)
     let accuracyAverage10 = HistoryChartPolicy.movingAverage(values: accuracies, windowSize: 10)
@@ -7640,7 +7642,7 @@ private struct ResultsHistoryView: View {
               }
             }
             Text(
-              "\(settings.typingSpeedUnit.formatted(wpm: metric.wpm)) \(settings.typingSpeedUnit.displayName) · Raw \(settings.typingSpeedUnit.formatted(wpm: metric.rawWpm)) · \(metric.accuracy)% 准确率 · \(formattedConsistency(metric.consistency))% 稳定度"
+              "\(settings.typingSpeedUnit.formatted(wpm: metric.wpm)) \(settings.typingSpeedUnit.displayName) · Raw \(settings.typingSpeedUnit.formatted(wpm: metric.rawWpm)) · \(ResultMetricPresentation.accuracy(metric.accuracy, alwaysShowDecimalPlaces: true)) 准确率 · \(formattedConsistency(metric.consistency))% 稳定度"
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -7792,9 +7794,9 @@ private struct ResultsHistoryView: View {
       statistic("平均 Raw", settings.typingSpeedUnit.formatted(wpm: summary.averageRawWPM))
       statistic("最高 Raw", settings.typingSpeedUnit.formatted(wpm: summary.bestRawWPM))
       statistic("近 10 Raw", settings.typingSpeedUnit.formatted(wpm: summary.averageRawWPMLast10))
-      statistic("平均准确率", "\(summary.averageAccuracy)%")
-      statistic("最高准确率", "\(summary.bestAccuracy)%")
-      statistic("近 10 准确率", "\(summary.averageAccuracyLast10)%")
+      statistic("平均准确率", ResultMetricPresentation.percentage(summary.averageAccuracy, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces))
+      statistic("最高准确率", ResultMetricPresentation.percentage(summary.bestAccuracy, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces))
+      statistic("近 10 准确率", ResultMetricPresentation.percentage(summary.averageAccuracyLast10, alwaysShowDecimalPlaces: settings.alwaysShowDecimalPlaces))
       statistic("最高稳定度", "\(formattedConsistency(summary.highestConsistency))%")
       statistic("平均稳定度", "\(formattedConsistency(summary.averageConsistency))%")
       statistic("近 10 稳定度", "\(formattedConsistency(summary.averageConsistencyLast10))%")
@@ -8714,7 +8716,7 @@ private struct ResultDetailView: View {
         }
         GridRow {
           Text("准确率")
-          Text("\(result.accuracy)%")
+          Text(ResultMetricPresentation.accuracy(CompletedTestResult.normalizedAccuracyPrecision(result.preciseAccuracy, fallback: result.accuracy), alwaysShowDecimalPlaces: true))
         }
         GridRow {
           Text("Raw WPM")

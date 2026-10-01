@@ -3403,7 +3403,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     return value
   }
 
-  private static func normalizedAccuracyPrecision(_ value: Double?, fallback: Int) -> Double {
+  static func normalizedAccuracyPrecision(_ value: Double?, fallback: Int) -> Double {
     guard let value, value.isFinite else { return Double(fallback) }
     return value.clamped(to: 0...100)
   }

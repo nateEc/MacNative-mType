@@ -33,7 +33,7 @@ struct SignedOutResultClaimView: View {
       Grid(alignment: .leading, horizontalSpacing: 34, verticalSpacing: 10) {
         GridRow {
           metric("速度", "\(result.wpm) WPM")
-          metric("准确率", "\(result.accuracy)%")
+          metric("准确率", ResultMetricPresentation.compactAccuracy(result.preciseAccuracy))
         }
         GridRow {
           metric("原始速度", "\(result.rawWpm) WPM")

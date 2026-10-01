@@ -24512,7 +24512,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(recentStatistics.averageRawWPM, 75)
     XCTAssertEqual(recentStatistics.averageRawWPMLast10, 75)
     XCTAssertEqual(recentStatistics.averageAccuracy, 85)
-    XCTAssertEqual(recentStatistics.averageAccuracyLast10, 85)
+    XCTAssertEqual(recentStatistics.averageAccuracyLast10, 84.5)
     XCTAssertEqual(recentStatistics.averageConsistency, 50)
     XCTAssertEqual(recentStatistics.averageConsistencyLast10, 55)
 
@@ -24585,7 +24585,7 @@ final class TypingEngineTests: XCTestCase {
     let average = RecentTestAveragePolicy.average(
       currentConfiguration: current, currentPrompt: "irrelevant for words",
       samples: matching + [differentWordLimit, differentQuote])
-    XCTAssertEqual(average, .init(count: 10, wpm: 56, accuracy: 86))
+    XCTAssertEqual(average, .init(count: 10, wpm: 56, accuracy: 85.5))
 
     XCTAssertNil(
       RecentTestAveragePolicy.average(

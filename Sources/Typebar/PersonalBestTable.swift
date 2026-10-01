@@ -9,7 +9,7 @@ struct LocalPersonalBestRow: Equatable, Identifiable {
   let parameter: Int
   let wpm: Int
   let rawWpm: Int
-  let accuracy: Int
+  let accuracy: Double
   let consistency: Double
   let difficulty: Difficulty
   let language: TypingLanguage
@@ -43,7 +43,7 @@ enum LocalPersonalBestTablePolicy {
     for result in results {
       guard result.outcome == .completed,
         CurrentPersonalBestPolicy.isResultEligible(
-          configuration: result.configuration, accuracy: result.accuracy),
+          configuration: result.configuration, accuracy: result.preciseAccuracy),
         let key = ConfigurationKey(result.configuration)
       else { continue }
 
@@ -109,7 +109,7 @@ enum LocalPersonalBestTablePolicy {
     return .init(
       id: result.id, mode: configuration.mode,
       parameter: configuration.mode == .time ? Int(configuration.duration ?? 0) : configuration.wordLimit ?? 0,
-      wpm: result.wpm, rawWpm: result.rawWpm, accuracy: result.accuracy,
+      wpm: result.wpm, rawWpm: result.rawWpm, accuracy: result.preciseAccuracy,
       consistency: consistency, difficulty: configuration.difficulty, language: configuration.language,
       includesPunctuation: configuration.contentOptions.includePunctuation,
       includesNumbers: configuration.contentOptions.includeNumbers,
@@ -122,6 +122,7 @@ struct LocalPersonalBestTableView: View {
   @Query(sort: \TestResultRecord.finishedAt, order: .reverse) private var results: [TestResultRecord]
   @State private var selectedMode: TestMode = .time
   let speedUnit: TypingSpeedUnit
+  let alwaysShowDecimalPlaces: Bool
 
   private var rows: [LocalPersonalBestRow] {
     LocalPersonalBestTablePolicy.rows(results: results.compactMap(\.portableResult))
@@ -155,7 +156,7 @@ struct LocalPersonalBestTableView: View {
                   .frame(width: 56, alignment: .trailing)
                 VStack(alignment: .leading, spacing: 3) {
                   Text(
-                    "\(speedUnit.converted(wpm: Double(row.wpm)).formatted(.number.precision(.fractionLength(0)))) \(speedUnit.displayName) · \(row.accuracy)%"
+                    "\(speedUnit.converted(wpm: Double(row.wpm)).formatted(.number.precision(.fractionLength(0)))) \(speedUnit.displayName) · \(ResultMetricPresentation.accuracy(row.accuracy, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))"
                   )
                   Text(
                     "Raw \(speedUnit.converted(wpm: Double(row.rawWpm)).formatted(.number.precision(.fractionLength(0)))) · \(row.consistency.formatted(.number.precision(.fractionLength(0))))% 稳定"

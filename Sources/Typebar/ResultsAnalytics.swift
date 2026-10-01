@@ -1,7 +1,6 @@
 import Foundation
 
-/// Applies the reference result-page precision rule without changing the
-/// integer metrics that drive local history, thresholds, or PB comparison.
+/// Applies presentation precision independently of stored and derived metrics.
 enum ResultMetricPresentation {
   static func typingSpeed(
     wpm: Double, unit: TypingSpeedUnit, alwaysShowDecimalPlaces: Bool
@@ -28,6 +27,12 @@ enum ResultMetricPresentation {
       return String(format: "%.2f%%", normalized)
     }
     return "\(Int(normalized.rounded(.down)))%"
+  }
+
+  /// Compact local shares retain integer spelling for legacy results while
+  /// never turning a fractional near-perfect result into a perfect result.
+  static func compactAccuracy(_ value: Double) -> String {
+    accuracy(value, alwaysShowDecimalPlaces: value != value.rounded())
   }
 
   static func percentage(_ value: Double, alwaysShowDecimalPlaces: Bool) -> String {
@@ -130,7 +135,7 @@ struct ResultMetric: Equatable, Identifiable {
     let finishedAt: Date
     let wpm: Int
     let rawWpm: Int
-    let accuracy: Int
+    let accuracy: Double
     let typingSeconds: TimeInterval
     let elapsedSeconds: TimeInterval
     let consistency: Double
@@ -138,14 +143,14 @@ struct ResultMetric: Equatable, Identifiable {
 
     init(
         id: UUID = UUID(), finishedAt: Date, wpm: Int, rawWpm: Int? = nil, accuracy: Int,
-        typingSeconds: TimeInterval, elapsedSeconds: TimeInterval? = nil,
+        preciseAccuracy: Double? = nil, typingSeconds: TimeInterval, elapsedSeconds: TimeInterval? = nil,
         consistency: Double = 0, restartCount: Int = 0
     ) {
         self.id = id
         self.finishedAt = finishedAt
         self.wpm = wpm
         self.rawWpm = rawWpm ?? wpm
-        self.accuracy = accuracy
+        self.accuracy = CompletedTestResult.normalizedAccuracyPrecision(preciseAccuracy, fallback: accuracy)
         self.typingSeconds = typingSeconds
         self.elapsedSeconds = max(0, elapsedSeconds ?? typingSeconds)
         self.consistency = consistency.isFinite ? min(100, max(0, consistency)) : 0
@@ -159,6 +164,7 @@ struct ResultMetric: Equatable, Identifiable {
             wpm: record.wpm,
             rawWpm: record.rawWpm,
             accuracy: record.accuracy,
+            preciseAccuracy: record.preciseAccuracy,
             typingSeconds: record.totalEngagedDuration,
             elapsedSeconds: max(0, record.finishedAt.timeIntervalSince(record.startedAt)),
             consistency: ResultConsistencyPolicy.metrics(
@@ -220,7 +226,7 @@ enum ResultHistorySortPolicy {
         case .finishedAt: metric.finishedAt.timeIntervalSinceReferenceDate
         case .wpm: Double(metric.wpm)
         case .rawWpm: Double(metric.rawWpm)
-        case .accuracy: Double(metric.accuracy)
+        case .accuracy: metric.accuracy
         case .consistency: metric.consistency
         }
     }
@@ -589,7 +595,7 @@ struct RecentAverageSample: Equatable {
   let prompt: String
   let finishedAt: Date
   let wpm: Int
-  let accuracy: Int
+  let accuracy: Double
   let tags: [String]
 
   init(
@@ -598,13 +604,14 @@ struct RecentAverageSample: Equatable {
     finishedAt: Date,
     wpm: Int,
     accuracy: Int,
+    preciseAccuracy: Double? = nil,
     tags: [String] = []
   ) {
     self.configuration = configuration
     self.prompt = prompt
     self.finishedAt = finishedAt
     self.wpm = wpm
-    self.accuracy = accuracy
+    self.accuracy = CompletedTestResult.normalizedAccuracyPrecision(preciseAccuracy, fallback: accuracy)
     self.tags = tags
   }
 }
@@ -612,12 +619,12 @@ struct RecentAverageSample: Equatable {
 struct RecentTestAverage: Equatable {
   let count: Int
   let wpm: Int
-  let accuracy: Int
+  let accuracy: Double
 }
 
 struct CurrentPersonalBest: Equatable {
   let wpm: Int
-  let accuracy: Int
+  let accuracy: Double
 }
 
 enum WordBurstHeatmapTone: Int, CaseIterable, Equatable, Identifiable {
@@ -1505,8 +1512,7 @@ enum RecentTestAveragePolicy {
     let count = matching.count
     let averageWpm = Int(
       (Double(matching.map(\.wpm).reduce(0, +)) / Double(count)).rounded())
-    let averageAccuracy = Int(
-      (Double(matching.map(\.accuracy).reduce(0, +)) / Double(count)).rounded())
+    let averageAccuracy = matching.map(\.accuracy).reduce(0, +) / Double(count)
     return .init(count: count, wpm: averageWpm, accuracy: averageAccuracy)
   }
 
@@ -1600,7 +1606,7 @@ enum CurrentPersonalBestPolicy {
       && configuration.modifiers.allSatisfy(modifierAllowsPersonalBest)
   }
 
-  static func isResultEligible(configuration: TestConfiguration, accuracy: Int) -> Bool {
+  static func isResultEligible(configuration: TestConfiguration, accuracy: Double) -> Bool {
     isConfigurationEligible(configuration)
       && (!configuration.rules.stopOnError || accuracy == 100)
   }
@@ -1647,14 +1653,15 @@ enum ResultPersonalBestPolicy {
   ) -> ResultPersonalBestFeedback? {
     guard result.outcome == .completed,
       CurrentPersonalBestPolicy.isResultEligible(
-        configuration: result.configuration, accuracy: result.accuracy)
+        configuration: result.configuration, accuracy: result.preciseAccuracy)
     else { return nil }
 
     let samples = previousResults.compactMap { previous -> RecentAverageSample? in
       guard previous.id != result.id, previous.outcome == .completed else { return nil }
       return .init(
         configuration: previous.configuration, prompt: previous.prompt,
-        finishedAt: previous.finishedAt, wpm: previous.wpm, accuracy: previous.accuracy)
+        finishedAt: previous.finishedAt, wpm: previous.wpm, accuracy: previous.accuracy,
+        preciseAccuracy: previous.preciseAccuracy)
     }
     let previousBest = CurrentPersonalBestPolicy.personalBest(
       currentConfiguration: result.configuration, currentPrompt: result.prompt, samples: samples)
@@ -1688,7 +1695,7 @@ enum TagPersonalBestPolicy {
   ) -> [TagPersonalBestFeedback] {
     guard result.outcome == .completed,
       CurrentPersonalBestPolicy.isResultEligible(
-        configuration: result.configuration, accuracy: result.accuracy)
+        configuration: result.configuration, accuracy: result.preciseAccuracy)
     else { return [] }
 
     return ResultTagPolicy.normalized(result.tags).map { tag in
@@ -1697,7 +1704,7 @@ enum TagPersonalBestPolicy {
           $0.id != result.id
             && $0.outcome == .completed
             && CurrentPersonalBestPolicy.isResultEligible(
-              configuration: $0.configuration, accuracy: $0.accuracy)
+              configuration: $0.configuration, accuracy: $0.preciseAccuracy)
             && configurationsMatch($0.configuration, result.configuration)
             && hasTag(tag, in: $0.tags)
         }
@@ -2280,9 +2287,9 @@ struct ResultStatistics: Equatable {
     let averageRawWPM: Int
     let bestRawWPM: Int
     let averageRawWPMLast10: Int
-    let averageAccuracy: Int
-    let bestAccuracy: Int
-    let averageAccuracyLast10: Int
+    let averageAccuracy: Double
+    let bestAccuracy: Double
+    let averageAccuracyLast10: Double
     let totalTypingSeconds: TimeInterval
     let highestConsistency: Double
     let averageConsistency: Double
@@ -2322,6 +2329,11 @@ struct ResultStatistics: Equatable {
     private static func average(_ values: [Int]) -> Int {
         guard !values.isEmpty else { return 0 }
         return Int((Double(values.reduce(0, +)) / Double(values.count)).rounded())
+    }
+
+    private static func average(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0 }
+        return values.reduce(0, +) / Double(values.count)
     }
 
     static func personalBestIDs(metrics: [ResultMetric]) -> Set<UUID> {
@@ -2606,7 +2618,7 @@ enum ActivityAggregation {
                 typingSeconds: values.map(\.typingSeconds).reduce(0, +),
                 averageWPM: average(values.map(\.wpm)),
                 highestWPM: values.map(\.wpm).max() ?? 0,
-                averageAccuracy: average(values.map(\.accuracy)),
+                averageAccuracy: values.map(\.accuracy).reduce(0, +) / Double(completedTests),
                 averageConsistency: values.map(\.consistency).reduce(0, +) / Double(completedTests),
                 restartsPerCompletedTest: Double(totalRestarts) / Double(completedTests)
             )
