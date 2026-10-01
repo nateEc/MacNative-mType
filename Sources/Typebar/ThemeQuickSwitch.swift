@@ -23,6 +23,52 @@ enum ThemeQuickPickerScope: String, Identifiable {
   var id: String { rawValue }
 }
 
+struct ThemeQuickPickerResults {
+  let builtInThemes: [AppTheme]
+  let customThemes: [CustomThemeDefinition]
+
+  var isEmpty: Bool { builtInThemes.isEmpty && customThemes.isEmpty }
+}
+
+enum ThemeQuickPickerSearch {
+  static func results(
+    scope: ThemeQuickPickerScope, query: String, builtInThemes: [AppTheme],
+    customThemes: [CustomThemeDefinition], favoriteThemeIDs: [String]
+  ) -> ThemeQuickPickerResults {
+    let favorites = Set(favoriteThemeIDs)
+    let matchingBuiltIns = scope == .all
+      ? builtInThemes.filter { matches(query, name: $0.displayName, id: $0.rawValue) }
+      : []
+    let matchingCustom = customThemes.filter { matches(query, name: $0.name) }
+    return .init(
+      builtInThemes: matchingBuiltIns.filter {
+        favorites.contains(ThemeFavoritePolicy.builtInID(for: $0))
+      } + matchingBuiltIns.filter {
+        !favorites.contains(ThemeFavoritePolicy.builtInID(for: $0))
+      },
+      customThemes: matchingCustom.sorted { lhs, rhs in
+        let lhsFavorite = favorites.contains(ThemeFavoritePolicy.customID(for: lhs.id))
+        let rhsFavorite = favorites.contains(ThemeFavoritePolicy.customID(for: rhs.id))
+        if lhsFavorite != rhsFavorite { return lhsFavorite }
+        let order = lhs.name.localizedStandardCompare(rhs.name)
+        return order == .orderedSame ? lhs.id.uuidString < rhs.id.uuidString
+          : order == .orderedAscending
+      })
+  }
+
+  private static func matches(_ query: String, name: String, id: String = "") -> Bool {
+    let needle = normalized(query)
+    return needle.isEmpty || normalized(name).contains(needle) || normalized(id).contains(needle)
+  }
+
+  private static func normalized(_ value: String) -> String {
+    value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+      .replacingOccurrences(of: "_", with: " ")
+      .split(whereSeparator: \.isWhitespace)
+      .joined(separator: " ")
+  }
+}
+
 enum ThemeQuickSwitchPolicy {
   static func presentation(
     builtInTheme: AppTheme, activeCustomThemeID: UUID?, customThemes: [CustomThemeDefinition],
@@ -85,57 +131,72 @@ struct ThemeIndicatorButton: View {
 
 struct ThemeQuickPickerView: View {
   @Environment(\.dismiss) private var dismiss
+  @FocusState private var searchFocused: Bool
+  @State private var searchText = ""
   let scope: ThemeQuickPickerScope
   let customThemes: [CustomThemeDefinition]
   let favoriteThemeIDs: [String]
   let selectedTheme: ThemeCommandTarget
   let onSelect: (ThemeCommandTarget) -> Void
 
-  private var sortedCustomThemes: [CustomThemeDefinition] {
-    customThemes.sorted { lhs, rhs in
-      let lhsFavorite = favoriteThemeIDs.contains(ThemeFavoritePolicy.customID(for: lhs.id))
-      let rhsFavorite = favoriteThemeIDs.contains(ThemeFavoritePolicy.customID(for: rhs.id))
-      if lhsFavorite != rhsFavorite { return lhsFavorite }
-      return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-    }
+  private var searchResults: ThemeQuickPickerResults {
+    ThemeQuickPickerSearch.results(
+      scope: scope, query: searchText, builtInThemes: AppTheme.allCases,
+      customThemes: customThemes, favoriteThemeIDs: favoriteThemeIDs)
   }
 
   var body: some View {
     NavigationStack {
-      List {
-        if scope == .all {
-          Section("内置主题") {
-            ForEach(AppTheme.allCases, id: \.self) { theme in
-              themeRow(
-                name: theme.displayName,
-                accent: theme.accent,
-                isFavorite: favoriteThemeIDs.contains(
-                  ThemeFavoritePolicy.builtInID(for: theme)),
-                isSelected: selectedTheme == .builtIn(theme)
-              ) {
-                choose(.builtIn(theme))
+      VStack(spacing: 0) {
+        TextField("搜索主题", text: $searchText)
+          .textFieldStyle(.roundedBorder)
+          .focused($searchFocused)
+          .accessibilityLabel("搜索主题")
+          .onSubmit { chooseFirstSearchResult() }
+          .padding(.horizontal, 16)
+          .padding(.top, 12)
+
+        if searchResults.isEmpty && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          ContentUnavailableView(
+            "没有匹配的主题", systemImage: "magnifyingglass",
+            description: Text("换个名称，或试试主题 ID。"))
+        } else {
+          List {
+            if !searchResults.builtInThemes.isEmpty {
+              Section("内置主题") {
+                ForEach(searchResults.builtInThemes, id: \.self) { theme in
+                  themeRow(
+                    name: theme.displayName,
+                    accent: theme.accent,
+                    isFavorite: favoriteThemeIDs.contains(
+                      ThemeFavoritePolicy.builtInID(for: theme)),
+                    isSelected: selectedTheme == .builtIn(theme)
+                  ) {
+                    choose(.builtIn(theme))
+                  }
+                }
               }
             }
-          }
-        }
-        Section(scope == .all ? "自定义主题" : "选择自定义主题") {
-          if sortedCustomThemes.isEmpty {
-            ContentUnavailableView(
-              "还没有自定义主题",
-              systemImage: "paintpalette",
-              description: Text("可在设置的“自定义主题”中创建或导入仅属于这台 Mac 的主题。")
-            )
-            .frame(maxWidth: .infinity, minHeight: 150)
-          } else {
-            ForEach(sortedCustomThemes) { theme in
-              themeRow(
-                name: theme.name,
-                accent: theme.accent.color,
-                isFavorite: favoriteThemeIDs.contains(
-                  ThemeFavoritePolicy.customID(for: theme.id)),
-                isSelected: selectedTheme == .custom(theme.id)
-              ) {
-                choose(.custom(theme.id))
+            if !searchResults.customThemes.isEmpty || customThemes.isEmpty && searchText.isEmpty {
+              Section(scope == .all ? "自定义主题" : "选择自定义主题") {
+                if customThemes.isEmpty {
+                  ContentUnavailableView(
+                    "还没有自定义主题", systemImage: "paintpalette",
+                    description: Text("可在设置的“自定义主题”中创建或导入仅属于这台 Mac 的主题。"))
+                    .frame(maxWidth: .infinity, minHeight: 150)
+                } else {
+                  ForEach(searchResults.customThemes) { theme in
+                    themeRow(
+                      name: theme.name,
+                      accent: theme.accent.color,
+                      isFavorite: favoriteThemeIDs.contains(
+                        ThemeFavoritePolicy.customID(for: theme.id)),
+                      isSelected: selectedTheme == .custom(theme.id)
+                    ) {
+                      choose(.custom(theme.id))
+                    }
+                  }
+                }
               }
             }
           }
@@ -150,6 +211,16 @@ struct ThemeQuickPickerView: View {
       }
     }
     .frame(width: 430, height: 410)
+    .onAppear { searchFocused = true }
+  }
+
+  private func chooseFirstSearchResult() {
+    guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    if let theme = searchResults.builtInThemes.first {
+      choose(.builtIn(theme))
+    } else if let theme = searchResults.customThemes.first {
+      choose(.custom(theme.id))
+    }
   }
 
   private func themeRow(
