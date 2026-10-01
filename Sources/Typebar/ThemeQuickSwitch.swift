@@ -115,6 +115,14 @@ enum ThemeQuickPickerSearch {
 }
 
 enum ThemeQuickSwitchPolicy {
+  @MainActor
+  static func shiftClickAction(settings: AppSettings) -> ThemeQuickSwitchAction {
+    return shiftClickAction(
+      activeCustomThemeID: settings.manualCustomThemeIDForQuickSwitch,
+      customThemes: settings.customThemes,
+      lastCustomThemeID: settings.lastCustomThemeID)
+  }
+
   static func presentation(
     builtInTheme: AppTheme, activeCustomThemeID: UUID?, customThemes: [CustomThemeDefinition],
     favoriteThemeIDs: [String]
@@ -133,12 +141,15 @@ enum ThemeQuickSwitchPolicy {
   }
 
   static func shiftClickAction(
-    activeCustomThemeID: UUID?, customThemes: [CustomThemeDefinition]
+    activeCustomThemeID: UUID?, customThemes: [CustomThemeDefinition], lastCustomThemeID: UUID? = nil
   ) -> ThemeQuickSwitchAction {
     if let activeCustomThemeID,
       customThemes.contains(where: { $0.id == activeCustomThemeID })
     {
       return .selectBuiltIn
+    }
+    if let lastCustomThemeID, customThemes.contains(where: { $0.id == lastCustomThemeID }) {
+      return .selectCustom(lastCustomThemeID)
     }
     switch customThemes {
     case []:

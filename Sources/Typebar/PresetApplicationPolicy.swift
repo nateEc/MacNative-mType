@@ -176,6 +176,7 @@ private extension AppSettingsSnapshot {
       result.theme = source.theme
       result.customThemes = source.customThemes
       result.activeCustomThemeID = source.activeCustomThemeID
+      result.lastCustomThemeID = source.lastCustomThemeID
       result.favoriteThemeIDs = source.favoriteThemeIDs
       result.followSystemTheme = source.followSystemTheme
       result.systemLightTheme = source.systemLightTheme

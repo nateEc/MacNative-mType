@@ -412,6 +412,10 @@ struct TypebarArchive: Codable, Equatable {
            !sanitized.customThemes.contains(where: { $0.id == activeThemeID }) {
             sanitized.activeCustomThemeID = nil
         }
+        if let rememberedThemeID = sanitized.lastCustomThemeID,
+           !sanitized.customThemes.contains(where: { $0.id == rememberedThemeID }) {
+            sanitized.lastCustomThemeID = nil
+        }
         sanitized.favoriteThemeIDs = ThemeFavoritePolicy.normalized(
             sanitized.favoriteThemeIDs, customThemes: sanitized.customThemes)
         sanitized.customKeyboardLayouts.removeAll { deletedKeyboardLayoutIDs.contains($0.id) }

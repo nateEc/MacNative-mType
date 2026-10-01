@@ -561,6 +561,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
   var saveCompletedResults = true
   var customThemes: [CustomThemeDefinition] = []
   var activeCustomThemeID: UUID?
+  var lastCustomThemeID: UUID?
   var favoriteThemeIDs: [String] = []
   var showKeyboardGuide = false
   var keyboardGuideMode: KeyboardGuideMode = .off
@@ -667,6 +668,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     saveCompletedResults: Bool = true,
     customThemes: [CustomThemeDefinition] = [],
     activeCustomThemeID: UUID? = nil,
+    lastCustomThemeID: UUID? = nil,
     favoriteThemeIDs: [String] = [],
     showKeyboardGuide: Bool = false,
     keyboardGuideMode: KeyboardGuideMode = .off,
@@ -775,6 +777,9 @@ struct AppSettingsSnapshot: Codable, Equatable {
     self.saveCompletedResults = saveCompletedResults
     self.customThemes = customThemes
     self.activeCustomThemeID = activeCustomThemeID
+    self.lastCustomThemeID = customThemes.first {
+      $0.id == (activeCustomThemeID ?? lastCustomThemeID)
+    }?.id
     self.favoriteThemeIDs = ThemeFavoritePolicy.normalized(
       favoriteThemeIDs, customThemes: customThemes)
     self.showKeyboardGuide = showKeyboardGuide
@@ -882,7 +887,7 @@ struct AppSettingsSnapshot: Codable, Equatable {
     case difficulty, strictSpace, stopOnError, stopOnErrorMode, deleteOnError, deleteOnErrorMode,
       hideExtraLetters, blindMode, fontSize,
       practiceFont, installedPracticeFontName, theme, publishCompletedResults, saveCompletedResults, customThemes,
-      activeCustomThemeID,
+      activeCustomThemeID, lastCustomThemeID,
       favoriteThemeIDs, showKeyboardGuide, keyboardGuideMode, keyboardGuideScale, keyboardGuideLegendStyle, keyboardGuideKeysMode, keyboardGuideStyle, keyboardLayout, keyboardInputLayout, keyboardGuideLayoutSource, customKeyboardLayouts, customKeyboardLayoutID, quickEnd, quickRestartKey, showKeyTips, commandPaletteListMode, followSystemTheme, systemLightTheme, systemDarkTheme,
       randomThemeOnRestart, randomThemeMode, flipTestColors, colorfulMode, customBackgroundURL, customBackgroundFit, customBackgroundFilter, practiceBackdrop, reducePracticeMotion, animationFrameRate, showTypingCompanion, typingPowerMode, englishVariant, prefersArabicLazyInput,
       favoriteQuoteIDs, activeResultTags, repeatQuotes, freedomMode, confidenceMode, oppositeShiftMode, codeUnindentOnBackspace,
@@ -932,6 +937,10 @@ struct AppSettingsSnapshot: Codable, Equatable {
     customThemes =
       try values.decodeIfPresent([CustomThemeDefinition].self, forKey: .customThemes) ?? []
     activeCustomThemeID = try values.decodeIfPresent(UUID.self, forKey: .activeCustomThemeID)
+    let rememberedID = try values.decodeIfPresent(UUID.self, forKey: .lastCustomThemeID)
+    lastCustomThemeID = customThemes.first {
+      $0.id == (activeCustomThemeID ?? rememberedID)
+    }?.id
     favoriteThemeIDs = ThemeFavoritePolicy.normalized(
       try values.decodeIfPresent([String].self, forKey: .favoriteThemeIDs) ?? [],
       customThemes: customThemes)
@@ -1229,8 +1238,24 @@ final class AppSettings {
   }
   var publishCompletedResults = false { didSet { persist() } }
   var saveCompletedResults = true { didSet { persist() } }
-  var customThemes: [CustomThemeDefinition] = [] { didSet { persist() } }
-  var activeCustomThemeID: UUID? { didSet { persist() } }
+  var customThemes: [CustomThemeDefinition] = [] {
+    didSet {
+      if let lastCustomThemeID, !customThemes.contains(where: { $0.id == lastCustomThemeID }) {
+        self.lastCustomThemeID = nil
+      }
+      persist()
+    }
+  }
+  var activeCustomThemeID: UUID? {
+    didSet {
+      if let activeCustomThemeID, customThemes.contains(where: { $0.id == activeCustomThemeID }) {
+        lastCustomThemeID = activeCustomThemeID
+      }
+      persist()
+    }
+  }
+  // Unlike the active selection, this survives a switch to a built-in theme.
+  private(set) var lastCustomThemeID: UUID? { didSet { persist() } }
   var favoriteThemeIDs: [String] = [] { didSet { persist() } }
   var showKeyboardGuide = false { didSet { persist() } }
   var keyboardGuideMode: KeyboardGuideMode = .off {
@@ -1498,6 +1523,7 @@ final class AppSettings {
     saveCompletedResults = snapshot.saveCompletedResults
     customThemes = snapshot.customThemes
     activeCustomThemeID = snapshot.activeCustomThemeID
+    lastCustomThemeID = snapshot.lastCustomThemeID
     favoriteThemeIDs = ThemeFavoritePolicy.normalized(
       snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
     showKeyboardGuide = snapshot.showKeyboardGuide
@@ -1645,7 +1671,8 @@ final class AppSettings {
       installedPracticeFontName: installedPracticeFontName, theme: theme,
       publishCompletedResults: publishCompletedResults, saveCompletedResults: saveCompletedResults,
       customThemes: customThemes,
-      activeCustomThemeID: activeCustomThemeID, favoriteThemeIDs: favoriteThemeIDs,
+      activeCustomThemeID: activeCustomThemeID, lastCustomThemeID: lastCustomThemeID,
+      favoriteThemeIDs: favoriteThemeIDs,
       showKeyboardGuide: showKeyboardGuide, keyboardGuideMode: effectiveKeyboardGuideMode,
       keyboardGuideScale: keyboardGuideScale,
       keyboardGuideLegendStyle: keyboardGuideLegendStyle,
@@ -1734,6 +1761,7 @@ final class AppSettings {
     saveCompletedResults = true
     customThemes = []
     activeCustomThemeID = nil
+    lastCustomThemeID = nil
     favoriteThemeIDs = []
     showKeyboardGuide = false
     keyboardGuideMode = .off
@@ -1943,6 +1971,9 @@ final class AppSettings {
     saveCompletedResults = snapshot.saveCompletedResults
     customThemes = snapshot.customThemes
     activeCustomThemeID = snapshot.activeCustomThemeID
+    lastCustomThemeID = customThemes.first {
+      $0.id == (snapshot.activeCustomThemeID ?? snapshot.lastCustomThemeID)
+    }?.id
     favoriteThemeIDs = ThemeFavoritePolicy.normalized(
       snapshot.favoriteThemeIDs, customThemes: snapshot.customThemes)
     showKeyboardGuide = snapshot.showKeyboardGuide
@@ -2077,6 +2108,14 @@ final class AppSettings {
       return .custom(activeCustomThemeID)
     }
     return .builtIn(theme)
+  }
+
+  /// Shift toggles the manual custom mode, not an ephemeral random preview.
+  var manualCustomThemeIDForQuickSwitch: UUID? {
+    guard !followSystemTheme, randomThemeTarget == nil, let activeCustomThemeID,
+      customThemes.contains(where: { $0.id == activeCustomThemeID })
+    else { return nil }
+    return activeCustomThemeID
   }
 
   var hasLocalBackground: Bool { TypebarLocalBackgroundStore.hasImage }
@@ -2324,6 +2363,7 @@ final class AppSettings {
       saveCompletedResults: saveCompletedResults,
       customThemes: customThemes,
       activeCustomThemeID: activeCustomThemeID,
+      lastCustomThemeID: lastCustomThemeID,
       favoriteThemeIDs: favoriteThemeIDs,
       showKeyboardGuide: showKeyboardGuide,
       keyboardGuideMode: effectiveKeyboardGuideMode,

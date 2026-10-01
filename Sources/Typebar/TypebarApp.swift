@@ -3316,20 +3316,13 @@ private struct ContentView: View {
     settings.currentThemeQuickPickerTarget(for: systemColorScheme)
   }
 
-  private var activeCustomThemeQuickPickerID: UUID? {
-    guard case .custom(let id) = selectedThemeQuickPickerTarget else { return nil }
-    return id
-  }
-
   private func handleThemeIndicatorActivation() {
     themeQuickSwitchMessage = nil
     guard NSEvent.modifierFlags.contains(.shift) else {
       themeQuickPickerScope = .all
       return
     }
-    switch ThemeQuickSwitchPolicy.shiftClickAction(
-      activeCustomThemeID: activeCustomThemeQuickPickerID,
-      customThemes: settings.customThemes)
+    switch ThemeQuickSwitchPolicy.shiftClickAction(settings: settings)
     {
     case .selectBuiltIn:
       applyThemeQuickPickerSelection(.builtIn(settings.theme))
