@@ -5975,6 +5975,8 @@ struct TestSessionFactory {
     var randomCustomPreviousWords: [String] = []
     var sequentialCustomWordStream: CustomSequentialWordStream?
     var finiteCustomTextStream: CustomFiniteTextStream?
+    var customSectionWordStream: CustomSectionWordStream?
+    var customSectionChunk: CustomSectionPromptChunk?
     var usesFreshGeneratedWords = false
     var usesGeneratedStream = false
     var usesGeneratedCode = false
@@ -6030,26 +6032,14 @@ struct TestSessionFactory {
           randomCustomSourceTokens = source.split(whereSeparator: \.isWhitespace).map(String.init)
         }
         if configuration.customTextCompletion == .sections {
-          let sections = CustomTextPolicy.sections(in: source)
-          let limit = min(
-            max(configuration.customTextSectionLimit ?? sections.count, 1), sections.count)
-          let transformedSections = sections.prefix(limit).map {
-            configuration.language.presentationText(
-              TestModifierPolicy.transformed(
-                $0, modifiers: configuration.modifiers, language: configuration.language))
-          }
-          noSpaceBoundarySource = sections.prefix(limit).joined(separator: " ")
-          let separator =
-            !configuration.language.usesSpaceDelimitedWords
-              || (TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
-                && !configuration.modifiers.contains(.underscoreSeparators))
-            ? "" : configuration.modifiers.contains(.underscoreSeparators) ? "_" : " "
-          prompt = transformedSections.joined(separator: separator)
-          var length = 0
-          sectionEndIndices = transformedSections.enumerated().map { index, section in
-            length += section.count
-            defer { length += index < transformedSections.count - 1 ? separator.count : 0 }
-            return length
+          if var stream = CustomSectionWordStream(source: source, configuration: configuration) {
+            let chunk = stream.nextChunk()
+            prompt = chunk.text
+            sectionEndIndices = chunk.sectionEndOffsets
+            customSectionChunk = chunk
+            customSectionWordStream = stream
+          } else {
+            prompt = "Write text between the section separators before starting a custom test."
           }
         } else {
           if configuration.customTextCompletion == .finish, let verifiedScript {
@@ -6101,12 +6091,12 @@ struct TestSessionFactory {
         ? prompt
         : TestModifierPolicy.transformed(
           prompt, modifiers: configuration.modifiers, language: configuration.language))
-    let noSpaceWordLengths = NoSpaceWordBoundaryPolicy.wordLengths(
+    let noSpaceWordLengths = customSectionChunk?.noSpaceWordLengths ?? NoSpaceWordBoundaryPolicy.wordLengths(
       source: noSpaceBoundarySource ?? prompt, language: configuration.language,
       modifiers: configuration.modifiers,
       transformedPrompt: transformedPrompt,
       preservesNoSpaceBoundaries: noSpaceBoundarySource != nil)
-    let noSpaceTargetWords = NoSpaceWordBoundaryPolicy.targetWords(
+    let noSpaceTargetWords = customSectionChunk?.noSpaceTargetWords ?? NoSpaceWordBoundaryPolicy.targetWords(
       for: noSpaceWordLengths, in: transformedPrompt)
     let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
       && !hasCompleteRandomWordPrompt && !streamsRandomCustomText
@@ -6124,7 +6114,7 @@ struct TestSessionFactory {
         nextTokenIndex: GeneratedPromptChunkPolicy.wordCount(for: configuration))
       : nil
     let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
-      && !usesGeneratedCode
+      && !usesGeneratedCode && customSectionWordStream == nil
       && (configuration.isInfinite
       || (configuration.mode == .custom
         && [.time, .words].contains(configuration.customTextCompletion)
@@ -6160,6 +6150,7 @@ struct TestSessionFactory {
       randomCustomPreviousWords: randomCustomPreviousWords,
       sequentialCustomWordStream: sequentialCustomWordStream,
       finiteCustomTextStream: finiteCustomTextStream,
+      customSectionWordStream: customSectionWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeats && generatedWordContinuation == nil

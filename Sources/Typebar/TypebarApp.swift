@@ -1028,6 +1028,7 @@ private struct ContentView: View {
   @State private var showingCustomWordsEditor = false
   @State private var showingCustomTextTimeEditor = false
   @State private var showingCustomTextWordsEditor = false
+  @State private var showingCustomTextSectionsEditor = false
   @State private var practiceThresholdEditorKind: PracticeThresholdEditorKind?
   @State private var showingCommandBailoutConfirmation = false
   @State private var showingTestShare = false
@@ -1594,6 +1595,13 @@ private struct ContentView: View {
         if value == 0 { reset() }
       }
     }
+    .sheet(isPresented: $showingCustomTextSectionsEditor) {
+      TestLimitEditor(kind: .sections, initialValue: customTextSectionLimit,
+        allowsInfinite: infiniteIncompatibleModifiers.isEmpty) { value in
+        guard acceptsRestartingConfigurationChange() else { return }
+        customTextSectionLimit = value
+      }
+    }
     .sheet(item: $practiceThresholdEditorKind) { kind in
       PracticeThresholdEditor(
         kind: kind, unit: settings.typingSpeedUnit,
@@ -1623,7 +1631,7 @@ private struct ContentView: View {
           duration: customTextCompletion == .time ? TimeInterval(customTextDuration) : nil,
           wordLimit: customTextCompletion == .words ? customTextWordLimit : nil,
           sectionLimit: customTextCompletion == .sections
-            ? min(customTextSectionLimit, max(1, customTextSections.count)) : nil,
+            ? customTextSectionLimit : nil,
           ordering: customTextOrdering),
         challengeLibrary: TypebarChallengeLibrary.all,
         onLoadChallenge: loadChallenge
@@ -1638,18 +1646,11 @@ private struct ContentView: View {
         wordLimit = memory.wordLimit
         customTextDuration = memory.customTextDuration
         customTextWordLimit = memory.customTextWordLimit
-        customTextSectionLimit = min(
-          memory.customTextSectionLimit,
-          max(1, CustomTextPolicy.sections(in: customText).count))
-        var configuration = document.configuration
+        customTextSectionLimit = memory.customTextSectionLimit
+        let configuration = document.configuration
         var retainedCustomText: String?
         if configuration.mode == .custom {
           retainedCustomText = customText
-          if configuration.customTextCompletion == .sections {
-            configuration.customTextSectionLimit = min(
-              configuration.customTextSectionLimit ?? 1,
-              max(1, CustomTextPolicy.sections(in: customText).count))
-          }
         }
         apply(.init(configuration: configuration, customText: retainedCustomText))
       }
@@ -2232,8 +2233,6 @@ private struct ContentView: View {
               .onChange(of: customText) { _, value in
                 let clamped = CustomTextPolicy.clamped(value)
                 if clamped != value { customText = clamped }
-                customTextSectionLimit = min(
-                  customTextSectionLimit, max(1, CustomTextPolicy.sections(in: clamped).count))
                 if let activeLongSavedText,
                   value != activeLongSavedText.currentChunk
                 {
@@ -2330,27 +2329,31 @@ private struct ContentView: View {
               }
             }
             if customTextCompletion == .sections {
-              Stepper(
-                value: restartingConfigurationBinding($customTextSectionLimit),
-                in: 1...max(1, customTextSections.count)
-              ) {
-                LabeledContent(
-                  "完成段数", value: "\(customTextSectionLimit) / \(customTextSections.count) 段")
+              HStack {
+                if customTextSectionLimit == 0 {
+                  LabeledContent("完成段数", value: "无限")
+                } else {
+                  Stepper(value: restartingConfigurationBinding($customTextSectionLimit),
+                    in: 1...OfficialTestLimitInput.maximumValue) {
+                    LabeledContent("完成段数", value: "\(customTextSectionLimit) 段")
+                  }
+                }
+                Button("自定义…") { showingCustomTextSectionsEditor = true }
+                  .buttonStyle(.borderless)
               }
               .disabled(hasLockedCustomTextSource)
               .onChange(of: customTextSectionLimit) { _, _ in reset() }
-              Text("使用竖线 | 分隔段落；练习会按顺序取前面的段落。")
+              Text("使用竖线 | 分隔段落；按所选顺序循环取段，0 表示无限。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            } else {
-              Picker("文本顺序", selection: restartingConfigurationBinding($customTextOrdering)) {
-                ForEach(CustomTextOrdering.allCases) { ordering in
-                  Text(ordering.displayName).tag(ordering)
-                }
-              }
-              .disabled(hasLockedCustomTextSource)
-              .onChange(of: customTextOrdering) { _, _ in reset() }
             }
+            Picker("文本顺序", selection: restartingConfigurationBinding($customTextOrdering)) {
+              ForEach(CustomTextOrdering.allCases) { ordering in
+                Text(ordering.displayName).tag(ordering)
+              }
+            }
+            .disabled(hasLockedCustomTextSource)
+            .onChange(of: customTextOrdering) { _, _ in reset() }
             HStack {
               Button("使用这段文本开始") {
                 guard acceptsRestartingConfigurationChange() else { return }
@@ -3111,7 +3114,7 @@ private struct ContentView: View {
           isHidden: isProgressFlashHidden && progressStyle == .flashMini)
       }
       if let sections = session.sectionProgress {
-        metric("段落", value: "\(sections.completed)/\(sections.total)")
+        metric("段落", value: sections.total == 0 ? "\(sections.completed)" : "\(sections.completed)/\(sections.total)")
       }
       if let errorCount = live.errorCount { metric("错误", value: "\(errorCount)") }
     }
@@ -4670,13 +4673,13 @@ private struct ContentView: View {
       let wordLimit = customTextCompletion == .words ? customTextWordLimit : nil
       let sectionLimit =
         customTextCompletion == .sections
-        ? min(customTextSectionLimit, customTextSections.count) : nil
+        ? customTextSectionLimit : nil
       return .init(
         mode: .custom, duration: duration, wordLimit: wordLimit, difficulty: settings.difficulty,
         rules: settings.inputRules, language: language, englishVariant: settings.englishVariant,
         customTextCompletion: customTextCompletion,
         customTextSectionLimit: sectionLimit,
-        customTextOrdering: customTextCompletion == .sections ? .inOrder : customTextOrdering,
+        customTextOrdering: customTextOrdering,
         mixedLanguageComponents: mixedLanguageComponents,
         modifiers: effectiveTestModifiers(for: language, mode: .custom),
         contentOptions: contentOptions)
@@ -4851,15 +4854,7 @@ private struct ContentView: View {
     customTextWordLimit = memory.customTextWordLimit
     customTextSectionLimit = memory.customTextSectionLimit
     quoteSource = document.quoteSource
-    var preset = document.preset
-    if preset.configuration.mode == .custom, let customText = preset.customText {
-      preset.configuration.customTextSectionLimit = min(
-        preset.configuration.customTextSectionLimit ?? 1,
-        max(1, CustomTextPolicy.sections(in: customText).count))
-      customTextSectionLimit = min(
-        customTextSectionLimit,
-        max(1, CustomTextPolicy.sections(in: customText).count))
-    }
+    let preset = document.preset
     apply(
       preset,
       overwritesParameterMemory: false,

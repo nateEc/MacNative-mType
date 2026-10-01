@@ -17,11 +17,13 @@ enum OfficialTestLimitInput {
 enum TestLimitKind {
   case time
   case words
+  case sections
 
   var title: String {
     switch self {
     case .time: "自定义时间"
     case .words: "自定义字数"
+    case .sections: "自定义段数"
     }
   }
 
@@ -29,6 +31,7 @@ enum TestLimitKind {
     switch self {
     case .time: "练习秒数"
     case .words: "练习词数"
+    case .sections: "练习段数"
     }
   }
 
@@ -36,6 +39,7 @@ enum TestLimitKind {
     switch self {
     case .time: "秒"
     case .words: "词"
+    case .sections: "段"
     }
   }
 }

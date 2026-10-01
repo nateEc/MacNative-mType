@@ -190,8 +190,7 @@ enum LegacyTestSettingsLinkImporter {
         case .sections:
           duration = nil
           wordLimit = nil
-          customTextSectionLimit = min(
-            customTextSectionLimit ?? 1, max(1, CustomTextPolicy.sections(in: text).count))
+          customTextSectionLimit = customTextSectionLimit ?? 1
         }
       } else if payload.customText == nil {
         switch customTextCompletion {
@@ -210,8 +209,7 @@ enum LegacyTestSettingsLinkImporter {
         case .sections:
           duration = nil
           wordLimit = nil
-          customTextSectionLimit = min(
-            old.customTextSectionLimit ?? 1, max(1, CustomTextPolicy.sections(in: text).count))
+          customTextSectionLimit = old.customTextSectionLimit ?? 1
         }
       }
     }
@@ -396,8 +394,7 @@ enum LegacyTestSettingsLinkImporter {
     case "time": return (.time, TimeInterval(value), nil, nil)
     case "word": return (.words, nil, value, nil)
     case "section":
-      let sections = CustomTextPolicy.sections(in: text).count
-      guard (1...sections).contains(value) else { throw ImportError.unsupportedSetting }
+      guard (0...OfficialTestLimitInput.maximumValue).contains(value) else { throw ImportError.unsupportedSetting }
       return (.sections, nil, nil, value)
     default: throw ImportError.unsupportedSetting
     }

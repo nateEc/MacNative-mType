@@ -90,7 +90,7 @@ enum TestConfigurationShare {
                 guard let wordLimit = config.wordLimit, isValidWordLimit(wordLimit), config.duration == nil else { return false }
             case .sections:
                 guard let sectionLimit = config.customTextSectionLimit,
-                      (1...CustomTextPolicy.sections(in: text).count).contains(sectionLimit),
+                      (0...OfficialTestLimitInput.maximumValue).contains(sectionLimit),
                       config.duration == nil, config.wordLimit == nil
                 else { return false }
             }

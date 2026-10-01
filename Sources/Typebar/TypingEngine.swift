@@ -2135,7 +2135,7 @@ struct TestConfiguration: Codable, Equatable {
   var isInfinite: Bool {
     Self.usesInfiniteLimit(
       mode: mode, duration: duration, wordLimit: wordLimit,
-      customTextCompletion: customTextCompletion)
+      customTextCompletion: customTextCompletion, customTextSectionLimit: customTextSectionLimit)
   }
 
   /// Mirrors reference `joiningScript` metadata for native prompt shaping.
@@ -2208,7 +2208,7 @@ struct TestConfiguration: Codable, Equatable {
       normalizedModifiers, mode: self.mode)
     self.modifiers = Self.usesInfiniteLimit(
       mode: self.mode, duration: self.duration, wordLimit: self.wordLimit,
-      customTextCompletion: customTextCompletion)
+      customTextCompletion: customTextCompletion, customTextSectionLimit: customTextSectionLimit)
       ? TestModifierPolicy.compatibleWithInfiniteTest(modeCompatibleModifiers) : modeCompatibleModifiers
     self.contentOptions = FunboxForcedContentOptionsPolicy.effectiveOptions(
       contentOptions, modifiers: self.modifiers)
@@ -2330,7 +2330,7 @@ struct TestConfiguration: Codable, Equatable {
       normalizedModifiers, mode: mode)
     modifiers = Self.usesInfiniteLimit(
       mode: mode, duration: duration, wordLimit: wordLimit,
-      customTextCompletion: customTextCompletion)
+      customTextCompletion: customTextCompletion, customTextSectionLimit: customTextSectionLimit)
       ? TestModifierPolicy.compatibleWithInfiniteTest(modeCompatibleModifiers) : modeCompatibleModifiers
     let decodedContentOptions =
       try values.decodeIfPresent(ContentOptions.self, forKey: .contentOptions) ?? .init()
@@ -2341,7 +2341,7 @@ struct TestConfiguration: Codable, Equatable {
 
   private static func usesInfiniteLimit(
     mode: TestMode, duration: TimeInterval?, wordLimit: Int?,
-    customTextCompletion: CustomTextCompletion
+    customTextCompletion: CustomTextCompletion, customTextSectionLimit: Int?
   ) -> Bool {
     switch mode {
     case .time: duration == 0
@@ -2349,6 +2349,7 @@ struct TestConfiguration: Codable, Equatable {
     case .custom:
       (customTextCompletion == .time && duration == 0)
         || (customTextCompletion == .words && wordLimit == 0)
+        || (customTextCompletion == .sections && customTextSectionLimit == 0)
     case .quote, .zen: false
     }
   }
@@ -2818,7 +2819,8 @@ enum QuickRestartSafetyPolicy {
       case .words:
         return configuration.wordLimit == 0 || (configuration.wordLimit ?? 0) >= longWordLimit
       case .sections:
-        return (configuration.customTextSectionLimit ?? 0) >= longWordLimit
+        return configuration.customTextSectionLimit == 0
+          || (configuration.customTextSectionLimit ?? 0) >= longWordLimit
       case .finish:
         return false
       }
@@ -2844,7 +2846,9 @@ enum CommandBailoutPolicy {
       switch configuration.customTextCompletion {
       case .time: return configuration.duration == 0 || (configuration.duration ?? 0) >= 3_600
       case .words: return configuration.wordLimit == 0 || (configuration.wordLimit ?? 0) >= 5_000
-      case .sections: return (configuration.customTextSectionLimit ?? 0) >= 5_000
+      case .sections:
+        return configuration.customTextSectionLimit == 0
+          || (configuration.customTextSectionLimit ?? 0) >= 5_000
       case .finish: return false
       }
     case .quote:
@@ -3516,7 +3520,10 @@ struct TypingSession {
   private let initialSequentialCustomWordStream: CustomSequentialWordStream?
   private var finiteCustomTextStream: CustomFiniteTextStream?
   private let initialFiniteCustomTextStream: CustomFiniteTextStream?
-  private let sectionEndIndices: [Int]
+  private var sectionEndIndices: [Int]
+  private let initialSectionEndIndices: [Int]
+  private var customSectionWordStream: CustomSectionWordStream?
+  private let initialCustomSectionWordStream: CustomSectionWordStream?
   /// In no-space tests, the reference product still commits each source word
   /// when its final character is entered. Keep those boundaries separately:
   /// after the prompt has been flattened, spaces can no longer recover them.
@@ -3601,6 +3608,7 @@ struct TypingSession {
     randomCustomPreviousWords: [String] = [],
     sequentialCustomWordStream: CustomSequentialWordStream? = nil,
     finiteCustomTextStream: CustomFiniteTextStream? = nil,
+    customSectionWordStream: CustomSectionWordStream? = nil,
     noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
     repeatingNoSpaceTargetWords: [String] = []
@@ -3627,6 +3635,9 @@ struct TypingSession {
     self.finiteCustomTextStream = finiteCustomTextStream
     self.initialFiniteCustomTextStream = finiteCustomTextStream
     self.sectionEndIndices = sectionEndIndices
+    self.initialSectionEndIndices = sectionEndIndices
+    self.customSectionWordStream = customSectionWordStream
+    self.initialCustomSectionWordStream = customSectionWordStream
     self.noSpaceWordEndIndices = noSpaceWordEndIndices
     self.initialNoSpaceWordEndIndices = noSpaceWordEndIndices
     self.noSpaceTargetWords = noSpaceTargetWords
@@ -3644,11 +3655,12 @@ struct TypingSession {
       generatedWordContinuation: initialGeneratedWordContinuation,
       generatedStreamContinuation: initialGeneratedStreamContinuation,
       generatedCodeContinuation: initialGeneratedCodeContinuation,
-      sectionEndIndices: sectionEndIndices,
+      sectionEndIndices: initialSectionEndIndices,
       randomCustomSourceTokens: randomCustomSourceTokens,
       randomCustomPreviousWords: initialRandomCustomPreviousWords,
       sequentialCustomWordStream: initialSequentialCustomWordStream,
       finiteCustomTextStream: initialFiniteCustomTextStream,
+      customSectionWordStream: initialCustomSectionWordStream,
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
@@ -3706,6 +3718,7 @@ struct TypingSession {
       || repeatingPrompt?.isEmpty == false
       || randomCustomSourceTokens?.isEmpty == false
       || sequentialCustomWordStream != nil || finiteCustomTextStream?.hasRemaining == true
+      || customSectionWordStream?.hasRemaining == true
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
   var typedCharacterCount: Int { typed.count }
@@ -3744,9 +3757,20 @@ struct TypingSession {
   }
 
   var sectionProgress: (completed: Int, total: Int)? {
-    guard !sectionEndIndices.isEmpty else { return nil }
-    let completed = sectionEndIndices.filter { nextTargetIndex >= $0 }.count
-    return (min(completed, sectionEndIndices.count), sectionEndIndices.count)
+    guard customSectionWordStream != nil || !sectionEndIndices.isEmpty else { return nil }
+    let targetIndex = nextTargetIndex
+    var lower = 0
+    var upper = sectionEndIndices.count
+    while lower < upper {
+      let middle = lower + (upper - lower) / 2
+      if sectionEndIndices[middle] <= targetIndex { lower = middle + 1 }
+      else { upper = middle }
+    }
+    let awaitingFinalCommit = lower > 0 && sectionEndIndices[lower - 1] == promptCharacters.count
+      && !isFinished && !lastInputCommitsWord
+    let completed = lower - (awaitingFinalCommit ? 1 : 0)
+    let total = customSectionWordStream?.sectionLimit ?? sectionEndIndices.count
+    return (total == 0 ? completed : min(completed, total), total)
   }
   var nextExpectedCharacter: Character? {
     guard !isFinished, nextTargetIndex < promptCharacters.count else { return nil }
@@ -4200,6 +4224,9 @@ struct TypingSession {
   /// including no-space prompts whose commits happen on a word's final
   /// character. This presentation does not derive any scoring state.
   func progressText(at date: Date = .now) -> String? {
+    if let sections = sectionProgress {
+      return sections.total == 0 ? "\(sections.completed)" : "\(sections.completed)/\(sections.total)"
+    }
     if configuration.duration == 0 {
       guard let startedAt else { return "0s" }
       return "\(max(0, Int(date.timeIntervalSince(startedAt).rounded(.down))))s"
@@ -4213,12 +4240,16 @@ struct TypingSession {
   }
 
   var progressLabel: String {
+    if sectionProgress != nil { return "段数" }
     if configuration.duration == 0 { return "用时" }
     if configuration.wordLimit == 0 { return "词数" }
     return configuration.duration == nil && configuration.wordLimit != nil ? "进度" : "剩余"
   }
 
   func progressFraction(at date: Date = .now) -> Double? {
+    if let sections = sectionProgress {
+      return sections.total == 0 ? 0 : Double(sections.completed) / Double(sections.total)
+    }
     if let duration = configuration.duration {
       if duration == 0 { return 1 }
       // The reference bar depicts time remaining, not elapsed time. Before a
@@ -5609,7 +5640,7 @@ struct TypingSession {
           complete(at: date)
         }
       case .sections:
-        if shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
+        if !usesIncrementalPromptExtension && shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
       }
     case .time, .zen:
       break
@@ -5618,6 +5649,22 @@ struct TypingSession {
 
   private mutating func extendPromptIfNeeded() {
     guard nextTargetIndex >= promptCharacters.count else { return }
+    if var stream = customSectionWordStream, stream.hasRemaining {
+      let chunk = stream.nextChunk()
+      customSectionWordStream = stream
+      let previousEnd = promptCharacters.count
+      appendPrompt(chunk.text)
+      sectionEndIndices += chunk.sectionEndOffsets.map { previousEnd + $0 }
+      if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+        var end = previousEnd
+        for length in chunk.noSpaceWordLengths {
+          end += length
+          noSpaceWordEndIndices.append(end)
+        }
+        noSpaceTargetWords += chunk.noSpaceTargetWords
+      }
+      return
+    }
     if var stream = finiteCustomTextStream, stream.hasRemaining {
       let source = stream.nextChunk()
       finiteCustomTextStream = stream

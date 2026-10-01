@@ -729,7 +729,7 @@ enum SettingsJSONConfigurationPolicy {
             && isValidLimit(memory.wordLimit)
             && isValidLimit(memory.customTextDuration)
             && isValidLimit(memory.customTextWordLimit)
-            && (1...OfficialTestLimitInput.maximumValue).contains(memory.customTextSectionLimit)
+            && (0...OfficialTestLimitInput.maximumValue).contains(memory.customTextSectionLimit)
     }
 
     static func isValid(_ configuration: TestConfiguration) -> Bool {
@@ -761,7 +761,7 @@ enum SettingsJSONConfigurationPolicy {
                 else { return false }
             case .sections:
                 guard let sectionLimit = configuration.customTextSectionLimit,
-                      (1...OfficialTestLimitInput.maximumValue).contains(sectionLimit),
+                      (0...OfficialTestLimitInput.maximumValue).contains(sectionLimit),
                       configuration.duration == nil, configuration.wordLimit == nil
                 else { return false }
             }
