@@ -37,7 +37,10 @@ struct CustomSectionWordStream {
     guard !sections.isEmpty, (0...OfficialTestLimitInput.maximumValue).contains(limit) else { return nil }
     self.configuration = configuration
     self.sections = sections
-    self.words = sections.map { $0.split(separator: " ").map(String.init) }
+    self.words = sections.map { section in
+      section.unicodeScalars.split(separator: " ")
+        .map { String(String.UnicodeScalarView($0)) }
+    }
     self.sectionLimit = limit
   }
 
@@ -113,6 +116,9 @@ struct CustomSectionWordStream {
         chunk.noSpaceTargetWords[chunk.noSpaceTargetWords.count - 1].removeLast(lastSeparator.count)
       }
     }
+    let captured = TransformedPromptBatch(text: chunk.text, noSpaceTargetWords: chunk.noSpaceTargetWords)
+    chunk.noSpaceWordLengths = captured.noSpaceWordLengths
+    chunk.noSpaceTargetWords = captured.noSpaceTargetWords
     return chunk
   }
 
@@ -157,21 +163,37 @@ struct CustomSectionWordStream {
   }
 
   static func sourceSections(from source: String, usesPipe: Bool) -> [String] {
-    normalized(source).split(separator: usesPipe ? "|" : " ", omittingEmptySubsequences: true)
-      .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " ")) }
+    // A literal delimiter may share a grapheme with the following mark. It
+    // still separates candidates; the mark belongs to the next candidate.
+    normalized(source).unicodeScalars.split(separator: usesPipe ? "|" : " ")
+      .map { scalars in
+        let trimmed = scalars.drop(while: { $0 == " " }).reversed()
+          .drop(while: { $0 == " " }).reversed()
+        return String(String.UnicodeScalarView(trimmed))
+      }
       .filter { !$0.isEmpty }
   }
 
   private static func normalized(_ source: String) -> String {
-    var text = source.precomposedStringWithCanonicalMapping
-    text = String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in
-      (0x2000...0x200A).contains(scalar.value) || [0x202F, 0x205F, 0x00A0].contains(scalar.value)
-        ? UnicodeScalar(0x20)! : scalar
-    }))
-    text = text.replacingOccurrences(of: "\r\n", with: "\n")
-      .replacingOccurrences(of: "\r", with: "\n")
-    let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map {
-      $0.split(separator: " ").joined(separator: " ")
+    var text = ""
+    var previousWasCR = false
+    for scalar in source.precomposedStringWithCanonicalMapping.unicodeScalars {
+      if scalar.value == 0x0A && previousWasCR {
+        previousWasCR = false
+        continue
+      }
+      previousWasCR = scalar.value == 0x0D
+      if previousWasCR {
+        text.unicodeScalars.append("\n")
+      } else if (0x2000...0x200A).contains(scalar.value)
+        || [0x202F, 0x205F, 0x00A0].contains(scalar.value) {
+        text.unicodeScalars.append(" ")
+      } else {
+        text.unicodeScalars.append(scalar)
+      }
+    }
+    let lines = text.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+      line.split(separator: " ").map { String(String.UnicodeScalarView($0)) }.joined(separator: " ")
     }
     return lines.joined(separator: "\n ")
   }

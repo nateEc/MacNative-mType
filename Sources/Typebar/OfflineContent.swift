@@ -6537,8 +6537,8 @@ enum CustomTextOrderPolicy {
   static func avoidsRecentFirstWord(
     in section: String, previous: [String], lazyLanguage: TypingLanguage?
   ) -> Bool {
-    guard let first = section.split(separator: " ").first else { return false }
-    let key = candidateWordKey(String(first), lazyLanguage: lazyLanguage)
+    guard let first = section.unicodeScalars.split(separator: " ").first else { return false }
+    let key = candidateWordKey(String(String.UnicodeScalarView(first)), lazyLanguage: lazyLanguage)
     return previous.suffix(2).contains { recentWordKey($0, lazyLanguage: lazyLanguage) == key }
   }
 
