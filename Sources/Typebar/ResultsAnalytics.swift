@@ -1349,17 +1349,24 @@ enum ResultPerformanceTrace {
     let lastCharacter = typed.count - 1
     let wordEnd: Int
     let wordStart: Int
-    if typed[lastCharacter] == " " {
+    if isPromptWordSeparator(typed[lastCharacter]) {
       wordEnd = lastCharacter
-      wordStart = typed[..<wordEnd].lastIndex(of: " ").map { $0 + 1 } ?? 0
+      wordStart = typed[..<wordEnd].lastIndex(where: isPromptWordSeparator).map { $0 + 1 } ?? 0
     } else {
       wordEnd = lastCharacter
-      wordStart = typed[..<typed.count].lastIndex(of: " ").map { $0 + 1 } ?? 0
+      wordStart = typed[..<typed.count].lastIndex(where: isPromptWordSeparator).map { $0 + 1 } ?? 0
     }
     let elapsed = dates[wordEnd] - dates[wordStart]
     guard elapsed > 0 else { return 0 }
-    let characters = wordEnd - wordStart + 1 + (typed[wordEnd] == " " ? 0 : 1)
-    return wpm(characters: characters, elapsed: elapsed)
+    let units = WordBurstInputUnits.count(typed[wordStart...wordEnd])
+      + (isPromptWordSeparator(typed[wordEnd]) ? 0 : 1)
+    // Unlike whole-test sampling, a word interval must not be clamped to one
+    // second: subsecond words use the same duration as the live burst.
+    let speed = (Double(units) / 5 / elapsed * 60).rounded()
+    // Imported replay can contain arbitrarily tiny positive intervals. Keep
+    // unrepresentable values neutral rather than trapping on Int conversion.
+    guard speed.isFinite, speed < Double(Int.max) else { return 0 }
+    return Int(speed)
   }
 }
 

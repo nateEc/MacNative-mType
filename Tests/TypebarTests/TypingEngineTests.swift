@@ -4583,7 +4583,8 @@ final class TypingEngineTests: XCTestCase {
     session.insert("c", at: start)
     session.insert("afe\u{301} ", at: start.addingTimeInterval(1))
     XCTAssertEqual(session.typedCharacterCount, 5)
-    XCTAssertEqual(session.wordBurstHistory, [60])
+    // Five visible characters, but six UTF-16 input units in a one-second word.
+    XCTAssertEqual(session.wordBurstHistory, [72])
     session.deleteBackward(at: start.addingTimeInterval(1.2))
     XCTAssertEqual(session.typedCharacterCount, 4)
     session.insert(" harbor", at: start.addingTimeInterval(2))

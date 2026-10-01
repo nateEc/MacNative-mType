@@ -162,6 +162,14 @@ enum MinimumWordBurstPolicy {
   }
 }
 
+/// Burst weights text in UTF-16 code units, independently of the grapheme
+/// indices used by native input, word boundaries, timestamps and replay.
+enum WordBurstInputUnits {
+  static func count<C: Collection>(_ characters: C) -> Int where C.Element == Character {
+    characters.reduce(0) { $0 + String($1).utf16.count }
+  }
+}
+
 enum PracticeThresholdPolicy {
   static func speed(_ value: Double) -> Double {
     value.isFinite && value >= 0 ? value : 0
@@ -3864,20 +3872,21 @@ struct TypingSession {
 
   /// Word burst is the WPM for the latest completed word, or the currently
   /// active word once it has at least two accepted characters. The submitting
-  /// space counts as one input character, matching the app's word metric.
+  /// space counts as one UTF-16 unit; an active/no-space word has one virtual
+  /// submit unit. Native character indices remain grapheme-based.
   var burstWpm: Int {
     let characters = Array(typed)
     if tracksNoSpaceWordBursts {
       if noSpaceCommittedWordIndex != nil { return committedWordBursts.last ?? 0 }
       let start = noSpaceWordEndIndices.last(where: { $0 < characters.count }) ?? 0
-      return activeWordBurst(start: start) ?? committedWordBursts.last ?? 0
+      return activeWordBurst(start: start, in: characters) ?? committedWordBursts.last ?? 0
     }
     guard let lastSeparator = characters.lastIndex(where: isPromptWordSeparator) else {
-      return activeWordBurst(start: 0) ?? committedWordBursts.last ?? 0
+      return activeWordBurst(start: 0, in: characters) ?? committedWordBursts.last ?? 0
     }
     let start = lastSeparator + 1
     guard start < characters.count else { return committedWordBursts.last ?? 0 }
-    return activeWordBurst(start: start) ?? committedWordBursts.last ?? 0
+    return activeWordBurst(start: start, in: characters) ?? committedWordBursts.last ?? 0
   }
 
   /// The most recent submitted-word speeds for the live practice strip.
@@ -3896,7 +3905,8 @@ struct TypingSession {
       var bursts: [Int?] = []
       for range in noSpaceWordRanges where range.lowerBound < characters.count {
         let end = min(range.upperBound, characters.count) - 1
-        bursts.append(wordBurst(from: range.lowerBound, through: end, includesTrailingSpace: false))
+        bursts.append(wordBurst(
+          from: range.lowerBound, through: end, in: characters, includesTrailingSpace: false))
       }
       return bursts
     }
@@ -3906,11 +3916,13 @@ struct TypingSession {
     var bursts: [Int?] = []
     var wordStart = 0
     for index in characters.indices where isPromptWordSeparator(characters[index]) {
-      bursts.append(wordBurst(from: wordStart, through: index, includesTrailingSpace: true))
+      bursts.append(wordBurst(
+        from: wordStart, through: index, in: characters, includesTrailingSpace: true))
       wordStart = index + 1
     }
     if wordStart < characters.count {
-      bursts.append(wordBurst(from: wordStart, through: characters.count - 1, includesTrailingSpace: false))
+      bursts.append(wordBurst(
+        from: wordStart, through: characters.count - 1, in: characters, includesTrailingSpace: false))
     }
     return bursts
   }
@@ -4705,20 +4717,26 @@ struct TypingSession {
     } + max(0, typedWord.count - promptWord.count)
   }
 
-  private func activeWordBurst(start: Int) -> Int? {
+  private func activeWordBurst(start: Int, in characters: [Character]) -> Int? {
     let length = typedCharacterDates.count - start
-    guard length >= 2, start >= 0, start < typedCharacterDates.count else { return nil }
+    guard length >= 2, start >= 0, start < typedCharacterDates.count,
+      characters.count == typedCharacterDates.count
+    else { return nil }
     let elapsed = typedCharacterDates.last!.timeIntervalSince(typedCharacterDates[start])
     guard elapsed > 0 else { return nil }
-    return wpm(characters: length + 1, seconds: elapsed)
+    return wpm(characters: WordBurstInputUnits.count(characters[start...]) + 1, seconds: elapsed)
   }
 
-  private func wordBurst(from start: Int, through end: Int, includesTrailingSpace: Bool) -> Int? {
-    guard start >= 0, end >= start, end < typedCharacterDates.count else { return nil }
+  private func wordBurst(
+    from start: Int, through end: Int, in characters: [Character], includesTrailingSpace: Bool
+  ) -> Int? {
+    guard start >= 0, end >= start, end < typedCharacterDates.count,
+      end < characters.count
+    else { return nil }
     let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
     guard elapsed > 0 else { return nil }
-    let characters = end - start + 1 + (includesTrailingSpace ? 0 : 1)
-    return wpm(characters: characters, seconds: elapsed)
+    let units = WordBurstInputUnits.count(characters[start...end]) + (includesTrailingSpace ? 0 : 1)
+    return wpm(characters: units, seconds: elapsed)
   }
 
   private mutating func recordWordBurstIfCommitted() {
@@ -4743,7 +4761,8 @@ struct TypingSession {
     guard start < end else { return }
     let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
     guard elapsed > 0 else { return }
-    committedWordBursts.append(wpm(characters: end - start + 1, seconds: elapsed))
+    let units = WordBurstInputUnits.count(typed.suffix(end - start + 1))
+    committedWordBursts.append(wpm(characters: units, seconds: elapsed))
   }
 
   private mutating func recordNoSpaceWordBurstIfCommitted() {
@@ -4758,7 +4777,8 @@ struct TypingSession {
     // A no-space commit is the word's last letter rather than an entered
     // separator, so count the same virtual trailing character used by the
     // regular word-burst path.
-    committedWordBursts.append(wpm(characters: end - start + 2, seconds: elapsed))
+    let units = WordBurstInputUnits.count(typed.suffix(end - start + 1)) + 1
+    committedWordBursts.append(wpm(characters: units, seconds: elapsed))
   }
 
   private mutating func recordZenWordBurstIfCommitted(after character: Character) {
@@ -4770,7 +4790,8 @@ struct TypingSession {
     guard start < end else { return }
     let elapsed = typedCharacterDates[end].timeIntervalSince(typedCharacterDates[start])
     guard elapsed > 0 else { return }
-    committedWordBursts.append(wpm(characters: end - start + 1, seconds: elapsed))
+    let units = WordBurstInputUnits.count(characters[start...end])
+    committedWordBursts.append(wpm(characters: units, seconds: elapsed))
   }
 
   private func shouldFailMinimumWordBurst(after character: Character) -> Bool {
@@ -4808,17 +4829,19 @@ struct TypingSession {
       guard let last = characters.last, isZenWordCommit(last) else { return nil }
       let end = characters.count - 1
       let start = characters[..<end].lastIndex(where: { isZenWordCommit($0) }).map { $0 + 1 } ?? 0
-      return end - start + 1
+      return WordBurstInputUnits.count(characters[start...end])
     }
     if let wordIndex = noSpaceCommittedWordIndex {
       let start = wordIndex == 0 ? 0 : noSpaceWordEndIndices[wordIndex - 1]
-      return noSpaceWordEndIndices[wordIndex] - start
+      let end = noSpaceWordEndIndices[wordIndex]
+      guard start >= 0, start < end, end <= promptCharacters.count else { return nil }
+      return WordBurstInputUnits.count(promptCharacters[start..<end])
     }
     guard typed.last.map(isPromptWordSeparator) == true else { return nil }
     let committedWords = splitPromptWords(String(typed.dropLast()), omittingEmptySubsequences: true)
     let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: true)
     guard committedWords.count > 0, committedWords.count <= targetWords.count else { return nil }
-    return targetWords[committedWords.count - 1].count
+    return targetWords[committedWords.count - 1].utf16.count
   }
 
   private var zenActiveWordLength: Int {
