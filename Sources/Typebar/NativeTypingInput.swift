@@ -188,7 +188,7 @@ struct NativeTypingInput: NSViewRepresentable {
     }
 }
 
-final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
+class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onInsert: (String, Bool) -> Void = { _, _ in }
     var onDelete: () -> Void = {}
     var onDeleteWord: () -> Void = {}
@@ -390,6 +390,13 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
                !disablesQuickRestart,
                event.modifierFlags.contains(.shift) {
                 if !event.isARepeat { onRestart() }
+                return
+            }
+            if hasMarkedText(),
+               event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty {
+                // Return may confirm an input-method candidate instead of
+                // inserting a newline. Preserve explicit shortcuts above.
+                interpretKeyEvents([event])
                 return
             }
             onInsert("\n", false)
