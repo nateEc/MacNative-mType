@@ -2520,6 +2520,10 @@ private struct ContentView: View {
           if activeChallengeID != "mouse-warrior" { session.beginComposition() }
         },
         onCompositionChanged: { compositionText = $0 },
+        shouldFinishWithComposition: { text, forceError in
+          activeChallengeID != "mouse-warrior"
+            && session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
+        },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
         onKeyDown: { keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
           if konamiSequenceTracker.consume(
@@ -3166,13 +3170,17 @@ private struct ContentView: View {
     return .easeInOut(duration: 0.25)
   }
 
+  private func effectiveInsertedText(_ text: String) -> String {
+    settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text
+  }
+
   private func handleInsertedText(
     _ text: String, forceError: Bool, origin: TypingInputOrigin = .physicalKeyboard
   ) {
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     session.insertBatch(
-      settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text,
+      effectiveInsertedText(text),
       forceError: forceError, origin: origin)
     verifyChallengeFontAvailability()
     emitTypingPowerEffect(

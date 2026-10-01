@@ -135,6 +135,7 @@ struct NativeTypingInput: NSViewRepresentable {
     let onWindowFocusChanged: (Bool, Bool) -> Void
     let onCompositionStarted: () -> Void
     let onCompositionChanged: (String) -> Void
+    let shouldFinishWithComposition: (String, Bool) -> Bool
     let onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void
     let onKeyDown: (UInt16, String?, NSEvent.ModifierFlags, Bool) -> Void
     let onPhysicalKey: (UInt16, Bool, Bool) -> Void
@@ -175,6 +176,7 @@ struct NativeTypingInput: NSViewRepresentable {
         view.onWindowFocusChanged = onWindowFocusChanged
         view.onCompositionStarted = onCompositionStarted
         view.onCompositionChanged = onCompositionChanged
+        view.shouldFinishWithComposition = shouldFinishWithComposition
         view.onModifierFlagsChanged = onModifierFlagsChanged
         view.onKeyDown = onKeyDown
         view.onPhysicalKey = onPhysicalKey
@@ -212,6 +214,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onWindowFocusChanged: (Bool, Bool) -> Void = { _, _ in }
     var onCompositionStarted: () -> Void = {}
     var onCompositionChanged: (String) -> Void = { _ in }
+    var shouldFinishWithComposition: (String, Bool) -> Bool = { _, _ in false }
     var onModifierFlagsChanged: (NSEvent.ModifierFlags) -> Void = { _ in }
     var onKeyDown: (UInt16, String?, NSEvent.ModifierFlags, Bool) -> Void = { _, _, _, _ in }
     var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
@@ -552,7 +555,14 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             composition = NSAttributedString(string: string as? String ?? "")
         }
         if startsComposition, composition.length > 0 { onCompositionStarted() }
-        onCompositionChanged(composition.string)
+        if shouldFinishWithComposition(composition.string, pendingForcedError) {
+            insertText(composition, replacementRange: replacementRange)
+            // The marked range has been cleared by insertText before asking
+            // AppKit to dispose of the input method's conversion session.
+            inputContext?.discardMarkedText()
+        } else {
+            onCompositionChanged(composition.string)
+        }
     }
 
     func unmarkText() {

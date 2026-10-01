@@ -3573,6 +3573,45 @@ struct TypingSession {
 
   var isFinished: Bool { outcome != .active }
   var hasStarted: Bool { startedAt != nil }
+  /// A matching conversion may confirm the final word without an extra IME
+  /// action. Probe the ordinary input path on a value copy, so all finite
+  /// limits and difficulty rules remain owned by the engine, not AppKit.
+  func shouldFinishWithComposition(
+    _ text: String, forceError: Bool = false, at date: Date = .now
+  ) -> Bool {
+    guard !isFinished, !text.isEmpty, !forceError, !configuration.isInfinite,
+      configuration.mode != .time, configuration.mode != .zen,
+      !(configuration.mode == .custom && configuration.customTextCompletion == .time)
+    else { return false }
+
+    let wordIndex: Int
+    let currentInput: String
+    if let range = activeNoSpaceWordRange,
+      let index = noSpaceWordRanges.firstIndex(of: range)
+    {
+      wordIndex = index
+      currentInput = String(Array(typed)[range.lowerBound...])
+    } else {
+      wordIndex = promptCharacters.prefix(nextTargetIndex).filter(isPromptWordSeparator).count
+      currentInput = String(splitPromptWords(typed, omittingEmptySubsequences: false).last ?? "")
+    }
+    guard let range = targetRange(forWord: wordIndex),
+      !hasError(inWord: wordIndex, indices: forcedErrorIndices)
+    else { return false }
+    if let limit = configuration.wordLimit, limit > 0 {
+      guard completedWordCount + 1 >= limit else { return false }
+    } else {
+      guard !usesIncrementalPromptExtension, range.upperBound == promptCharacters.count else {
+        return false
+      }
+    }
+    var target = String(promptCharacters[range])
+    if target.last.map(isPromptWordSeparator) == true { target.removeLast() }
+    guard currentInput + text == target else { return false }
+    var projected = self
+    projected.insertBatch(text, at: date)
+    return projected.outcome == .completed || projected.outcome == .invalidAFK
+  }
   var usesIncrementalPromptExtension: Bool {
     generatedWordContinuation != nil || generatedStreamContinuation != nil
       || generatedCodeContinuation != nil
