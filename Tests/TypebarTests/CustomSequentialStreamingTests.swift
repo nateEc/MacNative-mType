@@ -244,8 +244,10 @@ final class CustomSequentialStreamingTests: XCTestCase {
       configuration: configuration,
       customText: try XCTUnwrap(challenge.preset.customText))
     XCTAssertEqual(session.prompt.split(separator: " ").count, 100)
+    let target = Array(repeating: "typebar", count: 100_000).joined(separator: " ")
     for word in 0..<100_000 {
-      session.insert(word == 99_999 ? "typebar" : "typebar ", at: start)
+      session.insert(word == 99_999 ? "typebar" : "typebar ",
+        at: start.addingTimeInterval(Double(word) * 0.5))
       if (word + 1).isMultiple(of: 1_000) {
         XCTAssertEqual(session.completedWordCount, word + 1)
       }
@@ -255,6 +257,51 @@ final class CustomSequentialStreamingTests: XCTestCase {
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.outcome, .completed)
     XCTAssertTrue(ChallengeEvaluator.evaluate(result, challenge: challenge).passed)
+    XCTAssertEqual(result.elapsedDuration, 49_999.5)
+    XCTAssertEqual(result.afkDuration, 0)
+    XCTAssertEqual(result.typedCharacterCount, 799_999)
+    XCTAssertEqual(result.correctCharacterCount, 799_999)
+    XCTAssertEqual(result.errorCount, 0)
+    XCTAssertEqual(result.preciseAccuracy, 100)
+    XCTAssertEqual(result.inputMetrics, .init(version: 1, correctAttempts: 799_999,
+      totalAttempts: 799_999, creditedUnits: 799_999, retainedUnits: 799_999))
+    let expectedSpeed = 799_999.0 / 5 / result.elapsedDuration * 60
+    XCTAssertEqual(result.preciseWpm, expectedSpeed, accuracy: 0.000_000_1)
+    XCTAssertEqual(result.preciseRawWpm, expectedSpeed, accuracy: 0.000_000_1)
+    XCTAssertTrue(result.prompt == target)
+    XCTAssertEqual(result.replayEvents.count, 799_999)
+    XCTAssertEqual(result.replayEvents.first?.offset, 0)
+    XCTAssertEqual(result.replayEvents.last?.offset, result.elapsedDuration)
+    XCTAssertTrue(TypingReplay.typedText(events: result.replayEvents,
+      through: 24_999.5) == String(target.prefix(400_000)))
+    XCTAssertTrue(TypingReplay.typedText(events: result.replayEvents,
+      through: result.elapsedDuration) == target)
+    let reviews = session.wordReviews
+    XCTAssertEqual(reviews.count, 100_000)
+    XCTAssertTrue(reviews.allSatisfy(\.isCorrect))
+    XCTAssertEqual(reviews.last?.typed, "typebar")
+    do {
+      let record = try XCTUnwrap(TestResultRecord(result: result).portableResult)
+      XCTAssertTrue(record == result, "十万词内存记录必须完整保留结果和回放")
+    }
+    do {
+      let encoded = try JSONEncoder().encode(result)
+      let decoded = try JSONDecoder().decode(CompletedTestResult.self, from: encoded)
+      XCTAssertTrue(decoded == result, "十万词 JSON 往返不能丢失精度、提示或事件")
+    }
+    let row = ResultCSVExport.csvString(for: [result]).components(separatedBy: "\r\n")[1]
+    let fields = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns,
+      row.components(separatedBy: ",")))
+    XCTAssertEqual(fields["word_limit"], "100000")
+    XCTAssertEqual(fields["typed_characters"], "799999")
+    XCTAssertEqual(fields["correct_characters"], "799999")
+    XCTAssertEqual(fields["accuracy_percent"], "100")
+    XCTAssertEqual(Double(try XCTUnwrap(fields["elapsed_seconds"])), result.elapsedDuration)
+    let archiveData = try TypebarDataTransfer.exportArchive(settings: .init(), results: [result],
+      presets: [], at: result.finishedAt)
+    let archive = try TypebarDataTransfer.importArchive(from: archiveData)
+    XCTAssertEqual(archive.exportedAt, result.finishedAt)
+    XCTAssertTrue(archive.results.first == result, "正式归档必须完整保留十万词结果")
   }
 
   func testPromptCacheResegmentsCombiningCharacterAcrossRepeatedChunk() {

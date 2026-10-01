@@ -3445,6 +3445,40 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       preciseWpm, preciseRawWpm, preciseAccuracy, inputMetrics, restartCount, keyDurationSamples,
       priorAttemptEngagedDuration, keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
       challengePresentation
+    case startedAtReferenceTime, finishedAtReferenceTime
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    try values.encode(id, forKey: .id)
+    try values.encode(configuration, forKey: .configuration)
+    try values.encode(outcome, forKey: .outcome)
+    try CompatibleDatePrecision.encode(startedAt, into: &values,
+      legacyKey: .startedAt, precisionKey: .startedAtReferenceTime)
+    try CompatibleDatePrecision.encode(finishedAt, into: &values,
+      legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
+    try values.encode(afkDuration, forKey: .afkDuration)
+    try values.encode(typedCharacterCount, forKey: .typedCharacterCount)
+    try values.encode(correctCharacterCount, forKey: .correctCharacterCount)
+    try values.encode(errorCount, forKey: .errorCount)
+    try values.encode(wpm, forKey: .wpm)
+    try values.encode(rawWpm, forKey: .rawWpm)
+    try values.encode(accuracy, forKey: .accuracy)
+    try values.encode(preciseWpm, forKey: .preciseWpm)
+    try values.encode(preciseRawWpm, forKey: .preciseRawWpm)
+    try values.encode(preciseAccuracy, forKey: .preciseAccuracy)
+    try values.encodeIfPresent(inputMetrics, forKey: .inputMetrics)
+    try values.encode(restartCount, forKey: .restartCount)
+    try values.encode(priorAttemptEngagedDuration, forKey: .priorAttemptEngagedDuration)
+    try values.encode(characterStats, forKey: .characterStats)
+    try values.encode(keyDurationSamples, forKey: .keyDurationSamples)
+    try values.encode(keySpacingSamples, forKey: .keySpacingSamples)
+    try values.encode(keyOverlapDuration, forKey: .keyOverlapDuration)
+    try values.encode(tags, forKey: .tags)
+    try values.encodeIfPresent(quoteSource, forKey: .quoteSource)
+    try values.encode(prompt, forKey: .prompt)
+    try values.encode(replayEvents, forKey: .replayEvents)
+    try values.encodeIfPresent(challengePresentation, forKey: .challengePresentation)
   }
 
   init(from decoder: Decoder) throws {
@@ -3452,8 +3486,10 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     id = try values.decode(UUID.self, forKey: .id)
     configuration = try values.decode(TestConfiguration.self, forKey: .configuration)
     outcome = try values.decode(TestOutcome.self, forKey: .outcome)
-    startedAt = try values.decode(Date.self, forKey: .startedAt)
-    finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+    startedAt = try CompatibleDatePrecision.decode(from: values,
+      legacyKey: .startedAt, precisionKey: .startedAtReferenceTime)
+    finishedAt = try CompatibleDatePrecision.decode(from: values,
+      legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
     afkDuration = max(0, try values.decodeIfPresent(TimeInterval.self, forKey: .afkDuration) ?? 0)
     typedCharacterCount = try values.decode(Int.self, forKey: .typedCharacterCount)
     correctCharacterCount = try values.decode(Int.self, forKey: .correctCharacterCount)

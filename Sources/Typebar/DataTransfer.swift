@@ -344,12 +344,33 @@ struct TypebarArchive: Codable, Equatable {
         case version, exportedAt, settings, deletedCustomThemeIDs, deletedCustomKeyboardLayoutIDs,
             results, deletedResultIDs, presets, deletedPresetIDs, savedTexts, deletedSavedTextIDs, resultFilterPresets,
             deletedResultFilterPresetIDs, activeTestSelection
+        case exportedAtReferenceTime
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(version, forKey: .version)
+        try CompatibleDatePrecision.encode(exportedAt, into: &values,
+            legacyKey: .exportedAt, precisionKey: .exportedAtReferenceTime)
+        try values.encode(settings, forKey: .settings)
+        try values.encode(deletedCustomThemeIDs, forKey: .deletedCustomThemeIDs)
+        try values.encode(deletedCustomKeyboardLayoutIDs, forKey: .deletedCustomKeyboardLayoutIDs)
+        try values.encode(results, forKey: .results)
+        try values.encode(deletedResultIDs, forKey: .deletedResultIDs)
+        try values.encode(presets, forKey: .presets)
+        try values.encode(deletedPresetIDs, forKey: .deletedPresetIDs)
+        try values.encode(savedTexts, forKey: .savedTexts)
+        try values.encode(deletedSavedTextIDs, forKey: .deletedSavedTextIDs)
+        try values.encode(resultFilterPresets, forKey: .resultFilterPresets)
+        try values.encode(deletedResultFilterPresetIDs, forKey: .deletedResultFilterPresetIDs)
+        try values.encodeIfPresent(activeTestSelection, forKey: .activeTestSelection)
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decode(Int.self, forKey: .version)
-        exportedAt = try values.decode(Date.self, forKey: .exportedAt)
+        exportedAt = try CompatibleDatePrecision.decode(from: values,
+            legacyKey: .exportedAt, precisionKey: .exportedAtReferenceTime)
         let decodedSettings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
         let deletedThemes = version >= 9
             ? Set(try values.decodeIfPresent([UUID].self, forKey: .deletedCustomThemeIDs) ?? [])
