@@ -1,5 +1,13 @@
 # 功能盘点与追踪表
 
+2026-10-02 当前最终门禁（连续空行词槽）：最终客户端 1457 项（0 跳过、0 失败，约 300.63 秒，显式十万词耐力已执行）、服务端 131 项、固定参考／原创性、659 个唯一人工场景及未启动 GUI 的应用包通过。新增 9 项及修正后的相关 123 项均零失败／零跳过；下文本轮“最终待执行”由此取代，首轮 1 个 quick-end 回归不计通过。关闭已列 normal 引语空槽输入／恢复／完成／词历史及显示模型错位，不关闭严格空格／expert 导航、词预算／最低 burst、英式备用文本、Funbox 跨换行及设备等剩余缺口，整体 goal active。
+
+连续空行首轮完整门禁未通过：1457 客户端仅 1 项生成续批 quick-end 失败。新额外输入规则曾误分类续批的上一非空词结束空格；现以目标开头／连续提交字符区分真实空槽，保留旧 quick-end 用例及非空边界行为，未删测试或放宽断言。阶段相关 103 项绿灯不替代该失败，最终重跑待执行；不改成功范围或整体 goal。
+
+2026-10-02 连续空行词槽增量：普通引语规范化后单独的 LF 是一个可提交目标，不是可删除的分词空白。依据固定 [引语拆池](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L570-L599)、[提交与完成](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/helpers/fail-or-finish.ts#L84-L114)、[输入框校验](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/helpers/validation.ts#L41-L85) 和 [退格保护](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/before-delete.ts#L55-L74)，原生目标／输入保持同一空槽索引。空槽中的额外字母留在当前框，纠错和默认退格检查实际前一槽，词历史／历史错误计数及额外字形归属不再偏到相邻词。独立 `BlankQuoteWordTests` 9 项：8 项先行 45 个有效失败断言，呈现补证 1 项 2 个有效失败断言；相关 103 项零失败／零跳过通过，最终门禁待执行。
+
+此增量证明 normal 引语、正确后前进、词级停止／恢复、终词错误编辑／强制错误／quick-end、批／逐键事件、Unicode 词和多空行，以及计分／回放／记录／正式归档往返；不复用原版代码、引语或测试夹具。严格空格／expert 空槽导航、有限词预算与空槽、最低 burst、源内 TAB／LF 移位、无空格／Morse／反写跨换行、英式备用文本和设备仍待核验；已有 Funbox 部分状态不提升。不改持久格式或回算真实历史，goal active。
+
 2026-10-02 当前最终门禁（正常引语源准备）：客户端 1448 项（0 跳过、0 失败，约 300.71 秒，显式十万词耐力已执行）、服务端 131 项、固定参考／原创性、657 个唯一人工场景清单及未启动 GUI 的应用包校验通过。新增 11 项和相关 119 项均零失败／零跳过；下文本轮“最终验证待执行”由此取代。新两项仍待设备验收；源准备与正常单换行、简单 ASCII 反写组合仅为本增量证据，英式备用文本、连续空槽完成、通用／代码候选池反序、Unicode／设备等缺口与 Funbox 部分状态保留，goal active。
 
 2026-10-02 正常引语源准备增量：固定参考 [words-generator.ts:570–599](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L570-L599) 的普通引语先合并 ASCII 空格、规范 CRLF／CR／LF 并保留换行后的分词空格、展开省略号、按 ECMAScript 集合裁边，再拆池／反序。独立 `QuoteSourcePolicy` 只用于创建正常引语测试，原创内容及社区引语经同一 factory；源对象、已准备的外部 stream、自定义输入和已保存历史不改写。首轮 9 项测试有 8 项 37 个失败断言；随后按原版提交语义修正换行的物理目标夹具，不能把全部首轮断言都称为有效产品红测。累计 11 项，最终验证待执行。英式 `britishText` 原版分支直接拆池、不走正常文本规范化，仍待实现；本增量不关闭通用随机／代码反序池、换行 Funbox／Unicode 组合、Morse／下划线／反写的部分覆盖或设备差异，goal active。

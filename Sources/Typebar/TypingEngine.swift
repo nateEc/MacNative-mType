@@ -3939,16 +3939,21 @@ struct TypingSession {
     var extraGlyphIndices = Array(repeating: [Int](), count: ranges.count)
     if !isZen {
       var owner = 0
+      var targetCursor = 0
       var extraGlyphIndex = characters.count
       for (typedIndex, character) in typed.enumerated() {
         let targetIndex = typedTargetIndices.indices.contains(typedIndex)
           ? typedTargetIndices[typedIndex] : nil
         if let targetIndex, characters.indices.contains(targetIndex) {
           owner = wordByTarget[targetIndex]
+          targetCursor = targetIndex + 1
           if character != characters[targetIndex] || forcedErrorIndices.contains(targetIndex) {
             inputErrors.insert(owner)
           }
         } else {
+          // Extra input belongs to the field awaiting the next target, not
+          // necessarily the word owning the previous committed separator.
+          if wordByTarget.indices.contains(targetCursor) { owner = wordByTarget[targetCursor] }
           if extraErrorTypedIndices.contains(typedIndex) { inputErrors.insert(owner) }
           if !configuration.rules.blindMode, extraGlyphIndices.indices.contains(owner) {
             extraGlyphIndices[owner].append(extraGlyphIndex)
@@ -4625,9 +4630,11 @@ struct TypingSession {
       return true
     }
     if configuration.rules.confidenceMode == .on { return false }
-    let completedWords = retainedInputWords(omittingEmptySubsequences: true)
+    // Drop the active field, not submitted empty fields: a blank line is a
+    // real prior word whose correctness controls reopening it.
+    let completedWords = Array(retainedInputWords(omittingEmptySubsequences: false).dropLast())
     guard let typedWord = completedWords.last else { return true }
-    let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: true)
+    let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: false)
     let index = completedWords.count - 1
     guard index < targetWords.count else { return true }
     return typedWord != targetWords[index]
@@ -5006,7 +5013,9 @@ struct TypingSession {
   }
 
   private var currentWordIsCorrect: Bool {
-    let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: true)
+    // Input retains submitted blank fields. Target slots must use the same
+    // indexing or a later correct word is compared with the wrong target.
+    let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: false)
     let typedWords = retainedInputWords(omittingEmptySubsequences: false)
     let wordIndex = lastInputCommitsWord
       ? max(typedWords.count - 1, 0) : typedWords.count - 1
@@ -5398,8 +5407,16 @@ struct TypingSession {
   /// word buffer. They are visible errors but do not advance toward the next
   /// word until the user enters its separator.
   private func shouldRetainInCurrentWord(_ character: Character, expected: Character) -> Bool {
-    !isPromptWordSeparator(character) && isPromptWordSeparator(expected)
-      && hasUncommittedSpaceDelimitedInput
+    guard !isPromptWordSeparator(character), isPromptWordSeparator(expected),
+      configuration.mode != .zen, usesWordCommitInput,
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    else { return false }
+    // A freshly appended chunk can still expose the closing separator of
+    // the previous nonempty target after its earlier commit. That is not an
+    // empty target field; only a leading/consecutive separator creates one.
+    let targetIndex = nextTargetIndex
+    return !inputWordIsEmpty || targetIndex == 0
+      || isPromptWordSeparator(promptCharacters[targetIndex - 1])
   }
 
   /// The target cursor is independent from raw input length when normal
@@ -5607,7 +5624,7 @@ struct TypingSession {
     guard usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else { return [] }
-    return splitPromptWords(prompt, omittingEmptySubsequences: true).map(String.init)
+    return splitPromptWords(prompt, omittingEmptySubsequences: false).map(String.init)
   }
 
   private var noSpaceWordRanges: [Range<Int>] {
