@@ -220,6 +220,7 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     var onPhysicalKey: (UInt16, Bool, Bool) -> Void = { _, _, _ in }
 
     private var composition = NSAttributedString()
+    private var compositionEscapeKeyCode: UInt16?
     private var leftShiftPressed = false
     private var rightShiftPressed = false
     private var pendingForcedError = false
@@ -348,7 +349,10 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
-        if opensCommandPalette(event) {
+        let defersEscapeToComposition = hasMarkedText()
+          && event.charactersIgnoringModifiers == "\u{1B}"
+          && event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty
+        if !defersEscapeToComposition, opensCommandPalette(event) {
             if !event.isARepeat { onOpenCommandPalette() }
             return
         }
@@ -359,6 +363,13 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
             event.modifierFlags,
             event.isARepeat)
         onModifierFlagsChanged(event.modifierFlags)
+        if defersEscapeToComposition {
+            compositionEscapeKeyCode = event.keyCode
+            // Let the input method choose whether Escape steps back through
+            // candidate conversion or sends an explicit cancellation command.
+            interpretKeyEvents([event])
+            return
+        }
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers?.lowercased() == "r" {
             if !event.isARepeat { onRestart() }
             return
@@ -444,7 +455,11 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
     }
 
     override func keyUp(with event: NSEvent) {
-        if opensCommandPalette(event) { return }
+        if compositionEscapeKeyCode == event.keyCode {
+            compositionEscapeKeyCode = nil
+        } else if opensCommandPalette(event) {
+            return
+        }
         onPhysicalKey(event.keyCode, false, false)
         super.keyUp(with: event)
     }
@@ -507,6 +522,13 @@ final class TypingInputView: NSView, @preconcurrency NSTextInputClient {
       pendingForcedError = false
       if TypingInputNavigationPolicy.shouldIntercept(selector) { return }
       switch selector {
+        case #selector(NSResponder.cancelOperation(_:)):
+            guard hasMarkedText() else {
+                super.doCommand(by: selector)
+                return
+            }
+            unmarkText()
+            inputContext?.discardMarkedText()
         case #selector(copy(_:)):
           guard !interceptsEditingCommand(.copy) else { return }
         case #selector(cut(_:)):
