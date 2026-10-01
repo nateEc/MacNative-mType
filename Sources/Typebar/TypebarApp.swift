@@ -1185,8 +1185,7 @@ private struct ContentView: View {
     .onChange(of: settings.globalHotkeyEnabled) { _, enabled in hotkey.setEnabled(enabled) }
     .onChange(of: settings.paceGuideMode) { _, _ in refreshPaceTarget() }
     .onChange(of: settings.paceGuideCustomWpm) { _, _ in refreshPaceTarget() }
-    .onChange(of: settings.blindMode) { _, enabled in session.setBlindMode(enabled) }
-    .onChange(of: settings.hideExtraLetters) { _, enabled in session.setHideExtraLetters(enabled) }
+    .onChange(of: settings.inputRules) { _, rules in session.synchronizeLiveInputRules(rules) }
     .onChange(of: settings.liveSpeedStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.paceCaretStyle) { _, _ in activeChallengeID = nil }
     .onChange(of: settings.promptHighlightMode) { previous, selected in
@@ -1608,7 +1607,7 @@ private struct ContentView: View {
       titleVisibility: .visible
     ) {
       Button("中止并显示未保存结果", role: .destructive) {
-        synchronizePromptVisibility()
+        synchronizeLiveInputRules()
         session.bailOut()
       }
     } message: {
@@ -1849,7 +1848,7 @@ private struct ContentView: View {
   }
 
   private func advanceClock(at now: Date) {
-    synchronizePromptVisibility()
+    synchronizeLiveInputRules()
     capsLockEnabled = NSEvent.modifierFlags.contains(.capsLock)
     verifyChallengeFontAvailability()
     if let startedAt = session.startedAt {
@@ -2523,12 +2522,12 @@ private struct ContentView: View {
         onBailoutArmed: armLongTestBailout,
         onBailout: {
           bailoutConfirmationMessage = nil
-          synchronizePromptVisibility()
+          synchronizeLiveInputRules()
           session.bailOut()
         },
         onQuickRestartProtectionRequired: showQuickRestartProtectionNotice,
         onFinishZen: {
-          synchronizePromptVisibility()
+          synchronizeLiveInputRules()
           session.finishZen()
         },
         onFocusChanged: { isFocused in
@@ -2541,7 +2540,7 @@ private struct ContentView: View {
         },
         onCompositionStarted: {
           if activeChallengeID != "mouse-warrior" {
-            synchronizePromptVisibility()
+            synchronizeLiveInputRules()
             session.beginComposition()
           }
         },
@@ -2551,14 +2550,16 @@ private struct ContentView: View {
             previous: compositionText, current: $0)
           compositionText = $0
           if activeChallengeID != "mouse-warrior" {
+            synchronizeLiveInputRules()
             session.refreshLiveAccuracyAfterComposition(
               hadMarkedText: hadMarkedText, hasMarkedText: !$0.isEmpty)
             if playsCompositionClick { playInputFeedback(inputWasCorrect: true) }
           }
         },
         shouldFinishWithComposition: { text, forceError in
-          activeChallengeID != "mouse-warrior"
-            && session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
+          guard activeChallengeID != "mouse-warrior" else { return false }
+          synchronizeLiveInputRules()
+          return session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
         },
         onModifierFlagsChanged: { keyboardModifierFlags = $0 },
         onKeyDown: { keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
@@ -3194,15 +3195,14 @@ private struct ContentView: View {
     settings.testModifiers.contains(.mirrorKeyboard) ? KeyboardMirror.transform(text) : text
   }
 
-  private func synchronizePromptVisibility() {
-    session.setBlindMode(settings.blindMode)
-    session.setHideExtraLetters(settings.hideExtraLetters)
+  private func synchronizeLiveInputRules() {
+    session.synchronizeLiveInputRules(settings.inputRules)
   }
 
   private func handleInsertedText(
     _ text: String, forceError: Bool, origin: TypingInputOrigin = .physicalKeyboard
   ) {
-    synchronizePromptVisibility()
+    synchronizeLiveInputRules()
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
     session.insertBatch(
@@ -3223,7 +3223,7 @@ private struct ContentView: View {
   }
 
   private func handleDeletedText(deletesWord: Bool) {
-    synchronizePromptVisibility()
+    synchronizeLiveInputRules()
     let before = session.typed
     if deletesWord { session.deleteWordBackward() }
     else { session.deleteBackward() }
@@ -3255,7 +3255,7 @@ private struct ContentView: View {
       if session.hasStarted && !session.isFinished {
         if session.canFinishInfiniteChallenge {
           Button("完成挑战并查看成绩") {
-            synchronizePromptVisibility()
+            synchronizeLiveInputRules()
             session.finishInfiniteChallenge()
           }
             .buttonStyle(.bordered)
@@ -3264,7 +3264,7 @@ private struct ContentView: View {
           shouldBailOutFromControls ? "中止并显示未保存结果" : "放弃本次测试",
           role: .destructive
         ) {
-          synchronizePromptVisibility()
+          synchronizeLiveInputRules()
           if shouldBailOutFromControls {
             session.bailOut()
           } else {

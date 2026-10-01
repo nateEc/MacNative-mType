@@ -183,13 +183,13 @@
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。命令面板另按固定名称提供 48 项切换与 `none` 清除入口；`weakspot` 为实时选词修饰器，多语路由到 Typebar 原生工作流，持久化弱项分析保持独立入口。 |
 | `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并合并为虚拟词池，普通词频从合并池均匀抽取，Zipf 词频从合并池偏向低位抽取；与前两词重复时最多重抽 100 次，不强制按语言轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。与参考的具体词表、跨语言同形词去重及随机序列不承诺一致。新建或缺失／无效配置采用参考默认的 English、Spanish、French、German 四项；已有明确保存的旧 153 项组合继续原样加载，不强制迁移。 |
-| `freedomMode` | `freedomMode` | 已映射。 |
+| `freedomMode` | `freedomMode` | 已映射；活动同步不重启，开启按来源关闭信心模式。`RuntimeInputRuleTests` 覆盖下一次删除与真实命令消费。 |
 | `strictSpace` | `strictSpace` | 已映射。 |
-| `oppositeShiftMode` | `oppositeShiftMode` | 已映射。 |
+| `oppositeShiftMode` | `oppositeShiftMode` | 已映射；on／keymap／off 活动同步，拒绝尝试沿用原计量／master 规则，实体键盘仍待验收。 |
 | `stopOnError` | `stopOnErrorMode` | 已映射；使用明确的 off/word/letter 模式。 |
-| `deleteOnError` | `deleteOnErrorMode` | 已映射；使用明确的 off/letter/letter hard/word/word hard 模式。 |
-| `confidenceMode` | `confidenceMode` | 已映射。 |
-| `quickEnd` | `quickEnd` | 已映射。 |
+| `deleteOnError` | `deleteOnErrorMode` | 已映射；四档及 off 活动同步，只在下一次错误恢复，不追溯清理；开启关闭信心和停止输入并同步旧布尔别名。 |
+| `confidenceMode` | `confidenceMode` | 已映射；off／on／max 活动同步，开启关闭自由回退、停止输入和自动删除，不恢复旧规则。 |
+| `quickEnd` | `quickEnd` | 已映射；活动同步不直接结束，下一次真实输入才判定，错误恢复限制与错误候选不自动确认的边界保留。完整 UTF-16 终词长度仍待补证。 |
 | `indicateTypos` | `typoIndicatorStyle` | 已映射。 |
 | `compositionDisplay` | `compositionDisplayStyle` | 已映射。 |
 | `hideExtraLetters` | `hideExtraLetters` | 已映射。 |

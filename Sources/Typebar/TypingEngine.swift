@@ -3815,6 +3815,27 @@ struct TypingSession {
     configuration.rules.hideExtraLetters = enabled
   }
 
+  /// Synchronizes only settings whose reference metadata permits live changes.
+  mutating func synchronizeLiveInputRules(_ rules: InputRules) {
+    guard !isFinished else { return }
+    var live = rules
+    live.normalizeErrorHandlingModes()
+    configuration.rules.freedomMode = live.confidenceMode == .off && live.freedomMode
+    configuration.rules.confidenceMode = live.confidenceMode
+    configuration.rules.oppositeShiftMode = live.oppositeShiftMode
+    configuration.rules.deleteOnErrorMode = live.deleteOnErrorMode
+    configuration.rules.deleteOnError = live.deleteOnErrorMode.isEnabled
+    configuration.rules.quickEnd = live.quickEnd
+    // These two live rules explicitly disable stopped input in the source.
+    // Clear both persisted aliases; disabling them must not restore old rules.
+    if live.confidenceMode != .off || live.deleteOnErrorMode.isEnabled {
+      configuration.rules.stopOnErrorMode = .off
+      configuration.rules.stopOnError = false
+    }
+    setBlindMode(live.blindMode)
+    setHideExtraLetters(live.hideExtraLetters)
+  }
+
   var completedPromptCharacterIndices: Set<Int> {
     TypedCharacterEffectPolicy.completedCharacterIndices(
       target: prompt, typed: typed, typedTargetIndices: typedTargetIndices, isFinished: isFinished)
