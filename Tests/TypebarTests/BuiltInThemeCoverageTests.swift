@@ -4,6 +4,34 @@ import XCTest
 @testable import Typebar
 
 final class BuiltInThemeCoverageTests: XCTestCase {
+  func testTwelveFurtherOriginalThemesAreSelectableReadableAndDistinct() throws {
+    let names = [
+      "blueberry_dark", "blueberry_light", "cafe", "cheesecake", "creamsicle", "fire",
+      "iceberg_light", "mountain", "mint", "nebula", "olive", "strawberry",
+    ]
+    let variants = names.compactMap(AppTheme.init(rawValue:))
+    XCTAssertEqual(variants.count, names.count)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .light }.count, 6)
+    XCTAssertEqual(variants.filter { $0.colorScheme == .dark }.count, 6)
+    for theme in variants {
+      XCTAssertEqual(try JSONDecoder().decode(AppTheme.self, from: JSONEncoder().encode(theme)), theme)
+      XCTAssertFalse(theme.displayName.isEmpty)
+      for surface in [theme.background, theme.panel] {
+        XCTAssertGreaterThanOrEqual(contrast(theme.resolvedTheme.text, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(
+          contrast(theme.resolvedTheme.secondaryText, surface), 4.5, theme.rawValue)
+        XCTAssertGreaterThanOrEqual(contrast(theme.accent, surface), 3.0, theme.rawValue)
+      }
+    }
+    for left in variants.indices {
+      for right in variants.indices where left < right {
+        XCTAssertNotEqual(
+          ThemeColor(color: variants[left].background),
+          ThemeColor(color: variants[right].background))
+      }
+    }
+  }
+
   func testOriginalThreeThemeIDsAndColorsRemainCompatibleWithSavedSettings() throws {
     let legacy: [(AppTheme, [Double], [Double], [Double], ColorScheme)] = [
       (.paper, [0.96, 0.95, 0.91], [0.88, 0.86, 0.80], [0.66, 0.28, 0.14], .light),

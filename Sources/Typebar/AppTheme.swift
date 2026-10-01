@@ -283,6 +283,18 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case desert_oasis
     case grape
     case moonlight
+    case blueberry_dark
+    case blueberry_light
+    case cafe
+    case cheesecake
+    case creamsicle
+    case fire
+    case iceberg_light
+    case mountain
+    case mint
+    case nebula
+    case olive
+    case strawberry
 
     private static func rgb(_ hex: UInt32) -> Color {
         Color(
@@ -332,6 +344,18 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .desert_oasis: "沙漠绿洲 · Typebar"
         case .grape: "葡萄 · Typebar"
         case .moonlight: "月光 · Typebar"
+        case .blueberry_dark: "深蓝莓 · Typebar"
+        case .blueberry_light: "浅蓝莓 · Typebar"
+        case .cafe: "咖啡馆 · Typebar"
+        case .cheesecake: "芝士蛋糕 · Typebar"
+        case .creamsicle: "奶油橘 · Typebar"
+        case .fire: "火光 · Typebar"
+        case .iceberg_light: "浅海冰 · Typebar"
+        case .mountain: "山峦 · Typebar"
+        case .mint: "薄荷 · Typebar"
+        case .nebula: "星云 · Typebar"
+        case .olive: "橄榄 · Typebar"
+        case .strawberry: "草莓 · Typebar"
         }
     }
 
@@ -413,6 +437,30 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
             Self.palette(0x302640, 0x493756, 0xDBB7F1, 0xF7ECFA, 0xD4C3DC, light: false)
         case .moonlight:
             Self.palette(0x1D2A3E, 0x2C3E53, 0xE6D6A5, 0xEEF2F4, 0xC4D0D8, light: false)
+        case .blueberry_dark:
+            Self.palette(0x1A233C, 0x2D3754, 0xBAA5E6, 0xF3EFFA, 0xC3C3D8, light: false)
+        case .blueberry_light:
+            Self.palette(0xE8EEF8, 0xCFDBEE, 0x4E4F99, 0x1F2C4C, 0x4A5874, light: true)
+        case .cafe:
+            Self.palette(0x2C251F, 0x49382E, 0xE8BE81, 0xF4ECE0, 0xD6C8B7, light: false)
+        case .cheesecake:
+            Self.palette(0xF5EBCB, 0xEADCA9, 0x6B4A19, 0x3B3422, 0x5E5139, light: true)
+        case .creamsicle:
+            Self.palette(0xFFF0DF, 0xF1D7B8, 0xA04724, 0x3F2D27, 0x6C5148, light: true)
+        case .fire:
+            Self.palette(0x301D1D, 0x4A2A28, 0xFFC078, 0xFCEDE1, 0xDEC4BE, light: false)
+        case .iceberg_light:
+            Self.palette(0xE6F5F7, 0xCBE6EC, 0x2E6877, 0x153944, 0x466570, light: true)
+        case .mountain:
+            Self.palette(0x1D2C33, 0x2E454A, 0xB9D7B3, 0xEEF3EC, 0xBED0CC, light: false)
+        case .mint:
+            Self.palette(0xDDF2EA, 0xC4E3D5, 0x286E5A, 0x173B34, 0x42675B, light: true)
+        case .nebula:
+            Self.palette(0x211F39, 0x373451, 0xCDB6F1, 0xF3F0FA, 0xC8C2D8, light: false)
+        case .olive:
+            Self.palette(0x282D20, 0x3D4930, 0xD4CF89, 0xF2F1E4, 0xC9CEB4, light: false)
+        case .strawberry:
+            Self.palette(0xFBEDEF, 0xF1D5DB, 0x9C3D57, 0x472B35, 0x6B4A55, light: true)
         }
     }
 }
