@@ -65,7 +65,8 @@ enum ResultCSVExport {
 
     private static func row(for result: CompletedTestResult) -> [String] {
         let consistency = ResultConsistencyPolicy.metrics(
-            events: result.replayEvents, duration: result.elapsedDuration)
+            events: result.replayEvents, duration: result.elapsedDuration,
+            configuration: result.configuration, keySpacingSamples: result.keySpacingSamples)
         let configuration = result.configuration
         let keyDurationStats = result.keyDurationStats
         let keySpacingStats = result.keySpacingStats

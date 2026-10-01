@@ -2384,10 +2384,13 @@ enum TestInactivityPolicy {
     var boundaries = fullIntervals > 0 ? (1...fullIntervals).map(Double.init) : []
     // The reference classifies the tail after rounding seconds to hundredths,
     // including carry into a whole second. Event cutoffs still use raw time.
-    let roundedHundredths = ((duration + Double.ulpOfOne) * 100).rounded()
-    let tailHundredths = roundedHundredths.truncatingRemainder(dividingBy: 100)
-    if includesFractionalTail, tailHundredths >= 50 { boundaries.append(duration) }
+    if includesFractionalTail, retainsFractionalTail(duration: duration) { boundaries.append(duration) }
     return boundaries
+  }
+
+  static func retainsFractionalTail(duration: TimeInterval) -> Bool {
+    let roundedHundredths = ((duration + Double.ulpOfOne) * 100).rounded()
+    return roundedHundredths.truncatingRemainder(dividingBy: 100) >= 50
   }
 
   static func intervalCounts(

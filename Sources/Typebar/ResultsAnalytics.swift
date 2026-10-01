@@ -163,7 +163,8 @@ struct ResultMetric: Equatable, Identifiable {
             elapsedSeconds: max(0, record.finishedAt.timeIntervalSince(record.startedAt)),
             consistency: ResultConsistencyPolicy.metrics(
                 events: record.replayEvents,
-                duration: record.finishedAt.timeIntervalSince(record.startedAt)
+                duration: record.finishedAt.timeIntervalSince(record.startedAt),
+                configuration: record.configuration, keySpacingSamples: record.keySpacingSamples
             ).typing,
             restartCount: record.restartCount
         )
@@ -1169,62 +1170,63 @@ enum ResultPromptText {
   }
 }
 
-/// Local result consistency values reconstructed from Typebar's own replay.
-/// They intentionally remain derived data: existing archives with no replay
-/// safely show zero instead of inventing a cadence statistic.
+/// Derived input-activity and physical-key cadence values. Text replay cannot
+/// stand in for physical keydown evidence; missing press samples stay neutral.
 struct ResultConsistency: Equatable {
   let typing: Double
   let key: Double
 }
 
 enum ResultConsistencyPolicy {
-  static func metrics(events: [TypingReplayEvent], duration: TimeInterval) -> ResultConsistency {
-    let ordered = events.enumerated().sorted { lhs, rhs in
-      lhs.element.offset == rhs.element.offset ? lhs.offset < rhs.offset : lhs.element.offset < rhs.element.offset
-    }.map(\.element)
-    let typingSamples = typingSpeeds(events: ordered, duration: duration)
-    let keySpacing = keySpacings(events: ordered)
+  static func metrics(
+    events: [TypingReplayEvent], duration: TimeInterval,
+    configuration: TestConfiguration? = nil, keySpacingSamples: [TimeInterval] = []
+  ) -> ResultConsistency {
     return .init(
-      typing: consistency(for: typingSamples),
-      key: consistency(for: Array(keySpacing.dropLast())))
+      typing: typingConsistency(events: events, duration: duration, configuration: configuration),
+      key: consistency(for: keySpacingSamples.dropLast().filter { $0.isFinite && $0 >= 0 }))
   }
 
-  private static func typingSpeeds(
-    events: [TypingReplayEvent], duration: TimeInterval
-  ) -> [Double] {
-    guard duration > 0 else { return [] }
-    let wholeSeconds = Int(duration.rounded(.down))
-    var boundaries = wholeSeconds > 0 ? (1...wholeSeconds).map(TimeInterval.init) : []
-    let fractionalTail = duration - Double(wholeSeconds)
-    if fractionalTail >= 0.5 { boundaries.append(duration) }
+  private static func typingConsistency(
+    events: [TypingReplayEvent], duration: TimeInterval, configuration: TestConfiguration?
+  ) -> Double {
+    guard duration.isFinite, duration > 0 else { return 0 }
+    let wholeSeconds = duration.rounded(.down)
+    let hasTail = !ResultIntervalSamplingPolicy.isTimed(configuration)
+      && TestInactivityPolicy.retainsFractionalTail(duration: duration)
+    let sampleCount = wholeSeconds + (hasTail ? 1 : 0)
+    guard sampleCount > 0 else { return 0 }
 
-    var previousBoundary: TimeInterval = 0
-    return boundaries.map { boundary in
-      let characters = events.reduce(into: 0) { count, event in
-        guard event.kind == .insert, event.offset > previousBoundary, event.offset <= boundary else { return }
-        count += event.text.count
-      }
-      defer { previousBoundary = boundary }
-      let interval = boundary - previousBoundary
-      guard interval > 0 else { return 0 }
-      return Double(Int((Double(characters) / 5 / interval * 60).rounded()))
+    // Empty windows remain population members without allocating one element
+    // per second. Work and storage follow actual input, not imported duration.
+    var unitsByWindow: [Double: Int] = [:]
+    for event in events {
+      guard event.kind == .insert, event.offset.isFinite, event.offset >= 0,
+        event.offset <= duration, event.offset <= wholeSeconds || hasTail
+      else { continue }
+      let index = max(0, event.offset.rounded(.up) - 1)
+      unitsByWindow[index, default: 0] += event.text.utf16.count
     }
-  }
-
-  private static func keySpacings(events: [TypingReplayEvent]) -> [TimeInterval] {
-    let keyEvents = events.filter { $0.kind == .insert || $0.kind == .delete }
-    return zip(keyEvents, keyEvents.dropFirst()).map { earlier, later in
-      max(0, later.offset - earlier.offset)
+    let speeds = unitsByWindow.sorted { $0.key < $1.key }.map { index, units in
+      let interval = hasTail && index == wholeSeconds ? duration - wholeSeconds : 1
+      return (Double(units) / 5 / interval * 60).rounded()
     }
+    return consistency(for: speeds, populationCount: sampleCount)
   }
 
-  private static func consistency(for samples: [Double]) -> Double {
-    guard !samples.isEmpty else { return 0 }
-    let average = samples.reduce(0, +) / Double(samples.count)
+  private static func consistency(for samples: [Double], populationCount: Double? = nil) -> Double {
+    guard let largest = samples.max(), largest.isFinite, largest > 0 else { return 0 }
+    let count = populationCount ?? Double(samples.count)
+    // COV is scale invariant. Normalize first so tiny/large imported physical
+    // intervals cannot underflow or overflow the variance calculation.
+    let scaled = samples.map { $0 / largest }
+    let average = scaled.reduce(0, +) / count
     guard average > 0 else { return 0 }
-    let variance = samples.reduce(0) { partial, sample in
+    let implicitZeros = count - Double(samples.count)
+    let deviations = scaled.reduce(0) { partial, sample in
       partial + pow(sample - average, 2)
-    } / Double(samples.count)
+    } + implicitZeros * pow(average, 2)
+    let variance = deviations / count
     let coefficientOfVariation = sqrt(variance) / average
     let mapped = 100 * (
       1 - tanh(
@@ -1234,7 +1236,17 @@ enum ResultConsistencyPolicy {
       )
     )
     guard mapped.isFinite else { return 0 }
-    return (mapped * 100).rounded() / 100
+    return ((mapped + Double.ulpOfOne) * 100).rounded() / 100
+  }
+}
+
+/// The result graph and whole-test consistency use the same mode gate. Unknown
+/// legacy context keeps finite-test sampling; it cannot recover a lost mode.
+enum ResultIntervalSamplingPolicy {
+  static func isTimed(_ configuration: TestConfiguration?) -> Bool {
+    configuration.map {
+      $0.mode == .time || $0.isInfinite || ($0.mode == .custom && $0.customTextCompletion == .time)
+    } ?? false
   }
 }
 
@@ -1395,11 +1407,8 @@ enum ResultPerformanceTrace {
   private static func samplingTimes(
     for duration: TimeInterval, configuration: TestConfiguration?
   ) -> [TimeInterval] {
-    let isTimed = configuration.map {
-      $0.mode == .time || $0.isInfinite || ($0.mode == .custom && $0.customTextCompletion == .time)
-    } ?? false
     return TestInactivityPolicy.intervalBoundaries(
-      duration: duration, includesFractionalTail: !isTimed)
+      duration: duration, includesFractionalTail: !ResultIntervalSamplingPolicy.isTimed(configuration))
   }
 
   private static func validOrderedEvents(_ events: [TypingReplayEvent]) -> [TypingReplayEvent] {

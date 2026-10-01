@@ -679,7 +679,8 @@ final class TypingEngineTests: XCTestCase {
     ]
     let steady = ResultConsistencyPolicy.metrics(events: steadyEvents, duration: 3)
     XCTAssertEqual(steady.typing, 100)
-    XCTAssertEqual(steady.key, 100)
+    // Replay text timing does not supply physical keydown spacing.
+    XCTAssertEqual(steady.key, 0)
 
     let uneven = ResultConsistencyPolicy.metrics(
       events: [
@@ -691,7 +692,7 @@ final class TypingEngineTests: XCTestCase {
       duration: 4
     )
     XCTAssertLessThan(uneven.typing, steady.typing)
-    XCTAssertLessThan(uneven.key, steady.key)
+    XCTAssertEqual(uneven.key, 0)
 
     let unavailable = ResultConsistencyPolicy.metrics(events: [], duration: 3)
     XCTAssertEqual(unavailable, .init(typing: 0, key: 0))

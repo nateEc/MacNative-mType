@@ -180,7 +180,8 @@ enum ChallengeEvaluator {
       let consistency = Int(
         ResultConsistencyPolicy.metrics(
           events: result.replayEvents,
-          duration: result.elapsedDuration
+          duration: result.elapsedDuration,
+          configuration: result.configuration, keySpacingSamples: result.keySpacingSamples
         ).typing.rounded())
       if let failure = consistencyRequirement.failure(
         label: "一致性", actual: consistency, suffix: "%"

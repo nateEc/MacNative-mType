@@ -791,7 +791,8 @@ struct RemoteResultSubmission: Codable, Sendable {
         rawWpm = result.rawWpm
         accuracy = result.accuracy
         consistency = ResultConsistencyPolicy.metrics(
-            events: result.replayEvents, duration: result.elapsedDuration
+            events: result.replayEvents, duration: result.elapsedDuration,
+            configuration: result.configuration, keySpacingSamples: result.keySpacingSamples
         ).typing
         errorCount = result.errorCount
         eventCount = result.typedCharacterCount

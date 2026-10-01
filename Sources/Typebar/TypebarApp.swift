@@ -6213,7 +6213,9 @@ private struct CompletedResultView: View {
   }
 
   private var consistency: ResultConsistency {
-    ResultConsistencyPolicy.metrics(events: result.replayEvents, duration: result.elapsedDuration)
+    ResultConsistencyPolicy.metrics(
+      events: result.replayEvents, duration: result.elapsedDuration,
+      configuration: result.configuration, keySpacingSamples: result.keySpacingSamples)
   }
 
   private func metric(_ title: String, _ value: String) -> some View {
@@ -8811,7 +8813,8 @@ private struct ResultDetailView: View {
   private var consistency: ResultConsistency {
     ResultConsistencyPolicy.metrics(
       events: result.replayEvents,
-      duration: result.finishedAt.timeIntervalSince(result.startedAt)
+      duration: result.finishedAt.timeIntervalSince(result.startedAt),
+      configuration: result.configuration, keySpacingSamples: result.keySpacingSamples
     )
   }
 
