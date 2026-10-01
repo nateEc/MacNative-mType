@@ -3319,7 +3319,7 @@ private struct ContentView: View {
   private func handleThemeIndicatorActivation() {
     themeQuickSwitchMessage = nil
     guard NSEvent.modifierFlags.contains(.shift) else {
-      themeQuickPickerScope = .all
+      themeQuickPickerScope = ThemeQuickSwitchPolicy.pickerScope(settings: settings)
       return
     }
     switch ThemeQuickSwitchPolicy.shiftClickAction(settings: settings)

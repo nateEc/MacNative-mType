@@ -52,9 +52,18 @@ enum ThemeQuickSwitchAction: Equatable {
 
 enum ThemeQuickPickerScope: String, Identifiable {
   case all
+  case builtIn
   case custom
 
   var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .all: "选择主题"
+    case .builtIn: "选择内置主题"
+    case .custom: "选择自定义主题"
+    }
+  }
 }
 
 struct ThemeQuickPickerResults {
@@ -81,10 +90,12 @@ enum ThemeQuickPickerSearch {
     customThemes: [CustomThemeDefinition], favoriteThemeIDs: [String]
   ) -> ThemeQuickPickerResults {
     let favorites = Set(favoriteThemeIDs)
-    let matchingBuiltIns = scope == .all
+    let matchingBuiltIns = scope != .custom
       ? builtInThemes.filter { matches(query, name: $0.displayName, id: $0.rawValue) }
       : []
-    let matchingCustom = customThemes.filter { matches(query, name: $0.name) }
+    let matchingCustom = scope != .builtIn
+      ? customThemes.filter { matches(query, name: $0.name) }
+      : []
     return .init(
       builtInThemes: matchingBuiltIns.filter {
         favorites.contains(ThemeFavoritePolicy.builtInID(for: $0))
@@ -115,6 +126,11 @@ enum ThemeQuickPickerSearch {
 }
 
 enum ThemeQuickSwitchPolicy {
+  @MainActor
+  static func pickerScope(settings: AppSettings) -> ThemeQuickPickerScope {
+    settings.manualCustomThemeIDForQuickSwitch == nil ? .builtIn : .custom
+  }
+
   @MainActor
   static func shiftClickAction(settings: AppSettings) -> ThemeQuickSwitchAction {
     return shiftClickAction(
@@ -242,7 +258,9 @@ struct ThemeQuickPickerView: View {
                   }
                 }
               }
-              if !searchResults.customThemes.isEmpty || customThemes.isEmpty && searchText.isEmpty {
+              if scope != .builtIn,
+                !searchResults.customThemes.isEmpty || customThemes.isEmpty && searchText.isEmpty
+              {
                 Section(scope == .all ? "自定义主题" : "选择自定义主题") {
                   if customThemes.isEmpty {
                     ContentUnavailableView(
@@ -277,7 +295,7 @@ struct ThemeQuickPickerView: View {
           }
         }
       }
-      .navigationTitle("选择主题")
+      .navigationTitle(scope.title)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("完成") { dismiss() }
