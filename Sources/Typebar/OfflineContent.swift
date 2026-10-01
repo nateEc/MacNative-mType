@@ -5893,7 +5893,7 @@ struct GeneratedWordChunk {
 
   init(source: String, configuration: TestConfiguration, wordOffset: Int = 0,
     preservesNoSpaceBoundaries: Bool = false, showAllLines: Bool = false,
-    preservesWordOrder: Bool = false,
+    preservesWordOrder: Bool = false, formatsWordPool: Bool = false,
     nextRandomCaseBit: () -> Bool = { Bool.random() }) {
     self.source = source
     let batch = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
@@ -5901,6 +5901,7 @@ struct GeneratedWordChunk {
       wordOffset: wordOffset, wordBound: GeneratedWordBoundPolicy.bound(for: configuration,
         wordOffset: wordOffset, sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source),
         showAllLines: showAllLines), preservesWordOrder: preservesWordOrder,
+      formatsWordPool: formatsWordPool,
       nextRandomCaseBit: nextRandomCaseBit)
     transformed = batch.text
     noSpaceWordLengths = batch.noSpaceWordLengths
@@ -6067,6 +6068,7 @@ struct TestSessionFactory {
     var usesGeneratedStream = false
     var usesGeneratedCode = false
     var preservesGeneratedWordOrder = false
+    var formatsQuoteWordPool = false
     var generatedCodeContinuation: GeneratedCodeContinuation?
     var generatedCodeChunk: GeneratedWordChunk?
     let streamWordCount = streamWordCount(for: configuration, showAllLines: showAllLines)
@@ -6108,9 +6110,11 @@ struct TestSessionFactory {
             for: configuration, showAllLines: showAllLines),
           scores: weakSpotScores)
       case .quote:
-        prompt =
+        let source =
           quote?.text ?? OfflineContent.quotes(for: configuration.language).first?.text
           ?? OfflineContent.quotes(for: .english)[0].text
+        prompt = QuoteSourcePolicy.preparedText(source)
+        formatsQuoteWordPool = true
       case .zen:
         // Zen renders and scores only text entered locally by the user. It
         // intentionally has no generated target prompt or imported content.
@@ -6206,6 +6210,7 @@ struct TestSessionFactory {
     } else {
       let chunk = GeneratedWordChunk(source: prompt, configuration: configuration, showAllLines: generatesWholeLines,
         preservesWordOrder: preservesGeneratedWordOrder,
+        formatsWordPool: formatsQuoteWordPool,
         nextRandomCaseBit: nextRandomCaseBit)
       batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
     }

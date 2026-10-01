@@ -1268,11 +1268,11 @@ enum TestModifierPolicy {
   static func transformedBatch(
     _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
     preservesNoSpaceBoundaries: Bool = false, wordOffset: Int = 0, wordBound: Int? = nil,
-    preservesWordOrder: Bool = false,
+    preservesWordOrder: Bool = false, formatsWordPool: Bool = false,
     nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> TransformedPromptBatch {
     let presented = language?.presentationText(prompt) ?? prompt
-    guard preservesNoSpaceBoundaries || modifiers.contains(where: { canonicalTextAlterations.contains($0)
+    guard formatsWordPool || preservesNoSpaceBoundaries || modifiers.contains(where: { canonicalTextAlterations.contains($0)
       || [.noSpaces, .arrowStream, .lazyLatin].contains($0) }) else {
       return .init(text: presented)
     }

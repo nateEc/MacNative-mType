@@ -1,5 +1,13 @@
 # 功能盘点与追踪表
 
+2026-10-02 当前最终门禁（正常引语源准备）：客户端 1448 项（0 跳过、0 失败，约 300.71 秒，显式十万词耐力已执行）、服务端 131 项、固定参考／原创性、657 个唯一人工场景清单及未启动 GUI 的应用包校验通过。新增 11 项和相关 119 项均零失败／零跳过；下文本轮“最终验证待执行”由此取代。新两项仍待设备验收；源准备与正常单换行、简单 ASCII 反写组合仅为本增量证据，英式备用文本、连续空槽完成、通用／代码候选池反序、Unicode／设备等缺口与 Funbox 部分状态保留，goal active。
+
+2026-10-02 正常引语源准备增量：固定参考 [words-generator.ts:570–599](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L570-L599) 的普通引语先合并 ASCII 空格、规范 CRLF／CR／LF 并保留换行后的分词空格、展开省略号、按 ECMAScript 集合裁边，再拆池／反序。独立 `QuoteSourcePolicy` 只用于创建正常引语测试，原创内容及社区引语经同一 factory；源对象、已准备的外部 stream、自定义输入和已保存历史不改写。首轮 9 项测试有 8 项 37 个失败断言；随后按原版提交语义修正换行的物理目标夹具，不能把全部首轮断言都称为有效产品红测。累计 11 项，最终验证待执行。英式 `britishText` 原版分支直接拆池、不走正常文本规范化，仍待实现；本增量不关闭通用随机／代码反序池、换行 Funbox／Unicode 组合、Morse／下划线／反写的部分覆盖或设备差异，goal active。
+
+换行后分词空格不是实际第二次提交：依据 [appendCommitCharacter](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L990-L999) 和 [词提交模型](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-words.ts#L51-L69)，普通引语批次显式走词池拼接（其他入口默认不变），单换行目标为 ab\ncd... 而不是 ab\n cd...；否则双分隔导致终词校验索引偏移。连续空行目前只证明源准备／提示结构，空槽完成与组合语义仍开放，不冒称完整多行等价。
+
+裁边依据 [ECMAScript WhiteSpace](https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-white-space) 与 [TrimString](https://tc39.es/ecma262/multipage/text-processing.html#sec-trimstring)：仅移除边界集合，保留内部 TAB、NBSP、LS／PS、BOM 和分解标量；NEL／U+180E／零宽空格不作可裁边字符。没有复用原项目实现、原始引语或夹具。
+
 2026-10-02 当前最终验证（非管道自定义词池反序）：最终源码客户端 1437 项（0 跳过、0 失败，约 299.49 秒，显式十万词耐力已执行）、服务端 131 项、固定参考／原创性、655 个唯一人工场景清单与未启动 GUI 的应用包门禁通过。新增 11 项、反序索引重构后同 11 项全部通过；相关 198 项的 1 次默认耐力跳过与最终门禁分别记录，下文本轮“最终门禁待执行”由此取代。最终核对覆盖当前首批／续批改动，而非早期反序复制实现；进程内风险评审不等于独立评审或实际迁移。新两项待设备验收，通用词源／方向 UI／随机未来恢复／Unicode 等已列缺口与 Funbox 部分状态不提升，goal active。
 
 2026-10-02 非管道自定义词池反序增量（取代历史“所有随机池均未接入”的范围）：固定 `words-generator.ts:639–666,849–902`、Funbox `list.ts:407–421` 先反候选池，再抽词／遍历并逐词变换。原生顺序／洗牌游标在取首批前反池，随机模式以反序索引访问原池；已生成目标不再按批倒序，首批和续批共享该边界。静态完整有限平铺与既有管道路径不变，关闭反写的抽样顺序不变。新增 `CustomWordPoolOrderTests` 11 项，先行 6 项 19 个有效失败断言；相关 198 项通过（1 默认耐力跳过、0 失败），反序索引重构后的最终门禁待执行。
