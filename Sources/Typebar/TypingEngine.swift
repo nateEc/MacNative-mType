@@ -2355,8 +2355,11 @@ enum TestInactivityPolicy {
     let duration = max(0, endedAt.timeIntervalSince(startedAt))
     let fullIntervals = Int(duration.rounded(.down))
     var boundaries = fullIntervals > 0 ? (1...fullIntervals).map(Double.init) : []
-    let remainder = duration - Double(fullIntervals)
-    if includesFractionalTail, remainder >= 0.5 { boundaries.append(duration) }
+    // The reference classifies the tail after rounding seconds to hundredths,
+    // including carry into a whole second. Event cutoffs still use raw time.
+    let roundedHundredths = ((duration + Double.ulpOfOne) * 100).rounded()
+    let tailHundredths = roundedHundredths.truncatingRemainder(dividingBy: 100)
+    if includesFractionalTail, tailHundredths >= 50 { boundaries.append(duration) }
 
     var counts = Array(repeating: 0, count: boundaries.count)
     for date in activityDates {
