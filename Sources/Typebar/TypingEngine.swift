@@ -1238,7 +1238,9 @@ enum TestModifierPolicy {
   static func transformed(
     _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil
   ) -> String {
-    var transformed = prompt
+    // Language presentation precedes Funbox alteration in the source. In
+    // particular Swiss German expands sharp S before Morse can discard it.
+    var transformed = language?.presentationText(prompt) ?? prompt
     if modifiers.contains(.noSpaces) {
       transformed = transformed.replacingOccurrences(of: " ", with: "")
     } else if modifiers.contains(.underscoreSeparators) {
@@ -1341,16 +1343,15 @@ enum MorseTextPolicy {
   ]
 
   static func transformed(_ text: String) -> String {
-    text.reduce(into: "") { output, character in
-      guard !character.isWhitespace else { return }
-      let normalized = String(character)
-        .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
-        .lowercased()
-      for scalarCharacter in normalized {
-        if let code = codeByCharacter[scalarCharacter] {
-          output += code
-          output.append("/")
-        }
+    // Canonical decomposition and the combining-diacritic block are the
+    // source contract, not compatibility/width folding or transliteration.
+    let scalars = text.decomposedStringWithCanonicalMapping.unicodeScalars
+      .filter { !(0x0300...0x036F).contains($0.value) }
+    let normalized = String(String.UnicodeScalarView(scalars)).lowercased()
+    return normalized.unicodeScalars.reduce(into: "") { output, scalar in
+      if let code = codeByCharacter[Character(String(scalar))] {
+        output += code
+        output.append("/")
       }
     }
   }
