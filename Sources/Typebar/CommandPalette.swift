@@ -1747,6 +1747,28 @@ enum ThemeCommandPreviewPolicy {
     }
 }
 
+enum ThemeCommandApplication {
+    @MainActor
+    @discardableResult
+    static func apply(_ target: ThemeCommandTarget, to settings: AppSettings) -> Bool {
+        // Catalog entries can outlive a custom theme. Reject them before any
+        // preference changes, including disabling system appearance following.
+        if case .custom(let id) = target,
+            !settings.customThemes.contains(where: { $0.id == id })
+        {
+            return false
+        }
+        settings.followSystemTheme = false
+        switch target {
+        case .builtIn(let theme):
+            settings.selectBuiltInTheme(theme)
+        case .custom(let id):
+            settings.selectCustomTheme(id)
+        }
+        return true
+    }
+}
+
 enum CurrentThemeFavoriteCommandTarget: Equatable {
     case add
     case remove

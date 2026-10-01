@@ -3343,16 +3343,8 @@ private struct ContentView: View {
   }
 
   private func applyThemeQuickPickerSelection(_ target: ThemeCommandTarget) {
-    guard ThemeCommandPreviewPolicy.resolvedTheme(for: target, customThemes: settings.customThemes) != nil
-    else { return }
+    guard ThemeCommandApplication.apply(target, to: settings) else { return }
     themeQuickSwitchMessage = nil
-    settings.followSystemTheme = false
-    switch target {
-    case .builtIn(let theme):
-      settings.selectBuiltInTheme(theme)
-    case .custom(let id):
-      settings.selectCustomTheme(id)
-    }
   }
 
   private func attemptRestart() {
@@ -4447,11 +4439,7 @@ private struct ContentView: View {
       return
     }
     if let target = ThemeCommandCatalog.target(for: item.id) {
-      settings.followSystemTheme = false
-      switch target {
-      case .builtIn(let theme): settings.selectBuiltInTheme(theme)
-      case .custom(let id): settings.selectCustomTheme(id)
-      }
+      ThemeCommandApplication.apply(target, to: settings)
       return
     }
     if let target = FontFamilyCommandCatalog.target(for: item.id) {
