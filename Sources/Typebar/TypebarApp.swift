@@ -975,6 +975,7 @@ private struct ContentView: View {
   @State private var customTextWordLimit = 25
   @State private var customTextSectionLimit = 1
   @State private var customTextOrdering: CustomTextOrdering = .inOrder
+  @State private var customTextPipeDelimiter: Bool?
   @State private var activeLongSavedText: ActiveLongSavedText?
   @State private var activeVerifiedScript: ReferenceScriptChallengePolicy.VerifiedScript?
   @State private var activeSessionTags: [String] = []
@@ -1632,7 +1633,7 @@ private struct ContentView: View {
           wordLimit: customTextCompletion == .words ? customTextWordLimit : nil,
           sectionLimit: customTextCompletion == .sections
             ? customTextSectionLimit : nil,
-          ordering: customTextOrdering),
+          ordering: customTextOrdering, pipeDelimiter: customTextPipeDelimiter),
         challengeLibrary: TypebarChallengeLibrary.all,
         onLoadChallenge: loadChallenge
       ) { apply($0) }
@@ -2281,6 +2282,14 @@ private struct ContentView: View {
             }
             .disabled(hasLockedCustomTextSource)
             .onChange(of: customTextCompletion) { _, _ in reset() }
+            Toggle("用竖线分隔段落", isOn: Binding(
+              get: { customTextPipeDelimiter ?? (customTextCompletion == .sections) },
+              set: { value in
+                guard acceptsRestartingConfigurationChange() else { return }
+                customTextPipeDelimiter = value
+                reset()
+              }))
+              .disabled(hasLockedCustomTextSource)
             if customTextCompletion == .time {
               Toggle("无限循环计时", isOn: infiniteBinding($customTextDuration, fallback: 30))
                 .disabled(
@@ -2343,7 +2352,9 @@ private struct ContentView: View {
               }
               .disabled(hasLockedCustomTextSource)
               .onChange(of: customTextSectionLimit) { _, _ in reset() }
-              Text("使用竖线 | 分隔段落；按所选顺序循环取段，0 表示无限。")
+              Text((customTextPipeDelimiter ?? true)
+                ? "使用竖线 | 分隔段落；按所选顺序循环取段，0 表示无限。"
+                : "按空格分隔的每个词计一段；竖线保留为目标字符，0 表示无限。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -2359,7 +2370,7 @@ private struct ContentView: View {
                 guard acceptsRestartingConfigurationChange() else { return }
                 reset()
               }
-                .disabled(!CustomTextPolicy.isValid(customText))
+                .disabled(!CustomTextPolicy.isValid(customText, configuration: configuration))
               Button("保存文本…") { showingSaveCustomText = true }
                 .disabled(!CustomTextPolicy.isValid(customText))
               Button("已保存文本…") { showingSavedTexts = true }
@@ -3834,6 +3845,7 @@ private struct ContentView: View {
     customText = active.currentChunk
     customTextCompletion = .finish
     customTextOrdering = .inOrder
+    customTextPipeDelimiter = false
     reset()
   }
 
@@ -3849,6 +3861,7 @@ private struct ContentView: View {
     customText = nextText
     customTextCompletion = .finish
     customTextOrdering = .inOrder
+    customTextPipeDelimiter = false
     completedResult = nil
     reset()
   }
@@ -4033,6 +4046,7 @@ private struct ContentView: View {
     customTextCompletion = .words
     customTextWordLimit = weakSpotPrompt.split(separator: " ").count
     customTextOrdering = .inOrder
+    customTextPipeDelimiter = false
     reset()
   }
 
@@ -4680,6 +4694,7 @@ private struct ContentView: View {
         customTextCompletion: customTextCompletion,
         customTextSectionLimit: sectionLimit,
         customTextOrdering: customTextOrdering,
+        customTextPipeDelimiter: customTextPipeDelimiter,
         mixedLanguageComponents: mixedLanguageComponents,
         modifiers: effectiveTestModifiers(for: language, mode: .custom),
         contentOptions: contentOptions)
@@ -4813,6 +4828,7 @@ private struct ContentView: View {
       customTextSectionLimit = sectionLimit
     }
     customTextOrdering = configuration.customTextOrdering
+    customTextPipeDelimiter = configuration.customTextPipeDelimiter
     self.polyglotReturnLanguage = configuration.language == .mixedLanguages
       ? PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage) : nil
     language = configuration.language
@@ -5232,6 +5248,7 @@ private struct ContentView: View {
     customTextCompletion = .sections
     customTextSectionLimit = practice.sectionCount
     customTextOrdering = .inOrder
+    customTextPipeDelimiter = true
     completedResult = nil
     reset()
   }

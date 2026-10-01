@@ -89,7 +89,7 @@ enum ActiveTestSelectionPolicy {
     }
     if document.preset.configuration.mode == .custom {
       guard let customText = document.preset.customText,
-        CustomTextPolicy.isValid(customText)
+        CustomTextPolicy.isValid(customText, configuration: document.preset.configuration)
       else { return nil }
     } else if document.preset.customText != nil {
       return nil

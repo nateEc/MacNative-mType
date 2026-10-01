@@ -2127,6 +2127,9 @@ struct TestConfiguration: Codable, Equatable {
   var customTextCompletion: CustomTextCompletion
   var customTextSectionLimit: Int?
   var customTextOrdering: CustomTextOrdering
+  /// Nil preserves the historical native default: pipes only for section
+  /// completion. Explicit values keep the delimiter independent of limits.
+  var customTextPipeDelimiter: Bool?
   var mixedLanguageComponents: [TypingLanguage]
   var modifiers: [TestModifier]
   var contentOptions: ContentOptions
@@ -2136,6 +2139,10 @@ struct TestConfiguration: Codable, Equatable {
     Self.usesInfiniteLimit(
       mode: mode, duration: duration, wordLimit: wordLimit,
       customTextCompletion: customTextCompletion, customTextSectionLimit: customTextSectionLimit)
+  }
+
+  var usesCustomTextPipeDelimiter: Bool {
+    customTextPipeDelimiter ?? (customTextCompletion == .sections)
   }
 
   /// Mirrors reference `joiningScript` metadata for native prompt shaping.
@@ -2171,6 +2178,7 @@ struct TestConfiguration: Codable, Equatable {
     quoteSelectionMode: QuoteSelectionMode = .lengths,
     customTextCompletion: CustomTextCompletion = .finish, customTextSectionLimit: Int? = nil,
     customTextOrdering: CustomTextOrdering = .inOrder,
+    customTextPipeDelimiter: Bool? = nil,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     modifiers: [TestModifier] = [], contentOptions: ContentOptions = .init(),
     challengeID: String? = nil
@@ -2192,6 +2200,7 @@ struct TestConfiguration: Codable, Equatable {
     self.customTextCompletion = customTextCompletion
     self.customTextSectionLimit = customTextSectionLimit
     self.customTextOrdering = customTextOrdering
+    self.customTextPipeDelimiter = customTextPipeDelimiter
     let normalizedMixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
       mixedLanguageComponents)
     self.mixedLanguageComponents = normalizedMixedLanguageComponents
@@ -2287,7 +2296,7 @@ struct TestConfiguration: Codable, Equatable {
   private enum CodingKeys: String, CodingKey {
     case mode, duration, wordLimit, difficulty, rules, language, englishVariant, quoteLength,
       quoteLengths, quoteSelectionMode, customTextCompletion, customTextSectionLimit,
-      customTextOrdering, mixedLanguageComponents,
+      customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents,
       modifiers, contentOptions, challengeID
   }
 
@@ -2314,6 +2323,7 @@ struct TestConfiguration: Codable, Equatable {
     customTextSectionLimit = try values.decodeIfPresent(Int.self, forKey: .customTextSectionLimit)
     customTextOrdering =
       try values.decodeIfPresent(CustomTextOrdering.self, forKey: .customTextOrdering) ?? .inOrder
+    customTextPipeDelimiter = try values.decodeIfPresent(Bool.self, forKey: .customTextPipeDelimiter)
     mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
       try values.decodeIfPresent([TypingLanguage].self, forKey: .mixedLanguageComponents)
         ?? TypingLanguage.referenceDefaultMixedComponents)
@@ -3757,6 +3767,7 @@ struct TypingSession {
   }
 
   var sectionProgress: (completed: Int, total: Int)? {
+    guard configuration.customTextCompletion == .sections else { return nil }
     guard customSectionWordStream != nil || !sectionEndIndices.isEmpty else { return nil }
     let targetIndex = nextTargetIndex
     var lower = 0
@@ -5654,7 +5665,9 @@ struct TypingSession {
       customSectionWordStream = stream
       let previousEnd = promptCharacters.count
       appendPrompt(chunk.text)
-      sectionEndIndices += chunk.sectionEndOffsets.map { previousEnd + $0 }
+      if configuration.customTextCompletion == .sections {
+        sectionEndIndices += chunk.sectionEndOffsets.map { previousEnd + $0 }
+      }
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
         var end = previousEnd
         for length in chunk.noSpaceWordLengths {

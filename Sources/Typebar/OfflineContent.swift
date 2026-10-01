@@ -5959,16 +5959,21 @@ struct TestSessionFactory {
     let prompt: String
     var sectionEndIndices: [Int] = []
     var noSpaceBoundarySource: String?
+    let streamsCustomSections = configuration.mode == .custom
+      && (configuration.customTextCompletion == .sections || configuration.usesCustomTextPipeDelimiter)
     let hasCompleteRandomWordPrompt = configuration.mode == .custom
+      && !streamsCustomSections
       && configuration.customTextCompletion == .words
       && configuration.customTextOrdering == .random
       && (1...CustomTextOrderPolicy.maximumCompleteRandomWordCount)
         .contains(configuration.wordLimit ?? 0)
     let streamsRandomCustomText = configuration.mode == .custom
+      && !streamsCustomSections
       && configuration.customTextOrdering == .random
       && [.time, .words].contains(configuration.customTextCompletion)
       && !hasCompleteRandomWordPrompt
     let streamsSequentialCustomText = configuration.mode == .custom
+      && !streamsCustomSections
       && configuration.customTextOrdering != .random
       && [.time, .words].contains(configuration.customTextCompletion)
     var randomCustomSourceTokens: [String] = []
@@ -6025,17 +6030,17 @@ struct TestSessionFactory {
         prompt = ""
       case .custom:
         let source =
-          !CustomTextPolicy.isValid(customText)
+          !CustomTextPolicy.isValid(customText, configuration: configuration)
           ? "Write your own text in the configuration panel before starting a custom test."
           : customText
         if streamsRandomCustomText {
           randomCustomSourceTokens = source.split(whereSeparator: \.isWhitespace).map(String.init)
         }
-        if configuration.customTextCompletion == .sections {
+        if streamsCustomSections {
           if var stream = CustomSectionWordStream(source: source, configuration: configuration) {
             let chunk = stream.nextChunk()
             prompt = chunk.text
-            sectionEndIndices = chunk.sectionEndOffsets
+            if configuration.customTextCompletion == .sections { sectionEndIndices = chunk.sectionEndOffsets }
             customSectionChunk = chunk
             customSectionWordStream = stream
           } else {
@@ -6087,7 +6092,7 @@ struct TestSessionFactory {
       }
     }
     let transformedPrompt = configuration.language.presentationText(
-      configuration.mode == .custom && configuration.customTextCompletion == .sections
+      streamsCustomSections
         ? prompt
         : TestModifierPolicy.transformed(
           prompt, modifiers: configuration.modifiers, language: configuration.language))
@@ -6101,6 +6106,7 @@ struct TestSessionFactory {
     let repeats = GeneratedPromptChunkPolicy.repeatsPrompt(for: configuration)
       && !hasCompleteRandomWordPrompt && !streamsRandomCustomText
       && !streamsSequentialCustomText
+      && customSectionWordStream == nil
     var generatedWordContinuation = repeats && usesFreshGeneratedWords
       ? GeneratedWordContinuation(
         configuration: configuration, weakSpotScores: weakSpotScores,
@@ -6512,6 +6518,14 @@ enum CustomTextOrderPolicy {
     let lowercase = word.lowercased()
     return lazyLanguage.map { TypingTextNormalizer.lazyLatin(lowercase, language: $0) }
       ?? lowercase
+  }
+
+  static func avoidsRecentFirstWord(
+    in section: String, previous: [String], lazyLanguage: TypingLanguage?
+  ) -> Bool {
+    guard let first = section.split(separator: " ").first else { return false }
+    let key = candidateWordKey(String(first), lazyLanguage: lazyLanguage)
+    return previous.suffix(2).contains { recentWordKey($0, lazyLanguage: lazyLanguage) == key }
   }
 
   static func randomWords(

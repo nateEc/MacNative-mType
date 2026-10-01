@@ -20,7 +20,7 @@ enum TestConfigurationShareError: Error, Equatable, LocalizedError {
 enum TestConfigurationShare {
     private static let scheme = "typebar"
     private static let host = "test"
-    private static let version = 1
+    private static let version = 2
     private static let maximumPayloadLength = 16_384
 
     private struct Payload: Codable, Equatable {
@@ -58,7 +58,7 @@ enum TestConfigurationShare {
         } catch {
             throw TestConfigurationShareError.invalidPayload
         }
-        guard payload.version == version else { throw TestConfigurationShareError.unsupportedVersion(payload.version) }
+        guard (1...version).contains(payload.version) else { throw TestConfigurationShareError.unsupportedVersion(payload.version) }
         let sharedPreset = testConfigurationOnly(payload.preset)
         guard isValid(sharedPreset) else { throw TestConfigurationShareError.invalidConfiguration }
         return sharedPreset
@@ -80,7 +80,7 @@ enum TestConfigurationShare {
         case .words:
             guard let wordLimit = config.wordLimit, isValidWordLimit(wordLimit), config.duration == nil else { return false }
         case .custom:
-            guard let text = preset.customText, CustomTextPolicy.isValid(text) else { return false }
+            guard let text = preset.customText, CustomTextPolicy.isValid(text, configuration: config) else { return false }
             switch config.customTextCompletion {
             case .finish:
                 guard config.duration == nil, config.wordLimit == nil else { return false }

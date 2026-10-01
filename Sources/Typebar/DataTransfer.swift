@@ -267,7 +267,7 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    static let currentVersion = 9
+    static let currentVersion = 10
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -608,7 +608,7 @@ struct TypebarTestParameterMemory: Codable, Equatable {
 }
 
 struct TypebarSettingsDocument: Codable, Equatable {
-    static let currentVersion = 2
+    static let currentVersion = 3
 
     let version: Int
     let settings: AppSettingsSnapshot
@@ -640,7 +640,7 @@ struct TypebarSettingsDocument: Codable, Equatable {
         settings = try values.decode(AppSettingsSnapshot.self, forKey: .settings)
         configuration = try values.decode(TestConfiguration.self, forKey: .configuration)
         layoutFluidLayouts = try values.decode([KeyboardLayout].self, forKey: .layoutFluidLayouts)
-        if version == Self.currentVersion {
+        if version >= 2 {
             testParameterMemory = try values.decode(
                 TypebarTestParameterMemory.self, forKey: .testParameterMemory)
         } else {

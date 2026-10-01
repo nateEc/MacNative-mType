@@ -15599,7 +15599,7 @@ final class TypingEngineTests: XCTestCase {
     let importedSnapshot = target.snapshot
     let importedLayouts = target.layoutFluidLayouts
     let unsupported = exported.replacingOccurrences(
-      of: #""version" : 2"#, with: #""version" : 999"#)
+      of: "\"version\" : \(TypebarSettingsDocument.currentVersion)", with: #""version" : 999"#)
     XCTAssertThrowsError(try SettingsJSONCommandImport.apply(unsupported, to: target)) {
       XCTAssertEqual($0 as? SettingsJSONCommandError, .unsupportedVersion(999))
     }
@@ -26051,7 +26051,7 @@ final class TypingEngineTests: XCTestCase {
       deletedResultFilterPresetIDs: [deletedResultFilterPresetID],
       activeTestSelection: activeTestSelection, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(archive.version, 9)
+    XCTAssertEqual(archive.version, 10)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])
@@ -26197,10 +26197,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertNil(
       try TypebarDataTransfer.importArchive(from: invalidSelectionData).activeTestSelection)
 
-    versionTwoPayload["version"] = 10
+    let unsupportedVersion = TypebarArchive.currentVersion + 1
+    versionTwoPayload["version"] = unsupportedVersion
     let futureData = try JSONSerialization.data(withJSONObject: versionTwoPayload)
     XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: futureData)) { error in
-      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(10))
+      XCTAssertEqual(error as? DataTransferError, .unsupportedVersion(unsupportedVersion))
     }
   }
 

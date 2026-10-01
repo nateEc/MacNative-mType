@@ -17,6 +17,11 @@ enum CustomTextPolicy {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && text.count <= maximumLength
     }
 
+    static func isValid(_ text: String, configuration: TestConfiguration) -> Bool {
+        isValid(text) && (configuration.mode != .custom || !configuration.usesCustomTextPipeDelimiter
+            || !CustomSectionWordStream.sourceSections(from: text, usesPipe: true).isEmpty)
+    }
+
     static func sections(in text: String) -> [String] {
         let values = text.split(separator: "|", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }

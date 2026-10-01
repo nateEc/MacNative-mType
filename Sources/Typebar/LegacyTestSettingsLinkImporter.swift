@@ -12,6 +12,7 @@ enum LegacyTestSettingsLinkImporter {
     let wordLimit: Int?
     let sectionLimit: Int?
     let ordering: CustomTextOrdering
+    var pipeDelimiter: Bool? = nil
   }
 
   enum ImportError: Error, Equatable, LocalizedError {
@@ -40,6 +41,7 @@ enum LegacyTestSettingsLinkImporter {
     let wordLimit: Int?
     let sectionLimit: Int?
     let ordering: CustomTextOrdering
+    let pipeDelimiter: Bool
   }
 
   private struct Payload {
@@ -109,6 +111,7 @@ enum LegacyTestSettingsLinkImporter {
     var customTextCompletion = old.customTextCompletion
     var customTextSectionLimit = old.customTextSectionLimit
     var customTextOrdering = old.customTextOrdering
+    var customTextPipeDelimiter = old.customTextPipeDelimiter
     var language = payload.language ?? old.language
     var customText = current.customText
     var quoteID = mode == .quote ? current.quoteID : nil
@@ -119,6 +122,7 @@ enum LegacyTestSettingsLinkImporter {
         customTextCompletion = custom.completion
         customTextSectionLimit = custom.sectionLimit
         customTextOrdering = custom.ordering
+        customTextPipeDelimiter = custom.pipeDelimiter
         duration = custom.duration
         wordLimit = custom.wordLimit
       }
@@ -132,6 +136,7 @@ enum LegacyTestSettingsLinkImporter {
       customTextCompletion = customTextFallback.completion
       customTextSectionLimit = customTextFallback.sectionLimit
       customTextOrdering = customTextFallback.ordering
+      customTextPipeDelimiter = customTextFallback.pipeDelimiter
       duration = customTextFallback.duration
       wordLimit = customTextFallback.wordLimit
     }
@@ -225,6 +230,7 @@ enum LegacyTestSettingsLinkImporter {
       englishVariant: old.englishVariant, quoteLength: quoteLength, quoteLengths: quoteLengths,
       quoteSelectionMode: quoteSelectionMode, customTextCompletion: customTextCompletion,
       customTextSectionLimit: customTextSectionLimit, customTextOrdering: customTextOrdering,
+      customTextPipeDelimiter: customTextPipeDelimiter,
       mixedLanguageComponents: old.mixedLanguageComponents, modifiers: modifiers,
       contentOptions: options, challengeID: nil)
     return .init(configuration: configuration, quoteID: quoteID, customText: customText)
@@ -324,10 +330,10 @@ enum LegacyTestSettingsLinkImporter {
           let pieces = rawText as? [String]
     else { throw ImportError.unsupportedSetting }
 
-    let currentUsesSections = current.configuration.customTextCompletion == .sections
     let providedPipe = try optionalBoolean(object["pipeDelimiter"])
     let legacyDelimiter = try optionalString(object["delimiter"])
-    let usesPipe = currentUsesSections || providedPipe == true || legacyDelimiter == "|"
+    let usesPipe = providedPipe ?? legacyDelimiter.map { $0 == "|" }
+      ?? current.configuration.usesCustomTextPipeDelimiter
     let text = pieces.joined(separator: usesPipe ? "|" : " ")
     guard CustomTextPolicy.isValid(text) else { throw ImportError.unsupportedSetting }
 
@@ -335,7 +341,8 @@ enum LegacyTestSettingsLinkImporter {
     let limit = try customTextLimit(object, text: text, usesPipe: usesPipe, current: current)
     return .init(
       text: text, completion: limit.completion, duration: limit.duration,
-      wordLimit: limit.wordLimit, sectionLimit: limit.sectionLimit, ordering: ordering)
+      wordLimit: limit.wordLimit, sectionLimit: limit.sectionLimit, ordering: ordering,
+      pipeDelimiter: usesPipe)
   }
 
   private static func customTextOrdering(_ value: Any?) throws -> CustomTextOrdering {
