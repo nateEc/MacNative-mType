@@ -5893,13 +5893,14 @@ struct GeneratedWordChunk {
 
   init(source: String, configuration: TestConfiguration, wordOffset: Int = 0,
     preservesNoSpaceBoundaries: Bool = false, showAllLines: Bool = false,
+    preservesWordOrder: Bool = false,
     nextRandomCaseBit: () -> Bool = { Bool.random() }) {
     self.source = source
     let batch = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
       language: configuration.language, preservesNoSpaceBoundaries: preservesNoSpaceBoundaries,
       wordOffset: wordOffset, wordBound: GeneratedWordBoundPolicy.bound(for: configuration,
         wordOffset: wordOffset, sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source),
-        showAllLines: showAllLines),
+        showAllLines: showAllLines), preservesWordOrder: preservesWordOrder,
       nextRandomCaseBit: nextRandomCaseBit)
     transformed = batch.text
     noSpaceWordLengths = batch.noSpaceWordLengths
@@ -6033,6 +6034,7 @@ struct TestSessionFactory {
     streamPrompt: String? = nil,
     streamNoSpaceBoundarySource: String? = nil,
     weakSpotScores: WeakSpotScores = .init(), showAllLines: Bool = false,
+    nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> TypingSession {
     let prompt: String
@@ -6064,6 +6066,7 @@ struct TestSessionFactory {
     var usesFreshGeneratedWords = false
     var usesGeneratedStream = false
     var usesGeneratedCode = false
+    var preservesGeneratedWordOrder = false
     var generatedCodeContinuation: GeneratedCodeContinuation?
     var generatedCodeChunk: GeneratedWordChunk?
     let streamWordCount = streamWordCount(for: configuration, showAllLines: showAllLines)
@@ -6152,13 +6155,15 @@ struct TestSessionFactory {
             finiteCustomTextStream = stream
           } else if streamsSequentialCustomText,
             var stream = CustomSequentialWordStream(
-              source: source, ordering: configuration.customTextOrdering)
+              source: source, ordering: configuration.customTextOrdering,
+              reversesCandidatePool: configuration.modifiers.contains(.backwards))
           {
             let targetWords = configuration.customTextCompletion == .words
               && (configuration.wordLimit ?? 0) > 0
               ? min(configuration.wordLimit ?? 100, 100) : 100
-            prompt = stream.nextWords(count: targetWords)
+            prompt = stream.nextWords(count: targetWords, random: nextRandomWordIndex)
             sequentialCustomWordStream = stream
+            preservesGeneratedWordOrder = true
           } else {
             prompt = CustomTextOrderPolicy.prompt(
               from: source, ordering: configuration.customTextOrdering,
@@ -6166,7 +6171,10 @@ struct TestSessionFactory {
                 ? CustomTextOrderPolicy.maximumCompleteRandomWordCount
                 : hasCompleteRandomWordPrompt ? configuration.wordLimit : nil,
               lazyLanguage: configuration.modifiers.contains(.lazyLatin)
-                ? configuration.language : nil)
+                ? configuration.language : nil,
+              reversesCandidatePool: configuration.modifiers.contains(.backwards),
+              random: nextRandomWordIndex)
+            preservesGeneratedWordOrder = configuration.customTextOrdering != .inOrder
             if streamsRandomCustomText {
               randomCustomPreviousWords = Array(
                 prompt.split(whereSeparator: \.isWhitespace).suffix(2).map(String.init))
@@ -6192,10 +6200,12 @@ struct TestSessionFactory {
       boundarySource.replacingOccurrences(of: " ", with: "") == prompt {
       let chunk = GeneratedWordChunk(source: boundarySource, configuration: configuration,
         preservesNoSpaceBoundaries: true, showAllLines: generatesWholeLines,
+        preservesWordOrder: preservesGeneratedWordOrder,
         nextRandomCaseBit: nextRandomCaseBit)
       batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
     } else {
       let chunk = GeneratedWordChunk(source: prompt, configuration: configuration, showAllLines: generatesWholeLines,
+        preservesWordOrder: preservesGeneratedWordOrder,
         nextRandomCaseBit: nextRandomCaseBit)
       batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
     }
@@ -6533,7 +6543,7 @@ struct CustomSequentialWordStream {
   private var shuffledIndices: [Int] = []
   private var hasEmittedWord = false
 
-  init?(source: String, ordering: CustomTextOrdering) {
+  init?(source: String, ordering: CustomTextOrdering, reversesCandidatePool: Bool = false) {
     guard ordering != .random else { return nil }
     var words: [String] = []
     var prefixes: [String] = []
@@ -6562,6 +6572,7 @@ struct CustomSequentialWordStream {
       prefixes.append(prefix)
     }
     guard !words.isEmpty else { return nil }
+    if reversesCandidatePool { words.reverse() }
     self.words = words
     self.prefixes = prefixes
     self.trailingWhitespace = whitespace
@@ -6635,21 +6646,28 @@ enum CustomTextOrderPolicy {
   static func randomWords(
     from tokens: [String], count: Int, avoiding previous: [String] = [],
     lazyLanguage: TypingLanguage? = nil,
+    reversesCandidatePool: Bool = false,
     random: () -> Int = { Int.random(in: Int.min...Int.max) }
   ) -> [String] {
     guard !tokens.isEmpty, count > 0 else { return [] }
+    // Mirror a draw into the original pool instead of copying a reversed
+    // array on every continuation. The candidate order is identical.
+    func drawCandidate() -> String {
+      let index = Int(random().magnitude % UInt(tokens.count))
+      return tokens[reversesCandidatePool ? tokens.count - 1 - index : index]
+    }
     var chosen: [String] = []
     chosen.reserveCapacity(count)
     var recent = Array(previous.suffix(2)).map {
       recentWordKey($0, lazyLanguage: lazyLanguage)
     }
     for _ in 0..<count {
-      var candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
+      var candidate = drawCandidate()
       if tokens.count >= 4 {
         var attempts = 0
         while attempts < 100 && recent.contains(candidateWordKey(candidate, lazyLanguage: lazyLanguage)) {
           attempts += 1
-          candidate = tokens[Int(random().magnitude % UInt(tokens.count))]
+          candidate = drawCandidate()
         }
       }
       chosen.append(candidate)
@@ -6663,6 +6681,7 @@ enum CustomTextOrderPolicy {
     from text: String, ordering: CustomTextOrdering,
     wordCount: Int? = nil,
     lazyLanguage: TypingLanguage? = nil,
+    reversesCandidatePool: Bool = false,
     random: () -> Int = { Int.random(in: Int.min...Int.max) }
   ) -> String {
     let tokens = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
@@ -6672,12 +6691,14 @@ enum CustomTextOrderPolicy {
       return text
     case .shuffled:
       guard tokens.count > 1 else { return text }
-      var stream = CustomSequentialWordStream(source: text, ordering: .shuffled)!
+      var stream = CustomSequentialWordStream(source: text, ordering: .shuffled,
+        reversesCandidatePool: reversesCandidatePool)!
       return stream.nextWords(count: tokens.count, random: random)
     case .random:
       let count = wordCount.map { max(1, $0) } ?? max(tokens.count, 100)
       return randomWords(
-        from: tokens, count: count, lazyLanguage: lazyLanguage, random: random
+        from: tokens, count: count, lazyLanguage: lazyLanguage,
+        reversesCandidatePool: reversesCandidatePool, random: random
       ).joined(separator: " ")
     }
   }

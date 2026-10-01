@@ -1268,6 +1268,7 @@ enum TestModifierPolicy {
   static func transformedBatch(
     _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
     preservesNoSpaceBoundaries: Bool = false, wordOffset: Int = 0, wordBound: Int? = nil,
+    preservesWordOrder: Bool = false,
     nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> TransformedPromptBatch {
     let presented = language?.presentationText(prompt) ?? prompt
@@ -1280,9 +1281,9 @@ enum TestModifierPolicy {
     // mark. Split scalars so the mark stays in its word, not in the separator.
     var words = presented.unicodeScalars.split(separator: " ", omittingEmptySubsequences: false)
       .map { String(String.UnicodeScalarView($0)) }
-    // A flat finite pool is reversed before words are selected/altered. Pipe
-    // cursors reverse their candidate pool themselves, not its inner words.
-    if modifiers.contains(.backwards) { words.reverse() }
+    // Prepared pools/cursors retain their actual draw order; only the
+    // standalone whole-text entry reverses its flat finite pool here.
+    if modifiers.contains(.backwards), !preservesWordOrder { words.reverse() }
     var output = ""
     var targets: [String] = []
     var generatedWordIndex = wordOffset
@@ -5802,11 +5803,12 @@ struct TypingSession {
         count: CustomTextOrderPolicy.maximumCompleteRandomWordCount,
         avoiding: randomCustomPreviousWords,
         lazyLanguage: configuration.modifiers.contains(.lazyLatin)
-          ? configuration.language : nil)
+          ? configuration.language : nil,
+        reversesCandidatePool: configuration.modifiers.contains(.backwards))
       randomCustomPreviousWords = Array(words.suffix(2))
       let source = words.joined(separator: " ")
       let chunk = GeneratedWordChunk(source: source, configuration: configuration,
-        wordOffset: noSpaceTargetWords.count)
+        wordOffset: noSpaceTargetWords.count, preservesWordOrder: true)
       let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
       let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true ? "" : " "
       let previousEnd = promptCharacters.count + separator.count
@@ -5825,7 +5827,7 @@ struct TypingSession {
       let source = stream.nextWords(count: 100)
       sequentialCustomWordStream = stream
       let chunk = GeneratedWordChunk(source: source, configuration: configuration,
-        wordOffset: noSpaceTargetWords.count)
+        wordOffset: noSpaceTargetWords.count, preservesWordOrder: true)
       let previousEnd = promptCharacters.count
       appendPrompt(chunk.transformed)
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
