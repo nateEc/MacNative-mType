@@ -38,13 +38,15 @@ final class CustomFunboxWordTargetsTests: XCTestCase {
     XCTAssertEqual(session.errors, 0)
   }
 
-  func testMorsePipeWordBudgetEndsAtWordThreeDespiteWholeSectionPrefetch() {
+  func testMorsePipeWordModeConsumesTheWholeSectionPrefetch() {
     var session = TestSessionFactory.make(configuration: configuration(.words, limit: 3),
       customText: "a b | e t")
     XCTAssertEqual(session.prompt, cycle + ".-/-.../")
     session.insertBatch(".-/-..././", at: start)
+    XCTAssertEqual(session.outcome, .active)
+    session.insertBatch("-/.-/-.../", at: start.addingTimeInterval(1))
     XCTAssertEqual(session.outcome, .completed)
-    XCTAssertEqual(session.completedWordCount, 3)
+    XCTAssertEqual(session.completedWordCount, 6)
     XCTAssertEqual(session.errors, 0)
   }
 
@@ -59,13 +61,15 @@ final class CustomFunboxWordTargetsTests: XCTestCase {
     XCTAssertEqual(session.sectionProgress?.completed, 3)
   }
 
-  func testEveryCodeLanguageKeepsMorseTargetsAndWordLimits() {
+  func testEveryCodeLanguageKeepsMorseTargetsAndTheWholePipeQueue() {
     for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
       var session = TestSessionFactory.make(configuration: configuration(.words, limit: 3,
         language: language), customText: "a b | e t")
       session.insertBatch(".-/-..././", at: start)
+      XCTAssertEqual(session.outcome, .active, language.displayName)
+      session.insertBatch("-/.-/-.../", at: start.addingTimeInterval(1))
       XCTAssertEqual(session.outcome, .completed, language.displayName)
-      XCTAssertEqual(session.completedWordCount, 3, language.displayName)
+      XCTAssertEqual(session.completedWordCount, 6, language.displayName)
       XCTAssertEqual(session.errors, 0, language.displayName)
     }
   }
@@ -161,9 +165,12 @@ final class CustomFunboxWordTargetsTests: XCTestCase {
       modifier: .underscoreSeparators), customText: "a b | e t")
     XCTAssertEqual(session.prompt, "a_b_et_a_b_")
     session.insertBatch("a_b_e", at: start)
-    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.outcome, .active)
     XCTAssertEqual(session.completedWordCount, 3)
-    XCTAssertEqual(session.wordReviews.map(\.target), ["a_", "b_", "e"])
+    session.insertBatch("t_a_b_", at: start.addingTimeInterval(1))
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 6)
+    XCTAssertEqual(session.wordReviews.map(\.target), ["a_", "b_", "e", "t_", "a_", "b_"])
     XCTAssertEqual(session.errors, 0)
   }
 

@@ -25,14 +25,16 @@ final class CustomDelimiterTests: XCTestCase {
     return object["customTextPipeDelimiter"] as? Bool
   }
 
-  func testWordLimitedPipePromptSelectsWholeSectionsButFinishesAtTheActualWordBudget() throws {
+  func testWordLimitedPipePromptFinishesAfterItsWholeGeneratedQueue() throws {
     var session = TestSessionFactory.make(configuration: try configuration(.words, pipe: true, limit: 3),
       customText: "amber bay | cedar dune")
     XCTAssertEqual(session.prompt, "amber bay cedar dune amber bay")
     XCTAssertNil(session.sectionProgress)
     session.insertBatch("amber bay cedar", at: start)
+    XCTAssertEqual(session.outcome, .active)
+    session.insertBatch(" dune amber bay", at: start.addingTimeInterval(1))
     XCTAssertEqual(session.outcome, .completed)
-    XCTAssertEqual(session.completedWordCount, 3)
+    XCTAssertEqual(session.completedWordCount, 6)
     XCTAssertEqual(session.errors, 0)
   }
 
@@ -191,13 +193,15 @@ final class CustomDelimiterTests: XCTestCase {
     XCTAssertEqual(archive.version, 10)
   }
 
-  func testEveryCodeChoiceHonorsTheIndependentPipeWordBudget() throws {
+  func testEveryCodeChoiceConsumesTheWholePipeWordQueue() throws {
     for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
       var session = TestSessionFactory.make(configuration: try configuration(.words, pipe: true,
         limit: 3, language: language), customText: "let vessel | seed() cabin")
       session.insertBatch("let vessel seed()", at: start)
+      XCTAssertEqual(session.outcome, .active, language.displayName)
+      session.insertBatch(" cabin let vessel", at: start.addingTimeInterval(1))
       XCTAssertEqual(session.outcome, .completed, language.displayName)
-      XCTAssertEqual(session.completedWordCount, 3, language.displayName)
+      XCTAssertEqual(session.completedWordCount, 6, language.displayName)
       XCTAssertEqual(session.errors, 0, language.displayName)
     }
   }
@@ -273,7 +277,7 @@ final class CustomDelimiterTests: XCTestCase {
   func testOldResultKeepsItsStoredPromptAndReplayWhenDelimiterFieldIsMissing() throws {
     var session = TestSessionFactory.make(configuration: try configuration(.words, pipe: true,
       limit: 3, language: .codeSwift), customText: "let vessel | seed() cabin")
-    session.insertBatch("let vessel seed()", at: start)
+    session.insertBatch("let vessel seed() cabin let vessel", at: start)
     let result = try XCTUnwrap(session.result())
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any])
     var config = try XCTUnwrap(object["configuration"] as? [String: Any])

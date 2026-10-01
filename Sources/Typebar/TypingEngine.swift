@@ -5764,7 +5764,13 @@ struct TypingSession {
       case .time:
         break
       case .words:
-        if tracksNoSpaceWordBursts {
+        if configuration.usesCustomTextPipeDelimiter, customSectionWordStream != nil {
+          // Pipe initialization can prefetch whole sections past wordLimit.
+          // Match the generated queue, not an earlier configured word index;
+          // a partial batch must still continue before final-word rules apply.
+          if !configuration.isInfinite, !usesIncrementalPromptExtension,
+            shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
+        } else if tracksNoSpaceWordBursts {
           if reachedConfiguredWordLimit { complete(at: date) }
         } else if shouldFinishEnglishWordsTest {
           complete(at: date)

@@ -72,6 +72,7 @@ struct CustomSectionWordStream {
     }
     let previousSectionCount = selectedSections
     var lastSeparator = ""
+    var lastWordIsBlank = false
     for _ in 0..<maximumWords where hasSectionWordsRemaining {
       if pendingIndex >= pendingWords.count {
         let index = nextSectionIndex(random: random)
@@ -92,6 +93,7 @@ struct CustomSectionWordStream {
       let separator = commits ? " " : ""
       let transformed = altered + separator
       lastSeparator = altered.hasSuffix("\n") ? "\n" : separator
+      lastWordIsBlank = altered == "\n"
       recentWords = Array((recentWords + [altered]).suffix(2))
       chunk.text += transformed
       length += transformed.count
@@ -101,12 +103,14 @@ struct CustomSectionWordStream {
       }
       if pendingIndex == pendingWords.count { chunk.sectionEndOffsets.append(length) }
       // The source's initial pipe/word prompt prefetches complete sections;
-      // actual completion still uses its independent word budget. Later
-      // chunks consume only that budget's remaining words.
+      // completion consumes that entire generated queue. Later chunks are
+      // bounded by the configured budget's remaining words.
       if initial && finiteWords && pendingIndex == pendingWords.count,
         selectedSections - previousSectionCount >= initialSectionQuota { break }
     }
-    if !hasRemaining && !lastSeparator.isEmpty {
+    // A newline-only candidate is an empty word with a real commit. Removing
+    // that commit would erase its only target and silently skip the slot.
+    if !hasRemaining && !lastSeparator.isEmpty && !lastWordIsBlank {
       chunk.text.removeLast(lastSeparator.count)
       if chunk.sectionEndOffsets.last == length {
         chunk.sectionEndOffsets[chunk.sectionEndOffsets.count - 1] -= lastSeparator.count
