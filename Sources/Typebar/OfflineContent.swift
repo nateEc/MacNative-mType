@@ -5011,69 +5011,89 @@ enum CodeLanguageCatalog {
 /// Self-authored fragments and generated units keep code input, indentation and
 /// replay observable without importing an upstream corpus or language asset.
 enum CodePracticeContent {
-  static func prompt(language: TypingLanguage, targetTokenCount: Int) -> String {
-    let blockCount = max(1, Int(ceil(Double(max(targetTokenCount, 1)) / 8)))
+  static func supportsIndexedContinuation(for language: TypingLanguage) -> Bool {
+    switch language {
+    case .codePython, .codePython1k, .codePython2k, .codePython5k,
+      .codeJavaScript, .codeJavaScript1k, .codeSwift, .codeCSharp, .codeC, .codeCPP,
+      .codeGo, .codeJava, .codeRuby, .codePerl, .codeSQL, .codeBash, .codeVimscript,
+      .codeCSS, .codeDart, .codeRust, .codeKotlin, .codeTypeScript,
+      .codeR, .codeR2k, .codeLua, .codeLuau, .codePHP:
+      return true
+    default: return false
+    }
+  }
+
+  static func unitCount(forTargetTokenCount count: Int) -> Int {
+    max(1, Int(ceil(Double(max(count, 1)) / 8)))
+  }
+
+  static func prompt(
+    language: TypingLanguage, targetTokenCount: Int, startUnitIndex: Int = 0
+  ) -> String {
+    let blockCount = unitCount(forTargetTokenCount: targetTokenCount)
+    let firstUnit = max(0, startUnitIndex)
+    let units = firstUnit..<(firstUnit + blockCount)
     if language == .codePython || language == .codePython1k
       || language == .codePython2k || language == .codePython5k
     {
-      return (0..<blockCount).map { pythonBlock(at: $0, language: language) }.joined(separator: "\n")
+      return units.map { pythonBlock(at: $0, language: language) }.joined(separator: "\n")
     }
     if language == .codeJavaScript || language == .codeJavaScript1k {
-      return (0..<blockCount).map {
+      return units.map {
         javascriptBlock(at: $0, extended: language == .codeJavaScript1k)
       }.joined(separator: "\n")
     }
     if language == .codeSwift {
-      return (0..<blockCount).map(swiftBlock).joined(separator: "\n")
+      return units.map(swiftBlock).joined(separator: "\n")
     }
     if language == .codeCSharp {
-      return (0..<blockCount).map(csharpBlock).joined(separator: "\n")
+      return units.map(csharpBlock).joined(separator: "\n")
     }
     if language == .codeC {
-      return (0..<blockCount).map(cBlock).joined(separator: "\n")
+      return units.map(cBlock).joined(separator: "\n")
     }
     if language == .codeCPP {
-      return (0..<blockCount).map(cppBlock).joined(separator: "\n")
+      return units.map(cppBlock).joined(separator: "\n")
     }
     if language == .codeGo {
-      return (0..<blockCount).map(goBlock).joined(separator: "\n")
+      return units.map(goBlock).joined(separator: "\n")
     }
     if language == .codeJava {
-      return (0..<blockCount).map(javaBlock).joined(separator: "\n")
+      return units.map(javaBlock).joined(separator: "\n")
     }
     if language == .codeRuby {
-      return (0..<blockCount).map(rubyBlock).joined(separator: "\n")
+      return units.map(rubyBlock).joined(separator: "\n")
     }
     if language == .codePerl {
-      return (0..<blockCount).map(perlBlock).joined(separator: "\n")
+      return units.map(perlBlock).joined(separator: "\n")
     }
     if language == .codeSQL {
-      return (0..<blockCount).map(sqlBlock).joined(separator: "\n")
+      return units.map(sqlBlock).joined(separator: "\n")
     }
     if language == .codeBash {
-      return (0..<blockCount).map(bashBlock).joined(separator: "\n")
+      return units.map(bashBlock).joined(separator: "\n")
     }
     if language == .codeHTML {
       let sections = (0..<blockCount).map(htmlSection).joined(separator: "\n")
       return "<main class=\"practice\">\n\(sections)\n</main>"
     }
     if language == .codeVimscript {
-      return (0..<blockCount).map(vimscriptBlock).joined(separator: "\n")
+      return units.map(vimscriptBlock).joined(separator: "\n")
     }
     if language == .codeCSS {
-      return (0..<blockCount).map(cssRule).joined(separator: "\n")
+      return units.map(cssRule).joined(separator: "\n")
     }
     if language == .codeDart {
-      return (0..<blockCount).map(dartBlock).joined(separator: "\n")
+      return units.map(dartBlock).joined(separator: "\n")
     }
     if language == .codeRust {
-      return (0..<blockCount).map(rustBlock).joined(separator: "\n")
+      return units.map(rustBlock).joined(separator: "\n")
     }
     if language == .codeKotlin {
-      return (0..<blockCount).map(kotlinBlock).joined(separator: "\n")
+      return units.map(kotlinBlock).joined(separator: "\n")
     }
     if language == .codeTypeScript {
-      return (0..<blockCount).map(typeScriptBlock).joined(separator: "\n")
+      return units.map(typeScriptBlock).joined(separator: "\n")
     }
     if language == .codeJavaScriptReact {
       return "import React from \"react\";\n"
@@ -5092,7 +5112,7 @@ enum CodePracticeContent {
     if language == .codeR || language == .codeR2k || language == .codeLua
       || language == .codeLuau || language == .codePHP
     {
-      return (0..<blockCount).map { scriptBlock(language: language, at: $0) }.joined(separator: "\n")
+      return units.map { scriptBlock(language: language, at: $0) }.joined(separator: "\n")
     }
     let blocks = blocks(for: language)
     return (0..<blockCount).map { blocks[$0 % blocks.count] }.joined(separator: "\n")
@@ -5887,6 +5907,24 @@ struct GeneratedStreamContinuation {
   }
 }
 
+/// Code batches advance by whole authored units, not by whitespace tokens.
+/// Document wrappers and static snippet corpora retain their existing policy.
+struct GeneratedCodeContinuation {
+  let configuration: TestConfiguration
+  let batchTokenCount: Int
+  private(set) var nextUnitIndex: Int
+
+  mutating func nextChunk() -> GeneratedWordChunk {
+    // Own the join newline so transformations and hidden word boundaries
+    // account for it together; noSpaces removes spaces, not code line feeds.
+    let source = "\n" + CodePracticeContent.prompt(
+      language: configuration.language, targetTokenCount: batchTokenCount,
+      startUnitIndex: nextUnitIndex)
+    nextUnitIndex += CodePracticeContent.unitCount(forTargetTokenCount: batchTokenCount)
+    return GeneratedWordChunk(source: source, configuration: configuration)
+  }
+}
+
 struct TestSessionFactory {
   static func make(
     configuration: TestConfiguration,
@@ -5919,6 +5957,7 @@ struct TestSessionFactory {
     var finiteCustomTextStream: CustomFiniteTextStream?
     var usesFreshGeneratedWords = false
     var usesGeneratedStream = false
+    var usesGeneratedCode = false
     let streamWordCount = streamWordCount(for: configuration)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -5929,6 +5968,12 @@ struct TestSessionFactory {
     {
       prompt = streamPrompt
       usesGeneratedStream = true
+    } else if let streamWordCount,
+      CodePracticeContent.supportsIndexedContinuation(for: configuration.language)
+    {
+      prompt = CodePracticeContent.prompt(
+        language: configuration.language, targetTokenCount: streamWordCount)
+      usesGeneratedCode = true
     } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
       usesFreshGeneratedWords = !configuration.language.isCodeLanguage
       prompt = weakSpotPrompt(
@@ -6055,6 +6100,13 @@ struct TestSessionFactory {
         batchWordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
         nextTokenIndex: GeneratedPromptChunkPolicy.wordCount(for: configuration))
       : nil
+    var generatedCodeContinuation = repeats && usesGeneratedCode
+      ? GeneratedCodeContinuation(
+        configuration: configuration,
+        batchTokenCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
+        nextUnitIndex: CodePracticeContent.unitCount(
+          forTargetTokenCount: GeneratedPromptChunkPolicy.wordCount(for: configuration)))
+      : nil
     let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
       && (configuration.isInfinite
       || (configuration.mode == .custom
@@ -6064,9 +6116,11 @@ struct TestSessionFactory {
     let initialNoSpaceWordEndIndices: [Int]
     let initialNoSpaceTargetWords: [String]
     if primesRepeatedPrompt {
-      let separator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? "" : " "
+      let separator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+        || generatedCodeContinuation != nil ? "" : " "
       let nextChunk = generatedWordContinuation?.nextChunk()
         ?? generatedStreamContinuation?.nextChunk()
+        ?? generatedCodeContinuation?.nextChunk()
       initialPrompt = transformedPrompt + separator + (nextChunk?.transformed ?? transformedPrompt)
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
         for: noSpaceWordLengths + (nextChunk?.noSpaceWordLengths ?? noSpaceWordLengths))
@@ -6079,9 +6133,11 @@ struct TestSessionFactory {
     return TypingSession(
       configuration: configuration, prompt: initialPrompt,
       repeatingPrompt: repeats && generatedWordContinuation == nil
-        && generatedStreamContinuation == nil ? transformedPrompt : nil,
+        && generatedStreamContinuation == nil && generatedCodeContinuation == nil
+        ? transformedPrompt : nil,
       generatedWordContinuation: generatedWordContinuation,
       generatedStreamContinuation: generatedStreamContinuation,
+      generatedCodeContinuation: generatedCodeContinuation,
       sectionEndIndices: sectionEndIndices,
       randomCustomSourceTokens: streamsRandomCustomText ? randomCustomSourceTokens : nil,
       randomCustomPreviousWords: randomCustomPreviousWords,
@@ -6090,9 +6146,11 @@ struct TestSessionFactory {
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeats && generatedWordContinuation == nil
-        && generatedStreamContinuation == nil ? noSpaceWordLengths : [],
+        && generatedStreamContinuation == nil && generatedCodeContinuation == nil
+        ? noSpaceWordLengths : [],
       repeatingNoSpaceTargetWords: repeats && generatedWordContinuation == nil
-        && generatedStreamContinuation == nil ? noSpaceTargetWords : [])
+        && generatedStreamContinuation == nil && generatedCodeContinuation == nil
+        ? noSpaceTargetWords : [])
   }
 
   static func weakSpotPrompt(
