@@ -3745,6 +3745,13 @@ struct TypingSession {
     )
   }
 
+  var promptGlyphsInDisplayOrder: [TypingPromptGlyph] {
+    let glyphs = promptGlyphs
+    return PromptGlyphLayout.indices(
+      glyphs: glyphs, words: promptWordPresentations,
+      hideExtraLetters: configuration.rules.hideExtraLetters).map { glyphs[$0] }
+  }
+
   /// A linear snapshot of word ownership for presentation, including retained
   /// no-space boundaries and extra letters that have no target position.
   var promptWordPresentations: [TypingPromptWordPresentation] {

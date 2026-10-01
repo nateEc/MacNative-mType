@@ -431,20 +431,21 @@ private struct PromptFlowLayout: Layout {
 
 private struct TapePracticePrompt: View {
   let prompt: AttributedString
-  let typed: String
+  let anchorCharacterIndex: Int
   let mode: PracticeTapeMode
   let margin: Double
-  let font: Font
+  let font: NSFont
   let fontSize: Double
   let animatesScroll: Bool
 
   var body: some View {
     GeometryReader { proxy in
       let offset = PracticeTapePolicy.horizontalOffset(
-        typed: typed, mode: mode, margin: margin, glyphWidth: fontSize * 0.62,
+        prompt: prompt, anchorCharacterIndex: anchorCharacterIndex,
+        mode: mode, margin: margin, font: font,
         containerWidth: proxy.size.width)
       Text(prompt)
-        .font(font)
+        .font(Font(font))
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
         .offset(x: -offset)
@@ -2713,10 +2714,10 @@ private struct ContentView: View {
     return Group {
       if practiceVisualEffect.usesASL {
         ASLPracticePrompt(
-          glyphs: session.promptGlyphs, fontSize: settings.fontSize, accent: activeTheme.accent)
+          glyphs: session.promptGlyphsInDisplayOrder, fontSize: settings.fontSize, accent: activeTheme.accent)
       } else if practiceVisualEffect.usesChoo {
         ChooPracticePrompt(
-          glyphs: session.promptGlyphs,
+          glyphs: session.promptGlyphsInDisplayOrder,
           font: practicePromptNSFont(size: settings.fontSize),
           palette: ChooGlyphPalette(
             theme: activeTheme, flipsCompletionAndFuture: settings.flipTestColors,
@@ -2726,9 +2727,12 @@ private struct ContentView: View {
             .ignoringSystemMotionModifiers.isDisjoint(with: session.configuration.modifiers))
       } else if usesTapePractice {
         TapePracticePrompt(
-          prompt: rendering.text, typed: session.typed, mode: settings.practiceTapeMode,
+          prompt: rendering.text,
+          anchorCharacterIndex: PracticeTapePolicy.anchorCharacterIndex(
+            session: session, rendering: rendering, mode: settings.practiceTapeMode),
+          mode: settings.practiceTapeMode,
           margin: settings.practiceTapeMargin,
-          font: Font(practicePromptNSFont(size: settings.fontSize)),
+          font: practicePromptNSFont(size: settings.fontSize),
           fontSize: settings.fontSize, animatesScroll: settings.smoothPracticeLineScroll)
       } else {
         Text(rendering.text)
@@ -2909,17 +2913,17 @@ private struct ContentView: View {
   }
 
   private var renderedPrompt: PromptRendering {
-    var output = AttributedString()
-    var glyphCharacterOffsets: [Int: Int] = [:]
     let completedCharacterIndices = session.completedPromptCharacterIndices
     let promptHighlightMode = effectivePromptHighlightMode
     let glyphs = session.promptGlyphs
+    let words = session.promptWordPresentations
+    let indices = PromptGlyphLayout.indices(
+      glyphs: glyphs, words: words, hideExtraLetters: session.configuration.rules.hideExtraLetters)
     let appearances = PromptGlyphAppearance.plan(
-      glyphs: glyphs, words: session.promptWordPresentations,
+      glyphs: glyphs, words: words,
       mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,
       typedEffect: settings.typedCharacterEffect)
-    for (index, glyph) in glyphs.enumerated() {
-      glyphCharacterOffsets[index] = output.characters.count
+    return PromptRendering.make(glyphs: glyphs, indices: indices) { index, glyph in
       let replacesTypo = glyph.typedCharacter != nil && settings.typoIndicatorStyle.replacesTarget
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
         isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
@@ -2941,8 +2945,7 @@ private struct ContentView: View {
       var character = AttributedString(displayedText)
       if session.configuration.modifiers.contains(.listening) {
         character.foregroundColor = .clear
-        output += character
-        continue
+        return character
       }
       if !usesNativeCaretOverlay, index == paceGuideIndex, glyph.state != .current {
         applyPaceCaret(to: &character)
@@ -2975,7 +2978,6 @@ private struct ContentView: View {
       if settings.typedCharacterEffect != .hide || !completedCharacterIndices.contains(index) {
         appearance.applyErrorUnderline(to: &character, errorColor: errorFeedbackColor)
       }
-      output += character
       if glyph.state == .incorrect,
         appearance.color != .hidden,
         settings.typoIndicatorStyle.showsHint,
@@ -2990,10 +2992,10 @@ private struct ContentView: View {
         // Reserve no additional horizontal advance: the hint sits under the
         // erroneous glyph instead of reflowing every following character.
         hint.kern = -settings.fontSize * 0.62
-        output += hint
+        character += hint
       }
+      return character
     }
-    return PromptRendering(text: output, glyphCharacterOffsets: glyphCharacterOffsets)
   }
 
   private var completedPromptColor: Color {

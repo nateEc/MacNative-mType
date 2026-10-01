@@ -49,6 +49,19 @@ struct PromptRendering {
   let text: AttributedString
   let glyphCharacterOffsets: [Int: Int]
 
+  static func make(
+    glyphs: [TypingPromptGlyph], indices: [Int],
+    renderGlyph: (Int, TypingPromptGlyph) -> AttributedString
+  ) -> Self {
+    var text = AttributedString()
+    var offsets: [Int: Int] = [:]
+    for index in indices {
+      offsets[index] = text.characters.count
+      text += renderGlyph(index, glyphs[index])
+    }
+    return Self(text: text, glyphCharacterOffsets: offsets)
+  }
+
   func characterOffset(forGlyphAt index: Int?) -> Int? {
     guard let index else { return nil }
     return glyphCharacterOffsets[index]
