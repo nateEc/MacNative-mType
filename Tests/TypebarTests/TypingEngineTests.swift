@@ -24813,7 +24813,8 @@ final class TypingEngineTests: XCTestCase {
       duration: 4)
 
     XCTAssertEqual(points.map(\.elapsed), [1, 2, 3, 4])
-    XCTAssertEqual(points.map(\.wpm), [24, 12, 8, 9])
+    // An active word containing a typo is not a correct prefix.
+    XCTAssertEqual(points.map(\.wpm), [24, 0, 8, 9])
     XCTAssertEqual(points.map(\.rawWpm), [24, 18, 8, 9])
     // Burst is the input activity in each window, independent of corrections.
     XCTAssertEqual(points.map(\.burstWpm), [24, 12, 0, 12])

@@ -101,9 +101,9 @@ final class UnicodeWordBurstTests: XCTestCase {
     XCTAssertEqual(points.map(\.burstWpm), [96])
     let point = ResultPerformanceTrace.point(prompt: "🦊a bay", events: events, elapsed: 0.5)
     XCTAssertEqual(point.burstWpm, 96)
-    // Whole-test WPM/Raw still have their existing independent accounting.
-    XCTAssertEqual(point.wpm, 36)
-    XCTAssertEqual(point.rawWpm, 36)
+    // Four UTF-16 units over the actual half-second interval.
+    XCTAssertEqual(point.wpm, 96)
+    XCTAssertEqual(point.rawWpm, 96)
   }
 
   func testReplayChartCountsNewlineInItsTimeWindowWithoutWordSubmitCredit() {

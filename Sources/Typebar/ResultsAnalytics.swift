@@ -1273,22 +1273,21 @@ enum ResultPerformanceTrace {
     let windowStart = max(0, safeElapsed.rounded(.up) - 1)
     var inputUnits = 0
     var windowErrors = 0
-    var errorActivity = ErrorActivityCursor(prompt: prompt, configuration: configuration)
+    var inputActivity = InputActivityCursor(prompt: prompt, configuration: configuration)
     for event in orderedEvents where event.offset <= safeElapsed {
-      let insertionErrors = errorActivity.apply(event)
+      let insertion = inputActivity.apply(event)
       if event.kind == .insert, windowStart == 0 || event.offset > windowStart {
         inputUnits += event.text.utf16.count
-        windowErrors += insertionErrors
+        windowErrors += insertion.errors
       }
-      apply(event, typed: &typed, forcedErrors: &forcedErrors)
+      apply(event, insertedText: insertion.text, typed: &typed, forcedErrors: &forcedErrors)
     }
-    let errors = errorCount(
-      typed: typed, prompt: Array(prompt), forcedErrors: forcedErrors)
-    let correct = max(0, typed.count - errors)
+    let correct = speedCredit(typed: typed, prompt: prompt,
+      forcedErrors: forcedErrors, configuration: configuration)
     return .init(
       elapsed: safeElapsed,
       wpm: wpm(characters: correct, elapsed: safeElapsed),
-      rawWpm: wpm(characters: typed.count, elapsed: safeElapsed),
+      rawWpm: wpm(characters: String(typed).utf16.count, elapsed: safeElapsed),
       burstWpm: intervalBurst(inputUnits: inputUnits, seconds: safeElapsed - windowStart),
       errorCount: windowErrors)
   }
@@ -1299,7 +1298,7 @@ enum ResultPerformanceTrace {
     duration: TimeInterval,
     configuration: TestConfiguration? = nil
   ) -> [ResultPerformancePoint] {
-    guard !prompt.isEmpty, !events.isEmpty,
+    guard (!prompt.isEmpty || configuration?.mode == .zen), !events.isEmpty,
       duration > 0, duration <= maximumChartDuration
     else { return [] }
 
@@ -1310,7 +1309,7 @@ enum ResultPerformanceTrace {
     var typed: [Character] = []
     var forcedErrors: [Bool] = []
     var previousBoundary: TimeInterval = 0
-    var errorActivity = ErrorActivityCursor(prompt: prompt, configuration: configuration)
+    var inputActivity = InputActivityCursor(prompt: prompt, configuration: configuration)
 
     return sampleTimes.map { elapsed in
       var inputUnits = 0
@@ -1318,18 +1317,19 @@ enum ResultPerformanceTrace {
       while eventIndex < orderedEvents.count, orderedEvents[eventIndex].offset <= elapsed {
         let event = orderedEvents[eventIndex]
         if event.kind == .insert { inputUnits += event.text.utf16.count }
-        windowErrors += errorActivity.apply(event)
-        apply(event, typed: &typed, forcedErrors: &forcedErrors)
+        let insertion = inputActivity.apply(event)
+        windowErrors += insertion.errors
+        apply(event, insertedText: insertion.text, typed: &typed, forcedErrors: &forcedErrors)
         eventIndex += 1
       }
-      let errors = errorCount(typed: typed, prompt: Array(prompt), forcedErrors: forcedErrors)
-      let correct = max(0, typed.count - errors)
+      let correct = speedCredit(typed: typed, prompt: prompt,
+        forcedErrors: forcedErrors, configuration: configuration)
       let interval = elapsed - previousBoundary
       previousBoundary = elapsed
       return .init(
         elapsed: elapsed,
         wpm: wpm(characters: correct, elapsed: elapsed),
-        rawWpm: wpm(characters: typed.count, elapsed: elapsed),
+        rawWpm: wpm(characters: String(typed).utf16.count, elapsed: elapsed),
         burstWpm: intervalBurst(inputUnits: inputUnits, seconds: interval),
         errorCount: windowErrors)
     }
@@ -1339,7 +1339,7 @@ enum ResultPerformanceTrace {
   /// checkpoints follow native characters for deletion, while comparisons use
   /// UTF-16 units and word-local positions, including real commit characters.
   /// This cannot restore stopped input or hidden word metadata absent in replay.
-  private struct ErrorActivityCursor {
+  private struct InputActivityCursor {
     let targets: [[UInt16]]
     let language: TypingLanguage
     let usesWordCommits: Bool
@@ -1365,22 +1365,24 @@ enum ResultPerformanceTrace {
       targets = words
     }
 
-    mutating func apply(_ event: TypingReplayEvent) -> Int {
+    mutating func apply(_ event: TypingReplayEvent) -> (errors: Int, text: String) {
       switch event.kind {
       case .delete:
         if let checkpoint = checkpoints.popLast() {
           word = checkpoint.word
           position = checkpoint.position
         }
-        return 0
+        return (0, "")
       case .insert:
         var errors = 0
+        var text = ""
         for originalCharacter in event.text {
           checkpoints.append((word, position))
           let expectedUnit = targetUnit(at: position)
           let expectedCharacter = expectedUnit.flatMap(UnicodeScalar.init).map { Character(String($0)) }
           let character = InputCharacterEquivalence.normalized(
             originalCharacter, expected: expectedCharacter, language: language)
+          text.append(character)
           let units = Array(String(character).utf16)
           if hasTargetErrors {
             errors += units.enumerated().filter { index, unit in
@@ -1394,7 +1396,7 @@ enum ResultPerformanceTrace {
             position += units.count
           }
         }
-        return errors
+        return (errors, text)
       }
     }
 
@@ -1417,12 +1419,13 @@ enum ResultPerformanceTrace {
 
   private static func apply(
     _ event: TypingReplayEvent,
+    insertedText: String,
     typed: inout [Character],
     forcedErrors: inout [Bool]
   ) {
     switch event.kind {
     case .insert:
-      for character in event.text {
+      for character in insertedText {
         typed.append(character)
         forcedErrors.append(event.forceError)
       }
@@ -1433,18 +1436,28 @@ enum ResultPerformanceTrace {
     }
   }
 
-  private static func errorCount(
-    typed: [Character], prompt: [Character], forcedErrors: [Bool]
+  private static func speedCredit(
+    typed: [Character], prompt: String, forcedErrors: [Bool], configuration: TestConfiguration?
   ) -> Int {
-    typed.indices.reduce(into: 0) { count, index in
-      if index >= prompt.count || typed[index] != prompt[index] || forcedErrors[index] {
-        count += 1
+    if configuration?.mode == .zen { return String(typed).utf16.count }
+    if TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []) {
+      // Older flattened replay has no retained word boundaries. Keep this
+      // explicitly partial fallback rather than inventing hidden words.
+      let targets = Array(prompt)
+      return typed.indices.reduce(into: 0) { count, index in
+        if targets.indices.contains(index), typed[index] == targets[index], !forcedErrors[index] {
+          count += String(typed[index]).utf16.count
+        }
       }
     }
+    return TypingWordCredit.words(target: prompt, input: String(typed), creditsActivePrefix: true).inputUnits
   }
 
   private static func wpm(characters: Int, elapsed: TimeInterval) -> Int {
-    Int((Double(characters) / 5 / max(elapsed, 1) * 60).rounded())
+    guard elapsed.isFinite, elapsed > 0 else { return 0 }
+    let speed = (Double(characters) / 5 / elapsed * 60).rounded()
+    guard speed.isFinite, speed < Double(Int.max) else { return 0 }
+    return Int(speed)
   }
 
   private static func intervalBurst(inputUnits: Int, seconds: TimeInterval) -> Double {

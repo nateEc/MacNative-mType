@@ -123,9 +123,9 @@ struct AboutTypebarView: View {
   private var metrics: some View {
     VStack(alignment: .leading, spacing: 12) {
       sectionTitle("练习指标", systemImage: "chart.bar")
-      metric("WPM", detail: "正确字符数（含正确提交的分隔符）÷ 5，再换算为每分钟。")
-      metric("Raw", detail: "按最终保留的全部输入字符数计算原始速度，错误字符也会计入。")
-      metric("准确率", detail: "最终保留输入中的正确字符占全部输入字符的比例。")
+      metric("WPM", detail: "完整正确词的 UTF-16 输入单位数 ÷ 5，再换算为每分钟；进行中、限时或退出时可计入当前正确前缀。")
+      metric("Raw", detail: "按最终保留输入的全部 UTF-16 单位计算原始速度，错误输入也计入；可见字符数仍按完整书写簇统计。")
+      metric("准确率", detail: "输入尝试中正确尝试的比例；退格修正不会抹去此前误键。")
       metric("稳定度", detail: "由本机输入回放中的速度离散程度映射为 0–100%。")
     }
   }

@@ -3750,7 +3750,7 @@ struct TypingSession {
   /// tests. A completed typo does not earn partial WPM credit, while a timed
   /// or bailed-out final word can retain its correctly typed prefix.
   private var scoredCorrectCharacters: Int {
-    referenceScoredCorrectCharacters(countPartialLastWord: resultCreditsPartialLastWord)
+    referenceWordCredit(countPartialLastWord: resultCreditsPartialLastWord).characters
   }
 
   private var resultCreditsPartialLastWord: Bool {
@@ -3759,74 +3759,49 @@ struct TypingSession {
 
   /// The pre-result display always credits a correct prefix of the active
   /// word, matching the live speed readout without changing final scoring.
-  private var liveScoredCorrectCharacters: Int {
-    referenceScoredCorrectCharacters(countPartialLastWord: true)
-  }
-
-  private func referenceScoredCorrectCharacters(countPartialLastWord: Bool) -> Int {
+  private func referenceWordCredit(countPartialLastWord: Bool) -> TypingWordCredit {
     if hasNoSpaceWordSegmentation {
-      return noSpaceScoredCorrectCharacters(countPartialLastWord: countPartialLastWord)
+      return noSpaceWordCredit(countPartialLastWord: countPartialLastWord)
     }
-    guard configuration.language.usesSpaceDelimitedWords,
-      !configuration.language.isCodeLanguage,
+    guard configuration.mode != .zen,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
     else {
-      return max(0, typed.count - errors)
-    }
-
-    let targetWords = metricWords(in: prompt)
-    let inputWords = metricWords(in: typed)
-    return inputWords.enumerated().reduce(into: 0) { total, entry in
-      let (index, inputWord) = entry
-      guard targetWords.indices.contains(index) else {
-        total += inputWord.count
-        return
+      let errorUnits = typed.enumerated().reduce(into: 0) { total, entry in
+        let (typedIndex, character) = entry
+        guard typedTargetIndices.indices.contains(typedIndex) else { return }
+        guard let targetIndex = typedTargetIndices[typedIndex], promptCharacters.indices.contains(targetIndex)
+        else {
+          if extraErrorTypedIndices.contains(typedIndex) { total += String(character).utf16.count }
+          return
+        }
+        if character != promptCharacters[targetIndex] || forcedErrorIndices.contains(targetIndex) {
+          total += String(character).utf16.count
+        }
       }
-      let targetWord = targetWords[index]
-      if inputWord == targetWord {
-        total += targetWord.count
-      } else if countPartialLastWord, index == inputWords.index(before: inputWords.endIndex),
-        targetWord.hasPrefix(inputWord)
-      {
-        total += inputWord.count
-      }
+      return .init(characters: max(0, typed.count - errors), inputUnits: max(0, typed.utf16.count - errorUnits))
     }
+    return TypingWordCredit.words(target: prompt, input: typed, creditsActivePrefix: countPartialLastWord)
   }
 
   /// No-space input visually flattens its prompt but still advances through
   /// source words one at a time. Result WPM therefore keeps the same complete
   /// word rule as ordinary input rather than treating an early typo as a
   /// globally correct character prefix.
-  private func noSpaceScoredCorrectCharacters(countPartialLastWord: Bool) -> Int {
+  private func noSpaceWordCredit(countPartialLastWord: Bool) -> TypingWordCredit {
     let typedCharacters = Array(typed)
     let activeWordIndex = noSpaceWordRanges.lastIndex { typedCharacters.count > $0.lowerBound }
-    return noSpaceWordRanges.enumerated().reduce(into: 0) { total, entry in
+    return noSpaceWordRanges.enumerated().reduce(into: TypingWordCredit()) { total, entry in
       let (index, range) = entry
       guard noSpaceTargetWords.indices.contains(index) else { return }
       let typedEnd = min(range.upperBound, typedCharacters.count)
       guard typedEnd > range.lowerBound else { return }
       let inputWord = String(typedCharacters[range.lowerBound..<typedEnd])
       let targetWord = noSpaceTargetWords[index]
-      if inputWord == targetWord {
-        total += targetWord.count
-      } else if countPartialLastWord, index == activeWordIndex, targetWord.hasPrefix(inputWord) {
-        total += inputWord.count
-      }
+      let credit = TypingWordCredit.word(target: targetWord, input: inputWord,
+        creditsPrefix: countPartialLastWord && index == activeWordIndex)
+      total.characters += credit.characters
+      total.inputUnits += credit.inputUnits
     }
-  }
-
-  private func metricWords(in text: String) -> [String] {
-    var words: [String] = []
-    var current = ""
-    for character in text {
-      current.append(character)
-      if isPromptWordSeparator(character) {
-        words.append(current)
-        current = ""
-      }
-    }
-    if !current.isEmpty { words.append(current) }
-    return words
   }
 
   /// A native final-state classification derived from the accepted input's
@@ -3877,27 +3852,27 @@ struct TypingSession {
   func wpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    let characters = finishedAt == nil ? liveScoredCorrectCharacters : scoredCorrectCharacters
-    return wpm(characters: characters, seconds: end.timeIntervalSince(startedAt))
+    let credit = referenceWordCredit(countPartialLastWord: finishedAt == nil || resultCreditsPartialLastWord)
+    return wpm(characters: credit.inputUnits, seconds: end.timeIntervalSince(startedAt))
   }
 
   func preciseWpm(at date: Date) -> Double {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    let characters = finishedAt == nil ? liveScoredCorrectCharacters : scoredCorrectCharacters
-    return wpmValue(characters: characters, seconds: end.timeIntervalSince(startedAt))
+    let credit = referenceWordCredit(countPartialLastWord: finishedAt == nil || resultCreditsPartialLastWord)
+    return wpmValue(characters: credit.inputUnits, seconds: end.timeIntervalSince(startedAt))
   }
 
   func rawWpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    return wpm(characters: typed.count, seconds: end.timeIntervalSince(startedAt))
+    return wpm(characters: typed.utf16.count, seconds: end.timeIntervalSince(startedAt))
   }
 
   func preciseRawWpm(at date: Date) -> Double {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    return wpmValue(characters: typed.count, seconds: end.timeIntervalSince(startedAt))
+    return wpmValue(characters: typed.utf16.count, seconds: end.timeIntervalSince(startedAt))
   }
 
   /// Word burst is the WPM for the latest completed word, or the currently

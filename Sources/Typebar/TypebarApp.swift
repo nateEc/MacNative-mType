@@ -5775,6 +5775,7 @@ private struct CompletedResultView: View {
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
         ReplayTimelineView(
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
+          configuration: result.configuration,
           soundConfiguration: .init(settings: settings))
       }
 
@@ -6564,6 +6565,7 @@ private struct ReplayTimelineView: View {
   let prompt: String
   let events: [TypingReplayEvent]
   let speedUnit: TypingSpeedUnit
+  let configuration: TestConfiguration?
   let soundConfiguration: ReplaySoundConfiguration
   @State private var elapsed: TimeInterval = 0
   @State private var isPlaying = false
@@ -6578,17 +6580,19 @@ private struct ReplayTimelineView: View {
     TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed)
   }
   private var performance: ResultPerformancePoint {
-    ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed)
+    ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed, configuration: configuration)
   }
 
   init(
     prompt: String, events: [TypingReplayEvent], speedUnit: TypingSpeedUnit,
+    configuration: TestConfiguration?,
     soundConfiguration: ReplaySoundConfiguration
   ) {
     let chronologicalEvents = TypingReplay.chronologicalEvents(events)
     self.prompt = prompt
     self.events = chronologicalEvents
     self.speedUnit = speedUnit
+    self.configuration = configuration
     self.soundConfiguration = soundConfiguration
     self.characterSeekOffsets = TypingReplay.characterSeekOffsets(
       prompt: prompt, events: chronologicalEvents)
@@ -8774,6 +8778,7 @@ private struct ResultDetailView: View {
       if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
         ReplayTimelineView(
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
+          configuration: result.configuration,
           soundConfiguration: .init(settings: settings))
       }
       ResultTagEditor(result: result)
