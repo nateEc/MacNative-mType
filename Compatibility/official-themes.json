@@ -195,7 +195,17 @@
   "nativeBuiltInThemes": [
     "paper",
     "midnight",
-    "grove"
+    "grove",
+    "aurora",
+    "beach",
+    "diner"
   ],
-  "exactMappings": {}
+  "exactMappings": {},
+  "relatedMappings": {
+    "aurora": "aurora",
+    "beach": "beach",
+    "diner": "diner",
+    "midnight": "midnight",
+    "paper": "paper"
+  }
 }

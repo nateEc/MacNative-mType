@@ -266,12 +266,25 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
     case paper
     case midnight
     case grove
+    case aurora
+    case beach
+    case diner
+
+    private static func rgb(_ hex: UInt32) -> Color {
+        Color(
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255)
+    }
 
     var displayName: String {
         switch self {
         case .paper: "纸白"
         case .midnight: "午夜"
         case .grove: "林地"
+        case .aurora: "极光 · Typebar"
+        case .beach: "海岸 · Typebar"
+        case .diner: "夜间餐厅 · Typebar"
         }
     }
 
@@ -280,6 +293,9 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .paper: Color(red: 0.96, green: 0.95, blue: 0.91)
         case .midnight: Color(red: 0.07, green: 0.09, blue: 0.13)
         case .grove: Color(red: 0.09, green: 0.16, blue: 0.13)
+        case .aurora: Self.rgb(0x10272C)
+        case .beach: Self.rgb(0xE0F0F3)
+        case .diner: Self.rgb(0x282532)
         }
     }
 
@@ -288,6 +304,9 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .paper: Color(red: 0.88, green: 0.86, blue: 0.80)
         case .midnight: Color(red: 0.13, green: 0.16, blue: 0.22)
         case .grove: Color(red: 0.14, green: 0.25, blue: 0.19)
+        case .aurora: Self.rgb(0x1E3C41)
+        case .beach: Self.rgb(0xC7DEE3)
+        case .diner: Self.rgb(0x45394A)
         }
     }
 
@@ -296,14 +315,29 @@ enum AppTheme: String, CaseIterable, Codable, Equatable {
         case .paper: Color(red: 0.66, green: 0.28, blue: 0.14)
         case .midnight: Color(red: 0.38, green: 0.73, blue: 1.00)
         case .grove: Color(red: 0.48, green: 0.78, blue: 0.52)
+        case .aurora: Self.rgb(0xB8D98B)
+        case .beach: Self.rgb(0xA13D38)
+        case .diner: Self.rgb(0xEABF79)
         }
     }
 
     var colorScheme: ColorScheme {
-        self == .paper ? .light : .dark
+        self == .paper || self == .beach ? .light : .dark
     }
 
     var resolvedTheme: ResolvedTheme {
-        .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme)
+        switch self {
+        case .aurora:
+            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
+                  text: Self.rgb(0xEDF3E8), secondaryText: Self.rgb(0xB7CFCC))
+        case .beach:
+            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
+                  text: Self.rgb(0x193D49), secondaryText: Self.rgb(0x48636B))
+        case .diner:
+            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme,
+                  text: Self.rgb(0xF3E9DC), secondaryText: Self.rgb(0xCDBFCC))
+        case .paper, .midnight, .grove:
+            .init(background: background, panel: panel, accent: accent, colorScheme: colorScheme)
+        }
     }
 }

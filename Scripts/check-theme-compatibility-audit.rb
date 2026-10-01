@@ -23,7 +23,7 @@ source_path = File.join(reference_root, "packages/schemas/src/themes.ts")
 end
 
 fixture = JSON.parse(File.read(fixture_path))
-expected_keys = %w[referenceRepository referenceCommit sourceFile officialCount officialNames nativeBuiltInThemes exactMappings]
+expected_keys = %w[referenceRepository referenceCommit sourceFile officialCount officialNames nativeBuiltInThemes exactMappings relatedMappings]
 fail_audit("fixture includes unexpected fields") unless fixture.keys.sort == expected_keys.sort
 fail_audit("unexpected source file") unless fixture.fetch("sourceFile") == "packages/schemas/src/themes.ts"
 commit, status = Open3.capture2("git", "-C", reference_root, "rev-parse", "HEAD")
@@ -50,11 +50,22 @@ fail_audit("mapping names are outside fixed schema") unless (mappings.keys - nam
 fail_audit("mapping targets are not native built-ins") unless (mappings.values - native_names).empty?
 fail_audit("one native theme cannot be exact for multiple official themes") unless mappings.values.uniq == mappings.values
 
+related = fixture.fetch("relatedMappings")
+fail_audit("relatedMappings must be an object") unless related.is_a?(Hash)
+fail_audit("related names are outside fixed schema") unless (related.keys - names).empty?
+fail_audit("related targets are not native built-ins") unless (related.values - native_names).empty?
+fail_audit("exact and related mappings overlap") unless (related.keys & mappings.keys).empty?
+fail_audit("one native theme cannot represent multiple related identities") unless related.values.uniq == related.values
+
 pending_count = names.length - mappings.length
+unmapped_count = pending_count - related.length
 audit = File.read(audit_path)
 inventory = File.read(inventory_path)
 summary = "#{names.length} 个官方主题身份、#{mappings.length} 个已验证精确原生映射、#{pending_count} 个待映射"
 fail_audit("theme audit summary drift") unless audit.include?(summary)
 fail_audit("functional inventory summary drift") unless inventory.include?(summary)
+related_summary = "#{related.length} 个原创相关替代、#{unmapped_count} 个尚无相关替代"
+fail_audit("related theme audit summary drift") unless audit.include?(related_summary)
+fail_audit("related functional inventory summary drift") unless inventory.include?(related_summary)
 
-puts "theme compatibility audit passed (#{summary} at #{commit.strip}; identities only, no theme assets)"
+puts "theme compatibility audit passed (#{summary}; #{related_summary} at #{commit.strip}; no theme assets)"
