@@ -7,6 +7,32 @@ enum NativePracticeFont {
   static let maximumNameLength = 50
   private static let comparisonLocale = Locale(identifier: "en_US_POSIX")
 
+  struct Resolver {
+    enum Purpose { case practice, catalogPreview }
+
+    let localFontName: () -> String?
+    let installedFontName: (String) -> String?
+
+    init(
+      localFontName: @escaping () -> String? = {
+        TypebarLocalPracticeFontStore.activeInfo?.postScriptName
+      },
+      installedFontName: @escaping (String) -> String? = {
+        NativePracticeFont.postScriptName(for: $0)
+      }
+    ) {
+      self.localFontName = localFontName
+      self.installedFontName = installedFontName
+    }
+
+    func postScriptName(for requestedName: String, purpose: Purpose = .practice) -> String? {
+      // Previewing another family must neither substitute nor register the
+      // user's active local font; actual practice keeps that explicit override.
+      if purpose == .practice, let name = localFontName() { return name }
+      return installedFontName(requestedName)
+    }
+  }
+
   static var fallbackPostScriptName: String {
     NSFont.systemFont(ofSize: 12).fontName
   }
@@ -40,12 +66,12 @@ enum NativePracticeFont {
   }
 
   static func font(named requestedName: String, size: Double) -> Font? {
-    guard let postScriptName = preferredPostScriptName(for: requestedName) else { return nil }
+    guard let postScriptName = Resolver().postScriptName(for: requestedName) else { return nil }
     return .custom(postScriptName, size: size)
   }
 
   static func nsFont(named requestedName: String, size: CGFloat) -> NSFont? {
-    guard let postScriptName = preferredPostScriptName(for: requestedName) else { return nil }
+    guard let postScriptName = Resolver().postScriptName(for: requestedName) else { return nil }
     return NSFont(name: postScriptName, size: size)
   }
 
@@ -78,10 +104,6 @@ enum NativePracticeFont {
       NSFont(name: postScriptName, size: 1) != nil
     else { return nil }
     return postScriptName
-  }
-
-  private static func preferredPostScriptName(for requestedName: String) -> String? {
-    TypebarLocalPracticeFontStore.activeInfo?.postScriptName ?? postScriptName(for: requestedName)
   }
 }
 

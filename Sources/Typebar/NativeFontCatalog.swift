@@ -65,6 +65,16 @@ enum NativeFontCatalog {
     }
   }
 
+  static func previewFont(
+    for family: String, size: CGFloat = 15,
+    resolver: NativePracticeFont.Resolver = .init()
+  ) -> NSFont {
+    guard let name = resolver.postScriptName(for: family, purpose: .catalogPreview),
+      let font = NSFont(name: name, size: size)
+    else { return .systemFont(ofSize: size) }
+    return font
+  }
+
   @MainActor
   static var installedFamilies: [String] {
     normalizedFamilies(NSFontManager.shared.availableFontFamilies)
@@ -87,10 +97,7 @@ struct NativeFontFamilyPicker: View {
   }
 
   private func previewFont(for family: String) -> Font {
-    guard let font = NativePracticeFont.nsFont(named: family, size: 15) else {
-      return .system(size: 15)
-    }
-    return Font(font)
+    Font(NativeFontCatalog.previewFont(for: family))
   }
 
   private func previewLabel(for family: String) -> some View {
