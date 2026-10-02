@@ -10687,7 +10687,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.accuracy, 0)
     XCTAssertEqual(session.promptGlyphs[0].state, .current)
     session.bailOut(at: start.addingTimeInterval(0.1))
-    XCTAssertTrue(try XCTUnwrap(session.result()?.replayEvents).isEmpty)
+    let stoppedTape = try XCTUnwrap(session.result()?.replayEvents)
+    XCTAssertEqual(stoppedTape.map(\.inputStopped), [true])
+    XCTAssertTrue(TypingReplay.actions(events: stoppedTape).isEmpty)
+    XCTAssertEqual(TypingReplay.typedText(events: stoppedTape, through: 1), "")
 
     var correctedSession = TypingSession(
       configuration: .words(2, rules: oppositeShiftRules), prompt: "a b ")
@@ -10702,9 +10705,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(correctedSession.wordReviews.first?.typed, "a")
     XCTAssertFalse(correctedSession.wordReviews.first?.isCorrect ?? true)
     XCTAssertTrue(correctedSession.missedWords.contains("a"))
-    XCTAssertFalse(
-      correctedSession.result(at: start.addingTimeInterval(1))?.replayEvents.contains(where: \.forceError)
-        ?? true)
+    let correctedTape = try XCTUnwrap(correctedSession.result(at: start.addingTimeInterval(1))?.replayEvents)
+    XCTAssertFalse(correctedTape.filter { !$0.isStoppedInsertion }.contains(where: \.forceError))
+    XCTAssertEqual(correctedTape.filter(\.isStoppedInsertion).map(\.forceError), [true])
 
     var masterSession = TypingSession(
       configuration: .timed(seconds: 30, difficulty: .master, rules: oppositeShiftRules), prompt: "a")
@@ -26068,7 +26071,7 @@ final class TypingEngineTests: XCTestCase {
       deletedResultFilterPresetIDs: [deletedResultFilterPresetID],
       activeTestSelection: activeTestSelection, at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(archive.version, 10)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     XCTAssertEqual(archive.settings, settings)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(archive.presets, [preset])

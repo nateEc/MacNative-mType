@@ -3005,12 +3005,17 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// A character-delete input action can clear a whole destination field
   /// during code unindent. Keep its type separate from a word-delete action.
   let characterDeletionCount: Int?
+  /// A judged attempt removed by letter-stop or opposite Shift. It counts
+  /// as input activity but never contributes retained text or replay actions.
+  /// Missing on legacy tapes: those cannot recover attempts never recorded.
+  let inputStopped: Bool?
+  var isStoppedInsertion: Bool { kind == .insert && inputStopped == true }
   var id: String { "\(offset)-\(kind.rawValue)-\(text)" }
 
   init(
     offset: TimeInterval, kind: TypingReplayEventKind, text: String, forceError: Bool = false,
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
-    characterDeletionCount: Int? = nil
+    characterDeletionCount: Int? = nil, inputStopped: Bool? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3020,10 +3025,12 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.commitsWord = commitsWord
     self.wordDeletionCount = wordDeletionCount
     self.characterDeletionCount = characterDeletionCount
+    self.inputStopped = inputStopped
   }
 
   private enum CodingKeys: String, CodingKey {
     case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount, characterDeletionCount
+    case inputStopped
   }
 
   init(from decoder: Decoder) throws {
@@ -3036,6 +3043,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     commitsWord = try values.decodeIfPresent(Bool.self, forKey: .commitsWord)
     wordDeletionCount = try values.decodeIfPresent(Int.self, forKey: .wordDeletionCount)
     characterDeletionCount = try values.decodeIfPresent(Int.self, forKey: .characterDeletionCount)
+    inputStopped = try values.decodeIfPresent(Bool.self, forKey: .inputStopped)
   }
 }
 
@@ -3081,6 +3089,7 @@ enum TypingReplay {
     var result: [Action] = []
     var index = 0
     while index < ordered.count {
+      if ordered[index].isStoppedInsertion { index += 1; continue }
       let deletionRange = deletionActionRange(at: index, in: ordered)
       let range = deletionRange ?? index..<(index + 1)
       let kind: Action.Kind = ordered[index].kind == .insert ? .insert
@@ -3145,7 +3154,7 @@ enum TypingReplay {
   static func typedText(events: [TypingReplayEvent], through elapsed: TimeInterval) -> String {
     chronologicalEvents(events).filter { $0.offset <= elapsed }.reduce(into: "") { typed, event in
       switch event.kind {
-      case .insert: typed += event.text
+      case .insert: if !event.isStoppedInsertion { typed += event.text }
       case .delete:
         guard !typed.isEmpty else { return }
         typed.removeLast()
@@ -3167,6 +3176,7 @@ enum TypingReplay {
       guard event.offset <= elapsed else { break }
       switch event.kind {
       case .insert:
+        guard !event.isStoppedInsertion else { continue }
         for character in event.text {
           let coordinate = characterCoordinate(
             word: typedWord, position: typedPosition, character: character)
@@ -3250,7 +3260,16 @@ enum TypingReplay {
     let finalFields = SavedTextInputHistoryPolicy.inputFields(events: orderedEvents)
     let continuationIndices = deletionContinuationIndices(in: orderedEvents)
     for (eventIndex, event) in orderedEvents.enumerated() {
-      if event.kind == .insert, event.text.isEmpty { continue }
+      if event.kind == .insert, event.text.isEmpty || event.isStoppedInsertion {
+        if event.isStoppedInsertion, let previous = previousEventWord, typedWord > previous {
+          let correct = isZen || (targetFields.indices.contains(previous)
+            && finalFields.indices.contains(previous)
+            && InputTextIdentity.matches(finalFields[previous], String(targetFields[previous])))
+          cues.append(.init(offset: event.offset, cue: correct ? .click : .error))
+          previousEventWord = typedWord
+        }
+        continue
+      }
       var eventWord = typedWord
       var cue: TypingReplaySoundCue?
       switch event.kind {
@@ -3309,6 +3328,7 @@ enum TypingReplay {
     for event in chronologicalEvents(events) {
       switch event.kind {
       case .insert:
+        guard !event.isStoppedInsertion else { continue }
         for character in event.text {
           let coordinate = characterCoordinate(
             word: typedWord, position: typedPosition, character: character)
@@ -5130,11 +5150,13 @@ struct TypingSession {
     if configuration.mode == .zen {
       // The reference still starts a Zen test when opposite Shift rejects a
       // key, but Zen has no target character to score as incorrect. The key
-      // therefore leaves neither accepted text nor a replay action behind.
+      // therefore leaves no accepted text or replay action, but still has a
+      // correct judged input event for activity statistics.
       if rejectsOppositeShiftInput {
         beginIfNeeded(at: date)
         recordInputAttempt(character, correctUnits: String(character).utf16.count)
         recordWeakSpotInput(character, isCorrect: true, at: date)
+        recordReplayEvent(kind: .insert, text: String(character), inputStopped: true, at: date)
         return false
       }
       let accepted = insertZenCharacter(character, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
@@ -5189,6 +5211,8 @@ struct TypingSession {
       recordWeakSpotInput(inputCharacter, isCorrect: units.lastCorrect, at: date)
       if !units.lastCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
       if rejectsOppositeShiftInput {
+        recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: true,
+          inputStopped: true, at: date)
         if evaluatesTerminalRules, configuration.difficulty == .master { fail(at: date) }
         return false
       }
@@ -5205,6 +5229,12 @@ struct TypingSession {
       beginIfNeeded(at: date)
       recordInputAttempt(inputCharacter, correctUnits: 0)
       recordWeakSpotInput(inputCharacter, isCorrect: false, at: date)
+      if rejectsOppositeShiftInput {
+        recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: true,
+          inputStopped: true, at: date)
+        if evaluatesTerminalRules, configuration.difficulty == .master { fail(at: date) }
+        return false
+      }
       appendTypedCharacter(
         inputCharacter, targetIndex: nil,
         countsAsExtraError: inputCharacter != " " && hasUncommittedSpaceDelimitedInput, at: date)
@@ -5238,7 +5268,11 @@ struct TypingSession {
     // immediately removes its text and does not run stop/delete-on-error
     // recovery. Master difficulty still fails on that rejected mistake.
     if rejectsOppositeShiftInput {
-      if evaluatesTerminalRules, configuration.difficulty == .master {
+      recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: true,
+        inputStopped: true, at: date)
+      if evaluatesTerminalRules,
+        configuration.difficulty == .master || shouldFailExpertOnStoppedInput(inputCharacter)
+      {
         fail(at: date)
       }
       return false
@@ -5259,7 +5293,17 @@ struct TypingSession {
     {
       return false
     }
-    if !isCorrect && configuration.rules.stopOnErrorMode == .letter { return false }
+    if !isCorrect && configuration.rules.stopOnErrorMode == .letter {
+      recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: forceError,
+        inputStopped: true, at: date)
+      if evaluatesTerminalRules,
+        (configuration.difficulty == .master && !accuracyUnits.lastCorrect)
+          || shouldFailExpertOnStoppedInput(inputCharacter)
+      {
+        fail(at: date)
+      }
+      return false
+    }
     if !isCorrect && configuration.rules.deleteOnErrorMode.isEnabled {
       // The reference first inserts and logs the failed key, then emits its
       // recovery deletes. Keeping that transient state in the native replay
@@ -5332,7 +5376,11 @@ struct TypingSession {
     recordWeakSpotInput(character, isCorrect: false, at: date)
     attemptedErrorCounts[boundary, default: 0] += 1
     if evaluatesTerminalRules, configuration.difficulty == .master { fail(at: date) }
-    guard !rejectsOppositeShiftInput, configuration.rules.stopOnErrorMode != .letter else { return false }
+    if rejectsOppositeShiftInput || configuration.rules.stopOnErrorMode == .letter {
+      recordReplayEvent(kind: .insert, text: String(character), forceError: forceError,
+        inputStopped: true, at: date)
+      return false
+    }
     let activeWordWasEmpty = typedGraphemeCount == boundary
     appendTypedCharacter(character, targetIndex: nil, countsAsExtraError: true, at: date)
     if configuration.rules.deleteOnErrorMode.isEnabled {
@@ -5538,6 +5586,7 @@ struct TypingSession {
 
   private mutating func recordReplayEvent(
     kind: TypingReplayEventKind, text: String, forceError: Bool = false, automatic: Bool = false,
+    inputStopped: Bool = false,
     at date: Date
   )
   {
@@ -5547,7 +5596,7 @@ struct TypingSession {
         offset: max(0, date.timeIntervalSince(startedAt)), kind: kind, text: text,
         forceError: forceError, automatic: automatic || applyingAutomaticCodeInput,
         commitsWord: kind == .insert && retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
-          ? false : nil))
+          ? false : nil, inputStopped: inputStopped ? true : nil))
   }
 
   private mutating func markDeletion(since start: Int, wholeWord: Bool = true) {
@@ -5983,6 +6032,22 @@ struct TypingSession {
       }
       return !isTypedCharacterCorrect(at: index)
     }
+  }
+
+  /// Difficulty judges the attempted commit even when its text is stopped.
+  /// Expert compares the complete field, not the Shift correctness flag.
+  private func shouldFailExpertOnStoppedInput(_ character: Character) -> Bool {
+    guard configuration.difficulty == .expert else { return false }
+    if tracksNoSpaceWordBursts, let range = activeNoSpaceWordRange,
+      range.upperBound <= promptCharacters.count
+    {
+      let attempted = String(typed.suffix(max(0, typedGraphemeCount - range.lowerBound))) + String(character)
+      let target = String(promptCharacters[range])
+      return attempted.utf16.count == target.utf16.count && !InputTextIdentity.matches(attempted, target)
+    }
+    guard isPromptWordSeparator(character), !inputWordIsEmpty else { return false }
+    return !currentWordIsCorrect || nextTargetIndex >= promptCharacters.count
+      || !InputTextIdentity.matches(character, promptCharacters[nextTargetIndex])
   }
 
   private func noSpaceWordRange(for wordIndex: Int) -> Range<Int>? {

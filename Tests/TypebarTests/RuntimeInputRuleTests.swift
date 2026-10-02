@@ -124,7 +124,8 @@ final class RuntimeInputRuleTests: XCTestCase {
       let result = try XCTUnwrap(session.result())
       XCTAssertEqual(result.inputMetrics?.totalAttempts, 3)
       XCTAssertEqual(result.inputMetrics?.correctAttempts, 2)
-      XCTAssertEqual(result.replayEvents.map(\.text), ["a", "b"])
+      XCTAssertEqual(result.replayEvents.filter { !$0.isStoppedInsertion }.map(\.text), ["a", "b"])
+      XCTAssertEqual(result.replayEvents.filter(\.isStoppedInsertion).map(\.text), ["b"])
     }
   }
 

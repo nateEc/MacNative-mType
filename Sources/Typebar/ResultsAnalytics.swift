@@ -1018,8 +1018,8 @@ enum ResultPerformanceInspectionPolicy {
           if belongsToInterval, let wordIndex, validIndexes.contains(wordIndex) {
             touched.insert(wordIndex)
           }
-          typed.append(character)
-          if !usesUnspacedBoundaries, isPromptWordSeparator(character) {
+          if !event.isStoppedInsertion { typed.append(character) }
+          if !event.isStoppedInsertion, !usesUnspacedBoundaries, isPromptWordSeparator(character) {
             spacedWordIndex += 1
           }
         }
@@ -1347,7 +1347,8 @@ enum ResultPerformanceTrace {
   /// Tracks input-time judgments separately from the surviving text. Cursor
   /// checkpoints follow native characters for deletion, while comparisons use
   /// UTF-16 units and word-local positions, including real commit characters.
-  /// This cannot restore stopped input or hidden word metadata absent in replay.
+  /// Legacy tapes still cannot restore missing stopped attempts or hidden
+  /// word metadata; marked future attempts judge without moving the cursor.
   private struct InputActivityCursor {
     let targets: [[UInt16]]
     let language: TypingLanguage
@@ -1389,18 +1390,19 @@ enum ResultPerformanceTrace {
         var text = ""
         for originalCharacter in event.text {
           let inputIndex = checkpoints.count
-          checkpoints.append((word, position))
+          if !event.isStoppedInsertion { checkpoints.append((word, position)) }
           let expectedUnit = targetUnit(at: position)
           let expectedCharacter = expectedUnit.flatMap(UnicodeScalar.init).map { Character(String($0)) }
           let character = InputCharacterEquivalence.normalized(
             originalCharacter, expected: expectedCharacter, language: language)
-          text.append(character)
+          if !event.isStoppedInsertion { text.append(character) }
           let units = Array(String(character).utf16)
           if hasTargetErrors {
             errors += units.enumerated().filter { index, unit in
               event.forceError || targetUnit(at: position + index) != unit
             }.count
           }
+          if event.isStoppedInsertion { continue }
           if usesWordCommits && isPromptWordSeparator(character), event.commitsWord != false {
             word += 1
             position = 0

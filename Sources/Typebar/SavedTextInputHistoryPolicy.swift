@@ -60,6 +60,10 @@ enum SavedTextInputHistoryPolicy {
     let noSpaceFieldLimit = noSpaceWordEnds.isEmpty ? displays.count
       : displays.firstIndex(of: "") ?? noSpaceWordEnds.count
     for event in events {
+      if event.isStoppedInsertion {
+        while fields.count <= field { fields.append("") }
+        continue
+      }
       trimsLastField = false
       switch event.kind {
       case .insert:

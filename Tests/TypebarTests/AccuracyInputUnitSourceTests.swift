@@ -93,7 +93,9 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
     session.insert("🦊", at: start.addingTimeInterval(2))
     XCTAssertEqual(session.preciseAccuracy, 60)
     session.bailOut(at: start.addingTimeInterval(3))
-    XCTAssertEqual(try XCTUnwrap(session.result()).replayEvents.map(\.text), ["a", "🦊"])
+    let tape = try XCTUnwrap(session.result()).replayEvents
+    XCTAssertEqual(tape.filter { !$0.isStoppedInsertion }.map(\.text), ["a", "🦊"])
+    XCTAssertEqual(tape.filter(\.isStoppedInsertion).map(\.text), ["🦊"])
   }
 
   func testAutomaticCodeIndentationContributesItsOwnCorrectInputUnits() throws {
@@ -230,7 +232,8 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
     session.finishZen(at: start.addingTimeInterval(2))
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.preciseAccuracy, 100)
-    XCTAssertEqual(result.replayEvents.map(\.text), ["🦊"])
+    XCTAssertEqual(result.replayEvents.filter { !$0.isStoppedInsertion }.map(\.text), ["🦊"])
+    XCTAssertEqual(result.replayEvents.filter(\.isStoppedInsertion).map(\.text), ["🦁"])
   }
 
   func testStoppedEntirelyWrongUnicodeUnitsCountWithoutAdvancingPosition() {

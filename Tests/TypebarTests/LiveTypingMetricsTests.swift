@@ -105,7 +105,8 @@ final class LiveTypingMetricsTests: XCTestCase {
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.inputMetrics?.correctAttempts, 5_000)
     XCTAssertEqual(result.inputMetrics?.totalAttempts, 10_001)
-    XCTAssertEqual(result.replayEvents.count, 10_000)
+    XCTAssertEqual(result.replayEvents.filter { !$0.isStoppedInsertion }.count, 10_000)
+    XCTAssertEqual(result.replayEvents.filter(\.isStoppedInsertion).count, 5_001)
     XCTAssertEqual(result.preciseAccuracy, 50)
   }
 
@@ -186,7 +187,8 @@ final class LiveTypingMetricsTests: XCTestCase {
     session.bailOut(at: start.addingTimeInterval(2))
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.inputMetrics?.totalAttempts, 10_001)
-    XCTAssertEqual(result.replayEvents.count, 10_000)
+    XCTAssertEqual(result.replayEvents.filter { !$0.isStoppedInsertion }.count, 10_000)
+    XCTAssertEqual(result.replayEvents.filter(\.isStoppedInsertion).count, 5_001)
     XCTAssertFalse(result.replayEvents.contains { $0.text.contains("候") })
     XCTAssertEqual(result.preciseAccuracy, 50)
   }

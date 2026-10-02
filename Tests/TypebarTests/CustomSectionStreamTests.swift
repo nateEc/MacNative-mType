@@ -264,7 +264,7 @@ final class CustomSectionStreamTests: XCTestCase {
       let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
         settings: settings, results: [], presets: [], activeTestSelection: selection, at: start))
       XCTAssertEqual(archive.activeTestSelection, selection)
-      XCTAssertEqual(archive.version, 10)
+      XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     }
   }
 

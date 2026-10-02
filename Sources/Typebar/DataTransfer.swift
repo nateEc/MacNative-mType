@@ -267,7 +267,9 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    static let currentVersion = 10
+    // Older readers append every insert event, including judged-but-stopped
+    // input. Reject this archive generation there rather than corrupt replay.
+    static let currentVersion = 11
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -299,7 +301,9 @@ struct TypebarArchive: Codable, Equatable {
         deletedResultFilterPresetIDs: [UUID] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil
     ) {
-        self.version = version
+        self.version = version < 11 && results.contains(where: {
+            $0.replayEvents.contains(where: \.isStoppedInsertion)
+        }) ? 11 : version
         self.exportedAt = exportedAt
         let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = version >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
@@ -849,6 +853,9 @@ enum TypebarDataTransfer {
     static func importArchive(from data: Data) throws -> TypebarArchive {
         let archive = try JSONDecoder.typebar.decode(TypebarArchive.self, from: data)
         guard (1...TypebarArchive.currentVersion).contains(archive.version) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 11 || !archive.results.contains(where: {
+            $0.replayEvents.contains(where: \.isStoppedInsertion)
+        }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         return archive
     }
 }

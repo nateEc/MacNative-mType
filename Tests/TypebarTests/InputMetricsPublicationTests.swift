@@ -40,7 +40,8 @@ final class InputMetricsPublicationTests: XCTestCase {
     session.insert("e\u{301}", at: start.addingTimeInterval(1))
     session.bailOut(at: start.addingTimeInterval(2))
     let result = try XCTUnwrap(session.result())
-    XCTAssertEqual(result.replayEvents.map(\.text), ["a"])
+    XCTAssertEqual(result.replayEvents.filter { !$0.isStoppedInsertion }.map(\.text), ["a"])
+    XCTAssertEqual(result.replayEvents.filter(\.isStoppedInsertion).map(\.text), ["e\u{301}"])
     try assertMetrics(result, correct: 1, total: 3, credited: 1, retained: 1)
   }
 

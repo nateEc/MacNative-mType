@@ -190,7 +190,7 @@ final class CustomDelimiterTests: XCTestCase {
     XCTAssertEqual(try SettingsJSONCommandCodec.decode(json).version, 3)
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [], presets: [], at: start))
-    XCTAssertEqual(archive.version, 10)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
   }
 
   func testEveryCodeChoiceConsumesTheWholePipeWordQueue() throws {

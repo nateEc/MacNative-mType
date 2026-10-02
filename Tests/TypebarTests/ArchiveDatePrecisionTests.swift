@@ -53,7 +53,7 @@ final class ArchiveDatePrecisionTests: XCTestCase {
         presets: [], at: date)
       let archive = try TypebarDataTransfer.importArchive(from: encoded)
       XCTAssertEqual(archive.exportedAt, date)
-      XCTAssertEqual(archive.version, 10)
+      XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
       XCTAssertTrue(archive.results.first == original)
     }
   }

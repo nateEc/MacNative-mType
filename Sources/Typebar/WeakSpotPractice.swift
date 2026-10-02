@@ -152,7 +152,7 @@ enum WeakSpotPractice {
                 samples[expected, default: .init()].intervals.append(interval)
               }
             }
-            typed.append(entered)
+            if !event.isStoppedInsertion { typed.append(entered) }
           }
         }
       }

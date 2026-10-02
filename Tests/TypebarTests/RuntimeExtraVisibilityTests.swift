@@ -200,7 +200,9 @@ final class RuntimeExtraVisibilityTests: XCTestCase {
       XCTAssertEqual(result.inputMetrics?.totalAttempts, 1)
       XCTAssertEqual(result.inputMetrics?.correctAttempts, 0)
       XCTAssertTrue(result.configuration.rules.hideExtraLetters)
-      XCTAssertEqual(result.replayEvents.count, rules.deleteOnErrorMode.isEnabled ? 2 : 0)
+      XCTAssertEqual(result.replayEvents.count, rules.deleteOnErrorMode.isEnabled ? 2 : 1)
+      XCTAssertEqual(result.replayEvents.filter(\.isStoppedInsertion).count,
+        rules.deleteOnErrorMode.isEnabled ? 0 : 1)
     }
   }
 
