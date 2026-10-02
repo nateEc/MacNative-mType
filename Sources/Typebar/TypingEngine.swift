@@ -5891,15 +5891,17 @@ struct TypingSession {
       finiteCustomTextStream = stream
       let chunk = GeneratedWordChunk(source: source, configuration: configuration,
         wordOffset: noSpaceTargetWords.count)
+      let batch = TransformedPromptBatch(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
+      let prepared = stream.hasRemaining ? batch : FinitePromptCommitPolicy.finalized(batch)
       let previousEnd = promptCharacters.count
-      appendPrompt(chunk.transformed)
+      appendPrompt(prepared.text)
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
         var end = previousEnd
-        for length in chunk.noSpaceWordLengths {
+        for length in prepared.noSpaceWordLengths {
           end += length
           noSpaceWordEndIndices.append(end)
         }
-        noSpaceTargetWords += chunk.noSpaceTargetWords
+        noSpaceTargetWords += prepared.noSpaceTargetWords
       }
       return
     }

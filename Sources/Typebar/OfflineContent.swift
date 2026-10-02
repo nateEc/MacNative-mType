@@ -6198,7 +6198,7 @@ struct TestSessionFactory {
       && GeneratedWordBoundPolicy.wordCount(in: noSpaceBoundarySource ?? prompt)
         < (configuration.wordLimit ?? 25)
     let generatesWholeLines = showAllLines && !hasIncompleteExternalPreview
-    let batch: TransformedPromptBatch
+    var batch: TransformedPromptBatch
     if streamsCustomSections {
       batch = .init(text: prompt)
     } else if let codeChunk = generatedCodeChunk {
@@ -6216,6 +6216,12 @@ struct TestSessionFactory {
         formatsWordPool: formatsQuoteWordPool,
         nextRandomCaseBit: nextRandomCaseBit)
       batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
+    }
+    if configuration.mode == .custom, configuration.customTextCompletion == .finish,
+      !streamsCustomSections, finiteTextSource != nil || verifiedScript != nil,
+      finiteCustomTextStream?.hasRemaining != true
+    {
+      batch = FinitePromptCommitPolicy.finalized(batch)
     }
     let transformedPrompt = batch.text
     let noSpaceWordLengths = customSectionChunk?.noSpaceWordLengths ?? batch.noSpaceWordLengths
@@ -6317,6 +6323,24 @@ struct TestSessionFactory {
     case .quote, .zen, .custom:
       return nil
     }
+  }
+}
+
+/// Finalizes rendered targets, never the saved source or its cursor offsets.
+/// Only a nonempty final word loses its ASCII-space/LF commit; a blank LF
+/// slot retains its sole required input. Call after transformations and only
+/// when all targets for this finite attempt have been generated.
+enum FinitePromptCommitPolicy {
+  static func finalized(_ batch: TransformedPromptBatch) -> TransformedPromptBatch {
+    guard let commit = batch.text.last, isPromptWordSeparator(commit),
+      let preceding = batch.text.dropLast().last, !isPromptWordSeparator(preceding)
+    else { return batch }
+    // Joined no-space text can place the previous word's letter directly
+    // before an empty LF target. Preserve that explicitly captured slot.
+    if batch.noSpaceTargetWords.last == String(commit) { return batch }
+    var targets = batch.noSpaceTargetWords
+    if !targets.isEmpty { targets[targets.count - 1].removeLast() }
+    return .init(text: String(batch.text.dropLast()), noSpaceTargetWords: targets)
   }
 }
 

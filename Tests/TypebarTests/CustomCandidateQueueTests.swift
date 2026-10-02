@@ -159,11 +159,14 @@ final class CustomCandidateQueueTests: XCTestCase {
   func testAnExplicitShortBookChunkKeepsItsExactFormattingAndProgressBoundary() {
     let source = "amber  harbor\n"
     var attempt = TestSessionFactory.make(configuration: config(.finish), customText: source, finiteTextSource: source)
-    XCTAssertEqual(attempt.prompt, source)
-    attempt.insertBatch(source, at: start)
+    let target = String(source.dropLast())
+    XCTAssertEqual(attempt.prompt, target)
+    attempt.insertBatch(target, at: start)
     XCTAssertEqual(attempt.outcome, .completed)
-    XCTAssertEqual(attempt.typed, source)
-    XCTAssertEqual(LongSavedTextProgress.advancedOffset(in: source + "next", from: 0, typed: attempt.typed), source.count)
+    XCTAssertEqual(attempt.typed, target)
+    XCTAssertEqual(attempt.errors, 0)
+    XCTAssertEqual(LongSavedTextProgress.advancedOffset(in: source + "next", from: 0, session: attempt), source.count)
+    XCTAssertEqual(LongSavedTextProgress.nextChunk(in: source, after: 0), source)
   }
 
   func testEveryCodeLanguageCountsTheSameNonPipeBlankCandidates() {
