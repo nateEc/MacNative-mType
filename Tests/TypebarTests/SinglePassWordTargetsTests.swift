@@ -228,15 +228,15 @@ final class SinglePassWordTargetsTests: XCTestCase {
     XCTAssertEqual(batch.noSpaceWordLengths, [3, 4])
   }
 
-  func testUnmappableGraphemeAndZeroTargetsDoNotInventOffsets() {
+  func testUnmappableGraphemesRejectOffsetsButEmptyTargetsRetainIdentity() {
     let fused = TestModifierPolicy.transformedBatch("a \u{301}b", modifiers: [.noSpaces])
     XCTAssertEqual(fused.text, "a\u{301}b")
     XCTAssertTrue(fused.noSpaceWordLengths.isEmpty)
     XCTAssertTrue(fused.noSpaceTargetWords.isEmpty)
     let empty = TestModifierPolicy.transformedBatch("中 a", modifiers: [.morseStream])
     XCTAssertEqual(empty.text, ".-/")
-    XCTAssertTrue(empty.noSpaceWordLengths.isEmpty)
-    XCTAssertTrue(empty.noSpaceTargetWords.isEmpty)
+    XCTAssertEqual(empty.noSpaceWordLengths, [0, 3])
+    XCTAssertEqual(empty.noSpaceTargetWords, ["", ".-/"])
   }
 
   func testLegacyTextOnlyBoundaryInferenceDoesNotResampleRandomCase() {

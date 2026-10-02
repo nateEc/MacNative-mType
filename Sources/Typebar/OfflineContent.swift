@@ -6277,6 +6277,8 @@ struct TestSessionFactory {
       generatedStreamContinuation: generatedStreamContinuation,
       generatedCodeContinuation: generatedCodeContinuation,
       sectionEndIndices: sectionEndIndices,
+      noSpaceSectionWordEnds: configuration.customTextCompletion == .sections
+        ? customSectionChunk?.sectionWordEnds ?? [] : [],
       randomCustomSourceTokens: streamsRandomCustomText ? randomCustomSourceTokens : nil,
       randomCustomPreviousWords: randomCustomPreviousWords,
       sequentialCustomWordStream: sequentialCustomWordStream,

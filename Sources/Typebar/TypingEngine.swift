@@ -909,8 +909,9 @@ struct TransformedPromptBatch {
     self.text = text
     let lengths = noSpaceTargetWords.map(\.count)
     // Joining can fuse graphemes across a word boundary. Do not hand the
-    // grapheme-indexed engine unsafe offsets, or invent missing zero targets.
-    if !lengths.isEmpty, lengths.allSatisfy({ $0 > 0 }),
+    // grapheme-indexed engine unsafe offsets. Empty transformed words retain
+    // their identity even though they contribute no rendered character.
+    if !lengths.isEmpty,
       lengths.reduce(0, +) == text.count, noSpaceTargetWords.joined() == text {
       self.noSpaceWordLengths = lengths
       self.noSpaceTargetWords = noSpaceTargetWords
@@ -3632,6 +3633,8 @@ struct TypingSession {
   private let initialFiniteCustomTextStream: CustomFiniteTextStream?
   private var sectionEndIndices: [Int]
   private let initialSectionEndIndices: [Int]
+  private var noSpaceSectionWordEnds: [Int]
+  private let initialNoSpaceSectionWordEnds: [Int]
   private var customSectionWordStream: CustomSectionWordStream?
   private let initialCustomSectionWordStream: CustomSectionWordStream?
   /// In no-space tests, the reference product still commits each source word
@@ -3642,7 +3645,16 @@ struct TypingSession {
   /// Rendered word slices paired with the separate no-space boundaries. They
   /// let result history and local practice retain word-level behavior even
   /// though the prompt itself has no visible separator.
-  private var noSpaceTargetWords: [String]
+  private var noSpaceTargetWords: [String] {
+    didSet {
+      // Scan only newly appended targets, never the whole prompt per key.
+      if firstEmptyNoSpaceWordIndex == nil, noSpaceTargetWords.count > oldValue.count {
+        firstEmptyNoSpaceWordIndex = noSpaceTargetWords.indices.dropFirst(oldValue.count)
+          .first { noSpaceTargetWords[$0].isEmpty }
+      }
+    }
+  }
+  private var firstEmptyNoSpaceWordIndex: Int?
   private let initialNoSpaceTargetWords: [String]
   private let repeatingNoSpaceWordLengths: [Int]
   private let repeatingNoSpaceTargetWords: [String]
@@ -3723,7 +3735,8 @@ struct TypingSession {
     generatedWordContinuation: GeneratedWordContinuation? = nil,
     generatedStreamContinuation: GeneratedStreamContinuation? = nil,
     generatedCodeContinuation: GeneratedCodeContinuation? = nil,
-    sectionEndIndices: [Int] = [], randomCustomSourceTokens: [String]? = nil,
+    sectionEndIndices: [Int] = [], noSpaceSectionWordEnds: [Int] = [],
+    randomCustomSourceTokens: [String]? = nil,
     randomCustomPreviousWords: [String] = [],
     sequentialCustomWordStream: CustomSequentialWordStream? = nil,
     finiteCustomTextStream: CustomFiniteTextStream? = nil,
@@ -3756,11 +3769,14 @@ struct TypingSession {
     self.initialFiniteCustomTextStream = finiteCustomTextStream
     self.sectionEndIndices = sectionEndIndices
     self.initialSectionEndIndices = sectionEndIndices
+    self.noSpaceSectionWordEnds = noSpaceSectionWordEnds
+    self.initialNoSpaceSectionWordEnds = noSpaceSectionWordEnds
     self.customSectionWordStream = customSectionWordStream
     self.initialCustomSectionWordStream = customSectionWordStream
     self.noSpaceWordEndIndices = noSpaceWordEndIndices
     self.initialNoSpaceWordEndIndices = noSpaceWordEndIndices
     self.noSpaceTargetWords = noSpaceTargetWords
+    self.firstEmptyNoSpaceWordIndex = noSpaceTargetWords.firstIndex(of: "")
     self.initialNoSpaceTargetWords = noSpaceTargetWords
     self.repeatingNoSpaceWordLengths = repeatingNoSpaceWordLengths
     self.repeatingNoSpaceTargetWords = repeatingNoSpaceTargetWords
@@ -3776,6 +3792,7 @@ struct TypingSession {
       generatedStreamContinuation: initialGeneratedStreamContinuation,
       generatedCodeContinuation: initialGeneratedCodeContinuation,
       sectionEndIndices: initialSectionEndIndices,
+      noSpaceSectionWordEnds: initialNoSpaceSectionWordEnds,
       randomCustomSourceTokens: randomCustomSourceTokens,
       randomCustomPreviousWords: initialRandomCustomPreviousWords,
       sequentialCustomWordStream: initialSequentialCustomWordStream,
@@ -3799,7 +3816,7 @@ struct TypingSession {
   func shouldFinishWithComposition(
     _ text: String, forceError: Bool = false, at date: Date = .now
   ) -> Bool {
-    guard !isFinished, !text.isEmpty, !forceError, !configuration.isInfinite,
+    guard !isFinished, !isAtEmptyNoSpaceWord, !text.isEmpty, !forceError, !configuration.isInfinite,
       configuration.mode != .time, configuration.mode != .zen,
       !(configuration.mode == .custom && configuration.customTextCompletion == .time)
     else { return false }
@@ -3879,6 +3896,18 @@ struct TypingSession {
   var sectionProgress: (completed: Int, total: Int)? {
     guard configuration.customTextCompletion == .sections else { return nil }
     guard customSectionWordStream != nil || !sectionEndIndices.isEmpty else { return nil }
+    if hasNoSpaceWordSegmentation, !noSpaceSectionWordEnds.isEmpty {
+      let committed = completedWordCount
+      var lower = 0
+      var upper = noSpaceSectionWordEnds.count
+      while lower < upper {
+        let middle = (lower + upper) / 2
+        if noSpaceSectionWordEnds[middle] <= committed { lower = middle + 1 }
+        else { upper = middle }
+      }
+      let total = customSectionWordStream?.sectionLimit ?? noSpaceSectionWordEnds.count
+      return (total == 0 ? lower : min(lower, total), total)
+    }
     let targetIndex = nextTargetIndex
     var lower = 0
     var upper = sectionEndIndices.count
@@ -3894,7 +3923,7 @@ struct TypingSession {
     return (total == 0 ? completed : min(completed, total), total)
   }
   var nextExpectedCharacter: Character? {
-    guard !isFinished, nextTargetIndex < promptCharacters.count else { return nil }
+    guard !isFinished, !isAtEmptyNoSpaceWord, nextTargetIndex < promptCharacters.count else { return nil }
     return promptCharacters[nextTargetIndex]
   }
 
@@ -3904,7 +3933,7 @@ struct TypingSession {
         typed: typed, isFinished: isFinished, blindMode: configuration.rules.blindMode)
     }
     let presentation = promptPresentationInput
-    return TypingPromptPresentation.glyphs(
+    let glyphs = TypingPromptPresentation.glyphs(
       target: prompt,
       typed: typed,
       isFinished: isFinished,
@@ -3920,6 +3949,13 @@ struct TypingSession {
       concealedCurrentAndFutureWords: hasStarted ? configuration.readAheadConcealedWordCount : nil,
       concealPendingCharacters: configuration.modifiers.contains(.simonSays)
     )
+    // The active empty field owns no visible target. Do not highlight the
+    // first glyph of a later word as if it could be entered now.
+    guard isAtEmptyNoSpaceWord else { return glyphs }
+    return glyphs.map { glyph in
+      glyph.state == .current
+        ? .init(character: glyph.character, state: .pending, typedCharacter: glyph.typedCharacter) : glyph
+    }
   }
 
   /// Rendering can match a correct retained newline to its glyph without
@@ -3994,7 +4030,9 @@ struct TypingSession {
         } else {
           // Extra input belongs to the field awaiting the next target, not
           // necessarily the word owning the previous committed separator.
-          if wordByTarget.indices.contains(targetCursor) { owner = wordByTarget[targetCursor] }
+          if usesHiddenBoundaries, targetCursor == emptyNoSpaceWordBoundary,
+            let firstEmptyNoSpaceWordIndex { owner = firstEmptyNoSpaceWordIndex }
+          else if wordByTarget.indices.contains(targetCursor) { owner = wordByTarget[targetCursor] }
           if presentation.extraErrors.contains(typedIndex) { inputErrors.insert(owner) }
           if !configuration.rules.blindMode, extraGlyphIndices.indices.contains(owner) {
             extraGlyphIndices[owner].append(extraGlyphIndex)
@@ -4008,7 +4046,10 @@ struct TypingSession {
     }
     return ranges.enumerated().map { word, range in
       let phase: TypingPromptWordPhase
-      if usesHiddenBoundaries ? range.upperBound <= cursor : range.upperBound < cursor {
+      if usesHiddenBoundaries, firstEmptyNoSpaceWordIndex != nil {
+        let committed = completedWordCount
+        phase = word < committed ? .committed : word == committed ? .active : .future
+      } else if usesHiddenBoundaries ? range.upperBound <= cursor : range.upperBound < cursor {
         phase = .committed
       } else if range.lowerBound <= cursor { phase = .active }
       else { phase = .future }
@@ -4122,6 +4163,7 @@ struct TypingSession {
     let activeWordIndex = noSpaceWordRanges.lastIndex { typedCharacters.count > $0.lowerBound }
     return noSpaceWordRanges.enumerated().reduce(into: TypingWordCredit()) { total, entry in
       let (index, range) = entry
+      if let firstEmptyNoSpaceWordIndex, index >= firstEmptyNoSpaceWordIndex { return }
       guard noSpaceTargetWords.indices.contains(index) else { return }
       let typedEnd = min(range.upperBound, typedCharacters.count)
       guard typedEnd > range.lowerBound else { return }
@@ -4222,7 +4264,8 @@ struct TypingSession {
     let characters = Array(typed)
     if tracksNoSpaceWordBursts {
       if noSpaceCommittedWordIndex != nil { return committedWordBursts.last ?? 0 }
-      let start = noSpaceWordEndIndices.last(where: { $0 < characters.count }) ?? 0
+      let start = isAtEmptyNoSpaceWord ? emptyNoSpaceWordBoundary ?? 0
+        : noSpaceWordEndIndices.last(where: { $0 < characters.count }) ?? 0
       return activeWordBurst(start: start, in: characters) ?? committedWordBursts.last ?? 0
     }
     guard let lastSeparator = characters.lastIndex(where: isPromptWordSeparator) else {
@@ -4443,7 +4486,8 @@ struct TypingSession {
     if tracksNoSpaceWordBursts {
       let typedLength = typedGraphemeCount
       var lower = 0
-      var upper = noSpaceWordEndIndices.count
+      var upper = hasNoSpaceWordSegmentation
+        ? firstEmptyNoSpaceWordIndex ?? noSpaceWordEndIndices.count : noSpaceWordEndIndices.count
       while lower < upper {
         let middle = lower + (upper - lower) / 2
         if noSpaceWordEndIndices[middle] <= typedLength {
@@ -4699,6 +4743,9 @@ struct TypingSession {
       return true
     }
     if configuration.rules.confidenceMode == .on { return false }
+    if firstEmptyNoSpaceWordIndex != nil, let word = noSpaceCommittedWordIndex,
+      let range = noSpaceWordRange(for: word)
+    { return range.contains { !isTypedCharacterCorrect(at: $0) } }
     // Drop the active field, not submitted empty fields: a blank line is a
     // real prior word whose correctness controls reopening it.
     let completedWords = Array(retainedInputWords(omittingEmptySubsequences: false).dropLast())
@@ -4845,6 +4892,10 @@ struct TypingSession {
       return false
     }
     extendPromptIfNeeded()
+    if isAtEmptyNoSpaceWord {
+      return insertIntoEmptyNoSpaceWord(character, rejectsOppositeShiftInput: rejectsOppositeShiftInput,
+        forceError: forceError, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
+    }
     let currentTargetIndex = nextTargetIndex
     let inputCharacter = normalizedInputCharacter(
       character,
@@ -5002,6 +5053,32 @@ struct TypingSession {
     return true
   }
 
+  /// A zero-length no-space target has no final letter capable of committing
+  /// it. Nonseparator attempts belong to that field, never to later glyphs.
+  private mutating func insertIntoEmptyNoSpaceWord(
+    _ character: Character, rejectsOppositeShiftInput: Bool, forceError: Bool,
+    at date: Date, evaluatesTerminalRules: Bool
+  ) -> Bool {
+    guard let boundary = emptyNoSpaceWordBoundary,
+      String(typed.suffix(max(0, typedGraphemeCount - boundary))).utf16.count < 20
+    else { return false }
+    beginIfNeeded(at: date)
+    recordInputAttempt(character, correctUnits: 0)
+    recordWeakSpotInput(character, isCorrect: false, at: date)
+    attemptedErrorCounts[boundary, default: 0] += 1
+    if evaluatesTerminalRules, configuration.difficulty == .master { fail(at: date) }
+    guard !rejectsOppositeShiftInput, configuration.rules.stopOnErrorMode != .letter else { return false }
+    let activeWordWasEmpty = typedGraphemeCount == boundary
+    appendTypedCharacter(character, targetIndex: nil, countsAsExtraError: true, at: date)
+    if configuration.rules.deleteOnErrorMode.isEnabled {
+      recordReplayEvent(kind: .insert, text: String(character), forceError: forceError, at: date)
+      deleteForError(configuration.rules.deleteOnErrorMode,
+        activeWordWasEmpty: activeWordWasEmpty, at: date)
+      return false
+    }
+    return true
+  }
+
   private mutating func recordWeakSpotInput(
     _ character: Character, isCorrect: Bool, at date: Date
   ) {
@@ -5155,6 +5232,7 @@ struct TypingSession {
   private mutating func removeLastCharacterFromCurrentWord(
     at date: Date, automatic: Bool = false
   ) {
+    if isAtEmptyNoSpaceWord, typedGraphemeCount == emptyNoSpaceWordBoundary { return }
     guard let last = typed.last, !last.isWhitespace else { return }
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
@@ -5359,13 +5437,17 @@ struct TypingSession {
 
   private var noSpaceCommittedWordIndex: Int? {
     guard tracksNoSpaceWordBursts else { return nil }
+    if isAtEmptyNoSpaceWord, let firstEmptyNoSpaceWordIndex, let boundary = emptyNoSpaceWordBoundary {
+      return typedGraphemeCount == boundary && firstEmptyNoSpaceWordIndex > 0
+        ? firstEmptyNoSpaceWordIndex - 1 : nil
+    }
     return noSpaceWordEndIndices.firstIndex(of: typedGraphemeCount)
   }
 
   /// No-space keeps a hidden word boundary after every source word. The final
   /// visible character is therefore the equivalent of an entered separator.
   private var nextNoSpaceCommittedWordIndex: Int? {
-    guard tracksNoSpaceWordBursts else { return nil }
+    guard tracksNoSpaceWordBursts, !isAtEmptyNoSpaceWord else { return nil }
     return noSpaceWordEndIndices.firstIndex(of: typedGraphemeCount + 1)
   }
 
@@ -5415,7 +5497,10 @@ struct TypingSession {
   }
 
   private var lastInputCommitsWord: Bool {
-    typed.last.map(isPromptWordSeparator) == true
+    if firstEmptyNoSpaceWordIndex != nil, hasNoSpaceWordSegmentation {
+      return noSpaceCommittedWordIndex != nil
+    }
+    return typed.last.map(isPromptWordSeparator) == true
       && !retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
   }
 
@@ -5620,7 +5705,7 @@ struct TypingSession {
     guard noSpaceWordEndIndices.indices.contains(wordIndex) else { return nil }
     let start = wordIndex == 0 ? 0 : noSpaceWordEndIndices[wordIndex - 1]
     let end = noSpaceWordEndIndices[wordIndex]
-    guard start < end else { return nil }
+    guard start <= end else { return nil }
     return start..<end
   }
 
@@ -5721,7 +5806,16 @@ struct TypingSession {
   private var hasNoSpaceWordSegmentation: Bool {
     tracksNoSpaceWordBursts
       && noSpaceTargetWords.count == noSpaceWordEndIndices.count
-      && noSpaceTargetWords.allSatisfy { !$0.isEmpty }
+  }
+
+  private var emptyNoSpaceWordBoundary: Int? {
+    guard hasNoSpaceWordSegmentation, let firstEmptyNoSpaceWordIndex else { return nil }
+    return noSpaceWordEndIndices[firstEmptyNoSpaceWordIndex]
+  }
+
+  private var isAtEmptyNoSpaceWord: Bool {
+    guard let boundary = emptyNoSpaceWordBoundary else { return false }
+    return nextTargetIndex == boundary
   }
 
   private func noSpaceWordReviews(
@@ -5733,10 +5827,12 @@ struct TypingSession {
     }.map { $0 + 1 } ?? 0
     let historicalAttemptedCount = attemptedErrors.indices.last(where: { attemptedErrors[$0] > 0 })
       .map { $0 + 1 } ?? 0
-    let attemptedCount = max(directlyAttemptedCount, historicalAttemptedCount)
+    let attemptedCount = min(max(directlyAttemptedCount, historicalAttemptedCount),
+      firstEmptyNoSpaceWordIndex.map { $0 + 1 } ?? targetWords.count)
     return (0..<min(attemptedCount, targetWords.count)).map { index in
       let range = noSpaceWordRanges[index]
-      let typedEnd = min(range.upperBound, typedCharacters.count)
+      let typedEnd = index == firstEmptyNoSpaceWordIndex
+        ? typedCharacters.count : min(range.upperBound, typedCharacters.count)
       let typedWord = typedEnd > range.lowerBound
         ? String(typedCharacters[range.lowerBound..<typedEnd]) : ""
       return .init(
@@ -5770,7 +5866,12 @@ struct TypingSession {
         if isPromptWordSeparator(targetCharacters[index]) { word += 1 }
       }
     }
-    for (index, count) in attemptedErrorCounts where wordByTargetIndex.indices.contains(index) {
+    for (index, count) in attemptedErrorCounts {
+      if index == emptyNoSpaceWordBoundary, let firstEmptyNoSpaceWordIndex {
+        counts[firstEmptyNoSpaceWordIndex] += count
+        continue
+      }
+      guard wordByTargetIndex.indices.contains(index) else { continue }
       let word = wordByTargetIndex[index]
       if counts.indices.contains(word) { counts[word] += count }
     }
@@ -5819,7 +5920,7 @@ struct TypingSession {
   }
 
   private mutating func finishIfNeeded(at date: Date) {
-    guard !isFinished else { return }
+    guard !isFinished, !isAtEmptyNoSpaceWord else { return }
     switch configuration.mode {
     case .words:
       if hasNoSpaceWordSegmentation || !usesWordCommitInput
@@ -5867,7 +5968,7 @@ struct TypingSession {
   }
 
   private mutating func extendPromptIfNeeded() {
-    guard nextTargetIndex >= promptCharacters.count else { return }
+    guard !isAtEmptyNoSpaceWord, nextTargetIndex >= promptCharacters.count else { return }
     if var stream = customSectionWordStream, stream.hasRemaining {
       let chunk = stream.nextChunk()
       customSectionWordStream = stream
@@ -5875,6 +5976,7 @@ struct TypingSession {
       appendPrompt(chunk.text)
       if configuration.customTextCompletion == .sections {
         sectionEndIndices += chunk.sectionEndOffsets.map { previousEnd + $0 }
+        noSpaceSectionWordEnds += chunk.sectionWordEnds
       }
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
         var end = previousEnd

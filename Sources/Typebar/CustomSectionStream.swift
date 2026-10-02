@@ -3,6 +3,7 @@ import Foundation
 struct CustomSectionPromptChunk {
   var text = ""
   var sectionEndOffsets: [Int] = []
+  var sectionWordEnds: [Int] = []
   var noSpaceWordLengths: [Int] = []
   var noSpaceTargetWords: [String] = []
 }
@@ -101,7 +102,10 @@ struct CustomSectionWordStream {
         chunk.noSpaceWordLengths.append(transformed.count)
         chunk.noSpaceTargetWords.append(transformed)
       }
-      if pendingIndex == pendingWords.count { chunk.sectionEndOffsets.append(length) }
+      if pendingIndex == pendingWords.count {
+        chunk.sectionEndOffsets.append(length)
+        chunk.sectionWordEnds.append(emittedWords)
+      }
       // The source's initial pipe/word prompt prefetches complete sections;
       // completion consumes that entire generated queue. Later chunks are
       // bounded by the configured budget's remaining words.

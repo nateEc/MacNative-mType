@@ -37,6 +37,8 @@ enum SavedTextInputHistoryPolicy {
     var liveGraphemeCount = 0
     var field = 0
     var trimsLastField = false
+    let noSpaceFieldLimit = noSpaceWordEnds.isEmpty ? displays.count
+      : displays.firstIndex(of: "") ?? noSpaceWordEnds.count
     for event in events {
       trimsLastField = false
       switch event.kind {
@@ -46,7 +48,7 @@ enum SavedTextInputHistoryPolicy {
             // Native no-space target boundaries are grapheme offsets. A
             // binary search avoids rescanning every target for every event.
             var lower = 0
-            var upper = noSpaceWordEnds.count
+            var upper = noSpaceFieldLimit
             while lower < upper {
               let middle = (lower + upper) / 2
               if noSpaceWordEnds[middle] <= liveGraphemeCount { lower = middle + 1 }

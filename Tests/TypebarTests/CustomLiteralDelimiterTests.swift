@@ -27,7 +27,7 @@ final class CustomLiteralDelimiterTests: XCTestCase {
       ["a", "\u{301}b", "c"])
   }
 
-  func testUnmappableAndEmptyWordTargetsDoNotExportInventedGraphemeOffsets() throws {
+  func testFusedTargetsRejectOffsetsAndEmptyMorseWordsRetainTheirIdentity() throws {
     var fused = try XCTUnwrap(CustomSectionWordStream(source: "a \u{301}b",
       configuration: configuration(.finish, modifiers: [.noSpaces])))
     let fusedChunk = fused.nextChunk()
@@ -37,8 +37,9 @@ final class CustomLiteralDelimiterTests: XCTestCase {
     var empty = try XCTUnwrap(CustomSectionWordStream(source: "中 a", configuration: configuration(.finish)))
     let emptyChunk = empty.nextChunk()
     XCTAssertEqual(emptyChunk.text, ".-/")
-    XCTAssertTrue(emptyChunk.noSpaceWordLengths.isEmpty)
-    XCTAssertTrue(emptyChunk.noSpaceTargetWords.isEmpty)
+    XCTAssertEqual(emptyChunk.noSpaceWordLengths, [0, 3])
+    XCTAssertEqual(emptyChunk.noSpaceTargetWords, ["", ".-/"])
+    XCTAssertEqual(NoSpaceWordBoundaryPolicy.endIndices(for: emptyChunk.noSpaceWordLengths), [0, 3])
   }
 
   func testAllMappedSpaceScalarsStillSplitBeforeACombiningMark() {
