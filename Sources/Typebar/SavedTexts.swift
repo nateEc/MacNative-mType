@@ -48,8 +48,8 @@ enum CustomTextPolicy {
 }
 
 /// Typebar keeps progress as a character offset rather than copying the
-/// reference project's word-array storage. The offset always advances to a
-/// fully matched word boundary, so whitespace, line breaks, and the user's
+/// reference project's word-array storage. The offset advances to a source
+/// word boundary based on the attempted input history, so the user's
 /// original formatting remain intact when a long text resumes.
 enum LongSavedTextProgress {
     /// Returns the next complete-word slice without changing any source
@@ -84,6 +84,7 @@ enum LongSavedTextProgress {
             ? 0 : value
     }
 
+    /// Legacy matched-prefix utility, not the desktop input-history contract.
     static func advancedOffset(in text: String, from offset: Int, typed: String) -> Int {
         let normalizedOffset = normalized(offset, in: text)
         let remaining = Array(remainingText(in: text, after: normalizedOffset))
@@ -119,6 +120,23 @@ enum LongSavedTextProgress {
             completedPrefixCount = cursor
         }
         return normalizedOffset + completedPrefixCount
+    }
+
+    static func advancedOffset(in text: String, from offset: Int, session: TypingSession) -> Int {
+        let start = normalized(offset, in: text)
+        let count = session.savedTextProgressWordCount
+        guard count > 0 else { return start }
+        var words = 0
+        var position = start
+        for character in text.dropFirst(start) {
+            position += 1
+            if isPromptWordSeparator(character) {
+                words += 1
+                if words == count { return position }
+            }
+        }
+        // A terminal word without a commit still occupies one source slot.
+        return position
     }
 
     static func progressLabel(in text: String, offset: Int) -> String {

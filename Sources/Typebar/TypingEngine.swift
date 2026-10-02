@@ -3701,6 +3701,15 @@ struct TypingSession {
   private var attemptedErrorCounts = [Int: Int]()
   private var committedWordBursts: [Int] = []
   private var replayEvents: [TypingReplayEvent] = []
+  /// Derived only when saving long-text progress; no new per-key state or
+  /// persisted event fields. Native replay remains the accepted-input source.
+  var savedTextProgressWordCount: Int {
+    SavedTextInputHistoryPolicy.progressWordCount(
+      displays: hasNoSpaceWordSegmentation
+        ? noSpaceTargetWords : SavedTextInputHistoryPolicy.displayWords(in: prompt),
+      events: replayEvents,
+      noSpaceWordEnds: hasNoSpaceWordSegmentation ? noSpaceWordEndIndices : [])
+  }
   private var weakSpotInputSamples: [WeakSpotInputSample] = []
   private var weakSpotLastInputDate: Date?
   private var physicalKeyTiming = PhysicalKeyTiming()

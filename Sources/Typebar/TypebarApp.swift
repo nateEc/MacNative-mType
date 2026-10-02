@@ -3892,7 +3892,7 @@ private struct ContentView: View {
         in: active.text, from: active.progress)
     case .bailedOut, .failed, .invalidAFK:
       nextProgress = LongSavedTextProgress.advancedOffset(
-        in: active.text, from: active.progress, typed: session.typed)
+        in: active.text, from: active.progress, session: session)
     case .active, .abandoned:
       return false
     }
