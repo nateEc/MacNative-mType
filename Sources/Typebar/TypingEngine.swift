@@ -5329,7 +5329,7 @@ struct TypingSession {
       recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: true,
         inputStopped: true, at: date)
       if evaluatesTerminalRules,
-        configuration.difficulty == .master || shouldFailExpertOnStoppedInput(inputCharacter)
+        configuration.difficulty == .master || shouldFailExpertOnAttemptedInput(inputCharacter)
       {
         fail(at: date)
       }
@@ -5368,7 +5368,7 @@ struct TypingSession {
         inputStopped: true, at: date)
       if evaluatesTerminalRules,
         (configuration.difficulty == .master && !accuracyUnits.lastCorrect)
-          || shouldFailExpertOnStoppedInput(inputCharacter)
+          || shouldFailExpertOnAttemptedInput(inputCharacter)
       {
         fail(at: date)
       }
@@ -5380,6 +5380,10 @@ struct TypingSession {
       // makes playback, automatic-event sound policy, and live input history
       // agree with the visible error recovery.
       let activeWordWasEmpty = activeDeleteOnErrorWordIsEmpty
+      // Difficulty uses the attempted field before recovery rewinds it.
+      // Still perform and log recovery before publishing the failed outcome.
+      let failsDifficulty = (configuration.difficulty == .master && !accuracyUnits.lastCorrect)
+        || shouldFailExpertOnAttemptedInput(inputCharacter)
       if isPromptWordSeparator(inputCharacter) {
         // Recovery never submits its erroneous separator. Persist the same
         // existing no-commit marker used for other retained field separators.
@@ -5393,6 +5397,7 @@ struct TypingSession {
         kind: .insert, text: String(inputCharacter), forceError: forceError, at: date)
       deleteForError(
         configuration.rules.deleteOnErrorMode, activeWordWasEmpty: activeWordWasEmpty, at: date)
+      if evaluatesTerminalRules && failsDifficulty { fail(at: date) }
       return false
     }
     if !isCorrect && configuration.modifiers.contains(.clearCurrentWordOnError),
@@ -5629,6 +5634,7 @@ struct TypingSession {
     at date: Date, automatic: Bool = false
   ) {
     if isAtEmptyNoSpaceWord, typedGraphemeCount == emptyNoSpaceWordBoundary { return }
+    if let range = activeNoSpaceWordRange, typedGraphemeCount == range.lowerBound { return }
     guard !typed.isEmpty, !lastInputCommitsWord else { return }
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
@@ -6112,9 +6118,9 @@ struct TypingSession {
     }
   }
 
-  /// Difficulty judges the attempted commit even when its text is stopped.
+  /// Difficulty judges the attempted commit even when stopped or recovered.
   /// Expert compares the complete field, not the Shift correctness flag.
-  private func shouldFailExpertOnStoppedInput(_ character: Character) -> Bool {
+  private func shouldFailExpertOnAttemptedInput(_ character: Character) -> Bool {
     guard configuration.difficulty == .expert else { return false }
     if tracksNoSpaceWordBursts, let range = activeNoSpaceWordRange,
       range.upperBound <= promptCharacters.count

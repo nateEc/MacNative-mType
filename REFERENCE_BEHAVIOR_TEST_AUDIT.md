@@ -1,5 +1,19 @@
 # 固定参考行为测试盘点
 
+2026-10-03 恢复后难度增量（定向验证已通过，最终完整门禁已通过）：固定 [输入处理／恢复后的终止检查](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L300-L376)、[难度合同](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/helpers/fail-or-finish.ts#L48-L78) 和 [当前字段删除边界](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L90-L140)。原生自动删除原本提前 return，错字被移除后绕过 Master／Expert 终止检查；现先捕获删除前尝试是否失败，完成并记录恢复后再发布 failed。Master 保留本次最终单位判定；Expert 使用完整尝试字段／已知 no-space 词尾，不把恢复后空文本当成没有提交尝试。既有 Expert 帮助函数改为表达“尝试输入”的私有名称，停止与 Shift 调用继续共用，不引入重复终止规则。
+
+四档 letter／letterHard／word／wordHard 都执行恢复并保留错误尝试；批次仅最终单位运行难度，早期自动恢复错误不单独结束；Expert 内部错字与空输入前导分隔符不失败，非空字段错误 space／LF 和 no-space 最终错字仍失败。补齐有明确词界的 no-space 普通 letter 删除守卫：删除错误新词首后不再吞前词末字，hard 模式仍经独立返回前词路径。没有隐藏词界元数据时不猜测语言分词；不升级该部分为完整兼容。
+
+RecoveryDifficultyTests 新增 22 项。先行三组在四档恢复中产生十二个预期失败（0.520 秒），初次修正相关 97 项零失败（2.057 秒）。扩展相关 215 项出现三处断言失败（4.886 秒）：一个真实 no-space 普通删除越界，以及两个自动事件保存排序夹具预期错误；新增 21 项独立复验同三失败（0.095 秒）。修正边界后保留完整自动标记／offset／动作断言，按既有按时间戳排序的保存合同检查，不以降低断言绕过排序差异。最终相关 216 项零失败（4.382 秒），新增 22 项独立零失败（0.058 秒），覆盖 Master／Expert／四档恢复、批次末单位、空字段／LF／保留前导空间、普通与 hard 已知 no-space 词界、自动 Tab 执行时钟、终态后拒绝输入／删除、实际不开窗 TypingInputView 桥、隔离记录／归档 11 往返和旧 nil 日志读取。
+
+只读 bundled Node v24.19.0 类型擦除／内存执行实际完整 util.ts、validation.ts、fail-or-finish.ts、insert-text.ts；第一组十二例遍历四档 Master／Expert 提前空间／Expert no-space 词尾，实际记录插入→恢复删除→UI→difficulty failure；第二组二十四例核对 Master 末正确批次、Expert 早期分隔符批次、严格空字段、保留前导空格、单字 no-space 词尾和 no-space 内部错字，均按实际难度／完成函数决定结果。DOM／词目录、当前字段／日志衍生、语言等值、导航、前置守卫、UI／TestLogic 状态发布、组合状态与 Funbox 属性为明确自有依赖，minBurst 未触发；不冒称实际完整浏览器、滚出视区的 hard 返回、Vitest、IME／RAF／实体键盘或 Howler 已验收。无参考源码、数据或资产进入原生仓库。
+
+源码驱动／行为优先／根因调试及会话内有界决策／风险复核促成本次先证实绕过难度，再保留恢复副作用与删除前判断；迁移安全限定为新练习行为改变、旧成绩不回算。未新增事件字段／配置／归档版本／SwiftData schema／服务协议，不写真实库、不部署、不播放音频、不启动图形实例。自动回调仍保留原时间戳，保存按时间排序与执行顺序不同，可能使延迟输入回放和实际文字不一致，此缺口未在本轮关闭；全逐 UTF-16 变更／半代理／CRLF、全面字段游标／accepted LF 映射、候选／RAF／真实 UI／IME、主题／词库／远程等仍开放，94 配置键与部分 Funbox 不升级。三个新人工场景仅待验收清单，整体 goal active；不冒称独立评审或全量重写完成。
+
+静态复核固定 [日志衍生与排序](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/data.ts#L204-L223)：getCurrentInput 取最后执行输入的字段快照，getAllTestEvents 另按时间和事件类型排序；因此不能假定把排序改成执行序就等价原版，后续应核对字段快照／词索引与删除作用域。此处是实际源码阅读，不冒称执行了完整 data.ts 日志模块。
+
+2026-10-03 本恢复后难度增量最终完整门禁通过：客户端 2,034 项零失败（375.850 秒）、服务端 131 项零失败（1.451 秒）、744 条唯一人工场景清单、固定参考／元数据／原创性审计与未打开应用包检查全部通过。门禁内 testOptionalHundredThousandWordEndurance 实际通过（40.871 秒），详细日志清理前已核对，不凭环境开关或旧轮结果推断。测试／编译串行且活跃期间未改 Swift 输入；门禁前真实背景存储路径不存在，未删除用户数据。未启动 Typebar 图形实例、播放音频、写真实成绩／设置库、部署服务或跨设备同步。Core Data 系统环境诊断与 XCTest 失败分开，零测试失败不意味没有系统诊断；三个新增人工场景仍待验收，前述完整 Unicode／字段／延迟回放／真实 UI／IME 等缺口保留，整体 goal active。
+
 2026-10-03 换行字段恢复增量（定向验证已通过，最终完整门禁已通过）：以固定 [字段位置判定](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/helpers/validation.ts#L13-L36)、[自动删除](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L90-L140)、[停止与恢复顺序](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L230-L320) 和既有实际正文绘制探针为合同。原生独立修正三条路径：letter-stop 首次落在可见目标 LF 槽位的错字覆盖该槽位，不追加额外字，包含空 LF 字段上的 strictSpace 错空格；ASCII 空格提交槽仍与可见 LF 不同。正确性同时检查当前字段实际 UTF-16 位置，避免 word-stop 保留 LF 后切换自动恢复，把重复 Return 误当正确输入。letter 恢复删除错误输入及当前字段前一个字符，包括未提交 Tab／空格／LF，但不跨越已提交的前词分隔符；word 与 hard 模式保留各自删除／返回边界。
 
 恢复中的错误分隔符使用既有 commitsWord:false 标记，不把瞬间插入误作词提交；原版不导航事件原始 commitsWord 为 undefined，原生 false 是既有适配合同而非原样复制该 schema。未来事件才改变，旧 nil 标记按旧合同读取，不改写旧成绩；归档仍为 11，SwiftData schema／偏好和服务协议不变。标记补证前最终 history／回放文本已经正确，只复现缺少显式“不提交”元数据，不冒称抓到最终历史幽灵字段故障。
