@@ -1190,6 +1190,12 @@ private struct ContentView: View {
         requiresConfirmation: LongTestCloseProtectionPolicy.requiresConfirmation(
           for: session, savedLongText: hasLockedCustomTextSource))
     )
+    .background(
+      TypingMusicPracticeScopeBridge(
+        isPracticePage: !(showingHistory || showingWeakSpots || showingSync || showingConnections))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    )
     .environment(\.typebarAnimationFrameRate, effectiveAnimationFrameRate)
     .overlay(alignment: .top) {
       if network.showsOfflineBanner, !session.hasStarted {

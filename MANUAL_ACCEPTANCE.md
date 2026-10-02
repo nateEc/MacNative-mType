@@ -1,5 +1,13 @@
 # Typebar 人工验收记录
 
+2026-10-02 音乐 Shift 页面／窗口作用域增量（最终门禁已通过）：固定 [modifier effect](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/states/modifiers.ts) 只在 test 页注册左右 Shift／Alt 的 keydown/up，切页先清逻辑状态；[PageName](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/pages/page.ts#L8-L20) 与测试页的弹层不是同一概念。本增量用独立弱窗口／视图 owner 注册表显式标记主练习与结果窗口；历史、弱项、同步账户／榜单／资料和好友展示期间为非测试页，设置／关于／版本窗口未标记，命令／挑战／配置等测试页 sheet 继承 sheetParent 宿主。标记 false 的 sheet 可显式阻断继承。不是按窗口标题猜测，不借用长测试关闭保护注册表，不改关闭／退出授权。
+
+监听器继续全 app 更新最后键码／Caps，并识别所有物理修饰键按下／释放；仅选中的练习作用域能更新逻辑 Shift。切到非测试页、返回或换到另一练习窗口只 resetPracticeShift，不停样本／音乐，不清音阶、主音量或最后键码；物理侧键记录保留，非测试页按住 Shift 不能在回来后的普通 Q 上复活逻辑状态。相同页面的 sheet／key 通知不清 Shift；没有监听 resign-key，暂离 app 本身不是切页。注册／拆除和 willClose 发布同步通知，didBecomeKey 与每次键事件同步校正选中作用域，鼠标切页后无需等下次按键才清状态；安装回调重入时返回前再校正。stop 先退休 generation 并移除自身通知，再卸载监听。注册表弱持有窗口，视图 owner UUID 独立移除；作用域用独立 UUID，不把可复用对象地址当活动页身份，全部 owner 退出后的重新注册有新身份，未强迫测试分配器复用地址。同步 NSView 挂接／拆除避免旧异步注册；元数据视图不命中鼠标，SwiftUI 禁用其 hit testing／辅助功能呈现，没有新增交互元素。
+
+行为证据：先行 3 项真实执行产生 6 个失败断言，另注册内切页 1 项产生 1 个预期失败断言；首次相关 94 项通过，所有补证后相关 104 项零失败（约 0.37 秒）。新增 13 项：监听总 33 项、作用域注册／非交互视图 7 项，已有音乐 22 项保留。用真实未分发 NSEvent、NotificationCenter selector 回调及无窗口 NSView 进行隔离检查；安装／移除、当前键窗口与父关系用显式自有替身，不创建 NSWindow，不启动 app，不调用真实 sendEvent，不播放音频或写真实数据。只读 Node v24.19.0 类型擦除／内存执行实际 modifier 模块，signal/effect/Caps/document 为明确自有桩：左 Shift→settings→off-page 右 Shift→test→普通 Q→右 Shift 按下／释放，逻辑 Shift 为 true/false/false/false/false/true/false，Caps 全程 true；仅该实际 modifier 模块的监听数 test 为 1/1、settings 为 0/0，不冒称同时执行了声音控制器全局监听、浏览器或上游 Vitest，没有参考代码／资产入仓。最多三轮会话内决策／风险复核，非独立评审；实机 SwiftUI 窗口／sheet 生命周期、系统通知顺序／多窗口听感、菜单 tracking loop／自动失焦丢事件、IME、多设备和全 Alt 行为仍未验收。本增量不等于原版所有修饰状态路径已完成，样本随机变体、16 号混响、浏览器 DSP 等仍缺口。新增三个人工项总 711 个，均待验收；历史作用域／复位缺口由本增量部分补齐，不据此关 goal。归档／成绩／SwiftData 和持久化音型未改，goal active。
+
+本页面／窗口作用域增量完整门禁通过：客户端 1,847 项零失败（360.745 秒）、服务端 131 项零失败（1.534 秒），711 项人工场景、固定参考／元数据／原创性审计及未打开的应用打包全部通过。完整门禁内明确的 testOptionalHundredThousandWordEndurance 实际执行并通过（38.746 秒），在临时日志自动清理前核对，不只是环境变量或预览生成；它仍只证明文本引擎，不证明设备声音压力。所有测试串行，编译／测试期间未编辑源码，本轮没有启动 Typebar 图形实例、播放音频、写真实数据库或改动持久化结构。完整 goal 保持 active，不能把本增量当作原版全功能完成或多窗口实机验收。
+
 2026-10-02 练习重置音乐 Shift 增量（最终门禁已通过）：依据固定 [modifier 模块](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/states/modifiers.ts) 与 [测试 reset](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L297)，把可重置的左右逻辑 Shift 与监听器的物理侧键转换记录分离。beginPracticeAttempt 清逻辑 Shift 并停止旧样本，不清 CapsLock、最后键码、音乐实例、试听／练习音阶状态、样本原型缓存或主音量；普通 keyDown、Caps 切换、未知修饰和其他修饰键释放均不从原始 aggregate Shift 复活旧状态。物理记录保留，所以无设备位合成事件的释放回退仍可正确识别。普通 clearAllSounds 仅停样本，不承担练习重置。正常重开、结果重复与允许的在线内容替换三处在既有守卫后接入；被锁定／拒绝／过期分支不改动，三处私有 SwiftUI 入口仅代码复核／编译，未运行真实按钮或网络替换 UI。
 
 行为优先红阶段：仅添加新入口的旧停样本行为占位及三项测试，真实执行 3 项产生 6 个预期失败断言；实现后先 89 项通过，补证后相关 92 项零失败（约 0.44 秒），包括 MusicKeyboardMonitorTests 27 项与 MusicalClickSoundTests 22 项。修正一项旧测试的事件序列，显式发 Shift 释放；旧序列误把独立 Caps 事件当作 Shift keyup，新增测试保留该反例而非放宽频率断言。后补三项覆盖启动持有 Shift 的普通键、Caps 不合成 Shift 释放、音阶／在播音乐／主音量／原型缓存保留；它们是复核证据，不冒称先行红证据。
@@ -1292,6 +1300,14 @@ pgrep -alf -f '/swiftc ' || true
 | CFG-SOUND-SHIFT-RESET-01 | 新练习清逻辑 Shift | 后续获准的唯一隔离候选选择钢琴音；按住左 Shift 重开并继续 Q/Z，分别开关 CapsLock；在结果重复和允许在线内容替换路径复查。 | 重开清逻辑 Shift，原始 shiftKey 不使普通键重新升八度；Caps 与最后键码保留。拒绝／过期／锁定操作不提前清状态。 | 待验收（三项先行反例含重复直接 responder 路径；真实三个私有 SwiftUI 入口仅代码／编译核对，未实机操作） |
 | CFG-SOUND-SHIFT-SIDES-01 | 重开后的左右侧键独立性 | 左 Shift 按住时重开，再按右 Shift、输入 Q、松右 Shift但保持左 Shift；再松并重新按左 Shift。 | 右按下升一层，右松开回基础八度，不导入重开前左侧；左重新按下才重新升一层。普通未知／Option 修饰不恢复清空状态，Caps 不伪造 Shift 释放。 | 待验收（真实未分发 NSEvent，SDK 设备位与无设备位合成回退自动化；实际物理键、多设备和完整页面切换未验收） |
 | CFG-SOUND-SHIFT-PRESERVE-01 | 重开与样本停音职责分离 | 唯一隔离候选交替试听／练习两种音阶，播放音乐与样本后重开；另单独执行样本停音，再继续输入。 | 重开仅停止样本并清逻辑 Shift；在播音乐、两模式试听／练习音阶状态、主音量和样本缓存不清。样本停音本身不清 Shift。 | 待验收（声音控制器 22 项音乐测试与监听 27 项含隔离补证；未播放实际音频、未验收设备压力） |
+
+## 音乐页面与窗口作用域待验收
+
+| ID | 场景 | 操作 | 期望结果 | 状态 |
+| --- | --- | --- | --- | --- |
+| CFG-SOUND-PAGE-01 | 测试页与非测试页 Shift | 后续获准的唯一候选按住 Shift 从练习进入设置、历史、弱项、账户／榜单／资料或好友，分别鼠标试听；在非测试页按 Shift，再返回练习输 Q，另开 CapsLock 复查。 | 切页清逻辑 Shift，非测试页 Shift 不进入练习逻辑，返回普通 Q 不导入原始 Shift；Caps 和全 app 最后键码仍可更新，切页本身不播放或停止音频。 | 待验收（三项先行反例及只读实际 modifier effect 探针；私有 SwiftUI 页面布尔标记仅代码／编译接入，未实机点击） |
+| CFG-SOUND-PAGE-SHEET-01 | 弹层继承与多练习窗口 | 唯一候选在练习内打开命令、挑战或配置 sheet；再切到另一练习窗口，切回原窗口并暂离 app；分别以鼠标和按键触发试听。 | 同测试页 sheet 继承宿主且保留 Shift；明确非测试页阻断继承；换练习窗口清 Shift但保留音乐、音阶和键码，暂离 app 本身不清逻辑 Shift。元数据标记不遮挡鼠标或新增辅助功能内容。 | 待验收（父关系／显式 false／循环隔离、真实通知回调及无窗口 NSView hitTest 自动化；真实 sheetParent、VoiceOver、窗口焦点和事件顺序未验收） |
+| CFG-SOUND-PAGE-OWNER-01 | 标记资源退出与旧回调 | 单实例检查两视图 owner、新旧视图替换、窗口关闭／拒绝关闭、stop／restart 和失败重试；另无窗口自动化核对弱引用、重复 unregister 与注册内切页。 | 旧 owner 不删新 owner或别的窗口，实际 willClose 才退场，标记不强留窗口；全退场后新注册有独立 UUID。停监听后通知不清声音上下文，安装内切页返回前校正，不重复启动 GUI 或申请全局键盘权限。 | 待验收（33 项监听和 7 项注册／视图测试；真实关闭批准／拒绝与窗口生命周期仅保留既有保护代码，未实机验证） |
 
 ## 记录格式
 

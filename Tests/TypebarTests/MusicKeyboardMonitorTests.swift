@@ -7,12 +7,23 @@ import XCTest
 final class MusicKeyboardMonitorTests: XCTestCase {
   private final class Voice: TypingSoundVoice {
     var volume: Float = 1
-    func copyForPlayback() -> (any TypingSoundVoice)? { Voice() }
+    var stops = 0
+    var copies: [Voice] = []
+    func copyForPlayback() -> (any TypingSoundVoice)? {
+      let voice = Voice(); copies.append(voice); return voice
+    }
     func play(onFinish: @escaping () -> Void) -> Bool { true }
-    func stop() {}
+    func stop() { stops += 1 }
   }
 
   @MainActor private final class Events {
+    let practiceWindow = NSObject()
+    let center = NotificationCenter()
+    let defaultScope = UUID()
+    var selectedScope: UUID?
+    var scope: UUID? { selectedScope ?? defaultScope }
+    var isOutsidePractice = false
+    func practiceScope() -> UUID? { isOutsidePractice ? nil : scope }
     var handlers: [TypingMusicKeyboardMonitor.Handler] = []
     var masks: [NSEvent.EventTypeMask] = []
     var tokens: [NSObject] = []
@@ -54,7 +65,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     let event = try key(12)
     XCTAssertTrue(events.send(event) === event)
@@ -68,7 +79,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     sound.recordKeyDown(keyCode: 12, modifierFlags: [])
     monitor.start()
     let space = try key(49)
@@ -82,7 +93,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     _ = events.send(try key(12))
     _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
@@ -101,7 +112,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
   func testStartIsSingleInstanceStopRemovesExactTokenAndCanRestart() {
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start(); monitor.start()
     XCTAssertEqual(events.handlers.count, 1)
     XCTAssertEqual(events.masks, [[.keyDown, .flagsChanged]])
@@ -119,7 +130,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start(); monitor.stop(); monitor.start()
     guard events.handlers.count == 2 else { XCTFail("missing active listener"); return }
     _ = events.send(try key(12), index: 1)
@@ -135,7 +146,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { .capsLock })
+      modifierFlags: { .capsLock }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     sound.previewClick(style: .pianoSine, volume: 0.5)
     XCTAssertEqual(pitch(sources.last), 523.25)
@@ -148,7 +159,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let events = Events()
     var flags: NSEvent.ModifierFlags = []
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { flags })
+      modifierFlags: { flags }, practiceScope: events.practiceScope, notificationCenter: events.center)
     let delegate = TypebarApplicationDelegate(musicKeyboardMonitor: monitor)
     delegate.applicationDidFinishLaunching(.init(name: NSApplication.didFinishLaunchingNotification))
     flags = .capsLock
@@ -171,7 +182,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let events = Events()
     var flags: NSEvent.ModifierFlags = []
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { flags })
+      modifierFlags: { flags }, practiceScope: events.practiceScope, notificationCenter: events.center)
     sound.recordKeyDown(keyCode: 12, modifierFlags: .capsLock)
     monitor.refreshCapsLock()
     sound.playClick(style: .pianoSine, volume: 0.5)
@@ -203,7 +214,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { .shift })
+      modifierFlags: { .shift }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     sound.previewClick(style: .pianoSine, volume: 0.5)
     _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
@@ -217,7 +228,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     _ = events.send(try key(12))
     let up = try key(6, type: .keyUp, flags: [.shift, .capsLock])
@@ -234,7 +245,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     let repeatKey = try key(6, flags: [.command, .control], repeatKey: true)
     XCTAssertTrue(events.send(repeatKey) === repeatKey)
@@ -253,7 +264,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let events = Events()
     events.acceptsInstall = false
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     XCTAssertTrue(events.tokens.isEmpty)
     events.acceptsInstall = true
@@ -272,7 +283,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let events = Events(), reference = WeakMonitor()
     events.onInstall = { reference.value?.stop() }
     let monitor = TypingMusicKeyboardMonitor(install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     reference.value = monitor
     monitor.start()
     XCTAssertEqual(events.tokens.count, 1)
@@ -290,7 +301,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let events = Events(), reference = WeakMonitor()
     events.onInstall = { reference.value?.start() }
     let monitor = TypingMusicKeyboardMonitor(install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     reference.value = monitor
     monitor.start()
     XCTAssertEqual(events.tokens.count, 1)
@@ -308,7 +319,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
       reference.value?.start()
     }
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     reference.value = monitor
     monitor.start(); monitor.stop()
     XCTAssertEqual(events.tokens.count, 2)
@@ -323,7 +334,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
   func testStoppedOwnerIsNotRetainedByCallbackAndReleasedHandlerStillPassesEventThrough() throws {
     let events = Events(), reference = WeakMonitor()
     var monitor: TypingMusicKeyboardMonitor? = .init(install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     reference.value = monitor
     monitor?.start(); monitor?.stop(); monitor = nil
     XCTAssertNil(reference.value)
@@ -335,7 +346,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
   func testActualApplicationDelegateOwnsOneRegistrationAcrossRepeatedLaunchAndExplicitTermination() {
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     let delegate = TypebarApplicationDelegate(musicKeyboardMonitor: monitor)
     let launched = Notification(name: NSApplication.didFinishLaunchingNotification)
     delegate.applicationDidFinishLaunching(launched)
@@ -358,7 +369,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
       let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
       let events = Events()
       let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-        modifierFlags: { [] })
+        modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
       monitor.start()
       _ = events.send(try key(12))
       _ = events.send(try key(code, type: .flagsChanged, flags: flag.union(.init(rawValue: bit))))
@@ -377,7 +388,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     let both = NSEvent.ModifierFlags.shift.union(.init(rawValue: UInt(NX_DEVICELSHIFTKEYMASK | NX_DEVICERSHIFTKEYMASK)))
     _ = events.send(try key(56, type: .flagsChanged, flags: .shift.union(.init(rawValue: UInt(NX_DEVICELSHIFTKEYMASK)))))
@@ -397,7 +408,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     for flags: NSEvent.ModifierFlags in [.capsLock, []] {
       _ = events.send(try key(12, flags: flags))
@@ -413,7 +424,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
     sound.playClick(style: .pianoSine, volume: 0.5)
@@ -436,7 +447,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
       let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
       let events = Events()
       let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-        modifierFlags: { caps })
+        modifierFlags: { caps }, practiceScope: events.practiceScope, notificationCenter: events.center)
       monitor.start()
       _ = events.send(try key(56, type: .flagsChanged, flags: caps.union(.shift)))
       _ = events.send(try key(6, flags: caps.union(.shift)))
@@ -459,7 +470,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
       let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
       let events = Events()
       let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-        modifierFlags: { [] })
+        modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
       let left = NSEvent.ModifierFlags.shift.union(deviceBits ? .init(rawValue: UInt(NX_DEVICELSHIFTKEYMASK)) : [])
       let both = left.union(deviceBits ? .init(rawValue: UInt(NX_DEVICERSHIFTKEYMASK)) : [])
       monitor.start()
@@ -486,7 +497,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
     _ = events.send(try key(12, flags: .shift))
@@ -507,7 +518,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { .shift })
+      modifierFlags: { .shift }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     _ = events.send(try key(12, flags: .shift))
     sound.playClick(style: .pianoSine, volume: 0.5)
@@ -524,7 +535,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
     let events = Events()
     let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
-      modifierFlags: { [] })
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
     monitor.start()
     _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
     for caps: NSEvent.ModifierFlags in [.capsLock, []] {
@@ -532,6 +543,152 @@ final class MusicKeyboardMonitorTests: XCTestCase {
       sound.previewClick(style: .pianoSine, volume: 0.5)
     }
     XCTAssertEqual(sources.compactMap { pitch($0) }, [523.25, 523.25])
+    monitor.stop()
+  }
+
+  func testLeavingPracticeClearsShiftWithoutChangingCapsKeyOrStartingAudio() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+    let events = Events()
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
+    monitor.start()
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    _ = events.send(try key(6, flags: .shift))
+    events.isOutsidePractice = true
+    monitor.refreshPracticeScope()
+    XCTAssertTrue(sources.isEmpty)
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 130.81)
+    _ = events.send(try key(60, type: .flagsChanged, flags: [.shift, .capsLock]))
+    _ = events.send(try key(6, flags: [.shift, .capsLock]))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    sound.synchronizeCapsLock(false)
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 130.81)
+    monitor.stop()
+  }
+
+  func testReturningToPracticeDoesNotImportOffPageShiftButStillObservesGlobalKeyCode() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+    let events = Events()
+    events.isOutsidePractice = true
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
+    monitor.start()
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    _ = events.send(try key(6, flags: .shift))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 130.81)
+    events.isOutsidePractice = false
+    _ = events.send(try key(12, flags: .shift))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    _ = events.send(try key(60, type: .flagsChanged, flags: .shift))
+    _ = events.send(try key(12, flags: .shift))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 523.25)
+    _ = events.send(try key(60, type: .flagsChanged, flags: .shift))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    monitor.stop()
+  }
+
+  func testKeyWindowNotificationClearsShiftOnScopeChangeBeforeAnyNextKeyDown() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+    let events = Events(), secondPractice = NSObject()
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
+    monitor.start()
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    _ = events.send(try key(12, flags: .shift))
+    // Same practice page, including its command sheet, must retain Shift.
+    events.center.post(name: NSWindow.didBecomeKeyNotification, object: events.practiceWindow)
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 523.25)
+    events.selectedScope = UUID()
+    events.center.post(name: NSWindow.didBecomeKeyNotification, object: secondPractice)
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    monitor.stop()
+  }
+
+  func testActualRegistryPageAndCloseNotificationsClearShiftButNeverStopSounds() throws {
+    var voices: [Voice] = [], sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: {
+      sources.append($0); let voice = Voice(); voices.append(voice); return voice
+    }, beep: {})
+    let events = Events(), registry = TypingMusicPracticeScopeRegistry(notificationCenter: events.center)
+    let owner = UUID()
+    registry.update(window: events.practiceWindow, owner: owner, isPracticePage: true)
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { [] }, practiceScope: { registry.identifier(for: events.practiceWindow) },
+      notificationCenter: events.center)
+    monitor.start()
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    _ = events.send(try key(12, flags: .shift))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    sound.playClick(style: .tink, volume: 0.5)
+    let music = try XCTUnwrap(voices.first), sample = try XCTUnwrap(voices.last?.copies.first)
+    registry.update(window: events.practiceWindow, owner: owner, isPracticePage: false)
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    XCTAssertEqual(music.stops, 0)
+    XCTAssertEqual(sample.stops, 0)
+    registry.update(window: events.practiceWindow, owner: owner, isPracticePage: true)
+    _ = events.send(try key(56, type: .flagsChanged))
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    _ = events.send(try key(12, flags: .shift))
+    events.center.post(name: NSWindow.didResignKeyNotification, object: events.practiceWindow)
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 523.25, "app deactivation is not a page change")
+    events.center.post(name: NSWindow.willCloseNotification, object: events.practiceWindow)
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    XCTAssertEqual(music.stops, 0)
+    XCTAssertEqual(sample.stops, 0)
+    monitor.stop()
+  }
+
+  func testStoppedMonitorIgnoresScopeNotificationsAndRestartUsesTheCurrentPage() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+    let events = Events()
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
+    monitor.start(); monitor.stop()
+    sound.updateModifierFlags(.shift)
+    events.isOutsidePractice = true
+    for name in [NSWindow.didBecomeKeyNotification, TypingMusicPracticeScopeRegistry.didChange] {
+      events.center.post(name: name, object: events.practiceWindow)
+    }
+    monitor.refreshPracticeScope()
+    sound.previewClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 523.25)
+    monitor.start()
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    sound.previewClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    monitor.stop()
+  }
+
+  func testScopeChangingDuringSynchronousRegistrationIsReconciledBeforeStartReturns() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+    let events = Events()
+    let shift = try key(56, type: .flagsChanged, flags: .shift), q = try key(12, flags: .shift)
+    events.onInstall = {
+      _ = events.send(shift); _ = events.send(q)
+      events.isOutsidePractice = true
+    }
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { [] }, practiceScope: events.practiceScope, notificationCenter: events.center)
+    monitor.start()
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
     monitor.stop()
   }
 }

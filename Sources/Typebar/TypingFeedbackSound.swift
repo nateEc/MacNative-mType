@@ -497,9 +497,13 @@ final class TypingFeedbackSound {
   /// Call only after a replacement attempt is accepted. Sample-only cleanup
   /// must not reset modifiers; Caps Lock, key code and music state survive.
   func beginPracticeAttempt() {
+    resetPracticeShift()
+    clearAllSounds()
+  }
+
+  func resetPracticeShift() {
     practiceShiftKeys.removeAll(keepingCapacity: true)
     currentModifierFlags.remove(.shift)
-    clearAllSounds()
   }
 
   private func playbackVolume(_ requested: Double) -> Double? {
@@ -529,8 +533,9 @@ final class TypingFeedbackSound {
     practiceShiftKeys = flags.contains(.shift) ? [56] : []
   }
 
-  func recordModifierTransition(keyCode: UInt16, isDown: Bool, modifierFlags: NSEvent.ModifierFlags) {
-    if keyCode == 56 || keyCode == 60 {
+  func recordModifierTransition(keyCode: UInt16, isDown: Bool, modifierFlags: NSEvent.ModifierFlags,
+    tracksPracticeShift: Bool = true) {
+    if tracksPracticeShift && (keyCode == 56 || keyCode == 60) {
       if isDown { practiceShiftKeys.insert(keyCode) }
       else { practiceShiftKeys.remove(keyCode) }
       if practiceShiftKeys.isEmpty { currentModifierFlags.remove(.shift) }
