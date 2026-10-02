@@ -18045,7 +18045,7 @@ final class TypingEngineTests: XCTestCase {
       TypingReplay.playbackElapsed(startedAt: 10, now: 9.9, duration: 2), 0)
   }
 
-  func testReplaySoundCuesOnlyIncludeNewManualEventsInStableOrder() {
+  func testReplaySoundCuesIncludeNewAutomaticEventsInStableOrder() {
     let events: [TypingReplayEvent] = [
       .init(offset: 0.4, kind: .insert, text: "m"),
       .init(offset: 0.2, kind: .insert, text: "x"),
@@ -18062,7 +18062,7 @@ final class TypingEngineTests: XCTestCase {
       [.click])
     XCTAssertEqual(
       TypingReplay.soundCues(prompt: "am", events: events, after: 0.1, through: 0.5),
-      [.error, .click, .click])
+      [.error, .click, .click, .error])
   }
 
   func testReplaySoundCueClassifiesWholeInsertAndForcedErrors() {
@@ -18087,7 +18087,7 @@ final class TypingEngineTests: XCTestCase {
 
     XCTAssertEqual(
       TypingReplay.soundCues(prompt: "am bay", events: events, after: 0.2, through: 0.4),
-      [.error, .click])
+      [.click, .error, .click])
   }
 
   func testReplaySoundRouteMatchesEnabledFeedbackSettings() {

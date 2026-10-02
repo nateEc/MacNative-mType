@@ -3044,6 +3044,11 @@ enum TypingReplaySoundCue: Equatable {
   case error
 }
 
+struct TypingReplayTimedSoundCue: Equatable {
+  let offset: TimeInterval
+  let cue: TypingReplaySoundCue
+}
+
 enum TypingReplaySoundRoute: Equatable {
   case none
   case click
@@ -3193,53 +3198,82 @@ enum TypingReplay {
 
   static func soundCues(
     prompt: String, events: [TypingReplayEvent], after lowerBound: TimeInterval,
-    through upperBound: TimeInterval
+    through upperBound: TimeInterval, configuration: TestConfiguration? = nil
   ) -> [TypingReplaySoundCue] {
     guard upperBound > lowerBound else { return [] }
-    let promptCharacters = Array(prompt)
-    let promptCoordinates = promptCharacterIndices(prompt: prompt)
+    return soundCues(in: soundTimeline(prompt: prompt, events: events, configuration: configuration),
+      after: lowerBound, through: upperBound)
+  }
+
+  /// The timeline is the ordered, finite snapshot returned by soundTimeline.
+  static func soundCues(in timeline: [TypingReplayTimedSoundCue], after lowerBound: TimeInterval,
+    through upperBound: TimeInterval) -> [TypingReplaySoundCue] {
+    guard upperBound > lowerBound else { return [] }
+    var lower = 0
+    var upper = timeline.count
+    while lower < upper {
+      let middle = (lower + upper) / 2
+      if timeline[middle].offset <= lowerBound { lower = middle + 1 }
+      else { upper = middle }
+    }
+    var result: [TypingReplaySoundCue] = []
+    while lower < timeline.count, timeline[lower].offset <= upperBound {
+      result.append(timeline[lower].cue)
+      lower += 1
+    }
+    return result
+  }
+
+  /// Prepared once for a result's immutable tape. Automatic input still
+  /// produces playback actions; it is not a new live keyboard attempt.
+  static func soundTimeline(prompt: String, events: [TypingReplayEvent],
+    configuration: TestConfiguration? = nil) -> [TypingReplayTimedSoundCue] {
+    var targetFields: [[Character]] = []
+    var targetField: [Character] = []
+    for character in prompt {
+      targetField.append(character)
+      if isPromptWordSeparator(character) {
+        targetFields.append(targetField)
+        targetField = []
+      }
+    }
+    if !targetField.isEmpty { targetFields.append(targetField) }
+    let isZen = configuration?.mode == .zen
     var typed: [Character] = []
-    var typedErrors: [Bool] = []
     var typedWord = 0
     var typedPosition = 0
-    var currentWordContainsError = false
-    var cues: [TypingReplaySoundCue] = []
+    var previousEventWord: Int?
+    var cues: [TypingReplayTimedSoundCue] = []
     var retainedSeparators = Set<Int>()
 
-    let orderedEvents = chronologicalEvents(events)
+    let orderedEvents = chronologicalEvents(events.filter { $0.offset.isFinite })
+    let finalFields = SavedTextInputHistoryPolicy.inputFields(events: orderedEvents)
     let continuationIndices = deletionContinuationIndices(in: orderedEvents)
     for (eventIndex, event) in orderedEvents.enumerated() {
-      guard event.offset <= upperBound else { break }
+      if event.kind == .insert, event.text.isEmpty { continue }
+      var eventWord = typedWord
       var cue: TypingReplaySoundCue?
       switch event.kind {
       case .insert:
+        if let previous = previousEventWord, typedWord > previous {
+          let correct = isZen || (targetFields.indices.contains(previous)
+            && finalFields.indices.contains(previous)
+            && InputTextIdentity.matches(finalFields[previous], String(targetFields[previous])))
+          cues.append(.init(offset: event.offset, cue: correct ? .click : .error))
+        }
         var eventContainsError = false
         for character in event.text {
-          let coordinate = characterCoordinate(
-            word: typedWord, position: typedPosition, character: character)
-          let characterIsIncorrect: Bool
-          if let promptIndex = promptCoordinates[coordinate] {
-            characterIsIncorrect =
-              event.forceError || !InputTextIdentity.matches(promptCharacters[promptIndex], character)
-          } else {
-            characterIsIncorrect = true
-          }
-          if isPromptWordSeparator(character), currentWordContainsError {
-            eventContainsError = true
-          }
+          let characterIsIncorrect = !isZen && (event.forceError
+            || !targetFields.indices.contains(typedWord)
+            || !targetFields[typedWord].indices.contains(typedPosition)
+            || !InputTextIdentity.matches(targetFields[typedWord][typedPosition], character))
           eventContainsError = eventContainsError || characterIsIncorrect
           if isPromptWordSeparator(character), event.commitsWord == false {
             retainedSeparators.insert(typed.count)
           }
           typed.append(character)
-          typedErrors.append(characterIsIncorrect)
           advanceCursor(for: character, word: &typedWord, position: &typedPosition,
             commitsWord: event.commitsWord)
-          if isPromptWordSeparator(character), event.commitsWord != false {
-            currentWordContainsError = false
-          } else {
-            currentWordContainsError = currentWordContainsError || characterIsIncorrect
-          }
         }
         if !event.text.isEmpty {
           cue = eventContainsError ? .error : .click
@@ -3248,19 +3282,16 @@ enum TypingReplay {
         if !typed.isEmpty {
           retainedSeparators.remove(typed.count - 1)
           typed.removeLast()
-          typedErrors.removeLast()
           (typedWord, typedPosition) = cursorPosition(after: typed, retainedSeparators: retainedSeparators)
-          let lastCommit = typed.indices.last {
-            isPromptWordSeparator(typed[$0]) && !retainedSeparators.contains($0)
-          }.map { $0 + 1 } ?? 0
-          currentWordContainsError = typedErrors[lastCommit...].contains(true)
         }
+        eventWord = typedWord
         cue = .click
       }
 
-      if event.offset > lowerBound, !event.automatic, !continuationIndices.contains(eventIndex), let cue {
-        cues.append(cue)
+      if !continuationIndices.contains(eventIndex), let cue {
+        cues.append(.init(offset: event.offset, cue: cue))
       }
+      previousEventWord = eventWord
     }
     return cues
   }

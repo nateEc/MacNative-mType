@@ -31,6 +31,26 @@ enum SavedTextInputHistoryPolicy {
     displays: [String], events: [TypingReplayEvent], noSpaceWordEnds: [Int] = []
   ) -> Int {
     guard !displays.isEmpty else { return 0 }
+    let history = projectInput(displays: displays, events: events, noSpaceWordEnds: noSpaceWordEnds)
+    guard var last = history.fields.last else { return 0 }
+    if history.trimsLastField {
+      while let scalar = last.unicodeScalars.last, QuoteSourcePolicy.isBoundaryWhitespace(scalar) {
+        last.unicodeScalars.removeLast()
+      }
+    }
+    let targetLength = history.fields.count <= displays.count ? displays[history.fields.count - 1].utf16.count : 0
+    return history.fields.count - (last.utf16.count < targetLength ? 1 : 0)
+  }
+
+  /// Final accepted fields, including their commits. Playback submission
+  /// cues use this history, not a transient spelling or a progress count.
+  static func inputFields(events: [TypingReplayEvent]) -> [String] {
+    projectInput(displays: [], events: events, noSpaceWordEnds: []).fields
+  }
+
+  private static func projectInput(
+    displays: [String], events: [TypingReplayEvent], noSpaceWordEnds: [Int]
+  ) -> (fields: [String], trimsLastField: Bool) {
     var fields: [String] = []
     var pieces: [Piece] = []
     var live = ""
@@ -90,13 +110,6 @@ enum SavedTextInputHistoryPolicy {
         }
       }
     }
-    guard var last = fields.last else { return 0 }
-    if trimsLastField {
-      while let scalar = last.unicodeScalars.last, QuoteSourcePolicy.isBoundaryWhitespace(scalar) {
-        last.unicodeScalars.removeLast()
-      }
-    }
-    let targetLength = fields.count <= displays.count ? displays[fields.count - 1].utf16.count : 0
-    return fields.count - (last.utf16.count < targetLength ? 1 : 0)
+    return (fields, trimsLastField)
   }
 }

@@ -6634,6 +6634,7 @@ private struct ReplayTimelineView: View {
   @State private var includesCurrentOffsetOnNextTick = true
   private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
   private let characterSeekOffsets: [Int: TimeInterval]
+  private let replaySoundTimeline: [TypingReplayTimedSoundCue]
 
   private var duration: TimeInterval { events.last?.offset ?? 0 }
   private var replayedGlyphs: [TypingPromptGlyph] {
@@ -6656,6 +6657,8 @@ private struct ReplayTimelineView: View {
     self.soundConfiguration = soundConfiguration
     self.characterSeekOffsets = TypingReplay.characterSeekOffsets(
       prompt: prompt, events: chronologicalEvents)
+    self.replaySoundTimeline = TypingReplay.soundTimeline(
+      prompt: prompt, events: chronologicalEvents, configuration: configuration)
   }
 
   var body: some View {
@@ -6747,7 +6750,7 @@ private struct ReplayTimelineView: View {
 
   private func playSounds(after lowerBound: TimeInterval, through upperBound: TimeInterval) {
     for cue in TypingReplay.soundCues(
-      prompt: prompt, events: events, after: lowerBound, through: upperBound)
+      in: replaySoundTimeline, after: lowerBound, through: upperBound)
     {
       switch TypingReplaySoundRoute.resolve(
         cue: cue, playsClicks: soundConfiguration.playsClicks,

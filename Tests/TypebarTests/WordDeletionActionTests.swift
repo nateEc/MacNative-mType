@@ -144,9 +144,10 @@ final class WordDeletionActionTests: XCTestCase {
     XCTAssertEqual(hard.typed, "")
     XCTAssertEqual(hardDeletes.map { $0.primitiveRange.count }, [1, 3])
     XCTAssertTrue(hardDeletes.flatMap(\.primitives).allSatisfy(\.automatic))
-    // The attempted incorrect key remains audible; automatic removal does not add clicks.
-    XCTAssertEqual(deletionCues(normalResult), [.error])
-    XCTAssertEqual(deletionCues(hardResult), [.error])
+    // Automatic recovery remains audible in playback. Hard recovery also
+    // retroactively makes the prior committed field an incorrect submission.
+    XCTAssertEqual(deletionCues(normalResult), [.error, .click])
+    XCTAssertEqual(deletionCues(hardResult), [.error, .error, .click, .click])
   }
 
   func testCodeUnindentProjectsTabsAndPriorNewlineAsDistinctActions() throws {
