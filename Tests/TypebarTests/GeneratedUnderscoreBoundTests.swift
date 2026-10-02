@@ -228,8 +228,9 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
     let config = TestConfiguration(mode: .quote, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init(), modifiers: [.underscoreSeparators])
     var session = TestSessionFactory.make(configuration: config, quote: quote)
-    XCTAssertEqual(session.prompt, target)
+    XCTAssertEqual(session.prompt, (0..<100).map { "w\($0)" + ($0 == 99 ? "" : "_") }.joined())
     session.insertBatch(target, at: start)
+    XCTAssertEqual(session.prompt, target)
     XCTAssertEqual(session.outcome, .completed)
     XCTAssertEqual(session.completedWordCount, 101)
     XCTAssertEqual(session.errors, 0)

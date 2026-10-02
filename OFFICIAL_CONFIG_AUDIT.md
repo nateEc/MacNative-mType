@@ -1,5 +1,11 @@
 # 官方配置兼容性审计
 
+2026-10-02 引语按需生成增量（最终门禁已通过）：独立 `QuoteWordStream` 保存自有原始词池。按固定 [初始预算](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L428-L491)、[逐次补词](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L571-L659) 和 [全源控制符](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L721-L730)，默认首批 100 词；showAll 展开全部，toPush 1–4 优先覆盖。实际向前提交才补一个词，重开旧词不重复抽样，最终非空词只移除一个字面提交标量。初始前词用变换后的 raw，后续用去提交后的 text；随机大小写重复练习从同一原始池重新抽样。进度以整池总量显示，不以当前缓冲量代替。Return／Tab 的能力检查实际选中词池和已生成提示，未显现控制符不误触快速重启，未选中的原文／备用文不泄漏到重试或快捷键。
+
+验证阶段：新增 `QuoteStreamingTests` 29 项；最初 20 项有 43 个有效失败断言，首版相关 85 项通过。会话内有界风险审查增加重复抽样、末词进度与 Unicode 融合反例，发现并最小复现 1 个真实错误时钟，沿补词链传输入时间修正。相关 174 项阶段仅 1 个旧夹具仍要求全量初始 Under 引语，按固定首批规则更新而保留全量完成与计数／错误断言。未来换行另有 1 个真实先行失败，已接入全源能力及不开窗原生按键测试；其后 46 项阶段仅 2 个命令面板快捷键夹具断言失败：错误地选择 Tab 快速重启却要求 Esc 快速重启下的 Shift-Tab，按实际快捷键政策更正，不改产品迁就夹具。相关 185 项首次零失败通过（约 32.24 秒）；最终复核区分“允许换行”与“源含换行”，避免改变 Zen 卷带显示，调整后的相关 185 项零跳过／零失败通过（约 32.12 秒）；完整门禁待执行。该过滤不含十万词测试，不能由环境变量声称耐力已执行。首轮完整客户端 1646 项（约 331.99 秒）有 3 个旧语言目录夹具断言失败，均要求超过百词引语初始完整呈现；已按固定规则增加默认首批、showAll 全量及完整输入后原文／完成／零错误验证，保留 376 个可用语言和全部长度覆盖。首轮十万词实际执行通过（约 37.15 秒），但服务与打包尚未执行，该失败门禁不计通过；随后语言目录及新增引语复验 30 项零跳过／零失败通过（约 56.26 秒）；第二轮完整门禁通过：客户端 1646 项零失败（约 354.22 秒）、服务端 131 项（约 1.40 秒）、681 场景清单及不开窗应用包。之后复核发现全源控制符范围错误地合并了未选中原文；实际 getQuoteWordList 内存探针确认只检查选中池，新增 1 项产生 6 个真实失败后修正。此前完整绿灯不作最终修正证据；修正后的 37 项定向零跳过／零失败通过（约 0.18 秒），包含最终 29 项引语游标测试及原生 Return；第三轮最终完整门禁通过：客户端 1647 项（零跳过／零失败，约 354.12 秒）、服务端 131 项（零失败，约 1.42 秒）、固定参考／原创性与兼容审计、681 个唯一人工场景清单及未开窗 macOS 应用包全部通过；本轮显式十万词实际执行约 37.45 秒。清单通过不是设备验收，中间失败与修正前完整绿灯保留但不计最终修正证据。阶段失败不计最终通过。固定原版 getLimit、Words.push、getQuoteWordList 与英式 replace 在只读检出的内存探针运行，Node v24.19.0，依赖显式提供；没有完整上游 Vitest／DOM／异步 UI／设备证据。
+
+迁移与边界：仅未来练习生成和活跃引语进度改变，无设置、成绩、回放、分享、归档、SwiftData 字段或版本变化；旧成绩快照不重新生成、原文及偏移不回写。已有英式有限 14 家庭不等于完整字典；全部标点／数字／Funbox 组合（含后续新造控制符与原版初始化信号范围）、原版初始化三次重选及错误模态／异步显示、Unicode／半代理／CRLF 导航、真实 IME／设备仍开放。Morse／Under／Backwards 部分状态及 94 配置键 91／2／1 分区不升级。使用行为优先测试、源码驱动、根因调试及有界决策／迁移／风险复核，不冒称独立评审。不写真实库、不启动 GUI、不部署、不引入参考代码／数据／资产；整体 goal active。本条仅取代此前已列引语初始预算、后续前词提交和延后空候选机制缺口，不宣称完整引语等价。
+
 2026-10-02 英式逐词生成增量（最终门禁已通过）：依据固定 [逐词转换](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/british-english.ts#L5-L67)、[English 门控及备用引语绕过](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L381-L399)、[前词清理](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L815-L823) 和 [变换顺序](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L946-L977)，接入独立 `BritishEnglishPolicy`，由 `GeneratedWordChunk` 和段游标共用，先 lazy、后英式、再 Funbox、最后提交。普通引语、词数／计时、自定义 pipe／非 pipe、顺序续批、长原文续批和外部词源进入该生成阶段；非空备用引语不再替换，美式与非 English 源不启用，Wordle／Pig Latin 不因内容像英文而误启用。现有拼写选择器对 13 个实际 English 源身份可用，未创建新设置。
 
 拼写家庭是独立编写的有限 14 个普通词形，覆盖自有词库中的常用拼写及 tire／tyre 上下文；没有导入、翻译或打包参考替换表、词库、引语或代码。未知词不猜测转换。ASCII 双引号改单引号、连字符空组件保留、ASCII word 边缘／内部字符、首字母与全大写规则保留；引语例外使用已经 Funbox 变换的前词，按限定标点去除和小写处理，单引号／下划线／换行不会被当成可删除标点。规则覆盖不等于完整词典等价；新增引语无备用源的通用机制，但完整替换表覆盖仍开放。
@@ -210,7 +216,7 @@
 | `minAccCustom` | `minimumAccuracy` | 已映射；使用 0–100 的有限小数，零值关闭；旧整数配置可直接迁移。 |
 | `minBurst` | `minimumWordBurstMode` | 已映射；命令面板严格提供关闭/固定/弹性。 |
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射；使用有限非负小数且不施加额外速度上限，固定/弹性命令要求按当前显示单位输入整数后换算，旧整数配置可直接迁移。 |
-| `britishEnglish` | `englishVariant` | 已映射；使用自有英式词库，English 源逐词运行独立的有限拼写规则、引号／连字符／大小写及引语前词例外；13 个实际 English 源身份显示选择器，Wordle 不误启用。非空自有英式备用引语绕过二次转换；缺失／空备用源先准备普通引语。完整替换表覆盖、长引语生成时机、混排与设备仍未证明等价。 |
+| `britishEnglish` | `englishVariant` | 已映射；使用自有英式词库，English 源逐词运行独立的有限拼写规则、引号／连字符／大小写及引语前词例外；13 个实际 English 源身份显示选择器，Wordle 不误启用。非空自有英式备用引语绕过二次转换；缺失／空备用源先准备普通引语。自有引语按初始／逐次预算生成，区分 raw／去提交前词；完整替换表、原版三次重选／异步错误 UI、全部组合与设备仍未证明等价。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。命令面板另按固定名称提供 48 项切换与 `none` 清除入口；`weakspot` 为实时选词修饰器，多语路由到 Typebar 原生工作流，持久化弱项分析保持独立入口。 |
 | `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并合并为虚拟词池，普通词频从合并池均匀抽取，Zipf 词频从合并池偏向低位抽取；与前两词重复时最多重抽 100 次，不强制按语言轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。与参考的具体词表、跨语言同形词去重及随机序列不承诺一致。新建或缺失／无效配置采用参考默认的 English、Spanish、French、German 四项；已有明确保存的旧 153 项组合继续原样加载，不强制迁移。 |
@@ -250,7 +256,7 @@
 | `tapeMode` | `practiceTapeMode` | 已映射；启用关闭完整行，关闭卷带不恢复完整行，命令与偏好页遵守相同互斥规则。 |
 | `tapeMargin` | `practiceTapeMargin` | 已映射；以 0–1 原生比例保存。 |
 | `smoothLineScroll` | `smoothPracticeLineScroll` | 已映射。 |
-| `showAllLines` | `showAllPracticeLines` | 部分映射：词／引语／自定义（含计时自定义）展开，不重开，下一轮生成读取；有限 1–100,000 词完整预览，无限／自定义 bound 遵守覆盖。卷带内拒绝启用；更大预算与外部短词源保持可练习并提示未完整预览，仍有差异。 |
+| `showAllLines` | `showAllPracticeLines` | 部分映射：词／引语／自定义（含计时自定义）展开，不重开，下一轮生成读取；有限 1–100,000 词完整预览，无限／自定义 bound 遵守覆盖。自有引语默认首批 100、开启全量，toPush 窗口 1–4 优先覆盖。卷带内拒绝启用；更大预算与外部短词源保持可练习并提示未完整预览，仍有差异；实际布局与设备仍待验收。 |
 | `alwaysShowDecimalPlaces` | `alwaysShowDecimalPlaces` | 已映射。完成结果页保留未取整的速度与准确率；关闭时按参考规则展示换算后整数、向下取整准确率、四舍五入稳定度及四舍五入总用时，开启时速度、非满分准确率与两类稳定度展示两位小数，满分准确率保留 `100%`，短时总用时展示两位小数、超过 61 秒切换为时钟格式；旧本机记录安全回退为原整数值。 |
 | `typingSpeedUnit` | `typingSpeedUnit` | 已映射。 |
 | `startGraphsAtZero` | `startGraphsAtZero` | 已映射。 |

@@ -6090,8 +6090,8 @@ struct TestSessionFactory {
     var usesGeneratedStream = false
     var usesGeneratedCode = false
     var preservesGeneratedWordOrder = false
-    var formatsQuoteWordPool = false
-    var authoredBritishQuote = false
+    var quoteWordStream: QuoteWordStream?
+    var quoteChunk: TransformedPromptBatch?
     var generatedCodeContinuation: GeneratedCodeContinuation?
     var generatedCodeChunk: GeneratedWordChunk?
     let streamWordCount = streamWordCount(for: configuration, showAllLines: showAllLines)
@@ -6137,15 +6137,17 @@ struct TestSessionFactory {
           quote ?? OfflineContent.quotes(for: configuration.language).first
           ?? OfflineContent.quotes(for: .english)[0]
         do {
-          prompt = try QuoteSourcePolicy.selectedText(for: source, variant: configuration.englishVariant)
+          var stream = QuoteWordStream(quote: source, configuration: configuration, showAllLines: showAllLines)
+          let chunk = try stream.initialChunk(nextRandomCaseBit: nextRandomCaseBit)
+          prompt = chunk.text
+          quoteWordStream = stream
+          quoteChunk = chunk
         } catch {
           // Do not clean an invalid selected alternate or silently practice
           // a different quote. This failure occurs before any timed attempt.
           return .init(configuration: configuration, prompt: "",
-            initializationFailure: "英式引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换美式拼写。")
+            initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。")
         }
-        formatsQuoteWordPool = true
-        authoredBritishQuote = source.britishText?.isEmpty == false
       case .zen:
         // Zen renders and scores only text entered locally by the user. It
         // intentionally has no generated target prompt or imported content.
@@ -6229,7 +6231,9 @@ struct TestSessionFactory {
         < (configuration.wordLimit ?? 25)
     let generatesWholeLines = showAllLines && !hasIncompleteExternalPreview
     var batch: TransformedPromptBatch
-    if streamsCustomSections {
+    if let quoteChunk {
+      batch = quoteChunk
+    } else if streamsCustomSections {
       batch = .init(text: prompt)
     } else if let codeChunk = generatedCodeChunk {
       batch = .init(text: codeChunk.transformed, noSpaceTargetWords: codeChunk.noSpaceTargetWords)
@@ -6243,8 +6247,6 @@ struct TestSessionFactory {
     } else {
       let chunk = GeneratedWordChunk(source: prompt, configuration: configuration, showAllLines: generatesWholeLines,
         preservesWordOrder: preservesGeneratedWordOrder,
-        formatsWordPool: formatsQuoteWordPool,
-        authoredBritishQuote: authoredBritishQuote,
         nextRandomCaseBit: nextRandomCaseBit)
       batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
     }
@@ -6307,6 +6309,7 @@ struct TestSessionFactory {
       generatedWordContinuation: generatedWordContinuation,
       generatedStreamContinuation: generatedStreamContinuation,
       generatedCodeContinuation: generatedCodeContinuation,
+      quoteWordStream: quoteWordStream,
       sectionEndIndices: sectionEndIndices,
       noSpaceSectionWordEnds: configuration.customTextCompletion == .sections
         ? customSectionChunk?.sectionWordEnds ?? [] : [],

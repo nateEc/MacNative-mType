@@ -4,17 +4,12 @@ import Foundation
 /// already prepared external stream. Interior Unicode whitespace and scalar
 /// composition are deliberately retained; quote input is not custom input.
 enum QuoteSourcePolicy {
-  enum PreparationError: Error { case emptyAlternateCandidate }
-
   /// An authored nonempty alternate is a separate word source, not text to
-  /// normalize or respell. Its literal ASCII fields must remain generatable.
-  static func selectedText(for quote: OfflineQuote, variant: EnglishVariant) throws -> String {
+  /// normalize or respell. The cursor validates literal fields on request,
+  /// so a bad future candidate does not fail initialization prematurely.
+  static func selectedText(for quote: OfflineQuote, variant: EnglishVariant) -> String {
     guard variant == .british, let alternate = quote.britishText, !alternate.isEmpty else {
       return preparedText(quote.text)
-    }
-    if alternate.unicodeScalars.split(separator: " ", omittingEmptySubsequences: false)
-      .contains(where: \.isEmpty) {
-      throw PreparationError.emptyAlternateCandidate
     }
     return alternate
   }

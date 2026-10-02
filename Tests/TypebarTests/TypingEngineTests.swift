@@ -23746,12 +23746,21 @@ final class TypingEngineTests: XCTestCase {
       XCTAssertEqual(quote.language, language)
       XCTAssertEqual(quote.length, .extended)
       XCTAssertGreaterThan(quote.text.count, 120)
-      let session = TestSessionFactory.make(
+      var session = TestSessionFactory.make(
         configuration: .init(
           mode: .quote, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init(),
           language: language, quoteLength: .extended),
         quote: quote)
-      XCTAssertEqual(session.prompt, quote.text)
+      let words = quote.text.split(separator: " ", omittingEmptySubsequences: false)
+      let initial = words.count > 100 ? words.prefix(100).joined(separator: " ") + " " : quote.text
+      XCTAssertEqual(session.prompt, initial, language.displayName)
+      let whole = TestSessionFactory.make(configuration: session.configuration,
+        quote: quote, showAllLines: true)
+      XCTAssertEqual(whole.prompt, quote.text, language.displayName)
+      session.insert(quote.text, at: Date(timeIntervalSince1970: 4_500))
+      XCTAssertEqual(session.outcome, .completed, language.displayName)
+      XCTAssertEqual(session.prompt, quote.text, language.displayName)
+      XCTAssertEqual(session.errors, 0, language.displayName)
     }
   }
 

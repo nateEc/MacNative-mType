@@ -1141,8 +1141,8 @@ private struct ContentView: View {
           overrideRows: effectiveKeyboardGuideOverrideRows,
           nextCharacter: session.nextExpectedCharacter,
           accent: activeTheme.accent, panel: activeTheme.panel,
-          allowsNewline: session.configuration.mode == .zen || session.prompt.contains("\n"),
-          allowsTab: session.configuration.mode == .zen || session.prompt.contains("\t"),
+          allowsNewline: session.acceptsNewlineInput,
+          allowsTab: session.acceptsTabInput,
           isEnabled: !session.isFinished,
           onInsert: {
             handleInsertedText($0, forceError: false, origin: .virtualKeyboard)
@@ -2518,8 +2518,8 @@ private struct ContentView: View {
         keymapLayout: effectiveKeyboardLayout,
         oppositeShiftMode: settings.oppositeShiftMode,
         mapsArrowKeysToInput: settings.testModifiers.contains(.arrowStream),
-        acceptsNewlineInput: session.configuration.mode == .zen || session.prompt.contains("\n"),
-        acceptsTabInput: session.configuration.mode == .zen || session.prompt.contains("\t"),
+        acceptsNewlineInput: session.acceptsNewlineInput,
+        acceptsTabInput: session.acceptsTabInput,
         discardsAutofocusInput: settings.showFocusWarning,
         requiresShiftQuickRestart: quickRestartRequiresProtection
           && settings.quickRestartKey != .enter,
@@ -3048,7 +3048,7 @@ private struct ContentView: View {
   }
 
   private var usesTapePractice: Bool {
-    settings.practiceTapeMode != .off && !session.prompt.contains("\n")
+    settings.practiceTapeMode != .off && !session.hasPracticeNewlineContent
       && !session.configuration.containsRightToLeftPromptRun
   }
 
@@ -3537,7 +3537,7 @@ private struct ContentView: View {
   private var commandPaletteShortcutInstruction: String {
     let dynamic = CommandPaletteDynamicShortcut.resolve(
       quickRestartKey: settings.quickRestartKey,
-      promptAcceptsTab: session.configuration.mode == .zen || session.prompt.contains("\t"))
+      promptAcceptsTab: session.acceptsTabInput)
     return "\(dynamic.displayName) / ⇧⌘P / ⇧⌘K"
   }
 
@@ -5454,6 +5454,7 @@ private extension TestFailureReason {
   var resultSummary: String {
     switch self {
     case .timerHealth: "计时调度持续延迟，为避免不准确的成绩已停止测试"
+    case .wordGeneration: "无法生成后续词，练习已停止"
     case .minimumWpm: "整体速度低于设定的最低速度"
     case .minimumAccuracy: "准确率低于设定的最低准确率"
     }

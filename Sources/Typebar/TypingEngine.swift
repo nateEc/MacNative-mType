@@ -2447,12 +2447,13 @@ enum TestOutcome: String, Codable, Equatable {
   case bailedOut
 }
 
-/// The user-visible cause of a failed attempt when the reference timer stops
-/// it for an enabled practice threshold or unreliable timer delivery.
+/// The user-visible cause of a failed attempt: practice thresholds, unreliable
+/// timer delivery, or an unusable candidate encountered during generation.
 enum TestFailureReason: Hashable {
   case minimumWpm
   case minimumAccuracy
   case timerHealth
+  case wordGeneration
 }
 
 /// Native equivalent of the reference test's one-second inactivity accounting.
@@ -3620,7 +3621,8 @@ enum PromptHighlightPolicy {
 
 struct TypingSession {
   private(set) var configuration: TestConfiguration
-  let generationNotice: String?
+  private(set) var generationNotice: String?
+  private let initialGenerationNotice: String?
   private let initializationFailure: String?
   private(set) var prompt: String
   private var promptCharacters: [Character]
@@ -3634,6 +3636,7 @@ struct TypingSession {
   private let initialGeneratedStreamContinuation: GeneratedStreamContinuation?
   private var generatedCodeContinuation: GeneratedCodeContinuation?
   private let initialGeneratedCodeContinuation: GeneratedCodeContinuation?
+  private var quoteWordStream: QuoteWordStream?
   private let randomCustomSourceTokens: [String]?
   private var randomCustomPreviousWords: [String]
   private let initialRandomCustomPreviousWords: [String]
@@ -3745,6 +3748,7 @@ struct TypingSession {
     generatedWordContinuation: GeneratedWordContinuation? = nil,
     generatedStreamContinuation: GeneratedStreamContinuation? = nil,
     generatedCodeContinuation: GeneratedCodeContinuation? = nil,
+    quoteWordStream: QuoteWordStream? = nil,
     sectionEndIndices: [Int] = [], noSpaceSectionWordEnds: [Int] = [],
     randomCustomSourceTokens: [String]? = nil,
     randomCustomPreviousWords: [String] = [],
@@ -3758,6 +3762,7 @@ struct TypingSession {
   ) {
     self.configuration = configuration
     self.generationNotice = initializationFailure ?? generationNotice
+    self.initialGenerationNotice = initializationFailure ?? generationNotice
     self.initializationFailure = initializationFailure
     if initializationFailure != nil { self.outcome = .failed }
     self.prompt = prompt
@@ -3773,6 +3778,7 @@ struct TypingSession {
     self.initialGeneratedStreamContinuation = generatedStreamContinuation
     self.generatedCodeContinuation = generatedCodeContinuation
     self.initialGeneratedCodeContinuation = generatedCodeContinuation
+    self.quoteWordStream = quoteWordStream
     self.randomCustomSourceTokens = randomCustomSourceTokens
     self.randomCustomPreviousWords = randomCustomPreviousWords
     self.initialRandomCustomPreviousWords = randomCustomPreviousWords
@@ -3795,11 +3801,22 @@ struct TypingSession {
     self.repeatingNoSpaceTargetWords = repeatingNoSpaceTargetWords
   }
 
-  /// Starts an equivalent fresh attempt without regenerating content. This is
-  /// intentionally based on the initial session prompt so timed custom text
-  /// retains its original repeat source instead of reusing a grown prompt.
-  func repeatedAttempt() -> TypingSession {
-    TypingSession(
+  /// Restarts from the original source: owned quotes regenerate sampled targets,
+  /// while other paths restore the initial snapshot (not a grown timed prompt).
+  func repeatedAttempt(nextRandomCaseBit: () -> Bool = { Bool.random() }) -> TypingSession {
+    if let quoteWordStream {
+      var stream = quoteWordStream.reset()
+      do {
+        let batch = try stream.initialChunk(nextRandomCaseBit: nextRandomCaseBit)
+        return .init(configuration: configuration, prompt: batch.text, quoteWordStream: stream,
+          noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: batch.noSpaceWordLengths),
+          noSpaceTargetWords: batch.noSpaceTargetWords, generationNotice: initialGenerationNotice)
+      } catch {
+        return .init(configuration: configuration, prompt: "",
+          initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。")
+      }
+    }
+    return TypingSession(
       configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
       generatedWordContinuation: initialGeneratedWordContinuation,
       generatedStreamContinuation: initialGeneratedStreamContinuation,
@@ -3814,7 +3831,7 @@ struct TypingSession {
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
-      repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: generationNotice,
+      repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: initialGenerationNotice,
       initializationFailure: initializationFailure)
   }
 
@@ -3870,6 +3887,7 @@ struct TypingSession {
       || randomCustomSourceTokens?.isEmpty == false
       || sequentialCustomWordStream != nil || finiteCustomTextStream?.hasRemaining == true
       || customSectionWordStream?.hasRemaining == true
+      || quoteWordStream?.hasRemaining == true
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
   var typedCharacterCount: Int { typed.count }
@@ -4440,6 +4458,18 @@ struct TypingSession {
     }
   }
 
+  var hasPracticeNewlineContent: Bool {
+    prompt.contains("\n") || quoteWordStream?.sourceHasNewline == true
+  }
+
+  var acceptsNewlineInput: Bool {
+    configuration.mode == .zen || hasPracticeNewlineContent
+  }
+
+  var acceptsTabInput: Bool {
+    configuration.mode == .zen || prompt.contains("\t") || quoteWordStream?.sourceHasTab == true
+  }
+
   func remainingSeconds(at date: Date) -> Int? {
     guard configuration.duration != 0 else { return nil }
     guard let duration = configuration.duration, let startedAt else {
@@ -4453,6 +4483,9 @@ struct TypingSession {
   /// including no-space prompts whose commits happen on a word's final
   /// character. This presentation does not derive any scoring state.
   func progressText(at date: Date = .now) -> String? {
+    if let stream = quoteWordStream {
+      return "\(min(quoteNavigationIndex, max(0, stream.totalWords - 1)))/\(stream.totalWords)"
+    }
     if let sections = sectionProgress {
       return sections.total == 0 ? "\(sections.completed)" : "\(sections.completed)/\(sections.total)"
     }
@@ -4469,6 +4502,7 @@ struct TypingSession {
   }
 
   var progressLabel: String {
+    if quoteWordStream != nil { return "进度" }
     if sectionProgress != nil { return "段数" }
     if configuration.duration == 0 { return "用时" }
     if configuration.wordLimit == 0 { return "词数" }
@@ -4476,6 +4510,11 @@ struct TypingSession {
   }
 
   func progressFraction(at date: Date = .now) -> Double? {
+    if let stream = quoteWordStream {
+      if outcome == .completed || outcome == .invalidAFK { return 1 }
+      guard stream.totalWords > 0, hasStarted else { return 0 }
+      return floor(Double(quoteNavigationIndex) / Double(stream.totalWords) * 100) / 100
+    }
     if let sections = sectionProgress {
       return sections.total == 0 ? 0 : Double(sections.completed) / Double(sections.total)
     }
@@ -4638,7 +4677,7 @@ struct TypingSession {
     let attemptsBeforeEvent = inputAttemptCount
     for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
-      if shouldExpandReferenceEllipsis(character) {
+      if shouldExpandReferenceEllipsis(character, at: date) {
         // The web reference replaces a single ellipsis with three periods
         // only when the prompt expects periods. Treat that replacement as
         // its own multi-character insertion event so replay and terminal
@@ -4648,7 +4687,7 @@ struct TypingSession {
           evaluatesTerminalRulesOnLastCharacterOnly: true, origin: origin)
         continue
       }
-      if shouldExpandDutchLigature(character) {
+      if shouldExpandDutchLigature(character, at: date) {
         // The reference expands the Dutch IJ ligature through its ordinary
         // multi-character input path, but preserves a literal ligature target.
         insertText(
@@ -4658,6 +4697,7 @@ struct TypingSession {
       }
       let evaluatesTerminalRules = !evaluatesTerminalRulesOnLastCharacterOnly
         || index == characters.indices.last
+      let quoteWordBefore = quoteWordStream == nil ? 0 : quoteNavigationIndex
       if insertCharacter(
         character, forceError: forceError, at: date,
         evaluatesTerminalRules: evaluatesTerminalRules)
@@ -4668,6 +4708,9 @@ struct TypingSession {
         }
         recordReplayEvent(kind: .insert, text: String(character), forceError: forceError, at: date)
         insertCodeIndentationIfNeeded(after: character, at: date)
+        if quoteWordStream != nil, quoteNavigationIndex > quoteWordBefore {
+          refillQuoteIfNeeded(activeWordBefore: quoteWordBefore, at: date)
+        }
       }
     }
     // Browser input guards reject a leading separator, unsupported Return,
@@ -4688,19 +4731,19 @@ struct TypingSession {
     {
       // No-space input has no separator key to trigger the next chunk. Make
       // the upcoming target visible immediately after its final character.
-      extendPromptIfNeeded()
+      extendPromptIfNeeded(at: date)
     }
     if finiteCustomTextStream?.hasRemaining == true,
       nextTargetIndex >= promptCharacters.count
     {
-      extendPromptIfNeeded()
+      extendPromptIfNeeded(at: date)
     }
     if !isFinished, customSectionWordStream?.hasRemaining == true,
       nextTargetIndex >= promptCharacters.count
     {
       // A candidate batch already carries its last commit. Do not require
       // an extra, blind keypress before exposing the next generated target.
-      extendPromptIfNeeded()
+      extendPromptIfNeeded(at: date)
     }
     finishIfNeeded(at: date)
   }
@@ -4852,9 +4895,9 @@ struct TypingSession {
   /// The reference expands the typographic ellipsis only when it is not the
   /// character the prompt itself requests. This preserves literal ellipses
   /// in custom text while accepting the common macOS replacement for `...`.
-  private mutating func shouldExpandReferenceEllipsis(_ character: Character) -> Bool {
+  private mutating func shouldExpandReferenceEllipsis(_ character: Character, at date: Date) -> Bool {
     guard character == "…" else { return false }
-    extendPromptIfNeeded()
+    extendPromptIfNeeded(at: date)
     guard nextTargetIndex < promptCharacters.count else { return true }
     return promptCharacters[nextTargetIndex] != character
   }
@@ -4862,11 +4905,11 @@ struct TypingSession {
   /// The fixed reference expands the Dutch IJ ligature through regular `i`
   /// and `j` input for the base catalog and its numeric-size variants. It
   /// keeps a literal ligature target intact for custom prompts.
-  private mutating func shouldExpandDutchLigature(_ character: Character) -> Bool {
+  private mutating func shouldExpandDutchLigature(_ character: Character, at date: Date) -> Bool {
     guard character == "ĳ", configuration.language.usesDutchLigatureInputExpansion else {
       return false
     }
-    extendPromptIfNeeded()
+    extendPromptIfNeeded(at: date)
     guard nextTargetIndex < promptCharacters.count else { return true }
     return promptCharacters[nextTargetIndex] != character
   }
@@ -4902,10 +4945,10 @@ struct TypingSession {
     if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), isReferenceInputSpace(character) {
       return false
     }
-    if character == "\n", !prompt.contains("\n") {
+    if character == "\n", !acceptsNewlineInput {
       return false
     }
-    extendPromptIfNeeded()
+    extendPromptIfNeeded(at: date)
     if isAtEmptyNoSpaceWord {
       return insertIntoEmptyNoSpaceWord(character, rejectsOppositeShiftInput: rejectsOppositeShiftInput,
         forceError: forceError, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
@@ -5949,7 +5992,7 @@ struct TypingSession {
         complete(at: date)
       }
     case .quote:
-      if shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
+      if !usesIncrementalPromptExtension, shouldFinishFiniteSpaceDelimitedTest { complete(at: date) }
     case .custom:
       switch configuration.customTextCompletion {
       case .finish:
@@ -5981,8 +6024,12 @@ struct TypingSession {
     }
   }
 
-  private mutating func extendPromptIfNeeded() {
+  private mutating func extendPromptIfNeeded(at date: Date) {
     guard !isAtEmptyNoSpaceWord, nextTargetIndex >= promptCharacters.count else { return }
+    if quoteWordStream?.hasRemaining == true {
+      refillQuoteIfNeeded(activeWordBefore: max(0, quoteNavigationIndex - 1), at: date)
+      return
+    }
     if var stream = customSectionWordStream, stream.hasRemaining {
       let chunk = stream.nextChunk()
       customSectionWordStream = stream
@@ -6104,6 +6151,39 @@ struct TypingSession {
     }
     guard repeatingNoSpaceTargetWords.count == repeatingNoSpaceWordLengths.count else { return }
     noSpaceTargetWords += repeatingNoSpaceTargetWords
+  }
+
+  private var quoteNavigationIndex: Int {
+    if tracksNoSpaceWordBursts { return completedWordCount }
+    return canUseCachedWordProgress ? cachedCommittedWordCount : scannedCommittedWordCount
+  }
+
+  private mutating func refillQuoteIfNeeded(activeWordBefore: Int, at date: Date) {
+    guard !isFinished, !isAtEmptyNoSpaceWord, var stream = quoteWordStream, stream.hasRemaining,
+      stream.emittedWords - (activeWordBefore + 1) <= stream.lookaheadBound else { return }
+    do {
+      let previousEnd = promptCharacters.count
+      let hadSafeTargets = noSpaceTargetWords.count == stream.emittedWords
+      let chunk = try stream.nextWord()
+      quoteWordStream = stream
+      appendPrompt(chunk.text)
+      if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
+        if hadSafeTargets, promptCharacters.count == previousEnd + chunk.text.count,
+          chunk.noSpaceTargetWords.count == 1 {
+          noSpaceWordEndIndices += chunk.noSpaceWordLengths.map { previousEnd + $0 }
+          noSpaceTargetWords += chunk.noSpaceTargetWords
+        } else {
+          // Preserve the established unsegmented fallback rather than expose
+          // invented grapheme offsets when a new word fuses at the boundary.
+          noSpaceWordEndIndices = []
+          noSpaceTargetWords = []
+          firstEmptyNoSpaceWordIndex = nil
+        }
+      }
+    } catch {
+      generationNotice = "无法生成引语的下一个词，练习已停止。请选择另一条引语或切换拼写设置。"
+      fail(at: date, reason: .wordGeneration)
+    }
   }
 
   private mutating func appendPrompt(_ chunk: String) {
