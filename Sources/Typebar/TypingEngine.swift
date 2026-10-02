@@ -2995,13 +2995,28 @@ enum TypingReplayEventKind: String, Codable, Equatable {
 struct TypingReplayInputField: Codable, Equatable {
   let index: Int
   let value: String
+  /// Archive 14. `value` is display-safe; these optional units retain lone
+  /// surrogates which Swift String cannot represent. Never infer old units.
+  let valueUTF16: [UInt16]?
+  var validatedValueUTF16: [UInt16]? {
+    guard let valueUTF16,
+      Array(String(decoding: valueUTF16, as: UTF16.self).utf16) == Array(value.utf16)
+    else { return nil }
+    return valueUTF16
+  }
+  var units: [UInt16] { validatedValueUTF16 ?? Array(value.utf16) }
 
-  init(index: Int, value: String) {
+  init(index: Int, value: String, valueUTF16: [UInt16]? = nil) {
     self.index = index
     self.value = value
+    self.valueUTF16 = valueUTF16
   }
 
-  private enum CodingKeys: String, CodingKey { case index, value }
+  init(index: Int, units: [UInt16]) {
+    self.init(index: index, value: String(decoding: units, as: UTF16.self), valueUTF16: units)
+  }
+
+  private enum CodingKeys: String, CodingKey { case index, value, valueUTF16 }
 
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -3011,6 +3026,11 @@ struct TypingReplayInputField: Codable, Equatable {
         debugDescription: "An input field index cannot be negative.")
     }
     value = try values.decode(String.self, forKey: .value)
+    valueUTF16 = try values.decodeIfPresent([UInt16].self, forKey: .valueUTF16)
+    guard valueUTF16 == nil || validatedValueUTF16 != nil else {
+      throw DecodingError.dataCorruptedError(forKey: .valueUTF16, in: values,
+        debugDescription: "Raw field units must project to the recorded display text.")
+    }
   }
 }
 
@@ -3040,9 +3060,24 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// represent several source input actions, including mixed surrogate results.
   /// nil retains the prior archive's derivation; never backfill old judgments.
   let inputCorrectness: [Bool]?
+  /// Archive 14. Insert payload in source units; a deletion's empty payload
+  /// marks a unit primitive. String text is only its safe display projection.
+  let textUTF16: [UInt16]?
+  var validatedTextUTF16: [UInt16]? {
+    guard let textUTF16,
+      kind == .insert ? !textUTF16.isEmpty : textUTF16.isEmpty,
+      Array(String(decoding: textUTF16, as: UTF16.self).utf16) == Array(text.utf16)
+    else { return nil }
+    return textUTF16
+  }
+  var inputUnits: [UInt16] { validatedTextUTF16 ?? Array(text.utf16) }
+  var hasRawUTF16Metadata: Bool { textUTF16 != nil || inputField?.valueUTF16 != nil }
+  var deletesUTF16Unit: Bool {
+    kind == .delete && (validatedTextUTF16 != nil || inputField?.validatedValueUTF16 != nil)
+  }
   var validatedInputCorrectness: [Bool]? {
     guard kind == .insert, !text.isEmpty, let inputCorrectness,
-      inputCorrectness.count == text.utf16.count else { return nil }
+      inputCorrectness.count == inputUnits.count else { return nil }
     return inputCorrectness
   }
   var isStoppedInsertion: Bool { kind == .insert && inputStopped == true }
@@ -3052,7 +3087,8 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     offset: TimeInterval, kind: TypingReplayEventKind, text: String, forceError: Bool = false,
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
-    inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil
+    inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
+    textUTF16: [UInt16]? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3065,11 +3101,25 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.inputStopped = inputStopped
     self.inputField = inputField
     self.inputCorrectness = inputCorrectness
+    self.textUTF16 = textUTF16
+  }
+
+  init(
+    offset: TimeInterval, kind: TypingReplayEventKind, units: [UInt16], forceError: Bool = false,
+    automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
+    characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
+    inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil
+  ) {
+    self.init(offset: offset, kind: kind, text: String(decoding: units, as: UTF16.self),
+      forceError: forceError, automatic: automatic, commitsWord: commitsWord,
+      wordDeletionCount: wordDeletionCount, characterDeletionCount: characterDeletionCount,
+      inputStopped: inputStopped, inputField: inputField, inputCorrectness: inputCorrectness,
+      textUTF16: units)
   }
 
   private enum CodingKeys: String, CodingKey {
     case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount, characterDeletionCount
-    case inputStopped, inputField, inputCorrectness
+    case inputStopped, inputField, inputCorrectness, textUTF16
   }
 
   init(from decoder: Decoder) throws {
@@ -3084,7 +3134,12 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     characterDeletionCount = try values.decodeIfPresent(Int.self, forKey: .characterDeletionCount)
     inputStopped = try values.decodeIfPresent(Bool.self, forKey: .inputStopped)
     inputField = try values.decodeIfPresent(TypingReplayInputField.self, forKey: .inputField)
+    textUTF16 = try values.decodeIfPresent([UInt16].self, forKey: .textUTF16)
     inputCorrectness = try values.decodeIfPresent([Bool].self, forKey: .inputCorrectness)
+    guard textUTF16 == nil || validatedTextUTF16 != nil else {
+      throw DecodingError.dataCorruptedError(forKey: .textUTF16, in: values,
+        debugDescription: "Raw insert units must be nonempty and project to text; deletion payloads must be empty.")
+    }
     guard inputCorrectness == nil || validatedInputCorrectness != nil else {
       throw DecodingError.dataCorruptedError(forKey: .inputCorrectness, in: values,
         debugDescription: "Input judgments require one Boolean per inserted UTF-16 unit.")
@@ -3197,12 +3252,43 @@ enum TypingReplay {
   }
 
   static func typedText(events: [TypingReplayEvent], through elapsed: TimeInterval) -> String {
+    guard events.contains(where: \.hasRawUTF16Metadata) else {
+      return legacyTypedText(events: events, through: elapsed)
+    }
+    return String(decoding: rawTypedUTF16(events: events, through: elapsed), as: UTF16.self)
+  }
+
+  /// Keep the original native String path for genuine legacy tapes: repeatedly
+  /// decoding the entire unit buffer on each old backspace is quadratic.
+  private static func legacyTypedText(events: [TypingReplayEvent], through elapsed: TimeInterval) -> String {
     chronologicalEvents(events).filter { $0.offset <= elapsed }.reduce(into: "") { typed, event in
       switch event.kind {
       case .insert: if !event.isStoppedInsertion { typed += event.text }
       case .delete:
         guard !typed.isEmpty else { return }
         typed.removeLast()
+      }
+    }
+  }
+
+  /// Decode only after reconstruction: separately recorded surrogate halves
+  /// can rejoin. Old deletion primitives retain their whole-grapheme contract.
+  static func typedUTF16(events: [TypingReplayEvent], through elapsed: TimeInterval) -> [UInt16] {
+    guard events.contains(where: \.hasRawUTF16Metadata) else {
+      return Array(legacyTypedText(events: events, through: elapsed).utf16)
+    }
+    return rawTypedUTF16(events: events, through: elapsed)
+  }
+
+  private static func rawTypedUTF16(events: [TypingReplayEvent], through elapsed: TimeInterval) -> [UInt16] {
+    chronologicalEvents(events).filter { $0.offset <= elapsed }.reduce(into: []) { typed, event in
+      switch event.kind {
+      case .insert: if !event.isStoppedInsertion { typed.append(contentsOf: event.inputUnits) }
+      case .delete:
+        guard !typed.isEmpty else { return }
+        let count = event.deletesUTF16Unit ? 1
+          : String(decoding: typed, as: UTF16.self).last.map { String($0).utf16.count } ?? 0
+        typed.removeLast(min(count, typed.count))
       }
     }
   }
@@ -3296,14 +3382,17 @@ enum TypingReplay {
     if let recorded = recordedFieldActions(targetFields: targetFields,
       events: orderedEvents, configuration: configuration)
     { return recorded.map { .init(offset: $0.offset, cue: $0.soundCue) } }
-    let finalFields = SavedTextInputHistoryPolicy.inputFields(events: orderedEvents)
+    if orderedEvents.contains(where: { $0.validatedTextUTF16 != nil || $0.inputField?.validatedValueUTF16 != nil }) {
+      return rawUnitSoundTimeline(targetFields: targetFields, events: orderedEvents, isZen: isZen)
+    }
+    let finalFields = SavedTextInputHistoryPolicy.inputFieldUTF16(events: orderedEvents)
     let continuationIndices = deletionContinuationIndices(in: orderedEvents)
     for (eventIndex, event) in orderedEvents.enumerated() {
       if event.kind == .insert, event.text.isEmpty || event.isStoppedInsertion {
         if event.isStoppedInsertion, let previous = previousEventWord, typedWord > previous {
           let correct = isZen || (targetFields.indices.contains(previous)
             && finalFields.indices.contains(previous)
-            && InputTextIdentity.matches(finalFields[previous], String(targetFields[previous])))
+            && finalFields[previous] == Array(String(targetFields[previous]).utf16))
           cues.append(.init(offset: event.offset, cue: correct ? .click : .error))
           previousEventWord = typedWord
         }
@@ -3316,7 +3405,7 @@ enum TypingReplay {
         if let previous = previousEventWord, typedWord > previous {
           let correct = isZen || (targetFields.indices.contains(previous)
             && finalFields.indices.contains(previous)
-            && InputTextIdentity.matches(finalFields[previous], String(targetFields[previous])))
+            && finalFields[previous] == Array(String(targetFields[previous]).utf16))
           cues.append(.init(offset: event.offset, cue: correct ? .click : .error))
         }
         var eventContainsError = false
@@ -3354,6 +3443,78 @@ enum TypingReplay {
         }
       }
       previousEventWord = eventWord
+    }
+    return cues
+  }
+
+  /// Flat/unknown target tapes have no hidden word catalog to reconstruct.
+  /// Still compare raw units, never their lossy display replacements. Mixed
+  /// old payloads keep one aggregate cue unless judgments were recorded.
+  private static func rawUnitSoundTimeline(
+    targetFields: [[Character]], events: [TypingReplayEvent], isZen: Bool
+  ) -> [TypingReplayTimedSoundCue] {
+    let targets = targetFields.map { Array(String($0).utf16) }
+    let finalFields = SavedTextInputHistoryPolicy.inputFieldUTF16(events: events)
+    let continuationIndices = deletionContinuationIndices(in: events)
+    var typed: [UInt16] = []
+    var retainedSeparators = Set<Int>()
+    var word = 0
+    var position = 0
+    var previousEventWord: Int?
+    var cues: [TypingReplayTimedSoundCue] = []
+    func submitIfNeeded(at offset: TimeInterval) {
+      guard let previousEventWord, word > previousEventWord else { return }
+      let correct = isZen || (targets.indices.contains(previousEventWord)
+        && finalFields.indices.contains(previousEventWord)
+        && finalFields[previousEventWord] == targets[previousEventWord])
+      cues.append(.init(offset: offset, cue: correct ? .click : .error))
+    }
+    for (index, event) in events.enumerated() {
+      if event.isStoppedInsertion {
+        submitIfNeeded(at: event.offset)
+        previousEventWord = word
+        continue
+      }
+      switch event.kind {
+      case .insert:
+        let units = event.inputUnits
+        guard !units.isEmpty else { continue }
+        submitIfNeeded(at: event.offset)
+        let eventWord = word
+        let judgments = event.validatedInputCorrectness
+        let separateCues = event.validatedTextUTF16 != nil || judgments != nil
+        var allCorrect = true
+        for (index, unit) in units.enumerated() {
+          let correct = judgments?[index] ?? (isZen || (!event.forceError
+            && targets.indices.contains(word) && targets[word].indices.contains(position)
+            && targets[word][position] == unit))
+          allCorrect = allCorrect && correct
+          if separateCues { cues.append(.init(offset: event.offset, cue: correct ? .click : .error)) }
+          let separator = unit == 32 || unit == 10
+          if separator && event.commitsWord == false { retainedSeparators.insert(typed.count) }
+          typed.append(unit)
+          if separator && event.commitsWord != false { word += 1; position = 0 }
+          else { position += 1 }
+        }
+        if !separateCues { cues.append(.init(offset: event.offset, cue: allCorrect ? .click : .error)) }
+        previousEventWord = eventWord
+      case .delete:
+        if !typed.isEmpty {
+          let count = event.deletesUTF16Unit ? 1
+            : String(decoding: typed, as: UTF16.self).last.map { String($0).utf16.count } ?? 0
+          let start = max(0, typed.count - count)
+          for index in start..<typed.count { retainedSeparators.remove(index) }
+          typed.removeLast(typed.count - start)
+          word = 0
+          position = 0
+          for (index, unit) in typed.enumerated() {
+            if (unit == 32 || unit == 10) && !retainedSeparators.contains(index) { word += 1; position = 0 }
+            else { position += 1 }
+          }
+        }
+        if !continuationIndices.contains(index) { cues.append(.init(offset: event.offset, cue: .click)) }
+        previousEventWord = word
+      }
     }
     return cues
   }
@@ -3408,8 +3569,8 @@ enum TypingReplay {
     else { return nil }
 
     let targets = targetFields.map { Array(String($0).utf16) }
-    let finalFields = events.reduce(into: [Int: String]()) { fields, event in
-      if let field = event.inputField { fields[field.index] = field.value }
+    let finalFields = events.reduce(into: [Int: [UInt16]]()) { fields, event in
+      if let field = event.inputField { fields[field.index] = field.units }
     }
     var previousField: Int?
     var actions: [FieldAction] = []
@@ -3425,13 +3586,13 @@ enum TypingReplay {
       let wentBack = previousField.map { field.index < $0 } ?? false
       if let previousField, field.index != previousField {
         let correct = wentBack || isZen
-          || InputTextIdentity.matches(finalFields[previousField] ?? "", String(targetFields[previousField]))
+          || finalFields[previousField] == targets[previousField]
         actions.append(.init(offset: event.offset, kind: wentBack ? .retreat : .advance(correct: correct)))
       }
       switch event.kind {
       case .insert:
         if !event.isStoppedInsertion {
-          let units = Array(event.text.utf16)
+          let units = event.inputUnits
           if let judgments = event.validatedInputCorrectness {
             for (index, unit) in units.enumerated() {
               // A lone surrogate is a separate source DOM node. Display it
@@ -3440,17 +3601,27 @@ enum TypingReplay {
               actions.append(.init(offset: event.offset, kind: .input(text: text, correct: judgments[index])))
             }
           } else {
-            let end = field.value.utf16.count
+            let end = field.units.count
             let start = end - units.count
-            let correct = isZen || (!event.forceError && start >= 0 && end <= targets[field.index].count
-              && units.enumerated().allSatisfy { offset, unit in targets[field.index][start + offset] == unit })
-            actions.append(.init(offset: event.offset, kind: .input(text: event.text, correct: correct)))
+            if event.validatedTextUTF16 != nil {
+              for (offset, unit) in units.enumerated() {
+                let position = start + offset
+                let correct = isZen || (!event.forceError && targets[field.index].indices.contains(position)
+                  && targets[field.index][position] == unit)
+                actions.append(.init(offset: event.offset,
+                  kind: .input(text: String(decoding: [unit], as: UTF16.self), correct: correct)))
+              }
+            } else {
+              let correct = isZen || (!event.forceError && start >= 0 && end <= targets[field.index].count
+                && units.enumerated().allSatisfy { offset, unit in targets[field.index][start + offset] == unit })
+              actions.append(.init(offset: event.offset, kind: .input(text: event.text, correct: correct)))
+            }
           }
         }
       case .delete:
         // Regression already emits the source back-word action. Do not add
         // a second same-time click for setting the destination field length.
-        if !wentBack { actions.append(.init(offset: event.offset, kind: .resize(field.value.utf16.count))) }
+        if !wentBack { actions.append(.init(offset: event.offset, kind: .resize(field.units.count))) }
       }
       previousField = field.index
     }
@@ -5872,7 +6043,8 @@ struct TypingSession {
         forceError: event.forceError, automatic: event.automatic, commitsWord: event.commitsWord,
         wordDeletionCount: wholeWord && index == start ? replayEvents.count - start : nil,
         characterDeletionCount: !wholeWord && index == start ? replayEvents.count - start : nil,
-        inputField: event.inputField, inputCorrectness: event.inputCorrectness)
+        inputStopped: event.inputStopped, inputField: event.inputField,
+        inputCorrectness: event.inputCorrectness, textUTF16: event.textUTF16)
     }
   }
 

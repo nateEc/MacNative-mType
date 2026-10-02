@@ -179,7 +179,7 @@ final class DelayedFieldHistoryTests: XCTestCase {
     for version in 1...11 {
       let archive = TypebarArchive(version: version, exportedAt: start, settings: .init(),
         results: [result], presets: [])
-      XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
+      XCTAssertEqual(archive.version, 13, "判定日志的最小版本仍为 13，不冒充原始单位日志")
     }
   }
 

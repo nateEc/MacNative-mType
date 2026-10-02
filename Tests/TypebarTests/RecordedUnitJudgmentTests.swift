@@ -224,12 +224,12 @@ final class RecordedUnitJudgmentTests: XCTestCase {
     }
   }
 
-  func testCurrentPortableAndArchiveThirteenPreserveTextJudgmentsAndScores() throws {
+  func testCurrentPortableAndArchivePreserveTextJudgmentsAndScores() throws {
     let original = try attempt("🙃", prompt: "🙂x")
     let portable = try XCTUnwrap(TestResultRecord(result: original).portableResult)
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [original], presets: [], at: start))
-    XCTAssertEqual(archive.version, 13)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for result in [portable, archive.results[0]] {
       XCTAssertEqual(result, original)
       XCTAssertEqual(result.replayEvents[0].inputCorrectness, [true, false])

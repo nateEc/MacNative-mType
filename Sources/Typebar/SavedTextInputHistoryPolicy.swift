@@ -48,11 +48,33 @@ enum SavedTextInputHistoryPolicy {
     projectInput(displays: [], events: events, noSpaceWordEnds: []).fields
   }
 
+  /// Display text is not input identity for lone surrogates. Raw fields stay
+  /// in source-time order, including a deleted future field's empty snapshot.
+  /// Missing legacy metadata is never inferred from replacement characters.
+  static func inputFieldUTF16(events: [TypingReplayEvent]) -> [[UInt16]] {
+    guard !events.isEmpty, events.allSatisfy({ $0.inputField != nil }) else {
+      if hasValidatedRawUnits(events) { return rawPrimitiveFields(displays: [], events: events).fields }
+      return inputFields(events: events).map { Array($0.utf16) }
+    }
+    var order: [Int] = []
+    var fields: [Int: [UInt16]] = [:]
+    for event in TypingReplay.chronologicalEvents(events) {
+      guard let field = event.inputField, field.index >= 0 else { continue }
+      if fields[field.index] == nil { order.append(field.index) }
+      fields[field.index] = field.units
+    }
+    return order.map { fields[$0] ?? [] }
+  }
+
   private static func projectInput(
     displays: [String], events: [TypingReplayEvent], noSpaceWordEnds: [Int]
   ) -> (fields: [String], trimsLastField: Bool) {
     if !events.isEmpty, events.allSatisfy({ $0.inputField != nil }) {
       return recordedFields(displays: displays, events: events)
+    }
+    if noSpaceWordEnds.isEmpty, hasValidatedRawUnits(events) {
+      let raw = rawPrimitiveFields(displays: displays, events: events)
+      return (raw.fields.map { String(decoding: $0, as: UTF16.self) }, raw.trimsLastField)
     }
     var fields: [String] = []
     var pieces: [Piece] = []
@@ -113,6 +135,54 @@ enum SavedTextInputHistoryPolicy {
           }
           fields[piece.field].unicodeScalars.removeLast(removedScalars)
           if !remainder.isEmpty { pieces.append(.init(field: piece.field, text: remainder)) }
+          field = piece.field
+        }
+      }
+    }
+    return (fields, trimsLastField)
+  }
+
+  private static func hasValidatedRawUnits(_ events: [TypingReplayEvent]) -> Bool {
+    events.contains { $0.validatedTextUTF16 != nil || $0.inputField?.validatedValueUTF16 != nil }
+  }
+
+  /// No snapshots or hidden target segmentation: own primitive buckets are
+  /// still lossless. A deletion can leave a lone surrogate or combining base.
+  /// Old primitives remove a whole grapheme; marked new primitives remove a unit.
+  private static func rawPrimitiveFields(
+    displays: [String], events: [TypingReplayEvent]
+  ) -> (fields: [[UInt16]], trimsLastField: Bool) {
+    var fields: [[UInt16]] = []
+    var pieces: [(field: Int, unit: UInt16)] = []
+    var live: [UInt16] = []
+    var field = 0
+    var trimsLastField = false
+    for event in TypingReplay.chronologicalEvents(events) {
+      if event.isStoppedInsertion {
+        while fields.count <= field { fields.append([]) }
+        continue
+      }
+      trimsLastField = false
+      switch event.kind {
+      case .insert:
+        for unit in event.inputUnits {
+          while fields.count <= field { fields.append([]) }
+          trimsLastField = unit == 32 && event.commitsWord != false && field == displays.count - 1
+            && (fields[field] != Array(displays[field].utf16) || event.forceError)
+          fields[field].append(unit)
+          pieces.append((field, unit))
+          live.append(unit)
+          if (unit == 32 || unit == 10) && event.commitsWord != false { field += 1 }
+        }
+      case .delete:
+        guard !live.isEmpty else { continue }
+        let count = event.deletesUTF16Unit ? 1
+          : String(decoding: live, as: UTF16.self).last.map { String($0).utf16.count } ?? 0
+        let removed = min(count, live.count)
+        live.removeLast(removed)
+        for _ in 0..<removed {
+          guard let piece = pieces.popLast() else { break }
+          fields[piece.field].removeLast()
           field = piece.field
         }
       }
