@@ -4694,13 +4694,14 @@ struct TypingSession {
       }
       var credit = TypingWordCredit()
       for index in acceptedUnits.starts.indices {
-        let input = acceptedUnits.field(index, withoutCommit: true)
-        let target = unitTargets.field(index, withoutCommit: true)
+        // A commit's identity belongs to the word: stripping SPACE and LF
+        // before comparison would make the wrong separator earn full credit.
+        let input = acceptedUnits.field(index)
+        let target = unitTargets.field(index)
         let prefix = countPartialLastWord && index == acceptedUnits.fieldIndex
         if input == target || prefix && input.count <= target.count && target.starts(with: input) {
           credit.inputUnits += input.count
           credit.characters += String(decoding: input, as: UTF16.self).count
-          if index < acceptedUnits.fieldIndex { credit.inputUnits += 1; credit.characters += 1 }
         }
       }
       return credit

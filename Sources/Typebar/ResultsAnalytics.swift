@@ -1380,12 +1380,16 @@ enum ResultPerformanceTrace {
 
     init?(prompt: String, events: [TypingReplayEvent], configuration: TestConfiguration?) {
       guard !events.isEmpty, !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []) else { return nil }
-      let targets = UnitInputTargets(prompt, buildsASCIICatalog: true)
       guard events.allSatisfy({ event in
         guard let field = event.inputField, field.index >= 0,
           field.valueUTF16 == nil || field.validatedValueUTF16 != nil
         else { return false }
-        return configuration?.mode == .zen || targets.fields.indices.contains(field.index)
+        return true
+      }) else { return nil }
+      // Missing/legacy snapshots do not need an unused full target catalog.
+      let targets = UnitInputTargets(prompt, buildsASCIICatalog: true)
+      guard configuration?.mode == .zen || events.allSatisfy({
+        targets.fields.indices.contains($0.inputField!.index)
       }) else { return nil }
       self.targets = targets
       self.configuration = configuration
