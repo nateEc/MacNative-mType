@@ -1275,6 +1275,9 @@ enum ResultPerformanceTrace {
   ) -> ResultPerformancePoint {
     let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
     let orderedEvents = validOrderedEvents(events)
+    if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration) {
+      return fieldSamples(fields, events: orderedEvents, times: [safeElapsed], singleWindow: true)[0]
+    }
     if containsRawUnits(orderedEvents) {
       return rawSamples(prompt: prompt, events: orderedEvents, times: [safeElapsed],
         configuration: configuration, singleWindow: true)[0]
@@ -1317,6 +1320,9 @@ enum ResultPerformanceTrace {
     let sampleTimes = samplingTimes(for: duration, configuration: configuration)
     let orderedEvents = validOrderedEvents(events)
     guard !orderedEvents.isEmpty else { return [] }
+    if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration) {
+      return fieldSamples(fields, events: orderedEvents, times: sampleTimes, singleWindow: false)
+    }
     if containsRawUnits(orderedEvents) {
       return rawSamples(prompt: prompt, events: orderedEvents, times: sampleTimes,
         configuration: configuration, singleWindow: false)
@@ -1354,6 +1360,106 @@ enum ResultPerformanceTrace {
 
   private static func containsRawUnits(_ events: [TypingReplayEvent]) -> Bool {
     events.contains { $0.validatedTextUTF16 != nil || $0.inputField?.validatedValueUTF16 != nil }
+  }
+
+  /// Captured fields are authoritative even when a delayed automatic key's
+  /// timestamp sorts before the manual input it changed. Cache each field's
+  /// last snapshot; do not replay its deletion into a different source word.
+  private struct FieldActivityCursor {
+    private struct Snapshot {
+      let fullCredit: Int
+      let prefixCredit: Int
+      let rawCount: Int
+      let endsWithInsertedSpace: Bool
+    }
+
+    let targets: UnitInputTargets
+    let configuration: TestConfiguration?
+    private var order: [Int] = []
+    private var snapshots: [Int: Snapshot] = [:]
+
+    init?(prompt: String, events: [TypingReplayEvent], configuration: TestConfiguration?) {
+      guard !events.isEmpty, !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []) else { return nil }
+      let targets = UnitInputTargets(prompt, buildsASCIICatalog: true)
+      guard events.allSatisfy({ event in
+        guard let field = event.inputField, field.index >= 0,
+          field.valueUTF16 == nil || field.validatedValueUTF16 != nil
+        else { return false }
+        return configuration?.mode == .zen || targets.fields.indices.contains(field.index)
+      }) else { return nil }
+      self.targets = targets
+      self.configuration = configuration
+    }
+
+    mutating func apply(_ event: TypingReplayEvent) -> Int {
+      let field = event.inputField!
+      let units = field.units.map { unit -> UInt16 in
+        guard let scalar = UnicodeScalar(UInt32(unit)),
+          InputCharacterEquivalence.isReferenceSpace(Character(String(scalar))) else { return unit }
+        return 32
+      }
+      let target = configuration?.mode == .zen ? units : targets.field(field.index)
+      if snapshots[field.index] == nil { order.append(field.index) }
+      snapshots[field.index] = .init(fullCredit: units == target ? units.count : 0,
+        prefixCredit: target.starts(with: units) ? units.count : 0, rawCount: units.count,
+        endsWithInsertedSpace: event.kind == .insert && event.inputUnits == [32])
+      // Judgments own attempt errors. For genuine older field tapes without
+      // them, compare at the insertion interval of this captured field, not a
+      // flattened cursor. Stopped insertion leaves that interval unaccepted.
+      if event.kind != .insert { return 0 }
+      if configuration?.mode == .zen { return 0 }
+      if let judgments = event.validatedInputCorrectness { return judgments.filter { !$0 }.count }
+      let input = event.inputUnits
+      let start = event.isStoppedInsertion ? units.count : max(0, units.count - input.count)
+      return input.enumerated().reduce(0) { total, part in
+        let position = start + part.offset
+        return total + (event.forceError || !target.indices.contains(position)
+          || input[part.offset] != target[position] ? 1 : 0)
+      }
+    }
+
+    var counts: (credit: Int, raw: Int) {
+      var active = 0
+      if let last = order.filter({ snapshots[$0]!.rawCount > 0 }).max(), let snapshot = snapshots[last] {
+        active = snapshot.endsWithInsertedSpace && last < Int.max ? last + 1 : last
+      }
+      var credit = 0
+      var raw = 0
+      for index in order {
+        let snapshot = snapshots[index]!
+        credit += index == active ? snapshot.prefixCredit : snapshot.fullCredit
+        raw += snapshot.rawCount
+        if index == active { break }
+      }
+      return (credit, raw)
+    }
+  }
+
+  private static func fieldSamples(
+    _ initial: FieldActivityCursor, events: [TypingReplayEvent], times: [TimeInterval], singleWindow: Bool
+  ) -> [ResultPerformancePoint] {
+    var fields = initial
+    var index = 0
+    var previousBoundary: TimeInterval = 0
+    return times.map { elapsed in
+      let start = singleWindow ? max(0, elapsed.rounded(.up) - 1) : previousBoundary
+      var attempts = 0
+      var errors = 0
+      while index < events.count, events[index].offset <= elapsed {
+        let event = events[index]
+        let inputErrors = fields.apply(event)
+        if event.kind == .insert, !singleWindow || start == 0 || event.offset > start {
+          attempts += event.inputUnits.count
+          errors += inputErrors
+        }
+        index += 1
+      }
+      previousBoundary = elapsed
+      let counts = fields.counts
+      return .init(elapsed: elapsed, wpm: wpm(characters: counts.credit, elapsed: elapsed),
+        rawWpm: wpm(characters: counts.raw, elapsed: elapsed),
+        burstWpm: intervalBurst(inputUnits: attempts, seconds: elapsed - start), errorCount: errors)
+    }
   }
 
   /// Raw tapes never compare lossy replacement glyphs with a target. Keep the
