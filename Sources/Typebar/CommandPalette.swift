@@ -889,8 +889,7 @@ enum SoundCommandTarget: Equatable {
         case .volume(let volume):
             settings.soundVolume = volume
         case .click(let style):
-            settings.playKeyclickSound = style != nil
-            if let style { settings.clickSoundStyle = style }
+            settings.setClickSound(style)
         case .error(let style):
             settings.playErrorBeep = style != nil
             if let style { settings.errorSoundStyle = style }

@@ -503,6 +503,8 @@ final class TypingFeedbackSound {
   }, beep: { NSSound.beep() })
 
   private var cachedSources: [TypingClickPlaybackSource: any TypingSoundVoice] = [:]
+  private var loadingSources: Set<TypingClickPlaybackSource> = []
+  private var configuredClickStyle: TypingClickSoundStyle?
   private var activeVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
   private var musicalVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
   private var currentKeyCode: UInt16 = 0
@@ -530,6 +532,40 @@ final class TypingFeedbackSound {
     configuredVolume = volume
     let voices = Array(activeVoices.values)
     for voice in voices { voice.volume = Float(volume) }
+  }
+
+  /// A non-off configuration change prepares resources without creating a
+  /// playback instance. Preview targets do not replace the configured family.
+  func configureClickSound(style: TypingClickSoundStyle?) {
+    configuredClickStyle = style
+    if let style { prepareClickSamples(style: style) }
+  }
+
+  private func prepareErrorSamples() {
+    for style in TypingErrorSoundStyle.allCases {
+      for index in 0..<style.sampleVariantCount {
+        if let source = style.sampleSource(variantIndex: index) { _ = prototype(for: source) }
+      }
+    }
+  }
+
+  private func prepareClickSamples(style: TypingClickSoundStyle?) {
+    prepareErrorSamples()
+    guard let style else { return }
+    for index in 0..<style.sampleVariantCount {
+      if let source = style.sampleSource(variantIndex: index) { _ = prototype(for: source) }
+    }
+  }
+
+  private func prototype(for source: TypingClickPlaybackSource) -> (any TypingSoundVoice)? {
+    if let cached = cachedSources[source] { return cached }
+    // The synchronous native loader can be injected/reentered. Never load
+    // the same resource recursively; failed loads remain retryable.
+    guard loadingSources.insert(source).inserted else { return nil }
+    defer { loadingSources.remove(source) }
+    guard let loaded = loadSound(source) else { return nil }
+    cachedSources[source] = loaded
+    return loaded
   }
 
   func clearAllSounds() {
@@ -564,6 +600,7 @@ final class TypingFeedbackSound {
       playMusic(mode: mode, requestedVolume: volume, isPreview: false)
       return
     }
+    prepareClickSamples(style: style)
     guard let source = style.sampleSource(variantIndex: randomSampleIndex(count: style.sampleVariantCount)) else { return }
     _ = play(source: source, volume: volume)
   }
@@ -602,7 +639,10 @@ final class TypingFeedbackSound {
     if let mode = style.musicMode {
       if case .keys = mode { currentKeyCode = 12 }
       playMusic(mode: mode, requestedVolume: volume, isPreview: true, usesPracticeShift: usesPracticeShift)
-    } else { _ = play(source: style.playbackSource, volume: volume) }
+    } else {
+      prepareClickSamples(style: configuredClickStyle)
+      _ = play(source: style.playbackSource, volume: volume)
+    }
   }
 
   private func playMusic(mode: TypingMusicMode, requestedVolume: Double, isPreview: Bool,
@@ -636,6 +676,7 @@ final class TypingFeedbackSound {
   }
 
   func playError(style: TypingErrorSoundStyle, volume: Double) {
+    prepareErrorSamples()
     guard let source = style.sampleSource(variantIndex: randomSampleIndex(count: style.sampleVariantCount)) else { return }
     if !play(source: source, volume: volume), (playbackVolume(volume) ?? 0) > 0 {
       beep()
@@ -643,6 +684,7 @@ final class TypingFeedbackSound {
   }
 
   func previewError(style: TypingErrorSoundStyle, volume: Double) {
+    prepareErrorSamples()
     if !play(source: .system(style.systemSoundName), volume: volume), (playbackVolume(volume) ?? 0) > 0 { beep() }
   }
 
@@ -665,15 +707,8 @@ final class TypingFeedbackSound {
   private func play(source: TypingClickPlaybackSource, volume: Double,
     restartingWarning: Bool = false) -> Bool {
     guard let effectiveVolume = playbackVolume(volume) else { return false }
-    let prototype: (any TypingSoundVoice)?
-    if let cached = cachedSources[source] {
-      prototype = cached
-    } else {
-      let loaded = loadSound(source)
-      if let loaded { cachedSources[source] = loaded }
-      prototype = loaded
-    }
-    guard let prototype, let voice = prototype.copyForPlayback(), voice !== prototype else {
+    guard let prototype = prototype(for: source),
+      let voice = prototype.copyForPlayback(), voice !== prototype else {
       return false
     }
 

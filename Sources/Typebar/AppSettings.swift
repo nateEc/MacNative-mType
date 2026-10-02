@@ -1118,6 +1118,8 @@ private enum RandomThemeTarget: Equatable {
 final class AppSettings {
   @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private let feedbackSound: TypingFeedbackSound
+  @ObservationIgnored private var batchingClickSoundConfiguration = true
+  @ObservationIgnored private var initializingSettings = true
   @ObservationIgnored private let storageKey = "appSettings.v1"
   @ObservationIgnored private let layoutFluidStorageKey = "layoutFluidLayouts.v1"
   @ObservationIgnored private var randomThemeBag: [RandomThemeTarget] = []
@@ -1484,8 +1486,8 @@ final class AppSettings {
   var showFocusWarning = true { didSet { persist() } }
   var showCapsLockWarning = true { didSet { persist() } }
   var playErrorBeep = false { didSet { persist() } }
-  var playKeyclickSound = false { didSet { persist() } }
-  var clickSoundStyle: TypingClickSoundStyle = .tink { didSet { persist() } }
+  var playKeyclickSound = false { didSet { synchronizeClickSoundConfiguration(); persist() } }
+  var clickSoundStyle: TypingClickSoundStyle = .tink { didSet { synchronizeClickSoundConfiguration(); persist() } }
   var errorSoundStyle: TypingErrorSoundStyle = .basso { didSet { persist() } }
   var timeWarningOffset: TimeWarningOffset = .off { didSet { persist() } }
   var timeWarningSoundStyle: TimeWarningSoundStyle = .glass { didSet { persist() } }
@@ -1506,7 +1508,12 @@ final class AppSettings {
   init(defaults: UserDefaults = .standard, feedbackSound: TypingFeedbackSound = .shared) {
     self.defaults = defaults
     self.feedbackSound = feedbackSound
-    defer { feedbackSound.setVolume(soundVolume) }
+    defer {
+      initializingSettings = false
+      batchingClickSoundConfiguration = false
+      feedbackSound.setVolume(soundVolume)
+      synchronizeClickSoundConfiguration()
+    }
     if let rawLayouts = defaults.stringArray(forKey: layoutFluidStorageKey) {
       layoutFluidLayouts = LayoutFluidPolicy.normalizedLayouts(
         rawLayouts.compactMap(KeyboardLayout.init(rawValue:)))
@@ -1954,6 +1961,11 @@ final class AppSettings {
   }
 
   func apply(_ snapshot: AppSettingsSnapshot) {
+    batchingClickSoundConfiguration = true
+    defer {
+      batchingClickSoundConfiguration = false
+      synchronizeClickSoundConfiguration()
+    }
     difficulty = snapshot.difficulty
     strictSpace = snapshot.strictSpace
     confidenceMode = .off
@@ -2353,7 +2365,21 @@ final class AppSettings {
     }
   }
 
+  private func synchronizeClickSoundConfiguration() {
+    guard !batchingClickSoundConfiguration else { return }
+    feedbackSound.configureClickSound(style: playKeyclickSound ? clickSoundStyle : nil)
+  }
+
+  func setClickSound(_ style: TypingClickSoundStyle?) {
+    batchingClickSoundConfiguration = true
+    if let style { clickSoundStyle = style }
+    playKeyclickSound = style != nil
+    batchingClickSoundConfiguration = false
+    synchronizeClickSoundConfiguration()
+  }
+
   private func persist() {
+    guard !initializingSettings else { return }
     let snapshot = AppSettingsSnapshot(
       difficulty: difficulty,
       strictSpace: strictSpace,

@@ -5,17 +5,26 @@ import XCTest
 @MainActor
 final class SampleSoundVariantTests: XCTestCase {
   private final class Voice: TypingSoundVoice {
+    let onCopy: (() -> Void)?
+    init(onCopy: (() -> Void)? = nil) { self.onCopy = onCopy }
     var volume: Float = 1
     var copies: [Voice] = []
     var starts = 0, stops = 0
     var finish: (() -> Void)?
     func copyForPlayback() -> (any TypingSoundVoice)? {
+      onCopy?()
       let voice = Voice(); copies.append(voice); return voice
     }
     func play(onFinish: @escaping () -> Void) -> Bool {
       starts += 1; finish = onFinish; return true
     }
     func stop() { stops += 1 }
+  }
+
+  private var errorSources: [TypingClickPlaybackSource] {
+    TypingErrorSoundStyle.allCases.flatMap { style in
+      (0..<style.sampleVariantCount).compactMap { style.sampleSource(variantIndex: $0) }
+    }
   }
 
   // Cardinality facts from the pinned public configuration, not source/assets.
@@ -48,51 +57,59 @@ final class SampleSoundVariantTests: XCTestCase {
   func testLiveSampleSelectionDrawsOnceAndEveryUniformBucketLoadsItsOwnCachedPrototype() throws {
     for (id, style, count) in try families() {
       var sources: [TypingClickPlaybackSource] = []
+      var selected: [TypingClickPlaybackSource] = []
       var draws = 0
-      let player = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {}, randomUnit: {
+      let player = TypingFeedbackSound(loadSound: { source in sources.append(source); return Voice(onCopy: { selected.append(source) }) }, beep: {}, randomUnit: {
         let value = (Double(draws % count) + 0.5) / Double(count)
         draws += 1; return value
       })
       for _ in 0..<(count * 2) { player.playClick(style: style, volume: 0.5) }
       XCTAssertEqual(draws, count * 2, "family \(id)")
-      XCTAssertEqual(sources.count, count, "family \(id) should cache independently")
-      XCTAssertEqual(sources, (0..<count).compactMap { style.sampleSource(variantIndex: $0) })
+      let family = (0..<count).compactMap { style.sampleSource(variantIndex: $0) }
+      XCTAssertEqual(sources, errorSources + family, "family \(id) should cache independently")
+      XCTAssertEqual(selected, family + family)
     }
   }
 
   func testFourthErrorFamilyRandomlyUsesTwoVariantsAndTheOtherFamiliesStillDrawOnce() {
     for style in TypingErrorSoundStyle.allCases {
       var sources: [TypingClickPlaybackSource] = []
+      var selected: [TypingClickPlaybackSource] = []
       var draws = 0
       let count = style == .submarine ? 2 : 1
-      let player = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {}, randomUnit: {
+      let player = TypingFeedbackSound(loadSound: { source in sources.append(source); return Voice(onCopy: { selected.append(source) }) }, beep: {}, randomUnit: {
         let value = (Double(draws % count) + 0.5) / Double(count)
         draws += 1; return value
       })
       for _ in 0..<(count * 2) { player.playError(style: style, volume: 0.5) }
       XCTAssertEqual(style.sampleVariantCount, count)
       XCTAssertEqual(draws, count * 2)
-      XCTAssertEqual(sources.count, count)
-      XCTAssertEqual(sources, (0..<count).compactMap { style.sampleSource(variantIndex: $0) })
+      let family = (0..<count).compactMap { style.sampleSource(variantIndex: $0) }
+      XCTAssertEqual(sources, errorSources)
+      XCTAssertEqual(selected, family + family)
     }
   }
 
   func testSamplePreviewsAlwaysUseTheFirstVariantWithoutDrawingRandomness() throws {
     for (_, style, _) in try families() {
       var sources: [TypingClickPlaybackSource] = []
-      let player = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {},
+      var selected: [TypingClickPlaybackSource] = []
+      let player = TypingFeedbackSound(loadSound: { source in sources.append(source); return Voice(onCopy: { selected.append(source) }) }, beep: {},
         randomUnit: { XCTFail("sample preview must not draw"); return 0.999 })
       player.previewClick(style: style, volume: 0.5)
       player.previewClick(style: style, volume: 0.5)
-      XCTAssertEqual(sources, [style.playbackSource])
+      XCTAssertEqual(sources, errorSources + [style.playbackSource])
+      XCTAssertEqual(selected, [style.playbackSource, style.playbackSource])
     }
     for style in TypingErrorSoundStyle.allCases {
       var sources: [TypingClickPlaybackSource] = []
-      let player = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {},
+      var selected: [TypingClickPlaybackSource] = []
+      let player = TypingFeedbackSound(loadSound: { source in sources.append(source); return Voice(onCopy: { selected.append(source) }) }, beep: {},
         randomUnit: { XCTFail("error preview must not draw"); return 0.999 })
       player.previewError(style: style, volume: 0.5)
       player.previewError(style: style, volume: 0.5)
-      XCTAssertEqual(sources, [style.sampleSource(variantIndex: 0)].compactMap { $0 })
+      XCTAssertEqual(sources, errorSources)
+      XCTAssertEqual(selected, Array(repeating: try XCTUnwrap(style.sampleSource(variantIndex: 0)), count: 2))
     }
   }
 
@@ -102,10 +119,12 @@ final class SampleSoundVariantTests: XCTestCase {
         + (1..<count).map { Double($0) / Double(count) }
       for value in values {
         var sources: [TypingClickPlaybackSource] = []
-        let player = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {}, randomUnit: { value })
+        var selected: [TypingClickPlaybackSource] = []
+        let player = TypingFeedbackSound(loadSound: { source in sources.append(source); return Voice(onCopy: { selected.append(source) }) }, beep: {}, randomUnit: { value })
         player.playClick(style: style, volume: 0.5)
         let index = value.isFinite ? Int(value.clamped(to: 0...Double(1).nextDown) * Double(count)) : 0
-        XCTAssertEqual(sources, [try XCTUnwrap(style.sampleSource(variantIndex: index))])
+        XCTAssertEqual(sources, errorSources + (0..<count).compactMap { style.sampleSource(variantIndex: $0) })
+        XCTAssertEqual(selected, [try XCTUnwrap(style.sampleSource(variantIndex: index))])
       }
     }
   }
@@ -117,7 +136,7 @@ final class SampleSoundVariantTests: XCTestCase {
     }, beep: {}, randomUnit: { defer { draws += 1 }; return [0.0, 0.5, 0.99][draws % 3] })
     player.setVolume(0.8)
     for _ in 0..<4 { player.playClick(style: .tink, volume: 0.1) }
-    XCTAssertEqual(prototypes.count, 3)
+    XCTAssertEqual(prototypes.count, 8)
     let old = prototypes.flatMap(\.copies)
     XCTAssertEqual(Set(old.map(ObjectIdentifier.init)).count, 4)
     XCTAssertTrue(old.allSatisfy { $0.volume == 0.8 && $0.starts == 1 && $0.stops == 0 })
@@ -130,14 +149,15 @@ final class SampleSoundVariantTests: XCTestCase {
     for voice in old { voice.finish?() }
     XCTAssertEqual(newest.stops, 0)
     XCTAssertEqual(newest.volume, 0.2, accuracy: 0.0001)
-    XCTAssertEqual(prototypes.count, 3)
+    XCTAssertEqual(prototypes.count, 8)
     player.clearAllSounds()
     XCTAssertEqual(newest.stops, 1)
   }
 
   func testSamplePreviewDoesNotAdvanceTheSharedLiveSampleAndScaleRandomStream() {
     var sources: [TypingClickPlaybackSource] = [], draws = 0
-    let player = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {}, randomUnit: {
+    var selected: [TypingClickPlaybackSource] = []
+    let player = TypingFeedbackSound(loadSound: { source in sources.append(source); return Voice(onCopy: { selected.append(source) }) }, beep: {}, randomUnit: {
       defer { draws += 1 }; return [0.0, 0.99, 0.0, 0.0][draws]
     })
     player.previewClick(style: .tink, volume: 0.5)
@@ -147,7 +167,7 @@ final class SampleSoundVariantTests: XCTestCase {
     player.previewClick(style: .tink, volume: 0.5)
     player.playClick(style: .tink, volume: 0.5)
     XCTAssertEqual(draws, 2)
-    XCTAssertEqual(sources.last, TypingClickSoundStyle.tink.sampleSource(variantIndex: 2))
+    XCTAssertEqual(selected.last, TypingClickSoundStyle.tink.sampleSource(variantIndex: 2))
     player.playClick(style: .pentatonic, volume: 0.5)
     XCTAssertEqual(draws, 4)
     guard case .musical(_, let tone) = sources.last else { XCTFail("expected scale"); return }
@@ -159,10 +179,11 @@ final class SampleSoundVariantTests: XCTestCase {
     let clickMissing = TypingClickSoundStyle.tink.sampleSource(variantIndex: 2)
     let errorMissing = TypingErrorSoundStyle.submarine.sampleSource(variantIndex: 1)
     var voices: [Voice] = [], sources: [TypingClickPlaybackSource] = [], draws = 0, beeps = 0
+    var selected: [TypingClickPlaybackSource] = []
     let player = TypingFeedbackSound(loadSound: { source in
       sources.append(source)
       if source == clickMissing || source == errorMissing { return nil }
-      let voice = Voice(); voices.append(voice); return voice
+      let voice = Voice(onCopy: { selected.append(source) }); voices.append(voice); return voice
     }, beep: { beeps += 1 }, randomUnit: { defer { draws += 1 }; return draws == 0 ? 0 : 0.99 })
     player.playClick(style: .tink, volume: 0.5)
     player.playClick(style: .tink, volume: 0.5)
@@ -171,8 +192,8 @@ final class SampleSoundVariantTests: XCTestCase {
     XCTAssertEqual(beeps, 1)
     player.previewError(style: .submarine, volume: 0.5)
     XCTAssertEqual(draws, 3)
-    XCTAssertEqual(sources.first, clickFirst)
-    XCTAssertEqual(sources.last, TypingErrorSoundStyle.submarine.sampleSource(variantIndex: 0))
+    XCTAssertEqual(sources.first, errorSources.first)
+    XCTAssertEqual(selected, [clickFirst, TypingErrorSoundStyle.submarine.sampleSource(variantIndex: 0)].compactMap { $0 })
     XCTAssertTrue(voices.flatMap(\.copies).allSatisfy { $0.stops == 0 && $0.starts == 1 })
     XCTAssertEqual(beeps, 1)
   }

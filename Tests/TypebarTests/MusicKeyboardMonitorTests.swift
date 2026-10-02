@@ -632,7 +632,7 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     _ = events.send(try key(12, flags: .shift))
     sound.playClick(style: .pianoSine, volume: 0.5)
     sound.playClick(style: .tink, volume: 0.5)
-    let music = try XCTUnwrap(voices.first), sample = try XCTUnwrap(voices.last?.copies.first)
+    let music = try XCTUnwrap(voices.first), sample = try XCTUnwrap(voices.flatMap(\.copies).first)
     registry.update(window: events.practiceWindow, owner: owner, isPracticePage: false)
     sound.playClick(style: .pianoSine, volume: 0.5)
     XCTAssertEqual(pitch(sources.last), 261.63)

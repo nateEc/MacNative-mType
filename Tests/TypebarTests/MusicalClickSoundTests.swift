@@ -227,7 +227,7 @@ final class MusicalClickSoundTests: XCTestCase {
     XCTAssertEqual(sources.compactMap(pitch), [523.25, 523.25, 523.25, 523.25, 1046.5, 1046.5, 1046.5, 1046.5])
     XCTAssertTrue(music.allSatisfy { abs($0.volume - 0.08) < 0.0001 })
     player.playClick(style: .tink, volume: 0.1)
-    XCTAssertEqual(sampleLoads, 1)
+    XCTAssertEqual(sampleLoads, 8) // Five error resources + the full three-sample Tink family.
     XCTAssertEqual(sample.copies.count, 2)
     XCTAssertEqual(try XCTUnwrap(sample.copies.last).volume, 0.8, accuracy: 0.0001)
   }
