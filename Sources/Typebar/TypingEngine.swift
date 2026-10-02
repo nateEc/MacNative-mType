@@ -3846,6 +3846,15 @@ struct TypingSession {
   /// including attempts that stop/delete rules do not leave on screen.
   private(set) var lastInputWasCorrect: Bool?
   private var liveInsertionFeedback: [Bool] = []
+  /// A stopped letter can be drawn without entering the accepted input.
+  /// Only a final input callback publishes this candidate; pre-input guards
+  /// and earlier characters in a batch must not replace the visible snapshot.
+  private struct StoppedPromptInput {
+    let character: Character
+    let targetIndex: Int?
+  }
+  private var stoppedPromptCandidate: StoppedPromptInput?
+  private var stoppedPromptInput: StoppedPromptInput?
   let automaticInputAttemptID = UUID()
   private var queuedCodeInputDates: [Date] = []
   private var queuedCodeInputHead = 0
@@ -4106,6 +4115,34 @@ struct TypingSession {
   }
 
   var promptGlyphs: [TypingPromptGlyph] {
+    var glyphs = acceptedPromptGlyphs
+    guard let stoppedPromptInput, !configuration.rules.blindMode else { return glyphs }
+    if let index = stoppedPromptInput.targetIndex, glyphs.indices.contains(index) {
+      let glyph = glyphs[index]
+      glyphs[index] = .init(character: glyph.character,
+        state: glyph.state == .hidden ? .hidden : .incorrect,
+        typedCharacter: stoppedPromptInput.character)
+    } else {
+      let concealed = configuration.rules.hideExtraLetters
+        || (configuration.modifiers.contains(.memory) && hasStarted && !isFinished)
+      glyphs.append(.init(character: stoppedPromptInput.character,
+        state: concealed ? .hidden : .extra))
+    }
+    return glyphs
+  }
+
+  /// Error color and cursor ownership are independent. A transient extra
+  /// belongs before the source separator, with the caret at its leading edge.
+  var promptCaretGlyphIndex: Int? {
+    guard !isFinished else { return nil }
+    let glyphs = acceptedPromptGlyphs
+    if let stoppedPromptInput, stoppedPromptInput.targetIndex == nil,
+      !configuration.rules.blindMode, !configuration.rules.hideExtraLetters
+    { return glyphs.count }
+    return glyphs.firstIndex { $0.state == .current }
+  }
+
+  private var acceptedPromptGlyphs: [TypingPromptGlyph] {
     if configuration.mode == .zen {
       return TypingPromptPresentation.zenGlyphs(
         typed: typed, isFinished: isFinished, blindMode: configuration.rules.blindMode)
@@ -4222,7 +4259,7 @@ struct TypingSession {
         }
       }
     }
-    return ranges.enumerated().map { word, range in
+    var words: [TypingPromptWordPresentation] = ranges.enumerated().map { word, range in
       let phase: TypingPromptWordPhase
       if usesHiddenBoundaries, firstEmptyNoSpaceWordIndex != nil {
         let committed = completedWordCount
@@ -4235,6 +4272,16 @@ struct TypingSession {
         hasCommitError: committedErrorWordStarts.contains(range.lowerBound),
         extraGlyphIndices: extraGlyphIndices[word])
     }
+    if let stoppedPromptInput, !configuration.rules.blindMode,
+      let owner = words.firstIndex(where: { $0.phase == .active })
+    {
+      let word = words[owner]
+      var extras = word.extraGlyphIndices
+      if stoppedPromptInput.targetIndex == nil { extras.append(acceptedPromptGlyphs.count) }
+      words[owner] = .init(range: word.range, phase: word.phase, hasInputError: true,
+        hasCommitError: word.hasCommitError, extraGlyphIndices: extras)
+    }
+    return words
   }
 
   /// Runtime blind-mode changes have their own active-session boundary.
@@ -4855,9 +4902,15 @@ struct TypingSession {
     roundsLiveAccuracyForInputDisplay = true
   }
 
+  /// An explicit highlight-mode redraw uses accepted input, not the last typo.
+  mutating func refreshPromptPresentation() {
+    stoppedPromptInput = nil
+  }
+
   /// Candidate changes refresh display only: marked text never adds attempts.
   mutating func refreshLiveAccuracyAfterComposition(hadMarkedText: Bool, hasMarkedText: Bool) {
     guard !isFinished, hadMarkedText || hasMarkedText else { return }
+    stoppedPromptInput = nil
     roundsLiveAccuracyForInputDisplay = true
   }
 
@@ -4896,6 +4949,7 @@ struct TypingSession {
         || index == characters.indices.last
       let quoteWordBefore = quoteWordStream == nil ? 0 : quoteNavigationIndex
       let attemptsBeforeCharacter = inputAttemptCount
+      stoppedPromptCandidate = nil
       let accepted = insertCharacter(
         character, forceError: forceError, at: date,
         evaluatesTerminalRules: evaluatesTerminalRules)
@@ -4905,6 +4959,7 @@ struct TypingSession {
       if evaluatesTerminalRules, inputAttemptCount > attemptsBeforeCharacter,
         let correct = lastInputWasCorrect
       {
+        stoppedPromptInput = stoppedPromptCandidate
         liveInsertionFeedback.append(correct)
       }
       if accepted {
@@ -4962,6 +5017,7 @@ struct TypingSession {
     recordKeyboardActivity(at: date)
     guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
+    stoppedPromptInput = nil
     roundsLiveAccuracyForInputDisplay = true
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
       removeCodeIndentationBeforeField(at: date)
@@ -4980,6 +5036,7 @@ struct TypingSession {
     recordKeyboardActivity(at: date)
     guard !typed.isEmpty else { return }
     guard canDeleteBackward else { return }
+    stoppedPromptInput = nil
     roundsLiveAccuracyForInputDisplay = true
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
       removeCodeIndentationBeforeField(at: date, deletesWholeIndent: true)
@@ -5041,6 +5098,7 @@ struct TypingSession {
   mutating func replaceInput(with value: String, at date: Date = .now) {
     guard !isFinished else { return }
     if value.count < typed.count {
+      stoppedPromptInput = nil
       roundsLiveAccuracyForInputDisplay = true
       while typed.count > value.count { removeLastTypedCharacter() }
       return
@@ -5294,6 +5352,10 @@ struct TypingSession {
       return false
     }
     if !isCorrect && configuration.rules.stopOnErrorMode == .letter {
+      if !configuration.rules.blindMode {
+        stoppedPromptCandidate = .init(character: inputCharacter,
+          targetIndex: retainsCurrentWordAsExtra || retainsEmptySlot ? nil : currentTargetIndex)
+      }
       recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: forceError,
         inputStopped: true, at: date)
       if evaluatesTerminalRules,
@@ -5377,6 +5439,9 @@ struct TypingSession {
     attemptedErrorCounts[boundary, default: 0] += 1
     if evaluatesTerminalRules, configuration.difficulty == .master { fail(at: date) }
     if rejectsOppositeShiftInput || configuration.rules.stopOnErrorMode == .letter {
+      if !rejectsOppositeShiftInput && !configuration.rules.blindMode {
+        stoppedPromptCandidate = .init(character: character, targetIndex: nil)
+      }
       recordReplayEvent(kind: .insert, text: String(character), forceError: forceError,
         inputStopped: true, at: date)
       return false

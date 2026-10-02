@@ -1,5 +1,17 @@
 # Typebar 人工验收记录
 
+2026-10-03 停止输入显示增量（定向验证已通过，最终完整门禁已通过）：固定 [输入处理](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L230-L320)、[字形重绘](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L734-L962)、[输入／删除／候选回调](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L1690-L1731)、[光标](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/caret.ts#L37-L45) 为合同。原生独立增加会话内停止错字候选和已发布显示值：仅最终判定回调发布，前置拒绝不清除，前面的批次错字不积累；反向 Shift 不发布，盲打创建时不保存供以后揭示。没有人为毫秒过期器，下一正确／Shift 回调、获准删除、候选重绘或有效高亮模式切换恢复真实输入。首词空输入退格被阻止，不应误清除。计时刷新与 compositionstart 本身不重绘该错字。
+
+目标内错误保留原目标与 typedCharacter，沿用原生替换／提示显示；活动词显示错误但不生成已提交边框。目标外错误是活动词内的额外字，在其分隔符前布局，隐藏额外字不预留空间；有来源元数据的空 no-space 字段拥有该额外字，不误标后词目标。独立光标索引支持停止错字与 Tape，不从错误颜色猜位置；实时 SwiftUI 主练习引用它，绘制循环只计算一次索引，避免每字形重复生成全提示。Memory 的隐藏颜色优先。保留正文、目标游标、计分、事件日志、回放、归档 11 与 SwiftData schema 不改变，不写真实库。
+
+StoppedInputPresentationTests 新增 16 项；首轮私有日志接口夹具编译错误已改公开 result，随后首项出现三个预期行为失败（错误状态／提示／词标志），证明缺口。实现中 Swift map 上下文类型缺失已显式标注，扩展测试的 typedEffect 错写 off 已改实际 keep，均为编译修正而非行为证据；首项复验零失败 0.003 秒。最终相关 128 项零失败（2.016 秒），新增 16 项零失败（0.012 秒）。覆盖正确回调、连续替换、普通／整词删除、首词空删除、预拒绝、批次末值、Shift、盲打、候选、无定时过期、高亮重绘、额外字／隐藏布局、空 no-space、Memory、词高亮与不开窗原生 TextKit 光标几何。共享 API 与布局实际运行，私有 SwiftUI 接线仅源码／编译，不冒称真实窗口／IME 验收。
+
+只读 bundled Node v24.19.0 对实际完整 updateWordLetters、三个 afterTest 回调、afterAnyTestInput 和 caret.updatePosition 做类型擦除／内存执行。普通停止显示目标 b 错误但 caret 1，额外 x 绘在 ab 后但 caret 2，Shift 重绘无停止字；候选／删除重绘清除。replace 下停止空格原版显示下划线；原生控制字符替换／提示仍用既有字符串，空格下划线、Tab／LF 图示等尚未完整对齐，此探针反例不隐藏。DOM／词目录、配置／状态、RAF、字形拆分、音频／统计／焦点等依赖为明确自有桩，无参考代码／数据／资产进入仓库；不是浏览器、上游 Vitest 或设备证明。有界会话内决策／风险复核，未使用独立评审。
+
+仅关闭已证实的停止字母／额外字显示与光标分离缺口；批次中间接受而末单元前置拒绝时的完整逐词 DOM 快照、参考 RAF 合并／词导航竞态、全 UTF-16／半代理／CRLF、提示控制字符图示、Firefox、Funbox 特殊绘制、真实 UI／IME／多窗口／听感、主题／词库／远程仍开放，94 配置键与部分 Funbox 状态不升级。新增三条人工场景仍待验收，不是设备通过；不启动 GUI、不播放声音、不部署，整体 goal active。
+
+2026-10-03 本停止显示增量最终完整门禁通过：客户端 1,972 项零失败（374.976 秒）、服务端 131 项零失败（1.383 秒）、735 条唯一人工场景清单、固定参考／元数据／原创性审计及未打开应用包检查全部通过。门禁内 testOptionalHundredThousandWordEndurance 实际执行通过（40.793 秒），已在临时日志清理前核对并记录，不以变量或旧轮结果代替。测试与编译串行，活跃期间没有修改 Swift 输入；真实背景存储路径在门禁前检查为不存在，没有删除用户数据。没有 Typebar 图形进程、实际音频播放、真实成绩／设置库写入、服务部署或跨设备同步。Core Data 环境诊断不等同于 XCTest 失败，零失败不意味着零系统诊断；三条新人工场景继续待验收，原版完整功能与前述控制字符／快照／UTF-16／UI 等缺口仍开放，goal active。
+
 2026-10-02 停止输入日志增量（定向验证已通过，最终门禁已通过）：固定 [插入处理](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L230-L340) 在字符 stop-on-error／反向 Shift 移除文字后仍记录带 inputStopped 的判定事件；预插入拒绝不记录。原生独立增加可选 inputStopped 标志，仅未来停止尝试记 true，旧事件缺失／false 继续按已接受文字处理；普通、Zen、空 no-space 字段及目标结束后的反向 Shift 路径保留尝试。Zen 停止 Shift 仍是正确活动但没有正文。Master 的末错误单元、Expert 的错误提交即使文本被停止也失败；Expert 检查整词文本，不因单独 Shift 错误使一个文本正确的提交失败。批次仍只在最终单元检查难度与反馈，不变成逐字符失败。
 
 已接受文字、字形、seek、回放动作与历史字段不追加停止字符，也不让之后删除多退一格；首个被停止的尝试仍保留空历史字段。逐键回放声音跳过停止输入，但下一词首个停止事件仍可触发前词提交音，之后正确输入不能重复该音。结果图表的错误／Burst／一致性继续计入判定尝试，原始／信用速度只使用保留文本；图表定位与自有 WeakSpot 记录尝试但不推进目标。实际原版的 [回放](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/replay-ui.ts#L49-L113)、[事件正文](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/helpers.ts#L96-L126) 与 [准确率](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/stats.ts#L550-L581) 是合同依据。旧日志未记录的尝试无法恢复，不反推补写或回算旧成绩。
@@ -1423,6 +1435,9 @@ pgrep -alf -f '/swiftc ' || true
 
 | ID | 场景 | 操作 | 预期 | 状态 |
 | --- | --- | --- | --- | --- |
+| INP-STOPPED-VISUAL-LETTER-01 | 停止错字不推进正文和光标 | 后续唯一获准隔离候选启用 letter-stop，在词中按错键，换提示样式／高亮／Tape，按正确键与退格；词首空输入按错后再按退格。 | 错目标／提示可见但输入与光标不推进；下一有效输入／删除／高亮重绘清除，空首词被阻止退格保留；计时不任意过期。 | 待验收（共享引擎／TextKit 自动化；私有 SwiftUI 仅编译，真实窗口与控制字符图示未验收） |
+| INP-STOPPED-VISUAL-EXTRA-01 | 停止额外字属于当前字段 | 后续唯一隔离候选在完整词后按错键，再开关隐藏额外字；有来源 no-space 空字段输入错键，核对 Memory。 | 临时额外字在当前词分隔符前，光标不跨它；隐藏不占额外空间，空字段不标后词，Memory 不泄露错误颜色。 | 待验收（布局／归属／隐藏自动化；真实 Tape／RTL／输入法与设备未验收） |
+| INP-STOPPED-VISUAL-BATCH-01 | 批次、候选与 Shift 重绘 | 后续唯一隔离候选输入末对／末错批次，启用反向 Shift 和盲打，按预拒绝 Return，再更新／确认／取消 IME 候选。 | 仅最终回调发布停止字，Shift 不显示被移除字，盲打不保存新停止字；候选重绘恢复实际输入，前置拒绝不清除旧错字。 | 待验收（16 项定向自动化／实际函数探针；末预拒绝整词快照、RAF／导航竞态与真实 IME 未验收） |
 | INP-LIVE-FEEDBACK-AUTO-01 | 正确输入与每个自动 Tab 分别反馈 | 后续唯一获准隔离候选选择代码片段，在正确空格／换行后进入 Tab 首字段，另手动输入首 Tab；对照点击关闭、错误音与盲打设置。 | 当前最终输入和各自动 Tab 各自产生一次实时反馈，不用批次末值吞掉自动输入；错误音与点击互斥，关闭与盲打按当前设置。 | 待验收（18 项实时反馈及实际源码函数探针；真实窗口、自动音乐上下文、设备延迟与异步队列未验收） |
 | INP-LIVE-FEEDBACK-BATCH-01 | 批次末值、递归替换与预拒绝 | 后续唯一隔离候选提交多字符末错／末对文字、嵌套省略号／荷兰语字形、字面目标；再用不接受 Return 的提示使批次最后单元被拒绝，并确认／取消候选。 | 普通批次只报实际末尝试，递归替换保留自身最终回调；预拒绝末单元不会拿前一个单元补响，候选更新与确认不混作机械字符声音。 | 待验收（原生接受／停止／Shift／字形和未开窗桥自动化；真实 IME、粘贴定时、Unicode 单元与窗口未验收） |
 | INP-LIVE-FEEDBACK-DELETE-01 | 实时与回放删除声音的刻意区别 | 后续唯一隔离候选在非空代码 Tab 字段普通退格／Option-Delete，再在 letter／word／hard 自动删除模式输入错键并回放；重开、静音后检查声音释放。 | 实时每次手动删除只响一次，自动恢复只反馈原错键；回放保留两条代码动作、自动删除与提交声音，不把回放动作当实时回调。 | 待验收（两种音轨分离、真实控制器替身的声部与零音量释放检查；真实听感、窗口和异步播放未验收） |

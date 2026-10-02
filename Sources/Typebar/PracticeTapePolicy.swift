@@ -10,7 +10,7 @@ enum PracticeTapePolicy {
     let logicalIndex: Int?
     switch mode {
     case .off: return 0
-    case .letter: logicalIndex = session.promptGlyphs.firstIndex { $0.state == .current }
+    case .letter: logicalIndex = session.promptCaretGlyphIndex
     case .word:
       let words = session.promptWordPresentations
       logicalIndex = (words.first { $0.phase == .active } ?? words.last)?.range.lowerBound

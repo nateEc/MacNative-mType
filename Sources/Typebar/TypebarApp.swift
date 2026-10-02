@@ -1234,6 +1234,7 @@ private struct ContentView: View {
         return
       }
       funboxConfigurationMessage = nil
+      session.refreshPromptPresentation()
       activeChallengeID = nil
     }
     .onChange(of: settings.showAllPracticeLines) { _, _ in activeChallengeID = nil }
@@ -2954,7 +2955,7 @@ private struct ContentView: View {
   }
 
   private var currentPromptGlyphIndex: Int? {
-    session.promptGlyphs.firstIndex { $0.state == .current }
+    session.promptCaretGlyphIndex
   }
 
   private var usesNativeCaretOverlay: Bool {
@@ -2979,6 +2980,7 @@ private struct ContentView: View {
     let completedCharacterIndices = session.completedPromptCharacterIndices
     let promptHighlightMode = effectivePromptHighlightMode
     let glyphs = session.promptGlyphs
+    let caretIndex = currentPromptGlyphIndex
     let words = session.promptWordPresentations
     let indices = PromptGlyphLayout.indices(
       glyphs: glyphs, words: words, hideExtraLetters: session.configuration.rules.hideExtraLetters)
@@ -2991,7 +2993,7 @@ private struct ContentView: View {
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
         isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
         effect: settings.typedCharacterEffect)
-      let replacesCurrentWithComposition = glyph.state == .current
+      let replacesCurrentWithComposition = index == caretIndex
         && settings.compositionDisplayStyle == .replace
         && !compositionText.isEmpty
       let displayedText: String
@@ -3010,7 +3012,7 @@ private struct ContentView: View {
         character.foregroundColor = .clear
         return character
       }
-      if !usesNativeCaretOverlay, index == paceGuideIndex, glyph.state != .current {
+      if !usesNativeCaretOverlay, index == paceGuideIndex, index != caretIndex {
         applyPaceCaret(to: &character)
       }
       let appearance = appearances[index]
@@ -3033,10 +3035,12 @@ private struct ContentView: View {
         default: break
         }
       case .current:
-        if promptHighlightMode != .off && settings.caretStyle.drawsMarker && !usesNativeCaretOverlay {
-          applyCaret(to: &character)
-        }
+        break
       case .incorrect, .pending, .hidden, .extra: break
+      }
+      if index == caretIndex, promptHighlightMode != .off,
+        settings.caretStyle.drawsMarker && !usesNativeCaretOverlay {
+        applyCaret(to: &character)
       }
       if settings.typedCharacterEffect != .hide || !completedCharacterIndices.contains(index) {
         appearance.applyErrorUnderline(to: &character, errorColor: errorFeedbackColor)
