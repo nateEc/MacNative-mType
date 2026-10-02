@@ -4804,6 +4804,17 @@ struct TypingSession {
       return
     }
 
+    // A hidden source-word boundary is still a commit. Do not let the
+    // space-delimited fallback clear the entire flattened input history.
+    if tracksNoSpaceWordBursts {
+      if noSpaceCommittedWordIndex != nil {
+        removePreviousWordForHardDelete(clearingWord: true, at: date)
+      } else {
+        clearCurrentWord(at: date)
+      }
+      return
+    }
+
     var removedCurrentWord = false
     while !typed.isEmpty, !lastInputCommitsWord {
       removeLastTypedCharacter()
@@ -4822,13 +4833,15 @@ struct TypingSession {
 
   private var canDeleteBackward: Bool {
     if configuration.rules.confidenceMode == .maximum { return false }
-    guard !configuration.rules.freedomMode, lastInputCommitsWord else {
+    if configuration.rules.freedomMode { return true }
+    if let word = noSpaceCommittedWordIndex, let range = noSpaceWordRange(for: word) {
+      if configuration.rules.confidenceMode == .on { return false }
+      return range.contains { !isTypedCharacterCorrect(at: $0) }
+    }
+    guard lastInputCommitsWord else {
       return true
     }
     if configuration.rules.confidenceMode == .on { return false }
-    if firstEmptyNoSpaceWordIndex != nil, let word = noSpaceCommittedWordIndex,
-      let range = noSpaceWordRange(for: word)
-    { return range.contains { !isTypedCharacterCorrect(at: $0) } }
     // Drop the active field, not submitted empty fields: a blank line is a
     // real prior word whose correctness controls reopening it.
     let completedWords = Array(retainedInputWords(omittingEmptySubsequences: false).dropLast())
@@ -4836,7 +4849,7 @@ struct TypingSession {
     let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: false)
     let index = completedWords.count - 1
     guard index < targetWords.count else { return true }
-    return typedWord != targetWords[index]
+    return !InputTextIdentity.matches(typedWord, targetWords[index])
   }
 
   mutating func replaceInput(with value: String, at date: Date = .now) {
