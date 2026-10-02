@@ -5904,6 +5904,7 @@ private struct CompletedResultView: View {
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
           configuration: result.configuration,
           soundConfiguration: .init(settings: settings))
+          .id(result.id)
       }
 
       VStack(alignment: .leading, spacing: 10) {
@@ -6698,10 +6699,13 @@ private struct ReplayTimelineView: View {
   @State private var isPlaying = false
   @State private var playbackStartedAt: TimeInterval?
   @State private var selectedPromptIndex: Int?
+  @State private var fieldFrame: FieldReplayPlan.Frame?
+  @State private var selectedFieldCoordinate: FieldReplayPlan.Coordinate?
   @State private var includesCurrentOffsetOnNextTick = true
   private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
   private let characterSeekOffsets: [Int: TimeInterval]
   private let replaySoundTimeline: [TypingReplayTimedSoundCue]
+  private let fieldPlan: FieldReplayPlan?
 
   private var duration: TimeInterval { events.last?.offset ?? 0 }
   private var replayedGlyphs: [TypingPromptGlyph] {
@@ -6726,6 +6730,9 @@ private struct ReplayTimelineView: View {
       prompt: prompt, events: chronologicalEvents)
     self.replaySoundTimeline = TypingReplay.soundTimeline(
       prompt: prompt, events: chronologicalEvents, configuration: configuration)
+    let fieldPlan = FieldReplayPlan.make(prompt: prompt, events: chronologicalEvents, configuration: configuration)
+    self.fieldPlan = fieldPlan
+    self._fieldFrame = State(initialValue: fieldPlan?.initialFrame)
   }
 
   var body: some View {
@@ -6740,31 +6747,60 @@ private struct ReplayTimelineView: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
-      ReplayInputView(glyphs: replayedGlyphs)
-        .frame(height: 72)
-      .padding(8)
-      .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-      VStack(alignment: .leading, spacing: 4) {
-        Text("目标（点按已输入字符定位）")
+      if let fieldPlan, let fieldFrame {
+        let presentation = fieldFrame.presentation
+        Text("目标字形回放（点按字符定位）")
           .font(.caption2)
           .foregroundStyle(.secondary)
         ReplayCharacterPicker(
-          text: prompt,
-          reachableIndices: Set(characterSeekOffsets.keys),
-          selectedIndex: selectedPromptIndex
+          text: presentation.text,
+          reachableIndices: Set(presentation.coordinates.indices.filter { index in
+            fieldPlan.maximumSeekCoordinate.map { presentation.coordinates[index] <= $0 } ?? false
+          }),
+          selectedIndex: presentation.coordinates.firstIndex { $0 == selectedFieldCoordinate },
+          glyphs: presentation.glyphs, errorIndices: presentation.errorIndices
         ) { index in
-          guard let targetOffset = characterSeekOffsets[index] else { return }
-          selectedPromptIndex = index
-          elapsed = min(duration, targetOffset)
+          guard presentation.coordinates.indices.contains(index),
+            let seek = fieldPlan.seek(presentation.coordinates[index]) else { return }
+          selectedFieldCoordinate = presentation.coordinates[index]
+          self.fieldFrame = seek.frame
+          elapsed = min(duration, seek.nextOffset)
           isPlaying = false
           playbackStartedAt = nil
-          includesCurrentOffsetOnNextTick = false
         }
         .frame(height: 96)
         .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
+      } else {
+        ReplayInputView(glyphs: replayedGlyphs)
+          .frame(height: 72)
+          .padding(8)
+          .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        VStack(alignment: .leading, spacing: 4) {
+          Text("目标（点按已输入字符定位）")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+          ReplayCharacterPicker(
+            text: prompt,
+            reachableIndices: Set(characterSeekOffsets.keys),
+            selectedIndex: selectedPromptIndex
+          ) { index in
+            guard let targetOffset = characterSeekOffsets[index] else { return }
+            selectedPromptIndex = index
+            elapsed = min(duration, targetOffset)
+            isPlaying = false
+            playbackStartedAt = nil
+            includesCurrentOffsetOnNextTick = false
+          }
+          .frame(height: 96)
+          .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
+        }
       }
       Slider(
-        value: $elapsed, in: 0...max(duration, 0.01),
+        value: Binding(get: { elapsed }, set: { value in
+          elapsed = min(duration, value)
+          fieldFrame = fieldPlan?.frame(through: elapsed)
+          selectedFieldCoordinate = nil
+        }), in: 0...max(duration, 0.01),
         onEditingChanged: { editing in
           if editing {
             isPlaying = false
@@ -6777,24 +6813,28 @@ private struct ReplayTimelineView: View {
         .accessibilityHint("调整回放位置；目标文本也支持鼠标点选字符定位")
       HStack {
         Button(isPlaying ? "暂停" : "播放") {
-          if elapsed >= duration {
+          if elapsed >= duration && (fieldPlan == nil || fieldFrame?.nextActionIndex == fieldPlan?.actions.count) {
             elapsed = 0
+            fieldFrame = fieldPlan?.initialFrame
             includesCurrentOffsetOnNextTick = true
           }
           selectedPromptIndex = nil
+          selectedFieldCoordinate = nil
           isPlaying.toggle()
           playbackStartedAt = isPlaying
             ? ProcessInfo.processInfo.systemUptime - elapsed : nil
         }
-        .disabled(duration == 0)
+        .disabled(duration == 0 && (fieldPlan?.actions.isEmpty ?? true))
         Button("重置") {
           elapsed = 0
           isPlaying = false
           playbackStartedAt = nil
           selectedPromptIndex = nil
+          selectedFieldCoordinate = nil
+          fieldFrame = fieldPlan?.initialFrame
           includesCurrentOffsetOnNextTick = true
         }
-        .disabled(elapsed == 0 && !isPlaying)
+        .disabled(elapsed == 0 && !isPlaying && (fieldFrame?.nextActionIndex ?? 0) == 0)
         Spacer()
       }
     }
@@ -6807,7 +6847,13 @@ private struct ReplayTimelineView: View {
       let soundLowerBound = includesCurrentOffsetOnNextTick
         ? -Double.leastNonzeroMagnitude : previousElapsed
       includesCurrentOffsetOnNextTick = false
-      playSounds(after: soundLowerBound, through: elapsed)
+      if let fieldPlan, var frame = fieldFrame {
+        let cues = fieldPlan.advance(&frame, through: elapsed)
+        fieldFrame = frame
+        playSounds(cues)
+      } else {
+        playSounds(after: soundLowerBound, through: elapsed)
+      }
       if elapsed >= duration {
         isPlaying = false
         self.playbackStartedAt = nil
@@ -6816,9 +6862,11 @@ private struct ReplayTimelineView: View {
   }
 
   private func playSounds(after lowerBound: TimeInterval, through upperBound: TimeInterval) {
-    for cue in TypingReplay.soundCues(
-      in: replaySoundTimeline, after: lowerBound, through: upperBound)
-    {
+    playSounds(TypingReplay.soundCues(in: replaySoundTimeline, after: lowerBound, through: upperBound))
+  }
+
+  private func playSounds(_ cues: [TypingReplaySoundCue]) {
+    for cue in cues {
       switch TypingReplaySoundRoute.resolve(
         cue: cue, playsClicks: soundConfiguration.playsClicks,
         playsErrors: soundConfiguration.playsErrors)
@@ -8911,6 +8959,7 @@ private struct ResultDetailView: View {
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
           configuration: result.configuration,
           soundConfiguration: .init(settings: settings))
+          .id(result.id)
       }
       ResultTagEditor(result: result)
       Spacer()

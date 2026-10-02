@@ -5,9 +5,13 @@ struct ReplayCharacterUTF16Index {
   private let offsets: [Int]
 
   init(_ text: String) {
+    self.init(characters: Array(text))
+  }
+
+  init(characters: [Character]) {
     var offsets = [0]
-    offsets.reserveCapacity(text.count + 1)
-    for character in text {
+    offsets.reserveCapacity(characters.count + 1)
+    for character in characters {
       offsets.append(offsets[offsets.count - 1] + String(character).utf16.count)
     }
     self.offsets = offsets
@@ -48,6 +52,8 @@ struct ReplayCharacterPicker: NSViewRepresentable {
   let text: String
   let reachableIndices: Set<Int>
   let selectedIndex: Int?
+  var glyphs: [TypingPromptGlyph]? = nil
+  var errorIndices: Set<Int> = []
   let onSelect: (Int) -> Void
 
   func makeNSView(context: Context) -> NSScrollView {
@@ -65,7 +71,7 @@ struct ReplayCharacterPicker: NSViewRepresentable {
     view.update(
       text: text,
       reachableIndices: reachableIndices,
-      selectedIndex: selectedIndex)
+      selectedIndex: selectedIndex, glyphs: glyphs, errorIndices: errorIndices)
   }
 }
 
@@ -75,6 +81,8 @@ final class ReplayCharacterTextView: NSTextView {
   private var renderedText: String?
   private var reachableIndices: Set<Int> = []
   private var renderedSelection: Int?
+  private var renderedGlyphs: [TypingPromptGlyph]?
+  private var renderedErrors: Set<Int> = []
 
   override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
     super.init(frame: frameRect, textContainer: container)
@@ -112,23 +120,43 @@ final class ReplayCharacterTextView: NSTextView {
     setAccessibilityHelp("可用鼠标点选已输入的字符定位；也可使用下方滑杆定位")
   }
 
-  func update(text: String, reachableIndices: Set<Int>, selectedIndex: Int?) {
+  func update(text: String, reachableIndices: Set<Int>, selectedIndex: Int?,
+    glyphs: [TypingPromptGlyph]? = nil, errorIndices: Set<Int> = []) {
+    let validGlyphs = glyphs.flatMap {
+      String($0.map(\.character)).utf16.elementsEqual(text.utf16) ? $0 : nil
+    }
     guard renderedText != text || self.reachableIndices != reachableIndices
-      || renderedSelection != selectedIndex
+      || renderedSelection != selectedIndex || renderedGlyphs != validGlyphs || renderedErrors != errorIndices
     else { return }
-    utf16Index = ReplayCharacterUTF16Index(text)
+    let characters = validGlyphs?.map(\.character) ?? Array(text)
+    utf16Index = ReplayCharacterUTF16Index(characters: characters)
     renderedText = text
     self.reachableIndices = reachableIndices
     renderedSelection = selectedIndex
+    renderedGlyphs = validGlyphs
+    renderedErrors = errorIndices
     let rendered = NSMutableAttributedString()
     let font = NSFont.monospacedSystemFont(
       ofSize: NSFont.smallSystemFontSize, weight: .regular)
-    for (index, character) in text.enumerated() {
+    for (index, character) in characters.enumerated() {
+      let color: NSColor
+      if let state = validGlyphs?[index].state {
+        switch state {
+        case .correct: color = .labelColor
+        case .incorrect, .extra: color = .systemRed
+        default: color = .secondaryLabelColor
+        }
+      } else {
+        color = reachableIndices.contains(index) ? .labelColor : .tertiaryLabelColor
+      }
       var attributes: [NSAttributedString.Key: Any] = [
         .font: font,
-        .foregroundColor: reachableIndices.contains(index)
-          ? NSColor.labelColor : NSColor.tertiaryLabelColor,
+        .foregroundColor: color,
       ]
+      if errorIndices.contains(index) {
+        attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+        attributes[.underlineColor] = NSColor.systemRed
+      }
       if selectedIndex == index {
         attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
         attributes[.underlineColor] = NSColor.controlAccentColor
@@ -137,6 +165,7 @@ final class ReplayCharacterTextView: NSTextView {
       rendered.append(NSAttributedString(string: String(character), attributes: attributes))
     }
     textStorage?.setAttributedString(rendered)
+    setAccessibilityLabel(validGlyphs == nil ? "回放目标文本" : "回放目标字形")
     setAccessibilityValue(text)
     window?.invalidateCursorRects(for: self)
     needsDisplay = true

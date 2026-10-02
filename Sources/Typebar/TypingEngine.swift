@@ -3268,16 +3268,7 @@ enum TypingReplay {
   /// produces playback actions; it is not a new live keyboard attempt.
   static func soundTimeline(prompt: String, events: [TypingReplayEvent],
     configuration: TestConfiguration? = nil) -> [TypingReplayTimedSoundCue] {
-    var targetFields: [[Character]] = []
-    var targetField: [Character] = []
-    for character in prompt {
-      targetField.append(character)
-      if isPromptWordSeparator(character) {
-        targetFields.append(targetField)
-        targetField = []
-      }
-    }
-    if !targetField.isEmpty { targetFields.append(targetField) }
+    let targetFields = promptFields(prompt)
     let isZen = configuration?.mode == .zen
     var typed: [Character] = []
     var typedWord = 0
@@ -3287,9 +3278,9 @@ enum TypingReplay {
     var retainedSeparators = Set<Int>()
 
     let orderedEvents = chronologicalEvents(events.filter { $0.offset.isFinite })
-    if let recorded = recordedFieldSoundTimeline(targetFields: targetFields,
+    if let recorded = recordedFieldActions(targetFields: targetFields,
       events: orderedEvents, configuration: configuration)
-    { return recorded }
+    { return recorded.map { .init(offset: $0.offset, cue: $0.soundCue) } }
     let finalFields = SavedTextInputHistoryPolicy.inputFields(events: orderedEvents)
     let continuationIndices = deletionContinuationIndices(in: orderedEvents)
     for (eventIndex, event) in orderedEvents.enumerated() {
@@ -3351,9 +3342,43 @@ enum TypingReplay {
   /// Input-time field position is not necessarily playback position when
   /// automatic actions keep an earlier timestamp. Legacy and unsegmented
   /// tapes retain their existing derivation rather than inventing targets.
-  private static func recordedFieldSoundTimeline(
+  struct FieldAction {
+    enum Kind: Equatable {
+      case input(text: String, correct: Bool)
+      case advance(correct: Bool)
+      case retreat
+      case resize(Int)
+    }
+    let offset: TimeInterval
+    let kind: Kind
+    var soundCue: TypingReplaySoundCue {
+      switch kind {
+      case .input(_, let correct), .advance(let correct): return correct ? .click : .error
+      case .retreat, .resize: return .click
+      }
+    }
+  }
+
+  static func promptFields(_ prompt: String) -> [[Character]] {
+    var fields: [[Character]] = []
+    var field: [Character] = []
+    for character in prompt {
+      field.append(character)
+      if isPromptWordSeparator(character) { fields.append(field); field = [] }
+    }
+    if !field.isEmpty { fields.append(field) }
+    return fields
+  }
+
+  static func fieldActions(prompt: String, events: [TypingReplayEvent],
+    configuration: TestConfiguration? = nil) -> [FieldAction]? {
+    recordedFieldActions(targetFields: promptFields(prompt),
+      events: chronologicalEvents(events.filter { $0.offset.isFinite }), configuration: configuration)
+  }
+
+  private static func recordedFieldActions(
     targetFields: [[Character]], events: [TypingReplayEvent], configuration: TestConfiguration?
-  ) -> [TypingReplayTimedSoundCue]? {
+  ) -> [FieldAction]? {
     let isZen = configuration?.mode == .zen
     guard !events.isEmpty,
       !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []),
@@ -3368,7 +3393,7 @@ enum TypingReplay {
       if let field = event.inputField { fields[field.index] = field.value }
     }
     var previousField: Int?
-    var cues: [TypingReplayTimedSoundCue] = []
+    var actions: [FieldAction] = []
     var index = 0
     while index < events.count {
       let range = deletionActionRange(at: index, in: events) ?? index..<(index + 1)
@@ -3382,7 +3407,7 @@ enum TypingReplay {
       if let previousField, field.index != previousField {
         let correct = wentBack || isZen
           || InputTextIdentity.matches(finalFields[previousField] ?? "", String(targetFields[previousField]))
-        cues.append(.init(offset: event.offset, cue: correct ? .click : .error))
+        actions.append(.init(offset: event.offset, kind: wentBack ? .retreat : .advance(correct: correct)))
       }
       switch event.kind {
       case .insert:
@@ -3392,16 +3417,16 @@ enum TypingReplay {
           let start = end - units.count
           let correct = isZen || (!event.forceError && start >= 0 && end <= targets[field.index].count
             && units.enumerated().allSatisfy { offset, unit in targets[field.index][start + offset] == unit })
-          cues.append(.init(offset: event.offset, cue: correct ? .click : .error))
+          actions.append(.init(offset: event.offset, kind: .input(text: event.text, correct: correct)))
         }
       case .delete:
         // Regression already emits the source back-word action. Do not add
         // a second same-time click for setting the destination field length.
-        if !wentBack { cues.append(.init(offset: event.offset, cue: .click)) }
+        if !wentBack { actions.append(.init(offset: event.offset, kind: .resize(field.value.utf16.count))) }
       }
       previousField = field.index
     }
-    return cues
+    return actions
   }
 
   static func characterSeekOffsets(
