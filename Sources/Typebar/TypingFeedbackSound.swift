@@ -460,6 +460,7 @@ final class TypingFeedbackSound {
   private var musicalVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
   private var currentKeyCode: UInt16 = 0
   private var currentModifierFlags: NSEvent.ModifierFlags = []
+  private var practiceShiftKeys: Set<UInt16> = []
   private var scaleStates: [TypingMusicMode: TypingMusicScaleState] = [:]
   private var previewScaleStates: [TypingMusicMode: TypingMusicScaleState] = [:]
   private var configuredVolume: Double?
@@ -493,6 +494,14 @@ final class TypingFeedbackSound {
     for voice in voices { voice.stop() }
   }
 
+  /// Call only after a replacement attempt is accepted. Sample-only cleanup
+  /// must not reset modifiers; Caps Lock, key code and music state survive.
+  func beginPracticeAttempt() {
+    practiceShiftKeys.removeAll(keepingCapacity: true)
+    currentModifierFlags.remove(.shift)
+    clearAllSounds()
+  }
+
   private func playbackVolume(_ requested: Double) -> Double? {
     if let configuredVolume { return configuredVolume }
     guard requested > 0 else { return nil }
@@ -509,10 +518,27 @@ final class TypingFeedbackSound {
 
   func recordKeyDown(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
     currentKeyCode = keyCode
-    currentModifierFlags = modifierFlags
+    // A letter's raw Shift flag is not a new Shift press. After a practice
+    // reset, an already held physical Shift must stay logically clear.
+    synchronizeCapsLock(modifierFlags.contains(.capsLock))
   }
 
-  func updateModifierFlags(_ flags: NSEvent.ModifierFlags) { currentModifierFlags = flags }
+  /// Explicit context initialization, not observation of ordinary key flags.
+  func updateModifierFlags(_ flags: NSEvent.ModifierFlags) {
+    currentModifierFlags = flags
+    practiceShiftKeys = flags.contains(.shift) ? [56] : []
+  }
+
+  func recordModifierTransition(keyCode: UInt16, isDown: Bool, modifierFlags: NSEvent.ModifierFlags) {
+    if keyCode == 56 || keyCode == 60 {
+      if isDown { practiceShiftKeys.insert(keyCode) }
+      else { practiceShiftKeys.remove(keyCode) }
+      if practiceShiftKeys.isEmpty { currentModifierFlags.remove(.shift) }
+      else { currentModifierFlags.insert(.shift) }
+    }
+    synchronizeCapsLock(modifierFlags.contains(.capsLock))
+    if isDown { currentKeyCode = keyCode }
+  }
 
   func synchronizeCapsLock(_ isEnabled: Bool) {
     if isEnabled { currentModifierFlags.insert(.capsLock) }

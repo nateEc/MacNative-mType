@@ -12,6 +12,8 @@ final class TypingMusicKeyboardMonitor {
   private let modifierFlags: @MainActor () -> NSEvent.ModifierFlags
   private var token: Any?
   private var generation: UUID?
+  // Physical transition history deliberately survives practice resets. The
+  // sound controller owns the separately resettable logical Shift sides.
   private var pressedModifierKeys: Set<UInt16> = []
 
   init(sound: TypingFeedbackSound = .shared,
@@ -75,7 +77,7 @@ final class TypingMusicKeyboardMonitor {
       return
     }
     guard let modifier = Self.modifier(for: event.keyCode) else {
-      sound.updateModifierFlags(event.modifierFlags)
+      sound.synchronizeCapsLock(event.modifierFlags.contains(.capsLock))
       return
     }
     let hardwareBits = event.modifierFlags.rawValue & modifier.familyBits
@@ -92,11 +94,10 @@ final class TypingMusicKeyboardMonitor {
     }
     if isDown {
       pressedModifierKeys.insert(event.keyCode)
-      sound.recordKeyDown(keyCode: event.keyCode, modifierFlags: event.modifierFlags)
     } else {
       pressedModifierKeys.remove(event.keyCode)
-      sound.updateModifierFlags(event.modifierFlags)
     }
+    sound.recordModifierTransition(keyCode: event.keyCode, isDown: isDown, modifierFlags: event.modifierFlags)
   }
 
   private static func modifier(for code: UInt16)

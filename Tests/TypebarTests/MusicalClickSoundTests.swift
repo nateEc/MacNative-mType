@@ -198,6 +198,40 @@ final class MusicalClickSoundTests: XCTestCase {
     XCTAssertEqual(sources.compactMap(pitch), [523.25, 1046.5, 523.25, 523.25, 1046.5, 523.25])
   }
 
+  @MainActor func testPracticeResetKeepsScaleWalksMusicVoicesAndSampleMasterAndCache() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    var music: [Voice] = []
+    let sample = Voice()
+    var sampleLoads = 0
+    let player = TypingFeedbackSound(loadSound: { source in
+      if case .musical = source {
+        sources.append(source)
+        let voice = Voice(); music.append(voice); return voice
+      }
+      sampleLoads += 1; return sample
+    }, beep: {}, randomUnit: { 0 })
+    player.setVolume(0.8)
+    for id in [12, 13] {
+      player.previewClick(style: try style(id), volume: 0.1)
+      player.playClick(style: try style(id), volume: 0.1)
+    }
+    player.playClick(style: .tink, volume: 0.1)
+    let oldSample = try XCTUnwrap(sample.copies.first)
+    player.beginPracticeAttempt()
+    XCTAssertEqual(oldSample.stops, 1)
+    XCTAssertTrue(music.allSatisfy { $0.stops == 0 && $0.starts == 1 })
+    for id in [12, 13] {
+      player.previewClick(style: try style(id), volume: 0.1)
+      player.playClick(style: try style(id), volume: 0.1)
+    }
+    XCTAssertEqual(sources.compactMap(pitch), [523.25, 523.25, 523.25, 523.25, 1046.5, 1046.5, 1046.5, 1046.5])
+    XCTAssertTrue(music.allSatisfy { abs($0.volume - 0.08) < 0.0001 })
+    player.playClick(style: .tink, volume: 0.1)
+    XCTAssertEqual(sampleLoads, 1)
+    XCTAssertEqual(sample.copies.count, 2)
+    XCTAssertEqual(try XCTUnwrap(sample.copies.last).volume, 0.8, accuracy: 0.0001)
+  }
+
   func testRandomWalkThresholdIsStrictAndBoundaryDirectionDoesNotDriftOutOfRange() throws {
     var state = TypingMusicScaleState()
     var draws = 0

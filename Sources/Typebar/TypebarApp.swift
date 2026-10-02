@@ -3711,7 +3711,7 @@ private struct ContentView: View {
     liveContentMessage = nil
     if mode != .custom { activeLongSavedText = nil }
     NativeSpeech.shared.stop()
-    TypingFeedbackSound.shared.clearAllSounds()
+    TypingFeedbackSound.shared.beginPracticeAttempt()
     if restarting, mode == .quote,
       !QuoteRestartPolicy.shouldKeepCurrent(
         repeatWhileTyping: settings.repeatQuotes, hasStarted: session.hasStarted,
@@ -3787,7 +3787,7 @@ private struct ContentView: View {
         return
       }
       let livePrompt = content.promptDescriptor(for: configuration)
-      TypingFeedbackSound.shared.clearAllSounds()
+      TypingFeedbackSound.shared.beginPracticeAttempt()
       session = TestSessionFactory.make(
         configuration: configuration, streamPrompt: livePrompt.text,
         streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource,
@@ -3970,7 +3970,7 @@ private struct ContentView: View {
     lastClockTickSecond = 0
     timerHealth = .init()
     NativeSpeech.shared.stop()
-    TypingFeedbackSound.shared.clearAllSounds()
+    TypingFeedbackSound.shared.beginPracticeAttempt()
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
     session = repeatedSession

@@ -89,6 +89,8 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     sound.previewClick(style: .pianoSine, volume: 0.5)
     _ = events.send(try key(57, type: .flagsChanged, flags: .capsLock))
     sound.previewClick(style: .pianoSine, volume: 0.5)
+    // Caps Lock is independent; its event must not synthesize Shift keyup.
+    _ = events.send(try key(56, type: .flagsChanged, flags: .capsLock))
     _ = events.send(try key(57, type: .flagsChanged))
     sound.previewClick(style: .pianoSine, volume: 0.5)
     _ = events.send(try key(51, type: .keyUp))
@@ -425,6 +427,111 @@ final class MusicKeyboardMonitorTests: XCTestCase {
     _ = events.send(try key(60, type: .flagsChanged))
     sound.playClick(style: .pianoSine, volume: 0.5)
     XCTAssertEqual(pitch(sources.last), 261.63)
+    monitor.stop()
+  }
+
+  func testNewAttemptClearsPracticeShiftButKeepsCapsLockAndLastKey() throws {
+    for caps: NSEvent.ModifierFlags in [[], .capsLock] {
+      var sources: [TypingClickPlaybackSource] = []
+      let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+      let events = Events()
+      let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+        modifierFlags: { caps })
+      monitor.start()
+      _ = events.send(try key(56, type: .flagsChanged, flags: caps.union(.shift)))
+      _ = events.send(try key(6, flags: caps.union(.shift)))
+      sound.beginPracticeAttempt()
+      sound.playClick(style: .pianoSine, volume: 0.5)
+      XCTAssertEqual(pitch(sources.last), caps.isEmpty ? 130.81 : 261.63)
+      // The ordinary practice responder receives the same event after the
+      // local monitor; neither path may resurrect a cleared logical Shift.
+      _ = events.send(try key(12, flags: caps.union(.shift)))
+      sound.recordKeyDown(keyCode: 12, modifierFlags: caps.union(.shift))
+      sound.playClick(style: .pianoSine, volume: 0.5)
+      XCTAssertEqual(pitch(sources.last), caps.isEmpty ? 261.63 : 523.25)
+      monitor.stop()
+    }
+  }
+
+  func testNewAttemptDoesNotReimportTheStillHeldOppositeShiftOnRelease() throws {
+    for deviceBits in [true, false] {
+      var sources: [TypingClickPlaybackSource] = []
+      let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+      let events = Events()
+      let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+        modifierFlags: { [] })
+      let left = NSEvent.ModifierFlags.shift.union(deviceBits ? .init(rawValue: UInt(NX_DEVICELSHIFTKEYMASK)) : [])
+      let both = left.union(deviceBits ? .init(rawValue: UInt(NX_DEVICERSHIFTKEYMASK)) : [])
+      monitor.start()
+      _ = events.send(try key(56, type: .flagsChanged, flags: left))
+      sound.beginPracticeAttempt()
+      _ = events.send(try key(60, type: .flagsChanged, flags: both))
+      _ = events.send(try key(12, flags: both))
+      sound.playClick(style: .pianoSine, volume: 0.5)
+      XCTAssertEqual(pitch(sources.last), 523.25)
+      _ = events.send(try key(60, type: .flagsChanged, flags: left))
+      sound.playClick(style: .pianoSine, volume: 0.5)
+      XCTAssertEqual(pitch(sources.last), 261.63)
+      _ = events.send(try key(56, type: .flagsChanged))
+      _ = events.send(try key(56, type: .flagsChanged, flags: left))
+      _ = events.send(try key(12, flags: left))
+      sound.playClick(style: .pianoSine, volume: 0.5)
+      XCTAssertEqual(pitch(sources.last), 523.25)
+      monitor.stop()
+    }
+  }
+
+  func testUnrelatedModifierEventsCannotResurrectShiftAfterNewAttempt() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+    let events = Events()
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { [] })
+    monitor.start()
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    _ = events.send(try key(12, flags: .shift))
+    sound.beginPracticeAttempt()
+    _ = events.send(try key(63, type: .flagsChanged, flags: [.shift, .function]))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    _ = events.send(try key(58, type: .flagsChanged, flags: [.shift, .option]))
+    _ = events.send(try key(12, flags: [.shift, .option]))
+    _ = events.send(try key(58, type: .flagsChanged, flags: .shift))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(pitch(sources.last), 261.63)
+    monitor.stop()
+  }
+
+  func testOrdinaryRawShiftCannotImportAHeldStartupShiftAndSampleClearDoesNotResetPracticeShift() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+    let events = Events()
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { .shift })
+    monitor.start()
+    _ = events.send(try key(12, flags: .shift))
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    _ = events.send(try key(12, flags: .shift))
+    sound.clearAllSounds()
+    sound.playClick(style: .pianoSine, volume: 0.5)
+    XCTAssertEqual(sources.compactMap { pitch($0) }, [261.63, 523.25])
+    monitor.stop()
+  }
+
+  func testCapsLockTogglesDoNotSynthesizeAReleaseOfHeldPracticeShift() throws {
+    var sources: [TypingClickPlaybackSource] = []
+    let sound = TypingFeedbackSound(loadSound: { sources.append($0); return Voice() }, beep: {})
+    let events = Events()
+    let monitor = TypingMusicKeyboardMonitor(sound: sound, install: events.install, remove: events.remove,
+      modifierFlags: { [] })
+    monitor.start()
+    _ = events.send(try key(56, type: .flagsChanged, flags: .shift))
+    for caps: NSEvent.ModifierFlags in [.capsLock, []] {
+      _ = events.send(try key(57, type: .flagsChanged, flags: caps))
+      sound.previewClick(style: .pianoSine, volume: 0.5)
+    }
+    XCTAssertEqual(sources.compactMap { pitch($0) }, [523.25, 523.25])
     monitor.stop()
   }
 }

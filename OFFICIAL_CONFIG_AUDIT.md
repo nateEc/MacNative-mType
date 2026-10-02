@@ -1,5 +1,13 @@
 # 官方配置兼容性审计
 
+2026-10-02 练习重置音乐 Shift 增量（最终门禁已通过）：依据固定 [modifier 模块](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/states/modifiers.ts) 与 [测试 reset](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L297)，把可重置的左右逻辑 Shift 与监听器的物理侧键转换记录分离。beginPracticeAttempt 清逻辑 Shift 并停止旧样本，不清 CapsLock、最后键码、音乐实例、试听／练习音阶状态、样本原型缓存或主音量；普通 keyDown、Caps 切换、未知修饰和其他修饰键释放均不从原始 aggregate Shift 复活旧状态。物理记录保留，所以无设备位合成事件的释放回退仍可正确识别。普通 clearAllSounds 仅停样本，不承担练习重置。正常重开、结果重复与允许的在线内容替换三处在既有守卫后接入；被锁定／拒绝／过期分支不改动，三处私有 SwiftUI 入口仅代码复核／编译，未运行真实按钮或网络替换 UI。
+
+行为优先红阶段：仅添加新入口的旧停样本行为占位及三项测试，真实执行 3 项产生 6 个预期失败断言；实现后先 89 项通过，补证后相关 92 项零失败（约 0.44 秒），包括 MusicKeyboardMonitorTests 27 项与 MusicalClickSoundTests 22 项。修正一项旧测试的事件序列，显式发 Shift 释放；旧序列误把独立 Caps 事件当作 Shift keyup，新增测试保留该反例而非放宽频率断言。后补三项覆盖启动持有 Shift 的普通键、Caps 不合成 Shift 释放、音阶／在播音乐／主音量／原型缓存保留；它们是复核证据，不冒称先行红证据。
+
+只读 Node v24.19.0 类型擦除并内存执行实际 modifier 模块，用显式自有 signal/effect/Caps 桩：左 Shift 按下→reset→带 shiftKey 的普通 Q→右 Shift 按下→右 Shift 释放的逻辑 Shift 实际为 true/false/false/true/false，Caps 全程 true。未复制参考代码／资产；不是浏览器、上游 Vitest 或硬件测试。本会话有界决策／风险复核验证最强反例为重开后仍物理按住左侧再释放右侧，保留物理历史而不导入聚合标志；不是独立评审。新加三个人工场景均待验收，总 708 个唯一项，不抬升为实机通过。原版完整页面切换、非测试页左右 Shift 监听作用域、跨窗口／IME／丢事件、实际声音设备与浏览器 DSP、样本随机变体和 16 号混响仍待完成；旧历史记录的重置缺口由本增量部分补齐，不据此关闭 goal。归档／成绩／SwiftData 与持久化音型结构未改变；本轮不启动 Typebar 图形实例、不播放音频、不写真实数据。
+
+本练习重置增量完整门禁通过：客户端 1,834 项零失败（362.349 秒）、服务端 131 项零失败（1.449 秒），708 项人工场景、固定参考／元数据／原创性审计与未打开应用打包通过。完整门禁带 TYPEBAR_ENDURANCE_TESTS=1；门禁退出会清理详细日志，故另用 --skip-build 单独补跑明确的十万词测试，1 项实际执行通过（39.092 秒）并保留独立日志，不仅凭环境变量或生成预览宣称耐力通过。两轮串行、没有编译期间修改源码，没有启动图形实例；十万词只证明文本引擎，不证明声音设备压力。goal 保持 active，不将本增量当完整重写验收。
+
 2026-10-02 应用范围音乐键位上下文增量（最终门禁已通过）：固定 [声音控制器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/sound-controller.ts#L149-L355) 的 document keydown 和 [修饰状态](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/states/modifiers.ts) 后，新增由唯一应用代理持有的 MainActor 本地音乐键位监听器。启动回调注册一次，实际终止回调移除；不是按练习窗口反复创建，也不是系统全局监听，不申请辅助功能权限，不记录输入文字／回放／偏好。keyDown 同步保存物理键码与事件修饰状态，flagsChanged 同步更新，原样返回事件，不转发输入、不启动音频，不使用异步 Task 使上下文落后于同一输入。普通练习 keyDown 留作直接接入；移除练习输入失焦空 flags 对共享声音上下文的覆盖，避免错误清掉 Caps Lock。
 
 特别区分按下和释放修饰键：浏览器 modifier keydown 也会替换当前 code 为非钢琴键，不能让 flagsChanged 只改变音高而沿用旧字母。用安装 SDK 26.2 的 IOKit.hidsystem／IOLLEvent.h 左右 Shift、Control、Option、Command 设备标志判断按下／释放；按下替换 code，释放只更新 flags。CapsLock 两个切换方向都作为非钢琴按下，无设备位的合成事件按已观察的侧键转换回退，真实位优先；左右并按后释放一侧不误清新的字母键。尚未宣称混合设备／丢事件／非标准 CapsLock 或 Fn 传输全对齐。
