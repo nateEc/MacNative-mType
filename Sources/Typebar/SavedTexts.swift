@@ -14,7 +14,8 @@ enum CustomTextPolicy {
     }
 
     static func isValid(_ text: String) -> Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && text.count <= maximumLength
+        text.count <= maximumLength
+            && !CustomSectionWordStream.sourceSections(from: text, usesPipe: false).isEmpty
     }
 
     static func isValid(_ text: String, configuration: TestConfiguration) -> Bool {
@@ -23,10 +24,7 @@ enum CustomTextPolicy {
     }
 
     static func sections(in text: String) -> [String] {
-        let values = text.split(separator: "|", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        return values.isEmpty ? [text.trimmingCharacters(in: .whitespacesAndNewlines)] : values
+        CustomSectionWordStream.sourceSections(from: text, usesPipe: true)
     }
 
     static func isValidSavedText(
