@@ -4832,7 +4832,7 @@ struct TypingSession {
         case .virtualKeyboard: hasAcceptedVirtualKeyboardInput = true
         }
         recordReplayEvent(kind: .insert, text: String(character), forceError: forceError, at: date)
-        insertCodeIndentationIfNeeded(after: character, at: date)
+        insertCodeIndentationIfNeeded(at: date)
         if quoteWordStream != nil, quoteNavigationIndex > quoteWordBefore {
           refillQuoteIfNeeded(activeWordBefore: quoteWordBefore, at: date)
         }
@@ -4880,7 +4880,7 @@ struct TypingSession {
     guard canDeleteBackward else { return }
     roundsLiveAccuracyForInputDisplay = true
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
-      removeCodeIndentationBeforeLine(at: date)
+      removeCodeIndentationBeforeField(at: date)
     {
       return
     }
@@ -4898,7 +4898,7 @@ struct TypingSession {
     guard canDeleteBackward else { return }
     roundsLiveAccuracyForInputDisplay = true
     if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
-      removeCodeIndentationBeforeLine(at: date, deletesWholeIndent: true)
+      removeCodeIndentationBeforeField(at: date, deletesWholeIndent: true)
     {
       return
     }
@@ -5962,43 +5962,68 @@ struct TypingSession {
       && !forcedErrorIndices.contains(index)
   }
 
-  private mutating func insertCodeIndentationIfNeeded(after character: Character, at date: Date) {
-    guard character == "\n", configuration.language.isCodeLanguage,
-      isTypedCharacterCorrect(at: nextTargetIndex - 1)
-    else { return }
-    while nextTargetIndex < promptCharacters.count, promptCharacters[nextTargetIndex] == "\t" {
-      recordInputAttempt("\t", correctUnits: 1)
-      appendTypedCharacter("\t", targetIndex: nextTargetIndex, at: date)
+  private var codeInputFieldText: String {
+    if let range = activeNoSpaceWordRange {
+      return String(typed.suffix(max(0, typedGraphemeCount - range.lowerBound)))
+    }
+    return inputWordText()
+  }
+
+  private var codeTargetFieldText: String {
+    if let range = activeNoSpaceWordRange {
+      guard range.upperBound <= promptCharacters.count else { return "" }
+      return String(promptCharacters[range])
+    }
+    // Never infer hidden word boundaries from flattened no-space text.
+    guard !tracksNoSpaceWordBursts else { return "" }
+    let inputStart = typedGraphemeCount - codeInputFieldText.count
+    let anchor = typedTargetIndices.indices.contains(inputStart)
+      ? typedTargetIndices[inputStart] ?? nextTargetIndex : nextTargetIndex
+    guard promptCharacters.indices.contains(anchor) else { return "" }
+    let start = promptCharacters[..<anchor].lastIndex(where: isPromptWordSeparator)
+      .map { $0 + 1 } ?? 0
+    let end = promptCharacters[anchor...].firstIndex(where: isPromptWordSeparator)
+      ?? promptCharacters.count
+    return String(promptCharacters[start..<end])
+  }
+
+  private mutating func insertCodeIndentationIfNeeded(at date: Date) {
+    // Correctness belongs to the attempted key, not its remapped commit
+    // cursor: an early space can navigate without being a correct insert.
+    guard configuration.language.isCodeLanguage, lastInputWasCorrect == true else { return }
+    while true {
+      let target = Array(codeTargetFieldText.utf16)
+      let offset = codeInputFieldText.utf16.count
+      guard target.first == 9, target.indices.contains(offset), target[offset] == 9 else { break }
+      // Automatic tabs use the normal scoring, word-boundary and difficulty
+      // path, but remain explicitly automatic on the persisted replay tape.
+      guard insertCharacter("\t", forceError: false, at: date, evaluatesTerminalRules: true) else { break }
       recordReplayEvent(kind: .insert, text: "\t", automatic: true, at: date)
+      if isFinished || lastInputWasCorrect != true { break }
     }
   }
 
-  private mutating func removeCodeIndentationBeforeLine(
+  private mutating func removeCodeIndentationBeforeField(
     at date: Date, deletesWholeIndent: Bool = false
   ) -> Bool {
-    let typedCharacters = Array(typed)
-    let lineStart = typedCharacters.lastIndex(of: "\n").map { $0 + 1 } ?? 0
-    guard lineStart < typedCharacters.count,
-      typedCharacters[lineStart...].allSatisfy({ $0 == "\t" }),
-      // The reference checks the indentation after the browser has removed
-      // the requested input. A word deletion leaves an empty indentation,
-      // while ordinary Backspace leaves all tabs except the final one.
-      (deletesWholeIndent
-        || typedCharacters.indices.filter({ $0 >= lineStart && $0 < typedCharacters.count - 1 })
-          .allSatisfy(isTypedCharacterCorrect))
+    let field = codeInputFieldText
+    guard !field.isEmpty, field.allSatisfy({ $0 == "\t" }) else { return false }
+    let remainingTabs = deletesWholeIndent ? 0 : field.count - 1
+    let prefix = codeTargetFieldText.prefix(remainingTabs)
+    // The reference checks the indentation after the browser has removed
+    // the requested input. A word deletion leaves an empty indentation,
+    // while ordinary Backspace leaves all tabs except the final one.
+    guard prefix.count == remainingTabs, prefix.allSatisfy({ $0 == "\t" })
     else { return false }
     let deletionStart = replayEvents.count
-    while typed.last == "\t" {
+    for _ in field {
       removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", at: date)
     }
     markDeletion(since: deletionStart)
     let navigationStart = replayEvents.count
-    if typed.last == "\n" {
-      removeLastTypedCharacter()
-      recordReplayEvent(kind: .delete, text: "", at: date)
-      if deletesWholeIndent { clearCurrentWord(at: date) }
-    } else {
+    removePreviousWordForHardDelete(clearingWord: deletesWholeIndent, at: date)
+    if replayEvents.count == navigationStart {
       // At the first field, the source still logs a destination character
       // action after clearing tabs. The tape is already empty: this is a
       // no-op, not a fabricated removal of an earlier word.
