@@ -130,9 +130,12 @@ enum WeakSpotPractice {
       var typed: [Character] = []
       let target = Array(result.prompt)
       var previousInputOffset: TimeInterval?
-      for event in result.replayEvents.sorted(by: { $0.offset < $1.offset }) where !event.automatic {
-        let interval = previousInputOffset.flatMap { event.offset > $0 ? event.offset - $0 : nil }
-        previousInputOffset = event.offset
+      for event in TypingReplay.chronologicalEvents(result.replayEvents) {
+        // Automatic indentation and error recovery still move the input
+        // cursor, but neither is a new human attempt or timing sample.
+        let interval = event.automatic ? nil
+          : previousInputOffset.flatMap { event.offset > $0 ? event.offset - $0 : nil }
+        if !event.automatic { previousInputOffset = event.offset }
         switch event.kind {
         case .delete:
           if !typed.isEmpty { typed.removeLast() }
@@ -140,9 +143,9 @@ enum WeakSpotPractice {
           for (index, entered) in event.text.enumerated() {
             guard typed.count < target.count else { continue }
             let expected = target[typed.count]
-            if expected != " " {
+            if !event.automatic, expected != " " {
               samples[expected, default: .init()].attemptCount += 1
-              if entered != expected || event.forceError {
+              if !InputTextIdentity.matches(entered, expected) || event.forceError {
                 samples[expected, default: .init()].mistakeCount += 1
               }
               if index == 0, let interval {

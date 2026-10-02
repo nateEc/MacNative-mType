@@ -160,9 +160,8 @@ final class WordDeletionActionTests: XCTestCase {
     XCTAssertEqual(session.typed, "if ready {")
     XCTAssertEqual(actions.map(\.kind), [.deleteWord, .deleteCharacter])
     XCTAssertEqual(actions.map { $0.primitiveRange.count }, [2, 1])
-    // Ordinary unindent only. Whole-word code unindent still has a known
-    // destination-text gap; neither case claims upstream automatic/audio parity.
-    XCTAssertTrue(actions.flatMap(\.primitives).allSatisfy(\.automatic))
+    // Both logged actions belong to the manual deletion, not automatic indentation.
+    XCTAssertTrue(actions.flatMap(\.primitives).allSatisfy { !$0.automatic })
   }
 
   func testLegacyRecordsDoNotAcquireInventedWordActionsOrNewJSONKeys() throws {

@@ -10770,7 +10770,8 @@ final class TypingEngineTests: XCTestCase {
     var wordDelete = TypingSession(configuration: configuration, prompt: prompt)
     wordDelete.insert("if ready {\n\t\t", at: start)
     wordDelete.deleteWordBackward(at: start.addingTimeInterval(1))
-    XCTAssertEqual(wordDelete.typed, "if ready {")
+    // Word navigation clears the previous field ({), not just its newline.
+    XCTAssertEqual(wordDelete.typed, "if ready ")
 
     var disabled = TypingSession(
       configuration: .words(
@@ -10781,7 +10782,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(disabled.typed, "if ready {\n\t")
   }
 
-  func testFirstLineCodeIndentBackspaceRecordsOnlyActualDeletions() {
+  func testFirstLineCodeIndentBackspaceRecordsDestinationWithoutExtraRemoval() {
     let configuration = TestConfiguration.words(
       1, rules: .init(codeUnindentOnBackspace: true), language: .codeSwift)
     var session = TypingSession(configuration: configuration, prompt: "\tgo()")
@@ -10794,7 +10795,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(session.isFinished)
 
     let replay = session.result(at: start.addingTimeInterval(2))?.replayEvents ?? []
-    XCTAssertEqual(replay.filter({ $0.kind == .delete }).count, 2)
+    XCTAssertEqual(replay.filter({ $0.kind == .delete }).count, 3)
+    XCTAssertEqual(replay.filter({ $0.kind == .delete }).map(\.wordDeletionCount), [2, nil, nil])
+    XCTAssertEqual(replay.filter({ $0.kind == .delete }).last?.characterDeletionCount, 1)
     XCTAssertEqual(TypingReplay.typedText(events: replay, through: 2), "\tgo()")
 
     var wordDelete = TypingSession(configuration: configuration, prompt: "\tgo()")
@@ -10803,7 +10806,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(wordDelete.typed, "")
     wordDelete.insert("\tgo()", at: start.addingTimeInterval(2))
     let wordReplay = wordDelete.result(at: start.addingTimeInterval(2))?.replayEvents ?? []
-    XCTAssertEqual(wordReplay.filter({ $0.kind == .delete }).count, 2)
+    XCTAssertEqual(wordReplay.filter({ $0.kind == .delete }).count, 3)
+    XCTAssertEqual(TypingReplay.typedText(events: wordReplay, through: 2), "\tgo()")
+    XCTAssertEqual(wordReplay.filter({ $0.kind == .delete }).last?.characterDeletionCount, 1)
   }
 
   func testEveryStandaloneLanguageGeneratesAndCompletesAnOwnedWordsSession() {
@@ -23395,7 +23400,7 @@ final class TypingEngineTests: XCTestCase {
       1)
   }
 
-  func testWeakSpotReportFindsSlowCorrectCharactersAndIgnoresAutomaticReplay() throws {
+  func testWeakSpotReportFindsSlowCorrectCharactersAndIgnoresAutomaticAttempts() throws {
     let slowCorrect = CompletedTestResult(
       id: UUID(), configuration: .words(1, language: .english), outcome: .completed,
       startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 5,
@@ -23410,13 +23415,13 @@ final class TypingEngineTests: XCTestCase {
       ])
     let forcedError = CompletedTestResult(
       id: UUID(), configuration: .words(1, language: .english), outcome: .completed,
-      startedAt: start, finishedAt: start.addingTimeInterval(1), typedCharacterCount: 2,
-      correctCharacterCount: 1, errorCount: 1, wpm: 24, rawWpm: 24, accuracy: 50,
-      prompt: "am",
+      startedAt: start, finishedAt: start.addingTimeInterval(1), typedCharacterCount: 3,
+      correctCharacterCount: 2, errorCount: 1, wpm: 24, rawWpm: 36, accuracy: 67,
+      prompt: "amb",
       replayEvents: [
-        .init(offset: 0.1, kind: .insert, text: "x", automatic: true),
-        .init(offset: 0.2, kind: .insert, text: "a", forceError: true),
-        .init(offset: 0.3, kind: .insert, text: "m"),
+        .init(offset: 0.1, kind: .insert, text: "a", automatic: true),
+        .init(offset: 0.2, kind: .insert, text: "m", forceError: true),
+        .init(offset: 0.3, kind: .insert, text: "b"),
       ])
 
     let slowReport = try XCTUnwrap(
@@ -23431,8 +23436,8 @@ final class TypingEngineTests: XCTestCase {
       WeakSpotPractice.report(
         results: [forcedError], language: .english, englishVariant: .american))
     XCTAssertEqual(forcedReport.totalMistakeCount, 1)
-    XCTAssertEqual(WeakSpotPractice.characterScores(results: [forcedError], language: .english), ["a": 1])
-    XCTAssertFalse(forcedReport.characters.contains(where: { $0.character == "x" }))
+    XCTAssertEqual(WeakSpotPractice.characterScores(results: [forcedError], language: .english), ["m": 1])
+    XCTAssertFalse(forcedReport.characters.contains(where: { $0.character == "a" }))
   }
 
   func testLocalWordFilterUsesOnlyRequestedCharactersLengthsAndRegularExpressions() throws {
