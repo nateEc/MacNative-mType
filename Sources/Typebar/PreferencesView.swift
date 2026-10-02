@@ -217,7 +217,7 @@ struct PreferencesView: View {
                 style: settings.clickSoundStyle, volume: settings.soundVolume, usesPracticeShift: false)
             }
             Button("试听错误") {
-              TypingFeedbackSound.shared.playError(
+              TypingFeedbackSound.shared.previewError(
                 style: settings.errorSoundStyle, volume: settings.soundVolume)
             }
             Button("试听倒计时") {

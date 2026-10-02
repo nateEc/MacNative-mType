@@ -4316,7 +4316,7 @@ private struct ContentView: View {
       case .click(let style):
         TypingFeedbackSound.shared.previewClick(style: style, volume: settings.soundVolume)
       case .error(let style):
-        TypingFeedbackSound.shared.playError(style: style, volume: settings.soundVolume)
+        TypingFeedbackSound.shared.previewError(style: style, volume: settings.soundVolume)
       case .timeWarning:
         TypingFeedbackSound.shared.playTimeWarning(
           style: settings.timeWarningSoundStyle, volume: settings.soundVolume)

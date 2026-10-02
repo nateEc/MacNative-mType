@@ -197,6 +197,37 @@ enum TypingClickSoundStyle: String, CaseIterable, Codable, Equatable, Identifiab
     }
   }
 
+  var sampleVariantCount: Int {
+    switch self {
+    case .tink, .pop, .ping, .drift, .quartz: 3
+    case .morse, .ember: 6
+    case .velvet, .frost: 8
+    case .copper: 5
+    case .lantern, .meadow, .prism, .rain, .slate, .spark, .tide, .willow, .zephyr, .nocturne: 10
+    case .ripple, .reed, .pebble, .loom, .orbit, .pulse: 1
+    case .pianoSine, .pianoSaw, .pianoSquare, .pianoTriangle, .pentatonic, .wholeTone: 0
+    }
+  }
+
+  func sampleSource(variantIndex: Int) -> TypingClickPlaybackSource? {
+    guard (0..<sampleVariantCount).contains(variantIndex) else { return nil }
+    let first = playbackSource
+    guard variantIndex > 0 else { return first }
+    let base: TypingClickToneProfile
+    if case .synthesized(let profile) = first { base = profile }
+    else {
+      // Owned seeds for variations of the four retained macOS selections.
+      switch self {
+      case .tink: base = .init(waveform: .sine, frequency: 1_460, overtone: 2.3, overtoneMix: 0.12, duration: 0.035, decay: 4)
+      case .pop: base = .init(waveform: .triangle, frequency: 240, overtone: 1.4, overtoneMix: 0.18, duration: 0.050, decay: 2.6)
+      case .ping: base = .init(waveform: .sine, frequency: 930, overtone: 2.6, overtoneMix: 0.23, duration: 0.055, decay: 3.1)
+      case .morse: base = .init(waveform: .softSquare, frequency: 690, overtone: 1.7, overtoneMix: 0.09, duration: 0.042, decay: 2.9)
+      default: return nil
+      }
+    }
+    return .synthesized(base.sampleVariation(variantIndex))
+  }
+
   var musicMode: TypingMusicMode? {
     switch self {
     case .pianoSine: .keys(.sine)
@@ -230,6 +261,14 @@ struct TypingClickToneProfile: Hashable {
   let overtoneMix: Double
   let duration: Double
   let decay: Double
+
+  /// A small owned timbre lattice, not a reproduction of any web WAV pack.
+  func sampleVariation(_ index: Int) -> Self {
+    let offset = Double(index)
+    return .init(waveform: waveform, frequency: frequency * pow(2, offset / 40),
+      overtone: overtone + offset * 0.06, overtoneMix: min(0.45, overtoneMix + offset * 0.008),
+      duration: duration * (1 + offset * 0.02), decay: decay + offset * 0.04)
+  }
 
   func renderedWAVData(sampleRate: Int = 22_050) -> Data {
     let frameCount = max(1, Int(duration * Double(sampleRate)))
@@ -313,6 +352,14 @@ enum TypingErrorSoundStyle: String, CaseIterable, Codable, Equatable, Identifiab
     case .sosumi: "Sosumi"
     case .submarine: "Submarine"
     }
+  }
+
+  var sampleVariantCount: Int { self == .submarine ? 2 : 1 }
+  func sampleSource(variantIndex: Int) -> TypingClickPlaybackSource? {
+    guard (0..<sampleVariantCount).contains(variantIndex) else { return nil }
+    if variantIndex == 0 { return .system(systemSoundName) }
+    return .synthesized(.init(waveform: .triangle, frequency: 198, overtone: 2.35,
+      overtoneMix: 0.22, duration: 0.14, decay: 2.1))
   }
 }
 
@@ -517,7 +564,8 @@ final class TypingFeedbackSound {
       playMusic(mode: mode, requestedVolume: volume, isPreview: false)
       return
     }
-    _ = play(source: style.playbackSource, volume: volume)
+    guard let source = style.sampleSource(variantIndex: randomSampleIndex(count: style.sampleVariantCount)) else { return }
+    _ = play(source: source, volume: volume)
   }
 
   func recordKeyDown(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
@@ -554,7 +602,7 @@ final class TypingFeedbackSound {
     if let mode = style.musicMode {
       if case .keys = mode { currentKeyCode = 12 }
       playMusic(mode: mode, requestedVolume: volume, isPreview: true, usesPracticeShift: usesPracticeShift)
-    } else { playClick(style: style, volume: volume) }
+    } else { _ = play(source: style.playbackSource, volume: volume) }
   }
 
   private func playMusic(mode: TypingMusicMode, requestedVolume: Double, isPreview: Bool,
@@ -588,9 +636,22 @@ final class TypingFeedbackSound {
   }
 
   func playError(style: TypingErrorSoundStyle, volume: Double) {
-    if !play(source: .system(style.systemSoundName), volume: volume), (playbackVolume(volume) ?? 0) > 0 {
+    guard let source = style.sampleSource(variantIndex: randomSampleIndex(count: style.sampleVariantCount)) else { return }
+    if !play(source: source, volume: volume), (playbackVolume(volume) ?? 0) > 0 {
       beep()
     }
+  }
+
+  func previewError(style: TypingErrorSoundStyle, volume: Double) {
+    if !play(source: .system(style.systemSoundName), volume: volume), (playbackVolume(volume) ?? 0) > 0 { beep() }
+  }
+
+  private func randomSampleIndex(count: Int) -> Int {
+    let value = randomUnit()
+    // Production draws are in 0..<1. Keep injected invalid values from
+    // trapping during Double-to-Int conversion or escaping the family.
+    guard value.isFinite else { return 0 }
+    return Int(value.clamped(to: 0...Double(1).nextDown) * Double(count))
   }
 
   func playTimeWarning(style: TimeWarningSoundStyle, volume: Double) {

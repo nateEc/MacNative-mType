@@ -5,6 +5,8 @@ import XCTest
 /// Only the unstable audio-device boundary is stubbed. Every request goes
 /// through the production sound controller, not a parallel voice model.
 final class FeedbackSoundVoiceTests: XCTestCase {
+  // Voice/volume tests pin the first resource. Variant selection is exercised
+  // independently by SampleSoundVariantTests with explicit draw sequences.
   private func assertUnchangedResult(_ input: TypingSession, _ before: CompletedTestResult,
     file: StaticString = #filePath, line: UInt = #line) throws {
     let after = try XCTUnwrap(input.result(), file: file, line: line)
@@ -89,7 +91,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let trace = Trace()
     let prototype = RecordingSound(trace)
     var loads = 0
-    let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return prototype }, beep: {}, randomUnit: { 0 })
     for volume in [0.2, 0.6, 1.0] { player.playClick(style: .tink, volume: volume) }
     XCTAssertEqual(loads, 1)
     XCTAssertEqual(trace.starts, 3)
@@ -104,7 +106,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let trace = Trace()
     let prototype = RecordingSound(trace)
     var beeps = 0
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: { beeps += 1 })
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: { beeps += 1 }, randomUnit: { 0 })
     player.playError(style: .basso, volume: 0.25)
     player.playError(style: .basso, volume: 0.75)
     XCTAssertEqual(trace.stops, 0)
@@ -120,7 +122,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let errorPrototype = RecordingSound(error)
     let player = TypingFeedbackSound(loadSound: {
       $0 == .system("Basso") ? errorPrototype : clickPrototype
-    }, beep: {})
+    }, beep: {}, randomUnit: { 0 })
     for cue in [TypingReplaySoundCue.error, .error, .click, .click] {
       if cue == .error { player.playError(style: .basso, volume: 0.5) }
       else { player.playClick(style: .tink, volume: 0.5) }
@@ -134,7 +136,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
   @MainActor func testSuccessfulCompletionReleasesOnlyTheFinishedVoice() {
     let trace = Trace()
     let prototype = RecordingSound(trace)
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     player.playClick(style: .quartz, volume: 0.5)
     player.playClick(style: .quartz, volume: 0.5)
     trace.voices[1].value?.finish(true)
@@ -149,7 +151,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
   @MainActor func testUnsuccessfulCompletionAlsoReleasesItsVoice() {
     let trace = Trace()
     let prototype = RecordingSound(trace)
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     player.playError(style: .funk, volume: 0.5)
     trace.voices[0].value?.finish(false)
     XCTAssertNil(trace.voices[0].value)
@@ -161,7 +163,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     trace.succeeds = false
     let prototype = RecordingSound(trace)
     var beeps = 0
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: { beeps += 1 })
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: { beeps += 1 }, randomUnit: { 0 })
     player.playError(style: .sosumi, volume: 0.5)
     XCTAssertNil(trace.voices[0].value)
     XCTAssertEqual(beeps, 1)
@@ -178,7 +180,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
       let trace = Trace()
       traces[source] = trace
       return RecordingSound(trace)
-    }, beep: {})
+    }, beep: {}, randomUnit: { 0 })
     player.playClick(style: .tink, volume: 0.5)
     player.playError(style: .basso, volume: 0.5)
     player.playTimeWarning(style: .glass, volume: 0.5)
@@ -194,7 +196,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
   @MainActor func testDuplicateAndLateCompletionCannotReleaseANewerVoice() {
     let trace = Trace()
     let prototype = RecordingSound(trace)
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     player.playTimeWarning(style: .glass, volume: 0.5)
     player.playTimeWarning(style: .glass, volume: 0.5)
     trace.completions[0]()
@@ -212,7 +214,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let trace = Trace()
     trace.finishesDuringStart = true
     let prototype = RecordingSound(trace)
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     player.playClick(style: .ember, volume: 0.5)
     XCTAssertEqual(trace.starts, 1)
     XCTAssertNil(trace.voices[0].value)
@@ -222,7 +224,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
   @MainActor func testCallbacksDoNotKeepTheControllerOrFinishedVoicesAlive() {
     let trace = Trace()
     let prototype = RecordingSound(trace)
-    var player: TypingFeedbackSound? = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {})
+    var player: TypingFeedbackSound? = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     weak var weakPlayer = player
     player?.playClick(style: .pop, volume: 0.5)
     player = nil
@@ -237,7 +239,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let prototype = RecordingSound(trace)
     var loads = 0
     var beeps = 0
-    let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return prototype }, beep: { beeps += 1 })
+    let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return prototype }, beep: { beeps += 1 }, randomUnit: { 0 })
     player.playTimeWarning(style: .glass, volume: 0.5)
     for volume in [0.0, -1, -Double.infinity, Double.nan] {
       player.playClick(style: .pop, volume: volume)
@@ -258,7 +260,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
       trace.copyMode = copyMode
       let prototype = RecordingSound(trace)
       var beeps = 0
-      let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: { beeps += 1 })
+      let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: { beeps += 1 }, randomUnit: { 0 })
       player.playClick(style: .tink, volume: 0.5)
       player.playError(style: .funk, volume: 0.5)
       player.playTimeWarning(style: .glass, volume: 0.5)
@@ -278,7 +280,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let player = TypingFeedbackSound(loadSound: { _ in
       loads += 1
       return available ? prototype : nil
-    }, beep: { beeps += 1 })
+    }, beep: { beeps += 1 }, randomUnit: { 0 })
     player.playError(style: .basso, volume: 0.5)
     available = true
     player.playError(style: .basso, volume: 0.5)
@@ -296,7 +298,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let player = TypingFeedbackSound(loadSound: { source in
       sources.append(source)
       return RecordingSound(trace)
-    }, beep: {})
+    }, beep: {}, randomUnit: { 0 })
     for style in TypingClickSoundStyle.allCases where style.musicMode == nil {
       player.playClick(style: style, volume: 2)
       player.playClick(style: style, volume: Double.infinity)
@@ -315,7 +317,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let trace = Trace()
     let prototype = RecordingSound(trace)
     var loads = 0
-    let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return prototype }, beep: {}, randomUnit: { 0 })
     for _ in 0..<256 { player.playClick(style: .quartz, volume: 0.5) }
     XCTAssertEqual(loads, 1)
     XCTAssertEqual(trace.starts, 256)
@@ -374,7 +376,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let trace = Trace()
     trace.completesOnStop = true
     let prototype = RecordingSound(trace)
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     player.playTimeWarning(style: .glass, volume: 0.5)
     player.playTimeWarning(style: .glass, volume: 0.5)
     XCTAssertNil(trace.voices[0].value)
@@ -390,7 +392,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     var beeps = 0
     let player = TypingFeedbackSound(loadSound: {
       $0 == .system("Tink") ? clickPrototype : warningPrototype
-    }, beep: { beeps += 1 })
+    }, beep: { beeps += 1 }, randomUnit: { 0 })
     player.playClick(style: .tink, volume: 0.5)
     player.playTimeWarning(style: .glass, volume: 0.5)
     warnings.succeeds = false
@@ -412,7 +414,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let result = try XCTUnwrap(input.result())
     let trace = Trace()
     let prototype = RecordingSound(trace)
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     let cues = TypingReplay.soundCues(prompt: result.prompt, events: result.replayEvents,
       after: 0.5, through: 1.5, configuration: result.configuration)
     XCTAssertEqual(cues, [.click, .click, .click])
@@ -435,7 +437,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let result = try XCTUnwrap(input.result())
     for playsErrors in [true, false] {
       let trace = Trace()
-      let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+      let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
       let cues = TypingReplay.soundCues(prompt: result.prompt, events: result.replayEvents,
         after: 0.5, through: 1.5, configuration: result.configuration)
       XCTAssertEqual(cues, [.error, .error, .click, .click])
@@ -455,7 +457,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
   @MainActor func testClearAllStopsEveryChannelOnceAndKeepsResourcePrototypes() {
     let trace = Trace()
     var loads = 0
-    let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     player.playClick(style: .tink, volume: 0.5)
     player.playError(style: .basso, volume: 0.5)
     player.playTimeWarning(style: .glass, volume: 0.5)
@@ -475,7 +477,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
   @MainActor func testGlobalVolumeChangesAllActiveChannelsWithoutRestartingThem() {
     let trace = Trace()
     let prototype = RecordingSound(trace)
-    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in prototype }, beep: {}, randomUnit: { 0 })
     player.playClick(style: .tink, volume: 0.2)
     player.playError(style: .basso, volume: 0.5)
     player.playTimeWarning(style: .glass, volume: 0.9)
@@ -493,7 +495,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
 
   @MainActor func testConfiguredGlobalVolumeWinsOverStalePerRequestSnapshots() {
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     player.setVolume(0.25)
     player.playClick(style: .tink, volume: 0.9)
     player.playError(style: .basso, volume: 0.1)
@@ -504,7 +506,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
   @MainActor func testMutedGlobalPlaybackCanBecomeAudibleWithoutStartingAgain() {
     let trace = Trace()
     var beeps = 0
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: { beeps += 1 })
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: { beeps += 1 }, randomUnit: { 0 })
     player.setVolume(0)
     player.playClick(style: .tink, volume: 0.5)
     player.playError(style: .basso, volume: 0.5)
@@ -522,7 +524,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
 
   @MainActor func testInvalidGlobalVolumeDoesNotChangeTheLastValidSetting() {
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     player.setVolume(0.25)
     player.playClick(style: .tink, volume: 0.8)
     for invalid in [-0.1, 1.1, Double.nan, Double.infinity, -Double.infinity] { player.setVolume(invalid) }
@@ -537,7 +539,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     let settings = AppSettings(defaults: defaults, feedbackSound: player)
     player.playClick(style: .tink, volume: 0.9)
     XCTAssertEqual(trace.voices[0].value?.volume, 0.5)
@@ -560,7 +562,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let encoded = try JSONEncoder().encode(AppSettingsSnapshot(soundVolume: 0.3))
     defaults.set(encoded, forKey: "appSettings.v1")
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     player.playError(style: .basso, volume: 0.8)
     let settings = AppSettings(defaults: defaults, feedbackSound: player)
     XCTAssertEqual(settings.soundVolume, 0.3)
@@ -575,7 +577,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
   @MainActor func testClearAllHandlesSynchronousAndLateCallbacksBeforeANewAttempt() {
     let trace = Trace()
     trace.completesOnStop = true
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     for _ in 0..<4 { player.playClick(style: .quartz, volume: 0.5) }
     player.clearAllSounds()
     XCTAssertEqual(trace.stops, 4)
@@ -590,7 +592,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
 
   @MainActor func testVolumeUpdateIgnoresFinishedVoicesAndTheirLateCallbacks() throws {
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     player.playClick(style: .tink, volume: 0.5)
     player.playClick(style: .tink, volume: 0.5)
     let finished = try XCTUnwrap(trace.voices[0].value)
@@ -606,7 +608,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
 
   @MainActor func testClearingMutedPlaybackKeepsGlobalVolumeAndNeverRevivesStoppedVoices() {
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     player.setVolume(0)
     player.playClick(style: .tink, volume: 0.9)
     player.clearAllSounds()
@@ -628,7 +630,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
       defaults.set(original, forKey: "appSettings.v1")
       let trace = Trace()
       var loads = 0
-      let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return RecordingSound(trace) }, beep: {})
+      let player = TypingFeedbackSound(loadSound: { _ in loads += 1; return RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
       let settings = AppSettings(defaults: defaults, feedbackSound: player)
       XCTAssertEqual(settings.soundVolume, 0.5)
       XCTAssertEqual(loads, 0)
@@ -643,7 +645,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     let settings = AppSettings(defaults: defaults, feedbackSound: player)
     settings.soundVolume = 0.1
     player.playClick(style: .tink, volume: 0.9)
@@ -655,7 +657,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
 
   @MainActor func testVolumeUpdateSnapshotToleratesPlaybackFinishingDuringTheSetter() {
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     for _ in 0..<4 { player.playClick(style: .tink, volume: 0.5) }
     trace.finishesOnVolumeChange = true
     player.setVolume(0.1)
@@ -668,7 +670,7 @@ final class FeedbackSoundVoiceTests: XCTestCase {
 
   @MainActor func testClearSnapshotDoesNotStopRequestsCreatedAfterTheClearBegan() {
     let trace = Trace()
-    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {})
+    let player = TypingFeedbackSound(loadSound: { _ in RecordingSound(trace) }, beep: {}, randomUnit: { 0 })
     player.playClick(style: .tink, volume: 0.5)
     player.playClick(style: .tink, volume: 0.5)
     trace.onStop = { [weak player] in
