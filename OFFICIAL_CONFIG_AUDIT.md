@@ -1,5 +1,14 @@
 # 官方配置兼容性审计
 
+2026-10-02 英式备用引语增量（最终门禁已通过）：固定 [备用源选择](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L570-L599)、[跳过再次拼写替换](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L381-L399)、[空候选错误](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L901-L916)、[生成失败终态](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L350-L367) 和 [LF 提交](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L990-L999) 确认：非空 `britishText` 直接拆 ASCII 词池，不套普通引语清理；缺失／空字符串回退普通文本。原生 `OfflineQuote` 增加非持久可选备用源，现有 `englishVariant` 接入真实 factory；新增原创 Colour study 美式／英式配对，可从原有目录选择。原文、长度／搜索／收藏／评分身份不切换。普通源处理、已准备外部源与自定义源保持独立。
+
+新增 `BritishQuoteSourceTests` 17 项。模型仅加无行为字段后，首批 14 项有 47 个有效先行失败；选择接入后还有 1 个真实 CRLF 提交失败。已用末 Unicode 标量判断 LF，不让 Swift 将 CRLF 书写簇误判为非 LF 并追加空格。后续内存旧／新成绩夹具的类型名编译错误不计产品红测。最终相关 93 项零失败通过（约 0.63 秒），最终完整门禁通过：客户端 1590 项（零失败，约 305.55 秒）、服务端 131 项（零失败，约 1.39 秒）、固定参考／原创性与兼容审计、677 个唯一人工场景清单及未开窗 macOS 应用包全部通过；显式十万词耐力已实际执行，约 37.43 秒。清单通过不等于设备验收，失败阶段不计通过，本轮没有启动 Typebar。涵盖美式、缺失／空备用源、字面省略号与限定原始标量、CR／CRLF／LF 目标结构、非英语元数据选择、无二次替换、无效 ASCII 空字段、反序／大小写／Under／Morse、重复、回放／便携结果、正式归档及内存 SwiftData 新旧记录共存。
+
+已在内存执行固定 `getQuoteWordList` 和 `appendCommitCharacter` 的实际函数，使用已安装 Node v24.19.0，依赖只为显式的配置／选择／loader／nospace 桩；独立文本证明美式／英式／空字符串分支、双 ASCII 空格产生空候选和 CRLF 提交差异。不是完整上游 Vitest、DOM、重试 UI 或设备证据。选中的无效短备用词池显示生成错误并禁用输入，不降级成普通源；该会话没有开始、结果或可保存成绩，重复仍保留错误。这里只关闭所列短源错误语义，不声称原版随机初始化三次重抽、长引语在百词后的错误时机或模态呈现已等价。
+
+风险／迁移复核限定未来引语生成，不改结果、回放、设置、分享、归档或 SwiftData 格式／版本；旧英式结果按快照保留，不回算历史。引用源元数据与反馈 ID 保持原文身份；搜索只查原文／标题，不把备用文本另当引语。仍开放无备用源的通用英式词替换／前词例外、原始内部换行的全部字段导航、半代理／融合词界、长引语预取、网络备用字段、初始化恢复 UI、全部组合与设备。Morse／Under／Backwards 部分状态不提升；不写真实库、不部署或开 GUI。进行了有界会话内反例审查，不冒称独立审查；整体 goal active。
+
+
 2026-10-02 当前最终门禁（完整行配置）：最终客户端 1426 项（0 跳过、0 失败，显式十万词耐力已执行）、服务端 131 项、固定参考／原创性、653 场景清单与未开窗应用包通过。新增 18 项最终通过，下文本轮“完整门禁待执行”由此取代；`showAllLines` 从映射下调为部分，94 键分区为 91／2／1，固定生成总账和原生分区断言同步且不丢任何键。首次旧计数门禁失败不计通过，最终重新执行。无格式版本或模型变更、真实库迁移及设备／远端 CI 证据；完整预览差异与整体 goal active 保留。
 
 本轮外部短源扩展：4／25／501 词目标保持可逐键完成，小预算先行同一方法 12 个有效失败断言。四个整批跨终点断言按固定 `input/handlers/insert-text.ts:134–150,342–374` 的末字符判定更正为逐键事件，全部精确词数／完成／记录断言保留，不计产品红测；原有批输入规则、历史结果及外部全预览差异不改写。
@@ -193,7 +202,7 @@
 | `minAccCustom` | `minimumAccuracy` | 已映射；使用 0–100 的有限小数，零值关闭；旧整数配置可直接迁移。 |
 | `minBurst` | `minimumWordBurstMode` | 已映射；命令面板严格提供关闭/固定/弹性。 |
 | `minBurstCustomSpeed` | `minimumWordBurstWpm` | 已映射；使用有限非负小数且不施加额外速度上限，固定/弹性命令要求按当前显示单位输入整数后换算，旧整数配置可直接迁移。 |
-| `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库。 |
+| `britishEnglish` | `englishVariant` | 已映射；使用 Typebar 自有英式词库，并优先选择非空的自有英式备用引语；缺失／空备用源回到普通引语准备。无备用源的通用词替换／前词例外、长引语生成时机和设备仍未证明等价。 |
 | `funbox` | `TestModifier` | 已映射；48 项逐项证据见 `OFFICIAL_FUNBOX_AUDIT.md`。命令面板另按固定名称提供 48 项切换与 `none` 清除入口；`weakspot` 为实时选词修饰器，多语路由到 Typebar 原生工作流，持久化弱项分析保持独立入口。 |
 | `customLayoutfluid` | `layoutFluidLayouts` | 已映射；官方上限 15，当前 244 个原生内置布局可任选至多 15 个进入原生序列。 |
 | `customPolyglot` | `mixedLanguageComponents` | 已映射；固定 schema 的 446 个单语言 ID 全部是可搜索的原生候选，至少选择两项、去重并合并为虚拟词池，普通词频从合并池均匀抽取，Zipf 词频从合并池偏向低位抽取；与前两词重复时最多重抽 100 次，不强制按语言轮转。LTR、RTL、双向、无空格及代码词表均使用 Typebar 自有内容；全 RTL 组合使用原生 RTL 段落，双向组合交给 macOS Unicode 双向排版。与参考的具体词表、跨语言同形词去重及随机序列不承诺一致。新建或缺失／无效配置采用参考默认的 English、Spanish、French、German 四项；已有明确保存的旧 153 项组合继续原样加载，不强制迁移。 |

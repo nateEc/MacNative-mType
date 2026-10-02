@@ -1299,7 +1299,7 @@ enum TestModifierPolicy {
       if !word.isEmpty { generatedWordIndex += 1 }
       output += altered
       if capturesTargets, !word.isEmpty { targets.append(altered) }
-      if index < words.count - 1, !capturesTargets, !altered.hasSuffix("\n") {
+      if index < words.count - 1, !capturesTargets, altered.unicodeScalars.last != "\n" {
         output.append(" ")
       }
     }
@@ -3612,6 +3612,7 @@ enum PromptHighlightPolicy {
 struct TypingSession {
   private(set) var configuration: TestConfiguration
   let generationNotice: String?
+  private let initializationFailure: String?
   private(set) var prompt: String
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
@@ -3743,10 +3744,13 @@ struct TypingSession {
     customSectionWordStream: CustomSectionWordStream? = nil,
     noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
-    repeatingNoSpaceTargetWords: [String] = [], generationNotice: String? = nil
+    repeatingNoSpaceTargetWords: [String] = [], generationNotice: String? = nil,
+    initializationFailure: String? = nil
   ) {
     self.configuration = configuration
-    self.generationNotice = generationNotice
+    self.generationNotice = initializationFailure ?? generationNotice
+    self.initializationFailure = initializationFailure
+    if initializationFailure != nil { self.outcome = .failed }
     self.prompt = prompt
     self.promptCharacters = Array(prompt)
     let wordProgress = Self.wordProgress(configuration.wordLimit, in: self.promptCharacters)
@@ -3801,7 +3805,8 @@ struct TypingSession {
       noSpaceWordEndIndices: initialNoSpaceWordEndIndices,
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
-      repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: generationNotice)
+      repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: generationNotice,
+      initializationFailure: initializationFailure)
   }
 
   var isFinished: Bool { outcome != .active }

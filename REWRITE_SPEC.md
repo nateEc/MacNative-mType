@@ -1,5 +1,14 @@
 # Typebar — Monkeytype 功能兼容重写规范
 
+2026-10-02 英式备用引语增量（最终门禁已通过）：固定 [备用源选择](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L570-L599)、[跳过再次拼写替换](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L381-L399)、[空候选错误](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L901-L916)、[生成失败终态](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L350-L367) 和 [LF 提交](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L990-L999) 确认：非空 `britishText` 直接拆 ASCII 词池，不套普通引语清理；缺失／空字符串回退普通文本。原生 `OfflineQuote` 增加非持久可选备用源，现有 `englishVariant` 接入真实 factory；新增原创 Colour study 美式／英式配对，可从原有目录选择。原文、长度／搜索／收藏／评分身份不切换。普通源处理、已准备外部源与自定义源保持独立。
+
+新增 `BritishQuoteSourceTests` 17 项。模型仅加无行为字段后，首批 14 项有 47 个有效先行失败；选择接入后还有 1 个真实 CRLF 提交失败。已用末 Unicode 标量判断 LF，不让 Swift 将 CRLF 书写簇误判为非 LF 并追加空格。后续内存旧／新成绩夹具的类型名编译错误不计产品红测。最终相关 93 项零失败通过（约 0.63 秒），最终完整门禁通过：客户端 1590 项（零失败，约 305.55 秒）、服务端 131 项（零失败，约 1.39 秒）、固定参考／原创性与兼容审计、677 个唯一人工场景清单及未开窗 macOS 应用包全部通过；显式十万词耐力已实际执行，约 37.43 秒。清单通过不等于设备验收，失败阶段不计通过，本轮没有启动 Typebar。涵盖美式、缺失／空备用源、字面省略号与限定原始标量、CR／CRLF／LF 目标结构、非英语元数据选择、无二次替换、无效 ASCII 空字段、反序／大小写／Under／Morse、重复、回放／便携结果、正式归档及内存 SwiftData 新旧记录共存。
+
+已在内存执行固定 `getQuoteWordList` 和 `appendCommitCharacter` 的实际函数，使用已安装 Node v24.19.0，依赖只为显式的配置／选择／loader／nospace 桩；独立文本证明美式／英式／空字符串分支、双 ASCII 空格产生空候选和 CRLF 提交差异。不是完整上游 Vitest、DOM、重试 UI 或设备证据。选中的无效短备用词池显示生成错误并禁用输入，不降级成普通源；该会话没有开始、结果或可保存成绩，重复仍保留错误。这里只关闭所列短源错误语义，不声称原版随机初始化三次重抽、长引语在百词后的错误时机或模态呈现已等价。
+
+风险／迁移复核限定未来引语生成，不改结果、回放、设置、分享、归档或 SwiftData 格式／版本；旧英式结果按快照保留，不回算历史。引用源元数据与反馈 ID 保持原文身份；搜索只查原文／标题，不把备用文本另当引语。仍开放无备用源的通用英式词替换／前词例外、原始内部换行的全部字段导航、半代理／融合词界、长引语预取、网络备用字段、初始化恢复 UI、全部组合与设备。Morse／Under／Backwards 部分状态不提升；不写真实库、不部署或开 GUI。进行了有界会话内反例审查，不冒称独立审查；整体 goal active。
+
+
 2026-10-02 最终门禁（Morse 空目标词）：客户端 1573 项（零失败，约 304.95 秒）、服务端 131 项（零失败）、固定参考／原创性与兼容审计、675 个唯一人工场景清单及未开窗 macOS 应用包全部通过。显式十万词耐力已实际执行，约 37.11 秒；不据此声称十万空词或全部 Unicode 已验证。新增 21 项、最终相关 153 项通过；首轮完整测试的 2 个失败及更正的旧字面分词夹具保留阶段性质，本条替代对应本轮最终“待执行”。不提升 Funbox 部分状态，不把人工清单检查当作设备验收；仅当前会话状态变化，无真实库、历史回算、GUI 或服务部署，goal active。
 
 2026-10-02 Morse 空目标词增量（最终门禁已通过）：固定 `input/helpers/util.ts`、`validation.ts`、`handlers/before-insert-text.ts`、`handlers/insert-text.ts`、`helpers/word-navigation.ts` 与 `helpers/fail-or-finish.ts` 确认：逐词变换后的空目标没有可触发无空格提交的末字符，不能自动跳过或用后续词字形完成。使用已安装的 Node v24.19.0 在内存中执行只读固定 util／validation 的纯函数；ASCII 探针的 space／Funbox／Config 依赖明确提供，不是完整上游 Vitest、DOM 或设备证明。原生独立保留安全拼接批次中的空词身份，缓存首个空字段，错误输入留在该字段，不计后续词数／正确词信用，不自动完成或越过空字段预取；段进度改用会话内的逻辑词结束序号。

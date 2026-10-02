@@ -4,8 +4,19 @@ struct OfflineQuote: Identifiable, Hashable {
   let id: String
   let title: String
   let text: String
+  let britishText: String?
   let language: TypingLanguage
   let length: QuoteLength
+
+  init(id: String, title: String, text: String, britishText: String? = nil,
+    language: TypingLanguage, length: QuoteLength) {
+    self.id = id
+    self.title = title
+    self.text = text
+    self.britishText = britishText
+    self.language = language
+    self.length = length
+  }
 }
 
 enum QuoteLengthPolicy {
@@ -153,6 +164,14 @@ enum OfflineContent {
       title: "Attention",
       text:
         "Attention is a lantern: point it at one useful thing, and the next step becomes visible.",
+      language: .english,
+      length: .short
+    ),
+    OfflineQuote(
+      id: "colour-study",
+      title: "Colour study",
+      text: "A careful sketch gives color a place to rest before the next line begins.",
+      britishText: "A careful sketch gives colour a place to rest before the next line begins.",
       language: .english,
       length: .short
     ),
@@ -6112,9 +6131,16 @@ struct TestSessionFactory {
           scores: weakSpotScores)
       case .quote:
         let source =
-          quote?.text ?? OfflineContent.quotes(for: configuration.language).first?.text
-          ?? OfflineContent.quotes(for: .english)[0].text
-        prompt = QuoteSourcePolicy.preparedText(source)
+          quote ?? OfflineContent.quotes(for: configuration.language).first
+          ?? OfflineContent.quotes(for: .english)[0]
+        do {
+          prompt = try QuoteSourcePolicy.selectedText(for: source, variant: configuration.englishVariant)
+        } catch {
+          // Do not clean an invalid selected alternate or silently practice
+          // a different quote. This failure occurs before any timed attempt.
+          return .init(configuration: configuration, prompt: "",
+            initializationFailure: "英式引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换美式拼写。")
+        }
         formatsQuoteWordPool = true
       case .zen:
         // Zen renders and scores only text entered locally by the user. It
