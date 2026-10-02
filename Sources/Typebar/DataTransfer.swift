@@ -267,9 +267,9 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    // Older readers append every insert event, including judged-but-stopped
-    // input. Reject this archive generation there rather than corrupt replay.
-    static let currentVersion = 11
+    // Older readers lack stopped-input and field-local snapshot semantics.
+    // Reject this archive generation there rather than silently misderive it.
+    static let currentVersion = 12
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -301,9 +301,9 @@ struct TypebarArchive: Codable, Equatable {
         deletedResultFilterPresetIDs: [UUID] = [],
         activeTestSelection: ActiveTestSelectionDocument? = nil
     ) {
-        self.version = version < 11 && results.contains(where: {
-            $0.replayEvents.contains(where: \.isStoppedInsertion)
-        }) ? 11 : version
+        let hasFields = results.contains { $0.replayEvents.contains { $0.inputField != nil } }
+        let hasStoppedInput = results.contains { $0.replayEvents.contains(where: \.isStoppedInsertion) }
+        self.version = hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
         let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = version >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
@@ -855,6 +855,9 @@ enum TypebarDataTransfer {
         guard (1...TypebarArchive.currentVersion).contains(archive.version) else { throw DataTransferError.unsupportedVersion(archive.version) }
         guard archive.version >= 11 || !archive.results.contains(where: {
             $0.replayEvents.contains(where: \.isStoppedInsertion)
+        }) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 12 || !archive.results.contains(where: {
+            $0.replayEvents.contains { $0.inputField != nil }
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         return archive
     }

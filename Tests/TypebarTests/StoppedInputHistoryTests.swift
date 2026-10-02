@@ -111,7 +111,7 @@ final class StoppedInputHistoryTests: XCTestCase {
     let portable = try XCTUnwrap(TestResultRecord(result: result).portableResult)
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 11)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for restored in [portable, archive.results[0]] {
       XCTAssertEqual(restored, result)
       XCTAssertEqual(restored.replayEvents.map(\.inputStopped), [nil, true, nil])
@@ -126,7 +126,7 @@ final class StoppedInputHistoryTests: XCTestCase {
     for version in 1...10 {
       let archive = TypebarArchive(version: version, exportedAt: start, settings: .init(),
         results: [result], presets: [])
-      XCTAssertEqual(archive.version, 11)
+      XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
       XCTAssertEqual(try TypebarDataTransfer.importArchive(from: archiveData(archive)).results, [result])
     }
   }

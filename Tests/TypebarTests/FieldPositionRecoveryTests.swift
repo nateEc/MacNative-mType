@@ -240,7 +240,7 @@ final class FieldPositionRecoveryTests: XCTestCase {
     let result = try XCTUnwrap(session.result())
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 11)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(try XCTUnwrap(TestResultRecord(result: result).portableResult), result)
     let legacy = try JSONDecoder().decode(TypingReplayEvent.self,

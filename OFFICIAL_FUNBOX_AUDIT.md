@@ -1,5 +1,21 @@
 # 官方 Funbox 逐项审计
 
+2026-10-03 延迟输入字段历史增量（定向验证已通过，最终完整门禁已通过）：固定 [字段快照与当前输入](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/data.ts#L204-L223)、[字段分桶与末快照读取](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/helpers.ts#L127-L225) 和 [最终输入历史](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/stats.ts#L519-L549)。原版保存时间排序与实时执行顺序并不等同，不能简单取消排序。延迟自动 Tab 的字段内删除在原生旧扁平投影中误删前词提交空间；现独立记录每个动作后的字段索引／实际接受文本，保存历史保留排序，在首次出现的字段桶内取末快照。停止显示不进入接受快照，保留分隔符不增加字段索引，hard 删除重标记保留快照；已知 no-space 边界使用已有二分进度和局部字段范围，不逐键线性扫描全部词界。未知隐藏词界不猜测。
+
+DelayedFieldHistoryTests 新增 20 项：先行三项五个有效失败（0.482 秒），首项修正后三项通过（0.012 秒）。扩展相关 207 项有十六个失败（5.063 秒）：十三个旧“当前版本等于 11”断言和三个手工删除正确前词的夹具缺失 freedomMode；独立十八项同三处夹具失败（0.061 秒）。只更新当前格式断言，补明确允许返回正确前词的配置，保留完整事件 offset／自动标记／动作与旧版兼容断言。最终相关 230 项零失败（5.220 秒）、新增 20 项独立零失败（0.610 秒），涵盖延迟恢复、后续正确输入、空访问字段、停止／盲打、hard 删除、Unicode 组合、同时间稳定顺序、巨大／负字段索引、一千已知 no-space 词、便携与正式归档。旧 nil 与混合快照日志继续原有扁平投影，明确不推断缺失字段。
+
+只读 bundled Node v24.19.0 类型擦除并在内存执行实际完整 helpers.ts 及完整 getInputHistory 函数；四组自有事件夹具核对延迟 Tab、随后正确输入、已访问但删除为空的字段及同时间稳定顺序。延迟样例最后执行字段为空，排序后源历史仍是 [a空格, Tab]，原生快照历史一致；没有把它冒称实际 live／回放全文一致。Config、事件夹具与仅输入时间排序明确自有；未执行完整 data.ts 日志／DOM、完整 stats.ts 模块、Vitest、浏览器／设备。没有参考代码、词库或资产进入原生仓库。
+
+迁移安全复核要求正式归档升至 12：任何含 inputField 的构造至少为 12，伪装成 1–11 的字段归档拒绝；真实缺字段旧 1–11 继续读取，非空 11 日志保留原指标和旧投影。SwiftData 仍为原 Data 列，实体 schema／偏好格式／服务协议未改，不写真实库、不补造快照、不回算历史。旧最大版本 11 阅读器按合同拒绝 12（未运行旧二进制）；旧二进制读取新本地原始 JSON 可能忽略快照并误投影，不能据实体 schema 未改声称可降级。回退须先保留升级前备份，新字段日志须由新阅读器保留，不剥离字段冒充旧档；跨二进制／跨设备与远程 payload 容量尚未验证。
+
+源码驱动、行为优先、根因调试及会话内有界决策／风险／迁移复核使本轮限定于字段记录、保存历史与进度入口；不是完整回放修复。typedText／字形／seek／trace／声音游标仍用旧原始动作，新最终字段仅供既有提交声音历史入口使用。源末词错误 SPACE 的完整 flags／trim、Firefox clearedNextWord、源末词字段上限与批次提交后继续输入、composition／全逐 UTF-16／半代理／CRLF、真实 UI／IME／听感、主题／词库／远程仍开放；94 配置键与部分 Funbox 不升级。三个新人工场景仅待验收清单，全程不开窗、不播放音频、不部署，整体 goal active，不冒称独立评审或全量重写完成。
+
+首次完整门禁客户端实际 2,054 项一失败（407.540 秒）：ArchiveDatePrecisionTests 的旧精度夹具从当前日志直接改成版本 1，仍带新字段，因而被版本守卫正确拒绝。此阶段十万词实际通过（52.426 秒），但整体门禁未通过，服务／打包未到达，不作最终通过依据。现仅在该隔离夹具移除 inputField 表达真实旧日志，并扩展 1–11、保留日期精度及新增旧字段／历史断言；新字段伪造 11 的拒绝回归仍保留。随后串行重跑完整门禁，最终结果见下。
+
+后续回放边界补证：完整阅读 replay-ui.ts，并只读内存执行实际完整 deriveReplayActions 与 helpers。延迟 Tab 样例输出 correctLetter、correctLetter、submitCorrectWord、incorrectLetter、setLetterIndex(1)、setLetterIndex(0)、correctLetter：同字段删除以快照 UTF-16 长度设字段游标，不能以全局 removeLast 替代。Config、词目录、输入事件时间排序及 data 模块绑定明确自有；没有执行 DOM 绘制／计时器／Howler／完整日志模块／浏览器。该探针只指导下一步，原生动作消费者尚未因此修正。快照序列化体积及长期成本未做同场旧构建基准；耐力通过不等于性能完全相同。日期旧夹具修正后 ArchiveDatePrecisionTests 与 DelayedFieldHistoryTests 共 31 项零失败（0.654 秒）。
+
+2026-10-03 本延迟字段历史增量最终完整门禁通过：客户端 2,054 项零失败（406.813 秒）、服务端 131 项零失败（1.570 秒）、747 条唯一人工场景清单、固定参考／元数据／原创性审计与未打开 macOS 应用包检查全部通过。门禁内 testOptionalHundredThousandWordEndurance 实际通过（52.603 秒），在详细日志清理前已核对并保存结果；首次完整门禁一失败及其阶段记录保留，不算最终通过。测试／编译串行，活跃期间未编辑 Swift 输入；两次门禁前真实背景存储路径都不存在，没有删除用户数据。未启动 Typebar 图形实例、播放音频、写真实成绩／设置库、部署服务或跨设备同步；Core Data 系统环境诊断不等同 XCTest 失败，零测试失败不意味着零系统诊断。三个新增人工场景仍待设备验收；快照成本同场基准、源末词／Firefox／字段上限、原生回放动作／画面／seek／trace／声音游标及真实 IME 等缺口仍开放，整体 goal active。归档 12 不承诺旧二进制可直接降级读取新本地 JSON，不改写或回算历史。
+
 2026-10-03 恢复后难度增量（定向验证已通过，最终完整门禁已通过）：固定 [输入处理／恢复后的终止检查](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L300-L376)、[难度合同](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/helpers/fail-or-finish.ts#L48-L78) 和 [当前字段删除边界](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L90-L140)。原生自动删除原本提前 return，错字被移除后绕过 Master／Expert 终止检查；现先捕获删除前尝试是否失败，完成并记录恢复后再发布 failed。Master 保留本次最终单位判定；Expert 使用完整尝试字段／已知 no-space 词尾，不把恢复后空文本当成没有提交尝试。既有 Expert 帮助函数改为表达“尝试输入”的私有名称，停止与 Shift 调用继续共用，不引入重复终止规则。
 
 四档 letter／letterHard／word／wordHard 都执行恢复并保留错误尝试；批次仅最终单位运行难度，早期自动恢复错误不单独结束；Expert 内部错字与空输入前导分隔符不失败，非空字段错误 space／LF 和 no-space 最终错字仍失败。补齐有明确词界的 no-space 普通 letter 删除守卫：删除错误新词首后不再吞前词末字，hard 模式仍经独立返回前词路径。没有隐藏词界元数据时不猜测语言分词；不升级该部分为完整兼容。

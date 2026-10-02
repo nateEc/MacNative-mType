@@ -213,7 +213,7 @@ final class PromptControlGlyphTests: XCTestCase {
     XCTAssertEqual(result.replayEvents.map(\.text).joined(), "\tab\ncd")
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 11)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     XCTAssertEqual(archive.results, [result])
   }
 

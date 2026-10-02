@@ -270,7 +270,7 @@ final class RecoveryDifficultyTests: XCTestCase {
     XCTAssertEqual(input.outcome, .failed)
   }
 
-  func testRecoveredFailedTapeRoundTripsWithoutANewArchiveFormat() throws {
+  func testRecoveredFailedTapeRoundTripsUsingTheCurrentArchiveFormat() throws {
     var input = TypingSession(configuration: .words(2, difficulty: .expert,
       rules: .init(deleteOnErrorMode: .letter)), prompt: "ab tail")
     input.insertBatch("a", at: start)
@@ -284,7 +284,7 @@ final class RecoveryDifficultyTests: XCTestCase {
     XCTAssertEqual(try XCTUnwrap(TestResultRecord(result: result).portableResult), result)
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 11)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     XCTAssertEqual(archive.results, [result])
     let legacy = try JSONDecoder().decode(TypingReplayEvent.self,
       from: Data(#"{"offset":0,"kind":"insert","text":"a"}"#.utf8))

@@ -64,12 +64,22 @@ final class ArchiveDatePrecisionTests: XCTestCase {
     var records = try XCTUnwrap(object["results"] as? [[String: Any]])
     records[0].removeValue(forKey: "startedAtReferenceTime")
     records[0].removeValue(forKey: "finishedAtReferenceTime")
+    // A genuine old record has neither date supplements nor field snapshots.
+    // Relabeling current fields as an old version is intentionally rejected.
+    let events = try XCTUnwrap(records[0]["replayEvents"] as? [[String: Any]])
+    records[0]["replayEvents"] = events.map { event in
+      var legacy = event
+      legacy.removeValue(forKey: "inputField")
+      return legacy
+    }
     object["results"] = records
-    for version in 1...10 {
+    for version in 1...11 {
       object["version"] = version
       let archive = try TypebarDataTransfer.importArchive(from: data(object))
       XCTAssertEqual(archive.exportedAt.timeIntervalSinceReferenceDate, 800_000_000)
       let restored = try XCTUnwrap(archive.results.first)
+      XCTAssertTrue(restored.replayEvents.allSatisfy { $0.inputField == nil })
+      XCTAssertEqual(SavedTextInputHistoryPolicy.inputFields(events: restored.replayEvents), ["ab"])
       XCTAssertEqual(restored.startedAt.timeIntervalSinceReferenceDate, 800_000_000)
       XCTAssertEqual(restored.finishedAt.timeIntervalSinceReferenceDate, 800_000_002)
       XCTAssertEqual(restored.elapsedDuration, 2, "缺失的旧精度不能从回放推算补回")

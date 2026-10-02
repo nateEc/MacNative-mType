@@ -2990,6 +2990,30 @@ enum TypingReplayEventKind: String, Codable, Equatable {
   case delete
 }
 
+/// A recorded field after an input action, independent of when that action's
+/// original timestamp sorts it into the saved tape.
+struct TypingReplayInputField: Codable, Equatable {
+  let index: Int
+  let value: String
+
+  init(index: Int, value: String) {
+    self.index = index
+    self.value = value
+  }
+
+  private enum CodingKeys: String, CodingKey { case index, value }
+
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    index = try values.decode(Int.self, forKey: .index)
+    guard index >= 0 else {
+      throw DecodingError.dataCorruptedError(forKey: .index, in: values,
+        debugDescription: "An input field index cannot be negative.")
+    }
+    value = try values.decode(String.self, forKey: .value)
+  }
+}
+
 struct TypingReplayEvent: Codable, Equatable, Identifiable {
   let offset: TimeInterval
   let kind: TypingReplayEventKind
@@ -3009,13 +3033,17 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// as input activity but never contributes retained text or replay actions.
   /// Missing on legacy tapes: those cannot recover attempts never recorded.
   let inputStopped: Bool?
+  /// Archive 12. Missing legacy snapshots cannot be inferred reliably after
+  /// delayed input has reordered primitive insert/delete actions.
+  let inputField: TypingReplayInputField?
   var isStoppedInsertion: Bool { kind == .insert && inputStopped == true }
   var id: String { "\(offset)-\(kind.rawValue)-\(text)" }
 
   init(
     offset: TimeInterval, kind: TypingReplayEventKind, text: String, forceError: Bool = false,
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
-    characterDeletionCount: Int? = nil, inputStopped: Bool? = nil
+    characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
+    inputField: TypingReplayInputField? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3026,11 +3054,12 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.wordDeletionCount = wordDeletionCount
     self.characterDeletionCount = characterDeletionCount
     self.inputStopped = inputStopped
+    self.inputField = inputField
   }
 
   private enum CodingKeys: String, CodingKey {
     case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount, characterDeletionCount
-    case inputStopped
+    case inputStopped, inputField
   }
 
   init(from decoder: Decoder) throws {
@@ -3044,6 +3073,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     wordDeletionCount = try values.decodeIfPresent(Int.self, forKey: .wordDeletionCount)
     characterDeletionCount = try values.decodeIfPresent(Int.self, forKey: .characterDeletionCount)
     inputStopped = try values.decodeIfPresent(Bool.self, forKey: .inputStopped)
+    inputField = try values.decodeIfPresent(TypingReplayInputField.self, forKey: .inputField)
   }
 }
 
@@ -3881,8 +3911,9 @@ struct TypingSession {
   private var attemptedErrorCounts = [Int: Int]()
   private var committedWordBursts: [Int] = []
   private var replayEvents: [TypingReplayEvent] = []
-  /// Derived only when saving long-text progress; no new per-key state or
-  /// persisted event fields. Native replay remains the accepted-input source.
+  private var replayCommittedSeparatorCount = 0
+  /// Derived only when saving long-text progress, using recorded fields for
+  /// new tapes and the unchanged primitive projection for legacy tapes.
   var savedTextProgressWordCount: Int {
     SavedTextInputHistoryPolicy.progressWordCount(
       displays: hasNoSpaceWordSegmentation
@@ -5680,7 +5711,33 @@ struct TypingSession {
         offset: max(0, date.timeIntervalSince(startedAt)), kind: kind, text: text,
         forceError: forceError, automatic: automatic || applyingAutomaticCodeInput,
         commitsWord: kind == .insert && retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
-          ? false : nil, inputStopped: inputStopped ? true : nil))
+          ? false : nil, inputStopped: inputStopped ? true : nil,
+        inputField: replayInputField(kind: kind, inputStopped: inputStopped)))
+  }
+
+  private func replayInputField(
+    kind: TypingReplayEventKind, inputStopped: Bool
+  ) -> TypingReplayInputField? {
+    if tracksNoSpaceWordBursts {
+      let completed = completedWordCount
+      let submitted = kind == .insert && !inputStopped && completed > 0
+        && noSpaceWordEndIndices[completed - 1] == typedGraphemeCount
+      let index = submitted ? completed - 1 : completed
+      let field = min(index, noSpaceWordEndIndices.count - 1)
+      guard let range = noSpaceWordRange(for: field) else { return nil }
+      return .init(index: field,
+        value: String(typed.suffix(max(0, typedGraphemeCount - range.lowerBound))))
+    }
+    // Unknown hidden boundaries remain a legacy flat tape, not guessed words.
+    guard configuration.mode == .zen || usesWordCommitInput,
+      !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    else { return nil }
+    let submitted = kind == .insert && !inputStopped && lastInputCommitsWord
+    let index = max(0, replayCommittedSeparatorCount - (submitted ? 1 : 0))
+    let value = submitted
+      ? inputWordText(omittingLastCommit: true) + String(typed.last!)
+      : inputWordText()
+    return .init(index: index, value: value)
   }
 
   private mutating func markDeletion(since start: Int, wholeWord: Bool = true) {
@@ -5690,7 +5747,8 @@ struct TypingSession {
       replayEvents[index] = .init(offset: event.offset, kind: event.kind, text: event.text,
         forceError: event.forceError, automatic: event.automatic, commitsWord: event.commitsWord,
         wordDeletionCount: wholeWord && index == start ? replayEvents.count - start : nil,
-        characterDeletionCount: !wholeWord && index == start ? replayEvents.count - start : nil)
+        characterDeletionCount: !wholeWord && index == start ? replayEvents.count - start : nil,
+        inputField: event.inputField)
     }
   }
 
@@ -6039,6 +6097,9 @@ struct TypingSession {
   ) {
     let typedIndex = typedGraphemeCount
     let joinsPreviousGrapheme = typed.last == "\r" && character == "\n"
+    if isPromptWordSeparator(character), !joinsPreviousGrapheme,
+      !retainedWordSeparatorTypedIndices.contains(typedIndex)
+    { replayCommittedSeparatorCount += 1 }
     if !character.isASCII || joinsPreviousGrapheme {
       canUseCachedWordProgress = false
     }
@@ -6071,6 +6132,9 @@ struct TypingSession {
   private mutating func removeLastTypedCharacter() {
     guard !typed.isEmpty else { return }
     let typedIndex = typedGraphemeCount - 1
+    if typed.last.map(isPromptWordSeparator) == true,
+      !retainedWordSeparatorTypedIndices.contains(typedIndex)
+    { replayCommittedSeparatorCount = max(0, replayCommittedSeparatorCount - 1) }
     retainedWordSeparatorTypedIndices.remove(typedIndex)
     let removedCharacter = typed.last
     let targetIndex = typedTargetIndices.popLast() ?? nil

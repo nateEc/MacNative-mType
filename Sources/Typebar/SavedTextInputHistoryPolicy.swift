@@ -51,6 +51,9 @@ enum SavedTextInputHistoryPolicy {
   private static func projectInput(
     displays: [String], events: [TypingReplayEvent], noSpaceWordEnds: [Int]
   ) -> (fields: [String], trimsLastField: Bool) {
+    if !events.isEmpty, events.allSatisfy({ $0.inputField != nil }) {
+      return recordedFields(displays: displays, events: events)
+    }
     var fields: [String] = []
     var pieces: [Piece] = []
     var live = ""
@@ -115,5 +118,25 @@ enum SavedTextInputHistoryPolicy {
       }
     }
     return (fields, trimsLastField)
+  }
+
+  /// Keep source time sorting and the last recorded snapshot in each bucket.
+  /// Do not apply a delayed field-local deletion to the whole accepted text.
+  private static func recordedFields(
+    displays: [String], events: [TypingReplayEvent]
+  ) -> (fields: [String], trimsLastField: Bool) {
+    var order: [Int] = []
+    var values: [Int: String] = [:]
+    var trimsLastField = false
+    for event in TypingReplay.chronologicalEvents(events) {
+      guard let snapshot = event.inputField, snapshot.index >= 0 else { continue }
+      if values[snapshot.index] == nil { order.append(snapshot.index) }
+      values[snapshot.index] = snapshot.value
+      trimsLastField = !event.isStoppedInsertion && event.kind == .insert
+        && event.text == " " && event.commitsWord != false
+        && snapshot.index == displays.count - 1
+        && (String(snapshot.value.dropLast()) != displays[snapshot.index] || event.forceError)
+    }
+    return (order.map { values[$0] ?? "" }, trimsLastField)
   }
 }
