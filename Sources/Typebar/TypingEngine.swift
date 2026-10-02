@@ -2999,11 +2999,14 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// Missing in older archives; false preserves a separator in its input
   /// field when word-stop accepts the key but prevents navigation.
   let commitsWord: Bool?
+  /// The first primitive of one whole-word deletion. Old readers still
+  /// apply every primitive; only action-aware views collapse this span.
+  let wordDeletionCount: Int?
   var id: String { "\(offset)-\(kind.rawValue)-\(text)" }
 
   init(
     offset: TimeInterval, kind: TypingReplayEventKind, text: String, forceError: Bool = false,
-    automatic: Bool = false, commitsWord: Bool? = nil
+    automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3011,9 +3014,12 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.forceError = forceError
     self.automatic = automatic
     self.commitsWord = commitsWord
+    self.wordDeletionCount = wordDeletionCount
   }
 
-  private enum CodingKeys: String, CodingKey { case offset, kind, text, forceError, automatic, commitsWord }
+  private enum CodingKeys: String, CodingKey {
+    case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount
+  }
 
   init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -3023,6 +3029,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     forceError = try values.decodeIfPresent(Bool.self, forKey: .forceError) ?? false
     automatic = try values.decodeIfPresent(Bool.self, forKey: .automatic) ?? false
     commitsWord = try values.decodeIfPresent(Bool.self, forKey: .commitsWord)
+    wordDeletionCount = try values.decodeIfPresent(Int.self, forKey: .wordDeletionCount)
   }
 }
 
@@ -3049,6 +3056,57 @@ enum TypingReplaySoundRoute: Equatable {
 }
 
 enum TypingReplay {
+  struct Action {
+    enum Kind: Equatable { case insert, deleteCharacter, deleteWord }
+    let kind: Kind
+    let primitiveRange: Range<Int>
+    let primitives: ArraySlice<TypingReplayEvent>
+  }
+
+  /// Retain the legacy playback tape, while exposing real future deletion
+  /// actions without inferring missing provenance from equal timestamps.
+  static func actions(events: [TypingReplayEvent]) -> [Action] {
+    let ordered = chronologicalEvents(events)
+    var result: [Action] = []
+    var index = 0
+    while index < ordered.count {
+      let deletionRange = wordDeletionRange(at: index, in: ordered)
+      let range = deletionRange ?? index..<(index + 1)
+      let kind: Action.Kind = ordered[index].kind == .insert ? .insert
+        : deletionRange != nil ? .deleteWord : .deleteCharacter
+      result.append(.init(kind: kind, primitiveRange: range, primitives: ordered[range]))
+      index = range.upperBound
+    }
+    return result
+  }
+
+  private static func wordDeletionRange(at index: Int, in events: [TypingReplayEvent]) -> Range<Int>? {
+    let first = events[index]
+    guard first.kind == .delete, let count = first.wordDeletionCount,
+      count > 0, count <= events.count - index, first.offset.isFinite
+    else { return nil }
+    let range = index..<(index + count)
+    guard range.allSatisfy({ position in
+      let event = events[position]
+      return event.kind == .delete && event.text.isEmpty && event.offset == first.offset
+        && event.automatic == first.automatic && !event.forceError && event.commitsWord == nil
+        && (position == index || event.wordDeletionCount == nil)
+    }) else { return nil }
+    return range
+  }
+
+  private static func deletionContinuationIndices(in events: [TypingReplayEvent]) -> Set<Int> {
+    var result = Set<Int>()
+    var index = 0
+    while index < events.count {
+      if let range = wordDeletionRange(at: index, in: events) {
+        result.formUnion(range.dropFirst())
+        index = range.upperBound
+      } else { index += 1 }
+    }
+    return result
+  }
+
   private struct CharacterCoordinate: Hashable {
     let word: Int
     let position: Int
@@ -3101,7 +3159,7 @@ enum TypingReplay {
             word: typedWord, position: typedPosition, character: character)
           let state: TypingPromptCharacterState
           if let promptIndex = promptCoordinates[coordinate] {
-            state = promptCharacters[promptIndex] == character && !event.forceError
+            state = InputTextIdentity.matches(promptCharacters[promptIndex], character) && !event.forceError
               ? .correct : .incorrect
           } else {
             state = .extra
@@ -3140,7 +3198,9 @@ enum TypingReplay {
     var cues: [TypingReplaySoundCue] = []
     var retainedSeparators = Set<Int>()
 
-    for event in chronologicalEvents(events) {
+    let orderedEvents = chronologicalEvents(events)
+    let continuationIndices = deletionContinuationIndices(in: orderedEvents)
+    for (eventIndex, event) in orderedEvents.enumerated() {
       guard event.offset <= upperBound else { break }
       var cue: TypingReplaySoundCue?
       switch event.kind {
@@ -3152,7 +3212,7 @@ enum TypingReplay {
           let characterIsIncorrect: Bool
           if let promptIndex = promptCoordinates[coordinate] {
             characterIsIncorrect =
-              event.forceError || promptCharacters[promptIndex] != character
+              event.forceError || !InputTextIdentity.matches(promptCharacters[promptIndex], character)
           } else {
             characterIsIncorrect = true
           }
@@ -3190,7 +3250,7 @@ enum TypingReplay {
         cue = .click
       }
 
-      if event.offset > lowerBound, !event.automatic, let cue {
+      if event.offset > lowerBound, !event.automatic, !continuationIndices.contains(eventIndex), let cue {
         cues.append(cue)
       }
     }
@@ -4804,6 +4864,9 @@ struct TypingSession {
       return
     }
 
+    let deletionStart = replayEvents.count
+    defer { markWordDeletion(since: deletionStart) }
+
     // A hidden source-word boundary is still a commit. Do not let the
     // space-delimited fallback clear the entire flattened input history.
     if tracksNoSpaceWordBursts {
@@ -5312,6 +5375,7 @@ struct TypingSession {
     // serialize it to replay. It must be removed before examining the prior
     // word boundary, including when the failed key is itself a separator.
     guard !typed.isEmpty else { return }
+    let deletionStart = replayEvents.count
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
 
@@ -5319,12 +5383,14 @@ struct TypingSession {
       ((usesWordCommitInput
         && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)) || tracksNoSpaceWordBursts), !typed.isEmpty
     {
+      if mode.clearsWholeWord { markWordDeletion(since: deletionStart) }
       removePreviousWordForHardDelete(
         clearingWord: mode.clearsWholeWord, automatic: true, at: date)
       return
     }
     if mode.clearsWholeWord {
       clearCurrentWord(at: date, automatic: true)
+      markWordDeletion(since: deletionStart)
     } else {
       removeLastCharacterFromCurrentWord(at: date, automatic: true)
     }
@@ -5342,6 +5408,8 @@ struct TypingSession {
   private mutating func removePreviousWordForHardDelete(
     clearingWord: Bool, automatic: Bool = false, at date: Date
   ) {
+    let deletionStart = replayEvents.count
+    defer { if clearingWord { markWordDeletion(since: deletionStart) } }
     if tracksNoSpaceWordBursts,
       let wordIndex = noSpaceWordEndIndices.firstIndex(of: typed.count),
       let previousRange = noSpaceWordRange(for: wordIndex)
@@ -5377,6 +5445,16 @@ struct TypingSession {
         forceError: forceError, automatic: automatic,
         commitsWord: kind == .insert && retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
           ? false : nil))
+  }
+
+  private mutating func markWordDeletion(since start: Int) {
+    guard start < replayEvents.count else { return }
+    for index in start..<replayEvents.count {
+      let event = replayEvents[index]
+      replayEvents[index] = .init(offset: event.offset, kind: event.kind, text: event.text,
+        forceError: event.forceError, automatic: event.automatic, commitsWord: event.commitsWord,
+        wordDeletionCount: index == start ? replayEvents.count - start : nil)
+    }
   }
 
   private func errorsInCurrentWord() -> Int {
@@ -5869,10 +5947,12 @@ struct TypingSession {
         || typedCharacters.indices.filter({ $0 >= lineStart && $0 < typedCharacters.count - 1 })
           .allSatisfy(isTypedCharacterCorrect))
     else { return false }
+    let deletionStart = replayEvents.count
     while typed.last == "\t" {
       removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", automatic: true, at: date)
     }
+    markWordDeletion(since: deletionStart)
     // The first word has no previous line. Clearing its indentation already
     // handled the key, so the caller must not append a phantom delete event.
     guard typed.last == "\n" else { return true }
