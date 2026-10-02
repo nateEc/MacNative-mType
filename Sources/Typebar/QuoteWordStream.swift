@@ -13,6 +13,8 @@ struct QuoteWordStream {
   let lookaheadBound: Int
   let sourceHasNewline: Bool
   let sourceHasTab: Bool
+  private(set) var initialGeneratedNewline = false
+  private(set) var initialGeneratedTab = false
   private(set) var emittedWords = 0
   private var previousRaw: String?
   private var previousText: String?
@@ -36,12 +38,16 @@ struct QuoteWordStream {
 
   var totalWords: Int { words.count }
   var hasRemaining: Bool { emittedWords < words.count }
+  var initialHasNewline: Bool { sourceHasNewline || initialGeneratedNewline }
+  var initialHasTab: Bool { sourceHasTab || initialGeneratedTab }
 
   func reset() -> Self {
     var fresh = self
     fresh.emittedWords = 0
     fresh.previousRaw = nil
     fresh.previousText = nil
+    fresh.initialGeneratedNewline = false
+    fresh.initialGeneratedTab = false
     return fresh
   }
 
@@ -70,6 +76,12 @@ struct QuoteWordStream {
     var committed = altered
     if altered.unicodeScalars.last != "\n", !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
       committed.append(" ")
+    }
+    if initial {
+      // Initial control signals precede final commit removal; later draws do
+      // not mutate them, even if their transforms introduce a new control.
+      initialGeneratedNewline = initialGeneratedNewline || committed.contains("\n")
+      initialGeneratedTab = initialGeneratedTab || committed.contains("\t")
     }
     previousRaw = altered
     var text = committed

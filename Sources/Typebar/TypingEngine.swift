@@ -4459,7 +4459,10 @@ struct TypingSession {
   }
 
   var hasPracticeNewlineContent: Bool {
-    prompt.contains("\n") || quoteWordStream?.sourceHasNewline == true
+    // Owned quotes retain the initial generation signal, not the contents of
+    // the growing buffer. Other modes retain their existing dynamic behavior.
+    if let quoteWordStream { return quoteWordStream.initialHasNewline }
+    return prompt.contains("\n")
   }
 
   var acceptsNewlineInput: Bool {
@@ -4467,7 +4470,9 @@ struct TypingSession {
   }
 
   var acceptsTabInput: Bool {
-    configuration.mode == .zen || prompt.contains("\t") || quoteWordStream?.sourceHasTab == true
+    if configuration.mode == .zen { return true }
+    if let quoteWordStream { return quoteWordStream.initialHasTab }
+    return prompt.contains("\t")
   }
 
   func remainingSeconds(at date: Date) -> Int? {
@@ -6159,8 +6164,15 @@ struct TypingSession {
   }
 
   private mutating func refillQuoteIfNeeded(activeWordBefore: Int, at date: Date) {
-    guard !isFinished, !isAtEmptyNoSpaceWord, var stream = quoteWordStream, stream.hasRemaining,
-      stream.emittedWords - (activeWordBefore + 1) <= stream.lookaheadBound else { return }
+    guard !isFinished, !isAtEmptyNoSpaceWord, var stream = quoteWordStream, stream.hasRemaining else { return }
+    if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), !hasNoSpaceWordSegmentation {
+      // An unsafe grapheme boundary has no usable word-navigation count.
+      // Consume the actual visible prefix before requesting its next target;
+      // comparing a fabricated zero word index would permanently stall it.
+      guard nextTargetIndex >= promptCharacters.count else { return }
+    } else {
+      guard stream.emittedWords - (activeWordBefore + 1) <= stream.lookaheadBound else { return }
+    }
     do {
       let previousEnd = promptCharacters.count
       let hadSafeTargets = noSpaceTargetWords.count == stream.emittedWords
