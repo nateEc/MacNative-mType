@@ -1091,6 +1091,7 @@ private struct ContentView: View {
   @State private var isRepeatedPaceAttempt = false
   @State private var activePaceTargetWpm: Int?
   @State private var compositionText = ""
+  @State private var automaticInputScheduler = TypingAutomaticInputScheduler()
   @State private var keyboardGuideFeedback: KeyboardGuideFeedback?
   @State private var keyboardGuideFeedbackSequence = 0
   @State private var keyboardModifierFlags: NSEvent.ModifierFlags = []
@@ -1265,6 +1266,10 @@ private struct ContentView: View {
     }
     .task(id: account.currentUser?.id) { await refreshNotificationSummary() }
     .onAppear(perform: contentAppeared)
+    .onDisappear {
+      automaticInputScheduler.cancel()
+      session.cancelAutomaticInput()
+    }
     .onChange(of: settings.activeTestSelectionGeneration) { _, _ in
       restorePersistedTestSelection()
     }
@@ -3263,7 +3268,7 @@ private struct ContentView: View {
     let typedCountBefore = session.typed.count
     let feedback = TypingLiveInputFeedback.insertBatch(
       effectiveInsertedText(text), into: &session,
-      forceError: forceError, origin: origin)
+      forceError: forceError, origin: origin, defersAutomaticInput: true)
     verifyChallengeFontAvailability()
     emitTypingPowerEffect(
       isCorrect: session.errors == errorsBefore,
@@ -3276,6 +3281,29 @@ private struct ContentView: View {
         isCorrect: session.errors == errorsBefore)
     }
     for correct in feedback { playInputFeedback(inputWasCorrect: correct) }
+    scheduleAutomaticInput()
+  }
+
+  private func scheduleAutomaticInput() {
+    guard session.hasPendingAutomaticInput else { return }
+    let attemptID = session.automaticInputAttemptID
+    automaticInputScheduler.schedule(for: attemptID) {
+      guard session.automaticInputAttemptID == attemptID else { return }
+      synchronizeLiveInputRules()
+      let errorsBefore = session.errors
+      let countBefore = session.typed.count
+      let feedback = session.processNextAutomaticInput(for: attemptID, executedAt: .now)
+      verifyChallengeFontAvailability()
+      emitTypingPowerEffect(isCorrect: feedback.last == true,
+        acceptedCharacters: session.typed.count - countBefore)
+      if !feedback.isEmpty, effectiveKeyboardGuideMode == .react {
+        keyboardGuideFeedbackSequence &+= 1
+        keyboardGuideFeedback = .init(sequence: keyboardGuideFeedbackSequence,
+          character: "\t", isCorrect: session.errors == errorsBefore)
+      }
+      for correct in feedback { playInputFeedback(inputWasCorrect: correct) }
+      scheduleAutomaticInput()
+    }
   }
 
   private func handleDeletedText(deletesWord: Bool) {

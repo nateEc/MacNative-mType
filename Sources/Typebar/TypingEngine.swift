@@ -3826,6 +3826,11 @@ struct TypingSession {
   /// including attempts that stop/delete rules do not leave on screen.
   private(set) var lastInputWasCorrect: Bool?
   private var liveInsertionFeedback: [Bool] = []
+  let automaticInputAttemptID = UUID()
+  private var queuedCodeInputDates: [Date] = []
+  private var queuedCodeInputHead = 0
+  private var applyingAutomaticCodeInput = false
+  private var automaticInputExecutionDate: Date?
   /// Input/deletion/composition UI publishes hundredths, but a real-second
   /// timer update publishes the unrounded live cache. Neither alters scoring.
   private var roundsLiveAccuracyForInputDisplay = true
@@ -4772,13 +4777,52 @@ struct TypingSession {
   /// spelling replacements; it is deliberately separate from persisted replay.
   @discardableResult mutating func insertBatch(
     _ text: String, forceError: Bool = false, at date: Date = .now,
-    origin: TypingInputOrigin = .physicalKeyboard
+    origin: TypingInputOrigin = .physicalKeyboard, defersAutomaticInput: Bool = false
   ) -> [Bool] {
     liveInsertionFeedback.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true,
-      origin: origin)
+      origin: origin, defersAutomaticInput: true)
+    if !defersAutomaticInput { drainAutomaticInput() }
     return liveInsertionFeedback
+  }
+
+  var hasPendingAutomaticInput: Bool { queuedCodeInputHead < queuedCodeInputDates.count }
+
+  mutating func cancelAutomaticInput() {
+    queuedCodeInputDates.removeAll()
+    queuedCodeInputHead = 0
+  }
+
+  /// Executes one queued callback, with its original input timestamp but the
+  /// current rules and field. A schedule-time match is not an execution guard.
+  /// Live callers supply the execution clock for terminal results; nil keeps
+  /// pure-engine simulations deterministic without changing replay timestamps.
+  mutating func processNextAutomaticInput(for attemptID: UUID, executedAt: Date? = nil) -> [Bool] {
+    guard attemptID == automaticInputAttemptID else { return [] }
+    guard !isFinished else { cancelAutomaticInput(); return [] }
+    guard hasPendingAutomaticInput else { return [] }
+    let date = queuedCodeInputDates[queuedCodeInputHead]
+    queuedCodeInputHead += 1
+    if !hasPendingAutomaticInput { cancelAutomaticInput() }
+    liveInsertionFeedback.removeAll()
+    applyingAutomaticCodeInput = true
+    automaticInputExecutionDate = executedAt
+    defer {
+      applyingAutomaticCodeInput = false
+      automaticInputExecutionDate = nil
+    }
+    insertText("\t", forceError: false, at: date,
+      evaluatesTerminalRulesOnLastCharacterOnly: true, defersAutomaticInput: true)
+    return liveInsertionFeedback
+  }
+
+  private mutating func drainAutomaticInput() {
+    var feedback = liveInsertionFeedback
+    while hasPendingAutomaticInput {
+      feedback += processNextAutomaticInput(for: automaticInputAttemptID)
+    }
+    liveInsertionFeedback = feedback
   }
 
   /// A marked-text composition starts the reference attempt before its text is
@@ -4800,7 +4844,7 @@ struct TypingSession {
   private mutating func insertText(
     _ text: String, forceError: Bool, at date: Date,
     evaluatesTerminalRulesOnLastCharacterOnly: Bool,
-    origin: TypingInputOrigin = .physicalKeyboard
+    origin: TypingInputOrigin = .physicalKeyboard, defersAutomaticInput: Bool = false
   ) {
     lastInputWasCorrect = nil
     guard !isFinished, !text.isEmpty else { return }
@@ -4815,7 +4859,8 @@ struct TypingSession {
         // rules match the transformed user input.
         insertText(
           "...", forceError: forceError, at: date,
-          evaluatesTerminalRulesOnLastCharacterOnly: true, origin: origin)
+          evaluatesTerminalRulesOnLastCharacterOnly: true, origin: origin,
+          defersAutomaticInput: defersAutomaticInput)
         continue
       }
       if shouldExpandDutchLigature(character, at: date) {
@@ -4823,7 +4868,8 @@ struct TypingSession {
         // multi-character input path, but preserves a literal ligature target.
         insertText(
           "ij", forceError: forceError, at: date,
-          evaluatesTerminalRulesOnLastCharacterOnly: true, origin: origin)
+          evaluatesTerminalRulesOnLastCharacterOnly: true, origin: origin,
+          defersAutomaticInput: defersAutomaticInput)
         continue
       }
       let evaluatesTerminalRules = !evaluatesTerminalRulesOnLastCharacterOnly
@@ -4842,12 +4888,15 @@ struct TypingSession {
         liveInsertionFeedback.append(correct)
       }
       if accepted {
-        switch origin {
-        case .physicalKeyboard: hasAcceptedPhysicalKeyboardInput = true
-        case .virtualKeyboard: hasAcceptedVirtualKeyboardInput = true
+        if !applyingAutomaticCodeInput {
+          switch origin {
+          case .physicalKeyboard: hasAcceptedPhysicalKeyboardInput = true
+          case .virtualKeyboard: hasAcceptedVirtualKeyboardInput = true
+          }
         }
         recordReplayEvent(kind: .insert, text: String(character), forceError: forceError, at: date)
         insertCodeIndentationIfNeeded(at: date)
+        if !defersAutomaticInput, !applyingAutomaticCodeInput { drainAutomaticInput() }
         if quoteWordStream != nil, quoteNavigationIndex > quoteWordBefore {
           refillQuoteIfNeeded(activeWordBefore: quoteWordBefore, at: date)
         }
@@ -5496,7 +5545,7 @@ struct TypingSession {
     replayEvents.append(
       .init(
         offset: max(0, date.timeIntervalSince(startedAt)), kind: kind, text: text,
-        forceError: forceError, automatic: automatic,
+        forceError: forceError, automatic: automatic || applyingAutomaticCodeInput,
         commitsWord: kind == .insert && retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
           ? false : nil))
   }
@@ -6006,21 +6055,10 @@ struct TypingSession {
     // Correctness belongs to the attempted key, not its remapped commit
     // cursor: an early space can navigate without being a correct insert.
     guard configuration.language.isCodeLanguage, lastInputWasCorrect == true else { return }
-    while true {
-      let target = Array(codeTargetFieldText.utf16)
-      let offset = codeInputFieldText.utf16.count
-      guard target.first == 9, target.indices.contains(offset), target[offset] == 9 else { break }
-      // Automatic tabs use the normal scoring, word-boundary and difficulty
-      // path, but remain explicitly automatic on the persisted replay tape.
-      let attemptsBeforeTab = inputAttemptCount
-      let accepted = insertCharacter("\t", forceError: false, at: date, evaluatesTerminalRules: true)
-      if inputAttemptCount > attemptsBeforeTab, let correct = lastInputWasCorrect {
-        liveInsertionFeedback.append(correct)
-      }
-      guard accepted else { break }
-      recordReplayEvent(kind: .insert, text: "\t", automatic: true, at: date)
-      if isFinished || lastInputWasCorrect != true { break }
-    }
+    let target = Array(codeTargetFieldText.utf16)
+    let offset = codeInputFieldText.utf16.count
+    guard target.first == 9, target.indices.contains(offset), target[offset] == 9 else { return }
+    queuedCodeInputDates.append(date)
   }
 
   private mutating func removeCodeIndentationBeforeField(
@@ -6555,8 +6593,9 @@ struct TypingSession {
   }
 
   private mutating func complete(at date: Date) {
-    finishedAt = date
-    outcome = hasTrailingInactivity(endingAt: date) ? .invalidAFK : .completed
+    let end = automaticInputExecutionDate ?? date
+    finishedAt = end
+    outcome = hasTrailingInactivity(endingAt: end) ? .invalidAFK : .completed
   }
 
   /// Retain unrounded accuracy for threshold comparison: the reference
@@ -6592,7 +6631,7 @@ struct TypingSession {
   private mutating func fail(at date: Date, reason: TestFailureReason? = nil) {
     failureReason = reason
     outcome = .failed
-    finishedAt = date
+    finishedAt = automaticInputExecutionDate ?? date
   }
 }
 

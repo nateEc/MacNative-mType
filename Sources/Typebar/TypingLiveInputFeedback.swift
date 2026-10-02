@@ -5,9 +5,11 @@ import Foundation
 enum TypingLiveInputFeedback {
   static func insertBatch(
     _ text: String, into session: inout TypingSession, forceError: Bool = false,
-    origin: TypingInputOrigin = .physicalKeyboard, at date: Date = .now
+    origin: TypingInputOrigin = .physicalKeyboard, at date: Date = .now,
+    defersAutomaticInput: Bool = false
   ) -> [Bool] {
-    session.insertBatch(text, forceError: forceError, at: date, origin: origin)
+    session.insertBatch(text, forceError: forceError, at: date, origin: origin,
+      defersAutomaticInput: defersAutomaticInput)
   }
 
   static func delete(

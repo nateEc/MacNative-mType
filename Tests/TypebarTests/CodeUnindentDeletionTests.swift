@@ -107,7 +107,7 @@ final class CodeUnindentDeletionTests: XCTestCase {
     let actions = deletionActions(try saved(input))
     XCTAssertEqual(actions.map(\.kind), [.deleteWord, .deleteCharacter])
     XCTAssertEqual(actions.map { $0.primitiveRange.count }, [1, 3])
-    input.insertBatch("🙂e\u{301}\ngo()\ntail", at: start.addingTimeInterval(2))
+    input.insertBatch("🙂e\u{301}\n\tgo()\ntail", at: start.addingTimeInterval(2))
     XCTAssertEqual(input.outcome, .completed)
     XCTAssertEqual(input.typed, prompt)
     let result = try XCTUnwrap(input.result())
@@ -123,9 +123,11 @@ final class CodeUnindentDeletionTests: XCTestCase {
 
   func testWeakSpotCursorIncludesAutomaticIndentationButDoesNotScoreItAsAHumanAttempt() throws {
     var input = session()
-    input.insertBatch("seed ab\n\t", at: start)
+    input.insertBatch("seed ab\n", at: start)
+    input.insertBatch("\t", at: start)
     input.deleteWordBackward(at: start.addingTimeInterval(1))
-    input.insertBatch("ab\ngo()\ntail", at: start.addingTimeInterval(2))
+    input.insertBatch("ab\n", at: start.addingTimeInterval(2))
+    input.insertBatch("go()\ntail", at: start.addingTimeInterval(2))
     XCTAssertEqual(input.outcome, .completed)
     let result = try XCTUnwrap(input.result())
     // The extra manually entered tab is the only wrong attempt, at target g.
