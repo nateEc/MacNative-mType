@@ -33,9 +33,10 @@ enum CustomTextPolicy {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty && trimmedTitle.count <= maximumTitleLength else { return false }
         if longProgress == nil { return isValid(text) }
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              text.count <= maximumLongSavedLength,
-              text.utf8.count <= maximumLongSavedLength * 4 else { return false }
+        guard text.count <= maximumLongSavedLength,
+              text.utf8.count <= maximumLongSavedLength * 4,
+              !CustomSectionWordStream.sourceSections(from: text, usesPipe: false).isEmpty
+        else { return false }
         var offset = 0
         while offset < text.count {
             let chunk = LongSavedTextProgress.nextChunk(in: text, after: offset)
@@ -59,9 +60,8 @@ enum LongSavedTextProgress {
         guard !remaining.isEmpty else { return "" }
         if remaining.count <= CustomTextPolicy.maximumLength { return remaining }
         let prefix = String(remaining.prefix(CustomTextPolicy.maximumLength))
-        guard let boundary = prefix.lastIndex(where: \.isWhitespace) else { return "" }
-        let chunk = String(prefix[...boundary])
-        return chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : chunk
+        guard let boundary = prefix.lastIndex(where: isPromptWordSeparator) else { return "" }
+        return String(prefix[...boundary])
     }
 
     static func offsetAfterCompletingChunk(in text: String, from offset: Int) -> Int {
@@ -75,6 +75,13 @@ enum LongSavedTextProgress {
 
     static func remainingText(in text: String, after offset: Int) -> String {
         String(text.dropFirst(normalized(offset, in: text)))
+    }
+
+    static func resumingOffset(_ offset: Int, in text: String) -> Int {
+        let value = normalized(offset, in: text)
+        let remaining = remainingText(in: text, after: value)
+        return CustomSectionWordStream.sourceSections(from: remaining, usesPipe: false).isEmpty
+            ? 0 : value
     }
 
     static func advancedOffset(in text: String, from offset: Int, typed: String) -> Int {
@@ -91,24 +98,50 @@ enum LongSavedTextProgress {
         var completedPrefixCount = 0
         var cursor = 0
         while cursor < remaining.count {
-            while cursor < remaining.count, remaining[cursor].isWhitespace { cursor += 1 }
+            if remaining[cursor] == " " {
+                while cursor < remaining.count, remaining[cursor] == " " { cursor += 1 }
+                completedPrefixCount = min(cursor, matchingPrefixCount)
+                guard matchingPrefixCount >= cursor else { break }
+                continue
+            }
             let wordStart = cursor
-            while cursor < remaining.count, !remaining[cursor].isWhitespace { cursor += 1 }
+            while cursor < remaining.count, !isPromptWordSeparator(remaining[cursor]) { cursor += 1 }
+            if cursor < remaining.count, remaining[cursor] == "\n" {
+                // Unlike an ASCII-space commit, LF is part of the required
+                // display. Each empty LF slot also needs its own matched input.
+                cursor += 1
+                guard matchingPrefixCount >= cursor else { break }
+                completedPrefixCount = cursor
+                continue
+            }
             guard wordStart < cursor, matchingPrefixCount >= cursor else { break }
-            while cursor < remaining.count, remaining[cursor].isWhitespace { cursor += 1 }
+            while cursor < remaining.count, remaining[cursor] == " " { cursor += 1 }
             completedPrefixCount = cursor
         }
         return normalizedOffset + completedPrefixCount
     }
 
     static func progressLabel(in text: String, offset: Int) -> String {
-        let words = text.split(whereSeparator: \.isWhitespace)
-        guard !words.isEmpty else { return "0 / 0 词" }
-        let completed = remainingText(in: text, after: 0)
-            .prefix(normalized(offset, in: text))
-            .split(whereSeparator: \.isWhitespace)
-            .count
-        return "\(min(completed, words.count)) / \(words.count) 词"
+        let total = wordCount(in: text)
+        let completed = wordCount(in: String(text.prefix(normalized(offset, in: text))))
+        return "\(min(completed, total)) / \(total) 词"
+    }
+
+    private static func wordCount(in text: String) -> Int {
+        var count = 0
+        var insideWord = false
+        for character in text {
+            if character == " " {
+                insideWord = false
+            } else if character == "\n" {
+                if !insideWord { count += 1 }
+                insideWord = false
+            } else if !insideWord {
+                count += 1
+                insideWord = true
+            }
+        }
+        return count
     }
 }
 
@@ -284,8 +317,7 @@ struct SavedTextsView: View {
             }
             let title = String(url.deletingPathExtension().lastPathComponent.prefix(
                 CustomTextPolicy.maximumTitleLength))
-            guard text.first?.isWhitespace == false,
-                  CustomTextPolicy.isValidSavedText(title: title, text: text, longProgress: 0)
+            guard CustomTextPolicy.isValidSavedText(title: title, text: text, longProgress: 0)
             else { throw LongTextImportError.invalidContent }
             let record = SavedCustomTextRecord(title: title, text: text, longProgress: 0)
             modelContext.insert(record)
@@ -309,7 +341,7 @@ private enum LongTextImportError: LocalizedError {
         switch self {
         case .tooLarge: "文件太大；长文本最多 128,000 个字符且不超过 512,000 字节。"
         case .invalidEncoding: "只支持 UTF-8 纯文本文件。"
-        case .invalidContent: "文件为空、以空白开头、超出字符上限，或含有无法按完整词边界切分的片段。"
+        case .invalidContent: "文件没有可练习候选、超出字符上限，或含有无法按完整词边界切分的片段。换行可以作为独立目标。"
         }
     }
 }

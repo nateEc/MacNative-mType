@@ -28453,7 +28453,9 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(LongSavedTextProgress.advancedOffset(
       in: text, from: 0, typed: "amber  har"), 7)
     XCTAssertEqual(LongSavedTextProgress.advancedOffset(
-      in: text, from: 0, typed: "amber  harbor"), 14)
+      in: text, from: 0, typed: "amber  harbor"), 7)
+    XCTAssertEqual(LongSavedTextProgress.advancedOffset(
+      in: text, from: 0, typed: "amber  harbor\n"), 14)
     XCTAssertEqual(LongSavedTextProgress.advancedOffset(
       in: text, from: 0, typed: "amber  x"), 7)
     XCTAssertEqual(

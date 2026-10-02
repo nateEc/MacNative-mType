@@ -3839,12 +3839,7 @@ private struct ContentView: View {
       reset()
       return
     }
-    var progress = LongSavedTextProgress.normalized(selection.longProgress ?? 0, in: selection.text)
-    if LongSavedTextProgress.remainingText(in: selection.text, after: progress)
-      .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    {
-      progress = 0
-    }
+    let progress = LongSavedTextProgress.resumingOffset(selection.longProgress ?? 0, in: selection.text)
     let active = ActiveLongSavedText(
       id: selection.id, title: selection.title, text: selection.text,
       progress: progress, continuous: continuous)
