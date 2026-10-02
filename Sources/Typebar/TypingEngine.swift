@@ -3287,6 +3287,9 @@ enum TypingReplay {
     var retainedSeparators = Set<Int>()
 
     let orderedEvents = chronologicalEvents(events.filter { $0.offset.isFinite })
+    if let recorded = recordedFieldSoundTimeline(targetFields: targetFields,
+      events: orderedEvents, configuration: configuration)
+    { return recorded }
     let finalFields = SavedTextInputHistoryPolicy.inputFields(events: orderedEvents)
     let continuationIndices = deletionContinuationIndices(in: orderedEvents)
     for (eventIndex, event) in orderedEvents.enumerated() {
@@ -3341,6 +3344,62 @@ enum TypingReplay {
         cues.append(.init(offset: event.offset, cue: cue))
       }
       previousEventWord = eventWord
+    }
+    return cues
+  }
+
+  /// Input-time field position is not necessarily playback position when
+  /// automatic actions keep an earlier timestamp. Legacy and unsegmented
+  /// tapes retain their existing derivation rather than inventing targets.
+  private static func recordedFieldSoundTimeline(
+    targetFields: [[Character]], events: [TypingReplayEvent], configuration: TestConfiguration?
+  ) -> [TypingReplayTimedSoundCue]? {
+    let isZen = configuration?.mode == .zen
+    guard !events.isEmpty,
+      !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []),
+      events.allSatisfy({ event in
+        guard let field = event.inputField, field.index >= 0 else { return false }
+        return isZen || targetFields.indices.contains(field.index)
+      })
+    else { return nil }
+
+    let targets = targetFields.map { Array(String($0).utf16) }
+    let finalFields = events.reduce(into: [Int: String]()) { fields, event in
+      if let field = event.inputField { fields[field.index] = field.value }
+    }
+    var previousField: Int?
+    var cues: [TypingReplayTimedSoundCue] = []
+    var index = 0
+    while index < events.count {
+      let range = deletionActionRange(at: index, in: events) ?? index..<(index + 1)
+      // Native word deletion has multiple primitives but one source action,
+      // whose snapshot is its final destination, not its first removed unit.
+      let event = events[range.upperBound - 1]
+      index = range.upperBound
+      guard let field = event.inputField else { continue }
+      if event.kind == .insert && event.text.isEmpty && !event.isStoppedInsertion { continue }
+      let wentBack = previousField.map { field.index < $0 } ?? false
+      if let previousField, field.index != previousField {
+        let correct = wentBack || isZen
+          || InputTextIdentity.matches(finalFields[previousField] ?? "", String(targetFields[previousField]))
+        cues.append(.init(offset: event.offset, cue: correct ? .click : .error))
+      }
+      switch event.kind {
+      case .insert:
+        if !event.isStoppedInsertion {
+          let units = Array(event.text.utf16)
+          let end = field.value.utf16.count
+          let start = end - units.count
+          let correct = isZen || (!event.forceError && start >= 0 && end <= targets[field.index].count
+            && units.enumerated().allSatisfy { offset, unit in targets[field.index][start + offset] == unit })
+          cues.append(.init(offset: event.offset, cue: correct ? .click : .error))
+        }
+      case .delete:
+        // Regression already emits the source back-word action. Do not add
+        // a second same-time click for setting the destination field length.
+        if !wentBack { cues.append(.init(offset: event.offset, cue: .click)) }
+      }
+      previousField = field.index
     }
     return cues
   }
