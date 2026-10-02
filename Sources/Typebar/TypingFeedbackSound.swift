@@ -365,65 +365,126 @@ enum ClockTickPolicy {
   }
 }
 
+/// The audio-device boundary; playback ownership remains in the controller.
+@MainActor
+protocol TypingSoundVoice: AnyObject {
+  var volume: Float { get set }
+  func copyForPlayback() -> (any TypingSoundVoice)?
+  func play(onFinish: @escaping () -> Void) -> Bool
+  func stop()
+}
+
+@MainActor
+final class NativeTypingSoundVoice: NSObject, TypingSoundVoice, NSSoundDelegate {
+  let sound: NSSound
+  private var onFinish: (() -> Void)?
+
+  init(sound: NSSound) {
+    self.sound = sound
+    super.init()
+  }
+
+  var volume: Float {
+    get { sound.volume }
+    set { sound.volume = newValue }
+  }
+
+  func copyForPlayback() -> (any TypingSoundVoice)? {
+    guard let copy = sound.copy() as? NSSound, copy !== sound else { return nil }
+    copy.loops = false
+    return NativeTypingSoundVoice(sound: copy)
+  }
+
+  func play(onFinish: @escaping () -> Void) -> Bool {
+    self.onFinish = onFinish
+    sound.delegate = self
+    let started = sound.play()
+    if !started { self.onFinish = nil }
+    return started
+  }
+
+  func stop() { _ = sound.stop() }
+
+  func sound(_ sound: NSSound, didFinishPlaying flag: Bool) {
+    guard sound === self.sound else { return }
+    let finished = onFinish
+    onFinish = nil
+    finished?()
+  }
+}
+
 /// Uses only local system sounds and in-memory waveforms. Playback is
 /// best-effort: unavailable audio never affects input acceptance or scoring.
 @MainActor
 final class TypingFeedbackSound {
-  static let shared = TypingFeedbackSound()
+  static let shared = TypingFeedbackSound(loadSound: { source in
+    let sound: NSSound?
+    switch source {
+    case .system(let name): sound = NSSound(named: NSSound.Name(name))
+    case .synthesized(let profile): sound = NSSound(data: profile.renderedWAVData())
+    }
+    return sound.map { NativeTypingSoundVoice(sound: $0) }
+  }, beep: { NSSound.beep() })
 
-  private var cachedSounds: [String: NSSound] = [:]
-  private var cachedClickSounds: [TypingClickSoundStyle: NSSound] = [:]
+  private var cachedSources: [TypingClickPlaybackSource: any TypingSoundVoice] = [:]
+  private var activeVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
+  private weak var warningVoice: (any TypingSoundVoice)?
+  private let loadSound: (TypingClickPlaybackSource) -> (any TypingSoundVoice)?
+  private let beep: () -> Void
 
-  private init() {}
+  init(loadSound: @escaping (TypingClickPlaybackSource) -> (any TypingSoundVoice)?, beep: @escaping () -> Void) {
+    self.loadSound = loadSound
+    self.beep = beep
+  }
 
   func playClick(style: TypingClickSoundStyle, volume: Double) {
-    guard volume > 0 else { return }
-    let sound: NSSound?
-    if let cached = cachedClickSounds[style] {
-      sound = cached
-    } else {
-      let loaded: NSSound?
-      switch style.playbackSource {
-      case .system(let name):
-        loaded = NSSound(named: NSSound.Name(name))
-      case .synthesized(let profile):
-        loaded = NSSound(data: profile.renderedWAVData())
-      }
-      if let loaded { cachedClickSounds[style] = loaded }
-      sound = loaded
-    }
-    guard let sound else { return }
-    sound.stop()
-    sound.volume = Float(volume.clamped(to: 0...1))
-    _ = sound.play()
+    _ = play(source: style.playbackSource, volume: volume)
   }
 
   func playError(style: TypingErrorSoundStyle, volume: Double) {
-    if !play(systemSoundNamed: style.systemSoundName, volume: volume), volume > 0 {
-      NSSound.beep()
+    if !play(source: .system(style.systemSoundName), volume: volume), volume > 0 {
+      beep()
     }
   }
 
   func playTimeWarning(style: TimeWarningSoundStyle, volume: Double) {
-    if !play(systemSoundNamed: style.systemSoundName, volume: volume), volume > 0 {
-      NSSound.beep()
+    if !play(source: .system(style.systemSoundName), volume: volume, restartingWarning: true), volume > 0 {
+      beep()
     }
   }
 
   @discardableResult
-  private func play(systemSoundNamed name: String, volume: Double) -> Bool {
+  private func play(source: TypingClickPlaybackSource, volume: Double,
+    restartingWarning: Bool = false) -> Bool {
     guard volume > 0 else { return false }
-    let sound: NSSound?
-    if let cached = cachedSounds[name] {
-      sound = cached
+    let prototype: (any TypingSoundVoice)?
+    if let cached = cachedSources[source] {
+      prototype = cached
     } else {
-      let loaded = NSSound(named: NSSound.Name(name))
-      if let loaded { cachedSounds[name] = loaded }
-      sound = loaded
+      let loaded = loadSound(source)
+      if let loaded { cachedSources[source] = loaded }
+      prototype = loaded
     }
-    guard let sound else { return false }
-    sound.stop()
-    sound.volume = Float(volume.clamped(to: 0...1))
-    return sound.play()
+    guard let prototype, let voice = prototype.copyForPlayback(), voice !== prototype else {
+      return false
+    }
+
+    // Click/error requests never steal a playing voice. Only the countdown
+    // channel restarts its previous request, matching the source's explicit stop.
+    if restartingWarning, let previous = warningVoice {
+      warningVoice = nil
+      activeVoices.removeValue(forKey: ObjectIdentifier(previous))
+      previous.stop()
+    }
+    let identity = ObjectIdentifier(voice)
+    activeVoices[identity] = voice
+    if restartingWarning { warningVoice = voice }
+    voice.volume = Float(volume.clamped(to: 0...1))
+    let started = voice.play { [weak self, weak voice] in
+      guard let self, let voice, self.activeVoices[identity] === voice else { return }
+      self.activeVoices.removeValue(forKey: identity)
+    }
+    if !started { activeVoices.removeValue(forKey: identity) }
+    return started
   }
 }
