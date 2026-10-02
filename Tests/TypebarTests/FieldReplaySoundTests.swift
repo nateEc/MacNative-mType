@@ -206,7 +206,7 @@ final class FieldReplaySoundTests: XCTestCase {
     let portable = try XCTUnwrap(TestResultRecord(result: result).portableResult)
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 12)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for restored in [result, portable, archive.results[0]] {
       XCTAssertEqual(TypingReplay.soundTimeline(prompt: restored.prompt, events: restored.replayEvents).map(\.cue),
         [.click, .click, .click, .error, .click, .click, .click, .click, .click])

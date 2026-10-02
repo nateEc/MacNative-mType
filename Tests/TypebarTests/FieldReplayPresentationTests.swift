@@ -314,12 +314,12 @@ final class FieldReplayPresentationTests: XCTestCase {
     XCTAssertFalse(frame.fields[0].letters[1].incorrect)
   }
 
-  func testPortableAndArchiveTwelveRecreateFrameAndSeekWithoutRewritingMetrics() throws {
+  func testPortableAndCurrentArchiveRecreateFrameAndSeekWithoutRewritingMetrics() throws {
     let result = try delayedResult(finish: true)
     let portable = try JSONDecoder().decode(CompletedTestResult.self, from: JSONEncoder().encode(result))
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 12)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     let original = try XCTUnwrap(FieldReplayPlan.make(prompt: result.prompt, events: result.replayEvents))
     for restored in [portable, archive.results[0]] {
       XCTAssertEqual(restored.replayEvents, result.replayEvents)

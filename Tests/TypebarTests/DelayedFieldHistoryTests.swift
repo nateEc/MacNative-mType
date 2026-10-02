@@ -42,7 +42,7 @@ final class DelayedFieldHistoryTests: XCTestCase {
     for restored in [portable, archive.results[0]] {
       XCTAssertEqual(SavedTextInputHistoryPolicy.inputFields(events: restored.replayEvents), ["a ", "\tb"])
     }
-    XCTAssertEqual(archive.version, 12)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
   }
 
   func testCapturedFieldsPreserveOriginalOffsetsAndAutomaticActions() throws {
@@ -179,7 +179,7 @@ final class DelayedFieldHistoryTests: XCTestCase {
     for version in 1...11 {
       let archive = TypebarArchive(version: version, exportedAt: start, settings: .init(),
         results: [result], presets: [])
-      XCTAssertEqual(archive.version, 12)
+      XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     }
   }
 
@@ -215,6 +215,7 @@ final class DelayedFieldHistoryTests: XCTestCase {
     records[0]["replayEvents"] = events.map { event in
       var old = event
       old.removeValue(forKey: "inputField")
+      old.removeValue(forKey: "inputCorrectness")
       return old
     }
     object["results"] = records

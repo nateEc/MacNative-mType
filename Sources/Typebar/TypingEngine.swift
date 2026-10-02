@@ -3036,6 +3036,15 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// Archive 12. Missing legacy snapshots cannot be inferred reliably after
   /// delayed input has reordered primitive insert/delete actions.
   let inputField: TypingReplayInputField?
+  /// Archive 13: input-time judgments in UTF-16 order. A native grapheme can
+  /// represent several source input actions, including mixed surrogate results.
+  /// nil retains the prior archive's derivation; never backfill old judgments.
+  let inputCorrectness: [Bool]?
+  var validatedInputCorrectness: [Bool]? {
+    guard kind == .insert, !text.isEmpty, let inputCorrectness,
+      inputCorrectness.count == text.utf16.count else { return nil }
+    return inputCorrectness
+  }
   var isStoppedInsertion: Bool { kind == .insert && inputStopped == true }
   var id: String { "\(offset)-\(kind.rawValue)-\(text)" }
 
@@ -3043,7 +3052,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     offset: TimeInterval, kind: TypingReplayEventKind, text: String, forceError: Bool = false,
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
-    inputField: TypingReplayInputField? = nil
+    inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3055,11 +3064,12 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.characterDeletionCount = characterDeletionCount
     self.inputStopped = inputStopped
     self.inputField = inputField
+    self.inputCorrectness = inputCorrectness
   }
 
   private enum CodingKeys: String, CodingKey {
     case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount, characterDeletionCount
-    case inputStopped, inputField
+    case inputStopped, inputField, inputCorrectness
   }
 
   init(from decoder: Decoder) throws {
@@ -3074,6 +3084,11 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     characterDeletionCount = try values.decodeIfPresent(Int.self, forKey: .characterDeletionCount)
     inputStopped = try values.decodeIfPresent(Bool.self, forKey: .inputStopped)
     inputField = try values.decodeIfPresent(TypingReplayInputField.self, forKey: .inputField)
+    inputCorrectness = try values.decodeIfPresent([Bool].self, forKey: .inputCorrectness)
+    guard inputCorrectness == nil || validatedInputCorrectness != nil else {
+      throw DecodingError.dataCorruptedError(forKey: .inputCorrectness, in: values,
+        debugDescription: "Input judgments require one Boolean per inserted UTF-16 unit.")
+    }
   }
 }
 
@@ -3332,7 +3347,11 @@ enum TypingReplay {
       }
 
       if !continuationIndices.contains(eventIndex), let cue {
-        cues.append(.init(offset: event.offset, cue: cue))
+        if let judgments = event.validatedInputCorrectness {
+          cues.append(contentsOf: judgments.map { .init(offset: event.offset, cue: $0 ? .click : .error) })
+        } else {
+          cues.append(.init(offset: event.offset, cue: cue))
+        }
       }
       previousEventWord = eventWord
     }
@@ -3413,11 +3432,20 @@ enum TypingReplay {
       case .insert:
         if !event.isStoppedInsertion {
           let units = Array(event.text.utf16)
-          let end = field.value.utf16.count
-          let start = end - units.count
-          let correct = isZen || (!event.forceError && start >= 0 && end <= targets[field.index].count
-            && units.enumerated().allSatisfy { offset, unit in targets[field.index][start + offset] == unit })
-          actions.append(.init(offset: event.offset, kind: .input(text: event.text, correct: correct)))
+          if let judgments = event.validatedInputCorrectness {
+            for (index, unit) in units.enumerated() {
+              // A lone surrogate is a separate source DOM node. Display it
+              // as replacement text in Swift, without changing retained input.
+              let text = String(decoding: [unit], as: UTF16.self)
+              actions.append(.init(offset: event.offset, kind: .input(text: text, correct: judgments[index])))
+            }
+          } else {
+            let end = field.value.utf16.count
+            let start = end - units.count
+            let correct = isZen || (!event.forceError && start >= 0 && end <= targets[field.index].count
+              && units.enumerated().allSatisfy { offset, unit in targets[field.index][start + offset] == unit })
+            actions.append(.init(offset: event.offset, kind: .input(text: event.text, correct: correct)))
+          }
         }
       case .delete:
         // Regression already emits the source back-word action. Do not add
@@ -3959,6 +3987,8 @@ struct TypingSession {
   /// Feedback follows the final attempted UTF-16 unit in one text event,
   /// including attempts that stop/delete rules do not leave on screen.
   private(set) var lastInputWasCorrect: Bool?
+  private var latestInputCorrectness: [Bool]?
+  private var latestReplayInputText: String?
   private var liveInsertionFeedback: [Bool] = []
   /// A stopped letter can be drawn without entering the accepted input.
   /// Only a final input callback publishes this candidate; pre-input guards
@@ -5084,7 +5114,8 @@ struct TypingSession {
           case .virtualKeyboard: hasAcceptedVirtualKeyboardInput = true
           }
         }
-        recordReplayEvent(kind: .insert, text: String(character), forceError: forceError, at: date)
+        // The source logs normalized data, not the pre-normalization key.
+        recordReplayEvent(kind: .insert, text: latestReplayInputText ?? String(character), forceError: forceError, at: date)
         insertCodeIndentationIfNeeded(at: date)
         if !defersAutomaticInput, !applyingAutomaticCodeInput { drainAutomaticInput() }
         if quoteWordStream != nil, quoteNavigationIndex > quoteWordBefore {
@@ -5380,7 +5411,8 @@ struct TypingSession {
       beginIfNeeded(at: date)
       let units = inputAccuracyUnits(for: inputCharacter,
         targetIndex: currentTargetIndex, forceError: forceError)
-      recordInputAttempt(inputCharacter, correctUnits: units.correct, lastUnitCorrect: units.lastCorrect)
+      recordInputAttempt(inputCharacter, correctUnits: units.correct, lastUnitCorrect: units.lastCorrect,
+        judgments: units.judgments)
       recordWeakSpotInput(inputCharacter, isCorrect: units.lastCorrect, at: date)
       if !units.lastCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
       if rejectsOppositeShiftInput {
@@ -5434,7 +5466,7 @@ struct TypingSession {
     let isCorrect = !retainsCurrentWordAsExtra && InputTextIdentity.matches(inputCharacter, expected) && !forceError
       && accuracyUnits.lastCorrect
     recordInputAttempt(inputCharacter, correctUnits: accuracyUnits.correct,
-      lastUnitCorrect: accuracyUnits.lastCorrect)
+      lastUnitCorrect: accuracyUnits.lastCorrect, judgments: accuracyUnits.judgments)
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
     if !isCorrect { attemptedErrorCounts[currentTargetIndex, default: 0] += 1 }
     // Opposite Shift records a failed physical attempt, but the reference
@@ -5623,12 +5655,14 @@ struct TypingSession {
   }
 
   private mutating func recordInputAttempt(
-    _ character: Character, correctUnits: Int, lastUnitCorrect: Bool? = nil
+    _ character: Character, correctUnits: Int, lastUnitCorrect: Bool? = nil, judgments: [Bool]? = nil
   ) {
     let units = String(character).utf16.count
     inputAttemptCount += units
     correctInputAttemptCount += correctUnits
     lastInputWasCorrect = lastUnitCorrect ?? (correctUnits == units)
+    latestInputCorrectness = judgments ?? Array(repeating: correctUnits == units, count: units)
+    latestReplayInputText = String(character)
   }
 
   /// Accuracy follows input-event units, not the native caret's grapheme
@@ -5636,8 +5670,11 @@ struct TypingSession {
   /// Deletion changes the next comparison position but never these tallies.
   private func inputAccuracyUnits(
     for character: Character, targetIndex: Int, forceError: Bool
-  ) -> (correct: Int, lastCorrect: Bool) {
-    guard !forceError, promptCharacters.indices.contains(targetIndex) else { return (0, false) }
+  ) -> (correct: Int, lastCorrect: Bool, judgments: [Bool]) {
+    let inputUnits = Array(String(character).utf16)
+    guard !forceError, promptCharacters.indices.contains(targetIndex) else {
+      return (0, false, Array(repeating: false, count: inputUnits.count))
+    }
     let target: String
     let position: Int
     if let range = activeNoSpaceWordRange, range.upperBound <= promptCharacters.count {
@@ -5658,11 +5695,13 @@ struct TypingSession {
     let targetUnits = Array(target.utf16)
     var correct = 0
     var lastCorrect = false
-    for (index, unit) in String(character).utf16.enumerated() {
+    var judgments: [Bool] = []
+    for (index, unit) in inputUnits.enumerated() {
       lastCorrect = targetUnits.indices.contains(position + index) && targetUnits[position + index] == unit
+      judgments.append(lastCorrect)
       if lastCorrect { correct += 1 }
     }
-    return (correct, lastCorrect)
+    return (correct, lastCorrect, judgments)
   }
 
   /// Zen accepts the user's own text rather than comparing it to a generated
@@ -5796,7 +5835,8 @@ struct TypingSession {
         forceError: forceError, automatic: automatic || applyingAutomaticCodeInput,
         commitsWord: kind == .insert && retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
           ? false : nil, inputStopped: inputStopped ? true : nil,
-        inputField: replayInputField(kind: kind, inputStopped: inputStopped)))
+        inputField: replayInputField(kind: kind, inputStopped: inputStopped),
+        inputCorrectness: kind == .insert ? latestInputCorrectness : nil))
   }
 
   private func replayInputField(
@@ -5832,7 +5872,7 @@ struct TypingSession {
         forceError: event.forceError, automatic: event.automatic, commitsWord: event.commitsWord,
         wordDeletionCount: wholeWord && index == start ? replayEvents.count - start : nil,
         characterDeletionCount: !wholeWord && index == start ? replayEvents.count - start : nil,
-        inputField: event.inputField)
+        inputField: event.inputField, inputCorrectness: event.inputCorrectness)
     }
   }
 

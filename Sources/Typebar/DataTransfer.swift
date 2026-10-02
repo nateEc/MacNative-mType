@@ -267,9 +267,9 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    // Older readers lack stopped-input and field-local snapshot semantics.
+    // Older readers lack stopped-input, field-local snapshot and unit judgment semantics.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 12
+    static let currentVersion = 13
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -302,8 +302,10 @@ struct TypebarArchive: Codable, Equatable {
         activeTestSelection: ActiveTestSelectionDocument? = nil
     ) {
         let hasFields = results.contains { $0.replayEvents.contains { $0.inputField != nil } }
+        let hasJudgments = results.contains { $0.replayEvents.contains { $0.inputCorrectness != nil } }
         let hasStoppedInput = results.contains { $0.replayEvents.contains(where: \.isStoppedInsertion) }
-        self.version = hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
+        self.version = hasJudgments ? max(13, version)
+            : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
         let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
         let deletedKeyboardLayouts = version >= 9 ? Set(deletedCustomKeyboardLayoutIDs) : []
@@ -858,6 +860,9 @@ enum TypebarDataTransfer {
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         guard archive.version >= 12 || !archive.results.contains(where: {
             $0.replayEvents.contains { $0.inputField != nil }
+        }) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 13 || !archive.results.contains(where: {
+            $0.replayEvents.contains { $0.inputCorrectness != nil }
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         return archive
     }

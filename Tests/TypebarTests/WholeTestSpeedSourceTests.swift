@@ -155,7 +155,10 @@ final class WholeTestSpeedSourceTests: XCTestCase {
     session.insert("'", at: start)
     session.insert("a", at: start.addingTimeInterval(2))
     let result = try XCTUnwrap(session.result())
-    XCTAssertEqual(result.replayEvents.first?.text, "'")
+    // New logs retain source-normalized data; old raw-key tapes stay readable.
+    XCTAssertEqual(result.replayEvents.first?.text, "’")
+    XCTAssertEqual(result.replayEvents.first?.inputCorrectness, [true])
+    XCTAssertEqual(result.replayEvents.first?.inputField?.value, "’")
     XCTAssertEqual(result.wpm, 12)
     let point = ResultPerformanceTrace.point(prompt: result.prompt, events: result.replayEvents,
       elapsed: result.elapsedDuration, configuration: result.configuration)
@@ -163,6 +166,13 @@ final class WholeTestSpeedSourceTests: XCTestCase {
     XCTAssertEqual(point.errorCount, 0)
     XCTAssertEqual(ResultPerformanceTrace.points(prompt: result.prompt, events: result.replayEvents,
       duration: result.elapsedDuration, configuration: result.configuration).last, point)
+    let old: [TypingReplayEvent] = [.init(offset: 0, kind: .insert, text: "'"),
+      .init(offset: 2, kind: .insert, text: "a")]
+    XCTAssertEqual(TypingReplay.typedText(events: old, through: 2), "'a")
+    let oldPoint = ResultPerformanceTrace.point(prompt: result.prompt, events: old,
+      elapsed: result.elapsedDuration, configuration: result.configuration)
+    XCTAssertEqual(oldPoint.wpm, result.wpm)
+    XCTAssertEqual(oldPoint.errorCount, 0)
   }
 
   func testReplayWordCreditUsesLanguageEquivalenceAndNormalizedCommitSpaces() {
