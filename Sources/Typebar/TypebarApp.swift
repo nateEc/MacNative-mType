@@ -3261,8 +3261,8 @@ private struct ContentView: View {
     synchronizeLiveInputRules()
     let errorsBefore = session.errors
     let typedCountBefore = session.typed.count
-    session.insertBatch(
-      effectiveInsertedText(text),
+    let feedback = TypingLiveInputFeedback.insertBatch(
+      effectiveInsertedText(text), into: &session,
       forceError: forceError, origin: origin)
     verifyChallengeFontAvailability()
     emitTypingPowerEffect(
@@ -3275,15 +3275,13 @@ private struct ContentView: View {
         character: pressedCharacter,
         isCorrect: session.errors == errorsBefore)
     }
-    playInputFeedback(inputWasCorrect: session.lastInputWasCorrect)
+    for correct in feedback { playInputFeedback(inputWasCorrect: correct) }
   }
 
   private func handleDeletedText(deletesWord: Bool) {
     synchronizeLiveInputRules()
-    let before = session.typed
-    if deletesWord { session.deleteWordBackward() }
-    else { session.deleteBackward() }
-    if session.typed != before { playInputFeedback(inputWasCorrect: true) }
+    let feedback = TypingLiveInputFeedback.delete(from: &session, wholeWord: deletesWord)
+    for correct in feedback { playInputFeedback(inputWasCorrect: correct) }
   }
 
   private func playInputFeedback(inputWasCorrect: Bool?) {

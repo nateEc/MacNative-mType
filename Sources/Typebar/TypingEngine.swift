@@ -3825,6 +3825,7 @@ struct TypingSession {
   /// Feedback follows the final attempted UTF-16 unit in one text event,
   /// including attempts that stop/delete rules do not leave on screen.
   private(set) var lastInputWasCorrect: Bool?
+  private var liveInsertionFeedback: [Bool] = []
   /// Input/deletion/composition UI publishes hundredths, but a real-second
   /// timer update publishes the unrounded live cache. Neither alters scoring.
   private var roundsLiveAccuracyForInputDisplay = true
@@ -4758,6 +4759,7 @@ struct TypingSession {
   }
 
   mutating func insert(_ text: String, forceError: Bool = false, at date: Date = .now) {
+    liveInsertionFeedback.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: false)
   }
@@ -4766,13 +4768,17 @@ struct TypingSession {
   /// confirmed IME composition. The reference processes every character but
   /// delays difficulty and burst terminal checks until the event's final
   /// character.
-  mutating func insertBatch(
+  /// Returns transient UI feedback, including automatic tabs and recursive
+  /// spelling replacements; it is deliberately separate from persisted replay.
+  @discardableResult mutating func insertBatch(
     _ text: String, forceError: Bool = false, at date: Date = .now,
     origin: TypingInputOrigin = .physicalKeyboard
-  ) {
+  ) -> [Bool] {
+    liveInsertionFeedback.removeAll()
     insertText(
       text, forceError: forceError, at: date, evaluatesTerminalRulesOnLastCharacterOnly: true,
       origin: origin)
+    return liveInsertionFeedback
   }
 
   /// A marked-text composition starts the reference attempt before its text is
@@ -4823,10 +4829,19 @@ struct TypingSession {
       let evaluatesTerminalRules = !evaluatesTerminalRulesOnLastCharacterOnly
         || index == characters.indices.last
       let quoteWordBefore = quoteWordStream == nil ? 0 : quoteNavigationIndex
-      if insertCharacter(
+      let attemptsBeforeCharacter = inputAttemptCount
+      let accepted = insertCharacter(
         character, forceError: forceError, at: date,
         evaluatesTerminalRules: evaluatesTerminalRules)
+      // A batch reports its final attempted character, even when an error
+      // guard removes it. Recursive spelling replacements have their own
+      // final callback; pre-insertion rejection has no UI feedback.
+      if evaluatesTerminalRules, inputAttemptCount > attemptsBeforeCharacter,
+        let correct = lastInputWasCorrect
       {
+        liveInsertionFeedback.append(correct)
+      }
+      if accepted {
         switch origin {
         case .physicalKeyboard: hasAcceptedPhysicalKeyboardInput = true
         case .virtualKeyboard: hasAcceptedVirtualKeyboardInput = true
@@ -5997,7 +6012,12 @@ struct TypingSession {
       guard target.first == 9, target.indices.contains(offset), target[offset] == 9 else { break }
       // Automatic tabs use the normal scoring, word-boundary and difficulty
       // path, but remain explicitly automatic on the persisted replay tape.
-      guard insertCharacter("\t", forceError: false, at: date, evaluatesTerminalRules: true) else { break }
+      let attemptsBeforeTab = inputAttemptCount
+      let accepted = insertCharacter("\t", forceError: false, at: date, evaluatesTerminalRules: true)
+      if inputAttemptCount > attemptsBeforeTab, let correct = lastInputWasCorrect {
+        liveInsertionFeedback.append(correct)
+      }
+      guard accepted else { break }
       recordReplayEvent(kind: .insert, text: "\t", automatic: true, at: date)
       if isFinished || lastInputWasCorrect != true { break }
     }
