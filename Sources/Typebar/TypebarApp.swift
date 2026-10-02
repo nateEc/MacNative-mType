@@ -2981,6 +2981,7 @@ private struct ContentView: View {
     let promptHighlightMode = effectivePromptHighlightMode
     let glyphs = session.promptGlyphs
     let caretIndex = currentPromptGlyphIndex
+    let targetGlyphCount = session.prompt.count
     let words = session.promptWordPresentations
     let indices = PromptGlyphLayout.indices(
       glyphs: glyphs, words: words, hideExtraLetters: session.configuration.rules.hideExtraLetters)
@@ -2989,23 +2990,21 @@ private struct ContentView: View {
       mode: promptHighlightMode, blindMode: session.configuration.rules.blindMode,
       typedEffect: settings.typedCharacterEffect)
     return PromptRendering.make(glyphs: glyphs, indices: indices) { index, glyph in
-      let replacesTypo = glyph.typedCharacter != nil && settings.typoIndicatorStyle.replacesTarget
       let turnsIntoDot = TypedCharacterEffectPolicy.replacesCommittedCharacterWithDot(
         isCompleted: completedCharacterIndices.contains(index), character: glyph.character,
         effect: settings.typedCharacterEffect)
       let replacesCurrentWithComposition = index == caretIndex
         && settings.compositionDisplayStyle == .replace
         && !compositionText.isEmpty
+      let textPlan = PromptControlCharacterPresentation.plan(
+        for: glyph, style: settings.typoIndicatorStyle,
+        isZen: session.configuration.mode == .zen, isExtra: index >= targetGlyphCount,
+        compositionReplacement: replacesCurrentWithComposition ? compositionText : nil)
       let displayedText: String
       if turnsIntoDot {
         displayedText = "•"
-      } else if replacesCurrentWithComposition {
-        displayedText = compositionText
-      } else if replacesTypo {
-        displayedText = String(glyph.typedCharacter ?? glyph.character)
       } else {
-        displayedText = PromptControlCharacterPresentation.text(
-          for: glyph.character, state: glyph.state)
+        displayedText = textPlan.text
       }
       var character = AttributedString(displayedText)
       if session.configuration.modifiers.contains(.listening) {
@@ -3042,16 +3041,15 @@ private struct ContentView: View {
         settings.caretStyle.drawsMarker && !usesNativeCaretOverlay {
         applyCaret(to: &character)
       }
+      if let color = character.foregroundColor {
+        character.foregroundColor = color.opacity(textPlan.opacity)
+      }
       if settings.typedCharacterEffect != .hide || !completedCharacterIndices.contains(index) {
         appearance.applyErrorUnderline(to: &character, errorColor: errorFeedbackColor)
       }
-      if glyph.state == .incorrect,
-        appearance.color != .hidden,
-        settings.typoIndicatorStyle.showsHint,
-        let enteredCharacter = glyph.typedCharacter
+      if appearance.color != .hidden, let hintText = textPlan.hint
       {
-        let hintCharacter = replacesTypo ? glyph.character : enteredCharacter
-        var hint = AttributedString(String(hintCharacter))
+        var hint = AttributedString(hintText)
         hint.font = .system(
           size: max(9, settings.fontSize * 0.48), weight: .semibold, design: .monospaced)
         hint.foregroundColor = errorFeedbackColor.opacity(0.72)

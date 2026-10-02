@@ -16277,11 +16277,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertGreaterThan(scrollView.contentView.documentVisibleRect.minY, 0)
   }
 
-  func testPendingCodeLineBreakShowsReturnTargetWithoutChangingOtherGlyphs() {
+  func testCodeLineBreakKeepsReturnMarkerAndSourceLayoutAfterCorrectInput() {
     XCTAssertEqual(
       PromptControlCharacterPresentation.text(for: "\n", state: .current), "↵\n")
     XCTAssertEqual(
-      PromptControlCharacterPresentation.text(for: "\n", state: .correct), "\n")
+      PromptControlCharacterPresentation.text(for: "\n", state: .correct), "↵\n")
     XCTAssertEqual(
       PromptControlCharacterPresentation.text(for: " ", state: .current), " ")
   }

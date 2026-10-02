@@ -68,12 +68,65 @@ struct PromptRendering {
   }
 }
 
-/// Keep the required Return visible at the end of a code line. The real
-/// newline remains in the rendered text, so following lines retain their
-/// original layout and glyph-to-caret offsets.
+struct PromptGlyphTextPlan: Equatable {
+  let text: String
+  let hint: String?
+  let opacity: Double
+}
+
+/// Native symbols replace control-character icons, not accepted input.
+/// Only a source newline owns a line break; a mistyped/extra newline is a
+/// visible error in its existing field. Hints remain text, not icons.
 enum PromptControlCharacterPresentation {
   static func text(for character: Character, state: TypingPromptCharacterState) -> String {
-    character == "\n" && state == .current ? "↵\n" : String(character)
+    plan(for: .init(character: character, state: state), style: .off).text
+  }
+
+  static func plan(
+    for glyph: TypingPromptGlyph, style: TypoIndicatorStyle,
+    isZen: Bool = false, isExtra: Bool = false, compositionReplacement: String? = nil
+  ) -> PromptGlyphTextPlan {
+    let extra = isExtra || glyph.state == .extra
+    if let compositionReplacement {
+      let body = compositionReplacement.map { character -> String in
+        if character == " ", !isZen { return "_" }
+        if character == "\t" || character == "\n" || character == "\r" { return " " }
+        return String(character)
+      }.joined()
+      return .init(text: body + (!isZen && !extra && glyph.character == "\n" ? "\n" : ""),
+        hint: nil, opacity: 1)
+    }
+    let isControl = glyph.character == "\t" || glyph.character == "\n"
+    if isZen {
+      return .init(text: String(glyph.character), hint: nil, opacity: isControl ? 0 : 1)
+    }
+    let replaces = glyph.typedCharacter != nil && style.replacesTarget
+    let displayed = replaces ? glyph.typedCharacter ?? glyph.character : glyph.character
+    let body: String
+    if replaces || extra { body = enteredText(for: displayed) }
+    else if glyph.character == "\t" { body = "→" }
+    else if glyph.character == "\n" { body = "↵" }
+    else { body = String(glyph.character) }
+    // The original target field owns its line layout even when its Return
+    // icon is replaced with a wrong letter. Input errors must not own it.
+    let text = body + (!extra && glyph.character == "\n" ? "\n" : "")
+    var hint: String?
+    if !extra, glyph.state == .incorrect, style.showsHint, let entered = glyph.typedCharacter {
+      let character = replaces ? glyph.character : entered
+      // HTML hints use ordinary collapsed whitespace, not control icons.
+      hint = character == "\t" || character == "\n" || character == "\r"
+        ? " " : String(character)
+    }
+    return .init(text: text, hint: hint, opacity: isControl && !extra ? 0.2 : 1)
+  }
+
+  private static func enteredText(for character: Character) -> String {
+    switch character {
+    case " ": "_"
+    case "\t": "→"
+    case "\n": "↵"
+    default: String(character)
+    }
   }
 }
 

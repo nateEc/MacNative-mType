@@ -1,5 +1,17 @@
 # Typebar 人工验收记录
 
+2026-10-03 控制字符提示增量（定向验证已通过，最终完整门禁已通过）：固定 [正文绘制](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L734-L962)、[原始文字提示](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L210-L245)、[源换行容器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L392-L418) 与 [控制图示样式](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/styles/test.scss#L135-L143) 为合同。原生独立建立 PromptGlyphTextPlan：目标 Tab／LF 使用自有方向符号，所有正确／待输入／错误状态保留目标图示；目标 LF 另保留真实分行。错误正文替换与额外输入中，ASCII 空格是下划线，Tab／LF 是方向符号而不是隐形 Tab stop／新行；替换源 LF 时仍只有其原有分行。正常空格及其他 Unicode 空白不被自动改成错误图示，隐藏额外字保留其输入来源而非错误创建源行。
+
+提示四档共用规则：off／below 保留目标正文，replace／both 显示实际输入；below 提示输入，both 提示目标。提示不是图示，Tab／LF／CR 按原版普通 HTML 空白语义显示空白，不让提示在原生文本中另开一行。目标控制图示保留 0.2 淡化，错误替换该图示也保留；输入的额外图示不继承它。Zen 已输入 Tab／LF 不显示图示，仍保留输入白字符布局。候选替换独立显示：普通模式空格为下划线、候选 Tab／LF 为文字空白，不继承控制目标的淡化，也不显示旧停止错字提示；Zen 候选不加下划线。主练习使用同一纯显示计划，源目标数量只在绘制循环外算一次；光标／Tape 继续由真实输入和渲染偏移定位。监听／隐藏颜色不因文字计划而揭露输入。
+
+PromptControlGlyphTests 新增 21 项。首轮三项有六个预期行为失败，证明目标 Tab、非当前 LF 和额外控制符不可见／错误换行；首项组复验三项零失败 0.001 秒。扩展相关 131 项零失败（0.503 秒），候选淡化反例经会话内有界风险复核后纳入同一规则，最终相关 144 项零失败（0.552 秒）。新增 21 项独立复验零失败（0.068 秒），覆盖四档提示、停止空格／LF、目标／额外／隐藏来源、目标淡化、Zen、Unicode 白字符、候选、布局偏移、不开窗 TextKit 几何、真实 TypingInputView 插入入口及归档／日志不变。原有当前 Return 测试仍保留当前图示与正常空格断言，正确 Return 的旧无图示断言按实际原版改为保留图示，不降低正文、结果或计分检查。
+
+只读 bundled Node v24.19.0 类型擦除／内存执行实际完整 updateWordLetters 与 createHintsHtml，八组核对目标 Tab／LF、输入空间／Tab／LF 替换、源 LF 的 both 提示、原始 below 提示与三种额外符；再四组核对候选控制字符、候选替换源 LF、Zen 已输入和 Zen 候选。原版提示实际保留 LF 文本，不把它伪称提示图示；普通 HTML 空白折叠是渲染语义依据，不冒称已跑浏览器 computed style。DOM／词目录、配置／状态、RAF、字形拆分、位置和提示重叠依赖为明确自有桩；无上游代码、FontAwesome 字体／图示或数据进入原生仓库，不代表 Vitest 或真实设备。原生方向符号是独立系统文字，源 FA 固定图示宽度／像素／字距与原生字体未验证精确等价。
+
+仅关闭本次证实的正文控制提示／错误行归属／候选控制淡化缺口。全逐 UTF-16／半代理／CRLF、候选多字符覆盖整段目标与移除剩余目标的完整布局、LF 字段自身错误映射／额外归属、RAF 词快照／竞态、真实 UI／IME／RTL／多窗口、Zen 控制占位精确宽度、提示重叠／色彩／字体，以及 Funbox 特殊绘制、主题／词库／远程等仍开放；94 配置键和部分 Funbox 状态不升级。无引擎／计分／回放／归档 11／SwiftData schema 改动，不写真实库、不回算历史、不部署、不启动图形实例。三条新人工场景只是待验收清单，整体 goal active；使用源码驱动、行为优先测试、简洁实现及会话内有界决策／风险复核，不冒称独立评审。
+
+2026-10-03 本控制字符提示增量最终完整门禁通过：客户端 1,993 项零失败（374.847 秒）、服务端 131 项零失败（1.487 秒）、738 条唯一人工场景清单、固定参考／元数据／原创性审计与未打开应用包检查全部通过。门禁内 testOptionalHundredThousandWordEndurance 实际执行通过（40.547 秒），已在日志清理前核对记录，不以环境开关／旧轮结果代替。测试／编译串行且活跃期间未改 Swift 输入；门禁前真实背景存储路径为不存在，没有删除用户数据。没有 Typebar 图形进程、实际音频播放、真实成绩／设置库写入、服务部署或跨设备同步；Core Data 环境诊断与 XCTest 失败分开，零测试失败不意味零系统诊断。三条新增人工场景仍待验收，方向符号的精确度量、候选覆盖、LF 字段映射、UTF-16、真实 UI／IME 等前述缺口保持开放，整体 goal active。
+
 2026-10-03 停止输入显示增量（定向验证已通过，最终完整门禁已通过）：固定 [输入处理](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L230-L320)、[字形重绘](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L734-L962)、[输入／删除／候选回调](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L1690-L1731)、[光标](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/caret.ts#L37-L45) 为合同。原生独立增加会话内停止错字候选和已发布显示值：仅最终判定回调发布，前置拒绝不清除，前面的批次错字不积累；反向 Shift 不发布，盲打创建时不保存供以后揭示。没有人为毫秒过期器，下一正确／Shift 回调、获准删除、候选重绘或有效高亮模式切换恢复真实输入。首词空输入退格被阻止，不应误清除。计时刷新与 compositionstart 本身不重绘该错字。
 
 目标内错误保留原目标与 typedCharacter，沿用原生替换／提示显示；活动词显示错误但不生成已提交边框。目标外错误是活动词内的额外字，在其分隔符前布局，隐藏额外字不预留空间；有来源元数据的空 no-space 字段拥有该额外字，不误标后词目标。独立光标索引支持停止错字与 Tape，不从错误颜色猜位置；实时 SwiftUI 主练习引用它，绘制循环只计算一次索引，避免每字形重复生成全提示。Memory 的隐藏颜色优先。保留正文、目标游标、计分、事件日志、回放、归档 11 与 SwiftData schema 不改变，不写真实库。
@@ -1435,6 +1447,9 @@ pgrep -alf -f '/swiftc ' || true
 
 | ID | 场景 | 操作 | 预期 | 状态 |
 | --- | --- | --- | --- | --- |
+| INP-CONTROL-BODY-01 | 目标与输入控制符图示 | 后续唯一获准隔离候选选择含 Tab／LF 的代码提示，对照四档错字提示，输入空间、Tab 和 LF 错误，再隐藏额外字。 | 目标 Tab／LF 有淡化方向符号，错误输入空间是下划线；输入 LF 图示不另造源行，源 LF 替换后仍保留分行，额外符不继承目标淡化。 | 待验收（21 项共享显示／布局回归；真实 UI、系统字体与源 FA 精确宽度未验收） |
+| INP-CONTROL-HINT-01 | 提示文字、光标与 Tape | 后续唯一隔离候选在含 LF 提示中用 below／both 输入控制错字，核对提示空白、随后词光标／Tape 和隐藏／监听模式。 | below 提示实际字，both 提示目标字；提示控制符不变正文图示、不增行；正文显示变化不推进接受输入与计分，隐藏颜色仍生效。 | 待验收（原始提示函数探针与不开窗 TextKit／插入入口；重叠提示、真实字体、RTL 与窗口未验收） |
+| INP-CONTROL-CANDIDATE-01 | 候选与 Zen 控制字符 | 后续唯一隔离候选在 Tab／LF 目标更新含空间／Tab／LF 的候选，再在 Zen 输入控制符并确认／取消候选。 | 候选不继承目标 0.2 淡化，普通候选空间为下划线、候选 Tab／LF 为空白，Zen 候选不加下划线；已输入 Zen 控制符不显示图示。 | 待验收（纯显示与实际绘制函数探针；多目标候选覆盖、真实 IME 与 Zen 控制宽度未验收） |
 | INP-STOPPED-VISUAL-LETTER-01 | 停止错字不推进正文和光标 | 后续唯一获准隔离候选启用 letter-stop，在词中按错键，换提示样式／高亮／Tape，按正确键与退格；词首空输入按错后再按退格。 | 错目标／提示可见但输入与光标不推进；下一有效输入／删除／高亮重绘清除，空首词被阻止退格保留；计时不任意过期。 | 待验收（共享引擎／TextKit 自动化；私有 SwiftUI 仅编译，真实窗口与控制字符图示未验收） |
 | INP-STOPPED-VISUAL-EXTRA-01 | 停止额外字属于当前字段 | 后续唯一隔离候选在完整词后按错键，再开关隐藏额外字；有来源 no-space 空字段输入错键，核对 Memory。 | 临时额外字在当前词分隔符前，光标不跨它；隐藏不占额外空间，空字段不标后词，Memory 不泄露错误颜色。 | 待验收（布局／归属／隐藏自动化；真实 Tape／RTL／输入法与设备未验收） |
 | INP-STOPPED-VISUAL-BATCH-01 | 批次、候选与 Shift 重绘 | 后续唯一隔离候选输入末对／末错批次，启用反向 Shift 和盲打，按预拒绝 Return，再更新／确认／取消 IME 候选。 | 仅最终回调发布停止字，Shift 不显示被移除字，盲打不保存新停止字；候选重绘恢复实际输入，前置拒绝不清除旧错字。 | 待验收（16 项定向自动化／实际函数探针；末预拒绝整词快照、RAF／导航竞态与真实 IME 未验收） |
