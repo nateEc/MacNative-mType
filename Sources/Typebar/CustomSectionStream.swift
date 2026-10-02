@@ -74,6 +74,7 @@ struct CustomSectionWordStream {
     let previousSectionCount = selectedSections
     var lastSeparator = ""
     var lastWordIsBlank = false
+    let britishEnglish = BritishEnglishPolicy.Context(configuration: configuration)
     for _ in 0..<maximumWords where hasSectionWordsRemaining {
       if pendingIndex >= pendingWords.count {
         let index = nextSectionIndex(random: random)
@@ -84,7 +85,8 @@ struct CustomSectionWordStream {
       }
       let altered = TestModifierPolicy.transformedWord(pendingWords[pendingIndex],
         modifiers: configuration.modifiers, language: configuration.language,
-        wordIndex: emittedWords, wordBound: alterationBound, nextRandomCaseBit: nextRandomCaseBit)
+        wordIndex: emittedWords, wordBound: alterationBound, britishEnglish: britishEnglish,
+        nextRandomCaseBit: nextRandomCaseBit)
       pendingIndex += 1
       emittedWords += 1
       // Commit follows text alteration; reversing a word must not move its

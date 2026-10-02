@@ -1270,10 +1270,11 @@ enum TestModifierPolicy {
     _ prompt: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
     preservesNoSpaceBoundaries: Bool = false, wordOffset: Int = 0, wordBound: Int? = nil,
     preservesWordOrder: Bool = false, formatsWordPool: Bool = false,
+    britishEnglish: BritishEnglishPolicy.Context? = nil,
     nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> TransformedPromptBatch {
     let presented = language?.presentationText(prompt) ?? prompt
-    guard formatsWordPool || preservesNoSpaceBoundaries || modifiers.contains(where: { canonicalTextAlterations.contains($0)
+    guard britishEnglish?.enabled == true || formatsWordPool || preservesNoSpaceBoundaries || modifiers.contains(where: { canonicalTextAlterations.contains($0)
       || [.noSpaces, .arrowStream, .lazyLatin].contains($0) }) else {
       return .init(text: presented)
     }
@@ -1288,6 +1289,7 @@ enum TestModifierPolicy {
     var output = ""
     var targets: [String] = []
     var generatedWordIndex = wordOffset
+    var previousBritishWord: String?
     for (index, word) in words.enumerated() {
       // A chunk's leading commit or repeated separators are not generated
       // words. Keep the standalone finite-text API's legacy behavior unless
@@ -1295,7 +1297,11 @@ enum TestModifierPolicy {
       let altered = word.isEmpty && wordBound != nil ? "" : transformedWord(word,
         modifiers: modifiers, language: language,
         wordIndex: wordBound == nil ? index : generatedWordIndex,
-        wordBound: wordBound ?? words.count, nextRandomCaseBit: nextRandomCaseBit)
+        wordBound: wordBound ?? words.count, britishEnglish: britishEnglish,
+        previousBritishWord: previousBritishWord, nextRandomCaseBit: nextRandomCaseBit)
+      if !word.isEmpty, britishEnglish?.isQuote == true {
+        previousBritishWord = BritishEnglishPolicy.previousWordKey(altered)
+      }
       if !word.isEmpty { generatedWordIndex += 1 }
       output += altered
       if capturesTargets, !word.isEmpty { targets.append(altered) }
@@ -1324,12 +1330,15 @@ enum TestModifierPolicy {
 
   static func transformedWord(
     _ word: String, modifiers: [TestModifier], language: TypingLanguage? = nil,
-    wordIndex: Int = 0, wordBound: Int = 1, nextRandomCaseBit: () -> Bool = { Bool.random() }
+    wordIndex: Int = 0, wordBound: Int = 1,
+    britishEnglish: BritishEnglishPolicy.Context? = nil, previousBritishWord: String? = nil,
+    nextRandomCaseBit: () -> Bool = { Bool.random() }
   ) -> String {
     var output = language?.presentationText(word) ?? word
     if modifiers.contains(.lazyLatin) {
       output = TypingTextNormalizer.lazyLatin(output, language: language)
     }
+    output = BritishEnglishPolicy.transformed(output, context: britishEnglish, previousWord: previousBritishWord)
     for modifier in canonicalTextAlterations where modifiers.contains(modifier) {
       switch modifier {
       case .uppercase: output = output.uppercased()

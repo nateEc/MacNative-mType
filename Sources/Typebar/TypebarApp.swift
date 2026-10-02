@@ -1966,7 +1966,7 @@ private struct ContentView: View {
               .font(.caption)
               .foregroundStyle(.secondary)
           }
-          if language == .english {
+          if BritishEnglishPolicy.supportsWordConversion(in: language) {
             Picker("英文拼写", selection: restartingConfigurationBinding($settings.englishVariant)) {
               ForEach(EnglishVariant.allCases) { variant in
                 Text(variant.displayName).tag(variant)

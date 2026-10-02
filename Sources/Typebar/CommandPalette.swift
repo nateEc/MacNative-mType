@@ -358,7 +358,7 @@ enum PracticePreferenceCommandCatalog {
             id: "test.englishVariant.american", title: "英文拼写：美式", subtitle: "English 基础词流使用美式拼写，引语使用原文",
             systemImage: "character.book.closed", keywords: ["english", "american", "英文", "美式", "拼写"], group: .practice),
         .init(
-            id: "test.englishVariant.british", title: "英文拼写：英式", subtitle: "English 基础词流使用英式词库，引语优先英式备用文本",
+            id: "test.englishVariant.british", title: "英文拼写：英式", subtitle: "English 词流使用自有英式词形，引语优先英式备用文本",
             systemImage: "character.book.closed", keywords: ["english", "british", "英文", "英式", "拼写"], group: .practice),
     ]
 

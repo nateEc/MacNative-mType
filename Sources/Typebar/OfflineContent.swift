@@ -5913,6 +5913,7 @@ struct GeneratedWordChunk {
   init(source: String, configuration: TestConfiguration, wordOffset: Int = 0,
     preservesNoSpaceBoundaries: Bool = false, showAllLines: Bool = false,
     preservesWordOrder: Bool = false, formatsWordPool: Bool = false,
+    authoredBritishQuote: Bool = false,
     nextRandomCaseBit: () -> Bool = { Bool.random() }) {
     self.source = source
     let batch = TestModifierPolicy.transformedBatch(source, modifiers: configuration.modifiers,
@@ -5921,6 +5922,7 @@ struct GeneratedWordChunk {
         wordOffset: wordOffset, sourceWordCount: GeneratedWordBoundPolicy.wordCount(in: source),
         showAllLines: showAllLines), preservesWordOrder: preservesWordOrder,
       formatsWordPool: formatsWordPool,
+      britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: authoredBritishQuote),
       nextRandomCaseBit: nextRandomCaseBit)
     transformed = batch.text
     noSpaceWordLengths = batch.noSpaceWordLengths
@@ -6089,6 +6091,7 @@ struct TestSessionFactory {
     var usesGeneratedCode = false
     var preservesGeneratedWordOrder = false
     var formatsQuoteWordPool = false
+    var authoredBritishQuote = false
     var generatedCodeContinuation: GeneratedCodeContinuation?
     var generatedCodeChunk: GeneratedWordChunk?
     let streamWordCount = streamWordCount(for: configuration, showAllLines: showAllLines)
@@ -6142,6 +6145,7 @@ struct TestSessionFactory {
             initializationFailure: "英式引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换美式拼写。")
         }
         formatsQuoteWordPool = true
+        authoredBritishQuote = source.britishText?.isEmpty == false
       case .zen:
         // Zen renders and scores only text entered locally by the user. It
         // intentionally has no generated target prompt or imported content.
@@ -6240,6 +6244,7 @@ struct TestSessionFactory {
       let chunk = GeneratedWordChunk(source: prompt, configuration: configuration, showAllLines: generatesWholeLines,
         preservesWordOrder: preservesGeneratedWordOrder,
         formatsWordPool: formatsQuoteWordPool,
+        authoredBritishQuote: authoredBritishQuote,
         nextRandomCaseBit: nextRandomCaseBit)
       batch = .init(text: chunk.transformed, noSpaceTargetWords: chunk.noSpaceTargetWords)
     }
