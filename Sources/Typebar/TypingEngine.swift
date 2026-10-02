@@ -5317,7 +5317,7 @@ struct TypingSession {
     let followsRetainedLeadingSeparator = !retainedWordSeparatorTypedIndices.isEmpty
       && inputWordText().first.map(isPromptWordSeparator) == true
     let isCorrect = !retainsCurrentWordAsExtra && InputTextIdentity.matches(inputCharacter, expected) && !forceError
-      && (!followsRetainedLeadingSeparator || accuracyUnits.lastCorrect)
+      && accuracyUnits.lastCorrect
     recordInputAttempt(inputCharacter, correctUnits: accuracyUnits.correct,
       lastUnitCorrect: accuracyUnits.lastCorrect)
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
@@ -5353,8 +5353,16 @@ struct TypingSession {
     }
     if !isCorrect && configuration.rules.stopOnErrorMode == .letter {
       if !configuration.rules.blindMode {
+        // Unlike a space commit, a source Return is a visible target slot.
+        // The first stopped letter at that slot replaces its icon; after a
+        // retained Return has consumed it, further stopped text is extra.
+        let fieldStart = promptCharacters[..<currentTargetIndex].lastIndex(where: isPromptWordSeparator)
+          .map { $0 + 1 } ?? 0
+        let occupiesReturn = expected == "\n"
+          && activeInputWordUTF16Length == String(promptCharacters[fieldStart..<currentTargetIndex]).utf16.count
         stoppedPromptCandidate = .init(character: inputCharacter,
-          targetIndex: retainsCurrentWordAsExtra || retainsEmptySlot ? nil : currentTargetIndex)
+          targetIndex: (retainsCurrentWordAsExtra || retainsEmptySlot) && !occupiesReturn
+            ? nil : currentTargetIndex)
       }
       recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: forceError,
         inputStopped: true, at: date)
@@ -5372,6 +5380,11 @@ struct TypingSession {
       // makes playback, automatic-event sound policy, and live input history
       // agree with the visible error recovery.
       let activeWordWasEmpty = activeDeleteOnErrorWordIsEmpty
+      if isPromptWordSeparator(inputCharacter) {
+        // Recovery never submits its erroneous separator. Persist the same
+        // existing no-commit marker used for other retained field separators.
+        retainedWordSeparatorTypedIndices.insert(typedGraphemeCount)
+      }
       appendTypedCharacter(
         inputCharacter, targetIndex: targetIndex,
         forceError: forceError || earlyWordCommitTargetIndex != nil,
@@ -5616,7 +5629,7 @@ struct TypingSession {
     at date: Date, automatic: Bool = false
   ) {
     if isAtEmptyNoSpaceWord, typedGraphemeCount == emptyNoSpaceWordBoundary { return }
-    guard let last = typed.last, !last.isWhitespace else { return }
+    guard !typed.isEmpty, !lastInputCommitsWord else { return }
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", automatic: automatic, at: date)
   }

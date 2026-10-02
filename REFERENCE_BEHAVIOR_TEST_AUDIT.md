@@ -1,5 +1,19 @@
 # 固定参考行为测试盘点
 
+2026-10-03 换行字段恢复增量（定向验证已通过，最终完整门禁已通过）：以固定 [字段位置判定](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/helpers/validation.ts#L13-L36)、[自动删除](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L90-L140)、[停止与恢复顺序](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L230-L320) 和既有实际正文绘制探针为合同。原生独立修正三条路径：letter-stop 首次落在可见目标 LF 槽位的错字覆盖该槽位，不追加额外字，包含空 LF 字段上的 strictSpace 错空格；ASCII 空格提交槽仍与可见 LF 不同。正确性同时检查当前字段实际 UTF-16 位置，避免 word-stop 保留 LF 后切换自动恢复，把重复 Return 误当正确输入。letter 恢复删除错误输入及当前字段前一个字符，包括未提交 Tab／空格／LF，但不跨越已提交的前词分隔符；word 与 hard 模式保留各自删除／返回边界。
+
+恢复中的错误分隔符使用既有 commitsWord:false 标记，不把瞬间插入误作词提交；原版不导航事件原始 commitsWord 为 undefined，原生 false 是既有适配合同而非原样复制该 schema。未来事件才改变，旧 nil 标记按旧合同读取，不改写旧成绩；归档仍为 11，SwiftData schema／偏好和服务协议不变。标记补证前最终 history／回放文本已经正确，只复现缺少显式“不提交”元数据，不冒称抓到最终历史幽灵字段故障。
+
+FieldPositionRecoveryTests 新增 19 项。先行三项九个预期失败（0.423 秒），三项修正后通过（0.004 秒）；标记回归四项一失败（0.405 秒）后相关 213 项通过（0.496 秒）。扩展 18 项及相关 270 项通过后，空 LF 严格空格反例在 19 项中复现八个断言失败（2.131 秒），修正后最终相关 221 项零失败（2.798 秒），新增 19 项独立零失败（0.032 秒）。覆盖停止槽位／光标、普通空格差异、盲打／Shift／难度、四种恢复模式、已提交前词保护、多次保留 LF、尝试准确率、人工修正完成、不开窗实际 TypingInputView 入口、保存记录与正式归档往返及旧日志 nil 兼容。不修改既有回归断言来绕过失败。
+
+只读 bundled Node v24.19.0 类型擦除并在内存执行实际完整 util.ts、validation.ts、insert-text.ts，七例核对严格空 LF 的 normal／expert 错空格、LF 槽位停止错字、保留 LF 的 letter／word 恢复及前一个 Tab／保留空格删除；输出均不导航，恢复记录实际插入及自动删除。DOM／当前字段与词目录、配置、日志衍生、语言等值、失败／结束、导航及 UI 为明确自有桩，直接 onInsertText 不执行前置守卫；实际难度函数、浏览器／Vitest／事件循环／IME 未由该探针证明。无参考代码／数据／资产进入原生仓库。
+
+依源码驱动、行为优先、根因调试、迁移安全及会话内有界决策／风险复核，仅关闭本次有证据的停止 LF 槽位和恢复边界；accepted 错字在 LF 的完整字段呈现、导航目标与实际字段位置全面统一、逐 UTF-16 编辑／半代理／CRLF、整字段停止快照、候选覆盖／RAF 竞态、真实 UI／IME／音频／多窗口以及主题／词库／远程仍开放，94 配置键与部分 Funbox 不升级为完整兼容。三条人工场景仍待验收；不开窗、不播放音频、不写真实库、不回算历史、不部署。整体 goal active，不冒称独立评审或全量重写完成。
+
+另只读执行实际完整 fail-or-finish.ts 中 checkIfFailedDueToDifficulty 五例：expert 空 LF 字段错空格不失败、master 失败；非空 LF 槽位停止普通错字仅 master 失败，expert 错误 LF 提交仍失败。依赖只有自有 Config，证明该难度纯函数，不扩大为完整 onInsertText 难度链／浏览器运行。
+
+2026-10-03 本换行字段恢复增量最终完整门禁通过：客户端 2,012 项零失败（376.974 秒）、服务端 131 项零失败（1.470 秒）、741 条唯一人工场景清单、固定参考／元数据／原创性审计及未打开应用包检查全部通过。门禁内 testOptionalHundredThousandWordEndurance 实际通过（40.581 秒），日志清理前已核对；不以旧轮结果或环境开关代替。测试／编译串行且活跃期间未改 Swift 输入，门禁前真实背景存储路径不存在，没有删除用户数据。未启动 Typebar 图形实例、播放音频、写真实成绩／设置库、部署服务或跨设备同步；Core Data 系统环境诊断与 XCTest 失败分开。三个新增人工场景仍待验收，前述完整字段／UTF-16／真实 UI／IME 等缺口保持开放，整体 goal active。
+
 2026-10-03 控制字符提示增量（定向验证已通过，最终完整门禁已通过）：固定 [正文绘制](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L734-L962)、[原始文字提示](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L210-L245)、[源换行容器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L392-L418) 与 [控制图示样式](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/styles/test.scss#L135-L143) 为合同。原生独立建立 PromptGlyphTextPlan：目标 Tab／LF 使用自有方向符号，所有正确／待输入／错误状态保留目标图示；目标 LF 另保留真实分行。错误正文替换与额外输入中，ASCII 空格是下划线，Tab／LF 是方向符号而不是隐形 Tab stop／新行；替换源 LF 时仍只有其原有分行。正常空格及其他 Unicode 空白不被自动改成错误图示，隐藏额外字保留其输入来源而非错误创建源行。
 
 提示四档共用规则：off／below 保留目标正文，replace／both 显示实际输入；below 提示输入，both 提示目标。提示不是图示，Tab／LF／CR 按原版普通 HTML 空白语义显示空白，不让提示在原生文本中另开一行。目标控制图示保留 0.2 淡化，错误替换该图示也保留；输入的额外图示不继承它。Zen 已输入 Tab／LF 不显示图示，仍保留输入白字符布局。候选替换独立显示：普通模式空格为下划线、候选 Tab／LF 为文字空白，不继承控制目标的淡化，也不显示旧停止错字提示；Zen 候选不加下划线。主练习使用同一纯显示计划，源目标数量只在绘制循环外算一次；光标／Tape 继续由真实输入和渲染偏移定位。监听／隐藏颜色不因文字计划而揭露输入。
