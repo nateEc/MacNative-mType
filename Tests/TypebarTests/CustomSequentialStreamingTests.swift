@@ -45,7 +45,7 @@ final class CustomSequentialStreamingTests: XCTestCase {
     var session = TestSessionFactory.make(
       configuration: configuration, customText: "amber\nharbor  quiet")
     let initial = session.prompt
-    XCTAssertTrue(initial.hasPrefix("amber\nharbor  quiet amber\nharbor  quiet"))
+    XCTAssertTrue(initial.hasPrefix("amber\nharbor quiet amber\nharbor quiet"))
     XCTAssertEqual(initial.split(whereSeparator: \.isWhitespace).count, 100)
     session.insert(initial + " ", at: start)
     XCTAssertGreaterThan(session.prompt.count, initial.count)

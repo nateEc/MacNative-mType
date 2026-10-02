@@ -126,9 +126,12 @@ final class CustomRandomStreamingTests: XCTestCase {
     var session = TestSessionFactory.make(configuration: configuration, customText: source)
     let firstBatch = session.prompt
     XCTAssertTrue(firstBatch.contains(" "))
-    session.insert(firstBatch + " ", at: start)
+    XCTAssertTrue(firstBatch.hasSuffix(" "))
+    session.insert(firstBatch, at: start)
     XCTAssertGreaterThan(session.prompt.count, firstBatch.count)
-    XCTAssertEqual(session.prompt.dropFirst(firstBatch.count).first, " ")
+    XCTAssertEqual(session.prompt.dropFirst(firstBatch.count - 1).first, " ")
+    XCTAssertTrue(source.split(separator: " ").contains(
+      session.prompt.dropFirst(firstBatch.count).split(separator: " ").first ?? ""))
     XCTAssertEqual(session.completedWordCount, 100)
     XCTAssertEqual(session.errors, 0)
     XCTAssertFalse(session.isFinished)
@@ -141,9 +144,12 @@ final class CustomRandomStreamingTests: XCTestCase {
       customTextCompletion: .time, customTextOrdering: .inOrder)
     var session = TestSessionFactory.make(configuration: configuration, customText: source)
     let firstBatch = session.prompt
-    session.insert(firstBatch + " ", at: start)
+    XCTAssertTrue(firstBatch.hasSuffix(" "))
+    session.insert(firstBatch, at: start)
     XCTAssertGreaterThan(session.prompt.count, firstBatch.count)
-    XCTAssertEqual(session.prompt.dropFirst(firstBatch.count).first, " ")
+    XCTAssertEqual(session.prompt.dropFirst(firstBatch.count - 1).first, " ")
+    XCTAssertTrue(session.prompt.dropFirst(firstBatch.count).hasPrefix("amber "))
+    XCTAssertEqual(session.completedWordCount, 100)
     XCTAssertEqual(session.errors, 0)
     XCTAssertFalse(session.isFinished)
   }

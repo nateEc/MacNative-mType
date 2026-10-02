@@ -95,12 +95,16 @@ final class QuoteSourcePreparationTests: XCTestCase {
       quote: quote(" \r\n\t\u{FEFF} ")).prompt, "")
   }
 
-  func testPreparedExternalSourceAndCustomSourceDoNotUseQuotePreparation() {
+  func testPreparedExternalSourceStaysExactAndCustomSourceUsesItsOwnPreparation() {
     let source = " ab   cd… "
     XCTAssertEqual(TestSessionFactory.make(configuration: configuration(), streamPrompt: source).prompt, source)
     let custom = TestConfiguration(mode: .custom, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init(), customTextPipeDelimiter: false)
-    XCTAssertEqual(TestSessionFactory.make(configuration: custom, customText: source).prompt, source)
+    var session = TestSessionFactory.make(configuration: custom, customText: source)
+    XCTAssertEqual(session.prompt, "ab cd…", "自定义合并空格但保留字面省略号，不套用引语准备")
+    session.insertBatch("ab cd…", at: start)
+    XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.errors, 0)
   }
 
   func testSavedLegacyQuoteTextIsNotPreparedOnDecodeRecordOrArchiveImport() throws {

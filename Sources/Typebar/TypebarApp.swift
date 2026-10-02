@@ -3702,8 +3702,7 @@ private struct ContentView: View {
     session = TestSessionFactory.make(
       configuration: configuration,
       customText: customText,
-      finiteTextSource: activeLongSavedText?.continuous == true
-        ? activeLongSavedText?.remainingText : nil,
+      finiteTextSource: activeLongSavedText.map { $0.continuous ? $0.remainingText : $0.currentChunk },
       verifiedScript: activeChallenge?.requirements.referenceScriptSpecification
         == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
       quote: selectedQuote,

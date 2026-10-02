@@ -6042,7 +6042,8 @@ struct TestSessionFactory {
     var sectionEndIndices: [Int] = []
     var noSpaceBoundarySource: String?
     let streamsCustomSections = configuration.mode == .custom
-      && (configuration.customTextCompletion == .sections || configuration.usesCustomTextPipeDelimiter)
+      && (configuration.customTextCompletion == .sections || configuration.usesCustomTextPipeDelimiter
+        || (finiteTextSource == nil && verifiedScript == nil))
     let hasCompleteRandomWordPrompt = configuration.mode == .custom
       && !streamsCustomSections
       && configuration.customTextCompletion == .words
@@ -6129,7 +6130,9 @@ struct TestSessionFactory {
         }
         if streamsCustomSections {
           if var stream = CustomSectionWordStream(source: source, configuration: configuration) {
-            let chunk = stream.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
+            let chunk = withoutActuallyEscaping(nextRandomWordIndex) { random in
+              stream.nextChunk(random: random, nextRandomCaseBit: nextRandomCaseBit)
+            }
             prompt = chunk.text
             if configuration.customTextCompletion == .sections { sectionEndIndices = chunk.sectionEndOffsets }
             customSectionChunk = chunk

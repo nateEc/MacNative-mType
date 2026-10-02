@@ -1,5 +1,7 @@
 # Typebar
 
+2026-10-02 增量：普通非管道自定义文本已接入独立候选队列，保留换行空槽及实际词数预算，修复百词批次提交／立即续接；用户长文本原文入口另行保留。证据与尚未覆盖边界见 [输入审计](OFFICIAL_INPUT_AUDIT.md)。客户端 1508／服务端 131 项零失败、零跳过，显式十万词、667 项人工清单及未开窗打包检查通过；清单不等于设备验收。未启动图形程序，完整重写仍未完成，goal active。
+
 一个从零实现的 macOS 打字应用。目标是对 Monkeytype 做功能兼容的纯重写，但不使用其代码、后端、资产或广告。完整范围、实现边界和进度见 [REWRITE_SPEC.md](REWRITE_SPEC.md)。原创性边界、允许的参考元数据及可执行护栏见 [ORIGINALITY_BOUNDARY.md](ORIGINALITY_BOUNDARY.md)。
 
 远程功能的自建服务范围与 API 草案见 [SERVICE_SCOPE.md](SERVICE_SCOPE.md) 和 [SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md)。

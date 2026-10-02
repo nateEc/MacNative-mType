@@ -4628,6 +4628,13 @@ struct TypingSession {
     {
       extendPromptIfNeeded()
     }
+    if !isFinished, customSectionWordStream?.hasRemaining == true,
+      nextTargetIndex >= promptCharacters.count
+    {
+      // A candidate batch already carries its last commit. Do not require
+      // an extra, blind keypress before exposing the next generated target.
+      extendPromptIfNeeded()
+    }
     finishIfNeeded(at: date)
   }
 
@@ -5830,8 +5837,9 @@ struct TypingSession {
       case .time:
         break
       case .words:
-        if configuration.usesCustomTextPipeDelimiter, customSectionWordStream != nil {
-          // Pipe initialization can prefetch whole sections past wordLimit.
+        if customSectionWordStream != nil {
+          // Pipe initialization can prefetch whole sections past wordLimit;
+          // non-pipe initialization includes newline-only candidate words.
           // Match the generated queue, not an earlier configured word index;
           // a partial batch must still continue before final-word rules apply.
           if !configuration.isInfinite, !usesIncrementalPromptExtension,
@@ -5974,9 +5982,15 @@ struct TypingSession {
   private mutating func appendPrompt(_ chunk: String) {
     let startsWithSeparator = chunk.first.map(isPromptWordSeparator) == true
       && !(prompt.last == "\r" && chunk.first == "\n")
+    let followsStableSeparator: Bool
+    if let previous = promptCharacters.last, isPromptWordSeparator(previous), let first = chunk.first {
+      followsStableSeparator = String([previous, first]).count == 2
+    } else {
+      followsStableSeparator = false
+    }
     let previousCount = promptCharacters.count
     prompt += chunk
-    if startsWithSeparator {
+    if startsWithSeparator || followsStableSeparator {
       // An explicit word separator breaks the grapheme boundary with the
       // previous chunk. Only the new characters need word-boundary scanning.
       var afterSeparator = true

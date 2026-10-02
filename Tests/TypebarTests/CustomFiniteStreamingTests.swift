@@ -42,14 +42,17 @@ final class CustomFiniteStreamingTests: XCTestCase {
     XCTAssertGreaterThan(repeated.prompt.count, first.count)
   }
 
-  func testCustomFiniteTextAcceptsWhitespacePresentInItsExactTarget() {
+  func testOrdinaryCustomFiniteTextCollapsesRepeatedASCIISpacesBeforeTyping() {
     let configuration = TestConfiguration(
       mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal,
       rules: .init(), customTextCompletion: .finish)
     var session = TestSessionFactory.make(
       configuration: configuration, customText: "amber  harbor")
-    session.insert("amber  harbor", at: start)
-    XCTAssertEqual(session.typed, "amber  harbor")
+    XCTAssertEqual(session.prompt, "amber harbor")
+    session.insert("amber harbor", at: start)
+    XCTAssertEqual(session.typed, "amber harbor")
+    XCTAssertEqual(session.completedWordCount, 2)
+    XCTAssertEqual(session.errors, 0)
     XCTAssertEqual(session.result()?.outcome, .completed)
   }
 

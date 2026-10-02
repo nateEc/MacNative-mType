@@ -597,7 +597,10 @@ final class OfficialChallengeCoverageTests: XCTestCase {
       XCTAssertFalse(challenge.dailyEligible, name)
       let session = TestSessionFactory.make(configuration: configuration, customText: word)
       XCTAssertTrue(session.prompt.hasPrefix(word), name)
-      XCTAssertTrue(session.usesIncrementalPromptExtension, name)
+      XCTAssertEqual(session.usesIncrementalPromptExtension, count > 100, name)
+      XCTAssertEqual(session.prompt,
+        Array(repeating: word, count: min(100, count)).joined(separator: " ")
+          + (count > 100 ? " " : ""), name)
       var practice = TestSessionFactory.make(
         configuration: configuration.with(challengeID: challenge.id), customText: word)
       let start = Date(timeIntervalSince1970: 100)
@@ -607,6 +610,8 @@ final class OfficialChallengeCoverageTests: XCTestCase {
       }
       XCTAssertEqual(practice.result()?.outcome, .completed, name)
       XCTAssertEqual(practice.result()?.configuration.challengeID, challenge.id, name)
+      XCTAssertEqual(practice.completedWordCount, count, name)
+      XCTAssertEqual(practice.errors, 0, name)
     }
   }
 

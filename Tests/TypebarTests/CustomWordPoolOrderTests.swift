@@ -15,17 +15,17 @@ final class CustomWordPoolOrderTests: XCTestCase {
     let source = (0..<105).map { "w\($0)" }
     let configuration = config(.time, ordering: .inOrder)
     var session = TestSessionFactory.make(configuration: configuration, customText: source.joined(separator: " "))
-    let opening = source.reversed().prefix(100).map { String($0.reversed()) }.joined(separator: " ")
+    let opening = source.reversed().prefix(100).map { String($0.reversed()) }.joined(separator: " ") + " "
     XCTAssertEqual(session.prompt, opening)
-    session.insertBatch(opening + " ", at: start)
+    session.insertBatch(opening, at: start)
     let expectedNext = Array(source.reversed().suffix(5)) + Array(source.reversed().prefix(95))
-    XCTAssertEqual(session.prompt, opening + " " + expectedNext.map { String($0.reversed()) }.joined(separator: " "))
+    XCTAssertEqual(session.prompt, opening + expectedNext.map { String($0.reversed()) }.joined(separator: " ") + " ")
     XCTAssertEqual(session.completedWordCount, 100)
     XCTAssertEqual(session.errors, 0)
     XCTAssertFalse(session.isFinished)
     var repeated = session.repeatedAttempt()
     XCTAssertEqual(repeated.prompt, opening)
-    repeated.insertBatch(opening + " ", at: start)
+    repeated.insertBatch(opening, at: start)
     XCTAssertEqual(repeated.prompt, session.prompt, "重复尝试从保存的初始游标独立续接")
   }
 
@@ -37,7 +37,7 @@ final class CustomWordPoolOrderTests: XCTestCase {
     let opening = (0..<100).map { String("w\(104 - $0)".reversed()) + ($0 == 99 ? "" : "_") }.joined()
     XCTAssertEqual(session.prompt, opening)
     session.insertBatch(opening, at: start)
-    XCTAssertEqual(session.prompt, opening + (0..<100).map { String("w\((4 - $0 + 105) % 105)".reversed()) + "_" }.joined())
+    XCTAssertEqual(session.prompt, opening + "4w_", "有限非管道续批只生成剩余的一词，不预取额外 99 词")
     XCTAssertFalse(session.isFinished)
     session.insertBatch("4w", at: start.addingTimeInterval(1))
     XCTAssertFalse(session.isFinished)
