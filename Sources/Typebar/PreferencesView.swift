@@ -214,7 +214,7 @@ struct PreferencesView: View {
           HStack {
             Button("试听键击") {
               TypingFeedbackSound.shared.previewClick(
-                style: settings.clickSoundStyle, volume: settings.soundVolume)
+                style: settings.clickSoundStyle, volume: settings.soundVolume, usesPracticeShift: false)
             }
             Button("试听错误") {
               TypingFeedbackSound.shared.playError(

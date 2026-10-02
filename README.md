@@ -1,5 +1,19 @@
 # Typebar
 
+2026-10-02 应用范围音乐键位上下文增量（最终门禁已通过）：固定 [声音控制器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/sound-controller.ts#L149-L355) 的 document keydown 和 [修饰状态](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/states/modifiers.ts) 后，新增由唯一应用代理持有的 MainActor 本地音乐键位监听器。启动回调注册一次，实际终止回调移除；不是按练习窗口反复创建，也不是系统全局监听，不申请辅助功能权限，不记录输入文字／回放／偏好。keyDown 同步保存物理键码与事件修饰状态，flagsChanged 同步更新，原样返回事件，不转发输入、不启动音频，不使用异步 Task 使上下文落后于同一输入。普通练习 keyDown 留作直接接入；移除练习输入失焦空 flags 对共享声音上下文的覆盖，避免错误清掉 Caps Lock。
+
+特别区分按下和释放修饰键：浏览器 modifier keydown 也会替换当前 code 为非钢琴键，不能让 flagsChanged 只改变音高而沿用旧字母。用安装 SDK 26.2 的 IOKit.hidsystem／IOLLEvent.h 左右 Shift、Control、Option、Command 设备标志判断按下／释放；按下替换 code，释放只更新 flags。CapsLock 两个切换方向都作为非钢琴按下，无设备位的合成事件按已观察的侧键转换回退，真实位优先；左右并按后释放一侧不误清新的字母键。尚未宣称混合设备／丢事件／非标准 CapsLock 或 Fn 传输全对齐。
+
+启动只同步当前 Caps Lock、不引入已按住的 Shift；应用重新激活时只刷新 Caps Lock，不覆盖已保存练习 Shift，停止前／后的激活无副作用。设置页试听显式 usesPracticeShift=false，保持测试页／命令面板默认 Shift 行为，而 Caps Lock 两处都有效；不把“捕获整个 app”误当“原版所有页面都跟踪 Shift”。完整原版 getActivePage 切换、左右状态复位和重置测试的 Shift 复位，其他页面与跨窗口作用域、IME／自动动作、无完成回调、浏览器 DSP／设备混音、样本随机变体及 16 号结束混响仍未完全对齐，goal 不关闭。
+
+先行 6 项有效红阶段 12 个失败断言；两项重新激活补证 4 个失败断言；修饰按下补证筛选 3 项中两项共 10 个失败断言、合成回退那项在旧行为上已通过，不将它当反例。初次测试桩嵌套 Events 未标 MainActor 而编译失败，在根因定位到测试隔离边界后仅补注解再运行，不把编译错误当产品红证据。最终 MusicKeyboardMonitorTests 22 项，相关 106 项零失败（约 0.53 秒），含已有 21 项音乐、35 项声音、副本／回放／NoQuit／快速重开等选中回归；不据环境变量宣称窄过滤执行十万词。
+
+只读 bundled Node v24.19.0 类型擦除／内存执行实际声音与 modifier 模块：其他 responder 的 Z 为 130.81 Hz，全局 Space 静音；test 页 Shift 试听为 523.25、切到 settings 为 261.63、Caps 开时仍 523.25；settings 仅保留 1 个 keydown、0 个 keyup，返回 test 为 2／1。另执行实际声音模块全局监听，左右 Shift／Control／Alt／Meta 和 CapsLock 九种 modifier keydown 均静音；没有新 keydown 时释放 Shift 后仍沿用 Q，频率 523.25→261.63。signals／effect／document、modifier／Caps 来源与 AudioContext 节点依赖为显式自有桩，后一个释放探针只改变 getModifierState 桩、不冒称实际 modifier keyup 被执行；不是上游 Vitest、浏览器或硬件，没有复制参考代码／资产。
+
+本应用范围音乐键位增量完整门禁实际通过：客户端 1,828 项零失败（约 361.57 秒），服务端 131 项零失败（约 1.39 秒）；可选十万词耐力实际执行并通过（38.836 秒），仅作文本引擎证据，不作音频设备压力证据。705 个唯一人工项审计、固定参考／元数据／原创性检查与未打开的应用打包通过，门禁确认未启动 Typebar 进程。默认 AppKit 注册 API 仅类型检查，测试注入安装／移除与修饰快照边界，调用真实监听回调和真实应用代理启动／激活／终止方法，但没有启动 app 或向 NSApplication.sendEvent 分发；真实设置按钮、字段编辑器、多窗口和实际终止拒绝／批准未实机验证。[Apple 事件监视文档](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/EventOverview/MonitoringEvents/MonitoringEvents.html) 与安装 NSEvent.h 支持本地观察、主线程同步回调和显式提前移除；原样放行不是实际系统全局权限测试，嵌套菜单／拖动 tracking loop 本地 monitor 不接收，监听顺序／自动失焦丢事件仍是平台接入边界。22 项用真实未分发 NSEvent 对象检查事件身份与上下文，设备状态全部隔离，不因用户 CapsLock 改变而污染测试。
+
+最多三轮会话内决策／风险复核（不是独立评审）：用 generation 先于注册发布和先于移除退休，过滤已停／失败／迟到回调；注册期间同步 stop 会移除后来返回的 token，同步 start 不重复，移除期间新注册不会被旧 stop 清掉，停止后的弱回调不保留 owner。监听器是应用代理的显式生命周期资源，要求 stop；不承诺活动 owner 任意丢弃时自动 deinit 移除。关闭单个窗口或被拒绝的终止不执行 willTerminate 清理，终止保护代码未改动。新增三项人工项，共 705 个唯一项，状态均未提升为实机已验收；归档／成绩／SwiftData 结构与 32 音型值不变。未启动 Typebar 图形实例，没有播放音频或写真实数据，完整 goal active。
+
 2026-10-02 原生按键音符与随机音阶增量（最终门禁已通过）：固定 [声音实现](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/sound-controller.ts#L149-L355) 与 [音型定义](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/constants/sounds.ts) 后，将官方 8–11 命令接到四种原生键位波形，12–13 接到五声／全音音阶。用 A4=440 的等温律公式计算并舍入到两位小数，不复制参考频率表；经既有 ANSI 物理键适配器和自写钢琴自然音／黑键行算法覆盖 37 个物理键，基准第 3 八度，Shift 或 CapsLock 只提高一个八度，非映射键静音。按键音 0.5 秒／0.15 秒指数衰减，音阶 2 秒／0.3 秒指数衰减；起始增益为音量十分之一。使用自有 48 kHz 单声道 PCM 与 NSSound，没有 WebView／网页依赖或参考音频。
 
 音阶先以严格小于 0.5 的随机抽样决定是否走一层八度，4–6 间折返，再均匀抽取该音阶的音；两个音阶及各自试听／练习状态独立，测试重置不清零音阶。已启动音乐持有独立初始增益／包络：样本全局调音量和 clearAllSounds 不更新／停止音乐，后续音符才采用新音量，静音启动的旧音乐不会随样本恢复音量复活。每个音符独立持有声音实例，完成／失败释放，迟到／同步回调不释放新音；不缓存无限音高原型。设备不可用为最佳努力，不改变输入／成绩；设备永久初始化失败通知、无完成回调故障、浏览器等价滤波／逐采样输出及主线程渲染压力仍待补证。

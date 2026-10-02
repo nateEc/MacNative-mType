@@ -94,6 +94,29 @@ struct TypebarApp: App {
 /// active long practice needs confirmation before the whole app exits.
 @MainActor
 final class TypebarApplicationDelegate: NSObject, NSApplicationDelegate {
+  private let musicKeyboardMonitor: TypingMusicKeyboardMonitor
+
+  override convenience init() {
+    self.init(musicKeyboardMonitor: .init())
+  }
+
+  init(musicKeyboardMonitor: TypingMusicKeyboardMonitor) {
+    self.musicKeyboardMonitor = musicKeyboardMonitor
+    super.init()
+  }
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    musicKeyboardMonitor.start()
+  }
+
+  func applicationWillTerminate(_ notification: Notification) {
+    musicKeyboardMonitor.stop()
+  }
+
+  func applicationDidBecomeActive(_ notification: Notification) {
+    musicKeyboardMonitor.refreshCapsLock()
+  }
+
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     let registry = LongTestTerminationProtectionRegistry.shared
     guard registry.requiresConfirmation, !registry.permitsCurrentTermination else {
@@ -2583,7 +2606,6 @@ private struct ContentView: View {
         },
         onModifierFlagsChanged: {
           keyboardModifierFlags = $0
-          TypingFeedbackSound.shared.updateModifierFlags($0)
         },
         onKeyDown: { keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
           TypingFeedbackSound.shared.recordKeyDown(keyCode: keyCode, modifierFlags: modifierFlags)

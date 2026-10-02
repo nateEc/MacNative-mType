@@ -514,19 +514,26 @@ final class TypingFeedbackSound {
 
   func updateModifierFlags(_ flags: NSEvent.ModifierFlags) { currentModifierFlags = flags }
 
-  func previewClick(style: TypingClickSoundStyle, volume: Double) {
+  func synchronizeCapsLock(_ isEnabled: Bool) {
+    if isEnabled { currentModifierFlags.insert(.capsLock) }
+    else { currentModifierFlags.remove(.capsLock) }
+  }
+
+  func previewClick(style: TypingClickSoundStyle, volume: Double, usesPracticeShift: Bool = true) {
     if let mode = style.musicMode {
       if case .keys = mode { currentKeyCode = 12 }
-      playMusic(mode: mode, requestedVolume: volume, isPreview: true)
+      playMusic(mode: mode, requestedVolume: volume, isPreview: true, usesPracticeShift: usesPracticeShift)
     } else { playClick(style: style, volume: volume) }
   }
 
-  private func playMusic(mode: TypingMusicMode, requestedVolume: Double, isPreview: Bool) {
+  private func playMusic(mode: TypingMusicMode, requestedVolume: Double, isPreview: Bool,
+    usesPracticeShift: Bool = true) {
     let tone: TypingMusicTone
     switch mode {
     case .keys(let waveform):
       guard let semitone = TypingMusicPitch.semitone(keyCode: currentKeyCode) else { return }
-      let raised = !currentModifierFlags.intersection([.shift, .capsLock]).isEmpty
+      let raised = currentModifierFlags.contains(.capsLock)
+        || (usesPracticeShift && currentModifierFlags.contains(.shift))
       tone = .key(waveform: waveform, semitone: semitone, octave: raised ? 4 : 3)
     case .pentatonic, .wholeTone:
       var state = (isPreview ? previewScaleStates[mode] : scaleStates[mode]) ?? .init()
