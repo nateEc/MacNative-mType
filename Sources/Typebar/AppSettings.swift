@@ -1117,6 +1117,7 @@ private enum RandomThemeTarget: Equatable {
 @Observable
 final class AppSettings {
   @ObservationIgnored private let defaults: UserDefaults
+  @ObservationIgnored private let feedbackSound: TypingFeedbackSound
   @ObservationIgnored private let storageKey = "appSettings.v1"
   @ObservationIgnored private let layoutFluidStorageKey = "layoutFluidLayouts.v1"
   @ObservationIgnored private var randomThemeBag: [RandomThemeTarget] = []
@@ -1488,7 +1489,12 @@ final class AppSettings {
   var errorSoundStyle: TypingErrorSoundStyle = .basso { didSet { persist() } }
   var timeWarningOffset: TimeWarningOffset = .off { didSet { persist() } }
   var timeWarningSoundStyle: TimeWarningSoundStyle = .glass { didSet { persist() } }
-  var soundVolume: Double = 0.5 { didSet { persist() } }
+  var soundVolume: Double = 0.5 {
+    didSet {
+      feedbackSound.setVolume(soundVolume)
+      persist()
+    }
+  }
   var globalHotkeyEnabled = false { didSet { persist() } }
   var paceGuideMode: PaceGuideMode = .off { didSet { persist() } }
   var paceGuideCustomWpm = 100 { didSet { persist() } }
@@ -1497,8 +1503,10 @@ final class AppSettings {
   private(set) var streakDayBoundaryOffsetHours = 0.0 { didSet { persist() } }
   private(set) var hasSetStreakDayBoundary = false { didSet { persist() } }
 
-  init(defaults: UserDefaults = .standard) {
+  init(defaults: UserDefaults = .standard, feedbackSound: TypingFeedbackSound = .shared) {
     self.defaults = defaults
+    self.feedbackSound = feedbackSound
+    defer { feedbackSound.setVolume(soundVolume) }
     if let rawLayouts = defaults.stringArray(forKey: layoutFluidStorageKey) {
       layoutFluidLayouts = LayoutFluidPolicy.normalizedLayouts(
         rawLayouts.compactMap(KeyboardLayout.init(rawValue:)))

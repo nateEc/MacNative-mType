@@ -428,6 +428,7 @@ final class TypingFeedbackSound {
 
   private var cachedSources: [TypingClickPlaybackSource: any TypingSoundVoice] = [:]
   private var activeVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
+  private var configuredVolume: Double?
   private weak var warningVoice: (any TypingSoundVoice)?
   private let loadSound: (TypingClickPlaybackSource) -> (any TypingSoundVoice)?
   private let beep: () -> Void
@@ -437,18 +438,43 @@ final class TypingFeedbackSound {
     self.beep = beep
   }
 
+  /// Configuration changes affect already playing voices as well as future
+  /// requests. Invalid values do not replace the last valid global setting.
+  func setVolume(_ volume: Double) {
+    guard volume.isFinite, (0...1).contains(volume) else { return }
+    configuredVolume = volume
+    let voices = Array(activeVoices.values)
+    for voice in voices { voice.volume = Float(volume) }
+  }
+
+  func clearAllSounds() {
+    let voices = Array(activeVoices.values)
+    activeVoices.removeAll(keepingCapacity: true)
+    warningVoice = nil
+    // Clear ownership first: NSSound.stop may complete synchronously, and an
+    // older queued completion must not affect a replacement attempt.
+    for voice in voices { voice.stop() }
+  }
+
+  private func playbackVolume(_ requested: Double) -> Double? {
+    if let configuredVolume { return configuredVolume }
+    guard requested > 0 else { return nil }
+    return requested.clamped(to: 0...1)
+  }
+
   func playClick(style: TypingClickSoundStyle, volume: Double) {
     _ = play(source: style.playbackSource, volume: volume)
   }
 
   func playError(style: TypingErrorSoundStyle, volume: Double) {
-    if !play(source: .system(style.systemSoundName), volume: volume), volume > 0 {
+    if !play(source: .system(style.systemSoundName), volume: volume), (playbackVolume(volume) ?? 0) > 0 {
       beep()
     }
   }
 
   func playTimeWarning(style: TimeWarningSoundStyle, volume: Double) {
-    if !play(source: .system(style.systemSoundName), volume: volume, restartingWarning: true), volume > 0 {
+    if !play(source: .system(style.systemSoundName), volume: volume, restartingWarning: true),
+      (playbackVolume(volume) ?? 0) > 0 {
       beep()
     }
   }
@@ -456,7 +482,7 @@ final class TypingFeedbackSound {
   @discardableResult
   private func play(source: TypingClickPlaybackSource, volume: Double,
     restartingWarning: Bool = false) -> Bool {
-    guard volume > 0 else { return false }
+    guard let effectiveVolume = playbackVolume(volume) else { return false }
     let prototype: (any TypingSoundVoice)?
     if let cached = cachedSources[source] {
       prototype = cached
@@ -479,7 +505,7 @@ final class TypingFeedbackSound {
     let identity = ObjectIdentifier(voice)
     activeVoices[identity] = voice
     if restartingWarning { warningVoice = voice }
-    voice.volume = Float(volume.clamped(to: 0...1))
+    voice.volume = Float(effectiveVolume)
     let started = voice.play { [weak self, weak voice] in
       guard let self, let voice, self.activeVoices[identity] === voice else { return }
       self.activeVoices.removeValue(forKey: identity)
