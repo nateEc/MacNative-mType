@@ -14,6 +14,22 @@ private func splitPromptWords(
     whereSeparator: isPromptWordSeparator)
 }
 
+/// Swift's text equality includes canonical Unicode equivalence. Input
+/// validation instead needs the actual retained spelling, after only the
+/// explicit typing substitutions below. For well-formed native Characters,
+/// identical scalars also mean identical UTF-16 units, without allocating.
+enum InputTextIdentity {
+  static func matches(_ first: Character, _ second: Character) -> Bool {
+    first.unicodeScalars.elementsEqual(second.unicodeScalars)
+  }
+
+  static func matches<First: StringProtocol, Second: StringProtocol>(
+    _ first: First, _ second: Second
+  ) -> Bool {
+    first.utf16.elementsEqual(second.utf16)
+  }
+}
+
 enum InputCharacterEquivalence {
   static let sets: [Set<Character>] = [
     ["’", "‘", "'", "ʼ", "׳", "ʻ", "᾽"],
@@ -26,11 +42,16 @@ enum InputCharacterEquivalence {
   static func matches(
     _ first: Character, _ second: Character, language: TypingLanguage
   ) -> Bool {
-    if first == second || sets.contains(where: { $0.contains(first) && $0.contains(second) }) {
+    if InputTextIdentity.matches(first, second)
+      || sets.contains(where: {
+        $0.contains(where: { InputTextIdentity.matches($0, first) })
+          && $0.contains(where: { InputTextIdentity.matches($0, second) })
+      }) {
       return true
     }
     return language.usesRussianYoInputEquivalence
-      && russianYoSet.contains(first) && russianYoSet.contains(second)
+      && russianYoSet.contains(where: { InputTextIdentity.matches($0, first) })
+      && russianYoSet.contains(where: { InputTextIdentity.matches($0, second) })
   }
 
   static func isReferenceSpace(_ character: Character) -> Bool {
@@ -2634,7 +2655,7 @@ enum TypingPromptPresentation {
         state =
           blindMode
           ? .correct
-          : typedCharacters[typedIndex] == targetCharacters[index] && !forcedErrorIndices.contains(index)
+          : InputTextIdentity.matches(typedCharacters[typedIndex], targetCharacters[index]) && !forcedErrorIndices.contains(index)
             ? .correct : .incorrect
       } else if index < activeTargetIndex {
         state = blindCommittedMissingTargetIndices.contains(index) ? .correct : .pending
@@ -2646,7 +2667,7 @@ enum TypingPromptPresentation {
       return TypingPromptGlyph(
         character: targetCharacters[index], state: state,
         typedCharacter: typedIndexByTarget[index].flatMap {
-          typedCharacters[$0] != targetCharacters[index] || forcedErrorIndices.contains(index)
+          !InputTextIdentity.matches(typedCharacters[$0], targetCharacters[index]) || forcedErrorIndices.contains(index)
             ? typedCharacters[$0] : nil
         })
     }
@@ -2947,7 +2968,7 @@ struct TypedWordReview: Equatable, Identifiable {
   let typed: String
   let hasInputError: Bool
   var id: Int { index }
-  var isCorrect: Bool { target == typed && !hasInputError }
+  var isCorrect: Bool { InputTextIdentity.matches(target, typed) && !hasInputError }
 
   init(index: Int, target: String, typed: String, hasInputError: Bool = false) {
     self.index = index
@@ -3875,7 +3896,7 @@ struct TypingSession {
     }
     var target = String(promptCharacters[range])
     if target.last.map(isPromptWordSeparator) == true { target.removeLast() }
-    guard currentInput + text == target else { return false }
+    guard InputTextIdentity.matches(currentInput + text, target) else { return false }
     var projected = self
     projected.insertBatch(text, at: date)
     return projected.outcome == .completed || projected.outcome == .invalidAFK
@@ -4140,7 +4161,7 @@ struct TypingSession {
         if extraErrorTypedIndices.contains(typedIndex) { total += 1 }
         return
       }
-      if typedCharacters[typedIndex] != targetCharacters[targetIndex]
+      if !InputTextIdentity.matches(typedCharacters[typedIndex], targetCharacters[targetIndex])
         || forcedErrorIndices.contains(targetIndex)
       {
         total += 1
@@ -4176,7 +4197,7 @@ struct TypingSession {
           if extraErrorTypedIndices.contains(typedIndex) { total += String(character).utf16.count }
           return
         }
-        if character != promptCharacters[targetIndex] || forcedErrorIndices.contains(targetIndex) {
+        if !InputTextIdentity.matches(character, promptCharacters[targetIndex]) || forcedErrorIndices.contains(targetIndex) {
           total += String(character).utf16.count
         }
       }
@@ -4235,7 +4256,7 @@ struct TypingSession {
         missed += targetIndex - previousTargetIndex - 1
       }
       previousTargetIndex = max(previousTargetIndex, targetIndex)
-      if typedCharacters[typedIndex] == targetCharacters[targetIndex]
+      if InputTextIdentity.matches(typedCharacters[typedIndex], targetCharacters[targetIndex])
         && !forcedErrorIndices.contains(targetIndex)
       {
         matched += 1
@@ -4453,7 +4474,7 @@ struct TypingSession {
       }
       return TypedWordReview(
         index: $0, target: targetWords[$0], typed: typedWord,
-        hasInputError: typedWord == targetWords[$0]
+        hasInputError: InputTextIdentity.matches(typedWord, targetWords[$0])
           && attemptedErrors[$0] > 0)
     }
   }
@@ -5028,7 +5049,7 @@ struct TypingSession {
       for: inputCharacter, targetIndex: currentTargetIndex, forceError: forceError)
     let followsRetainedLeadingSeparator = !retainedWordSeparatorTypedIndices.isEmpty
       && inputWordText().first.map(isPromptWordSeparator) == true
-    let isCorrect = !retainsCurrentWordAsExtra && inputCharacter == expected && !forceError
+    let isCorrect = !retainsCurrentWordAsExtra && InputTextIdentity.matches(inputCharacter, expected) && !forceError
       && (!followsRetainedLeadingSeparator || accuracyUnits.lastCorrect)
     recordInputAttempt(inputCharacter, correctUnits: accuracyUnits.correct,
       lastUnitCorrect: accuracyUnits.lastCorrect)
@@ -5088,7 +5109,7 @@ struct TypingSession {
     appendTypedCharacter(
       inputCharacter, targetIndex: targetIndex,
       forceError: forceError || earlyWordCommitTargetIndex != nil
-        || (followsRetainedLeadingSeparator && !isCorrect && inputCharacter == expected),
+        || (followsRetainedLeadingSeparator && !isCorrect && InputTextIdentity.matches(inputCharacter, expected)),
       countsAsExtraError: retainsCurrentWordAsExtra || (retainsEmptySlot && !isCorrect), at: date)
     if let commitErrorStart { committedErrorWordStarts.insert(commitErrorStart) }
     if configuration.rules.blindMode, let commitIndex = earlyWordCommitTargetIndex {
@@ -5103,7 +5124,10 @@ struct TypingSession {
       committedErrorWordStarts.insert(range.lowerBound)
     }
 
-    if evaluatesTerminalRules, configuration.difficulty == .master && !isCorrect {
+    // Multi-unit text runs terminal difficulty only on its last input unit.
+    // Keep the whole glyph's diagnostic error separate: it can be wrong
+    // while its final combining mark is correct (or the reverse after drift).
+    if evaluatesTerminalRules, configuration.difficulty == .master && !accuracyUnits.lastCorrect {
       fail(at: date)
     } else if evaluatesTerminalRules, configuration.difficulty == .expert
       && ((commitsCurrentWord && (!isCorrect || errorsInCurrentWord() > 0)) || committedNoSpaceWordHasError)
@@ -5167,7 +5191,8 @@ struct TypingSession {
     let end = isPromptWordSeparator(promptCharacters[targetIndex]) ? targetIndex : targetIndex + 1
     let input = inputWordText()
     let target = String(promptCharacters[start..<end])
-    let correct = input == target && promptCharacters[targetIndex] == character
+    let correct = InputTextIdentity.matches(input, target)
+      && InputTextIdentity.matches(promptCharacters[targetIndex], character)
       && !(start..<end).contains { forcedErrorIndices.contains($0) }
     return correct ? nil : start
   }
@@ -5243,7 +5268,8 @@ struct TypingSession {
     guard wordIndex >= 0, wordIndex < targetWords.count, wordIndex < typedWords.count else {
       return false
     }
-    return typedWords[wordIndex] == targetWords[wordIndex] && !hasForcedError(inWord: wordIndex)
+    return InputTextIdentity.matches(typedWords[wordIndex], targetWords[wordIndex])
+      && !hasForcedError(inWord: wordIndex)
   }
 
   /// Removes accepted characters from the active, unfinished word while
@@ -5352,7 +5378,8 @@ struct TypingSession {
         && !retainedWordSeparatorTypedIndices.contains($0)
     }).map { $0 + 1 } ?? 0
     return zip(typedWord, promptWord).enumerated().reduce(0) { total, pair in
-      total + (pair.element.0 == pair.element.1 && !forcedErrorIndices.contains(wordStart + pair.offset) ? 0 : 1)
+      total + (InputTextIdentity.matches(pair.element.0, pair.element.1)
+        && !forcedErrorIndices.contains(wordStart + pair.offset) ? 0 : 1)
     } + max(0, typedWord.count - promptWord.count)
   }
 
@@ -5757,7 +5784,7 @@ struct TypingSession {
     guard typedGraphemeCount == range.upperBound - 1, range.upperBound <= promptCharacters.count else { return false }
     return range.contains { index in
       if index == typedGraphemeCount {
-        return character != promptCharacters[index] || forceError
+        return !InputTextIdentity.matches(character, promptCharacters[index]) || forceError
       }
       return !isTypedCharacterCorrect(at: index)
     }
@@ -5789,7 +5816,7 @@ struct TypingSession {
     guard let submitted = committedWords.last, committedWords.count <= targetWords.count else {
       return false
     }
-    return submitted == targetWords[committedWords.count - 1]
+    return InputTextIdentity.matches(submitted, targetWords[committedWords.count - 1])
       && !hasForcedError(inWord: committedWords.count - 1)
   }
 
@@ -5800,7 +5827,8 @@ struct TypingSession {
       let typedIndex = typedTargetIndices.firstIndex(where: { $0 == index }),
       typedCharacters.indices.contains(typedIndex)
     else { return false }
-    return typedCharacters[typedIndex] == targetCharacters[index] && !forcedErrorIndices.contains(index)
+    return InputTextIdentity.matches(typedCharacters[typedIndex], targetCharacters[index])
+      && !forcedErrorIndices.contains(index)
   }
 
   private mutating func insertCodeIndentationIfNeeded(after character: Character, at date: Date) {
@@ -5899,7 +5927,7 @@ struct TypingSession {
         ? String(typedCharacters[range.lowerBound..<typedEnd]) : ""
       return .init(
         index: index, target: targetWords[index], typed: typedWord,
-        hasInputError: typedWord == targetWords[index]
+        hasInputError: InputTextIdentity.matches(typedWord, targetWords[index])
           && attemptedErrors[index] > 0)
     }
   }
@@ -6002,7 +6030,7 @@ struct TypingSession {
       switch configuration.customTextCompletion {
       case .finish:
         if !usesIncrementalPromptExtension
-          && (typed == prompt || shouldFinishFiniteSpaceDelimitedTest)
+          && (InputTextIdentity.matches(typed, prompt) || shouldFinishFiniteSpaceDelimitedTest)
         {
           complete(at: date)
         }
