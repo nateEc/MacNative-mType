@@ -1275,6 +1275,10 @@ enum ResultPerformanceTrace {
   ) -> ResultPerformancePoint {
     let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
     let orderedEvents = validOrderedEvents(events)
+    if containsRawUnits(orderedEvents) {
+      return rawSamples(prompt: prompt, events: orderedEvents, times: [safeElapsed],
+        configuration: configuration, singleWindow: true)[0]
+    }
     var typed: [Character] = []
     var forcedErrors: [Bool] = []
     let windowStart = max(0, safeElapsed.rounded(.up) - 1)
@@ -1313,6 +1317,10 @@ enum ResultPerformanceTrace {
     let sampleTimes = samplingTimes(for: duration, configuration: configuration)
     let orderedEvents = validOrderedEvents(events)
     guard !orderedEvents.isEmpty else { return [] }
+    if containsRawUnits(orderedEvents) {
+      return rawSamples(prompt: prompt, events: orderedEvents, times: sampleTimes,
+        configuration: configuration, singleWindow: false)
+    }
     var eventIndex = 0
     var typed: [Character] = []
     var forcedErrors: [Bool] = []
@@ -1341,6 +1349,117 @@ enum ResultPerformanceTrace {
         rawWpm: wpm(characters: String(typed).utf16.count, elapsed: elapsed),
         burstWpm: intervalBurst(inputUnits: inputUnits, seconds: interval),
         errorCount: windowErrors)
+    }
+  }
+
+  private static func containsRawUnits(_ events: [TypingReplayEvent]) -> Bool {
+    events.contains { $0.validatedTextUTF16 != nil || $0.inputField?.validatedValueUTF16 != nil }
+  }
+
+  /// Raw tapes never compare lossy replacement glyphs with a target. Keep the
+  /// original trace path intact for legacy tapes and each deletion's recorded
+  /// unit-vs-grapheme contract intact inside mixed tapes.
+  private static func rawSamples(
+    prompt: String, events: [TypingReplayEvent], times: [TimeInterval],
+    configuration: TestConfiguration?, singleWindow: Bool
+  ) -> [ResultPerformancePoint] {
+    var cursor = RawActivityCursor(prompt: prompt, configuration: configuration)
+    var index = 0
+    var previousBoundary: TimeInterval = 0
+    return times.map { elapsed in
+      let windowStart = singleWindow ? max(0, elapsed.rounded(.up) - 1) : previousBoundary
+      var attempts = 0
+      var errors = 0
+      while index < events.count, events[index].offset <= elapsed {
+        let event = events[index]
+        let inputErrors = cursor.apply(event)
+        if event.kind == .insert, !singleWindow || windowStart == 0 || event.offset > windowStart {
+          attempts += event.inputUnits.count
+          errors += inputErrors
+        }
+        index += 1
+      }
+      previousBoundary = elapsed
+      return .init(elapsed: elapsed,
+        wpm: wpm(characters: cursor.speedCredit, elapsed: elapsed),
+        rawWpm: wpm(characters: cursor.accepted.entries.count, elapsed: elapsed),
+        burstWpm: intervalBurst(inputUnits: attempts, seconds: elapsed - windowStart), errorCount: errors)
+    }
+  }
+
+  private struct RawActivityCursor {
+    let targets: UnitInputTargets
+    let configuration: TestConfiguration?
+    var accepted = AcceptedUnitInput()
+    var usesWordCommits: Bool { !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []) }
+    var hasTargetErrors: Bool { configuration?.mode != .zen }
+
+    init(prompt: String, configuration: TestConfiguration?) {
+      targets = UnitInputTargets(prompt, buildsASCIICatalog: true)
+      self.configuration = configuration
+    }
+
+    mutating func apply(_ event: TypingReplayEvent) -> Int {
+      if event.kind == .delete {
+        let count = event.deletesUTF16Unit ? 1
+          : String(decoding: accepted.units, as: UTF16.self).last.map { String($0).utf16.count } ?? 0
+        for _ in 0..<min(count, accepted.entries.count) { accepted.removeLast() }
+        return 0
+      }
+      var errors = 0
+      if let units = event.validatedTextUTF16 {
+        for unit in units {
+          errors += accept(unit, allowsCommit: true, event: event)
+        }
+      } else {
+        for original in event.text {
+          let next = target(at: accepted.activeCount)
+          let expected = next.flatMap { UnicodeScalar(UInt32($0)) }.map { Character(String($0)) }
+          let character = InputCharacterEquivalence.normalized(original,
+            expected: expected, language: configuration?.language ?? .english)
+          for unit in String(character).utf16 {
+            errors += accept(unit, allowsCommit: isPromptWordSeparator(character), event: event)
+          }
+        }
+      }
+      if hasTargetErrors, let judgments = event.validatedInputCorrectness {
+        return judgments.filter { !$0 }.count
+      }
+      return errors
+    }
+
+    private func target(at position: Int) -> UInt16? {
+      let field = usesWordCommits ? targets.field(accepted.fieldIndex) : targets.units
+      let index = usesWordCommits ? position : accepted.entries.count
+      return field.indices.contains(index) ? field[index] : nil
+    }
+
+    private mutating func accept(_ unit: UInt16, allowsCommit: Bool, event: TypingReplayEvent) -> Int {
+      let error = hasTargetErrors && (event.forceError || target(at: accepted.activeCount) != unit) ? 1 : 0
+      if !event.isStoppedInsertion {
+        accepted.append(.init(unit: unit, target: nil, date: Date(timeIntervalSince1970: event.offset),
+          forced: event.forceError, extra: false,
+          commits: usesWordCommits && allowsCommit && (unit == 32 || unit == 10) && event.commitsWord != false))
+      }
+      return error
+    }
+
+    var speedCredit: Int {
+      if configuration?.mode == .zen { return accepted.entries.count }
+      if !usesWordCommits {
+        // Unknown no-space word boundaries stay an explicitly flat fallback.
+        return accepted.entries.enumerated().reduce(0) { total, part in
+          total + (targets.units.indices.contains(part.offset) && targets.units[part.offset] == part.element.unit
+            && !part.element.forced ? 1 : 0)
+        }
+      }
+      return accepted.starts.indices.reduce(0) { total, index in
+        let input = accepted.field(index, withoutCommit: true)
+        let target = targets.field(index, withoutCommit: true)
+        let matches = input == target || index == accepted.fieldIndex
+          && input.count <= target.count && target.starts(with: input)
+        return total + (matches ? input.count + (index < accepted.fieldIndex ? 1 : 0) : 0)
+      }
     }
   }
 

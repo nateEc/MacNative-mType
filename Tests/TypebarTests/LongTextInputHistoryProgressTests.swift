@@ -220,11 +220,23 @@ final class LongTextInputHistoryProgressTests: XCTestCase {
     session.insert("🇨🇦", at: start.addingTimeInterval(1))
     XCTAssertEqual(session.typed.utf16.count, 6)
     session.deleteBackward(at: start.addingTimeInterval(2))
-    XCTAssertEqual(session.typed.utf16.count, 4)
+    XCTAssertEqual(session.typed.utf16.count, 5)
     XCTAssertEqual(progress(source, session), 5)
     session.deleteBackward(at: start.addingTimeInterval(3))
-    XCTAssertEqual(session.typed, "")
+    XCTAssertEqual(session.typed, "🇺🇨")
+    XCTAssertEqual(progress(source, session), 5)
+    for remaining in stride(from: 3, through: 0, by: -1) {
+      session.deleteBackward(at: start.addingTimeInterval(Double(7 - remaining)))
+      XCTAssertEqual(session.typed.utf16.count, remaining)
+      XCTAssertEqual(progress(source, session), 0)
+    }
     XCTAssertEqual(progress(source, session), 0)
+    var legacy: [TypingReplayEvent] = [.init(offset: 0, kind: .insert, text: "\u{1F1FA}"),
+      .init(offset: 1, kind: .insert, text: "🇨🇦"), .init(offset: 2, kind: .delete, text: "")]
+    XCTAssertEqual(TypingReplay.typedText(events: legacy, through: 2), "🇺🇨")
+    legacy.append(.init(offset: 3, kind: .delete, text: ""))
+    XCTAssertEqual(TypingReplay.typedText(events: legacy, through: 3), "")
+    XCTAssertEqual(SavedTextInputHistoryPolicy.progressWordCount(displays: ["abcd", "ef"], events: legacy), 0)
   }
 
   func testIncorrectFinalCommitProjectionTrimUsesECMAScriptWhitespaceNotFoundationNEL() {

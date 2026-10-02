@@ -188,7 +188,7 @@ final class QuickEndUnicodeTests: XCTestCase {
       XCTAssertEqual(result.outcome, .completed)
       XCTAssertEqual(result.inputMetrics?.totalAttempts, 7)
       XCTAssertEqual(result.inputMetrics?.correctAttempts, 5)
-      XCTAssertEqual(result.replayEvents.map(\.text).joined(), "seed 🙂")
+      XCTAssertEqual(String(decoding: result.replayEvents.flatMap(\.inputUnits), as: UTF16.self), "seed 🙂")
       XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents,
         through: result.elapsedDuration), session.typed)
       XCTAssertEqual(try JSONDecoder().decode(CompletedTestResult.self,

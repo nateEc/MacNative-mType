@@ -153,7 +153,9 @@ final class InputTextIdentityTests: XCTestCase {
     var attempt = TypingSession(configuration: config(), prompt: "e\u{301} tail")
     attempt.insertBatch("é tail", at: start)
     let result = try XCTUnwrap(attempt.result())
-    XCTAssertEqual(result.errorCount, 1)
+    XCTAssertEqual(result.errorCount, 2, "The commit arrives at the still-missing target mark's unit position")
+    XCTAssertEqual(result.replayEvents.prefix(2).map(\.textUTF16), [[233], [32]])
+    XCTAssertEqual(result.replayEvents.prefix(2).map(\.inputCorrectness), [[false], [false]])
     XCTAssertLessThan(result.preciseAccuracy, 100)
     let expected = Array("é tail".utf16)
     XCTAssertEqual(Array(TypingReplay.typedText(events: result.replayEvents,
@@ -163,7 +165,14 @@ final class InputTextIdentityTests: XCTestCase {
     let restored = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
     XCTAssertEqual(Array(restored.results[0].prompt.utf16), Array("e\u{301} tail".utf16))
-    XCTAssertEqual(restored.results[0].errorCount, 1)
+    XCTAssertEqual(restored.results[0].errorCount, 2)
+    let legacy = CompletedTestResult(id: UUID(), configuration: config(), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(1), typedCharacterCount: 6,
+      correctCharacterCount: 4, errorCount: 1, wpm: 48, rawWpm: 72, accuracy: 67,
+      prompt: "e\u{301} tail", replayEvents: [.init(offset: 0, kind: .insert, text: "é tail")])
+    let old = try JSONDecoder().decode(CompletedTestResult.self, from: JSONEncoder().encode(legacy))
+    XCTAssertEqual(old, legacy, "Stored legacy diagnostics are not remapped or rescored")
+    XCTAssertEqual(old.errorCount, 1)
   }
 
   func testSameWidthNoSpaceAliasFailsExpertAtItsActualWordCommit() {

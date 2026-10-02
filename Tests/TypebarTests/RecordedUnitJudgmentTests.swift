@@ -74,7 +74,7 @@ final class RecordedUnitJudgmentTests: XCTestCase {
     input.insertBatch("🙂", forceError: true, at: start)
     input.bailOut(at: start.addingTimeInterval(1))
     let result = try XCTUnwrap(input.result())
-    XCTAssertEqual(result.replayEvents[0].inputCorrectness, [false, false])
+    XCTAssertEqual(result.replayEvents.map(\.inputCorrectness), [[false], [false]])
     XCTAssertEqual(TypingReplay.soundTimeline(prompt: result.prompt, events: result.replayEvents).map(\.cue), [.error, .error])
   }
 
@@ -97,8 +97,8 @@ final class RecordedUnitJudgmentTests: XCTestCase {
     input.insertBatch("a", at: start.addingTimeInterval(1))
     input.finishZen(at: start.addingTimeInterval(2))
     let result = try XCTUnwrap(input.result())
-    XCTAssertEqual(result.replayEvents.map(\.inputCorrectness), [[true, true], [true]])
-    XCTAssertEqual(result.replayEvents.map(\.inputStopped), [true, nil])
+    XCTAssertEqual(result.replayEvents.map(\.inputCorrectness), [[true], [true], [true]])
+    XCTAssertEqual(result.replayEvents.map(\.inputStopped), [true, true, nil])
     XCTAssertEqual(TypingReplay.soundTimeline(prompt: result.prompt, events: result.replayEvents,
       configuration: result.configuration).map(\.cue), [.click])
     XCTAssertEqual(result.preciseAccuracy, 100)
@@ -232,29 +232,35 @@ final class RecordedUnitJudgmentTests: XCTestCase {
     XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for result in [portable, archive.results[0]] {
       XCTAssertEqual(result, original)
-      XCTAssertEqual(result.replayEvents[0].inputCorrectness, [true, false])
+      XCTAssertEqual(result.replayEvents.map(\.inputCorrectness), [[true], [false]])
       XCTAssertEqual(TypingReplay.soundTimeline(prompt: result.prompt, events: result.replayEvents).map(\.cue), [.click, .error])
     }
   }
 
   func testGenuineArchiveTwelveKeepsItsPreviousOneActionProjectionAndMetrics() throws {
-    let original = try attempt("🙃", prompt: "🙂x")
-    let old = try removingJudgments(original)
+    // Explicit owned archive-12 fixture, not stripped metadata from a new
+    // unit session: its insertion was genuinely one legacy glyph primitive.
+    let old = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .bailedOut,
+      startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 1,
+      correctCharacterCount: 0, errorCount: 1, wpm: 0, rawWpm: 12, accuracy: 50,
+      inputMetrics: .init(version: 1, correctAttempts: 1, totalAttempts: 2, creditedUnits: 0, retainedUnits: 2),
+      prompt: "🙂x", replayEvents: [.init(offset: 0, kind: .insert, text: "🙃",
+        inputField: .init(index: 0, value: "🙃"))])
     let archive = TypebarArchive(version: 12, exportedAt: start, settings: .init(), results: [old], presets: [])
     let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
     let decoded = try TypebarDataTransfer.importArchive(from: encoder.encode(archive))
     XCTAssertEqual(decoded.version, 12)
     XCTAssertNil(decoded.results[0].replayEvents[0].inputCorrectness)
-    XCTAssertEqual(decoded.results[0].inputMetrics, original.inputMetrics)
+    XCTAssertEqual(decoded.results[0], old)
     XCTAssertEqual(TypingReplay.soundTimeline(prompt: old.prompt, events: old.replayEvents).map(\.cue), [.error])
     XCTAssertEqual(FieldReplayPresentation.glyphs(prompt: old.prompt, events: old.replayEvents, through: 2).map(\.state),
       [.incorrect, .pending])
   }
 
   func testArchiveConstructionCannotMislabelJudgmentsAsAnyEarlierVersion() throws {
-    // An unchanged non-BMP producer still makes genuine archive-13 metadata;
-    // do not strip archive-14 units from a newly converted BMP session.
-    let original = try attempt("🙂", prompt: "🙂x")
+    // ASCII still produces genuine archive-13 metadata; never downgrade a
+    // converted Unicode session by stripping its raw fields or units.
+    let original = try attempt("a", prompt: "ab")
     for version in 1...12 {
       XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [original], presets: []).version, 13)
     }
@@ -280,7 +286,7 @@ final class RecordedUnitJudgmentTests: XCTestCase {
     var input = TypingSession(configuration: .words(1_000), prompt: prompt)
     input.insertBatch(prompt, at: start)
     let result = try XCTUnwrap(input.result())
-    XCTAssertEqual(result.replayEvents.count, 1_999)
+    XCTAssertEqual(result.replayEvents.count, 2_999)
     XCTAssertEqual(result.replayEvents.compactMap(\.inputCorrectness).flatMap { $0 }.count, 2_999)
     XCTAssertEqual(result.inputMetrics?.totalAttempts, 2_999)
     XCTAssertEqual(TypingReplay.soundTimeline(prompt: result.prompt, events: result.replayEvents).count, 3_998)

@@ -4077,7 +4077,13 @@ struct TypingSession {
   private(set) var generationNotice: String?
   private let initialGenerationNotice: String?
   private let initializationFailure: String?
-  private(set) var prompt: String
+  private(set) var prompt: String {
+    didSet { unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: acceptedUnits != nil) }
+  }
+  private var unitTargets = UnitInputTargets("")
+  private var acceptedUnits: AcceptedUnitInput?
+  private var currentInputUnit: UInt16?
+  private var latestReplayInputUnits: [UInt16]?
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
   private var promptWordCount: Int
@@ -4248,6 +4254,7 @@ struct TypingSession {
     if initializationFailure != nil { self.outcome = .failed }
     self.prompt = prompt
     self.promptCharacters = Array(prompt)
+    self.unitTargets = UnitInputTargets(prompt)
     let wordProgress = Self.wordProgress(configuration.wordLimit, in: self.promptCharacters)
     self.requiredWordStartIndex = wordProgress.startIndex
     self.promptWordCount = wordProgress.count
@@ -4681,6 +4688,23 @@ struct TypingSession {
   /// The pre-result display always credits a correct prefix of the active
   /// word, matching the live speed readout without changing final scoring.
   private func referenceWordCredit(countPartialLastWord: Bool) -> TypingWordCredit {
+    if let acceptedUnits {
+      if configuration.mode == .zen {
+        return .init(characters: typedGraphemeCount, inputUnits: acceptedUnits.entries.count)
+      }
+      var credit = TypingWordCredit()
+      for index in acceptedUnits.starts.indices {
+        let input = acceptedUnits.field(index, withoutCommit: true)
+        let target = unitTargets.field(index, withoutCommit: true)
+        let prefix = countPartialLastWord && index == acceptedUnits.fieldIndex
+        if input == target || prefix && input.count <= target.count && target.starts(with: input) {
+          credit.inputUnits += input.count
+          credit.characters += String(decoding: input, as: UTF16.self).count
+          if index < acceptedUnits.fieldIndex { credit.inputUnits += 1; credit.characters += 1 }
+        }
+      }
+      return credit
+    }
     if hasNoSpaceWordSegmentation {
       return noSpaceWordCredit(countPartialLastWord: countPartialLastWord)
     }
@@ -4812,6 +4836,9 @@ struct TypingSession {
   /// space counts as one UTF-16 unit; an active/no-space word has one virtual
   /// submit unit. Native character indices remain grapheme-based.
   var burstWpm: Int {
+    if let acceptedUnits {
+      return acceptedUnits.burst(acceptedUnits.fieldIndex) ?? committedWordBursts.last ?? 0
+    }
     let characters = Array(typed)
     if tracksNoSpaceWordBursts {
       if noSpaceCommittedWordIndex != nil { return committedWordBursts.last ?? 0 }
@@ -4837,6 +4864,11 @@ struct TypingSession {
   /// inserted in a single event), so presentation can keep it neutral instead
   /// of inventing an extreme speed.
   var wordBurstHistory: [Int?] {
+    if let acceptedUnits {
+      return acceptedUnits.starts.indices.compactMap { index -> [Int?]? in
+        acceptedUnits.range(index).isEmpty ? nil : [acceptedUnits.burst(index)]
+      }.flatMap { $0 }
+    }
     let characters = Array(typed)
     guard characters.count == typedCharacterDates.count else { return [] }
     if hasNoSpaceWordSegmentation {
@@ -4981,7 +5013,7 @@ struct TypingSession {
     // Owned quotes retain the initial generation signal, not the contents of
     // the growing buffer. Other modes retain their existing dynamic behavior.
     if let quoteWordStream { return quoteWordStream.initialHasNewline }
-    return prompt.contains("\n")
+    return unitTargets.hasNewline
   }
 
   var acceptsNewlineInput: Bool {
@@ -5060,6 +5092,17 @@ struct TypingSession {
   }
 
   var completedWordCount: Int {
+    if let acceptedUnits {
+      let committed = acceptedUnits.fieldIndex
+      if outcome == .completed, isAtFinalBlankTarget,
+        retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
+      { return committed + 1 }
+      if outcome == .completed, configuration.mode == .custom,
+        configuration.customTextCompletion == .words, !acceptedUnits.lastCommits
+      { return committed + 1 }
+      return committed + (nextTargetIndex >= promptCharacters.count
+        && unitTargets.units.last.map({ $0 != 32 && $0 != 10 }) == true ? 1 : 0)
+    }
     if tracksNoSpaceWordBursts {
       let typedLength = typedGraphemeCount
       var lower = 0
@@ -5247,21 +5290,20 @@ struct TypingSession {
   ) {
     lastInputWasCorrect = nil
     guard !isFinished, !text.isEmpty else { return }
-    // Convert only BMP graphemes inside an ordinary/Zen field. A separator
-    // fused with a mark crosses a field seam; CRLF, no-space and surrogate
-    // inputs still need the future raw accepted-buffer representation.
-    let characters: [Character] = text.flatMap { character in
-      guard supportsBMPUnitInput, character != "\r\n",
-        character.unicodeScalars.first.map({ !isPromptWordSeparator(Character(String($0))) }) == true,
-        character.unicodeScalars.count > 1,
-        character.unicodeScalars.allSatisfy({ $0.utf16.count == 1 })
-      else { return [character] }
-      recordsBMPUnits = true
-      return character.unicodeScalars.map { Character(String($0)) }
-    }
+    // ASCII fields already have one code unit per native primitive. On the
+    // first Unicode field/input, retain real units rather than decoded glyphs.
+    if supportsBMPUnitInput, acceptedUnits == nil,
+      text.utf16.contains(where: { $0 > 127 || $0 == 13 }) || unitTargets.requiresUnitInput
+    { beginUnitInput() }
+    let inputUnits = acceptedUnits == nil ? nil : Array(text.utf16)
+    let characters: [Character] = inputUnits.map { units in
+      units.map { Character(String(decoding: [$0], as: UTF16.self)) }
+    } ?? Array(text)
     let attemptsBeforeEvent = inputAttemptCount
     for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
+      currentInputUnit = inputUnits?[index]
+      defer { currentInputUnit = nil }
       if shouldExpandReferenceEllipsis(character, at: date) {
         // The web reference replaces a single ellipsis with three periods
         // only when the prompt expects periods. Treat that replacement as
@@ -5423,6 +5465,10 @@ struct TypingSession {
       return true
     }
     if configuration.rules.confidenceMode == .on { return false }
+    if let acceptedUnits {
+      let index = acceptedUnits.fieldIndex - 1
+      return acceptedUnits.field(index) != unitTargets.field(index)
+    }
     // Drop the active field, not submitted empty fields: a blank line is a
     // real prior word whose correctness controls reopening it.
     let completedWords = Array(retainedInputWords(omittingEmptySubsequences: false).dropLast())
@@ -5580,6 +5626,9 @@ struct TypingSession {
     let inputCharacter = normalizedInputCharacter(
       character,
       expected: currentTargetIndex < promptCharacters.count ? promptCharacters[currentTargetIndex] : nil)
+    if let unit = currentInputUnit, !(0xD800...0xDFFF).contains(unit) {
+      currentInputUnit = String(inputCharacter).utf16.first
+    }
     let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !inputWordIsEmpty
     let retainsLeadingSeparator = isPromptWordSeparator(inputCharacter) && inputWordIsEmpty
       && usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
@@ -5622,7 +5671,7 @@ struct TypingSession {
       { fail(at: date) }
       return true
     }
-    if currentTargetIndex >= promptCharacters.count {
+    if currentTargetIndex >= promptCharacters.count && (acceptedUnits == nil || promptCharacters.isEmpty) {
       beginIfNeeded(at: date)
       recordInputAttempt(inputCharacter, correctUnits: 0)
       recordWeakSpotInput(inputCharacter, isCorrect: false, at: date)
@@ -5640,7 +5689,14 @@ struct TypingSession {
       return true
     }
     beginIfNeeded(at: date)
-    let expected = promptCharacters[currentTargetIndex]
+    let fallbackExpected = promptCharacters[min(currentTargetIndex, promptCharacters.count - 1)]
+    let expected: Character = acceptedUnits.map { _ in
+      let comparison = inputAccuracyTarget(at: currentTargetIndex)
+      return comparison.units.indices.contains(comparison.position)
+        ? UnicodeScalar(UInt32(comparison.units[comparison.position])).map { Character(String($0)) }
+          ?? fallbackExpected
+        : fallbackExpected
+    } ?? fallbackExpected
     let retainsCurrentWordAsExtra = shouldRetainInCurrentWord(
       inputCharacter, expected: expected)
     let earlyWordCommitTargetIndex = incompleteWordCommitTargetIndex(
@@ -5649,7 +5705,8 @@ struct TypingSession {
     // while navigation is blocked. Nonempty words still consume their first
     // character, so the next comparison stays at its word-local position.
     let retainsEmptySlot = retainsLeadingSeparator && isPromptWordSeparator(expected)
-    let targetIndex = retainsCurrentWordAsExtra || retainsEmptySlot
+    let pastTargetEnd = currentTargetIndex >= promptCharacters.count
+    let targetIndex = retainsCurrentWordAsExtra || retainsEmptySlot || pastTargetEnd
       ? nil : earlyWordCommitTargetIndex ?? currentTargetIndex
     let accuracyUnits = inputAccuracyUnits(
       for: inputCharacter, targetIndex: currentTargetIndex, forceError: forceError)
@@ -5702,7 +5759,7 @@ struct TypingSession {
         let occupiesReturn = expected == "\n"
           && activeInputWordUTF16Length == String(promptCharacters[fieldStart..<currentTargetIndex]).utf16.count
         stoppedPromptCandidate = .init(character: inputCharacter,
-          targetIndex: (retainsCurrentWordAsExtra || retainsEmptySlot) && !occupiesReturn
+          targetIndex: (retainsCurrentWordAsExtra || retainsEmptySlot || pastTargetEnd) && !occupiesReturn
             ? nil : currentTargetIndex)
       }
       recordReplayEvent(kind: .insert, text: String(inputCharacter), forceError: forceError,
@@ -5733,7 +5790,7 @@ struct TypingSession {
       appendTypedCharacter(
         inputCharacter, targetIndex: targetIndex,
         forceError: forceError || earlyWordCommitTargetIndex != nil,
-        countsAsExtraError: retainsCurrentWordAsExtra, at: date)
+        countsAsExtraError: retainsCurrentWordAsExtra || pastTargetEnd, at: date)
       recordReplayEvent(
         kind: .insert, text: String(inputCharacter), forceError: forceError, at: date)
       deleteForError(
@@ -5754,7 +5811,8 @@ struct TypingSession {
       inputCharacter, targetIndex: targetIndex,
       forceError: forceError || earlyWordCommitTargetIndex != nil
         || (followsRetainedLeadingSeparator && !isCorrect && InputTextIdentity.matches(inputCharacter, expected)),
-      countsAsExtraError: retainsCurrentWordAsExtra || (retainsEmptySlot && !isCorrect), at: date)
+      countsAsExtraError: retainsCurrentWordAsExtra || (retainsEmptySlot && !isCorrect)
+        || (pastTargetEnd && !isPromptWordSeparator(inputCharacter)), at: date)
     if let commitErrorStart { committedErrorWordStarts.insert(commitErrorStart) }
     if configuration.rules.blindMode, let commitIndex = earlyWordCommitTargetIndex {
       let end = isPromptWordSeparator(promptCharacters[commitIndex]) ? commitIndex : commitIndex + 1
@@ -5832,6 +5890,16 @@ struct TypingSession {
   }
 
   private func ordinaryCommitErrorStart(for character: Character, targetIndex: Int?) -> Int? {
+    if let acceptedUnits {
+      guard !configuration.rules.blindMode, isPromptWordSeparator(character),
+        unitTargets.fields.indices.contains(acceptedUnits.fieldIndex)
+      else { return nil }
+      let range = unitTargets.fields[acceptedUnits.fieldIndex]
+      let attempted = acceptedUnits.field(acceptedUnits.fieldIndex) + [currentInputUnit ?? String(character).utf16.first!]
+      let correct = attempted == unitTargets.field(acceptedUnits.fieldIndex)
+        && !acceptedUnits.entries[acceptedUnits.range(acceptedUnits.fieldIndex)].contains(where: \.forced)
+      return correct || range.isEmpty ? nil : unitTargets.glyphs[range.lowerBound]
+    }
     guard !configuration.rules.blindMode, !tracksNoSpaceWordBursts,
       isPromptWordSeparator(character), let targetIndex,
       promptCharacters.indices.contains(targetIndex),
@@ -5857,6 +5925,7 @@ struct TypingSession {
     lastInputWasCorrect = lastUnitCorrect ?? (correctUnits == units)
     latestInputCorrectness = judgments ?? Array(repeating: correctUnits == units, count: units)
     latestReplayInputText = String(character)
+    latestReplayInputUnits = currentInputUnit.map { [$0] }
   }
 
   /// Accuracy follows input-event units, not the native caret's grapheme
@@ -5865,7 +5934,7 @@ struct TypingSession {
   private func inputAccuracyUnits(
     for character: Character, targetIndex: Int, forceError: Bool
   ) -> (correct: Int, lastCorrect: Bool, judgments: [Bool]) {
-    let inputUnits = Array(String(character).utf16)
+    let inputUnits = currentInputUnit.map { [$0] } ?? Array(String(character).utf16)
     guard !forceError, promptCharacters.indices.contains(targetIndex) else {
       return (0, false, Array(repeating: false, count: inputUnits.count))
     }
@@ -5884,6 +5953,9 @@ struct TypingSession {
   }
 
   private func inputAccuracyTarget(at targetIndex: Int) -> (units: [UInt16], position: Int) {
+    if let acceptedUnits {
+      return (unitTargets.field(acceptedUnits.fieldIndex), acceptedUnits.activeCount)
+    }
     guard promptCharacters.indices.contains(targetIndex) else { return ([], 0) }
     let target: String
     let position: Int
@@ -5924,6 +5996,12 @@ struct TypingSession {
   }
 
   private var currentWordIsCorrect: Bool {
+    if let acceptedUnits {
+      let index = acceptedUnits.fieldIndex - (acceptedUnits.lastCommits ? 1 : 0)
+      guard unitTargets.fields.indices.contains(index) else { return false }
+      return acceptedUnits.field(index, withoutCommit: true) == unitTargets.field(index, withoutCommit: true)
+        && !acceptedUnits.entries[acceptedUnits.range(index)].contains(where: \.forced)
+    }
     // Input retains submitted blank fields. Target slots must use the same
     // indexing or a later correct word is compared with the wrong target.
     let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: false)
@@ -6031,23 +6109,33 @@ struct TypingSession {
   {
     guard let startedAt else { return }
     let field = replayInputField(kind: kind, inputStopped: inputStopped)
-    // BMP unit insertion and deletion use archive 14's already defined raw
-    // contract. An unconverted non-BMP deletion keeps its old primitive type.
-    let raw = kind == .insert ? recordsBMPUnits : lastDeletionWasBMPUnit
-    let recordedField = raw ? field.map { TypingReplayInputField(index: $0.index, units: Array($0.value.utf16)) } : field
+    // A converted session preserves actual units, including lone surrogates;
+    // no-space/legacy primitives retain their distinct archive contracts.
+    let raw = acceptedUnits != nil || (kind == .insert ? recordsBMPUnits : lastDeletionWasBMPUnit)
+    let recordedField = acceptedUnits != nil ? field
+      : raw ? field.map { TypingReplayInputField(index: $0.index, units: Array($0.value.utf16)) } : field
+    let retainsSeparator = acceptedUnits.map { buffer in
+      guard let last = buffer.entries.last else { return false }
+      return (last.unit == 32 || last.unit == 10) && !last.commits
+    } ?? retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
     replayEvents.append(
       .init(
         offset: max(0, date.timeIntervalSince(startedAt)), kind: kind, text: text,
         forceError: forceError, automatic: automatic || applyingAutomaticCodeInput,
-        commitsWord: kind == .insert && retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
+        commitsWord: kind == .insert && retainsSeparator
           ? false : nil, inputStopped: inputStopped ? true : nil,
         inputField: recordedField, inputCorrectness: kind == .insert ? latestInputCorrectness : nil,
-        textUTF16: raw ? Array(text.utf16) : nil))
+        textUTF16: raw ? (kind == .insert ? latestReplayInputUnits ?? Array(text.utf16) : []) : nil))
   }
 
   private func replayInputField(
     kind: TypingReplayEventKind, inputStopped: Bool
   ) -> TypingReplayInputField? {
+    if let acceptedUnits {
+      let submitted = kind == .insert && !inputStopped && acceptedUnits.lastCommits
+      let index = acceptedUnits.fieldIndex - (submitted ? 1 : 0)
+      return .init(index: index, units: acceptedUnits.field(index))
+    }
     if tracksNoSpaceWordBursts {
       let completed = completedWordCount
       let submitted = kind == .insert && !inputStopped && completed > 0
@@ -6084,6 +6172,14 @@ struct TypingSession {
   }
 
   private func errorsInCurrentWord() -> Int {
+    if let acceptedUnits, acceptedUnits.lastCommits {
+      let index = acceptedUnits.fieldIndex - 1
+      let input = acceptedUnits.field(index, withoutCommit: true)
+      let target = unitTargets.field(index, withoutCommit: true)
+      return input.enumerated().reduce(0) { total, part in
+        total + (target.indices.contains(part.offset) && target[part.offset] == part.element ? 0 : 1)
+      }
+    }
     let typedWords = retainedInputWords(omittingEmptySubsequences: false)
     let promptWords = splitPromptWords(prompt, omittingEmptySubsequences: false)
     guard let typedWord = typedWords.dropLast().last, typedWords.count - 2 < promptWords.count
@@ -6124,6 +6220,10 @@ struct TypingSession {
 
   private mutating func recordWordBurstIfCommitted() {
     guard lastInputCommitsWord else { return }
+    if let acceptedUnits {
+      if let burst = acceptedUnits.burst(acceptedUnits.fieldIndex - 1) { committedWordBursts.append(burst) }
+      return
+    }
     if !typedNeedsFullSegmentation {
       let end = typedCharacterDates.count - 1
       let wordLength = retainedWordSeparatorTypedIndices.isEmpty
@@ -6168,6 +6268,10 @@ struct TypingSession {
 
   private mutating func recordZenWordBurstIfCommitted(after character: Character) {
     guard isZenWordCommit(character) else { return }
+    if let acceptedUnits {
+      if let burst = acceptedUnits.burst(acceptedUnits.fieldIndex - 1) { committedWordBursts.append(burst) }
+      return
+    }
     let characters = Array(typed)
     guard typedCharacterDates.count == characters.count else { return }
     let end = characters.count - 1
@@ -6209,6 +6313,10 @@ struct TypingSession {
   }
 
   private var lastCommittedBurstWordLength: Int? {
+    if let acceptedUnits, acceptedUnits.lastCommits {
+      return configuration.mode == .zen ? acceptedUnits.range(acceptedUnits.fieldIndex - 1).count
+        : unitTargets.field(acceptedUnits.fieldIndex - 1, withoutCommit: true).count
+    }
     if configuration.mode == .zen {
       let characters = Array(typed)
       guard let last = characters.last, isZenWordCommit(last) else { return nil }
@@ -6230,7 +6338,8 @@ struct TypingSession {
   }
 
   private var zenActiveWordLength: Int {
-    String(typed.reversed().prefix { !isZenWordCommit($0) }.reversed()).utf16.count
+    if let acceptedUnits { return acceptedUnits.activeCount }
+    return String(typed.reversed().prefix { !isZenWordCommit($0) }.reversed()).utf16.count
   }
 
   private func isZenWordCommit(_ character: Character) -> Bool {
@@ -6275,6 +6384,7 @@ struct TypingSession {
   }
 
   private func normalizedInputCharacter(_ character: Character, expected: Character?) -> Character {
+    if let currentInputUnit, (0xD800...0xDFFF).contains(currentInputUnit) { return character }
     guard supportsBMPUnitInput else {
       return InputCharacterEquivalence.normalized(character, expected: expected, language: configuration.language)
     }
@@ -6293,7 +6403,8 @@ struct TypingSession {
   }
 
   private var supportsBMPUnitInput: Bool {
-    configuration.mode == .zen || (usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers))
+    configuration.mode == .zen || (usesWordCommitInput && !tracksNoSpaceWordBursts
+      && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers))
   }
 
   private var shouldRejectLeadingSeparator: Bool {
@@ -6321,6 +6432,7 @@ struct TypingSession {
   }
 
   private var lastInputCommitsWord: Bool {
+    if let acceptedUnits { return acceptedUnits.lastCommits }
     if firstEmptyNoSpaceWordIndex != nil, hasNoSpaceWordSegmentation {
       return noSpaceCommittedWordIndex != nil
     }
@@ -6329,6 +6441,13 @@ struct TypingSession {
   }
 
   private func retainedInputWords(omittingEmptySubsequences: Bool) -> [Substring] {
+    if let acceptedUnits {
+      return acceptedUnits.starts.indices.compactMap { index in
+        let units = acceptedUnits.field(index, withoutCommit: true)
+        if units.isEmpty && omittingEmptySubsequences { return nil }
+        return Substring(String(decoding: units, as: UTF16.self))
+      }
+    }
     guard !retainedWordSeparatorTypedIndices.isEmpty else {
       return splitPromptWords(typed, omittingEmptySubsequences: omittingEmptySubsequences)
     }
@@ -6358,13 +6477,18 @@ struct TypingSession {
   }
 
   private var activeInputWordUTF16Length: Int {
-    inputWordText().utf16.count
+    if let acceptedUnits { return acceptedUnits.activeCount }
+    return inputWordText().utf16.count
   }
 
   /// Inspect only the current field, even after an older stopped separator
   /// survives a later real commit. Whole-history splitting here turns long
   /// custom text into a quadratic scan on each separator.
   private func inputWordText(omittingLastCommit: Bool = false) -> String {
+    if let acceptedUnits {
+      let index = acceptedUnits.fieldIndex - (omittingLastCommit && acceptedUnits.lastCommits ? 1 : 0)
+      return String(decoding: acceptedUnits.field(index, withoutCommit: omittingLastCommit), as: UTF16.self)
+    }
     let skipped = omittingLastCommit ? 1 : 0
     let reversed = typed.reversed().dropFirst(skipped)
     if retainedWordSeparatorTypedIndices.isEmpty {
@@ -6379,6 +6503,9 @@ struct TypingSession {
   /// Mirrors the reference guard of the current word, including its visible
   /// commit separator when one exists, plus twenty extra UTF-16 units.
   private var currentSpaceDelimitedWordInputLimit: Int? {
+    if let acceptedUnits, configuration.mode != .zen {
+      return unitTargets.field(acceptedUnits.fieldIndex).count + 20
+    }
     guard configuration.mode != .zen,
       usesWordCommitInput,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers), !prompt.isEmpty
@@ -6414,6 +6541,10 @@ struct TypingSession {
   /// typing submits an incomplete word with space. All ordinary input keeps
   /// its original one-to-one mapping, including no-space and code prompts.
   private var nextTargetIndex: Int {
+    if let acceptedUnits {
+      return unitTargets.cursor(field: acceptedUnits.fieldIndex, position: acceptedUnits.activeCount,
+        endGlyph: promptCharacters.count)
+    }
     guard let previousTargetIndex = typedTargetIndices.reversed().first(where: { $0 != nil }) ?? nil
     else {
       return 0
@@ -6441,6 +6572,18 @@ struct TypingSession {
   private func incompleteWordCommitTargetIndex(
     for character: Character, currentTargetIndex: Int
   ) -> Int? {
+    if let acceptedUnits {
+      guard isPromptWordSeparator(character),
+        !inputWordIsEmpty || character == "\n" && shouldCommitLeadingNewline,
+        unitTargets.fields.indices.contains(acceptedUnits.fieldIndex)
+      else { return nil }
+      let range = unitTargets.fields[acceptedUnits.fieldIndex]
+      let position = range.lowerBound + acceptedUnits.activeCount
+      guard position < range.upperBound, position < unitTargets.units.count,
+        unitTargets.units[position] != 32, unitTargets.units[position] != 10
+      else { return nil }
+      return range.isEmpty ? nil : unitTargets.glyphs[range.upperBound - 1]
+    }
     guard isPromptWordSeparator(character),
       (!inputWordIsEmpty || (character == "\n" && shouldCommitLeadingNewline)),
       usesWordCommitInput,
@@ -6461,6 +6604,11 @@ struct TypingSession {
     _ character: Character, targetIndex: Int?, forceError: Bool = false,
     countsAsExtraError: Bool = false, at date: Date
   ) {
+    if acceptedUnits != nil {
+      appendAcceptedUnit(character, targetIndex: targetIndex, forceError: forceError,
+        countsAsExtraError: countsAsExtraError, at: date)
+      return
+    }
     let typedIndex = typedGraphemeCount
     let previous = typed.last
     let joinsBMP = supportsBMPUnitInput && (!character.isASCII || previous?.isASCII == false) && previous.map {
@@ -6516,7 +6664,89 @@ struct TypingSession {
     if countsAsExtraError { extraErrorTypedIndices.insert(joinsBMP ? typedIndex - 1 : typedIndex) }
   }
 
+  private mutating func beginUnitInput() {
+    unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: true)
+    var buffer = AcceptedUnitInput()
+    for (index, character) in typed.enumerated() {
+      let target = typedTargetIndices[index]
+      let units = Array(String(character).utf16)
+      for (part, unit) in units.enumerated() {
+        buffer.append(.init(unit: unit, target: target, date: typedCharacterDates[index],
+          forced: target.map { forcedErrorIndices.contains($0) } ?? false,
+          extra: extraErrorTypedIndices.contains(index),
+          commits: part == units.count - 1 && isPromptWordSeparator(character)
+            && !retainedWordSeparatorTypedIndices.contains(index)))
+      }
+    }
+    acceptedUnits = buffer
+    recordsBMPUnits = true
+    canUseCachedWordProgress = false
+  }
+
+  /// Re-segment the changed tail, not the entire growing history. The two
+  /// previous glyphs include a pending surrogate plus its joinable neighbor.
+  private mutating func projectUnitTail(oldTail: String, unitStart: Int) {
+    let oldCount = oldTail.count
+    let glyphStart = typedGraphemeCount - oldCount
+    typed.removeLast(oldCount)
+    let entries = acceptedUnits!.entries[unitStart...]
+    let tail = String(decoding: entries.map(\.unit), as: UTF16.self)
+    typed.append(tail)
+    typedTargetIndices.removeLast(oldCount)
+    typedCharacterDates.removeLast(oldCount)
+    extraErrorTypedIndices = extraErrorTypedIndices.filter { $0 < glyphStart }
+    retainedWordSeparatorTypedIndices = retainedWordSeparatorTypedIndices.filter { $0 < glyphStart }
+    var offset = unitStart
+    for (part, character) in tail.enumerated() {
+      let length = String(character).utf16.count
+      let pieces = acceptedUnits!.entries[offset..<(offset + length)]
+      typedTargetIndices.append(pieces.reversed().first(where: { $0.target != nil })?.target)
+      typedCharacterDates.append(pieces.first!.date)
+      if pieces.contains(where: \.extra) { extraErrorTypedIndices.insert(glyphStart + part) }
+      if pieces.contains(where: { ($0.unit == 32 || $0.unit == 10) && !$0.commits }) {
+        retainedWordSeparatorTypedIndices.insert(glyphStart + part)
+      }
+      offset += length
+    }
+    typedGraphemeCount = glyphStart + tail.count
+    typedNeedsFullSegmentation = true
+    replayCommittedSeparatorCount = acceptedUnits!.fieldIndex
+  }
+
+  private mutating func appendAcceptedUnit(
+    _ character: Character, targetIndex: Int?, forceError: Bool,
+    countsAsExtraError: Bool, at date: Date
+  ) {
+    let oldTail = String(typed.suffix(2))
+    let start = acceptedUnits!.entries.count - oldTail.utf16.count
+    let retained = retainedWordSeparatorTypedIndices.contains(typedGraphemeCount)
+    let unit = currentInputUnit ?? String(character).utf16.first!
+    acceptedUnits!.append(.init(unit: unit, target: targetIndex, date: date,
+      forced: forceError, extra: countsAsExtraError,
+      commits: (unit == 32 || unit == 10) && !retained))
+    if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
+    projectUnitTail(oldTail: oldTail, unitStart: start)
+  }
+
+  private mutating func removeAcceptedUnit() {
+    guard !acceptedUnits!.entries.isEmpty else { return }
+    let oldTail = String(typed.suffix(2))
+    let start = acceptedUnits!.entries.count - oldTail.utf16.count
+    let removed = acceptedUnits!.removeLast()!
+    if removed.forced, let target = removed.target,
+      !acceptedUnits!.entries.contains(where: { $0.target == target && $0.forced })
+    { forcedErrorIndices.remove(target) }
+    if removed.commits, let target = removed.target {
+      let start = promptCharacters[..<target].lastIndex(where: isPromptWordSeparator).map { $0 + 1 } ?? 0
+      committedErrorWordStarts.remove(start)
+      for index in start..<target { blindCommittedMissingTargetIndices.remove(index) }
+    }
+    lastDeletionWasBMPUnit = true
+    projectUnitTail(oldTail: oldTail, unitStart: start)
+  }
+
   private mutating func removeLastTypedCharacter() {
+    if acceptedUnits != nil { removeAcceptedUnit(); return }
     lastDeletionWasBMPUnit = false
     guard !typed.isEmpty else { return }
     let typedIndex = typedGraphemeCount - 1
@@ -6620,6 +6850,7 @@ struct TypingSession {
   }
 
   private var lastCommittedWordIsCorrect: Bool {
+    if let acceptedUnits { return acceptedUnits.lastCommits && currentWordIsCorrect }
     guard lastInputCommitsWord else { return false }
     let committedWords = retainedInputWords(omittingEmptySubsequences: true)
     let targetWords = splitPromptWords(prompt, omittingEmptySubsequences: true)
@@ -6868,7 +7099,8 @@ struct TypingSession {
       switch configuration.customTextCompletion {
       case .finish:
         if !usesIncrementalPromptExtension
-          && (InputTextIdentity.matches(typed, prompt) || shouldFinishFiniteSpaceDelimitedTest)
+          && ((acceptedUnits.map { $0.units == unitTargets.units }
+            ?? InputTextIdentity.matches(typed, prompt)) || shouldFinishFiniteSpaceDelimitedTest)
         {
           complete(at: date)
         }
@@ -7127,6 +7359,16 @@ struct TypingSession {
 
   private var shouldFinishEnglishWordsTest: Bool {
     guard let wordLimit = configuration.wordLimit, wordLimit > 0 else { return false }
+    if let acceptedUnits {
+      let targets = unitTargets.fields.indices.filter { !unitTargets.field($0, withoutCommit: true).isEmpty }
+      guard targets.count >= wordLimit, acceptedUnits.fieldIndex >= targets[wordLimit - 1] else { return false }
+      let input = acceptedUnits.starts.indices.filter { !acceptedUnits.field($0, withoutCommit: true).isEmpty }
+      guard input.count >= wordLimit else { return false }
+      if currentWordIsCorrect || lastInputCommitsWord { return true }
+      return configuration.rules.quickEnd && !configuration.rules.stopOnError && !configuration.rules.deleteOnError
+        && acceptedUnits.field(input[wordLimit - 1], withoutCommit: true).count
+          == unitTargets.field(targets[wordLimit - 1], withoutCommit: true).count
+    }
     guard let requiredWordStartIndex, nextTargetIndex >= requiredWordStartIndex else {
       return false
     }

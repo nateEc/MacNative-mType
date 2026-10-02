@@ -31,6 +31,8 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
     var session = TypingSession(configuration: .words(2), prompt: "🦊a bay")
     session.insert("🦁", at: start)
     session.deleteBackward(at: start.addingTimeInterval(0.1))
+    XCTAssertEqual(session.typed, "�", "One source backspace retains the high surrogate")
+    session.deleteBackward(at: start.addingTimeInterval(0.15))
     session.insert("🦊", at: start.addingTimeInterval(0.2))
     XCTAssertEqual(session.preciseAccuracy, 75)
     session.insert("a", at: start.addingTimeInterval(0.3))
@@ -46,7 +48,7 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
     XCTAssertEqual(session.typed, "xa")
     XCTAssertEqual(session.preciseAccuracy, 0,
       "Both units miss their source positions, despite the second visible glyph matching")
-    XCTAssertEqual(session.errors, 1)
+    XCTAssertEqual(session.errors, 2, "Both accepted glyphs occupy the surrogate slots, not the later a")
   }
 
   func testNFDAndZWJAndFlagWeightsAreNotVisibleCharacterCounts() {
@@ -94,8 +96,8 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
     XCTAssertEqual(session.preciseAccuracy, 60)
     session.bailOut(at: start.addingTimeInterval(3))
     let tape = try XCTUnwrap(session.result()).replayEvents
-    XCTAssertEqual(tape.filter { !$0.isStoppedInsertion }.map(\.text), ["a", "🦊"])
-    XCTAssertEqual(tape.filter(\.isStoppedInsertion).map(\.text), ["🦊"])
+    XCTAssertEqual(tape.filter { !$0.isStoppedInsertion }.flatMap(\.inputUnits), Array("a🦊".utf16))
+    XCTAssertEqual(tape.filter(\.isStoppedInsertion).map(\.textUTF16), [[55358], [56714]])
   }
 
   func testAutomaticCodeIndentationContributesItsOwnCorrectInputUnits() throws {
@@ -186,7 +188,7 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
     session.tick(at: start.addingTimeInterval(2))
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.preciseAccuracy, 66.67)
-    XCTAssertEqual(result.replayEvents.map(\.text), ["🦊", "x"])
+    XCTAssertEqual(result.replayEvents.map(\.textUTF16), [[55358], [56714], [120]])
   }
 
   func testNewAndLegacyAccuracySurviveArchivesWithPreciseLocalAndLegacyWireConsumers() throws {
@@ -232,8 +234,8 @@ final class AccuracyInputUnitSourceTests: XCTestCase {
     session.finishZen(at: start.addingTimeInterval(2))
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.preciseAccuracy, 100)
-    XCTAssertEqual(result.replayEvents.filter { !$0.isStoppedInsertion }.map(\.text), ["🦊"])
-    XCTAssertEqual(result.replayEvents.filter(\.isStoppedInsertion).map(\.text), ["🦁"])
+    XCTAssertEqual(result.replayEvents.filter { !$0.isStoppedInsertion }.flatMap(\.inputUnits), Array("🦊".utf16))
+    XCTAssertEqual(result.replayEvents.filter(\.isStoppedInsertion).flatMap(\.inputUnits), Array("🦁".utf16))
   }
 
   func testStoppedEntirelyWrongUnicodeUnitsCountWithoutAdvancingPosition() {
