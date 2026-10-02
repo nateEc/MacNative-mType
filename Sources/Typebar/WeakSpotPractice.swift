@@ -127,6 +127,12 @@ enum WeakSpotPractice {
       guard result.outcome == .completed, result.configuration.language == language,
         !result.prompt.isEmpty
       else { return }
+      if result.replayEvents.contains(where: \.hasRawUTF16Metadata),
+        result.replayEvents.allSatisfy({ $0.inputField != nil })
+      {
+        addUnitFieldSamples(from: result, to: &samples)
+        return
+      }
       var typed: [Character] = []
       let target = Array(result.prompt)
       var previousInputOffset: TimeInterval?
@@ -155,6 +161,42 @@ enum WeakSpotPractice {
             if !event.isStoppedInsertion { typed.append(entered) }
           }
         }
+      }
+    }
+  }
+
+  /// New unit tapes have authoritative field positions and input judgments.
+  /// Keep local drill keys as visible target characters, but never regrade a
+  /// correct base or mark against that entire glyph. Legacy tapes stay above.
+  private static func addUnitFieldSamples(from result: CompletedTestResult,
+    to samples: inout [Character: CharacterSample]) {
+    let targets = TypingReplay.promptFields(result.prompt).map { String($0) }
+    let fields = targets.map { Array($0.utf16) }
+    let owners = targets.map { text in
+      text.flatMap { character in
+        Array(repeating: character, count: String(character).utf16.count)
+      }
+    }
+    var previousInputOffset: TimeInterval?
+    for event in TypingReplay.chronologicalEvents(result.replayEvents) {
+      let interval = event.automatic ? nil
+        : previousInputOffset.flatMap { event.offset > $0 ? event.offset - $0 : nil }
+      if !event.automatic { previousInputOffset = event.offset }
+      guard event.kind == .insert, !event.automatic, let field = event.inputField,
+        fields.indices.contains(field.index) else { continue }
+      let units = event.inputUnits
+      let position = field.units.count - (event.isStoppedInsertion ? 0 : units.count)
+      let judgments = event.validatedInputCorrectness
+      for (index, unit) in units.enumerated() {
+        let targetPosition = position + index
+        guard owners[field.index].indices.contains(targetPosition) else { continue }
+        let expected = owners[field.index][targetPosition]
+        guard !isPromptWordSeparator(expected) else { continue }
+        samples[expected, default: .init()].attemptCount += 1
+        let correct = judgments?[index]
+          ?? (!event.forceError && fields[field.index][targetPosition] == unit)
+        if !correct { samples[expected, default: .init()].mistakeCount += 1 }
+        if index == 0, let interval { samples[expected, default: .init()].intervals.append(interval) }
       }
     }
   }

@@ -106,7 +106,9 @@ final class CodeUnindentDeletionTests: XCTestCase {
     XCTAssertEqual(input.typed, "seed ")
     let actions = deletionActions(try saved(input))
     XCTAssertEqual(actions.map(\.kind), [.deleteWord, .deleteCharacter])
-    XCTAssertEqual(actions.map { $0.primitiveRange.count }, [1, 3])
+    // Converted combining text deletes its mark and base separately, while
+    // this still-unconverted emoji retains its legacy whole-glyph primitive.
+    XCTAssertEqual(actions.map { $0.primitiveRange.count }, [1, 4])
     input.insertBatch("🙂e\u{301}\n\tgo()\ntail", at: start.addingTimeInterval(2))
     XCTAssertEqual(input.outcome, .completed)
     XCTAssertEqual(input.typed, prompt)

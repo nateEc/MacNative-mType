@@ -165,7 +165,7 @@ final class LongTextInputHistoryProgressTests: XCTestCase {
     XCTAssertEqual(progress(source, session), 3)
   }
 
-  func testDeletionRemovesTheWholeNativeGraphemeBuiltBySeparateEvents() {
+  func testDeletionRemovesOneBMPUnitFromGraphemeBuiltBySeparateEvents() {
     let source = "ab cd"
     var session = attempt(source)
     session.insert("e", at: start)
@@ -173,8 +173,15 @@ final class LongTextInputHistoryProgressTests: XCTestCase {
     XCTAssertEqual(session.typed.count, 1)
     XCTAssertEqual(progress(source, session), 3)
     session.deleteBackward(at: start.addingTimeInterval(2))
+    XCTAssertEqual(session.typed, "e")
+    XCTAssertEqual(progress(source, session), 0)
+    session.deleteBackward(at: start.addingTimeInterval(3))
     XCTAssertEqual(session.typed, "")
     XCTAssertEqual(progress(source, session), 0)
+    // Genuine missing-unit legacy events retain their whole-grapheme delete.
+    let legacy: [TypingReplayEvent] = [.init(offset: 0, kind: .insert, text: "e"),
+      .init(offset: 1, kind: .insert, text: "\u{301}"), .init(offset: 2, kind: .delete, text: "")]
+    XCTAssertEqual(TypingReplay.typedText(events: legacy, through: 2), "")
   }
 
   func testNoSpaceInputUsesItsSavedWordTargetsInsteadOfOneFlattenedField() {

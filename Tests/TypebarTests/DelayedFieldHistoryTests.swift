@@ -136,8 +136,8 @@ final class DelayedFieldHistoryTests: XCTestCase {
     input.bailOut(at: start.addingTimeInterval(1))
     let events = try XCTUnwrap(input.result()).replayEvents
     XCTAssertEqual(events[1].inputField?.value, "e\u{301}")
-    XCTAssertEqual(events.last?.inputField?.value, "")
-    XCTAssertEqual(SavedTextInputHistoryPolicy.inputFields(events: events), [""])
+    XCTAssertEqual(events.last?.inputField?.value, "e")
+    XCTAssertEqual(SavedTextInputHistoryPolicy.inputFields(events: events), ["e"])
   }
 
   func testEqualTimestampSnapshotsKeepStableArrivalOrderWithinEachField() {

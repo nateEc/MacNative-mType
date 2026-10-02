@@ -4137,6 +4137,16 @@ struct TypingSession {
   /// A word can be submitted early with space, so this cannot always be
   /// inferred from the input string's character offset.
   private var typedTargetIndices: [Int?] = []
+  private struct JoinedInputPart {
+    let targetIndex: Int?
+    let forced: Bool
+    let extra: Bool
+  }
+  /// Only fused BMP input needs a part journal. ASCII long tests retain the
+  /// existing compact metadata; one visible grapheme can have several inputs.
+  private var joinedBMPInputParts: [Int: [JoinedInputPart]] = [:]
+  private var recordsBMPUnits = false
+  private var lastDeletionWasBMPUnit = false
   private var retainedWordSeparatorTypedIndices = Set<Int>()
   /// A blind word commit neutralizes its untouched letters. That display
   /// survives a later blind toggle, but is discarded when the word is reopened.
@@ -5237,7 +5247,18 @@ struct TypingSession {
   ) {
     lastInputWasCorrect = nil
     guard !isFinished, !text.isEmpty else { return }
-    let characters = Array(text)
+    // Convert only BMP graphemes inside an ordinary/Zen field. A separator
+    // fused with a mark crosses a field seam; CRLF, no-space and surrogate
+    // inputs still need the future raw accepted-buffer representation.
+    let characters: [Character] = text.flatMap { character in
+      guard supportsBMPUnitInput, character != "\r\n",
+        character.unicodeScalars.first.map({ !isPromptWordSeparator(Character(String($0))) }) == true,
+        character.unicodeScalars.count > 1,
+        character.unicodeScalars.allSatisfy({ $0.utf16.count == 1 })
+      else { return [character] }
+      recordsBMPUnits = true
+      return character.unicodeScalars.map { Character(String($0)) }
+    }
     let attemptsBeforeEvent = inputAttemptCount
     for (index, character) in characters.enumerated() {
       guard !isFinished else { break }
@@ -5634,8 +5655,10 @@ struct TypingSession {
       for: inputCharacter, targetIndex: currentTargetIndex, forceError: forceError)
     let followsRetainedLeadingSeparator = !retainedWordSeparatorTypedIndices.isEmpty
       && inputWordText().first.map(isPromptWordSeparator) == true
-    let isCorrect = !retainsCurrentWordAsExtra && InputTextIdentity.matches(inputCharacter, expected) && !forceError
-      && accuracyUnits.lastCorrect
+    let isCorrect = !retainsCurrentWordAsExtra && !forceError && accuracyUnits.lastCorrect
+      && (supportsBMPUnitInput
+        ? accuracyUnits.correct == String(inputCharacter).utf16.count
+        : InputTextIdentity.matches(inputCharacter, expected))
     recordInputAttempt(inputCharacter, correctUnits: accuracyUnits.correct,
       lastUnitCorrect: accuracyUnits.lastCorrect, judgments: accuracyUnits.judgments)
     recordWeakSpotInput(inputCharacter, isCorrect: isCorrect, at: date)
@@ -5846,6 +5869,22 @@ struct TypingSession {
     guard !forceError, promptCharacters.indices.contains(targetIndex) else {
       return (0, false, Array(repeating: false, count: inputUnits.count))
     }
+    let comparison = inputAccuracyTarget(at: targetIndex)
+    let targetUnits = comparison.units
+    let position = comparison.position
+    var correct = 0
+    var lastCorrect = false
+    var judgments: [Bool] = []
+    for (index, unit) in inputUnits.enumerated() {
+      lastCorrect = targetUnits.indices.contains(position + index) && targetUnits[position + index] == unit
+      judgments.append(lastCorrect)
+      if lastCorrect { correct += 1 }
+    }
+    return (correct, lastCorrect, judgments)
+  }
+
+  private func inputAccuracyTarget(at targetIndex: Int) -> (units: [UInt16], position: Int) {
+    guard promptCharacters.indices.contains(targetIndex) else { return ([], 0) }
     let target: String
     let position: Int
     if let range = activeNoSpaceWordRange, range.upperBound <= promptCharacters.count {
@@ -5863,16 +5902,7 @@ struct TypingSession {
       target = String(promptCharacters[start..<end])
       position = activeInputWordUTF16Length
     }
-    let targetUnits = Array(target.utf16)
-    var correct = 0
-    var lastCorrect = false
-    var judgments: [Bool] = []
-    for (index, unit) in inputUnits.enumerated() {
-      lastCorrect = targetUnits.indices.contains(position + index) && targetUnits[position + index] == unit
-      judgments.append(lastCorrect)
-      if lastCorrect { correct += 1 }
-    }
-    return (correct, lastCorrect, judgments)
+    return (Array(target.utf16), position)
   }
 
   /// Zen accepts the user's own text rather than comparing it to a generated
@@ -6000,14 +6030,19 @@ struct TypingSession {
   )
   {
     guard let startedAt else { return }
+    let field = replayInputField(kind: kind, inputStopped: inputStopped)
+    // BMP unit insertion and deletion use archive 14's already defined raw
+    // contract. An unconverted non-BMP deletion keeps its old primitive type.
+    let raw = kind == .insert ? recordsBMPUnits : lastDeletionWasBMPUnit
+    let recordedField = raw ? field.map { TypingReplayInputField(index: $0.index, units: Array($0.value.utf16)) } : field
     replayEvents.append(
       .init(
         offset: max(0, date.timeIntervalSince(startedAt)), kind: kind, text: text,
         forceError: forceError, automatic: automatic || applyingAutomaticCodeInput,
         commitsWord: kind == .insert && retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
           ? false : nil, inputStopped: inputStopped ? true : nil,
-        inputField: replayInputField(kind: kind, inputStopped: inputStopped),
-        inputCorrectness: kind == .insert ? latestInputCorrectness : nil))
+        inputField: recordedField, inputCorrectness: kind == .insert ? latestInputCorrectness : nil,
+        textUTF16: raw ? Array(text.utf16) : nil))
   }
 
   private func replayInputField(
@@ -6195,7 +6230,7 @@ struct TypingSession {
   }
 
   private var zenActiveWordLength: Int {
-    Array(typed).reversed().prefix { !isZenWordCommit($0) }.count
+    String(typed.reversed().prefix { !isZenWordCommit($0) }.reversed()).utf16.count
   }
 
   private func isZenWordCommit(_ character: Character) -> Bool {
@@ -6240,7 +6275,25 @@ struct TypingSession {
   }
 
   private func normalizedInputCharacter(_ character: Character, expected: Character?) -> Character {
-    InputCharacterEquivalence.normalized(character, expected: expected, language: configuration.language)
+    guard supportsBMPUnitInput else {
+      return InputCharacterEquivalence.normalized(character, expected: expected, language: configuration.language)
+    }
+    // No reference equivalence set contains an ASCII letter except Russian
+    // `e`. Its text cannot normalize differently at any target position, so
+    // ordinary letter input needs no second field/UTF-16 buffer construction.
+    if character.isASCII, character.isLetter,
+      character != "e" || !configuration.language.usesRussianYoInputEquivalence
+    { return character }
+    let comparison = inputAccuracyTarget(at: nextTargetIndex)
+    // A known surrogate or an exhausted field is not a different visible
+    // glyph to normalize against. Only the actual next unit owns equivalence.
+    let unitExpected = comparison.units.indices.contains(comparison.position)
+      ? UnicodeScalar(UInt32(comparison.units[comparison.position])).map { Character(String($0)) } : nil
+    return InputCharacterEquivalence.normalized(character, expected: unitExpected, language: configuration.language)
+  }
+
+  private var supportsBMPUnitInput: Bool {
+    configuration.mode == .zen || (usesWordCommitInput && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers))
   }
 
   private var shouldRejectLeadingSeparator: Bool {
@@ -6365,6 +6418,23 @@ struct TypingSession {
     else {
       return 0
     }
+    // Converted BMP input owns a unit cursor. Before that cutover, preserve
+    // legacy diagnostic mappings, except a correctly entered BMP prefix must
+    // remain on its unfinished target glyph for the next mark.
+    if supportsBMPUnitInput, promptCharacters.indices.contains(previousTargetIndex), !lastInputCommitsWord,
+      recordsBMPUnits || (promptCharacters[previousTargetIndex].unicodeScalars.count > 1
+        && promptCharacters[previousTargetIndex].unicodeScalars.allSatisfy({ $0.utf16.count == 1 })
+        && latestInputCorrectness?.allSatisfy({ $0 }) == true)
+    {
+      let start = promptCharacters[..<previousTargetIndex].lastIndex(where: isPromptWordSeparator).map { $0 + 1 } ?? 0
+      let position = activeInputWordUTF16Length
+      var end = 0
+      for index in start..<promptCharacters.count {
+        end += String(promptCharacters[index]).utf16.count
+        if position < end || isPromptWordSeparator(promptCharacters[index]) { return index }
+      }
+      return promptCharacters.count
+    }
     return min(previousTargetIndex + 1, promptCharacters.count)
   }
 
@@ -6392,7 +6462,24 @@ struct TypingSession {
     countsAsExtraError: Bool = false, at date: Date
   ) {
     let typedIndex = typedGraphemeCount
-    let joinsPreviousGrapheme = typed.last == "\r" && character == "\n"
+    let previous = typed.last
+    let joinsBMP = supportsBMPUnitInput && (!character.isASCII || previous?.isASCII == false) && previous.map {
+      $0.unicodeScalars.allSatisfy({ $0.utf16.count == 1 })
+        && character.unicodeScalars.allSatisfy({ $0.utf16.count == 1 })
+        && String([$0, character]).count == 1 && !isPromptWordSeparator($0)
+        && $0 != "\r" && character != "\n"
+    } == true
+    let joinsPreviousGrapheme = joinsBMP || (previous == "\r" && character == "\n")
+    if joinsBMP {
+      recordsBMPUnits = true
+      let index = typedIndex - 1
+      let oldTarget = typedTargetIndices[index]
+      var parts = joinedBMPInputParts[index] ?? [.init(targetIndex: oldTarget,
+        forced: oldTarget.map { forcedErrorIndices.contains($0) } ?? false,
+        extra: extraErrorTypedIndices.contains(index))]
+      parts.append(.init(targetIndex: targetIndex, forced: forceError, extra: countsAsExtraError))
+      joinedBMPInputParts[index] = parts
+    }
     if isPromptWordSeparator(character), !joinsPreviousGrapheme,
       !retainedWordSeparatorTypedIndices.contains(typedIndex)
     { replayCommittedSeparatorCount += 1 }
@@ -6419,15 +6506,34 @@ struct TypingSession {
       typedGraphemeCount += 1
     }
     if !character.isASCII || joinsPreviousGrapheme { typedNeedsFullSegmentation = true }
-    typedTargetIndices.append(targetIndex)
-    typedCharacterDates.append(date)
+    if joinsBMP {
+      typedTargetIndices[typedIndex - 1] = targetIndex ?? typedTargetIndices[typedIndex - 1]
+    } else {
+      typedTargetIndices.append(targetIndex)
+      typedCharacterDates.append(date)
+    }
     if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
-    if countsAsExtraError { extraErrorTypedIndices.insert(typedIndex) }
+    if countsAsExtraError { extraErrorTypedIndices.insert(joinsBMP ? typedIndex - 1 : typedIndex) }
   }
 
   private mutating func removeLastTypedCharacter() {
+    lastDeletionWasBMPUnit = false
     guard !typed.isEmpty else { return }
     let typedIndex = typedGraphemeCount - 1
+    if var parts = joinedBMPInputParts[typedIndex], parts.count > 1 {
+      let removed = parts.removeLast()
+      typed.unicodeScalars.removeLast()
+      lastDeletionWasBMPUnit = true
+      recordsBMPUnits = true
+      joinedBMPInputParts[typedIndex] = parts.count > 1 ? parts : nil
+      typedTargetIndices[typedIndex] = parts.last?.targetIndex
+      if let target = removed.targetIndex, !parts.contains(where: { $0.targetIndex == target && $0.forced }) {
+        forcedErrorIndices.remove(target)
+      }
+      if !parts.contains(where: \.extra) { extraErrorTypedIndices.remove(typedIndex) }
+      return
+    }
+    joinedBMPInputParts.removeValue(forKey: typedIndex)
     if typed.last.map(isPromptWordSeparator) == true,
       !retainedWordSeparatorTypedIndices.contains(typedIndex)
     { replayCommittedSeparatorCount = max(0, replayCommittedSeparatorCount - 1) }

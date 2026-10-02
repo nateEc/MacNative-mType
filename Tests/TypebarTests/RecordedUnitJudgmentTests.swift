@@ -63,7 +63,7 @@ final class RecordedUnitJudgmentTests: XCTestCase {
     for (text, target, expected) in [("🙃", "🙂x", [true, false]),
       ("a\u{301}", "e\u{301}x", [false, true]), ("e\u{301}", "e\u{301}x", [true, true])] {
       let result = try attempt(text, prompt: target)
-      XCTAssertEqual(result.replayEvents[0].inputCorrectness, expected)
+      XCTAssertEqual(result.replayEvents.compactMap(\.inputCorrectness).flatMap { $0 }, expected)
       XCTAssertEqual(result.inputMetrics?.totalAttempts, 2)
       XCTAssertEqual(result.inputMetrics?.correctAttempts, expected.filter { $0 }.count)
     }
@@ -252,7 +252,9 @@ final class RecordedUnitJudgmentTests: XCTestCase {
   }
 
   func testArchiveConstructionCannotMislabelJudgmentsAsAnyEarlierVersion() throws {
-    let original = try attempt("e\u{301}", prompt: "e\u{301}x")
+    // An unchanged non-BMP producer still makes genuine archive-13 metadata;
+    // do not strip archive-14 units from a newly converted BMP session.
+    let original = try attempt("🙂", prompt: "🙂x")
     for version in 1...12 {
       XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [original], presets: []).version, 13)
     }
