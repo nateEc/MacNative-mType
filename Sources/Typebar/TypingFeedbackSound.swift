@@ -245,6 +245,18 @@ enum TypingClickPlaybackSource: Hashable {
   case system(String)
   case synthesized(TypingClickToneProfile)
   case musical(TypingMusicMode, TypingMusicTone)
+  case finishReverb
+}
+
+enum TypingFinishSoundPolicy {
+  static func shouldPlay(previousOutcome: TestOutcome, outcome: TestOutcome, hasStarted: Bool,
+    clickEnabled: Bool, style: TypingClickSoundStyle) -> Bool {
+    guard previousOutcome == .active, hasStarted, clickEnabled, style == .frost else { return false }
+    switch outcome {
+    case .completed, .failed, .invalidAFK, .bailedOut: return true
+    case .active, .abandoned: return false
+    }
+  }
 }
 
 struct TypingClickToneProfile: Hashable {
@@ -498,6 +510,7 @@ final class TypingFeedbackSound {
     case .system(let name): sound = NSSound(named: NSSound.Name(name))
     case .synthesized(let profile): sound = NSSound(data: profile.renderedWAVData())
     case .musical(_, let tone): sound = NSSound(data: tone.renderedWAVData())
+    case .finishReverb: sound = NSSound(data: TypingFinishReverbSound.renderedWAVData())
     }
     return sound.map { NativeTypingSoundVoice(sound: $0) }
   }, beep: { NSSound.beep() })
@@ -514,6 +527,8 @@ final class TypingFeedbackSound {
   private var previewScaleStates: [TypingMusicMode: TypingMusicScaleState] = [:]
   private var configuredVolume: Double?
   private weak var warningVoice: (any TypingSoundVoice)?
+  private weak var finishVoice: (any TypingSoundVoice)?
+  private enum RestartingSampleChannel { case timeWarning, finishReverb }
   private let loadSound: (TypingClickPlaybackSource) -> (any TypingSoundVoice)?
   private let beep: () -> Void
   private let randomUnit: () -> Double
@@ -572,6 +587,7 @@ final class TypingFeedbackSound {
     let voices = Array(activeVoices.values)
     activeVoices.removeAll(keepingCapacity: true)
     warningVoice = nil
+    finishVoice = nil
     // Clear ownership first: NSSound.stop may complete synchronously, and an
     // older queued completion must not affect a replacement attempt.
     for voice in voices { voice.stop() }
@@ -697,31 +713,51 @@ final class TypingFeedbackSound {
   }
 
   func playTimeWarning(style: TimeWarningSoundStyle, volume: Double) {
-    if !play(source: .system(style.systemSoundName), volume: volume, restartingWarning: true),
+    if !play(source: .system(style.systemSoundName), volume: volume, restarting: .timeWarning),
       (playbackVolume(volume) ?? 0) > 0 {
       beep()
     }
   }
 
+  func playFinishReverb(volume: Double) {
+    _ = play(source: .finishReverb, volume: volume, restarting: .finishReverb)
+  }
+
+  func playPracticeFinish(previousOutcome: TestOutcome, outcome: TestOutcome, hasStarted: Bool,
+    clickEnabled: Bool, style: TypingClickSoundStyle, volume: Double) {
+    guard TypingFinishSoundPolicy.shouldPlay(previousOutcome: previousOutcome, outcome: outcome,
+      hasStarted: hasStarted, clickEnabled: clickEnabled, style: style) else { return }
+    playFinishReverb(volume: volume)
+  }
+
   @discardableResult
   private func play(source: TypingClickPlaybackSource, volume: Double,
-    restartingWarning: Bool = false) -> Bool {
+    restarting: RestartingSampleChannel? = nil) -> Bool {
     guard let effectiveVolume = playbackVolume(volume) else { return false }
     guard let prototype = prototype(for: source),
       let voice = prototype.copyForPlayback(), voice !== prototype else {
       return false
     }
 
-    // Click/error requests never steal a playing voice. Only the countdown
-    // channel restarts its previous request, matching the source's explicit stop.
-    if restartingWarning, let previous = warningVoice {
-      warningVoice = nil
+    // Click/error requests never steal a voice. Countdown and finish cues
+    // each restart only their own channel, matching their explicit stop.
+    let previous: (any TypingSoundVoice)?
+    switch restarting {
+    case .timeWarning: previous = warningVoice; warningVoice = nil
+    case .finishReverb: previous = finishVoice; finishVoice = nil
+    case nil: previous = nil
+    }
+    if let previous {
       activeVoices.removeValue(forKey: ObjectIdentifier(previous))
       previous.stop()
     }
     let identity = ObjectIdentifier(voice)
     activeVoices[identity] = voice
-    if restartingWarning { warningVoice = voice }
+    switch restarting {
+    case .timeWarning: warningVoice = voice
+    case .finishReverb: finishVoice = voice
+    case nil: break
+    }
     voice.volume = Float(effectiveVolume)
     let started = voice.play { [weak self, weak voice] in
       guard let self, let voice, self.activeVoices[identity] === voice else { return }

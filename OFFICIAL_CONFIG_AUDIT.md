@@ -1,5 +1,15 @@
 # 官方配置兼容性审计
 
+2026-10-02 16 号结束混响增量（最终门禁已通过）：固定 [onTestFinish](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts#L1883-L1889) 仅在当前点击音配置为 16 时播放结束效果；[finish](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L811-L932) 先检查测试活跃，再调用该 UI 钩子，之后才判断失败／AFK／成绩有效性。原生沿官方 16 身份 .frost，在已开始练习从 active 转到 completed／failed／bailedOut／invalidAFK 时播放；未开始、abandoned、关闭、其他音型及终止状态间变更不播放。使用结束时当前设置，不把成功保存／发布／成绩资格作为声音条件。主练习 onChange 在结果守卫前接入；该私有 SwiftUI 接线只代码／编译验证，未点击真实窗口。点击试听和回放音轨不新增结束效果，持久化 32 音型、成绩／归档／SwiftData 结构不变。
+
+新增独立 finishReverb 资源身份与重启通道，沿 [playFartReverb](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/sound-controller.ts#L310-L322) 的缓存／stop／seek／play 意义，每次复制零起点声部、只替换之前结束声，不抢点击／错误／倒计时／音乐；全局样本主音量、静音恢复、重开停样本与晚回调身份守卫保持有效。结束资源按需加载，不预加载其他族、不抽样或蜂鸣；失败继续原生 best-effort 重试，复制／载入不可用时不停止已有声部，这与 Howler 故障时序未验证等价。自有确定性低频气流声：0.3 秒干声、四个带阻尼反馈延迟形成衰减尾音，总 1.6 秒／22,050 Hz／16-bit mono PCM；没有 web WAV、录音或脉冲响应入仓。它是原生自有音色，不能把参数或尾音检查冒称原版录音、时长或 DSP 逐样本等价；完整设备听感仍待验收。
+
+FinishSoundTests 新增 10 项，先行 3 项真实执行产生 10 个预期失败，首次实现相关 82 项通过，补证后相关 132 项零失败（0.767 秒）。覆盖全部 32 音型／终止状态、真实完成／失败／中止／AFK／放弃会话、当前设置和试听边界、通道互不抢占、主音量／静音／重置、缓存、不可用载入／复制／别名／开始失败、同步完成、释放／控制器销毁及晚回调。复核修正两处测试夹具：缓存成功后恢复复制能力需直接更新缓存替身；JSON 字典键序不固定，改比较除 result() 新生成 UUID 外的全部结果字段，未降低声音或成绩断言。实际生成 WAV 字节确定、有限／无削波、有衰减湿尾；实际 NSSound 解码 1.6 秒、独立副本零起点／不循环／未播放。安装 Swift 6.2.4／SDK 26.2、macOS 14 目标与 NSSound delegate／copy 接口核对；会话内有界决策／风险复核，非独立评审。
+
+只读 Node v24.19.0 类型擦除并在内存执行实际 sounds 配置、sound-controller 及抽取的完整 onTestFinish 函数；依赖为明确自有 Howl、Config、document、Caret／focus 等桩。遍历 off 与 1–26，再重复 16，只有 16 触发两次结束资源 stop→seek(0)→play 且只构造一个原型；独立倒计时另构造一个，clearAll 调全局 stop。finish 调用点早于失败／AFK 判断是源码顺序证据，不冒称执行了完整 finish／浏览器／上游 Vitest 或实际 Howler。新三项人工场景共 720 项、仍待验收；历史“结束效果未实现”由本增量补齐触发与自有播放，原版录音听感、异步 load/playLock、首池 seek／空闲复用、实际 UI 时序／多窗口及 Unicode／Funbox／主题／远程等完整缺口保留，goal active。本轮不启动 Typebar 图形实例、不播放音频、不写真实数据库。
+
+本结束混响增量完整门禁通过：客户端 1,879 项零失败（359.419 秒）、服务端 131 项零失败（1.502 秒），720 项人工场景清单、固定参考／元数据／原创性审计与未打开应用打包通过。门禁内明确的 testOptionalHundredThousandWordEndurance 实际执行通过（38.819 秒），在详细日志自动清理前核对；不是凭环境变量推断，也不是音频压力验证。测试／编译均串行且期间未改源码，未启动 Typebar 图形实例、播放音频、写真实数据库或改变保存格式。同步正式声音配置／规范／盘点矩阵，区分已实现算法与尚未验收的原版音色、异步队列和真实设备；完整 goal 保持 active。
+
 2026-10-02 样本族预加载增量（最终门禁已通过）：依据固定 [声音控制器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/sound-controller.ts#L63-L143) 的 init／configEvent／preview 路径，原生在非关闭点击配置变更及样本实时播放前准备全部 5 个错误资源和当前整族点击资源。错误播放／试听只准备错误族；音乐实时／试听绕过样本准备，选择音乐配置仅预加载错误族。跨族试听准备已配置族，仅额外加载目标首个；关闭配置不主动加载，关闭时试听仍准备错误族与目标首个。正常开启设置恢复后只预加载最终族，命令与快照应用合并点击配置更新；初始化观察器不再把中间默认族提前加载或改写保存快照。默认／损坏快照仍不加载，保存格式、32 个音型、成绩／归档／SwiftData 未变。
 
 新增 SampleSoundPreloadingTests 11 项。有效先行红阶段为 5 项、13 个预期失败；初次测试夹具越界已修正再跑，崩溃不算有效证据。初次实现另暴露初始化提前加载／写快照，修正后先行 5 项通过；补证后相关 122 项零失败（0.543 秒），其中新预加载测试 11 项，原有变体／声部／音乐／监听／作用域和三项声音命令测试保留。复核覆盖整族切换／159 资源唯一缓存、关闭与恢复、设置绑定／命令／快照、失败可重试、同步加载器重入、在播声音／主音量／音乐保留和独立倒计时。旧夹具区分加载与播放，保持逐桶选择、音量、独立声部和停止次数断言，未用生产开关绕过预加载。原型加载不复制、播放、停止、蜂鸣或消耗随机数；仅成功原型缓存，同一资源同步重入被阻止，失败重试及蜂鸣仍是原生 best-effort 策略，与原版缓存 Promise／Howler 故障语义有差异。会话内有界决策／风险复核，非独立评审。
@@ -375,9 +385,9 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `lazyMode`（Sindhi 补充） | `TestModifier.lazyLatin` | 固定参考的 Sindhi 未定义 `noLazyMode`；因此可保留用户显式选择的简化输入，但不会继承仅针对标准 Arabic 的自动快捷偏好。 |
 | `layout` | `KeyboardInputLayout` | 已映射；系统输入源为默认，固定参考的 239 个官方名称全部解析到独立编写的原生物理布局，另支持用户自写四行布局。机器清单 `Compatibility/official-layouts.json` 固定 239 项精确映射与 0 项兼容映射；覆盖测试验证名称唯一、目标存在且无未列项目。Typebar 不读取、打包或运行官方布局 JSON、代码或资产。 |
 | `codeUnindentOnBackspace` | `codeUnindentOnBackspace` | 已映射；代码行仅含 Tab 时，普通退格按删除末尾 Tab 后的剩余缩进是否与目标匹配决定是否一并返回上一行，删词键按删除整段缩进后的空前缀处理；多余缩进的修正与完成回放有原生回归。 |
-| `soundVolume` | `soundVolume` | 已映射；已配置音量同步当前与未来原生样本声音实例，零音量不停止未结束实例，设置命令／恢复／默认／快照应用保持贯通。原版独立 AudioContext 的振荡器／音阶 gain 与 Howler 样本音分支不同，完整音乐行为仍未重写；设备听感未验收。 |
-| `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 已映射；官方 27 入口保留，8–13 接到四种物理键波形与五声／全音随机音阶，37 键、Shift／CapsLock、包络／增益及试听状态由独立原生算法实现。旧 26 原创音型值保留并增添六音乐值，六旧短音以原生扩展命令可选；原生 32 选项不冒充官方数量。21 项音乐自动化，未复制网页代码／频率表／音频；全局非练习键位、IME／自动动作、DSP／实际混音仍待验收，样本包内随机变化及 16 号结束混响仍未实现。 |
-| `playSoundOnError` | `playErrorBeep`、`errorSoundStyle` | 已映射；关闭开关加四种可持久化的 macOS 系统音型，覆盖固定 schema 的 off/1/2/3/4 五档契约。 |
+| `soundVolume` | `soundVolume` | 已映射；全局主音量同步当前与未来样本，包括点击／错误／倒计时／结束混响，零音量不停止未结束实例，设置命令／恢复／默认／快照应用保持贯通。音乐由独立原生振荡器／音阶包络实现，起始增益为主音量的十分之一，之后的样本调量／停音不影响已生成音乐；不是浏览器 DSP 或设备听感一致性验收。 |
+| `playSoundOnClick` | `playKeyclickSound`、`clickSoundStyle` | 已映射；官方 27 入口保留，8–13 接到四种物理键波形与五声／全音随机音阶，37 键、练习 Shift／全局 CapsLock、包络／增益及试听状态由独立原生算法实现。32 个保存音型保留六个原生扩展，不冒充官方数量；20 个官方样本族共 148 个自有变体，实时随机、试听首个、整族和全部错误音预加载已实现。16 号在已开始练习的完成／失败／中止／AFK 结束时播放自有气流混响，不以保存或资格筛选；只重启自身通道。22 项音乐、11 项变体、11 项预加载与 10 项结束效果自动化；没有参考代码／频率表／音频入仓。真实 UI／多窗口／IME／自动动作、原版音色／DSP／设备混音、异步队列及首池 seek／空闲复用仍待完成或验收。 |
+| `playSoundOnError` | `playErrorBeep`、`errorSoundStyle` | 已映射；off/1/2/3/4 五档保留四种保存音型；前三族各一、第四族两变体（首个系统音加自有合成），实时一次抽样、试听固定首个，首次错误播放／试听准备全部五个错误资源。与点击互斥、盲打不触发错误音；资源复制独立、不抢声部，全局静音可恢复；原版音色与加载队列故障语义尚未验收一致。 |
 | `playTimeWarning` | `timeWarningOffset`、`timeWarningSoundStyle` | 已映射；关闭、结束前 1/3/5/10 秒五档与固定 schema 精确对应，并额外提供四种可持久化原生音型。 |
 | `smoothCaret` | `smoothCaretMotion` | 已映射。 |
 | `caretStyle` | `caretStyle` | 已映射；off/default/block/outline/underline/carrot/banana/monkey 八档逐项映射到关闭、条形及七种 Typebar 原创原生矢量呈现，旧存储 ID 保持不变。非卷带、非特殊视觉／听写模式的全 RTL 提示会以原生 TextKit 右向段落测量，并把窄光标锚定在目标字形的右缘；混合双向提示保留字形附着回退，不猜测跨方向的插入边。 |

@@ -1268,7 +1268,11 @@ private struct ContentView: View {
     .onChange(of: settings.activeTestSelectionGeneration) { _, _ in
       restorePersistedTestSelection()
     }
-    .onChange(of: session.outcome) { _, outcome in
+    .onChange(of: session.outcome) { previousOutcome, outcome in
+      TypingFeedbackSound.shared.playPracticeFinish(
+        previousOutcome: previousOutcome, outcome: outcome, hasStarted: session.hasStarted,
+        clickEnabled: settings.playKeyclickSound, style: settings.clickSoundStyle,
+        volume: settings.soundVolume)
       defer {
         if outcome != .active { timerHealth = .init() }
       }
