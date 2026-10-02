@@ -29,6 +29,12 @@ enum TypingClickSoundStyle: String, CaseIterable, Codable, Equatable, Identifiab
   case willow
   case zephyr
   case nocturne
+  case pianoSine
+  case pianoSaw
+  case pianoSquare
+  case pianoTriangle
+  case pentatonic
+  case wholeTone
 
   var id: Self { self }
 
@@ -60,11 +66,18 @@ enum TypingClickSoundStyle: String, CaseIterable, Codable, Equatable, Identifiab
     case .willow: "柳梢"
     case .zephyr: "微风"
     case .nocturne: "夜曲"
+    case .pianoSine: "键位正弦"
+    case .pianoSaw: "键位锯齿"
+    case .pianoSquare: "键位方波"
+    case .pianoTriangle: "键位三角"
+    case .pentatonic: "五声音阶"
+    case .wholeTone: "全音音阶"
     }
   }
 
   var playbackSource: TypingClickPlaybackSource {
-    switch self {
+    if let musicMode { return .musical(musicMode, musicMode.representativeTone) }
+    return switch self {
     case .tink: .system("Tink")
     case .pop: .system("Pop")
     case .ping: .system("Ping")
@@ -179,6 +192,20 @@ enum TypingClickSoundStyle: String, CaseIterable, Codable, Equatable, Identifiab
         .init(
           waveform: .softSquare, frequency: 155, overtone: 1.6, overtoneMix: 0.14, duration: 0.080,
           decay: 1.5))
+    case .pianoSine, .pianoSaw, .pianoSquare, .pianoTriangle, .pentatonic, .wholeTone:
+      preconditionFailure("Music is routed above")
+    }
+  }
+
+  var musicMode: TypingMusicMode? {
+    switch self {
+    case .pianoSine: .keys(.sine)
+    case .pianoSaw: .keys(.sawtooth)
+    case .pianoSquare: .keys(.square)
+    case .pianoTriangle: .keys(.triangle)
+    case .pentatonic: .pentatonic
+    case .wholeTone: .wholeTone
+    default: nil
     }
   }
 }
@@ -186,6 +213,7 @@ enum TypingClickSoundStyle: String, CaseIterable, Codable, Equatable, Identifiab
 enum TypingClickPlaybackSource: Hashable {
   case system(String)
   case synthesized(TypingClickToneProfile)
+  case musical(TypingMusicMode, TypingMusicTone)
 }
 
 struct TypingClickToneProfile: Hashable {
@@ -422,23 +450,32 @@ final class TypingFeedbackSound {
     switch source {
     case .system(let name): sound = NSSound(named: NSSound.Name(name))
     case .synthesized(let profile): sound = NSSound(data: profile.renderedWAVData())
+    case .musical(_, let tone): sound = NSSound(data: tone.renderedWAVData())
     }
     return sound.map { NativeTypingSoundVoice(sound: $0) }
   }, beep: { NSSound.beep() })
 
   private var cachedSources: [TypingClickPlaybackSource: any TypingSoundVoice] = [:]
   private var activeVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
+  private var musicalVoices: [ObjectIdentifier: any TypingSoundVoice] = [:]
+  private var currentKeyCode: UInt16 = 0
+  private var currentModifierFlags: NSEvent.ModifierFlags = []
+  private var scaleStates: [TypingMusicMode: TypingMusicScaleState] = [:]
+  private var previewScaleStates: [TypingMusicMode: TypingMusicScaleState] = [:]
   private var configuredVolume: Double?
   private weak var warningVoice: (any TypingSoundVoice)?
   private let loadSound: (TypingClickPlaybackSource) -> (any TypingSoundVoice)?
   private let beep: () -> Void
+  private let randomUnit: () -> Double
 
-  init(loadSound: @escaping (TypingClickPlaybackSource) -> (any TypingSoundVoice)?, beep: @escaping () -> Void) {
+  init(loadSound: @escaping (TypingClickPlaybackSource) -> (any TypingSoundVoice)?,
+    beep: @escaping () -> Void, randomUnit: @escaping () -> Double = { Double.random(in: 0..<1) }) {
     self.loadSound = loadSound
     self.beep = beep
+    self.randomUnit = randomUnit
   }
 
-  /// Configuration changes affect already playing voices as well as future
+  /// Configuration changes affect already playing sample voices and future
   /// requests. Invalid values do not replace the last valid global setting.
   func setVolume(_ volume: Double) {
     guard volume.isFinite, (0...1).contains(volume) else { return }
@@ -463,7 +500,53 @@ final class TypingFeedbackSound {
   }
 
   func playClick(style: TypingClickSoundStyle, volume: Double) {
+    if let mode = style.musicMode {
+      playMusic(mode: mode, requestedVolume: volume, isPreview: false)
+      return
+    }
     _ = play(source: style.playbackSource, volume: volume)
+  }
+
+  func recordKeyDown(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
+    currentKeyCode = keyCode
+    currentModifierFlags = modifierFlags
+  }
+
+  func updateModifierFlags(_ flags: NSEvent.ModifierFlags) { currentModifierFlags = flags }
+
+  func previewClick(style: TypingClickSoundStyle, volume: Double) {
+    if let mode = style.musicMode {
+      if case .keys = mode { currentKeyCode = 12 }
+      playMusic(mode: mode, requestedVolume: volume, isPreview: true)
+    } else { playClick(style: style, volume: volume) }
+  }
+
+  private func playMusic(mode: TypingMusicMode, requestedVolume: Double, isPreview: Bool) {
+    let tone: TypingMusicTone
+    switch mode {
+    case .keys(let waveform):
+      guard let semitone = TypingMusicPitch.semitone(keyCode: currentKeyCode) else { return }
+      let raised = !currentModifierFlags.intersection([.shift, .capsLock]).isEmpty
+      tone = .key(waveform: waveform, semitone: semitone, octave: raised ? 4 : 3)
+    case .pentatonic, .wholeTone:
+      var state = (isPreview ? previewScaleStates[mode] : scaleStates[mode]) ?? .init()
+      guard let next = state.nextTone(mode: mode, randomUnit: randomUnit) else { return }
+      if isPreview { previewScaleStates[mode] = state } else { scaleStates[mode] = state }
+      tone = next
+    }
+    guard let voice = loadSound(.musical(mode, tone)) else { return }
+    let identity = ObjectIdentifier(voice)
+    musicalVoices[identity] = voice
+    // The music branch owns its starting gain and exponential envelope.
+    // Later sample-volume changes and sample resets intentionally do not
+    // change or stop an already scheduled note.
+    let volume = configuredVolume ?? (requestedVolume.isFinite ? requestedVolume.clamped(to: 0...1) : 0)
+    voice.volume = Float(volume / 10)
+    let started = voice.play { [weak self, weak voice] in
+      guard let self, let voice, self.musicalVoices[identity] === voice else { return }
+      self.musicalVoices.removeValue(forKey: identity)
+    }
+    if !started { musicalVoices.removeValue(forKey: identity) }
   }
 
   func playError(style: TypingErrorSoundStyle, volume: Double) {

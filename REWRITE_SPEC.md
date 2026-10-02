@@ -1,5 +1,17 @@
 # Typebar — Monkeytype 功能兼容重写规范
 
+2026-10-02 原生按键音符与随机音阶增量（最终门禁已通过）：固定 [声音实现](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/sound-controller.ts#L149-L355) 与 [音型定义](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/constants/sounds.ts) 后，将官方 8–11 命令接到四种原生键位波形，12–13 接到五声／全音音阶。用 A4=440 的等温律公式计算并舍入到两位小数，不复制参考频率表；经既有 ANSI 物理键适配器和自写钢琴自然音／黑键行算法覆盖 37 个物理键，基准第 3 八度，Shift 或 CapsLock 只提高一个八度，非映射键静音。按键音 0.5 秒／0.15 秒指数衰减，音阶 2 秒／0.3 秒指数衰减；起始增益为音量十分之一。使用自有 48 kHz 单声道 PCM 与 NSSound，没有 WebView／网页依赖或参考音频。
+
+音阶先以严格小于 0.5 的随机抽样决定是否走一层八度，4–6 间折返，再均匀抽取该音阶的音；两个音阶及各自试听／练习状态独立，测试重置不清零音阶。已启动音乐持有独立初始增益／包络：样本全局调音量和 clearAllSounds 不更新／停止音乐，后续音符才采用新音量，静音启动的旧音乐不会随样本恢复音量复活。每个音符独立持有声音实例，完成／失败释放，迟到／同步回调不释放新音；不缓存无限音高原型。设备不可用为最佳努力，不改变输入／成绩；设备永久初始化失败通知、无完成回调故障、浏览器等价滤波／逐采样输出及主线程渲染压力仍待补证。
+
+新增六个持久化音型值，保留全部旧 26 值及四系统／22 原创短音；被官方音乐命令替换的六个旧短音以 sound.nativeClick.* 扩展命令保留，官方 1–26／off 仍共 27 个入口。新候选原生选项共 32 个，不把原生扩展数当官方数量。所有旧音型快照解码及新值完整字段 JSON 往返通过；没有偏好域／归档字段／SwiftData 结构迁移或真实数据写入。旧二进制不认识新增 enum 值，跨二进制／回滚到旧版的归档读取不宣称已兼容：启用新值前的导出或恢复旧音型是回退边界，不同时运行新旧 GUI。
+
+行为优先先新增 6 项、以兼容入口暂存旧行为，实测 22 个有效失败断言；修复后扩展为 MusicalClickSoundTests 21 项，相关 84 项零失败（约 2.06 秒）。真实 TypingInputView 无窗口事件核对先记录物理 E 键、再输出 Colemak 的 f，音高仍 E4；真实 NSSound 解码四个半秒波形及一个两秒音阶并保持未播放。另覆盖 37 键与高低范围、四波形命令、Shift／CapsLock、音阶音集合／千步边界／两抽样与独立状态、静音及样本隔离、256 个独立音乐请求、完成／启动失败／迟到回调和旧设置不重分配。256 仅桩实例压力，不是设备混音或十万词音频耐力。
+
+本音乐增量完整门禁实际通过：客户端 1,806 项零失败（约 361.24 秒），服务端 131 项零失败（约 1.54 秒）；可选十万词耐力项实际执行并通过（38.502 秒），仅证明文本引擎，不作音乐设备压力证据。702 个唯一人工项审计、固定参考／元数据／原创性边界检查和未打开的应用打包均通过，全程没有 Typebar 图形进程。只读原版探针使用 bundled Node v24.19.0 擦除类型并执行实际 previewClick／playClick／playNote／playScale：四个预览 261.63 Hz、增益 0.05、衰减 0.15、0.5 秒停；37 映射键的修饰升八度检查通过，Space 不创建声音；两音阶固定随机序列得 C5→C6→C5→C4→C5、衰减 0.3、2 秒停，Howler 调零／stop 后旧 gain 仍 0.05。AudioContext、节点／设备、modifier 和随机均为显式桩，不是上游 Vitest、浏览器或设备实测；未将参考源代码或资产写进原生项目。
+
+最多三轮会话内决策／风险复核（不是独立评审）：生命周期分离与缓存范围为必要合同，保留旧 enum／命令作为增量过渡；一次 Swift 6.2.4 编译因扩展测试 ID 数组表达式过长而超时，拆分等价表达式后正常，不当产品行为反例。AppKit NSSound 接口依据安装 SDK 26.2／macOS 14 目标；指数衰减与波形相位依据 [W3C Web Audio 定义](https://www.w3.org/TR/webaudio/#dom-audioparam-settargetattime)。主练习 keyDown／modifier 与两个试听调用点代码复核及编译通过，未操作真实按钮／设置窗／命令面板；尚未全局捕获其他文本框／回放页键位或复核 IME／自动动作音乐上下文。样本随机变体、16 号结束混响、首池 seek／排队仍未实现或对齐，主题、Unicode／Funbox／远程服务等既有缺口不关闭。新增三项人工场景，共 702 个唯一项但未提升实机状态；goal active，未启动 Typebar 图形实例或播放设备音频。
+
 2026-10-02 全局样本声音音量与测试重置增量（最终门禁已通过）：固定 [声音控制器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/controllers/sound-controller.ts#L302-L433)、[重置入口](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-ui.ts)、锁定 [Howler 2.2.3](https://github.com/goldfire/howler.js/blob/v2.2.3/src/howler.core.js) 和 [音量范围](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/packages/schemas/src/configs.ts#L173-L174) 证明：样本声音由全局音量影响当前和未来实例，零音量不是停止；重置会停止 Howler 声音而不卸载资源。原生独立新增有限 0…1 的全局设置；修改时更新活动副本、不重启，未来请求采用已配置音量而非旧视图快照。全局零仍允许请求以零音量播放，未结束实例可随恢复音量继续；失败时按有效全局音量决定蜂鸣，零音量不蜂鸣。未接入全局配置的旧独立调用仍保留原来的非正请求不播放及上限裁切，这是原生旧 API 兼容，不当作原版全局语义。
 
 AppSettings 默认接入共享控制器，测试可只注入设备边界；声量 didSet、真实命令／快照应用／恢复默认同步现有播放，初始化用 defer 包含新建、已保存、损坏偏好返回路径。控制器持有的活动声音先快照并清空所有权／倒计时引用，再逐个停止，不依赖 stop 是否同步完成；资源原型缓存与全局音量保留。普通 reset 的拒绝守卫之后、结果重复及通过请求 ID／配置／未开始守卫的在线内容替换均接入 clearAllSounds；被拒绝的 reset／过期内容没有越过停音调用，未在普通完成、暂停或调音量时擅自增加停音。三个真实私有 SwiftUI 接入点已代码复核／类型检查，但没有执行真实按钮／窗口，不把模型守卫回归称作私有 UI 端到端证据。

@@ -388,7 +388,7 @@ final class OfficialLayoutCoverageTests: XCTestCase {
         .union(QuoteSelection.compatibilityValues(mode: .search)),
       Set(fixture.officialChoices["quoteLength"] ?? []))
     XCTAssertEqual(
-      TypingClickSoundStyle.allCases.count + 1,
+      SoundCommandCatalog.items.filter { $0.id.hasPrefix("sound.playSoundOnClick.") }.count,
       fixture.officialChoiceCounts["playSoundOnClick"])
     XCTAssertEqual(
       TypingErrorSoundStyle.allCases.count + 1,

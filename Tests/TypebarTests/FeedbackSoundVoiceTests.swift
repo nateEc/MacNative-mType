@@ -297,13 +297,13 @@ final class FeedbackSoundVoiceTests: XCTestCase {
       sources.append(source)
       return RecordingSound(trace)
     }, beep: {})
-    for style in TypingClickSoundStyle.allCases {
+    for style in TypingClickSoundStyle.allCases where style.musicMode == nil {
       player.playClick(style: style, volume: 2)
       player.playClick(style: style, volume: Double.infinity)
     }
     for style in TypingErrorSoundStyle.allCases { player.playError(style: style, volume: 0.5) }
     for style in TimeWarningSoundStyle.allCases { player.playTimeWarning(style: style, volume: 0.5) }
-    XCTAssertEqual(Array(sources.prefix(26)), TypingClickSoundStyle.allCases.map(\.playbackSource))
+    XCTAssertEqual(Array(sources.prefix(26)), TypingClickSoundStyle.allCases.filter { $0.musicMode == nil }.map(\.playbackSource))
     XCTAssertEqual(sources.count, 34)
     XCTAssertEqual(trace.starts, 60)
     XCTAssertEqual(Array(trace.volumes.prefix(52)), Array(repeating: 1, count: 52))

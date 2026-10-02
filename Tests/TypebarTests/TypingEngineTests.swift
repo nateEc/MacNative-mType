@@ -3293,10 +3293,13 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testSoundCommandsCoverFixedReferenceChoicesAndRejectMalformedIDs() {
-    let expectedIDs = [
+    var expectedIDs = [
       "sound.soundVolume.0.1", "sound.soundVolume.0.5", "sound.soundVolume.1",
       "sound.playSoundOnClick.off",
-    ] + (1...26).map { "sound.playSoundOnClick.\($0)" } + [
+    ]
+    expectedIDs += (1...26).map { "sound.playSoundOnClick.\($0)" }
+    expectedIDs += ["ripple", "reed", "pebble", "loom", "orbit", "pulse"].map { "sound.nativeClick.\($0)" }
+    expectedIDs += [
       "sound.playSoundOnError.off",
     ] + (1...4).map { "sound.playSoundOnError.\($0)" }
       + [
@@ -27605,10 +27608,10 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(GlobalHotkeyMonitor.matches(keyCode: 36, modifiers: [.control, .shift]))
   }
 
-  func testClickSoundCatalogProvidesTwentySixIndependentNativeChoices() throws {
+  func testClickSoundCatalogRetainsTwentySixNativeChoicesAndAddsSixMusicalChoices() throws {
     let styles = TypingClickSoundStyle.allCases
 
-    XCTAssertEqual(styles.count, 26)
+    XCTAssertEqual(styles.count, 32)
     XCTAssertEqual(Set(styles.map(\.rawValue)).count, styles.count)
     XCTAssertEqual(Set(styles.map(\.displayName)).count, styles.count)
     XCTAssertEqual(Set(styles.map(\.playbackSource)).count, styles.count)

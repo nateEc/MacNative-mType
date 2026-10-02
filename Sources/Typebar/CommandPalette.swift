@@ -904,9 +904,14 @@ enum SoundCommandTarget: Equatable {
 /// while mapping each numbered option to a Typebar-owned native sound.
 enum SoundCommandCatalog {
     private static let clickStyles: [TypingClickSoundStyle] = [
-        .tink, .pop, .ping, .morse, .ember, .drift, .quartz, .ripple, .reed,
-        .pebble, .loom, .orbit, .pulse, .velvet, .copper, .frost, .lantern,
+        .tink, .pop, .ping, .morse, .ember, .drift, .quartz, .pianoSine, .pianoSaw,
+        .pianoSquare, .pianoTriangle, .pentatonic, .wholeTone, .velvet, .copper, .frost, .lantern,
         .meadow, .prism, .rain, .slate, .spark, .tide, .willow, .zephyr, .nocturne,
+    ]
+    // These previously persisted native tones remain selectable. They are
+    // extensions, not substitutes for the six official musical branches.
+    private static let additionalClickStyles: [TypingClickSoundStyle] = [
+        .ripple, .reed, .pebble, .loom, .orbit, .pulse,
     ]
     private static let errorStyles: [TypingErrorSoundStyle] = [
         .basso, .funk, .sosumi, .submarine,
@@ -949,6 +954,14 @@ enum SoundCommandCatalog {
                     style.displayName, String(index + 1),
                 ], group: .settings))
         }
+        for style in additionalClickStyles {
+            let identifier = "sound.nativeClick.\(style.rawValue)"
+            result.append(CommandPaletteItem(
+                id: identifier, title: "键击提示音：\(style.displayName)",
+                subtitle: "保留的 Typebar 原创短音", systemImage: "keyboard.badge.ellipsis",
+                keywords: [identifier, "sound", "click", "键击", "提示音", style.displayName],
+                group: .settings))
+        }
         result.append(CommandPaletteItem(
             id: "sound.playSoundOnError.off", title: "错误提示音：关闭",
             subtitle: "保留当前音型供下次开启", systemImage: "speaker.slash",
@@ -988,6 +1001,9 @@ enum SoundCommandCatalog {
             return .volume(option.value)
         }
         if identifier == "sound.playSoundOnClick.off" { return .click(nil) }
+        if let style = additionalClickStyles.first(where: {
+            identifier == "sound.nativeClick.\($0.rawValue)"
+        }) { return .click(style) }
         if let index = numberedIndex(identifier, prefix: "sound.playSoundOnClick."),
             clickStyles.indices.contains(index)
         {

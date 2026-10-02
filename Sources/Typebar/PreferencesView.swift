@@ -213,7 +213,7 @@ struct PreferencesView: View {
           }
           HStack {
             Button("试听键击") {
-              TypingFeedbackSound.shared.playClick(
+              TypingFeedbackSound.shared.previewClick(
                 style: settings.clickSoundStyle, volume: settings.soundVolume)
             }
             Button("试听错误") {

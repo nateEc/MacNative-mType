@@ -2581,8 +2581,12 @@ private struct ContentView: View {
           synchronizeLiveInputRules()
           return session.shouldFinishWithComposition(effectiveInsertedText(text), forceError: forceError)
         },
-        onModifierFlagsChanged: { keyboardModifierFlags = $0 },
+        onModifierFlagsChanged: {
+          keyboardModifierFlags = $0
+          TypingFeedbackSound.shared.updateModifierFlags($0)
+        },
         onKeyDown: { keyCode, charactersIgnoringModifiers, modifierFlags, isRepeat in
+          TypingFeedbackSound.shared.recordKeyDown(keyCode: keyCode, modifierFlags: modifierFlags)
           if konamiSequenceTracker.consume(
             keyCode: keyCode,
             charactersIgnoringModifiers: charactersIgnoringModifiers,
@@ -4282,7 +4286,7 @@ private struct ContentView: View {
       target.apply(to: settings)
       switch target.preview {
       case .click(let style):
-        TypingFeedbackSound.shared.playClick(style: style, volume: settings.soundVolume)
+        TypingFeedbackSound.shared.previewClick(style: style, volume: settings.soundVolume)
       case .error(let style):
         TypingFeedbackSound.shared.playError(style: style, volume: settings.soundVolume)
       case .timeWarning:
