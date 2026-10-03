@@ -2243,6 +2243,9 @@ struct TestConfiguration: Codable, Equatable {
   /// Fresh generation opts into primary-language code input. Missing markers
   /// preserve manual Tab/deletion semantics in historical mixed snapshots.
   var polyglotUsesPrimaryCodeInput: Bool?
+  /// Fresh Dockerfile attempts follow the source's non-code-prefix input.
+  /// Nil preserves automatic indentation in historical native snapshots.
+  var dockerfileUsesLiteralIndentation: Bool?
   var modifiers: [TestModifier]
   var contentOptions: ContentOptions
   var challengeID: String?
@@ -2252,6 +2255,7 @@ struct TestConfiguration: Codable, Equatable {
   }
 
   var usesCodeIndentationInput: Bool {
+    if language == .dockerFile, dockerfileUsesLiteralIndentation == true { return false }
     guard language == .mixedLanguages else { return language.isCodeLanguage }
     guard polyglotUsesPrimaryCodeInput == true, let polyglotBaseLanguage else { return false }
     // The source input branches match the code prefix, not the broader
@@ -2334,6 +2338,7 @@ struct TestConfiguration: Codable, Equatable {
       ? PolyglotReturnLanguagePolicy.validated(polyglotBaseLanguage) : nil
     self.polyglotUsesPrimaryDirection = nil
     self.polyglotUsesPrimaryCodeInput = nil
+    self.dockerfileUsesLiteralIndentation = nil
     let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
       modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents)
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
@@ -2442,7 +2447,7 @@ struct TestConfiguration: Codable, Equatable {
     case mode, duration, wordLimit, difficulty, rules, language, englishVariant, quoteLength,
       quoteLengths, quoteSelectionMode, customTextCompletion, customTextSectionLimit,
       customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents, polyglotBaseLanguage,
-      polyglotUsesPrimaryDirection, polyglotUsesPrimaryCodeInput,
+      polyglotUsesPrimaryDirection, polyglotUsesPrimaryCodeInput, dockerfileUsesLiteralIndentation,
       modifiers, contentOptions, challengeID
   }
 
@@ -2480,6 +2485,8 @@ struct TestConfiguration: Codable, Equatable {
       ? try values.decodeIfPresent(Bool.self, forKey: .polyglotUsesPrimaryDirection) : nil
     polyglotUsesPrimaryCodeInput = polyglotBaseLanguage != nil
       ? try values.decodeIfPresent(Bool.self, forKey: .polyglotUsesPrimaryCodeInput) : nil
+    dockerfileUsesLiteralIndentation = language == .dockerFile
+      ? try values.decodeIfPresent(Bool.self, forKey: .dockerfileUsesLiteralIndentation) : nil
     let normalizedModifiers = TestModifierPolicy.normalized(
       try values.decodeIfPresent([TestModifier].self, forKey: .modifiers) ?? [])
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(

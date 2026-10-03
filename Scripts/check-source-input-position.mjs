@@ -279,6 +279,42 @@ try {
   assert.equal(modules.get('input/handlers/before-insert-text').namespace.onBeforeInsertText('\n'),false);
  }
  console.log('13 pinned-source primary-language code input scenarios passed (same 13 actual modules; owned Polyglot tag/targets, FIFO/microtask and sentinel deletion adapters; no generation/browser/AppKit/IME parity claim).');
+
+ // Remove the Polyglot adapter tag: standalone Dockerfile is likewise NOT
+ // selected by the source code prefix. No upstream vocabulary is copied.
+ function resetStandaloneInput(base,words) {
+  resetPolyglotInput(base,words);Config.funbox=[];
+ }
+ resetStandaloneInput('dockerfile',['ab ','\t\tgo() ','tail']);
+ await main.namespace.emulateInsertText({data:'ab ',now:7});
+ assert.equal(element,'');assert.equal(callbacks.length,0);
+ assert.equal(inputEvents().filter(e=>e.automatic).length,0);
+ resetStandaloneInput('dockerfile',['\t\tgo() ','tail']);
+ await main.namespace.emulateInsertText({data:'\t',now:7});
+ assert.equal(element,'\t');assert.equal(callbacks.length,0);
+ for(const word of [false,true]) {
+  resetStandaloneInput('dockerfile',['ab\n','\t\tgo() ','tail']);
+  await main.namespace.emulateInsertText({data:'ab\n\t\t',now:7});
+  const before=inputEvents().length;deleteInput({word,now:8});
+  assert.equal(inputEvents().length,before+1);
+  assert.deepEqual([inputEvents().at(-1).inputType,wordIndex,inputEvents().at(-1).charIndex,element],
+   [word?'deleteWordBackward':'deleteContentBackward',1,2,word?'':'\t']);
+ }
+ resetStandaloneInput('dockerfile',['ab ','\t\tgo() ','tail']);
+ Config.confidenceMode='max';
+ await main.namespace.emulateInsertText({data:'ab \t\t',now:7});
+ assert.equal(deleteInput({now:8}),false);assert.equal(element,'\t\t');
+ seedDelete(['ab','\t\tgo()','tail'],[[0,'ab'],[1,'\t\t']],{index:1,noSpace:true});
+ Object.assign(Config,{language:'dockerfile',funbox:['nospace'],codeUnindentOnBackspace:true});
+ deleteInput();assert.equal(wordIndex,1);assert.equal(element,'\t');
+ resetStandaloneInput('dockerfile',['ab\n','tail']);
+ assert.equal(modules.get('input/handlers/before-insert-text').namespace.onBeforeInsertText('\n'),false);
+ resetStandaloneInput('code_javascript',['ab ','\t\tgo() ','tail']);
+ await main.namespace.emulateInsertText({data:'ab ',now:7});await drainCodeCallbacks();
+ assert.equal(element,'\t\t');deleteInput({now:8});
+ assert.deepEqual(inputEvents().slice(-2).map(e=>e.inputType),['deleteWordBackward','deleteContentBackward']);
+ assert.equal(wordIndex,0);assert.equal(element,'ab');
+ console.log('8 pinned-source standalone Dockerfile/code-prefix input scenarios passed (same 13 actual modules; owned targets, FIFO and sentinel deletion adapters; no generation/browser/device equivalence claim).');
 } finally {
  globalThis.setTimeout=originalSetTimeout;
 }

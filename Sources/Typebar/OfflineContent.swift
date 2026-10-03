@@ -6348,7 +6348,10 @@ struct TestSessionFactory {
     nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }
   ) -> TypingSession {
     let polyglotPreparation = PolyglotGenerationPreparation(configuration)
-    let configuration = polyglotPreparation.configuration
+    var configuration = polyglotPreparation.configuration
+    // Only fresh generation changes Dockerfile's historical input behavior.
+    // Import and original-target repeat retain the captured configuration.
+    if configuration.language == .dockerFile { configuration.dockerfileUsesLiteralIndentation = true }
     let prompt: String
     var sectionEndIndices: [Int] = []
     var noSpaceBoundarySource: String?
