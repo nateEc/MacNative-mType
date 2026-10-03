@@ -14069,16 +14069,9 @@ enum StarterLexicon {
       return prompt(
         tokens: count, lexicon: ordered(twitchEmoteWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
-    case .typingOfTheDead:
-      return sectionPrompt(
-        tokens: count, sections: reversesCandidatePool ? Array(typingOfTheDeadSections.reversed()) : typingOfTheDeadSections, contentOptions: contentOptions)
-    case .pokemon1k:
-      return entryPrompt(
-        tokens: count, entries: reversesCandidatePool ? Array(creatureIndexEntries.reversed()) : creatureIndexEntries, contentOptions: contentOptions)
-    case .arenaStrategy:
-      return entryPrompt(
-        tokens: count, entries: reversesCandidatePool ? Array(arenaStrategyEntries.reversed()) : arenaStrategyEntries, contentOptions: contentOptions,
-        lowercasesWithoutPunctuation: true)
+    case .typingOfTheDead, .pokemon1k, .arenaStrategy:
+      return OrdinaryEntryContent.prompt(wordCount: count, language: language, contentOptions: contentOptions,
+        modifiers: (reversesCandidatePool ? [.backwards] : []) + (usesZipfFrequency ? [.zipf] : []))
     case .friulian:
       return prompt(
         tokens: count, lexicon: ordered(friulianWords), separator: " ", punctuation: [",", ".", "!", "?"],
@@ -14391,7 +14384,8 @@ enum StarterLexicon {
         tokens: count, lexicon: ordered(tamil1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tamilOld:
-      return entryPrompt(tokens: count, entries: reversesCandidatePool ? Array(tamilOldWords.reversed()) : tamilOldWords, contentOptions: contentOptions)
+      return OrdinaryEntryContent.prompt(wordCount: count, language: language, contentOptions: contentOptions,
+        modifiers: (reversesCandidatePool ? [.backwards] : []) + (usesZipfFrequency ? [.zipf] : []))
     case .tanglish:
       return prompt(
         tokens: count, lexicon: ordered(tanglishWords), separator: " ", punctuation: [",", ".", "!", "?"],
@@ -15533,55 +15527,6 @@ enum StarterLexicon {
     ).joined(separator: " ")
   }
 
-  private static func sectionPrompt(
-    tokens: Int, sections: [String], contentOptions: ContentOptions
-  ) -> String {
-    precondition(!sections.isEmpty)
-    var words: [String] = []
-    while words.count < tokens {
-      let section = sections[Int.random(in: sections.indices)]
-      if contentOptions.includePunctuation {
-        words.append(contentsOf: section.split(whereSeparator: \.isWhitespace).map(String.init))
-      } else {
-        words.append(contentsOf: section.lowercased().split { !$0.isLetter }.map(String.init))
-      }
-    }
-    words = Array(words.prefix(tokens))
-    if contentOptions.includeNumbers {
-      for index in words.indices where index.isMultiple(of: 9) {
-        words[index] = String(index / 9 + 1)
-      }
-    }
-    return words.joined(separator: " ")
-  }
-
-  private static func entryPrompt(
-    tokens: Int, entries: [String], contentOptions: ContentOptions,
-    lowercasesWithoutPunctuation: Bool = false
-  ) -> String {
-    let eligibleEntries = contentOptions.includePunctuation
-      ? entries
-      : entries.filter { entry in entry.allSatisfy { $0.isLetter || $0.isNumber || $0.isWhitespace } }
-    precondition(!eligibleEntries.isEmpty)
-    var words: [String] = []
-    while words.count < tokens {
-      let entry = eligibleEntries[Int.random(in: eligibleEntries.indices)]
-      let entryWords = entry.split(whereSeparator: \.isWhitespace).map(String.init)
-      words.append(contentsOf: lowercasesWithoutPunctuation && !contentOptions.includePunctuation
-        ? entryWords.map { $0.lowercased() }
-        : entryWords)
-    }
-    words = Array(words.prefix(tokens))
-    for index in words.indices {
-      if contentOptions.includeNumbers, index.isMultiple(of: 9) {
-        words[index] = String(index / 9 + 1)
-      } else if contentOptions.includePunctuation, index.isMultiple(of: 7) {
-        let punctuation = [",", ".", "!", "?"]
-        words[index] += punctuation[index / 7 % punctuation.count]
-      }
-    }
-    return words.joined(separator: " ")
-  }
 
   private static func source(for language: TypingLanguage, englishVariant: EnglishVariant) -> (
     [String], [String]

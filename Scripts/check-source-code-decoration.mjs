@@ -145,11 +145,12 @@ console.log(`${count} code-decoration fixtures passed (7 complete actual modules
 // Sections use owned candidates, not any upstream language content. Register
 // the actual pool identity so a phrase cannot be mistaken for an operator array.
 let sectionCount = 0;
-async function section(words, wordCount, draws, expected, indexes, names = []) {
-  config.mode = 'words'; config.words = wordCount; config.language = 'code_swift';
+async function section(words, wordCount, draws, expected, indexes, names = [],
+  language = 'code_swift', originalPunctuation = false) {
+  config.mode = 'words'; config.words = wordCount; config.language = language;
   config.punctuation = false; config.numbers = false; repeated = false;
   activeNames = names; units = []; ranks = [...draws]; candidatePools.add(words);
-  const result = await main.namespace.generateWords({name: config.language, words});
+  const result = await main.namespace.generateWords({name: config.language, words, originalPunctuation});
   assert.deepEqual(Array.from(result.words), expected);
   assert.deepEqual(Array.from(result.sectionIndexes), indexes);
   assert.equal(ranks.length, 0); assert.equal(units.length, 0); sectionCount++;
@@ -202,6 +203,43 @@ assert.deepEqual(Array.from(numericSection.sectionIndexes), [1, 1]);
 assert.equal(units.length, 0); assert.equal(ranks.length, 0); sectionCount++;
 console.log(`${sectionCount} code-section fixtures passed (actual section order, gates, per-word discarded base draws, finite cut, repeat cache/fresh section, Weakspot boundary; owned adapters, no corpus/RNG/browser parity claim).`);
 
+const previousSectionCount = sectionCount;
+await section(['Node Bay Elm', 'Oak'], 2, [0, 1], ['node ', 'bay '], [1, 1], [], 'league_of_legends');
+await section(['node-ray', 'foo♀'], 1, [0, 1], ['foo♀ '], [1], [], 'pokemon_1k');
+await section(['node item2', 'oak bay'], 2, [0, 1, 0], ['oak ', 'bay '], [1, 1], [], 'pokemon_1k');
+await section(['The hallway breathes.', 'Oak bay'], 3, [...Array(101).fill(0), 1, 1],
+  ['the ', 'hallway ', 'breathes. '], [1, 1, 1], [], 'typing_of_the_dead', true);
+await section(['The hallway breathes!', 'Oak bay'], 3, [0, 1, 1],
+  ['the ', 'hallway ', 'breathes! '], [1, 1, 1], [], 'typing_of_the_dead', true);
+await section(['aaax bb', 'bb'], 2, [1, 0, ...Array(19).fill(1), 1],
+  ['aaax ', 'bb '], [1, 1], ['weakspot'], 'pokemon_1k');
+await section(['Node Bay', 'Oak'], 2, [1, 0, ...Array(19).fill(1), 1],
+  ['Node ', 'Bay '], [1, 1], ['weakspot'], 'league_of_legends');
+await section(['node bay', 'oak elm'], 2, [0, 1], ['kao ', 'mle '], [1, 1], ['backwards'], 'league_of_legends');
+await section(['node bay elm', 'oak'], 2, [0, 1], ['node', 'bay'], [1, 1], ['nospace'], 'tamil_old');
+repeated = true; ranks = [1];
+const ordinaryReplayPool = ['node bay elm', 'oak']; candidatePools.add(ordinaryReplayPool);
+const ordinaryRestored = await main.namespace.generateWords({name: 'tamil_old', words: ordinaryReplayPool});
+assert.deepEqual(Array.from(ordinaryRestored.words), ['node', 'bay']); assert.deepEqual(ranks, [1]);
+config.mode = 'time';
+assert.equal((await main.namespace.getNextWord(2, 100, 'bay', 'node')).word, 'oak');
+assert.equal(ranks.length, 0); sectionCount++;
+repeated = false; activeNames = []; config.mode = 'words'; config.words = 2;
+config.language = 'typing_of_the_dead'; config.punctuation = true; config.numbers = false;
+units = []; ranks = [0, 1];
+const originalPool = ['The hallway breathes!', 'Oak bay']; candidatePools.add(originalPool);
+const originalSection = await main.namespace.generateWords({name: config.language,
+  words: originalPool, originalPunctuation: true});
+assert.deepEqual(Array.from(originalSection.words), ['The ', 'hallway ']);
+assert.equal(units.length, 0); assert.equal(ranks.length, 0); sectionCount++;
+config.language = 'pokemon_1k'; config.numbers = true;
+units = [0.05, 0, 0, 0.5, 0.95, 0.5]; ranks = [0, 1];
+const commonPool = ['node bay', 'oak']; candidatePools.add(commonPool);
+const commonSection = await main.namespace.generateWords({name: config.language, words: commonPool});
+assert.deepEqual(Array.from(commonSection.words), ['1 ', 'bay! ']);
+assert.equal(units.length, 0); assert.equal(ranks.length, 0); sectionCount++;
+console.log(`${sectionCount - previousSectionCount} ordinary-entry fixtures passed (4 named identity routes, actual gates/case/Weakspot/decoration/original-punctuation/repeat; owned words and runtime adapters, no corpus/RNG/device parity claim).`);
+
 // Metadata-only inventory: read values to count sections, never print, persist
 // or import upstream word strings into the native content pool.
 const languages = path.join(root, 'frontend/static/languages');
@@ -216,3 +254,21 @@ assert.deepEqual(sectionIdentities, [['code_abap', 200, 2], ['code_haskell', 208
   ['code_javascript', 126, 3], ['code_javascript_react', 202, 3], ['code_ocaml', 495, 57],
   ['code_ook', 9, 9], ['code_rust', 192, 13], ['code_typst', 43, 1], ['code_vim', 167, 1]]);
 console.log('Metadata-only section inventory passed: 69 code identities, 9 multiword pools; no vocabulary parity claim.');
+
+let ordinaryRawPools = 0, ordinarySectionPools = 0;
+const entryMetadata = [];
+for (const filename of fs.readdirSync(languages).filter(name => name.endsWith('.json') && !name.startsWith('code_'))) {
+  const language = JSON.parse(fs.readFileSync(path.join(languages, filename), 'utf8'));
+  if (language.words.some(word => word.includes(' '))) ordinaryRawPools++;
+  const multiword = language.words.filter(word => word.replace(/ +/g, ' ')
+    .replace(/(^ )|( $)/g, '').split(' ').length > 1).length;
+  if (multiword) ordinarySectionPools++;
+  if (['league_of_legends', 'pokemon_1k', 'tamil_old', 'typing_of_the_dead'].includes(language.name)) {
+    entryMetadata.push([language.name, language.words.length, multiword, language.originalPunctuation ?? false]);
+  }
+}
+assert.equal(ordinaryRawPools, 67); assert.equal(ordinarySectionPools, 66);
+assert.deepEqual(entryMetadata.sort((a, b) => a[0].localeCompare(b[0])),
+  [['league_of_legends', 442, 229, false], ['pokemon_1k', 1025, 28, false],
+    ['tamil_old', 460, 1, false], ['typing_of_the_dead', 10098, 7338, true]]);
+console.log('Metadata-only ordinary inventory passed: 67 raw-space identities, 66 normalized multiword pools; 4 entry routes audited, remaining routes not proven equivalent.');

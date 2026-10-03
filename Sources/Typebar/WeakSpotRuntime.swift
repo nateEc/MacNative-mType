@@ -88,6 +88,10 @@ enum WeakSpotWordSelection {
     contentOptions: ContentOptions, scores: WeakSpotScores, reversesCandidatePool: Bool = false
   ) -> String? {
     guard !language.isCodeLanguage else { return nil }
+    if OrdinaryEntryContent.pool(for: language) != nil {
+      return OrdinaryEntryContent.prompt(wordCount: wordCount, language: language, contentOptions: contentOptions,
+        modifiers: [.weakSpot] + (reversesCandidatePool ? [.backwards] : []), weakSpotScores: scores)
+    }
     guard let source = sourceLexicon(
       for: language, englishVariant: englishVariant,
       mixedLanguageComponents: mixedLanguageComponents)

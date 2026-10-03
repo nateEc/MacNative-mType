@@ -6031,9 +6031,36 @@ struct GeneratedStreamContinuation {
   }
 }
 
-/// Code word practice samples an owned candidate pool, not whole programs in
-/// authored order. Saved prompts and authored custom programs stay separate.
-struct GeneratedCodeContinuation {
+enum OrdinaryEntryContent {
+  static func pool(for language: TypingLanguage) -> IndexedLexicon? {
+    switch language {
+    case .typingOfTheDead: IndexedLexicon(StarterLexicon.typingOfTheDeadSections)
+    case .pokemon1k: IndexedLexicon(StarterLexicon.creatureIndexEntries)
+    case .arenaStrategy: IndexedLexicon(StarterLexicon.arenaStrategyEntries)
+    case .tamilOld: IndexedLexicon(StarterLexicon.tamilOldWords)
+    default: nil
+    }
+  }
+
+  static func prompt(wordCount: Int, language: TypingLanguage, contentOptions: ContentOptions,
+    modifiers: [TestModifier] = [], weakSpotScores: WeakSpotScores = .init()) -> String {
+    var cursor = GeneratedCandidateContinuation(configuration: .words(max(1, wordCount),
+      language: language, contentOptions: contentOptions).with(modifiers: modifiers),
+      batchTokenCount: max(1, wordCount), showAllLines: true, weakSpotScores: weakSpotScores)
+    var text = ""
+    // Existing content APIs return sampled/decorated source words; their
+    // callers apply text funboxes separately. The session uses actual chunks.
+    while cursor.hasRemaining { text += cursor.nextChunk().source }
+    return text
+  }
+}
+
+// Existing code-only callers retain this in-memory name. It is not serialized.
+typealias GeneratedCodeContinuation = GeneratedCandidateContinuation
+
+/// Samples owned code/entry pools and emits section words in order. Saved
+/// prompts, Polyglot, and authored custom programs keep separate contracts.
+struct GeneratedCandidateContinuation {
   let configuration: TestConfiguration
   let batchTokenCount: Int
   private let previewsWholeFiniteWords: Bool
@@ -6051,7 +6078,10 @@ struct GeneratedCodeContinuation {
     self.configuration = configuration
     self.batchTokenCount = batchTokenCount
     self.weakSpotScores = weakSpotScores
-    pool = IndexedLexicon.ordered(sourceWords ?? CodePracticeContent.wordCandidates(for: configuration.language),
+    let candidates = sourceWords.map(IndexedLexicon.init)
+      ?? OrdinaryEntryContent.pool(for: configuration.language)
+      ?? IndexedLexicon(CodePracticeContent.wordCandidates(for: configuration.language))
+    pool = IndexedLexicon.ordered(candidates,
       reversed: configuration.modifiers.contains(.backwards))
     previewsWholeFiniteWords = GeneratedPromptChunkPolicy.previewsWholeFiniteWords(
       for: configuration, showAllLines: showAllLines)
@@ -6113,14 +6143,20 @@ struct GeneratedCodeContinuation {
       }
       var word = sectionWords[nextSectionWord]
       nextSectionWord += 1
-      // Dockerfile is a code-oriented native entry, but not a code_* source
-      // language. Its ordinary-source case rule remains distinct.
-      if configuration.language == .dockerFile && !configuration.contentOptions.includePunctuation {
+      // Ordinary entries lowercase ASCII-capital-bearing components, not the
+      // entire candidate before selection. Code syntax keeps its case.
+      if (!configuration.language.isCodeLanguage || configuration.language == .dockerFile)
+        && !configuration.contentOptions.includePunctuation
+        && !configuration.modifiers.contains(.weakSpot)
+        && word.utf8.contains(where: { (65...90).contains($0) }) {
         word = word.lowercased()
       }
-      word = CodeWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
+      let options = configuration.language == .typingOfTheDead
+        ? ContentOptions(includePunctuation: false, includeNumbers: configuration.contentOptions.includeNumbers)
+        : configuration.contentOptions
+      word = PoolWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
         language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
-        options: configuration.contentOptions, random: nextRandomContentUnit)
+        options: options, random: nextRandomContentUnit)
       sourceWords.append(word)
       let target = TestModifierPolicy.transformedWord(word, modifiers: configuration.modifiers,
         language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
@@ -6159,7 +6195,8 @@ struct GeneratedCodeContinuation {
     while retries < 100 && (comparison == latest || comparison == earlier
       || (!configuration.contentOptions.includeNumbers && word.utf8.contains { (48...57).contains($0) })
       || (!configuration.contentOptions.includePunctuation && word == "I")
-      || (configuration.language == .dockerFile && !configuration.contentOptions.includePunctuation
+      || ((!configuration.language.isCodeLanguage || configuration.language == .dockerFile)
+        && !configuration.contentOptions.includePunctuation
         && word.contains { "-=_+[]{};'\\:\"|,./<>?".contains($0) })) {
       word = drawCandidate(random: random)
       // The pinned generator lowercases the first comparison but preserves
@@ -6232,7 +6269,7 @@ struct TestSessionFactory {
       usesGeneratedStream = true
       preservesGeneratedWordOrder = true
     } else if let streamWordCount,
-      configuration.language.isCodeLanguage
+      configuration.language.isCodeLanguage || OrdinaryEntryContent.pool(for: configuration.language) != nil
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
         batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores)
@@ -6464,6 +6501,12 @@ struct TestSessionFactory {
   static func weakSpotPrompt(
     configuration: TestConfiguration, wordCount: Int, scores: WeakSpotScores
   ) -> String {
+    if OrdinaryEntryContent.pool(for: configuration.language) != nil {
+      return OrdinaryEntryContent.prompt(wordCount: wordCount, language: configuration.language,
+        contentOptions: configuration.contentOptions,
+        modifiers: configuration.modifiers.filter { [.backwards, .zipf, .weakSpot].contains($0) },
+        weakSpotScores: scores)
+    }
     if configuration.modifiers.contains(.weakSpot),
       let prompt = WeakSpotWordSelection.prompt(
         wordCount: wordCount, language: configuration.language,

@@ -1,6 +1,8 @@
-/// Native per-word decoration for the owned code pool. It is deliberately
+typealias CodeWordDecorationPolicy = PoolWordDecorationPolicy
+
+/// Common native per-word decoration for owned code and entry pools. It stays
 /// separate from authored programs and uses the already-altered prior target.
-enum CodeWordDecorationPolicy {
+enum PoolWordDecorationPolicy {
   static func decorated(_ word: String, previousTarget: String?, language: TypingLanguage,
     wordIndex: Int, wordBound: Int, options: ContentOptions,
     random: () -> Double = { Double.random(in: 0..<1) }) -> String {
@@ -25,7 +27,7 @@ enum CodeWordDecorationPolicy {
 
   private static func punctuated(_ word: String, previous: String?, language: TypingLanguage,
     index: Int, bound: Int, random: () -> Double) -> String {
-    let isCode = language != .dockerFile
+    let isCode = language.isCodeLanguage && language != .dockerFile
     let last = previous?.last
     let canWrap = last != "," && last != "."
     if !isCode && (index == 0 || last.map { ".?!؟".contains($0) } == true) {
