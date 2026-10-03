@@ -5734,7 +5734,7 @@ private struct CompletedResultView: View {
               result.elapsedDuration, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
         }
         GridRow {
-          metric("字符（匹配/错位/额外/跳过）", characterStatsText)
+          metric(ResultCharacterStatsPresentation.label(result.characterStats), characterStatsText)
           metric("输入字符", "\(result.typedCharacterCount)")
         }
         GridRow {
@@ -6029,8 +6029,7 @@ private struct CompletedResultView: View {
   }
 
   private var characterStatsText: String {
-    let stats = result.characterStats
-    return "\(stats.matched)/\(stats.incorrect)/\(stats.extra)/\(stats.missed)"
+    ResultCharacterStatsPresentation.value(result.characterStats)
   }
 
   private var visibleResultTags: [String] {
@@ -8916,7 +8915,7 @@ private struct ResultDetailView: View {
           Text("\(result.correctCharacterCount)")
         }
         GridRow {
-          Text("字符（匹配/错位/额外/跳过）")
+          Text(ResultCharacterStatsPresentation.label(result.characterStats))
           Text(characterStatsText)
         }
         GridRow {
@@ -9017,8 +9016,7 @@ private struct ResultDetailView: View {
   }
 
   private var characterStatsText: String {
-    let stats = result.characterStats
-    return "\(stats.matched)/\(stats.incorrect)/\(stats.extra)/\(stats.missed)"
+    ResultCharacterStatsPresentation.value(result.characterStats)
   }
 
   private func keyDurationText(_ milliseconds: Double) -> String {

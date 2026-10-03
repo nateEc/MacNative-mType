@@ -137,9 +137,23 @@ final class TerminalFieldReentryTests: XCTestCase {
     XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(TestResultRecord(result: result).portableResult, result)
-    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    // Keep minimum-17 contraction evidence independent of current format-19 stats.
+    let minimal = CompletedTestResult(id: UUID(), configuration: .words(1).with(modifiers: [.noSpaces]),
+      outcome: .bailedOut, startedAt: start, finishedAt: start.addingTimeInterval(2),
+      typedCharacterCount: 0, correctCharacterCount: 0, errorCount: 0, wpm: 0, rawWpm: 0,
+      accuracy: 77, prompt: "ab", replayEvents: [
+        .init(offset: 0, kind: .insert, units: [97,98], inputField: .init(index: 0, units: [97,98])),
+        .init(offset: 1, kind: .insert, units: [120], inputStopped: true,
+          inputField: .init(index: 0, units: []), discardedInputUnits: 2)],
+      targetWordDirectory: .init(words: ["ab"], noSpace: true))
+    let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+    let minimalArchive = TypebarArchive(version: 1, exportedAt: start, settings: .init(), results: [minimal], presets: [])
+    XCTAssertEqual(minimalArchive.version, 17)
+    let minimalData = try encoder.encode(minimalArchive)
+    XCTAssertEqual(try TypebarDataTransfer.importArchive(from: minimalData).results, [minimal])
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: minimalData) as? [String: Any])
     for version in 1...16 {
-      XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [result], presets: []).version, 17)
+      XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [minimal], presets: []).version, 17)
       object["version"] = version
       XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: object))) {
         XCTAssertEqual($0 as? DataTransferError, .unsupportedVersion(version))

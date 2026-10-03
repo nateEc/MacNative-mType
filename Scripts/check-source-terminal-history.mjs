@@ -50,3 +50,30 @@ const stopped=log([...later.events,event(2000,0,'ab'),event(3000,1,'','insertTex
 assert.equal(stats.getChars(stopped).correctWord,2);assert.equal(stats.getChars(stopped).allCorrect,2);
 assert.deepEqual(stats.getInputHistory(stopped),['ab','']);
 console.log('6 pinned-source terminal-history fixtures passed (4 complete actual modules; adapters, no browser/handler/Korean parity claim).');
+const classificationCases=[
+ ['ab','ab',false,[2,2,0,0,0]], ['ax ','ab ',false,[1,0,1,1,0]],
+ ['ab','ab ',false,[2,0,0,0,1]], ['abx','ab ',false,[2,0,0,1,0]],
+ ['ab ','ab cd',true,[2,3,0,1,0]], ['ax','abcd',true,[1,0,1,0,0]],
+ ['ax','abcd',false,[1,0,1,0,2]], ['abxx','ab',true,[2,0,0,2,0]],
+ ['','abcd',false,[0,0,0,0,4]], ['','abcd',true,[0,0,0,0,0]],
+ ['🙂','🙂',false,[2,2,0,0,0]], ['e\u0301','e\u0301b',true,[2,2,0,0,0]],
+ ['a\n','ab\n',false,[1,0,1,0,1]], ['x y','ab ',false,[0,0,3,0,0]],
+ ['\ud83d','🙂',true,[1,1,0,0,0]], ['\ud83d','🙂',false,[1,0,0,0,1]],
+];
+for(const [input,target,partial,expected] of classificationCases){
+ const result=modules.get('utils/strings').namespace.countChars(input,target,partial);
+ assert.deepEqual([result.allCorrect,result.correctWord,result.incorrect,result.extra,result.missed],expected);
+ assert.equal(result.allCorrect+result.incorrect+result.extra,input.length);
+}
+const normalizedSpace=log([event(0,0,'a\u3000')],['a ']);
+assert.deepEqual(stats.getChars(normalizedSpace),{allCorrect:2,correctWord:2,incorrect:0,extra:0,missed:0});
+const absentTarget=log([event(0,7,'a\u3000')],['ab']);
+assert.deepEqual(stats.getChars(absentTarget),{allCorrect:2,correctWord:2,incorrect:0,extra:0,missed:0});
+const knownEmptyTarget=log([event(0,0,'a\u3000')],['']);
+assert.deepEqual(stats.getChars(knownEmptyTarget),{allCorrect:0,correctWord:0,incorrect:0,extra:2,missed:0});
+const failedInfinite=log([event(0,0,'ax')],['abcd']);
+failedInfinite.context.mode='words'; failedInfinite.context.mode2='0'; failedInfinite.context.bailedOut=false;
+assert.deepEqual(stats.getChars(failedInfinite),{allCorrect:1,correctWord:0,incorrect:1,extra:0,missed:0});
+failedInfinite.context.mode2='1';
+assert.deepEqual(stats.getChars(failedInfinite),{allCorrect:1,correctWord:0,incorrect:1,extra:0,missed:2});
+console.log('21 owned UTF-16 classification fixtures passed (16 countChars cases and 5 normalized/fallback/mode getChars cases; result.ts/TestLogic display inspected, not executed).');

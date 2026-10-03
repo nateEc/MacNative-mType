@@ -47,6 +47,11 @@ enum ResultCSVExport {
         "engaged_seconds",
         "restart_count",
         "prior_attempt_engaged_seconds",
+        "source_matched_utf16_units",
+        "source_credited_utf16_units",
+        "source_incorrect_utf16_units",
+        "source_extra_utf16_units",
+        "source_missed_utf16_units",
     ]
 
     static func data(for results: [CompletedTestResult]) -> Data {
@@ -108,6 +113,11 @@ enum ResultCSVExport {
             decimal(result.engagedDuration),
             String(result.restartCount),
             decimal(result.priorAttemptEngagedDuration),
+            result.characterStats.sourceUnits.map { String($0.allCorrect) } ?? "",
+            result.characterStats.sourceUnits.map { String($0.correctWord) } ?? "",
+            result.characterStats.sourceUnits.map { String($0.incorrect) } ?? "",
+            result.characterStats.sourceUnits.map { String($0.extra) } ?? "",
+            result.characterStats.sourceUnits.map { String($0.missed) } ?? "",
         ]
     }
 
@@ -269,9 +279,9 @@ enum RemoteResultCSVExport {
 struct TypebarArchive: Codable, Equatable {
     // Older readers lack stopped-input, field-local/unit metadata, target
     // directories, pre-validation positions, explicit unit contractions and
-    // next-word abandonment markers.
+    // next-word abandonment markers and explicit unit classifications.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 18
+    static let currentVersion = 19
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -311,7 +321,8 @@ struct TypebarArchive: Codable, Equatable {
         let hasPositions = results.contains { $0.replayEvents.contains { $0.inputPosition != nil } }
         let hasContractions = results.contains { $0.replayEvents.contains { $0.discardedInputUnits != nil } }
         let hasClearedNextWord = results.contains { $0.replayEvents.contains { $0.clearedNextWord != nil } }
-        self.version = hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        let hasUnitStats = results.contains { $0.characterStats.sourceUnits != nil }
+        self.version = hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
         let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
@@ -885,6 +896,9 @@ enum TypebarDataTransfer {
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         guard archive.version >= 18 || !archive.results.contains(where: {
             $0.replayEvents.contains { $0.clearedNextWord != nil }
+        }) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 19 || !archive.results.contains(where: {
+            $0.characterStats.sourceUnits != nil
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         return archive
     }

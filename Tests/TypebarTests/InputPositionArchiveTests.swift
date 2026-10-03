@@ -47,7 +47,13 @@ final class InputPositionArchiveTests: XCTestCase {
   }
 
   func testNewPositionsCannotBeConstructedOrImportedUnderAnyEarlierArchiveVersion() throws {
-    let result = try currentResult()
+    // Owned minimal position fixture, not a new classified session relabeled.
+    let result = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 1,
+      correctCharacterCount: 1, errorCount: 0, wpm: 6, rawWpm: 6, accuracy: 100,
+      prompt: "a", replayEvents: [.init(offset: 0, kind: .insert, units: [97],
+        inputField: .init(index: 0, units: [97]), inputPosition: .init(charIndex: 0, lastWord: true))])
+    XCTAssertNil(result.characterStats.sourceUnits)
     let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [result], presets: [], at: start)
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     for version in 1...15 {

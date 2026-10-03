@@ -281,12 +281,11 @@ enum ResultHistoryRowSummaryPolicy {
     configuration: TestConfiguration?, characterStats: ResultCharacterStats, tags: [String]
   ) -> ResultHistoryRowSummary {
     let normalizedTags = ResultTagPolicy.normalized(tags)
-    let spokenCharacters =
-      "字符：匹配 \(characterStats.matched)，错位 \(characterStats.incorrect)，额外 \(characterStats.extra)，跳过 \(characterStats.missed)"
+    let spokenCharacters = ResultCharacterStatsPresentation.spoken(characterStats)
     return .init(
       modeAndParameter: modeAndParameter(configuration),
       characterStats:
-        "字符 \(characterStats.matched)/\(characterStats.incorrect)/\(characterStats.extra)/\(characterStats.missed)",
+        "\(characterStats.sourceUnits == nil ? "字符" : "UTF-16 单位") \(ResultCharacterStatsPresentation.value(characterStats))",
       tags: normalizedTags,
       accessibilityMetadata: normalizedTags.isEmpty
         ? spokenCharacters : "\(spokenCharacters)；标签：\(normalizedTags.joined(separator: "、"))")

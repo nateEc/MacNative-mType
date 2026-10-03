@@ -72,7 +72,7 @@ final class TerminalFieldHistoryTests: XCTestCase {
     XCTAssertNil(saved.replayEvents.last?.clearedNextWord)
   }
 
-  func testNewClearRequiresEighteenAndSurvivesBothArchiveBoundaries() throws {
+  func testNewClearAndClassificationSurviveBothArchiveBoundaries() throws {
     var input = session(); input.insertBatch("abcd ", at: start)
     input.deleteWordBackward(at: start.addingTimeInterval(1))
     let saved = try result(input)
@@ -80,12 +80,12 @@ final class TerminalFieldHistoryTests: XCTestCase {
     XCTAssertNotNil(saved.replayEvents.first { $0.wordDeletionCount != nil }?.clearedNextWord)
     let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [saved], presets: [], at: start)
     let restored = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(restored.version, 18)
+    XCTAssertEqual(restored.version, 19)
     XCTAssertEqual(restored.results, [saved])
     XCTAssertEqual(TestResultRecord(result: saved).portableResult, saved)
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-    for version in 1...17 {
-      XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [saved], presets: []).version, 18)
+    for version in 1...18 {
+      XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [saved], presets: []).version, 19)
       object["version"] = version
       XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: object))) {
         XCTAssertEqual($0 as? DataTransferError, .unsupportedVersion(version))

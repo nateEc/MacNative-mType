@@ -3801,12 +3801,15 @@ struct ResultCharacterStats: Codable, Equatable {
   let incorrect: Int
   let extra: Int
   let missed: Int
+  /// Archive 19. Absent on genuine older results; never infer or backfill it.
+  let sourceUnits: ResultUnitCharacterStats?
 
-  init(matched: Int, incorrect: Int, extra: Int, missed: Int) {
+  init(matched: Int, incorrect: Int, extra: Int, missed: Int, sourceUnits: ResultUnitCharacterStats? = nil) {
     self.matched = max(0, matched)
     self.incorrect = max(0, incorrect)
     self.extra = max(0, extra)
     self.missed = max(0, missed)
+    self.sourceUnits = sourceUnits
   }
 
   static func legacy(typedCharacterCount: Int, correctCharacterCount: Int) -> Self {
@@ -4805,7 +4808,7 @@ struct TypingSession {
   }
 
   private var resultCreditsPartialLastWord: Bool {
-    configuration.duration != nil || outcome == .bailedOut
+    ResultIntervalSamplingPolicy.isTimed(configuration) || outcome == .bailedOut
   }
 
   /// The pre-result display always credits a correct prefix of the active
@@ -4914,7 +4917,10 @@ struct TypingSession {
         incorrect += 1
       }
     }
-    return .init(matched: matched, incorrect: incorrect, extra: extra, missed: missed)
+    return .init(matched: matched, incorrect: incorrect, extra: extra, missed: missed,
+      sourceUnits: unitTargets.noSpace
+        ? recordedNoSpaceStats.counts(targets: unitTargets,
+          creditsActivePrefix: finishedAt == nil || resultCreditsPartialLastWord).unitStats : nil)
   }
 
   var accuracy: Int {

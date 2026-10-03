@@ -138,12 +138,25 @@ final class TargetWordDirectoryTests: XCTestCase {
   }
 
   func testArchiveWithTargetsCannotBeMislabeledAsOneThroughFourteen() throws {
-    let result = try noSpaceResult()
-    let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [result], presets: [], at: start)
+    // Owned directory-only fixture: no newer position, clear or classification.
+    let result = CompletedTestResult(id: UUID(), configuration: .words(2).with(modifiers: [.noSpaces]),
+      outcome: .completed, startedAt: start, finishedAt: start.addingTimeInterval(2),
+      typedCharacterCount: 4, correctCharacterCount: 3, errorCount: 1, wpm: 17, rawWpm: 29,
+      accuracy: 75, prompt: "abcd", replayEvents: [
+        .init(offset: 0, kind: .insert, units: [120,98], inputField: .init(index: 0, units: [120,98])),
+        .init(offset: 2, kind: .insert, units: [99,100], inputField: .init(index: 1, units: [99,100]))],
+      targetWordDirectory: .init(words: ["ab", "cd"], noSpace: true))
+    let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+    let data = try encoder.encode(TypebarArchive(version: 1, exportedAt: start,
+      settings: .init(), results: [result], presets: []))
+    let restored = try TypebarDataTransfer.importArchive(from: data)
+    XCTAssertEqual(restored.version, 15)
+    XCTAssertEqual(restored.results, [result])
+    XCTAssertNil(restored.results[0].characterStats.sourceUnits)
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     for version in 1...14 {
       XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(),
-        results: [result], presets: []).version, 16)
+        results: [result], presets: []).version, 15)
       object["version"] = version
       XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: object))) {
         XCTAssertEqual($0 as? DataTransferError, .unsupportedVersion(version))

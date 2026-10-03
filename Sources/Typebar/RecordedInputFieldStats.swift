@@ -44,25 +44,24 @@ struct RecordedInputFieldStats {
   }
 
   func counts(targets: UnitInputTargets, creditsActivePrefix: Bool)
-    -> (credit: TypingWordCredit, rawUnits: Int, rawCharacters: Int) {
+    -> (credit: TypingWordCredit, rawUnits: Int, rawCharacters: Int, unitStats: ResultUnitCharacterStats) {
     let highest = snapshots.filter { !$0.value.units.isEmpty }.keys.max() ?? 0
     let active = snapshots[highest]?.insertedSpace == true && highest < Int.max ? highest + 1 : highest
     var credit = TypingWordCredit(); var raw: [UInt16] = []
+    var unitStats = ResultUnitCharacterStats()
     for index in order {
       let input = snapshots[index]!.units
-      let normalized = input.map { unit -> UInt16 in
-        guard let scalar = UnicodeScalar(UInt32(unit)),
-          InputCharacterEquivalence.isReferenceSpace(Character(String(scalar))) else { return unit }
-        return 32
-      }
-      let target = targets.field(index)
-      if normalized == target || index == active && creditsActivePrefix && target.starts(with: normalized) {
-        credit.inputUnits += normalized.count
+      let target = targets.fields.indices.contains(index) ? targets.field(index) : nil
+      let stats = ResultUnitCharacterStats.classify(input: input, target: target,
+        creditsPartial: index == active && creditsActivePrefix)
+      unitStats.add(stats)
+      if stats.correctWord > 0 {
+        credit.inputUnits += stats.correctWord
         credit.characters += String(decoding: input, as: UTF16.self).count
       }
       raw += input
       if index == active { break }
     }
-    return (credit, raw.count, String(decoding: raw, as: UTF16.self).count)
+    return (credit, raw.count, String(decoding: raw, as: UTF16.self).count, unitStats)
   }
 }

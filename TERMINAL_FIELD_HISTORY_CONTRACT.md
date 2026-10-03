@@ -2,6 +2,8 @@
 
 本增量继续完整原生重写，三种读者不得合并。固定源码为 91bd24bb8513785c7364cbea29296ff7adafac41；没有参考代码或资产进入实现。
 
+后续格式 19 增量已为新有效 no-space 会话增加明确单位分类，详见 SOURCE_UNIT_CHARACTER_STATS_CONTRACT.md；旧四项 characterStats 仍为原生接受映射描述，新可选 sourceUnits 才是原始桶单位分类。当前默认正式归档 19，只有清空标记的独立最低版本仍是 18；下方默认 18 和十三项测试是上一阶段历史证据，最新完整验证见 README，不回算旧记录。
+
 ## 源码合同
 
 [实际删除处理器](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/delete.ts) 在删除 sentinel 后回退，并在原当前快照非空时把 clearedNextWord 放到目的词事件。有限末词导航清空元素但保留快照，因此普通退格也可能触发，不仅是 Firefox 特殊删除。[getInputForWord](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/data.ts) 仍读取未来词桶原快照；这不等于保存历史。
