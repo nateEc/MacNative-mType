@@ -1,5 +1,7 @@
 # 官方 Funbox 逐项审计
 
+2026-10-04 当前阶段：[完整生成目标缓存与嵌套重开](GENERATED_TARGET_CACHE_CONTRACT.md) 普通词、生成流和代码／条目游标共用值缓存，重开保留实际源词、大小写及隐藏词界；嵌套重开固定初始检查点，有限尾批耗尽后正常完成。新增十项、相关 83 项及七模块四组缓存夹具通过；完整串行门禁客户端 2545 项、服务端 145 项零失败，十万词耐久、798 项人工清单结构与未开窗应用包通过。归档仍 22，旧成绩不回算；按词补题、其他词源、内容／分布、设备及长期缓存内存仍未证明等价，goal active。下方为历史阶段。
+
 2026-10-04 当前阶段：[Weakspot 实时评分与后续出题](WEAKSPOT_LIVE_GENERATION_CONTRACT.md) 会话即时学习，普通词及代码／条目续批读取最新评分；代码／条目段内余词与缓存目标不重抽，重复不重记旧样本。新增九项、相关 78 项及七模块四组实时夹具通过；最终客户端 2535 项、服务端 145 项、十万词耐久、797 场景清单及未开窗应用包通过。评分不持久化，归档仍 22；原版按词补题与原生批次预取、原始捕获及全部普通缓存仍未等价证明，goal active。下方为历史阶段。
 
 2026-10-04 当前阶段：[普通条目分段与连续出题](ORDINARY_ENTRY_GENERATION_CONTRACT.md) 四条普通条目路径共用候选段游标，按整候选过滤、按输出词装饰与计数；Weakspot 在段边界选段并保留取词钩子的大小写，原标点词库不额外追加标点。新增 14 项、相关 106 项零失败，七模块新增 12 组普通夹具及元数据断言通过；最终客户端 2526 项、服务端 145 项、十万词耐久、796 场景清单与未开窗应用包通过。归档仍 22，旧成绩不回算。其余普通多词池、Weakspot 活跃游标评分快照／实时续批学习、全部组合、词值／随机分布和设备仍未等价证明，goal active。下方为历史阶段。
@@ -663,7 +665,7 @@ AppSettings 默认接入共享控制器，测试可只注入设备边界；声�
 | `nospace` | 无空格 | 等价实现 | 移除显示分隔符，同时保留可安全映射的原始词边界与渲染后词段；拒绝直接输入的常见 Unicode 空白字符，遇错停下和修正后再前进均在原始词末字符提交点阻止错误词；字数进度、expert 难度校验、末字符提交的 Burst、最低单词速度和弹性词长阈值，以及结果词历史、Burst 热力图、错词和慢词复练都逐词运行 |
 | `poetry` | 诗性散文 | 等价实现 | 英文等空格分词的 time/words 练习中，用户启用后会以原生 URLSession 请求 PoetryDB 的随机诗歌，显示标题/作者；强制关闭标点和数字；请求失败、超时或用户已开始输入时保持 Typebar 自有离线诗性流，且不保存远端内容到设置 |
 | `wikipedia` | 知识短文 | 等价实现 | 所有空格分词的原生语言，以及简体/繁体中文的 time/words 练习中，用户启用后会以原生 URLSession 请求对应 Wikipedia 的随机摘要，并显示标题；强制关闭标点和数字；中文内容由 macOS 的系统词元器分段后以无空格提示呈现。日语假名与罗马字选项均承诺保持所选书写形式，随机百科可能含汉字，故保守使用原创离线知识流。请求失败、超时或用户已开始输入时始终保持 Typebar 自有离线内容，避免将网页代码、资产或固定外部文本纳入项目 |
-| `weakspot` | 弱项训练 | 部分覆盖 | app 生命周期内保留瞬时输入间隔与错误罚时，20 候选首个最高值；均分只计已学习 Unicode 标量并保留已学零分，普通／代码反池在抽样前应用、Polyglot 新池不二次反转。会话输入即时学习，普通及代码／条目新批次读最新簿，重开传整簿而不重记旧样本；代码和四类条目新段接入 20 候选整段评分，段内余词和已生成缓存不重抽。取词后应用装饰，实际源码及原生有界夹具通过；按词补题／批次预取时序、普通完整缓存、其他词源分段、段身份消费者、全部组合、字符键规范、真实捕获／IME、词库身份与分布仍未等价验证。不写评分簿到成绩／偏好，Weakspot 练习不产生 PB；独立持久化分析不变；见 WEAKSPOT_LIVE_GENERATION_CONTRACT.md、ORDINARY_ENTRY_GENERATION_CONTRACT.md、CODE_SECTION_GENERATION_CONTRACT.md、CODE_WORD_DECORATION_CONTRACT.md、CODE_POOL_GENERATION_CONTRACT.md、ORDINARY_BACKWARDS_POOL_CONTRACT.md、`FUN-WS-01`、`FUN-WS-LIVE-01`、`MET-02` |
+| `weakspot` | 弱项训练 | 部分覆盖 | app 生命周期内保留瞬时输入间隔与错误罚时，20 候选首个最高值；均分只计已学习 Unicode 标量并保留已学零分，普通／代码反池在抽样前应用、Polyglot 新池不二次反转。会话输入即时学习，普通及代码／条目新批次读最新簿，重开传整簿而不重记旧样本；代码和四类条目新段接入 20 候选整段评分，段内余词和已生成缓存不重抽；普通词及生成流也保留完整实际目标，嵌套重开固定开头检查点。取词后应用装饰，实际源码及原生有界夹具通过；按词补题／批次预取时序、其他词源完整缓存／分段、段身份消费者、全部组合、字符键规范、真实捕获／IME、词库身份与分布仍未等价验证。不写评分簿到成绩／偏好，Weakspot 练习不产生 PB；独立持久化分析不变；见 GENERATED_TARGET_CACHE_CONTRACT.md、WEAKSPOT_LIVE_GENERATION_CONTRACT.md、ORDINARY_ENTRY_GENERATION_CONTRACT.md、CODE_SECTION_GENERATION_CONTRACT.md、CODE_WORD_DECORATION_CONTRACT.md、CODE_POOL_GENERATION_CONTRACT.md、ORDINARY_BACKWARDS_POOL_CONTRACT.md、`FUN-WS-01`、`FUN-WS-LIVE-01`、`MET-02` |
 | `pseudolang` | 伪语言词流 | 等价实现 | Typebar 自有生成器 |
 | `IPv4` | IPv4 地址流 | 等价实现 | Typebar 自有确定性地址流；强制关闭数字 |
 | `IPv6` | IPv6 地址流 | 等价实现 | Typebar 自有确定性地址流；强制关闭数字 |

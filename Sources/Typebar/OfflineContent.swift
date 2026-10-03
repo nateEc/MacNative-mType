@@ -5958,15 +5958,46 @@ struct GeneratedWordChunk {
   }
 }
 
-/// Carries only the two prior source words between bounded, freshly generated
-/// practice chunks. User-authored custom loops and dedicated content streams
-/// keep their separate continuation rules.
+/// Value-owned actual chunks. A repeat restores only the suffix not already
+/// included in its opening; later growth remains local to the copied cursor.
+struct GeneratedPromptCache {
+  private var chunks: [GeneratedWordChunk] = []
+  private var nextReplayIndex: Int?
+  private var replayOpeningCount: Int?
+
+  init() {}
+
+  var openingCount: Int { replayOpeningCount ?? chunks.count }
+  var hasPendingReplay: Bool { nextReplayIndex.map { $0 < chunks.count } ?? false }
+
+  mutating func append(_ chunk: GeneratedWordChunk) { chunks.append(chunk) }
+
+  mutating func nextReplayedChunk() -> GeneratedWordChunk? {
+    guard let index = nextReplayIndex, index < chunks.count else {
+      nextReplayIndex = nil
+      return nil
+    }
+    nextReplayIndex = index + 1
+    return chunks[index]
+  }
+
+  func replaying(after openingCount: Int) -> Self {
+    var copy = self
+    copy.nextReplayIndex = min(openingCount, chunks.count)
+    copy.replayOpeningCount = copy.nextReplayIndex
+    return copy
+  }
+}
+
+/// Retains the two prior source words and actual sampled targets across
+/// ordinary batches. User-authored custom loops keep separate contracts.
 struct GeneratedWordContinuation {
   let configuration: TestConfiguration
   let weakSpotScores: WeakSpotScores
   let batchWordCount: Int
   private(set) var previousWords: [String]
   private var nextWordIndex: Int
+  private var cache = GeneratedPromptCache()
 
   init(
     configuration: TestConfiguration, weakSpotScores: WeakSpotScores,
@@ -5980,9 +6011,21 @@ struct GeneratedWordContinuation {
       .map { $0.lowercased() }
   }
 
+  var hasRemaining: Bool {
+    cache.hasPendingReplay || configuration.mode != .words || configuration.isInfinite
+      || nextWordIndex < (configuration.wordLimit ?? 0)
+  }
+
+  func replayingContinuation(after opening: Self) -> Self {
+    var copy = self
+    copy.cache = cache.replaying(after: opening.cache.openingCount)
+    return copy
+  }
+
   mutating func nextChunk(generator: (() -> String)? = nil, weakSpotScores: WeakSpotScores? = nil,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk {
+    if let chunk = cache.nextReplayedChunk() { return chunk }
     let count = configuration.mode == .words && !configuration.isInfinite
       ? min(batchWordCount, max(0, (configuration.wordLimit ?? 0) - nextWordIndex)) : batchWordCount
     guard count > 0 else {
@@ -6007,6 +6050,7 @@ struct GeneratedWordContinuation {
       preservesWordOrder: true,
       nextRandomCaseBit: nextRandomCaseBit)
     nextWordIndex += GeneratedWordBoundPolicy.wordCount(in: source)
+    cache.append(chunk)
     return chunk
   }
 }
@@ -6017,8 +6061,27 @@ struct GeneratedStreamContinuation {
   let configuration: TestConfiguration
   let batchWordCount: Int
   private(set) var nextTokenIndex: Int
+  private var cache = GeneratedPromptCache()
+
+  init(configuration: TestConfiguration, batchWordCount: Int, nextTokenIndex: Int) {
+    self.configuration = configuration
+    self.batchWordCount = batchWordCount
+    self.nextTokenIndex = nextTokenIndex
+  }
+
+  var hasRemaining: Bool {
+    cache.hasPendingReplay || configuration.mode != .words || configuration.isInfinite
+      || nextTokenIndex < (configuration.wordLimit ?? 0)
+  }
+
+  func replayingContinuation(after opening: Self) -> Self {
+    var copy = self
+    copy.cache = cache.replaying(after: opening.cache.openingCount)
+    return copy
+  }
 
   mutating func nextChunk(nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk? {
+    if let chunk = cache.nextReplayedChunk() { return chunk }
     let count = configuration.mode == .words && !configuration.isInfinite
       ? min(batchWordCount, max(0, (configuration.wordLimit ?? 0) - nextTokenIndex)) : batchWordCount
     guard count > 0 else { return nil }
@@ -6029,6 +6092,7 @@ struct GeneratedStreamContinuation {
       preservesWordOrder: true,
       nextRandomCaseBit: nextRandomCaseBit)
     nextTokenIndex += count
+    cache.append(chunk)
     return chunk
   }
 }
@@ -6071,8 +6135,7 @@ struct GeneratedCandidateContinuation {
   private let weakSpotScores: WeakSpotScores
   private var previousTargets: [String] = []
   private var emittedWords = 0
-  private var generatedChunks: [GeneratedWordChunk] = []
-  private var replayIndex: Int?
+  private var cache = GeneratedPromptCache()
   private var sectionWords: [String] = []
   private var nextSectionWord = 0
 
@@ -6091,7 +6154,7 @@ struct GeneratedCandidateContinuation {
   }
 
   var hasRemaining: Bool {
-    (replayIndex.map { $0 < generatedChunks.count } ?? false)
+    cache.hasPendingReplay
       || configuration.mode != .words || configuration.isInfinite
       || emittedWords < (configuration.wordLimit ?? 0)
   }
@@ -6100,7 +6163,7 @@ struct GeneratedCandidateContinuation {
     var copy = self
     // The original opening is already restored by TypingSession. Replay only
     // the exact chunks generated after it, including sampled case and targets.
-    copy.replayIndex = min(1, generatedChunks.count)
+    copy.cache = cache.replaying(after: 1)
     // The source resets its section on repeat. Cached actual targets survive,
     // but after that cache ends generation starts a fresh candidate section.
     copy.sectionWords = []
@@ -6112,11 +6175,7 @@ struct GeneratedCandidateContinuation {
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }) -> GeneratedWordChunk {
-    if let index = replayIndex, index < generatedChunks.count {
-      replayIndex = index + 1
-      return generatedChunks[index]
-    }
-    replayIndex = nil
+    if let chunk = cache.nextReplayedChunk() { return chunk }
     let remaining = configuration.mode == .words && !configuration.isInfinite
       ? max(0, (configuration.wordLimit ?? 0) - emittedWords) : 100
     let chunkLimit = previewsWholeFiniteWords && emittedWords == 0 ? batchTokenCount : 100
@@ -6176,7 +6235,7 @@ struct GeneratedCandidateContinuation {
     emittedWords += count
     let chunk = GeneratedWordChunk(source: source, batch: .init(text: output,
       noSpaceTargetWords: noSpace ? targets : []))
-    generatedChunks.append(chunk)
+    cache.append(chunk)
     return chunk
   }
 

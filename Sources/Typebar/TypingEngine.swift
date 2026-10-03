@@ -4488,8 +4488,12 @@ struct TypingSession {
     }
     return TypingSession(
       configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
-      generatedWordContinuation: initialGeneratedWordContinuation,
-      generatedStreamContinuation: initialGeneratedStreamContinuation,
+      generatedWordContinuation: initialGeneratedWordContinuation.map {
+        generatedWordContinuation?.replayingContinuation(after: $0) ?? $0
+      },
+      generatedStreamContinuation: initialGeneratedStreamContinuation.map {
+        generatedStreamContinuation?.replayingContinuation(after: $0) ?? $0
+      },
       generatedCodeContinuation: generatedCodeContinuation?.replayingContinuation() ?? initialGeneratedCodeContinuation,
       sectionEndIndices: initialSectionEndIndices,
       noSpaceSectionWordEnds: initialNoSpaceSectionWordEnds,
@@ -4563,7 +4567,7 @@ struct TypingSession {
     return projected.outcome == .completed || projected.outcome == .invalidAFK
   }
   var usesIncrementalPromptExtension: Bool {
-    generatedWordContinuation != nil || generatedStreamContinuation != nil
+    generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
       || generatedCodeContinuation?.hasRemaining == true
       || repeatingPrompt?.isEmpty == false
       || randomCustomSourceTokens?.isEmpty == false

@@ -276,6 +276,42 @@ assert.equal((await main.namespace.getNextWord(3, 100, 'vv', 'uu')).word, 'vv ')
 assert.equal(ranks.length, 0); liveCount++;
 console.log(`${liveCount} live-weakspot fixtures passed (actual mutable score book, new sections, pending words and cached repeat; owned spacing/rank adapters, no capture/prefetch/device parity claim).`);
 
+// An ordinary word pool with randomized actual targets. Repeat restores the
+// complete generated suffix, including words added after the initial request.
+let cacheCount = 0;
+config.mode = 'words'; config.words = 2; config.language = 'english';
+config.punctuation = false; config.numbers = false; repeated = false;
+activeNames = ['rAnDoMcAsE', 'nospace'];
+const cachePool = ['node', 'bay', 'elm']; candidatePools.add(cachePool);
+ranks = [0, 1]; units = Array(7).fill(0);
+const randomizedOpening = await main.namespace.generateWords({name: 'english', words: cachePool});
+assert.deepEqual(Array.from(randomizedOpening.words), ['NODE', 'BAY']);
+assert.equal(ranks.length, 0); assert.equal(units.length, 0); cacheCount++;
+config.mode = 'time'; ranks = [2]; units = Array(3).fill(0.9);
+assert.equal((await main.namespace.getNextWord(2, 100, 'BAY', 'NODE')).word, 'elm');
+assert.equal(ranks.length, 0); assert.equal(units.length, 0);
+repeated = true; config.mode = 'words'; config.words = 2;
+const freshCachePool = ['oak', 'cedar']; candidatePools.add(freshCachePool);
+ranks = [1]; units = [0.777];
+const cachedOpening = await main.namespace.generateWords({name: 'english', words: freshCachePool});
+assert.deepEqual(Array.from(cachedOpening.words), ['NODE', 'BAY']);
+config.words = 4;
+assert.equal((await main.namespace.getNextWord(2, 100, 'BAY', 'NODE')).word, 'elm');
+assert.deepEqual(ranks, [1]); assert.deepEqual(units, [0.777]); cacheCount++;
+ranks = [0]; units = Array(3).fill(0.9);
+assert.equal((await main.namespace.getNextWord(3, 100, 'elm', 'BAY')).word, 'oak');
+assert.equal(ranks.length, 0); assert.equal(units.length, 0);
+config.words = 2; ranks = [1]; units = [0.777];
+const nestedCache = await main.namespace.generateWords({name: 'english', words: freshCachePool});
+assert.deepEqual(Array.from(nestedCache.words), ['NODE', 'BAY']);
+config.words = 4;
+assert.equal((await main.namespace.getNextWord(2, 100, 'BAY', 'NODE')).word, 'elm');
+assert.equal((await main.namespace.getNextWord(3, 100, 'elm', 'BAY')).word, 'oak');
+assert.deepEqual(ranks, [1]); assert.deepEqual(units, [0.777]); cacheCount++;
+await assert.rejects(main.namespace.getNextWord(4, 100, 'oak', 'elm'), /Repeated word is undefined/);
+assert.deepEqual(ranks, [1]); assert.deepEqual(units, [0.777]); cacheCount++;
+console.log(`${cacheCount} generated-target-cache fixtures passed (actual ordinary pool, randomized targets, complete suffix, nested growth and finite exhaustion; owned ranks/units/adapters, no corpus/RNG/prefetch/device parity claim).`);
+
 // Metadata-only inventory: read values to count sections, never print, persist
 // or import upstream word strings into the native content pool.
 const languages = path.join(root, 'frontend/static/languages');

@@ -12,7 +12,7 @@
 
 TypingSession 持有一个值拥有的 currentWeakSpotScores。有效相邻输入在既有两位毫秒舍入后立即更新评分；首个输入没有间隔样本，无空格模式预先拒绝的空格不学习，删除既不学习也不撤回过去评分。未启用 Weakspot 的会话同样保留学习。字符键及原始事件捕获继续沿已有合同，不因此证明多标量／多字符输入等价。
 
-GeneratedWordContinuation 与 GeneratedCandidateContinuation 的 nextChunk 接收当前评分；不传时仍使用初始化簿，以保留独立调用的语义。候选段游标的缓存分支先返回已生成目标，不抽样；新评分只影响之后新选的段，不能改变待输出段内词。普通词生成游标还没有这套完整缓存，见剩余差异。普通词选择的可注入 rank 是自有测试输入，不是与原版 RNG 分布一致的声明。
+GeneratedWordContinuation 与 GeneratedCandidateContinuation 的 nextChunk 接收当前评分；不传时仍使用初始化簿，以保留独立调用的语义。候选段游标的缓存分支先返回已生成目标，不抽样；新评分只影响之后新选的段，不能改变待输出段内词。后续[完整生成目标缓存](GENERATED_TARGET_CACHE_CONTRACT.md) 已补齐普通词与生成流的实际目标缓存和嵌套重开检查点；这不关闭预取时序或其他词源差异。普通词选择的可注入 rank 是自有测试输入，不是与原版 RNG 分布一致的声明。
 
 主工厂把基准簿交给会话，普通、代码、引语和初始化失败都保留它。repeatedAttempt 传递最终评分且清空本次样本／首输入计时；应用在重置或重复入口接收整簿而非重新吸收已学习样本。较早保存的内存重复尝试用 withWeakSpotScores 继承最新应用簿，目标和缓存不变；异步外部内容替换也保留当前簿。全程没有新增共享可变引用或持久评分存储。
 
@@ -32,4 +32,4 @@ Scripts/check-source-code-decoration.mjs 在内存运行七个完整实际模块
 
 ## 剩余功能差异
 
-后续必须继续核对原版补词触发／前瞻队列和正常导航的事件时序，以及普通生成路径的完整已生成缓存复用。字符键规范、输入批次拆分、Unicode／半代理、原始 live-cache、所有 Funbox 组合、外部词源／Polyglot、词库身份及随机分布、真实 GUI／IME／VoiceOver／设备、长期缓存和服务部署仍未验证等价。整体 goal 保持 active。
+后续必须继续核对原版补词触发／前瞻队列和正常导航的事件时序；普通生成路径的完整已生成缓存由后续合同补齐，不代表所有词源和完整组合等价。字符键规范、输入批次拆分、Unicode／半代理、原始 live-cache、所有 Funbox 组合、外部词源／Polyglot、词库身份及随机分布、真实 GUI／IME／VoiceOver／设备、长期缓存和服务部署仍未验证等价。整体 goal 保持 active。
