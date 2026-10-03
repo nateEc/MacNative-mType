@@ -3102,6 +3102,15 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// Captured only for known no-space unit fields so far. Absence on any
   /// legacy or unsupported path is not permission to infer a source position.
   let inputPosition: TypingReplayInputPosition?
+  /// Archive 17: explicit unit contraction before this action, when finite
+  /// terminal navigation cleared the element but retained its prior snapshot.
+  /// Absence preserves the cumulative primitive contract of archives 1–16.
+  let discardedInputUnits: Int?
+  var validatedDiscardedInputUnits: Int? {
+    guard let discardedInputUnits, discardedInputUnits > 0,
+      validatedTextUTF16 != nil, let inputField, inputField.index >= 0 else { return nil }
+    return discardedInputUnits
+  }
   var validatedInputPosition: TypingReplayInputPosition? {
     guard kind == .insert, !inputUnits.isEmpty,
       let inputField, inputField.index >= 0,
@@ -3133,7 +3142,8 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
     inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
-    textUTF16: [UInt16]? = nil, inputPosition: TypingReplayInputPosition? = nil
+    textUTF16: [UInt16]? = nil, inputPosition: TypingReplayInputPosition? = nil,
+    discardedInputUnits: Int? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3148,6 +3158,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.inputCorrectness = inputCorrectness
     self.textUTF16 = textUTF16
     self.inputPosition = inputPosition
+    self.discardedInputUnits = discardedInputUnits
   }
 
   init(
@@ -3155,18 +3166,18 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
     inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
-    inputPosition: TypingReplayInputPosition? = nil
+    inputPosition: TypingReplayInputPosition? = nil, discardedInputUnits: Int? = nil
   ) {
     self.init(offset: offset, kind: kind, text: String(decoding: units, as: UTF16.self),
       forceError: forceError, automatic: automatic, commitsWord: commitsWord,
       wordDeletionCount: wordDeletionCount, characterDeletionCount: characterDeletionCount,
       inputStopped: inputStopped, inputField: inputField, inputCorrectness: inputCorrectness,
-      textUTF16: units, inputPosition: inputPosition)
+      textUTF16: units, inputPosition: inputPosition, discardedInputUnits: discardedInputUnits)
   }
 
   private enum CodingKeys: String, CodingKey {
     case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount, characterDeletionCount
-    case inputStopped, inputField, inputCorrectness, textUTF16, inputPosition
+    case inputStopped, inputField, inputCorrectness, textUTF16, inputPosition, discardedInputUnits
   }
 
   init(from decoder: Decoder) throws {
@@ -3184,6 +3195,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     textUTF16 = try values.decodeIfPresent([UInt16].self, forKey: .textUTF16)
     inputCorrectness = try values.decodeIfPresent([Bool].self, forKey: .inputCorrectness)
     inputPosition = try values.decodeIfPresent(TypingReplayInputPosition.self, forKey: .inputPosition)
+    discardedInputUnits = try values.decodeIfPresent(Int.self, forKey: .discardedInputUnits)
     guard textUTF16 == nil || validatedTextUTF16 != nil else {
       throw DecodingError.dataCorruptedError(forKey: .textUTF16, in: values,
         debugDescription: "Raw insert units must be nonempty and project to text; deletion payloads must be empty.")
@@ -3195,6 +3207,10 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     guard inputPosition == nil || validatedInputPosition != nil else {
       throw DecodingError.dataCorruptedError(forKey: .inputPosition, in: values,
         debugDescription: "A validation position requires a nonempty insertion and a recorded field.")
+    }
+    guard discardedInputUnits == nil || validatedDiscardedInputUnits != nil else {
+      throw DecodingError.dataCorruptedError(forKey: .discardedInputUnits, in: values,
+        debugDescription: "A contraction requires a positive unit count, raw action and recorded field.")
     }
   }
 }
@@ -3334,6 +3350,7 @@ enum TypingReplay {
 
   private static func rawTypedUTF16(events: [TypingReplayEvent], through elapsed: TimeInterval) -> [UInt16] {
     chronologicalEvents(events).filter { $0.offset <= elapsed }.reduce(into: []) { typed, event in
+      if let discarded = event.validatedDiscardedInputUnits { typed.removeLast(min(discarded, typed.count)) }
       switch event.kind {
       case .insert: if !event.isStoppedInsertion { typed.append(contentsOf: event.inputUnits) }
       case .delete:
@@ -4147,6 +4164,10 @@ struct TypingSession {
   private var currentInputUnit: UInt16?
   private var latestReplayInputUnits: [UInt16]?
   private var latestReplayInputPosition: TypingReplayInputPosition?
+  private var latestNoSpaceAttempt: [UInt16]?
+  private var latestNoSpaceAttemptFieldIndex: Int?
+  private var latestNoSpaceFinishDecision = false
+  private var latestReplayDiscardedUnits: Int?
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
   private var promptWordCount: Int
@@ -5188,7 +5209,7 @@ struct TypingSession {
 
   var completedWordCount: Int {
     if let acceptedUnits {
-      let committed = acceptedUnits.fieldIndex
+      let committed = acceptedUnits.completedFieldCount
       if unitTargets.noSpace { return committed + (outcome == .completed && noSpaceTerminalFieldMatches ? 1 : 0) }
       if outcome == .completed, isAtFinalBlankTarget,
         retainedWordSeparatorTypedIndices.contains(typedGraphemeCount - 1)
@@ -5552,6 +5573,7 @@ struct TypingSession {
   }
 
   private var canDeleteBackward: Bool {
+    if let acceptedUnits, acceptedUnits.terminalElementCleared, acceptedUnits.fieldIndex == 0 { return false }
     if configuration.rules.confidenceMode == .maximum { return false }
     if configuration.rules.freedomMode { return true }
     if acceptedUnits == nil, let word = noSpaceCommittedWordIndex, let range = noSpaceWordRange(for: word) {
@@ -5683,6 +5705,9 @@ struct TypingSession {
     _ character: Character, forceError: Bool, at date: Date, evaluatesTerminalRules: Bool
   ) -> Bool {
     latestReplayInputPosition = nil
+    latestNoSpaceAttempt = nil
+    latestNoSpaceAttemptFieldIndex = nil
+    latestNoSpaceFinishDecision = false
     // `forceError` also supports deterministic engine tests that intentionally
     // retain a wrong character. Only the physical opposite-Shift path has the
     // reference behavior of immediately rejecting its text.
@@ -5719,7 +5744,7 @@ struct TypingSession {
     if unitTargets.noSpace, let acceptedUnits,
       unitTargets.fields.indices.contains(acceptedUnits.fieldIndex)
     {
-      latestReplayInputPosition = .init(charIndex: acceptedUnits.activeCount,
+      latestReplayInputPosition = .init(charIndex: acceptedUnits.validationCount,
         lastWord: acceptedUnits.fieldIndex == unitTargets.fields.count - 1)
     }
     if isAtEmptyNoSpaceWord, !unitTargets.noSpace {
@@ -5732,6 +5757,20 @@ struct TypingSession {
       expected: currentTargetIndex < promptCharacters.count ? promptCharacters[currentTargetIndex] : nil)
     if let unit = currentInputUnit, !(0xD800...0xDFFF).contains(unit) {
       currentInputUnit = String(inputCharacter).utf16.first
+    }
+    if unitTargets.noSpace, let acceptedUnits {
+      latestNoSpaceAttemptFieldIndex = acceptedUnits.fieldIndex
+      latestNoSpaceAttempt = acceptedUnits.field(acceptedUnits.fieldIndex)
+        + [currentInputUnit ?? String(inputCharacter).utf16.first!]
+      let stopped = rejectsOppositeShiftInput || configuration.rules.stopOnErrorMode == .letter
+        && !inputAccuracyUnits(for: inputCharacter, targetIndex: currentTargetIndex,
+          forceError: forceError).lastCorrect
+      let attempted = latestNoSpaceAttempt!
+      let target = unitTargets.field(acceptedUnits.fieldIndex)
+      let quick = configuration.rules.quickEnd && configuration.rules.stopOnErrorMode == .off
+        && !configuration.rules.deleteOnErrorMode.isEnabled && attempted.count == target.count
+      latestNoSpaceFinishDecision = attempted == target || quick || !stopped
+        && shouldCommitNoSpaceUnit(currentInputUnit ?? String(inputCharacter).utf16.first!)
     }
     let commitsCurrentWord = isPromptWordSeparator(inputCharacter) && !inputWordIsEmpty
     let retainsLeadingSeparator = isPromptWordSeparator(inputCharacter) && inputWordIsEmpty
@@ -6067,7 +6106,7 @@ struct TypingSession {
 
   private func inputAccuracyTarget(at targetIndex: Int) -> (units: [UInt16], position: Int) {
     if let acceptedUnits {
-      return (unitTargets.field(acceptedUnits.fieldIndex), acceptedUnits.activeCount)
+      return (unitTargets.field(acceptedUnits.fieldIndex), acceptedUnits.validationCount)
     }
     guard promptCharacters.indices.contains(targetIndex) else { return ([], 0) }
     let target: String
@@ -6110,7 +6149,7 @@ struct TypingSession {
 
   private var currentWordIsCorrect: Bool {
     if let acceptedUnits {
-      let index = acceptedUnits.fieldIndex - (acceptedUnits.lastCommits ? 1 : 0)
+      let index = acceptedUnits.lastCommits ? acceptedUnits.submittedFieldIndex : acceptedUnits.fieldIndex
       guard unitTargets.fields.indices.contains(index) else { return false }
       return acceptedUnits.field(index, withoutCommit: true) == unitTargets.field(index, withoutCommit: true)
         && !acceptedUnits.entries[acceptedUnits.range(index)].contains(where: \.forced)
@@ -6221,6 +6260,7 @@ struct TypingSession {
   )
   {
     guard let startedAt else { return }
+    if kind == .insert, inputStopped { discardTerminalElementIfNeeded() }
     let field = replayInputField(kind: kind, inputStopped: inputStopped)
     // A converted session preserves actual units, including lone surrogates;
     // no-space/legacy primitives retain their distinct archive contracts.
@@ -6239,7 +6279,9 @@ struct TypingSession {
           ? false : nil, inputStopped: inputStopped ? true : nil,
         inputField: recordedField, inputCorrectness: kind == .insert ? latestInputCorrectness : nil,
         textUTF16: raw ? (kind == .insert ? latestReplayInputUnits ?? Array(text.utf16) : []) : nil,
-        inputPosition: kind == .insert ? latestReplayInputPosition : nil))
+        inputPosition: kind == .insert ? latestReplayInputPosition : nil,
+        discardedInputUnits: latestReplayDiscardedUnits))
+    latestReplayDiscardedUnits = nil
   }
 
   private func replayInputField(
@@ -6247,7 +6289,7 @@ struct TypingSession {
   ) -> TypingReplayInputField? {
     if let acceptedUnits {
       let submitted = kind == .insert && !inputStopped && acceptedUnits.lastCommits
-      let index = acceptedUnits.fieldIndex - (submitted ? 1 : 0)
+      let index = submitted ? acceptedUnits.submittedFieldIndex : acceptedUnits.fieldIndex
       return .init(index: index, units: acceptedUnits.field(index))
     }
     if tracksNoSpaceWordBursts {
@@ -6282,13 +6324,13 @@ struct TypingSession {
         characterDeletionCount: !wholeWord && index == start ? replayEvents.count - start : nil,
         inputStopped: event.inputStopped, inputField: event.inputField,
         inputCorrectness: event.inputCorrectness, textUTF16: event.textUTF16,
-        inputPosition: event.inputPosition)
+        inputPosition: event.inputPosition, discardedInputUnits: event.discardedInputUnits)
     }
   }
 
   private func errorsInCurrentWord() -> Int {
     if let acceptedUnits, acceptedUnits.lastCommits {
-      let index = acceptedUnits.fieldIndex - 1
+      let index = acceptedUnits.submittedFieldIndex
       let input = acceptedUnits.field(index, withoutCommit: true)
       let target = unitTargets.field(index, withoutCommit: true)
       return input.enumerated().reduce(0) { total, part in
@@ -6336,7 +6378,7 @@ struct TypingSession {
   private mutating func recordWordBurstIfCommitted() {
     guard lastInputCommitsWord else { return }
     if let acceptedUnits {
-      if let burst = acceptedUnits.burst(acceptedUnits.fieldIndex - 1) { committedWordBursts.append(burst) }
+      if let burst = acceptedUnits.burst(acceptedUnits.submittedFieldIndex) { committedWordBursts.append(burst) }
       return
     }
     if !typedNeedsFullSegmentation {
@@ -6384,7 +6426,7 @@ struct TypingSession {
   private mutating func recordZenWordBurstIfCommitted(after character: Character) {
     guard isZenWordCommit(character) else { return }
     if let acceptedUnits {
-      if let burst = acceptedUnits.burst(acceptedUnits.fieldIndex - 1) { committedWordBursts.append(burst) }
+      if let burst = acceptedUnits.burst(acceptedUnits.submittedFieldIndex) { committedWordBursts.append(burst) }
       return
     }
     let characters = Array(typed)
@@ -6399,6 +6441,7 @@ struct TypingSession {
   }
 
   private func shouldFailMinimumWordBurst(after character: Character) -> Bool {
+    if acceptedUnits?.terminalElementCleared == true { return false }
     let minimum = configuration.rules.minimumWordBurstWpm
     let mode = configuration.rules.minimumWordBurstMode
     let commitsWord: Bool
@@ -6429,8 +6472,8 @@ struct TypingSession {
 
   private var lastCommittedBurstWordLength: Int? {
     if let acceptedUnits, acceptedUnits.lastCommits {
-      return configuration.mode == .zen ? acceptedUnits.range(acceptedUnits.fieldIndex - 1).count
-        : unitTargets.field(acceptedUnits.fieldIndex - 1, withoutCommit: true).count
+      return configuration.mode == .zen ? acceptedUnits.range(acceptedUnits.submittedFieldIndex).count
+        : unitTargets.field(acceptedUnits.submittedFieldIndex, withoutCommit: true).count
     }
     if configuration.mode == .zen {
       let characters = Array(typed)
@@ -6468,7 +6511,7 @@ struct TypingSession {
   private var noSpaceCommittedWordIndex: Int? {
     guard tracksNoSpaceWordBursts else { return nil }
     if unitTargets.noSpace, let acceptedUnits {
-      return acceptedUnits.lastCommits ? acceptedUnits.fieldIndex - 1 : nil
+      return acceptedUnits.lastCommits ? acceptedUnits.submittedFieldIndex : nil
     }
     if isAtEmptyNoSpaceWord, let firstEmptyNoSpaceWordIndex, let boundary = emptyNoSpaceWordBoundary {
       return typedGraphemeCount == boundary && firstEmptyNoSpaceWordIndex > 0
@@ -6604,7 +6647,8 @@ struct TypingSession {
   /// custom text into a quadratic scan on each separator.
   private func inputWordText(omittingLastCommit: Bool = false) -> String {
     if let acceptedUnits {
-      let index = acceptedUnits.fieldIndex - (omittingLastCommit && acceptedUnits.lastCommits ? 1 : 0)
+      let index = omittingLastCommit && acceptedUnits.lastCommits
+        ? acceptedUnits.submittedFieldIndex : acceptedUnits.fieldIndex
       return String(decoding: acceptedUnits.field(index, withoutCommit: omittingLastCommit), as: UTF16.self)
     }
     let skipped = omittingLastCommit ? 1 : 0
@@ -6696,7 +6740,7 @@ struct TypingSession {
         unitTargets.fields.indices.contains(acceptedUnits.fieldIndex)
       else { return nil }
       let range = unitTargets.fields[acceptedUnits.fieldIndex]
-      let position = range.lowerBound + acceptedUnits.activeCount
+      let position = range.lowerBound + acceptedUnits.validationCount
       guard position < range.upperBound, position < unitTargets.units.count,
         unitTargets.units[position] != 32, unitTargets.units[position] != 10
       else { return nil }
@@ -6836,13 +6880,18 @@ struct TypingSession {
     _ character: Character, targetIndex: Int?, forceError: Bool,
     countsAsExtraError: Bool, at date: Date
   ) {
+    let unit = currentInputUnit ?? String(character).utf16.first!
+    let commits = unitTargets.noSpace ? shouldCommitNoSpaceUnit(unit) : nil
+    discardTerminalElementIfNeeded()
     let oldTail = String(typed.suffix(2))
     let start = acceptedUnits!.entries.count - oldTail.utf16.count
     let retained = retainedWordSeparatorTypedIndices.contains(typedGraphemeCount)
-    let unit = currentInputUnit ?? String(character).utf16.first!
+    let advances = !unitTargets.noSpace || acceptedUnits!.fieldIndex < unitTargets.fields.count - 1
+      || usesIncrementalPromptExtension
     acceptedUnits!.append(.init(unit: unit, target: targetIndex, date: date,
       forced: forceError, extra: countsAsExtraError,
-      commits: unitTargets.noSpace ? shouldCommitNoSpaceUnit(unit) : (unit == 32 || unit == 10) && !retained))
+      commits: commits ?? ((unit == 32 || unit == 10) && !retained)),
+      advances: advances)
     if forceError, let targetIndex { forcedErrorIndices.insert(targetIndex) }
     projectUnitTail(oldTail: oldTail, unitStart: start)
   }
@@ -6850,9 +6899,9 @@ struct TypingSession {
   private func shouldCommitNoSpaceUnit(_ unit: UInt16) -> Bool {
     guard let acceptedUnits, unitTargets.fields.indices.contains(acceptedUnits.fieldIndex) else { return false }
     let target = unitTargets.field(acceptedUnits.fieldIndex)
-    let attempted = acceptedUnits.field(acceptedUnits.fieldIndex) + [unit]
+    let attempted = latestNoSpaceAttempt ?? acceptedUnits.field(acceptedUnits.fieldIndex) + [unit]
     guard unit == 10 || attempted.count == target.count else { return false }
-    if unit == 10, acceptedUnits.activeCount == 0,
+    if unit == 10, attempted.count == 1,
       configuration.rules.strictSpace || configuration.difficulty != .normal { return false }
     if configuration.rules.stopOnErrorMode != .off || configuration.rules.deleteOnErrorMode.isEnabled
       || configuration.modifiers.contains(.correctBeforeAdvance)
@@ -6860,7 +6909,24 @@ struct TypingSession {
     return true
   }
 
+  private mutating func discardTerminalElementIfNeeded(retainsHistory: Bool = false) {
+    guard let buffer = acceptedUnits, buffer.terminalElementCleared else { return }
+    let range = buffer.range(buffer.fieldIndex)
+    let oldTail = String(typed.suffix(min(typedGraphemeCount, range.count + 2)))
+    let start = buffer.entries.count - oldTail.utf16.count
+    let forced = Set(buffer.entries[range].compactMap { $0.forced ? $0.target : nil })
+    let count = acceptedUnits!.discardClearedTerminalField(retainsHistory: retainsHistory)
+    for target in forced where !acceptedUnits!.entries.contains(where: { $0.target == target && $0.forced }) {
+      forcedErrorIndices.remove(target)
+    }
+    if count > 0 { latestReplayDiscardedUnits = (latestReplayDiscardedUnits ?? 0) + count }
+    projectUnitTail(oldTail: oldTail, unitStart: start)
+  }
+
   private mutating func removeAcceptedUnit() {
+    if acceptedUnits?.terminalElementCleared == true {
+      discardTerminalElementIfNeeded(retainsHistory: true)
+    }
     guard !acceptedUnits!.entries.isEmpty else { return }
     let oldTail = String(typed.suffix(2))
     let start = acceptedUnits!.entries.count - oldTail.utf16.count
@@ -6953,8 +7019,8 @@ struct TypingSession {
     if unitTargets.noSpace, let acceptedUnits {
       let unit = currentInputUnit ?? String(character).utf16.first!
       let target = unitTargets.field(acceptedUnits.fieldIndex)
-      let attempted = acceptedUnits.field(acceptedUnits.fieldIndex) + [unit]
-      if unit == 10, acceptedUnits.activeCount == 0 { return false }
+      let attempted = latestNoSpaceAttempt ?? acceptedUnits.field(acceptedUnits.fieldIndex) + [unit]
+      if unit == 10, attempted.count == 1 { return false }
       return (unit == 10 || attempted.count == target.count) && attempted != target
     }
     if tracksNoSpaceWordBursts, let range = activeNoSpaceWordRange,
@@ -6983,7 +7049,7 @@ struct TypingSession {
   /// input errors rather than historical attempts: a corrected word is valid.
   private var committedNoSpaceWordHasError: Bool {
     if unitTargets.noSpace, let acceptedUnits, acceptedUnits.lastCommits {
-      let index = acceptedUnits.fieldIndex - 1
+      let index = acceptedUnits.submittedFieldIndex
       return acceptedUnits.field(index) != unitTargets.field(index)
     }
     guard let wordIndex = noSpaceCommittedWordIndex,
@@ -7240,6 +7306,31 @@ struct TypingSession {
 
   private mutating func finishIfNeeded(at date: Date) {
     guard !isFinished, !isAtEmptyNoSpaceWord else { return }
+    if unitTargets.noSpace {
+      // Navigation may extend the catalog. Completion compares the captured
+      // input field against that post-navigation catalog, unlike `lastWord`
+      // in the event, which describes the pre-navigation catalog. Repeating
+      // external previews may oversupply it: honor the finite word budget.
+      let wordBudget = configuration.mode == .words
+        || configuration.mode == .custom && configuration.customTextCompletion == .words
+          && customSectionWordStream == nil ? configuration.wordLimit : nil
+      let finalFieldCount = wordBudget.flatMap { $0 > 0 ? min($0, unitTargets.fields.count) : nil }
+        ?? unitTargets.fields.count
+      guard latestNoSpaceFinishDecision, let attemptedField = latestNoSpaceAttemptFieldIndex,
+        attemptedField >= finalFieldCount - 1 else { return }
+      switch configuration.mode {
+      case .time, .zen: return
+      case .words:
+        if reachedConfiguredWordLimit || !usesIncrementalPromptExtension { complete(at: date) }
+      case .custom:
+        guard configuration.customTextCompletion != .time, !configuration.isInfinite else { return }
+        if !usesIncrementalPromptExtension || configuration.customTextCompletion == .words
+          && customSectionWordStream == nil && reachedConfiguredWordLimit { complete(at: date) }
+      case .quote:
+        if !usesIncrementalPromptExtension { complete(at: date) }
+      }
+      return
+    }
     switch configuration.mode {
     case .words:
       if hasNoSpaceWordSegmentation || !usesWordCommitInput
@@ -7528,7 +7619,7 @@ struct TypingSession {
   }
 
   private var reachedInputTargetEnd: Bool {
-    if unitTargets.noSpace { return (acceptedUnits?.fieldIndex ?? 0) >= unitTargets.fields.count }
+    if unitTargets.noSpace { return (acceptedUnits?.completedFieldCount ?? 0) >= unitTargets.fields.count }
     return nextTargetIndex >= promptCharacters.count
   }
 

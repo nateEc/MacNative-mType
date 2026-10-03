@@ -68,7 +68,7 @@ final class TargetWordDirectoryTests: XCTestCase {
     let result = try noSpaceResult()
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 16)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for restored in [result, archive.results[0], try XCTUnwrap(TestResultRecord(result: result).portableResult)] {
       XCTAssertEqual(restored.targetWordDirectory?.words, ["ab", "cd"])
       XCTAssertEqual(restored.wpm, 12)

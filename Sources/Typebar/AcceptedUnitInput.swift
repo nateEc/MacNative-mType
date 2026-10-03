@@ -14,14 +14,36 @@ struct AcceptedUnitInput {
 
   private(set) var entries: [Entry] = []
   private(set) var starts = [0]
+  /// Navigation cleared the element, but the last event still owns this
+  /// finite field's validation snapshot until another input event replaces it.
+  private(set) var terminalElementCleared = false
+  private var retiredFields: [Int: [Entry]] = [:]
   var fieldIndex: Int { starts.count - 1 }
-  var activeCount: Int { entries.count - starts.last! }
+  var activeCount: Int { terminalElementCleared ? 0 : entries.count - starts.last! }
+  var validationCount: Int { entries.count - starts.last! }
   var lastCommits: Bool { entries.last?.commits == true }
+  var submittedFieldIndex: Int { fieldIndex - (terminalElementCleared ? 0 : 1) }
+  var completedFieldCount: Int { fieldIndex + (terminalElementCleared ? 1 : 0) }
   var units: [UInt16] { entries.map(\.unit) }
 
-  mutating func append(_ entry: Entry) {
+  mutating func append(_ entry: Entry, advances: Bool = true) {
+    retiredFields[fieldIndex] = nil
     entries.append(entry)
-    if entry.commits { starts.append(entries.count) }
+    if entry.commits {
+      if advances { starts.append(entries.count) }
+      else { terminalElementCleared = true }
+    }
+  }
+
+  /// The next logged action replaces the cleared element, not its snapshot.
+  /// Manual regression retains the abandoned field's last recorded history.
+  mutating func discardClearedTerminalField(retainsHistory: Bool = false) -> Int {
+    guard terminalElementCleared else { return 0 }
+    let range = range(fieldIndex)
+    if retainsHistory { retiredFields[fieldIndex] = Array(entries[range]) }
+    entries.removeLast(range.count)
+    terminalElementCleared = false
+    return range.count
   }
 
   @discardableResult
@@ -41,7 +63,8 @@ struct AcceptedUnitInput {
   }
 
   func field(_ index: Int, withoutCommit: Bool = false) -> [UInt16] {
-    entries[range(index, withoutCommit: withoutCommit)].map(\.unit)
+    if index > fieldIndex, let retired = retiredFields[index] { return retired.map(\.unit) }
+    return entries[range(index, withoutCommit: withoutCommit)].map(\.unit)
   }
 
   func burst(_ index: Int) -> Int? {

@@ -25,7 +25,7 @@ final class InputPositionArchiveTests: XCTestCase {
     let result = try currentResult()
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 16)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for restored in [archive.results[0], try XCTUnwrap(TestResultRecord(result: result).portableResult)] {
       XCTAssertEqual(restored, result)
       XCTAssertEqual(restored.replayEvents.map { $0.inputPosition?.charIndex }, [0,1,nil])
