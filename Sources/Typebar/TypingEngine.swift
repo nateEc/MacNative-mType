@@ -4214,6 +4214,7 @@ struct TypingSession {
     didSet { refreshUnitTargets() }
   }
   private var unitTargets = UnitInputTargets("")
+  private var promptSeparatorUnitCount = 0
   private var acceptedUnits: AcceptedUnitInput?
   private var currentInputUnit: UInt16?
   private var latestReplayInputUnits: [UInt16]?
@@ -4398,6 +4399,9 @@ struct TypingSession {
     self.prompt = prompt
     self.promptCharacters = Array(prompt)
     self.unitTargets = UnitInputTargets(prompt)
+    self.promptSeparatorUnitCount = prompt.utf8.reduce(into: 0) { count, unit in
+      if unit == 32 || unit == 10 { count += 1 }
+    }
     let wordProgress = Self.wordProgress(configuration.wordLimit, in: self.promptCharacters)
     self.requiredWordStartIndex = wordProgress.startIndex
     self.promptWordCount = wordProgress.count
@@ -4435,7 +4439,8 @@ struct TypingSession {
 
   private mutating func refreshUnitTargets() {
     unitTargets = UnitInputTargets(prompt, buildsASCIICatalog: acceptedUnits != nil,
-      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil)
+      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil,
+      asciiSeparatorCount: promptSeparatorUnitCount)
   }
 
   /// Restarts from the original source: owned quotes regenerate sampled targets,
@@ -4853,6 +4858,10 @@ struct TypingSession {
       return recordedFieldStats.counts(targets: unitTargets,
         creditsActivePrefix: countPartialLastWord).credit
     }
+    if isFinished, hasKnownOrdinarySourceFields {
+      return recordedFieldStats.counts(targets: sourceStatsTargets,
+        creditsActivePrefix: countPartialLastWord).credit
+    }
     if let acceptedUnits {
       if configuration.mode == .zen {
         return .init(characters: typedGraphemeCount, inputUnits: acceptedUnits.entries.count)
@@ -4957,9 +4966,24 @@ struct TypingSession {
       }
     }
     return .init(matched: matched, incorrect: incorrect, extra: extra, missed: missed,
-      sourceUnits: unitTargets.noSpace
-        ? recordedFieldStats.counts(targets: unitTargets,
+      sourceUnits: unitTargets.noSpace || hasKnownOrdinarySourceFields
+        ? recordedFieldStats.counts(targets: sourceStatsTargets,
           creditsActivePrefix: finishedAt == nil || resultCreditsPartialLastWord).unitStats : nil)
+  }
+
+  private var hasKnownOrdinarySourceFields: Bool {
+    hasOrdinarySourceFields && !unitTargets.requiresKoreanDisassembly
+  }
+
+  private var hasOrdinarySourceFields: Bool {
+    configuration.mode != .zen && usesWordCommitInput && !prompt.isEmpty
+      && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+  }
+
+  /// ASCII keeps its fast insertion path. Only result/stat readers need the
+  /// complete unit catalog, not every keystroke or live speed update.
+  private var sourceStatsTargets: UnitInputTargets {
+    unitTargets.fields.isEmpty ? .init(prompt, buildsASCIICatalog: true) : unitTargets
   }
 
   var accuracy: Int {
@@ -5005,7 +5029,8 @@ struct TypingSession {
   }
 
   private var rawSpeedInputUnitCount: Int {
-    unitTargets.noSpace ? recordedFieldStats.counts(targets: unitTargets, creditsActivePrefix: false).rawUnits
+    unitTargets.noSpace || isFinished && hasKnownOrdinarySourceFields
+      ? recordedFieldStats.counts(targets: sourceStatsTargets, creditsActivePrefix: false).rawUnits
       : typed.utf16.count
   }
 
@@ -5826,6 +5851,14 @@ struct TypingSession {
     {
       latestReplayInputPosition = .init(charIndex: acceptedUnits.validationCount,
         lastWord: acceptedUnits.fieldIndex == unitTargets.fields.count - 1)
+    } else if usesWordCommitInput, !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers),
+      !prompt.isEmpty {
+      let fieldIndex = acceptedUnits?.fieldIndex ?? replayCommittedSeparatorCount
+      if fieldIndex < unitTargets.sourceFieldCount {
+        latestReplayInputPosition = .init(
+          charIndex: acceptedUnits?.validationCount ?? inputWordText().utf16.count,
+          lastWord: fieldIndex == unitTargets.sourceFieldCount - 1)
+      }
     }
     if isAtEmptyNoSpaceWord, !unitTargets.noSpace {
       return insertIntoEmptyNoSpaceWord(character, rejectsOppositeShiftInput: rejectsOppositeShiftInput,
@@ -5835,6 +5868,15 @@ struct TypingSession {
     let inputCharacter = normalizedInputCharacter(
       character,
       expected: currentTargetIndex < promptCharacters.count ? promptCharacters[currentTargetIndex] : nil)
+    // Finite terminal navigation clears the element without advancing the
+    // source field. Convert ASCII only at that edge, not on every insertion.
+    // Check the cheap candidate first: a finite stream's exhaustion reader
+    // counts its whole source and must not run for every ordinary character.
+    if acceptedUnits == nil, hasOrdinarySourceFields, inputCharacter == " ", !inputWordIsEmpty,
+      replayCommittedSeparatorCount == unitTargets.sourceFieldCount - 1,
+      !usesIncrementalPromptExtension {
+      beginUnitInput()
+    }
     if let unit = currentInputUnit, !(0xD800...0xDFFF).contains(unit) {
       currentInputUnit = String(inputCharacter).utf16.first
     }
@@ -6362,7 +6404,7 @@ struct TypingSession {
         inputPosition: kind == .insert ? latestReplayInputPosition : nil,
         discardedInputUnits: latestReplayDiscardedUnits,
         clearedNextWord: latestReplayClearedNextWord ? true : nil))
-    if unitTargets.noSpace || configuration.mode == .zen {
+    if unitTargets.noSpace || configuration.mode == .zen || hasOrdinarySourceFields {
       recordedFieldStats.record(replayEvents.last!)
     }
     latestReplayDiscardedUnits = nil
@@ -6808,6 +6850,9 @@ struct TypingSession {
   /// its original one-to-one mapping, including no-space and code prompts.
   private var nextTargetIndex: Int {
     if let acceptedUnits {
+      if hasOrdinarySourceFields, acceptedUnits.terminalElementCleared {
+        return promptCharacters.count
+      }
       return unitTargets.cursor(field: acceptedUnits.fieldIndex, position: acceptedUnits.activeCount,
         endGlyph: promptCharacters.count)
     }
@@ -6990,7 +7035,8 @@ struct TypingSession {
     let oldTail = String(typed.suffix(2))
     let start = acceptedUnits!.entries.count - oldTail.utf16.count
     let retained = retainedWordSeparatorTypedIndices.contains(typedGraphemeCount)
-    let advances = !unitTargets.noSpace || acceptedUnits!.fieldIndex < unitTargets.fields.count - 1
+    let advances = !(unitTargets.noSpace || hasOrdinarySourceFields && unit == 32)
+      || acceptedUnits!.fieldIndex < unitTargets.fields.count - 1
       || usesIncrementalPromptExtension
     acceptedUnits!.append(.init(unit: unit, target: targetIndex, date: date,
       forced: forceError, extra: countsAsExtraError,
@@ -7676,6 +7722,11 @@ struct TypingSession {
       followsStableSeparator = false
     }
     let previousCount = promptCharacters.count
+    // The prompt's only post-initialization mutation appends a chunk. Count
+    // its literal separators once, not the entire growing ASCII prompt.
+    promptSeparatorUnitCount += chunk.utf8.reduce(into: 0) { count, unit in
+      if unit == 32 || unit == 10 { count += 1 }
+    }
     prompt += chunk
     if startsWithSeparator || followsStableSeparator {
       // An explicit word separator breaks the grapheme boundary with the

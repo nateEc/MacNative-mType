@@ -122,7 +122,16 @@ final class StoppedInputHistoryTests: XCTestCase {
   }
 
   func testArchiveConstructionCannotMislabelStoppedTapeAsLegacyVersion() throws {
-    let result = try completedStoppedResult()
+    // Owned version-13 fixture; a current session now also captures source
+    // classification/position and must not be relabeled as an older producer.
+    let result = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(1), typedCharacterCount: 2,
+      correctCharacterCount: 2, errorCount: 1, wpm: 24, rawWpm: 24, accuracy: 67, prompt: "ab",
+      replayEvents: [
+        .init(offset: 0, kind: .insert, text: "a", inputField: .init(index: 0, value: "a"), inputCorrectness: [true]),
+        .init(offset: 0.2, kind: .insert, text: "x", inputStopped: true,
+          inputField: .init(index: 0, value: "a"), inputCorrectness: [false]),
+        .init(offset: 1, kind: .insert, text: "b", inputField: .init(index: 0, value: "ab"), inputCorrectness: [true])])
     for version in 1...10 {
       let archive = TypebarArchive(version: version, exportedAt: start, settings: .init(),
         results: [result], presets: [])

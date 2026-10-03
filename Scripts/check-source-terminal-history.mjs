@@ -101,3 +101,28 @@ for(const [events,count] of zenCases){
  assert.deepEqual(stats.getChars(zenLog(events)),{allCorrect:count,correctWord:count,incorrect:0,extra:0,missed:0});
 }
 console.log('10 owned target-free Zen getChars fixtures passed (same 4 complete actual modules; Korean status false, no handler/browser/IME claim).');
+
+const ordinaryCases=[
+ [[event(0,0,'ax ','insertText',' ',{commitsWord:true}),event(1000,1,'cd')],['ab ','cd'],[3,2,1,1,0]],
+ [[event(0,0,'ab ','insertText',' ',{lastWord:true,commitsWord:true,correct:false})],['ab'],[2,2,0,0,0]],
+ [[event(0,0,'ax ','insertText',' ',{lastWord:true,commitsWord:true,correct:false})],['ab'],[1,0,1,0,0]],
+ [[event(0,0,'a ','insertText',' ',{commitsWord:true,correct:false}),event(1000,1,'ef')],['abcd ','ef'],[3,2,1,0,3]],
+ [[event(0,0,'a','insertText',' ',{lastWord:true,inputStopped:true,correct:false})],['ab'],[1,0,0,0,1]],
+ [[event(0,0,'ax ','insertText',' ',{lastWord:true,correct:false})],['ab'],[1,0,1,1,0]],
+ [[event(0,0,'🙂 ','insertText',' ',{commitsWord:true}),event(1000,1,'e\u0301')],['🙂 ','e\u0301'],[5,5,0,0,0]],
+ [[event(0,0,'ab\n','insertText','\n',{commitsWord:true}),event(1000,1,'\n','insertText','\n',{commitsWord:true}),event(1500,2,'cd')],['ab\n','\n','cd'],[6,6,0,0,0]],
+ [[event(0,0,'ab ','insertText',' ',{lastWord:true,commitsWord:true,correct:false}),event(1000,0,'x')],['ab'],[0,0,1,0,0]],
+ [[event(0,0,'a\ud83d\uFEFF ','insertText',' ',{lastWord:true,commitsWord:true,correct:false})],['a\ud83d'],[2,2,0,0,0]],
+ [[event(0,0,'a\u0085 ','insertText',' ',{lastWord:true,commitsWord:true,correct:false})],['a'],[1,0,0,1,0]],
+];
+for(const [events,targets,expected] of ordinaryCases){
+ const result=stats.getChars(log(events,targets));
+ assert.deepEqual([result.allCorrect,result.correctWord,result.incorrect,result.extra,result.missed],expected);
+}
+console.log('11 owned ordinary getChars fixtures passed (same 4 actual modules; includes stopped SPACE active inference and source trim, no browser/IME/Korean claim).');
+const terminalSpace=log([event(0,0,'ab ','insertText',' ',{lastWord:true,commitsWord:true,correct:false})],['ab']);
+terminalSpace.context.bailedOut=false;
+const terminalChars=stats.getChars(terminalSpace);
+assert.equal(modules.get('utils/numbers').namespace.calculateWpm(terminalChars.correctWord,1),24);
+assert.equal(modules.get('utils/numbers').namespace.calculateWpm(terminalChars.allCorrect+terminalChars.incorrect+terminalChars.extra,1),24);
+console.log('Ordinary terminal SPACE WPM/Raw numerators passed actual getChars + calculateWpm (buildCompletedEvent mapping read, full lifecycle not executed).');

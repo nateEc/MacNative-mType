@@ -2057,7 +2057,8 @@ final class TypingEngineTests: XCTestCase {
     let earlyResult = try XCTUnwrap(earlyCommit.result(at: start.addingTimeInterval(1)))
     XCTAssertEqual(
       earlyResult.characterStats,
-      .init(matched: 2, incorrect: 1, extra: 0, missed: 1))
+      .init(matched: 2, incorrect: 1, extra: 0, missed: 1,
+        sourceUnits: .classify(input: Array("ca ".utf16), target: Array("cat ".utf16), creditsPartial: false)))
     XCTAssertEqual(earlyResult.typedCharacterCount, 3)
     XCTAssertEqual(earlyResult.correctCharacterCount, 0)
     XCTAssertEqual(earlyResult.errorCount, 1)
@@ -2067,7 +2068,8 @@ final class TypingEngineTests: XCTestCase {
     extraInput.tick(at: start.addingTimeInterval(1))
     XCTAssertEqual(
       try XCTUnwrap(extraInput.result(at: start.addingTimeInterval(1))).characterStats,
-      .init(matched: 4, incorrect: 0, extra: 1, missed: 0))
+      .init(matched: 4, incorrect: 0, extra: 1, missed: 0,
+        sourceUnits: .classify(input: Array("cats ".utf16), target: Array("cat ".utf16), creditsPartial: false)))
 
     var forcedError = TypingSession(configuration: .timed(seconds: 1), prompt: "cat dog")
     forcedError.insert("c", forceError: true, at: start)
@@ -2075,7 +2077,8 @@ final class TypingEngineTests: XCTestCase {
     forcedError.tick(at: start.addingTimeInterval(1))
     XCTAssertEqual(
       try XCTUnwrap(forcedError.result(at: start.addingTimeInterval(1))).characterStats,
-      .init(matched: 3, incorrect: 1, extra: 0, missed: 0))
+      .init(matched: 3, incorrect: 1, extra: 0, missed: 0,
+        sourceUnits: .classify(input: Array("cat ".utf16), target: Array("cat ".utf16), creditsPartial: false)))
 
     var zen = TypingSession(
       configuration: .init(

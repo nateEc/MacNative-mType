@@ -59,20 +59,20 @@ final class ArchiveDatePrecisionTests: XCTestCase {
   }
 
   func testAllLegacyArchiveVersionsRemainReadableWithoutPrecisionMetadata() throws {
-    var object = try archiveObject()
+    // Independent owned pre-field fixture; never strip a current producer's
+    // position/stat metadata to impersonate an older archive.
+    let old = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(2.75), typedCharacterCount: 2,
+      correctCharacterCount: 2, errorCount: 0, wpm: 17, rawWpm: 29, accuracy: 77,
+      prompt: "ab", replayEvents: [.init(offset: 0, kind: .insert, text: "a"),
+        .init(offset: 2.75, kind: .insert, text: "b")])
+    let encoded = try TypebarDataTransfer.exportArchive(settings: .init(), results: [old],
+      presets: [], at: start)
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     object.removeValue(forKey: "exportedAtReferenceTime")
     var records = try XCTUnwrap(object["results"] as? [[String: Any]])
     records[0].removeValue(forKey: "startedAtReferenceTime")
     records[0].removeValue(forKey: "finishedAtReferenceTime")
-    // A genuine old record has neither date supplements, fields nor judgments.
-    // Relabeling current fields as an old version is intentionally rejected.
-    let events = try XCTUnwrap(records[0]["replayEvents"] as? [[String: Any]])
-    records[0]["replayEvents"] = events.map { event in
-      var legacy = event
-      legacy.removeValue(forKey: "inputField")
-      legacy.removeValue(forKey: "inputCorrectness")
-      return legacy
-    }
     object["results"] = records
     for version in 1...12 {
       object["version"] = version
@@ -81,6 +81,11 @@ final class ArchiveDatePrecisionTests: XCTestCase {
       let restored = try XCTUnwrap(archive.results.first)
       XCTAssertTrue(restored.replayEvents.allSatisfy { $0.inputField == nil })
       XCTAssertTrue(restored.replayEvents.allSatisfy { $0.inputCorrectness == nil })
+      XCTAssertTrue(restored.replayEvents.allSatisfy { $0.inputPosition == nil })
+      XCTAssertNil(restored.characterStats.sourceUnits)
+      XCTAssertEqual(restored.wpm, 17)
+      XCTAssertEqual(restored.rawWpm, 29)
+      XCTAssertEqual(restored.accuracy, 77)
       XCTAssertEqual(SavedTextInputHistoryPolicy.inputFields(events: restored.replayEvents), ["ab"])
       XCTAssertEqual(restored.startedAt.timeIntervalSinceReferenceDate, 800_000_000)
       XCTAssertEqual(restored.finishedAt.timeIntervalSinceReferenceDate, 800_000_002)

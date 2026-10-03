@@ -16,7 +16,9 @@ const bindings={
 'input/input-element':{getInputElementValue:()=>({inputValue:element,realInputValue:' '+element}),setInputElementValue:v=>{element=v},appendToInputElementValue:v=>{element+=v},replaceInputElementLastValueChar:v=>{element=element.slice(0,-1)+v}},
  'test/events/data':{getCurrentInput:()=>events.filter(e=>e.wordIndex===wordIndex).at(-1)?.inputValue??'',getInputForWord:i=>events.filter(e=>e.wordIndex===i).at(-1)?.inputValue??'',buildEventLog:noop,logTestEvent:(type,now,event)=>{events.push({...event,time:now});field=event.inputValue}},
  'test/test-words':{words:{getCurrent:()=>({textWithCommit:targets[wordIndex]??'',text:targets[wordIndex]??'',display:targets[wordIndex]??''}),get:i=>targets[i]===undefined?undefined:{textWithCommit:targets[i],text:targets[i]},get length(){return targets.length}}},
- 'test/test-ui':{afterTestTextInput:correct=>feedback.push(correct),pendingWordData:new Map(),getWordElement:()=>({}),beforeTestWordChange:noop,afterTestWordChange:noop,afterTestDelete:noop},
+ 'test/test-ui':{afterTestTextInput:correct=>feedback.push(correct),pendingWordData:new Map(),getWordElement:()=>({}),beforeTestWordChange:noop,afterTestWordChange:noop,afterTestDelete:noop,
+  // Bounded no-wrap geometry only; never browser layout evidence.
+  activeWordTop:0,activeWordHeight:1,getActiveWordTopAndHeightWithDifferentData:()=>({top:0,height:1})},
  'input/state':{setAwaitingNextWord:noop,isAwaitingNextWord:()=>false,isCorrectShiftUsed:()=>true,getIncorrectShiftsInARow:()=>0,incrementIncorrectShiftsInARow:noop,resetIncorrectShiftsInARow:noop},
  'legacy-states/slow-timer':{get:()=>false},'states/test':{isTestRestarting:()=>false,getActiveWordIndex:()=>wordIndex,increaseActiveWordIndex:()=>wordIndex++,decreaseActiveWordIndex:()=>wordIndex--,isResultCalculating:()=>false,wordsHaveNewline:()=>false,isTestActive:()=>active},
  'test/test-logic':{addWord:()=>{if(growNext && wordIndex===targets.length-1){targets.push('c');growNext=false}},startTest:()=>{active=true},fail:()=>{failed=true},finish:()=>{completed=true}},'events/keymap':{flash:noop},'test/weak-spot':{updateScore:noop},'legacy-states/composition':{getComposing:()=>false},'states/notifications':{showNoticeNotification:noop},
@@ -141,3 +143,63 @@ assert.equal(inputEvents().at(-1).charIndex,0);assert.equal(inputEvents().at(-1)
 seedDelete(['abc','tail'],[[0,'ab']]); Config.freedomMode=false;Config.confidenceMode='max';
 const before=inputEvents().length;assert.equal(deleteInput(),false);assert.equal(inputEvents().length,before);
 console.log('10 pinned-source deletion scenarios passed (13 actual modules; seeded snapshots and browser editing adapters, no native/Firefox/IME parity claim).');
+
+// Ordinary source targets carry their literal commits. Switch both explicit
+// funbox adapters; don't let the earlier no-space binding prove ordinary input.
+modules.get('test/funbox/active').setExport('isFunboxActiveWithProperty',p=>p==='nospace'&&noSpaceDelete);
+const ordinaryWord=i=>targets[i]===undefined?undefined:{
+ textWithCommit:targets[i],text:targets[i].replace(/[ \n]$/,''),display:targets[i],
+};
+modules.get('test/test-words').setExport('words',{
+ getCurrent:()=>ordinaryWord(wordIndex),get:i=>i===undefined?targets.map((_,i)=>ordinaryWord(i)):ordinaryWord(i),
+ get length(){return targets.length},
+});
+function resetOrdinary(words,options={}) {
+ noSpaceDelete=false;browserDeletedSentinel=false;reset(words,options);
+ Object.assign(Config,{blindMode:false,freedomMode:false,confidenceMode:'off',language:'english',
+  codeUnindentOnBackspace:false,quickEnd:false,oppositeShiftMode:'off',deleteOnError:'off',difficulty:'normal'});
+}
+resetOrdinary(['ab ','cd']);
+await main.namespace.emulateInsertText({data:'ax cd',now:0});
+assert.deepEqual(positions(),[0,1,2,0,1]);
+assert.deepEqual(inputEvents().map(e=>e.lastWord===true),[false,false,false,true,true]);
+assert.equal(inputEvents()[2].commitsWord,true);assert.equal(completed,true);
+resetOrdinary(['ab']);
+await main.namespace.emulateInsertText({data:'ab ',now:0});
+assert.equal(completed,true);assert.equal(inputEvents().at(-1).correct,false);
+assert.equal(inputEvents().at(-1).commitsWord,true);assert.equal(inputEvents().at(-1).lastWord,true);
+assert.equal(inputEvents().at(-1).inputValue,'ab ');
+assert.equal(modules.get('test/events/helpers').namespace.getInputFromDom(eventData.getAllTestEvents()),'ab');
+resetOrdinary(['ab']);
+await main.namespace.emulateInsertText({data:'ax ',now:0});
+assert.equal(completed,true);
+assert.equal(modules.get('test/events/helpers').namespace.getInputFromDom(eventData.getAllTestEvents()),'ax');
+resetOrdinary(['ab'],{stop:'letter'});
+await main.namespace.emulateInsertText({data:'a ',now:0});
+assert.equal(inputEvents().at(-1).inputStopped,true);assert.equal(inputEvents().at(-1).commitsWord,undefined);
+assert.equal(inputEvents().at(-1).inputValue,'a');assert.equal(completed,false);
+resetOrdinary(['ab'],{stop:'word'});
+await main.namespace.emulateInsertText({data:'ax ',now:0});
+assert.equal(inputEvents().at(-1).commitsWord,undefined);
+assert.equal(inputEvents().at(-1).inputValue,'ax ');assert.equal(completed,false);
+resetOrdinary(['ab '],{mode:'time',grow:true});
+await main.namespace.emulateInsertText({data:'ab ',now:0});
+assert.equal(inputEvents().at(-1).correct,true);assert.equal(inputEvents().at(-1).lastWord,true);
+assert.equal(targets.length,2);assert.equal(wordIndex,1);assert.equal(completed,false);
+resetOrdinary(['🙂 ','e\u0301']);
+await main.namespace.emulateInsertText({data:'🙂 e\u0301',now:0});
+assert.deepEqual(positions(),[0,1,2,0,1]);assert.equal(completed,true);
+resetOrdinary(['ab\n','\n','cd']);
+await main.namespace.emulateInsertText({data:'ab\n\ncd',now:0});
+assert.deepEqual(inputEvents().map(e=>e.wordIndex),[0,0,0,1,2,2]);
+assert.equal(completed,true);
+console.log('8 pinned-source ordinary insertion scenarios passed (13 actual modules; catalog/funbox/DOM adapters, no browser/IME/full-generation parity claim).');
+for(const text of ['ab','🙂']) {
+ resetOrdinary([text]);
+ await main.namespace.emulateInsertText({data:text+' x',now:0});
+ assert.equal(completed,false);assert.equal(wordIndex,0);assert.equal(element,'x');
+ assert.equal(inputEvents().at(-1).charIndex,3);assert.equal(inputEvents().at(-1).inputValue,'x');
+ await main.namespace.emulateInsertText({data:'b',now:1});
+ assert.equal(inputEvents().at(-1).charIndex,1);
+}
+console.log('2 pinned-source ordinary terminal SPACE batch-reentry scenarios passed (same bounded adapters).');

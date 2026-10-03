@@ -1,10 +1,11 @@
 import Foundation
 
-/// Source-time snapshots for live known no-space and target-free Zen fields.
+/// Source-time snapshots for known input fields and target-free Zen fields.
 /// Navigation's accepted buffer and saved history are different readers.
 struct RecordedInputFieldStats {
   private struct Snapshot {
     let units: [UInt16]
+    let classifiedUnits: [UInt16]
     let offset: TimeInterval
     let insertedSpace: Bool
   }
@@ -29,7 +30,16 @@ struct RecordedInputFieldStats {
       return lhs == rhs ? $0.offset < $1.offset : lhs < rhs
     }.map(\.element) }
     if event.offset >= snapshots[field.index]?.offset ?? -Double.infinity {
-      snapshots[field.index] = .init(units: field.units, offset: event.offset,
+      var projected = field.units
+      // Source getInputFromDom trims only an incorrect final SPACE commit.
+      // Keep the actual event/history buffer and raw surrogate units intact.
+      if event.kind == .insert, event.inputUnits == [32], !event.isStoppedInsertion,
+        event.commitsWord != false, event.inputPosition?.lastWord == true,
+        event.inputCorrectness?.last == false {
+        while let unit = projected.last, let scalar = UnicodeScalar(UInt32(unit)),
+          QuoteSourcePolicy.isBoundaryWhitespace(scalar) { projected.removeLast() }
+      }
+      snapshots[field.index] = .init(units: field.units, classifiedUnits: projected, offset: event.offset,
         insertedSpace: event.kind == .insert && event.inputUnits == [32])
     }
     if event.validatedClearedNextWord {
@@ -45,12 +55,12 @@ struct RecordedInputFieldStats {
 
   func counts(targets: UnitInputTargets, creditsActivePrefix: Bool)
     -> (credit: TypingWordCredit, rawUnits: Int, rawCharacters: Int, unitStats: ResultUnitCharacterStats) {
-    let highest = snapshots.filter { !$0.value.units.isEmpty }.keys.max() ?? 0
+    let highest = snapshots.filter { !$0.value.classifiedUnits.isEmpty }.keys.max() ?? 0
     let active = snapshots[highest]?.insertedSpace == true && highest < Int.max ? highest + 1 : highest
     var credit = TypingWordCredit(); var raw: [UInt16] = []
     var unitStats = ResultUnitCharacterStats()
     for index in order {
-      let input = snapshots[index]!.units
+      let input = snapshots[index]!.classifiedUnits
       let target = targets.fields.indices.contains(index) ? targets.field(index) : nil
       let stats = ResultUnitCharacterStats.classify(input: input, target: target,
         creditsPartial: index == active && creditsActivePrefix)

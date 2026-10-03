@@ -28,7 +28,8 @@ final class BlankQuoteWordTests: XCTestCase {
     XCTAssertEqual(attempt.wordReviews.map(\.typed), ["ab", "", "cd"])
     let result = try XCTUnwrap(attempt.result())
     XCTAssertEqual(result.correctCharacterCount, 6)
-    XCTAssertEqual(result.characterStats, .init(matched: 6, incorrect: 0, extra: 0, missed: 0))
+    XCTAssertEqual(result.characterStats, .init(matched: 6, incorrect: 0, extra: 0, missed: 0,
+      sourceUnits: .classify(input: Array("ab\n\ncd".utf16), target: Array("ab\n\ncd".utf16), creditsPartial: false)))
     XCTAssertEqual(TypingReplay.typedText(events: result.replayEvents, through: 2), result.prompt)
     XCTAssertEqual(try XCTUnwrap(TestResultRecord(result: result).portableResult), result)
     XCTAssertEqual(try TypebarDataTransfer.importArchive(from:

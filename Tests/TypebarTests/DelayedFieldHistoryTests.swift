@@ -175,7 +175,15 @@ final class DelayedFieldHistoryTests: XCTestCase {
   }
 
   func testArchiveConstructionCannotMislabelFieldTapesAsVersionsOneThroughEleven() throws {
-    let result = try delayedResult(finish: true)
+    // Independent owned old field/judgment producer, not stripped new events.
+    let result = CompletedTestResult(id: UUID(), configuration: .words(2), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 3,
+      correctCharacterCount: 3, errorCount: 0, wpm: 17, rawWpm: 29, accuracy: 77, prompt: "a b",
+      replayEvents: [
+        .init(offset: 0, kind: .insert, text: "a", inputField: .init(index: 0, value: "a"), inputCorrectness: [true]),
+        .init(offset: 1, kind: .insert, text: " ", inputField: .init(index: 0, value: "a "), inputCorrectness: [true]),
+        .init(offset: 0.5, kind: .insert, text: "b", automatic: true,
+          inputField: .init(index: 1, value: "b"), inputCorrectness: [true])])
     for version in 1...11 {
       let archive = TypebarArchive(version: version, exportedAt: start, settings: .init(),
         results: [result], presets: [])
@@ -205,24 +213,25 @@ final class DelayedFieldHistoryTests: XCTestCase {
   }
 
   func testLegacyVersionElevenRecordKeepsItsPrimitiveHistoryAndMetrics() throws {
-    let result = try delayedResult(finish: true)
-    let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [result],
-      presets: [], at: start)
-    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-    object["version"] = 11
-    var records = try XCTUnwrap(object["results"] as? [[String: Any]])
-    let events = try XCTUnwrap(records[0]["replayEvents"] as? [[String: Any]])
-    records[0]["replayEvents"] = events.map { event in
-      var old = event
-      old.removeValue(forKey: "inputField")
-      old.removeValue(forKey: "inputCorrectness")
-      return old
-    }
-    object["results"] = records
-    let archive = try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: object))
+    let result = CompletedTestResult(id: UUID(), configuration: .words(2), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(4), typedCharacterCount: 4,
+      correctCharacterCount: 4, errorCount: 1, wpm: 17, rawWpm: 29, accuracy: 77,
+      inputMetrics: .init(version: 1, correctAttempts: 4, totalAttempts: 6, creditedUnits: 4, retainedUnits: 4),
+      prompt: "a \tb", replayEvents: [
+        .init(offset: 0, kind: .insert, text: "a"), .init(offset: 0, kind: .insert, text: " "),
+        .init(offset: 0, kind: .insert, text: "\t", automatic: true),
+        .init(offset: 0, kind: .delete, text: "", automatic: true),
+        .init(offset: 0, kind: .delete, text: "", automatic: true),
+        .init(offset: 1, kind: .insert, text: "\t"), .init(offset: 4, kind: .insert, text: "\t"),
+        .init(offset: 4, kind: .insert, text: "b")])
+    let old = TypebarArchive(version: 11, exportedAt: start, settings: .init(), results: [result], presets: [])
+    let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+    let archive = try TypebarDataTransfer.importArchive(from: encoder.encode(old))
     XCTAssertEqual(archive.version, 11)
     XCTAssertTrue(archive.results[0].replayEvents.allSatisfy { $0.inputField == nil })
     XCTAssertEqual(archive.results[0].inputMetrics, result.inputMetrics)
+    XCTAssertEqual(archive.results[0], result)
+    XCTAssertNil(archive.results[0].characterStats.sourceUnits)
     XCTAssertEqual(SavedTextInputHistoryPolicy.inputFields(events: archive.results[0].replayEvents), ["a\t\tb", ""])
   }
 

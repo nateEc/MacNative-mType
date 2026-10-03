@@ -258,9 +258,13 @@ final class RecordedUnitJudgmentTests: XCTestCase {
   }
 
   func testArchiveConstructionCannotMislabelJudgmentsAsAnyEarlierVersion() throws {
-    // ASCII still produces genuine archive-13 metadata; never downgrade a
-    // converted Unicode session by stripping its raw fields or units.
-    let original = try attempt("a", prompt: "ab")
+    // Independent owned archive-13 fixture. Current ASCII captures newer
+    // positions/stats and is not an old producer.
+    let original = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .bailedOut,
+      startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 1,
+      correctCharacterCount: 1, errorCount: 0, wpm: 17, rawWpm: 29, accuracy: 77,
+      prompt: "ab", replayEvents: [.init(offset: 0, kind: .insert, text: "a",
+        inputField: .init(index: 0, value: "a"), inputCorrectness: [true])])
     for version in 1...12 {
       XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [original], presets: []).version, 13)
     }

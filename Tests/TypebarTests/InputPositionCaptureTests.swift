@@ -82,12 +82,13 @@ final class InputPositionCaptureTests: XCTestCase {
       .compactMap { ($0["inputPosition"] as? [String: Any])?["charIndex"] as? Int }, [0,1,0,1])
   }
 
-  func testUnknownNoSpaceBoundariesAndLegacyASCIIHaveNoInventedWordPosition() throws {
+  func testUnknownNoSpaceBoundariesStayUnknownWhileNewASCIIRecordsItsKnownPosition() throws {
     var unknown = TypingSession(configuration: .words(2).with(modifiers: [.noSpaces]), prompt: "abcd")
     unknown.insert("ab", at: start)
     var ascii = TypingSession(configuration: .words(2), prompt: "ab cd")
     ascii.insert("a", at: start)
-    for session in [unknown, ascii] { XCTAssertTrue(try objects(session).allSatisfy { $0["inputPosition"] == nil }) }
+    XCTAssertTrue(try objects(unknown).allSatisfy { $0["inputPosition"] == nil })
+    XCTAssertEqual(try events(ascii).first?.inputPosition, .init(charIndex: 0, lastWord: false))
   }
 
   func testLastWordDescribesTheCatalogBeforeTimedRefillNotTheFinalDirectory() throws {

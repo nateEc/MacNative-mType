@@ -192,12 +192,13 @@ final class RawUTF16ReplayTests: XCTestCase {
 
   private let start = Date(timeIntervalSinceReferenceDate: 908_000_000.125)
   private func result(events: [TypingReplayEvent]) throws -> CompletedTestResult {
-    var session = TypingSession(configuration: .words(1), prompt: "ab")
-    session.insertBatch("ab", at: start)
-    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(try XCTUnwrap(session.result()))) as? [String: Any])
-    // A codec fixture, not evidence that the session already produces units.
-    object["replayEvents"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(events))
-    return try JSONDecoder().decode(CompletedTestResult.self, from: JSONSerialization.data(withJSONObject: object))
+    // Independent owned codec fixture. New sessions carry newer source stats
+    // and must never be stripped to masquerade as a version-13/14 producer.
+    CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .completed,
+      startedAt: start, finishedAt: start.addingTimeInterval(1), typedCharacterCount: 2,
+      correctCharacterCount: 2, errorCount: 0, wpm: 17, rawWpm: 29, accuracy: 77,
+      inputMetrics: .init(version: 1, correctAttempts: 2, totalAttempts: 2, creditedUnits: 2, retainedUnits: 2),
+      prompt: "ab", replayEvents: events)
   }
 
   func testPortableAndArchiveFourteenPreserveRawUnitsDatesAndStoredScores() throws {

@@ -90,15 +90,28 @@ struct UnitInputTargets {
   let requiresUnitInput: Bool
   let hasNewline: Bool
   let noSpace: Bool
+  let sourceFieldCount: Int
+  let requiresKoreanDisassembly: Bool
 
-  init(_ text: String, buildsASCIICatalog: Bool = false, noSpaceWords: [String]? = nil) {
+  init(_ text: String, buildsASCIICatalog: Bool = false, noSpaceWords: [String]? = nil,
+    asciiSeparatorCount: Int? = nil) {
     requiresUnitInput = text.utf8.contains { $0 > 127 || $0 == 13 }
     hasNewline = text.utf8.contains(10)
     noSpace = noSpaceWords.map { !$0.isEmpty && $0.joined().utf16.elementsEqual(text.utf16) } ?? false
+    requiresKoreanDisassembly = requiresUnitInput && text.utf16.contains {
+      (0xac00...0xd7af).contains($0) || (0x1100...0x11ff).contains($0)
+        || (0x3130...0x318f).contains($0) || (0xa960...0xa97f).contains($0)
+        || (0xd7b0...0xd7ff).contains($0)
+    }
     // A growing ASCII prompt has no unit/glyph ambiguity. Do not rebuild an
     // unused full catalog on each chunk; a later Unicode input builds it once.
     guard requiresUnitInput || buildsASCIICatalog || noSpace else {
       units = []; glyphs = []; fields = []
+      let separators = asciiSeparatorCount ?? text.utf8.reduce(into: 0) { count, unit in
+        if unit == 32 || unit == 10 { count += 1 }
+      }
+      let tail = text.utf8.last.map { $0 != 32 && $0 != 10 } == true ? 1 : 0
+      sourceFieldCount = max(1, separators + tail)
       return
     }
     units = Array(text.utf16)
@@ -112,6 +125,7 @@ struct UnitInputTargets {
         defer { start = end }
         return start..<end
       }
+      sourceFieldCount = noSpaceWords.count
       return
     }
     var ranges: [Range<Int>] = []
@@ -122,6 +136,7 @@ struct UnitInputTargets {
     }
     if start < units.count || ranges.isEmpty { ranges.append(start..<units.count) }
     fields = ranges
+    sourceFieldCount = ranges.count
   }
 
   func field(_ index: Int, withoutCommit: Bool = false) -> [UInt16] {

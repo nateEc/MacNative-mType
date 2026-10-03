@@ -181,12 +181,10 @@ final class ZenSourceUnitStatsTests: XCTestCase {
     XCTAssertFalse(row.joined().contains("🙂"))
   }
 
-  func testOrdinaryAndUnknownNoSpaceSessionsRemainUnclassified() throws {
-    for configuration in [TestConfiguration.words(2), .words(2).with(modifiers: [.noSpaces])] {
-      var input = TypingSession(configuration: configuration, prompt: "ab cd")
-      input.insertBatch("a", at: start)
-      input.bailOut(at: start.addingTimeInterval(2))
-      XCTAssertNil(try XCTUnwrap(input.result()).characterStats.sourceUnits)
-    }
+  func testUnknownNoSpaceSessionsRemainUnclassifiedAfterOrdinaryCapture() throws {
+    var input = TypingSession(configuration: .words(2).with(modifiers: [.noSpaces]), prompt: "ab cd")
+    input.insertBatch("a", at: start)
+    input.bailOut(at: start.addingTimeInterval(2))
+    XCTAssertNil(try XCTUnwrap(input.result()).characterStats.sourceUnits)
   }
 }
