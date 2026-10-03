@@ -234,7 +234,12 @@ final class OrdinarySourceUnitStatsTests: XCTestCase {
       }
     }
     let row = ResultCSVExport.csvString(for: [saved]).components(separatedBy: "\r\n")[1].components(separatedBy: ",")
-    XCTAssertEqual(Array(row.suffix(5)), ["3","2","1","1","0"])
+    let scoringColumns = ["source_matched_scoring_units", "source_credited_scoring_units",
+      "source_incorrect_scoring_units", "source_extra_scoring_units", "source_missed_scoring_units"]
+    XCTAssertEqual(row.count, ResultCSVExport.columns.count)
+    XCTAssertEqual(Array(ResultCSVExport.columns.dropLast().suffix(5)), scoringColumns)
+    let scoringValues = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns, row))
+    XCTAssertEqual(scoringColumns.map { scoringValues[$0] ?? "missing" }, ["3","2","1","1","0"])
     XCTAssertEqual(ResultCharacterStatsPresentation.value(saved.characterStats), "2/1/1/0")
   }
 

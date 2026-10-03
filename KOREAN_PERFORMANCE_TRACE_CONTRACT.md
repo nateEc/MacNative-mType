@@ -29,7 +29,7 @@ ResultPerformanceTrace 的点和点列增加可选 sourceScoringBasis；缺省�
 
 没有新增保存字段、SwiftData 实体列、服务协议或归档版本。正式归档、便携记录及内存实体验证保存基础被曲线读者使用，读取曲线不会更改保存分数。独立自有旧 21 记录保持原来的 UTF-16 曲线与固定 WPM、Raw；不从回放回填基础。
 
-源码同时确认 [结果稳定度](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L750) 取 WPM history 的变异系数。当前原生 ResultConsistencyPolicy 仍取尝试区间速率，这是已定位且未修复的独立语义差异；CSV、PB、挑战和匿名投稿的稳定度消费者不能因曲线接入而标为已等价。普通缺基础字段曲线的其他历史差异、词 burst、其他消费者、真实输入法、VoiceOver、旧库、降级及部署也未完整验收。
+后续完整读取源结果对象后，更正本阶段对稳定度的解释：consistency 使用 Burst 输入节奏，另一个独立 wpmConsistency 才使用 WPM history；现有输入节奏不应被替换。新增独立指标的证据与边界见 [独立 WPM 稳定度与输入节奏](WPM_CONSISTENCY_CONTRACT.md)。普通缺基础字段曲线的其他历史差异、词 burst、其他消费者、真实输入法、VoiceOver、旧库、降级及部署仍未完整验收。
 
 ## 定向证据与有界复核
 
@@ -45,4 +45,4 @@ ResultPerformanceTrace 的点和点列增加可选 sourceScoringBasis；缺省�
 
 本次实际 100,000 词耐久测试通过（118.896 秒），12,000 次组合字素删除、两种回放投影基准为 0.052813 秒。这是既有普通路径验证，不是韩文大规模混合性能证明。客户端详细日志在耐久项通过后保存了一份阶段快照；完整门禁的独立外层日志记录最终客户端、服务及应用包结果，阶段快照不冒充完整日志。
 
-未打开的 macOS 应用包构建、签名及资源边界验证通过，门禁未启动 Typebar 进程。没有部署服务、网络投稿或访问真实用户数据库。归档仍为 22，完整重写 goal 未完成；下一项已定位差异是结果稳定度与固定源 WPM history 的关系。
+未打开的 macOS 应用包构建、签名及资源边界验证通过，门禁未启动 Typebar 进程。没有部署服务、网络投稿或访问真实用户数据库。归档仍为 22，完整重写 goal 未完成；后续稳定度取证已纠正上述解释，不能把本阶段检查通过扩展为独立 WPM 指标或完整功能验收。

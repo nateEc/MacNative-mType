@@ -297,6 +297,9 @@ final class CustomSequentialStreamingTests: XCTestCase {
     XCTAssertEqual(fields["correct_characters"], "799999")
     XCTAssertEqual(fields["accuracy_percent"], "100")
     XCTAssertEqual(Double(try XCTUnwrap(fields["elapsed_seconds"])), result.elapsedDuration)
+    let wpmConsistency = try XCTUnwrap(Double(try XCTUnwrap(fields["wpm_consistency_percent"])))
+    XCTAssertGreaterThan(wpmConsistency, 95, "Continuous correct input must retain whole-test WPM consistency")
+    XCTAssertLessThanOrEqual(wpmConsistency, 100)
     let archiveData = try TypebarDataTransfer.exportArchive(settings: .init(), results: [result],
       presets: [], at: result.finishedAt)
     let archive = try TypebarDataTransfer.importArchive(from: archiveData)

@@ -150,7 +150,15 @@ final class ZenSourceUnitStatsTests: XCTestCase {
     XCTAssertEqual(restored, old)
     XCTAssertNil(restored.characterStats.sourceUnits)
     XCTAssertEqual(ResultCharacterStatsPresentation.value(restored.characterStats), "1/0/0/0")
-    XCTAssertTrue(ResultCSVExport.csvString(for: [restored]).hasSuffix(",,,,,\r\n"))
+    let row = ResultCSVExport.csvString(for: [restored]).components(separatedBy: "\r\n")[1].components(separatedBy: ",")
+    XCTAssertEqual(row.count, ResultCSVExport.columns.count)
+    let columns = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns, row))
+    for key in ["source_matched_scoring_units", "source_credited_scoring_units",
+      "source_incorrect_scoring_units", "source_extra_scoring_units", "source_missed_scoring_units"] {
+      XCTAssertEqual(columns[key], "")
+    }
+    XCTAssertEqual(columns["wpm_consistency_percent"], "66.67", "A new derived metric must not backfill saved unit stats")
+    XCTAssertEqual(restored, old)
   }
 
   @MainActor func testInMemoryEntityRetainsUnitsAndNativeGlyphStats() throws {
@@ -177,7 +185,11 @@ final class ZenSourceUnitStatsTests: XCTestCase {
     XCTAssertEqual(summary.accessibilityMetadata, "UTF-16 单位：计分正确 5，错误 0，多打 0，漏打 0；位置匹配 5")
     let row = ResultCSVExport.csvString(for: [saved]).components(separatedBy: "\r\n")[1].components(separatedBy: ",")
     XCTAssertEqual(row.count, ResultCSVExport.columns.count)
-    XCTAssertEqual(Array(row.suffix(5)), ["5", "5", "0", "0", "0"])
+    let scoringColumns = ["source_matched_scoring_units", "source_credited_scoring_units",
+      "source_incorrect_scoring_units", "source_extra_scoring_units", "source_missed_scoring_units"]
+    XCTAssertEqual(Array(ResultCSVExport.columns.dropLast().suffix(5)), scoringColumns)
+    let scoringValues = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns, row))
+    XCTAssertEqual(scoringColumns.map { scoringValues[$0] ?? "missing" }, ["5", "5", "0", "0", "0"])
     XCTAssertFalse(row.joined().contains("🙂"))
   }
 

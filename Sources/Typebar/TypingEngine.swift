@@ -2996,14 +2996,14 @@ struct MissedWordErrorCount: Equatable {
   let count: Int
 }
 
-enum TypingReplayEventKind: String, Codable, Equatable {
+enum TypingReplayEventKind: String, Codable, Equatable, Sendable {
   case insert
   case delete
 }
 
 /// A recorded field after an input action, independent of when that action's
 /// original timestamp sorts it into the saved tape.
-struct TypingReplayInputField: Codable, Equatable {
+struct TypingReplayInputField: Codable, Equatable, Sendable {
   let index: Int
   let value: String
   /// Archive 14. `value` is display-safe; these optional units retain lone
@@ -3048,7 +3048,7 @@ struct TypingReplayInputField: Codable, Equatable {
 /// Archive 16. Insertion validation reads this position BEFORE updating the
 /// field or navigating. A stopped attempt can leave a shorter field snapshot;
 /// lastWord describes the catalog at the event, not the final grown catalog.
-struct TypingReplayInputPosition: Codable, Equatable {
+struct TypingReplayInputPosition: Codable, Equatable, Sendable {
   let charIndex: Int
   let lastWord: Bool
 
@@ -3070,7 +3070,7 @@ struct TypingReplayInputPosition: Codable, Equatable {
   }
 }
 
-struct TypingReplayEvent: Codable, Equatable, Identifiable {
+struct TypingReplayEvent: Codable, Equatable, Identifiable, Sendable {
   let offset: TimeInterval
   let kind: TypingReplayEventKind
   let text: String

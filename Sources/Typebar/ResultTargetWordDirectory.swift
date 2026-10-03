@@ -3,7 +3,7 @@ import Foundation
 /// Actual ordered targets, including their literal commit units and empty
 /// slots. These are generated values, never reconstructed from accepted input
 /// or resampled from a transform recipe. Glyph boundaries are not word bounds.
-struct ResultTargetWordDirectory: Codable, Equatable {
+struct ResultTargetWordDirectory: Codable, Equatable, Sendable {
   let words: [String]
   let noSpace: Bool
 

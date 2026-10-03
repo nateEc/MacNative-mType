@@ -10,7 +10,7 @@ import {stripTypeScriptTypes} from 'node:module';
 const reference=path.resolve(process.argv[2]??'');
 if(!process.argv[2] || execFileSync('git',['-C',reference,'rev-parse','HEAD'],{encoding:'utf8'}).trim()!=='91bd24bb8513785c7364cbea29296ff7adafac41')throw Error('Pinned checkout required');
 if(execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim())throw Error('Reference must be clean');
-const actual=new Set(['test/events/stats','test/events/helpers','utils/strings','utils/numbers']);
+const actual=new Set(['test/events/stats','test/events/helpers','utils/strings','utils/numbers','@monkeytype/util/numbers']);
 let koreanOracle;
 if(process.argv[3]){
  const root=path.resolve(process.argv[3]);
@@ -26,7 +26,6 @@ if(process.argv[3]){
  koreanOracle=sandbox.module.exports;
 }
 const bindings={'config/store':{Config:{funbox:[]}},'constants/keys':{Keycode:{}},'@monkeytype/schemas/languages':{Language:{}},
- '@monkeytype/util/numbers':{roundTo2:v=>Math.round(v*100)/100},
  'test/events/types':{InputEventNoMs:{},TestEventNoMs:{},EventLog:{}},
  'hangul-js':{default:koreanOracle??{disassemble:()=>{throw Error('Korean is outside this probe')}}}};
 const modules=new Map();
@@ -34,7 +33,9 @@ function moduleFor(id){
  if(modules.has(id))return modules.get(id);
  // Single-file stripping cannot resolve an imported erased type. Remove
  // only this type name, leaving every source behavior function intact.
- const source=actual.has(id)?fs.readFileSync(path.join(reference,'frontend/src/ts',id+'.ts'),'utf8').replace('import { CharCounts, countChars, isSpace }','import { countChars, isSpace }'):null;
+ const source=actual.has(id)?fs.readFileSync(id==='@monkeytype/util/numbers'
+  ?path.join(reference,'packages/util/src/numbers.ts'):path.join(reference,'frontend/src/ts',id+'.ts'),'utf8')
+  .replace('import { CharCounts, countChars, isSpace }','import { countChars, isSpace }'):null;
  const mod=source!==null?new vm.SourceTextModule(stripTypeScriptTypes(source,{mode:'transform'}),{identifier:id}):
   new vm.SyntheticModule(Object.keys(bindings[id]??{}),function(){if(!bindings[id])throw Error('Unknown binding '+id);for(const[k,v]of Object.entries(bindings[id]))this.setExport(k,v)},{identifier:id});
  modules.set(id,mod);return mod;
@@ -65,7 +66,38 @@ assert.equal(stats.getChars(cleared).correctWord,2);
 const stopped=log([...later.events,event(2000,0,'ab'),event(3000,1,'','insertText','x',{inputStopped:true,correct:false})]);
 assert.equal(stats.getChars(stopped).correctWord,2);assert.equal(stats.getChars(stopped).allCorrect,2);
 assert.deepEqual(stats.getInputHistory(stopped),['ab','']);
-console.log('6 pinned-source terminal-history fixtures passed (4 complete actual modules; adapters, no browser/handler/Korean parity claim).');
+console.log('6 pinned-source terminal-history fixtures passed (5 complete actual modules; adapters, no browser/handler/Korean parity claim).');
+const numbers=modules.get('@monkeytype/util/numbers').namespace;
+const consistencyOf=history=>{
+ const value=numbers.roundTo2(numbers.kogasa(numbers.stdDev(history)/numbers.mean(history)));
+ return Number.isNaN(value)?0:value;
+};
+const cadenceCases=[
+ [[event(0,0,'a','insertText','a'),event(1200,0,'ab','insertText','b'),event(2200,0,'abc','insertText','c')],['abc'],3000,100,100],
+ [[event(0,0,'x','insertText','x',{correct:false}),event(500,0,'','deleteContentBackward',''),event(1200,0,'a','insertText','a')],['ab'],2000,8.9,100],
+ [[event(0,0,'a','insertText','a')],['a'],150000,0,0],
+ [[event(0,0,'ab ','insertText',' ',{lastWord:true,commitsWord:true,correct:false})],['ab'],2000,66.67,8.9],
+ [[event(0,0,'a','insertText','a'),event(1500,0,'ab','insertText','b')],['ab'],3500,76.64,8.9],
+ [[event(0,0,'a','insertText','a')],['a'],24000,2.72,0],
+];
+for(const [events,targets,duration,wpmExpected,burstExpected] of cadenceCases){
+ const value=log([...events,{type:'timer',testMs:duration,data:{event:'end'}}],targets);
+ value.context.mode='words';value.context.mode2='1';value.context.bailedOut=false;
+ const wpm=stats.getWpmHistory(value),burst=stats.getBurstHistory(value);
+ assert.equal(consistencyOf(wpm),wpmExpected);
+ assert.equal(consistencyOf(burst),burstExpected);
+}
+const longCadence=log([...Array.from({length:122},(_,i)=>event(i*1000,0,'a'.repeat(i+1),'insertText','a')),
+ event(122100,0,'','deleteWordBackward',''),{type:'timer',testMs:150000,data:{event:'end'}}],['a'.repeat(150)]);
+longCadence.context.mode='words';longCadence.context.mode2='1';longCadence.context.bailedOut=false;
+assert.equal(consistencyOf(stats.getWpmHistory(longCadence)),50.72);
+const heapCadence=log([event(0,1,'b','insertText','b'),event(1200,0,'a ','insertText',' '),
+ event(2200,1,'','deleteContentBackward',''),event(3200,2,'c','insertText','c'),
+ event(4200,2,'','deleteContentBackward',''),event(5200,1,'b ','insertText',' '),
+ event(6200,2,'c','insertText','c'),{type:'timer',testMs:7000,data:{event:'end'}}],['a ','b ','c']);
+heapCadence.context.mode='words';heapCadence.context.mode2='1';heapCadence.context.bailedOut=false;
+assert.deepEqual(stats.getWpmHistory(heapCadence),[12,6,0,9,0,8,9]);
+console.log('8 input-cadence versus WPM-consistency fixtures passed (5 complete modules, including actual util statistics; seeded context, no full buildCompletedEvent execution).');
 const classificationCases=[
  ['ab','ab',false,[2,2,0,0,0]], ['ax ','ab ',false,[1,0,1,1,0]],
  ['ab','ab ',false,[2,0,0,0,1]], ['abx','ab ',false,[2,0,0,1,0]],
@@ -116,7 +148,7 @@ const zenCases=[
 for(const [events,count] of zenCases){
  assert.deepEqual(stats.getChars(zenLog(events)),{allCorrect:count,correctWord:count,incorrect:0,extra:0,missed:0});
 }
-console.log('10 owned target-free Zen getChars fixtures passed (same 4 complete actual modules; Korean status false, no handler/browser/IME claim).');
+console.log('10 owned target-free Zen getChars fixtures passed (same 5 complete actual modules; Korean status false, no handler/browser/IME claim).');
 
 const ordinaryCases=[
  [[event(0,0,'ax ','insertText',' ',{commitsWord:true}),event(1000,1,'cd')],['ab ','cd'],[3,2,1,1,0]],
@@ -135,7 +167,7 @@ for(const [events,targets,expected] of ordinaryCases){
  const result=stats.getChars(log(events,targets));
  assert.deepEqual([result.allCorrect,result.correctWord,result.incorrect,result.extra,result.missed],expected);
 }
-console.log('11 owned ordinary getChars fixtures passed (same 4 actual modules; includes stopped SPACE active inference and source trim, no browser/IME/Korean claim).');
+console.log('11 owned ordinary getChars fixtures passed (same 5 actual modules; includes stopped SPACE active inference and source trim, no browser/IME/Korean claim).');
 const terminalSpace=log([event(0,0,'ab ','insertText',' ',{lastWord:true,commitsWord:true,correct:false})],['ab']);
 terminalSpace.context.bailedOut=false;
 const terminalChars=stats.getChars(terminalSpace);
@@ -169,7 +201,7 @@ if(koreanOracle){
   const result=stats.getChars(value);
   assert.deepEqual([result.allCorrect,result.correctWord,result.incorrect,result.extra,result.missed],expected);
  }
- console.log('12 Korean getChars fixtures passed (4 complete source modules + verified complete hangul-js 0.2.6; seeded context, no IME/state-capture/native-publication parity claim).');
+ console.log('12 Korean getChars fixtures passed (5 complete source modules + verified complete hangul-js 0.2.6; seeded context, no IME/state-capture/native-publication parity claim).');
  const historyCases=[
   [[event(0,0,'괅','insertText','괅')],['괅'],2000,[60,30],[60,30],[12,0],[0,0]],
   [[event(0,0,'가','insertText','가',{correct:false}),event(1500,0,'각','insertText','각')],

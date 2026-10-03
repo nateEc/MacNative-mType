@@ -1234,6 +1234,24 @@ enum ResultConsistencyPolicy {
     } + implicitZeros * pow(average, 2)
     let variance = deviations / count
     let coefficientOfVariation = sqrt(variance) / average
+    return mappedConsistency(coefficientOfVariation)
+  }
+
+  /// Histogram weights include every whole-test sample, not just a chart.
+  static func consistency(positiveSamples: [Double: Double], population: Double) -> Double {
+    guard population > 0, population.isFinite,
+      let largest = positiveSamples.keys.max(), largest > 0 else { return 0 }
+    let samples = positiveSamples.sorted { $0.key < $1.key }
+      .map { (value: $0.key / largest, weight: $0.value / population) }
+    let average = samples.reduce(0) { $0 + $1.value * $1.weight }
+    guard average > 0 else { return 0 }
+    let zeroWeight = max(0, 1 - samples.reduce(0) { $0 + $1.weight })
+    let variance = samples.reduce(0) { $0 + pow($1.value - average, 2) * $1.weight }
+      + zeroWeight * pow(average, 2)
+    return mappedConsistency(sqrt(variance) / average)
+  }
+
+  private static func mappedConsistency(_ coefficientOfVariation: Double) -> Double {
     let mapped = 100 * (
       1 - tanh(
         coefficientOfVariation
@@ -1265,6 +1283,73 @@ enum ResultIntervalSamplingPolicy {
 /// live practice and word history. Deletion changes text, not past activity.
 enum ResultPerformanceTrace {
   static let maximumChartDuration: TimeInterval = 122
+
+  /// Independent from input-cadence consistency; requires captured fields.
+  static func wpmConsistency(
+    prompt: String, events: [TypingReplayEvent], duration: TimeInterval,
+    configuration: TestConfiguration? = nil,
+    targetWordDirectory: ResultTargetWordDirectory? = nil,
+    sourceScoringBasis: ResultScoringUnitBasis? = nil
+  ) -> Double? {
+    guard !Task.isCancelled, duration.isFinite, duration > 0 else { return nil }
+    let ordered = validOrderedEvents(events).filter { $0.offset <= duration }
+    guard var fields = FieldActivityCursor(prompt: prompt, events: ordered, configuration: configuration,
+      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis,
+      sourceClassification: true) else { return nil }
+    let whole = duration.rounded(.down)
+    let hasTail = !ResultIntervalSamplingPolicy.isTimed(configuration)
+      && TestInactivityPolicy.retainsFractionalTail(duration: duration)
+    let population = whole + (hasTail ? 1 : 0)
+    guard population > 0 else { return 0 }
+    var histogram: [Double: Double] = [:]
+    var boundary: Double = 1
+    for event in ordered where event.offset <= whole {
+      guard !Task.isCancelled else { return nil }
+      let next = max(1, event.offset.rounded(.up))
+      if next > boundary {
+        addWPMRange(credit: fields.counts.credit, first: boundary, last: next - 1, to: &histogram)
+        boundary = next
+      }
+      _ = fields.apply(event)
+    }
+    addWPMRange(credit: fields.counts.credit, first: boundary, last: whole, to: &histogram)
+    if hasTail {
+      for event in ordered where event.offset > whole {
+        guard !Task.isCancelled else { return nil }
+        _ = fields.apply(event)
+      }
+      let speed = sourceRoundedWPM(credit: fields.counts.credit, elapsed: duration)
+      if speed > 0 { histogram[speed, default: 0] += 1 }
+    }
+    guard !Task.isCancelled else { return nil }
+    return ResultConsistencyPolicy.consistency(positiveSamples: histogram, population: population)
+  }
+
+  private static func sourceRoundedWPM(credit: Int, elapsed: Double) -> Double {
+    (Double(credit) / 5 / (elapsed / 60)).rounded()
+  }
+
+  /// Round(C*12/t) is monotone on an unchanged-credit span. Skip whole runs
+  /// of equal speeds; zero-speed seconds remain implicit population members.
+  private static func addWPMRange(
+    credit: Int, first: Double, last: Double, to histogram: inout [Double: Double]
+  ) {
+    guard credit > 0, first <= last else { return }
+    var time = first
+    while time <= last {
+      guard !Task.isCancelled else { return }
+      let speed = sourceRoundedWPM(credit: credit, elapsed: time)
+      guard speed > 0 else { return }
+      var end = min(last, max(time, (Double(credit) * 12 / (speed - 0.5)).rounded(.down)))
+      // Check floating-point half ties with the actual source operation order.
+      while end > time, sourceRoundedWPM(credit: credit, elapsed: end) != speed { end -= 1 }
+      while end < last, end + 1 > end,
+        sourceRoundedWPM(credit: credit, elapsed: end + 1) == speed { end += 1 }
+      histogram[speed, default: 0] += end - time + 1
+      guard end < last, end + 1 > end else { return }
+      time = end + 1
+    }
+  }
 
   static func point(
     prompt: String,
@@ -1384,11 +1469,20 @@ enum ResultPerformanceTrace {
     let directoryTargets: [[UInt16]]?
     let configuration: TestConfiguration?
     let usesKoreanScoring: Bool
+    let sourceClassification: Bool
     private var order: [Int] = []
     private var snapshots: [Int: Snapshot] = [:]
+    // Only the whole-test source reader needs unbounded sampling. Prefix
+    // totals follow first appearance, not numeric word order; a max heap
+    // tracks the highest nonempty field even after deletion and reentry.
+    private var ranks: [Int: Int] = [:]
+    private var sums: [(credit: Int, raw: Int)] = [(0, 0)]
+    private var nonemptyHeap: [Int] = []
+    private var heapMembers: Set<Int> = []
 
     init?(prompt: String, events: [TypingReplayEvent], configuration: TestConfiguration?,
-      targetWordDirectory: ResultTargetWordDirectory?, sourceScoringBasis: ResultScoringUnitBasis?) {
+      targetWordDirectory: ResultTargetWordDirectory?, sourceScoringBasis: ResultScoringUnitBasis?,
+      sourceClassification: Bool = false) {
       guard !events.isEmpty else { return nil }
       guard events.allSatisfy({ event in
         guard let field = event.inputField, field.index >= 0,
@@ -1416,10 +1510,12 @@ enum ResultPerformanceTrace {
       }
       self.configuration = configuration
       usesKoreanScoring = sourceScoringBasis == .koreanJamo && configuration?.mode != .zen
+      self.sourceClassification = sourceClassification
     }
 
     mutating func apply(_ event: TypingReplayEvent) -> Int {
       let field = event.inputField!
+      let previous = snapshots[field.index]
       let units = field.units.map { unit -> UInt16 in
         guard let scalar = UnicodeScalar(UInt32(unit)),
           InputCharacterEquivalence.isReferenceSpace(Character(String(scalar))) else { return unit }
@@ -1427,13 +1523,24 @@ enum ResultPerformanceTrace {
       }
       let target = configuration?.mode == .zen ? units
         : directoryTargets?[field.index] ?? targets!.field(field.index)
-      if snapshots[field.index] == nil { order.append(field.index) }
-      if usesKoreanScoring {
+      if previous == nil {
+        order.append(field.index)
+        if sourceClassification {
+          let rank = order.count
+          ranks[field.index] = rank
+          let end = prefixTotals(rank - 1)
+          let start = prefixTotals(rank - (rank & -rank))
+          sums.append((end.credit - start.credit, end.raw - start.raw))
+        }
+      }
+      if usesKoreanScoring || sourceClassification {
         let input = RecordedInputFieldStats.classificationInput(for: event)
-        let full = ResultUnitCharacterStats.classify(input: input, target: target,
-          creditsPartial: false, basis: .koreanJamo)
-        let prefix = ResultUnitCharacterStats.classify(input: input, target: target,
-          creditsPartial: true, basis: .koreanJamo)
+        let scoringTarget = configuration?.mode == .zen ? input : target
+        let basis: ResultScoringUnitBasis = usesKoreanScoring ? .koreanJamo : .utf16
+        let full = ResultUnitCharacterStats.classify(input: input, target: scoringTarget,
+          creditsPartial: false, basis: basis)
+        let prefix = ResultUnitCharacterStats.classify(input: input, target: scoringTarget,
+          creditsPartial: true, basis: basis)
         snapshots[field.index] = .init(fullCredit: full.correctWord, prefixCredit: prefix.correctWord,
           rawCount: full.allCorrect + full.incorrect + full.extra,
           endsWithInsertedSpace: event.kind == .insert && event.inputUnits == [32])
@@ -1443,6 +1550,16 @@ enum ResultPerformanceTrace {
         snapshots[field.index] = .init(fullCredit: units == target ? units.count : 0,
           prefixCredit: target.starts(with: units) ? units.count : 0, rawCount: units.count,
           endsWithInsertedSpace: event.kind == .insert && event.inputUnits == [32])
+      }
+      if sourceClassification {
+        let current = snapshots[field.index]!
+        var rank = ranks[field.index]!
+        while rank < sums.count {
+          sums[rank].credit += current.fullCredit - (previous?.fullCredit ?? 0)
+          sums[rank].raw += current.rawCount - (previous?.rawCount ?? 0)
+          rank += rank & -rank
+        }
+        updateNonemptyFields(field.index, nonempty: current.rawCount > 0)
       }
       // Judgments own attempt errors. For genuine older field tapes without
       // them, compare at the insertion interval of this captured field, not a
@@ -1459,7 +1576,54 @@ enum ResultPerformanceTrace {
       }
     }
 
+    private func prefixTotals(_ count: Int) -> (credit: Int, raw: Int) {
+      var rank = count
+      var total = (credit: 0, raw: 0)
+      while rank > 0 {
+        total.credit += sums[rank].credit
+        total.raw += sums[rank].raw
+        rank -= rank & -rank
+      }
+      return total
+    }
+
+    private mutating func updateNonemptyFields(_ field: Int, nonempty: Bool) {
+      if nonempty, heapMembers.insert(field).inserted {
+        nonemptyHeap.append(field)
+        var child = nonemptyHeap.count - 1
+        while child > 0 {
+          let parent = (child - 1) / 2
+          guard nonemptyHeap[child] > nonemptyHeap[parent] else { break }
+          nonemptyHeap.swapAt(child, parent)
+          child = parent
+        }
+      }
+      while let top = nonemptyHeap.first, snapshots[top]!.rawCount == 0 {
+        heapMembers.remove(top)
+        let last = nonemptyHeap.removeLast()
+        guard !nonemptyHeap.isEmpty else { continue }
+        nonemptyHeap[0] = last
+        var parent = 0
+        while parent * 2 + 1 < nonemptyHeap.count {
+          var child = parent * 2 + 1
+          if child + 1 < nonemptyHeap.count, nonemptyHeap[child + 1] > nonemptyHeap[child] { child += 1 }
+          guard nonemptyHeap[child] > nonemptyHeap[parent] else { break }
+          nonemptyHeap.swapAt(child, parent)
+          parent = child
+        }
+      }
+    }
+
     var counts: (credit: Int, raw: Int) {
+      if sourceClassification {
+        let highest = nonemptyHeap.first
+        let active = highest.map { snapshots[$0]!.endsWithInsertedSpace && $0 < Int.max ? $0 + 1 : $0 } ?? 0
+        if let rank = ranks[active], let snapshot = snapshots[active] {
+          let before = prefixTotals(rank - 1)
+          return (before.credit + snapshot.prefixCredit, before.raw + snapshot.rawCount)
+        }
+        return prefixTotals(order.count)
+      }
       var active = 0
       if let last = order.filter({ snapshots[$0]!.rawCount > 0 }).max(), let snapshot = snapshots[last] {
         active = snapshot.endsWithInsertedSpace && last < Int.max ? last + 1 : last

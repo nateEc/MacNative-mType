@@ -5661,6 +5661,7 @@ private struct CompletedResultView: View {
   let onPracticeMissedAndSlowWords: ([String], Int) -> Void
   let onPracticeContextualMissedAndSlowWords: ([String], Int) -> Void
   @State private var exportStatus: String?
+  @State private var wpmConsistencyLoader = ResultWPMConsistencyLoader()
   @State private var communityRating: RemoteQuoteRatingResponse?
   @State private var quoteFeedbackStatus: String?
   @State private var quoteReportReason: RemoteQuoteReportReason = .other
@@ -5742,6 +5743,11 @@ private struct CompletedResultView: View {
             consistency.typing, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
           metric("按键稳定度", ResultMetricPresentation.percentage(
             consistency.key, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces))
+        }
+        GridRow {
+          metric("WPM 稳定度", wpmConsistencyText)
+          Text("根据正确速度变化；与输入节奏不同")
+            .font(.caption).foregroundStyle(.secondary)
         }
         if result.afkDuration > 0 {
           GridRow {
@@ -6000,6 +6006,12 @@ private struct CompletedResultView: View {
     .focusedSceneValue(\.openCommandPalette) { showingCommandPalette = true }
     .onAppear {
       communityRating = initialCommunityRating
+    }
+    .task(id: result.id) {
+      let input = try? ResultWPMConsistencyInput(prompt: result.prompt, events: result.replayEvents,
+        duration: result.elapsedDuration, configuration: result.configuration,
+        targetWordDirectory: result.targetWordDirectory, sourceScoringBasis: result.characterStats.sourceUnitBasis)
+      await wpmConsistencyLoader.load(input)
     }
     .sheet(isPresented: $showingCommandPalette) {
       CommandPaletteView(
@@ -6348,6 +6360,15 @@ private struct CompletedResultView: View {
     ResultConsistencyPolicy.metrics(
       events: result.replayEvents, duration: result.elapsedDuration,
       configuration: result.configuration, keySpacingSamples: result.keySpacingSamples)
+  }
+
+  private var wpmConsistencyText: String {
+    switch wpmConsistencyLoader.state {
+    case .loading: "计算中…"
+    case .unavailable: "不可用"
+    case .value(let value):
+      ResultMetricPresentation.percentage(value, alwaysShowDecimalPlaces: alwaysShowDecimalPlaces)
+    }
   }
 
   private func metric(_ title: String, _ value: String) -> some View {
@@ -8831,6 +8852,17 @@ private struct ResultTagEditor: View {
   }
 }
 
+private struct ResultWPMConsistencyRecordIdentity: Hashable {
+  let id: UUID
+  let prompt: String
+  let startedAt: Date
+  let finishedAt: Date
+  let configurationData: Data
+  let replayEventsData: Data?
+  let targetWordDirectoryData: Data?
+  let characterStatsData: Data?
+}
+
 private struct ResultDetailView: View {
   @Environment(\.dismiss) private var dismiss
   let result: TestResultRecord
@@ -8839,6 +8871,7 @@ private struct ResultDetailView: View {
   let typingSpeedUnit: TypingSpeedUnit
   let settings: AppSettings
   @State private var showingPerformanceChart = false
+  @State private var wpmConsistencyLoader = ResultWPMConsistencyLoader()
 
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
@@ -8933,6 +8966,10 @@ private struct ResultDetailView: View {
           Text("稳定度 / 按键稳定度")
           Text("\(consistencyText(consistency.typing))% / \(consistencyText(consistency.key))%")
         }
+        GridRow {
+          Text("WPM 稳定度")
+          Text(wpmConsistencyText)
+        }
         if result.afkDuration > 0 {
           GridRow {
             Text("闲置 / 有效键入")
@@ -8986,6 +9023,13 @@ private struct ResultDetailView: View {
     }
     .padding(32)
     .frame(width: 460, height: 620)
+    .task(id: wpmConsistencyIdentity) {
+      let input = ResultWPMConsistencyInput(prompt: result.prompt, duration: elapsedDuration,
+        configurationData: result.configurationData, replayEventsData: result.replayEventsData,
+        targetWordDirectoryData: result.targetWordDirectoryData,
+        sourceScoringBasis: result.characterStats.sourceUnitBasis)
+      await wpmConsistencyLoader.load(input)
+    }
     .sheet(isPresented: $showingPerformanceChart) {
       HistoricalResultPerformanceChart(result: result, typingSpeedUnit: typingSpeedUnit, settings: settings)
     }
@@ -9022,6 +9066,20 @@ private struct ResultDetailView: View {
 
   private func consistencyText(_ value: Double) -> String {
     value.formatted(.number.precision(.fractionLength(0...2)))
+  }
+
+  private var wpmConsistencyIdentity: ResultWPMConsistencyRecordIdentity {
+    .init(id: result.id, prompt: result.prompt, startedAt: result.startedAt, finishedAt: result.finishedAt,
+      configurationData: result.configurationData, replayEventsData: result.replayEventsData,
+      targetWordDirectoryData: result.targetWordDirectoryData, characterStatsData: result.characterStatsData)
+  }
+
+  private var wpmConsistencyText: String {
+    switch wpmConsistencyLoader.state {
+    case .loading: "计算中…"
+    case .unavailable: "不可用（无可用字段采样）"
+    case .value(let value): "\(consistencyText(value))%"
+    }
   }
 
   private var characterStatsText: String {

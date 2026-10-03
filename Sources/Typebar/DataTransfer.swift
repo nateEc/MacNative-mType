@@ -58,6 +58,7 @@ enum ResultCSVExport {
         "source_incorrect_scoring_units",
         "source_extra_scoring_units",
         "source_missed_scoring_units",
+        "wpm_consistency_percent",
     ]
 
     static func data(for results: [CompletedTestResult]) -> Data {
@@ -133,6 +134,10 @@ enum ResultCSVExport {
             units.map { String($0.incorrect) } ?? "",
             units.map { String($0.extra) } ?? "",
             units.map { String($0.missed) } ?? "",
+            ResultPerformanceTrace.wpmConsistency(prompt: result.prompt, events: result.replayEvents,
+                duration: result.elapsedDuration, configuration: result.configuration,
+                targetWordDirectory: result.targetWordDirectory,
+                sourceScoringBasis: result.characterStats.sourceUnitBasis).map(decimal) ?? "",
         ]
     }
 
