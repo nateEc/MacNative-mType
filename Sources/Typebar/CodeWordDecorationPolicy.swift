@@ -1,10 +1,13 @@
+import Foundation
+
 typealias CodeWordDecorationPolicy = PoolWordDecorationPolicy
 
-/// Common native per-word decoration for owned code and entry pools. It stays
+/// Common native per-word decoration for owned English, code and entry pools. It stays
 /// separate from authored programs and uses the already-altered prior target.
 enum PoolWordDecorationPolicy {
   static func decorated(_ word: String, previousTarget: String?, language: TypingLanguage,
     wordIndex: Int, wordBound: Int, options: ContentOptions,
+    britishEnglish: BritishEnglishPolicy.Context? = nil,
     random: () -> Double = { Double.random(in: 0..<1) }) -> String {
     var result = word
     if options.includePunctuation {
@@ -16,6 +19,8 @@ enum PoolWordDecorationPolicy {
         result = result.replacingOccurrences(of: control, with: "") + control
       }
     }
+    result = BritishEnglishPolicy.transformed(result, context: britishEnglish,
+      previousWord: previousTarget.map(BritishEnglishPolicy.previousWordKey))
     if options.includeNumbers && random() < 0.1 {
       let length = integer(random(), count: 4, lowerBound: 1)
       result = (0..<length).map { position in
@@ -31,7 +36,11 @@ enum PoolWordDecorationPolicy {
     let last = previous?.last
     let canWrap = last != "," && last != "."
     if !isCode && (index == 0 || last.map { ".?!؟".contains($0) } == true) {
-      return word.prefix(1).uppercased() + word.dropFirst()
+      return word.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
+        .components(separatedBy: " ").map { component in
+          guard let first = component.unicodeScalars.first, first.value <= 0xFFFF else { return component }
+          return String(first).uppercased() + String(component.unicodeScalars.dropFirst())
+        }.joined(separator: " ")
     }
     // Draw before the guards, including the forced terminal branch. Fixed
     // unit fixtures must not accidentally shift all following decisions.
@@ -68,9 +77,11 @@ enum PoolWordDecorationPolicy {
       }
       return operators[self.index(random(), count: operators.count)]
     }
-    // The pinned common decorator draws for its English-only contraction
-    // branch even when the code/Dockerfile language cannot enter it.
-    _ = random()
+    // Draw for this gate even outside English. The replacement itself takes
+    // one independent choice only if its whole ASCII-word match succeeds.
+    if random() < 0.5 && EnglishWordPoolContent.supports(language) {
+      return EnglishPunctuationPolicy.replacingAtWordGate(word, random: random)
+    }
     return word
   }
 

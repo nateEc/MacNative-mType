@@ -8261,6 +8261,25 @@ enum EnglishPunctuationPolicy {
     return prefix + preservingCase(of: source, in: choice) + suffix
   }
 
+  /// The per-word generator has already consumed the probability gate.
+  /// JavaScript's non-word wrappers exclude ASCII digits and underscore;
+  /// non-ASCII letters can be wrappers, not part of the matched English key.
+  static func replacingAtWordGate(_ token: String, random: () -> Double) -> String {
+    let scalars = Array(token.unicodeScalars)
+    func isWord(_ scalar: Unicode.Scalar) -> Bool {
+      (65...90).contains(scalar.value) || (97...122).contains(scalar.value)
+        || (48...57).contains(scalar.value) || scalar.value == 95
+    }
+    guard let start = scalars.firstIndex(where: isWord), let end = scalars.lastIndex(where: isWord)
+    else { return token }
+    let source = String(String.UnicodeScalarView(scalars[start...end]))
+    guard let choices = replacements[source.lowercased()] else { return token }
+    let choice = choices[boundedIndex(random(), upperBound: choices.count)]
+    return String(String.UnicodeScalarView(scalars[..<start]))
+      + preservingCase(of: source, in: choice)
+      + String(String.UnicodeScalarView(scalars[(end + 1)...]))
+  }
+
   static func punctuatedPrompt(
     _ rawTokens: [String], random: () -> Double = { Double.random(in: 0..<1) }
   ) -> [String] {

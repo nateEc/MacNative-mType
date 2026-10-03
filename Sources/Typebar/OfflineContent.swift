@@ -6097,6 +6097,24 @@ struct GeneratedStreamContinuation {
   }
 }
 
+/// Native single-language English identities share a per-word generator.
+/// Other ordinary languages retain their own pending punctuation contracts.
+enum EnglishWordPoolContent {
+  static func supports(_ language: TypingLanguage) -> Bool {
+    switch language {
+    case .english, .english1k, .english5k, .english10k, .english25k, .english450k,
+      .englishCommonlyMisspelled, .englishContractions, .englishDoubleLetter,
+      .englishLegal, .englishMedical, .englishShakespearean, .oldEnglish: true
+    default: false
+    }
+  }
+
+  static func pool(for configuration: TestConfiguration) -> IndexedLexicon? {
+    supports(configuration.language)
+      ? configuration.language.ownedPracticeLexicon(englishVariant: configuration.englishVariant) : nil
+  }
+}
+
 enum OrdinaryEntryContent {
   static func pool(for language: TypingLanguage) -> IndexedLexicon? {
     switch language {
@@ -6146,6 +6164,7 @@ struct GeneratedCandidateContinuation {
     self.weakSpotScores = weakSpotScores
     let candidates = sourceWords.map(IndexedLexicon.init)
       ?? OrdinaryEntryContent.pool(for: configuration.language)
+      ?? EnglishWordPoolContent.pool(for: configuration)
       ?? IndexedLexicon(CodePracticeContent.wordCandidates(for: configuration.language))
     pool = IndexedLexicon.ordered(candidates,
       reversed: configuration.modifiers.contains(.backwards))
@@ -6214,16 +6233,19 @@ struct GeneratedCandidateContinuation {
         && word.utf8.contains(where: { (65...90).contains($0) }) {
         word = word.lowercased()
       }
+      if EnglishWordPoolContent.supports(configuration.language), configuration.modifiers.contains(.lazyLatin) {
+        word = TypingTextNormalizer.lazyLatin(word, language: configuration.language)
+      }
       let options = configuration.language == .typingOfTheDead
         ? ContentOptions(includePunctuation: false, includeNumbers: configuration.contentOptions.includeNumbers)
         : configuration.contentOptions
       word = PoolWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
         language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
-        options: options, random: nextRandomContentUnit)
+        options: options, britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
+        random: nextRandomContentUnit)
       sourceWords.append(word)
       let target = TestModifierPolicy.transformedWord(word, modifiers: configuration.modifiers,
         language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
-        britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
         nextRandomCaseBit: nextRandomCaseBit)
       output += target
       targets.append(target)
@@ -6253,7 +6275,13 @@ struct GeneratedCandidateContinuation {
     let latest = previousTargets.last?.filter { !".?!\":-,".contains($0) }.lowercased() ?? ""
     let earlier = previousTargets.dropLast().last?.filter { !".?!\":-,'".contains($0) }.lowercased() ?? ""
     var word = initialCandidate
-    var comparison = word.components(separatedBy: " ")[0].lowercased()
+    func candidateComparison(_ candidate: String, firstDraw: Bool) -> String {
+      let first = candidate.components(separatedBy: " ")[0]
+      let value = firstDraw ? first.lowercased() : first
+      return EnglishWordPoolContent.supports(configuration.language) && configuration.modifiers.contains(.lazyLatin)
+        ? TypingTextNormalizer.lazyLatin(value, language: configuration.language) : value
+    }
+    var comparison = candidateComparison(word, firstDraw: true)
     var retries = 0
     while retries < 100 && (comparison == latest || comparison == earlier
       || (!configuration.contentOptions.includeNumbers && word.utf8.contains { (48...57).contains($0) })
@@ -6264,7 +6292,7 @@ struct GeneratedCandidateContinuation {
       word = drawCandidate(random: random)
       // The pinned generator lowercases the first comparison but preserves
       // case on a redraw. Keep this asymmetry until its source contract changes.
-      comparison = word.components(separatedBy: " ")[0]
+      comparison = candidateComparison(word, firstDraw: false)
       retries += 1
     }
     return word
@@ -6333,6 +6361,7 @@ struct TestSessionFactory {
       preservesGeneratedWordOrder = true
     } else if let streamWordCount,
       configuration.language.isCodeLanguage || OrdinaryEntryContent.pool(for: configuration.language) != nil
+        || EnglishWordPoolContent.supports(configuration.language)
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
         batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores)

@@ -36,4 +36,4 @@ Scripts/check-source-code-decoration.mjs 完整载入九个实际模块，新加
 
 源码驱动、行为优先、简洁局部实现及会话内决策／迁移／风险复核限定本增量；根因调试区分旧期望、适配缺项和空词守卫缺陷，写作复核区分导航发起与异步完成。不是独立审查。
 
-后续优先核对普通候选取样、逐词标点与数字装饰，避免把初始整批格式化规则用于每次一词续接。其他普通多词源、外部／Polyglot、自定义词流、pullSection、原始 live-cache、Unicode／半代理及完整 Funbox 组合未关闭。GUI／IME／VoiceOver、浏览器微任务、旧库／降级、长期缓存内存与长程性能、源词库／随机分布、主题身份和服务部署仍开放。94 配置键及部分 Funbox 总体覆盖不升级，完整 goal active。
+后续[英语逐词候选与上下文装饰](ENGLISH_WORD_POOL_CONTRACT.md) 已将十三个英语主入口接入候选游标，补齐英语缩写、全局索引与实际前词，不能把它推广为所有普通语言等价。其他普通语言的特殊标点／数字字形、多词源、外部／Polyglot、自定义词流、pullSection、原始 live-cache、Unicode／半代理及完整 Funbox 组合未关闭。GUI／IME／VoiceOver、浏览器微任务、旧库／降级、长期缓存内存与长程性能、源词库／随机分布、主题身份和服务部署仍开放。94 配置键及部分 Funbox 总体覆盖不升级，完整 goal active。

@@ -78,6 +78,7 @@ const bindings = {
 const actual = new Set(['test/words-generator', 'test/wordset', 'test/funbox/funbox-functions',
   'test/weak-spot', 'utils/generate', 'utils/strings', '@monkeytype/util/numbers',
   'test/test-logic', 'input/helpers/word-navigation']);
+actual.add('test/english-punctuation');
 const modules = new Map(), requested = new Map();
 const resolve = (id, from) => id.startsWith('.')
   ? path.posix.normalize(path.posix.join(path.posix.dirname(from), id)) : id;
@@ -404,6 +405,45 @@ assert.equal(ownedWordQueue.data.at(-1), 'elm');
 ranks = [1]; await logic.addWord();
 assert.equal(ownedWordQueue.length, 3); assert.deepEqual(ranks, [1]); lookaheadCount++;
 console.log(`${lookaheadCount} generated-lookahead fixtures passed (9 actual modules, initial limits, visibility override, inclusive queue bound, single refill, forward/await ordering and finite exhaustion; owned queue/events/DOM/ranks, no browser or input-capture parity claim).`);
+
+// English decoration and continuation use the real contraction module too.
+// Candidate strings, rank draws and the queue remain self-authored adapters.
+let englishCount = 0;
+config.language = 'english'; activeNames = []; repeated = false;
+async function englishPunctuation(word, previous, index, bound, draws, expected) {
+  units = [...draws];
+  assert.equal(await main.namespace.punctuateWord(previous, word, index, bound), expected);
+  assert.equal(units.length, 0); englishCount++;
+}
+await englishPunctuation('node', undefined, 0, 1, [], 'Node');
+await englishPunctuation('𐐨bay', undefined, 0, 100, [], '𐐨bay');
+await englishPunctuation('ébay', undefined, 0, 100, [], 'Ébay');
+await englishPunctuation('node', 'bay!', 100, 100, [], 'Node');
+await englishPunctuation('node', 'bay', 100, 100, Array(10).fill(0.5), 'node');
+for (const [word, choice, expected] of [['are', 0, "aren't"], ['(IT)', 0.99, "(IT'LL)"],
+  ['I', 0, "I'm"], ['éareé', 0, "éaren'té"]]) {
+  await englishPunctuation(word, 'bay', 100, 100, [...Array(9).fill(0.5), 0.49, choice], expected);
+}
+for (const word of ['2are', 'are2', '_are', 'are_', 'are bay']) {
+  await englishPunctuation(word, 'bay', 100, 100, [...Array(9).fill(0.5), 0], word);
+}
+await englishPunctuation('are', 'bay', 100, 100, Array(10).fill(0.5), 'are');
+const englishPool = ['node', 'bay', 'are']; candidatePools.add(englishPool);
+config.mode = 'words'; config.words = 101; config.punctuation = false; config.numbers = false;
+ranks = Array.from({length: 100}, (_, index) => index % 3); units = [];
+const englishOpening = await main.namespace.generateWords({name: 'english', words: englishPool});
+assert.equal(englishOpening.words.length, 100); assert.equal(ranks.length, 0);
+config.punctuation = true; config.numbers = true;
+ranks = [2]; units = [...Array(9).fill(0.5), 0, 0, 0, 0.25, 0.999, 0];
+const englishFuture = await main.namespace.getNextWord(100, 100, 'bay', 'node');
+assert.equal(englishFuture.wordRaw, '90'); assert.equal(englishFuture.word, '90 ');
+assert.equal(ranks.length, 0); assert.equal(units.length, 0); englishCount++;
+repeated = true; ranks = [1]; units = [0.777];
+const englishCached = await main.namespace.getNextWord(100, 100, 'changed', 'inputs');
+assert.deepEqual(englishCached, englishFuture); assert.deepEqual(ranks, [1]);
+assert.deepEqual(units, [0.777]); englishCount++;
+repeated = false; config.punctuation = false; config.numbers = false;
+console.log(`${englishCount} english-word fixtures passed (10 complete actual modules, global continuation, contraction wrappers/choices, numeric overwrite and cache; owned words/ranks/DOM adapters, no vocabulary/RNG/British dictionary/browser/device parity claim).`);
 
 // Metadata-only inventory: read values to count sections, never print, persist
 // or import upstream word strings into the native content pool.
