@@ -5574,6 +5574,26 @@ enum CodePracticeContent {
     return tokens.isEmpty ? [language.displayName] : tokens
   }
 
+  /// Main code practice keeps authored phrases only for identities whose
+  /// pinned source pools support sections. Polyglot keeps its flat contract.
+  static func wordCandidates(for language: TypingLanguage) -> [String] {
+    let tokens = polyglotTokens(for: language)
+    switch language {
+    case .codeABAP, .codeHaskell, .codeJavaScript, .codeJavaScriptReact,
+      .codeOCaml, .codeOok, .codeRust, .codeTypst, .codeVim:
+      let phrases = prompt(language: language, targetTokenCount: 24)
+        .split(separator: "\n").compactMap { line -> String? in
+          let words = line.split(whereSeparator: \Character.isWhitespace)
+          return words.count > 1 ? words.joined(separator: " ") : nil
+        }
+      // Ook instructions are pairs, never standalone words in its source
+      // pool. The owned lines remain sections; no upstream vocabulary copied.
+      return language == .codeOok ? phrases : tokens + phrases
+    default:
+      return tokens
+    }
+  }
+
   private static func blocks(for language: TypingLanguage) -> [String] {
     switch language {
     case .dockerFile:
@@ -6023,13 +6043,15 @@ struct GeneratedCodeContinuation {
   private var emittedWords = 0
   private var generatedChunks: [GeneratedWordChunk] = []
   private var replayIndex: Int?
+  private var sectionWords: [String] = []
+  private var nextSectionWord = 0
 
   init(configuration: TestConfiguration, batchTokenCount: Int, showAllLines: Bool = false,
     weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil) {
     self.configuration = configuration
     self.batchTokenCount = batchTokenCount
     self.weakSpotScores = weakSpotScores
-    pool = IndexedLexicon.ordered(sourceWords ?? CodePracticeContent.polyglotTokens(for: configuration.language),
+    pool = IndexedLexicon.ordered(sourceWords ?? CodePracticeContent.wordCandidates(for: configuration.language),
       reversed: configuration.modifiers.contains(.backwards))
     previewsWholeFiniteWords = GeneratedPromptChunkPolicy.previewsWholeFiniteWords(
       for: configuration, showAllLines: showAllLines)
@@ -6046,6 +6068,10 @@ struct GeneratedCodeContinuation {
     // The original opening is already restored by TypingSession. Replay only
     // the exact chunks generated after it, including sampled case and targets.
     copy.replayIndex = min(1, generatedChunks.count)
+    // The source resets its section on repeat. Cached actual targets survive,
+    // but after that cache ends generation starts a fresh candidate section.
+    copy.sectionWords = []
+    copy.nextSectionWord = 0
     return copy
   }
 
@@ -6070,11 +6096,23 @@ struct GeneratedCodeContinuation {
     var targets: [String] = []
     var output = emittedWords > 0 && !noSpace && previousTargets.last?.hasSuffix("\n") != true ? " " : ""
     for index in 0..<count {
-      var word = sampledWord(random: nextRandomWordIndex)
-      if configuration.modifiers.contains(.weakSpot) {
-        word = WeakSpotWordSelection.word(from: pool, scores: weakSpotScores,
-          random: nextRandomWordIndex) ?? word
+      // One base draw per emitted word, including unused draws while a section
+      // is pending. Gates and Weakspot run only when selecting a new section.
+      let candidate = drawCandidate(random: nextRandomWordIndex)
+      if nextSectionWord >= sectionWords.count {
+        var section = sampledWord(initialCandidate: candidate, random: nextRandomWordIndex)
+        section = section.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
+        if section.hasPrefix(" ") { section.removeFirst() }
+        if section.hasSuffix(" ") { section.removeLast() }
+        if configuration.modifiers.contains(.weakSpot) {
+          section = WeakSpotWordSelection.word(from: pool, scores: weakSpotScores,
+            random: nextRandomWordIndex) ?? section
+        }
+        sectionWords = section.components(separatedBy: " ")
+        nextSectionWord = 0
       }
+      var word = sectionWords[nextSectionWord]
+      nextSectionWord += 1
       // Dockerfile is a code-oriented native entry, but not a code_* source
       // language. Its ordinary-source case rule remains distinct.
       if configuration.language == .dockerFile && !configuration.contentOptions.includePunctuation {
@@ -6102,30 +6140,31 @@ struct GeneratedCodeContinuation {
     return chunk
   }
 
-  private func sampledWord(random: () -> Int) -> String {
-    func draw() -> String {
-      let value = random()
-      let rank = configuration.modifiers.contains(.zipf)
-        ? ZipfWordSelection.index(in: pool.count, random: {
-          Double(value.magnitude) / (Double(Int.max) + 1)
-        })
-        : Int(value.magnitude % UInt(pool.count))
-      return pool[rank]
-    }
-    let latest = previousTargets.last?.filter { !".?!\":-,".contains($0) }.lowercased()
-    let earlier = previousTargets.dropLast().last?.filter { !".?!\":-,'".contains($0) }.lowercased()
-    var word = draw()
-    var comparison = word.lowercased()
+  private func drawCandidate(random: () -> Int) -> String {
+    let value = random()
+    let rank = configuration.modifiers.contains(.zipf)
+      ? ZipfWordSelection.index(in: pool.count, random: {
+        Double(value.magnitude) / (Double(Int.max) + 1)
+      })
+      : Int(value.magnitude % UInt(pool.count))
+    return pool[rank]
+  }
+
+  private func sampledWord(initialCandidate: String, random: () -> Int) -> String {
+    let latest = previousTargets.last?.filter { !".?!\":-,".contains($0) }.lowercased() ?? ""
+    let earlier = previousTargets.dropLast().last?.filter { !".?!\":-,'".contains($0) }.lowercased() ?? ""
+    var word = initialCandidate
+    var comparison = word.components(separatedBy: " ")[0].lowercased()
     var retries = 0
     while retries < 100 && (comparison == latest || comparison == earlier
       || (!configuration.contentOptions.includeNumbers && word.utf8.contains { (48...57).contains($0) })
       || (!configuration.contentOptions.includePunctuation && word == "I")
       || (configuration.language == .dockerFile && !configuration.contentOptions.includePunctuation
         && word.contains { "-=_+[]{};'\\:\"|,./<>?".contains($0) })) {
-      word = draw()
+      word = drawCandidate(random: random)
       // The pinned generator lowercases the first comparison but preserves
       // case on a redraw. Keep this asymmetry until its source contract changes.
-      comparison = word
+      comparison = word.components(separatedBy: " ")[0]
       retries += 1
     }
     return word
