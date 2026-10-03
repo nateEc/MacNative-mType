@@ -133,21 +133,20 @@ final class CodeWordContractTests: XCTestCase {
     XCTAssertEqual(trace.errorCount, 2)
   }
 
-  func testCodeCursorClampsTheFiniteTailAndRetainsUnusedSourceWords() {
+  func testCodeCursorClampsTheFiniteTailWithoutOverdrawing() {
     var cursor = GeneratedCodeContinuation(configuration: .words(101, language: .codeSwift),
-      batchTokenCount: 100, nextUnitIndex: 0)
-    let first = cursor.nextChunk()
-    let tail = cursor.nextChunk()
+      batchTokenCount: 100, sourceWords: ["ab", "cd", "ef"])
+    var rank = 0
+    func draw() -> Int { defer { rank += 1 }; return rank % 3 }
+    let first = cursor.nextChunk(nextRandomWordIndex: draw)
+    let tail = cursor.nextChunk(nextRandomWordIndex: draw)
     XCTAssertEqual(first.source.split(separator: " ").count, 100)
     XCTAssertEqual(tail.source.split(separator: " ").count, 1)
     XCTAssertTrue(tail.source.hasPrefix(" "))
     XCTAssertFalse(cursor.hasRemaining)
     XCTAssertEqual(cursor.nextChunk().source, "")
-    var expected: [String] = []
-    for index in 0..<20 {
-      expected += CodePracticeContent.prompt(language: .codeSwift, targetTokenCount: 1,
-        startUnitIndex: index).split(whereSeparator: \.isWhitespace).map(String.init)
-    }
+    XCTAssertEqual(rank, 101)
+    let expected = (0..<101).map { ["ab", "cd", "ef"][$0 % 3] }
     XCTAssertEqual(first.source + tail.source, expected.prefix(101).joined(separator: " "))
   }
 

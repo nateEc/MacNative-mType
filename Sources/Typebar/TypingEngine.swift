@@ -4486,7 +4486,7 @@ struct TypingSession {
       configuration: configuration, prompt: initialPrompt, repeatingPrompt: repeatingPrompt,
       generatedWordContinuation: initialGeneratedWordContinuation,
       generatedStreamContinuation: initialGeneratedStreamContinuation,
-      generatedCodeContinuation: initialGeneratedCodeContinuation,
+      generatedCodeContinuation: generatedCodeContinuation?.replayingContinuation() ?? initialGeneratedCodeContinuation,
       sectionEndIndices: initialSectionEndIndices,
       noSpaceSectionWordEnds: initialNoSpaceSectionWordEnds,
       randomCustomSourceTokens: randomCustomSourceTokens,

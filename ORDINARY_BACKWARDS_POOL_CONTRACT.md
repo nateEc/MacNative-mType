@@ -6,7 +6,7 @@
 
 参考目录只读固定在 91bd24bb8513785c7364cbea29296ff7adafac41。[候选池构造](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L639) 先反转 wordList，再调用 withWords 和建立 Wordset。[实际 Wordset](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/wordset.ts) 从已排列的池按普通或 Zipf 索引抽样；getNextWord 才进行当前词的文字变换。[Polyglot](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/funbox/funbox-functions.ts#L653) 的 withWords 忽略传入池并加载组合语言，不能把该新池再次反转。[Weakspot](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/weak-spot.ts) 按 for-of 字符迭代，仅累计 book 中已有的字符，包括值为零的已学记录；从 20 个候选中保持第一个最高分词。
 
-Scripts/check-source-generated-backwards-order.mjs 现在运行完整实际 words-generator、funbox-functions、wordset、weak-spot 四个模块。保留四组生成型夹具，并新增九组：普通／Zipf 的正反池共四组，未知字符、已学零分、组合标记、辅助平面字符四组，以及 Polyglot 新池一组。普通池 ab/cd/ef 按自有固定索引 0/2/1，正常输出 ab/ef/cd；反池再逐词反写输出 fe/ba/dc。
+该历史阶段的 Scripts/check-source-generated-backwards-order.mjs 运行完整实际 words-generator、funbox-functions、wordset、weak-spot 四个模块。保留四组生成型夹具，并新增九组：普通／Zipf 的正反池共四组，未知字符、已学零分、组合标记、辅助平面字符四组，以及 Polyglot 新池一组。普通池 ab/cd/ef 按自有固定索引 0/2/1，正常输出 ab/ef/cd；反池再逐词反写输出 fe/ba/dc。此后脚本增加十组代码池夹具，当前二十三组的范围与结果见 CODE_POOL_GENERATION_CONTRACT.md。
 
 随机索引与 Zipf 索引、shuffle、语言内容、配置、活动元数据、输入间隔、GetText、类型及 UI／异常都是明确的自有适配。测试执行真实取词和评分函数，但不执行原版随机分布算法、浏览器生命周期或实体输入；不能由这些夹具证明原版词库内容与随机分布等价。参考函数和资产不进入原生项目或包。
 

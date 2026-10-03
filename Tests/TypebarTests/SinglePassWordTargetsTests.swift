@@ -178,11 +178,12 @@ final class SinglePassWordTargetsTests: XCTestCase {
   func testEveryCodeFactoryReusesItsInitialChunkInsteadOfTransformingItAgain() {
     for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
       let plain = TestConfiguration.words(2, language: language)
-      var rawCursor = GeneratedCodeContinuation(configuration: plain, batchTokenCount: 2, nextUnitIndex: 0)
-      let source = rawCursor.nextChunk().source
+      var rawCursor = GeneratedCodeContinuation(configuration: plain, batchTokenCount: 2)
+      let source = rawCursor.nextChunk(nextRandomWordIndex: { 0 }).source
       let targets = source.split(separator: " ").map { $0.lowercased() }
       var draws = 0
       var attempt = TestSessionFactory.make(configuration: plain.with(modifiers: [.noSpaces, .randomCase]),
+        nextRandomWordIndex: { 0 },
         nextRandomCaseBit: { draws += 1; return false })
       XCTAssertEqual(draws, targets.reduce(0) { $0 + $1.unicodeScalars.count }, language.displayName)
       XCTAssertEqual(attempt.prompt, targets.joined(), language.displayName)
@@ -196,7 +197,7 @@ final class SinglePassWordTargetsTests: XCTestCase {
   func testEveryCodeContinuationKeeps100ThenOneActualTargetWithNoPrefixSample() {
     for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
       let config = TestConfiguration.words(101, language: language).with(modifiers: [.noSpaces, .randomCase])
-      var cursor = GeneratedCodeContinuation(configuration: config, batchTokenCount: 100, nextUnitIndex: 0)
+      var cursor = GeneratedCodeContinuation(configuration: config, batchTokenCount: 100)
       for count in [100, 1] {
         var draws = 0
         let chunk = cursor.nextChunk(nextRandomCaseBit: { draws += 1; return false })

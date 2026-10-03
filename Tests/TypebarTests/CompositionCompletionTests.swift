@@ -110,7 +110,7 @@ final class CompositionCompletionTests: XCTestCase {
     let configuration = TestConfiguration.words(4, language: .codeSwift)
     var session = TypingSession(
       configuration: configuration, prompt: "let value = item",
-      generatedCodeContinuation: .init(configuration: configuration, batchTokenCount: 100, nextUnitIndex: 1))
+      generatedCodeContinuation: .init(configuration: configuration, batchTokenCount: 100))
     session.insert("let value = ", at: start)
     XCTAssertTrue(session.usesIncrementalPromptExtension)
     XCTAssertTrue(session.shouldFinishWithComposition("item", at: start.addingTimeInterval(1)))

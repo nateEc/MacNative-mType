@@ -15,7 +15,7 @@ const actual=new Set(['test/words-generator','test/funbox/funbox-functions','tes
 const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMode:false,
   punctuation:false,numbers:false,britishEnglish:false};
 let activeNames=['backwards','binary'], functions, drawIndex=0;
-let ownedIndexes=[], spacingMs=0;
+let ownedIndexes=[], spacingMs=0, ownedRepeated=false;
 const languages={english:{name:'english',words:['ab','cd'],rightToLeft:false},
   owned:{name:'owned',words:['ef','gh'],rightToLeft:false}};
 const binary=i=>(i%256).toString(2).padStart(8,'0');
@@ -29,7 +29,7 @@ const bindings={
   'test/custom-text':{getPipeDelimiter:()=>false},
   'test/practise-words':{before:{mode:null}},
   'controllers/quotes-controller':{default:{}},
-  'states/test':{isRepeated:()=>false,getCurrentQuote:()=>null,setCurrentQuote:()=>{},getSelectedQuoteId:()=>null},
+  'states/test':{isRepeated:()=>ownedRepeated,getCurrentQuote:()=>null,setCurrentQuote:()=>{},getSelectedQuoteId:()=>null},
   'test/funbox/list':{
     getActiveFunboxes:active,
     getActiveFunboxesWithFunction:name=>active().filter(value=>typeof value.functions[name]==='function'),
@@ -84,6 +84,16 @@ const main=moduleFor('test/words-generator');
 await main.link((id,from)=>moduleFor(resolve(id,from.identifier)));
 await main.evaluate();
 functions=modules.get('test/funbox/funbox-functions').namespace.getFunboxFunctions();
+// Run the replay fixture first so the real generator's retained results begin
+// at index zero. Only the external repeated flag and rank draws are adapters.
+config.language='code_swift';activeNames=[];ownedIndexes=[0,2,1];
+const codeOpening=await main.namespace.generateWords({name:'code_swift',words:['ab','cd','ef']});
+assert.deepEqual(codeOpening.words,['ab ','ef ','cd ']);
+ownedRepeated=true;ownedIndexes=[2,2,2];
+const codeRepeated=await main.namespace.generateWords({name:'code_swift',words:['other','owned','pool']});
+assert.deepEqual(codeRepeated.words,codeOpening.words);
+assert.deepEqual(ownedIndexes,[2,2,2],'Repeat uses actual saved targets without rank draws');
+ownedRepeated=false;ownedIndexes=[];config.language='english';
 for(const [limit,showAll,underscore] of [[3,false,false],[3,false,true],[101,false,true],[101,true,true]]){
   config.words=limit;config.showAllLines=showAll;drawIndex=0;
   activeNames=['backwards','binary',...(underscore?['underscore_spaces']:[])];
@@ -142,3 +152,28 @@ assert.deepEqual(primary,['ash','elm','oak']);
 assert.deepEqual(polyglot.words,['ba ','hg ','dc '],'Polyglot builds a fresh combined pool, not the reversed primary list');
 assert.equal(ownedIndexes.length,0);
 console.log('9 ordinary/Zipf/weakspot/polyglot fixtures passed (4 complete actual modules; deterministic rank/shuffle/spacing/language adapters, no source RNG/distribution, physical input, corpus or browser parity claim).');
+config.language='code_swift';config.showAllLines=false;
+for(const zipf of [false,true]){
+  config.words=3;activeNames=['backwards',...(zipf?['zipf']:[])];ownedIndexes=[0,2,1];
+  const pool=['ab','cd','ef'];
+  const result=await main.namespace.generateWords({name:'code_swift',words:pool});
+  assert.deepEqual(pool,['ef','cd','ab']);
+  assert.deepEqual(result.words,['fe ','ba ','dc ']);
+  assert.equal(ownedIndexes.length,0);
+}
+for(const [pool,indexes,expected] of [
+  [['value2','func'],[0,1],['func ']],
+  [['foo()','Foundation','v٢'],[0,1,2],['foo() ','Foundation ','v٢ ']],
+  [['aa','AA'],[0,1,1],['aa ','AA ']],
+  [['value2'],Array(101).fill(0),['value2 ']],
+  [['I','Foundation'],[0,1],['Foundation ']],
+]){
+  config.words=expected.length;activeNames=[];ownedIndexes=[...indexes];
+  const result=await main.namespace.generateWords({name:'code_swift',words:pool});
+  assert.deepEqual(result.words,expected);
+  assert.equal(ownedIndexes.length,0);
+}
+config.words=1;activeNames=['weakspot'];ownedIndexes=[1,0,...Array(19).fill(1)];
+const codeWeak=await main.namespace.generateWords({name:'code_swift',words:['aaax','bb']});
+assert.deepEqual(codeWeak.words,['aaax ']);assert.equal(ownedIndexes.length,0);
+console.log('10 code-pool fixtures passed (normal/reverse/Zipf plumbing, real cached repeat, candidate gates and weakspot; ranks, source input words, repeated flag and runtime boundaries are owned adapters, no code corpus, source RNG, punctuation decoration, number injection or device equivalence claim).');

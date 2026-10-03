@@ -80,16 +80,16 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
 
   func testCodeContinuationDoesNotCreateATargetForItsLeadingCommitSpace() {
     let plain = TestConfiguration.words(101, language: .codeSwift)
-    var baseline = GeneratedCodeContinuation(configuration: plain, batchTokenCount: 100, nextUnitIndex: 0)
+    var baseline = GeneratedCodeContinuation(configuration: plain, batchTokenCount: 100)
     var cursor = GeneratedCodeContinuation(configuration: plain.with(modifiers: [.underscoreSeparators]),
-      batchTokenCount: 100, nextUnitIndex: 0)
-    let firstWords = baseline.nextChunk().source.split(whereSeparator: \.isWhitespace).map(String.init)
-    let first = cursor.nextChunk()
+      batchTokenCount: 100)
+    let firstWords = baseline.nextChunk(nextRandomWordIndex: { 0 }).source.split(whereSeparator: \.isWhitespace).map(String.init)
+    let first = cursor.nextChunk(nextRandomWordIndex: { 0 })
     XCTAssertEqual(first.noSpaceTargetWords, firstWords.enumerated().map {
       $0.element + ($0.offset == 99 ? "" : "_")
     })
-    let finalWords = baseline.nextChunk().source.split(whereSeparator: \.isWhitespace).map(String.init)
-    let final = cursor.nextChunk()
+    let finalWords = baseline.nextChunk(nextRandomWordIndex: { 0 }).source.split(whereSeparator: \.isWhitespace).map(String.init)
+    let final = cursor.nextChunk(nextRandomWordIndex: { 0 })
     XCTAssertEqual(final.transformed, finalWords.map { $0 + "_" }.joined())
     XCTAssertEqual(final.noSpaceTargetWords, finalWords.map { $0 + "_" })
   }
@@ -172,17 +172,20 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
   func testEveryNativeCodeLanguageFinishesAtTheOneWordContinuation() {
     for language in TypingLanguage.allCases.filter(\.isCodeLanguage) {
       let config = TestConfiguration.words(101, language: language)
-      var source = GeneratedCodeContinuation(configuration: config, batchTokenCount: 100, nextUnitIndex: 0)
-      let openingWords = source.nextChunk().source.split(whereSeparator: \.isWhitespace).map(String.init)
-      let finalWord = source.nextChunk().source.trimmingCharacters(in: .whitespacesAndNewlines)
+      var source = GeneratedCodeContinuation(configuration: config, batchTokenCount: 100)
+      let openingWords = source.nextChunk(nextRandomWordIndex: { 0 }).source.split(whereSeparator: \.isWhitespace).map(String.init)
       let opening = openingWords.enumerated().map {
         $0.element + ($0.offset == 99 ? "" : "_")
       }.joined()
-      var session = TestSessionFactory.make(configuration: config.with(modifiers: [.underscoreSeparators]))
+      var session = TestSessionFactory.make(configuration: config.with(modifiers: [.underscoreSeparators]),
+        nextRandomWordIndex: { 0 })
       XCTAssertEqual(session.prompt, opening, language.rawValue)
       session.insertBatch(opening, at: start)
       XCTAssertEqual(session.completedWordCount, 100, language.rawValue)
       XCTAssertFalse(session.isFinished, language.rawValue)
+      let tail = String(session.prompt.dropFirst(opening.count))
+      XCTAssertTrue(tail.hasSuffix("_"), language.rawValue)
+      let finalWord = String(tail.dropLast())
       XCTAssertEqual(session.prompt, opening + finalWord + "_", language.rawValue)
       session.insertBatch(finalWord, at: start.addingTimeInterval(1))
       XCTAssertFalse(session.isFinished, language.rawValue)

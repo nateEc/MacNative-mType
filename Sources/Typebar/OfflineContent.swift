@@ -5911,6 +5911,13 @@ struct GeneratedWordChunk {
   let noSpaceWordLengths: [Int]
   let noSpaceTargetWords: [String]
 
+  init(source: String, batch: TransformedPromptBatch) {
+    self.source = source
+    transformed = batch.text
+    noSpaceWordLengths = batch.noSpaceWordLengths
+    noSpaceTargetWords = batch.noSpaceTargetWords
+  }
+
   init(source: String, configuration: TestConfiguration, wordOffset: Int = 0,
     preservesNoSpaceBoundaries: Bool = false, showAllLines: Bool = false,
     preservesWordOrder: Bool = false, formatsWordPool: Bool = false,
@@ -6004,48 +6011,120 @@ struct GeneratedStreamContinuation {
   }
 }
 
-/// Word practice consumes only Typebar-authored syntax. Keep unused words
-/// across chunks instead of treating a whole code unit as one practice limit.
+/// Code word practice samples an owned candidate pool, not whole programs in
+/// authored order. Saved prompts and authored custom programs stay separate.
 struct GeneratedCodeContinuation {
   let configuration: TestConfiguration
   let batchTokenCount: Int
   private let previewsWholeFiniteWords: Bool
-  private(set) var nextUnitIndex: Int
-  private var pendingWords: [String] = []
+  private let pool: IndexedLexicon
+  private let weakSpotScores: WeakSpotScores
+  private var previousTargets: [String] = []
   private var emittedWords = 0
+  private var generatedChunks: [GeneratedWordChunk] = []
+  private var replayIndex: Int?
 
-  init(configuration: TestConfiguration, batchTokenCount: Int, nextUnitIndex: Int, showAllLines: Bool = false) {
+  init(configuration: TestConfiguration, batchTokenCount: Int, showAllLines: Bool = false,
+    weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil) {
     self.configuration = configuration
     self.batchTokenCount = batchTokenCount
-    self.nextUnitIndex = nextUnitIndex
+    self.weakSpotScores = weakSpotScores
+    pool = IndexedLexicon.ordered(sourceWords ?? CodePracticeContent.polyglotTokens(for: configuration.language),
+      reversed: configuration.modifiers.contains(.backwards))
     previewsWholeFiniteWords = GeneratedPromptChunkPolicy.previewsWholeFiniteWords(
       for: configuration, showAllLines: showAllLines)
   }
 
   var hasRemaining: Bool {
-    configuration.mode != .words || configuration.isInfinite
+    (replayIndex.map { $0 < generatedChunks.count } ?? false)
+      || configuration.mode != .words || configuration.isInfinite
       || emittedWords < (configuration.wordLimit ?? 0)
   }
 
-  mutating func nextChunk(nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk {
+  func replayingContinuation() -> Self {
+    var copy = self
+    // The original opening is already restored by TypingSession. Replay only
+    // the exact chunks generated after it, including sampled case and targets.
+    copy.replayIndex = min(1, generatedChunks.count)
+    return copy
+  }
+
+  mutating func nextChunk(nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
+    nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk {
+    if let index = replayIndex, index < generatedChunks.count {
+      replayIndex = index + 1
+      return generatedChunks[index]
+    }
+    replayIndex = nil
     let remaining = configuration.mode == .words && !configuration.isInfinite
       ? max(0, (configuration.wordLimit ?? 0) - emittedWords) : 100
     let chunkLimit = previewsWholeFiniteWords && emittedWords == 0 ? batchTokenCount : 100
     let count = min(max(1, batchTokenCount), chunkLimit, remaining)
     guard count > 0 else { return .init(source: "", configuration: configuration) }
-    while pendingWords.count < count {
-      let unit = CodePracticeContent.prompt(language: configuration.language,
-        targetTokenCount: 1, startUnitIndex: nextUnitIndex)
-      pendingWords += unit.split(whereSeparator: \.isWhitespace).map(String.init)
-      nextUnitIndex += 1
+    guard !pool.isEmpty else { return .init(source: "", configuration: configuration) }
+    let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+    let bound = GeneratedWordBoundPolicy.bound(for: configuration, wordOffset: emittedWords,
+      sourceWordCount: count, showAllLines: previewsWholeFiniteWords)
+    var sourceWords: [String] = []
+    var targets: [String] = []
+    var output = emittedWords > 0 && !noSpace && previousTargets.last?.hasSuffix("\n") != true ? " " : ""
+    for index in 0..<count {
+      var word = sampledWord(random: nextRandomWordIndex)
+      if configuration.modifiers.contains(.weakSpot) {
+        word = WeakSpotWordSelection.word(from: pool, scores: weakSpotScores,
+          random: nextRandomWordIndex) ?? word
+      }
+      // Dockerfile is a code-oriented native entry, but not a code_* source
+      // language. Its ordinary-source case rule remains distinct.
+      if configuration.language == .dockerFile && !configuration.contentOptions.includePunctuation {
+        word = word.lowercased()
+      }
+      sourceWords.append(word)
+      let target = TestModifierPolicy.transformedWord(word, modifiers: configuration.modifiers,
+        language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
+        britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
+        nextRandomCaseBit: nextRandomCaseBit)
+      output += target
+      targets.append(target)
+      previousTargets.append(target)
+      if previousTargets.count > 2 { previousTargets.removeFirst() }
+      if index < count - 1 && !noSpace && !target.hasSuffix("\n") { output.append(" ") }
     }
-    let source = (emittedWords > 0 ? " " : "") + pendingWords.prefix(count).joined(separator: " ")
-    pendingWords.removeFirst(count)
-    let chunk = GeneratedWordChunk(source: source, configuration: configuration, wordOffset: emittedWords,
-      showAllLines: previewsWholeFiniteWords,
-      nextRandomCaseBit: nextRandomCaseBit)
+    let source = (emittedWords > 0 ? " " : "") + sourceWords.joined(separator: " ")
     emittedWords += count
+    let chunk = GeneratedWordChunk(source: source, batch: .init(text: output,
+      noSpaceTargetWords: noSpace ? targets : []))
+    generatedChunks.append(chunk)
     return chunk
+  }
+
+  private func sampledWord(random: () -> Int) -> String {
+    func draw() -> String {
+      let value = random()
+      let rank = configuration.modifiers.contains(.zipf)
+        ? ZipfWordSelection.index(in: pool.count, random: {
+          Double(value.magnitude) / (Double(Int.max) + 1)
+        })
+        : Int(value.magnitude % UInt(pool.count))
+      return pool[rank]
+    }
+    let latest = previousTargets.last?.filter { !".?!\":-,".contains($0) }.lowercased()
+    let earlier = previousTargets.dropLast().last?.filter { !".?!\":-,'".contains($0) }.lowercased()
+    var word = draw()
+    var comparison = word.lowercased()
+    var retries = 0
+    while retries < 100 && (comparison == latest || comparison == earlier
+      || (!configuration.contentOptions.includeNumbers && word.utf8.contains { (48...57).contains($0) })
+      || (!configuration.contentOptions.includePunctuation && word == "I")
+      || (configuration.language == .dockerFile && !configuration.contentOptions.includePunctuation
+        && word.contains { "-=_+[]{};'\\:\"|,./<>?".contains($0) })) {
+      word = draw()
+      // The pinned generator lowercases the first comparison but preserves
+      // case on a redraw. Keep this asymmetry until its source contract changes.
+      comparison = word
+      retries += 1
+    }
+    return word
   }
 }
 
@@ -6112,8 +6191,8 @@ struct TestSessionFactory {
       configuration.language.isCodeLanguage
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
-        batchTokenCount: streamWordCount, nextUnitIndex: 0, showAllLines: showAllLines)
-      let chunk = cursor.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
+        batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores)
+      let chunk = cursor.nextChunk(nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit)
       prompt = chunk.source
       generatedCodeChunk = chunk
       generatedCodeContinuation = cursor.hasRemaining ? cursor : nil
@@ -6296,7 +6375,8 @@ struct TestSessionFactory {
         || generatedCodeContinuation != nil ? "" : " "
       let nextChunk = generatedWordContinuation?.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
         ?? generatedStreamContinuation?.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
-        ?? generatedCodeContinuation?.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
+        ?? generatedCodeContinuation?.nextChunk(nextRandomWordIndex: nextRandomWordIndex,
+          nextRandomCaseBit: nextRandomCaseBit)
       initialPrompt = transformedPrompt + separator + (nextChunk?.transformed ?? transformedPrompt)
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
         for: noSpaceWordLengths + (nextChunk?.noSpaceWordLengths ?? noSpaceWordLengths))

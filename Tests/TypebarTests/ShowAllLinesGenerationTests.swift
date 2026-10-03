@@ -62,11 +62,11 @@ final class ShowAllLinesGenerationTests: XCTestCase {
 
   func testCodePreviewIncludesAllWordsInItsOpeningInsteadOfOnlyOneHundred() {
     let plain = TestConfiguration.words(101, language: .codeSwift)
-    var source = GeneratedCodeContinuation(configuration: plain, batchTokenCount: 100, nextUnitIndex: 0)
+    var source = GeneratedCodeContinuation(configuration: plain, batchTokenCount: 100)
     var words: [String] = []
-    while source.hasRemaining { words += source.nextChunk().source.split(whereSeparator: \.isWhitespace).map(String.init) }
+    while source.hasRemaining { words += source.nextChunk(nextRandomWordIndex: { 0 }).source.split(whereSeparator: \.isWhitespace).map(String.init) }
     let session = TestSessionFactory.make(configuration: plain.with(modifiers: [.underscoreSeparators]),
-      showAllLines: true)
+      showAllLines: true, nextRandomWordIndex: { 0 })
     let target = words.enumerated().map { $0.element + ($0.offset == 100 ? "" : "_") }.joined()
     XCTAssertEqual(session.prompt, target)
   }
@@ -210,15 +210,15 @@ final class ShowAllLinesGenerationTests: XCTestCase {
     XCTAssertEqual(languages.count, 70)
     for language in languages {
       let config = TestConfiguration.words(101, language: language)
-      var source = GeneratedCodeContinuation(configuration: config, batchTokenCount: 100, nextUnitIndex: 0)
+      var source = GeneratedCodeContinuation(configuration: config, batchTokenCount: 100)
       var words: [String] = []
       while source.hasRemaining {
-        words += source.nextChunk().source.split(whereSeparator: \.isWhitespace).map(String.init)
+        words += source.nextChunk(nextRandomWordIndex: { 0 }).source.split(whereSeparator: \.isWhitespace).map(String.init)
       }
       XCTAssertEqual(words.count, 101, language.rawValue)
       let target = words.enumerated().map { $0.element + ($0.offset == 100 ? "" : "_") }.joined()
       let preview = TestSessionFactory.make(configuration: config.with(modifiers: [.underscoreSeparators]),
-        showAllLines: true)
+        showAllLines: true, nextRandomWordIndex: { 0 })
       XCTAssertEqual(preview.prompt, target, language.rawValue)
       XCTAssertNil(preview.generationNotice, language.rawValue)
     }
