@@ -3106,6 +3106,13 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// terminal navigation cleared the element but retained its prior snapshot.
   /// Absence preserves the cumulative primitive contract of archives 1–16.
   let discardedInputUnits: Int?
+  /// Archive 18: the regression destination abandoned its following word.
+  /// Saved history consumes this; scoring still reads that word's raw bucket.
+  let clearedNextWord: Bool?
+  var validatedClearedNextWord: Bool {
+    clearedNextWord == true && kind == .delete && validatedTextUTF16 != nil
+      && inputField.map { $0.index >= 0 && $0.index < Int.max } == true
+  }
   var validatedDiscardedInputUnits: Int? {
     guard let discardedInputUnits, discardedInputUnits > 0,
       validatedTextUTF16 != nil, let inputField, inputField.index >= 0 else { return nil }
@@ -3143,7 +3150,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
     inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
     textUTF16: [UInt16]? = nil, inputPosition: TypingReplayInputPosition? = nil,
-    discardedInputUnits: Int? = nil
+    discardedInputUnits: Int? = nil, clearedNextWord: Bool? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3159,6 +3166,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.textUTF16 = textUTF16
     self.inputPosition = inputPosition
     self.discardedInputUnits = discardedInputUnits
+    self.clearedNextWord = clearedNextWord
   }
 
   init(
@@ -3166,18 +3174,21 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
     inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
-    inputPosition: TypingReplayInputPosition? = nil, discardedInputUnits: Int? = nil
+    inputPosition: TypingReplayInputPosition? = nil, discardedInputUnits: Int? = nil,
+    clearedNextWord: Bool? = nil
   ) {
     self.init(offset: offset, kind: kind, text: String(decoding: units, as: UTF16.self),
       forceError: forceError, automatic: automatic, commitsWord: commitsWord,
       wordDeletionCount: wordDeletionCount, characterDeletionCount: characterDeletionCount,
       inputStopped: inputStopped, inputField: inputField, inputCorrectness: inputCorrectness,
-      textUTF16: units, inputPosition: inputPosition, discardedInputUnits: discardedInputUnits)
+      textUTF16: units, inputPosition: inputPosition, discardedInputUnits: discardedInputUnits,
+      clearedNextWord: clearedNextWord)
   }
 
   private enum CodingKeys: String, CodingKey {
     case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount, characterDeletionCount
     case inputStopped, inputField, inputCorrectness, textUTF16, inputPosition, discardedInputUnits
+    case clearedNextWord
   }
 
   init(from decoder: Decoder) throws {
@@ -3196,6 +3207,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     inputCorrectness = try values.decodeIfPresent([Bool].self, forKey: .inputCorrectness)
     inputPosition = try values.decodeIfPresent(TypingReplayInputPosition.self, forKey: .inputPosition)
     discardedInputUnits = try values.decodeIfPresent(Int.self, forKey: .discardedInputUnits)
+    clearedNextWord = try values.decodeIfPresent(Bool.self, forKey: .clearedNextWord)
     guard textUTF16 == nil || validatedTextUTF16 != nil else {
       throw DecodingError.dataCorruptedError(forKey: .textUTF16, in: values,
         debugDescription: "Raw insert units must be nonempty and project to text; deletion payloads must be empty.")
@@ -3211,6 +3223,10 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     guard discardedInputUnits == nil || validatedDiscardedInputUnits != nil else {
       throw DecodingError.dataCorruptedError(forKey: .discardedInputUnits, in: values,
         debugDescription: "A contraction requires a positive unit count, raw action and recorded field.")
+    }
+    guard clearedNextWord == nil || validatedClearedNextWord else {
+      throw DecodingError.dataCorruptedError(forKey: .clearedNextWord, in: values,
+        debugDescription: "A next-word clear requires a true marker, raw deletion and bounded destination field.")
     }
   }
 }
@@ -4168,6 +4184,8 @@ struct TypingSession {
   private var latestNoSpaceAttemptFieldIndex: Int?
   private var latestNoSpaceFinishDecision = false
   private var latestReplayDiscardedUnits: Int?
+  private var latestReplayClearedNextWord = false
+  private var recordedNoSpaceStats = RecordedInputFieldStats()
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
   private var promptWordCount: Int
@@ -4793,6 +4811,10 @@ struct TypingSession {
   /// The pre-result display always credits a correct prefix of the active
   /// word, matching the live speed readout without changing final scoring.
   private func referenceWordCredit(countPartialLastWord: Bool) -> TypingWordCredit {
+    if unitTargets.noSpace {
+      return recordedNoSpaceStats.counts(targets: unitTargets,
+        creditsActivePrefix: countPartialLastWord).credit
+    }
     if let acceptedUnits {
       if configuration.mode == .zen {
         return .init(characters: typedGraphemeCount, inputUnits: acceptedUnits.entries.count)
@@ -4928,13 +4950,18 @@ struct TypingSession {
   func rawWpm(at date: Date) -> Int {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    return wpm(characters: typed.utf16.count, seconds: end.timeIntervalSince(startedAt))
+    return wpm(characters: rawSpeedInputUnitCount, seconds: end.timeIntervalSince(startedAt))
   }
 
   func preciseRawWpm(at date: Date) -> Double {
     guard let startedAt else { return 0 }
     let end = finishedAt ?? date
-    return wpmValue(characters: typed.utf16.count, seconds: end.timeIntervalSince(startedAt))
+    return wpmValue(characters: rawSpeedInputUnitCount, seconds: end.timeIntervalSince(startedAt))
+  }
+
+  private var rawSpeedInputUnitCount: Int {
+    unitTargets.noSpace ? recordedNoSpaceStats.counts(targets: unitTargets, creditsActivePrefix: false).rawUnits
+      : typed.utf16.count
   }
 
   /// Word burst is the WPM for the latest completed word, or the currently
@@ -5080,10 +5107,10 @@ struct TypingSession {
   /// Per-word comparison for words actually attempted during a test with
   /// space delimiters, or with safely reconstructed no-space boundaries.
   var wordReviews: [TypedWordReview] {
-    if unitTargets.noSpace, let acceptedUnits {
+    if unitTargets.noSpace, acceptedUnits != nil {
       let count = min(noSpaceTargetWords.count, (highestAttemptedNoSpaceField ?? -1) + 1)
       return (0..<count).map { index in
-        let input = acceptedUnits.field(index)
+        let input = recordedNoSpaceStats.history(index)
         let target = unitTargets.field(index)
         return .init(index: index, target: noSpaceTargetWords[index],
           typed: String(decoding: input, as: UTF16.self),
@@ -5291,7 +5318,8 @@ struct TypingSession {
       startedAt: startedAt,
       finishedAt: finishedAt,
       afkDuration: afkDuration,
-      typedCharacterCount: typed.count,
+      typedCharacterCount: unitTargets.noSpace
+        ? recordedNoSpaceStats.counts(targets: unitTargets, creditsActivePrefix: false).rawCharacters : typed.count,
       correctCharacterCount: scoredCorrectCharacters,
       errorCount: errors,
       wpm: wpm(at: date),
@@ -5301,7 +5329,7 @@ struct TypingSession {
       preciseRawWpm: preciseRawWpm(at: date),
       preciseAccuracy: preciseAccuracy,
       inputMetrics: .init(version: 1, correctAttempts: correctInputAttemptCount,
-        totalAttempts: inputAttemptCount, creditedUnits: credit.inputUnits, retainedUnits: typed.utf16.count),
+        totalAttempts: inputAttemptCount, creditedUnits: credit.inputUnits, retainedUnits: rawSpeedInputUnitCount),
       restartCount: restartCount,
       priorAttemptEngagedDuration: priorAttemptEngagedDuration,
       characterStats: characterStats,
@@ -6280,8 +6308,11 @@ struct TypingSession {
         inputField: recordedField, inputCorrectness: kind == .insert ? latestInputCorrectness : nil,
         textUTF16: raw ? (kind == .insert ? latestReplayInputUnits ?? Array(text.utf16) : []) : nil,
         inputPosition: kind == .insert ? latestReplayInputPosition : nil,
-        discardedInputUnits: latestReplayDiscardedUnits))
+        discardedInputUnits: latestReplayDiscardedUnits,
+        clearedNextWord: latestReplayClearedNextWord ? true : nil))
+    if unitTargets.noSpace { recordedNoSpaceStats.record(replayEvents.last!) }
     latestReplayDiscardedUnits = nil
+    latestReplayClearedNextWord = false
   }
 
   private func replayInputField(
@@ -6324,7 +6355,8 @@ struct TypingSession {
         characterDeletionCount: !wholeWord && index == start ? replayEvents.count - start : nil,
         inputStopped: event.inputStopped, inputField: event.inputField,
         inputCorrectness: event.inputCorrectness, textUTF16: event.textUTF16,
-        inputPosition: event.inputPosition, discardedInputUnits: event.discardedInputUnits)
+        inputPosition: event.inputPosition, discardedInputUnits: event.discardedInputUnits,
+        clearedNextWord: event.clearedNextWord)
     }
   }
 
@@ -6925,6 +6957,7 @@ struct TypingSession {
 
   private mutating func removeAcceptedUnit() {
     if acceptedUnits?.terminalElementCleared == true {
+      latestReplayClearedNextWord = !applyingAutomaticCodeInput
       discardTerminalElementIfNeeded(retainsHistory: true)
     }
     guard !acceptedUnits!.entries.isEmpty else { return }

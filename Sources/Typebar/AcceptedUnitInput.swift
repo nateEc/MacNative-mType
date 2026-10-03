@@ -36,7 +36,8 @@ struct AcceptedUnitInput {
   }
 
   /// The next logged action replaces the cleared element, not its snapshot.
-  /// Manual regression retains the abandoned field's last recorded history.
+  /// Manual regression retains the abandoned field's navigation snapshot,
+  /// not the separately projected saved history or source scoring counts.
   mutating func discardClearedTerminalField(retainsHistory: Bool = false) -> Int {
     guard terminalElementCleared else { return 0 }
     let range = range(fieldIndex)

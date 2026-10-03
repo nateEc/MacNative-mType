@@ -268,9 +268,10 @@ enum RemoteResultCSVExport {
 
 struct TypebarArchive: Codable, Equatable {
     // Older readers lack stopped-input, field-local/unit metadata, target
-    // directories, pre-validation positions and explicit unit contractions.
+    // directories, pre-validation positions, explicit unit contractions and
+    // next-word abandonment markers.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 17
+    static let currentVersion = 18
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -309,7 +310,8 @@ struct TypebarArchive: Codable, Equatable {
         let hasTargets = results.contains { $0.targetWordDirectory != nil }
         let hasPositions = results.contains { $0.replayEvents.contains { $0.inputPosition != nil } }
         let hasContractions = results.contains { $0.replayEvents.contains { $0.discardedInputUnits != nil } }
-        self.version = hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        let hasClearedNextWord = results.contains { $0.replayEvents.contains { $0.clearedNextWord != nil } }
+        self.version = hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
         let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
@@ -880,6 +882,9 @@ enum TypebarDataTransfer {
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         guard archive.version >= 17 || !archive.results.contains(where: {
             $0.replayEvents.contains { $0.discardedInputUnits != nil }
+        }) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 18 || !archive.results.contains(where: {
+            $0.replayEvents.contains { $0.clearedNextWord != nil }
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         return archive
     }

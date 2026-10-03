@@ -134,7 +134,7 @@ final class TerminalFieldReentryTests: XCTestCase {
     XCTAssertEqual(result.replayEvents.last?.discardedInputUnits, 2)
     let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [result], presets: [], at: start)
     let archive = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(archive.version, 17)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     XCTAssertEqual(archive.results, [result])
     XCTAssertEqual(TestResultRecord(result: result).portableResult, result)
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])

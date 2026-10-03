@@ -1,7 +1,8 @@
 import Foundation
 
 /// An end-of-attempt projection of accepted native input. Kept separate from
-/// navigation and scoring: a deleted future field remains in history, and
+/// navigation and scoring: a future bucket remains, but an explicit later
+/// abandonment can empty its saved value without changing its scoring snapshot;
 /// only the final field is tested for sufficient UTF-16 display length.
 enum SavedTextInputHistoryPolicy {
   private struct Piece {
@@ -58,12 +59,21 @@ enum SavedTextInputHistoryPolicy {
     }
     var order: [Int] = []
     var fields: [Int: [UInt16]] = [:]
+    var offsets: [Int: TimeInterval] = [:]
+    var clearOffsets: [Int: TimeInterval] = [:]
     for event in TypingReplay.chronologicalEvents(events) {
       guard let field = event.inputField, field.index >= 0 else { continue }
       if fields[field.index] == nil { order.append(field.index) }
       fields[field.index] = field.units
+      offsets[field.index] = event.offset
+      if event.validatedClearedNextWord {
+        let next = field.index + 1
+        clearOffsets[next] = max(clearOffsets[next] ?? -Double.infinity, event.offset)
+      }
     }
-    return order.map { fields[$0] ?? [] }
+    return order.map { index in
+      (clearOffsets[index] ?? -Double.infinity) > (offsets[index] ?? -Double.infinity) ? [] : fields[index] ?? []
+    }
   }
 
   private static func projectInput(
@@ -195,18 +205,14 @@ enum SavedTextInputHistoryPolicy {
   private static func recordedFields(
     displays: [String], events: [TypingReplayEvent]
   ) -> (fields: [String], trimsLastField: Bool) {
-    var order: [Int] = []
-    var values: [Int: String] = [:]
     var trimsLastField = false
     for event in TypingReplay.chronologicalEvents(events) {
       guard let snapshot = event.inputField, snapshot.index >= 0 else { continue }
-      if values[snapshot.index] == nil { order.append(snapshot.index) }
-      values[snapshot.index] = snapshot.value
       trimsLastField = !event.isStoppedInsertion && event.kind == .insert
         && event.text == " " && event.commitsWord != false
         && snapshot.index == displays.count - 1
         && (String(snapshot.value.dropLast()) != displays[snapshot.index] || event.forceError)
     }
-    return (order.map { values[$0] ?? "" }, trimsLastField)
+    return (inputFieldUTF16(events: events).map { String(decoding: $0, as: UTF16.self) }, trimsLastField)
   }
 }
