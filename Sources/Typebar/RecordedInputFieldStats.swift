@@ -30,22 +30,26 @@ struct RecordedInputFieldStats {
       return lhs == rhs ? $0.offset < $1.offset : lhs < rhs
     }.map(\.element) }
     if event.offset >= snapshots[field.index]?.offset ?? -Double.infinity {
-      var projected = field.units
-      // Source getInputFromDom trims only an incorrect final SPACE commit.
-      // Keep the actual event/history buffer and raw surrogate units intact.
-      if event.kind == .insert, event.inputUnits == [32], !event.isStoppedInsertion,
-        event.commitsWord != false, event.inputPosition?.lastWord == true,
-        event.inputCorrectness?.last == false {
-        while let unit = projected.last, let scalar = UnicodeScalar(UInt32(unit)),
-          QuoteSourcePolicy.isBoundaryWhitespace(scalar) { projected.removeLast() }
-      }
-      snapshots[field.index] = .init(units: field.units, classifiedUnits: projected, offset: event.offset,
+      snapshots[field.index] = .init(units: field.units, classifiedUnits: Self.classificationInput(for: event), offset: event.offset,
         insertedSpace: event.kind == .insert && event.inputUnits == [32])
     }
     if event.validatedClearedNextWord {
       let next = field.index + 1
       clearOffsets[next] = max(clearOffsets[next] ?? -Double.infinity, event.offset)
     }
+  }
+
+  /// Source getInputFromDom trims only an incorrect final SPACE commit.
+  /// Terminal and interval readers share this rule, never the saved buffer.
+  static func classificationInput(for event: TypingReplayEvent) -> [UInt16] {
+    var units = event.inputField?.units ?? []
+    if event.kind == .insert, event.inputUnits == [32], !event.isStoppedInsertion,
+      event.commitsWord != false, event.inputPosition?.lastWord == true,
+      event.inputCorrectness?.last == false {
+      while let unit = units.last, let scalar = UnicodeScalar(UInt32(unit)),
+        QuoteSourcePolicy.isBoundaryWhitespace(scalar) { units.removeLast() }
+    }
+    return units
   }
 
   func history(_ index: Int) -> [UInt16] {

@@ -1271,12 +1271,13 @@ enum ResultPerformanceTrace {
     events: [TypingReplayEvent],
     elapsed: TimeInterval,
     configuration: TestConfiguration? = nil,
-    targetWordDirectory: ResultTargetWordDirectory? = nil
+    targetWordDirectory: ResultTargetWordDirectory? = nil,
+    sourceScoringBasis: ResultScoringUnitBasis? = nil
   ) -> ResultPerformancePoint {
     let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
     let orderedEvents = validOrderedEvents(events)
     if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration,
-      targetWordDirectory: targetWordDirectory) {
+      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis) {
       return fieldSamples(fields, events: orderedEvents, times: [safeElapsed], singleWindow: true)[0]
     }
     if containsRawUnits(orderedEvents) {
@@ -1313,7 +1314,8 @@ enum ResultPerformanceTrace {
     events: [TypingReplayEvent],
     duration: TimeInterval,
     configuration: TestConfiguration? = nil,
-    targetWordDirectory: ResultTargetWordDirectory? = nil
+    targetWordDirectory: ResultTargetWordDirectory? = nil,
+    sourceScoringBasis: ResultScoringUnitBasis? = nil
   ) -> [ResultPerformancePoint] {
     guard (!prompt.isEmpty || configuration?.mode == .zen
       || targetWordDirectory?.matches(prompt: prompt,
@@ -1325,7 +1327,7 @@ enum ResultPerformanceTrace {
     let orderedEvents = validOrderedEvents(events)
     guard !orderedEvents.isEmpty else { return [] }
     if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration,
-      targetWordDirectory: targetWordDirectory) {
+      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis) {
       return fieldSamples(fields, events: orderedEvents, times: sampleTimes, singleWindow: false)
     }
     if containsRawUnits(orderedEvents) {
@@ -1381,11 +1383,12 @@ enum ResultPerformanceTrace {
     let targets: UnitInputTargets?
     let directoryTargets: [[UInt16]]?
     let configuration: TestConfiguration?
+    let usesKoreanScoring: Bool
     private var order: [Int] = []
     private var snapshots: [Int: Snapshot] = [:]
 
     init?(prompt: String, events: [TypingReplayEvent], configuration: TestConfiguration?,
-      targetWordDirectory: ResultTargetWordDirectory?) {
+      targetWordDirectory: ResultTargetWordDirectory?, sourceScoringBasis: ResultScoringUnitBasis?) {
       guard !events.isEmpty else { return nil }
       guard events.allSatisfy({ event in
         guard let field = event.inputField, field.index >= 0,
@@ -1412,6 +1415,7 @@ enum ResultPerformanceTrace {
         directoryTargets = nil
       }
       self.configuration = configuration
+      usesKoreanScoring = sourceScoringBasis == .koreanJamo && configuration?.mode != .zen
     }
 
     mutating func apply(_ event: TypingReplayEvent) -> Int {
@@ -1424,9 +1428,22 @@ enum ResultPerformanceTrace {
       let target = configuration?.mode == .zen ? units
         : directoryTargets?[field.index] ?? targets!.field(field.index)
       if snapshots[field.index] == nil { order.append(field.index) }
-      snapshots[field.index] = .init(fullCredit: units == target ? units.count : 0,
-        prefixCredit: target.starts(with: units) ? units.count : 0, rawCount: units.count,
-        endsWithInsertedSpace: event.kind == .insert && event.inputUnits == [32])
+      if usesKoreanScoring {
+        let input = RecordedInputFieldStats.classificationInput(for: event)
+        let full = ResultUnitCharacterStats.classify(input: input, target: target,
+          creditsPartial: false, basis: .koreanJamo)
+        let prefix = ResultUnitCharacterStats.classify(input: input, target: target,
+          creditsPartial: true, basis: .koreanJamo)
+        snapshots[field.index] = .init(fullCredit: full.correctWord, prefixCredit: prefix.correctWord,
+          rawCount: full.allCorrect + full.incorrect + full.extra,
+          endsWithInsertedSpace: event.kind == .insert && event.inputUnits == [32])
+      } else {
+        // No saved basis means the old UTF-16 reader, not detection from a
+        // final prompt that may have grown since initialization.
+        snapshots[field.index] = .init(fullCredit: units == target ? units.count : 0,
+          prefixCredit: target.starts(with: units) ? units.count : 0, rawCount: units.count,
+          endsWithInsertedSpace: event.kind == .insert && event.inputUnits == [32])
+      }
       // Judgments own attempt errors. For genuine older field tapes without
       // them, compare at the insertion interval of this captured field, not a
       // flattened cursor. Stopped insertion leaves that interval unaccepted.
@@ -1747,11 +1764,12 @@ enum ResultPerformanceChartAvailability {
     events: [TypingReplayEvent],
     duration: TimeInterval,
     configuration: TestConfiguration? = nil,
-    targetWordDirectory: ResultTargetWordDirectory? = nil
+    targetWordDirectory: ResultTargetWordDirectory? = nil,
+    sourceScoringBasis: ResultScoringUnitBasis? = nil
   ) -> Bool {
     !ResultPerformanceTrace.points(
       prompt: prompt, events: events, duration: duration, configuration: configuration,
-      targetWordDirectory: targetWordDirectory).isEmpty
+      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis).isEmpty
   }
 }
 

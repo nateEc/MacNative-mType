@@ -5814,6 +5814,7 @@ private struct CompletedResultView: View {
         duration: result.elapsedDuration,
         configuration: result.configuration,
         targetWordDirectory: result.targetWordDirectory,
+        sourceScoringBasis: result.characterStats.sourceUnitBasis,
         reviews: wordReviews,
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: startGraphsAtZero,
@@ -5905,6 +5906,7 @@ private struct CompletedResultView: View {
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
           configuration: result.configuration,
           targetWordDirectory: result.targetWordDirectory,
+          sourceScoringBasis: result.characterStats.sourceUnitBasis,
           soundConfiguration: .init(settings: settings))
           .id(result.id)
       }
@@ -6696,6 +6698,7 @@ private struct ReplayTimelineView: View {
   let speedUnit: TypingSpeedUnit
   let configuration: TestConfiguration?
   let targetWordDirectory: ResultTargetWordDirectory?
+  let sourceScoringBasis: ResultScoringUnitBasis?
   let soundConfiguration: ReplaySoundConfiguration
   @State private var elapsed: TimeInterval = 0
   @State private var isPlaying = false
@@ -6715,13 +6718,14 @@ private struct ReplayTimelineView: View {
   }
   private var performance: ResultPerformancePoint {
     ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed, configuration: configuration,
-      targetWordDirectory: targetWordDirectory)
+      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis)
   }
 
   init(
     prompt: String, events: [TypingReplayEvent], speedUnit: TypingSpeedUnit,
     configuration: TestConfiguration?,
     targetWordDirectory: ResultTargetWordDirectory?,
+    sourceScoringBasis: ResultScoringUnitBasis?,
     soundConfiguration: ReplaySoundConfiguration
   ) {
     let chronologicalEvents = TypingReplay.chronologicalEvents(events)
@@ -6730,6 +6734,7 @@ private struct ReplayTimelineView: View {
     self.speedUnit = speedUnit
     self.configuration = configuration
     self.targetWordDirectory = targetWordDirectory
+    self.sourceScoringBasis = sourceScoringBasis
     self.soundConfiguration = soundConfiguration
     self.characterSeekOffsets = TypingReplay.characterSeekOffsets(
       prompt: prompt, events: chronologicalEvents)
@@ -7061,6 +7066,7 @@ private struct ResultPerformanceChart: View {
     duration: TimeInterval,
     configuration: TestConfiguration?,
     targetWordDirectory: ResultTargetWordDirectory?,
+    sourceScoringBasis: ResultScoringUnitBasis?,
     reviews: [TypedWordReview],
     typingSpeedUnit: TypingSpeedUnit,
     startsAtZero: Bool,
@@ -7074,7 +7080,7 @@ private struct ResultPerformanceChart: View {
   ) {
     points = ResultPerformanceTrace.points(
       prompt: prompt, events: events, duration: duration, configuration: configuration,
-      targetWordDirectory: targetWordDirectory)
+      targetWordDirectory: targetWordDirectory, sourceScoringBasis: sourceScoringBasis)
     self.reviews = reviews
     self.events = events
     self.typingSpeedUnit = typingSpeedUnit
@@ -8967,6 +8973,7 @@ private struct ResultDetailView: View {
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
           configuration: result.configuration,
           targetWordDirectory: result.targetWordDirectory,
+          sourceScoringBasis: result.characterStats.sourceUnitBasis,
           soundConfiguration: .init(settings: settings))
           .id(result.id)
       }
@@ -8991,7 +8998,8 @@ private struct ResultDetailView: View {
   private var hasPerformanceChart: Bool {
     ResultPerformanceChartAvailability.isAvailable(
       prompt: result.prompt, events: result.replayEvents, duration: elapsedDuration,
-      configuration: result.configuration, targetWordDirectory: result.targetWordDirectory)
+      configuration: result.configuration, targetWordDirectory: result.targetWordDirectory,
+      sourceScoringBasis: result.characterStats.sourceUnitBasis)
   }
 
   private var performanceChartHelp: String {
@@ -9059,6 +9067,7 @@ private struct HistoricalResultPerformanceChart: View {
         duration: elapsedDuration,
         configuration: result.configuration,
         targetWordDirectory: result.targetWordDirectory,
+        sourceScoringBasis: result.characterStats.sourceUnitBasis,
         reviews: [],
         typingSpeedUnit: typingSpeedUnit,
         startsAtZero: settings.startGraphsAtZero,

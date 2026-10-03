@@ -1,0 +1,48 @@
+# 韩文活动曲线与保存计分基础
+
+已知字段的韩文结果曲线和回放速度现在读取保存的 sourceUnitBasis，不按最终提示或语言菜单重新猜测。当前结果、历史图表、历史可用性判断及两处回放速度读者均传入该基础。WPM、Raw 使用韩文拆分计分；Burst 与错误轨迹仍读取原始输入尝试。归档保持 22，旧固定成绩与缺基础的旧曲线行为不改写。完整 Monkeytype 重写 goal 保持 active。
+
+## 固定源合同
+
+参考仍为 91bd24bb8513785c7364cbea29296ff7adafac41。[getWpmHistory](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/stats.ts#L674) 和 [getRawHistory](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/stats.ts#L741) 按时间边界增量更新字段，两种末词角色共用 countCharsForWordIndex，包含韩文上下文投影和源空格规范化。字段首次出现顺序、最高非空字段及末 SPACE 的活动词推断决定信用，不能按词号排序或按最终接受文本重放。
+
+[getBurstHistory](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/stats.ts#L264) 与 [getErrorCountHistory](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/events/stats.ts#L663) 统计输入事件，而非韩文计分投影。合成探针给定 end timer 与韩文上下文，验证理想时间网格、有限测试小数尾和七组历史；它不执行浏览器 rAF、真实 timer 或物理 IME。
+
+## 单位分离与原生读者
+
+| 轨迹 | 新韩文已知字段的读者 |
+| --- | --- |
+| WPM | 完整词或活动前缀的韩文拆分信用 |
+| Raw | 位置匹配、错误、多打之和，单位已拆分 |
+| Burst | 原始输入尝试单位，退格不抹除过去活动 |
+| 错误 | 已记录原始判断；缺判断时仍按原始字段位置比较 |
+
+FieldActivityCursor 仅在明确 koreanJamo 基础且有有效字段和目标时投影。每个发生变化的快照分别缓存完整词与部分词信用，采样时读取缓存，不在每个时间边界重拆完整事件历史。终态和区间统计共用 RecordedInputFieldStats.classificationInput 的末词 SPACE 裁剪规则；必须有错误判断、实际 SPACE、末词、可提交且非停止插入的证据。
+
+规范化和拆分仅用于计分。原始字段、UTF-16 代理半部、保存历史的下一词清空、回放动作、导航及尝试判断不变。错误读者继续使用未拆分的字段和目标，不能拿投影后的长度寻找输入尝试位置。停止 SPACE 会影响活动词推断，但不因此把未提交前缀算成正确词。
+
+ResultPerformanceTrace 的点和点列增加可选 sourceScoringBasis；缺省为旧 UTF-16 行为。界面初始化参数要求显式传入保存值，历史可用性也传同一值。新 22 结果沿用已经保存的基础；从 ASCII 开始而后来长出韩文的会话仍缺韩文基础，不因最终提示而切换。
+
+缺目录的无空格输入、无效目录、非法或混合字段日志仍走已有原始／旧日志回退，不发明字段。Zen 即使收到错误韩文提示也保持无目标 UTF-16 读者。图表仍保持 122 秒上限，既有采样边界和单点区间不改动；没有以这一上限证明长会话或大型混合路径性能等价。
+
+## 兼容与未完成范围
+
+没有新增保存字段、SwiftData 实体列、服务协议或归档版本。正式归档、便携记录及内存实体验证保存基础被曲线读者使用，读取曲线不会更改保存分数。独立自有旧 21 记录保持原来的 UTF-16 曲线与固定 WPM、Raw；不从回放回填基础。
+
+源码同时确认 [结果稳定度](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L750) 取 WPM history 的变异系数。当前原生 ResultConsistencyPolicy 仍取尝试区间速率，这是已定位且未修复的独立语义差异；CSV、PB、挑战和匿名投稿的稳定度消费者不能因曲线接入而标为已等价。普通缺基础字段曲线的其他历史差异、词 burst、其他消费者、真实输入法、VoiceOver、旧库、降级及部署也未完整验收。
+
+## 定向证据与有界复核
+
+新增十二项原生回归。先加入不改变旧行为的明确基础参数，首轮新夹具因 inputStopped 参数顺序编译失败；对照实际构造签名修正后，三项中两项共十五处 WPM／Raw 预期失败（0.438 秒），Burst／错误断言和旧缺省保护已通过。实现后相关六十一项零失败（0.091 秒），扩大一百五十八项零失败（0.301 秒）。
+
+七组历史探针运行实际完整 stats、helpers、strings、numbers 与完整性验证通过的仓库外 hangul-js 0.2.6 oracle，覆盖五单位音节、部分音节替换、小数尾、末 SPACE 裁剪、停止 SPACE、遗留字段、代理半部和首次出现顺序。既有十二组 getChars、全部 65,536 单 UInt16 指纹及非韩文探针同时通过。原生六组主夹具和第七组顺序夹具断言相同历史值；其他测试补目录、Zen、裁剪守卫、持久化和旧格式边界。
+
+源码驱动与行为优先测试限定了投影的位置；根因调试区分编译夹具错误与行为红灯。会话内有界决策、风险及迁移复核检查了保存基础、旧值、四种单位、字面换行、顺序、缺元数据和容量边界，不是独立评审。没有执行真实 GUI／IME、音频、真实库或网络投稿，也没有大型韩文混合性能基准。
+
+## 本轮完整串行验证
+
+2026-10-03，本轮完整 readiness 门禁通过：客户端 2,406 项零失败（555.692 秒）、自托管服务 138 项零失败（1.592 秒），787 项人工验收场景的结构审计通过。原创边界、固定参考元数据、页面／弹窗、服务面、键盘、主题身份、挑战及行为证据检查通过；审计通过不代表所有待验收功能已等价。
+
+本次实际 100,000 词耐久测试通过（118.896 秒），12,000 次组合字素删除、两种回放投影基准为 0.052813 秒。这是既有普通路径验证，不是韩文大规模混合性能证明。客户端详细日志在耐久项通过后保存了一份阶段快照；完整门禁的独立外层日志记录最终客户端、服务及应用包结果，阶段快照不冒充完整日志。
+
+未打开的 macOS 应用包构建、签名及资源边界验证通过，门禁未启动 Typebar 进程。没有部署服务、网络投稿或访问真实用户数据库。归档仍为 22，完整重写 goal 未完成；下一项已定位差异是结果稳定度与固定源 WPM history 的关系。

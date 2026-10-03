@@ -170,4 +170,28 @@ if(koreanOracle){
   assert.deepEqual([result.allCorrect,result.correctWord,result.incorrect,result.extra,result.missed],expected);
  }
  console.log('12 Korean getChars fixtures passed (4 complete source modules + verified complete hangul-js 0.2.6; seeded context, no IME/state-capture/native-publication parity claim).');
+ const historyCases=[
+  [[event(0,0,'괅','insertText','괅')],['괅'],2000,[60,30],[60,30],[12,0],[0,0]],
+  [[event(0,0,'가','insertText','가',{correct:false}),event(1500,0,'각','insertText','각')],
+   ['각'],3500,[24,18,12,10],[24,18,12,10],[12,12,0,0],[1,0,0,0]],
+  [[event(0,0,'괅 ','insertText',' ',{lastWord:true,commitsWord:true,correct:false})],
+   ['괅'],2000,[60,30],[60,30],[12,0],[1,0]],
+  [[event(0,0,'가','insertText',' ',{lastWord:true,inputStopped:true,correct:false})],
+   ['각'],2000,[0,0],[24,12],[12,0],[1,0]],
+  [[event(0,0,'괅x'),event(500,1,'가'),event(1500,0,'괅','deleteContentBackward','',{clearedNextWord:true})],
+   ['괅x','가'],2000,[96,12],[96,42],[24,0],[0,0]],
+  [[event(0,0,'가\ud83d','insertText','\ud83d',{correct:false})],
+   ['가🙂'],2000,[36,18],[36,18],[12,0],[1,0]],
+  [[event(0,1,'가','insertText','가'),event(500,0,'괅 ','insertText',' ')],
+   ['괅 ','가'],2000,[24,12],[24,12],[24,0],[0,0]],
+ ];
+ for(const [events,targets,duration,wpm,raw,burst,errors] of historyCases){
+  const value=log([...events,{type:'timer',testMs:duration,data:{event:'end'}}],targets);
+  value.context.koreanStatus=true;value.context.mode='words';value.context.mode2='1';value.context.bailedOut=false;
+  assert.deepEqual(stats.getWpmHistory(value),wpm);
+  assert.deepEqual(stats.getRawHistory(value),raw);
+  assert.deepEqual(stats.getBurstHistory(value),burst);
+  assert.deepEqual(stats.getErrorCountHistory(value),errors);
+ }
+ console.log('7 Korean WPM/Raw/Burst/error history fixtures passed (complete source functions and verified oracle; synthetic end timer, seeded context, no physical IME or real timer claim).');
 }
