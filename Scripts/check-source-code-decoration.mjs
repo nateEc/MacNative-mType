@@ -14,6 +14,8 @@ assert.equal(execFileSync('git', ['-C', root, 'status', '--porcelain'], {encodin
 let units = [], ranks = [], repeated = false, activeNames = [], functions, spacingMs = null;
 const candidatePools = new WeakSet();
 const ownedPolyglotLanguages = new Map();
+let languageWrites = [], languageNotices = [], poolShuffles = 0;
+const ownedRTL = name => ['arabic', 'hebrew', 'kurdish_central', 'persian', 'urdu'].includes(name);
 const draw = () => { assert.ok(units.length, 'Unexpected unit draw'); return units.shift(); };
 const math = Object.create(Math); math.random = draw;
 const context = vm.createContext({Math: math, console: {debug() {}},
@@ -63,6 +65,13 @@ const bindings = {
     assert.ok(ownedPolyglotLanguages.has(name), `Unprovided language: ${name}`);
     return ownedPolyglotLanguages.get(name);
   }},
+  'config/setters': {setConfig: (key, value, options) => {
+    assert.equal(key, 'language'); assert.equal(options, undefined);
+    languageWrites.push(value); config[key] = value; return true;
+  }},
+  'states/notifications': {showNoticeNotification: (message, options) => {
+    languageNotices.push({message, options});
+  }},
   'throttle-debounce': {debounce: () => unused},
   'events/test': {restartTestEvent: {subscribe() {}}},
   'events/config': {configEvent: {subscribe() {}}},
@@ -77,7 +86,7 @@ const bindings = {
   'utils/arrays': {randomElementFromArray: values => candidatePools.has(values)
       || values.includes('node') || values.includes('bay')
     ? values[ranks.shift() ?? 0] : values[Math.floor(draw() * values.length)],
-    shuffle: values => { candidatePools.add(values); return values; }, nthElementFromArray: (values, index) => values.at(index)},
+    shuffle: values => { poolShuffles++; candidatePools.add(values); return values; }, nthElementFromArray: (values, index) => values.at(index)},
   'utils/word-gen-error': {WordGenError: class extends Error {}},
 };
 const actual = new Set(['test/words-generator', 'test/wordset', 'test/funbox/funbox-functions',
@@ -86,6 +95,7 @@ const actual = new Set(['test/words-generator', 'test/wordset', 'test/funbox/fun
 actual.add('test/english-punctuation');
 actual.add('utils/misc');
 actual.add('test/lazy-mode');
+actual.add('utils/word-gen-error');
 const modules = new Map(), requested = new Map();
 const resolve = (id, from) => id.startsWith('.')
   ? path.posix.normalize(path.posix.join(path.posix.dirname(from), id)) : id;
@@ -521,13 +531,14 @@ let polyglotCount = 0;
 function ownedPolyglot(base, sources) {
   ownedPolyglotLanguages.clear();
   for (const [name, words, noLazyMode = true] of sources) {
-    ownedPolyglotLanguages.set(name, {name, words, noLazyMode, rightToLeft: false});
+    ownedPolyglotLanguages.set(name, {name, words, noLazyMode, rightToLeft: ownedRTL(name)});
   }
   if (!ownedPolyglotLanguages.has(base)) ownedPolyglotLanguages.set(base,
-    {name: base, words: ['unused'], noLazyMode: true, rightToLeft: false});
+    {name: base, words: ['unused'], noLazyMode: true, rightToLeft: ownedRTL(base)});
   config.language = base; config.customPolyglot = sources.map(value => value[0]);
   config.words = 1; config.punctuation = false; config.numbers = false; config.lazyMode = false;
   activeNames = ['polyglot']; repeated = false; units = []; ranks = [];
+  languageWrites = []; languageNotices = []; poolShuffles = 0;
 }
 async function polyglotGenerate(expected, rankValues, drawValues = []) {
   ranks = [...rankValues]; units = [...drawValues];
@@ -557,7 +568,7 @@ config.words = 2; config.punctuation = true;
 await polyglotGenerate(['Node ', '? '], [0, 1], [0.5, 0.85]);
 ownedPolyglot('english', [['hindi', ['node']], ['nepali', ['bay']]]); config.numbers = true;
 await polyglotGenerate(['90 '], [0], [0, 0.25, 0.999, 0]);
-ownedPolyglot('kurdish_central', [['english', ['node']], ['german', ['bay']]]); config.numbers = true;
+ownedPolyglot('kurdish_central', [['english', ['node']], ['kurdish_central', ['bay']]]); config.numbers = true;
 await polyglotGenerate(['١ '], [0], [0, 0, 0]);
 ownedPolyglot('typing_of_the_dead', [['english', ['node']], ['german', ['bay']]]);
 ownedPolyglotLanguages.get('typing_of_the_dead').originalPunctuation = true; config.punctuation = true;
@@ -588,7 +599,41 @@ repeated = true; ranks = [1]; units = [0.777];
 const cachedTail = await main.namespace.getNextWord(100, 100, 'changed', 'inputs');
 assert.deepEqual(cachedTail, polyglotTail); assert.deepEqual(ranks, [1]); assert.deepEqual(units, [0.777]); polyglotCount++;
 repeated = false; activeNames = []; config.lazyMode = false; config.numbers = false;
-console.log(`${polyglotCount} polyglot-candidate fixtures passed (12 actual modules; whole-candidate map, last owner, primary-language decoration, exact Lazy lookup, sections, gates and cached future; owned shuffle/vocabulary/ranks/DOM, not corpus/RNG/browser/device parity).`);
+console.log(`${polyglotCount} polyglot-candidate fixtures passed (13 actual modules; whole-candidate map, last owner, primary-language decoration, exact Lazy lookup, sections, gates and cached future; owned shuffle/vocabulary/ranks/DOM, not corpus/RNG/browser/device parity).`);
+
+let directionCount = 0;
+async function direction(base, sources, expectedPrimary, expectedRTL, expectedTarget, switches) {
+  ownedPolyglot(base, sources); config.numbers = true;
+  ranks = [0]; units = [0, 0, 0];
+  if (switches) {
+    await assert.rejects(main.namespace.generateWords(ownedPolyglotLanguages.get(base)),
+      error => error.name === 'WordGenError' && error.message === '');
+    assert.equal(config.language, expectedPrimary);
+    assert.deepEqual(languageWrites, [expectedPrimary]);
+    assert.equal(languageNotices.length, 1);
+    assert.ok(languageNotices[0].message.includes(expectedPrimary));
+    assert.equal(languageNotices[0].options.durationMs, 5000);
+    assert.equal(poolShuffles, 0);
+    assert.deepEqual(ranks, [0]); assert.deepEqual(units, [0, 0, 0]);
+  }
+  // A bounded second generator call follows the observed config write.
+  // Browser init(), setter validation/persistence, notification UI are not run.
+  const generated = await main.namespace.generateWords(ownedPolyglotLanguages.get(config.language));
+  assert.equal(config.language, expectedPrimary);
+  assert.equal(generated.allRightToLeft, expectedRTL);
+  assert.deepEqual(Array.from(generated.words), [expectedTarget + ' ']);
+  assert.equal(poolShuffles, 1);
+  assert.equal(ranks.length, 0); assert.equal(units.length, 0);
+  if (!switches) { assert.equal(languageWrites.length, 0); assert.equal(languageNotices.length, 0); }
+  directionCount++;
+}
+await direction('english', [['kurdish_central', ['node']], ['arabic', ['bay']]], 'kurdish_central', true, '١', true);
+await direction('arabic', [['nepali', ['node']], ['hindi', ['bay']]], 'nepali', false, '१', true);
+await direction('kurdish_central', [['english', ['node']], ['arabic', ['bay']]], 'kurdish_central', true, '١', false);
+await direction('nepali', [['arabic', ['node']], ['english', ['bay']]], 'nepali', false, '१', false);
+await direction('kurdish_central', [['arabic', ['node']], ['hebrew', ['bay']]], 'kurdish_central', true, '١', false);
+await direction('nepali', [['english', ['node']], ['french', ['bay']]], 'nepali', false, '१', false);
+console.log(`${directionCount} polyglot-direction fixtures passed (13 actual modules; reject before shuffle/draw, first-language switch, notice contract, fresh generator retry and primary RTL return; owned language metadata/config-write/notification/shuffle/vocabulary adapters, not browser init/persistence/device equivalence).`);
 
 // Metadata-only inventory: read values to count sections, never print, persist
 // or import upstream word strings into the native content pool.

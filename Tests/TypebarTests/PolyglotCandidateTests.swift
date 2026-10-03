@@ -137,8 +137,11 @@ final class PolyglotCandidateTests: XCTestCase {
     var session = TestSessionFactory.make(configuration: value)
     session.insertBatch(session.prompt, at: Date(timeIntervalSince1970: 100))
     let result = try XCTUnwrap(session.result())
+    var prepared = value
+    prepared.polyglotUsesPrimaryDirection = true
+    XCTAssertEqual(result.configuration, prepared)
     XCTAssertEqual(try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
-      settings: .init(), results: [result], presets: [])).results.first?.configuration, value)
+      settings: .init(), results: [result], presets: [])).results.first?.configuration, prepared)
   }
 
   func testCachedPolyglotTargetsDoNotRedrawRankShuffleContentOrCase() {
@@ -196,7 +199,8 @@ final class PolyglotCandidateTests: XCTestCase {
   }
 
   func testFactoryFiniteNoSpaceTailArchivesRepeatsAndKeepsPrimary() throws {
-    let configuration = config(101, base: .kurdishCentral, numbers: true, modifiers: [.noSpaces])
+    var configuration = config(101, base: .kurdishCentral, numbers: true, modifiers: [.noSpaces])
+    configuration.mixedLanguageComponents = [.english, .kurdishCentral]
     var session = TestSessionFactory.make(configuration: configuration,
       nextRandomWordIndex: { 0 }, nextRandomContentUnit: { 0 }, nextRandomPoolShuffleIndex: { $0 - 1 })
     let opening = String(repeating: "١", count: 100), start = Date(timeIntervalSince1970: 100)

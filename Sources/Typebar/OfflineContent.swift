@@ -6347,6 +6347,8 @@ struct TestSessionFactory {
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) },
     nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }
   ) -> TypingSession {
+    let polyglotPreparation = PolyglotGenerationPreparation(configuration)
+    let configuration = polyglotPreparation.configuration
     let prompt: String
     var sectionEndIndices: [Int] = []
     var noSpaceBoundarySource: String?
@@ -6602,6 +6604,11 @@ struct TestSessionFactory {
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(for: noSpaceWordLengths)
       initialNoSpaceTargetWords = noSpaceTargetWords
     }
+    let generationNotices = [polyglotPreparation.notice,
+      GeneratedPromptChunkPolicy.previewNotice(for: configuration, showAllLines: showAllLines)
+        ?? (hasIncompleteExternalPreview
+          ? "当前外部词源仅提供部分目标；当前目标保持不变，保留原有续接方式，未预览全部目标。" : nil)]
+      .compactMap { $0 }
     return TypingSession(
       configuration: configuration, prompt: initialPrompt,
       repeatingPrompt: repeats && generatedWordContinuation == nil
@@ -6627,9 +6634,7 @@ struct TestSessionFactory {
       repeatingNoSpaceTargetWords: repeats && generatedWordContinuation == nil
         && generatedStreamContinuation == nil && generatedCodeContinuation == nil
         ? noSpaceTargetWords : [],
-      generationNotice: GeneratedPromptChunkPolicy.previewNotice(for: configuration, showAllLines: showAllLines)
-        ?? (hasIncompleteExternalPreview
-          ? "当前外部词源仅提供部分目标；当前目标保持不变，保留原有续接方式，未预览全部目标。" : nil),
+      generationNotice: generationNotices.isEmpty ? nil : generationNotices.joined(separator: "\n"),
       weakSpotScores: weakSpotScores, wordDecorationState: currentDecorationState)
   }
 

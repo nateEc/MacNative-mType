@@ -3776,6 +3776,9 @@ private struct ContentView: View {
       wordDecorationState: wordDecorationState,
       showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off
     )
+    if session.configuration.language == .mixedLanguages {
+      polyglotReturnLanguage = session.configuration.polyglotBaseLanguage
+    }
     synchronizeNoQuitConfigurationLock()
     persistActiveTestSelection()
     if shouldCountRestart {

@@ -2238,6 +2238,8 @@ struct TestConfiguration: Codable, Equatable {
   var mixedLanguageComponents: [TypingLanguage]
   /// Missing in older configurations. It does not rewrite saved targets.
   var polyglotBaseLanguage: TypingLanguage?
+  /// Absent in older snapshots, including those that already record a primary.
+  var polyglotUsesPrimaryDirection: Bool?
   var modifiers: [TestModifier]
   var contentOptions: ContentOptions
   var challengeID: String?
@@ -2263,20 +2265,21 @@ struct TestConfiguration: Codable, Equatable {
       || (language == .mixedLanguages && mixedLanguageComponents.contains { $0.usesJoiningScriptPrompt })
   }
 
-  /// A polyglot prompt uses an RTL paragraph base only when every selected
-  /// language is RTL. Mixed-direction prompts keep the native LTR base and
-  /// let macOS apply Unicode bidirectional layout to each run.
+  /// Fresh Polyglot generation opts into its resolved primary direction.
+  /// Snapshots without that marker keep the old all-selected rule.
   var usesRightToLeftPrompt: Bool {
     guard language == .mixedLanguages else { return language.usesRightToLeftPrompt }
+    if polyglotUsesPrimaryDirection == true, let polyglotBaseLanguage {
+      return polyglotBaseLanguage.usesRightToLeftPrompt
+    }
     return !mixedLanguageComponents.isEmpty
       && mixedLanguageComponents.allSatisfy(\.usesRightToLeftPrompt)
   }
 
-  /// Character-position overlays support a wholly RTL paragraph. Mixed-direction
-  /// polyglots remain on the glyph-attached fallback to avoid guessing an
-  /// inline edge across Unicode bidirectional runs.
+  /// RTL primary direction and any RTL component require native glyph-attached
+  /// overlays rather than guessing an inline edge across bidirectional runs.
   var containsRightToLeftPromptRun: Bool {
-    language.usesRightToLeftPrompt
+    usesRightToLeftPrompt
       || (language == .mixedLanguages
         && mixedLanguageComponents.contains(where: \.usesRightToLeftPrompt))
   }
@@ -2318,6 +2321,7 @@ struct TestConfiguration: Codable, Equatable {
     self.mixedLanguageComponents = normalizedMixedLanguageComponents
     self.polyglotBaseLanguage = language == .mixedLanguages
       ? PolyglotReturnLanguagePolicy.validated(polyglotBaseLanguage) : nil
+    self.polyglotUsesPrimaryDirection = nil
     let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
       modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents)
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
@@ -2370,6 +2374,7 @@ struct TestConfiguration: Codable, Equatable {
     var copy = self
     copy.polyglotBaseLanguage = language == .mixedLanguages
       ? PolyglotReturnLanguagePolicy.validated(polyglotBaseLanguage) : nil
+    if copy.polyglotBaseLanguage == nil { copy.polyglotUsesPrimaryDirection = nil }
     return copy
   }
 
@@ -2422,6 +2427,7 @@ struct TestConfiguration: Codable, Equatable {
     case mode, duration, wordLimit, difficulty, rules, language, englishVariant, quoteLength,
       quoteLengths, quoteSelectionMode, customTextCompletion, customTextSectionLimit,
       customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents, polyglotBaseLanguage,
+      polyglotUsesPrimaryDirection,
       modifiers, contentOptions, challengeID
   }
 
@@ -2455,6 +2461,8 @@ struct TestConfiguration: Codable, Equatable {
     polyglotBaseLanguage = language == .mixedLanguages
       ? PolyglotReturnLanguagePolicy.validated(try values.decodeIfPresent(TypingLanguage.self, forKey: .polyglotBaseLanguage))
       : nil
+    polyglotUsesPrimaryDirection = polyglotBaseLanguage != nil
+      ? try values.decodeIfPresent(Bool.self, forKey: .polyglotUsesPrimaryDirection) : nil
     let normalizedModifiers = TestModifierPolicy.normalized(
       try values.decodeIfPresent([TestModifier].self, forKey: .modifiers) ?? [])
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
@@ -16762,8 +16770,8 @@ extension TypingLanguage {
     return [",", ".", "!", "?"]
   }
 
-  /// Right-to-left scripts use the native text system. Polyglot paragraph
-  /// direction is derived by `TestConfiguration` from the complete selection.
+  /// Right-to-left scripts use the native text system. TestConfiguration owns
+  /// Polyglot's resolved primary direction and legacy rendering fallback.
   var usesRightToLeftPrompt: Bool {
     self == .arabic || self == .arabic10k || self == .arabicEgypt || self == .arabicEgypt1k || self == .arabicMorocco || self == .pashto || self == .sindhi || self == .hebrew || self == .hebrew1k || self == .hebrew5k || self == .hebrew10k || self == .persian || self == .persian1k || self == .persian5k || self == .persian20k || self == .urdu || self == .urdu1k || self == .urdu5k || self == .kurdishCentral || self == .kurdishCentral2k || self == .kurdishCentral4k || self == .yiddish
   }
