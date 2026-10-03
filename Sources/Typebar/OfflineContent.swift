@@ -6050,7 +6050,8 @@ struct GeneratedCodeContinuation {
   }
 
   mutating func nextChunk(nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
-    nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk {
+    nextRandomCaseBit: () -> Bool = { Bool.random() },
+    nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }) -> GeneratedWordChunk {
     if let index = replayIndex, index < generatedChunks.count {
       replayIndex = index + 1
       return generatedChunks[index]
@@ -6079,6 +6080,9 @@ struct GeneratedCodeContinuation {
       if configuration.language == .dockerFile && !configuration.contentOptions.includePunctuation {
         word = word.lowercased()
       }
+      word = CodeWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
+        language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
+        options: configuration.contentOptions, random: nextRandomContentUnit)
       sourceWords.append(word)
       let target = TestModifierPolicy.transformedWord(word, modifiers: configuration.modifiers,
         language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
@@ -6139,7 +6143,8 @@ struct TestSessionFactory {
     streamNoSpaceBoundarySource: String? = nil,
     weakSpotScores: WeakSpotScores = .init(), showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
-    nextRandomCaseBit: () -> Bool = { Bool.random() }
+    nextRandomCaseBit: () -> Bool = { Bool.random() },
+    nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }
   ) -> TypingSession {
     let prompt: String
     var sectionEndIndices: [Int] = []
@@ -6192,7 +6197,8 @@ struct TestSessionFactory {
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
         batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores)
-      let chunk = cursor.nextChunk(nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit)
+      let chunk = cursor.nextChunk(nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit,
+        nextRandomContentUnit: nextRandomContentUnit)
       prompt = chunk.source
       generatedCodeChunk = chunk
       generatedCodeContinuation = cursor.hasRemaining ? cursor : nil
@@ -6376,7 +6382,7 @@ struct TestSessionFactory {
       let nextChunk = generatedWordContinuation?.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
         ?? generatedStreamContinuation?.nextChunk(nextRandomCaseBit: nextRandomCaseBit)
         ?? generatedCodeContinuation?.nextChunk(nextRandomWordIndex: nextRandomWordIndex,
-          nextRandomCaseBit: nextRandomCaseBit)
+          nextRandomCaseBit: nextRandomCaseBit, nextRandomContentUnit: nextRandomContentUnit)
       initialPrompt = transformedPrompt + separator + (nextChunk?.transformed ?? transformedPrompt)
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(
         for: noSpaceWordLengths + (nextChunk?.noSpaceWordLengths ?? noSpaceWordLengths))
