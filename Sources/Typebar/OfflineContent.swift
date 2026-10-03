@@ -4974,7 +4974,8 @@ enum OfflineContent {
   static func generatedPrompt(
     wordCount: Int, language: TypingLanguage = .english, englishVariant: EnglishVariant = .american,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
-    contentOptions: ContentOptions = .init(), usesZipfFrequency: Bool = false
+    contentOptions: ContentOptions = .init(), usesZipfFrequency: Bool = false,
+    reversesCandidatePool: Bool = false
   ) -> String {
     if language.isCodeLanguage {
       return CodePracticeContent.prompt(language: language, targetTokenCount: wordCount)
@@ -4982,7 +4983,7 @@ enum OfflineContent {
     return StarterLexicon.prompt(
       wordCount: max(1, wordCount), language: language, englishVariant: englishVariant,
       mixedLanguageComponents: mixedLanguageComponents, contentOptions: contentOptions,
-      usesZipfFrequency: usesZipfFrequency)
+      usesZipfFrequency: usesZipfFrequency, reversesCandidatePool: reversesCandidatePool)
   }
 
   static func timedPrompt(
@@ -5974,6 +5975,7 @@ struct GeneratedWordContinuation {
     }
     previousWords = Array(words.suffix(2)).map { $0.lowercased() }
     let chunk = GeneratedWordChunk(source: source, configuration: configuration, wordOffset: nextWordIndex,
+      preservesWordOrder: true,
       nextRandomCaseBit: nextRandomCaseBit)
     nextWordIndex += GeneratedWordBoundPolicy.wordCount(in: source)
     return chunk
@@ -6232,6 +6234,7 @@ struct TestSessionFactory {
       && GeneratedWordBoundPolicy.wordCount(in: noSpaceBoundarySource ?? prompt)
         < (configuration.wordLimit ?? 25)
     let generatesWholeLines = showAllLines && !hasIncompleteExternalPreview
+    if usesFreshGeneratedWords { preservesGeneratedWordOrder = true }
     var batch: TransformedPromptBatch
     if let quoteChunk {
       batch = quoteChunk
@@ -6342,7 +6345,7 @@ struct TestSessionFactory {
         englishVariant: configuration.englishVariant,
         mixedLanguageComponents: configuration.mixedLanguageComponents,
         contentOptions: configuration.contentOptions,
-        scores: scores)
+        scores: scores, reversesCandidatePool: configuration.modifiers.contains(.backwards))
     {
       return prompt
     }
@@ -6351,7 +6354,8 @@ struct TestSessionFactory {
       englishVariant: configuration.englishVariant,
       mixedLanguageComponents: configuration.mixedLanguageComponents,
       contentOptions: configuration.contentOptions,
-      usesZipfFrequency: configuration.modifiers.contains(.zipf))
+      usesZipfFrequency: configuration.modifiers.contains(.zipf),
+      reversesCandidatePool: configuration.modifiers.contains(.backwards))
   }
 
   private static func streamWordCount(for configuration: TestConfiguration, showAllLines: Bool) -> Int? {

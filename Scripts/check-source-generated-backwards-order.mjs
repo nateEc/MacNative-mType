@@ -1,4 +1,4 @@
-// Read-only complete pinned generator/functions/wordset modules. GetText,
+// Read-only complete pinned generator/functions/wordset/weak-spot modules. GetText,
 // configuration, active metadata, random draws and UI are owned adapters.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
@@ -11,15 +11,18 @@ assert.ok(process.argv[2],'Reference checkout required');
 assert.equal(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),
   '91bd24bb8513785c7364cbea29296ff7adafac41');
 assert.equal(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim(),'');
-const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset']);
+const actual=new Set(['test/words-generator','test/funbox/funbox-functions','test/wordset','test/weak-spot']);
 const config={mode:'words',words:3,language:'english',showAllLines:false,lazyMode:false,
   punctuation:false,numbers:false,britishEnglish:false};
 let activeNames=['backwards','binary'], functions, drawIndex=0;
+let ownedIndexes=[], spacingMs=0;
+const languages={english:{name:'english',words:['ab','cd'],rightToLeft:false},
+  owned:{name:'owned',words:['ef','gh'],rightToLeft:false}};
 const binary=i=>(i%256).toString(2).padStart(8,'0');
 const unexpected=()=>{throw Error('Unexpected adapter call outside ordering probe')};
 const active=()=>activeNames.map(name=>({name,properties:name==='backwards'?['wordOrder:reverse']:
   name==='underscore_spaces'?['nospace']:[],functions:functions[name]}));
-const arrays={randomElementFromArray:words=>words[0],shuffle:unexpected,
+const arrays={randomElementFromArray:words=>words[ownedIndexes.shift()??0],shuffle:words=>words,
   nthElementFromArray:(words,index)=>words.at(index)};
 const bindings={
   'config/store':{Config:config},
@@ -35,7 +38,9 @@ const bindings={
     isFunboxActiveWithProperty:name=>active().some(value=>value.properties.includes(name)),
   },
   'utils/arrays':arrays,
-  'utils/misc':{zipfyRandomArrayIndex:unexpected},
+  'utils/misc':{zipfyRandomArrayIndex:()=>ownedIndexes.shift()??0},
+  'utils/json-data':{getLanguage:async name=>languages[name]},
+  'test/events/live-cache':{getLiveCachedMsSinceLastInputEvent:()=>spacingMs},
   'utils/generate':{getBinary:()=>binary(drawIndex++)},
   'utils/word-gen-error':{WordGenError:class extends Error {}},
 };
@@ -94,4 +99,46 @@ for(const [limit,showAll,underscore] of [[3,false,false],[3,false,true],[101,fal
     assert.equal(next.word,binary(bound).split('').reverse().join('')+'_');
   }
 }
-console.log('4 generated-backwards ordering fixtures passed (3 complete actual modules; GetText/random/config/metadata/UI adapters, no RNG, corpus, browser or layout parity claim).');
+console.log('4 generated-backwards ordering fixtures passed (GetText/config/metadata/random adapters).');
+for(const backwards of [false,true]){
+  for(const zipf of [false,true]){
+    config.words=3;config.showAllLines=false;
+    activeNames=[...(backwards?['backwards']:[]),...(zipf?['zipf']:[])];
+    ownedIndexes=[0,2,1];
+    const pool=['ab','cd','ef'];
+    const generated=await main.namespace.generateWords({name:'english',words:pool});
+    assert.deepEqual(pool,backwards?['ef','cd','ab']:['ab','cd','ef']);
+    assert.deepEqual(generated.words,backwards?['fe ','ba ','dc ']:['ab ','ef ','cd ']);
+    assert.equal(ownedIndexes.length,0);
+  }
+}
+const weakspot=modules.get('test/weak-spot').namespace;
+spacingMs=1000;weakspot.updateScore('a',true);
+spacingMs=800;weakspot.updateScore('b',true);
+ownedIndexes=[0,...Array(19).fill(1)];
+const wordset=modules.get('test/wordset').namespace;
+assert.equal(weakspot.getWord(new wordset.Wordset(['aaax','bb'])),'aaax');
+assert.equal(ownedIndexes.length,0,'Exactly twenty candidates, unknown letters excluded from the mean');
+// Fresh keys keep these fixtures independent of the learned a/b scores above.
+for(const [character,milliseconds] of [['z',0],['y',1000],['v',750]]){
+  spacingMs=milliseconds;weakspot.updateScore(character,true);
+}
+ownedIndexes=[0,...Array(19).fill(1)];
+assert.equal(weakspot.getWord(new wordset.Wordset(['zy','v'])),'v',
+  'A learned zero stays in the average; an unknown character does not');
+assert.equal(ownedIndexes.length,0);
+for(const [character,candidate] of [['e','e\u0301'],['🙂','🙂x']]){
+  spacingMs=1000;weakspot.updateScore(character,true);
+  ownedIndexes=[0,...Array(19).fill(1)];
+  assert.equal(weakspot.getWord(new wordset.Wordset([candidate,'bb'])),candidate,
+    'Source for-of scores known code points inside a combining or astral word');
+  assert.equal(ownedIndexes.length,0);
+}
+config.words=3;config.customPolyglot=['english','owned'];
+activeNames=['backwards','polyglot'];ownedIndexes=[0,3,1];
+const primary=['oak','elm','ash'];
+const polyglot=await main.namespace.generateWords({name:'english',words:primary});
+assert.deepEqual(primary,['ash','elm','oak']);
+assert.deepEqual(polyglot.words,['ba ','hg ','dc '],'Polyglot builds a fresh combined pool, not the reversed primary list');
+assert.equal(ownedIndexes.length,0);
+console.log('9 ordinary/Zipf/weakspot/polyglot fixtures passed (4 complete actual modules; deterministic rank/shuffle/spacing/language adapters, no source RNG/distribution, physical input, corpus or browser parity claim).');

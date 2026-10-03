@@ -8106,6 +8106,15 @@ struct IndexedLexicon: RandomAccessCollection {
     self.init(count: words.count) { words[$0] }
   }
 
+  /// A draw-order view; even the largest owned lexicon stays lazy.
+  static func ordered<C: RandomAccessCollection>(_ source: C, reversed: Bool) -> IndexedLexicon
+    where C.Element == String {
+    let count = source.count
+    return .init(count: count) { position in
+      source[source.index(source.startIndex, offsetBy: reversed ? count - 1 - position : position)]
+    }
+  }
+
   subscript(position: Int) -> String {
     precondition(indices.contains(position))
     return wordAt(position)
@@ -13865,8 +13874,12 @@ enum StarterLexicon {
     wordCount: Int, language: TypingLanguage, englishVariant: EnglishVariant = .american,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
     contentOptions: ContentOptions, usesZipfFrequency: Bool = false,
+    reversesCandidatePool: Bool = false,
     polyglotRandom: () -> Double = { Double.random(in: 0..<1) }
   ) -> String {
+    func ordered<C: RandomAccessCollection>(_ source: C) -> IndexedLexicon where C.Element == String {
+      IndexedLexicon.ordered(source, reversed: reversesCandidatePool)
+    }
     let count = max(1, wordCount)
     if language.isCodeLanguage {
       return CodePracticeContent.prompt(language: language, targetTokenCount: count)
@@ -13874,1231 +13887,1231 @@ enum StarterLexicon {
     switch language {
     case .english:
       return englishPrompt(
-        tokens: count, lexicon: englishVariant == .british ? britishWords : words,
+        tokens: count, lexicon: ordered(englishVariant == .british ? britishWords : words),
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .english1k:
       return englishPrompt(
-        tokens: count, lexicon: english1kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(english1kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .english5k:
       return englishPrompt(
-        tokens: count, lexicon: english5kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(english5kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .english10k:
       return englishPrompt(
-        tokens: count, lexicon: english10kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(english10kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .english25k:
       return englishPrompt(
-        tokens: count, lexicon: english25kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(english25kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .english450k:
       return englishPrompt(
-        tokens: count, lexicon: english450kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(english450kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishFiveLetter:
       return prompt(
-        tokens: count, lexicon: englishFiveLetterWords, separator: " ",
+        tokens: count, lexicon: ordered(englishFiveLetterWords), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishFiveLetter1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishCommonlyMisspelled:
       return englishPrompt(
-        tokens: count, lexicon: englishCommonlyMisspelledWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(englishCommonlyMisspelledWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishContractions:
       return englishPrompt(
-        tokens: count, lexicon: englishContractionWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(englishContractionWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishDoubleLetter:
       return englishPrompt(
-        tokens: count, lexicon: englishDoubleLetterWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(englishDoubleLetterWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishLegal:
       return englishPrompt(
-        tokens: count, lexicon: englishLegalWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(englishLegalWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishMedical:
       return englishPrompt(
-        tokens: count, lexicon: englishMedicalWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(englishMedicalWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .englishShakespearean:
       return englishPrompt(
-        tokens: count, lexicon: englishShakespeareanWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(englishShakespeareanWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .oldEnglish:
       return englishPrompt(
-        tokens: count, lexicon: oldEnglishWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(oldEnglishWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .kokanu:
       return prompt(
-        tokens: count, lexicon: kokanuWords, separator: " ",
+        tokens: count, lexicon: ordered(kokanuWords), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .likanu:
       return prompt(
-        tokens: count, lexicon: likanuWords, separator: " ",
+        tokens: count, lexicon: ordered(likanuWords), separator: " ",
         punctuation: ["､", ":", "ʭ", "≈"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .pigLatin:
       return prompt(
-        tokens: count, lexicon: pigLatinWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(pigLatinWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .spanish:
       return spanishPrompt(
-        tokens: count, lexicon: spanishWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(spanishWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .spanish1k:
       return spanishPrompt(
-        tokens: count, lexicon: spanish1kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(spanish1kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .spanish10k:
       return spanishPrompt(
-        tokens: count, lexicon: spanish10kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(spanish10kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .spanish650k:
       return spanishPrompt(
-        tokens: count, lexicon: spanish650kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(spanish650kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .german:
       return prompt(
-        tokens: count, lexicon: germanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(germanWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .german1k:
       return prompt(
-        tokens: count, lexicon: german1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(german1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .german10k:
       return prompt(
-        tokens: count, lexicon: german10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(german10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .german250k:
       return prompt(
-        tokens: count, lexicon: german250kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(german250kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .swissGerman:
       return prompt(
-        tokens: count, lexicon: swissGermanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(swissGermanWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .swissGerman1k:
       return prompt(
-        tokens: count, lexicon: swissGerman1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(swissGerman1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .swissGerman2k:
       return prompt(
-        tokens: count, lexicon: swissGerman2kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(swissGerman2kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .afrikaans:
       return prompt(
-        tokens: count, lexicon: afrikaansWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(afrikaansWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .afrikaans1k:
       return prompt(
-        tokens: count, lexicon: afrikaans1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(afrikaans1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .afrikaans10k:
       return prompt(
-        tokens: count, lexicon: afrikaans10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(afrikaans10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .albanian:
       return prompt(
-        tokens: count, lexicon: albanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(albanianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .albanian1k, .bosnian4k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .bemba:
       return prompt(
-        tokens: count, lexicon: bembaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(bembaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bosnian:
       return prompt(
-        tokens: count, lexicon: bosnianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(bosnianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .esperanto:
       return prompt(
-        tokens: count, lexicon: esperantoWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(esperantoWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .esperanto1k, .esperanto10k, .esperanto25k, .esperanto36k,
       .esperantoXSystem1k, .esperantoXSystem10k, .esperantoXSystem25k, .esperantoXSystem36k,
       .esperantoHSystem1k, .esperantoHSystem10k, .esperantoHSystem25k, .esperantoHSystem36k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .esperantoXSystem:
       return prompt(
-        tokens: count, lexicon: esperantoXSystemWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(esperantoXSystemWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .esperantoHSystem:
       return prompt(
-        tokens: count, lexicon: esperantoHSystemWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(esperantoHSystemWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .latin:
       return prompt(
-        tokens: count, lexicon: latinWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(latinWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .loremIpsum:
       return prompt(
-        tokens: count, lexicon: loremIpsumWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(loremIpsumWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .git:
       return prompt(
-        tokens: count, lexicon: gitWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(gitWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .twitchEmotes:
       return prompt(
-        tokens: count, lexicon: twitchEmoteWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(twitchEmoteWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .typingOfTheDead:
       return sectionPrompt(
-        tokens: count, sections: typingOfTheDeadSections, contentOptions: contentOptions)
+        tokens: count, sections: reversesCandidatePool ? Array(typingOfTheDeadSections.reversed()) : typingOfTheDeadSections, contentOptions: contentOptions)
     case .pokemon1k:
       return entryPrompt(
-        tokens: count, entries: creatureIndexEntries, contentOptions: contentOptions)
+        tokens: count, entries: reversesCandidatePool ? Array(creatureIndexEntries.reversed()) : creatureIndexEntries, contentOptions: contentOptions)
     case .arenaStrategy:
       return entryPrompt(
-        tokens: count, entries: arenaStrategyEntries, contentOptions: contentOptions,
+        tokens: count, entries: reversesCandidatePool ? Array(arenaStrategyEntries.reversed()) : arenaStrategyEntries, contentOptions: contentOptions,
         lowercasesWithoutPunctuation: true)
     case .friulian:
       return prompt(
-        tokens: count, lexicon: friulianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(friulianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .malagasy:
       return prompt(
-        tokens: count, lexicon: malagasyWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(malagasyWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .malagasy1k:
       return prompt(
-        tokens: count, lexicon: malagasy1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(malagasy1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .welsh:
       return prompt(
-        tokens: count, lexicon: welshWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(welshWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hausa:
       return prompt(
-        tokens: count, lexicon: hausaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(hausaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tatar:
       return prompt(
-        tokens: count, lexicon: tatarWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tatarWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tatar1k, .tatar5k, .tatar9k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .tatarCrimean:
       return prompt(
-        tokens: count, lexicon: tatarCrimeanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tatarCrimeanWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tatarCrimean1k, .tatarCrimean5k, .tatarCrimean10k, .tatarCrimean15k,
       .tatarCrimeanCyrillic1k, .tatarCrimeanCyrillic5k,
       .tatarCrimeanCyrillic10k, .tatarCrimeanCyrillic15k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .tatarCrimeanCyrillic:
       return prompt(
-        tokens: count, lexicon: tatarCrimeanCyrillicWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tatarCrimeanCyrillicWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .klingon:
       return prompt(
-        tokens: count, lexicon: klingonWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(klingonWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .klingon1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .quenya:
       return prompt(
-        tokens: count, lexicon: quenyaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(quenyaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .viossa:
       return prompt(
-        tokens: count, lexicon: viossaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(viossaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .viossaNjutro:
       return prompt(
-        tokens: count, lexicon: viossaNjutroWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(viossaNjutroWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .maori:
       return prompt(
-        tokens: count, lexicon: maoriWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(maoriWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .lojbanGismu:
       return prompt(
-        tokens: count, lexicon: lojbanGismuWords, separator: " ", punctuation: [",", "!", "?"],
+        tokens: count, lexicon: ordered(lojbanGismuWords), separator: " ", punctuation: [",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .lojbanCmavo:
       return prompt(
-        tokens: count, lexicon: lojbanCmavoWords, separator: " ", punctuation: [",", "!", "?"],
+        tokens: count, lexicon: ordered(lojbanCmavoWords), separator: " ", punctuation: [",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .uzbek:
       return prompt(
-        tokens: count, lexicon: uzbekWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(uzbekWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .uzbek1k, .uzbek70k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .occitan:
       return prompt(
-        tokens: count, lexicon: occitanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(occitanWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .occitan1k, .occitan2k, .occitan5k, .occitan10k,
       .kabyle1k, .kabyle2k, .kabyle5k, .kabyle10k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .oromo:
       return prompt(
-        tokens: count, lexicon: oromoWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(oromoWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .oromo1k, .oromo5k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .macedonian:
       return prompt(
-        tokens: count, lexicon: macedonianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(macedonianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .macedonian1k, .macedonian10k, .macedonian75k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .kazakh:
       return prompt(
-        tokens: count, lexicon: kazakhWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(kazakhWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kazakh1k:
       return prompt(
-        tokens: count, lexicon: kazakh1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(kazakh1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .vietnamese:
       return prompt(
-        tokens: count, lexicon: vietnameseWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(vietnameseWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .jyutping:
       return prompt(
-        tokens: count, lexicon: jyutpingWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(jyutpingWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .pinyin:
       return prompt(
-        tokens: count, lexicon: pinyinWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(pinyinWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bashkir:
       return prompt(
-        tokens: count, lexicon: bashkirWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(bashkirWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .basque:
       return prompt(
-        tokens: count, lexicon: basqueWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(basqueWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .frisian:
       return prompt(
-        tokens: count, lexicon: frisianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(frisianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .zulu:
       return prompt(
-        tokens: count, lexicon: zuluWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(zuluWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hawaiian:
       return prompt(
-        tokens: count, lexicon: hawaiianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(hawaiianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hawaiian1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .kabyle:
       return prompt(
-        tokens: count, lexicon: kabyleWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(kabyleWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .maltese:
       return prompt(
-        tokens: count, lexicon: malteseWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(malteseWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tokiPona:
       return prompt(
-        tokens: count, lexicon: tokiPonaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tokiPonaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tokiPonaKuSuli:
       return prompt(
-        tokens: count, lexicon: tokiPonaKuSuliWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tokiPonaKuSuliWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tokiPonaKuLili:
       return prompt(
-        tokens: count, lexicon: tokiPonaKuLiliWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tokiPonaKuLiliWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .xhosa:
       return prompt(
-        tokens: count, lexicon: xhosaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(xhosaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .xhosa3k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .tibetan:
       return prompt(
-        tokens: count, lexicon: tibetanWords, separator: " ", punctuation: ["།"],
+        tokens: count, lexicon: ordered(tibetanWords), separator: " ", punctuation: ["།"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tibetan1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: ["།"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .kyrgyz:
       return prompt(
-        tokens: count, lexicon: kyrgyzWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(kyrgyzWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kyrgyz1k:
       return prompt(
-        tokens: count, lexicon: kyrgyz1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(kyrgyz1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .udmurt:
       return prompt(
-        tokens: count, lexicon: udmurtWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(udmurtWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .yoruba:
       return prompt(
-        tokens: count, lexicon: yorubaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(yorubaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .swahili:
       return prompt(
-        tokens: count, lexicon: swahiliWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(swahiliWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kinyarwanda:
       return prompt(
-        tokens: count, lexicon: kinyarwandaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(kinyarwandaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .shona:
       return prompt(
-        tokens: count, lexicon: shonaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(shonaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .shona1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .santali:
       return prompt(
-        tokens: count, lexicon: santaliWords, separator: " ", punctuation: ["᱾", "?"],
+        tokens: count, lexicon: ordered(santaliWords), separator: " ", punctuation: ["᱾", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .yiddish:
       return prompt(
-        tokens: count, lexicon: yiddishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(yiddishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .arabic:
       return arabicPrompt(
-        tokens: count, lexicon: arabicWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(arabicWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .arabic10k:
       return arabicPrompt(
-        tokens: count, lexicon: arabic10kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(arabic10kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .arabicEgypt:
       return arabicPrompt(
-        tokens: count, lexicon: arabicEgyptWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(arabicEgyptWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .arabicEgypt1k:
       return arabicPrompt(
-        tokens: count, lexicon: arabicEgypt1kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(arabicEgypt1kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .arabicMorocco:
       return arabicPrompt(
-        tokens: count, lexicon: arabicMoroccoWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(arabicMoroccoWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .pashto:
       return prompt(
-        tokens: count, lexicon: pashtoWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        tokens: count, lexicon: ordered(pashtoWords), separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .sindhi:
       return prompt(
-        tokens: count, lexicon: sindhiWords, separator: " ", punctuation: ["،", "؛", "؟", "."],
+        tokens: count, lexicon: ordered(sindhiWords), separator: " ", punctuation: ["،", "؛", "؟", "."],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hebrew:
       return prompt(
-        tokens: count, lexicon: hebrewWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(hebrewWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hebrew1k, .hebrew5k, .hebrew10k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .persian:
       return persianUrduPrompt(
-        tokens: count, lexicon: persianWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(persianWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .persian1k, .persian5k, .persian20k:
       return persianUrduPrompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .persianRomanized:
       return persianUrduPrompt(
-        tokens: count, lexicon: persianRomanizedWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(persianRomanizedWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .urdu:
       return persianUrduPrompt(
-        tokens: count, lexicon: urduWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(urduWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .urdu1k, .urdu5k:
       return persianUrduPrompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .urduRoman:
       return persianUrduPrompt(
-        tokens: count, lexicon: urduRomanWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(urduRomanWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .urdish:
       return prompt(
-        tokens: count, lexicon: urdishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(urdishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tamil:
       return prompt(
-        tokens: count, lexicon: tamilWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tamilWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tamil1k:
       return prompt(
-        tokens: count, lexicon: tamil1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tamil1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .tamilOld:
-      return entryPrompt(tokens: count, entries: tamilOldWords, contentOptions: contentOptions)
+      return entryPrompt(tokens: count, entries: reversesCandidatePool ? Array(tamilOldWords.reversed()) : tamilOldWords, contentOptions: contentOptions)
     case .tanglish:
       return prompt(
-        tokens: count, lexicon: tanglishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(tanglishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hindi:
-      return indicPrompt(tokens: count, lexicon: hindiWords, digits: Array("०१२३४५६७८९"),
+      return indicPrompt(tokens: count, lexicon: ordered(hindiWords), digits: Array("०१२३४५६७८९"),
                          contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hindi1k:
-      return indicPrompt(tokens: count, lexicon: hindi1kLexicon, digits: Array("०१२३४५६७८९"),
+      return indicPrompt(tokens: count, lexicon: ordered(hindi1kLexicon), digits: Array("०१२३४५६७८९"),
                          contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hinglish:
       return prompt(
-        tokens: count, lexicon: hinglishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(hinglishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .gujarati:
       return prompt(
-        tokens: count, lexicon: gujaratiWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(gujaratiWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .gujarati1k:
       return prompt(
-        tokens: count, lexicon: gujarati1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(gujarati1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bangla:
-      return indicPrompt(tokens: count, lexicon: banglaWords, digits: Array("০১২৩৪৫৬৭৮৯"),
+      return indicPrompt(tokens: count, lexicon: ordered(banglaWords), digits: Array("০১২৩৪৫৬৭৮৯"),
                          contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bangla10k:
-      return indicPrompt(tokens: count, lexicon: bangla10kLexicon, digits: Array("০১২৩৪৫৬৭৮৯"),
+      return indicPrompt(tokens: count, lexicon: ordered(bangla10kLexicon), digits: Array("০১২৩৪৫৬৭৮৯"),
                          contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .banglaLetters:
-      return indicPrompt(tokens: count, lexicon: banglaLetterWords, digits: Array("০১২৩৪৫৬৭৮৯"),
+      return indicPrompt(tokens: count, lexicon: ordered(banglaLetterWords), digits: Array("০১২৩৪৫৬৭৮৯"),
                          contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai:
       return prompt(
-        tokens: count, lexicon: thaiWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(thaiWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai1k:
       return prompt(
-        tokens: count, lexicon: thai1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(thai1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai5k:
       return prompt(
-        tokens: count, lexicon: thai5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(thai5kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai10k:
       return prompt(
-        tokens: count, lexicon: thai10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(thai10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai20k:
       return prompt(
-        tokens: count, lexicon: thai20kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(thai20kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai50k:
       return prompt(
-        tokens: count, lexicon: thai50kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(thai50kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .thai60k:
       return prompt(
-        tokens: count, lexicon: thai60kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(thai60kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .nepali:
-      return indicPrompt(tokens: count, lexicon: nepaliWords, digits: Array("०१२३४५६७८९"),
+      return indicPrompt(tokens: count, lexicon: ordered(nepaliWords), digits: Array("०१२३४५६७८९"),
                          contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .nepali1k:
-      return indicPrompt(tokens: count, lexicon: nepali1kLexicon, digits: Array("०१२३४५६७८९"),
+      return indicPrompt(tokens: count, lexicon: ordered(nepali1kLexicon), digits: Array("०१२३४५६७८९"),
                          contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .nepaliRomanized:
-      return indicPrompt(tokens: count, lexicon: nepaliRomanizedWords, digits: Array("०१२३४५६७८९"),
+      return indicPrompt(tokens: count, lexicon: ordered(nepaliRomanizedWords), digits: Array("०१२३४५६७८९"),
                          contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kannada:
       return prompt(
-        tokens: count, lexicon: kannadaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(kannadaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .telugu:
       return prompt(
-        tokens: count, lexicon: teluguWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(teluguWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .telugu1k:
       return prompt(
-        tokens: count, lexicon: telugu1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(telugu1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .malayalam:
       return prompt(
-        tokens: count, lexicon: malayalamWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(malayalamWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .sanskrit:
       return prompt(
-        tokens: count, lexicon: sanskritWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(sanskritWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .sanskritRoman:
       return prompt(
-        tokens: count, lexicon: sanskritRomanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(sanskritRomanWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .sinhala:
       return prompt(
-        tokens: count, lexicon: sinhalaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(sinhalaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .khmer:
       return prompt(
-        tokens: count, lexicon: khmerWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(khmerWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .myanmarBurmese:
       return prompt(
-        tokens: count, lexicon: myanmarBurmeseWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(myanmarBurmeseWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .lao:
       return prompt(
-        tokens: count, lexicon: laoWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(laoWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .amharic:
       return prompt(
-        tokens: count, lexicon: amharicWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(amharicWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .amharic1k, .amharic5k, .armenian1k, .armenianWestern1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .armenian:
       return prompt(
-        tokens: count, lexicon: armenianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(armenianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .armenianWestern:
       return prompt(
-        tokens: count, lexicon: armenianWesternWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(armenianWesternWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .georgian:
       return prompt(
-        tokens: count, lexicon: georgianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(georgianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .azerbaijani:
       return prompt(
-        tokens: count, lexicon: azerbaijaniWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(azerbaijaniWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .azerbaijani1k:
       return prompt(
-        tokens: count, lexicon: azerbaijani1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(azerbaijani1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusian:
       return prompt(
-        tokens: count, lexicon: belarusianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(belarusianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusian1k:
       return prompt(
-        tokens: count, lexicon: belarusian1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(belarusian1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusian5k:
       return prompt(
-        tokens: count, lexicon: belarusian5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(belarusian5kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusian10k:
       return prompt(
-        tokens: count, lexicon: belarusian10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(belarusian10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusian25k:
       return prompt(
-        tokens: count, lexicon: belarusian25kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(belarusian25kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusian50k:
       return prompt(
-        tokens: count, lexicon: belarusian50kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(belarusian50kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusian100k:
       return prompt(
-        tokens: count, lexicon: belarusian100kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(belarusian100kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusianLacinka:
       return prompt(
-        tokens: count, lexicon: belarusianLacinkaWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(belarusianLacinkaWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .belarusianLacinka1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .lithuanian:
       return prompt(
-        tokens: count, lexicon: lithuanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(lithuanianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .latvian:
       return prompt(
-        tokens: count, lexicon: latvianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(latvianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .mongolian:
       return prompt(
-        tokens: count, lexicon: mongolianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(mongolianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .mongolian10k:
       return prompt(
-        tokens: count, lexicon: mongolian10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(mongolian10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .irish:
       return prompt(
-        tokens: count, lexicon: irishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(irishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .galician:
       return prompt(
-        tokens: count, lexicon: galicianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(galicianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .marathi:
       return prompt(
-        tokens: count, lexicon: marathiWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(marathiWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .kurdishCentral:
       return kurdishPrompt(
-        tokens: count, lexicon: kurdishCentralWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(kurdishCentralWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .kurdishCentral2k, .kurdishCentral4k:
       return kurdishPrompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .greek:
       return greekPrompt(
-        tokens: count, lexicon: greekWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(greekWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .greek1k, .greek5k, .greek10k, .greek25k:
       return greekPrompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .greekKoine:
       return greekPrompt(
-        tokens: count, lexicon: greekKoineWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(greekKoineWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .greeklish1k, .greeklish5k, .greeklish10k, .greeklish25k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .greeklish:
       return prompt(
-        tokens: count, lexicon: greeklishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(greeklishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .dutch:
       return prompt(
-        tokens: count, lexicon: dutchWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(dutchWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .dutch1k, .dutch10k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .filipino:
       return prompt(
-        tokens: count, lexicon: filipinoWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(filipinoWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .catalan:
       return prompt(
-        tokens: count, lexicon: catalanWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(catalanWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .indonesian:
       return prompt(
-        tokens: count, lexicon: indonesianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(indonesianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .indonesian1k:
       return prompt(
-        tokens: count, lexicon: indonesian1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(indonesian1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .indonesian10k:
       return prompt(
-        tokens: count, lexicon: indonesian10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(indonesian10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .malay:
       return prompt(
-        tokens: count, lexicon: malayWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(malayWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .malay1k:
       return prompt(
-        tokens: count, lexicon: malay1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(malay1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .danish:
       return prompt(
-        tokens: count, lexicon: danishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(danishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .danish1k, .danish10k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .norwegianBokmal:
       return prompt(
-        tokens: count, lexicon: norwegianBokmalWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianBokmalWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianBokmal1k:
       return prompt(
-        tokens: count, lexicon: norwegianBokmal1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianBokmal1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianBokmal5k:
       return prompt(
-        tokens: count, lexicon: norwegianBokmal5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianBokmal5kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianBokmal10k:
       return prompt(
-        tokens: count, lexicon: norwegianBokmal10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianBokmal10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianBokmal150k:
       return prompt(
-        tokens: count, lexicon: norwegianBokmal150kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianBokmal150kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianBokmal600k:
       return prompt(
-        tokens: count, lexicon: norwegianBokmal600kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianBokmal600kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianNynorsk:
       return prompt(
-        tokens: count, lexicon: norwegianNynorskWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianNynorskWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianNynorsk1k:
       return prompt(
-        tokens: count, lexicon: norwegianNynorsk1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianNynorsk1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianNynorsk5k:
       return prompt(
-        tokens: count, lexicon: norwegianNynorsk5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianNynorsk5kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianNynorsk10k:
       return prompt(
-        tokens: count, lexicon: norwegianNynorsk10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianNynorsk10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianNynorsk100k:
       return prompt(
-        tokens: count, lexicon: norwegianNynorsk100kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianNynorsk100kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .norwegianNynorsk400k:
       return prompt(
-        tokens: count, lexicon: norwegianNynorsk400kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(norwegianNynorsk400kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .swedish:
       return prompt(
-        tokens: count, lexicon: swedishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(swedishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .swedish1k:
       return prompt(
-        tokens: count, lexicon: swedish1kLexicon, separator: " ",
+        tokens: count, lexicon: ordered(swedish1kLexicon), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .swedishDiacritics:
       return prompt(
-        tokens: count, lexicon: swedishDiacriticsWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(swedishDiacriticsWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .hungarian:
       return prompt(
-        tokens: count, lexicon: hungarianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(hungarianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .czech:
       return prompt(
-        tokens: count, lexicon: czechWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(czechWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .czech1k, .czech10k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .slovak:
       return slavicPrompt(
-        tokens: count, lexicon: slovakWords, allowsDoubleQuotes: true, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(slovakWords), allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .slovak1k, .slovak10k:
       return slavicPrompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), allowsDoubleQuotes: true,
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), allowsDoubleQuotes: true,
         allowsApostrophes: false, contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .slovenian:
       return prompt(
-        tokens: count, lexicon: slovenianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(slovenianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .slovenian1k, .slovenian5k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .croatian:
       return prompt(
-        tokens: count, lexicon: croatianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(croatianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .croatian1k:
       return prompt(
-        tokens: count, lexicon: croatian1kLexicon, separator: " ",
+        tokens: count, lexicon: ordered(croatian1kLexicon), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .serbian:
       return prompt(
-        tokens: count, lexicon: serbianWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(serbianWords), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .serbianLatin:
       return prompt(
-        tokens: count, lexicon: serbianLatinWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(serbianLatinWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .serbian10k, .serbianLatin10k, .bulgarian1k, .bulgarianLatin1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .bulgarian:
       return prompt(
-        tokens: count, lexicon: bulgarianWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(bulgarianWords), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .bulgarianLatin:
       return prompt(
-        tokens: count, lexicon: bulgarianLatinWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(bulgarianLatinWords), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian:
       return prompt(
-        tokens: count, lexicon: romanianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(romanianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian1k:
       return prompt(
-        tokens: count, lexicon: romanian1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(romanian1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian5k:
       return prompt(
-        tokens: count, lexicon: romanian5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(romanian5kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian10k:
       return prompt(
-        tokens: count, lexicon: romanian10kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(romanian10kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian25k:
       return prompt(
-        tokens: count, lexicon: romanian25kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(romanian25kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian50k:
       return prompt(
-        tokens: count, lexicon: romanian50kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(romanian50kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian100k:
       return prompt(
-        tokens: count, lexicon: romanian100kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(romanian100kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .romanian200k:
       return prompt(
-        tokens: count, lexicon: romanian200kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(romanian200kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .finnish:
       return prompt(
-        tokens: count, lexicon: finnishWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(finnishWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .finnish1k, .finnish10k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .estonian:
       return prompt(
-        tokens: count, lexicon: estonianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(estonianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .estonian1k, .estonian5k, .estonian10k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .icelandic:
       return prompt(
-        tokens: count, lexicon: icelandicWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(icelandicWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .icelandic1k:
       return prompt(
-        tokens: count, lexicon: icelandic1kLexicon, separator: " ",
+        tokens: count, lexicon: ordered(icelandic1kLexicon), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .french:
       return frenchPrompt(
-        tokens: count, lexicon: frenchWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(frenchWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .french1k:
       return frenchPrompt(
-        tokens: count, lexicon: french1kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(french1kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .french2k:
       return frenchPrompt(
-        tokens: count, lexicon: french2kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(french2kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .french10k:
       return frenchPrompt(
-        tokens: count, lexicon: french10kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(french10kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .french600k:
       return frenchPrompt(
-        tokens: count, lexicon: french600kLexicon, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(french600kLexicon), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .frenchBitoduc:
       return frenchPrompt(
-        tokens: count, lexicon: frenchBitoducWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(frenchBitoducWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .italian:
       return prompt(
-        tokens: count, lexicon: italianWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(italianWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .italian1k:
       return prompt(
-        tokens: count, lexicon: italian1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(italian1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .italian7k:
       return prompt(
-        tokens: count, lexicon: italian7kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(italian7kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .italian60k:
       return prompt(
-        tokens: count, lexicon: italian60kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(italian60kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .italian280k:
       return prompt(
-        tokens: count, lexicon: italian280kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(italian280kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portuguese:
       return prompt(
-        tokens: count, lexicon: portugueseWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(portugueseWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portuguese1k:
       return prompt(
-        tokens: count, lexicon: portuguese1kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(portuguese1kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portuguese3k:
       return prompt(
-        tokens: count, lexicon: portuguese3kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(portuguese3kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portuguese5k:
       return prompt(
-        tokens: count, lexicon: portuguese5kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(portuguese5kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portuguese320k:
       return prompt(
-        tokens: count, lexicon: portuguese320kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(portuguese320kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portuguese550k:
       return prompt(
-        tokens: count, lexicon: portuguese550kLexicon, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(portuguese550kLexicon), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .portugueseAccents:
       return prompt(
-        tokens: count, lexicon: portugueseAccentsWords, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(portugueseAccentsWords), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese:
       return cjkPrompt(
-        tokens: count, lexicon: simplifiedChineseWords, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(simplifiedChineseWords), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese1k:
       return cjkPrompt(
-        tokens: count, lexicon: simplifiedChinese1kLexicon, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(simplifiedChinese1kLexicon), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese5k:
       return cjkPrompt(
-        tokens: count, lexicon: simplifiedChinese5kLexicon, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(simplifiedChinese5kLexicon), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese10k:
       return cjkPrompt(
-        tokens: count, lexicon: simplifiedChinese10kLexicon, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(simplifiedChinese10kLexicon), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .simplifiedChinese50k:
       return cjkPrompt(
-        tokens: count, lexicon: simplifiedChinese50kLexicon, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(simplifiedChinese50kLexicon), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese:
       return cjkPrompt(
-        tokens: count, lexicon: traditionalChineseWords, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(traditionalChineseWords), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese1k:
       return cjkPrompt(
-        tokens: count, lexicon: traditionalChinese1kLexicon, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(traditionalChinese1kLexicon), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese5k:
       return cjkPrompt(
-        tokens: count, lexicon: traditionalChinese5kLexicon, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(traditionalChinese5kLexicon), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese10k:
       return cjkPrompt(
-        tokens: count, lexicon: traditionalChinese10kLexicon, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(traditionalChinese10kLexicon), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .traditionalChinese50k:
       return cjkPrompt(
-        tokens: count, lexicon: traditionalChinese50kLexicon, usesChineseMarks: true,
+        tokens: count, lexicon: ordered(traditionalChinese50kLexicon), usesChineseMarks: true,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian:
       return slavicPrompt(
-        tokens: count, lexicon: russianWords, allowsDoubleQuotes: false, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(russianWords), allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian1k:
       return slavicPrompt(
-        tokens: count, lexicon: russian1kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(russian1kLexicon), allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian5k:
       return slavicPrompt(
-        tokens: count, lexicon: russian5kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(russian5kLexicon), allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian10k:
       return slavicPrompt(
-        tokens: count, lexicon: russian10kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(russian10kLexicon), allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian25k:
       return slavicPrompt(
-        tokens: count, lexicon: russian25kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(russian25kLexicon), allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian50k:
       return slavicPrompt(
-        tokens: count, lexicon: russian50kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(russian50kLexicon), allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russian375k:
       return slavicPrompt(
-        tokens: count, lexicon: russian375kLexicon, allowsDoubleQuotes: false, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(russian375kLexicon), allowsDoubleQuotes: false, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russianAbbreviations:
       return slavicPrompt(
-        tokens: count, lexicon: russianAbbreviationWords, allowsDoubleQuotes: false,
+        tokens: count, lexicon: ordered(russianAbbreviationWords), allowsDoubleQuotes: false,
         allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .russianContractions:
       return slavicEntryPrompt(
-        tokens: count, entries: russianShortFormWords, allowsDoubleQuotes: false,
+        tokens: count, entries: reversesCandidatePool ? Array(russianShortFormWords.reversed()) : russianShortFormWords, allowsDoubleQuotes: false,
         allowsApostrophes: false, contentOptions: contentOptions, lowercasesWithoutPunctuation: true)
     case .russianContractions1k:
       return slavicEntryPrompt(
-        tokens: count, entries: russianShortForm1kWords, allowsDoubleQuotes: false,
+        tokens: count, entries: reversesCandidatePool ? Array(russianShortForm1kWords.reversed()) : russianShortForm1kWords, allowsDoubleQuotes: false,
         allowsApostrophes: false, contentOptions: contentOptions, lowercasesWithoutPunctuation: true)
     case .ukrainian:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainianWords, allowsDoubleQuotes: true, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(ukrainianWords), allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainian1k:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainian1kLexicon, allowsDoubleQuotes: true, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(ukrainian1kLexicon), allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainian10k:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainian10kLexicon, allowsDoubleQuotes: true, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(ukrainian10kLexicon), allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainian50k:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainian50kLexicon, allowsDoubleQuotes: true, allowsApostrophes: false,
+        tokens: count, lexicon: ordered(ukrainian50kLexicon), allowsDoubleQuotes: true, allowsApostrophes: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianEndings:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainianEndingWords, allowsDoubleQuotes: true,
+        tokens: count, lexicon: ordered(ukrainianEndingWords), allowsDoubleQuotes: true,
         allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatin:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainianLatinWords, allowsDoubleQuotes: true,
+        tokens: count, lexicon: ordered(ukrainianLatinWords), allowsDoubleQuotes: true,
         allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynka1k:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainianLatynka1kLexicon, allowsDoubleQuotes: true,
+        tokens: count, lexicon: ordered(ukrainianLatynka1kLexicon), allowsDoubleQuotes: true,
         allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynka10k:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainianLatynka10kLexicon, allowsDoubleQuotes: true,
+        tokens: count, lexicon: ordered(ukrainianLatynka10kLexicon), allowsDoubleQuotes: true,
         allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynka50k:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainianLatynka50kLexicon, allowsDoubleQuotes: true,
+        tokens: count, lexicon: ordered(ukrainianLatynka50kLexicon), allowsDoubleQuotes: true,
         allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .ukrainianLatynkaEndings:
       return slavicPrompt(
-        tokens: count, lexicon: ukrainianLatynkaEndingWords, allowsDoubleQuotes: true,
+        tokens: count, lexicon: ordered(ukrainianLatynkaEndingWords), allowsDoubleQuotes: true,
         allowsApostrophes: false, contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseHiragana:
       return cjkPrompt(
-        tokens: count, lexicon: japaneseHiraganaWords, usesChineseMarks: false,
+        tokens: count, lexicon: ordered(japaneseHiraganaWords), usesChineseMarks: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseKatakana:
       return cjkPrompt(
-        tokens: count, lexicon: japaneseKatakanaWords, usesChineseMarks: false,
+        tokens: count, lexicon: ordered(japaneseKatakanaWords), usesChineseMarks: false,
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseRomaji:
       return cjkPrompt(
-        tokens: count, lexicon: japaneseRomajiWords, usesChineseMarks: false, separator: " ",
+        tokens: count, lexicon: ordered(japaneseRomajiWords), usesChineseMarks: false, separator: " ",
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .japaneseRomaji1k:
       return cjkPrompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), usesChineseMarks: false,
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), usesChineseMarks: false,
         separator: " ", contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .korean:
       return prompt(
-        tokens: count, lexicon: koreanWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(koreanWords), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .korean1k:
       return prompt(
-        tokens: count, lexicon: korean1kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(korean1kLexicon), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .korean5k:
       return prompt(
-        tokens: count, lexicon: korean5kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(korean5kLexicon), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .turkish:
       return turkishPrompt(
-        tokens: count, lexicon: turkishWords, contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(turkishWords), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .turkish1k, .turkish5k:
       return turkishPrompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), contentOptions: contentOptions,
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .polish:
       return prompt(
-        tokens: count, lexicon: polishWords, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(polishWords), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .polish2k:
       return prompt(
-        tokens: count, lexicon: polish2kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(polish2kLexicon), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .polish5k:
       return prompt(
-        tokens: count, lexicon: polish5kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(polish5kLexicon), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .polish10k:
       return prompt(
-        tokens: count, lexicon: polish10kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(polish10kLexicon), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .polish20k:
       return prompt(
-        tokens: count, lexicon: polish20kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(polish20kLexicon), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .polish40k:
       return prompt(
-        tokens: count, lexicon: polish40kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(polish40kLexicon), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .polish200k:
       return prompt(
-        tokens: count, lexicon: polish200kLexicon, separator: " ", punctuation: [".", ",", "!", "?"],
+        tokens: count, lexicon: ordered(polish200kLexicon), separator: " ", punctuation: [".", ",", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     case .irish1k, .filipino1k, .hungarian1k, .hungarian2k, .welsh1k,
       .lithuanian1k, .lithuanian3k, .latvian1k, .maltese1k,
       .vietnamese1k, .vietnamese5k, .pinyin1k, .pinyin10k, .hausa1k,
       .bemba1k, .bemba10k, .catalan1k, .frisian1k:
       return prompt(
-        tokens: count, lexicon: language.ownedPracticeLexicon(), separator: " ",
+        tokens: count, lexicon: ordered(language.ownedPracticeLexicon()), separator: " ",
         punctuation: [",", ".", "!", "?"], contentOptions: contentOptions,
         usesZipfFrequency: usesZipfFrequency)
     case .mixedEnglishChinese:
@@ -15146,7 +15159,7 @@ enum StarterLexicon {
       }.joined(separator: " ")
     default:
       return prompt(
-        tokens: count, lexicon: words, separator: " ", punctuation: [",", ".", "!", "?"],
+        tokens: count, lexicon: ordered(words), separator: " ", punctuation: [",", ".", "!", "?"],
         contentOptions: contentOptions, usesZipfFrequency: usesZipfFrequency)
     }
   }

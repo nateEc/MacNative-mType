@@ -36,6 +36,10 @@ struct WeakSpotScores: Equatable {
   func averageScore(for character: Character) -> TimeInterval {
     values[character]?.average ?? 0
   }
+
+  func knownAverageScore(for character: Character) -> TimeInterval? {
+    values[character]?.average
+  }
 }
 
 /// One user-entered character that is eligible for weakspot scoring. The
@@ -81,7 +85,7 @@ enum WeakSpotWordSelection {
   static func prompt(
     wordCount: Int, language: TypingLanguage, englishVariant: EnglishVariant,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
-    contentOptions: ContentOptions, scores: WeakSpotScores
+    contentOptions: ContentOptions, scores: WeakSpotScores, reversesCandidatePool: Bool = false
   ) -> String? {
     guard !language.isCodeLanguage else { return nil }
     guard let source = sourceLexicon(
@@ -89,7 +93,11 @@ enum WeakSpotWordSelection {
       mixedLanguageComponents: mixedLanguageComponents)
     else { return nil }
     let count = max(1, wordCount)
-    let selected = (0..<count).compactMap { _ in word(from: source, scores: scores) }
+    // Polyglot's withWords builds a fresh combined pool after the primary
+    // pool order step. Do not reverse that combined pool a second time.
+    let selectedSource = IndexedLexicon.ordered(source,
+      reversed: reversesCandidatePool && ![.mixedLanguages, .mixedEnglishChinese].contains(language))
+    let selected = (0..<count).compactMap { _ in word(from: selectedSource, scores: scores) }
     guard selected.count == count else { return nil }
     return selected.enumerated().map { index, word in
       decorated(
@@ -134,9 +142,11 @@ enum WeakSpotWordSelection {
   }
 
   private static func score(of word: String, scores: WeakSpotScores) -> TimeInterval {
-    let characters = Array(word)
-    guard !characters.isEmpty else { return 0 }
-    return characters.map(scores.averageScore).reduce(0, +) / Double(characters.count)
+    let learned = word.unicodeScalars.compactMap {
+      scores.knownAverageScore(for: Character(String($0)))
+    }
+    guard !learned.isEmpty else { return 0 }
+    return learned.reduce(0, +) / Double(learned.count)
   }
 
   private static func decorated(

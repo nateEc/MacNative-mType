@@ -6,7 +6,7 @@
 
 参考固定在 91bd24bb8513785c7364cbea29296ff7adafac41。[候选池构造](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L639) 先反转 wordList 再构造 Wordset；[生成下一词](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/words-generator.ts#L891) 调用 Funbox getWord 后才进行逐词文本变换。[二进制入口](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/funbox/funbox-functions.ts#L566) 不读取候选池，[反写](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/funbox/funbox-functions.ts#L349) 只反转当前词的 UTF-16 单位。生成后的整批不再反转。
 
-Scripts/check-source-generated-backwards-order.mjs 只读运行完整 words-generator、funbox-functions、wordset 三个实际模块，四组自有二进制生成输入验证正常／下划线、默认百词／显示全部、候选池反转和第 101 词续取。GetText 输入、随机抽样、活动元数据、配置、数组工具、类型与 UI／异常为明确适配，不是原版随机生成算法、词库、浏览器布局或完整生命周期运行证据。源函数未复制到原生实现，参考代码与资产不进入应用包。
+本阶段当时的 Scripts/check-source-generated-backwards-order.mjs 版本只读运行完整 words-generator、funbox-functions、wordset 三个实际模块，四组自有二进制生成输入验证正常／下划线、默认百词／显示全部、候选池反转和第 101 词续取。后续四模块与普通词池扩展见 [普通候选池反写与弱项评分](ORDINARY_BACKWARDS_POOL_CONTRACT.md)。GetText 输入、随机抽样、活动元数据、配置、数组工具、类型与 UI／异常为明确适配，不是原版随机生成算法、词库、浏览器布局或完整生命周期运行证据。源函数未复制到原生实现，参考代码与资产不进入应用包。
 
 ## 原生改动与消费者
 
