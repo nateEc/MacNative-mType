@@ -135,14 +135,26 @@ final class FunboxAlterationOrderTests: XCTestCase {
     XCTAssertEqual(session.errors, 0)
   }
 
-  func testCanonicalUnderscoreAfterMessagingOwnsTheInternalNewline() {
+  func testCanonicalUnderscoreAfterMessagingKeepsItsTargetButReturnNavigatesOnSingleKeyEvents() throws {
     var session = TestSessionFactory.make(configuration: configuration([.underscoreSeparators, .messagingStyle],
       pipe: true, completion: .sections), customText: "Hi! | Next.")
     XCTAssertEqual(session.prompt, "hi\n_next")
-    session.insertBatch("hi\n_next", at: start)
+    // Source LF is a separator even when another alterText suffix follows
+    // it. Separate physical events finish on the last-word commit, before
+    // the final t. Whole-event last-word reentry is a separate open contract.
+    for (index, character) in "hi\n_next".enumerated() {
+      session.insert(String(character), at: start.addingTimeInterval(Double(index) / 10))
+    }
     XCTAssertEqual(session.outcome, .completed)
     XCTAssertEqual(session.wordReviews.map(\.target), ["hi\n_", "next"])
-    XCTAssertEqual(session.errors, 0)
+    XCTAssertEqual(session.typed, "hi\n_nex")
+    XCTAssertEqual(session.wordReviews.map(\.typed), ["hi\n", "_nex"])
+    XCTAssertEqual(session.errors, 4)
+    let result = try XCTUnwrap(session.result())
+    XCTAssertEqual(result.inputMetrics?.totalAttempts, 7)
+    XCTAssertEqual(result.inputMetrics?.correctAttempts, 3)
+    XCTAssertEqual(result.inputMetrics?.creditedUnits, 0)
+    XCTAssertEqual(result.replayEvents.map { $0.inputField?.index }, [0,0,0,1,1,1,1])
   }
 
   func testRandomCaseDrawsAfterDoublingForEveryDoubledScalar() {

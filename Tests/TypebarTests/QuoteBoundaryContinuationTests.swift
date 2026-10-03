@@ -34,14 +34,14 @@ final class QuoteBoundaryContinuationTests: XCTestCase {
     XCTAssertFalse(attempt.usesIncrementalPromptExtension)
   }
 
-  func testExhaustedUnsafePrefixExposesExactlyOneFutureWordWithoutABlindExtraKey() {
+  func testUnitCommitsMaintainTheSameHundredWordLookaheadAsAlignedTargets() {
     var attempt = session(words.joined(separator: " "))
     let prefix = attempt.prompt
     attempt.insertBatch(prefix, at: start)
-    XCTAssertEqual(attempt.prompt, prefix + "b")
+    XCTAssertEqual(attempt.prompt, words.prefix(200).joined())
     for index in 100..<205 {
       attempt.insert("b", at: start.addingTimeInterval(Double(index - 99)))
-      XCTAssertEqual(attempt.prompt, words.prefix(min(index + 2, 205)).joined())
+      XCTAssertEqual(attempt.prompt, words.prefix(min(index + 101, 205)).joined())
     }
     XCTAssertEqual(attempt.outcome, .completed)
     XCTAssertEqual(attempt.typed, words.joined())
@@ -58,17 +58,19 @@ final class QuoteBoundaryContinuationTests: XCTestCase {
       XCTAssertEqual(attempt.outcome, .completed, modifier.rawValue)
       XCTAssertEqual(attempt.prompt, target, modifier.rawValue)
       XCTAssertEqual(attempt.errors, 0, modifier.rawValue)
-      XCTAssertTrue(attempt.wordReviews.isEmpty, modifier.rawValue)
+      XCTAssertEqual(attempt.wordReviews.count, words.count, modifier.rawValue)
+      XCTAssertEqual(attempt.wordReviews.map(\.typed).joined(), target, modifier.rawValue)
+      XCTAssertTrue(attempt.wordReviews.allSatisfy(\.isCorrect), modifier.rawValue)
     }
   }
 
-  func testUnsafeFallbackDoesNotPrefetchOnLettersOrBlockedErrors() {
+  func testUnitCommitsPrefetchOnlyAtActualWordEndsAndNeverOnBlockedErrors() {
     var attempt = session(words.joined(separator: " "), rules: .init(stopOnErrorMode: .letter))
-    let initial = attempt.prompt
     attempt.insert("a\u{301}", at: start)
-    XCTAssertEqual(attempt.prompt, initial)
+    XCTAssertEqual(attempt.prompt, words.prefix(102).joined())
+    let afterCommits = attempt.prompt
     attempt.insert("x", at: start.addingTimeInterval(1))
-    XCTAssertEqual(attempt.prompt, initial)
+    XCTAssertEqual(attempt.prompt, afterCommits)
     XCTAssertEqual(attempt.typed, "a\u{301}")
     attempt.insertBatch(String(words.joined().dropFirst()), at: start.addingTimeInterval(2))
     XCTAssertEqual(attempt.outcome, .completed)
@@ -131,7 +133,8 @@ final class QuoteBoundaryContinuationTests: XCTestCase {
       XCTAssertEqual(attempt.prompt, target)
       XCTAssertEqual(attempt.typed, target)
       XCTAssertEqual(attempt.errors, 0)
-      XCTAssertTrue(attempt.wordReviews.isEmpty)
+      XCTAssertEqual(attempt.wordReviews.map(\.target), sourceWords)
+      XCTAssertEqual(attempt.wordReviews.map(\.typed), sourceWords)
     }
   }
 
@@ -145,17 +148,18 @@ final class QuoteBoundaryContinuationTests: XCTestCase {
     XCTAssertEqual(attempt.typed, target)
     XCTAssertEqual(attempt.outcome, .completed)
     XCTAssertEqual(attempt.errors, 0)
-    XCTAssertTrue(attempt.wordReviews.isEmpty)
+    XCTAssertEqual(attempt.wordReviews.map(\.target), sourceWords)
+    XCTAssertEqual(attempt.wordReviews.map(\.typed), sourceWords)
   }
 
-  func testFallbackReopeningAPrefixDoesNotDrawAnAlreadyBufferedTargetTwice() {
+  func testReopeningAUnitFieldMaintainsLookaheadWithoutDuplicatingTargetIdentity() {
     var attempt = session(words.joined(separator: " "), rules: .init(freedomMode: true))
     let prefix = attempt.prompt
     attempt.insertBatch(String(prefix.dropLast()) + "x", at: start)
-    XCTAssertEqual(attempt.prompt, prefix + "b")
+    XCTAssertEqual(attempt.prompt, words.prefix(200).joined())
     attempt.deleteBackward(at: start.addingTimeInterval(1))
     attempt.insert("b", at: start.addingTimeInterval(2))
-    XCTAssertEqual(attempt.prompt, prefix + "b")
+    XCTAssertEqual(attempt.prompt, words.prefix(201).joined())
     attempt.insertBatch(String(words.joined().dropFirst(prefix.count)), at: start.addingTimeInterval(3))
     XCTAssertEqual(attempt.prompt, words.joined())
     XCTAssertEqual(attempt.typed, words.joined())

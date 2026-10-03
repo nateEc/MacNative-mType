@@ -35,7 +35,8 @@ struct AcceptedUnitInput {
     guard starts.indices.contains(index) else { return 0..<0 }
     let start = starts[index]
     var end = starts.indices.contains(index + 1) ? starts[index + 1] : entries.count
-    if withoutCommit, end > start, entries[end - 1].commits { end -= 1 }
+    if withoutCommit, end > start, entries[end - 1].commits,
+      entries[end - 1].unit == 32 || entries[end - 1].unit == 10 { end -= 1 }
     return start..<end
   }
 
@@ -48,7 +49,8 @@ struct AcceptedUnitInput {
     guard !range.isEmpty else { return nil }
     let elapsed = entries[range.upperBound - 1].date.timeIntervalSince(entries[range.lowerBound].date)
     guard elapsed > 0 else { return nil }
-    let count = range.count + (entries[range.upperBound - 1].commits ? 0 : 1)
+    let last = entries[range.upperBound - 1].unit
+    let count = range.count + (last == 32 || last == 10 ? 0 : 1)
     let value = (Double(count) / 5 / elapsed * 60).rounded()
     guard value.isFinite, value >= 0, value < Double(Int.max) else { return nil }
     return Int(value)
@@ -63,13 +65,15 @@ struct UnitInputTargets {
   let fields: [Range<Int>]
   let requiresUnitInput: Bool
   let hasNewline: Bool
+  let noSpace: Bool
 
-  init(_ text: String, buildsASCIICatalog: Bool = false) {
+  init(_ text: String, buildsASCIICatalog: Bool = false, noSpaceWords: [String]? = nil) {
     requiresUnitInput = text.utf8.contains { $0 > 127 || $0 == 13 }
     hasNewline = text.utf8.contains(10)
+    noSpace = noSpaceWords.map { !$0.isEmpty && $0.joined().utf16.elementsEqual(text.utf16) } ?? false
     // A growing ASCII prompt has no unit/glyph ambiguity. Do not rebuild an
     // unused full catalog on each chunk; a later Unicode input builds it once.
-    guard requiresUnitInput || buildsASCIICatalog else {
+    guard requiresUnitInput || buildsASCIICatalog || noSpace else {
       units = []; glyphs = []; fields = []
       return
     }
@@ -77,6 +81,15 @@ struct UnitInputTargets {
     glyphs = requiresUnitInput ? text.enumerated().flatMap { index, character in
       Array(repeating: index, count: String(character).utf16.count)
     } : Array(units.indices)
+    if noSpace, let noSpaceWords {
+      var start = 0
+      fields = noSpaceWords.map { word in
+        let end = start + word.utf16.count
+        defer { start = end }
+        return start..<end
+      }
+      return
+    }
     var ranges: [Range<Int>] = []
     var start = 0
     for index in units.indices where units[index] == 32 || units[index] == 10 {
@@ -100,7 +113,8 @@ struct UnitInputTargets {
     let range = fields[field]
     let end = range.upperBound
     let hasCommit = end > range.lowerBound && (units[end - 1] == 32 || units[end - 1] == 10)
-    let unitIndex = min(range.lowerBound + position, hasCommit ? end - 1 : end)
+    let unitIndex = min(range.lowerBound + position,
+      hasCommit || noSpace && !range.isEmpty ? end - 1 : end)
     return glyphs.indices.contains(unitIndex) ? glyphs[unitIndex] : endGlyph
   }
 }

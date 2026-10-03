@@ -2163,8 +2163,9 @@ final class TypingEngineTests: XCTestCase {
     var session = TestSessionFactory.make(configuration: configuration, customText: "amber harbor")
 
     session.insert("amxer", at: start)
-    XCTAssertEqual(session.typed, "amxe")
+    XCTAssertEqual(session.typed, "amxer")
 
+    session.deleteBackward(at: start.addingTimeInterval(1))
     session.deleteBackward(at: start.addingTimeInterval(1))
     session.deleteBackward(at: start.addingTimeInterval(1))
     session.insert("ber", at: start.addingTimeInterval(2))
@@ -18554,7 +18555,8 @@ final class TypingEngineTests: XCTestCase {
       configuration: configuration, prompt: "晨光窗边", noSpaceWordEndIndices: [2, 4],
       noSpaceTargetWords: ["晨光", "窗边"])
     session.insert("晨x", at: start)
-    XCTAssertEqual(session.typed, "晨")
+    XCTAssertEqual(session.typed, "晨x")
+    session.deleteBackward(at: start.addingTimeInterval(1))
     session.insert("光", at: start.addingTimeInterval(1))
     XCTAssertEqual(session.completedWordCount, 1)
     XCTAssertEqual(session.progressText(at: start), "1/2")
@@ -21232,7 +21234,8 @@ final class TypingEngineTests: XCTestCase {
     var noSpaceLazySession = TestSessionFactory.make(
       configuration: noSpaceLazyConfiguration, customText: "amber bay")
     noSpaceLazySession.insert("amxer", at: start)
-    XCTAssertEqual(noSpaceLazySession.typed, "amxe")
+    XCTAssertEqual(noSpaceLazySession.typed, "amxer")
+    noSpaceLazySession.deleteBackward(at: start)
     noSpaceLazySession.deleteBackward(at: start)
     noSpaceLazySession.deleteBackward(at: start)
     noSpaceLazySession.insert("ber", at: start)

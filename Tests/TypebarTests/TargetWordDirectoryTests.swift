@@ -52,7 +52,7 @@ final class TargetWordDirectoryTests: XCTestCase {
     var repeated = session.repeatedAttempt()
     repeated.insert("a\u{301}", at: start)
     repeated.bailOut(at: start.addingTimeInterval(1))
-    XCTAssertEqual(try savedWords(try XCTUnwrap(repeated.result()))?.count, 100)
+    XCTAssertEqual(try savedWords(try XCTUnwrap(repeated.result()))?.count, 102)
   }
 
   private func noSpaceResult() throws -> CompletedTestResult {
@@ -222,7 +222,8 @@ final class TargetWordDirectoryTests: XCTestCase {
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.targetWordDirectory?.words.map { Array($0.utf16) }, words.map { Array($0.utf16) })
     XCTAssertEqual(result.outcome, .completed)
-    XCTAssertTrue(session.wordReviews.isEmpty, "Saved unit targets do not enable unsafe legacy glyph navigation")
+    XCTAssertEqual(session.wordReviews.map(\.target), words)
+    XCTAssertEqual(session.wordReviews.map(\.typed), words)
   }
 
   func testEqualGlyphCountsDoNotProveARegionalIndicatorWordBoundary() {
@@ -237,7 +238,7 @@ final class TargetWordDirectoryTests: XCTestCase {
       .noSpaceWordLengths, [1,1], "Actual aligned flag boundaries remain eligible")
   }
 
-  func testEqualCountFlagFusionUsesFallbackScoringInsteadOfWrongWordSlices() throws {
+  func testEqualCountFlagFusionUsesActualUnitFieldsInsteadOfWrongGlyphSlices() throws {
     let words = ["🇫", "🇷🇨"]
     let configuration = TestConfiguration(mode: .quote, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init(), modifiers: [.noSpaces])
@@ -252,10 +253,11 @@ final class TargetWordDirectoryTests: XCTestCase {
     XCTAssertEqual(result.inputMetrics?.creditedUnits, 6)
     XCTAssertEqual(result.wpm, 72)
     XCTAssertEqual(result.targetWordDirectory?.words, words)
-    XCTAssertTrue(session.wordReviews.isEmpty)
+    XCTAssertEqual(session.wordReviews.map(\.target), words)
+    XCTAssertEqual(session.wordReviews.map(\.typed), words)
   }
 
-  func testEqualCountFlagFusionDuringRefillDoesNotEnableUnsafeWordNavigation() throws {
+  func testEqualCountFlagFusionDuringRefillKeepsActualUnitNavigation() throws {
     let words = Array(repeating: "a", count: 99) + ["🇫", "🇷🇨", "b"]
     let configuration = TestConfiguration(mode: .quote, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init(), modifiers: [.noSpaces])
@@ -267,6 +269,6 @@ final class TargetWordDirectoryTests: XCTestCase {
     session.bailOut(at: start.addingTimeInterval(1))
     let result = try XCTUnwrap(session.result())
     XCTAssertEqual(result.targetWordDirectory?.words, Array(words.prefix(101)))
-    XCTAssertTrue(session.wordReviews.isEmpty)
+    XCTAssertEqual(session.wordReviews.map(\.target), ["a"])
   }
 }
