@@ -5980,7 +5980,8 @@ struct GeneratedWordContinuation {
       .map { $0.lowercased() }
   }
 
-  mutating func nextChunk(generator: (() -> String)? = nil,
+  mutating func nextChunk(generator: (() -> String)? = nil, weakSpotScores: WeakSpotScores? = nil,
+    nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() }) -> GeneratedWordChunk {
     let count = configuration.mode == .words && !configuration.isInfinite
       ? min(batchWordCount, max(0, (configuration.wordLimit ?? 0) - nextWordIndex)) : batchWordCount
@@ -5991,7 +5992,8 @@ struct GeneratedWordContinuation {
     var words: [String] = []
     for _ in 0...100 {
       source = generator?() ?? TestSessionFactory.weakSpotPrompt(
-        configuration: configuration, wordCount: count, scores: weakSpotScores)
+        configuration: configuration, wordCount: count, scores: weakSpotScores ?? self.weakSpotScores,
+        nextRandomWordIndex: nextRandomWordIndex)
       words = source.split(whereSeparator: \.isWhitespace).map(String.init)
       guard let first = words.first else { break }
       let previousLast = previousWords.last
@@ -6043,14 +6045,15 @@ enum OrdinaryEntryContent {
   }
 
   static func prompt(wordCount: Int, language: TypingLanguage, contentOptions: ContentOptions,
-    modifiers: [TestModifier] = [], weakSpotScores: WeakSpotScores = .init()) -> String {
+    modifiers: [TestModifier] = [], weakSpotScores: WeakSpotScores = .init(),
+    nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) }) -> String {
     var cursor = GeneratedCandidateContinuation(configuration: .words(max(1, wordCount),
       language: language, contentOptions: contentOptions).with(modifiers: modifiers),
       batchTokenCount: max(1, wordCount), showAllLines: true, weakSpotScores: weakSpotScores)
     var text = ""
     // Existing content APIs return sampled/decorated source words; their
     // callers apply text funboxes separately. The session uses actual chunks.
-    while cursor.hasRemaining { text += cursor.nextChunk().source }
+    while cursor.hasRemaining { text += cursor.nextChunk(nextRandomWordIndex: nextRandomWordIndex).source }
     return text
   }
 }
@@ -6105,7 +6108,8 @@ struct GeneratedCandidateContinuation {
     return copy
   }
 
-  mutating func nextChunk(nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
+  mutating func nextChunk(weakSpotScores: WeakSpotScores? = nil,
+    nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }) -> GeneratedWordChunk {
     if let index = replayIndex, index < generatedChunks.count {
@@ -6135,7 +6139,7 @@ struct GeneratedCandidateContinuation {
         if section.hasPrefix(" ") { section.removeFirst() }
         if section.hasSuffix(" ") { section.removeLast() }
         if configuration.modifiers.contains(.weakSpot) {
-          section = WeakSpotWordSelection.word(from: pool, scores: weakSpotScores,
+          section = WeakSpotWordSelection.word(from: pool, scores: weakSpotScores ?? self.weakSpotScores,
             random: nextRandomWordIndex) ?? section
         }
         sectionWords = section.components(separatedBy: " ")
@@ -6311,7 +6315,8 @@ struct TestSessionFactory {
           // Do not clean an invalid selected alternate or silently practice
           // a different quote. This failure occurs before any timed attempt.
           return .init(configuration: configuration, prompt: "",
-            initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。")
+            initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。",
+            weakSpotScores: weakSpotScores)
         }
       case .zen:
         // Zen renders and scores only text entered locally by the user. It
@@ -6495,17 +6500,19 @@ struct TestSessionFactory {
         ? noSpaceTargetWords : [],
       generationNotice: GeneratedPromptChunkPolicy.previewNotice(for: configuration, showAllLines: showAllLines)
         ?? (hasIncompleteExternalPreview
-          ? "当前外部词源仅提供部分目标；当前目标保持不变，保留原有续接方式，未预览全部目标。" : nil))
+          ? "当前外部词源仅提供部分目标；当前目标保持不变，保留原有续接方式，未预览全部目标。" : nil),
+      weakSpotScores: weakSpotScores)
   }
 
   static func weakSpotPrompt(
-    configuration: TestConfiguration, wordCount: Int, scores: WeakSpotScores
+    configuration: TestConfiguration, wordCount: Int, scores: WeakSpotScores,
+    nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) }
   ) -> String {
     if OrdinaryEntryContent.pool(for: configuration.language) != nil {
       return OrdinaryEntryContent.prompt(wordCount: wordCount, language: configuration.language,
         contentOptions: configuration.contentOptions,
         modifiers: configuration.modifiers.filter { [.backwards, .zipf, .weakSpot].contains($0) },
-        weakSpotScores: scores)
+        weakSpotScores: scores, nextRandomWordIndex: nextRandomWordIndex)
     }
     if configuration.modifiers.contains(.weakSpot),
       let prompt = WeakSpotWordSelection.prompt(
@@ -6513,7 +6520,8 @@ struct TestSessionFactory {
         englishVariant: configuration.englishVariant,
         mixedLanguageComponents: configuration.mixedLanguageComponents,
         contentOptions: configuration.contentOptions,
-        scores: scores, reversesCandidatePool: configuration.modifiers.contains(.backwards))
+        scores: scores, reversesCandidatePool: configuration.modifiers.contains(.backwards),
+        random: nextRandomWordIndex)
     {
       return prompt
     }

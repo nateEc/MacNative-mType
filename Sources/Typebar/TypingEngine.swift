@@ -4389,6 +4389,7 @@ struct TypingSession {
       noSpaceWordEnds: hasNoSpaceWordSegmentation ? noSpaceWordEndIndices : [])
   }
   private var weakSpotInputSamples: [WeakSpotInputSample] = []
+  private var currentWeakSpotScores = WeakSpotScores()
   private var weakSpotLastInputDate: Date?
   private var physicalKeyTiming = PhysicalKeyTiming()
   private(set) var startedAt: Date?
@@ -4411,8 +4412,9 @@ struct TypingSession {
     noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
     repeatingNoSpaceTargetWords: [String] = [], generationNotice: String? = nil,
-    initializationFailure: String? = nil
+    initializationFailure: String? = nil, weakSpotScores: WeakSpotScores = .init()
   ) {
+    self.currentWeakSpotScores = weakSpotScores
     self.configuration = configuration
     self.generationNotice = initializationFailure ?? generationNotice
     self.initialGenerationNotice = initializationFailure ?? generationNotice
@@ -4476,10 +4478,12 @@ struct TypingSession {
         let batch = try stream.initialChunk(nextRandomCaseBit: nextRandomCaseBit)
         return .init(configuration: configuration, prompt: batch.text, quoteWordStream: stream,
           noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: batch.noSpaceWordLengths),
-          noSpaceTargetWords: batch.noSpaceTargetWords, generationNotice: initialGenerationNotice)
+          noSpaceTargetWords: batch.noSpaceTargetWords, generationNotice: initialGenerationNotice,
+          weakSpotScores: currentWeakSpotScores)
       } catch {
         return .init(configuration: configuration, prompt: "",
-          initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。")
+          initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。",
+          weakSpotScores: currentWeakSpotScores)
       }
     }
     return TypingSession(
@@ -4498,7 +4502,7 @@ struct TypingSession {
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
       repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: initialGenerationNotice,
-      initializationFailure: initializationFailure)
+      initializationFailure: initializationFailure, weakSpotScores: currentWeakSpotScores)
   }
 
   var isFinished: Bool { outcome != .active }
@@ -4568,6 +4572,16 @@ struct TypingSession {
       || quoteWordStream?.hasRemaining == true
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
+  var liveWeakSpotScores: WeakSpotScores { currentWeakSpotScores }
+
+  /// A saved repeat can carry an older in-memory book. The app's latest
+  /// book replaces it without changing captured targets or replay state.
+  func withWeakSpotScores(_ scores: WeakSpotScores) -> Self {
+    var copy = self
+    copy.currentWeakSpotScores = scores
+    return copy
+  }
+
   var typedCharacterCount: Int { typed.count }
   var afkDuration: TimeInterval {
     guard let startedAt, let finishedAt else { return 0 }
@@ -6200,6 +6214,7 @@ struct TypingSession {
     let roundedInterval = (interval * 100_000).rounded() / 100_000
     weakSpotInputSamples.append(
       .init(character: character, interval: roundedInterval, isCorrect: isCorrect))
+    currentWeakSpotScores.record(character: character, interval: roundedInterval, isCorrect: isCorrect)
   }
 
   private func ordinaryCommitErrorStart(for character: Character, targetIndex: Int?) -> Int? {
@@ -7667,13 +7682,13 @@ struct TypingSession {
     }
     var generatedChunk: GeneratedWordChunk?
     if var continuation = generatedWordContinuation {
-      generatedChunk = continuation.nextChunk()
+      generatedChunk = continuation.nextChunk(weakSpotScores: currentWeakSpotScores)
       generatedWordContinuation = continuation
     } else if var continuation = generatedStreamContinuation {
       generatedChunk = continuation.nextChunk()
       generatedStreamContinuation = continuation
     } else if var continuation = generatedCodeContinuation {
-      generatedChunk = continuation.nextChunk()
+      generatedChunk = continuation.nextChunk(weakSpotScores: currentWeakSpotScores)
       generatedCodeContinuation = continuation
     }
     if let chunk = generatedChunk {

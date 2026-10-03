@@ -240,6 +240,42 @@ assert.deepEqual(Array.from(commonSection.words), ['1 ', 'bay! ']);
 assert.equal(units.length, 0); assert.equal(ranks.length, 0); sectionCount++;
 console.log(`${sectionCount - previousSectionCount} ordinary-entry fixtures passed (4 named identity routes, actual gates/case/Weakspot/decoration/original-punctuation/repeat; owned words and runtime adapters, no corpus/RNG/device parity claim).`);
 
+// Keep the real source score book alive while generation is in progress.
+// Spacing, ranks, and words are owned adapters, not physical input capture.
+let liveCount = 0;
+for (const [language, first, second] of [['code_swift', 'q', 'r'], ['pokemon_1k', 'c', 'd']]) {
+  spacingMs = 1000; weakspot.updateScore(first, true);
+  const words = [first.repeat(2), second.repeat(2)];
+  await section(words, 1, [1, 0, ...Array(19).fill(1)], [words[0] + ' '], [1], ['weakspot'], language);
+  config.mode = 'time'; spacingMs = 200; weakspot.updateScore(second, false);
+  ranks = [1, 0, ...Array(19).fill(1)];
+  assert.equal((await main.namespace.getNextWord(1, 100, words[0], '')).word, words[1] + ' ');
+  assert.equal(ranks.length, 0); liveCount++;
+}
+spacingMs = 1000; weakspot.updateScore('u', true);
+const pendingPool = ['uu uu', 'vv vv'];
+await section(pendingPool, 1, [1, 0, ...Array(19).fill(1)], ['uu '], [1], ['weakspot']);
+config.mode = 'time'; spacingMs = 200; weakspot.updateScore('v', false);
+ranks = [1];
+assert.equal((await main.namespace.getNextWord(1, 100, 'uu', '')).word, 'uu ');
+assert.equal(ranks.length, 0);
+ranks = [1, 0, ...Array(19).fill(1)];
+assert.equal((await main.namespace.getNextWord(2, 100, 'uu', 'uu')).word, 'vv ');
+assert.equal(ranks.length, 0); liveCount++;
+repeated = true; config.mode = 'words'; config.words = 1; ranks = [1];
+const learnedRepeat = await main.namespace.generateWords({name: 'code_swift', words: pendingPool});
+assert.deepEqual(Array.from(learnedRepeat.words), ['uu ']); assert.deepEqual(ranks, [1]);
+config.mode = 'time'; ranks = [1, 0, ...Array(19).fill(1)];
+assert.equal((await main.namespace.getNextWord(1, 100, 'uu', '')).word, 'uu ');
+assert.equal((await main.namespace.getNextWord(2, 100, 'uu', 'uu')).word, 'vv ');
+assert.equal(ranks.length, 21);
+// Both pool first components are recent. Consume the exact capped gate
+// draws before the twenty Weakspot draws; do not silently use fallback ranks.
+ranks = [...Array(101).fill(1), 0, ...Array(19).fill(1)];
+assert.equal((await main.namespace.getNextWord(3, 100, 'vv', 'uu')).word, 'vv ');
+assert.equal(ranks.length, 0); liveCount++;
+console.log(`${liveCount} live-weakspot fixtures passed (actual mutable score book, new sections, pending words and cached repeat; owned spacing/rank adapters, no capture/prefetch/device parity claim).`);
+
 // Metadata-only inventory: read values to count sections, never print, persist
 // or import upstream word strings into the native content pool.
 const languages = path.join(root, 'frontend/static/languages');

@@ -3829,6 +3829,7 @@ private struct ContentView: View {
       session = TestSessionFactory.make(
         configuration: configuration, streamPrompt: livePrompt.text,
         streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource,
+        weakSpotScores: session.liveWeakSpotScores,
         showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
       liveContentMessage = "已载入\(content.attribution)。"
       if configuration.modifiers.contains(.listening) {
@@ -4011,7 +4012,7 @@ private struct ContentView: View {
     TypingFeedbackSound.shared.beginPracticeAttempt()
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
-    session = repeatedSession
+    session = repeatedSession.withWeakSpotScores(weakSpotScores)
     isSamePromptRepeatAttempt = true
     isRepeatedPaceAttempt = settings.repeatedPace
     let shouldUseRepeatedPace = isRepeatedPaceAttempt && settings.paceGuideMode == .off
@@ -4024,7 +4025,7 @@ private struct ContentView: View {
   }
 
   private func absorbLiveWeakSpotScores(from session: TypingSession) {
-    weakSpotScores.absorb(session.liveWeakSpotInputSamples)
+    weakSpotScores = session.liveWeakSpotScores
   }
 
   private func refreshPaceTarget() {

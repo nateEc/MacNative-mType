@@ -85,12 +85,14 @@ enum WeakSpotWordSelection {
   static func prompt(
     wordCount: Int, language: TypingLanguage, englishVariant: EnglishVariant,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
-    contentOptions: ContentOptions, scores: WeakSpotScores, reversesCandidatePool: Bool = false
+    contentOptions: ContentOptions, scores: WeakSpotScores, reversesCandidatePool: Bool = false,
+    random: () -> Int = { Int.random(in: Int.min...Int.max) }
   ) -> String? {
     guard !language.isCodeLanguage else { return nil }
     if OrdinaryEntryContent.pool(for: language) != nil {
       return OrdinaryEntryContent.prompt(wordCount: wordCount, language: language, contentOptions: contentOptions,
-        modifiers: [.weakSpot] + (reversesCandidatePool ? [.backwards] : []), weakSpotScores: scores)
+        modifiers: [.weakSpot] + (reversesCandidatePool ? [.backwards] : []), weakSpotScores: scores,
+        nextRandomWordIndex: random)
     }
     guard let source = sourceLexicon(
       for: language, englishVariant: englishVariant,
@@ -101,7 +103,7 @@ enum WeakSpotWordSelection {
     // pool order step. Do not reverse that combined pool a second time.
     let selectedSource = IndexedLexicon.ordered(source,
       reversed: reversesCandidatePool && ![.mixedLanguages, .mixedEnglishChinese].contains(language))
-    let selected = (0..<count).compactMap { _ in word(from: selectedSource, scores: scores) }
+    let selected = (0..<count).compactMap { _ in word(from: selectedSource, scores: scores, random: random) }
     guard selected.count == count else { return nil }
     return selected.enumerated().map { index, word in
       decorated(

@@ -41,6 +41,6 @@ Scripts/check-source-code-decoration.mjs 在内存执行七个完整实际模块
 
 ## 未验证范围
 
-实时 Weakspot 学习仍有已定位差异：[原版 insert-text](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L299) 在记录输入后立即更新评分；本项目先记录 liveWeakSpotInputSamples，应用在重置／重复尝试入口吸收它们，而两类生成游标持有初始化评分快照。当前段边界的整候选选择与大小写证明不包括“本次输入的学习及时影响后续未生成段”；后续需要按实际源评分更新、预取与缓存时序补行为证据，不重抽已经显示或保存的目标。
+后续 [Weakspot 实时评分与后续出题](WEAKSPOT_LIVE_GENERATION_CONTRACT.md) 已接入会话内即时学习，两类游标的新批次读取最新评分，尝试之间传整簿而不重复吸收旧样本；段内余词和已生成缓存不重抽。这取代先前的初始化评分快照缺口，但原版按词导航补词与原生批次预取的时序、原始事件捕获及全部普通路径缓存仍未证明等价。
 
 其他普通多词池、普通单词主路径的装饰与最近词规则、Polyglot、外部词源、原版词值及随机分布、全部修饰器组合／简化输入／Unicode／半代理、空候选异常、段身份消费者、长期缓存、GUI／IME／VoiceOver、真实设备、旧库和服务部署仍未证明等价。446 个语言身份、48 个 Funbox 入口及静态检查不升级为全部功能覆盖；goal 保持 active。
