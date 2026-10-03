@@ -115,11 +115,11 @@ function seedDelete(targetWords,snapshots,{index=0,value=snapshots.at(-1)?.[1]??
  Object.assign(Config,{freedomMode:true,confidenceMode:'off',language:code?'code_javascript':'english',codeUnindentOnBackspace:code});
  for(const [wordIndex,inputValue]of snapshots)eventData.logTestEvent('input',0,{inputType:'insertText',wordIndex,inputValue,data:inputValue,correct:true});
 }
-function deleteInput({word=false,firefox=false}={}) {
+function deleteInput({word=false,firefox=false,now=1}={}) {
  let prevented=false;beforeDeleteModule.namespace.onBeforeDelete({preventDefault(){prevented=true}});
  if(prevented)return false;
  if(element===''||firefox){browserDeletedSentinel=true;element=''}else element=word?'':element.slice(0,-1);
- deleteModule.namespace.onDelete(word?'deleteWordBackward':'deleteContentBackward',1);return true;
+ deleteModule.namespace.onDelete(word?'deleteWordBackward':'deleteContentBackward',now);return true;
 }
 seedDelete(['abc','tail'],[[0,'ab']]); deleteInput();
 assert.deepEqual([inputEvents().at(-1).wordIndex,inputEvents().at(-1).charIndex,inputEvents().at(-1).inputValue],[0,2,'a']);
@@ -203,3 +203,82 @@ for(const text of ['ab','🙂']) {
  assert.equal(inputEvents().at(-1).charIndex,1);
 }
 console.log('2 pinned-source ordinary terminal SPACE batch-reentry scenarios passed (same bounded adapters).');
+
+// Primary language, not a candidate's identity, selects code indentation.
+// Polyglot generation/selection is NOT run here. Targets and its config tag
+// are owned adapters; these are the complete actual insertion/delete modules.
+// Capture source zero-delay callbacks to drain deterministically, never wait
+// for wall-clock scheduling or pretend this is a browser event loop.
+const originalSetTimeout=globalThis.setTimeout;
+let callbacks=[];
+globalThis.setTimeout=(callback,delay)=>{
+ assert.equal(delay,0);callbacks.push(callback);return callbacks.length;
+};
+function resetPolyglotInput(base,words) {
+ resetOrdinary(words);callbacks=[];
+ Object.assign(Config,{language:base,funbox:['polyglot'],codeUnindentOnBackspace:true});
+ // getAllTestEvents exposes relative testMs, not raw timestamps. Give its
+ // actual projection an explicit zero-start timer rather than assume a field.
+ eventData.logTestEvent('timer',0,{event:'start'});
+}
+async function drainCodeCallbacks() {
+ let count=0;
+ while(callbacks.length) {
+  assert.ok(++count<10,'bounded owned target must not schedule an unbounded chain');
+  callbacks.shift()();
+  // The source callback discards its async result; settle the actual
+  // insertion/navigation microtasks before executing a successor callback.
+  for(let i=0;i<8;i++)await Promise.resolve();
+ }
+}
+try {
+ for(const base of ['code_javascript','english','dockerfile']) {
+  resetPolyglotInput(base,['ab ','\t\tgo() ','tail']);
+  await main.namespace.emulateInsertText({data:'ab ',now:7});
+  assert.equal(callbacks.length,base==='code_javascript'?1:0);
+  assert.equal(element,'');await drainCodeCallbacks();
+  assert.equal(element,base==='code_javascript'?'\t\t':'');
+  assert.deepEqual(inputEvents().filter(e=>e.automatic).map(e=>e.data),base==='code_javascript'?['\t','\t']:[]);
+  assert.ok(eventData.getAllTestEvents().filter(e=>e.type==='input'&&e.data.automatic).every(e=>e.testMs===7));
+ }
+ resetPolyglotInput('code_javascript',['\t\tgo() ','tail']);
+ await main.namespace.emulateInsertText({data:'\tX',now:7});
+ assert.equal(element,'\tX');assert.equal(callbacks.length,1);
+ await drainCodeCallbacks();
+ assert.equal(element,'\tX\t');assert.equal(inputEvents().at(-1).correct,false);
+ assert.deepEqual(inputEvents().map(e=>e.automatic===true),[false,false,true]);
+ resetPolyglotInput('code_javascript',['ab ','\t\tgo() ','tail']);
+ await main.namespace.emulateInsertText({data:'a ',now:7});
+ assert.equal(wordIndex,1);assert.equal(callbacks.length,0);
+ for(const word of [false,true]) {
+  resetPolyglotInput('code_javascript',['ab\n','\t\tgo() ','tail']);
+  await main.namespace.emulateInsertText({data:'ab\n',now:7});await drainCodeCallbacks();
+  assert.equal(element,'\t\t');deleteInput({word,now:8});
+  assert.deepEqual(inputEvents().slice(-2).map(e=>[e.inputType,e.wordIndex,e.charIndex,e.inputValue]),[
+   ['deleteWordBackward',1,2,''],['deleteContentBackward',0,word?0:2,word?'':'ab']]);
+ }
+ for(const base of ['english','dockerfile']) {
+  resetPolyglotInput(base,['ab ','\t\tgo() ','tail']);
+  await main.namespace.emulateInsertText({data:'ab \t\t',now:7});
+  assert.equal(callbacks.length,0);deleteInput({now:8});
+  assert.equal(wordIndex,1);assert.equal(element,'\t');
+  assert.equal(inputEvents().at(-1).charIndex,2);
+ }
+ resetPolyglotInput('code_javascript',['ab ','\t\tgo() ','tail']);
+ Config.codeUnindentOnBackspace=false;
+ await main.namespace.emulateInsertText({data:'ab ',now:7});await drainCodeCallbacks();
+ deleteInput({now:8});assert.equal(wordIndex,1);assert.equal(element,'\t');
+ resetPolyglotInput('code_javascript',['ab ','\t\tgo() ','tail']);
+ Config.confidenceMode='max';
+ await main.namespace.emulateInsertText({data:'ab ',now:7});await drainCodeCallbacks();
+ assert.equal(deleteInput({word:true,now:8}),false);assert.equal(element,'\t\t');
+ for(const base of ['english','code_javascript']) {
+  resetPolyglotInput(base,['ab ','tail']);
+  assert.equal(modules.get('input/handlers/before-insert-text').namespace.onBeforeInsertText('\n'),true);
+  resetPolyglotInput(base,['ab\n','tail']);
+  assert.equal(modules.get('input/handlers/before-insert-text').namespace.onBeforeInsertText('\n'),false);
+ }
+ console.log('13 pinned-source primary-language code input scenarios passed (same 13 actual modules; owned Polyglot tag/targets, FIFO/microtask and sentinel deletion adapters; no generation/browser/AppKit/IME parity claim).');
+} finally {
+ globalThis.setTimeout=originalSetTimeout;
+}

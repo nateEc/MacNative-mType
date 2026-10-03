@@ -2240,12 +2240,23 @@ struct TestConfiguration: Codable, Equatable {
   var polyglotBaseLanguage: TypingLanguage?
   /// Absent in older snapshots, including those that already record a primary.
   var polyglotUsesPrimaryDirection: Bool?
+  /// Fresh generation opts into primary-language code input. Missing markers
+  /// preserve manual Tab/deletion semantics in historical mixed snapshots.
+  var polyglotUsesPrimaryCodeInput: Bool?
   var modifiers: [TestModifier]
   var contentOptions: ContentOptions
   var challengeID: String?
 
   var wordPoolBaseLanguage: TypingLanguage {
     language == .mixedLanguages ? (polyglotBaseLanguage ?? .english) : language
+  }
+
+  var usesCodeIndentationInput: Bool {
+    guard language == .mixedLanguages else { return language.isCodeLanguage }
+    guard polyglotUsesPrimaryCodeInput == true, let polyglotBaseLanguage else { return false }
+    // The source input branches match the code prefix, not the broader
+    // native catalog family (which also includes Dockerfile).
+    return polyglotBaseLanguage.isCodeLanguage && polyglotBaseLanguage != .dockerFile
   }
 
   var isInfinite: Bool {
@@ -2322,6 +2333,7 @@ struct TestConfiguration: Codable, Equatable {
     self.polyglotBaseLanguage = language == .mixedLanguages
       ? PolyglotReturnLanguagePolicy.validated(polyglotBaseLanguage) : nil
     self.polyglotUsesPrimaryDirection = nil
+    self.polyglotUsesPrimaryCodeInput = nil
     let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
       modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents)
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
@@ -2374,7 +2386,10 @@ struct TestConfiguration: Codable, Equatable {
     var copy = self
     copy.polyglotBaseLanguage = language == .mixedLanguages
       ? PolyglotReturnLanguagePolicy.validated(polyglotBaseLanguage) : nil
-    if copy.polyglotBaseLanguage == nil { copy.polyglotUsesPrimaryDirection = nil }
+    if copy.polyglotBaseLanguage == nil {
+      copy.polyglotUsesPrimaryDirection = nil
+      copy.polyglotUsesPrimaryCodeInput = nil
+    }
     return copy
   }
 
@@ -2427,7 +2442,7 @@ struct TestConfiguration: Codable, Equatable {
     case mode, duration, wordLimit, difficulty, rules, language, englishVariant, quoteLength,
       quoteLengths, quoteSelectionMode, customTextCompletion, customTextSectionLimit,
       customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents, polyglotBaseLanguage,
-      polyglotUsesPrimaryDirection,
+      polyglotUsesPrimaryDirection, polyglotUsesPrimaryCodeInput,
       modifiers, contentOptions, challengeID
   }
 
@@ -2463,6 +2478,8 @@ struct TestConfiguration: Codable, Equatable {
       : nil
     polyglotUsesPrimaryDirection = polyglotBaseLanguage != nil
       ? try values.decodeIfPresent(Bool.self, forKey: .polyglotUsesPrimaryDirection) : nil
+    polyglotUsesPrimaryCodeInput = polyglotBaseLanguage != nil
+      ? try values.decodeIfPresent(Bool.self, forKey: .polyglotUsesPrimaryCodeInput) : nil
     let normalizedModifiers = TestModifierPolicy.normalized(
       try values.decodeIfPresent([TestModifier].self, forKey: .modifiers) ?? [])
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
@@ -5723,7 +5740,7 @@ struct TypingSession {
     guard canDeleteBackward else { return }
     stoppedPromptInput = nil
     roundsLiveAccuracyForInputDisplay = true
-    if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
+    if configuration.rules.codeUnindentOnBackspace, configuration.usesCodeIndentationInput,
       removeCodeIndentationBeforeField(at: date)
     {
       return
@@ -5745,7 +5762,7 @@ struct TypingSession {
     guard canDeleteBackward else { return }
     stoppedPromptInput = nil
     roundsLiveAccuracyForInputDisplay = true
-    if configuration.rules.codeUnindentOnBackspace, configuration.language.isCodeLanguage,
+    if configuration.rules.codeUnindentOnBackspace, configuration.usesCodeIndentationInput,
       removeCodeIndentationBeforeField(at: date, deletesWholeIndent: true)
     {
       return
@@ -7378,7 +7395,7 @@ struct TypingSession {
   private mutating func insertCodeIndentationIfNeeded(at date: Date) {
     // Correctness belongs to the attempted key, not its remapped commit
     // cursor: an early space can navigate without being a correct insert.
-    guard configuration.language.isCodeLanguage, lastInputWasCorrect == true else { return }
+    guard configuration.usesCodeIndentationInput, lastInputWasCorrect == true else { return }
     let target = Array(codeTargetFieldText.utf16)
     let offset = codeInputFieldText.utf16.count
     guard target.first == 9, target.indices.contains(offset), target[offset] == 9 else { return }

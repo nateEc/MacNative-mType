@@ -139,6 +139,7 @@ final class PolyglotCandidateTests: XCTestCase {
     let result = try XCTUnwrap(session.result())
     var prepared = value
     prepared.polyglotUsesPrimaryDirection = true
+    prepared.polyglotUsesPrimaryCodeInput = true
     XCTAssertEqual(result.configuration, prepared)
     XCTAssertEqual(try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [])).results.first?.configuration, prepared)
