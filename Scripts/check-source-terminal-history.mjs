@@ -1,7 +1,9 @@
 // Owned fixtures run the complete pinned stats/helpers/strings/numbers modules.
 // No source is copied into the implementation. No browser or input handler runs.
-// Config/key types are adapters; Korean disassembly is intentionally unsupported.
+// Config/key types are adapters. An optional external, integrity-checked
+// dependency is a read-only oracle, never a native or packaged dependency.
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs'; import path from 'node:path'; import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
@@ -9,10 +11,24 @@ const reference=path.resolve(process.argv[2]??'');
 if(!process.argv[2] || execFileSync('git',['-C',reference,'rev-parse','HEAD'],{encoding:'utf8'}).trim()!=='91bd24bb8513785c7364cbea29296ff7adafac41')throw Error('Pinned checkout required');
 if(execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim())throw Error('Reference must be clean');
 const actual=new Set(['test/events/stats','test/events/helpers','utils/strings','utils/numbers']);
+let koreanOracle;
+if(process.argv[3]){
+ const root=path.resolve(process.argv[3]);
+ const locked=fs.readFileSync(path.join(reference,'pnpm-lock.yaml'),'utf8')
+  .match(/hangul-js@0\.2\.6:\r?\n\s+resolution: \{integrity: sha512-([^}]+)\}/)?.[1];
+ assert.ok(locked,'Pinned dependency integrity required');
+ assert.equal(crypto.createHash('sha512').update(fs.readFileSync(path.join(root,'hangul-js-0.2.6.tgz'))).digest('base64'),locked);
+ const code=fs.readFileSync(path.join(root,'package/hangul.js'));
+ assert.equal(crypto.createHash('sha256').update(code).digest('hex'),'94362dfdd81723a3cb94e5d27c7c0ef09b6949dc25002ecc06aff5448602bfc8');
+ assert.equal(JSON.parse(fs.readFileSync(path.join(root,'package/package.json'),'utf8')).version,'0.2.6');
+ const sandbox={module:{exports:{}}};
+ vm.runInNewContext(code.toString('utf8'),sandbox,{timeout:1000,filename:'external-hangul-js-0.2.6'});
+ koreanOracle=sandbox.module.exports;
+}
 const bindings={'config/store':{Config:{funbox:[]}},'constants/keys':{Keycode:{}},'@monkeytype/schemas/languages':{Language:{}},
  '@monkeytype/util/numbers':{roundTo2:v=>Math.round(v*100)/100},
  'test/events/types':{InputEventNoMs:{},TestEventNoMs:{},EventLog:{}},
- 'hangul-js':{default:{disassemble:()=>{throw Error('Korean is outside this probe')}}}};
+ 'hangul-js':{default:koreanOracle??{disassemble:()=>{throw Error('Korean is outside this probe')}}}};
 const modules=new Map();
 function moduleFor(id){
  if(modules.has(id))return modules.get(id);
@@ -126,3 +142,32 @@ const terminalChars=stats.getChars(terminalSpace);
 assert.equal(modules.get('utils/numbers').namespace.calculateWpm(terminalChars.correctWord,1),24);
 assert.equal(modules.get('utils/numbers').namespace.calculateWpm(terminalChars.allCorrect+terminalChars.incorrect+terminalChars.extra,1),24);
 console.log('Ordinary terminal SPACE WPM/Raw numerators passed actual getChars + calculateWpm (buildCompletedEvent mapping read, full lifecycle not executed).');
+
+if(koreanOracle){
+ const hash=crypto.createHash('sha256');
+ for(let unit=0;unit<=0xffff;unit++){
+  const result=koreanOracle.disassemble(String.fromCharCode(unit)).join('');
+  const tuple=Buffer.alloc(4+2*result.length);
+  tuple.writeUInt16LE(unit,0);tuple.writeUInt16LE(result.length,2);
+  for(let i=0;i<result.length;i++)tuple.writeUInt16LE(result.charCodeAt(i),4+2*i);
+  hash.update(tuple);
+ }
+ const fingerprint=hash.digest('hex');
+ assert.equal(fingerprint,'3ce3e56e227e9d618cd7b00e63c65ffd783807a110e071bde31d1172d05144a7');
+ console.log('Korean complete-BMP oracle fingerprint (65536 single-unit inputs): '+fingerprint);
+ const cases=[
+  ['각','각',true,[3,3,0,0,0]],['가','각',true,[2,2,0,0,0]],
+  ['가','각',false,[2,0,0,0,1]],['갃','갃',true,[4,4,0,0,0]],
+  ['괅','괅',true,[5,5,0,0,0]],['갂','갂',true,[3,3,0,0,0]],
+  ['ㄲㅄㅙ','ㄲㅄㅙ',true,[5,5,0,0,0]],['가','가',true,[0,0,2,0,0]],
+  ['가🙂','가🙂',true,[4,4,0,0,0]],['가\ud83d','가\ud83d',true,[3,3,0,0,0]],
+  ['가\u3000','가 ',true,[3,3,0,0,0]],['\ud83d','🙂',false,[1,0,0,0,1]],
+ ];
+ for(const [input,target,partial,expected]of cases){
+  const value=log([event(0,0,input)],[target]);
+  value.context.koreanStatus=true;value.context.bailedOut=partial;
+  const result=stats.getChars(value);
+  assert.deepEqual([result.allCorrect,result.correctWord,result.incorrect,result.extra,result.missed],expected);
+ }
+ console.log('12 Korean getChars fixtures passed (4 complete source modules + verified complete hangul-js 0.2.6; seeded context, no IME/state-capture/native-publication parity claim).');
+}
