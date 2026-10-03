@@ -39,4 +39,4 @@ CSV 在旧列后追加 source_matched_utf16_units、source_credited_utf16_units�
 
 Scripts/check-source-terminal-history.mjs 在只读干净固定检出加载完整 stats／helpers／strings／numbers 行为模块，旧六组日志与新 21 组自有 UTF-16 夹具通过（16 组实际 countChars、5 组实际 getChars）。类型／Config／Korean 是显式适配，Korean 若调用即报错；未执行完整 TestLogic、DOM／RAF、真实 IME／Firefox 或结果视图。结果映射来自源码阅读，不是浏览器渲染证据。会话内有界复核，不是独立评审。
 
-其他模式的单位快照捕获、Korean、完整事件 flags、其他曲线／seek／声音／挑战／复制／渲染、实机、真实旧库、官方资源身份、服务部署及 no-space／混合大规模性能仍开放；普通十万词耐久不证明这些路径。只读核对具体下一入口：TypingReplay.recordedFieldActions 仍明确拒绝 no-space，即使成绩已保存有效 targetWordDirectory，FieldReplayPlan.make 和 ReplayView 初始化尚未传入目录。后续应先取证固定源码动作／展示／seek 合同，不能简单移除守卫或从扁平提示猜词界。人工设备状态保持待验收，不因清单或测试绿色升级。
+其他模式的单位快照捕获、Korean、完整事件 flags、其他曲线／声音／挑战／复制消费者、实机、真实旧库、官方资源身份、部署及 no-space／混合大规模性能仍开放；普通十万词耐久不证明这些路径。后续已对固定完整 replay-ui 取证，并仅对有效已捕获目录接入 FieldReplayPlan／ReplayTimelineView 与序号 seek；缺目录守卫仍保留，不从扁平提示猜词界。详见 NOSPACE_FIELD_REPLAY_CONTRACT.md。人工设备状态保持待验收，不因清单或测试绿色升级。

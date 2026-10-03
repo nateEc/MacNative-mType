@@ -3,8 +3,10 @@ import Foundation
 /// Presentation is distinct from accepted-text reconstruction and grading.
 enum FieldReplayPresentation {
   static func glyphs(prompt: String, events: [TypingReplayEvent], through elapsed: TimeInterval,
-    configuration: TestConfiguration? = nil) -> [TypingPromptGlyph] {
-    FieldReplayPlan.make(prompt: prompt, events: events, configuration: configuration)?
+    configuration: TestConfiguration? = nil,
+    targetWordDirectory: ResultTargetWordDirectory? = nil) -> [TypingPromptGlyph] {
+    FieldReplayPlan.make(prompt: prompt, events: events, configuration: configuration,
+      targetWordDirectory: targetWordDirectory)?
       .frame(through: elapsed).presentation.glyphs
       ?? TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed)
   }
@@ -78,13 +80,18 @@ struct FieldReplayPlan {
   let maximumSeekCoordinate: Coordinate?
 
   static func make(prompt: String, events: [TypingReplayEvent],
-    configuration: TestConfiguration? = nil) -> Self? {
+    configuration: TestConfiguration? = nil,
+    targetWordDirectory: ResultTargetWordDirectory? = nil) -> Self? {
     // Partial/imported tapes must not index a missing target or retreat before
     // the first rendered word. They keep the legacy viewer, without backfill.
     let ordered = TypingReplay.chronologicalEvents(events)
-    guard ordered.first?.inputField?.index == 0,
+    // A captured no-space catalog can have leading empty targets. The source
+    // still initializes display word zero, not the first recorded field index.
+    let capturedNoSpace = targetWordDirectory?.noSpace == true
+    guard ordered.first?.inputField?.index == 0 || capturedNoSpace,
       ordered.allSatisfy({ $0.offset.isFinite && $0.offset >= 0 }),
-      let actions = TypingReplay.fieldActions(prompt: prompt, events: ordered, configuration: configuration)
+      let actions = TypingReplay.fieldActions(prompt: prompt, events: ordered, configuration: configuration,
+        targetWordDirectory: targetWordDirectory)
     else { return nil }
     var wordCount = 0
     for action in actions {
@@ -97,7 +104,8 @@ struct FieldReplayPlan {
     }
     let targets = configuration?.mode == .zen
       ? SavedTextInputHistoryPolicy.inputFields(events: ordered)
-      : TypingReplay.promptFields(prompt).map { String($0) }
+      : TypingReplay.replayTargetFields(prompt: prompt, configuration: configuration,
+        targetWordDirectory: targetWordDirectory) ?? []
     guard !targets.isEmpty else { return nil }
     // The original initializes the net final word prefix, not max visited.
     let fields = targets.prefix(min(targets.count, wordCount + 1)).map { target in

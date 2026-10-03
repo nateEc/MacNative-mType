@@ -3636,17 +3636,35 @@ enum TypingReplay {
   }
 
   static func fieldActions(prompt: String, events: [TypingReplayEvent],
-    configuration: TestConfiguration? = nil) -> [FieldAction]? {
-    recordedFieldActions(targetFields: promptFields(prompt),
-      events: chronologicalEvents(events.filter { $0.offset.isFinite }), configuration: configuration)
+    configuration: TestConfiguration? = nil,
+    targetWordDirectory: ResultTargetWordDirectory? = nil) -> [FieldAction]? {
+    guard let targets = replayTargetFields(prompt: prompt, configuration: configuration,
+      targetWordDirectory: targetWordDirectory) else { return nil }
+    return recordedFieldActions(targetFields: targets.map { Array($0) },
+      events: chronologicalEvents(events.filter { $0.offset.isFinite }), configuration: configuration,
+      allowsNoSpace: targetWordDirectory != nil)
+  }
+
+  /// Captured source targets include empty slots and literal commits. A flat
+  /// no-space prompt cannot recover their boundaries; never split or resample it.
+  static func replayTargetFields(prompt: String, configuration: TestConfiguration?,
+    targetWordDirectory: ResultTargetWordDirectory?) -> [String]? {
+    let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? [])
+    if let targetWordDirectory {
+      guard targetWordDirectory.matches(prompt: prompt, noSpace: noSpace) else { return nil }
+      return targetWordDirectory.words
+    }
+    guard !noSpace else { return nil }
+    return promptFields(prompt).map { String($0) }
   }
 
   private static func recordedFieldActions(
-    targetFields: [[Character]], events: [TypingReplayEvent], configuration: TestConfiguration?
+    targetFields: [[Character]], events: [TypingReplayEvent], configuration: TestConfiguration?,
+    allowsNoSpace: Bool = false
   ) -> [FieldAction]? {
     let isZen = configuration?.mode == .zen
     guard !events.isEmpty,
-      !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []),
+      allowsNoSpace || !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []),
       events.allSatisfy({ event in
         guard let field = event.inputField, field.index >= 0 else { return false }
         return isZen || targetFields.indices.contains(field.index)

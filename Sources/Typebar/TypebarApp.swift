@@ -6735,7 +6735,8 @@ private struct ReplayTimelineView: View {
       prompt: prompt, events: chronologicalEvents)
     self.replaySoundTimeline = TypingReplay.soundTimeline(
       prompt: prompt, events: chronologicalEvents, configuration: configuration)
-    let fieldPlan = FieldReplayPlan.make(prompt: prompt, events: chronologicalEvents, configuration: configuration)
+    let fieldPlan = FieldReplayPlan.make(prompt: prompt, events: chronologicalEvents,
+      configuration: configuration, targetWordDirectory: targetWordDirectory)
     self.fieldPlan = fieldPlan
     self._fieldFrame = State(initialValue: fieldPlan?.initialFrame)
   }
