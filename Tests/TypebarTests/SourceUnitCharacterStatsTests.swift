@@ -164,7 +164,11 @@ final class SourceUnitCharacterStatsTests: XCTestCase {
       .components(separatedBy: ",")
     XCTAssertEqual(row.count, ResultCSVExport.columns.count)
     XCTAssertEqual(Array(row.suffix(5)), ["3", "2", "0", "0", "1"])
-    XCTAssertEqual(Array(ResultCSVExport.columns.suffix(5)), ["source_matched_utf16_units", "source_credited_utf16_units", "source_incorrect_utf16_units", "source_extra_utf16_units", "source_missed_utf16_units"])
+    let values = Dictionary(uniqueKeysWithValues: zip(ResultCSVExport.columns, row))
+    XCTAssertEqual(values["source_scoring_unit_basis"], "utf16")
+    for (key, value) in zip(["source_matched_utf16_units", "source_credited_utf16_units", "source_incorrect_utf16_units", "source_extra_utf16_units", "source_missed_utf16_units"], ["3", "2", "0", "0", "1"]) {
+      XCTAssertEqual(values[key], value)
+    }
     XCTAssertFalse(row.joined().contains(saved.prompt))
     let old = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .completed,
       startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 1,

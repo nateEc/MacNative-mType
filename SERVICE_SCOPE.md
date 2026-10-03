@@ -1,5 +1,7 @@
 # 自建服务范围
 
+2026-10-03 当前阶段：[韩文会话计分与归档 22](KOREAN_SESSION_SCORING_CONTRACT.md) 已接入已知字段的实时／最终 WPM、Raw、明确分类基础、历史及辅助功能标签、CSV 和 v2 匿名计量；原始回放、尝试准确率及旧成绩不回算。默认归档 22，显式分类基础最低 22，旧 v2 最低仍 21；十三项新增测试和固定源有界对照已覆盖。真实 IME／设备、活动曲线与其他消费者、旧库／降级、部署及完整功能等价仍开放，官方覆盖不升级，完整 goal active。下方保留历史阶段，当前生产与格式状态以本合同为准。
+
 2026-10-03 计量协议实现与迁移边界见[输入计量 v2 与归档 21](VERSIONED_INPUT_METRICS_CONTRACT.md)。自建 v1 API 另行声明 v2 指标能力，匿名计数按明确 UTF-16／韩文拆分基础校验；旧协议保持，未部署或调用真实账户，不能据此升级整项 resultSubmission 的 partial 状态。
 
 Typebar 的远程功能必须使用自建身份、数据库和 API，不能访问或代理 Monkeytype 的服务。固定参考的后端路由族、可观察用户任务和 Typebar 自建映射见 [OFFICIAL_SERVICE_SURFACE_AUDIT.md](OFFICIAL_SERVICE_SURFACE_AUDIT.md)。

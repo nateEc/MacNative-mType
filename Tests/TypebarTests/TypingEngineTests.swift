@@ -17579,7 +17579,13 @@ final class TypingEngineTests: XCTestCase {
       csv.contains(",11,12,1,9,1,2,3,100.00,20.00,2,150.00,50.00,2,30.00,time,"))
     XCTAssertTrue(csv.contains(",true,true,expert,uppercase;rot13,\"focus, \"\"deep\"\";café\","))
     XCTAssertTrue(csv.contains("1970-01-01T00:00:00"))
-    XCTAssertTrue(csv.hasSuffix("2.50,0.50,2.00,3,4.25,,,,,\r\n"))
+    let unknownUnitColumns = ["source_matched_utf16_units", "source_credited_utf16_units",
+      "source_incorrect_utf16_units", "source_extra_utf16_units", "source_missed_utf16_units",
+      "source_scoring_unit_basis", "source_matched_scoring_units", "source_credited_scoring_units",
+      "source_incorrect_scoring_units", "source_extra_scoring_units", "source_missed_scoring_units"]
+    XCTAssertEqual(Array(ResultCSVExport.columns.suffix(unknownUnitColumns.count)), unknownUnitColumns)
+    XCTAssertTrue(csv.hasSuffix("2.50,0.50,2.00,3,4.25"
+      + String(repeating: ",", count: unknownUnitColumns.count) + "\r\n"))
     XCTAssertFalse(csv.contains("private prompt"))
     XCTAssertTrue(csv.hasSuffix("\r\n"))
     XCTAssertEqual(ResultCSVExport.csvString(for: []), ResultCSVExport.columns.joined(separator: ",") + "\r\n")

@@ -80,8 +80,8 @@ final class KoreanScoringUnitsTests: XCTestCase {
   }
 
   func testExplicitProjectedClassificationMatchesTwelveSourceFixtures() {
-    // Explicit foundation composition only: the production session does NOT
-    // yet select this scoring basis or publish it as v1 input metrics.
+    // Keep the foundation composition independently checked alongside the
+    // production classifier's explicit basis, using pinned source fixtures.
     let cases: [([UInt16], [UInt16], Bool, [Int])] = [
       (Array("각".utf16), Array("각".utf16), true, [3,3,0,0,0]),
       (Array("가".utf16), Array("각".utf16), true, [2,2,0,0,0]),
@@ -101,6 +101,8 @@ final class KoreanScoringUnitsTests: XCTestCase {
         input: KoreanScoringUnits.disassemble(input),
         target: KoreanScoringUnits.disassemble(target), creditsPartial: partial)
       XCTAssertEqual([value.allCorrect,value.correctWord,value.incorrect,value.extra,value.missed], expected)
+      XCTAssertEqual(ResultUnitCharacterStats.classify(input: input, target: target,
+        creditsPartial: partial, basis: .koreanJamo), value)
     }
     let input = KoreanScoringUnits.disassemble([0xac00,0x3000])
     XCTAssertEqual(ResultUnitCharacterStats.classify(input: input, target: nil, creditsPartial: false).correctWord, 3)

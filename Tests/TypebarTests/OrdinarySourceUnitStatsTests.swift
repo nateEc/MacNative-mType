@@ -143,7 +143,8 @@ final class OrdinarySourceUnitStatsTests: XCTestCase {
     var hangul = TypingSession(configuration: .words(1), prompt: "가x")
     hangul.insertBatch("가", at: start)
     hangul.bailOut(at: start.addingTimeInterval(1))
-    XCTAssertNil(hangul.result()?.characterStats.sourceUnits)
+    XCTAssertEqual(hangul.result()?.characterStats.sourceUnits?.correctWord, 2)
+    XCTAssertEqual(hangul.result()?.characterStats.sourceUnitBasis, .koreanJamo)
   }
 
   func testCacheTrimPreservesRawHistorySurrogateAndNonECMAScriptNEL() {

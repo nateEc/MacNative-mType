@@ -129,7 +129,7 @@ final class VersionedInputMetricsTests: XCTestCase {
     let saved = try trimmed()
     let formal = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [saved], presets: [], at: start))
-    XCTAssertEqual(formal.version, 21)
+    XCTAssertEqual(formal.version, TypebarArchive.currentVersion)
     XCTAssertEqual(formal.results.first, saved)
     XCTAssertEqual(try XCTUnwrap(TestResultRecord(result: saved).portableResult), saved)
     let container = try ModelContainer(for: TestResultRecord.self,

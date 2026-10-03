@@ -53,8 +53,9 @@ struct RecordedInputFieldStats {
     return (clearOffsets[index] ?? -Double.infinity) > snapshot.offset ? [] : snapshot.units
   }
 
-  func counts(targets: UnitInputTargets, creditsActivePrefix: Bool)
-    -> (credit: TypingWordCredit, rawUnits: Int, rawCharacters: Int, unitStats: ResultUnitCharacterStats) {
+  func counts(targets: UnitInputTargets, creditsActivePrefix: Bool, basis: ResultScoringUnitBasis = .utf16)
+    -> (credit: TypingWordCredit, rawUnits: Int, rawCharacters: Int,
+      unitStats: ResultUnitCharacterStats, retainedInputUnits: Int) {
     let highest = snapshots.filter { !$0.value.classifiedUnits.isEmpty }.keys.max() ?? 0
     let active = snapshots[highest]?.insertedSpace == true && highest < Int.max ? highest + 1 : highest
     var credit = TypingWordCredit(); var raw: [UInt16] = []
@@ -63,15 +64,25 @@ struct RecordedInputFieldStats {
       let input = snapshots[index]!.classifiedUnits
       let target = targets.fields.indices.contains(index) ? targets.field(index) : nil
       let stats = ResultUnitCharacterStats.classify(input: input, target: target,
-        creditsPartial: index == active && creditsActivePrefix)
+        creditsPartial: index == active && creditsActivePrefix, basis: basis)
       unitStats.add(stats)
       if stats.correctWord > 0 {
         credit.inputUnits += stats.correctWord
-        credit.characters += String(decoding: input, as: UTF16.self).count
+        // A syllable may become a correct jamo prefix without being a
+        // matching native glyph (가 versus 각). Do not change that old reader.
+        let creditsRawGlyphs = basis != .koreanJamo || (target.map {
+          input == $0 || index == active && creditsActivePrefix && $0.starts(with: input)
+        } ?? true)
+        if creditsRawGlyphs {
+          credit.characters += String(decoding: input, as: UTF16.self).count
+        }
       }
       raw += input
       if index == active { break }
     }
-    return (credit, raw.count, String(decoding: raw, as: UTF16.self).count, unitStats)
+    // Positional classification conserves projected entered units. Keep the
+    // pre-projection count and native glyph reader independent of that sum.
+    return (credit, unitStats.allCorrect + unitStats.incorrect + unitStats.extra,
+      String(decoding: raw, as: UTF16.self).count, unitStats, raw.count)
   }
 }

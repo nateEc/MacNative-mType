@@ -1,6 +1,6 @@
 import Foundation
 
-/// Explicit UTF-16 classification, separate from legacy native glyph counts.
+/// Explicit scoring-unit classification, separate from native glyph counts.
 /// Position matches are not word-level speed credit. A partial active field
 /// suppresses missing units even when a typo prevents prefix credit.
 struct ResultUnitCharacterStats: Codable, Equatable {
@@ -10,14 +10,16 @@ struct ResultUnitCharacterStats: Codable, Equatable {
   var extra = 0
   var missed = 0
 
-  static func classify(input: [UInt16], target: [UInt16]?, creditsPartial: Bool) -> Self {
-    let normalized = input.map { unit -> UInt16 in
+  static func classify(input: [UInt16], target: [UInt16]?, creditsPartial: Bool,
+    basis: ResultScoringUnitBasis = .utf16) -> Self {
+    var normalized = input.map { unit -> UInt16 in
       guard let scalar = UnicodeScalar(UInt32(unit)),
         InputCharacterEquivalence.isReferenceSpace(Character(String(scalar))) else { return unit }
       return 32
     }
     // Missing source target falls back to normalized input, unlike a known empty word.
-    let target = target ?? normalized
+    if basis == .koreanJamo { normalized = KoreanScoringUnits.disassemble(normalized) }
+    let target = target.map { basis == .koreanJamo ? KoreanScoringUnits.disassemble($0) : $0 } ?? normalized
     let exact = normalized == target
     let credited = exact || creditsPartial && target.starts(with: normalized)
     var value = Self()
@@ -65,8 +67,12 @@ struct ResultUnitCharacterStats: Codable, Equatable {
 }
 
 enum ResultCharacterStatsPresentation {
+  static func unitName(_ stats: ResultCharacterStats) -> String {
+    guard stats.sourceUnits != nil else { return "字符" }
+    return stats.sourceUnitBasis == .koreanJamo ? "韩文拆分单位" : "UTF-16 单位"
+  }
   static func label(_ stats: ResultCharacterStats) -> String {
-    stats.sourceUnits == nil ? "字符（匹配/错位/额外/跳过）" : "UTF-16 单位（计分正确/错误/多打/漏打）"
+    stats.sourceUnits == nil ? "字符（匹配/错位/额外/跳过）" : "\(unitName(stats))（计分正确/错误/多打/漏打）"
   }
   static func value(_ stats: ResultCharacterStats) -> String {
     if let units = stats.sourceUnits {
@@ -76,7 +82,7 @@ enum ResultCharacterStatsPresentation {
   }
   static func spoken(_ stats: ResultCharacterStats) -> String {
     if let units = stats.sourceUnits {
-      return "UTF-16 单位：计分正确 \(units.correctWord)，错误 \(units.incorrect)，多打 \(units.extra)，漏打 \(units.missed)；位置匹配 \(units.allCorrect)"
+      return "\(unitName(stats))：计分正确 \(units.correctWord)，错误 \(units.incorrect)，多打 \(units.extra)，漏打 \(units.missed)；位置匹配 \(units.allCorrect)"
     }
     return "字符：匹配 \(stats.matched)，错位 \(stats.incorrect)，额外 \(stats.extra)，跳过 \(stats.missed)"
   }

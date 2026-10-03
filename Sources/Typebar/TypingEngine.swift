@@ -3838,13 +3838,32 @@ struct ResultCharacterStats: Codable, Equatable {
   let missed: Int
   /// Archive 19. Absent on genuine older results; never infer or backfill it.
   let sourceUnits: ResultUnitCharacterStats?
+  /// Archive 22. Missing on older classifications means their original UTF-16 basis.
+  let sourceUnitBasis: ResultScoringUnitBasis?
 
-  init(matched: Int, incorrect: Int, extra: Int, missed: Int, sourceUnits: ResultUnitCharacterStats? = nil) {
+  init(matched: Int, incorrect: Int, extra: Int, missed: Int, sourceUnits: ResultUnitCharacterStats? = nil,
+    sourceUnitBasis: ResultScoringUnitBasis? = nil) {
     self.matched = max(0, matched)
     self.incorrect = max(0, incorrect)
     self.extra = max(0, extra)
     self.missed = max(0, missed)
     self.sourceUnits = sourceUnits
+    self.sourceUnitBasis = sourceUnitBasis
+  }
+
+  private enum CodingKeys: String, CodingKey { case matched, incorrect, extra, missed, sourceUnits, sourceUnitBasis }
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    matched = try values.decode(Int.self, forKey: .matched)
+    incorrect = try values.decode(Int.self, forKey: .incorrect)
+    extra = try values.decode(Int.self, forKey: .extra)
+    missed = try values.decode(Int.self, forKey: .missed)
+    sourceUnits = try values.decodeIfPresent(ResultUnitCharacterStats.self, forKey: .sourceUnits)
+    sourceUnitBasis = try values.decodeIfPresent(ResultScoringUnitBasis.self, forKey: .sourceUnitBasis)
+    guard sourceUnitBasis == nil || sourceUnits != nil else {
+      throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+        debugDescription: "A classification basis requires its saved unit counts."))
+    }
   }
 
   static func legacy(typedCharacterCount: Int, correctCharacterCount: Int) -> Self {
@@ -4214,6 +4233,9 @@ struct TypingSession {
     didSet { refreshUnitTargets() }
   }
   private var unitTargets = UnitInputTargets("")
+  /// Source initialization selects this once; input or later prompt growth
+  /// cannot switch the scoring basis. It is not a language-menu preference.
+  private let initialKoreanScoring: Bool
   private var promptSeparatorUnitCount = 0
   private var acceptedUnits: AcceptedUnitInput?
   private var currentInputUnit: UInt16?
@@ -4398,7 +4420,9 @@ struct TypingSession {
     if initializationFailure != nil { self.outcome = .failed }
     self.prompt = prompt
     self.promptCharacters = Array(prompt)
-    self.unitTargets = UnitInputTargets(prompt)
+    let initialTargets = UnitInputTargets(prompt)
+    self.unitTargets = initialTargets
+    self.initialKoreanScoring = configuration.mode != .zen && initialTargets.requiresKoreanDisassembly
     self.promptSeparatorUnitCount = prompt.utf8.reduce(into: 0) { count, unit in
       if unit == 32 || unit == 10 { count += 1 }
     }
@@ -4856,11 +4880,11 @@ struct TypingSession {
   private func referenceWordCredit(countPartialLastWord: Bool) -> TypingWordCredit {
     if unitTargets.noSpace {
       return recordedFieldStats.counts(targets: unitTargets,
-        creditsActivePrefix: countPartialLastWord).credit
+        creditsActivePrefix: countPartialLastWord, basis: sourceScoringBasis).credit
     }
-    if isFinished, hasKnownOrdinarySourceFields {
+    if hasKnownOrdinarySourceFields, isFinished || initialKoreanScoring {
       return recordedFieldStats.counts(targets: sourceStatsTargets,
-        creditsActivePrefix: countPartialLastWord).credit
+        creditsActivePrefix: countPartialLastWord, basis: sourceScoringBasis).credit
     }
     if let acceptedUnits {
       if configuration.mode == .zen {
@@ -4968,11 +4992,20 @@ struct TypingSession {
     return .init(matched: matched, incorrect: incorrect, extra: extra, missed: missed,
       sourceUnits: unitTargets.noSpace || hasKnownOrdinarySourceFields
         ? recordedFieldStats.counts(targets: sourceStatsTargets,
-          creditsActivePrefix: finishedAt == nil || resultCreditsPartialLastWord).unitStats : nil)
+          creditsActivePrefix: finishedAt == nil || resultCreditsPartialLastWord,
+          basis: sourceScoringBasis).unitStats : nil,
+      sourceUnitBasis: usesKoreanSourceScoring ? .koreanJamo : nil)
   }
 
   private var hasKnownOrdinarySourceFields: Bool {
-    hasOrdinarySourceFields && !unitTargets.requiresKoreanDisassembly
+    hasOrdinarySourceFields
+  }
+
+  private var usesKoreanSourceScoring: Bool {
+    initialKoreanScoring && (unitTargets.noSpace || hasKnownOrdinarySourceFields)
+  }
+  private var sourceScoringBasis: ResultScoringUnitBasis {
+    usesKoreanSourceScoring ? .koreanJamo : .utf16
   }
 
   private var hasOrdinarySourceFields: Bool {
@@ -5029,8 +5062,9 @@ struct TypingSession {
   }
 
   private var rawSpeedInputUnitCount: Int {
-    unitTargets.noSpace || isFinished && hasKnownOrdinarySourceFields
-      ? recordedFieldStats.counts(targets: sourceStatsTargets, creditsActivePrefix: false).rawUnits
+    unitTargets.noSpace || hasKnownOrdinarySourceFields && (isFinished || initialKoreanScoring)
+      ? recordedFieldStats.counts(targets: sourceStatsTargets, creditsActivePrefix: false,
+        basis: sourceScoringBasis).rawUnits
       : typed.utf16.count
   }
 
@@ -5386,7 +5420,10 @@ struct TypingSession {
     let retainedUnits = rawSpeedInputUnitCount
     // The v1 service assumes retained units cover the native character count.
     // Source terminal trimming violates that assumption without losing attempts.
-    let needsVersionTwo = retainedUnits < nativeCount
+    let needsVersionTwo = usesKoreanSourceScoring || retainedUnits < nativeCount
+    let retainedInputUnits = usesKoreanSourceScoring
+      ? recordedFieldStats.counts(targets: sourceStatsTargets, creditsActivePrefix: false,
+        basis: sourceScoringBasis).retainedInputUnits : retainedUnits
     return .init(
       id: UUID(),
       configuration: configuration,
@@ -5405,8 +5442,8 @@ struct TypingSession {
       preciseAccuracy: preciseAccuracy,
       inputMetrics: .init(version: needsVersionTwo ? 2 : 1, correctAttempts: correctInputAttemptCount,
         totalAttempts: inputAttemptCount, creditedUnits: credit.inputUnits, retainedUnits: retainedUnits,
-        retainedInputUnits: needsVersionTwo ? retainedUnits : nil,
-        scoringUnitBasis: needsVersionTwo ? .utf16 : nil),
+        retainedInputUnits: needsVersionTwo ? retainedInputUnits : nil,
+        scoringUnitBasis: needsVersionTwo ? sourceScoringBasis : nil),
       restartCount: restartCount,
       priorAttemptEngagedDuration: priorAttemptEngagedDuration,
       characterStats: characterStats,

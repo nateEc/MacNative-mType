@@ -285,7 +285,7 @@ enum ResultHistoryRowSummaryPolicy {
     return .init(
       modeAndParameter: modeAndParameter(configuration),
       characterStats:
-        "\(characterStats.sourceUnits == nil ? "字符" : "UTF-16 单位") \(ResultCharacterStatsPresentation.value(characterStats))",
+        "\(ResultCharacterStatsPresentation.unitName(characterStats)) \(ResultCharacterStatsPresentation.value(characterStats))",
       tags: normalizedTags,
       accessibilityMetadata: normalizedTags.isEmpty
         ? spokenCharacters : "\(spokenCharacters)；标签：\(normalizedTags.joined(separator: "、"))")
