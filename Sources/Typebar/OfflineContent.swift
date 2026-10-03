@@ -5995,6 +5995,7 @@ struct GeneratedStreamContinuation {
       configuration: configuration, wordCount: count, startIndex: nextTokenIndex)
     else { return nil }
     let chunk = GeneratedWordChunk(source: source, configuration: configuration, wordOffset: nextTokenIndex,
+      preservesWordOrder: true,
       nextRandomCaseBit: nextRandomCaseBit)
     nextTokenIndex += count
     return chunk
@@ -6104,6 +6105,7 @@ struct TestSessionFactory {
     {
       prompt = streamPrompt
       usesGeneratedStream = true
+      preservesGeneratedWordOrder = true
     } else if let streamWordCount,
       configuration.language.isCodeLanguage
     {
