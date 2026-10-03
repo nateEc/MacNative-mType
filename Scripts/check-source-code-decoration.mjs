@@ -15,12 +15,27 @@ let units = [], ranks = [], repeated = false, activeNames = [], functions, spaci
 const candidatePools = new WeakSet();
 const draw = () => { assert.ok(units.length, 'Unexpected unit draw'); return units.shift(); };
 const math = Object.create(Math); math.random = draw;
-const context = vm.createContext({Math: math, console: {debug() {}}});
+const context = vm.createContext({Math: math, console: {debug() {}},
+  window: {addEventListener() {}}, document: {addEventListener() {}}});
 const config = {mode: 'words', words: 1, language: 'code_swift', showAllLines: false,
   lazyMode: false, punctuation: true, numbers: true, britishEnglish: false};
 const unused = () => { throw Error('Unexpected runtime adapter call'); };
-const active = () => activeNames.map(name => ({name, functions: functions[name], properties:
-  name === 'backwards' ? ['wordOrder:reverse'] : name === 'nospace' ? ['nospace'] : []}));
+const active = () => activeNames.map(name => ({name, functions: functions[name] ?? {}, properties:
+  name === 'backwards' ? ['wordOrder:reverse'] : name === 'nospace' ? ['nospace']
+    : /^plus_/.test(name) ? ['toPush:' + ({plus_zero: 1, plus_one: 2, plus_two: 3, plus_three: 4}[name])] : []}));
+let activeWordIndex = 0, navigationTrace = [];
+const ownedWordQueue = {
+  data: [], get length() { return this.data.length; },
+  getCurrent() { return this.get(activeWordIndex); },
+  get(index) { const word = this.data[index]; return word === undefined ? undefined
+    : {text: word.endsWith(' ') ? word.slice(0, -1) : word, textWithCommit: word, display: word}; },
+  push(word) { this.data.push(word); return this.get(this.length - 1); },
+  removeCommitCharacterFromLastWord() {
+    const index = this.length - 1;
+    assert.ok(index >= 0); assert.ok(this.data[index].endsWith(' '));
+    this.data[index] = this.data[index].slice(0, -1);
+  },
+};
 const bindings = {
   'config/store': {Config: config},
   'test/custom-text': {getPipeDelimiter: () => false},
@@ -28,7 +43,25 @@ const bindings = {
   'test/events/live-cache': {getLiveCachedMsSinceLastInputEvent: () => spacingMs},
   'controllers/quotes-controller': {default: {}},
   'states/test': {isRepeated: () => repeated, getCurrentQuote: () => null,
-    setCurrentQuote: () => {}, getSelectedQuoteId: () => null},
+    setCurrentQuote: () => {}, getSelectedQuoteId: () => null,
+    getActiveWordIndex: () => activeWordIndex, increaseActiveWordIndex: () => {
+      navigationTrace.push('advance'); activeWordIndex++;
+    }},
+  'test/test-words': {words: ownedWordQueue},
+  'test/test-ui': {beforeTestWordChange: () => navigationTrace.push('before'),
+    afterTestWordChange: () => navigationTrace.push('after'),
+    addWord: () => navigationTrace.push('added')},
+  'test/pace-caret': {handleSpace: () => navigationTrace.push('pace')},
+  'test/funbox/funbox': {toggleScript() {}},
+  'input/input-element': {setInputElementValue: () => navigationTrace.push('clear')},
+  'input/state': {setAwaitingNextWord: value => navigationTrace.push(value ? 'await' : 'ready')},
+  'states/loader-bar': {showLoaderBar: () => navigationTrace.push('loader'),
+    hideLoaderBar: () => navigationTrace.push('hide')},
+  'utils/dom': {qs: () => null},
+  'throttle-debounce': {debounce: () => unused},
+  'events/test': {restartTestEvent: {subscribe() {}}},
+  'events/config': {configEvent: {subscribe() {}}},
+  'events/timer': {timerEvent: {subscribe() {}, dispatch: unused}},
   'test/funbox/list': {getActiveFunboxes: active,
     getActiveFunboxesWithFunction: name => active().filter(value => typeof value.functions[name] === 'function'),
     findSingleActiveFunboxWithFunction: name => active().find(value => typeof value.functions[name] === 'function'),
@@ -43,7 +76,8 @@ const bindings = {
   'utils/word-gen-error': {WordGenError: class extends Error {}},
 };
 const actual = new Set(['test/words-generator', 'test/wordset', 'test/funbox/funbox-functions',
-  'test/weak-spot', 'utils/generate', 'utils/strings', '@monkeytype/util/numbers']);
+  'test/weak-spot', 'utils/generate', 'utils/strings', '@monkeytype/util/numbers',
+  'test/test-logic', 'input/helpers/word-navigation']);
 const modules = new Map(), requested = new Map();
 const resolve = (id, from) => id.startsWith('.')
   ? path.posix.normalize(path.posix.join(path.posix.dirname(from), id)) : id;
@@ -311,6 +345,65 @@ assert.deepEqual(ranks, [1]); assert.deepEqual(units, [0.777]); cacheCount++;
 await assert.rejects(main.namespace.getNextWord(4, 100, 'oak', 'elm'), /Repeated word is undefined/);
 assert.deepEqual(ranks, [1]); assert.deepEqual(units, [0.777]); cacheCount++;
 console.log(`${cacheCount} generated-target-cache fixtures passed (actual ordinary pool, randomized targets, complete suffix, nested growth and finite exhaustion; owned ranks/units/adapters, no corpus/RNG/prefetch/device parity claim).`);
+
+// Execute actual addWord and forward navigation, with an explicit owned queue
+// and non-firing startup event/DOM adapters. No browser or source event capture.
+const navigation = moduleFor('input/helpers/word-navigation');
+await navigation.link((id, from) => moduleFor(resolve(id, from.identifier)));
+await navigation.evaluate();
+const logic = modules.get('test/test-logic').namespace;
+let lookaheadCount = 0;
+repeated = false; activeNames = []; config.punctuation = false; config.numbers = false;
+config.language = 'english'; config.showAllLines = false;
+config.minBurst = 'off'; config.liveBurstStyle = 'off';
+for (const [mode, words, expected] of [['time', 30, 100], ['words', 0, 100],
+  ['words', 501, 100], ['words', 2, 2]]) {
+  config.mode = mode; config.words = words;
+  assert.equal(main.namespace.getLimit(), expected); lookaheadCount++;
+}
+config.mode = 'words'; config.words = 701; config.showAllLines = true;
+assert.equal(main.namespace.getLimit(), 701); lookaheadCount++;
+for (const [name, expected] of [['plus_zero', 1], ['plus_one', 2], ['plus_two', 3], ['plus_three', 4]]) {
+  activeNames = [name]; assert.equal(main.namespace.getLimit(), expected); lookaheadCount++;
+}
+activeNames = ['plus_three']; config.words = 2;
+assert.equal(main.namespace.getLimit(), 2); lookaheadCount++;
+activeNames = []; config.mode = 'time'; config.showAllLines = false;
+const navigationPool = ['node', 'bay', 'elm']; candidatePools.add(navigationPool);
+async function resetOwnedNavigation(limit = 100) {
+  activeWordIndex = 0; navigationTrace = []; units = [];
+  ranks = Array.from({length: limit}, (_, index) => index % 3);
+  const opening = await main.namespace.generateWords({name: 'english', words: navigationPool});
+  ownedWordQueue.data = Array.from(opening.words);
+  assert.equal(ownedWordQueue.length, limit); assert.equal(ranks.length, 0);
+}
+await resetOwnedNavigation();
+ranks = [1]; await logic.addWord();
+assert.equal(ownedWordQueue.length, 101); assert.equal(ranks.length, 0); lookaheadCount++;
+ranks = [2]; await logic.addWord();
+assert.equal(ownedWordQueue.length, 102); assert.equal(ranks.length, 0);
+ranks = [1]; await logic.addWord();
+assert.equal(ownedWordQueue.length, 102); assert.deepEqual(ranks, [1]); lookaheadCount++;
+await resetOwnedNavigation();
+ranks = [1];
+const forward = await navigation.namespace.goToNextWord({correctInsert: true, now: 100});
+assert.equal(forward.increasedWordIndex, true); assert.equal(activeWordIndex, 1);
+assert.equal(ownedWordQueue.length, 101); assert.equal(ranks.length, 0);
+assert.ok(navigationTrace.indexOf('before') < navigationTrace.indexOf('advance'));
+assert.ok(navigationTrace.indexOf('advance') < navigationTrace.indexOf('after'));
+assert.equal(navigationTrace.filter(value => value === 'added').length, 1); lookaheadCount++;
+config.mode = 'words'; config.words = 3; activeNames = ['plus_zero'];
+await resetOwnedNavigation(1);
+ranks = [1]; await navigation.namespace.goToNextWord({correctInsert: true, now: 200});
+assert.equal(ownedWordQueue.length, 2); assert.equal(activeWordIndex, 1);
+assert.ok(navigationTrace.indexOf('added') < navigationTrace.indexOf('advance'));
+assert.ok(navigationTrace.includes('await')); assert.ok(navigationTrace.includes('ready'));
+ranks = [2]; await navigation.namespace.goToNextWord({correctInsert: true, now: 300});
+assert.equal(ownedWordQueue.length, 3); assert.equal(activeWordIndex, 2);
+assert.equal(ownedWordQueue.data.at(-1), 'elm');
+ranks = [1]; await logic.addWord();
+assert.equal(ownedWordQueue.length, 3); assert.deepEqual(ranks, [1]); lookaheadCount++;
+console.log(`${lookaheadCount} generated-lookahead fixtures passed (9 actual modules, initial limits, visibility override, inclusive queue bound, single refill, forward/await ordering and finite exhaustion; owned queue/events/DOM/ranks, no browser or input-capture parity claim).`);
 
 // Metadata-only inventory: read values to count sections, never print, persist
 // or import upstream word strings into the native content pool.

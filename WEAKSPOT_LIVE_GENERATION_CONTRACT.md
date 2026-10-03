@@ -6,7 +6,7 @@
 
 只读参考固定为 91bd24bb8513785c7364cbea29296ff7adafac41。[insert-text](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/input/handlers/insert-text.ts#L299) 在记录输入后更新 Weakspot，再执行词导航。[评分簿](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/weak-spot.ts) 保留最多 50 样本的 EMA 与五秒错误罚时，取词时从 20 候选中保留首个最高平均分。取词不再评估当前段的余词；重复练习先复用全部已生成缓存，之后才选择新段。
 
-原版 [addWord](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L571) 通常在词导航时补一个词，并维持约百词前瞻。当前原生仍在队列耗尽边界按批补题，普通无限入口也有既有首批预取策略。因此，同样输入到达时，两者可能已经生成不同数量的未来目标；本轮不把“新批次读取最新评分”升级为“每个未来词在完全相同时间采样”。
+原版 [addWord](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L571) 通常在词导航时补一个词，并维持约百词前瞻。本阶段原生仍按批补题；后续[生成词前瞻队列与逐词补题](GENERATED_LOOKAHEAD_CONTRACT.md) 已将普通词、代码／条目和自有生成流改为默认 100 词、导航补一个及 visibility 的 1–4 词窗口。这个后续模型对齐仍不把“新词读取最新评分”升级为“浏览器异步补题在完全相同时间采样”。
 
 ## 原生实现与数据边界
 
@@ -32,4 +32,4 @@ Scripts/check-source-code-decoration.mjs 在内存运行七个完整实际模块
 
 ## 剩余功能差异
 
-后续必须继续核对原版补词触发／前瞻队列和正常导航的事件时序；普通生成路径的完整已生成缓存由后续合同补齐，不代表所有词源和完整组合等价。字符键规范、输入批次拆分、Unicode／半代理、原始 live-cache、所有 Funbox 组合、外部词源／Polyglot、词库身份及随机分布、真实 GUI／IME／VoiceOver／设备、长期缓存和服务部署仍未验证等价。整体 goal 保持 active。
+后续合同已补齐自有生成路径的完整已生成缓存与模型前瞻／导航补题窗口；浏览器异步完成、其他词源和完整组合仍未等价验证。普通逐词装饰、字符键规范、输入批次拆分、Unicode／半代理、原始 live-cache、所有 Funbox 组合、外部词源／Polyglot、词库身份及随机分布、真实 GUI／IME／VoiceOver／设备、长期缓存和服务部署仍开放。整体 goal 保持 active。

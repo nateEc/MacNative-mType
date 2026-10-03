@@ -138,10 +138,14 @@ final class OrdinaryBackwardsPoolTests: XCTestCase {
     let config = TestConfiguration.words(501).with(modifiers: [.backwards, .underscoreSeparators])
     var session = TestSessionFactory.make(configuration: config)
     let opening = session.prompt, start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-    session.insertBatch(opening, at: start)
+    for _ in 0..<10_000 {
+      if session.completedWordCount >= 500 || session.isFinished { break }
+      let next = try XCTUnwrap(session.nextExpectedCharacter)
+      session.insertBatch(String(next), at: start)
+    }
     XCTAssertEqual(session.completedWordCount, 500)
     XCTAssertFalse(session.isFinished)
-    let final = String(session.prompt.dropFirst(opening.count))
+    let final = String(session.prompt.dropFirst(session.typed.count))
     XCTAssertTrue(final.hasSuffix("_"))
     session.insertBatch(String(final.dropLast()), at: start.addingTimeInterval(1))
     XCTAssertFalse(session.isFinished)

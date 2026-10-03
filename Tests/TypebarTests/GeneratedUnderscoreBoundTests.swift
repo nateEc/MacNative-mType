@@ -17,7 +17,7 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
     var session = TestSessionFactory.make(configuration:
       .words(101).with(modifiers: [.binaryStream, .underscoreSeparators]))
     let target = binaryTarget(0..<101)
-    XCTAssertEqual(session.prompt, target)
+    XCTAssertEqual(session.prompt, binaryTarget(0..<100))
     session.insertBatch(String(target.dropLast()), at: start)
     XCTAssertFalse(session.isFinished, "第 101 词的下划线也是实际目标")
     session.insertBatch("_", at: start.addingTimeInterval(1))
@@ -37,15 +37,15 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
     XCTAssertEqual(session.prompt, binaryTarget(0..<GeneratedPromptChunkPolicy.wordCount(for: config)))
   }
 
-  func testInfinitePrimingDoesNotResetTheBoundForTheSecondBatch() {
+  func testInfiniteNavigationDoesNotResetTheBoundForLaterWords() {
     var session = TestSessionFactory.make(configuration:
       .words(0).with(modifiers: [.binaryStream, .underscoreSeparators]))
-    let opening = binaryTarget(0..<200)
+    let opening = binaryTarget(0..<100)
     XCTAssertEqual(session.prompt, opening)
     session.insertBatch(opening, at: start)
     XCTAssertFalse(session.isFinished)
-    XCTAssertEqual(session.completedWordCount, 200)
-    XCTAssertEqual(session.prompt, binaryTarget(0..<300))
+    XCTAssertEqual(session.completedWordCount, 100)
+    XCTAssertEqual(session.prompt, binaryTarget(0..<200))
     XCTAssertEqual(session.repeatedAttempt().prompt, opening)
     XCTAssertEqual(session.errors, 0)
   }
@@ -53,7 +53,7 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
   func testLargeFiniteStreamFinishesOnlyAfterTheRealFinalSuffix() {
     var session = TestSessionFactory.make(configuration:
       .words(501).with(modifiers: [.binaryStream, .underscoreSeparators]))
-    XCTAssertEqual(session.prompt, binaryTarget(0..<500))
+    XCTAssertEqual(session.prompt, binaryTarget(0..<100))
     session.insertBatch(binaryTarget(0..<500), at: start)
     XCTAssertEqual(session.completedWordCount, 500)
     XCTAssertFalse(session.isFinished)
@@ -134,7 +134,7 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
       XCTAssertTrue(config.modifiers.contains(.underscoreSeparators))
       XCTAssertFalse(config.modifiers.contains(modifier))
       let session = TestSessionFactory.make(configuration: config)
-      XCTAssertEqual(session.prompt, binaryTarget(0..<101))
+      XCTAssertEqual(session.prompt, binaryTarget(0..<100))
     }
   }
 
@@ -156,7 +156,7 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
     let count = GeneratedPromptChunkPolicy.wordCount(for: config)
     let opening = session.prompt
     XCTAssertEqual(opening.filter { $0 == "_" }.count, count - 1)
-    XCTAssertTrue(opening.hasSuffix("_"))
+    XCTAssertFalse(opening.hasSuffix("_"))
     session.insertBatch(opening, at: start)
     XCTAssertEqual(session.completedWordCount, count)
     XCTAssertEqual(session.wordReviews.count, count)
@@ -202,7 +202,7 @@ final class GeneratedUnderscoreBoundTests: XCTestCase {
       var session = TestSessionFactory.make(configuration:
         .words(limit).with(modifiers: [.binaryStream, .underscoreSeparators]))
       let target = binaryTarget(0..<limit, omittedIndex: min(limit, 100) - 1)
-      XCTAssertEqual(session.prompt, target)
+      XCTAssertEqual(session.prompt, binaryTarget(0..<min(limit, 100), omittedIndex: min(limit, 100) - 1))
       session.insertBatch(target, at: start)
       XCTAssertEqual(session.outcome, .completed)
       XCTAssertEqual(session.completedWordCount, limit)

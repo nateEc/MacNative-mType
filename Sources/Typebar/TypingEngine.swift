@@ -6137,6 +6137,9 @@ struct TypingSession {
     }
     let commitErrorStart = ordinaryCommitErrorStart(for: inputCharacter, targetIndex: targetIndex)
     if retainsLeadingSeparator { retainedWordSeparatorTypedIndices.insert(typedGraphemeCount) }
+    let hasGeneratedCursor = generatedWordContinuation != nil || generatedStreamContinuation != nil
+      || generatedCodeContinuation != nil
+    let generatedWordBefore = hasGeneratedCursor ? quoteNavigationIndex : 0
     appendTypedCharacter(
       inputCharacter, targetIndex: targetIndex,
       forceError: forceError || earlyWordCommitTargetIndex != nil
@@ -6144,6 +6147,9 @@ struct TypingSession {
       countsAsExtraError: retainsCurrentWordAsExtra || (retainsEmptySlot && !isCorrect)
         || (pastTargetEnd && !isPromptWordSeparator(inputCharacter)), at: date)
     if let commitErrorStart { committedErrorWordStarts.insert(commitErrorStart) }
+    if hasGeneratedCursor, quoteNavigationIndex > generatedWordBefore {
+      refillGeneratedIfNeeded(activeWordBefore: generatedWordBefore, at: date)
+    }
     if configuration.rules.blindMode, let commitIndex = earlyWordCommitTargetIndex {
       let end = isPromptWordSeparator(promptCharacters[commitIndex]) ? commitIndex : commitIndex + 1
       blindCommittedMissingTargetIndices.formUnion(currentTargetIndex..<end)
@@ -7684,31 +7690,8 @@ struct TypingSession {
       }
       return
     }
-    var generatedChunk: GeneratedWordChunk?
-    if var continuation = generatedWordContinuation {
-      generatedChunk = continuation.nextChunk(weakSpotScores: currentWeakSpotScores)
-      generatedWordContinuation = continuation
-    } else if var continuation = generatedStreamContinuation {
-      generatedChunk = continuation.nextChunk()
-      generatedStreamContinuation = continuation
-    } else if var continuation = generatedCodeContinuation {
-      generatedChunk = continuation.nextChunk(weakSpotScores: currentWeakSpotScores)
-      generatedCodeContinuation = continuation
-    }
-    if let chunk = generatedChunk {
-      let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
-      let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true
-        || generatedCodeContinuation != nil ? "" : " "
-      let previousEnd = promptCharacters.count + separator.count
-      appendPrompt(separator + chunk.transformed)
-      if usesNoSpaceSeparator {
-        var end = previousEnd
-        for length in chunk.noSpaceWordLengths {
-          end += length
-          noSpaceWordEndIndices.append(end)
-        }
-        noSpaceTargetWords += chunk.noSpaceTargetWords
-      }
+    if generatedWordContinuation != nil || generatedStreamContinuation != nil || generatedCodeContinuation != nil {
+      appendGeneratedWord(at: date)
       return
     }
     guard let repeatingPrompt, !repeatingPrompt.isEmpty else { return }
@@ -7726,6 +7709,50 @@ struct TypingSession {
       repeatingNoSpaceTargetWords.joined().utf16.elementsEqual(repeatingPrompt.utf16)
     else { return }
     noSpaceTargetWords += repeatingNoSpaceTargetWords
+  }
+
+  private mutating func refillGeneratedIfNeeded(activeWordBefore: Int, at date: Date) {
+    guard !isFinished,
+      generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
+        || generatedCodeContinuation?.hasRemaining == true else { return }
+    let bound = configuration.visibleFutureWordCount ?? 100
+    guard unitTargets.sourceFieldCount - (activeWordBefore + 1) <= bound else { return }
+    appendGeneratedWord(at: date)
+  }
+
+  private mutating func appendGeneratedWord(at date: Date) {
+    var generatedChunk: GeneratedWordChunk?
+    if var continuation = generatedWordContinuation {
+      generatedChunk = continuation.nextChunk(weakSpotScores: currentWeakSpotScores)
+      generatedWordContinuation = continuation
+    } else if var continuation = generatedStreamContinuation {
+      generatedChunk = continuation.nextChunk()
+      generatedStreamContinuation = continuation
+    } else if var continuation = generatedCodeContinuation {
+      generatedChunk = continuation.nextChunk(maximumWordCount: 1, weakSpotScores: currentWeakSpotScores)
+      generatedCodeContinuation = continuation
+    }
+    if let chunk = generatedChunk {
+      let usesNoSpaceSeparator = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+      var text = chunk.transformed
+      if generatedCodeContinuation != nil, prompt.last == " ", text.first == " " { text.removeFirst() }
+      let separator = usesNoSpaceSeparator || prompt.last?.isWhitespace == true
+        || generatedCodeContinuation != nil ? "" : " "
+      let hasFuture = generatedWordContinuation?.hasRemaining == true || generatedStreamContinuation?.hasRemaining == true
+        || generatedCodeContinuation?.hasRemaining == true
+      if !usesNoSpaceSeparator, hasFuture, text.last != " ", text.last != "\n" { text.append(" ") }
+      let previousEnd = promptCharacters.count + separator.count
+      appendPrompt(separator + text)
+      if usesNoSpaceSeparator {
+        var end = previousEnd
+        for length in chunk.noSpaceWordLengths {
+          end += length
+          noSpaceWordEndIndices.append(end)
+        }
+        noSpaceTargetWords += chunk.noSpaceTargetWords
+      }
+      return
+    }
   }
 
   private var quoteNavigationIndex: Int {

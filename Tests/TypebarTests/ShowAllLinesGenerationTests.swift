@@ -144,7 +144,7 @@ final class ShowAllLinesGenerationTests: XCTestCase {
       let config = TestConfiguration.words(limit).with(modifiers: [.binaryStream])
       let session = TestSessionFactory.make(configuration: config, showAllLines: true)
       XCTAssertEqual(session.configuration, config)
-      XCTAssertEqual(session.prompt.split(separator: " ").count, 500)
+      XCTAssertEqual(session.prompt.split(separator: " ").count, 100)
       XCTAssertTrue(try XCTUnwrap(session.generationNotice).contains("分批"))
       XCTAssertEqual(session.repeatedAttempt().generationNotice, session.generationNotice)
       XCTAssertFalse(session.isFinished)
@@ -167,7 +167,7 @@ final class ShowAllLinesGenerationTests: XCTestCase {
   func testDisabledPreviewAndTimedModeKeepTheirExistingBoundedGeneration() {
     let finite = TestConfiguration.words(701).with(modifiers: [.binaryStream])
     let session = TestSessionFactory.make(configuration: finite, showAllLines: false)
-    XCTAssertEqual(session.prompt.split(separator: " ").count, 500)
+    XCTAssertEqual(session.prompt.split(separator: " ").count, 100)
     XCTAssertNil(session.generationNotice)
     let timed = TestConfiguration.timed(seconds: 120).with(modifiers: [.binaryStream])
     XCTAssertEqual(TestSessionFactory.make(configuration: timed, showAllLines: true).prompt,

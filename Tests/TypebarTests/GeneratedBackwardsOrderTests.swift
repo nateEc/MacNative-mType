@@ -36,7 +36,7 @@ final class GeneratedBackwardsOrderTests: XCTestCase {
     let config = TestConfiguration.words(501).with(modifiers: [.binaryStream, .backwards, .underscoreSeparators])
     var session = TestSessionFactory.make(configuration: config)
     let opening = target(0..<500, omitted: 99)
-    XCTAssertEqual(session.prompt, opening)
+    XCTAssertEqual(session.prompt, target(0..<100, omitted: 99))
     session.insertBatch(opening, at: start)
     XCTAssertEqual(session.completedWordCount, 500)
     XCTAssertFalse(session.isFinished)
@@ -57,7 +57,7 @@ final class GeneratedBackwardsOrderTests: XCTestCase {
     let config = TestConfiguration.words(101).with(modifiers: [.binaryStream, .backwards, .underscoreSeparators])
     let ordinary = TestSessionFactory.make(configuration: config)
     let whole = TestSessionFactory.make(configuration: config, showAllLines: true)
-    XCTAssertEqual(ordinary.prompt, target(0..<101, omitted: 99))
+    XCTAssertEqual(ordinary.prompt, target(0..<100, omitted: 99))
     XCTAssertEqual(whole.prompt, target(0..<101, omitted: 100))
     XCTAssertEqual(whole.repeatedAttempt().prompt, whole.prompt)
     XCTAssertEqual(whole.configuration, config)
@@ -100,7 +100,7 @@ final class GeneratedBackwardsOrderTests: XCTestCase {
     let config = TestConfiguration.words(0).with(modifiers: [.binaryStream, .backwards, .underscoreSeparators])
     for showAll in [false, true] {
       var session = TestSessionFactory.make(configuration: config, showAllLines: showAll)
-      let count = showAll ? 100 : 200
+      let count = 100
       let opening = target(0..<count, omitted: 99)
       XCTAssertEqual(session.prompt, opening)
       session.insertBatch(opening, at: start)

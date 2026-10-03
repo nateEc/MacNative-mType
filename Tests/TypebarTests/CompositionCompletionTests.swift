@@ -108,11 +108,14 @@ final class CompositionCompletionTests: XCTestCase {
 
   func testFinalCodeWordCanFinishWhenTheGeneratedCursorStillExists() {
     let configuration = TestConfiguration.words(4, language: .codeSwift)
+    var cursor = GeneratedCodeContinuation(configuration: configuration, batchTokenCount: 4,
+      sourceWords: ["let value = item"])
+    _ = cursor.nextChunk(nextRandomWordIndex: { 0 })
     var session = TypingSession(
       configuration: configuration, prompt: "let value = item",
-      generatedCodeContinuation: .init(configuration: configuration, batchTokenCount: 100))
+      generatedCodeContinuation: cursor)
     session.insert("let value = ", at: start)
-    XCTAssertTrue(session.usesIncrementalPromptExtension)
+    XCTAssertFalse(session.usesIncrementalPromptExtension)
     XCTAssertTrue(session.shouldFinishWithComposition("item", at: start.addingTimeInterval(1)))
     XCTAssertEqual(session.typed, "let value = ")
     session.insertBatch("item", at: start.addingTimeInterval(1))

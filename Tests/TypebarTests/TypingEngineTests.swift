@@ -561,9 +561,14 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(timed.outcome, .completed)
 
     var words = TestSessionFactory.make(configuration: .words(137))
-    XCTAssertEqual(words.prompt.split(separator: " ").count, 137)
+    XCTAssertEqual(words.prompt.split(separator: " ").count, 100)
     words.insert(words.prompt, at: start)
+    XCTAssertEqual(words.completedWordCount, 100)
+    XCTAssertEqual(words.outcome, .active)
+    words.insert(String(words.prompt.dropFirst(words.typed.count)), at: start)
     XCTAssertEqual(words.outcome, .completed)
+    XCTAssertEqual(words.completedWordCount, 137)
+    XCTAssertEqual(words.errors, 0)
   }
 
   func testInactivityPolicyCountsIdleIntervalsAndInvalidatesTrailingIdleTimedTests() throws {
@@ -1188,7 +1193,7 @@ final class TypingEngineTests: XCTestCase {
     var words = TestSessionFactory.make(configuration: .words(0))
     let initialWordsPrompt = words.prompt
     XCTAssertTrue(words.configuration.isInfinite)
-    XCTAssertEqual(initialWordsPrompt.split(separator: " ").count, 200)
+    XCTAssertEqual(initialWordsPrompt.split(separator: " ").count, 100)
     XCTAssertEqual(words.progressLabel, "词数")
     XCTAssertEqual(words.progressText(at: start), "0")
     XCTAssertEqual(words.progressFraction(at: start), 0)
@@ -1216,41 +1221,49 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(custom.progressText(at: start.addingTimeInterval(60)), "60s")
   }
 
-  func testInfiniteWordPracticePrimesASecondFreshWordBatch() {
-    let session = TestSessionFactory.make(configuration: .words(0))
+  func testInfiniteWordPracticeGeneratesFreshFutureWordsOnNavigation() {
+    var session = TestSessionFactory.make(configuration: .words(0))
     let words = session.prompt.split(separator: " ").map(String.init)
-    XCTAssertEqual(words.count, 200)
-    XCTAssertNotEqual(Array(words.prefix(100)), Array(words.suffix(100)),
-                      "Infinite practice should extend with new random words, not replay its first batch")
+    XCTAssertEqual(words.count, 100)
+    session.insert(session.prompt, at: start)
+    let extended = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(extended.count, 200)
+    XCTAssertNotEqual(Array(extended.prefix(100)), Array(extended.suffix(100)),
+                      "Infinite practice should generate fresh words rather than replay its opening")
   }
 
-  func testInfiniteTimedPracticePrimesASecondFreshWordBatch() {
-    let session = TestSessionFactory.make(configuration: .timed(seconds: 0))
+  func testInfiniteTimedPracticeGeneratesFreshFutureWordsOnNavigation() {
+    var session = TestSessionFactory.make(configuration: .timed(seconds: 0))
     let words = session.prompt.split(separator: " ").map(String.init)
     let batchCount = GeneratedPromptChunkPolicy.wordCount(for: session.configuration)
-    XCTAssertEqual(words.count, batchCount * 2)
-    XCTAssertNotEqual(Array(words.prefix(batchCount)), Array(words.suffix(batchCount)))
+    XCTAssertEqual(words.count, batchCount)
+    session.insert(session.prompt, at: start)
+    let extended = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(extended.count, batchCount * 2)
+    XCTAssertNotEqual(Array(extended.prefix(batchCount)), Array(extended.suffix(batchCount)))
   }
 
-  func testInfiniteBinaryStreamContinuesItsTokenSequenceAcrossThePrimedBatch() {
-    let session = TestSessionFactory.make(
+  func testInfiniteBinaryStreamContinuesItsTokenSequenceOnNavigation() {
+    var session = TestSessionFactory.make(
       configuration: .words(0).with(modifiers: [.binaryStream]))
     let words = session.prompt.split(separator: " ").map(String.init)
-    XCTAssertEqual(words.count, 200)
+    XCTAssertEqual(words.count, 100)
     XCTAssertEqual(words[0], "00000000")
     XCTAssertEqual(words[99], "01100011")
-    XCTAssertEqual(words[100], "01100100")
-    XCTAssertEqual(words[199], "11000111")
+    session.insert("00000000 ", at: start)
+    let extended = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(extended.count, 101)
+    XCTAssertEqual(extended[100], "01100100")
   }
 
   func testLargeFiniteBinaryStreamContinuesAfterItsInitialBatch() {
     var session = TestSessionFactory.make(
       configuration: .words(501).with(modifiers: [.binaryStream]))
-    XCTAssertEqual(session.prompt.split(separator: " ").count, 500)
+    XCTAssertEqual(session.prompt.split(separator: " ").count, 100)
     session.insert(session.prompt + " ", at: start)
     let words = session.prompt.split(separator: " ").map(String.init)
-    XCTAssertGreaterThan(words.count, 500)
-    XCTAssertEqual(words[500], "11110100")
+    XCTAssertEqual(words.count, 200)
+    XCTAssertEqual(words[100], "01100100")
   }
 
   func testInfiniteBinaryStreamExtendsAgainAndRestartRestoresItsInitialCursor() {
@@ -1259,8 +1272,8 @@ final class TypingEngineTests: XCTestCase {
     let initialPrompt = session.prompt
     session.insert(initialPrompt + " ", at: start)
     let extendedWords = session.prompt.split(separator: " ").map(String.init)
-    XCTAssertGreaterThan(extendedWords.count, 200)
-    XCTAssertEqual(extendedWords[200], "11001000")
+    XCTAssertEqual(extendedWords.count, 200)
+    XCTAssertEqual(extendedWords[199], "11000111")
     XCTAssertEqual(session.repeatedAttempt().prompt, initialPrompt)
   }
 
@@ -1278,12 +1291,14 @@ final class TypingEngineTests: XCTestCase {
   }
 
   func testInfiniteIPv4StreamDoesNotReplayItsFirstBatch() {
-    let session = TestSessionFactory.make(
+    var session = TestSessionFactory.make(
       configuration: .words(0).with(modifiers: [.ipv4Stream]))
     let words = session.prompt.split(separator: " ").map(String.init)
-    XCTAssertEqual(words.count, 200)
-    XCTAssertEqual(words[100], TypebarNetworkAddressStream.ipv4Token(at: 100))
-    XCTAssertNotEqual(Array(words.prefix(100)), Array(words.suffix(100)))
+    XCTAssertEqual(words.count, 100)
+    session.insert(words[0] + " ", at: start)
+    let extended = session.prompt.split(separator: " ").map(String.init)
+    XCTAssertEqual(extended.count, 101)
+    XCTAssertEqual(extended[100], TypebarNetworkAddressStream.ipv4Token(at: 100))
   }
 
   func testGeneratedWordContinuationRejectsBoundaryRepeatsAndStopsAfterOneHundredRetries() {
@@ -1312,12 +1327,12 @@ final class TypingEngineTests: XCTestCase {
   func testLargeFiniteWordPracticeAppendsFreshWordsWhenFirstBatchIsCompleted() {
     var session = TestSessionFactory.make(configuration: .words(501))
     let firstBatch = session.prompt.split(separator: " ").map(String.init)
-    XCTAssertEqual(firstBatch.count, 500)
+    XCTAssertEqual(firstBatch.count, 100)
     session.insert(session.prompt + " ", at: start)
     let extended = session.prompt.split(separator: " ").map(String.init)
     XCTAssertFalse(session.isFinished)
     XCTAssertGreaterThan(extended.count, firstBatch.count)
-    XCTAssertNotEqual(Array(extended.suffix(500)), firstBatch)
+    XCTAssertNotEqual(Array(extended.suffix(100)), firstBatch)
   }
 
   func testGeneratedNoSpaceContinuationKeepsWordProgressAcrossFreshBatches() {
@@ -1327,7 +1342,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertFalse(initialPrompt.contains(" "))
     session.insert(initialPrompt, at: start)
     XCTAssertFalse(session.isFinished)
-    XCTAssertEqual(session.completedWordCount, 200)
+    XCTAssertEqual(session.completedWordCount, 100)
     XCTAssertGreaterThan(session.prompt.count, initialPrompt.count)
   }
 
@@ -18449,7 +18464,7 @@ final class TypingEngineTests: XCTestCase {
         mode: .custom, duration: nil, wordLimit: nil, difficulty: .normal, rules: .init()),
       customText: "own text")
 
-    XCTAssertGreaterThanOrEqual(timed.prompt.split(separator: " ").count, 480)
+    XCTAssertEqual(timed.prompt.split(separator: " ").count, 100)
     XCTAssertEqual(words.prompt.split(separator: " ").count, 25)
     XCTAssertEqual(quote.prompt, OfflineContent.quotes[1].text)
     XCTAssertTrue(zen.prompt.isEmpty)
@@ -18727,7 +18742,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.koreanWords, StarterLexicon.turkishWords, StarterLexicon.polishWords,
     ]
 
-    XCTAssertEqual(tokens.count, TypingLanguage.defaultMixedComponents.count)
+    XCTAssertEqual(tokens.count, 100)
     XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 153)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
@@ -18735,7 +18750,13 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
     XCTAssertFalse(TypingLanguage.mixedLanguages.supportsQuotes)
     session.insert(session.prompt, at: start)
+    XCTAssertEqual(session.completedWordCount, 100)
+    XCTAssertEqual(session.outcome, .active)
+    session.insert(String(session.prompt.dropFirst(session.typed.count)), at: start)
     XCTAssertEqual(session.outcome, .completed)
+    XCTAssertEqual(session.completedWordCount, 153)
+    XCTAssertEqual(session.errors, 0)
+    XCTAssertTrue(session.prompt.split(separator: " ").allSatisfy { token in corpora.contains { $0.contains(String(token)) } })
 
     let selected = [TypingLanguage.italian, .french]
     let customConfiguration = TestConfiguration.words(

@@ -23,7 +23,7 @@ final class CodePromptStreamingTests: XCTestCase {
       XCTAssertFalse(session.isFinished)
       XCTAssertEqual(session.errors, 0, language.rawValue)
       XCTAssertEqual(session.completedWordCount, 100, language.rawValue)
-      XCTAssertTrue(session.prompt.hasPrefix(opening + " "))
+      XCTAssertTrue(session.prompt.hasPrefix(opening))
       XCTAssertEqual(session.prompt.split(separator: " ").count, 200, language.rawValue)
       assertOwnedPool(session.prompt, language: language)
     }
@@ -38,7 +38,7 @@ final class CodePromptStreamingTests: XCTestCase {
       XCTAssertFalse(session.isFinished)
       XCTAssertEqual(session.errors, 0)
       XCTAssertEqual(session.completedWordCount, 100)
-      XCTAssertTrue(session.prompt.hasPrefix(opening + " "))
+      XCTAssertTrue(session.prompt.hasPrefix(opening))
       XCTAssertEqual(session.prompt.split(separator: " ").count, 200)
       assertOwnedPool(session.prompt, language: .codeSwift)
     }
@@ -98,6 +98,6 @@ final class CodePromptStreamingTests: XCTestCase {
       .contains("func practiceUnit0("))
     let funbox = TestSessionFactory.make(configuration: configuration.with(modifiers: [.binaryStream]))
     XCTAssertFalse(funbox.prompt.contains("func practiceUnit"))
-    XCTAssertEqual(funbox.prompt.split(separator: " ").count, 200)
+    XCTAssertEqual(funbox.prompt.split(separator: " ").count, 100)
   }
 }

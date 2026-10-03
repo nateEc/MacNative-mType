@@ -123,7 +123,7 @@ final class GeneratedTargetCacheTests: XCTestCase {
     nested.insertBatch(first, at: start.addingTimeInterval(4))
     XCTAssertEqual(nested.prompt, full)
     XCTAssertEqual(nested.errors, 0)
-    XCTAssertEqual(nested.completedWordCount, 300)
+    XCTAssertEqual(nested.completedWordCount, 200)
   }
 
   func testOrdinaryWeakspotCacheIgnoresNewScoresUntilItsCapturedFutureEnds() throws {

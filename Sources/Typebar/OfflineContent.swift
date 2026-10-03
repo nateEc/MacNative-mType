@@ -5841,7 +5841,7 @@ enum NoSpaceWordBoundaryPolicy {
 }
 
 enum GeneratedPromptChunkPolicy {
-  static let maximumInitialWordCount = 500
+  static let maximumInitialWordCount = 100
   /// Whole previews are an explicit memory operation, not a new test limit.
   /// Larger valid budgets remain playable in chunks with a visible notice.
   static let maximumWholePreviewWordCount = 100_000
@@ -5858,14 +5858,14 @@ enum GeneratedPromptChunkPolicy {
   }
 
   static func wordCount(forTime seconds: TimeInterval) -> Int {
-    let words = seconds / 60 * 240
-    guard words.isFinite, words < Double(maximumInitialWordCount) else {
-      return maximumInitialWordCount
-    }
-    return min(maximumInitialWordCount, max(300, Int(ceil(words))))
+    maximumInitialWordCount
   }
 
   static func wordCount(for configuration: TestConfiguration, showAllLines: Bool = false) -> Int {
+    if [.time, .words].contains(configuration.mode), let visible = configuration.visibleFutureWordCount {
+      return configuration.mode == .words && !configuration.isInfinite
+        ? min(visible + 1, configuration.wordLimit ?? 25) : visible + 1
+    }
     switch configuration.mode {
     case .time:
       return wordCount(forTime: configuration.duration ?? 30)
@@ -5885,9 +5885,8 @@ enum GeneratedPromptChunkPolicy {
     switch configuration.mode {
     case .time: return true
     case .words:
-      if previewsWholeFiniteWords(for: configuration, showAllLines: showAllLines) { return false }
       return configuration.isInfinite
-        || (configuration.wordLimit ?? 0) > maximumInitialWordCount
+        || (configuration.wordLimit ?? 0) > wordCount(for: configuration, showAllLines: showAllLines)
     case .custom:
       return [.time, .words].contains(configuration.customTextCompletion)
     case .quote, .zen: return false
@@ -5907,12 +5906,13 @@ enum GeneratedWordBoundPolicy {
     showAllLines: Bool = false) -> Int {
     // Visibility-push funboxes cannot coexist with underscore/no-space
     // alterations; their separate viewport policy remains unchanged.
-    if wordOffset > 0 { return 100 }
+    if wordOffset > 0 { return configuration.visibleFutureWordCount ?? 100 }
     var bound = 100
     if GeneratedPromptChunkPolicy.previewsWholeFiniteWords(for: configuration, showAllLines: showAllLines) {
       bound = configuration.wordLimit ?? 100
     }
     if showAllLines, configuration.mode == .quote { bound = sourceWordCount }
+    if let visible = configuration.visibleFutureWordCount { bound = visible + 1 }
     if configuration.mode == .words,
       let limit = configuration.wordLimit, limit > 0 { bound = min(bound, limit) }
     if configuration.mode == .quote { bound = min(bound, sourceWordCount) }
@@ -6045,7 +6045,7 @@ struct GeneratedWordContinuation {
         && (previousLast == words[1].lowercased() || first.lowercased() == words[1].lowercased())
       if !firstRepeats && !secondRepeats { break }
     }
-    previousWords = Array(words.suffix(2)).map { $0.lowercased() }
+    previousWords = Array((previousWords + words.map { $0.lowercased() }).suffix(2))
     let chunk = GeneratedWordChunk(source: source, configuration: configuration, wordOffset: nextWordIndex,
       preservesWordOrder: true,
       nextRandomCaseBit: nextRandomCaseBit)
@@ -6171,7 +6171,7 @@ struct GeneratedCandidateContinuation {
     return copy
   }
 
-  mutating func nextChunk(weakSpotScores: WeakSpotScores? = nil,
+  mutating func nextChunk(maximumWordCount: Int? = nil, weakSpotScores: WeakSpotScores? = nil,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }) -> GeneratedWordChunk {
@@ -6179,7 +6179,7 @@ struct GeneratedCandidateContinuation {
     let remaining = configuration.mode == .words && !configuration.isInfinite
       ? max(0, (configuration.wordLimit ?? 0) - emittedWords) : 100
     let chunkLimit = previewsWholeFiniteWords && emittedWords == 0 ? batchTokenCount : 100
-    let count = min(max(1, batchTokenCount), chunkLimit, remaining)
+    let count = min(max(1, maximumWordCount ?? batchTokenCount), chunkLimit, remaining)
     guard count > 0 else { return .init(source: "", configuration: configuration) }
     guard !pool.isEmpty else { return .init(source: "", configuration: configuration) }
     let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
@@ -6497,17 +6497,18 @@ struct TestSessionFactory {
     var generatedWordContinuation = repeats && usesFreshGeneratedWords
       ? GeneratedWordContinuation(
         configuration: configuration, weakSpotScores: weakSpotScores,
-        batchWordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
+        batchWordCount: 1,
         previousSource: prompt)
       : nil
     var generatedStreamContinuation = repeats && usesGeneratedStream
       ? GeneratedStreamContinuation(
         configuration: configuration,
-        batchWordCount: GeneratedPromptChunkPolicy.wordCount(for: configuration),
-        nextTokenIndex: GeneratedPromptChunkPolicy.wordCount(for: configuration))
+        batchWordCount: 1,
+        nextTokenIndex: streamWordCount ?? GeneratedPromptChunkPolicy.wordCount(for: configuration))
       : nil
     let primesRepeatedPrompt = !streamsRandomCustomText && !streamsSequentialCustomText
       && !usesGeneratedCode && customSectionWordStream == nil
+      && !usesFreshGeneratedWords && !usesGeneratedStream
       && !(generatesWholeLines && configuration.mode == .words)
       && (configuration.isInfinite
       || (configuration.mode == .custom
@@ -6528,7 +6529,11 @@ struct TestSessionFactory {
         for: noSpaceWordLengths + (nextChunk?.noSpaceWordLengths ?? noSpaceWordLengths))
       initialNoSpaceTargetWords = noSpaceTargetWords + (nextChunk?.noSpaceTargetWords ?? noSpaceTargetWords)
     } else {
-      initialPrompt = transformedPrompt
+      let hasGeneratedFuture = generatedWordContinuation?.hasRemaining == true
+        || generatedStreamContinuation?.hasRemaining == true || generatedCodeContinuation?.hasRemaining == true
+      let needsCommit = hasGeneratedFuture && !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)
+        && transformedPrompt.last != " " && transformedPrompt.last != "\n"
+      initialPrompt = transformedPrompt + (needsCommit ? " " : "")
       initialNoSpaceWordEndIndices = NoSpaceWordBoundaryPolicy.endIndices(for: noSpaceWordLengths)
       initialNoSpaceTargetWords = noSpaceTargetWords
     }
