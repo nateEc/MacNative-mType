@@ -315,6 +315,58 @@ try {
  assert.deepEqual(inputEvents().slice(-2).map(e=>e.inputType),['deleteWordBackward','deleteContentBackward']);
  assert.equal(wordIndex,0);assert.equal(element,'ab');
  console.log('8 pinned-source standalone Dockerfile/code-prefix input scenarios passed (same 13 actual modules; owned targets, FIFO and sentinel deletion adapters; no generation/browser/device equivalence claim).');
+
+ // The actual source substitutions read Config.language (the primary), not
+ // candidate identity. Owned targets/tag do not exercise Polyglot generation
+ // or its direction preflight; native tests cover that separate boundary.
+ let normalizationScenarios=0;
+ async function checkNormalization(base,target,entered,retained,correct) {
+  resetPolyglotInput(base,[target+' ','tail']);
+  await main.namespace.emulateInsertText({data:entered,now:7});
+  assert.equal(element,retained);assert.equal(eventData.getCurrentInput(),retained);
+  assert.deepEqual(inputEvents().map(e=>e.correct),correct);
+  assert.deepEqual(positions(),correct.map((_,index)=>index));
+  assert.equal(callbacks.length,0);normalizationScenarios++;
+ }
+ for(const target of ['ё','е','e'])for(const entered of ['ё','е','e']) {
+  await checkNormalization('russian',target,entered,target,[true]);
+  assert.equal(inputEvents()[0].data,target);
+ }
+ for(const base of ['russian','russian_1k','russian_5k','russian_10k','russian_25k','russian_50k','russian_375k']) {
+  await checkNormalization(base,'ёл','eл','ёл',[true,true]);
+ }
+ for(const base of ['russian_abbreviations','russian_contractions','russian_contractions_1k']) {
+  await checkNormalization(base,'ёл','eл','eл',[false,true]);
+ }
+ for(const base of ['dutch','dutch_1k','dutch_10k']) {
+  await checkNormalization(base,'ij','ĳ','ij',[true,true]);
+  assert.deepEqual(inputEvents().map(e=>e.data),['i','j']);
+  assert.deepEqual(eventData.getAllTestEvents().filter(e=>e.type==='input').map(e=>e.testMs),[7,7]);
+ }
+ await checkNormalization('dutch','ĳ','ĳ','ĳ',[true]);
+ await checkNormalization('dutch','IJ','Ĳ','Ĳ',[false]);
+ await checkNormalization('english','ё','e','e',[false]);
+ await checkNormalization('english','ij','ĳ','ĳ',[false]);
+ await checkNormalization('dutch','ijx','ĳx','ijx',[true,true,true]);
+ resetPolyglotInput('russian',['ёл','tail']);noSpaceDelete=true;
+ Config.funbox=['polyglot','nospace'];
+ await main.namespace.emulateInsertText({data:'eл',now:7});
+ assert.equal(wordIndex,1);assert.equal(element,'');
+ assert.deepEqual(inputEvents().map(e=>[e.data,e.correct,e.wordIndex,e.charIndex]),
+  [['ё',true,0,0],['л',true,0,1]]);normalizationScenarios++;
+ await checkNormalization('russian',"'",'’',"'",[true]);
+ await checkNormalization('dutch','é','e\u0301','e\u0301',[false,false]);
+ for(const base of ['russian','dutch']) {
+  resetPolyglotInput(base,[base==='russian'?'ёл ':'ij ','tail']);
+  await main.namespace.emulateInsertText({data:base==='russian'?'e':'ĳ',now:7});
+  deleteInput({now:8});assert.equal(element,base==='russian'?'':'i');
+  await main.namespace.emulateInsertText({data:base==='russian'?'e':'j',now:9});
+  assert.equal(element,base==='russian'?'ё':'ij');
+  assert.equal(inputEvents().at(-1).charIndex,base==='russian'?0:1);
+  assert.equal(inputEvents().at(-1).correct,true);normalizationScenarios++;
+ }
+ assert.equal(normalizationScenarios,32);
+ console.log(`${normalizationScenarios} pinned-source primary-language normalization scenarios passed (same 13 actual modules; owned Polyglot tag/targets and DOM deletion adapters; no generation/direction/browser/IME/Zen parity claim).`);
 } finally {
  globalThis.setTimeout=originalSetTimeout;
 }

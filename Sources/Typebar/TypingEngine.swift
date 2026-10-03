@@ -2243,6 +2243,9 @@ struct TestConfiguration: Codable, Equatable {
   /// Fresh generation opts into primary-language code input. Missing markers
   /// preserve manual Tab/deletion semantics in historical mixed snapshots.
   var polyglotUsesPrimaryCodeInput: Bool?
+  /// Fresh attempts use the resolved primary for input substitutions. Missing
+  /// markers preserve historical mixed-language spelling and replay events.
+  var polyglotUsesPrimaryInputNormalization: Bool?
   /// Fresh Dockerfile attempts follow the source's non-code-prefix input.
   /// Nil preserves automatic indentation in historical native snapshots.
   var dockerfileUsesLiteralIndentation: Bool?
@@ -2252,6 +2255,13 @@ struct TestConfiguration: Codable, Equatable {
 
   var wordPoolBaseLanguage: TypingLanguage {
     language == .mixedLanguages ? (polyglotBaseLanguage ?? .english) : language
+  }
+
+  var inputNormalizationLanguage: TypingLanguage {
+    guard language == .mixedLanguages,
+      polyglotUsesPrimaryInputNormalization == true, let polyglotBaseLanguage
+    else { return language }
+    return polyglotBaseLanguage
   }
 
   var usesCodeIndentationInput: Bool {
@@ -2338,6 +2348,7 @@ struct TestConfiguration: Codable, Equatable {
       ? PolyglotReturnLanguagePolicy.validated(polyglotBaseLanguage) : nil
     self.polyglotUsesPrimaryDirection = nil
     self.polyglotUsesPrimaryCodeInput = nil
+    self.polyglotUsesPrimaryInputNormalization = nil
     self.dockerfileUsesLiteralIndentation = nil
     let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
       modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents)
@@ -2394,6 +2405,7 @@ struct TestConfiguration: Codable, Equatable {
     if copy.polyglotBaseLanguage == nil {
       copy.polyglotUsesPrimaryDirection = nil
       copy.polyglotUsesPrimaryCodeInput = nil
+      copy.polyglotUsesPrimaryInputNormalization = nil
     }
     return copy
   }
@@ -2447,7 +2459,8 @@ struct TestConfiguration: Codable, Equatable {
     case mode, duration, wordLimit, difficulty, rules, language, englishVariant, quoteLength,
       quoteLengths, quoteSelectionMode, customTextCompletion, customTextSectionLimit,
       customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents, polyglotBaseLanguage,
-      polyglotUsesPrimaryDirection, polyglotUsesPrimaryCodeInput, dockerfileUsesLiteralIndentation,
+      polyglotUsesPrimaryDirection, polyglotUsesPrimaryCodeInput,
+      polyglotUsesPrimaryInputNormalization, dockerfileUsesLiteralIndentation,
       modifiers, contentOptions, challengeID
   }
 
@@ -2485,6 +2498,8 @@ struct TestConfiguration: Codable, Equatable {
       ? try values.decodeIfPresent(Bool.self, forKey: .polyglotUsesPrimaryDirection) : nil
     polyglotUsesPrimaryCodeInput = polyglotBaseLanguage != nil
       ? try values.decodeIfPresent(Bool.self, forKey: .polyglotUsesPrimaryCodeInput) : nil
+    polyglotUsesPrimaryInputNormalization = polyglotBaseLanguage != nil
+      ? try values.decodeIfPresent(Bool.self, forKey: .polyglotUsesPrimaryInputNormalization) : nil
     dockerfileUsesLiteralIndentation = language == .dockerFile
       ? try values.decodeIfPresent(Bool.self, forKey: .dockerfileUsesLiteralIndentation) : nil
     let normalizedModifiers = TestModifierPolicy.normalized(
@@ -5929,7 +5944,7 @@ struct TypingSession {
   /// and `j` input for the base catalog and its numeric-size variants. It
   /// keeps a literal ligature target intact for custom prompts.
   private mutating func shouldExpandDutchLigature(_ character: Character, at date: Date) -> Bool {
-    guard character == "ĳ", configuration.language.usesDutchLigatureInputExpansion else {
+    guard character == "ĳ", configuration.inputNormalizationLanguage.usesDutchLigatureInputExpansion else {
       return false
     }
     extendPromptIfNeeded(at: date)
@@ -6832,20 +6847,20 @@ struct TypingSession {
   private func normalizedInputCharacter(_ character: Character, expected: Character?) -> Character {
     if let currentInputUnit, (0xD800...0xDFFF).contains(currentInputUnit) { return character }
     guard supportsBMPUnitInput else {
-      return InputCharacterEquivalence.normalized(character, expected: expected, language: configuration.language)
+      return InputCharacterEquivalence.normalized(character, expected: expected, language: configuration.inputNormalizationLanguage)
     }
     // No reference equivalence set contains an ASCII letter except Russian
     // `e`. Its text cannot normalize differently at any target position, so
     // ordinary letter input needs no second field/UTF-16 buffer construction.
     if character.isASCII, character.isLetter,
-      character != "e" || !configuration.language.usesRussianYoInputEquivalence
+      character != "e" || !configuration.inputNormalizationLanguage.usesRussianYoInputEquivalence
     { return character }
     let comparison = inputAccuracyTarget(at: nextTargetIndex)
     // A known surrogate or an exhausted field is not a different visible
     // glyph to normalize against. Only the actual next unit owns equivalence.
     let unitExpected = comparison.units.indices.contains(comparison.position)
       ? UnicodeScalar(UInt32(comparison.units[comparison.position])).map { Character(String($0)) } : nil
-    return InputCharacterEquivalence.normalized(character, expected: unitExpected, language: configuration.language)
+    return InputCharacterEquivalence.normalized(character, expected: unitExpected, language: configuration.inputNormalizationLanguage)
   }
 
   private var supportsBMPUnitInput: Bool {

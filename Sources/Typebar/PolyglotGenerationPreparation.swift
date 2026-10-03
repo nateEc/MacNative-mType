@@ -22,6 +22,7 @@ struct PolyglotGenerationPreparation {
     var prepared = requested.with(polyglotBaseLanguage: resolved)
     prepared.polyglotUsesPrimaryDirection = true
     prepared.polyglotUsesPrimaryCodeInput = true
+    prepared.polyglotUsesPrimaryInputNormalization = true
     configuration = prepared
     switchedPrimaryLanguage = conflicts ? resolved : nil
   }

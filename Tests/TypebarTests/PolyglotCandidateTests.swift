@@ -140,6 +140,7 @@ final class PolyglotCandidateTests: XCTestCase {
     var prepared = value
     prepared.polyglotUsesPrimaryDirection = true
     prepared.polyglotUsesPrimaryCodeInput = true
+    prepared.polyglotUsesPrimaryInputNormalization = true
     XCTAssertEqual(result.configuration, prepared)
     XCTAssertEqual(try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [])).results.first?.configuration, prepared)
