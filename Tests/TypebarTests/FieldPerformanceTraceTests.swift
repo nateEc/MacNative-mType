@@ -160,7 +160,7 @@ final class FieldPerformanceTraceTests: XCTestCase {
           duration: 4, configuration: restored.configuration)
         XCTAssertEqual(points.map(\.wpm), [36,18,12,9])
       }
-      XCTAssertEqual(archive.version, 14)
+      XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     }
   }
 

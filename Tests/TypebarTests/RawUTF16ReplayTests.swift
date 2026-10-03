@@ -204,8 +204,10 @@ final class RawUTF16ReplayTests: XCTestCase {
     let original = try result(events: [insert([55357], snapshot: [55357], correct: [true]),
       insert([56899], snapshot: [55357], correct: [false], stopped: true)])
     let portable = try XCTUnwrap(TestResultRecord(result: original).portableResult)
-    let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
-      settings: .init(), results: [original], presets: [], at: start))
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    let archive = try TypebarDataTransfer.importArchive(from: encoder.encode(
+      TypebarArchive(version: 14, exportedAt: start, settings: .init(), results: [original], presets: [])))
     XCTAssertEqual(archive.version, 14)
     for restored in [portable, archive.results[0]] {
       XCTAssertEqual(restored, original)

@@ -267,9 +267,9 @@ enum RemoteResultCSVExport {
 }
 
 struct TypebarArchive: Codable, Equatable {
-    // Older readers lack stopped-input, field-local snapshot and unit judgment semantics.
+    // Older readers lack stopped-input, field-local/unit metadata and target directories.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 14
+    static let currentVersion = 15
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -305,7 +305,8 @@ struct TypebarArchive: Codable, Equatable {
         let hasJudgments = results.contains { $0.replayEvents.contains { $0.inputCorrectness != nil } }
         let hasRawUTF16 = results.contains { $0.replayEvents.contains(where: \.hasRawUTF16Metadata) }
         let hasStoppedInput = results.contains { $0.replayEvents.contains(where: \.isStoppedInsertion) }
-        self.version = hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        let hasTargets = results.contains { $0.targetWordDirectory != nil }
+        self.version = hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
         let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
@@ -867,6 +868,9 @@ enum TypebarDataTransfer {
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         guard archive.version >= 14 || !archive.results.contains(where: {
             $0.replayEvents.contains(where: \.hasRawUTF16Metadata)
+        }) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 15 || !archive.results.contains(where: {
+            $0.targetWordDirectory != nil
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         return archive
     }

@@ -1271,11 +1271,13 @@ enum ResultPerformanceTrace {
     prompt: String,
     events: [TypingReplayEvent],
     elapsed: TimeInterval,
-    configuration: TestConfiguration? = nil
+    configuration: TestConfiguration? = nil,
+    targetWordDirectory: ResultTargetWordDirectory? = nil
   ) -> ResultPerformancePoint {
     let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
     let orderedEvents = validOrderedEvents(events)
-    if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration) {
+    if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration,
+      targetWordDirectory: targetWordDirectory) {
       return fieldSamples(fields, events: orderedEvents, times: [safeElapsed], singleWindow: true)[0]
     }
     if containsRawUnits(orderedEvents) {
@@ -1311,16 +1313,20 @@ enum ResultPerformanceTrace {
     prompt: String,
     events: [TypingReplayEvent],
     duration: TimeInterval,
-    configuration: TestConfiguration? = nil
+    configuration: TestConfiguration? = nil,
+    targetWordDirectory: ResultTargetWordDirectory? = nil
   ) -> [ResultPerformancePoint] {
-    guard (!prompt.isEmpty || configuration?.mode == .zen), !events.isEmpty,
+    guard (!prompt.isEmpty || configuration?.mode == .zen
+      || targetWordDirectory?.matches(prompt: prompt,
+        noSpace: TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? [])) == true), !events.isEmpty,
       duration > 0, duration <= maximumChartDuration
     else { return [] }
 
     let sampleTimes = samplingTimes(for: duration, configuration: configuration)
     let orderedEvents = validOrderedEvents(events)
     guard !orderedEvents.isEmpty else { return [] }
-    if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration) {
+    if let fields = FieldActivityCursor(prompt: prompt, events: orderedEvents, configuration: configuration,
+      targetWordDirectory: targetWordDirectory) {
       return fieldSamples(fields, events: orderedEvents, times: sampleTimes, singleWindow: false)
     }
     if containsRawUnits(orderedEvents) {
@@ -1373,13 +1379,15 @@ enum ResultPerformanceTrace {
       let endsWithInsertedSpace: Bool
     }
 
-    let targets: UnitInputTargets
+    let targets: UnitInputTargets?
+    let directoryTargets: [[UInt16]]?
     let configuration: TestConfiguration?
     private var order: [Int] = []
     private var snapshots: [Int: Snapshot] = [:]
 
-    init?(prompt: String, events: [TypingReplayEvent], configuration: TestConfiguration?) {
-      guard !events.isEmpty, !TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? []) else { return nil }
+    init?(prompt: String, events: [TypingReplayEvent], configuration: TestConfiguration?,
+      targetWordDirectory: ResultTargetWordDirectory?) {
+      guard !events.isEmpty else { return nil }
       guard events.allSatisfy({ event in
         guard let field = event.inputField, field.index >= 0,
           field.valueUTF16 == nil || field.validatedValueUTF16 != nil
@@ -1387,11 +1395,23 @@ enum ResultPerformanceTrace {
         return true
       }) else { return nil }
       // Missing/legacy snapshots do not need an unused full target catalog.
-      let targets = UnitInputTargets(prompt, buildsASCIICatalog: true)
-      guard configuration?.mode == .zen || events.allSatisfy({
-        targets.fields.indices.contains($0.inputField!.index)
-      }) else { return nil }
-      self.targets = targets
+      let noSpace = TestModifierPolicy.usesNoSpaceInput(configuration?.modifiers ?? [])
+      if let targetWordDirectory {
+        guard configuration?.mode != .zen,
+          targetWordDirectory.matches(prompt: prompt, noSpace: noSpace),
+          events.allSatisfy({ targetWordDirectory.words.indices.contains($0.inputField!.index) })
+        else { return nil }
+        directoryTargets = targetWordDirectory.words.map { Array($0.utf16) }
+        targets = nil
+      } else {
+        guard !noSpace else { return nil }
+        let targets = UnitInputTargets(prompt, buildsASCIICatalog: true)
+        guard configuration?.mode == .zen || events.allSatisfy({
+          targets.fields.indices.contains($0.inputField!.index)
+        }) else { return nil }
+        self.targets = targets
+        directoryTargets = nil
+      }
       self.configuration = configuration
     }
 
@@ -1402,7 +1422,8 @@ enum ResultPerformanceTrace {
           InputCharacterEquivalence.isReferenceSpace(Character(String(scalar))) else { return unit }
         return 32
       }
-      let target = configuration?.mode == .zen ? units : targets.field(field.index)
+      let target = configuration?.mode == .zen ? units
+        : directoryTargets?[field.index] ?? targets!.field(field.index)
       if snapshots[field.index] == nil { order.append(field.index) }
       snapshots[field.index] = .init(fullCredit: units == target ? units.count : 0,
         prefixCredit: target.starts(with: units) ? units.count : 0, rawCount: units.count,
@@ -1726,10 +1747,12 @@ enum ResultPerformanceChartAvailability {
     prompt: String,
     events: [TypingReplayEvent],
     duration: TimeInterval,
-    configuration: TestConfiguration? = nil
+    configuration: TestConfiguration? = nil,
+    targetWordDirectory: ResultTargetWordDirectory? = nil
   ) -> Bool {
     !ResultPerformanceTrace.points(
-      prompt: prompt, events: events, duration: duration, configuration: configuration).isEmpty
+      prompt: prompt, events: events, duration: duration, configuration: configuration,
+      targetWordDirectory: targetWordDirectory).isEmpty
   }
 }
 

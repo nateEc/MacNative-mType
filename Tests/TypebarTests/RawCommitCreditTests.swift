@@ -85,7 +85,7 @@ final class RawCommitCreditTests: XCTestCase {
       XCTAssertEqual(restored.wpm, 54)
       XCTAssertEqual(RemoteResultSubmission(result: restored).wpm, 54)
     }
-    XCTAssertEqual(archive.version, 14)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
   }
 
   func testPreFixArchiveFourteenKeepsItsRecordedCreditRatherThanBeingRecomputed() throws {
@@ -98,8 +98,11 @@ final class RawCommitCreditTests: XCTestCase {
           inputCorrectness: [true]),
         .init(offset: 0, kind: .insert, units: [10], inputField: .init(index: 0, units: [233,10]),
           inputCorrectness: [false])])
-    let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
-      settings: .init(), results: [old], presets: [], at: start))
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    let archive = try TypebarDataTransfer.importArchive(from: encoder.encode(
+      TypebarArchive(version: 14, exportedAt: start, settings: .init(), results: [old], presets: [])))
+    XCTAssertEqual(archive.version, 14)
     for restored in [archive.results[0], try XCTUnwrap(TestResultRecord(result: old).portableResult)] {
       XCTAssertEqual(restored, old)
       XCTAssertEqual(restored.inputMetrics?.creditedUnits, 2)

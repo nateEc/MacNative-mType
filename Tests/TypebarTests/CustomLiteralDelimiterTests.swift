@@ -33,7 +33,7 @@ final class CustomLiteralDelimiterTests: XCTestCase {
     let fusedChunk = fused.nextChunk()
     XCTAssertEqual(fusedChunk.text, "a\u{301}b")
     XCTAssertTrue(fusedChunk.noSpaceWordLengths.isEmpty)
-    XCTAssertTrue(fusedChunk.noSpaceTargetWords.isEmpty)
+    XCTAssertEqual(fusedChunk.noSpaceTargetWords.map { Array($0.utf16) }, [[97], [769,98]])
     var empty = try XCTUnwrap(CustomSectionWordStream(source: "中 a", configuration: configuration(.finish)))
     let emptyChunk = empty.nextChunk()
     XCTAssertEqual(emptyChunk.text, ".-/")

@@ -929,12 +929,23 @@ struct TransformedPromptBatch {
   init(text: String, noSpaceTargetWords: [String] = []) {
     self.text = text
     let lengths = noSpaceTargetWords.map(\.count)
-    // Joining can fuse graphemes across a word boundary. Do not hand the
-    // grapheme-indexed engine unsafe offsets. Empty transformed words retain
-    // their identity even though they contribute no rendered character.
-    if !lengths.isEmpty,
-      lengths.reduce(0, +) == text.count, noSpaceTargetWords.joined() == text {
-      self.noSpaceWordLengths = lengths
+    // Preserve actual words even when joining fuses their glyphs. Only the
+    // legacy grapheme-indexed engine's offsets require non-fusing boundaries.
+    if !lengths.isEmpty, noSpaceTargetWords.joined().utf16.elementsEqual(text.utf16) {
+      // Equal glyph totals are insufficient: three regional indicators can
+      // regroup into two glyphs while moving the original first word's end.
+      var glyphUnitEnds: Set<Int> = [0]
+      var end = 0
+      for glyph in text {
+        end += glyph.utf16.count
+        glyphUnitEnds.insert(end)
+      }
+      var wordEnd = 0
+      let aligned = noSpaceTargetWords.allSatisfy { word in
+        wordEnd += word.utf16.count
+        return glyphUnitEnds.contains(wordEnd)
+      }
+      self.noSpaceWordLengths = aligned ? lengths : []
       self.noSpaceTargetWords = noSpaceTargetWords
     } else {
       self.noSpaceWordLengths = []
@@ -3825,6 +3836,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   let quoteSource: ResultQuoteSource?
   let prompt: String
   let replayEvents: [TypingReplayEvent]
+  let targetWordDirectory: ResultTargetWordDirectory?
   let challengePresentation: ChallengePresentationSnapshot?
 
   init(
@@ -3854,6 +3866,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     quoteSource: ResultQuoteSource? = nil,
     prompt: String = "",
     replayEvents: [TypingReplayEvent] = [],
+    targetWordDirectory: ResultTargetWordDirectory? = nil,
     challengePresentation: ChallengePresentationSnapshot? = nil
   ) {
     self.id = id
@@ -3884,6 +3897,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.quoteSource = configuration.mode == .quote ? quoteSource : nil
     self.prompt = prompt
     self.replayEvents = TypingReplay.chronologicalEvents(replayEvents)
+    self.targetWordDirectory = targetWordDirectory
     self.challengePresentation = challengePresentation
   }
 
@@ -3917,7 +3931,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
       preciseWpm, preciseRawWpm, preciseAccuracy, inputMetrics, restartCount, keyDurationSamples,
       priorAttemptEngagedDuration, keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
-      challengePresentation
+      challengePresentation, targetWordDirectory
     case startedAtReferenceTime, finishedAtReferenceTime
   }
 
@@ -3951,6 +3965,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     try values.encodeIfPresent(quoteSource, forKey: .quoteSource)
     try values.encode(prompt, forKey: .prompt)
     try values.encode(replayEvents, forKey: .replayEvents)
+    try values.encodeIfPresent(targetWordDirectory, forKey: .targetWordDirectory)
     try values.encodeIfPresent(challengePresentation, forKey: .challengePresentation)
   }
 
@@ -4001,6 +4016,12 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     prompt = try values.decodeIfPresent(String.self, forKey: .prompt) ?? ""
     replayEvents = TypingReplay.chronologicalEvents(
       try values.decodeIfPresent([TypingReplayEvent].self, forKey: .replayEvents) ?? [])
+    targetWordDirectory = try values.decodeIfPresent(ResultTargetWordDirectory.self, forKey: .targetWordDirectory)
+    if let targetWordDirectory, !targetWordDirectory.matches(prompt: prompt,
+      noSpace: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers)) {
+      throw DecodingError.dataCorruptedError(forKey: .targetWordDirectory, in: values,
+        debugDescription: "Target words do not match the recorded prompt and separator mode")
+    }
     challengePresentation = try values.decodeIfPresent(
       ChallengePresentationSnapshot.self, forKey: .challengePresentation)
   }
@@ -5196,6 +5217,7 @@ struct TypingSession {
       quoteSource: quoteSource,
       prompt: prompt,
       replayEvents: replayEvents,
+      targetWordDirectory: capturedTargetWordDirectory,
       challengePresentation: challengePresentation
     )
   }
@@ -6954,6 +6976,12 @@ struct TypingSession {
     return splitPromptWords(prompt, omittingEmptySubsequences: false).map(String.init)
   }
 
+  private var capturedTargetWordDirectory: ResultTargetWordDirectory? {
+    guard TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) else { return nil }
+    let directory = ResultTargetWordDirectory(words: noSpaceTargetWords, noSpace: true)
+    return directory.matches(prompt: prompt, noSpace: true) ? directory : nil
+  }
+
   private var noSpaceWordRanges: [Range<Int>] {
     guard hasNoSpaceWordSegmentation else { return [] }
     var start = 0
@@ -7274,18 +7302,25 @@ struct TypingSession {
     }
     do {
       let previousEnd = promptCharacters.count
-      let hadSafeTargets = noSpaceTargetWords.count == stream.emittedWords
+      let hadTargets = noSpaceTargetWords.count == stream.emittedWords
       let chunk = try stream.nextWord()
       quoteWordStream = stream
       appendPrompt(chunk.text)
       if TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) {
-        if hadSafeTargets, promptCharacters.count == previousEnd + chunk.text.count,
+        if hadTargets,
           chunk.noSpaceTargetWords.count == 1 {
-          noSpaceWordEndIndices += chunk.noSpaceWordLengths.map { previousEnd + $0 }
+          if noSpaceWordEndIndices.count == noSpaceTargetWords.count,
+            let lastWord = noSpaceTargetWords.last,
+            TransformedPromptBatch(text: lastWord + chunk.text,
+              noSpaceTargetWords: [lastWord, chunk.text]).noSpaceWordLengths.count == 2,
+            promptCharacters.count == previousEnd + chunk.text.count {
+            noSpaceWordEndIndices += chunk.noSpaceWordLengths.map { previousEnd + $0 }
+          } else {
+            noSpaceWordEndIndices = []
+          }
           noSpaceTargetWords += chunk.noSpaceTargetWords
         } else {
-          // Preserve the established unsegmented fallback rather than expose
-          // invented grapheme offsets when a new word fuses at the boundary.
+          // Incomplete actual target metadata is not a recoverable catalog.
           noSpaceWordEndIndices = []
           noSpaceTargetWords = []
           firstEmptyNoSpaceWordIndex = nil

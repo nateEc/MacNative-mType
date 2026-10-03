@@ -456,6 +456,8 @@ final class TestResultRecord {
   var quoteSourceData: Data?
   var prompt: String
   var replayEventsData: Data?
+  /// Additive optional metadata. Existing rows remain absent; no backfill.
+  var targetWordDirectoryData: Data?
   var challengePresentationData: Data?
 
   init(result: CompletedTestResult) {
@@ -485,6 +487,7 @@ final class TestResultRecord {
     quoteSourceData = result.quoteSource.flatMap { try? JSONEncoder().encode($0) }
     prompt = result.prompt
     replayEventsData = try? JSONEncoder().encode(result.replayEvents)
+    targetWordDirectoryData = result.targetWordDirectory.flatMap { try? JSONEncoder().encode($0) }
     challengePresentationData = result.challengePresentation.flatMap {
       try? JSONEncoder().encode($0)
     }
@@ -506,6 +509,10 @@ final class TestResultRecord {
 
   var quoteSource: ResultQuoteSource? {
     quoteSourceData.flatMap { try? JSONDecoder().decode(ResultQuoteSource.self, from: $0) }
+  }
+
+  var targetWordDirectory: ResultTargetWordDirectory? {
+    targetWordDirectoryData.flatMap { try? JSONDecoder().decode(ResultTargetWordDirectory.self, from: $0) }
   }
 
   var challengePresentation: ChallengePresentationSnapshot? {
@@ -593,6 +600,7 @@ final class TestResultRecord {
       quoteSource: quoteSource,
       prompt: prompt,
       replayEvents: replayEvents,
+      targetWordDirectory: targetWordDirectory,
       challengePresentation: challengePresentation
     )
   }

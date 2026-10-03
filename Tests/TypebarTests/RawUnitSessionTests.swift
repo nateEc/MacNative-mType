@@ -116,7 +116,7 @@ final class RawUnitSessionTests: XCTestCase {
     let original = try XCTUnwrap(session.result())
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [original], presets: [], at: start))
-    XCTAssertEqual(archive.version, 14)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for result in [try XCTUnwrap(TestResultRecord(result: original).portableResult), archive.results[0]] {
       XCTAssertEqual(result, original)
       XCTAssertEqual(result.replayEvents.first?.inputField?.valueUTF16, [55357])

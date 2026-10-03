@@ -232,7 +232,7 @@ final class SinglePassWordTargetsTests: XCTestCase {
     let fused = TestModifierPolicy.transformedBatch("a \u{301}b", modifiers: [.noSpaces])
     XCTAssertEqual(fused.text, "a\u{301}b")
     XCTAssertTrue(fused.noSpaceWordLengths.isEmpty)
-    XCTAssertTrue(fused.noSpaceTargetWords.isEmpty)
+    XCTAssertEqual(fused.noSpaceTargetWords.map { Array($0.utf16) }, [[97], [769,98]])
     let empty = TestModifierPolicy.transformedBatch("中 a", modifiers: [.morseStream])
     XCTAssertEqual(empty.text, ".-/")
     XCTAssertEqual(empty.noSpaceWordLengths, [0, 3])
