@@ -2085,7 +2085,8 @@ final class TypingEngineTests: XCTestCase {
     zen.finishZen(at: start.addingTimeInterval(1))
     XCTAssertEqual(
       try XCTUnwrap(zen.result(at: start.addingTimeInterval(1))).characterStats,
-      .init(matched: 5, incorrect: 0, extra: 0, missed: 0))
+      .init(matched: 5, incorrect: 0, extra: 0, missed: 0,
+        sourceUnits: .classify(input: Array("hello".utf16), target: nil, creditsPartial: false)))
   }
 
   func testCompletedResultDecodesLegacyCharacterStatsConservatively() throws {

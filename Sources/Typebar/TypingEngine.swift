@@ -4223,7 +4223,7 @@ struct TypingSession {
   private var latestNoSpaceFinishDecision = false
   private var latestReplayDiscardedUnits: Int?
   private var latestReplayClearedNextWord = false
-  private var recordedNoSpaceStats = RecordedInputFieldStats()
+  private var recordedFieldStats = RecordedInputFieldStats()
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
   private var promptWordCount: Int
@@ -4850,7 +4850,7 @@ struct TypingSession {
   /// word, matching the live speed readout without changing final scoring.
   private func referenceWordCredit(countPartialLastWord: Bool) -> TypingWordCredit {
     if unitTargets.noSpace {
-      return recordedNoSpaceStats.counts(targets: unitTargets,
+      return recordedFieldStats.counts(targets: unitTargets,
         creditsActivePrefix: countPartialLastWord).credit
     }
     if let acceptedUnits {
@@ -4921,7 +4921,11 @@ struct TypingSession {
   /// exact target mapping. It is descriptive only and never feeds scoring.
   var characterStats: ResultCharacterStats {
     if configuration.mode == .zen {
-      return .init(matched: typed.count, incorrect: 0, extra: 0, missed: 0)
+      // Zen's source context has no target words. Classify the logged fields
+      // against their normalized input, not the displayed or final text.
+      return .init(matched: typed.count, incorrect: 0, extra: 0, missed: 0,
+        sourceUnits: recordedFieldStats.counts(targets: .init(""),
+          creditsActivePrefix: false).unitStats)
     }
 
     let typedCharacters = Array(typed)
@@ -4954,7 +4958,7 @@ struct TypingSession {
     }
     return .init(matched: matched, incorrect: incorrect, extra: extra, missed: missed,
       sourceUnits: unitTargets.noSpace
-        ? recordedNoSpaceStats.counts(targets: unitTargets,
+        ? recordedFieldStats.counts(targets: unitTargets,
           creditsActivePrefix: finishedAt == nil || resultCreditsPartialLastWord).unitStats : nil)
   }
 
@@ -5001,7 +5005,7 @@ struct TypingSession {
   }
 
   private var rawSpeedInputUnitCount: Int {
-    unitTargets.noSpace ? recordedNoSpaceStats.counts(targets: unitTargets, creditsActivePrefix: false).rawUnits
+    unitTargets.noSpace ? recordedFieldStats.counts(targets: unitTargets, creditsActivePrefix: false).rawUnits
       : typed.utf16.count
   }
 
@@ -5151,7 +5155,7 @@ struct TypingSession {
     if unitTargets.noSpace, acceptedUnits != nil {
       let count = min(noSpaceTargetWords.count, (highestAttemptedNoSpaceField ?? -1) + 1)
       return (0..<count).map { index in
-        let input = recordedNoSpaceStats.history(index)
+        let input = recordedFieldStats.history(index)
         let target = unitTargets.field(index)
         return .init(index: index, target: noSpaceTargetWords[index],
           typed: String(decoding: input, as: UTF16.self),
@@ -5360,7 +5364,7 @@ struct TypingSession {
       finishedAt: finishedAt,
       afkDuration: afkDuration,
       typedCharacterCount: unitTargets.noSpace
-        ? recordedNoSpaceStats.counts(targets: unitTargets, creditsActivePrefix: false).rawCharacters : typed.count,
+        ? recordedFieldStats.counts(targets: unitTargets, creditsActivePrefix: false).rawCharacters : typed.count,
       correctCharacterCount: scoredCorrectCharacters,
       errorCount: errors,
       wpm: wpm(at: date),
@@ -6358,7 +6362,9 @@ struct TypingSession {
         inputPosition: kind == .insert ? latestReplayInputPosition : nil,
         discardedInputUnits: latestReplayDiscardedUnits,
         clearedNextWord: latestReplayClearedNextWord ? true : nil))
-    if unitTargets.noSpace { recordedNoSpaceStats.record(replayEvents.last!) }
+    if unitTargets.noSpace || configuration.mode == .zen {
+      recordedFieldStats.record(replayEvents.last!)
+    }
     latestReplayDiscardedUnits = nil
     latestReplayClearedNextWord = false
   }

@@ -77,3 +77,27 @@ assert.deepEqual(stats.getChars(failedInfinite),{allCorrect:1,correctWord:0,inco
 failedInfinite.context.mode2='1';
 assert.deepEqual(stats.getChars(failedInfinite),{allCorrect:1,correctWord:0,incorrect:1,extra:0,missed:2});
 console.log('21 owned UTF-16 classification fixtures passed (16 countChars cases and 5 normalized/fallback/mode getChars cases; result.ts/TestLogic display inspected, not executed).');
+
+// Zen has an empty target directory, not a directory built from final text.
+// These are source stats fixtures, not evidence for physical Zen input/IME.
+const zenLog=events=>{
+ const value=log(events,[]);
+ value.context.mode='zen'; value.context.mode2='zen'; value.context.bailedOut=false;
+ return value;
+};
+const zenCases=[
+ [[event(0,0,'🙂 ','insertText',' ',{commitsWord:true}),event(1000,1,'e\u0301','insertText','\u0301')],5],
+ [[event(0,0,'','insertText','x',{inputStopped:true}),event(1000,0,'a','insertText','a')],1],
+ [[event(0,0,'','insertText','x',{inputStopped:true})],0],
+ [[event(0,0,'a\n','insertText','\n',{commitsWord:true}),event(1000,1,'\n','insertText','\n',{commitsWord:true}),event(1500,2,'b')],4],
+ [[event(0,0,'ab ','insertText',' ',{lastWord:true,commitsWord:true})],3],
+ [[event(0,0,'가 ','insertText',' ',{commitsWord:true}),event(1000,1,'🙂')],4],
+ [[event(0,0,'a\u3000','insertText','\u3000')],2],
+ [[event(0,0,'ab ','insertText',' ',{commitsWord:true}),event(500,1,'c'),event(1000,1,'','deleteContentBackward','')],3],
+ [[event(0,0,'ab ','insertText',' ',{commitsWord:true}),event(500,1,'c'),event(1000,1,'','deleteContentBackward',''),event(1500,1,'d')],4],
+ [[event(0,0,'ab ','insertText',' ',{commitsWord:true}),event(1000,1,'\t🙂')],6],
+];
+for(const [events,count] of zenCases){
+ assert.deepEqual(stats.getChars(zenLog(events)),{allCorrect:count,correctWord:count,incorrect:0,extra:0,missed:0});
+}
+console.log('10 owned target-free Zen getChars fixtures passed (same 4 complete actual modules; Korean status false, no handler/browser/IME claim).');

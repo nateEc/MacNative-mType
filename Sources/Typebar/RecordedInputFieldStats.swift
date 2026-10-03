@@ -1,7 +1,7 @@
 import Foundation
 
-/// Source-time snapshots for live known no-space fields. Navigation's accepted
-/// buffer and saved abandoned-word history are deliberately different readers.
+/// Source-time snapshots for live known no-space and target-free Zen fields.
+/// Navigation's accepted buffer and saved history are different readers.
 struct RecordedInputFieldStats {
   private struct Snapshot {
     let units: [UInt16]
