@@ -98,19 +98,38 @@ final class CombiningUnitInputTests: XCTestCase {
     XCTAssertEqual(TypingReplay.typedUTF16(events: result.replayEvents, through: 5), Array(session.typed.utf16))
   }
 
-  func testNativeBMPProducerRequiresArchiveFourteenAndKeepsExactEvents() throws {
+  func testNativeBMPProducerKeepsExactUnitsAndDeletionRequiresTwenty() throws {
     var session = TypingSession(configuration: .words(1), prompt: "e\u{301}x")
     session.insertBatch("e\u{301}", at: start)
     session.deleteBackward(at: start.addingTimeInterval(1))
     session.bailOut(at: start.addingTimeInterval(2))
     let result = try XCTUnwrap(session.result())
     let archive = TypebarArchive(version: 13, exportedAt: start, settings: .init(), results: [result], presets: [])
-    XCTAssertEqual(archive.version, 14)
+    XCTAssertEqual(archive.version, 20)
+    XCTAssertEqual(result.replayEvents.map(\.deletionCharIndex), [nil,nil,2])
     XCTAssertEqual(result.replayEvents.map(\.textUTF16), [[101], [769], []])
     XCTAssertEqual(result.replayEvents.map { $0.inputField?.valueUTF16 }, [[101], [101, 769], [101]])
     let restored = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
     XCTAssertEqual(restored.results, [result])
+  }
+
+  func testOwnedFourteenBMPWithoutDeletionPositionsStaysFourteen() throws {
+    let events: [TypingReplayEvent] = [
+      .init(offset: 0, kind: .insert, units: [101], inputField: .init(index: 0, units: [101]), inputCorrectness: [true]),
+      .init(offset: 0, kind: .insert, units: [769], inputField: .init(index: 0, units: [101,769]), inputCorrectness: [true]),
+      .init(offset: 1, kind: .delete, units: [], inputField: .init(index: 0, units: [101]))]
+    let old = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .bailedOut,
+      startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 1,
+      correctCharacterCount: 1, errorCount: 0, wpm: 17, rawWpm: 29, accuracy: 77,
+      prompt: "e\u{301}x", replayEvents: events)
+    let archive = TypebarArchive(version: 13, exportedAt: start, settings: .init(), results: [old], presets: [])
+    XCTAssertEqual(archive.version, 14)
+    let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+    let restored = try TypebarDataTransfer.importArchive(from: encoder.encode(archive)).results[0]
+    XCTAssertEqual(restored, old)
+    XCTAssertTrue(restored.replayEvents.allSatisfy { $0.deletionCharIndex == nil })
+    XCTAssertEqual(TypingReplay.typedUTF16(events: restored.replayEvents, through: 2), [101])
   }
 
   func testUnitPositionOwnsQuoteNormalizationBeforeACombiningMark() throws {

@@ -3109,6 +3109,16 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// Archive 18: the regression destination abandoned its following word.
   /// Saved history consumes this; scoring still reads that word's raw bucket.
   let clearedNextWord: Bool?
+  /// Archive 20: one source position on the FINAL primitive of a logical
+  /// manual deletion. Within-field actions use their pre-delete length;
+  /// regression and code destination actions use the resulting field length.
+  /// This is not an insertion position and carries no fabricated lastWord.
+  let deletionCharIndex: Int?
+  var validatedDeletionCharIndex: Int? {
+    guard kind == .delete, text.isEmpty, let inputField, inputField.index >= 0,
+      let deletionCharIndex, deletionCharIndex >= 0 else { return nil }
+    return deletionCharIndex
+  }
   var validatedClearedNextWord: Bool {
     clearedNextWord == true && kind == .delete && validatedTextUTF16 != nil
       && inputField.map { $0.index >= 0 && $0.index < Int.max } == true
@@ -3150,7 +3160,8 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
     inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
     textUTF16: [UInt16]? = nil, inputPosition: TypingReplayInputPosition? = nil,
-    discardedInputUnits: Int? = nil, clearedNextWord: Bool? = nil
+    discardedInputUnits: Int? = nil, clearedNextWord: Bool? = nil,
+    deletionCharIndex: Int? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3167,6 +3178,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.inputPosition = inputPosition
     self.discardedInputUnits = discardedInputUnits
     self.clearedNextWord = clearedNextWord
+    self.deletionCharIndex = deletionCharIndex
   }
 
   init(
@@ -3175,20 +3187,20 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
     inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
     inputPosition: TypingReplayInputPosition? = nil, discardedInputUnits: Int? = nil,
-    clearedNextWord: Bool? = nil
+    clearedNextWord: Bool? = nil, deletionCharIndex: Int? = nil
   ) {
     self.init(offset: offset, kind: kind, text: String(decoding: units, as: UTF16.self),
       forceError: forceError, automatic: automatic, commitsWord: commitsWord,
       wordDeletionCount: wordDeletionCount, characterDeletionCount: characterDeletionCount,
       inputStopped: inputStopped, inputField: inputField, inputCorrectness: inputCorrectness,
       textUTF16: units, inputPosition: inputPosition, discardedInputUnits: discardedInputUnits,
-      clearedNextWord: clearedNextWord)
+      clearedNextWord: clearedNextWord, deletionCharIndex: deletionCharIndex)
   }
 
   private enum CodingKeys: String, CodingKey {
     case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount, characterDeletionCount
     case inputStopped, inputField, inputCorrectness, textUTF16, inputPosition, discardedInputUnits
-    case clearedNextWord
+    case clearedNextWord, deletionCharIndex
   }
 
   init(from decoder: Decoder) throws {
@@ -3208,6 +3220,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     inputPosition = try values.decodeIfPresent(TypingReplayInputPosition.self, forKey: .inputPosition)
     discardedInputUnits = try values.decodeIfPresent(Int.self, forKey: .discardedInputUnits)
     clearedNextWord = try values.decodeIfPresent(Bool.self, forKey: .clearedNextWord)
+    deletionCharIndex = try values.decodeIfPresent(Int.self, forKey: .deletionCharIndex)
     guard textUTF16 == nil || validatedTextUTF16 != nil else {
       throw DecodingError.dataCorruptedError(forKey: .textUTF16, in: values,
         debugDescription: "Raw insert units must be nonempty and project to text; deletion payloads must be empty.")
@@ -3227,6 +3240,10 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     guard clearedNextWord == nil || validatedClearedNextWord else {
       throw DecodingError.dataCorruptedError(forKey: .clearedNextWord, in: values,
         debugDescription: "A next-word clear requires a true marker, raw deletion and bounded destination field.")
+    }
+    guard deletionCharIndex == nil || validatedDeletionCharIndex != nil else {
+      throw DecodingError.dataCorruptedError(forKey: .deletionCharIndex, in: values,
+        debugDescription: "A deletion position requires a nonnegative index, empty deletion payload and recorded field.")
     }
   }
 }
@@ -5574,8 +5591,11 @@ struct TypingSession {
     {
       return
     }
+    let deletionStart = replayEvents.count
+    let previousField = replayInputField(kind: .delete, inputStopped: false)
     removeLastTypedCharacter()
     recordReplayEvent(kind: .delete, text: "", at: date)
+    recordDeletionPosition(since: deletionStart, previousField: previousField)
   }
 
   /// Handles the platform's word-backward command (for example Option-Delete)
@@ -5595,7 +5615,11 @@ struct TypingSession {
     }
 
     let deletionStart = replayEvents.count
-    defer { markDeletion(since: deletionStart) }
+    let previousField = replayInputField(kind: .delete, inputStopped: false)
+    defer {
+      markDeletion(since: deletionStart)
+      recordDeletionPosition(since: deletionStart, previousField: previousField)
+    }
 
     // A hidden source-word boundary is still a commit. Do not let the
     // space-delimited fallback clear the entire flattened input history.
@@ -6380,8 +6404,26 @@ struct TypingSession {
         inputStopped: event.inputStopped, inputField: event.inputField,
         inputCorrectness: event.inputCorrectness, textUTF16: event.textUTF16,
         inputPosition: event.inputPosition, discardedInputUnits: event.discardedInputUnits,
-        clearedNextWord: event.clearedNextWord)
+        clearedNextWord: event.clearedNextWord, deletionCharIndex: event.deletionCharIndex)
     }
+  }
+
+  private mutating func recordDeletionPosition(since start: Int,
+    previousField: TypingReplayInputField?, usesDestinationPosition: Bool = false
+  ) {
+    guard start < replayEvents.count, let previousField,
+      let event = replayEvents.last, event.kind == .delete,
+      let destination = event.inputField else { return }
+    let position = usesDestinationPosition || destination.index != previousField.index
+      ? destination.units.count : previousField.units.count
+    replayEvents[replayEvents.count - 1] = .init(offset: event.offset, kind: event.kind,
+      text: event.text, forceError: event.forceError, automatic: event.automatic,
+      commitsWord: event.commitsWord, wordDeletionCount: event.wordDeletionCount,
+      characterDeletionCount: event.characterDeletionCount, inputStopped: event.inputStopped,
+      inputField: event.inputField, inputCorrectness: event.inputCorrectness,
+      textUTF16: event.textUTF16, inputPosition: event.inputPosition,
+      discardedInputUnits: event.discardedInputUnits, clearedNextWord: event.clearedNextWord,
+      deletionCharIndex: position)
   }
 
   private func errorsInCurrentWord() -> Int {
@@ -7189,11 +7231,13 @@ struct TypingSession {
     guard prefix.count == remainingTabs, prefix.allSatisfy({ $0 == "\t" })
     else { return false }
     let deletionStart = replayEvents.count
+    let previousField = replayInputField(kind: .delete, inputStopped: false)
     for _ in field {
       removeLastTypedCharacter()
       recordReplayEvent(kind: .delete, text: "", at: date)
     }
     markDeletion(since: deletionStart)
+    recordDeletionPosition(since: deletionStart, previousField: previousField)
     let navigationStart = replayEvents.count
     removePreviousWordForHardDelete(clearingWord: deletesWholeIndent, at: date)
     if replayEvents.count == navigationStart {
@@ -7203,6 +7247,8 @@ struct TypingSession {
       recordReplayEvent(kind: .delete, text: "", at: date)
     }
     markDeletion(since: navigationStart, wholeWord: false)
+    recordDeletionPosition(since: navigationStart, previousField: previousField,
+      usesDestinationPosition: true)
     return true
   }
 

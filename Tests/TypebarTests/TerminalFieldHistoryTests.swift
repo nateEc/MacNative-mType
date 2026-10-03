@@ -80,12 +80,12 @@ final class TerminalFieldHistoryTests: XCTestCase {
     XCTAssertNotNil(saved.replayEvents.first { $0.wordDeletionCount != nil }?.clearedNextWord)
     let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [saved], presets: [], at: start)
     let restored = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(restored.version, 19)
+    XCTAssertEqual(restored.version, TypebarArchive.currentVersion)
     XCTAssertEqual(restored.results, [saved])
     XCTAssertEqual(TestResultRecord(result: saved).portableResult, saved)
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-    for version in 1...18 {
-      XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [saved], presets: []).version, 19)
+    for version in 1...19 {
+      XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(), results: [saved], presets: []).version, 20)
       object["version"] = version
       XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: object))) {
         XCTAssertEqual($0 as? DataTransferError, .unsupportedVersion(version))

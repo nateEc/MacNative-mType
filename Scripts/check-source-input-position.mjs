@@ -8,6 +8,7 @@ const reference=path.resolve(process.argv[2] ?? '');
 if (!process.argv[2] || execFileSync('git',['-C',reference,'rev-parse','HEAD'],{encoding:'utf8'}).trim() !== '91bd24bb8513785c7364cbea29296ff7adafac41') throw new Error('Provide the pinned read-only reference checkout.');
 if (execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim()) throw new Error('Reference checkout must be clean.');
 const root=path.join(reference,'frontend/src/ts'); const actual=new Set(['utils/strings','input/helpers/util','input/helpers/validation','input/helpers/fail-or-finish','input/handlers/before-insert-text','input/handlers/insert-text','input/helpers/word-navigation','input/input-element','test/events/data','test/events/helpers','test/events/live-cache']);
+let browserDeletedSentinel=false;
 let growNext=false;let wordIndex=0,targets=[]; let element='',field='',target='',active=false,events=[],feedback=[],failed=false,completed=false; const noop=()=>{};
 const Config={mode:'words',language:'english',oppositeShiftMode:'off',stopOnError:'off',deleteOnError:'off',difficulty:'normal',strictSpace:false,blindMode:true,hideExtraLetters:false,keymapMode:'off',minBurst:'off',liveBurstStyle:'off',confidenceMode:'off',freedomMode:false,quickEnd:false};
 const bindings={
@@ -91,4 +92,52 @@ assert.equal(targets.length,3);assert.equal(wordIndex,2);
 assert.equal(completed,false);
 await main.namespace.emulateInsertText({data:'c',now:1});
 assert.equal(completed,true);assert.equal(wordIndex,2);
-console.log('8 pinned-source scenarios passed (11 actual modules; bounded adapters, no browser/native parity claim).');
+console.log('8 pinned-source insertion scenarios passed (11 actual modules; bounded adapters, no browser/native parity claim).');
+
+// Read the actual delete handlers. Browser editing below is an explicit
+// sentinel/UTF-16 slice adapter; no real browser or platform word-delete used.
+actual.add('input/handlers/delete'); actual.add('input/handlers/before-delete');
+const linkModule=(specifier,from)=>getModule(specifier.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),specifier)):specifier);
+const deleteModule=getModule('input/handlers/delete'); await deleteModule.link(linkModule); await deleteModule.evaluate();
+const beforeDeleteModule=getModule('input/handlers/before-delete'); await beforeDeleteModule.link(linkModule); await beforeDeleteModule.evaluate();
+// The actual input module already captured this textarea object; replace its
+// accessor rather than replace document or modify a source behavior function.
+const textarea=modules.get('input/input-element').namespace.getInputElement();
+Object.defineProperty(textarea,'value',{get(){return browserDeletedSentinel?'':' '+element},set(v){browserDeletedSentinel=false;element=v.slice(1)}});
+let noSpaceDelete=true;
+// Synthetic bindings expose values at evaluation time, so update the module's
+// exported function deliberately; the official module is never modified.
+modules.get('test/funbox/list').setExport('isFunboxActiveWithProperty',p=>p==='nospace'&&noSpaceDelete);
+function seedDelete(targetWords,snapshots,{index=0,value=snapshots.at(-1)?.[1]??'',noSpace=true,code=false}={}) {
+ reset(targetWords); noSpaceDelete=noSpace; browserDeletedSentinel=false; wordIndex=index; element=value; active=true;
+ Object.assign(Config,{freedomMode:true,confidenceMode:'off',language:code?'code_javascript':'english',codeUnindentOnBackspace:code});
+ for(const [wordIndex,inputValue]of snapshots)eventData.logTestEvent('input',0,{inputType:'insertText',wordIndex,inputValue,data:inputValue,correct:true});
+}
+function deleteInput({word=false,firefox=false}={}) {
+ let prevented=false;beforeDeleteModule.namespace.onBeforeDelete({preventDefault(){prevented=true}});
+ if(prevented)return false;
+ if(element===''||firefox){browserDeletedSentinel=true;element=''}else element=word?'':element.slice(0,-1);
+ deleteModule.namespace.onDelete(word?'deleteWordBackward':'deleteContentBackward',1);return true;
+}
+seedDelete(['abc','tail'],[[0,'ab']]); deleteInput();
+assert.deepEqual([inputEvents().at(-1).wordIndex,inputEvents().at(-1).charIndex,inputEvents().at(-1).inputValue],[0,2,'a']);
+seedDelete(['🙂x','tail'],[[0,'🙂']]); deleteInput();
+assert.equal(inputEvents().at(-1).charIndex,2);assert.equal(inputEvents().at(-1).inputValue,'\ud83d');
+deleteInput();assert.equal(inputEvents().at(-1).charIndex,1);assert.equal(inputEvents().at(-1).inputValue,'');
+seedDelete(['ab','cd'],[[0,'ab']],{index:1,value:''}); deleteInput();
+assert.deepEqual([inputEvents().at(-1).wordIndex,inputEvents().at(-1).charIndex,inputEvents().at(-1).inputValue],[0,1,'a']);
+seedDelete(['ab','cd'],[[0,'ab']],{index:1,value:''}); deleteInput({word:true});
+assert.deepEqual([inputEvents().at(-1).wordIndex,inputEvents().at(-1).charIndex,inputEvents().at(-1).inputValue],[0,0,'']);
+seedDelete(['abcd','tail'],[[0,'abc']]); deleteInput({word:true});
+assert.deepEqual([inputEvents().at(-1).charIndex,inputEvents().at(-1).inputValue],[3,'']);
+seedDelete(['ab','cd'],[[0,'ab'],[1,'cd']],{index:1,value:''}); deleteInput();
+assert.equal(inputEvents().at(-1).charIndex,1);assert.equal(inputEvents().at(-1).clearedNextWord,true);
+seedDelete(['ab\n','\t\tx'],[[0,'ab\n'],[1,'\t\t']],{index:1,noSpace:false,code:true}); deleteInput();
+assert.deepEqual(inputEvents().slice(-2).map(e=>[e.inputType,e.wordIndex,e.charIndex,e.inputValue]),[['deleteWordBackward',1,2,''],['deleteContentBackward',0,2,'ab']]);
+seedDelete(['\t\tx'],[[0,'\t\t']],{code:true,noSpace:false}); deleteInput({word:true});
+assert.deepEqual(inputEvents().slice(-2).map(e=>[e.inputType,e.wordIndex,e.charIndex,e.inputValue]),[['deleteWordBackward',0,2,''],['deleteContentBackward',0,0,'']]);
+seedDelete(['ab','cd'],[[0,'ab'],[1,'c']],{index:1}); deleteInput({word:true,firefox:true});
+assert.equal(inputEvents().at(-1).charIndex,0);assert.equal(inputEvents().at(-1).clearedNextWord,true);
+seedDelete(['abc','tail'],[[0,'ab']]); Config.freedomMode=false;Config.confidenceMode='max';
+const before=inputEvents().length;assert.equal(deleteInput(),false);assert.equal(inputEvents().length,before);
+console.log('10 pinned-source deletion scenarios passed (13 actual modules; seeded snapshots and browser editing adapters, no native/Firefox/IME parity claim).');

@@ -60,12 +60,17 @@ final class SourceUnitCharacterStatsTests: XCTestCase {
   }
 
   func testClassifiedResultsRequireNineteenAndBothPersistenceBoundariesKeepThem() throws {
-    var input = session(); input.insertBatch("abcd ", at: start)
-    input.deleteBackward(at: start.addingTimeInterval(1))
-    let saved = try result(input)
+    // A true owned version-19 classification fixture, independent of current
+    // sessions which now also record minimum-20 manual deletion positions.
+    let saved = CompletedTestResult(id: UUID(), configuration: .words(1), outcome: .bailedOut,
+      startedAt: start, finishedAt: start.addingTimeInterval(2), typedCharacterCount: 1,
+      correctCharacterCount: 1, errorCount: 0, wpm: 17, rawWpm: 29, accuracy: 77,
+      characterStats: .init(matched: 1, incorrect: 0, extra: 0, missed: 0,
+        sourceUnits: .classify(input: [97], target: [97,98], creditsPartial: true)), prompt: "ab",
+      replayEvents: [.init(offset: 0, kind: .insert, units: [97], inputField: .init(index: 0, units: [97]))])
     let data = try TypebarDataTransfer.exportArchive(settings: .init(), results: [saved], presets: [], at: start)
     let restored = try TypebarDataTransfer.importArchive(from: data)
-    XCTAssertEqual(restored.version, 19)
+    XCTAssertEqual(restored.version, TypebarArchive.currentVersion)
     XCTAssertEqual(try counts(try XCTUnwrap(TestResultRecord(result: saved).portableResult)), try counts(saved))
     XCTAssertNotNil(try counts(restored.results[0]))
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
