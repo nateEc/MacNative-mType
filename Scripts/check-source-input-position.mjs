@@ -1,0 +1,87 @@
+// Owned, bounded VM harness: loads official modules from disk; never copies them.
+// Run with Node supporting stripTypeScriptTypes and --experimental-vm-modules.
+// UI/layout, config, catalog generation and lifecycle are explicit test bindings.
+// The textarea is an in-memory sentinel adapter, NOT a browser or real IME.
+// Passing proves these source observations, not native parity or full UI behavior.
+import assert from 'node:assert/strict'; import {execFileSync} from 'node:child_process'; import fs from 'node:fs'; import path from 'node:path'; import vm from 'node:vm'; import {stripTypeScriptTypes} from 'node:module';
+const reference=path.resolve(process.argv[2] ?? '');
+if (!process.argv[2] || execFileSync('git',['-C',reference,'rev-parse','HEAD'],{encoding:'utf8'}).trim() !== '91bd24bb8513785c7364cbea29296ff7adafac41') throw new Error('Provide the pinned read-only reference checkout.');
+if (execFileSync('git',['-C',reference,'status','--porcelain'],{encoding:'utf8'}).trim()) throw new Error('Reference checkout must be clean.');
+const root=path.join(reference,'frontend/src/ts'); const actual=new Set(['utils/strings','input/helpers/util','input/helpers/validation','input/helpers/fail-or-finish','input/handlers/before-insert-text','input/handlers/insert-text','input/helpers/word-navigation','input/input-element','test/events/data','test/events/helpers','test/events/live-cache']);
+let growNext=false;let wordIndex=0,targets=[]; let element='',field='',target='',active=false,events=[],feedback=[],failed=false,completed=false; const noop=()=>{};
+const Config={mode:'words',language:'english',oppositeShiftMode:'off',stopOnError:'off',deleteOnError:'off',difficulty:'normal',strictSpace:false,blindMode:true,hideExtraLetters:false,keymapMode:'off',minBurst:'off',liveBurstStyle:'off',confidenceMode:'off',freedomMode:false,quickEnd:false};
+const bindings={
+'config/store':{Config},'test/funbox/list':{isFunboxActiveWithProperty:()=>false,getActiveFunboxesWithFunction:()=>[]},
+'input/input-element':{getInputElementValue:()=>({inputValue:element,realInputValue:' '+element}),setInputElementValue:v=>{element=v},appendToInputElementValue:v=>{element+=v},replaceInputElementLastValueChar:v=>{element=element.slice(0,-1)+v}},
+ 'test/events/data':{getCurrentInput:()=>events.filter(e=>e.wordIndex===wordIndex).at(-1)?.inputValue??'',getInputForWord:i=>events.filter(e=>e.wordIndex===i).at(-1)?.inputValue??'',buildEventLog:noop,logTestEvent:(type,now,event)=>{events.push({...event,time:now});field=event.inputValue}},
+ 'test/test-words':{words:{getCurrent:()=>({textWithCommit:targets[wordIndex]??'',text:targets[wordIndex]??'',display:targets[wordIndex]??''}),get:i=>targets[i]===undefined?undefined:{textWithCommit:targets[i],text:targets[i]},get length(){return targets.length}}},
+ 'test/test-ui':{afterTestTextInput:correct=>feedback.push(correct),pendingWordData:new Map(),getWordElement:()=>({}),beforeTestWordChange:noop,afterTestWordChange:noop,afterTestDelete:noop},
+ 'input/state':{setAwaitingNextWord:noop,isAwaitingNextWord:()=>false,isCorrectShiftUsed:()=>true,getIncorrectShiftsInARow:()=>0,incrementIncorrectShiftsInARow:noop,resetIncorrectShiftsInARow:noop},
+ 'legacy-states/slow-timer':{get:()=>false},'states/test':{isTestRestarting:()=>false,getActiveWordIndex:()=>wordIndex,increaseActiveWordIndex:()=>wordIndex++,decreaseActiveWordIndex:()=>wordIndex--,isResultCalculating:()=>false,wordsHaveNewline:()=>false,isTestActive:()=>active},
+ 'test/test-logic':{addWord:()=>{if(growNext && wordIndex===targets.length-1){targets.push('c');growNext=false}},startTest:()=>{active=true},fail:()=>{failed=true},finish:()=>{completed=true}},'events/keymap':{flash:noop},'test/weak-spot':{updateScore:noop},'legacy-states/composition':{getComposing:()=>false},'states/notifications':{showNoticeNotification:noop},
+ 'input/helpers/word-navigation':{goToPreviousWord:noop,goToNextWord:async()=>({lastBurst:null,increasedWordIndex:true})},'test/pace-caret':{handleSpace:noop},'test/funbox/funbox':{toggleScript:noop},'states/loader-bar':{showLoaderBar:noop,hideLoaderBar:noop},'test/events/stats':{getWordBurst:()=>null},'test/words-generator':{areAllWordsGenerated:()=>Config.mode!=='time'},'utils/misc':{whorf:()=>0},'input/helpers/input-type':{DeleteInputType:{}},'@monkeytype/schemas/languages':{Language:{}}};
+Object.assign(bindings['states/test'],{getKoreanStatus:()=>false,getCurrentQuote:()=>null,getBailedOut:()=>false});Object.assign(bindings,{'constants/keys':{Keycode:{}},'test/events/types':{EVENT_LOG_VERSION:1,InputEventNoMs:{},TestEventNoMs:{},CompositionTestEvent:{},CompositionTestEventData:{},EventLog:{},InputEvent:{},InputEventData:{},KeydownEvent:{},KeydownEventData:{},KeyupEvent:{},KeyupEventData:{},TestEvent:{},TestEventData:{},TestEventType:{},TimerEvent:{},TimerEventData:{}},'test/custom-text':{getLimit:()=>({mode:'none',value:0})},'test/funbox/active':{isFunboxActiveWithProperty:p=>p==='nospace'},'@monkeytype/util/numbers':{roundTo2:v=>Math.round(v*100)/100,isSafeNumber:Number.isFinite,mean:a=>a.reduce((x,y)=>x+y,0)/a.length}});bindings['utils/misc'].getMode2=()=>2;bindings['test/funbox/list'].isFunboxActiveWithProperty=p=>p==='nospace';bindings['states/test'].wordsHaveNewline=()=>targets.some(t=>t.includes('\n'));console.debug=()=>{};globalThis.document={querySelector:()=>({get value(){return ' '+element},set value(v){element=v.slice(1)}})};const modules=new Map();function getModule(id){if(modules.has(id))return modules.get(id);let mod;if(actual.has(id))mod=new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(path.join(root,id+'.ts'),'utf8'),{mode:'transform'}),{identifier:id});else{const data=bindings[id];if(!data)throw new Error('Unknown import '+id);mod=new vm.SyntheticModule(Object.keys(data),function(){for(const [key,value]of Object.entries(data))this.setExport(key,value)},{identifier:id});}modules.set(id,mod);return mod;}
+const main=getModule('input/handlers/insert-text');await main.link((specifier,from)=>getModule(specifier.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(from.identifier),specifier)):specifier));await main.evaluate();
+
+const eventData=modules.get('test/events/data').namespace;
+function reset(words,{stop='off',strict=false,mode='words',grow=false}={}) {
+ targets=[...words];wordIndex=0;element='';active=false;completed=false;failed=false;growNext=grow;
+ Object.assign(Config,{mode,strictSpace:strict,stopOnError:stop,funbox:[]});
+ eventData.resetTestEvents();
+}
+function inputEvents(){return eventData.getAllTestEvents().filter(e=>e.type==='input').map(e=>e.data)}
+function positions(){return inputEvents().map(e=>e.charIndex)}
+reset(['hi\n_','next']);
+await main.namespace.emulateInsertText({data:'hi\n_next',now:0});
+assert.equal(wordIndex,1);assert.equal(completed,false);assert.equal(element,'t');
+assert.equal(eventData.getCurrentInput(),'t');
+assert.deepEqual(positions(),[0,1,2,0,1,2,3,4]);
+assert.equal(inputEvents().at(-2).inputValue,'_nex');
+assert.equal(inputEvents().at(-2).commitsWord,true);
+assert.equal(inputEvents().at(-1).inputValue,'t');
+assert.equal(inputEvents().at(-1).lastWord,true);
+assert.equal(inputEvents().filter(e=>e.correct).length,3);
+await main.namespace.emulateInsertText({data:'n',now:1});
+assert.equal(positions().at(-1),1);assert.equal(inputEvents().at(-1).inputValue,'tn');
+assert.equal(completed,false);
+
+reset(['hi\n_','next']);
+for(const key of 'hi\n_next') {
+ await main.namespace.emulateInsertText({data:key,now:0});
+ if(completed)break;
+}
+assert.equal(completed,true);assert.equal(inputEvents().length,7);
+assert.equal(inputEvents().at(-1).data,'x');assert.equal(wordIndex,1);
+
+reset(['ab'],{stop:'letter'});
+await main.namespace.emulateInsertText({data:'abx',now:0});
+assert.equal(completed,false);assert.equal(wordIndex,0);assert.equal(element,'');
+assert.deepEqual(positions(),[0,1,2]);assert.equal(inputEvents().at(-1).inputValue,'');
+assert.equal(inputEvents().at(-1).inputStopped,true);assert.equal(inputEvents().at(-1).lastWord,true);
+assert.equal(eventData.getCurrentInput(),'');
+
+reset(['🙂x','tail'],{stop:'letter'});
+await main.namespace.emulateInsertText({data:'🙃',now:0});
+assert.deepEqual(positions(),[0,1]);
+assert.deepEqual(inputEvents().map(e=>e.correct),[true,false]);
+assert.deepEqual(Array.from(element,c=>c.charCodeAt(0)),[55357]);
+assert.equal(inputEvents().at(-1).inputStopped,true);
+
+reset(['a','\n'],{strict:true});
+await main.namespace.emulateInsertText({data:'a\n',now:0});
+assert.equal(completed,true);assert.equal(wordIndex,1);
+assert.deepEqual(positions(),[0,0]);assert.equal(inputEvents().at(-1).lastWord,true);
+assert.equal(inputEvents().at(-1).commitsWord,undefined);
+
+reset(['ab','cd']);
+await main.namespace.emulateInsertText({data:'abcd',now:0});
+assert.deepEqual(positions(),[0,1,0,1]);
+assert.deepEqual(inputEvents().map(e=>e.lastWord===true),[false,false,true,true]);
+assert.equal(completed,true);
+
+reset(['a','b'],{mode:'time',grow:true});
+await main.namespace.emulateInsertText({data:'ab',now:0});
+assert.equal(inputEvents().at(-1).lastWord,true);
+assert.equal(targets.length,3);assert.equal(wordIndex,2);
+assert.equal(eventData.getCurrentInput(),'');assert.equal(completed,false);
+console.log('7 pinned-source scenarios passed (11 actual modules; bounded adapters, no browser/native parity claim).');

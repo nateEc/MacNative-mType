@@ -3045,6 +3045,31 @@ struct TypingReplayInputField: Codable, Equatable {
   }
 }
 
+/// Archive 16. Insertion validation reads this position BEFORE updating the
+/// field or navigating. A stopped attempt can leave a shorter field snapshot;
+/// lastWord describes the catalog at the event, not the final grown catalog.
+struct TypingReplayInputPosition: Codable, Equatable {
+  let charIndex: Int
+  let lastWord: Bool
+
+  init(charIndex: Int, lastWord: Bool) {
+    self.charIndex = charIndex
+    self.lastWord = lastWord
+  }
+
+  private enum CodingKeys: String, CodingKey { case charIndex, lastWord }
+
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    charIndex = try values.decode(Int.self, forKey: .charIndex)
+    lastWord = try values.decode(Bool.self, forKey: .lastWord)
+    guard charIndex >= 0 else {
+      throw DecodingError.dataCorruptedError(forKey: .charIndex, in: values,
+        debugDescription: "A validation position cannot be negative.")
+    }
+  }
+}
+
 struct TypingReplayEvent: Codable, Equatable, Identifiable {
   let offset: TimeInterval
   let kind: TypingReplayEventKind
@@ -3074,6 +3099,15 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
   /// Archive 14. Insert payload in source units; a deletion's empty payload
   /// marks a unit primitive. String text is only its safe display projection.
   let textUTF16: [UInt16]?
+  /// Captured only for known no-space unit fields so far. Absence on any
+  /// legacy or unsupported path is not permission to infer a source position.
+  let inputPosition: TypingReplayInputPosition?
+  var validatedInputPosition: TypingReplayInputPosition? {
+    guard kind == .insert, !inputUnits.isEmpty,
+      let inputField, inputField.index >= 0,
+      let inputPosition, inputPosition.charIndex >= 0 else { return nil }
+    return inputPosition
+  }
   var validatedTextUTF16: [UInt16]? {
     guard let textUTF16,
       kind == .insert ? !textUTF16.isEmpty : textUTF16.isEmpty,
@@ -3099,7 +3133,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
     inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
-    textUTF16: [UInt16]? = nil
+    textUTF16: [UInt16]? = nil, inputPosition: TypingReplayInputPosition? = nil
   ) {
     self.offset = offset
     self.kind = kind
@@ -3113,24 +3147,26 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     self.inputField = inputField
     self.inputCorrectness = inputCorrectness
     self.textUTF16 = textUTF16
+    self.inputPosition = inputPosition
   }
 
   init(
     offset: TimeInterval, kind: TypingReplayEventKind, units: [UInt16], forceError: Bool = false,
     automatic: Bool = false, commitsWord: Bool? = nil, wordDeletionCount: Int? = nil,
     characterDeletionCount: Int? = nil, inputStopped: Bool? = nil,
-    inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil
+    inputField: TypingReplayInputField? = nil, inputCorrectness: [Bool]? = nil,
+    inputPosition: TypingReplayInputPosition? = nil
   ) {
     self.init(offset: offset, kind: kind, text: String(decoding: units, as: UTF16.self),
       forceError: forceError, automatic: automatic, commitsWord: commitsWord,
       wordDeletionCount: wordDeletionCount, characterDeletionCount: characterDeletionCount,
       inputStopped: inputStopped, inputField: inputField, inputCorrectness: inputCorrectness,
-      textUTF16: units)
+      textUTF16: units, inputPosition: inputPosition)
   }
 
   private enum CodingKeys: String, CodingKey {
     case offset, kind, text, forceError, automatic, commitsWord, wordDeletionCount, characterDeletionCount
-    case inputStopped, inputField, inputCorrectness, textUTF16
+    case inputStopped, inputField, inputCorrectness, textUTF16, inputPosition
   }
 
   init(from decoder: Decoder) throws {
@@ -3147,6 +3183,7 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     inputField = try values.decodeIfPresent(TypingReplayInputField.self, forKey: .inputField)
     textUTF16 = try values.decodeIfPresent([UInt16].self, forKey: .textUTF16)
     inputCorrectness = try values.decodeIfPresent([Bool].self, forKey: .inputCorrectness)
+    inputPosition = try values.decodeIfPresent(TypingReplayInputPosition.self, forKey: .inputPosition)
     guard textUTF16 == nil || validatedTextUTF16 != nil else {
       throw DecodingError.dataCorruptedError(forKey: .textUTF16, in: values,
         debugDescription: "Raw insert units must be nonempty and project to text; deletion payloads must be empty.")
@@ -3154,6 +3191,10 @@ struct TypingReplayEvent: Codable, Equatable, Identifiable {
     guard inputCorrectness == nil || validatedInputCorrectness != nil else {
       throw DecodingError.dataCorruptedError(forKey: .inputCorrectness, in: values,
         debugDescription: "Input judgments require one Boolean per inserted UTF-16 unit.")
+    }
+    guard inputPosition == nil || validatedInputPosition != nil else {
+      throw DecodingError.dataCorruptedError(forKey: .inputPosition, in: values,
+        debugDescription: "A validation position requires a nonempty insertion and a recorded field.")
     }
   }
 }
@@ -4105,6 +4146,7 @@ struct TypingSession {
   private var acceptedUnits: AcceptedUnitInput?
   private var currentInputUnit: UInt16?
   private var latestReplayInputUnits: [UInt16]?
+  private var latestReplayInputPosition: TypingReplayInputPosition?
   private var promptCharacters: [Character]
   private var requiredWordStartIndex: Int?
   private var promptWordCount: Int
@@ -5640,6 +5682,7 @@ struct TypingSession {
   private mutating func insertCharacter(
     _ character: Character, forceError: Bool, at date: Date, evaluatesTerminalRules: Bool
   ) -> Bool {
+    latestReplayInputPosition = nil
     // `forceError` also supports deterministic engine tests that intentionally
     // retain a wrong character. Only the physical opposite-Shift path has the
     // reference behavior of immediately rejecting its text.
@@ -5673,6 +5716,12 @@ struct TypingSession {
       return false
     }
     extendPromptIfNeeded(at: date)
+    if unitTargets.noSpace, let acceptedUnits,
+      unitTargets.fields.indices.contains(acceptedUnits.fieldIndex)
+    {
+      latestReplayInputPosition = .init(charIndex: acceptedUnits.activeCount,
+        lastWord: acceptedUnits.fieldIndex == unitTargets.fields.count - 1)
+    }
     if isAtEmptyNoSpaceWord, !unitTargets.noSpace {
       return insertIntoEmptyNoSpaceWord(character, rejectsOppositeShiftInput: rejectsOppositeShiftInput,
         forceError: forceError, at: date, evaluatesTerminalRules: evaluatesTerminalRules)
@@ -6189,7 +6238,8 @@ struct TypingSession {
         commitsWord: kind == .insert && retainsSeparator
           ? false : nil, inputStopped: inputStopped ? true : nil,
         inputField: recordedField, inputCorrectness: kind == .insert ? latestInputCorrectness : nil,
-        textUTF16: raw ? (kind == .insert ? latestReplayInputUnits ?? Array(text.utf16) : []) : nil))
+        textUTF16: raw ? (kind == .insert ? latestReplayInputUnits ?? Array(text.utf16) : []) : nil,
+        inputPosition: kind == .insert ? latestReplayInputPosition : nil))
   }
 
   private func replayInputField(
@@ -6231,7 +6281,8 @@ struct TypingSession {
         wordDeletionCount: wholeWord && index == start ? replayEvents.count - start : nil,
         characterDeletionCount: !wholeWord && index == start ? replayEvents.count - start : nil,
         inputStopped: event.inputStopped, inputField: event.inputField,
-        inputCorrectness: event.inputCorrectness, textUTF16: event.textUTF16)
+        inputCorrectness: event.inputCorrectness, textUTF16: event.textUTF16,
+        inputPosition: event.inputPosition)
     }
   }
 

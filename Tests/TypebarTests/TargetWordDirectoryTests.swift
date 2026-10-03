@@ -68,7 +68,7 @@ final class TargetWordDirectoryTests: XCTestCase {
     let result = try noSpaceResult()
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [result], presets: [], at: start))
-    XCTAssertEqual(archive.version, 15)
+    XCTAssertEqual(archive.version, 16)
     for restored in [result, archive.results[0], try XCTUnwrap(TestResultRecord(result: result).portableResult)] {
       XCTAssertEqual(restored.targetWordDirectory?.words, ["ab", "cd"])
       XCTAssertEqual(restored.wpm, 12)
@@ -143,7 +143,7 @@ final class TargetWordDirectoryTests: XCTestCase {
     var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     for version in 1...14 {
       XCTAssertEqual(TypebarArchive(version: version, exportedAt: start, settings: .init(),
-        results: [result], presets: []).version, 15)
+        results: [result], presets: []).version, 16)
       object["version"] = version
       XCTAssertThrowsError(try TypebarDataTransfer.importArchive(from: JSONSerialization.data(withJSONObject: object))) {
         XCTAssertEqual($0 as? DataTransferError, .unsupportedVersion(version))
