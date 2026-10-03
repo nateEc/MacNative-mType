@@ -47,6 +47,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let rawWpm: Int
     public let accuracy: Int
     public let consistency: Double
+    public let resultConsistency: ResultConsistencyMetrics?
     public let errorCount: Int
     public let eventCount: Int
     public let restartCount: Int
@@ -62,6 +63,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         rawWpm: Int, accuracy: Int, consistency: Double = 0, errorCount: Int, eventCount: Int,
         restartCount: Int = 0, tags: [String] = [], timingEvidence: ResultTimingEvidence? = nil,
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
+        resultConsistency: ResultConsistencyMetrics? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -73,6 +75,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.rawWpm = rawWpm
         self.accuracy = accuracy
         self.consistency = consistency
+        self.resultConsistency = resultConsistency
         self.errorCount = errorCount
         self.eventCount = eventCount
         self.restartCount = restartCount
@@ -90,6 +93,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case timingEvidence
         case practiceTiming
         case inputMetrics
+        case resultConsistency
     }
 
     public init(from decoder: Decoder) throws {
@@ -103,6 +107,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         rawWpm = try values.decode(Int.self, forKey: .rawWpm)
         accuracy = try values.decode(Int.self, forKey: .accuracy)
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
+        resultConsistency = try values.decodeIfPresent(ResultConsistencyMetrics.self, forKey: .resultConsistency)
         errorCount = try values.decode(Int.self, forKey: .errorCount)
         eventCount = try values.decode(Int.self, forKey: .eventCount)
         restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0
@@ -138,6 +143,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let accuracy: Int
     public let preciseAccuracy: Double?
     public let consistency: Double
+    public let keyConsistency: Double?
     public let errorCount: Int
     public let eventCount: Int
     public let tags: [String]
@@ -149,6 +155,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         id: UUID, mode: String, language: String, durationSeconds: Int?, wordLimit: Int?, wpm: Int,
         rawWpm: Int, accuracy: Int, consistency: Double, errorCount: Int, eventCount: Int,
         tags: [String], practiceTiming: ResultPracticeTiming? = nil, preciseAccuracy: Double? = nil,
+        keyConsistency: Double? = nil,
         startedAt: Date, finishedAt: Date
     ) {
         self.id = id
@@ -161,6 +168,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.accuracy = accuracy
         self.preciseAccuracy = preciseAccuracy
         self.consistency = consistency
+        self.keyConsistency = keyConsistency
         self.errorCount = errorCount
         self.eventCount = eventCount
         self.tags = tags

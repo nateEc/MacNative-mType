@@ -2889,6 +2889,9 @@ private struct RemoteAccountResultRow: View {
       Text("\(result.mode) · \(result.language) · Raw \(result.rawWpm) · 一致性 \(Int(result.consistency.rounded()))%")
         .font(.caption)
         .foregroundStyle(.secondary)
+      Text("按键稳定度 \(result.keyConsistency.map { ResultMetricPresentation.percentage($0, alwaysShowDecimalPlaces: true) } ?? "不可用")")
+        .font(.caption)
+        .foregroundStyle(.secondary)
       if !result.tags.isEmpty {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 6) {

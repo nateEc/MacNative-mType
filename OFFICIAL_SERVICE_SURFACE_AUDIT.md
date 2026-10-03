@@ -1,5 +1,7 @@
 # 官方服务面审计
 
+2026-10-03 完成统计增量见 [完成统计提交与历史边界](RESULT_CONSISTENCY_SERVICE_CONTRACT.md)：实际运行固定完整 buildDbResult 确认原版只保存输入节奏与按键稳定度，WPM 仅属完成请求。自有能力协商、匿名校验、按键历史保存与读取的新增回归已接入；不要求官方 URL／payload 身份，不增加官方模块覆盖或把 partial 改为全等价。本机归档 22 不变，真实部署／账户切换／旧二进制和完整反作弊仍未验。
+
 ## 范围与证据
 
 - 固定参考：`monkeytypegame/monkeytype` 提交 `91bd24bb8513785c7364cbea29296ff7adafac41`。

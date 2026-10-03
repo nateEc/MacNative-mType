@@ -2,6 +2,8 @@
 
 已知字段的当前结果、历史详情和本机 CSV 现在提供独立 WPM 稳定度。它统计整场正确速度的离散程度，不替换输入节奏稳定度或物理按键稳定度。缺少可靠字段／目标的记录显示不可用，CSV 留空；读取新指标不会回写旧成绩、补造分类基础或改变归档 22。完整重写 goal 仍在进行。
 
+后续完整数据库构造核对见 [完成统计提交与历史边界](RESULT_CONSISTENCY_SERVICE_CONTRACT.md)：原版 WPM 指标只在完成请求出现，不进入正式结果历史，也没有独立可见标签。本机新增展示是原生补充；将固定保存它列为原版缺口的结论已纠正。下方门禁与阶段证据属于 015bb45，不证明后续服务版本；归档仍为 22。
+
 ## 固定源的三种指标
 
 参考为 91bd24bb8513785c7364cbea29296ff7adafac41。[buildCompletedEvent](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/test-logic.ts#L725) 分别产生三种指标，并在结果对象中分别赋值，不是同一个字段的两种算法。
@@ -34,7 +36,7 @@ SwiftUI task 取消向 worker 传播，计算在事件及舍入段边界合作�
 
 没有修改保存 WPM、Raw、准确率、原始回放、SwiftData 实体列、JSON 归档格式、服务能力或请求字段。独立旧 Zen 18 记录的单位分类仍为空，虽然有可靠字段可派生新 WPM 指标，读取后记录仍与原值相等；缺字段旧记录不会得到假零。旧保存值、正式归档与便携记录的回归仍保留。
 
-新指标尚未作为固定值持久化，也未接入自建服务请求／响应或其他新消费者。PB、挑战、聚合和投稿继续消费源 consistency，不应擅自换成 WPM 稳定度。真实 GUI／VoiceOver／IME、物理末尾时刻裁剪、旧数据库、降级、跨设备与部署未执行。人工场景仍待验收，官方配置、主题和词库身份覆盖不因此升级。
+原版不固定保存 WPM 指标，新服务接入只在协商后的完成请求传递它；历史保存可选按键稳定度，详情及远端 CSV 的新服务链见后续契约。PB、挑战、聚合和投稿的已有 consistency 不应换成 WPM 指标。真实 GUI／VoiceOver／IME、物理末尾时刻裁剪、旧数据库、降级、跨设备与部署未执行。人工场景仍待验收，官方配置、主题和词库身份覆盖不因此升级。
 
 ## 行为证据与复核
 
@@ -58,4 +60,4 @@ SwiftUI task 取消向 worker 传播，计算在事件及舍入段边界合作�
 
 最终后台版本完整串行门禁成功退出：客户端 2,431 项零失败（583.189 秒）、服务端 138 项零失败（1.551 秒），788 条人工清单结构、固定参考／原创性／元数据与资源边界审计、未打开 macOS 应用包构建和签名检查通过。当前 W0ri58 同轮实际十万词 143.484 秒，通过行在临时目录清理前捕获，完整客户端日志另存；旧 12,000 次组合字符删除双投影为 0.025581 秒。不复用历史 144.453 秒或取消轮作为最终结果，不把审计或普通耐久升级为全功能／浏览器／韩文混合性能等价。
 
-外层结果保存在 /tmp/typebar-wpm-consistency-async-final-full-gate.log，完整客户端证据保存在 /tmp/typebar-wpm-consistency-async-final-client-complete.log；早期 through-endurance 文件是阶段副本，不冒充完整日志。CoreData／AddressBook／XPC 信息是已知测试环境诊断，不是断言失败。固定参考检出保持干净，Typebar 图形进程为零，真实背景练习路径不存在；未播放真实音频、启动窗口、调用真实账户投稿、写真实 Typebar 数据库或部署服务。新指标固定保存／服务传输及实机验收仍待后续实现，完整 goal active。
+外层结果保存在 /tmp/typebar-wpm-consistency-async-final-full-gate.log，完整客户端证据保存在 /tmp/typebar-wpm-consistency-async-final-client-complete.log；早期 through-endurance 文件是阶段副本，不冒充完整日志。CoreData／AddressBook／XPC 信息是已知测试环境诊断，不是断言失败。该阶段固定参考检出保持干净，Typebar 图形进程为零，真实背景练习路径不存在；未播放真实音频、启动窗口、调用真实账户投稿、写真实 Typebar 数据库或部署服务。后续服务实现与源码边界修正另见新契约，实机验收仍待完成，完整 goal active。

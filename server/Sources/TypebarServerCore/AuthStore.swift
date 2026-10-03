@@ -944,6 +944,7 @@ public actor AuthStore {
     let inputMetrics: ResultInputMetrics?
     var effectiveAccuracy: Double { inputMetrics?.preciseAccuracy ?? Double(accuracy) }
     let consistency: Double
+    let keyConsistency: Double?
     let errorCount: Int
     let eventCount: Int
     var tags: [String]
@@ -954,14 +955,14 @@ public actor AuthStore {
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, tags, practiceTiming, inputMetrics, startedAt, finishedAt, acceptedAt
+        errorCount, eventCount, tags, practiceTiming, inputMetrics, keyConsistency, startedAt, finishedAt, acceptedAt
     }
 
     init(
       id: UUID, userID: UUID, mode: String, language: String, durationSeconds: Int?,
       wordLimit: Int?, wpm: Int, rawWpm: Int, accuracy: Int, consistency: Double,
       errorCount: Int, eventCount: Int, tags: [String], practiceTiming: ResultPracticeTiming? = nil,
-      inputMetrics: ResultInputMetrics? = nil,
+      inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil
     ) {
       self.id = id
@@ -975,6 +976,7 @@ public actor AuthStore {
       self.accuracy = accuracy
       self.inputMetrics = inputMetrics
       self.consistency = consistency
+      self.keyConsistency = keyConsistency
       self.errorCount = errorCount
       self.eventCount = eventCount
       self.tags = tags
@@ -997,6 +999,11 @@ public actor AuthStore {
       accuracy = try values.decode(Int.self, forKey: .accuracy)
       inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
       consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
+      keyConsistency = try values.decodeIfPresent(Double.self, forKey: .keyConsistency)
+      if let keyConsistency, !keyConsistency.isFinite || !(0...100).contains(keyConsistency) {
+        throw DecodingError.dataCorruptedError(forKey: .keyConsistency, in: values,
+          debugDescription: "Stored physical consistency must be a finite percentage")
+      }
       errorCount = try values.decode(Int.self, forKey: .errorCount)
       eventCount = try values.decode(Int.self, forKey: .eventCount)
       tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
@@ -1018,6 +1025,7 @@ public actor AuthStore {
         consistency: consistency, errorCount: errorCount, eventCount: eventCount, tags: tags,
         practiceTiming: practiceTiming,
         preciseAccuracy: inputMetrics?.preciseAccuracy,
+        keyConsistency: keyConsistency,
         startedAt: startedAt, finishedAt: finishedAt)
     }
   }
@@ -3134,6 +3142,7 @@ public actor AuthStore {
       rawWpm: record.rawWpm, accuracy: record.accuracy, consistency: record.consistency,
       errorCount: record.errorCount,
       eventCount: record.eventCount, tags: record.tags, inputMetrics: record.inputMetrics,
+      resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       startedAt: record.startedAt,
       finishedAt: record.finishedAt)
   }
@@ -3272,6 +3281,7 @@ public actor AuthStore {
         wpm: request.wpm, rawWpm: request.rawWpm, accuracy: request.accuracy,
         consistency: request.consistency, errorCount: request.errorCount, eventCount: request.eventCount,
         tags: tags, practiceTiming: request.practiceTiming, inputMetrics: request.inputMetrics,
+        keyConsistency: request.resultConsistency?.keyConsistency,
         startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
       ))
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
@@ -4002,6 +4012,7 @@ public actor AuthStore {
 
     let elapsed = result.finishedAt.timeIntervalSince(result.startedAt)
     guard (1...3600).contains(elapsed) else { throw ResultStoreError.invalidResult }
+    if let metrics = result.resultConsistency, !metrics.isValid { throw ResultStoreError.invalidResult }
     if let evidence = result.timingEvidence {
       try validate(timingEvidence: evidence, elapsed: elapsed)
     }

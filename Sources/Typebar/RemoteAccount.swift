@@ -376,6 +376,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let accuracy: Int
     let preciseAccuracy: Double?
     let consistency: Double
+    let keyConsistency: Double?
     let errorCount: Int
     let eventCount: Int
     let tags: [String]
@@ -388,7 +389,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, practiceTiming, preciseAccuracy, startedAt, finishedAt
+            errorCount, eventCount, tags, practiceTiming, preciseAccuracy, keyConsistency, startedAt, finishedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -403,6 +404,11 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         accuracy = try values.decode(Int.self, forKey: .accuracy)
         preciseAccuracy = try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy)
         consistency = try values.decodeIfPresent(Double.self, forKey: .consistency) ?? 0
+        keyConsistency = try values.decodeIfPresent(Double.self, forKey: .keyConsistency)
+        if let keyConsistency, !keyConsistency.isFinite || !(0...100).contains(keyConsistency) {
+            throw DecodingError.dataCorruptedError(forKey: .keyConsistency, in: values,
+                debugDescription: "Physical consistency must be a finite percentage")
+        }
         errorCount = try values.decode(Int.self, forKey: .errorCount)
         eventCount = try values.decode(Int.self, forKey: .eventCount)
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
@@ -771,6 +777,7 @@ struct RemoteResultSubmission: Codable, Sendable {
     let rawWpm: Int
     let accuracy: Int
     let consistency: Double
+    let resultConsistency: RemoteResultConsistency?
     let errorCount: Int
     let eventCount: Int
     let restartCount: Int
@@ -784,9 +791,10 @@ struct RemoteResultSubmission: Codable, Sendable {
     init(
         result: CompletedTestResult, includesTimingEvidence: Bool = false,
         includesPracticeTiming: Bool = false, includesInputMetrics: Bool = false,
-        includesInputMetricsV2: Bool = false
+        includesInputMetricsV2: Bool = false, resultConsistency: RemoteResultConsistency? = nil
     ) {
         id = result.id
+        self.resultConsistency = resultConsistency
         mode = result.configuration.mode.rawValue
         language = result.configuration.language.rawValue
         durationSeconds = result.configuration.duration.map { Int($0) }
@@ -841,6 +849,11 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     var supportsResultInputMetricsV2: Bool {
         apiVersion == "v1" && service == "typebar"
             && capabilities["resultInputMetricsV2"] == "available"
+    }
+
+    var supportsResultConsistency: Bool {
+        apiVersion == "v1" && service == "typebar"
+            && capabilities["resultConsistency"] == "available"
     }
 
     var supportsHumanVerification: Bool {
@@ -2731,16 +2744,18 @@ final class AccountSession {
             throw RemoteAccountError.accountScopeChanged
         }
         try ResultInputMetricsPublicationPolicy.validate(result, capabilities: capabilities)
+        let submission = try await ResultConsistencyPublication.prepare(result: result, capabilities: capabilities)
+        try Task.checkCancellation()
+        // Background computation is another suspension point: credentials
+        // captured for a previous account must not authorize a late POST.
+        guard resultPublicationScope == requestScope else {
+            throw RemoteAccountError.accountScopeChanged
+        }
         let response = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
             path: "v1/results",
             method: "POST",
             token: token,
-            body: RemoteResultSubmission(
-                result: result,
-                includesTimingEvidence: capabilities?.supportsResultTimingEvidence == true,
-                includesPracticeTiming: capabilities?.supportsResultPracticeTiming == true,
-                includesInputMetrics: capabilities?.supportsResultInputMetrics == true,
-                includesInputMetricsV2: capabilities?.supportsResultInputMetricsV2 == true),
+            body: submission,
             response: RemoteResultSubmissionResponse.self
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }

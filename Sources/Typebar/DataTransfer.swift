@@ -188,6 +188,7 @@ enum RemoteResultCSVExport {
         "accuracy_percent", "consistency_percent", "errors", "event_count", "tags",
         "terminal_engaged_seconds", "prior_attempt_engaged_seconds", "total_engaged_seconds",
         "started_at", "finished_at",
+        "key_consistency_percent",
     ]
 
     @MainActor
@@ -265,6 +266,7 @@ enum RemoteResultCSVExport {
             } ?? "",
             iso8601Date(result.startedAt),
             iso8601Date(result.finishedAt),
+            result.keyConsistency.map(decimal) ?? "",
         ]
     }
 
