@@ -4390,6 +4390,7 @@ struct TypingSession {
   }
   private var weakSpotInputSamples: [WeakSpotInputSample] = []
   private var currentWeakSpotScores = WeakSpotScores()
+  private var currentWordDecorationState = PoolWordDecorationState()
   private var weakSpotLastInputDate: Date?
   private var physicalKeyTiming = PhysicalKeyTiming()
   private(set) var startedAt: Date?
@@ -4412,9 +4413,11 @@ struct TypingSession {
     noSpaceWordEndIndices: [Int] = [],
     noSpaceTargetWords: [String] = [], repeatingNoSpaceWordLengths: [Int] = [],
     repeatingNoSpaceTargetWords: [String] = [], generationNotice: String? = nil,
-    initializationFailure: String? = nil, weakSpotScores: WeakSpotScores = .init()
+    initializationFailure: String? = nil, weakSpotScores: WeakSpotScores = .init(),
+    wordDecorationState: PoolWordDecorationState = .init()
   ) {
     self.currentWeakSpotScores = weakSpotScores
+    self.currentWordDecorationState = generatedCodeContinuation?.decorationState ?? wordDecorationState
     self.configuration = configuration
     self.generationNotice = initializationFailure ?? generationNotice
     self.initialGenerationNotice = initializationFailure ?? generationNotice
@@ -4479,11 +4482,11 @@ struct TypingSession {
         return .init(configuration: configuration, prompt: batch.text, quoteWordStream: stream,
           noSpaceWordEndIndices: NoSpaceWordBoundaryPolicy.endIndices(for: batch.noSpaceWordLengths),
           noSpaceTargetWords: batch.noSpaceTargetWords, generationNotice: initialGenerationNotice,
-          weakSpotScores: currentWeakSpotScores)
+          weakSpotScores: currentWeakSpotScores, wordDecorationState: liveWordDecorationState)
       } catch {
         return .init(configuration: configuration, prompt: "",
           initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。",
-          weakSpotScores: currentWeakSpotScores)
+          weakSpotScores: currentWeakSpotScores, wordDecorationState: liveWordDecorationState)
       }
     }
     return TypingSession(
@@ -4506,7 +4509,8 @@ struct TypingSession {
       noSpaceTargetWords: initialNoSpaceTargetWords,
       repeatingNoSpaceWordLengths: repeatingNoSpaceWordLengths,
       repeatingNoSpaceTargetWords: repeatingNoSpaceTargetWords, generationNotice: initialGenerationNotice,
-      initializationFailure: initializationFailure, weakSpotScores: currentWeakSpotScores)
+      initializationFailure: initializationFailure, weakSpotScores: currentWeakSpotScores,
+      wordDecorationState: liveWordDecorationState)
   }
 
   var isFinished: Bool { outcome != .active }
@@ -4577,6 +4581,17 @@ struct TypingSession {
   }
   var liveWeakSpotInputSamples: [WeakSpotInputSample] { weakSpotInputSamples }
   var liveWeakSpotScores: WeakSpotScores { currentWeakSpotScores }
+  var liveWordDecorationState: PoolWordDecorationState {
+    generatedCodeContinuation?.decorationState ?? currentWordDecorationState
+  }
+
+  /// Replace only transient language state; a cached prompt is not redecorated.
+  func withWordDecorationState(_ state: PoolWordDecorationState) -> Self {
+    var copy = self
+    copy.currentWordDecorationState = state
+    copy.generatedCodeContinuation = generatedCodeContinuation?.withDecorationState(state)
+    return copy
+  }
 
   /// A saved repeat can carry an older in-memory book. The app's latest
   /// book replaces it without changing captured targets or replay state.

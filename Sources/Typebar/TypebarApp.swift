@@ -1085,6 +1085,7 @@ private struct ContentView: View {
   @State private var restoringPromptHighlightAfterFunboxConflict = false
   @State private var priorAttemptLedger = PriorAttemptLedger()
   @State private var weakSpotScores = WeakSpotScores()
+  @State private var wordDecorationState = PoolWordDecorationState()
   @State private var lastCompletedWpm: Int?
   @State private var currentProcessPractice: [CurrentProcessPractice] = []
   @State private var isSamePromptRepeatAttempt = false
@@ -3772,6 +3773,7 @@ private struct ContentView: View {
         == activeVerifiedScript?.specification ? activeVerifiedScript : nil,
       quote: selectedQuote,
       weakSpotScores: weakSpotScores,
+      wordDecorationState: wordDecorationState,
       showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off
     )
     synchronizeNoQuitConfigurationLock()
@@ -3830,6 +3832,7 @@ private struct ContentView: View {
         configuration: configuration, streamPrompt: livePrompt.text,
         streamNoSpaceBoundarySource: livePrompt.noSpaceBoundarySource,
         weakSpotScores: session.liveWeakSpotScores,
+        wordDecorationState: session.liveWordDecorationState,
         showAllLines: settings.showAllPracticeLines && settings.practiceTapeMode == .off)
       liveContentMessage = "已载入\(content.attribution)。"
       if configuration.modifiers.contains(.listening) {
@@ -4012,7 +4015,7 @@ private struct ContentView: View {
     TypingFeedbackSound.shared.beginPracticeAttempt()
     absorbLiveWeakSpotScores(from: session)
     activeSessionTags = ResultTagPolicy.normalized(tags)
-    session = repeatedSession.withWeakSpotScores(weakSpotScores)
+    session = repeatedSession.withWeakSpotScores(weakSpotScores).withWordDecorationState(wordDecorationState)
     isSamePromptRepeatAttempt = true
     isRepeatedPaceAttempt = settings.repeatedPace
     let shouldUseRepeatedPace = isRepeatedPaceAttempt && settings.paceGuideMode == .off
@@ -4026,6 +4029,7 @@ private struct ContentView: View {
 
   private func absorbLiveWeakSpotScores(from session: TypingSession) {
     weakSpotScores = session.liveWeakSpotScores
+    wordDecorationState = session.liveWordDecorationState
   }
 
   private func refreshPaceTarget() {

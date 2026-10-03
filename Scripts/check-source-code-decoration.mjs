@@ -79,6 +79,7 @@ const actual = new Set(['test/words-generator', 'test/wordset', 'test/funbox/fun
   'test/weak-spot', 'utils/generate', 'utils/strings', '@monkeytype/util/numbers',
   'test/test-logic', 'input/helpers/word-navigation']);
 actual.add('test/english-punctuation');
+actual.add('utils/misc');
 const modules = new Map(), requested = new Map();
 const resolve = (id, from) => id.startsWith('.')
   ? path.posix.normalize(path.posix.join(path.posix.dirname(from), id)) : id;
@@ -445,9 +446,78 @@ assert.deepEqual(units, [0.777]); englishCount++;
 repeated = false; config.punctuation = false; config.numbers = false;
 console.log(`${englishCount} english-word fixtures passed (10 complete actual modules, global continuation, contraction wrappers/choices, numeric overwrite and cache; owned words/ranks/DOM adapters, no vocabulary/RNG/British dictionary/browser/device parity claim).`);
 
+let languageCount = 0;
+async function languagePunctuation(language, draws, expected, word = 'node', previous = 'bay', index = 1, bound = 10) {
+  config.language = language; units = [...draws];
+  assert.equal(await main.namespace.punctuateWord(previous, word, index, bound), expected, language);
+  assert.equal(units.length, 0, language); languageCount++;
+}
+for (const language of ['hindi', 'bangla_letters', 'nepali_romanized']) {
+  await languagePunctuation(language, [0, 0.8], 'node।');
+}
+for (const language of ['chinese', 'chinese_traditional', 'japanese_hiragana', 'japanese_romaji']) {
+  for (const [unit, mark] of [[0.8, '。'], [0.85, '？'], [0.9, '！']]) {
+    await languagePunctuation(language, [0, unit], 'node' + mark);
+  }
+  await languagePunctuation(language, [0.5, 0.5, 0.5, 0], '（node）');
+}
+for (const language of ['arabic', 'persian_romanized', 'urdu_roman', 'kurdish_central']) {
+  await languagePunctuation(language, [0, 0.85], 'node؟');
+  await languagePunctuation(language, [...Array(7).fill(0.5), 0], 'node،');
+}
+for (const language of ['sanskrit', 'pashto', 'greeklish', 'pinyin', 'urdish']) {
+  await languagePunctuation(language, [0, 0.85], 'node?');
+}
+await languagePunctuation('french', [0, 0.85], '?');
+await languagePunctuation('french_bitoduc', [0, 0.9], '!');
+await languagePunctuation('french', [...Array(4).fill(0.5), 0], ':');
+await languagePunctuation('french', [...Array(6).fill(0.5), 0], ';');
+await languagePunctuation('greek_koine', [0, 0.85], 'node;');
+await languagePunctuation('greek', [...Array(6).fill(0.5), 0], '.');
+await languagePunctuation('russian', [0.5, 0, 0, 0], '(node)');
+for (const language of ['ukrainian_latynka', 'slovak']) {
+  await languagePunctuation(language, [0.5, 0.5, 0, 0], '(node)');
+}
+await languagePunctuation('turkish', [], 'İzİ', 'izI', undefined, 0);
+await languagePunctuation('georgian', Array(10).fill(0.5), 'node', 'node', undefined, 0);
+await languagePunctuation('chinese', [0, 0.8], 'node。', 'node', 'bay。');
+await languagePunctuation('chinese', [...Array(7).fill(0.5), 0], 'node，', 'node', 'bay，');
+await languagePunctuation('arabic', [], 'Node', 'node', 'bay؟');
+await languagePunctuation('spanish', [0.91], '¿Node', 'node', undefined, 0);
+await languagePunctuation('french', [], 'Bay', 'bay', undefined, 0);
+await languagePunctuation('spanish', [0.8], 'Oak', 'oak', undefined, 0);
+await languagePunctuation('spanish', [0.5], 'bay?', 'bay', 'oak', 9);
+await languagePunctuation('spanish', [0.5], 'node', 'node', 'bay', 9);
+await languagePunctuation('spanish', [0.9], '¡Bay', 'bay', undefined, 0);
+
+const languagePool = ['node', 'bay']; candidatePools.add(languagePool);
+config.words = 1; config.punctuation = false; config.numbers = true;
+for (const [language, digit] of [['kurdish_central', '١'], ['nepali_romanized', '१'], ['hindi', '१'],
+  ['bangla_letters', '১'], ['arabic', '1'], ['persian', '1'], ['urdu_roman', '1'], ['sanskrit', '1']]) {
+  config.language = language; units = [0, 0, 0]; ranks = [0];
+  const generated = await main.namespace.generateWords({name: language, words: languagePool});
+  assert.deepEqual(Array.from(generated.words), [digit + ' ']);
+  assert.equal(units.length, 0); assert.equal(ranks.length, 0); languageCount++;
+}
+// Fresh generations and cached repeats do not reset the module-owned marker.
+config.language = 'spanish'; config.punctuation = true; config.numbers = false;
+units = [0.8]; ranks = [0];
+const spanishOpening = await main.namespace.generateWords({name: 'spanish', words: languagePool});
+assert.deepEqual(Array.from(spanishOpening.words), ['Node ']);
+repeated = true; units = [0.777]; ranks = [1];
+const spanishReplay = await main.namespace.generateWords({name: 'spanish', words: languagePool});
+assert.deepEqual(Array.from(spanishReplay.words), ['Node ']);
+assert.deepEqual(units, [0.777]); assert.deepEqual(ranks, [1]); repeated = false; languageCount++;
+await languagePunctuation('spanish', [0.5], 'oak!', 'oak', 'node', 9);
+console.log(`${languageCount} language-word fixtures passed (11 complete actual modules; owned vocabulary/DOM/ranks; language branches, actual numeric glyph helpers and persistent Spanish marker; not browser/device/corpus equivalence).`);
+
 // Metadata-only inventory: read values to count sections, never print, persist
 // or import upstream word strings into the native content pool.
 const languages = path.join(root, 'frontend/static/languages');
+assert.deepEqual(fs.readdirSync(languages).filter(name => name.endsWith('.json')).flatMap(filename => {
+  const language = JSON.parse(fs.readFileSync(path.join(languages, filename), 'utf8'));
+  return language.originalPunctuation ? [language.name] : [];
+}), ['typing_of_the_dead']);
 const codeFiles = fs.readdirSync(languages).filter(name => /^code_.*\.json$/.test(name));
 const sectionIdentities = codeFiles.flatMap(filename => {
   const language = JSON.parse(fs.readFileSync(path.join(languages, filename), 'utf8'));

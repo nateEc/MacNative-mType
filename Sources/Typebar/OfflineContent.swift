@@ -6097,8 +6097,7 @@ struct GeneratedStreamContinuation {
   }
 }
 
-/// Native single-language English identities share a per-word generator.
-/// Other ordinary languages retain their own pending punctuation contracts.
+/// English identities eligible for the language-specific contraction branch.
 enum EnglishWordPoolContent {
   static func supports(_ language: TypingLanguage) -> Bool {
     switch language {
@@ -6143,7 +6142,7 @@ enum OrdinaryEntryContent {
 // Existing code-only callers retain this in-memory name. It is not serialized.
 typealias GeneratedCodeContinuation = GeneratedCandidateContinuation
 
-/// Samples owned code/entry pools and emits section words in order. Saved
+/// Samples owned language/code/entry pools and emits section words in order. Saved
 /// prompts, Polyglot, and authored custom programs keep separate contracts.
 struct GeneratedCandidateContinuation {
   let configuration: TestConfiguration
@@ -6156,15 +6155,19 @@ struct GeneratedCandidateContinuation {
   private var cache = GeneratedPromptCache()
   private var sectionWords: [String] = []
   private var nextSectionWord = 0
+  private(set) var decorationState: PoolWordDecorationState
 
   init(configuration: TestConfiguration, batchTokenCount: Int, showAllLines: Bool = false,
-    weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil) {
+    weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil,
+    decorationState: PoolWordDecorationState = .init()) {
     self.configuration = configuration
     self.batchTokenCount = batchTokenCount
     self.weakSpotScores = weakSpotScores
+    self.decorationState = decorationState
     let candidates = sourceWords.map(IndexedLexicon.init)
       ?? OrdinaryEntryContent.pool(for: configuration.language)
-      ?? EnglishWordPoolContent.pool(for: configuration)
+      ?? (configuration.language.supportsQuotes
+        ? configuration.language.ownedPracticeLexicon(englishVariant: configuration.englishVariant) : nil)
       ?? IndexedLexicon(CodePracticeContent.wordCandidates(for: configuration.language))
     pool = IndexedLexicon.ordered(candidates,
       reversed: configuration.modifiers.contains(.backwards))
@@ -6187,6 +6190,12 @@ struct GeneratedCandidateContinuation {
     // but after that cache ends generation starts a fresh candidate section.
     copy.sectionWords = []
     copy.nextSectionWord = 0
+    return copy
+  }
+
+  func withDecorationState(_ state: PoolWordDecorationState) -> Self {
+    var copy = self
+    copy.decorationState = state
     return copy
   }
 
@@ -6227,21 +6236,23 @@ struct GeneratedCandidateContinuation {
       nextSectionWord += 1
       // Ordinary entries lowercase ASCII-capital-bearing components, not the
       // entire candidate before selection. Code syntax keeps its case.
-      if (!configuration.language.isCodeLanguage || configuration.language == .dockerFile)
+      if !PoolWordLanguageFamily.preservesASCIICase(configuration.language)
         && !configuration.contentOptions.includePunctuation
         && !configuration.modifiers.contains(.weakSpot)
         && word.utf8.contains(where: { (65...90).contains($0) }) {
         word = word.lowercased()
       }
-      if EnglishWordPoolContent.supports(configuration.language), configuration.modifiers.contains(.lazyLatin) {
+      if configuration.modifiers.contains(.lazyLatin) {
         word = TypingTextNormalizer.lazyLatin(word, language: configuration.language)
       }
+      word = configuration.language.presentationText(word)
       let options = configuration.language == .typingOfTheDead
         ? ContentOptions(includePunctuation: false, includeNumbers: configuration.contentOptions.includeNumbers)
         : configuration.contentOptions
       word = PoolWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
         language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
-        options: options, britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
+        options: options, state: &decorationState,
+        britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
         random: nextRandomContentUnit)
       sourceWords.append(word)
       let target = TestModifierPolicy.transformedWord(word, modifiers: configuration.modifiers,
@@ -6278,7 +6289,7 @@ struct GeneratedCandidateContinuation {
     func candidateComparison(_ candidate: String, firstDraw: Bool) -> String {
       let first = candidate.components(separatedBy: " ")[0]
       let value = firstDraw ? first.lowercased() : first
-      return EnglishWordPoolContent.supports(configuration.language) && configuration.modifiers.contains(.lazyLatin)
+      return configuration.modifiers.contains(.lazyLatin)
         ? TypingTextNormalizer.lazyLatin(value, language: configuration.language) : value
     }
     var comparison = candidateComparison(word, firstDraw: true)
@@ -6308,7 +6319,8 @@ struct TestSessionFactory {
     quote: OfflineQuote? = nil,
     streamPrompt: String? = nil,
     streamNoSpaceBoundarySource: String? = nil,
-    weakSpotScores: WeakSpotScores = .init(), showAllLines: Bool = false,
+    weakSpotScores: WeakSpotScores = .init(), wordDecorationState: PoolWordDecorationState = .init(),
+    showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
     nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }
@@ -6348,6 +6360,7 @@ struct TestSessionFactory {
     var quoteChunk: TransformedPromptBatch?
     var generatedCodeContinuation: GeneratedCodeContinuation?
     var generatedCodeChunk: GeneratedWordChunk?
+    var currentDecorationState = wordDecorationState
     let streamWordCount = streamWordCount(for: configuration, showAllLines: showAllLines)
     if configuration.mode != .custom, let streamPrompt {
       prompt = streamPrompt
@@ -6360,15 +6373,16 @@ struct TestSessionFactory {
       usesGeneratedStream = true
       preservesGeneratedWordOrder = true
     } else if let streamWordCount,
-      configuration.language.isCodeLanguage || OrdinaryEntryContent.pool(for: configuration.language) != nil
-        || EnglishWordPoolContent.supports(configuration.language)
+      configuration.language.isCodeLanguage || configuration.language.supportsQuotes
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
-        batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores)
+        batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores,
+        decorationState: wordDecorationState)
       let chunk = cursor.nextChunk(nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit,
         nextRandomContentUnit: nextRandomContentUnit)
       prompt = chunk.source
       generatedCodeChunk = chunk
+      currentDecorationState = cursor.decorationState
       generatedCodeContinuation = cursor.hasRemaining ? cursor : nil
       usesGeneratedCode = true
     } else if let streamWordCount, configuration.modifiers.contains(.weakSpot) {
@@ -6404,7 +6418,7 @@ struct TestSessionFactory {
           // a different quote. This failure occurs before any timed attempt.
           return .init(configuration: configuration, prompt: "",
             initializationFailure: "引语包含空的 ASCII 空格词候选，无法生成练习。请选择另一条引语或切换拼写设置。",
-            weakSpotScores: weakSpotScores)
+            weakSpotScores: weakSpotScores, wordDecorationState: wordDecorationState)
         }
       case .zen:
         // Zen renders and scores only text entered locally by the user. It
@@ -6594,7 +6608,7 @@ struct TestSessionFactory {
       generationNotice: GeneratedPromptChunkPolicy.previewNotice(for: configuration, showAllLines: showAllLines)
         ?? (hasIncompleteExternalPreview
           ? "当前外部词源仅提供部分目标；当前目标保持不变，保留原有续接方式，未预览全部目标。" : nil),
-      weakSpotScores: weakSpotScores)
+      weakSpotScores: weakSpotScores, wordDecorationState: currentDecorationState)
   }
 
   static func weakSpotPrompt(
