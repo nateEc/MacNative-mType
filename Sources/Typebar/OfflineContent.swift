@@ -6148,7 +6148,8 @@ struct GeneratedCandidateContinuation {
   let configuration: TestConfiguration
   let batchTokenCount: Int
   private let previewsWholeFiniteWords: Bool
-  private let pool: IndexedLexicon
+  private var pool: IndexedLexicon
+  private var polyglotCandidates: NativePolyglotCandidates?
   private let weakSpotScores: WeakSpotScores
   private var previousTargets: [String] = []
   private var emittedWords = 0
@@ -6159,18 +6160,26 @@ struct GeneratedCandidateContinuation {
 
   init(configuration: TestConfiguration, batchTokenCount: Int, showAllLines: Bool = false,
     weakSpotScores: WeakSpotScores = .init(), sourceWords: [String]? = nil,
-    decorationState: PoolWordDecorationState = .init()) {
+    decorationState: PoolWordDecorationState = .init(),
+    polyglotSources: [(TypingLanguage, IndexedLexicon)]? = nil,
+    nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) {
     self.configuration = configuration
     self.batchTokenCount = batchTokenCount
     self.weakSpotScores = weakSpotScores
     self.decorationState = decorationState
-    let candidates = sourceWords.map(IndexedLexicon.init)
+    if configuration.language == .mixedLanguages {
+      polyglotCandidates = polyglotSources.map { NativePolyglotCandidates(sources: $0,
+        reversingPrimaryLanguage: configuration.modifiers.contains(.backwards) ? configuration.wordPoolBaseLanguage : nil,
+        nextShuffleIndex: nextRandomPoolShuffleIndex) }
+        ?? NativePolyglotCandidates(configuration: configuration, nextShuffleIndex: nextRandomPoolShuffleIndex)
+    } else { polyglotCandidates = nil }
+    let candidates = polyglotCandidates?.lexicon ?? sourceWords.map(IndexedLexicon.init)
       ?? OrdinaryEntryContent.pool(for: configuration.language)
       ?? (configuration.language.supportsQuotes
         ? configuration.language.ownedPracticeLexicon(englishVariant: configuration.englishVariant) : nil)
       ?? IndexedLexicon(CodePracticeContent.wordCandidates(for: configuration.language))
     pool = IndexedLexicon.ordered(candidates,
-      reversed: configuration.modifiers.contains(.backwards))
+      reversed: polyglotCandidates == nil && configuration.modifiers.contains(.backwards))
     previewsWholeFiniteWords = GeneratedPromptChunkPolicy.previewsWholeFiniteWords(
       for: configuration, showAllLines: showAllLines)
   }
@@ -6181,7 +6190,7 @@ struct GeneratedCandidateContinuation {
       || emittedWords < (configuration.wordLimit ?? 0)
   }
 
-  func replayingContinuation() -> Self {
+  func replayingContinuation(nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }) -> Self {
     var copy = self
     // The original opening is already restored by TypingSession. Replay only
     // the exact chunks generated after it, including sampled case and targets.
@@ -6190,6 +6199,11 @@ struct GeneratedCandidateContinuation {
     // but after that cache ends generation starts a fresh candidate section.
     copy.sectionWords = []
     copy.nextSectionWord = 0
+    if let polyglotCandidates {
+      let refreshed = polyglotCandidates.reshuffled(nextShuffleIndex: nextRandomPoolShuffleIndex)
+      copy.polyglotCandidates = refreshed
+      copy.pool = refreshed.lexicon
+    }
     return copy
   }
 
@@ -6236,27 +6250,33 @@ struct GeneratedCandidateContinuation {
       nextSectionWord += 1
       // Ordinary entries lowercase ASCII-capital-bearing components, not the
       // entire candidate before selection. Code syntax keeps its case.
-      if !PoolWordLanguageFamily.preservesASCIICase(configuration.language)
+      let baseLanguage = configuration.wordPoolBaseLanguage
+      let wordLanguage = polyglotCandidates?.language(for: word) ?? baseLanguage
+      if !PoolWordLanguageFamily.preservesASCIICase(wordLanguage)
         && !configuration.contentOptions.includePunctuation
         && !configuration.modifiers.contains(.weakSpot)
         && word.utf8.contains(where: { (65...90).contains($0) }) {
         word = word.lowercased()
       }
       if configuration.modifiers.contains(.lazyLatin) {
-        word = TypingTextNormalizer.lazyLatin(word, language: configuration.language)
+        word = polyglotCandidates?.lazyWord(word)
+          ?? TypingTextNormalizer.lazyLatin(word, language: configuration.language)
       }
-      word = configuration.language.presentationText(word)
-      let options = configuration.language == .typingOfTheDead
+      word = baseLanguage.presentationText(word)
+      let options = baseLanguage == .typingOfTheDead
         ? ContentOptions(includePunctuation: false, includeNumbers: configuration.contentOptions.includeNumbers)
         : configuration.contentOptions
+      var decorationConfiguration = configuration
+      decorationConfiguration.language = baseLanguage
       word = PoolWordDecorationPolicy.decorated(word, previousTarget: previousTargets.last,
-        language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
+        language: baseLanguage, wordIndex: emittedWords + index, wordBound: bound,
         options: options, state: &decorationState,
-        britishEnglish: .init(configuration: configuration, authoredQuoteAlternate: false),
+        britishEnglish: .init(configuration: decorationConfiguration, authoredQuoteAlternate: false),
         random: nextRandomContentUnit)
       sourceWords.append(word)
-      let target = TestModifierPolicy.transformedWord(word, modifiers: configuration.modifiers,
-        language: configuration.language, wordIndex: emittedWords + index, wordBound: bound,
+      let modifiers = polyglotCandidates == nil ? configuration.modifiers : configuration.modifiers.filter { $0 != .lazyLatin }
+      let target = TestModifierPolicy.transformedWord(word, modifiers: modifiers,
+        language: baseLanguage, wordIndex: emittedWords + index, wordBound: bound,
         nextRandomCaseBit: nextRandomCaseBit)
       output += target
       targets.append(target)
@@ -6290,14 +6310,15 @@ struct GeneratedCandidateContinuation {
       let first = candidate.components(separatedBy: " ")[0]
       let value = firstDraw ? first.lowercased() : first
       return configuration.modifiers.contains(.lazyLatin)
-        ? TypingTextNormalizer.lazyLatin(value, language: configuration.language) : value
+        ? (polyglotCandidates?.lazyWord(value)
+          ?? TypingTextNormalizer.lazyLatin(value, language: configuration.language)) : value
     }
     var comparison = candidateComparison(word, firstDraw: true)
     var retries = 0
     while retries < 100 && (comparison == latest || comparison == earlier
       || (!configuration.contentOptions.includeNumbers && word.utf8.contains { (48...57).contains($0) })
       || (!configuration.contentOptions.includePunctuation && word == "I")
-      || ((!configuration.language.isCodeLanguage || configuration.language == .dockerFile)
+      || ((!configuration.wordPoolBaseLanguage.isCodeLanguage || configuration.wordPoolBaseLanguage == .dockerFile)
         && !configuration.contentOptions.includePunctuation
         && word.contains { "-=_+[]{};'\\:\"|,./<>?".contains($0) })) {
       word = drawCandidate(random: random)
@@ -6323,7 +6344,8 @@ struct TestSessionFactory {
     showAllLines: Bool = false,
     nextRandomWordIndex: () -> Int = { Int.random(in: Int.min...Int.max) },
     nextRandomCaseBit: () -> Bool = { Bool.random() },
-    nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) }
+    nextRandomContentUnit: () -> Double = { Double.random(in: 0..<1) },
+    nextRandomPoolShuffleIndex: (Int) -> Int = { Int.random(in: 0..<$0) }
   ) -> TypingSession {
     let prompt: String
     var sectionEndIndices: [Int] = []
@@ -6373,11 +6395,11 @@ struct TestSessionFactory {
       usesGeneratedStream = true
       preservesGeneratedWordOrder = true
     } else if let streamWordCount,
-      configuration.language.isCodeLanguage || configuration.language.supportsQuotes
+      configuration.language.isCodeLanguage || configuration.language.supportsQuotes || configuration.language == .mixedLanguages
     {
       var cursor = GeneratedCodeContinuation(configuration: configuration,
         batchTokenCount: streamWordCount, showAllLines: showAllLines, weakSpotScores: weakSpotScores,
-        decorationState: wordDecorationState)
+        decorationState: wordDecorationState, nextRandomPoolShuffleIndex: nextRandomPoolShuffleIndex)
       let chunk = cursor.nextChunk(nextRandomWordIndex: nextRandomWordIndex, nextRandomCaseBit: nextRandomCaseBit,
         nextRandomContentUnit: nextRandomContentUnit)
       prompt = chunk.source

@@ -18632,7 +18632,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.likanuWords,
       StarterLexicon.creatureIndexTokens,
       StarterLexicon.arenaStrategyTokens,
-      StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
+      StarterLexicon.words, StarterLexicon.britishWords, StarterLexicon.pigLatinWords, StarterLexicon.spanishWords, StarterLexicon.germanWords,
       StarterLexicon.swissGermanWords,
       StarterLexicon.afrikaansWords,
       StarterLexicon.albanianWords,
@@ -18732,7 +18732,7 @@ final class TypingEngineTests: XCTestCase {
       StarterLexicon.portugueseWords,
       StarterLexicon.portugueseAccentsWords,
       StarterLexicon.simplifiedChineseWords,
-      StarterLexicon.russianShortFormTokens, StarterLexicon.russianShortForm1kTokens,
+      StarterLexicon.russianShortFormWords, StarterLexicon.russianShortForm1kWords,
       StarterLexicon.traditionalChineseWords,
       StarterLexicon.russianWords, StarterLexicon.russianAbbreviationWords,
       StarterLexicon.ukrainianWords, StarterLexicon.ukrainianEndingWords,
@@ -18746,7 +18746,23 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TypingLanguage.defaultMixedComponents.count, 153)
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuSuli))
     XCTAssertTrue(TypingLanguage.defaultMixedComponents.contains(.tokiPonaKuLili))
-    XCTAssertTrue(tokens.allSatisfy { token in corpora.contains { $0.contains(token) } })
+    // This checks owned provenance, not literal presentation: Polyglot now applies
+    // the source's per-word ASCII-capital-triggered lowercase stage. Exact casing
+    // exemptions and punctuation-on behavior have deterministic candidate tests.
+    var ownedTargets: Set<String> = []
+    for corpus in corpora {
+      for entry in corpus {
+        for component in entry.split(separator: " ") {
+          let word = String(component)
+          ownedTargets.insert(word)
+          if word.unicodeScalars.contains(where: { (65...90).contains($0.value) }) {
+            ownedTargets.insert(word.lowercased())
+          }
+        }
+      }
+    }
+    XCTAssertTrue(tokens.allSatisfy { ownedTargets.contains($0) },
+      "Outside owned presentation targets: \(tokens.filter { !ownedTargets.contains($0) })")
     XCTAssertTrue(TypingLanguage.mixedLanguages.usesSpaceDelimitedWords)
     XCTAssertFalse(TypingLanguage.mixedLanguages.supportsQuotes)
     session.insert(session.prompt, at: start)
@@ -18756,7 +18772,8 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(session.outcome, .completed)
     XCTAssertEqual(session.completedWordCount, 153)
     XCTAssertEqual(session.errors, 0)
-    XCTAssertTrue(session.prompt.split(separator: " ").allSatisfy { token in corpora.contains { $0.contains(String(token)) } })
+    XCTAssertTrue(session.prompt.split(separator: " ").allSatisfy { ownedTargets.contains(String($0)) },
+      "Outside owned presentation targets after growth: \(session.prompt.split(separator: " ").filter { !ownedTargets.contains(String($0)) })")
 
     let selected = [TypingLanguage.italian, .french]
     let customConfiguration = TestConfiguration.words(

@@ -2236,9 +2236,15 @@ struct TestConfiguration: Codable, Equatable {
   /// completion. Explicit values keep the delimiter independent of limits.
   var customTextPipeDelimiter: Bool?
   var mixedLanguageComponents: [TypingLanguage]
+  /// Missing in older configurations. It does not rewrite saved targets.
+  var polyglotBaseLanguage: TypingLanguage?
   var modifiers: [TestModifier]
   var contentOptions: ContentOptions
   var challengeID: String?
+
+  var wordPoolBaseLanguage: TypingLanguage {
+    language == .mixedLanguages ? (polyglotBaseLanguage ?? .english) : language
+  }
 
   var isInfinite: Bool {
     Self.usesInfiniteLimit(
@@ -2285,6 +2291,7 @@ struct TestConfiguration: Codable, Equatable {
     customTextOrdering: CustomTextOrdering = .inOrder,
     customTextPipeDelimiter: Bool? = nil,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
+    polyglotBaseLanguage: TypingLanguage? = nil,
     modifiers: [TestModifier] = [], contentOptions: ContentOptions = .init(),
     challengeID: String? = nil
   ) {
@@ -2309,6 +2316,8 @@ struct TestConfiguration: Codable, Equatable {
     let normalizedMixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
       mixedLanguageComponents)
     self.mixedLanguageComponents = normalizedMixedLanguageComponents
+    self.polyglotBaseLanguage = language == .mixedLanguages
+      ? PolyglotReturnLanguagePolicy.validated(polyglotBaseLanguage) : nil
     let normalizedModifiers = JoiningScriptFunboxPolicy.effectiveModifiers(
       modifiers, language: language, mixedLanguageComponents: normalizedMixedLanguageComponents)
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(
@@ -2333,24 +2342,35 @@ struct TestConfiguration: Codable, Equatable {
     seconds: TimeInterval, difficulty: Difficulty = .normal, rules: InputRules = .init(),
     language: TypingLanguage = .english, englishVariant: EnglishVariant = .american,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
+    polyglotBaseLanguage: TypingLanguage? = nil,
     contentOptions: ContentOptions = .init()
   ) -> Self {
     .init(
       mode: .time, duration: seconds, wordLimit: nil, difficulty: difficulty, rules: rules,
       language: language, englishVariant: englishVariant,
-      mixedLanguageComponents: mixedLanguageComponents, contentOptions: contentOptions)
+      mixedLanguageComponents: mixedLanguageComponents, polyglotBaseLanguage: polyglotBaseLanguage,
+      contentOptions: contentOptions)
   }
 
   static func words(
     _ count: Int, difficulty: Difficulty = .normal, rules: InputRules = .init(),
     language: TypingLanguage = .english, englishVariant: EnglishVariant = .american,
     mixedLanguageComponents: [TypingLanguage] = TypingLanguage.referenceDefaultMixedComponents,
+    polyglotBaseLanguage: TypingLanguage? = nil,
     contentOptions: ContentOptions = .init()
   ) -> Self {
     .init(
       mode: .words, duration: nil, wordLimit: count, difficulty: difficulty, rules: rules,
       language: language, englishVariant: englishVariant,
-      mixedLanguageComponents: mixedLanguageComponents, contentOptions: contentOptions)
+      mixedLanguageComponents: mixedLanguageComponents, polyglotBaseLanguage: polyglotBaseLanguage,
+      contentOptions: contentOptions)
+  }
+
+  func with(polyglotBaseLanguage: TypingLanguage?) -> Self {
+    var copy = self
+    copy.polyglotBaseLanguage = language == .mixedLanguages
+      ? PolyglotReturnLanguagePolicy.validated(polyglotBaseLanguage) : nil
+    return copy
   }
 
   func with(modifiers: [TestModifier]) -> Self {
@@ -2401,7 +2421,7 @@ struct TestConfiguration: Codable, Equatable {
   private enum CodingKeys: String, CodingKey {
     case mode, duration, wordLimit, difficulty, rules, language, englishVariant, quoteLength,
       quoteLengths, quoteSelectionMode, customTextCompletion, customTextSectionLimit,
-      customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents,
+      customTextOrdering, customTextPipeDelimiter, mixedLanguageComponents, polyglotBaseLanguage,
       modifiers, contentOptions, challengeID
   }
 
@@ -2432,6 +2452,9 @@ struct TestConfiguration: Codable, Equatable {
     mixedLanguageComponents = TypingLanguage.normalizedMixedComponents(
       try values.decodeIfPresent([TypingLanguage].self, forKey: .mixedLanguageComponents)
         ?? TypingLanguage.referenceDefaultMixedComponents)
+    polyglotBaseLanguage = language == .mixedLanguages
+      ? PolyglotReturnLanguagePolicy.validated(try values.decodeIfPresent(TypingLanguage.self, forKey: .polyglotBaseLanguage))
+      : nil
     let normalizedModifiers = TestModifierPolicy.normalized(
       try values.decodeIfPresent([TestModifier].self, forKey: .modifiers) ?? [])
     let effectiveMode = MemoryFunboxModePolicy.effectiveMode(

@@ -4722,6 +4722,11 @@ private struct ContentView: View {
   }
 
   private var configuration: TestConfiguration {
+    let selected = baseConfiguration
+    return selected.with(polyglotBaseLanguage: polyglotReturnLanguage ?? selected.polyglotBaseLanguage)
+  }
+
+  private var baseConfiguration: TestConfiguration {
     if let activeChallenge {
       let challengePreset = activeChallenge.id == "one-handed-bandit"
         ? (oneHandedChallengePreset ?? activeChallenge.preset) : activeChallenge.preset
@@ -4907,7 +4912,7 @@ private struct ContentView: View {
     customTextOrdering = configuration.customTextOrdering
     customTextPipeDelimiter = configuration.customTextPipeDelimiter
     self.polyglotReturnLanguage = configuration.language == .mixedLanguages
-      ? PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage) : nil
+      ? PolyglotReturnLanguagePolicy.validated(polyglotReturnLanguage ?? configuration.polyglotBaseLanguage) : nil
     language = configuration.language
     constrainQuoteSource(for: language)
     mixedLanguageComponents = configuration.mixedLanguageComponents
