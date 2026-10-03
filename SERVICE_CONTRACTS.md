@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-03 当前输入计量补充：[输入计量 v2 与归档 21](VERSIONED_INPUT_METRICS_CONTRACT.md) 定义独立 resultInputMetricsV2 能力、计分基础与原始保留单位；API 路径仍 v1，旧指标 v1 校验不放宽。需要 v2 而服务未明确支持时在成绩 POST 前报错；旧裁剪 v1 只适配请求，不改历史。默认归档 21，无真实部署／账户投稿，韩文生产会话仍未接入。下方日期段落为历史阶段。
+
 2026-10-02 最终验证（本机日期精度）：客户端 1390 项（0 跳过、0 失败，含显式十万词）、服务端 131 项、固定参考／原创性、649 场景清单和未启动 GUI 的应用包通过，下方本轮“完整门禁待执行”由此取代。未改变服务 DTO、真实存储或部署，旧二进制降级与设备验收仍未执行。
 
 2026-10-02 本机归档精度增量（非服务 DTO 变更）：`TypebarArchive.exportedAtReferenceTime` 与 `CompletedTestResult.startedAtReferenceTime`／`finishedAtReferenceTime` 为可选 JSON 数字，按 Apple [timeIntervalSinceReferenceDate](https://developer.apple.com/documentation/foundation/date/timeintervalsincereferencedate-swift.property) 定义为距 2001-01-01 UTC 的秒。原 ISO 日期字段仍写入；补充值只恢复小于一秒的兼容差异，有限性、类型和偏离校验失败即拒绝。旧缺失／null 保留旧值，不推算历史精度。归档版本仍为 10，设置／分享版本和数据库结构不变，不新增服务器日期字段或发布流程。11 项回归覆盖旧版本形状、旧字段投影、错误单位、不同 JSON 日期策略、精度及合并导出时刻排序；投影不是实际旧二进制证据。旧客户端重新编码可丢新增键，降级前保留原始归档；本轮不操作真实库、不回填、不重发成绩、不部署。完整门禁待执行。

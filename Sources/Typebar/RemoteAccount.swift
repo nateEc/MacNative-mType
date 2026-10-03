@@ -783,7 +783,8 @@ struct RemoteResultSubmission: Codable, Sendable {
 
     init(
         result: CompletedTestResult, includesTimingEvidence: Bool = false,
-        includesPracticeTiming: Bool = false, includesInputMetrics: Bool = false
+        includesPracticeTiming: Bool = false, includesInputMetrics: Bool = false,
+        includesInputMetricsV2: Bool = false
     ) {
         id = result.id
         mode = result.configuration.mode.rawValue
@@ -803,7 +804,13 @@ struct RemoteResultSubmission: Codable, Sendable {
         tags = result.tags
         timingEvidence = includesTimingEvidence ? RemoteResultTimingEvidence(result: result) : nil
         practiceTiming = includesPracticeTiming ? RemoteResultPracticeTiming(result: result) : nil
-        inputMetrics = includesInputMetrics ? result.inputMetrics : nil
+        switch result.inputMetrics?.publicationVersion(nativeCharacterCount: result.typedCharacterCount) {
+        case 1:
+            inputMetrics = includesInputMetrics ? result.inputMetrics
+                : includesInputMetricsV2 ? result.inputMetrics?.versionTwoProjection : nil
+        case 2: inputMetrics = includesInputMetricsV2 ? result.inputMetrics?.versionTwoProjection : nil
+        default: inputMetrics = nil
+        }
         startedAt = result.startedAt
         finishedAt = result.finishedAt
     }
@@ -829,6 +836,11 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     var supportsResultInputMetrics: Bool {
         apiVersion == "v1" && service == "typebar"
             && capabilities["resultInputMetrics"] == "available"
+    }
+
+    var supportsResultInputMetricsV2: Bool {
+        apiVersion == "v1" && service == "typebar"
+            && capabilities["resultInputMetricsV2"] == "available"
     }
 
     var supportsHumanVerification: Bool {
@@ -2718,6 +2730,7 @@ final class AccountSession {
         guard resultPublicationScope == requestScope else {
             throw RemoteAccountError.accountScopeChanged
         }
+        try ResultInputMetricsPublicationPolicy.validate(result, capabilities: capabilities)
         let response = try await RemoteAccountAPI(endpoint: requestEndpoint).request(
             path: "v1/results",
             method: "POST",
@@ -2726,7 +2739,8 @@ final class AccountSession {
                 result: result,
                 includesTimingEvidence: capabilities?.supportsResultTimingEvidence == true,
                 includesPracticeTiming: capabilities?.supportsResultPracticeTiming == true,
-                includesInputMetrics: capabilities?.supportsResultInputMetrics == true),
+                includesInputMetrics: capabilities?.supportsResultInputMetrics == true,
+                includesInputMetricsV2: capabilities?.supportsResultInputMetricsV2 == true),
             response: RemoteResultSubmissionResponse.self
         )
         guard response.id == result.id, response.accepted else { throw RemoteAccountError.unexpectedResponse }

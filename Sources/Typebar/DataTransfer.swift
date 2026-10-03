@@ -282,7 +282,7 @@ struct TypebarArchive: Codable, Equatable {
     // next-word abandonment markers, explicit unit classifications and
     // logical deletion positions.
     // Reject this archive generation there rather than silently misderive it.
-    static let currentVersion = 20
+    static let currentVersion = 21
     let version: Int
     let exportedAt: Date
     let settings: AppSettingsSnapshot
@@ -324,7 +324,8 @@ struct TypebarArchive: Codable, Equatable {
         let hasClearedNextWord = results.contains { $0.replayEvents.contains { $0.clearedNextWord != nil } }
         let hasUnitStats = results.contains { $0.characterStats.sourceUnits != nil }
         let hasDeletionPositions = results.contains { $0.replayEvents.contains { $0.deletionCharIndex != nil } }
-        self.version = hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
+        let hasVersionedMetrics = results.contains { ($0.inputMetrics?.version ?? 1) >= 2 }
+        self.version = hasVersionedMetrics ? max(21, version) : hasDeletionPositions ? max(20, version) : hasUnitStats ? max(19, version) : hasClearedNextWord ? max(18, version) : hasContractions ? max(17, version) : hasPositions ? max(16, version) : hasTargets ? max(15, version) : hasRawUTF16 ? max(14, version) : hasJudgments ? max(13, version)
             : hasFields ? max(12, version) : hasStoppedInput ? max(11, version) : version
         self.exportedAt = exportedAt
         let deletedThemes = version >= 9 ? Set(deletedCustomThemeIDs) : []
@@ -904,6 +905,9 @@ enum TypebarDataTransfer {
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         guard archive.version >= 20 || !archive.results.contains(where: {
             $0.replayEvents.contains { $0.deletionCharIndex != nil }
+        }) else { throw DataTransferError.unsupportedVersion(archive.version) }
+        guard archive.version >= 21 || !archive.results.contains(where: {
+            ($0.inputMetrics?.version ?? 1) >= 2
         }) else { throw DataTransferError.unsupportedVersion(archive.version) }
         return archive
     }

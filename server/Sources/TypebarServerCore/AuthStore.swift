@@ -4019,7 +4019,9 @@ public actor AuthStore {
     let expectedWPM: Int
     let expectedRawWPM: Int
     if let metrics = result.inputMetrics {
-      guard metrics.isValid, metrics.retainedUnits >= result.eventCount else {
+      guard metrics.isValid,
+        (metrics.version == 1 ? metrics.retainedUnits >= result.eventCount
+          : result.eventCount <= metrics.totalAttempts) else {
         throw ResultStoreError.invalidResult
       }
       expectedAccuracy = Int(metrics.accuracyPercentage.rounded())

@@ -24,7 +24,7 @@ final class DeletionPositionArchiveTests: XCTestCase {
     let saved = try current()
     let archive = try TypebarDataTransfer.importArchive(from: TypebarDataTransfer.exportArchive(
       settings: .init(), results: [saved], presets: [], at: start))
-    XCTAssertEqual(archive.version, 20)
+    XCTAssertEqual(archive.version, TypebarArchive.currentVersion)
     for restored in [archive.results[0], try XCTUnwrap(TestResultRecord(result: saved).portableResult)] {
       XCTAssertEqual(restored, saved)
       XCTAssertEqual(restored.replayEvents.compactMap(\.deletionCharIndex), [3])

@@ -71,6 +71,7 @@ public func configure(
                 "resultTimingEvidence": .available,
                 "resultPracticeTiming": .available,
                 "resultInputMetrics": .available,
+                "resultInputMetricsV2": .available,
                 "resultHistory": .partial,
                 "leaderboards": .partial,
                 "leaderboardRankMemory": .available,

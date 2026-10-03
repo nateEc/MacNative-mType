@@ -5381,6 +5381,12 @@ struct TypingSession {
     guard let startedAt, let finishedAt else { return nil }
     let keyTiming = physicalKeyTiming.snapshot(startedAt: startedAt, finishedAt: finishedAt)
     let credit = referenceWordCredit(countPartialLastWord: resultCreditsPartialLastWord)
+    let nativeCount = unitTargets.noSpace
+      ? recordedFieldStats.counts(targets: unitTargets, creditsActivePrefix: false).rawCharacters : typed.count
+    let retainedUnits = rawSpeedInputUnitCount
+    // The v1 service assumes retained units cover the native character count.
+    // Source terminal trimming violates that assumption without losing attempts.
+    let needsVersionTwo = retainedUnits < nativeCount
     return .init(
       id: UUID(),
       configuration: configuration,
@@ -5388,8 +5394,7 @@ struct TypingSession {
       startedAt: startedAt,
       finishedAt: finishedAt,
       afkDuration: afkDuration,
-      typedCharacterCount: unitTargets.noSpace
-        ? recordedFieldStats.counts(targets: unitTargets, creditsActivePrefix: false).rawCharacters : typed.count,
+      typedCharacterCount: nativeCount,
       correctCharacterCount: scoredCorrectCharacters,
       errorCount: errors,
       wpm: wpm(at: date),
@@ -5398,8 +5403,10 @@ struct TypingSession {
       preciseWpm: preciseWpm(at: date),
       preciseRawWpm: preciseRawWpm(at: date),
       preciseAccuracy: preciseAccuracy,
-      inputMetrics: .init(version: 1, correctAttempts: correctInputAttemptCount,
-        totalAttempts: inputAttemptCount, creditedUnits: credit.inputUnits, retainedUnits: rawSpeedInputUnitCount),
+      inputMetrics: .init(version: needsVersionTwo ? 2 : 1, correctAttempts: correctInputAttemptCount,
+        totalAttempts: inputAttemptCount, creditedUnits: credit.inputUnits, retainedUnits: retainedUnits,
+        retainedInputUnits: needsVersionTwo ? retainedUnits : nil,
+        scoringUnitBasis: needsVersionTwo ? .utf16 : nil),
       restartCount: restartCount,
       priorAttemptEngagedDuration: priorAttemptEngagedDuration,
       characterStats: characterStats,
