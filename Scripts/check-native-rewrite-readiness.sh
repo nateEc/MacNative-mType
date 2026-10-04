@@ -107,8 +107,12 @@ run_check "checking manual acceptance inventory" \
   ruby "$project_root/Scripts/check-manual-acceptance-audit.rb"
 
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
+run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
+  ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
+require_no_conflicting_processes || fail "stop the listed process before running client tests"
 run_logged_check "running native client test suite" "$temporary_directory/client-tests.log" \
-  env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_REFERENCE_ROOT="$reference_root" swift test
+  env TYPEBAR_QA_IN_MEMORY_STORE=1 TYPEBAR_REFERENCE_ROOT="$reference_root" \
+  TYPEBAR_DISK_FIXTURE_ROOT="$temporary_directory/disk-model-fixtures" swift test
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"
 run_logged_check "running self-hosted service test suite" "$temporary_directory/service-tests.log" \
