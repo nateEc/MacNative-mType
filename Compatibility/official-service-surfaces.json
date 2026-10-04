@@ -72,6 +72,8 @@
       "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift",
       "server/Sources/TypebarServerCore/WeeklyExperiencePublicScore.swift",
       "server/Tests/TypebarServerCoreTests/WeeklyExperienceReadTests.swift",
+      "server/Sources/TypebarServerCore/WeeklyExperiencePartition.swift",
+      "server/Tests/TypebarServerCoreTests/WeeklyExperiencePartitionTests.swift",
       "Sources/Typebar/RemoteAccount.swift"
     ],
     "results": [

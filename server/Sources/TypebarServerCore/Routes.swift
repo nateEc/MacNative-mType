@@ -43,7 +43,9 @@ public func configure(
             fileURL: TypebarServerStorage.defaultUserStoreURL(for: app),
             minimumLeaderboardTypingSeconds: minimumPracticeSeconds,
             experienceConfiguration: try .fromJSON(Environment.get("TYPEBAR_XP_CONFIGURATION")),
-            rankingEnvironment: try .fromEnvironment(Environment.get("TYPEBAR_RANKING_ENVIRONMENT")))
+            rankingEnvironment: try .fromEnvironment(Environment.get("TYPEBAR_RANKING_ENVIRONMENT")),
+            weeklyExperienceTimeZone: try WeeklyExperiencePartition.configuredTimeZone(
+                Environment.get("TYPEBAR_WEEKLY_XP_TIME_ZONE")))
     }
     let authStore = resolvedAuthStore
     app.middleware.use(TypebarMaintenanceMiddleware(isEnabled: maintenanceMode))

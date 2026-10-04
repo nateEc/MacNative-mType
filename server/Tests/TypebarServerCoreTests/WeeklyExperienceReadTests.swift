@@ -32,6 +32,21 @@ final class WeeklyExperienceReadTests: XCTestCase {
     try XCTUnwrap(JSONSerialization.jsonObject(with:JSONEncoder().encode(value)) as? [String:Any])
   }
 
+  func testBackdatedClientFinishDoesNotMoveNewRewardIntoPreviousWeek() async throws {
+    let store = try AuthStore(fileURL:nil,bcryptCost:4,rankingEnvironment:.development)
+    let owner = try await account(store,"Backdated")
+    let end = now.addingTimeInterval(-8 * 86_400)
+    let submission = ResultSubmissionRequest(id:UUID(),mode:"words",language:"english",
+      durationSeconds:nil,wordLimit:25,wpm:60,rawWpm:60,accuracy:100,errorCount:0,eventCount:75,
+      startedAt:end.addingTimeInterval(-15),finishedAt:end)
+    let receipt = try await store.submitResult(submission,accessToken:owner.accessToken,now:now)
+    XCTAssertGreaterThan(receipt.experienceGained,0)
+    let current = try await store.experienceLeaderboard(now:now)
+    let previous = try await store.experienceLeaderboard(period:"lastWeek",now:now)
+    XCTAssertEqual(current.entries.map(\.userID),[owner.user.id])
+    XCTAssertTrue(previous.entries.isEmpty)
+  }
+
   func testPublicListAndRankTruncateOnlyAfterAddingFractionalAwardsAndDoNotRewriteLedger() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-weekly-read-\(UUID())")
     try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:false)
@@ -125,7 +140,11 @@ final class WeeklyExperienceReadTests: XCTestCase {
     let diagnostics = errors.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus,0,String(decoding:diagnostics,as:UTF8.self))
     struct Fixture: Decodable { let score:Double; let globalScore:Double; let friendsScore:Double; let rankScore:Double }
-    struct Document: Decodable { let referenceCommit:String; let redisVersion:String; let fixtures:[Fixture] }
+    struct PartitionFixture: Decodable { let zone:String; let timestamp:Int; let currentKey:Int }
+    struct Document: Decodable {
+      let referenceCommit:String; let redisVersion:String; let fixtures:[Fixture]
+      let partitionFixtures:[PartitionFixture]
+    }
     let document = try JSONDecoder().decode(Document.self,from:data)
     XCTAssertEqual(document.referenceCommit,"91bd24bb8513785c7364cbea29296ff7adafac41")
     XCTAssertEqual(document.redisVersion,"6.2.6"); XCTAssertEqual(document.fixtures.count,19)
@@ -133,6 +152,12 @@ final class WeeklyExperienceReadTests: XCTestCase {
       XCTAssertEqual(WeeklyExperiencePublicScore.project(fixture.score),fixture.globalScore,"global \(fixture.score)")
       XCTAssertEqual(WeeklyExperiencePublicScore.project(fixture.score,friendsList:true),fixture.friendsScore,"friends \(fixture.score)")
       XCTAssertEqual(WeeklyExperiencePublicScore.project(fixture.score),fixture.rankScore,"rank \(fixture.score)")
+    }
+    XCTAssertEqual(document.partitionFixtures.count,12)
+    for fixture in document.partitionFixtures {
+      let value = try WeeklyExperiencePartition.capture(at:Date(timeIntervalSince1970:Double(fixture.timestamp)/1_000),
+        timeZone:XCTUnwrap(TimeZone(identifier:fixture.zone)))
+      XCTAssertEqual(value.keyMilliseconds,fixture.currentKey)
     }
   }
 

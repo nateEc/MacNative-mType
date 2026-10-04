@@ -52,7 +52,15 @@ try {
     getResults:(...args) => cli('EVAL',scripts['get-results'],...args),
     getRank:(...args) => cli('EVAL',scripts['get-rank'],...args),
   };
-  const context = vm.createContext({});
+  let clockMilliseconds = Date.now();
+  const clock = new Proxy(Date, {
+    get: (target,key) => key === 'now' ? () => clockMilliseconds : Reflect.get(target,key),
+  });
+  const context = vm.createContext({Date:clock});
+  const dates = new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(
+    path.join(root,'packages/util/src/date-and-time.ts'),'utf8'), {mode:'transform'}), {context});
+  await dates.link(() => { throw new Error('Unexpected source date dependency'); });
+  await dates.evaluate();
   const module = new vm.SourceTextModule(stripTypeScriptTypes(fs.readFileSync(
     path.join(root,'backend/src/services/weekly-xp-leaderboard.ts'),'utf8'), {mode:'transform'}), {context});
   const exports = {
@@ -61,7 +69,7 @@ try {
     '../queues/later-queue':{default:{scheduleForNextWeek:async () => {}}},
     '@monkeytype/schemas/leaderboards':{RedisXpLeaderboardEntry:undefined,RedisXpLeaderboardScore:undefined,
       XpLeaderboardEntry:undefined,RedisXpLeaderboardEntrySchema:{parse:value => value}},
-    '@monkeytype/util/date-and-time':{getCurrentWeekTimestamp:() => { throw new Error('Use explicit isolated week'); }},
+    '@monkeytype/util/date-and-time':{getCurrentWeekTimestamp:dates.namespace.getCurrentWeekTimestamp},
     '../utils/error':{default:Error},
     '@monkeytype/util/json':{parseWithSchema:value => JSON.parse(value)},
     '../utils/misc':{omit:(value,keys) => Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)))},
@@ -107,10 +115,35 @@ try {
   assert.equal(await board.getRank('a',configuration,[]),null);
   assert.equal(await board.getResults(0,10,{enabled:false},false),null);
   await assert.rejects(() => board.getResults(-1,10,configuration,false));
+  // Exercise the complete default-constructor write/read path, not merely a
+  // replacement week arithmetic function. Future clock fixtures avoid expiry.
+  const previousTZ = process.env.TZ;
+  const partitionFixtures = [];
+  try {
+    for (const zone of ['Asia/Shanghai','America/Los_Angeles','America/New_York','Pacific/Chatham']) {
+      process.env.TZ = zone;
+      for (const delta of [-1,0,12 * 3_600_000]) {
+        cli('FLUSHDB');
+        clockMilliseconds = Date.UTC(2030,9,7) + delta;
+        const currentKey = dates.namespace.getCurrentWeekTimestamp();
+        const current = new module.namespace.WeeklyXpLeaderboard();
+        await current.addResult(configuration,{entry:{uid:'partition',name:'Partition',timeTypedSeconds:15,
+          lastActivityTimestamp:clockMilliseconds},xpGained:52.75});
+        assert.deepEqual(cli('KEYS','monkeytype:weekly-xp-leaderboard:scores:*'),
+          ['monkeytype:weekly-xp-leaderboard:scores:'+currentKey]);
+        assert.equal((await current.getResults(0,10,configuration,false)).count,1);
+        const previous = new module.namespace.WeeklyXpLeaderboard(currentKey - 604_800_000);
+        assert.equal((await previous.getResults(0,10,configuration,false)).count,0);
+        partitionFixtures.push({zone,timestamp:clockMilliseconds,currentKey});
+      }
+    }
+  } finally {
+    if (previousTZ === undefined) delete process.env.TZ; else process.env.TZ = previousTZ;
+  }
   verify();
   process.stdout.write(emit ? JSON.stringify({referenceCommit:pin,redisVersion,fixtures,
-    global:global.entries,friends:friends.entries,friendsSecondPage:friendsSecondPage.entries,rank})
-    : `Weekly XP read source passed (${fixtures.length} numeric fixtures, real Lua/global/friends/rank/pagination; Redis ${redisVersion}; isolated socket, no GUI)\n`);
+    global:global.entries,friends:friends.entries,friendsSecondPage:friendsSecondPage.entries,rank,partitionFixtures})
+    : `Weekly XP read source passed (${fixtures.length} numeric, ${partitionFixtures.length} default-clock fixtures, real Lua/global/friends/rank/pagination; Redis ${redisVersion}; isolated socket, no GUI)\n`);
 } finally {
   if (server.pid && !spawnError && server.exitCode === null && server.signalCode === null) {
     try { cli('SHUTDOWN','NOSAVE'); } catch { server.kill('SIGTERM'); }

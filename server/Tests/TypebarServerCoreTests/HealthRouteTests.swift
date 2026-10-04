@@ -5612,7 +5612,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(TypebarExperiencePolicy.points(for: zen), 0)
   }
 
-  func testExperienceLeaderboardSeparatesCurrentAndPreviousISOWeeks() async throws {
+  func testExperienceLeaderboardSeparatesCurrentAndPreviousAcceptanceWeeks() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let current = try await store.register(
       .init(email: "xp-current@example.com", password: "a secure password", displayName: "Current XP"))
@@ -5624,7 +5624,7 @@ final class HealthRouteTests: XCTestCase {
       now: now)
     _ = try await store.submitResult(
       result(id: UUID(), wpm: 75, accuracy: 99, finishedAt: now.addingTimeInterval(-60 * 60 * 24 * 8)),
-      accessToken: previous.accessToken, now: now)
+      accessToken: previous.accessToken, now: now.addingTimeInterval(-60 * 60 * 24 * 8))
 
     let thisWeek = try await store.experienceLeaderboard(period: "week", now: now)
     let lastWeek = try await store.experienceLeaderboard(period: "lastWeek", now: now)

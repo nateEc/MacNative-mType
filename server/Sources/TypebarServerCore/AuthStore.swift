@@ -1282,11 +1282,13 @@ public actor AuthStore {
   private let minimumLeaderboardTypingSeconds: Int
   private let rankingEnvironment: RankingEnvironment
   private let experienceConfiguration: ExperienceCalculationConfiguration?
+  private let weeklyExperienceTimeZone: TimeZone
 
   public init(
     fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0,
     experienceConfiguration: ExperienceCalculationConfiguration? = .typebarDefault,
-    rankingEnvironment: RankingEnvironment = .production
+    rankingEnvironment: RankingEnvironment = .production,
+    weeklyExperienceTimeZone: TimeZone = .current
   ) throws {
     guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
       minimumLeaderboardTypingSeconds)
@@ -1297,6 +1299,7 @@ public actor AuthStore {
     self.rankingEnvironment = rankingEnvironment
     try experienceConfiguration?.validateForProduction()
     self.experienceConfiguration = experienceConfiguration
+    self.weeklyExperienceTimeZone = weeklyExperienceTimeZone
     guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
       state = .init()
       committedState = state
@@ -3302,15 +3305,16 @@ public actor AuthStore {
   }
 
   private func weeklyExperience(
-    for userID: UUID, since: Date? = nil, before: Date? = nil,
+    for userID: UUID, partitionKey: Int, since: Date? = nil, before: Date? = nil,
     acceptedOnOrAfter rollingLeaderboardResumedAt: Date? = nil
   ) -> Double {
     state.experienceAwards!
       .filter {
         $0.userID == userID
           && $0.rankingAdmission?.decision.weeklyExperienceEligible != false
-          && (since == nil || $0.finishedAt >= since!)
-          && (before == nil || $0.finishedAt < before!)
+          && ($0.weeklyPartition.map { $0.keyMilliseconds == partitionKey }
+            ?? ((since == nil || $0.finishedAt >= since!)
+              && (before == nil || $0.finishedAt < before!)))
           && (rollingLeaderboardResumedAt == nil
             || $0.acceptedAt.map { $0 >= rollingLeaderboardResumedAt! } == true)
       }
@@ -3349,6 +3353,7 @@ public actor AuthStore {
         || user.displayNameChangeRequired || user.accountSuspended)
     record.rankingAdmission = .init(version: 1, input: rankingInput, context: rankingContext,
       decision: RankingAdmission.evaluate(rankingInput, context: rankingContext))
+    record.weeklyPartition = try .capture(at: now, timeZone: weeklyExperienceTimeZone)
     try record.validate()
     let allAwards = state.experienceAwards!.filter { $0.userID == userID }.reduce(0.0) { $0 + $1.award.xp }
     guard Double(experience(for: userID)) + Double(record.accountCredit) <= 9_007_199_254_740_991,
@@ -3384,7 +3389,7 @@ public actor AuthStore {
     }
     let isLeaderboardEligible = !user.leaderboardOptedOut
       && leaderboardEligibility(for: user).isEligible
-    let weeklyEntries = experienceLeaderboardEntries(now: now)
+    let weeklyEntries = try experienceLeaderboardEntries(now: now)
     let isToday = request.finishedAt >= Calendar.current.startOfDay(for: now)
     let isSpeedEligible = isLeaderboardEligible
       && (reward.rankingAdmission?.decision.speedEligible ?? (request.bailedOut != true))
@@ -3777,7 +3782,7 @@ public actor AuthStore {
   ) throws -> ExperienceLeaderboardResponse
   {
     let resolvedPeriod = try experienceLeaderboardPeriod(period)
-    let entries = experienceLeaderboardEntries(
+    let entries = try experienceLeaderboardEntries(
       eligibleUserIDs: eligibleUserIDs, period: resolvedPeriod, now: now)
     let pagination = try leaderboardPagination(offset: offset, limit: limit, defaultLimit: 100)
     return .init(
@@ -3792,7 +3797,7 @@ public actor AuthStore {
     let user = try authenticatedUser(for: accessToken, now: now)
     let resolvedPeriod = try experienceLeaderboardPeriod(period)
     return .init(
-      entry: experienceLeaderboardEntries(period: resolvedPeriod, now: now)
+      entry: try experienceLeaderboardEntries(period: resolvedPeriod, now: now)
         .first(where: { $0.userID == user.id }),
       period: resolvedPeriod.rawValue, eligibility: leaderboardEligibility(for: user.id))
   }
@@ -3815,7 +3820,7 @@ public actor AuthStore {
     let current = try authenticatedUser(for: accessToken, now: now)
     let resolvedPeriod = try experienceLeaderboardPeriod(period)
     return .init(
-      entry: experienceLeaderboardEntries(
+      entry: try experienceLeaderboardEntries(
         eligibleUserIDs: acceptedFriendIDs(for: current.id), period: resolvedPeriod, friendsList: false, now: now
       ).first(where: { $0.userID == current.id }),
       period: resolvedPeriod.rawValue, eligibility: leaderboardEligibility(for: current.id))
@@ -3843,7 +3848,10 @@ public actor AuthStore {
   private func experienceLeaderboardEntries(
     eligibleUserIDs: Set<UUID>? = nil, period: ExperienceLeaderboardPeriod = .week,
     friendsList: Bool = true, now: Date
-  ) -> [ExperienceLeaderboardEntry] {
+  ) throws -> [ExperienceLeaderboardEntry] {
+    let currentKey = try WeeklyExperiencePartition.capture(at: now,
+      timeZone: weeklyExperienceTimeZone).keyMilliseconds
+    let partitionKey = period == .lastWeek ? currentKey - WeeklyExperiencePartition.week : currentKey
     let calendar = Calendar(identifier: .iso8601)
     let currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
     let lowerBound: Date
@@ -3863,7 +3871,7 @@ public actor AuthStore {
         leaderboardEligibility(for: user, typingSeconds: typingSecondsByUser[user.id] ?? 0).isEligible
       else { return nil }
       let weeklyPoints = weeklyExperience(
-        for: user.id, since: lowerBound, before: upperBound,
+        for: user.id, partitionKey: partitionKey, since: lowerBound, before: upperBound,
         acceptedOnOrAfter: user.rollingLeaderboardResumedAt)
       return weeklyPoints > 0 ? (user, weeklyPoints) : nil
     }

@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-05 最新 [周 XP 分区合同](WEEKLY_XP_PARTITION_CONTRACT.md)：新奖励原子保存可选 weeklyPartition，以首次接受时间和固定服务端时区计算原版后端 key；上周 key 等于当前 key 减七天。缺字段继续旧 ISO 路径，显式损坏拒绝且不覆盖文件。TYPEBAR_WEEKLY_XP_TIME_ZONE 可显式配置，错误值拒绝启动；原生 UTC 倒计时不变。禁止旧 writer 覆盖新文件，真实切换／缓存／整体等价未验；下条周界未验描述为历史阶段。
+
 2026-10-05 最新 [周 XP 读取合同](WEEKLY_XP_READ_CONTRACT.md)：公开 totalExperience 保留既有 JSON 数字与 Double DTO，但使用整数前缀投影，不能当作奖励小数或累计信用。好友 rank 是全局名次、friendsRank 是新增可选好友内名次，列表与名次的格式化路径分别对应固定源行为；先升级原生端再升级服务，旧原生端不理解双名次。只读投影不迁移文件／重算奖励；缓存、周界和旧二进制仍未验。
 
 2026-10-05 最新扩展见 [榜单准入合同](RANKING_ADMISSION_CONTRACT.md)：resultRankingEvidence=available 协商匿名 version=1、stopOnLetter／modifiers；私有历史保留首次信息，XP 修饰器与语言必须一致。奖励墓碑增加可选准入快照，生产使用提交前严格时长资格；TYPEBAR_RANKING_ENVIRONMENT 默认 production，只显式 development 豁免时间。旧缺快照为未知，不回补周 XP、不重算奖励；完整榜单／PB 缓存、反作弊、混写／降级及部署未验，本机格式不变。
@@ -66,8 +68,8 @@
 | 匿名公开练习统计 | `GET /v1/public/practice-stats`、`GET /v1/public/speed-distribution` | 两者均为无认证只读接口。前者只返回完成成绩数、开始测试数和完成成绩的实际累计秒数；后者固定为 English、60 秒、time 成绩，每个允许公开统计的账户只取一个最高 WPM，并以十 WPM 非空桶返回。隐身、排行榜限制、显示名整改和账户封禁均即时排除贡献。响应绝不包含账户身份、邮箱、提示、输入、回放、令牌、单条时间戳或单条成绩；客户端只在 About 打开或用户主动重读时调用，旧服务不可用时不回退为本机统计（已实现） |
 | 排行榜 | `GET /v1/leaderboards`、`GET /v1/leaderboards/friends` | 前者为公开全局结果榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。两者都可按模式、语言与 `all`/`day`/`yesterday`/`week` 周期筛选；`yesterday` 是服务端当前日历日前的完整一天。每位用户仅保留该筛选下的最佳一条成绩，按此成绩排名，最多返回 100 位用户（部分实现） |
 | 我的 WPM 排名 | `GET /v1/leaderboards/rank`、`GET /v1/leaderboards/friends/rank` | 仅接受 Bearer 令牌，使用与相应全局/好友 WPM 榜完全相同的筛选、隐身和排序规则，返回当前账户的条目或空值；结果不受列表前 100 名限制，开发者密钥无此权限（部分实现） |
-| XP 排行榜 | `GET /v1/leaderboards/experience`、`GET /v1/leaderboards/experience/friends` | 前者为公开全局 ISO XP 榜；后者需要 Bearer 令牌且仅包含当前用户和已接受好友。`period` 可为 `week` 或 `lastWeek`，后者只包含前一个完整 ISO 周；响应回显实际范围，避免旧服务静默把上周请求当成本周。两者最多返回 100 位用户，返回展示名、服务端计算 XP 与名次（部分实现） |
-| 我的 XP 排名 | `GET /v1/leaderboards/experience/rank`、`GET /v1/leaderboards/experience/friends/rank` | 仅接受 Bearer 令牌，按相应全局/好友 ISO 周 XP 榜的既有规则返回当前账户条目或空值；`period` 可为 `week` 或 `lastWeek`，响应回显实际范围。结果不受前 100 名列表限制，开发者密钥无此权限（部分实现） |
+| XP 排行榜 | `GET /v1/leaderboards/experience`、`GET /v1/leaderboards/experience/friends` | 前者为公开全局 XP 榜；后者需要 Bearer 令牌且只含本人和已接受好友。period 为 week 或 lastWeek，回显实际范围；新奖励按首次接受冻结的后端 key，上周查询当前 key 减七天，旧缺分区奖励继续 ISO 兼容路径。公开 XP 在累计后投影为整数前缀，好友同时保留全局 rank 和好友 friendsRank；默认页 100、最多 200（部分实现，完整缓存未对齐） |
+| 我的 XP 排名 | `GET /v1/leaderboards/experience/rank`、`GET /v1/leaderboards/experience/friends/rank` | 仅接受 Bearer 令牌，与对应 XP 列表使用同一分区／排序；period 可为 week 或 lastWeek，回显实际范围。条目或空值不受列表前 100 名限制，好友有双名次；开发者密钥无此权限（部分实现） |
 | 资料 | `GET /v1/profiles?query=&limit=`、`GET /v1/profiles/{id}`、`GET/PATCH /v1/profiles/me`、`GET /v1/profiles/display-name-availability?name=` | 公开资料仅返回展示名、加入时间与聚合成绩；可按展示名搜索（2–40 字符，最多 50 项）。显示名预检为公开只读布尔查询，不预留名称或返回资料；带有效 Bearer 令牌时会排除当前账户，供仅大小写/重音调整使用，注册与改名写入仍是最终权威校验。本人可读取/更新显示名及 `leaderboardOptedOut`。已解锁徽章默认只以用户选择的一枚出现在资料和榜单；本人可通过可选 `showAllBadges` 明确开启公开资料的 `earnedBadges` 附加数组，省略 PATCH 字段会保留既有选择，旧账户/旧服务缺字段分别按 `false`/空数组处理，榜单永远不读取该数组。显示名在密码/OAuth 注册及改名时均按大小写与重音无关规则保证跨账户可用；首次改名可立即进行，之后每次实际改名须相隔至少 30 个 24 小时，部署方已设置显示名整改要求时可优先改为不同的可用名称。冷却时间只私有持久化，旧记录缺失时可立即改名；隐身/资料等无关更新、认证变更和账户重置不会绕过或刷新它。设为 `true` 会立即从全局和好友 WPM/XP 榜移除该账户，但不删除其服务端成绩、XP 或同步数据（部分实现） |
 | 好友 | `GET/POST /v1/connections`、`POST /v1/connections/{requesterID}/accept`、`DELETE /v1/connections/{userID}` | 受令牌保护的好友请求、接受、列表与解除关系（部分实现） |
 | 通知 | `GET /v1/notifications`、`POST /v1/notifications/{id}/read` | Bearer 令牌保护；仅返回当前账户的好友请求、接受与新私信事件及触发者公开资料，不携带私信正文，可单条标记已读（部分实现） |
