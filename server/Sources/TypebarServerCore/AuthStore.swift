@@ -664,6 +664,7 @@ public actor AuthStore {
     var results: [StoredResult] = []
     // Missing means a pre-ledger file; explicit null is corruption, not a migration.
     var experienceAwards: [ExperienceAwardRecord]? = []
+    var weeklyExperienceCache: WeeklyExperienceCache? = .init()
     var accountPractice: [UUID: AccountPracticeRecord]? = [:]
     var leaderboardRankMemories: [StoredLeaderboardRankMemory] = []
     var connections: [StoredConnection] = []
@@ -682,7 +683,7 @@ public actor AuthStore {
     private enum CodingKeys: String, CodingKey {
       case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, experienceAwards, accountPractice, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
-        nextSyncCursor
+        nextSyncCursor, weeklyExperienceCache
     }
 
     init() {}
@@ -707,6 +708,8 @@ public actor AuthStore {
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
       experienceAwards = values.contains(.experienceAwards)
         ? try values.decode([ExperienceAwardRecord].self, forKey: .experienceAwards) : nil
+      weeklyExperienceCache = values.contains(.weeklyExperienceCache)
+        ? try values.decode(WeeklyExperienceCache.self, forKey: .weeklyExperienceCache) : nil
       if values.contains(.accountPractice) {
         // UUID dictionaries encode as alternating key/value arrays. Reject a
         // duplicate explicitly rather than let Dictionary silently keep one.
@@ -1277,18 +1280,21 @@ public actor AuthStore {
 
   private var state: PersistedState
   private var committedState: PersistedState
+  private var legacyExperienceAwards: [ExperienceAwardRecord] = []
   private let fileURL: URL?
   private let bcryptCost: Int
   private let minimumLeaderboardTypingSeconds: Int
   private let rankingEnvironment: RankingEnvironment
   private let experienceConfiguration: ExperienceCalculationConfiguration?
   private let weeklyExperienceTimeZone: TimeZone
+  private let weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration
 
   public init(
     fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0,
     experienceConfiguration: ExperienceCalculationConfiguration? = .typebarDefault,
     rankingEnvironment: RankingEnvironment = .production,
-    weeklyExperienceTimeZone: TimeZone = .current
+    weeklyExperienceTimeZone: TimeZone = .current,
+    weeklyExperienceConfiguration: WeeklyExperienceLeaderboardConfiguration = .typebarDefault
   ) throws {
     guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
       minimumLeaderboardTypingSeconds)
@@ -1300,6 +1306,8 @@ public actor AuthStore {
     try experienceConfiguration?.validateForProduction()
     self.experienceConfiguration = experienceConfiguration
     self.weeklyExperienceTimeZone = weeklyExperienceTimeZone
+    try weeklyExperienceConfiguration.validate()
+    self.weeklyExperienceConfiguration = weeklyExperienceConfiguration
     guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
       state = .init()
       committedState = state
@@ -1310,6 +1318,14 @@ public actor AuthStore {
     committedState = state
     try Self.initializeExperienceAwards(state: &state)
     try Self.initializeAccountPractice(state: &state)
+    if state.weeklyExperienceCache == nil {
+      guard !state.experienceAwards!.contains(where: { $0.weeklyCacheReceipt != nil }) else {
+        throw WeeklyExperienceCacheError.invalidState
+      }
+      state.weeklyExperienceCache = .init()
+    }
+    try state.weeklyExperienceCache!.validate(users:Set(state.users.map(\.id)),awards:state.experienceAwards!)
+    legacyExperienceAwards = state.experienceAwards!.filter { $0.weeklyCacheReceipt == nil }
     committedState = state
   }
 
@@ -2254,6 +2270,7 @@ public actor AuthStore {
     }
     state.streakDayBoundaryOffsets.removeValue(forKey: userID)
     state.experienceAwards?.removeAll { $0.userID == userID }
+    state.weeklyExperienceCache?.purge(userID:userID)
     state.accountPractice?.removeValue(forKey: userID)
     state.personalBestResetDates.removeValue(forKey: userID)
     try persist()
@@ -2294,6 +2311,7 @@ public actor AuthStore {
     state.syncRecords.removeAll { $0.userID == user.id }
     state.results.removeAll { $0.userID == user.id }
     state.experienceAwards?.removeAll { $0.userID == user.id }
+    state.weeklyExperienceCache?.purge(userID:user.id)
     state.accountPractice?[user.id] = .init()
     state.leaderboardRankMemories.removeAll { $0.userID == user.id }
     state.notifications.removeAll { $0.recipientID == user.id }
@@ -2340,6 +2358,9 @@ public actor AuthStore {
       showAllBadges: request.showAllBadges ?? user.showAllBadges,
       startedTestCount: user.startedTestCount)
     state.users[index] = updatedUser
+    if weeklyExperienceConfiguration.enabled, !user.leaderboardOptedOut && updatedUser.leaderboardOptedOut {
+      state.weeklyExperienceCache?.purge(userID:user.id)
+    }
     try persist()
     return userResponse(for: updatedUser)
   }
@@ -2783,10 +2804,11 @@ public actor AuthStore {
     }
     if state.users[index].accountSuspended != suspended {
       state.users[index].accountSuspended = suspended
+      if suspended && weeklyExperienceConfiguration.enabled { state.weeklyExperienceCache?.purge(userID:userID) }
       if !suspended {
         // Monkeytype removes Redis-backed daily and weekly XP entries on ban.
-        // Typebar derives those views from retained results, so reopening an
-        // account records the equivalent boundary without deleting practice.
+        // Keep the compatibility boundary for old derived rows and daily WPM;
+        // new weekly XP rows are separately purged from the mutable cache.
         state.users[index].rollingLeaderboardResumedAt = now
       }
       try persist()
@@ -3304,23 +3326,19 @@ public actor AuthStore {
     state.experienceAwards!.filter { $0.userID == userID }.reduce(0) { $0 + $1.accountCredit }
   }
 
-  private func weeklyExperience(
-    for userID: UUID, partitionKey: Int, since: Date? = nil, before: Date? = nil,
-    acceptedOnOrAfter rollingLeaderboardResumedAt: Date? = nil
-  ) -> Double {
-    state.experienceAwards!
-      .filter {
-        $0.userID == userID
-          && $0.rankingAdmission?.decision.weeklyExperienceEligible != false
-          && ($0.weeklyPartition.map { $0.keyMilliseconds == partitionKey }
-            ?? ((since == nil || $0.finishedAt >= since!)
-              && (before == nil || $0.finishedAt < before!)))
-          && (rollingLeaderboardResumedAt == nil
-            || $0.acceptedAt.map { $0 >= rollingLeaderboardResumedAt! } == true)
-      }
-      .reduce(0) { total, record in
-        total + record.award.xp
-      }
+  private func legacyWeeklyExperience(partitionKey: Int, since: Date, before: Date?,
+    users: [UUID: StoredUser]) -> [UUID: Double] {
+    var scores: [UUID: Double] = [:]
+    for record in legacyExperienceAwards {
+      guard let user = users[record.userID], record.rankingAdmission?.decision.weeklyExperienceEligible != false,
+        record.weeklyPartition.map({ $0.keyMilliseconds == partitionKey })
+          ?? (record.finishedAt >= since && (before == nil || record.finishedAt < before!)),
+        user.rollingLeaderboardResumedAt.map({ boundary in
+          record.acceptedAt.map { $0 >= boundary } == true
+        }) ?? true else { continue }
+      scores[record.userID,default:0] += record.award.xp
+    }
+    return scores
   }
 
   private func prepareExperienceAward(for request: ResultSubmissionRequest, userID: UUID,
@@ -3389,7 +3407,8 @@ public actor AuthStore {
     }
     let isLeaderboardEligible = !user.leaderboardOptedOut
       && leaderboardEligibility(for: user).isEligible
-    let weeklyEntries = try experienceLeaderboardEntries(now: now)
+    let weeklyEntries = weeklyExperienceConfiguration.enabled
+      ? try experienceLeaderboardEntries(now: now) : []
     let isToday = request.finishedAt >= Calendar.current.startOfDay(for: now)
     let isSpeedEligible = isLeaderboardEligible
       && (reward.rankingAdmission?.decision.speedEligible ?? (request.bailedOut != true))
@@ -3410,9 +3429,10 @@ public actor AuthStore {
       dailyLeaderboardRank: dailyRank,
       experienceGained: reward.award.xp,
       totalExperience: experience(for: userID),
-      weeklyExperienceRank: isLeaderboardEligible && reward.award.xp > 0
+      weeklyExperienceRank: weeklyExperienceConfiguration.enabled && isLeaderboardEligible && reward.award.xp > 0
         && reward.rankingAdmission?.decision.weeklyExperienceEligible != false
-        ? weeklyEntries.first(where: { $0.userID == userID })?.rank
+        ? (reward.weeklyCacheReceipt != nil ? reward.weeklyCacheReceipt!.rank
+          : weeklyEntries.first(where: { $0.userID == userID })?.rank)
         : nil,
       dailyXpBonus: reward.input == nil ? nil : reward.award.dailyBonus ?? false,
       xpBreakdown: reward.input == nil ? nil : reward.award.breakdown ?? [:]
@@ -3535,8 +3555,18 @@ public actor AuthStore {
     let admissionDate = Date(timeIntervalSince1970: now.timeIntervalSince1970.rounded(.down))
     try practice.record(restarts: request.restartCount, seconds: seconds, at: admissionDate,
       offsetHours: state.streakDayBoundaryOffsets[user.id] ?? 0)
-    let reward = try prepareExperienceAward(for: request, userID: user.id, now: now,
+    var reward = try prepareExperienceAward(for: request, userID: user.id, now: now,
       streakDays: practice.streakLength)
+    var cache = state.weeklyExperienceCache!
+    let cacheRank: Int?
+    if weeklyExperienceConfiguration.enabled, reward.award.xp > 0,
+      reward.rankingAdmission!.decision.weeklyExperienceEligible {
+      cacheRank = try cache.add(userID:user.id,displayName:user.displayName,xp:reward.award.xp,
+        seconds:seconds,partition:reward.weeklyPartition!,configuration:weeklyExperienceConfiguration,now:now)
+    } else { cacheRank = nil }
+    reward.weeklyCacheReceipt = .init(version:1,configuration:weeklyExperienceConfiguration,
+      timeTypedSeconds:seconds,rank:cacheRank)
+    try reward.validate()
     let existingBadgeIDs = Set(availablePublicBadges(for: user.id).map(\.id))
     state.results.append(
       .init(
@@ -3561,6 +3591,7 @@ public actor AuthStore {
     state.users[userIndex].startedTestCount = practice.startedTests
     state.accountPractice![user.id] = practice
     state.experienceAwards!.append(reward)
+    state.weeklyExperienceCache = cache
     for badge in availablePublicBadges(for: user.id) where !existingBadgeIDs.contains(badge.id) {
       appendNotification(
         .init(
@@ -3849,9 +3880,17 @@ public actor AuthStore {
     eligibleUserIDs: Set<UUID>? = nil, period: ExperienceLeaderboardPeriod = .week,
     friendsList: Bool = true, now: Date
   ) throws -> [ExperienceLeaderboardEntry] {
+    guard weeklyExperienceConfiguration.enabled else { throw WeeklyExperienceCacheError.unavailable }
     let currentKey = try WeeklyExperiencePartition.capture(at: now,
       timeZone: weeklyExperienceTimeZone).keyMilliseconds
     let partitionKey = period == .lastWeek ? currentKey - WeeklyExperiencePartition.week : currentKey
+    state.weeklyExperienceCache!.expire(at:now)
+    // Evictions survive an unrelated failed save in this actor, but pure reads
+    // never rewrite the file. Successful normal writes persist the cleanup.
+    committedState.weeklyExperienceCache = state.weeklyExperienceCache
+    let cached = Dictionary(uniqueKeysWithValues:(state.weeklyExperienceCache!.buckets.first {
+      $0.keyMilliseconds == partitionKey
+    }?.entries ?? []).map { ($0.userID,$0) })
     let calendar = Calendar(identifier: .iso8601)
     let currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
     let lowerBound: Date
@@ -3866,13 +3905,15 @@ public actor AuthStore {
       upperBound = currentWeekStart
     }
     let typingSecondsByUser = totalTypingSecondsByUser()
+    let legacyScores = legacyWeeklyExperience(partitionKey:partitionKey,since:lowerBound,before:upperBound,
+      users:Dictionary(uniqueKeysWithValues:state.users.map { ($0.id,$0) }))
     let globallyRanked = state.users.compactMap { user -> (StoredUser, Double)? in
-      guard !user.leaderboardOptedOut,
-        leaderboardEligibility(for: user, typingSeconds: typingSecondsByUser[user.id] ?? 0).isEligible
+      guard !user.leaderboardOptedOut, !user.accountSuspended,
+        !user.leaderboardRestricted, !user.displayNameChangeRequired
       else { return nil }
-      let weeklyPoints = weeklyExperience(
-        for: user.id, partitionKey: partitionKey, since: lowerBound, before: upperBound,
-        acceptedOnOrAfter: user.rollingLeaderboardResumedAt)
+      let legacyPoints = leaderboardEligibility(for:user,typingSeconds:typingSecondsByUser[user.id] ?? 0).isEligible
+        ? legacyScores[user.id,default:0] : 0
+      let weeklyPoints = (cached[user.id]?.score ?? 0) + legacyPoints
       return weeklyPoints > 0 ? (user, weeklyPoints) : nil
     }
     .sorted {
@@ -3887,7 +3928,7 @@ public actor AuthStore {
       return ExperienceLeaderboardEntry(
         id: value.0.id, rank: ranked.offset + 1,
         friendsRank: eligibleUserIDs == nil ? nil : friendOffset + 1,
-        userID: value.0.id, displayName: value.0.displayName,
+        userID: value.0.id, displayName: cached[value.0.id]?.displayName ?? value.0.displayName,
         totalExperience: WeeklyExperiencePublicScore.project(value.1,
           friendsList: eligibleUserIDs != nil && friendsList), selectedBadge: selectedPublicBadge(for: value.0),
         discordAvatar: publicDiscordAvatar(for: value.0))
@@ -4129,6 +4170,7 @@ public actor AuthStore {
   }
 
   private func persist() throws {
+    defer { legacyExperienceAwards = state.experienceAwards?.filter { $0.weeklyCacheReceipt == nil } ?? [] }
     guard let fileURL else {
       committedState = state
       return

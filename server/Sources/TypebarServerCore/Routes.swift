@@ -45,7 +45,8 @@ public func configure(
             experienceConfiguration: try .fromJSON(Environment.get("TYPEBAR_XP_CONFIGURATION")),
             rankingEnvironment: try .fromEnvironment(Environment.get("TYPEBAR_RANKING_ENVIRONMENT")),
             weeklyExperienceTimeZone: try WeeklyExperiencePartition.configuredTimeZone(
-                Environment.get("TYPEBAR_WEEKLY_XP_TIME_ZONE")))
+                Environment.get("TYPEBAR_WEEKLY_XP_TIME_ZONE")),
+            weeklyExperienceConfiguration: try .fromJSON(Environment.get("TYPEBAR_WEEKLY_XP_CONFIGURATION")))
     }
     let authStore = resolvedAuthStore
     app.middleware.use(TypebarMaintenanceMiddleware(isEnabled: maintenanceMode))
@@ -1000,6 +1001,8 @@ public func configure(
                 period: try request.query.decode(ExperienceLeaderboardQuery.self).period,
                 accessToken: try request.accessToken()
             )
+        } catch WeeklyExperienceCacheError.unavailable {
+            throw Abort(.notFound, reason: "Weekly XP leaderboard is disabled.")
         } catch let error as AuthStoreError {
             throw error.abort
         } catch is ResultStoreError {
@@ -1013,6 +1016,8 @@ public func configure(
                 period: try request.query.decode(ExperienceLeaderboardQuery.self).period,
                 accessToken: try request.accessToken()
             )
+        } catch WeeklyExperienceCacheError.unavailable {
+            throw Abort(.notFound, reason: "Weekly XP leaderboard is disabled.")
         } catch let error as AuthStoreError {
             throw error.abort
         } catch is ResultStoreError {
@@ -1026,6 +1031,8 @@ public func configure(
             return try await authStore.experienceLeaderboard(
                 period: query.period, offset: query.offset, limit: query.limit
             )
+        } catch WeeklyExperienceCacheError.unavailable {
+            throw Abort(.notFound, reason: "Weekly XP leaderboard is disabled.")
         } catch is ResultStoreError {
             throw Abort(.badRequest, reason: "The experience leaderboard period was invalid.")
         }
@@ -1038,6 +1045,8 @@ public func configure(
                 period: query.period, offset: query.offset, limit: query.limit,
                 accessToken: try request.accessToken()
             )
+        } catch WeeklyExperienceCacheError.unavailable {
+            throw Abort(.notFound, reason: "Weekly XP leaderboard is disabled.")
         } catch let error as AuthStoreError {
             throw error.abort
         } catch is ResultStoreError {

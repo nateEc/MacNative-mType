@@ -133,7 +133,9 @@ final class WeeklyExperiencePartitionTests: XCTestCase {
     let owner = try await store.register(.init(email:"legacy@example.com",password:password,displayName:"Legacy"),now:now)
     _ = try await store.submitResult(request(at:now.addingTimeInterval(-6 * 86_400)),accessToken:owner.accessToken,now:now)
     var object = try json(file), awards = try XCTUnwrap(object["experienceAwards"] as? [[String:Any]])
-    awards[0].removeValue(forKey:"weeklyPartition"); object["experienceAwards"] = awards
+    awards[0].removeValue(forKey:"weeklyPartition")
+    awards[0].removeValue(forKey:"weeklyCacheReceipt"); object["experienceAwards"] = awards
+    object.removeValue(forKey:"weeklyExperienceCache")
     let legacy = try JSONSerialization.data(withJSONObject:object)
     try legacy.write(to:file,options:.atomic)
     let loaded = try AuthStore(fileURL:file,bcryptCost:4,rankingEnvironment:.development,

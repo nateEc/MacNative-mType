@@ -45,12 +45,13 @@ try {
     .match(/redis_version:([^\r\n]+)/)[1];
   assert.equal(redisVersion,'6.2.6','Use the server version pinned in the reference compose files');
   const lua = name => fs.readFileSync(path.join(root,'backend/redis-scripts',name+'.lua'),'utf8');
-  const scripts = Object.fromEntries(['get-results','get-rank','add-result-increment'].map(name => [name,lua(name)]));
+  const scripts = Object.fromEntries(['get-results','get-rank','add-result-increment','purge-results'].map(name => [name,lua(name)]));
   const connection = {
     hget:(...args) => cli('HGET',...args),
     addResultIncrement:(...args) => cli('EVAL',scripts['add-result-increment'],...args),
     getResults:(...args) => cli('EVAL',scripts['get-results'],...args),
     getRank:(...args) => cli('EVAL',scripts['get-rank'],...args),
+    purgeResults:(...args) => cli('EVAL',scripts['purge-results'],...args),
   };
   let clockMilliseconds = Date.now();
   const clock = new Proxy(Date, {
@@ -140,10 +141,78 @@ try {
   } finally {
     if (previousTZ === undefined) delete process.env.TZ; else process.env.TZ = previousTZ;
   }
+  const cacheFixtures = [];
+  const firstID = '00000000-0000-0000-0000-00000000000A';
+  const secondID = '00000000-0000-0000-0000-00000000000B';
+  const scenarios = [
+    {label:'singleton/multi/purge/disabled',timestamp:Date.UTC(2030,9,7,12),operations:[
+      {action:'add',uid:firstID,xp:10,seconds:2.5,name:'Before',days:14,enabled:true},
+      {action:'add',uid:firstID,xp:5,seconds:3,name:'Changed',days:20,enabled:true},
+      {action:'add',uid:secondID,xp:3,seconds:4,name:'Second',days:10,enabled:true},
+      {action:'add',uid:secondID,xp:7,seconds:5,name:'Second',days:1,enabled:true},
+      {action:'add',uid:firstID,xp:100,seconds:100,name:'Not cached',days:30,enabled:false},
+      {action:'purge',uid:firstID,days:20,enabled:false},
+      {action:'purge',uid:firstID,days:20,enabled:true},
+      {action:'add',uid:secondID,xp:2,seconds:1,name:'Remaining',days:3,enabled:true},
+      {action:'purge',uid:secondID,days:3,enabled:true},
+      {action:'add',uid:firstID,xp:1,seconds:0.75,name:'Recreated',days:15,enabled:true},
+    ]},
+    {label:'immediate-expiry',timestamp:Math.floor(Date.now()/86_400_000)*86_400_000+3_600_000,operations:[
+      {action:'add',uid:firstID,xp:10,seconds:2,name:'Expired',days:0,enabled:true},
+      {action:'add',uid:secondID,xp:20,seconds:3,name:'Expired too',days:0,enabled:true},
+    ]},
+  ];
+  try {
+    process.env.TZ = 'UTC';
+    for (const scenario of scenarios) {
+      cli('FLUSHDB');
+      clockMilliseconds = scenario.timestamp;
+      const key = dates.namespace.getCurrentWeekTimestamp();
+      const cachedBoard = new module.namespace.WeeklyXpLeaderboard(key);
+      const scoresKey = 'monkeytype:weekly-xp-leaderboard:scores:'+key;
+      const resultsKey = 'monkeytype:weekly-xp-leaderboard:results:'+key;
+      const operations = [];
+      for (const [index,operation] of scenario.operations.entries()) {
+        clockMilliseconds = scenario.timestamp + index * 1_000;
+        const config = {enabled:operation.enabled,expirationTimeInDays:operation.days};
+        let rank = null;
+        if (operation.action === 'add') {
+          rank = await cachedBoard.addResult(config,{entry:{uid:operation.uid,name:operation.name,
+            timeTypedSeconds:operation.seconds,lastActivityTimestamp:clockMilliseconds},xpGained:operation.xp});
+        } else await module.namespace.purgeUserFromXpLeaderboards(operation.uid,config);
+        const entries = (await cachedBoard.getResults(0,10,{enabled:true},false)).entries;
+        const readDeadline = cacheKey => {
+          const [seconds,microseconds,ttl] = cli('EVAL',
+            'local t=redis.call("TIME"); return {t[1],t[2],redis.call("PTTL",KEYS[1])}',1,cacheKey);
+          assert.ok(ttl >= 0 || ttl === -2,'All owned cache keys must have an expiry');
+          return ttl === -2 ? null : Math.round((Number(seconds)*1_000+Number(microseconds)/1_000+ttl)/1_000)*1_000;
+        };
+        const expiresAtMilliseconds = readDeadline(scoresKey);
+        assert.equal(readDeadline(resultsKey),expiresAtMilliseconds);
+        const observed = Array.from(entries,entry => ({uid:entry.uid,name:entry.name,
+          timeTypedSeconds:entry.timeTypedSeconds,lastActivityMilliseconds:entry.lastActivityTimestamp,
+          score:Number(cli('ZSCORE',scoresKey,entry.uid))}));
+        operations.push({...operation,timestamp:clockMilliseconds,rank,expiresAtMilliseconds,entries:observed});
+      }
+      cacheFixtures.push({label:scenario.label,key,operations});
+    }
+  } finally {
+    if (previousTZ === undefined) delete process.env.TZ; else process.env.TZ = previousTZ;
+  }
+  const operations = cacheFixtures[0].operations;
+  assert.equal(operations[1].expiresAtMilliseconds,cacheFixtures[0].key + 20 * 86_400_000);
+  assert.equal(operations[3].expiresAtMilliseconds,operations[1].expiresAtMilliseconds);
+  assert.equal(operations[4].rank,-1); assert.equal(operations[5].entries.length,2);
+  assert.equal(operations[7].expiresAtMilliseconds,cacheFixtures[0].key + 3 * 86_400_000);
+  assert.equal(operations[8].entries.length,0);
+  for (const operation of cacheFixtures[1].operations) {
+    assert.equal(operation.rank,1); assert.equal(operation.entries.length,0);
+    assert.equal(operation.expiresAtMilliseconds,null);
+  }
   verify();
   process.stdout.write(emit ? JSON.stringify({referenceCommit:pin,redisVersion,fixtures,
-    global:global.entries,friends:friends.entries,friendsSecondPage:friendsSecondPage.entries,rank,partitionFixtures})
-    : `Weekly XP read source passed (${fixtures.length} numeric, ${partitionFixtures.length} default-clock fixtures, real Lua/global/friends/rank/pagination; Redis ${redisVersion}; isolated socket, no GUI)\n`);
+    global:global.entries,friends:friends.entries,friendsSecondPage:friendsSecondPage.entries,rank,partitionFixtures,cacheFixtures})
+    : `Weekly XP read source passed (${fixtures.length} numeric, ${partitionFixtures.length} default-clock, ${cacheFixtures.reduce((sum,item)=>sum+item.operations.length,0)} cache lifecycle operations; real Lua/global/friends/rank/pagination; Redis ${redisVersion}; isolated socket, no GUI)\n`);
 } finally {
   if (server.pid && !spawnError && server.exitCode === null && server.signalCode === null) {
     try { cli('SHUTDOWN','NOSAVE'); } catch { server.kill('SIGTERM'); }
