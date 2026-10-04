@@ -116,6 +116,7 @@ run_logged_check "running native client test suite" "$temporary_directory/client
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"
 run_logged_check "running self-hosted service test suite" "$temporary_directory/service-tests.log" \
+  env TYPEBAR_REFERENCE_ROOT="$reference_root" \
   zsh -c 'cd "$1" && swift test' -- "$project_root/server"
 
 require_no_conflicting_processes || fail "stop the listed process before packaging"
