@@ -1199,7 +1199,7 @@ struct PreferencesView: View {
                 user.streakDayBoundaryOffsetHours != nil || account.isWorking || user.accountSuspended)
               Text(
                 user.streakDayBoundaryOffsetHours.map {
-                  "此账户已固定为 \(streakDayBoundaryLabel(for: $0))；公开活动日历与当前/最长连续天数使用该分界。"
+                  "此账户已固定为 \(streakDayBoundaryLabel(for: $0))；后续连续天数按该分界更新，活动日历始终按 UTC。"
                 }
                   ?? "默认按 UTC 00:00 分日。可在 −11 至 +12 小时之间选择 30 分钟档位；确认后此账户不能再次更改。"
               )
@@ -1221,7 +1221,7 @@ struct PreferencesView: View {
                 }
               }
             } message: {
-              Text("将固定为 \(streakDayBoundaryLabel(for: publicStreakDayBoundaryOffsetHours))。这个账户之后不能再次更改，但不会修改既有成绩时间。")
+              Text("将固定为 \(streakDayBoundaryLabel(for: publicStreakDayBoundaryOffsetHours))，并从现在起判断下一次提交的连续天数。不会重算既有连续天数、活动日历或成绩时间；这个账户之后不能再次更改。")
             }
             Divider()
             VStack(alignment: .leading, spacing: 9) {
@@ -1249,7 +1249,10 @@ struct PreferencesView: View {
               TextField("X / Twitter 用户名（可选）", text: $profileSocialHandle)
               TextField("个人网站（https://，可选）", text: $profileWebsiteURL)
                 .textContentType(.URL)
-              Toggle("在公开资料显示练习活动", isOn: $profileShowsActivity)
+              Toggle("在公开资料显示活动日历", isOn: $profileShowsActivity)
+              Text("此选项只隐藏日历；累计统计与连续天数仍属于公开基础资料。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
               if user.authenticationMethods.contains(.discord) {
                 Toggle("在公开资料显示 Discord 头像", isOn: $profileShowsDiscordAvatar)
               } else {

@@ -438,6 +438,7 @@ public struct PublicProfileResponse: Content, Equatable {
   public let selectedBadge: PublicProfileBadge?
   /// Typebar-owned earned badges, returned only after the owner opts in.
   public let earnedBadges: [PublicProfileBadge]
+  public var practiceHistoryComplete: Bool? = nil
 }
 
 /// A Typebar-owned badge that can be selected for public profiles and
@@ -475,13 +476,11 @@ public struct PublicProfileBestResponse: Content, Equatable, Identifiable {
 /// lists intentionally omit it.
 public struct PublicProfileActivityResponse: Content, Equatable {
   public let lastDay: Date
-  public let testsByDays: [Int]
+  public let testsByDays: [Int?]
   public let dayBoundaryOffsetHours: Double
 }
 
-/// A public streak summary derived using the same fixed boundary as activity.
-/// It shares the activity visibility preference and never includes individual
-/// result timestamps.
+/// Persisted streak summary. Activity visibility only controls the calendar.
 public struct PublicProfileStreakResponse: Content, Equatable {
   public let currentDays: Int
   public let longestDays: Int
@@ -665,6 +664,7 @@ public actor AuthStore {
     var results: [StoredResult] = []
     // Missing means a pre-ledger file; explicit null is corruption, not a migration.
     var experienceAwards: [ExperienceAwardRecord]? = []
+    var accountPractice: [UUID: AccountPracticeRecord]? = [:]
     var leaderboardRankMemories: [StoredLeaderboardRankMemory] = []
     var connections: [StoredConnection] = []
     var blockedUserIDs: [UUID: [UUID]] = [:]
@@ -680,7 +680,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, experienceAwards, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
+      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, experienceAwards, accountPractice, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
         nextSyncCursor
     }
@@ -707,6 +707,20 @@ public actor AuthStore {
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
       experienceAwards = values.contains(.experienceAwards)
         ? try values.decode([ExperienceAwardRecord].self, forKey: .experienceAwards) : nil
+      if values.contains(.accountPractice) {
+        // UUID dictionaries encode as alternating key/value arrays. Reject a
+        // duplicate explicitly rather than let Dictionary silently keep one.
+        var entries = try values.superDecoder(forKey: .accountPractice).unkeyedContainer()
+        var decoded: [UUID: AccountPracticeRecord] = [:]
+        while !entries.isAtEnd {
+          let id = try entries.decode(UUID.self)
+          guard decoded[id] == nil else {
+            throw DecodingError.dataCorruptedError(in: entries, debugDescription: "Duplicate account practice identity")
+          }
+          decoded[id] = try entries.decode(AccountPracticeRecord.self)
+        }
+        accountPractice = decoded
+      } else { accountPractice = nil }
       leaderboardRankMemories = try values.decodeIfPresent(
         [StoredLeaderboardRankMemory].self, forKey: .leaderboardRankMemories) ?? []
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
@@ -1289,7 +1303,79 @@ public actor AuthStore {
     state.notifications = Self.cappedNotifications(state.notifications)
     committedState = state
     try Self.initializeExperienceAwards(state: &state)
+    try Self.initializeAccountPractice(state: &state)
     committedState = state
+  }
+
+  private static func initializeAccountPractice(state: inout PersistedState) throws {
+    do {
+      let awardsByUser = Dictionary(grouping: state.experienceAwards!, by: \.userID)
+      if state.accountPractice == nil {
+        state.accountPractice = [:]
+        for user in state.users {
+          var practice = AccountPracticeRecord()
+          practice.historyComplete = false
+          let retained = state.results.filter { $0.userID == user.id }
+          guard Set(retained.map(\.id)).count == retained.count else {
+            throw ExperienceCalculationError.invalidInput
+          }
+          let results = Dictionary(uniqueKeysWithValues: retained.map { ($0.id, $0) })
+          let awards = (awardsByUser[user.id] ?? []).sorted {
+            ($0.acceptedAt ?? $0.finishedAt) < ($1.acceptedAt ?? $1.finishedAt)
+          }
+          for award in awards {
+            let result = results[award.resultID]
+            let input = award.input
+            let seconds: Double
+            if let input {
+              seconds = input.durationSeconds + (input.incompleteSeconds ?? 0) - input.afkSeconds
+            } else if let timing = result?.practiceTiming {
+              seconds = Double(timing.terminalEngagedMilliseconds + timing.priorAttemptEngagedMilliseconds) / 1_000
+            } else { seconds = result?.elapsedDuration ?? 0 }
+            try practice.record(restarts: result?.restartCount ?? 0, seconds: seconds,
+              at: award.acceptedAt ?? award.finishedAt,
+              offsetHours: state.streakDayBoundaryOffsets[user.id] ?? 0)
+          }
+          practice.startedTests = max(practice.startedTests, user.startedTestCount)
+          state.accountPractice![user.id] = practice
+        }
+      }
+      let users = Set(state.users.map(\.id))
+      guard Set(state.accountPractice!.keys).isSubset(of: users) else {
+        throw ExperienceCalculationError.invalidInput
+      }
+      for user in state.users {
+        let practice = state.accountPractice![user.id] ?? .init()
+        try practice.validate()
+        let awards = awardsByUser[user.id] ?? []
+        var activity: [String: [Int?]] = [:]
+        var knownSeconds = 0.0
+        for award in awards {
+          let date = award.acceptedAt ?? award.finishedAt
+          let calendar = AccountPracticeRecord.utc
+          let year = calendar.component(.year, from: date)
+          guard let ordinal = calendar.ordinality(of: .day, in: .year, for: date) else {
+            throw ExperienceCalculationError.invalidInput
+          }
+          var days = activity[String(year)] ?? []
+          if days.count < ordinal { days += Array(repeating: nil, count: ordinal - days.count) }
+          days[ordinal - 1] = (days[ordinal - 1] ?? 0) + 1
+          activity[String(year)] = days
+          if let input = award.input {
+            knownSeconds += input.durationSeconds + (input.incompleteSeconds ?? 0) - input.afkSeconds
+          }
+        }
+        // Different historical accumulation orders may differ by a few ULPs.
+        let tolerance = knownSeconds.ulp * Double(max(1, awards.count))
+        guard practice.completedTests == awards.count, activity == practice.activityByYear,
+          practice.typingSeconds + tolerance >= knownSeconds,
+          practice.startedTests >= user.startedTestCount else { throw ExperienceCalculationError.invalidInput }
+      }
+    } catch {
+      throw DecodingError.dataCorrupted(.init(codingPath: [],
+        debugDescription: "Account practice state is inconsistent; original file is not modified",
+        underlyingError: error))
+    }
   }
 
   private static func initializeExperienceAwards(state: inout PersistedState) throws {
@@ -2158,6 +2244,7 @@ public actor AuthStore {
     }
     state.streakDayBoundaryOffsets.removeValue(forKey: userID)
     state.experienceAwards?.removeAll { $0.userID == userID }
+    state.accountPractice?.removeValue(forKey: userID)
     state.personalBestResetDates.removeValue(forKey: userID)
     try persist()
   }
@@ -2197,6 +2284,7 @@ public actor AuthStore {
     state.syncRecords.removeAll { $0.userID == user.id }
     state.results.removeAll { $0.userID == user.id }
     state.experienceAwards?.removeAll { $0.userID == user.id }
+    state.accountPractice?[user.id] = .init()
     state.leaderboardRankMemories.removeAll { $0.userID == user.id }
     state.notifications.removeAll { $0.recipientID == user.id }
     state.personalBestResetDates.removeValue(forKey: user.id)
@@ -2308,7 +2396,11 @@ public actor AuthStore {
     guard state.streakDayBoundaryOffsets[user.id] == nil else {
       throw AuthStoreError.streakDayBoundaryAlreadySet
     }
+    var practice = state.accountPractice![user.id] ?? .init()
+    practice.lastResultMilliseconds = now.timeIntervalSince1970 * 1_000
+    try practice.validate()
     state.streakDayBoundaryOffsets[user.id] = offset == 0 ? 0 : offset
+    state.accountPractice![user.id] = practice
     try persist()
     return try userResponse(for: user.id)
   }
@@ -2980,23 +3072,18 @@ public actor AuthStore {
 
   private func publicProfile(for user: StoredUser) -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
-    return publicProfile(for: user, results: results, activity: nil, streak: nil)
+    return publicProfile(for: user, results: results, activity: nil, streak: publicStreak(for: user.id))
   }
 
   private func detailedPublicProfile(for user: StoredUser, now: Date) -> PublicProfileResponse {
     let results = state.results.filter { $0.userID == user.id }
     let shouldShowActivity = !user.accountSuspended && user.profileDetails.showActivity
-    let dayBoundaryOffsetHours = state.streakDayBoundaryOffsets[user.id] ?? 0
     return publicProfile(
       for: user, results: results,
       activity: shouldShowActivity
-        ? publicActivity(
-          from: results, endingAt: now, dayBoundaryOffsetHours: dayBoundaryOffsetHours)
+        ? (state.accountPractice![user.id] ?? .init()).activity(endingAt: now)
         : nil,
-      streak: shouldShowActivity
-        ? publicStreak(
-          from: results, endingAt: now, dayBoundaryOffsetHours: dayBoundaryOffsetHours)
-        : nil)
+      streak: publicStreak(for: user.id))
   }
 
   private func publicProfile(
@@ -3004,14 +3091,15 @@ public actor AuthStore {
     streak: PublicProfileStreakResponse?
   ) -> PublicProfileResponse {
     let personalBestResults = personalBestResults(for: user.id, from: results)
+    let practice = state.accountPractice![user.id] ?? .init()
     return .init(
       id: user.id,
       displayName: user.displayName,
       accountSuspended: user.accountSuspended,
       joinedAt: user.createdAt,
-      completedResultCount: results.count,
-      startedTestCount: user.startedTestCount,
-      totalTypingSeconds: totalTypingSeconds(from: results),
+      completedResultCount: practice.completedTests,
+      startedTestCount: practice.startedTests,
+      totalTypingSeconds: practice.typingSeconds,
       bestWPM: personalBestResults.map(\.wpm).max() ?? 0,
       highestConsistency: personalBestResults.map(\.consistency).max() ?? 0,
       personalBests: publicPersonalBests(from: personalBestResults),
@@ -3022,7 +3110,8 @@ public actor AuthStore {
       discordAvatar: user.accountSuspended ? nil : publicDiscordAvatar(for: user),
       selectedBadge: user.accountSuspended ? nil : selectedPublicBadge(for: user),
       earnedBadges: user.accountSuspended || !user.showAllBadges
-        ? [] : availablePublicBadges(for: user.id)
+        ? [] : availablePublicBadges(for: user.id),
+      practiceHistoryComplete: practice.historyComplete
     )
   }
 
@@ -3112,32 +3201,6 @@ public actor AuthStore {
     return .init(subject: identity.subject, avatarHash: avatarHash)
   }
 
-  private func publicActivity(
-    from results: [StoredResult], endingAt now: Date, dayBoundaryOffsetHours: Double
-  )
-    -> PublicProfileActivityResponse?
-  {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let lastDay = logicalPracticeDay(for: now, offsetHours: dayBoundaryOffsetHours, calendar: calendar)
-    guard let firstDay = calendar.date(byAdding: .day, value: -364, to: lastDay) else { return nil }
-    var testsByDays = Array(repeating: 0, count: 365)
-
-    for result in results {
-      let resultDay = logicalPracticeDay(
-        for: result.finishedAt, offsetHours: dayBoundaryOffsetHours, calendar: calendar)
-      guard resultDay >= firstDay, resultDay <= lastDay else { continue }
-      let offset = calendar.dateComponents([.day], from: firstDay, to: resultDay).day ?? -1
-      guard testsByDays.indices.contains(offset) else { continue }
-      testsByDays[offset] += 1
-    }
-
-    guard testsByDays.contains(where: { $0 > 0 }) else { return nil }
-    return .init(
-      lastDay: lastDay, testsByDays: testsByDays,
-      dayBoundaryOffsetHours: dayBoundaryOffsetHours)
-  }
-
   private func totalTypingSeconds(from results: [StoredResult]) -> Double {
     results.reduce(0) { total, result in
       total + effectiveTypingSeconds(for: result)
@@ -3163,9 +3226,7 @@ public actor AuthStore {
   }
 
   private func totalTypingSecondsByUser() -> [UUID: Double] {
-    state.results.reduce(into: [:]) { totals, result in
-      totals[result.userID, default: 0] += result.elapsedDuration
-    }
+    state.accountPractice!.mapValues(\.typingSeconds)
   }
 
   private func leaderboardEligibility(
@@ -3195,49 +3256,9 @@ public actor AuthStore {
     return leaderboardEligibility(for: user)
   }
 
-  private func publicStreak(
-    from results: [StoredResult], endingAt now: Date, dayBoundaryOffsetHours: Double
-  )
-    -> PublicProfileStreakResponse?
-  {
-    guard !results.isEmpty else { return nil }
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let days = Set(results.map {
-      logicalPracticeDay(for: $0.finishedAt, offsetHours: dayBoundaryOffsetHours, calendar: calendar)
-    })
-    let currentDay = logicalPracticeDay(
-      for: now, offsetHours: dayBoundaryOffsetHours, calendar: calendar)
-    var currentDays = 0
-    var cursor = currentDay
-    while days.contains(cursor) {
-      currentDays += 1
-      guard let previousDay = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
-      cursor = previousDay
-    }
-
-    let sortedDays = days.sorted()
-    var longestDays = 0
-    var runLength = 0
-    var previousDay: Date?
-    for day in sortedDays {
-      if let previousDay,
-        calendar.date(byAdding: .day, value: 1, to: previousDay) == day
-      {
-        runLength += 1
-      } else {
-        runLength = 1
-      }
-      longestDays = max(longestDays, runLength)
-      previousDay = day
-    }
-    return .init(currentDays: currentDays, longestDays: longestDays)
-  }
-
-  private func logicalPracticeDay(
-    for date: Date, offsetHours: Double, calendar: Calendar
-  ) -> Date {
-    calendar.startOfDay(for: date.addingTimeInterval(-offsetHours * 3_600))
+  private func publicStreak(for userID: UUID) -> PublicProfileStreakResponse {
+    let practice = state.accountPractice![userID] ?? .init()
+    return .init(currentDays: practice.streakLength, longestDays: practice.maximumStreakLength)
   }
 
   private func publicPersonalBests(from results: [StoredResult]) -> [PublicProfileBestResponse] {
@@ -3287,7 +3308,7 @@ public actor AuthStore {
   }
 
   private func prepareExperienceAward(for request: ResultSubmissionRequest, userID: UUID,
-    now: Date) throws -> ExperienceAwardRecord {
+    now: Date, streakDays: Int) throws -> ExperienceAwardRecord {
     let record: ExperienceAwardRecord
     if let configuration = experienceConfiguration, request.experienceEvidence != nil {
       let input = try ExperienceEvidenceAdapter.input(for: request)
@@ -3295,18 +3316,8 @@ public actor AuthStore {
       let previous = state.results.filter { $0.userID == userID }.map {
         ($0.acceptedAt ?? $0.finishedAt).timeIntervalSince1970.rounded(.down) * 1_000
       }.max()
-      let offset = (state.streakDayBoundaryOffsets[userID] ?? 0) * 3_600_000
-      func day(_ value: Double) -> Double {
-        value - (value - offset).truncatingRemainder(dividingBy: 86_400_000)
-      }
-      var days = Set(state.experienceAwards!.filter { $0.userID == userID }.map {
-        day(($0.acceptedAt ?? $0.finishedAt).timeIntervalSince1970 * 1_000)
-      })
-      days.insert(day(milliseconds))
-      var cursor = day(milliseconds), streak = 0.0
-      while days.contains(cursor) { streak += 1; cursor -= 86_400_000 }
       let context = ExperienceCalculationContext(previousResultMilliseconds: previous,
-        nowMilliseconds: milliseconds, currentTotalXP: Double(experience(for: userID)), streakDays: streak)
+        nowMilliseconds: milliseconds, currentTotalXP: Double(experience(for: userID)), streakDays: Double(streakDays))
       let award = try SourceStyleExperienceCalculator.calculate(input,
         configuration: configuration, context: context)
       record = .init(version: 1, userID: userID, resultID: request.id,
@@ -3478,7 +3489,25 @@ public actor AuthStore {
     if state.experienceAwards!.contains(where: { $0.userID == user.id && $0.resultID == request.id }) {
       return try resultSubmissionResponse(for: request, userID: user.id, now: now)
     }
-    let reward = try prepareExperienceAward(for: request, userID: user.id, now: now)
+    var practice = state.accountPractice![user.id] ?? .init()
+    let seconds: Double
+    if request.experienceEvidence != nil {
+      let input = try ExperienceEvidenceAdapter.input(for: request)
+      seconds = input.durationSeconds + (input.incompleteSeconds ?? 0) - input.afkSeconds
+    } else if let timing = request.practiceTiming {
+      seconds = Double(timing.terminalEngagedMilliseconds + timing.priorAttemptEngagedMilliseconds) / 1_000
+    } else {
+      seconds = request.terminalTiming?.duration(mode: request.mode)
+        ?? request.elapsedTime?.duration(mode: request.mode)
+        ?? request.finishedAt.timeIntervalSince(request.startedAt)
+    }
+    // Match the controller's whole-second admission timestamp; explicit
+    // boundary changes still use the precise current clock, as the source does.
+    let admissionDate = Date(timeIntervalSince1970: now.timeIntervalSince1970.rounded(.down))
+    try practice.record(restarts: request.restartCount, seconds: seconds, at: admissionDate,
+      offsetHours: state.streakDayBoundaryOffsets[user.id] ?? 0)
+    let reward = try prepareExperienceAward(for: request, userID: user.id, now: now,
+      streakDays: practice.streakLength)
     let existingBadgeIDs = Set(availablePublicBadges(for: user.id).map(\.id))
     state.results.append(
       .init(
@@ -3500,7 +3529,8 @@ public actor AuthStore {
     guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
       throw AuthStoreError.invalidAccessToken
     }
-    state.users[userIndex].startedTestCount += request.restartCount + 1
+    state.users[userIndex].startedTestCount = practice.startedTests
+    state.accountPractice![user.id] = practice
     state.experienceAwards!.append(reward)
     for badge in availablePublicBadges(for: user.id) where !existingBadgeIDs.contains(badge.id) {
       appendNotification(
@@ -3523,12 +3553,11 @@ public actor AuthStore {
   /// removes that user's contribution here.
   public func publicPracticeStats() -> PublicPracticeStatsResponse {
     let users = publiclyAggregatedUsers()
-    let userIDs = Set(users.map(\.id))
-    let results = state.results.filter { userIDs.contains($0.userID) }
+    let practice = users.map { state.accountPractice![$0.id] ?? .init() }
     return .init(
-      completedResultCount: results.count,
-      startedTestCount: users.reduce(0) { $0 + $1.startedTestCount },
-      totalTypingSeconds: Int(totalTypingSeconds(from: results).rounded()))
+      completedResultCount: practice.reduce(0) { $0 + $1.completedTests },
+      startedTestCount: practice.reduce(0) { $0 + $1.startedTests },
+      totalTypingSeconds: Int(practice.reduce(0.0) { $0 + $1.typingSeconds }.rounded()))
   }
 
   /// Returns one public personal best per account for the same English
@@ -3580,7 +3609,6 @@ public actor AuthStore {
     }
     let countBeforeDeletion = state.results.count
     state.results.removeAll { $0.userID == user.id }
-    state.users[userIndex].startedTestCount = 0
     let removedCount = countBeforeDeletion - state.results.count
     try persist()
     return .init(deleted: true, removedCount: removedCount)

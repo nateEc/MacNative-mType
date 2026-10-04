@@ -1095,6 +1095,16 @@ struct PublicProfileView: View {
                 systemImage: "timer")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if profile.practiceHistoryComplete == false {
+                Text("旧账户累计统计仅包含可确认的记录；已丢失的历史未补造。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if profile.streak != nil {
+                Text("连续天数在下一次成绩提交时更新；活动日历始终按 UTC。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Text("加入 \(profile.joinedAt.formatted(date: .abbreviated, time: .omitted))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1253,7 +1263,7 @@ private struct PublicProfileActivityCalendar: View {
 
     private var cells: [ActivityHeatmapCell] {
         ActivityHeatmap.cells(
-            completedTestsByDay: activity.testsByDays, endingAt: activity.lastDay, calendar: calendar)
+            completedTestsByDay: activity.testsByDays.map { $0 ?? 0 }, endingAt: activity.lastDay, calendar: calendar)
     }
 
     private var displayCells: [ActivityHeatmapDisplayCell] {

@@ -1282,11 +1282,12 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
     let discordAvatar: RemoteDiscordAvatar?
     let selectedBadge: RemotePublicProfileBadge?
     let earnedBadges: [RemotePublicProfileBadge]
+    let practiceHistoryComplete: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case id, displayName, accountSuspended, joinedAt, completedResultCount, startedTestCount, totalTypingSeconds, bestWPM, highestConsistency, personalBests,
             activity, streak, totalExperience, profileDetails, discordAvatar, selectedBadge,
-            earnedBadges
+            earnedBadges, practiceHistoryComplete
     }
 
     init(from decoder: Decoder) throws {
@@ -1308,6 +1309,7 @@ struct RemotePublicProfile: Codable, Identifiable, Sendable {
         discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
         selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
         earnedBadges = try values.decodeIfPresent([RemotePublicProfileBadge].self, forKey: .earnedBadges) ?? []
+        practiceHistoryComplete = try values.decodeIfPresent(Bool.self, forKey: .practiceHistoryComplete)
     }
 }
 
@@ -1372,7 +1374,7 @@ struct RemotePublicProfileBest: Codable, Identifiable, Sendable {
 
 struct RemotePublicProfileActivity: Codable, Sendable {
     let lastDay: Date
-    let testsByDays: [Int]
+    let testsByDays: [Int?]
     let dayBoundaryOffsetHours: Double
 
     private enum CodingKeys: String, CodingKey {
@@ -1382,9 +1384,17 @@ struct RemotePublicProfileActivity: Codable, Sendable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         lastDay = try values.decode(Date.self, forKey: .lastDay)
-        testsByDays = try values.decode([Int].self, forKey: .testsByDays)
+        testsByDays = try values.decode([Int?].self, forKey: .testsByDays)
         dayBoundaryOffsetHours = try values.decodeIfPresent(
             Double.self, forKey: .dayBoundaryOffsetHours) ?? 0
+        guard testsByDays.count <= 372,
+            testsByDays.compactMap({ $0 }).allSatisfy({ $0 >= 0 && Double($0) <= 9_007_199_254_740_991 }),
+            dayBoundaryOffsetHours.isFinite, (-11...12).contains(dayBoundaryOffsetHours),
+            (dayBoundaryOffsetHours * 2).rounded() == dayBoundaryOffsetHours * 2
+        else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                debugDescription: "Invalid public activity counts or day boundary"))
+        }
     }
 }
 

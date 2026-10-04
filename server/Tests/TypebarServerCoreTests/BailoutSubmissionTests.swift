@@ -187,7 +187,7 @@ final class BailoutSubmissionTests: XCTestCase {
     XCTAssertTrue(profile.personalBests.isEmpty)
     XCTAssertEqual(profile.completedResultCount, 1)
     XCTAssertEqual(profile.totalTypingSeconds, 15)
-    XCTAssertEqual(profile.activity?.testsByDays.reduce(0, +), 1)
+    XCTAssertEqual(profile.activity?.testsByDays.compactMap { $0 }.reduce(0, +), 1)
   }
 
   func testPreciseAccuracyCannotBeRescuedByRoundedIntegerWire() async throws {

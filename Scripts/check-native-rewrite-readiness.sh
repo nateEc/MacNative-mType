@@ -106,6 +106,17 @@ run_check "checking reference behavior evidence" \
 run_check "checking manual acceptance inventory" \
   ruby "$project_root/Scripts/check-manual-acceptance-audit.rb"
 
+practice_source_dependencies="${TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES:-$temporary_directory/practice-source-runtime}"
+if [[ ! -f "$practice_source_dependencies/node_modules/date-fns/package.json" ]]; then
+  run_logged_check "preparing pinned read-only account date dependencies" "$temporary_directory/practice-source-runtime.log" \
+    npm install --prefix "$practice_source_dependencies" --ignore-scripts --no-save --package-lock=false \
+    date-fns@3.6.0 @date-fns/utc@1.2.0
+fi
+run_logged_check "executing actual pinned account functions" "$temporary_directory/practice-source-check.log" \
+  env TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
+  "${TYPEBAR_PRACTICE_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-account-practice.mjs" "$reference_root"
+
 require_no_conflicting_processes || fail "stop the listed process before running client tests"
 run_logged_check "preparing isolated historical disk model writers" "$temporary_directory/disk-fixtures.log" \
   ruby "$project_root/Scripts/prepare-disk-model-fixtures.rb" "$temporary_directory/disk-model-fixtures"
@@ -116,7 +127,7 @@ run_logged_check "running native client test suite" "$temporary_directory/client
 
 require_no_conflicting_processes || fail "stop the listed process before running service tests"
 run_logged_check "running self-hosted service test suite" "$temporary_directory/service-tests.log" \
-  env TYPEBAR_REFERENCE_ROOT="$reference_root" \
+  env TYPEBAR_REFERENCE_ROOT="$reference_root" TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES="$practice_source_dependencies" \
   zsh -c 'cd "$1" && swift test' -- "$project_root/server"
 
 require_no_conflicting_processes || fail "stop the listed process before packaging"

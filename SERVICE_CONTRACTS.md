@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-05 账户生命周期最新约束见 [累计练习合同](ACCOUNT_PRACTICE_LIFETIME_CONTRACT.md)。公开资料 counts／seconds／streak 来自独立累计状态，活动数组允许 null、最多 372 天且固定 UTC；新增可选 practiceHistoryComplete，缺失不推测。showActivity 仅隐藏日历。删除历史保留统计与资格时长；明确账户重置／删除才清除。旧缺失文件保守只读迁移，显式坏状态拒绝，禁止旧 writer 回写。完整榜单准入、全站计数与私有账户显示尚未对齐；下方为历史阶段。
+
 2026-10-05 新扩展见 [XP 奖励账本](EXPERIENCE_AWARD_CONTRACT.md)：resultExperienceAwards=available 表示完整计量奖励的版本一保存合同，experience 整体仍 partial。experienceGained／周榜 totalExperience 为 Double，账户累计仍整数；新回执含 dailyXpBonus／xpBreakdown，旧报告缺失沿用旧公式，不重算历史。首次奖励冻结、删除历史留墓碑，明确重置／删账户才清账本；TYPEBAR_XP_CONFIGURATION 为自建服务配置。旧服务二进制回写／降级未验，先保留完整 JSON 副本；本机格式不变、未部署，下方为历史协议。
 
 2026-10-05 新扩展见 [终止 XP 计量与服务解析](EXPERIENCE_EVIDENCE_CONTRACT.md)：resultExperienceEvidence 为加法能力，严格匿名四项计数、基础、时长／AFK、内容开关和修饰器身份保存至私有历史，服务独立解析数值目录。没有采用客户端 XP 或改现有奖励，不改本机列、归档 26／设置 4、依赖或部署；旧 writer 混写／降级和全功能等价未验证。下方为历史协议。

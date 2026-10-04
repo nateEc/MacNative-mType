@@ -3313,7 +3313,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(suspendedProfile.accountSuspended)
     XCTAssertEqual(suspendedProfile.profileDetails, .init())
     XCTAssertNil(suspendedProfile.activity)
-    XCTAssertNil(suspendedProfile.streak)
+    XCTAssertEqual(suspendedProfile.streak, .init(currentDays: 1, longestDays: 1))
     XCTAssertNil(suspendedProfile.selectedBadge)
 
     do {
@@ -3551,7 +3551,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertTrue(ProfileReportReason.allCases.contains(.inappropriateLinks))
   }
 
-  func testPublicProfileStreakUsesUTCDaysAndRespectsActivityVisibility() async throws {
+  func testPublicProfileStreakUsesAcceptanceDaysIndependentOfActivityVisibility() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4)
     let now = Date(timeIntervalSince1970: 345_600)
     let session = try await store.register(
@@ -3564,16 +3564,16 @@ final class HealthRouteTests: XCTestCase {
     }
 
     let visible = try await store.publicProfile(id: session.user.id, now: now)
-    XCTAssertEqual(visible.streak, .init(currentDays: 2, longestDays: 2))
+    XCTAssertEqual(visible.streak, .init(currentDays: 1, longestDays: 1))
 
     _ = try await store.updateProfile(
       .init(profileDetails: .init(showActivity: false)), accessToken: session.accessToken, now: now)
     let hidden = try await store.publicProfile(id: session.user.id, now: now)
     XCTAssertNil(hidden.activity)
-    XCTAssertNil(hidden.streak)
+    XCTAssertEqual(hidden.streak, visible.streak)
   }
 
-  func testAccountStreakDayBoundaryCanBeSetOnceAndShiftsPublicDays() async throws {
+  func testAccountStreakDayBoundaryCanBeSetOnceWithoutRewritingUTCActivity() async throws {
     let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
       .appendingPathComponent("typebar-streak-boundary-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -3589,16 +3589,16 @@ final class HealthRouteTests: XCTestCase {
     }
 
     let utcProfile = try await store.publicProfile(id: session.user.id, now: now)
-    XCTAssertEqual(utcProfile.streak, .init(currentDays: 0, longestDays: 2))
-    XCTAssertEqual(utcProfile.activity?.testsByDays.suffix(3), [1, 1, 0])
+    XCTAssertEqual(utcProfile.streak, .init(currentDays: 1, longestDays: 1))
+    XCTAssertEqual(utcProfile.activity?.testsByDays.suffix(3), [nil, nil, 2])
 
     let updated = try await store.setStreakDayBoundary(
       .init(offsetHours: 1), accessToken: session.accessToken, now: now)
     XCTAssertEqual(updated.streakDayBoundaryOffsetHours, 1)
     let shiftedProfile = try await store.publicProfile(id: session.user.id, now: now)
-    XCTAssertEqual(shiftedProfile.streak, .init(currentDays: 2, longestDays: 2))
-    XCTAssertEqual(shiftedProfile.activity?.testsByDays.suffix(2), [1, 1])
-    XCTAssertEqual(shiftedProfile.activity?.dayBoundaryOffsetHours, 1)
+    XCTAssertEqual(shiftedProfile.streak, utcProfile.streak)
+    XCTAssertEqual(shiftedProfile.activity, utcProfile.activity)
+    XCTAssertEqual(shiftedProfile.activity?.dayBoundaryOffsetHours, 0)
 
     let reloadedStore = try AuthStore(fileURL: fileURL, bcryptCost: 4)
     let reloadedUser = try await reloadedStore.authenticatedUser(
@@ -3687,10 +3687,10 @@ final class HealthRouteTests: XCTestCase {
         finishedAt: now.addingTimeInterval(-366 * 24 * 60 * 60)), accessToken: session.accessToken,
       now: now)
     let detailedProfile = try await store.publicProfile(id: session.user.id, now: now)
-    XCTAssertEqual(detailedProfile.activity?.testsByDays.count, 365)
-    XCTAssertEqual(detailedProfile.activity?.testsByDays.reduce(0, +), 4)
+    XCTAssertEqual(detailedProfile.activity?.testsByDays.count, 372)
+    XCTAssertEqual(detailedProfile.activity?.testsByDays.compactMap { $0 }.reduce(0, +), 5)
     XCTAssertEqual(detailedProfile.startedTestCount, 5)
-    XCTAssertEqual(detailedProfile.activity?.testsByDays.last, 4)
+    XCTAssertEqual(detailedProfile.activity?.testsByDays.last, 5)
     XCTAssertEqual(detailedProfile.totalTypingSeconds, 135)
 
     do {
@@ -3708,8 +3708,8 @@ final class HealthRouteTests: XCTestCase {
         XCTAssertEqual(profile?.personalBests.map(\.wordLimit), [nil, nil, 10])
         XCTAssertEqual(profile?.personalBests.map(\.wpm), [72, 88, 66])
         XCTAssertEqual(profile?.personalBests.map(\.consistency), [88, 84, 75])
-        XCTAssertEqual(profile?.activity?.testsByDays.count, 365)
-        XCTAssertEqual(profile?.activity?.testsByDays.reduce(0, +), 4)
+        XCTAssertEqual(profile?.activity?.testsByDays.count, 372)
+        XCTAssertEqual(profile?.activity?.testsByDays.compactMap { $0 }.reduce(0, +), 5)
         XCTAssertFalse(response.body.string.contains("private@example.com"))
       }
       try await app.test(.GET, "v1/profiles/not-a-uuid") { response async in
@@ -4702,7 +4702,7 @@ final class HealthRouteTests: XCTestCase {
                    .init(version: 1, terminalEngagedMilliseconds: 22_000, priorAttemptEngagedMilliseconds: 9_000))
   }
 
-  func testResultPracticeTimingCannotChangeLeaderboardQualificationOrExceedBounds() async throws {
+  func testResultPracticeTimingCountsPriorPracticeForQualificationButRejectsOutOfBounds() async throws {
     let store = try AuthStore(
       fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 900)
     let session = try await store.register(
@@ -4715,7 +4715,9 @@ final class HealthRouteTests: XCTestCase {
           version: 1, terminalEngagedMilliseconds: 30_000,
           priorAttemptEngagedMilliseconds: 3_600_000),
         finishedAt: now), accessToken: session.accessToken, now: now)
-    XCTAssertFalse(accepted.leaderboardEligible)
+    XCTAssertTrue(accepted.leaderboardEligible)
+    let profile = try await store.publicProfile(id: session.user.id, now: now)
+    XCTAssertEqual(profile.totalTypingSeconds, 3_630)
 
     let invalidTimings: [(timing: ResultPracticeTiming, restartCount: Int)] = [
       (.init(version: 2, terminalEngagedMilliseconds: 30_000, priorAttemptEngagedMilliseconds: 0), 0),
@@ -4761,8 +4763,8 @@ final class HealthRouteTests: XCTestCase {
     _ = try await store.deleteResults(
       .init(currentPassword: "a secure password"), accessToken: session.accessToken, now: now)
     let clearedProfile = try await store.publicProfile(id: session.user.id, now: now)
-    XCTAssertEqual(clearedProfile.completedResultCount, 0)
-    XCTAssertEqual(clearedProfile.startedTestCount, 0)
+    XCTAssertEqual(clearedProfile.completedResultCount, 2)
+    XCTAssertEqual(clearedProfile.startedTestCount, 4)
   }
 
   func testDeveloperAccessKeysAreScopedHashedAndCanBeRevoked() async throws {
