@@ -3473,8 +3473,14 @@ enum TypingReplay {
   }
 
   static func inputGlyphs(
-    prompt: String, events: [TypingReplayEvent], through elapsed: TimeInterval
+    prompt: String, events: [TypingReplayEvent], through elapsed: TimeInterval,
+    configuration: TestConfiguration? = nil
   ) -> [TypingPromptGlyph] {
+    // Legacy Zen tapes have no targets or field coordinates. Reuse accepted
+    // text reconstruction; do not invent target errors or missing snapshots.
+    if configuration?.mode == .zen {
+      return typedText(events: events, through: elapsed).map { .init(character: $0, state: .correct) }
+    }
     let promptCharacters = Array(prompt)
     let promptCoordinates = promptCharacterIndices(prompt: prompt)
     var typed: [Character] = []
@@ -3779,7 +3785,7 @@ enum TypingReplay {
       let event = events[range.upperBound - 1]
       index = range.upperBound
       guard let field = event.inputField else { continue }
-      if event.kind == .insert && event.text.isEmpty && !event.isStoppedInsertion { continue }
+      if event.kind == .insert && event.text.isEmpty && !event.isStoppedInsertion && !isZen { continue }
       let wentBack = previousField.map { field.index < $0 } ?? false
       if let previousField, field.index != previousField {
         let correct = wentBack || isZen
@@ -3790,7 +3796,11 @@ enum TypingReplay {
       case .insert:
         if !event.isStoppedInsertion {
           let units = event.inputUnits
-          if let judgments = event.validatedInputCorrectness {
+          if isZen, units.isEmpty {
+            // Captured empty insertText still produces a source replay action.
+            // It advances the cursor/click without inventing accepted text.
+            actions.append(.init(offset: event.offset, kind: .input(text: "", correct: true)))
+          } else if let judgments = event.validatedInputCorrectness {
             for (index, unit) in units.enumerated() {
               // A lone surrogate is a separate source DOM node. Display it
               // as replacement text in Swift, without changing retained input.

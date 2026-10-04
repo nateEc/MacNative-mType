@@ -5921,7 +5921,8 @@ private struct CompletedResultView: View {
           isExpanded: wordHistoryExpansion)
       }
 
-      if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
+      if ResultReplayAvailability.isAvailable(prompt: result.prompt, events: result.replayEvents,
+        configuration: result.configuration) {
         ReplayTimelineView(
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
           configuration: result.configuration,
@@ -6760,10 +6761,11 @@ private struct ReplayTimelineView: View {
   private let characterSeekOffsets: [Int: TimeInterval]
   private let replaySoundTimeline: [TypingReplayTimedSoundCue]
   private let fieldPlan: FieldReplayPlan?
+  private let canPlay: Bool
 
   private var duration: TimeInterval { events.last?.offset ?? 0 }
   private var replayedGlyphs: [TypingPromptGlyph] {
-    TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed)
+    TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed, configuration: configuration)
   }
   private var performance: ResultPerformancePoint {
     ResultPerformanceTrace.point(prompt: prompt, events: events, elapsed: elapsed, configuration: configuration,
@@ -6792,6 +6794,8 @@ private struct ReplayTimelineView: View {
     let fieldPlan = FieldReplayPlan.make(prompt: prompt, events: chronologicalEvents,
       configuration: configuration, targetWordDirectory: targetWordDirectory)
     self.fieldPlan = fieldPlan
+    self.canPlay = ResultReplayAvailability.canPlay(duration: chronologicalEvents.last?.offset ?? 0,
+      events: chronologicalEvents, fieldPlan: fieldPlan)
     self._fieldFrame = State(initialValue: fieldPlan?.initialFrame)
   }
 
@@ -6809,7 +6813,7 @@ private struct ReplayTimelineView: View {
       }
       if let fieldPlan, let fieldFrame {
         let presentation = fieldFrame.presentation
-        Text("目标字形回放（点按字符定位）")
+        Text(configuration?.mode == .zen ? "禅模式输入回放（点按字符定位）" : "目标字形回放（点按字符定位）")
           .font(.caption2)
           .foregroundStyle(.secondary)
         ReplayCharacterPicker(
@@ -6835,24 +6839,26 @@ private struct ReplayTimelineView: View {
           .frame(height: 72)
           .padding(8)
           .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-        VStack(alignment: .leading, spacing: 4) {
-          Text("目标（点按已输入字符定位）")
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-          ReplayCharacterPicker(
-            text: prompt,
-            reachableIndices: Set(characterSeekOffsets.keys),
-            selectedIndex: selectedPromptIndex
-          ) { index in
-            guard let targetOffset = characterSeekOffsets[index] else { return }
-            selectedPromptIndex = index
-            elapsed = min(duration, targetOffset)
-            isPlaying = false
-            playbackStartedAt = nil
-            includesCurrentOffsetOnNextTick = false
+        if configuration?.mode != .zen {
+          VStack(alignment: .leading, spacing: 4) {
+            Text("目标（点按已输入字符定位）")
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+            ReplayCharacterPicker(
+              text: prompt,
+              reachableIndices: Set(characterSeekOffsets.keys),
+              selectedIndex: selectedPromptIndex
+            ) { index in
+              guard let targetOffset = characterSeekOffsets[index] else { return }
+              selectedPromptIndex = index
+              elapsed = min(duration, targetOffset)
+              isPlaying = false
+              playbackStartedAt = nil
+              includesCurrentOffsetOnNextTick = false
+            }
+            .frame(height: 96)
+            .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
           }
-          .frame(height: 96)
-          .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
         }
       }
       Slider(
@@ -6870,7 +6876,9 @@ private struct ReplayTimelineView: View {
           }
         })
         .accessibilityLabel("回放时间")
-        .accessibilityHint("调整回放位置；目标文本也支持鼠标点选字符定位")
+        .accessibilityHint(configuration?.mode == .zen
+          ? "调整回放位置；字段记录完整时也可点按字符定位"
+          : "调整回放位置；目标文本也支持鼠标点选字符定位")
       HStack {
         Button(isPlaying ? "暂停" : "播放") {
           if elapsed >= duration && (fieldPlan == nil || fieldFrame?.nextActionIndex == fieldPlan?.actions.count) {
@@ -6884,7 +6892,7 @@ private struct ReplayTimelineView: View {
           playbackStartedAt = isPlaying
             ? ProcessInfo.processInfo.systemUptime - elapsed : nil
         }
-        .disabled(duration == 0 && (fieldPlan?.actions.isEmpty ?? true))
+        .disabled(!canPlay)
         Button("重置") {
           elapsed = 0
           isPlaying = false
@@ -9033,7 +9041,8 @@ private struct ResultDetailView: View {
           }
         }
       }
-      if !result.prompt.isEmpty, !result.replayEvents.isEmpty {
+      if ResultReplayAvailability.isAvailable(prompt: result.prompt, events: result.replayEvents,
+        configuration: result.configuration) {
         ReplayTimelineView(
           prompt: result.prompt, events: result.replayEvents, speedUnit: typingSpeedUnit,
           configuration: result.configuration,

@@ -8,7 +8,7 @@ enum FieldReplayPresentation {
     FieldReplayPlan.make(prompt: prompt, events: events, configuration: configuration,
       targetWordDirectory: targetWordDirectory)?
       .frame(through: elapsed).presentation.glyphs
-      ?? TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed)
+      ?? TypingReplay.inputGlyphs(prompt: prompt, events: events, through: elapsed, configuration: configuration)
   }
 }
 
