@@ -1086,11 +1086,11 @@ private struct ContentView: View {
   @State private var priorAttemptLedger = PriorAttemptLedger()
   @State private var weakSpotScores = WeakSpotScores()
   @State private var wordDecorationState = PoolWordDecorationState()
-  @State private var lastCompletedWpm: Int?
+  @State private var lastFinishedWpm: Double?
   @State private var currentProcessPractice: [CurrentProcessPractice] = []
   @State private var isSamePromptRepeatAttempt = false
   @State private var isRepeatedPaceAttempt = false
-  @State private var activePaceTargetWpm: Int?
+  @State private var activePaceTargetWpm: Double?
   @State private var compositionText = ""
   @State private var automaticInputScheduler = TypingAutomaticInputScheduler()
   @State private var keyboardGuideFeedback: KeyboardGuideFeedback?
@@ -1316,9 +1316,9 @@ private struct ContentView: View {
           challengePresentation: challengePresentation
         ) else { return }
         let updatedLongTextProgress = updateLongSavedTextProgress(for: result.outcome)
-        lastCompletedWpm = LastTestPacePolicy.updatedWpm(
-          previousWpm: lastCompletedWpm,
-          candidateWpm: result.wpm,
+        lastFinishedWpm = LastTestPacePolicy.updatedWpm(
+          previousWpm: lastFinishedWpm,
+          candidateWpm: result.preciseWpm,
           outcome: result.outcome,
           isPaceRepeat: isRepeatedPaceAttempt)
         let eligibility = ResultEligibilityPolicy.assessment(
@@ -2742,14 +2742,14 @@ private struct ContentView: View {
         }
         if let activePaceTargetWpm, let paceGuideIndex {
           Label(
-            "节奏 \(activePaceTargetWpm) WPM · \(paceGuideProgressDescription)", systemImage: "metronome"
+            "节奏 \(activePaceTargetWpm.formatted(.number.precision(.fractionLength(0...2)))) WPM · \(paceGuideProgressDescription)", systemImage: "metronome"
           )
           .font(.caption.weight(.medium))
           .padding(.horizontal, 12)
           .padding(.vertical, 7)
           .background(.thinMaterial, in: Capsule())
           .accessibilityLabel(
-            "节奏引导：目标 \(activePaceTargetWpm) WPM，\(paceGuideProgressDescription)，目标位置 \(paceGuideIndex + 1)"
+            "节奏引导：目标 \(activePaceTargetWpm.formatted(.number.precision(.fractionLength(0...2)))) WPM，\(paceGuideProgressDescription)，目标位置 \(paceGuideIndex + 1)"
           )
         }
         if settings.compositionDisplayStyle == .below, !compositionText.isEmpty {
@@ -4022,7 +4022,7 @@ private struct ContentView: View {
     isRepeatedPaceAttempt = settings.repeatedPace
     let shouldUseRepeatedPace = isRepeatedPaceAttempt && settings.paceGuideMode == .off
     activePaceTargetWpm = paceGuideTarget(
-      usingRepeatedPace: shouldUseRepeatedPace ? lastCompletedWpm : nil)
+      usingRepeatedPace: shouldUseRepeatedPace ? lastFinishedWpm : nil)
     if session.configuration.modifiers.contains(.listening) {
       NativeSpeech.shared.speak(session.prompt, language: session.configuration.language)
     }
@@ -4122,15 +4122,13 @@ private struct ContentView: View {
     reset()
   }
 
-  private func paceGuideTarget(usingRepeatedPace repeatedWpm: Int? = nil) -> Int? {
-    if settings.paceGuideMode == .off, let repeatedWpm, repeatedWpm > 0 {
-      return repeatedWpm.clamped(to: PaceGuidePolicy.minimumWpm...PaceGuidePolicy.maximumWpm)
+  private func paceGuideTarget(usingRepeatedPace repeatedWpm: Double? = nil) -> Double? {
+    if settings.paceGuideMode == .off, let repeatedWpm {
+      return PaceGuidePolicy.validTarget(repeatedWpm)
     }
     let samples = savedResults.compactMap { record -> PaceGuideSample? in
       guard let result = record.portableResult else { return nil }
-      return .init(
-        configuration: result.configuration, outcome: result.outcome, finishedAt: result.finishedAt,
-        wpm: result.wpm, tags: result.tags, prompt: result.prompt)
+      return .init(result: result)
     }
     return PaceGuidePolicy.targetWpm(
       mode: settings.paceGuideMode,
@@ -4138,7 +4136,7 @@ private struct ContentView: View {
       configuration: configuration,
       samples: samples,
       activeTags: activeSessionTags,
-      lastTestWpm: repeatedWpm ?? lastCompletedWpm,
+      lastTestWpm: repeatedWpm ?? lastFinishedWpm,
       currentPrompt: session.prompt
     )
   }

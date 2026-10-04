@@ -33,6 +33,8 @@ struct PaceGuideSample: Equatable {
     let outcome: TestOutcome
     let finishedAt: Date
     let wpm: Int
+    let preciseWpm: Double
+    let accuracy: Double
     let tags: [String]
     let prompt: String
 
@@ -42,34 +44,44 @@ struct PaceGuideSample: Equatable {
         finishedAt: Date,
         wpm: Int,
         tags: [String] = [],
-        prompt: String = ""
+        prompt: String = "",
+        preciseWpm: Double? = nil,
+        accuracy: Double = 100
     ) {
         self.configuration = configuration
         self.outcome = outcome
         self.finishedAt = finishedAt
         self.wpm = wpm
+        self.preciseWpm = preciseWpm ?? Double(wpm)
+        self.accuracy = accuracy
         self.tags = tags
         self.prompt = prompt
     }
+
+    init(result: CompletedTestResult) {
+        self.init(configuration: result.configuration, outcome: result.outcome,
+            finishedAt: result.finishedAt, wpm: result.wpm, tags: result.tags,
+            prompt: result.prompt, preciseWpm: result.preciseWpm, accuracy: result.preciseAccuracy)
+    }
 }
 
-/// Mirrors Monkeytype's in-memory `lastTestWpm` update rule. Only a normally
-/// completed test is eligible, and a same-wordset repeated-pace chain retains
-/// its fastest completed result.
+/// Finish updates last speed before result validation/saving. Repeated pace
+/// retains the fastest finish, including bailout and rejected finishes.
 enum LastTestPacePolicy {
     static func updatedWpm(
-        previousWpm: Int?,
-        candidateWpm: Int,
+        previousWpm: Double?,
+        candidateWpm: Double,
         outcome: TestOutcome,
         isPaceRepeat: Bool
-    ) -> Int? {
-        guard outcome == .completed else { return previousWpm }
-        guard isPaceRepeat, let previousWpm else { return candidateWpm }
-        return max(previousWpm, candidateWpm)
+    ) -> Double? {
+        guard outcome != .active, outcome != .abandoned else { return previousWpm }
+        guard isPaceRepeat else { return candidateWpm }
+        return candidateWpm > (previousWpm ?? 0) ? candidateWpm : previousWpm
     }
 }
 
 enum PaceGuidePolicy {
+    // Persisted custom editor limits, not limits on PB or last-finish targets.
     static let minimumWpm = 10
     static let maximumWpm = 300
 
@@ -79,31 +91,33 @@ enum PaceGuidePolicy {
         configuration: TestConfiguration,
         samples: [PaceGuideSample],
         activeTags: [String] = [],
-        lastTestWpm: Int? = nil,
+        lastTestWpm: Double? = nil,
         currentPrompt: String = "",
         now: Date = .now,
         calendar: Calendar = .current
-    ) -> Int? {
+    ) -> Double? {
         switch mode {
         case .off:
             return nil
         case .custom:
-            return customWpm.clamped(to: minimumWpm...maximumWpm)
+            return validTarget(Double(customWpm))
         case .personalBest:
-            return matching(configuration: configuration, samples: samples).map(\.wpm).max()
+            guard CurrentPersonalBestPolicy.isConfigurationEligible(configuration) else { return nil }
+            return validTarget(personalBest(configuration: configuration,
+                currentPrompt: currentPrompt, samples: samples))
         case .activeTagPersonalBest:
             guard !activeTags.isEmpty else { return nil }
-            return matching(configuration: configuration, samples: samples)
-                .filter { sharesActiveTag($0.tags, activeTags: activeTags) }
-                .map(\.wpm)
-                .max()
+            // Reference tag PB has no current-funbox guard. Stored candidates
+            // must still have qualified when their result was recorded.
+            return validTarget(personalBest(configuration: configuration,
+                currentPrompt: currentPrompt, samples: samples, activeTags: activeTags))
         case .average:
-            return averageWpm(matching(configuration: configuration, samples: samples).map(\.wpm))
+            return averageWpm(matching(configuration: configuration, samples: samples).map(\.preciseWpm))
         case .dailyAverage:
             let today = calendar.startOfDay(for: now)
             let todaysWpm = matching(configuration: configuration, samples: samples)
                 .filter { calendar.startOfDay(for: $0.finishedAt) == today }
-                .map(\.wpm)
+                .map(\.preciseWpm)
             return averageWpm(todaysWpm)
         case .recentAverage:
             let recentWpm = referenceMatching(
@@ -111,32 +125,42 @@ enum PaceGuidePolicy {
                 activeTags: activeTags
             )
             .prefix(10)
-            .map(\.wpm)
+            .map(\.preciseWpm)
             return averageWpm(Array(recentWpm))
         case .dailyBest:
             let cutoff = now.addingTimeInterval(-86_400)
-            return referenceMatching(
+            let best = referenceMatching(
                 configuration: configuration, currentPrompt: currentPrompt, samples: samples,
                 activeTags: activeTags
             )
             .filter { $0.finishedAt >= cutoff }
-            .map(\.wpm)
+            .map(\.preciseWpm)
             .max()
+            return validTarget(best?.rounded())
         case .lastTest:
-            guard let lastTestWpm, lastTestWpm > 0 else { return nil }
-            return lastTestWpm.clamped(to: minimumWpm...maximumWpm)
+            return validTarget(lastTestWpm)
         }
     }
 
-    static func expectedCharacterIndex(elapsed: TimeInterval, targetWpm: Int, promptLength: Int) -> Int {
-        guard elapsed > 0, targetWpm > 0, promptLength > 0 else { return 0 }
-        let characters = Int((elapsed * Double(targetWpm) * 5 / 60).rounded(.down))
-        return characters.clamped(to: 0...max(0, promptLength - 1))
+    static func validTarget(_ speed: Double?) -> Double? {
+        guard let speed, speed.isFinite, speed >= 1 else { return nil }
+        return speed
+    }
+
+    static func expectedCharacterIndex(elapsed: TimeInterval, targetWpm: Double, promptLength: Int) -> Int {
+        guard elapsed.isFinite, elapsed > 0, targetWpm.isFinite, targetWpm > 0,
+            promptLength > 0 else { return 0 }
+        let position = (elapsed * targetWpm * 5 / 60).rounded(.down)
+        // Clamp before conversion: finite inputs may overflow their product.
+        let lastIndex = promptLength - 1
+        guard position < Double(lastIndex) else { return lastIndex }
+        return Int(position)
     }
 
     private static func matching(configuration: TestConfiguration, samples: [PaceGuideSample]) -> [PaceGuideSample] {
         samples.filter {
-            $0.outcome == .completed
+            ($0.outcome == .completed || $0.outcome == .bailedOut)
+                && $0.preciseWpm.isFinite && $0.preciseWpm >= 0
                 && $0.configuration.mode == configuration.mode
                 && $0.configuration.language == configuration.language
         }
@@ -151,7 +175,8 @@ enum PaceGuidePolicy {
         samples
             .filter { sample in
                 let sampleConfiguration = sample.configuration
-                return sample.outcome == .completed
+                return (sample.outcome == .completed || sample.outcome == .bailedOut)
+                    && sample.preciseWpm.isFinite && sample.preciseWpm >= 0
                     && sampleConfiguration.mode == configuration.mode
                     && sameModeParameter(sampleConfiguration, configuration)
                     && (configuration.mode != .quote || sample.prompt == currentPrompt)
@@ -176,9 +201,21 @@ enum PaceGuidePolicy {
         }
     }
 
-    private static func averageWpm(_ values: [Int]) -> Int? {
+    private static func personalBest(configuration: TestConfiguration, currentPrompt: String,
+        samples: [PaceGuideSample], activeTags: [String] = []) -> Double? {
+        referenceMatching(configuration: configuration, currentPrompt: currentPrompt,
+            samples: samples, activeTags: activeTags)
+            .filter { $0.outcome == .completed && CurrentPersonalBestPolicy.isResultEligible(
+                configuration: $0.configuration, accuracy: $0.accuracy) }
+            .map(\.preciseWpm).max()
+    }
+
+    private static func averageWpm(_ values: [Double]) -> Double? {
         guard !values.isEmpty else { return nil }
-        return Int((Double(values.reduce(0, +)) / Double(values.count)).rounded())
+        let sum = values.reduce(0, +)
+        let mean = sum.isFinite ? sum / Double(values.count)
+            : values.reduce(0) { $0 + $1 / Double(values.count) }
+        return validTarget(mean.rounded())
     }
 
     private static func sharesActiveTag(_ resultTags: [String], activeTags: [String]) -> Bool {

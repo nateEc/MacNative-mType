@@ -21,6 +21,8 @@
 
 ## PB 挑战和统计消费者
 
+后续 [节奏目标选择](PACE_RESULT_SELECTION_CONTRACT.md) 已补 Pace 消费者：上一轮在资格检查前更新，包括未保存的中止／AFK 结束；最近十次与滚动日最佳纳入已保存中止，普通／标签 PB 排除中止且完整匹配配置。Pace 仍有自定义值、引语身份和动画等缺口，不代表全部消费者完成。
+
 原版 [结果 PB 资格](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/frontend/src/ts/test/result.ts#L587-L622) 和后端 [PB](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/api/controllers/result.ts#L455-L466)、[速度排行榜](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/api/controllers/result.ts#L510-L536) 均排除 BailOut。此次前端 finish 和长度函数实际执行；完整后端保存、PB、榜单逻辑仅静态读取，不能当作已运行后端的证据。
 
 本机结果／标签 PB 反馈和 PB 表已按 completed 排除；此次补上当前 PB 的样本状态及历史 PB 曲线／ID 排除。BailOut 数据点保留，但不提高 PB 线；在首个完成结果之前没有 PB，不伪造零。挑战评估器直接拒绝中止，主界面仍只验证 completed。普通近期均值、练习时间及已保存结果总数保留中止；当前进程与落盘记录按 ID 去重，不把“排除 PB”误写为“排除全部统计”。

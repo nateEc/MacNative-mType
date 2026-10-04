@@ -159,7 +159,12 @@ function input(ms, value = 'a', text = 'a', extra = {}) {
   data.logTestEvent('input', ms, {inputType: 'insertText', wordIndex: 0, inputValue: value,
     data: text, correct: true, ...extra});
 }
-async function finish(ms) { now = ms; await logic.namespace.finish(); return state.lastResult; }
+async function finish(ms) {
+  now = ms; await logic.namespace.finish();
+  // Finish publishes raw pace speed even if validation rejects saving.
+  assert.equal(state.paceWpm, state.lastResult.wpm);
+  return state.lastResult;
+}
 function checkPresentation(result) {
   assert.equal(state.visible, true); assert.equal(state.active, false);
   assert.equal(state.update[0].testDuration, result.testDuration);
@@ -190,6 +195,7 @@ await keydown.onKeydown({code: 'Enter', key: 'Enter', shiftKey: true, repeat: fa
 for (let i = 0; i < 30 && state.update === null; i++) await Promise.resolve();
 assert.ok(state.update, 'Real finish must reach result adapter');
 result = state.lastResult; assert.equal(result.testDuration, 16);
+assert.equal(state.paceWpm, result.wpm);
 assert.ok(state.eventLog.events.some(x => x.type === 'keydown' && x.data.code === 'Enter' && x.testMs === 16000));
 assert.equal(state.signedOut.testDuration, 16); assert.equal(state.update[5], false); checkPresentation(result); count++;
 

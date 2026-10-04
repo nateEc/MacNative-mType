@@ -28072,7 +28072,7 @@ final class TypingEngineTests: XCTestCase {
         samples: older + [previousDayPeak, expiredPeak], activeTags: ["focus"], now: now), 140)
   }
 
-  func testLastTestPaceMatchesCompletedAndRepeatedReferenceRules() {
+  func testLastTestPaceMatchesFinishAndRepeatedReferenceRules() {
     XCTAssertEqual(
       LastTestPacePolicy.updatedWpm(
         previousWpm: 80, candidateWpm: 70, outcome: .completed, isPaceRepeat: false),
@@ -28092,7 +28092,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       LastTestPacePolicy.updatedWpm(
         previousWpm: 80, candidateWpm: 20, outcome: .invalidAFK, isPaceRepeat: false),
-      80)
+      20)
 
     let configuration = TestConfiguration.timed(seconds: 30, language: .english)
     XCTAssertNil(
@@ -28101,7 +28101,7 @@ final class TypingEngineTests: XCTestCase {
         lastTestWpm: 0))
   }
 
-  func testPaceGuideUsesOnlyComparableCompletedResultsAndClampsProgress() {
+  func testPaceGuideUsesComparableSavedResultsAndClampsOnlyProgress() {
     let calendar = Calendar(identifier: .gregorian)
     let today = Date(timeIntervalSinceReferenceDate: 10_000_000)
     let configuration = TestConfiguration.timed(seconds: 30, language: .english)
@@ -28133,11 +28133,11 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(
       PaceGuidePolicy.targetWpm(
         mode: .custom, customWpm: 1, configuration: configuration, samples: [], now: today,
-        calendar: calendar), PaceGuidePolicy.minimumWpm)
+        calendar: calendar), 1)
     XCTAssertEqual(
       PaceGuidePolicy.targetWpm(
         mode: .lastTest, customWpm: 60, configuration: configuration, samples: [],
-        lastTestWpm: 360, now: today, calendar: calendar), PaceGuidePolicy.maximumWpm)
+        lastTestWpm: 360, now: today, calendar: calendar), 360)
     XCTAssertNil(
       PaceGuidePolicy.targetWpm(
         mode: .lastTest, customWpm: 60, configuration: configuration, samples: [],
