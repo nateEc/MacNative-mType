@@ -588,7 +588,10 @@ final class TestResultRecord {
     // suppress derived time and refuse portable export until repaired.
     elapsedTimeData == nil ? wallClockDuration : elapsedTime?.seconds ?? 0
   }
-  var elapsedDuration: TimeInterval { terminalTiming?.duration(mode: configuration?.mode ?? .zen) ?? capturedDuration }
+  var elapsedDuration: TimeInterval {
+    terminalTiming?.duration(mode: configuration?.mode ?? .zen)
+      ?? elapsedTime?.duration(mode: configuration?.mode ?? .zen) ?? capturedDuration
+  }
   var chartDuration: TimeInterval { terminalTiming?.boundaryDuration ?? capturedDuration }
 
   var totalEngagedDuration: TimeInterval {

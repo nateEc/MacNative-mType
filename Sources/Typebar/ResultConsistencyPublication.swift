@@ -14,16 +14,19 @@ enum ResultConsistencyPublication {
     calculation: @escaping @Sendable (ResultWPMConsistencyInput) async -> Double? = { $0.calculate() }
   ) async throws -> RemoteResultSubmission {
     try Task.checkCancellation()
-    // Expand local persistence before the service cutover. No service yet
-    // implements this contract, even if an unknown capability claims it.
-    guard result.elapsedTime == nil else {
-      throw RemoteAccountError.serverMessage("独立时长成绩的服务协议尚未迁移，暂不能发布；本机成绩和归档不受影响。")
+    if let elapsedTime = result.elapsedTime, !elapsedTime.isServiceCompatible(
+      mode: result.configuration.mode, bailedOut: result.outcome == .bailedOut,
+      calendarSeconds: result.finishedAt.timeIntervalSince(result.startedAt)) {
+      throw RemoteAccountError.serverMessage("独立时长或计时成绩日期一致性无效，不能发布；本机记录保留。")
+    }
+    guard result.elapsedTime == nil || capabilities?.supportsResultElapsedTime == true else {
+      throw RemoteAccountError.serverMessage("当前服务不支持独立测量时长。请先升级自建服务；本机成绩不受影响。")
     }
     guard result.outcome != .bailedOut || capabilities?.supportsResultBailout == true else {
       // Timing support alone cannot authorize a completed-looking BailOut.
       throw RemoteAccountError.serverMessage("当前服务不支持 BailOut 中止成绩协议。请先升级自建服务；本机成绩不受影响。")
     }
-    if let timing = result.terminalTiming, !timing.isValid(wallClockDuration: result.wallClockDuration,
+    if let timing = result.terminalTiming, !timing.isValid(wallClockDuration: result.capturedDuration,
       mode: result.configuration.mode, outcome: result.outcome) {
       throw RemoteAccountError.serverMessage("结束计时证据无效，不能发布此成绩。")
     }

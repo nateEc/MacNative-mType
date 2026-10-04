@@ -128,16 +128,16 @@ final class ResultElapsedTimeTests: XCTestCase {
     }
   }
 
-  @MainActor func testPublicationCannotSilentlyDropIndependentDurationBeforeServiceMigration() async throws {
+  @MainActor func testPublicationCannotSilentlyDropIndependentDurationWithoutExactCapability() async throws {
     let result = try decode(payload())
     let capabilities = RemoteServiceCapabilities(apiVersion: "v1", service: "typebar",
-      capabilities: ["resultConsistency": "available", "resultElapsedTime": "available"])
+      capabilities: ["resultConsistency": "available", "resultElapsedTime": "planned"])
     for capability in [nil, capabilities] {
       do {
         _ = try await ResultConsistencyPublication.prepare(result: result, capabilities: capability) { _ in
           XCTFail("Do not calculate or upload an unsupported timing contract"); return 50
         }
-        XCTFail("Independent timing must stay local until the service migration is implemented")
+        XCTFail("Independent timing must stay local without exact service capability")
       } catch let error as RemoteAccountError {
         guard case .serverMessage = error else { return XCTFail("Unexpected error: \(error)") }
       }
@@ -158,7 +158,7 @@ final class ResultElapsedTimeTests: XCTestCase {
     for seconds in [0.0, 16.1256789] {
       let result = try decode(payload(seconds: seconds))
       XCTAssertEqual(result.capturedDuration, seconds)
-      XCTAssertEqual(result.elapsedDuration, seconds)
+      XCTAssertEqual(result.elapsedDuration, ResultTerminalTiming.round(seconds))
       let timing = try XCTUnwrap(try object(result)["elapsedTime"] as? [String: Double])
       XCTAssertEqual(Set(timing.keys), ["version", "seconds"])
       XCTAssertEqual(timing["seconds"], seconds)

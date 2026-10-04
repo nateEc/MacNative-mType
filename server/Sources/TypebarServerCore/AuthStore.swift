@@ -950,10 +950,14 @@ public actor AuthStore {
     var tags: [String]
     let practiceTiming: ResultPracticeTiming?
     let terminalTiming: ResultTerminalTiming?
+    let elapsedTime: ResultElapsedTime?
+    let startedAtReferenceTime: Double?
+    let finishedAtReferenceTime: Double?
     let bailedOut: Bool?
     let customLimit: ResultCustomLimit?
     var elapsedDuration: Double {
-      terminalTiming?.duration(mode: mode) ?? max(0, finishedAt.timeIntervalSince(startedAt))
+      terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
+        ?? max(0, finishedAt.timeIntervalSince(startedAt))
     }
     let startedAt: Date
     let finishedAt: Date
@@ -961,7 +965,8 @@ public actor AuthStore {
 
     private enum CodingKeys: String, CodingKey {
       case id, userID, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-        errorCount, eventCount, tags, practiceTiming, inputMetrics, keyConsistency, terminalTiming, bailedOut, customLimit, startedAt, finishedAt, acceptedAt
+        errorCount, eventCount, tags, practiceTiming, inputMetrics, keyConsistency, terminalTiming, elapsedTime,
+        bailedOut, customLimit, startedAt, finishedAt, acceptedAt, startedAtReferenceTime, finishedAtReferenceTime
     }
 
     init(
@@ -970,6 +975,7 @@ public actor AuthStore {
       errorCount: Int, eventCount: Int, tags: [String], practiceTiming: ResultPracticeTiming? = nil,
       inputMetrics: ResultInputMetrics? = nil, keyConsistency: Double? = nil,
       terminalTiming: ResultTerminalTiming? = nil,
+      elapsedTime: ResultElapsedTime? = nil,
       bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
       startedAt: Date, finishedAt: Date, acceptedAt: Date? = nil
     ) {
@@ -990,6 +996,9 @@ public actor AuthStore {
       self.tags = tags
       self.practiceTiming = practiceTiming
       self.terminalTiming = terminalTiming
+      self.elapsedTime = elapsedTime
+      self.startedAtReferenceTime = elapsedTime == nil ? nil : startedAt.timeIntervalSinceReferenceDate
+      self.finishedAtReferenceTime = elapsedTime == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
       self.bailedOut = bailedOut
       self.customLimit = customLimit
       self.startedAt = startedAt
@@ -1019,17 +1028,29 @@ public actor AuthStore {
       eventCount = try values.decode(Int.self, forKey: .eventCount)
       tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
       practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
-      finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+      elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
+      startedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
+      finishedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
+      finishedAt = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .finishedAt),
+        referenceTime: finishedAtReferenceTime, required: elapsedTime != nil,
+        key: .finishedAtReferenceTime, values: values)
       let legacyDuration =
         durationSeconds.map(TimeInterval.init)
         ?? max(1, Double(eventCount) / Double(max(rawWpm, 1) * 5) * 60)
-      startedAt =
-        try values.decodeIfPresent(Date.self, forKey: .startedAt)
-        ?? finishedAt.addingTimeInterval(-legacyDuration)
+      let rawStart = elapsedTime == nil
+        ? try values.decodeIfPresent(Date.self, forKey: .startedAt) ?? finishedAt.addingTimeInterval(-legacyDuration)
+        : try values.decode(Date.self, forKey: .startedAt)
+      startedAt = try ResultDatePrecision.restore(rawStart, referenceTime: startedAtReferenceTime,
+        required: elapsedTime != nil, key: .startedAtReferenceTime, values: values)
       acceptedAt = try values.decodeIfPresent(Date.self, forKey: .acceptedAt)
       terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
       bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
       customLimit = try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit)
+      if let elapsedTime, !elapsedTime.isDateConsistent(mode: mode, bailedOut: bailedOut == true,
+        calendarSeconds: finishedAt.timeIntervalSince(startedAt)) {
+        throw DecodingError.dataCorruptedError(forKey: .elapsedTime, in: values,
+          debugDescription: "Stored measured time must retain short timed date consistency")
+      }
       guard ResultBailoutPolicy.hasValidContext(bailedOut: bailedOut, mode: mode,
         duration: durationSeconds, words: wordLimit, custom: customLimit),
         bailedOut != true || ResultBailoutPolicy.isLongEnough(mode: mode,
@@ -1039,7 +1060,8 @@ public actor AuthStore {
           debugDescription: "Stored BailOut context must not silently become a completed result")
       }
       if let terminalTiming, !terminalTiming.isValid(
-        wallClockSeconds: finishedAt.timeIntervalSince(startedAt), mode: mode, bailedOut: bailedOut == true) {
+        wallClockSeconds: elapsedTime?.seconds ?? finishedAt.timeIntervalSince(startedAt), mode: mode,
+        bailedOut: bailedOut == true, independentElapsedTime: elapsedTime != nil) {
         throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
           debugDescription: "Stored terminal clock must remain valid; it cannot silently become wall time")
       }
@@ -1054,6 +1076,7 @@ public actor AuthStore {
         preciseAccuracy: inputMetrics?.preciseAccuracy,
         keyConsistency: keyConsistency,
         terminalTiming: terminalTiming,
+        elapsedTime: elapsedTime,
         bailedOut: bailedOut, customLimit: customLimit,
         startedAt: startedAt, finishedAt: finishedAt)
     }
@@ -3175,6 +3198,7 @@ public actor AuthStore {
       eventCount: record.eventCount, tags: record.tags, inputMetrics: record.inputMetrics,
       resultConsistency: record.keyConsistency.map { .init(keyConsistency: $0) },
       terminalTiming: record.terminalTiming,
+      elapsedTime: record.elapsedTime,
       bailedOut: record.bailedOut, customLimit: record.customLimit,
       startedAt: record.startedAt,
       finishedAt: record.finishedAt)
@@ -3317,6 +3341,7 @@ public actor AuthStore {
         tags: tags, practiceTiming: request.practiceTiming, inputMetrics: request.inputMetrics,
         keyConsistency: request.resultConsistency?.keyConsistency,
         terminalTiming: request.terminalTiming,
+        elapsedTime: request.elapsedTime,
         bailedOut: request.bailedOut, customLimit: request.customLimit,
         startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
       ))
@@ -4039,7 +4064,9 @@ public actor AuthStore {
       result.errorCount >= 0, (0...1_800_000).contains(result.eventCount),
       (0...1_000).contains(result.restartCount),
       result.rawWpm >= result.wpm, result.errorCount <= result.eventCount,
-      result.startedAt <= result.finishedAt,
+      result.startedAt.timeIntervalSinceReferenceDate.isFinite,
+      result.finishedAt.timeIntervalSinceReferenceDate.isFinite,
+      result.elapsedTime != nil || result.startedAt <= result.finishedAt,
       result.finishedAt <= now.addingTimeInterval(60 * 5),
       result.finishedAt >= now.addingTimeInterval(-60 * 60 * 24 * 365 * 2)
     else { throw ResultStoreError.invalidResult }
@@ -4051,13 +4078,21 @@ public actor AuthStore {
       throw ResultStoreError.invalidResult
     }
 
-    let elapsed = result.finishedAt.timeIntervalSince(result.startedAt)
-    guard (1...3600).contains(elapsed) else { throw ResultStoreError.invalidResult }
-    if let terminalTiming = result.terminalTiming,
-      !terminalTiming.isValid(wallClockSeconds: elapsed, mode: result.mode, bailedOut: isBailout) {
+    let calendarSeconds = result.finishedAt.timeIntervalSince(result.startedAt)
+    if let elapsedTime = result.elapsedTime,
+      !elapsedTime.isDateConsistent(mode: result.mode, bailedOut: isBailout, calendarSeconds: calendarSeconds) {
       throw ResultStoreError.invalidResult
     }
-    let measured = result.terminalTiming?.duration(mode: result.mode) ?? elapsed
+    let elapsed = result.elapsedTime?.seconds ?? calendarSeconds
+    guard result.elapsedTime != nil ? elapsed > 0 && elapsed <= 3_600 : (1...3_600).contains(elapsed)
+    else { throw ResultStoreError.invalidResult }
+    if let terminalTiming = result.terminalTiming,
+      !terminalTiming.isValid(wallClockSeconds: elapsed, mode: result.mode, bailedOut: isBailout,
+        independentElapsedTime: result.elapsedTime != nil) {
+      throw ResultStoreError.invalidResult
+    }
+    let measured = result.terminalTiming?.duration(mode: result.mode)
+      ?? result.elapsedTime?.duration(mode: result.mode) ?? elapsed
     if isBailout {
       let countAccuracy = result.eventCount == 0 ? 100
         : Double(result.eventCount - result.errorCount) / Double(result.eventCount) * 100

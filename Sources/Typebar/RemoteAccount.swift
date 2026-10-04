@@ -385,14 +385,19 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     /// wall-clock semantics instead of inventing an AFK estimate.
     let practiceTiming: RemoteResultPracticeTiming?
     let terminalTiming: ResultTerminalTiming?
+    let elapsedTime: ResultElapsedTime?
     let bailedOut: Bool?
     let customLimit: RemoteResultCustomLimit?
     let startedAt: Date
     let finishedAt: Date
 
+    let startedAtReferenceTime: Double?
+    let finishedAtReferenceTime: Double?
+
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, practiceTiming, preciseAccuracy, keyConsistency, terminalTiming, bailedOut, customLimit, startedAt, finishedAt
+            errorCount, eventCount, tags, practiceTiming, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
+            bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
     }
 
     init(from decoder: Decoder) throws {
@@ -416,11 +421,23 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         eventCount = try values.decode(Int.self, forKey: .eventCount)
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         practiceTiming = try values.decodeIfPresent(RemoteResultPracticeTiming.self, forKey: .practiceTiming)
-        startedAt = try values.decode(Date.self, forKey: .startedAt)
-        finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+        elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
+        startedAtReferenceTime = elapsedTime == nil ? nil : try values.decode(Double.self, forKey: .startedAtReferenceTime)
+        finishedAtReferenceTime = elapsedTime == nil ? nil : try values.decode(Double.self, forKey: .finishedAtReferenceTime)
+        startedAt = elapsedTime == nil ? try values.decode(Date.self, forKey: .startedAt)
+            : try CompatibleDatePrecision.decode(from: values, legacyKey: .startedAt, precisionKey: .startedAtReferenceTime)
+        finishedAt = elapsedTime == nil ? try values.decode(Date.self, forKey: .finishedAt)
+            : try CompatibleDatePrecision.decode(from: values, legacyKey: .finishedAt, precisionKey: .finishedAtReferenceTime)
         terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
         bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
         customLimit = try values.decodeIfPresent(RemoteResultCustomLimit.self, forKey: .customLimit)
+        if let elapsedTime {
+            guard let testMode = TestMode(rawValue: mode), elapsedTime.isServiceCompatible(mode: testMode,
+                bailedOut: bailedOut == true, calendarSeconds: finishedAt.timeIntervalSince(startedAt)) else {
+                throw DecodingError.dataCorruptedError(forKey: .elapsedTime, in: values,
+                    debugDescription: "Remote elapsed time must keep service bounds and short timed calendar consistency")
+            }
+        }
         guard RemoteResultBailoutPolicy.isValidHistory(mode: mode, bailedOut: bailedOut,
             duration: durationSeconds, words: wordLimit, custom: customLimit, measured: elapsedDuration) else {
             throw DecodingError.dataCorruptedError(forKey: .bailedOut, in: values,
@@ -428,10 +445,11 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         }
         if let terminalTiming {
             guard let testMode = TestMode(rawValue: mode),
-                terminalTiming.isValid(wallClockDuration: wallClockDuration,
+                terminalTiming.isValid(wallClockDuration: capturedDuration,
                     mode: testMode, outcome: bailedOut == true ? .bailedOut : .completed,
-                    wallClockToleranceMilliseconds: 1_000.011),
-                (1...3_600).contains(wallClockDuration),
+                    wallClockToleranceMilliseconds: elapsedTime == nil ? 1_000.011 : 0.011),
+                (elapsedTime != nil ? capturedDuration > 0 && capturedDuration <= 3_600
+                  : (1...3_600).contains(capturedDuration)),
                 ((bailedOut == true ? 1.0 : 15.0)...3_600).contains(terminalTiming.duration(mode: testMode)) else {
                 throw DecodingError.dataCorruptedError(forKey: .terminalTiming, in: values,
                     debugDescription: "Remote terminal clock must remain valid; never silently fall back to wall time")
@@ -440,8 +458,10 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     }
 
     var wallClockDuration: TimeInterval { max(0, finishedAt.timeIntervalSince(startedAt)) }
+    var capturedDuration: TimeInterval { elapsedTime?.seconds ?? wallClockDuration }
     var elapsedDuration: TimeInterval {
-        terminalTiming?.duration(mode: TestMode(rawValue: mode) ?? .zen) ?? wallClockDuration
+        terminalTiming?.duration(mode: TestMode(rawValue: mode) ?? .zen)
+            ?? elapsedTime?.duration(mode: TestMode(rawValue: mode) ?? .zen) ?? capturedDuration
     }
 }
 
@@ -815,6 +835,9 @@ struct RemoteResultSubmission: Codable, Sendable {
     let startedAt: Date
     let finishedAt: Date
     let terminalTiming: ResultTerminalTiming?
+    let elapsedTime: ResultElapsedTime?
+    let startedAtReferenceTime: Double?
+    let finishedAtReferenceTime: Double?
     let bailedOut: Bool?
     let customLimit: RemoteResultCustomLimit?
 
@@ -852,6 +875,9 @@ struct RemoteResultSubmission: Codable, Sendable {
         startedAt = result.startedAt
         finishedAt = result.finishedAt
         terminalTiming = result.terminalTiming
+        elapsedTime = result.elapsedTime
+        startedAtReferenceTime = result.elapsedTime == nil ? nil : result.startedAt.timeIntervalSinceReferenceDate
+        finishedAtReferenceTime = result.elapsedTime == nil ? nil : result.finishedAt.timeIntervalSinceReferenceDate
         bailedOut = result.outcome == .bailedOut ? true : nil
         customLimit = result.outcome == .bailedOut && result.configuration.mode == .custom
             ? .init(configuration: result.configuration) : nil
@@ -890,6 +916,11 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
             && capabilities["resultTerminalTiming"] == "available"
     }
 
+    var supportsResultElapsedTime: Bool {
+        apiVersion == "v1" && service == "typebar"
+            && capabilities["resultElapsedTime"] == "available"
+    }
+
     var supportsResultBailout: Bool {
         apiVersion == "v1" && service == "typebar"
             && capabilities["resultBailout"] == "available"
@@ -920,8 +951,8 @@ struct RemoteResultTimingEvidence: Codable, Equatable, Sendable {
     init?(result: CompletedTestResult) {
         let durationSamples = result.keyDurationSamples
         let spacingSamples = result.keySpacingSamples
-        let maximumSample = result.wallClockDuration + 1
-        guard (0...Self.maximumDuration).contains(result.wallClockDuration),
+        let maximumSample = result.capturedDuration + 1
+        guard (0...Self.maximumDuration).contains(result.capturedDuration),
             !durationSamples.isEmpty || !spacingSamples.isEmpty,
             durationSamples.count + spacingSamples.count <= Self.maximumSamples,
             durationSamples.allSatisfy({ (0...maximumSample).contains($0) }),
@@ -2777,7 +2808,8 @@ final class AccountSession {
         }
         let requestEndpoint = endpoint
         let requestScope = ResultPublicationScope(endpoint: requestEndpoint, userID: requestingUser.id)
-        let capabilities = try await RemoteResultBailoutPolicy.capabilities(for: result.outcome) {
+        let capabilities = try await RemoteResultBailoutPolicy.capabilities(for: result.outcome,
+            requiresElapsedTime: result.elapsedTime != nil) {
             try await RemoteAccountAPI(endpoint: requestEndpoint).request(
                 path: "v1/capabilities",
                 method: "GET",

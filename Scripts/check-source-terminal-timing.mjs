@@ -353,4 +353,25 @@ for (const options of [{mode:'time',time:15}, {mode:'words',words:25},
     count++;
   }
 }
+// The minimum and <=120s qualification apply after noncustom scalar rounding.
+for (const [mode, ms, duration, tooShort] of [['quote', 994, 0.99, true],
+  ['quote', 995, 1, false], ['custom', 995, 0.995, true], ['custom', 1004, 1.004, false]]) {
+  reset({mode, targets:['a']}); press(0); input(0); press(ms, 'KeyB');
+  result = await finish(ms);
+  assert.equal(result.testDuration, duration);
+  assert.equal(state.notices.includes('Test invalid - too short'), tooShort);
+  // This verifies the minimum branch, not other result fields/AFK/save eligibility.
+  count++;
+}
+for (const [ms, duration, inconsistent] of [[120004, 120, true], [120005, 120.01, false]]) {
+  const startDate = 1_800_000_000_000;
+  reset({mode:'time', time:120, targets:['ab'], startDate, endDate:startDate-3_600_000});
+  press(0); input(0); press(ms-1,'KeyB'); input(ms-1,'ab','b');
+  result = await finish(ms);
+  assert.equal(result.testDuration,duration);
+  assert.equal(stats.getDateBasedTestDurationMs(state.eventLog),-3_600_000);
+  assert.equal(state.notices.includes('Test invalid - inconsistent test duration'),inconsistent);
+  // Do not claim unrelated AFK/qualification branches succeeded.
+  count++;
+}
 console.log(`${count} owned terminal timing/finish fixtures passed (${actualFiles.size} complete actual modules; real event storage/cleanup/key handling/stats/finish/backend length check and authenticated save prefix, synthetic 503 transport/hash/identity/UI/timer-end, no success-save/browser/IME/native parity claim).`);

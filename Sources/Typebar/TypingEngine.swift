@@ -4126,7 +4126,8 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   }
 
   var elapsedDuration: TimeInterval {
-    terminalTiming?.duration(mode: configuration.mode) ?? capturedDuration
+    terminalTiming?.duration(mode: configuration.mode)
+      ?? elapsedTime?.duration(mode: configuration.mode) ?? capturedDuration
   }
 
   var wallClockDuration: TimeInterval { max(0, finishedAt.timeIntervalSince(startedAt)) }

@@ -56,6 +56,9 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let practiceTiming: ResultPracticeTiming?
     public let inputMetrics: ResultInputMetrics?
     public let terminalTiming: ResultTerminalTiming?
+    public let elapsedTime: ResultElapsedTime?
+    public let startedAtReferenceTime: Double?
+    public let finishedAtReferenceTime: Double?
     public let bailedOut: Bool?
     public let customLimit: ResultCustomLimit?
     public let startedAt: Date
@@ -68,6 +71,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
+        elapsedTime: ResultElapsedTime? = nil,
         bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
         startedAt: Date, finishedAt: Date
     ) {
@@ -89,6 +93,9 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.practiceTiming = practiceTiming
         self.inputMetrics = inputMetrics
         self.terminalTiming = terminalTiming
+        self.elapsedTime = elapsedTime
+        self.startedAtReferenceTime = elapsedTime == nil ? nil : startedAt.timeIntervalSinceReferenceDate
+        self.finishedAtReferenceTime = elapsedTime == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
         self.bailedOut = bailedOut
         self.customLimit = customLimit
         self.startedAt = startedAt
@@ -103,6 +110,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case inputMetrics
         case resultConsistency
         case terminalTiming
+        case elapsedTime, startedAtReferenceTime, finishedAtReferenceTime
         case bailedOut, customLimit
     }
 
@@ -126,10 +134,17 @@ public struct ResultSubmissionRequest: Content, Equatable {
         practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
         inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
         terminalTiming = try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming)
+        elapsedTime = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
+        startedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
+        finishedAtReferenceTime = elapsedTime == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
         bailedOut = try values.decodeIfPresent(Bool.self, forKey: .bailedOut)
         customLimit = try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit)
-        startedAt = try values.decode(Date.self, forKey: .startedAt)
-        finishedAt = try values.decode(Date.self, forKey: .finishedAt)
+        startedAt = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .startedAt),
+            referenceTime: startedAtReferenceTime, required: elapsedTime != nil,
+            key: .startedAtReferenceTime, values: values)
+        finishedAt = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .finishedAt),
+            referenceTime: finishedAtReferenceTime, required: elapsedTime != nil,
+            key: .finishedAtReferenceTime, values: values)
     }
 }
 
@@ -162,6 +177,9 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
     public let tags: [String]
     public let practiceTiming: ResultPracticeTiming?
     public let terminalTiming: ResultTerminalTiming?
+    public let elapsedTime: ResultElapsedTime?
+    public let startedAtReferenceTime: Double?
+    public let finishedAtReferenceTime: Double?
     public let bailedOut: Bool?
     public let customLimit: ResultCustomLimit?
     public let startedAt: Date
@@ -173,6 +191,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         tags: [String], practiceTiming: ResultPracticeTiming? = nil, preciseAccuracy: Double? = nil,
         keyConsistency: Double? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
+        elapsedTime: ResultElapsedTime? = nil,
         bailedOut: Bool? = nil, customLimit: ResultCustomLimit? = nil,
         startedAt: Date, finishedAt: Date
     ) {
@@ -192,10 +211,46 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
         self.tags = tags
         self.practiceTiming = practiceTiming
         self.terminalTiming = terminalTiming
+        self.elapsedTime = elapsedTime
+        self.startedAtReferenceTime = elapsedTime == nil ? nil : startedAt.timeIntervalSinceReferenceDate
+        self.finishedAtReferenceTime = elapsedTime == nil ? nil : finishedAt.timeIntervalSinceReferenceDate
         self.bailedOut = bailedOut
         self.customLimit = customLimit
         self.startedAt = startedAt
         self.finishedAt = finishedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, preciseAccuracy,
+            consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, terminalTiming,
+            elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let elapsed = try values.decodeIfPresent(ResultElapsedTime.self, forKey: .elapsedTime)
+        let startReference = elapsed == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .startedAtReferenceTime)
+        let endReference = elapsed == nil ? nil : try values.decodeIfPresent(Double.self, forKey: .finishedAtReferenceTime)
+        let start = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .startedAt),
+            referenceTime: startReference,
+            required: elapsed != nil, key: .startedAtReferenceTime, values: values)
+        let end = try ResultDatePrecision.restore(values.decode(Date.self, forKey: .finishedAt),
+            referenceTime: endReference,
+            required: elapsed != nil, key: .finishedAtReferenceTime, values: values)
+        self.init(id: try values.decode(UUID.self, forKey: .id), mode: try values.decode(String.self, forKey: .mode),
+            language: try values.decode(String.self, forKey: .language),
+            durationSeconds: try values.decodeIfPresent(Int.self, forKey: .durationSeconds),
+            wordLimit: try values.decodeIfPresent(Int.self, forKey: .wordLimit),
+            wpm: try values.decode(Int.self, forKey: .wpm), rawWpm: try values.decode(Int.self, forKey: .rawWpm),
+            accuracy: try values.decode(Int.self, forKey: .accuracy), consistency: try values.decode(Double.self, forKey: .consistency),
+            errorCount: try values.decode(Int.self, forKey: .errorCount), eventCount: try values.decode(Int.self, forKey: .eventCount),
+            tags: try values.decode([String].self, forKey: .tags),
+            practiceTiming: try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming),
+            preciseAccuracy: try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy),
+            keyConsistency: try values.decodeIfPresent(Double.self, forKey: .keyConsistency),
+            terminalTiming: try values.decodeIfPresent(ResultTerminalTiming.self, forKey: .terminalTiming), elapsedTime: elapsed,
+            bailedOut: try values.decodeIfPresent(Bool.self, forKey: .bailedOut),
+            customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
     }
 }
 
@@ -432,7 +487,7 @@ public enum TypebarExperiencePolicy {
             // A sixty-second configuration is not sixty seconds of practice
             // when the user stops early. Keep the legacy completed XP formula.
             seconds = result.terminalTiming?.duration(mode: result.mode)
-                ?? result.finishedAt.timeIntervalSince(result.startedAt)
+                ?? result.elapsedTime?.duration(mode: result.mode) ?? result.finishedAt.timeIntervalSince(result.startedAt)
         } else if let duration = result.durationSeconds {
             seconds = Double(duration)
         } else {

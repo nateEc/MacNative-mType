@@ -24,11 +24,11 @@ struct RemoteResultCustomLimit: Codable, Equatable, Sendable {
 enum RemoteResultBailoutPolicy {
   /// Capability absence is not the same as a temporary transport failure.
   /// Completed legacy submissions retain their existing optional lookup.
-  @MainActor static func capabilities(for outcome: TestOutcome,
+  @MainActor static func capabilities(for outcome: TestOutcome, requiresElapsedTime: Bool = false,
     load: () async throws -> RemoteServiceCapabilities) async throws -> RemoteServiceCapabilities? {
     do { return try await load() }
     catch {
-      if outcome == .bailedOut,
+      if outcome == .bailedOut || requiresElapsedTime,
         error is CancellationError || ResultPublicationRetryPolicy.shouldQueue(error) { throw error }
       return nil
     }

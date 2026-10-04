@@ -19,6 +19,20 @@ struct ResultElapsedTime: Codable, Equatable, Sendable {
     version == 1 && seconds.isFinite && (0...Self.maximumSeconds).contains(seconds)
   }
 
+  func duration(mode: TestMode) -> TimeInterval {
+    mode == .custom ? seconds : ResultTerminalTiming.round(seconds)
+  }
+
+  /// New service submissions use measured time without bypassing the source's
+  /// ordinary short-time calendar consistency check. Legacy absence is separate.
+  func isServiceCompatible(mode: TestMode, bailedOut: Bool, calendarSeconds: Double) -> Bool {
+    guard isValid, seconds > 0, seconds <= 3_600, calendarSeconds.isFinite else { return false }
+    let measured = duration(mode: mode)
+    guard (1...3_600).contains(measured) else { return false }
+    return mode != .time || bailedOut || measured > 120
+      || (measured >= calendarSeconds - 0.1 && measured <= calendarSeconds + 0.1)
+  }
+
   private enum CodingKeys: String, CodingKey { case version, seconds }
 
   init(from decoder: Decoder) throws {
