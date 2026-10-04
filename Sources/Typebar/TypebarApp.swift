@@ -1311,6 +1311,7 @@ private struct ContentView: View {
           tags: activeSessionTags,
           restartCount: resultPriorAttemptLedger.restartCount,
           priorAttemptEngagedDuration: resultPriorAttemptLedger.priorAttemptEngagedDuration,
+          incompletePractice: resultPriorAttemptLedger.incompletePractice,
           quoteSource: activeQuoteSource,
           challengePresentation: challengePresentation
         ) else { return }
@@ -1356,7 +1357,8 @@ private struct ContentView: View {
           priorAttemptLedger.recordTerminalAttempt(
             engagedDuration: result.engagedDuration, outcome: result.outcome, eligibility: eligibility,
             savingEnabled: settings.saveCompletedResults,
-            samePromptRepeat: isSamePromptRepeatAttempt && result.configuration.mode != .quote)
+            samePromptRepeat: isSamePromptRepeatAttempt && result.configuration.mode != .quote,
+            accuracy: result.preciseAccuracy)
         }
         let zeroSpeedFeedback = ZeroSpeedResultFeedbackPolicy.feedback(
           wpm: result.wpm, elapsedDuration: result.elapsedDuration, outcome: result.outcome)
@@ -3740,6 +3742,7 @@ private struct ContentView: View {
     let restartedSessionEngagedDuration = shouldCountRestart
       ? session.activeEngagedDuration()
       : 0
+    let restartedSessionAccuracy = shouldCountRestart ? session.preciseAccuracy : nil
     absorbLiveWeakSpotScores(from: session)
     restartLockMessage = nil
     bailoutConfirmationMessage = nil
@@ -3791,7 +3794,8 @@ private struct ContentView: View {
     persistActiveTestSelection()
     if shouldCountRestart {
       priorAttemptLedger.recordRestart(
-        engagedDuration: restartedSessionEngagedDuration, savingEnabled: settings.saveCompletedResults)
+        engagedDuration: restartedSessionEngagedDuration, accuracy: restartedSessionAccuracy,
+        savingEnabled: settings.saveCompletedResults)
     }
     isSamePromptRepeatAttempt = false
     isRepeatedPaceAttempt = false

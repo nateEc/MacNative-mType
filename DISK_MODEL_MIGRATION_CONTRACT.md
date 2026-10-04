@@ -1,6 +1,6 @@
 # 原生磁盘模型升级与备份验证合同
 
-2026-10-04：现有 SwiftData 自动迁移路径已在隔离 SQLite 文件上验证两代自有历史存储声明。没有修改生产模型、迁移策略、归档 25、设置 4 或依赖。完整 Monkeytype 原生重写 goal 仍 active；这不是实际用户库、已发布旧应用二进制、旧 SDK 或 macOS 14 的升级承诺。
+2026-10-04 最新增量见 [未完成练习证据合同](INCOMPLETE_PRACTICE_EVIDENCE_CONTRACT.md)：新增可选 incompletePracticeData，归档 26／设置 4；四 writer 包括第三代 before-incomplete 30 列和 current 31 列，九项真实磁盘测试已定向通过。迁移策略仍使用现有自动路径。本页下方两代历史、三 writer、current 30 列及七项测试描述保留为原阶段证据，不是当前 schema。完整 Monkeytype 原生重写 goal 仍 active；不是实际用户库、旧发行二进制、旧 SDK 或 macOS 14 的升级承诺。
 
 ## 被验证的模型
 

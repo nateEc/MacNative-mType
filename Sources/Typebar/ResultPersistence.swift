@@ -171,32 +171,42 @@ enum ResultSavingPolicy {
 struct PriorAttemptLedger: Equatable {
   private(set) var restartCount = 0
   private(set) var priorAttemptEngagedDuration: TimeInterval = 0
+  private(set) var incompletePractice: ResultIncompletePractice? = .empty
 
-  mutating func recordRestart(engagedDuration: TimeInterval, savingEnabled: Bool) {
+  mutating func recordRestart(engagedDuration: TimeInterval, accuracy: Double? = nil, savingEnabled: Bool) {
     guard savingEnabled else { return }
-    append(engagedDuration: engagedDuration)
+    append(engagedDuration: engagedDuration, accuracy: accuracy)
   }
 
   mutating func recordTerminalAttempt(
     engagedDuration: TimeInterval, outcome: TestOutcome, eligibility: ResultEligibility,
-    savingEnabled: Bool, samePromptRepeat: Bool = false
+    savingEnabled: Bool, samePromptRepeat: Bool = false, accuracy: Double? = nil
   ) {
     guard savingEnabled, shouldCarryTerminalAttempt(outcome: outcome, eligibility: eligibility,
       samePromptRepeat: samePromptRepeat) else {
       return
     }
-    append(engagedDuration: engagedDuration)
+    append(engagedDuration: engagedDuration, accuracy: accuracy)
   }
 
   mutating func clearAfterPersistingResult() {
     restartCount = 0
     priorAttemptEngagedDuration = 0
+    incompletePractice = .empty
   }
 
-  private mutating func append(engagedDuration: TimeInterval) {
+  private mutating func append(engagedDuration: TimeInterval, accuracy: Double?) {
     restartCount += 1
+    if let accuracy, let attempt = ResultIncompletePractice.Attempt.captured(
+      accuracy: accuracy, engagedDuration: engagedDuration) {
+      incompletePractice?.append(attempt)
+    } else {
+      // Never fill an unknown attempt with a perfect score or a partial array.
+      incompletePractice = nil
+    }
     guard engagedDuration.isFinite else { return }
     priorAttemptEngagedDuration += max(0, engagedDuration)
+    if !priorAttemptEngagedDuration.isFinite { incompletePractice = nil }
   }
 
   private func shouldCarryTerminalAttempt(
@@ -470,6 +480,8 @@ final class TestResultRecord {
   var terminalTimingData: Data?
   /// Additive optional metadata; old rows keep their original date semantics.
   var elapsedTimeData: Data?
+  /// Additive optional XP history. Old records remain absent, never backfilled.
+  var incompletePracticeData: Data?
   var typedCharacterCount: Int
   var correctCharacterCount: Int
   var errorCount: Int
@@ -506,6 +518,7 @@ final class TestResultRecord {
     terminalTimingData = result.terminalTiming.flatMap { try? JSONEncoder().encode($0) }
     // Preserve an invalid explicit marker rather than silently dropping it.
     elapsedTimeData = result.elapsedTime.map { (try? JSONEncoder().encode($0)) ?? Data() }
+    incompletePracticeData = result.incompletePractice.map { (try? JSONEncoder().encode($0)) ?? Data() }
     typedCharacterCount = result.typedCharacterCount
     correctCharacterCount = result.correctCharacterCount
     errorCount = result.errorCount
@@ -569,6 +582,14 @@ final class TestResultRecord {
       return 0
     }
     return max(0, storedPriorAttemptEngagedDuration)
+  }
+
+  var incompletePractice: ResultIncompletePractice? {
+    guard let incompletePracticeData,
+      let value = try? JSONDecoder().decode(ResultIncompletePractice.self, from: incompletePracticeData),
+      let count = storedRestartCount, let seconds = storedPriorAttemptEngagedDuration,
+      value.isValid(restartCount: count, engagedDuration: seconds) else { return nil }
+    return value
   }
 
   var characterStats: ResultCharacterStats {
@@ -638,6 +659,7 @@ final class TestResultRecord {
     guard let configuration, let parsedOutcome = TestOutcome(rawValue: outcome) else { return nil }
     guard terminalTimingData == nil || terminalTiming != nil else { return nil }
     guard elapsedTimeData == nil || elapsedTime != nil else { return nil }
+    guard incompletePracticeData == nil || incompletePractice != nil else { return nil }
     return CompletedTestResult(
       id: id,
       configuration: configuration,
@@ -659,6 +681,7 @@ final class TestResultRecord {
       inputMetrics: inputMetricsData.flatMap { try? JSONDecoder().decode(ResultInputMetrics.self, from: $0) },
       restartCount: restartCount,
       priorAttemptEngagedDuration: priorAttemptEngagedDuration,
+      incompletePractice: incompletePractice,
       characterStats: characterStats,
       keyDurationSamples: keyDurationSamples,
       keySpacingSamples: keySpacingSamples,

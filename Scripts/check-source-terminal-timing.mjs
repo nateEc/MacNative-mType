@@ -374,6 +374,31 @@ for (const [ms, duration, inconsistent] of [[120004, 120, true], [120005, 120.01
   // Do not claim unrelated AFK/qualification branches succeeded.
   count++;
 }
+// Actual finish carries per-attempt rounded accuracy and AFK-adjusted seconds.
+// These inputs also exercise the actual live accuracy cache used on restart;
+// this is not execution of the complete restart/word-generation lifecycle.
+for (const mode of ['words', 'custom']) {
+  for (const ms of [1005, 1505]) {
+    for (const options of [{repeated:true,failed:false,saving:true},
+      {repeated:false,failed:true,saving:true}, {repeated:true,failed:true,saving:false}]) {
+      reset({mode,words:25,targets:['abc'],signedIn:true,repeated:options.repeated});
+      config.resultSaving = options.saving;
+      press(0); input(0,'a','a'); press(500,'KeyX'); input(500,'ax','x',{correct:false});
+      press(ms,'KeyC'); input(ms,'axc','c');
+      const live = modules.get(local('test/events/live-cache')).namespace;
+      assert.equal(Math.round((live.getLiveCachedAccuracy() + Number.EPSILON) * 100) / 100,66.67);
+      const outcome = await finish(ms,options.failed);
+      assert.equal(outcome.acc,66.67);
+      assert.equal(state.incompleteAttempts.length,options.saving ? 1 : 0);
+      if (options.saving) {
+        assert.deepEqual(JSON.parse(JSON.stringify(state.incompleteAttempts[0])),
+          {acc:66.67,seconds:ms === 1005 ? 1.01 : 1.51});
+        assert.equal(stats.getIncompleteTestSeconds(state.eventLog),state.incompleteAttempts[0].seconds);
+      }
+      count++;
+    }
+  }
+}
 // Primary qualification uses the full finish function, not an extracted
 // condition. Keep independent repeat/failure accounting even when an earlier
 // invalidity wins the notice. Inputs, identity and result rendering are owned.

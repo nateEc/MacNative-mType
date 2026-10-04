@@ -30,6 +30,70 @@ final class DiskModelMigrationTests: XCTestCase {
     try exerciseUpgrade("before-elapsed")
   }
 
+  func testPreviousDiskSchemaAddsIncompleteEvidenceWithoutBackfillingOldAccuracy() throws {
+    try withDirectory { root in
+      let timing = ResultElapsedTime(seconds: 16.125)
+      let fixture = try createLegacy("before-incomplete", root: root,
+        overrides: ["elapsedTimeData": try blob(timing)])
+      let oldValues = try XCTUnwrap((fixture.receipt["rows"] as? [String: [[String: Any]]])?["TestResultRecord"]?.first)
+      let candidate = newResult()
+      var saved: Data?
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        let old = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).first)
+        try assertStored(old, expected: oldValues)
+        XCTAssertNil(old.incompletePracticeData)
+        let value = try XCTUnwrap(old.portableResult)
+        XCTAssertNil(value.incompletePractice)
+        XCTAssertEqual(value.restartCount, 3)
+        XCTAssertEqual(value.priorAttemptEngagedDuration, 5.25)
+        XCTAssertEqual(value.wpm, 17); XCTAssertEqual(value.preciseAccuracy, 77.5)
+        XCTAssertEqual(value.elapsedTime, timing)
+        let fresh = TestResultRecord(result: candidate)
+        saved = fresh.incompletePracticeData
+        container.mainContext.insert(fresh)
+        try container.mainContext.save()
+      }
+      let receipt = root.appendingPathComponent("cold-incomplete.json")
+      try runWriter("current", ["inspect", fixture.store.path, "-", receipt.path], root: root)
+      let rows = try XCTUnwrap(try object(receipt)["rows"] as? [String: [[String: Any]]])
+      let fresh = try XCTUnwrap(rows["TestResultRecord"]?.first { $0["id"] as? String == candidate.id.uuidString })
+      XCTAssertEqual(fresh["incompletePracticeData"] as? String, try XCTUnwrap(saved).base64EncodedString())
+      try autoreleasepool {
+        let container = try open(fixture.store)
+        let records = try container.mainContext.fetch(FetchDescriptor<TestResultRecord>())
+        let old = try XCTUnwrap(records.first { $0.id == resultID })
+        try assertStored(old, expected: oldValues)
+        XCTAssertNil(old.incompletePracticeData)
+        XCTAssertEqual(records.first { $0.id == candidate.id }?.portableResult, candidate)
+        try assertOtherEntities(container.mainContext, expected: try XCTUnwrap(fixture.receipt["rows"] as? [String: [[String: Any]]]),
+          version: "before-incomplete")
+      }
+    }
+  }
+
+  func testBrokenIncompleteEvidenceRemainsExplicitAcrossDiskReloadAndTagSave() throws {
+    try withDirectory { root in
+      let store = root.appendingPathComponent("store.sqlite")
+      let candidate = newResult(), bytes = Data("{\"version\":2,\"attempts\":[]}".utf8)
+      try autoreleasepool {
+        let container = try open(store), record = TestResultRecord(result: candidate)
+        record.incompletePracticeData = bytes
+        container.mainContext.insert(record); try container.mainContext.save()
+      }
+      for _ in 0..<2 {
+        try autoreleasepool {
+          let container = try open(store)
+          let record = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<TestResultRecord>()).first)
+          XCTAssertEqual(record.incompletePracticeData, bytes)
+          XCTAssertNil(record.incompletePractice); XCTAssertNil(record.portableResult)
+          XCTAssertEqual(record.wpm, candidate.wpm)
+          record.addTag("owned"); try container.mainContext.save()
+        }
+      }
+    }
+  }
+
   func testHistoricalTerminalEvidenceAndFractionalScoresAreNotBackfilledOrRescored() throws {
     try withDirectory { root in
       let configuration = TestConfiguration(mode: .zen, duration: nil, wordLimit: nil,
@@ -188,12 +252,13 @@ final class DiskModelMigrationTests: XCTestCase {
   }
 
   private func newResult() -> CompletedTestResult {
+    // A raw storage fixture (long idle), not proof of qualification or GUI save.
     var seconds = 0.0
     var session = TypingSession(configuration: .init(mode: .quote, duration: nil, wordLimit: nil,
       difficulty: .normal, rules: .init()), prompt: "ab").withElapsedClock(.init { seconds })
     session.insert("a", at: start); seconds = 16.125
     session.insert("b", at: start.addingTimeInterval(-3_600))
-    return session.result()!
+    return session.result(incompletePractice: .empty)!
   }
 
   private func createLegacy(_ version: String, root: URL, overrides: [String: Any] = [:]) throws ->
@@ -236,10 +301,12 @@ final class DiskModelMigrationTests: XCTestCase {
     XCTAssertEqual(try context.fetchCount(FetchDescriptor<TestResultRecord>()), 1)
     try assertStored(record, expected: XCTUnwrap(expected["TestResultRecord"]?.first))
     XCTAssertNil(record.elapsedTimeData); XCTAssertNil(record.terminalTimingData)
+    XCTAssertNil(record.incompletePracticeData)
     let value = try XCTUnwrap(record.portableResult)
     XCTAssertEqual(value.wpm, 17); XCTAssertEqual(value.rawWpm, 29); XCTAssertEqual(value.accuracy, 77)
     XCTAssertEqual(value.elapsedDuration, 16.125, "Legacy fractional duration must not be newly rounded")
     XCTAssertNil(value.elapsedTime)
+    XCTAssertNil(value.incompletePractice)
     XCTAssertEqual(value.afkDuration, version == "initial" ? 0 : 2)
     XCTAssertEqual(value.preciseWpm, version == "initial" ? 17 : 17.25)
     try assertOtherEntities(context, expected: expected, version: version)
@@ -277,6 +344,7 @@ final class DiskModelMigrationTests: XCTestCase {
       "keyOverlapDuration": row.keyOverlapDuration.map { $0 as Any } ?? NSNull(),
       "tagsData": row.tagsData.base64EncodedString(), "prompt": row.prompt,
       "terminalTimingData": encoded(row.terminalTimingData), "elapsedTimeData": encoded(row.elapsedTimeData),
+      "incompletePracticeData": encoded(row.incompletePracticeData),
       "inputMetricsData": encoded(row.inputMetricsData), "characterStatsData": encoded(row.characterStatsData),
       "keyDurationSamplesData": encoded(row.keyDurationSamplesData), "keySpacingSamplesData": encoded(row.keySpacingSamplesData),
       "quoteSourceData": encoded(row.quoteSourceData), "replayEventsData": encoded(row.replayEventsData),

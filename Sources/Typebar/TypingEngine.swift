@@ -4048,6 +4048,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
   /// The result sheet keeps `engagedDuration` scoped to the terminal attempt;
   /// history and exports use `totalEngagedDuration` when they need the full run.
   let priorAttemptEngagedDuration: TimeInterval
+  let incompletePractice: ResultIncompletePractice?
   let characterStats: ResultCharacterStats
   let keyDurationSamples: [TimeInterval]
   let keySpacingSamples: [TimeInterval]
@@ -4080,6 +4081,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     inputMetrics: ResultInputMetrics? = nil,
     restartCount: Int = 0,
     priorAttemptEngagedDuration: TimeInterval = 0,
+    incompletePractice: ResultIncompletePractice? = nil,
     characterStats: ResultCharacterStats? = nil,
     keyDurationSamples: [TimeInterval] = [],
     keySpacingSamples: [TimeInterval] = [],
@@ -4111,6 +4113,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     self.inputMetrics = inputMetrics
     self.restartCount = max(0, restartCount)
     self.priorAttemptEngagedDuration = Self.normalizedDuration(priorAttemptEngagedDuration)
+    self.incompletePractice = incompletePractice
     self.characterStats = characterStats ?? .legacy(
       typedCharacterCount: typedCharacterCount,
       correctCharacterCount: correctCharacterCount)
@@ -4160,11 +4163,16 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
       afkDuration, correctCharacterCount, errorCount, wpm, rawWpm, accuracy, characterStats,
       preciseWpm, preciseRawWpm, preciseAccuracy, inputMetrics, restartCount, keyDurationSamples,
       priorAttemptEngagedDuration, keySpacingSamples, keyOverlapDuration, tags, prompt, quoteSource, replayEvents,
-      challengePresentation, targetWordDirectory, terminalTiming, elapsedTime
+      challengePresentation, targetWordDirectory, terminalTiming, elapsedTime, incompletePractice
     case startedAtReferenceTime, finishedAtReferenceTime
   }
 
   func encode(to encoder: Encoder) throws {
+    if let incompletePractice, !incompletePractice.isValid(
+      restartCount: restartCount, engagedDuration: priorAttemptEngagedDuration) {
+      throw EncodingError.invalidValue(incompletePractice, .init(codingPath: encoder.codingPath,
+        debugDescription: "Incomplete practice must match the restart count and carried duration"))
+    }
     var values = encoder.container(keyedBy: CodingKeys.self)
     try values.encode(id, forKey: .id)
     try values.encode(configuration, forKey: .configuration)
@@ -4188,6 +4196,7 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     try values.encodeIfPresent(inputMetrics, forKey: .inputMetrics)
     try values.encode(restartCount, forKey: .restartCount)
     try values.encode(priorAttemptEngagedDuration, forKey: .priorAttemptEngagedDuration)
+    try values.encodeIfPresent(incompletePractice, forKey: .incompletePractice)
     try values.encode(characterStats, forKey: .characterStats)
     try values.encode(keyDurationSamples, forKey: .keyDurationSamples)
     try values.encode(keySpacingSamples, forKey: .keySpacingSamples)
@@ -4231,9 +4240,20 @@ struct CompletedTestResult: Codable, Equatable, Identifiable {
     preciseAccuracy = Self.normalizedAccuracyPrecision(
       try values.decodeIfPresent(Double.self, forKey: .preciseAccuracy), fallback: accuracy)
     inputMetrics = try values.decodeIfPresent(ResultInputMetrics.self, forKey: .inputMetrics)
-    restartCount = max(0, try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0)
-    priorAttemptEngagedDuration = Self.normalizedDuration(
-      try values.decodeIfPresent(TimeInterval.self, forKey: .priorAttemptEngagedDuration) ?? 0)
+    let hasIncompletePractice = values.contains(.incompletePractice)
+    let rawRestartCount = hasIncompletePractice ? try values.decode(Int.self, forKey: .restartCount)
+      : try values.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0
+    let rawPriorDuration = hasIncompletePractice ? try values.decode(TimeInterval.self, forKey: .priorAttemptEngagedDuration)
+      : try values.decodeIfPresent(TimeInterval.self, forKey: .priorAttemptEngagedDuration) ?? 0
+    restartCount = max(0, rawRestartCount)
+    priorAttemptEngagedDuration = Self.normalizedDuration(rawPriorDuration)
+    incompletePractice = hasIncompletePractice
+      ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
+    if let incompletePractice, !incompletePractice.isValid(
+      restartCount: rawRestartCount, engagedDuration: rawPriorDuration) {
+      throw DecodingError.dataCorruptedError(forKey: .incompletePractice, in: values,
+        debugDescription: "Incomplete practice must match the restart count and carried duration")
+    }
     characterStats = try values.decodeIfPresent(ResultCharacterStats.self, forKey: .characterStats)
       ?? .legacy(
         typedCharacterCount: typedCharacterCount,
@@ -5675,6 +5695,7 @@ struct TypingSession {
   func result(
     at date: Date = .now, tags: [String] = [], restartCount: Int = 0,
     priorAttemptEngagedDuration: TimeInterval = 0,
+    incompletePractice: ResultIncompletePractice? = nil,
     quoteSource: ResultQuoteSource? = nil,
     challengePresentation: ChallengePresentationSnapshot? = nil
   ) -> CompletedTestResult? {
@@ -5714,6 +5735,7 @@ struct TypingSession {
         scoringUnitBasis: needsVersionTwo ? sourceScoringBasis : nil),
       restartCount: restartCount,
       priorAttemptEngagedDuration: priorAttemptEngagedDuration,
+      incompletePractice: incompletePractice,
       characterStats: characterStats,
       keyDurationSamples: keyTiming.durations,
       keySpacingSamples: keyTiming.spacings,
