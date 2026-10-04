@@ -501,6 +501,8 @@ public struct ExperienceLeaderboardEntry: Content, Equatable, Identifiable {
     public let totalExperience: Double
     public let selectedBadge: PublicProfileBadge?
     public let discordAvatar: PublicDiscordAvatarResponse?
+    public var timeTypedSeconds: Double? = nil
+    public var lastActivityTimestamp: Int? = nil
 }
 
 public struct ExperienceLeaderboardQuery: Content {

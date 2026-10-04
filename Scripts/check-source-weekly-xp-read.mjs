@@ -146,9 +146,11 @@ try {
   const secondID = '00000000-0000-0000-0000-00000000000B';
   const scenarios = [
     {label:'singleton/multi/purge/disabled',timestamp:Date.UTC(2030,9,7,12),operations:[
-      {action:'add',uid:firstID,xp:10,seconds:2.5,name:'Before',days:14,enabled:true},
+      {action:'add',uid:firstID,xp:10,seconds:2.5,name:'Before',days:14,enabled:true,
+        discordId:'123456789012345678',discordAvatar:'a'.repeat(32),badgeId:24},
       {action:'add',uid:firstID,xp:5,seconds:3,name:'Changed',days:20,enabled:true},
-      {action:'add',uid:secondID,xp:3,seconds:4,name:'Second',days:10,enabled:true},
+      {action:'add',uid:secondID,xp:3,seconds:4,name:'Second',days:10,enabled:true,
+        discordId:'234567890123456789',discordAvatar:'b'.repeat(32),badgeId:25},
       {action:'add',uid:secondID,xp:7,seconds:5,name:'Second',days:1,enabled:true},
       {action:'add',uid:firstID,xp:100,seconds:100,name:'Not cached',days:30,enabled:false},
       {action:'purge',uid:firstID,days:20,enabled:false},
@@ -178,6 +180,7 @@ try {
         let rank = null;
         if (operation.action === 'add') {
           rank = await cachedBoard.addResult(config,{entry:{uid:operation.uid,name:operation.name,
+            discordId:operation.discordId,discordAvatar:operation.discordAvatar,badgeId:operation.badgeId,
             timeTypedSeconds:operation.seconds,lastActivityTimestamp:clockMilliseconds},xpGained:operation.xp});
         } else await module.namespace.purgeUserFromXpLeaderboards(operation.uid,config);
         const entries = (await cachedBoard.getResults(0,10,{enabled:true},false)).entries;
@@ -190,6 +193,7 @@ try {
         const expiresAtMilliseconds = readDeadline(scoresKey);
         assert.equal(readDeadline(resultsKey),expiresAtMilliseconds);
         const observed = Array.from(entries,entry => ({uid:entry.uid,name:entry.name,
+          discordId:entry.discordId,discordAvatar:entry.discordAvatar,badgeId:entry.badgeId,
           timeTypedSeconds:entry.timeTypedSeconds,lastActivityMilliseconds:entry.lastActivityTimestamp,
           score:Number(cli('ZSCORE',scoresKey,entry.uid))}));
         operations.push({...operation,timestamp:clockMilliseconds,rank,expiresAtMilliseconds,entries:observed});

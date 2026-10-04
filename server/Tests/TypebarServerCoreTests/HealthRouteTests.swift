@@ -3812,7 +3812,11 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(selectedPublicProfile.selectedBadge?.id, "swift-line")
     XCTAssertTrue(selectedPublicProfile.earnedBadges.isEmpty)
     XCTAssertEqual(wpmLeaderboard.entries.first?.selectedBadge?.id, "swift-line")
-    XCTAssertEqual(experienceLeaderboard.entries.first?.selectedBadge?.id, "swift-line")
+    XCTAssertNil(experienceLeaderboard.entries.first?.selectedBadge, "Selecting a badge does not rewrite the weekly cache")
+    _ = try await store.submitResult(
+      result(id: UUID(), wpm: 80, accuracy: 98, finishedAt: now), accessToken: session.accessToken, now: now)
+    let refreshedExperienceLeaderboard = try await store.experienceLeaderboard(now: now)
+    XCTAssertEqual(refreshedExperienceLeaderboard.entries.first?.selectedBadge?.id, "swift-line")
 
     let optedIn = try await store.updateProfile(
       .init(showAllBadges: true), accessToken: session.accessToken, now: now)

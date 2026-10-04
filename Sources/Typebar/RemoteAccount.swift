@@ -1235,9 +1235,12 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
     let totalExperience: Double
     let selectedBadge: RemotePublicProfileBadge?
     let discordAvatar: RemoteDiscordAvatar?
+    let timeTypedSeconds: Double?
+    let lastActivityTimestamp: Int?
 
     private enum CodingKeys: String, CodingKey {
-        case id, rank, friendsRank, userID, displayName, totalExperience, selectedBadge, discordAvatar
+        case id, rank, friendsRank, userID, displayName, totalExperience, selectedBadge, discordAvatar,
+            timeTypedSeconds, lastActivityTimestamp
     }
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -1253,6 +1256,13 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
         totalExperience = try values.decode(Double.self, forKey: .totalExperience)
         selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
         discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
+        timeTypedSeconds = try values.decodeIfPresent(Double.self, forKey: .timeTypedSeconds)
+        lastActivityTimestamp = try values.decodeIfPresent(Int.self, forKey: .lastActivityTimestamp)
+        guard timeTypedSeconds.map({ $0.isFinite && (0...9_007_199_254_740_991).contains($0) }) ?? true,
+            lastActivityTimestamp.map({ abs(Double($0)) <= 8_640_000_000_000_000 }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .timeTypedSeconds, in: values,
+                debugDescription: "Weekly metadata must contain bounded seconds and epoch milliseconds")
+        }
         guard totalExperience.isFinite, (0...9_007_199_254_740_991).contains(totalExperience) else {
             throw DecodingError.dataCorruptedError(forKey: .totalExperience, in: values,
                 debugDescription: "Weekly rewards require a finite nonnegative value")

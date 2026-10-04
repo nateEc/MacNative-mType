@@ -319,6 +319,8 @@ struct CloudSyncView: View {
                                     "你的\(experiencePeriod.displayName) XP 排名 \(experienceRank.rankLabel(in: experienceScope)) · \(ExperiencePresentation.compact(experienceRank.totalExperience)) XP\(standing.map { " · \($0.displayName)" } ?? "")",
                                     systemImage: "person.fill")
                                     .font(.caption.weight(.medium))
+                                Text("时长 \(WeeklyExperiencePresentation.duration(experienceRank.timeTypedSeconds)) · \(WeeklyExperiencePresentation.activityLabel(experienceRank.lastActivityTimestamp))")
+                                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                                 if let experienceRankChange {
                                     LeaderboardRankChangeLabel(change: experienceRankChange)
                                 }
@@ -357,13 +359,21 @@ struct CloudSyncView: View {
                                     .help(badge.title)
                                     .accessibilityLabel("\(badge.title) 徽章")
                             }
-                            Button(entry.displayName) { loadProfile(id: entry.userID) }
-                                .buttonStyle(.plain)
-                                .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Button(entry.displayName) { loadProfile(id: entry.userID) }
+                                    .buttonStyle(.plain).lineLimit(1)
+                                Text(WeeklyExperiencePresentation.activityLabel(entry.lastActivityTimestamp))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .accessibilityLabel("最后\(WeeklyExperiencePresentation.activityLabel(entry.lastActivityTimestamp))")
+                            }
                             Spacer()
-                            Text("\(ExperiencePresentation.compact(entry.totalExperience)) XP")
-                                .monospacedDigit()
-                                .accessibilityLabel("\(entry.totalExperience) XP")
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("\(ExperiencePresentation.compact(entry.totalExperience)) XP")
+                                    .accessibilityLabel("\(entry.totalExperience) XP")
+                                Text("时长 \(WeeklyExperiencePresentation.duration(entry.timeTypedSeconds))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .help("本周榜获准投稿的累计键入时长；旧来源可能未知。")
+                            }.monospacedDigit()
                         }
                     }
                     Text(experienceScope == .friends ? "好友 XP 榜包含你和已接受好友，分别显示好友与全局名次。公开分数不参与排序。" : "XP 按首次接受的服务端奖励累计；公开分数与奖励小数分开，旧奖励不重算。")

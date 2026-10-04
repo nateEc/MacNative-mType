@@ -49,6 +49,27 @@ struct WeeklyExperienceCacheReceipt: Codable {
   }
 }
 
+/// A known-empty snapshot differs from a pre-snapshot entry with unknown origin.
+struct WeeklyExperienceProfileSnapshot: Codable {
+  let version: Int
+  let selectedBadge: PublicProfileBadge?
+  let discordAvatar: PublicDiscordAvatarResponse?
+  func validate() throws {
+    guard version == 1 else { throw WeeklyExperienceCacheError.invalidState }
+    if let badge = selectedBadge {
+      guard !badge.id.isEmpty, badge.id.count <= 64, !badge.title.isEmpty, badge.title.count <= 80,
+        !badge.systemImage.isEmpty, badge.systemImage.count <= 80
+      else { throw WeeklyExperienceCacheError.invalidState }
+    }
+    if let avatar = discordAvatar {
+      let hex = avatar.avatarHash.hasPrefix("a_") ? String(avatar.avatarHash.dropFirst(2)) : avatar.avatarHash
+      guard !avatar.subject.isEmpty, avatar.subject.count <= 255,
+        hex.count == 32, hex.allSatisfy({ "0123456789abcdef".contains($0) })
+      else { throw WeeklyExperienceCacheError.invalidState }
+    }
+  }
+}
+
 /// Mutable leaderboard cache independent of the immutable account reward ledger.
 /// Expiry removes a bucket; purge removes a member without touching its reward.
 struct WeeklyExperienceCache: Codable {
@@ -58,6 +79,7 @@ struct WeeklyExperienceCache: Codable {
     var displayName: String
     var timeTypedSeconds: Double
     var lastActivityMilliseconds: Int
+    var profileSnapshot: WeeklyExperienceProfileSnapshot? = nil
   }
   struct Bucket: Codable {
     let keyMilliseconds: Int
@@ -80,8 +102,9 @@ struct WeeklyExperienceCache: Codable {
 
   mutating func add(userID: UUID, displayName: String, xp: Double, seconds: Double,
     partition: WeeklyExperiencePartition, configuration: WeeklyExperienceLeaderboardConfiguration,
-    now: Date) throws -> Int {
+    now: Date, profileSnapshot: WeeklyExperienceProfileSnapshot? = nil) throws -> Int {
     try configuration.validate()
+    try profileSnapshot?.validate()
     guard configuration.enabled, xp.isFinite, xp > 0, seconds.isFinite, seconds >= 0 else {
       throw WeeklyExperienceCacheError.invalidState
     }
@@ -97,9 +120,10 @@ struct WeeklyExperienceCache: Codable {
       buckets[index].entries[member].timeTypedSeconds += seconds
       buckets[index].entries[member].displayName = displayName
       buckets[index].entries[member].lastActivityMilliseconds = partition.acceptedMilliseconds
+      buckets[index].entries[member].profileSnapshot = profileSnapshot
     } else {
       buckets[index].entries.append(.init(userID:userID,score:xp,displayName:displayName,
-        timeTypedSeconds:seconds,lastActivityMilliseconds:partition.acceptedMilliseconds))
+        timeTypedSeconds:seconds,lastActivityMilliseconds:partition.acceptedMilliseconds,profileSnapshot:profileSnapshot))
     }
     let entry = buckets[index].entries.first { $0.userID == userID }!
     guard entry.score <= 9_007_199_254_740_991, entry.timeTypedSeconds <= 9_007_199_254_740_991 else {
@@ -137,6 +161,7 @@ struct WeeklyExperienceCache: Codable {
         throw WeeklyExperienceCacheError.invalidState
       }
       for entry in bucket.entries {
+        try entry.profileSnapshot?.validate()
         let contributions = (byUser[entry.userID] ?? []).filter { $0.weeklyPartition?.keyMilliseconds == bucket.keyMilliseconds }
         guard users.contains(entry.userID), !entry.displayName.isEmpty, entry.displayName.count <= 40,
           entry.score.isFinite, entry.score > 0, entry.score <= 9_007_199_254_740_991,
@@ -148,5 +173,21 @@ struct WeeklyExperienceCache: Codable {
         else { throw WeeklyExperienceCacheError.invalidState }
       }
     }
+  }
+}
+
+extension WeeklyExperienceCache.Entry {
+  private enum CodingKeys: String, CodingKey {
+    case userID, score, displayName, timeTypedSeconds, lastActivityMilliseconds, profileSnapshot
+  }
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy:CodingKeys.self)
+    self.init(userID:try values.decode(UUID.self,forKey:.userID),
+      score:try values.decode(Double.self,forKey:.score),
+      displayName:try values.decode(String.self,forKey:.displayName),
+      timeTypedSeconds:try values.decode(Double.self,forKey:.timeTypedSeconds),
+      lastActivityMilliseconds:try values.decode(Int.self,forKey:.lastActivityMilliseconds),
+      profileSnapshot:values.contains(.profileSnapshot)
+        ? try values.decode(WeeklyExperienceProfileSnapshot.self,forKey:.profileSnapshot) : nil)
   }
 }

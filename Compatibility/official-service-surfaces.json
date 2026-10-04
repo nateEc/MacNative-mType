@@ -76,6 +76,8 @@
       "server/Tests/TypebarServerCoreTests/WeeklyExperiencePartitionTests.swift",
       "server/Sources/TypebarServerCore/WeeklyExperienceCache.swift",
       "server/Tests/TypebarServerCoreTests/WeeklyExperienceCacheTests.swift",
+      "server/Tests/TypebarServerCoreTests/WeeklyExperienceMetadataTests.swift",
+      "Sources/Typebar/WeeklyExperiencePresentation.swift",
       "Sources/Typebar/RemoteAccount.swift"
     ],
     "results": [

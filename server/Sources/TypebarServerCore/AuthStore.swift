@@ -3557,12 +3557,17 @@ public actor AuthStore {
       offsetHours: state.streakDayBoundaryOffsets[user.id] ?? 0)
     var reward = try prepareExperienceAward(for: request, userID: user.id, now: now,
       streakDays: practice.streakLength)
+    guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
+      throw AuthStoreError.invalidAccessToken
+    }
     var cache = state.weeklyExperienceCache!
     let cacheRank: Int?
     if weeklyExperienceConfiguration.enabled, reward.award.xp > 0,
       reward.rankingAdmission!.decision.weeklyExperienceEligible {
       cacheRank = try cache.add(userID:user.id,displayName:user.displayName,xp:reward.award.xp,
-        seconds:seconds,partition:reward.weeklyPartition!,configuration:weeklyExperienceConfiguration,now:now)
+        seconds:seconds,partition:reward.weeklyPartition!,configuration:weeklyExperienceConfiguration,now:now,
+        profileSnapshot:.init(version:1,selectedBadge:selectedPublicBadge(for:state.users[userIndex]),
+          discordAvatar:publicDiscordAvatar(for:state.users[userIndex])))
     } else { cacheRank = nil }
     reward.weeklyCacheReceipt = .init(version:1,configuration:weeklyExperienceConfiguration,
       timeTypedSeconds:seconds,rank:cacheRank)
@@ -3585,9 +3590,6 @@ public actor AuthStore {
         bailedOut: request.bailedOut, customLimit: request.customLimit,
         startedAt: request.startedAt, finishedAt: request.finishedAt, acceptedAt: now
       ))
-    guard let userIndex = state.users.firstIndex(where: { $0.id == user.id }) else {
-      throw AuthStoreError.invalidAccessToken
-    }
     state.users[userIndex].startedTestCount = practice.startedTests
     state.accountPractice![user.id] = practice
     state.experienceAwards!.append(reward)
@@ -3925,13 +3927,22 @@ public actor AuthStore {
     }
     return visible.enumerated().map { friendOffset, ranked in
       let value = ranked.element
+      let cacheEntry = cached[value.0.id]
+      // Old derived rewards lack complete weekly timing; never present a partial
+      // new-cache duration as the duration of a combined old/new score.
+      let hasLegacyScore = leaderboardEligibility(for:value.0,typingSeconds:typingSecondsByUser[value.0.id] ?? 0).isEligible
+        && legacyScores[value.0.id,default:0] > 0
+      let badge = cacheEntry == nil ? selectedPublicBadge(for:value.0) : cacheEntry?.profileSnapshot?.selectedBadge
+      let avatar = cacheEntry == nil ? publicDiscordAvatar(for:value.0)
+        : (publicDiscordAvatar(for:value.0) != nil ? cacheEntry?.profileSnapshot?.discordAvatar : nil)
       return ExperienceLeaderboardEntry(
         id: value.0.id, rank: ranked.offset + 1,
         friendsRank: eligibleUserIDs == nil ? nil : friendOffset + 1,
         userID: value.0.id, displayName: cached[value.0.id]?.displayName ?? value.0.displayName,
         totalExperience: WeeklyExperiencePublicScore.project(value.1,
-          friendsList: eligibleUserIDs != nil && friendsList), selectedBadge: selectedPublicBadge(for: value.0),
-        discordAvatar: publicDiscordAvatar(for: value.0))
+          friendsList: eligibleUserIDs != nil && friendsList), selectedBadge: badge,
+        discordAvatar: avatar, timeTypedSeconds:hasLegacyScore ? nil : cacheEntry?.timeTypedSeconds,
+        lastActivityTimestamp:hasLegacyScore ? nil : cacheEntry?.lastActivityMilliseconds)
     }
   }
 

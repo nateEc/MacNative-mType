@@ -278,11 +278,15 @@ final class WeeklyExperienceCacheTests: XCTestCase {
     let data = output.fileHandleForReading.readDataToEndOfFile()
     let diagnostics = errors.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
     XCTAssertEqual(process.terminationStatus,0,String(decoding:diagnostics,as:UTF8.self))
-    struct Entry: Decodable { let uid:UUID; let name:String; let score:Double; let timeTypedSeconds:Double; let lastActivityMilliseconds:Int }
+    struct Entry: Decodable {
+      let uid:UUID; let name:String; let score:Double; let timeTypedSeconds:Double; let lastActivityMilliseconds:Int
+      let discordId:String?; let discordAvatar:String?; let badgeId:Int?
+    }
     struct Operation: Decodable {
       let action:String; let uid:UUID; let xp:Double?; let seconds:Double?; let name:String?
       let days:Double; let enabled:Bool; let timestamp:Int; let rank:Int?
       let expiresAtMilliseconds:Int?; let entries:[Entry]
+      let discordId:String?; let discordAvatar:String?; let badgeId:Int?
     }
     struct Fixture: Decodable { let label:String; let key:Int; let operations:[Operation] }
     struct Document: Decodable { let referenceCommit:String; let redisVersion:String; let cacheFixtures:[Fixture] }
@@ -299,7 +303,10 @@ final class WeeklyExperienceCacheTests: XCTestCase {
         if operation.action == "add", operation.enabled {
           let rank = try cache.add(userID:operation.uid,displayName:XCTUnwrap(operation.name),
             xp:XCTUnwrap(operation.xp),seconds:XCTUnwrap(operation.seconds),partition:partition,
-            configuration:configuration(operation.days),now:date)
+            configuration:configuration(operation.days),now:date,
+            profileSnapshot:.init(version:1,
+              selectedBadge:operation.badgeId.map { .init(id:"qa-\($0)",title:"Fixture",systemImage:"star") },
+              discordAvatar:operation.discordId.flatMap { id in operation.discordAvatar.map { .init(subject:id,avatarHash:$0) } }))
           XCTAssertEqual(rank,operation.rank)
         } else if operation.action == "purge", operation.enabled { cache.purge(userID:operation.uid) }
         let bucket = cache.buckets.first
@@ -310,6 +317,9 @@ final class WeeklyExperienceCacheTests: XCTestCase {
           XCTAssertEqual(actual.score,expected.score); XCTAssertEqual(actual.displayName,expected.name)
           XCTAssertEqual(actual.timeTypedSeconds,expected.timeTypedSeconds)
           XCTAssertEqual(actual.lastActivityMilliseconds,expected.lastActivityMilliseconds)
+          XCTAssertEqual(actual.profileSnapshot?.selectedBadge?.id,expected.badgeId.map { "qa-\($0)" })
+          XCTAssertEqual(actual.profileSnapshot?.discordAvatar?.subject,expected.discordId)
+          XCTAssertEqual(actual.profileSnapshot?.discordAvatar?.avatarHash,expected.discordAvatar)
         }
       }
     }
