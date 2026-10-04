@@ -1,0 +1,46 @@
+import XCTest
+@testable import Typebar
+
+// Deliberately unregistered diagnostic fixture, not a passing native test.
+// Apply as Tests/TypebarTests/TerminalTimingGapEvidenceTests.swift to reproduce
+// the documented gaps. Promote to durable regression tests with the real fix;
+// do not change expected values to freeze the incorrect native behavior.
+final class TerminalTimingGapEvidenceTests: XCTestCase {
+  private let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+  private func input(last: Double = 15) -> TypingSession {
+    let config = TestConfiguration(mode: .zen, duration: nil, wordLimit: nil,
+      difficulty: .normal, rules: .init())
+    var value = TestSessionFactory.make(configuration: config)
+    value.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
+    value.insertBatch("a", at: start)
+    value.recordPhysicalKeyEvent(keyCode: 11, isKeyDown: true, isRepeat: false,
+      at: start.addingTimeInterval(last))
+    value.insertBatch("b", at: start.addingTimeInterval(last))
+    return value
+  }
+
+  func testCommandZenFinishUsesPhysicalTailTrimForSpeed() throws {
+    var value = input()
+    value.finishZen(at: start.addingTimeInterval(16))
+    let result = try XCTUnwrap(value.result())
+    XCTAssertEqual(result.preciseWpm, 1.6, accuracy: 0.00001)
+    XCTAssertEqual(result.preciseRawWpm, 1.6, accuracy: 0.00001)
+  }
+
+  func testTrimmedBoundariesDoNotInventTrailingAfk() throws {
+    var value = input()
+    value.finishZen(at: start.addingTimeInterval(21.99999))
+    let result = try XCTUnwrap(value.result())
+    XCTAssertEqual(result.outcome, .completed)
+    XCTAssertEqual(result.afkDuration, 13)
+  }
+
+  func testValidBailoutIsEligibleForSavedHistory() throws {
+    var value = input()
+    value.bailOut(at: start.addingTimeInterval(16))
+    let result = try XCTUnwrap(value.result())
+    XCTAssertTrue(ResultSavingPolicy.shouldPersist(outcome: result.outcome, enabled: true,
+      eligibility: ResultEligibilityPolicy.assessment(for: result, samePromptRepeat: false)))
+  }
+}
