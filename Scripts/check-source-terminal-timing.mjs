@@ -40,9 +40,11 @@ const bindings = new Map([
     getIncompleteSeconds: () => 0, getIncompleteTests: () => [], getRestartCount: () => 0,
     setResultCalculating: set('calculating'), setTestActive: set('active'),
     setResultVisible: set('visible'), setIsTestInvalid: set('invalid'), setBailedOut: set('bailedOut'),
+    setIsRepeated: set('repeated'),
     setLastEventLog: set('eventLog'), setLastResult: set('lastResult'),
     setLastSignedOutResult: set('signedOut'),
     resetIncompleteTests: () => { state.incompleteResets++; },
+    pushIncompleteTest: value => { state.incompleteAttempts.push(value); },
     __nonReactive: {getKeymapLayout: unexpected('keymap')},
   }],
   [local('test/test-timer'), {clear: (ended, end) => {
@@ -55,14 +57,14 @@ const bindings = new Map([
     sleep: async () => {}, getMode2: () => config.mode === 'zen' ? 'zen'
       : config.mode === 'time' ? String(config.time) : String(config.words)}],
   [local('test/test-words'), {words: {get: () => state.targets.map(text => ({textWithCommit: text}))}}],
-  [local('test/custom-text'), {getLimit: () => ({mode: 'none', value: 1}),
-    getLimitMode: () => 'none', getLimitValue: () => 1,
-    getData: () => ({text: 'owned', mode: 'repeat', pipeDelimiter: false, limit: {mode: 'none', value: 1}})}],
+  [local('test/custom-text'), {getLimit: () => state.customLimit,
+    getLimitMode: () => state.customLimit.mode, getLimitValue: () => state.customLimit.value,
+    getData: () => ({text: 'owned', mode: 'repeat', pipeDelimiter: false, limit: state.customLimit})}],
   [local('collections/tags'), {__nonReactive: {getActiveTags: () => []}}],
   [local('test/pace-caret'), {setLastTestWpm: set('paceWpm')}],
   [local('utils/dom'), {qs: () => dom}],
   [local('utils/env'), {isDevEnvironment: () => false}],
-  [local('db'), {getSnapshot: () => ({lbOptOut: false})}],
+  [local('db'), {getSnapshot: () => ({lbOptOut: state.lbOptOut})}],
   [local('states/core'), {getCustomTextIndicator: () => null}],
   [local('firebase'), {getAuthenticatedUser: () => state.signedIn ? {uid: 'owned-user'} : null}],
   [local('controllers/challenge-controller'), {verify: result => {
@@ -143,11 +145,13 @@ const keys = modules.get(local('test/events/helpers')).namespace.keysToTrack;
 const keydown = modules.get(local('input/handlers/keydown')).namespace;
 const backend = modules.get('owned/backend-validation').namespace;
 let count = 0;
-function reset({mode = 'zen', bailedOut = false, repeated = false, targets = [], signedIn = false} = {}) {
+function reset({mode = 'zen', bailedOut = false, repeated = false, targets = [], signedIn = false,
+  lbOptOut = false, words = 100, time = 60, customLimit = {mode: 'none', value: 1}} = {}) {
   state = {active: true, calculating: false, repeated, bailedOut, targets, invalid: false,
     signedIn, notices: [], analytics: [], signedOut: null, update: null,
-    requests: [], challengeCalls: [], spinner: [], incompleteResets: 0};
-  config.mode = mode; config.resultSaving = signedIn; data.resetTestEvents(); now = 0;
+    requests: [], challengeCalls: [], spinner: [], incompleteResets: 0, incompleteAttempts: [], lbOptOut, customLimit};
+  config.mode = mode; config.words = words; config.time = time;
+  config.resultSaving = signedIn; data.resetTestEvents(); now = 0;
   data.logTestEvent('timer', 0, {event: 'start', date: 0});
 }
 function press(ms, code = 'KeyA') { data.logTestEvent('keydown', ms, {code}); }
@@ -258,5 +262,64 @@ for (const bailedOut of [false, true]) {
   assert.deepEqual(state.spinner, [true, false]);
   assert.equal(state.update[7], false); // Validity at result update, not synthetic request success.
   count++;
+}
+// Actual finish qualification on both sides of configured limits. Finite
+// bailout is retained locally even below the backend's measured-time minimum.
+for (const [options, retained] of [
+  [{mode:'time',time:14},false], [{mode:'time',time:15},true],
+  [{mode:'time',time:0},false], [{mode:'words',words:9},false],
+  [{mode:'words',words:10},true], [{mode:'words',words:0},false],
+  [{mode:'custom',customLimit:{mode:'word',value:9}},false],
+  [{mode:'custom',customLimit:{mode:'word',value:10}},true],
+  [{mode:'custom',customLimit:{mode:'section',value:9}},false],
+  [{mode:'custom',customLimit:{mode:'section',value:10}},true],
+  [{mode:'custom',customLimit:{mode:'time',value:14}},false],
+  [{mode:'custom',customLimit:{mode:'time',value:15}},true],
+  [{mode:'custom',customLimit:{mode:'none',value:1}},true],
+]) {
+  reset({...options,bailedOut:true,targets:['ab']}); press(0); input(0);
+  press(14500,'KeyB'); input(14500,'ab','b'); result=await finish(16000);
+  assert.equal(state.signedOut !== null,retained,JSON.stringify(options));
+  assert.equal(state.update[5],!retained); count++;
+}
+// Repeated time/word attempts are rejected even after bailout; quote repeats
+// are cleared by the actual finish path before qualification.
+for (const mode of ['zen','time','words','quote']) {
+  reset({mode,bailedOut:true,repeated:true,targets:['ab'],signedIn:true});
+  press(0); input(0); press(15000,'KeyB'); input(15000,'ab','b'); await finish(16000);
+  assert.equal(state.requests.length,mode==='quote' ? 1 : 0);
+  assert.equal(state.incompleteResets,mode==='quote' ? 1 : 0);
+  assert.equal(state.incompleteAttempts.length,mode==='quote' ? 0 : 1);
+  assert.equal(state.challengeCalls.length,0); count++;
+}
+for (const mode of ['zen','quote']) {
+  reset({mode,bailedOut:true,repeated:true,targets:['ab'],signedIn:true});
+  press(0); input(0); press(500,'KeyB'); input(500,'ab','b'); await finish(1500);
+  assert.equal(state.update[5],true);
+  assert.equal(state.requests.length,0);
+  assert.equal(state.incompleteAttempts.length,mode==='quote' ? 0 : 1); count++;
+}
+// Empty retained text after deleted mistakes isolates attempt accuracy from
+// speed and minimum length. Backend opts out of its 75% minimum independently.
+for (const [correct,total,optOut,retained] of [[3,4,false,true],[2,3,false,false],
+  [1,2,true,true],[1,3,true,false]]) {
+  reset({bailedOut:true,lbOptOut:optOut}); press(0);
+  for(let i=0;i<total;i++) input(i*100,'', 'x',{correct:i<correct,inputStopped:true});
+  press(15000,'Enter'); await finish(16000);
+  assert.equal(state.signedOut !== null,retained); count++;
+}
+// The pinned frontend's boolean condition is not a universal 350 WPM cap:
+// words other than 10 are uncapped here (the backend schema still caps 420).
+for (const [options,characters,retained] of [
+  [{mode:'zen'},437,true], [{mode:'zen'},438,false],
+  [{mode:'time',time:60},438,false], [{mode:'words',words:10},525,true],
+  [{mode:'words',words:10},526,false], [{mode:'words',words:25},625,true],
+  [{mode:'words',words:0},625,true],
+]) {
+  const text='a'.repeat(characters);
+  reset({...options,bailedOut:true,targets:[text]}); press(0); input(0,text,text);
+  press(15000,'Enter'); result=await finish(16000);
+  assert.equal(result.wpm,Math.round(characters*80)/100);
+  assert.equal(state.signedOut !== null,retained,JSON.stringify(options)); count++;
 }
 console.log(`${count} owned terminal timing/finish fixtures passed (${actualFiles.size} complete actual modules; real event storage/cleanup/key handling/stats/finish/backend length check and authenticated save prefix, synthetic 503 transport/hash/identity/UI/timer-end, no success-save/browser/IME/native parity claim).`);

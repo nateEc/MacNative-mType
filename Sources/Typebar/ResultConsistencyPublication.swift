@@ -14,15 +14,17 @@ enum ResultConsistencyPublication {
     calculation: @escaping @Sendable (ResultWPMConsistencyInput) async -> Double? = { $0.calculate() }
   ) async throws -> RemoteResultSubmission {
     try Task.checkCancellation()
+    guard result.outcome != .bailedOut else {
+      // The current wire has no BailOut semantic. Even a legacy result with
+      // nil timing would otherwise be published as a completed test.
+      throw RemoteAccountError.serverMessage("BailOut 已保留在本机；中止状态与服务保存资格协议尚未实现，暂不能发布此成绩。")
+    }
     if let timing = result.terminalTiming, !timing.isValid(wallClockDuration: result.wallClockDuration,
       mode: result.configuration.mode, outcome: result.outcome) {
       throw RemoteAccountError.serverMessage("结束计时证据无效，不能发布此成绩。")
     }
     guard result.terminalTiming == nil || capabilities?.supportsResultTerminalTiming == true else {
       throw RemoteAccountError.serverMessage("当前服务不支持结束计时证据。请先升级自建服务；本机成绩不受影响。")
-    }
-    guard result.terminalTiming == nil || result.configuration.mode == .zen else {
-      throw RemoteAccountError.serverMessage("普通 BailOut 的保存资格尚未完成兼容，暂不能发布此成绩。")
     }
     var metrics: RemoteResultConsistency?
     if capabilities?.supportsResultConsistency == true {

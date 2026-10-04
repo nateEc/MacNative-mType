@@ -52,17 +52,19 @@ enum ResultEligibilityPolicy {
     allowsReducedAccuracyThreshold: Bool = false
   ) -> ResultEligibility {
     // Terminal failures have their own result presentation and saving rules.
-    guard result.outcome == .completed else { return .eligible }
+    guard result.outcome == .completed || result.outcome == .bailedOut else { return .eligible }
     guard !isTooShort(result) else { return .ineligible(.tooShort) }
     if samePromptRepeat, result.configuration.mode != .quote {
       return .ineligible(.samePromptRepeat)
     }
 
     let maximumWpm = maximumSavedWpm(for: result.configuration)
-    if roundedToTwo(result.preciseWpm) < 0 || roundedToTwo(result.preciseWpm) > maximumWpm {
+    if !result.preciseWpm.isFinite || roundedToTwo(result.preciseWpm) < 0
+      || roundedToTwo(result.preciseWpm) > maximumWpm {
       return .ineligible(.typingSpeed)
     }
-    if roundedToTwo(result.preciseRawWpm) < 0 || roundedToTwo(result.preciseRawWpm) > maximumWpm {
+    if !result.preciseRawWpm.isFinite || roundedToTwo(result.preciseRawWpm) < 0
+      || roundedToTwo(result.preciseRawWpm) > maximumWpm {
       return .ineligible(.rawTypingSpeed)
     }
 
@@ -109,8 +111,12 @@ enum ResultEligibilityPolicy {
   }
 
   private static func maximumSavedWpm(for configuration: TestConfiguration) -> Double {
-    configuration.mode == .words && configuration.wordLimit == 10
-      ? tenWordMaximumWpm : standardMaximumWpm
+    // This is the pinned frontend's observable boolean condition, not the
+    // backend schema cap. Other word counts have no positive frontend cap.
+    if configuration.mode == .words {
+      return configuration.wordLimit == 10 ? tenWordMaximumWpm : .infinity
+    }
+    return standardMaximumWpm
   }
 
   private static func roundedToTwo(_ value: Double) -> Double {
@@ -121,13 +127,14 @@ enum ResultEligibilityPolicy {
 
 enum ResultSavingPolicy {
   static func shouldPersist(outcome: TestOutcome, enabled: Bool) -> Bool {
+    // Callers without a qualification assessment cannot admit BailOut.
     enabled && outcome == .completed
   }
 
   static func shouldPersist(
     outcome: TestOutcome, enabled: Bool, eligibility: ResultEligibility
   ) -> Bool {
-    shouldPersist(outcome: outcome, enabled: enabled) && eligibility.isEligible
+    enabled && (outcome == .completed || outcome == .bailedOut) && eligibility.isEligible
   }
 
   static func shouldPublish(localSaveState: LocalResultSaveState) -> Bool {
@@ -149,9 +156,10 @@ struct PriorAttemptLedger: Equatable {
 
   mutating func recordTerminalAttempt(
     engagedDuration: TimeInterval, outcome: TestOutcome, eligibility: ResultEligibility,
-    savingEnabled: Bool
+    savingEnabled: Bool, samePromptRepeat: Bool = false
   ) {
-    guard savingEnabled, shouldCarryTerminalAttempt(outcome: outcome, eligibility: eligibility) else {
+    guard savingEnabled, shouldCarryTerminalAttempt(outcome: outcome, eligibility: eligibility,
+      samePromptRepeat: samePromptRepeat) else {
       return
     }
     append(engagedDuration: engagedDuration)
@@ -169,11 +177,12 @@ struct PriorAttemptLedger: Equatable {
   }
 
   private func shouldCarryTerminalAttempt(
-    outcome: TestOutcome, eligibility: ResultEligibility
+    outcome: TestOutcome, eligibility: ResultEligibility, samePromptRepeat: Bool
   ) -> Bool {
     if outcome == .failed { return true }
+    if samePromptRepeat { return outcome == .completed || outcome == .bailedOut }
     guard case .ineligible(.samePromptRepeat) = eligibility else { return false }
-    return outcome == .completed
+    return outcome == .completed || outcome == .bailedOut
   }
 }
 
@@ -276,7 +285,8 @@ enum SignedOutResultClaimPolicy {
     localSaveState: LocalResultSaveState,
     isAuthenticatedForResultPublishing: Bool
   ) -> Bool {
-    outcome == .completed && localSaveState.isSaved && !isAuthenticatedForResultPublishing
+    (outcome == .completed || outcome == .bailedOut)
+      && localSaveState.isSaved && !isAuthenticatedForResultPublishing
   }
 
   static func disposition(

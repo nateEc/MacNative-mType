@@ -1,10 +1,9 @@
 import XCTest
 @testable import Typebar
 
-// Deliberately unregistered diagnostic fixture, not a passing native test.
-// Apply as Tests/TypebarTests/TerminalTimingGapEvidenceTests.swift to reproduce
-// the documented gaps. Promote to durable regression tests with the real fix;
-// do not change expected values to freeze the incorrect native behavior.
+// Historical diagnostic fixture for commit 9075114. All three expectations
+// are now registered in TerminalTimingTests and BailoutSavingTests. Kept for
+// provenance only; this is no longer evidence of three current failures.
 final class TerminalTimingGapEvidenceTests: XCTestCase {
   private let start = Date(timeIntervalSince1970: 1_800_000_000)
 

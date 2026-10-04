@@ -349,10 +349,10 @@ enum PracticePreferenceCommandCatalog {
             id: "test.repeatQuotes.typing", title: "引语重开：重复当前", subtitle: "输入开始后重开仍使用当前引语",
             systemImage: "repeat", keywords: ["repeat", "quote", "typing", "引语", "重复"], group: .practice),
         .init(
-            id: "test.resultSaving.off", title: "保存完成成绩：关闭", subtitle: "结果仍显示，但不进入历史或同步",
+            id: "test.resultSaving.off", title: "保存有效成绩：关闭", subtitle: "结果仍显示，但不进入历史或同步",
             systemImage: "archivebox", keywords: ["result", "saving", "incognito", "成绩", "保存", "关闭"], group: .practice),
         .init(
-            id: "test.resultSaving.on", title: "保存完成成绩：开启", subtitle: "完成成绩写入本机历史",
+            id: "test.resultSaving.on", title: "保存有效成绩：开启", subtitle: "合格的完成或中止结果写入本机历史",
             systemImage: "archivebox.fill", keywords: ["result", "saving", "成绩", "保存", "开启"], group: .practice),
         .init(
             id: "test.englishVariant.american", title: "英文拼写：美式", subtitle: "English 基础词流使用美式拼写，引语使用原文",

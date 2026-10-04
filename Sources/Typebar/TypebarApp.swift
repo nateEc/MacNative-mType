@@ -1353,18 +1353,11 @@ private struct ContentView: View {
         }
         if savesResult {
           saveCompletedResultLocally(result)
-          priorAttemptLedger.clearAfterPersistingResult()
-          if SignedOutResultClaimPolicy.shouldRecord(
-            outcome: result.outcome,
-            localSaveState: localResultSaveState,
-            isAuthenticatedForResultPublishing: account.resultPublicationScope != nil
-          ) {
-            signedOutResultClaimStore.record(result.id)
-          }
         } else {
           priorAttemptLedger.recordTerminalAttempt(
             engagedDuration: result.engagedDuration, outcome: result.outcome, eligibility: eligibility,
-            savingEnabled: settings.saveCompletedResults)
+            savingEnabled: settings.saveCompletedResults,
+            samePromptRepeat: isSamePromptRepeatAttempt && result.configuration.mode != .quote)
         }
         let zeroSpeedFeedback = ZeroSpeedResultFeedbackPolicy.feedback(
           wpm: result.wpm, elapsedDuration: result.elapsedDuration, outcome: result.outcome)
@@ -1398,10 +1391,16 @@ private struct ContentView: View {
           publishIfEnabled(result)
         } else if result.outcome == .bailedOut {
           publicationResultID = nil
-          publicationState = .notice(
-            updatedLongTextProgress
-              ? "长文本进度已保存；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
-              : "本次已中止：结果只在当前窗口显示，不会保存、本机统计、同步或发布。")
+          let reason: String
+          if case .ineligible(let invalidReason) = eligibility {
+            reason = "结果无效（\(invalidReason.resultSummary)），未写入本机历史"
+          } else if localResultSaveState.canRetry {
+            reason = "本机保存失败，可重试；尚未写入本机历史"
+          } else {
+            reason = "保存已关闭，未写入本机历史"
+          }
+          publicationState = .notice((updatedLongTextProgress ? "长文本进度已保存；" : "")
+            + "本次已中止：\(reason)，不会同步或发布；当前练习时间仍会显示。")
         } else if result.outcome == .invalidAFK {
           publicationResultID = nil
           publicationState = .notice(
@@ -1655,12 +1654,12 @@ private struct ContentView: View {
       "中止当前长测试？", isPresented: $showingCommandBailoutConfirmation,
       titleVisibility: .visible
     ) {
-      Button("中止并显示未保存结果", role: .destructive) {
+      Button("中止并查看结果", role: .destructive) {
         synchronizeLiveInputRules()
         session.bailOut()
       }
     } message: {
-      Text("结果不会保存、本机统计、同步或发布。")
+      Text("符合保存资格且开启保存时，中止结果会进入本机历史；不计入 PB 或挑战，服务发布尚未兼容。")
     }
     .sheet(isPresented: $showingTestShare, onDismiss: {
       presentQueuedReferenceScriptImport()
@@ -2111,7 +2110,7 @@ private struct ContentView: View {
           Toggle("无限计时", isOn: infiniteBinding($duration, fallback: 30))
             .disabled(duration != 0 && !infiniteIncompatibleModifiers.isEmpty)
           if duration == 0 {
-            Text("计时器正向累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
+            Text("计时器正向累计；使用 Bail Out 或双击 Shift+Enter 结束并查看结果，符合资格时保存到本机。")
               .font(.caption).foregroundStyle(.secondary)
           } else {
             HStack {
@@ -2131,7 +2130,7 @@ private struct ContentView: View {
           Toggle("无限字数", isOn: infiniteBinding($wordLimit, fallback: 25))
             .disabled(wordLimit != 0 && !infiniteIncompatibleModifiers.isEmpty)
           if wordLimit == 0 {
-            Text("词数持续累计；使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
+            Text("词数持续累计；使用 Bail Out 或双击 Shift+Enter 结束并查看结果，符合资格时保存到本机。")
               .font(.caption).foregroundStyle(.secondary)
           } else {
             HStack {
@@ -2342,7 +2341,7 @@ private struct ContentView: View {
                   hasLockedCustomTextSource
                     || (customTextDuration != 0 && !infiniteIncompatibleModifiers.isEmpty))
               if customTextDuration == 0 {
-                Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
+                Text("使用 Bail Out 或双击 Shift+Enter 结束并查看结果，符合资格时保存到本机。")
                   .font(.caption).foregroundStyle(.secondary)
               } else {
                 HStack {
@@ -2366,7 +2365,7 @@ private struct ContentView: View {
                   hasLockedCustomTextSource
                     || (customTextWordLimit != 0 && !infiniteIncompatibleModifiers.isEmpty))
               if customTextWordLimit == 0 {
-                Text("使用 Bail Out 或双击 Shift+Enter 结束并查看未保存结果。")
+                Text("使用 Bail Out 或双击 Shift+Enter 结束并查看结果，符合资格时保存到本机。")
                   .font(.caption).foregroundStyle(.secondary)
               } else {
                 HStack {
@@ -2436,7 +2435,7 @@ private struct ContentView: View {
     VStack(alignment: .leading, spacing: 7) {
       Label("活动标签", systemImage: "tag")
         .font(.headline)
-      Text("活动标签会写入之后开始的每轮已完成成绩，并可用于“活动标签个人最佳”节奏引导。")
+      Text("活动标签会写入之后开始的每轮已保存成绩；只有符合 PB 资格的完成成绩可用于“活动标签个人最佳”节奏引导。")
         .font(.caption)
         .foregroundStyle(.secondary)
       HStack {
@@ -3346,7 +3345,7 @@ private struct ContentView: View {
             .buttonStyle(.bordered)
         }
         Button(
-          shouldBailOutFromControls ? "中止并显示未保存结果" : "放弃本次测试",
+          shouldBailOutFromControls ? "中止并查看结果" : "放弃本次测试",
           role: .destructive
         ) {
           synchronizeLiveInputRules()
@@ -3979,7 +3978,7 @@ private struct ContentView: View {
   }
 
   private func armLongTestBailout() {
-    let message = "再次在 0.2 秒内按 Shift+Enter，可中止并显示未保存结果。"
+    let message = "再次在 0.2 秒内按 Shift+Enter，可中止并查看结果；符合资格时保存到本机。"
     bailoutConfirmationMessage = message
     Task { @MainActor in
       try? await Task.sleep(nanoseconds: 5_000_000_000)
@@ -4055,9 +4054,7 @@ private struct ContentView: View {
     guard settings.showAverage != .off else { return nil }
     let samples = savedResults.compactMap { record -> RecentAverageSample? in
       guard let result = record.portableResult else { return nil }
-      return .init(
-        configuration: result.configuration, prompt: result.prompt, finishedAt: result.finishedAt,
-        wpm: result.wpm, accuracy: result.accuracy, preciseAccuracy: result.preciseAccuracy, tags: result.tags)
+      return .init(result: result)
     }
     guard let average = RecentTestAveragePolicy.average(
       currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples,
@@ -4095,9 +4092,7 @@ private struct ContentView: View {
     }
     let samples = savedResults.compactMap { record -> RecentAverageSample? in
       guard let result = record.portableResult else { return nil }
-      return .init(
-        configuration: result.configuration, prompt: result.prompt, finishedAt: result.finishedAt,
-        wpm: result.wpm, accuracy: result.accuracy, preciseAccuracy: result.preciseAccuracy, tags: result.tags)
+      return .init(result: result)
     }
     guard let personalBest = CurrentPersonalBestPolicy.personalBest(
       currentConfiguration: configuration, currentPrompt: session.prompt, samples: samples,
@@ -4234,7 +4229,7 @@ private struct ContentView: View {
     items.append(contentsOf: NavigationCommandCatalog.items)
     if session.hasStarted, !session.isFinished, commandBailoutAvailable {
       items.append(.init(
-        id: "bailout", title: "中止长测试…", subtitle: "确认后显示未保存结果",
+        id: "bailout", title: "中止长测试…", subtitle: "确认后查看结果，符合资格时保存到本机",
         systemImage: "figure.run", keywords: ["bail", "bailout", "中止", "退出"], group: .practice))
     }
     items.append(contentsOf: QuickTestParameterCommandCatalog.items)
@@ -5436,6 +5431,12 @@ private struct ContentView: View {
     localResultSaveState = LocalResultSaveAttempt.perform { try modelContext.save() }
     if localResultSaveState.isSaved {
       savedResultRecord = record
+      priorAttemptLedger.clearAfterPersistingResult()
+      if SignedOutResultClaimPolicy.shouldRecord(outcome: result.outcome,
+        localSaveState: localResultSaveState,
+        isAuthenticatedForResultPublishing: account.resultPublicationScope != nil) {
+        signedOutResultClaimStore.record(result.id)
+      }
     } else {
       modelContext.delete(record)
       savedResultRecord = nil
@@ -5550,7 +5551,8 @@ extension TestOutcome {
     case .failed: "本次失败 · 未保存为完成成绩"
     case .invalidAFK: "本次因闲置无效 · 未保存为完成成绩"
     case .abandoned: "本次已放弃 · 未保存为完成成绩"
-    case .bailedOut: "本次已中止 · 未保存为完成成绩"
+    case .bailedOut:
+      saveState.isSaved ? "本次已中止 · 已保存到本机" : "本次已中止 · 未保存"
     }
   }
 }
@@ -6366,7 +6368,14 @@ private struct CompletedResultView: View {
 
   private var resultOutcomeSubtitle: String {
     switch result.outcome {
-    case .bailedOut: return "中止结果只在当前窗口显示，不保存成绩"
+    case .bailedOut:
+      if case .ineligible(let reason) = eligibility {
+        return "中止结果无效（\(reason.resultSummary)）；未写入本机历史"
+      }
+      guard savesResult else { return "中止结果未保存：保存已关闭" }
+      return localResultSaveState.isSaved
+        ? "中止结果已保存到这台 Mac；不计入 PB 或挑战，服务发布尚未兼容"
+        : "中止结果尚未保存到这台 Mac，可重试本机保存"
     case .invalidAFK: return "结束前连续约 5 秒没有文本输入；结果只在当前窗口显示，不保存成绩"
     case .failed:
       return (failureReason?.resultSummary ?? "本次没有保存为完成成绩")
@@ -7416,7 +7425,7 @@ private struct ResultsHistoryView: View {
     let speedAverage100: Double
     let accuracyAverage10: Double
     let accuracyAverage100: Double
-    let personalBestSpeed: Double
+    let personalBestSpeed: Double?
 
     var id: UUID { metric.id }
   }
@@ -7752,6 +7761,11 @@ private struct ResultsHistoryView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                     }
+                    if result.outcome == TestOutcome.bailedOut.rawValue {
+                      Label("中止", systemImage: "stop.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                     Spacer()
                     Text("raw \(result.rawWpm) · \(consistencyText(for: result))% 稳定")
                       .font(.caption)
@@ -7837,7 +7851,7 @@ private struct ResultsHistoryView: View {
     let speedAverage100 = HistoryChartPolicy.movingAverage(values: speeds, windowSize: 100)
     let accuracyAverage10 = HistoryChartPolicy.movingAverage(values: accuracies, windowSize: 10)
     let accuracyAverage100 = HistoryChartPolicy.movingAverage(values: accuracies, windowSize: 100)
-    let personalBestSpeed = HistoryChartPolicy.personalBestEnvelope(values: speeds)
+    let personalBestSpeed = HistoryChartPolicy.personalBestEnvelope(metrics: metrics)
     return metrics.indices.map { index in
       .init(
         metric: metrics[index], speedAverage10: speedAverage10[index],
@@ -7930,11 +7944,13 @@ private struct ResultsHistoryView: View {
           .lineStyle(.init(lineWidth: 1, dash: [3, 2]))
           .accessibilityHidden(true)
       }
-      LineMark(
-        x: .value("日期", point.metric.finishedAt),
-        y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: point.personalBestSpeed)))
-        .foregroundStyle(.secondary.opacity(0.45))
-        .lineStyle(.init(lineWidth: 1, dash: [4, 3]))
+      if let best = point.personalBestSpeed {
+        LineMark(
+          x: .value("日期", point.metric.finishedAt),
+          y: .value(settings.typingSpeedUnit.displayName, settings.typingSpeedUnit.converted(wpm: best)))
+          .foregroundStyle(.secondary.opacity(0.45))
+          .lineStyle(.init(lineWidth: 1, dash: [4, 3]))
+      }
       if visibility.average100 {
         LineMark(
           x: .value("日期", point.metric.finishedAt),
@@ -8920,6 +8936,11 @@ private struct ResultDetailView: View {
           Label("个人最佳", systemImage: "trophy.fill")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.orange)
+        }
+        if result.outcome == TestOutcome.bailedOut.rawValue {
+          Label("中止", systemImage: "stop.circle")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
         }
       }
       HStack {

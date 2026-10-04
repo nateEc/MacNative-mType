@@ -160,7 +160,7 @@ struct PreferencesView: View {
               Text(key.displayName).tag(key)
             }
           }
-          Text("⌘R 始终可用；选定 Esc、Tab 或 Enter 后，按该键可立即重新开始当前练习。提示需要 Tab/换行时，改按 Shift+该键重开；字数达 1000 词或时长达 15 分钟时，Esc/Tab 需配合 Shift，双击 Shift+Enter 可中止并显示未保存结果，Enter 不再用于重开。")
+          Text("⌘R 始终可用；选定 Esc、Tab 或 Enter 后，按该键可立即重新开始当前练习。提示需要 Tab/换行时，改按 Shift+该键重开；字数达 1000 词或时长达 15 分钟时，Esc/Tab 需配合 Shift，双击 Shift+Enter 可中止并查看结果，符合资格时保存到本机，Enter 不再用于重开。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("显示快捷键提示", isOn: $settings.showKeyTips)
@@ -175,8 +175,8 @@ struct PreferencesView: View {
           Text("单列表打开时显示全部命令并可直接筛选；分组导航可逐层浏览，输入 > 可随时搜索全部命令。")
             .font(.caption)
             .foregroundStyle(.secondary)
-          Toggle("保存完成成绩", isOn: $settings.saveCompletedResults)
-          Text("关闭后仍显示本次结果，但不会写入本机历史、统计、同步或排行榜。")
+          Toggle("保存有效成绩", isOn: $settings.saveCompletedResults)
+          Text("开启后，合格的完成或中止结果写入本机历史；中止不计入 PB 或挑战，服务发布尚未兼容。关闭后不保存，但当前练习时间仍显示。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("完成后自动展开单词历史", isOn: $settings.alwaysShowWordsHistory)
@@ -663,7 +663,7 @@ struct PreferencesView: View {
               Text(display.displayName).tag(display)
             }
           }
-          Text("按当前模式、时长或词数（引语按当前内容）、标点、数字、语言、难度和简化输入，显示最近 10 条本机完成成绩的均值。")
+          Text("按当前模式、时长或词数（引语按当前内容）、标点、数字、语言、难度和简化输入，显示最近 10 条本机已保存成绩的均值，包括合格的中止结果。")
             .font(.caption)
             .foregroundStyle(.secondary)
           Toggle("显示本机个人最佳", isOn: $settings.showPersonalBest)

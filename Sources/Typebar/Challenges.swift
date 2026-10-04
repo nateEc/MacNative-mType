@@ -152,6 +152,9 @@ enum ChallengeEvaluator {
   static func evaluate(_ result: CompletedTestResult, challenge: TypebarChallenge)
     -> ChallengeEvaluation
   {
+    guard result.outcome != .bailedOut else {
+      return .init(challenge: challenge, passed: false, failedRequirements: ["中止测试不验证挑战"])
+    }
     var failedRequirements: [String] = []
     let requirements = challenge.requirements
 

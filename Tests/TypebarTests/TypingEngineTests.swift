@@ -17400,7 +17400,7 @@ final class TypingEngineTests: XCTestCase {
     XCTAssertEqual(TestOutcome.completed.statusText(saveState: .saved), "本次完成 · 已保存到本机")
     XCTAssertEqual(TestOutcome.completed.statusText(saveState: .notRequested), "本次完成 · 未保存为完成成绩")
     XCTAssertEqual(TestOutcome.completed.statusText(saveState: .failed("磁盘不可写")), "本次完成 · 未保存为完成成绩")
-    XCTAssertEqual(TestOutcome.bailedOut.statusText(saveState: .saved), "本次已中止 · 未保存为完成成绩")
+    XCTAssertEqual(TestOutcome.bailedOut.statusText(saveState: .saved), "本次已中止 · 已保存到本机")
     XCTAssertEqual(TestOutcome.invalidAFK.statusText(saveState: .saved), "本次因闲置无效 · 未保存为完成成绩")
   }
 

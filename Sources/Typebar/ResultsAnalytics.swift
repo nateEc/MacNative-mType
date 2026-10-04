@@ -140,11 +140,12 @@ struct ResultMetric: Equatable, Identifiable {
     let elapsedSeconds: TimeInterval
     let consistency: Double
     let restartCount: Int
+    let outcome: TestOutcome
 
     init(
         id: UUID = UUID(), finishedAt: Date, wpm: Int, rawWpm: Int? = nil, accuracy: Int,
         preciseAccuracy: Double? = nil, typingSeconds: TimeInterval, elapsedSeconds: TimeInterval? = nil,
-        consistency: Double = 0, restartCount: Int = 0
+        consistency: Double = 0, restartCount: Int = 0, outcome: TestOutcome = .completed
     ) {
         self.id = id
         self.finishedAt = finishedAt
@@ -155,6 +156,7 @@ struct ResultMetric: Equatable, Identifiable {
         self.elapsedSeconds = max(0, elapsedSeconds ?? typingSeconds)
         self.consistency = consistency.isFinite ? min(100, max(0, consistency)) : 0
         self.restartCount = max(0, restartCount)
+        self.outcome = outcome
     }
 
     init(record: TestResultRecord) {
@@ -172,7 +174,8 @@ struct ResultMetric: Equatable, Identifiable {
                 duration: record.chartDuration,
                 configuration: record.configuration, keySpacingSamples: record.keySpacingSamples
             ).typing,
-            restartCount: record.restartCount
+            restartCount: record.restartCount,
+            outcome: TestOutcome(rawValue: record.outcome) ?? .abandoned
         )
     }
 }
@@ -448,6 +451,21 @@ enum HistoryChartPolicy {
     return envelope
   }
 
+  /// A saved BailOut can remain a chart point without raising its PB line.
+  /// Before the first completed result there is no PB, not a fabricated zero.
+  static func personalBestEnvelope(metrics: [ResultMetric]) -> [Double?] {
+    var envelope = Array<Double?>(repeating: nil, count: metrics.count)
+    var currentBest: Double?
+    for index in metrics.indices.reversed() {
+      if metrics[index].outcome == .completed {
+        let speed = Double(metrics[index].wpm)
+        currentBest = currentBest.map { max($0, speed) } ?? speed
+      }
+      envelope[index] = currentBest
+    }
+    return envelope
+  }
+
   /// Estimates speed change per hour of actual typing from the same local
   /// sequence used for the chart. It intentionally avoids calendar-wall time.
   static func speedChangePerTypingHour(metrics: [ResultMetric]) -> Double? {
@@ -596,6 +614,7 @@ struct RecentAverageSample: Equatable {
   let wpm: Int
   let accuracy: Double
   let tags: [String]
+  let outcome: TestOutcome
 
   init(
     configuration: TestConfiguration,
@@ -604,7 +623,7 @@ struct RecentAverageSample: Equatable {
     wpm: Int,
     accuracy: Int,
     preciseAccuracy: Double? = nil,
-    tags: [String] = []
+    tags: [String] = [], outcome: TestOutcome = .completed
   ) {
     self.configuration = configuration
     self.prompt = prompt
@@ -612,6 +631,13 @@ struct RecentAverageSample: Equatable {
     self.wpm = wpm
     self.accuracy = CompletedTestResult.normalizedAccuracyPrecision(preciseAccuracy, fallback: accuracy)
     self.tags = tags
+    self.outcome = outcome
+  }
+
+  init(result: CompletedTestResult) {
+    self.init(configuration: result.configuration, prompt: result.prompt,
+      finishedAt: result.finishedAt, wpm: result.wpm, accuracy: result.accuracy,
+      preciseAccuracy: result.preciseAccuracy, tags: result.tags, outcome: result.outcome)
   }
 }
 
@@ -2035,7 +2061,8 @@ enum CurrentPersonalBestPolicy {
     let matching = RecentTestAveragePolicy.matchingSamples(
       currentConfiguration: currentConfiguration, currentPrompt: currentPrompt, samples: samples,
       activeTags: activeTags)
-      .filter { isResultEligible(configuration: $0.configuration, accuracy: $0.accuracy) }
+      .filter { $0.outcome == .completed
+        && isResultEligible(configuration: $0.configuration, accuracy: $0.accuracy) }
     guard let highestWpm = matching.map(\.wpm).max(),
       let best = matching.filter({ $0.wpm == highestWpm }).min(by: { $0.finishedAt < $1.finishedAt })
     else {
@@ -2782,8 +2809,9 @@ struct ResultStatistics: Equatable {
     }
 
     static func personalBestIDs(metrics: [ResultMetric]) -> Set<UUID> {
-        guard let bestWPM = metrics.map(\.wpm).max() else { return [] }
-        return Set(metrics.filter { $0.wpm == bestWPM }.map(\.id))
+        let completed = metrics.filter { $0.outcome == .completed }
+        guard let bestWPM = completed.map(\.wpm).max() else { return [] }
+        return Set(completed.filter { $0.wpm == bestWPM }.map(\.id))
     }
 }
 

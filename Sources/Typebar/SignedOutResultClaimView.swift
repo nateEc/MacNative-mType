@@ -21,9 +21,11 @@ struct SignedOutResultClaimView: View {
           .foregroundStyle(.tint)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 5) {
-          Text("上传刚才的离线成绩？")
+          Text(result.outcome == .bailedOut ? "中止成绩已保存在本机" : "上传刚才的离线成绩？")
             .font(.title3.weight(.semibold))
-          Text("这局成绩已保存在这台 Mac。只有你确认后，才会发送到当前已登录的成绩服务。")
+          Text(result.outcome == .bailedOut
+            ? "这局中止成绩已保存在这台 Mac，不计入 PB 或挑战。中止状态的服务协议尚未兼容，当前不能上传；保留在本机不会删除历史记录。"
+            : "这局成绩已保存在这台 Mac。只有你确认后，才会发送到当前已登录的成绩服务。")
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -69,11 +71,11 @@ struct SignedOutResultClaimView: View {
               Text("正在上传…")
             }
           } else {
-            Text("上传这局成绩")
+            Text(result.outcome == .bailedOut ? "服务发布待兼容" : "上传这局成绩")
           }
         }
         .buttonStyle(.borderedProminent)
-        .disabled(isUploading)
+        .disabled(isUploading || result.outcome == .bailedOut)
       }
     }
     .padding(24)
@@ -92,6 +94,7 @@ struct SignedOutResultClaimView: View {
   }
 
   private func upload() {
+    guard result.outcome != .bailedOut else { return }
     Task {
       isUploading = true
       errorMessage = nil
