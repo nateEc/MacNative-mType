@@ -53,6 +53,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
     public let restartCount: Int
     public let incompletePractice: ResultIncompletePractice?
     public let experienceEvidence: ResultExperienceEvidence?
+    public let rankingEvidence: ResultRankingEvidence?
     public let tags: [String]
     public let timingEvidence: ResultTimingEvidence?
     public let practiceTiming: ResultPracticeTiming?
@@ -72,6 +73,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         restartCount: Int = 0, tags: [String] = [], timingEvidence: ResultTimingEvidence? = nil,
         incompletePractice: ResultIncompletePractice? = nil,
         experienceEvidence: ResultExperienceEvidence? = nil,
+        rankingEvidence: ResultRankingEvidence? = nil,
         practiceTiming: ResultPracticeTiming? = nil, inputMetrics: ResultInputMetrics? = nil,
         resultConsistency: ResultConsistencyMetrics? = nil,
         terminalTiming: ResultTerminalTiming? = nil,
@@ -94,6 +96,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         self.restartCount = restartCount
         self.incompletePractice = incompletePractice
         self.experienceEvidence = experienceEvidence
+        self.rankingEvidence = rankingEvidence
         self.tags = tags
         self.timingEvidence = timingEvidence
         self.practiceTiming = practiceTiming
@@ -115,6 +118,7 @@ public struct ResultSubmissionRequest: Content, Equatable {
         case practiceTiming
         case incompletePractice
         case experienceEvidence
+        case rankingEvidence
         case inputMetrics
         case resultConsistency
         case terminalTiming
@@ -142,6 +146,12 @@ public struct ResultSubmissionRequest: Content, Equatable {
             ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
         experienceEvidence = values.contains(.experienceEvidence)
             ? try values.decode(ResultExperienceEvidence.self, forKey: .experienceEvidence) : nil
+        rankingEvidence = values.contains(.rankingEvidence)
+            ? try values.decode(ResultRankingEvidence.self, forKey: .rankingEvidence) : nil
+        if let rankingEvidence, rankingEvidence.modifiers.contains("polyglot") != (language == "mixedLanguages") {
+            throw DecodingError.dataCorruptedError(forKey: .rankingEvidence, in: values,
+                debugDescription: "Ranking modifier and language identities must agree")
+        }
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         timingEvidence = try values.decodeIfPresent(ResultTimingEvidence.self, forKey: .timingEvidence)
         practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
@@ -185,6 +195,7 @@ public struct ResultSubmissionResponse: Content, Equatable {
 /// A compact, account-scoped view of a submitted result. It deliberately
 /// excludes prompt text, input replay, and every profile or credential field.
 public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable {
+    public var rankingEvidence: ResultRankingEvidence? = nil
     public let id: UUID
     public let mode: String
     public let language: String
@@ -254,7 +265,7 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, preciseAccuracy,
-            consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, terminalTiming,
+            consistency, keyConsistency, errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, terminalTiming,
             elapsedTime, bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
     }
 
@@ -297,6 +308,17 @@ public struct AccountResultResponse: Content, Equatable, Identifiable, Sendable 
             customLimit: try values.decodeIfPresent(ResultCustomLimit.self, forKey: .customLimit), startedAt: start, finishedAt: end)
         let measured = terminalTiming?.duration(mode: mode) ?? elapsedTime?.duration(mode: mode)
             ?? finishedAt.timeIntervalSince(startedAt)
+        rankingEvidence = values.contains(.rankingEvidence)
+            ? try values.decode(ResultRankingEvidence.self, forKey: .rankingEvidence) : nil
+        if let rankingEvidence, rankingEvidence.modifiers.contains("polyglot") != (language == "mixedLanguages") {
+            throw DecodingError.dataCorruptedError(forKey: .rankingEvidence, in: values,
+                debugDescription: "Ranking modifier and language identities must agree")
+        }
+        if let rankingEvidence, let experience,
+            Set(rankingEvidence.modifiers) != Set(experience.modifiers) {
+            throw DecodingError.dataCorruptedError(forKey: .rankingEvidence, in: values,
+                debugDescription: "Ranking and XP modifier identities must agree")
+        }
         if let experience, !experience.matchesTiming(duration: measured, practiceTiming: practice, restartCount: restarts)
             || experience.modifiers.contains("polyglot") != (language == "mixedLanguages") {
             throw DecodingError.dataCorruptedError(forKey: .experienceEvidence, in: values,

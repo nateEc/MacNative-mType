@@ -3066,10 +3066,15 @@ final class HealthRouteTests: XCTestCase {
       .init(mode: "time", language: "english", period: "all"), now: now.addingTimeInterval(60))
     XCTAssertTrue(boundarySpeedPage.entries.isEmpty)
 
-    let qualifying = try await store.submitResult(
+    let crossing = try await store.submitResult(
       result(id: UUID(), wpm: 82, accuracy: 100, durationSeconds: 5,
         finishedAt: now.addingTimeInterval(65)),
       accessToken: session.accessToken, now: now.addingTimeInterval(65))
+    XCTAssertFalse(crossing.leaderboardEligible, "Exactly 120 seconds before this submission is not qualified")
+    let qualifying = try await store.submitResult(
+      result(id: UUID(), wpm: 83, accuracy: 100, durationSeconds: 5,
+        finishedAt: now.addingTimeInterval(70)),
+      accessToken: session.accessToken, now: now.addingTimeInterval(70))
     let speedRank = try await store.leaderboardRank(
       .init(mode: "time", language: "english", period: "all"), accessToken: session.accessToken,
       now: now.addingTimeInterval(65))
@@ -3084,7 +3089,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(speedRank.entry?.userID, session.user.id)
     XCTAssertEqual(experienceRank.entry?.userID, session.user.id)
     XCTAssertEqual(speedRank.eligibility, .init(
-      isEligible: true, completedPracticeSeconds: 125, minimumPracticeSeconds: 120))
+      isEligible: true, completedPracticeSeconds: 130, minimumPracticeSeconds: 120))
   }
 
   func testLeaderboardQualificationUsesFractionalAcceptedPracticeTimeForItsStrictBoundary()
@@ -3106,16 +3111,21 @@ final class HealthRouteTests: XCTestCase {
       .init(mode: "time", language: "english", period: "all"), accessToken: session.accessToken,
       now: now)
 
-    XCTAssertTrue(receipt.leaderboardEligible)
+    XCTAssertFalse(receipt.leaderboardEligible, "Qualification uses pre-submission, not newly accepted fractional time")
     XCTAssertEqual(rank.entry?.userID, session.user.id)
     XCTAssertEqual(rank.eligibility, .init(
       isEligible: true, completedPracticeSeconds: 120, minimumPracticeSeconds: 120))
+    let next = try await store.submitResult(result(id: UUID(), wpm: 84, accuracy: 100,
+      durationSeconds: 5, finishedAt: now.addingTimeInterval(5)),
+      accessToken: session.accessToken, now: now.addingTimeInterval(5))
+    XCTAssertTrue(next.leaderboardEligible)
   }
 
   func testLeaderboardRestrictionHidesExistingResultsWithoutDeletingOrBlockingPractice()
     async throws
   {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0,
+      rankingEnvironment: .development)
     let now = Date(timeIntervalSince1970: 39_000)
     let session = try await store.register(
       .init(email: "restricted-ranking@example.com", password: "a secure password", displayName: "Restricted"),
@@ -3265,7 +3275,8 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testAccountSuspensionPurgesRollingLeaderboardsButKeepsPracticeAndMutableProfileBlocked() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0,
+      rankingEnvironment: .development)
     let now = Date(timeIntervalSince1970: 1_788_825_600)
     let suspendedAt = now.addingTimeInterval(10)
     let resumedAt = now.addingTimeInterval(60)
@@ -3723,7 +3734,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testPublicProfileShowsDiscordAvatarOnlyAfterExplicitOptIn() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let now = Date(timeIntervalSince1970: 37_000)
     let avatarHash = "a_" + String(repeating: "a", count: 32)
     let session = try await store.registerWithOAuth(
@@ -3767,7 +3778,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testPublicBadgesAreServerDerivedSelectableAndRemovedWithResults() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let now = Date(timeIntervalSince1970: 38_000)
     let session = try await store.register(
       .init(email: "badges@example.com", password: "a secure password", displayName: "Badge User"),
@@ -4450,7 +4461,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testResultsAreIdempotentAndLeaderboardOrdersEligibleScores() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let slower = try await store.register(
       .init(email: "slower@example.com", password: "a secure password", displayName: "Slower"))
     let faster = try await store.register(
@@ -4500,7 +4511,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testLeaderboardsExposeStablePagesWithTotalsAndOffsets() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let fastest = try await store.register(
       .init(email: "page-fastest@example.com", password: "a secure password", displayName: "Fastest"))
     let middle = try await store.register(
@@ -4555,7 +4566,7 @@ final class HealthRouteTests: XCTestCase {
 
   func testLeaderboardRoutesSeparateSpeedBucketsByConfiguredLimit() async throws {
     let app = try await Application.make(.testing)
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let fifteenSeconds = try await store.register(
       .init(
         email: "bucket-fifteen@example.com", password: "a secure password",
@@ -4715,9 +4726,12 @@ final class HealthRouteTests: XCTestCase {
           version: 1, terminalEngagedMilliseconds: 30_000,
           priorAttemptEngagedMilliseconds: 3_600_000),
         finishedAt: now), accessToken: session.accessToken, now: now)
-    XCTAssertTrue(accepted.leaderboardEligible)
+    XCTAssertFalse(accepted.leaderboardEligible, "Prior-attempt practice is added only after admission")
     let profile = try await store.publicProfile(id: session.user.id, now: now)
     XCTAssertEqual(profile.totalTypingSeconds, 3_630)
+    let next = try await store.submitResult(result(id: UUID(), wpm: 72, accuracy: 98,
+      finishedAt: now), accessToken: session.accessToken, now: now)
+    XCTAssertTrue(next.leaderboardEligible)
 
     let invalidTimings: [(timing: ResultPracticeTiming, restartCount: Int)] = [
       (.init(version: 2, terminalEngagedMilliseconds: 30_000, priorAttemptEngagedMilliseconds: 0), 0),
@@ -5562,7 +5576,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testExperienceIsServerCalculatedIdempotentAndRankedForTheCurrentISOWeek() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let alice = try await store.register(
       .init(email: "xp-alice@example.com", password: "a secure password", displayName: "XP Alice"))
     let bob = try await store.register(
@@ -5599,7 +5613,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testExperienceLeaderboardSeparatesCurrentAndPreviousISOWeeks() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let current = try await store.register(
       .init(email: "xp-current@example.com", password: "a secure password", displayName: "Current XP"))
     let previous = try await store.register(
@@ -5791,7 +5805,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testEveryCodeResultCanBeSubmittedAndFilteredWithoutEnablingQuoteSubmission() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let session = try await store.register(
       .init(email: "docker@example.com", password: "a secure password", displayName: "Docker User"))
     let now = Date(timeIntervalSince1970: 1_700_000_000)
@@ -5858,7 +5872,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testTokiPonaKuChoicesCrossQuoteAndResultDataPlanes() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let session = try await store.register(
       .init(email: "ku@example.com", password: "a secure password", displayName: "Ku User"))
     let now = Date(timeIntervalSince1970: 1_700_000_000)
@@ -5883,7 +5897,7 @@ final class HealthRouteTests: XCTestCase {
 
   func testResultRoutesRequireAuthenticationAndReturnLeaderboard() async throws {
     let app = try await Application.make(.testing)
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let session = try await store.register(
       .init(email: "me@example.com", password: "a secure password", displayName: "Route User"))
     let now = Date.now
@@ -6476,7 +6490,7 @@ final class HealthRouteTests: XCTestCase {
   }
 
   func testLeaderboardPeriodsUseTodayYesterdayAndISOWeekBoundaries() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, rankingEnvironment: .development)
     let session = try await store.register(
       .init(email: "period@example.com", password: "a secure password", displayName: "Period User"))
     let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-01T12:00:00Z"))

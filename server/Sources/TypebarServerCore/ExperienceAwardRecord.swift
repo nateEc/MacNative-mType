@@ -13,6 +13,7 @@ struct ExperienceAwardRecord: Codable {
   let input: ExperienceCalculationInput?
   let configuration: ExperienceCalculationConfiguration?
   let context: ExperienceCalculationContext?
+  var rankingAdmission: RankingAdmission? = nil
 
   static func legacy(userID: UUID, request: ResultSubmissionRequest, acceptedAt: Date?) -> Self {
     let xp = TypebarExperiencePolicy.points(for: request)
@@ -32,6 +33,7 @@ struct ExperienceAwardRecord: Codable {
   }
 
   func validate() throws {
+    try rankingAdmission?.validate()
     guard version == 1, finishedAt.timeIntervalSince1970.isFinite,
       acceptedAt.map({ $0.timeIntervalSince1970.isFinite }) ?? true,
       award.xp.isFinite, (0...9_007_199_254_740_991).contains(award.xp), accountCredit >= 0 else {
@@ -54,5 +56,27 @@ struct ExperienceAwardRecord: Codable {
         throw ExperienceCalculationError.invalidInput
       }
     }
+  }
+}
+
+extension ExperienceAwardRecord {
+  private enum CodingKeys: String, CodingKey {
+    case version, userID, resultID, finishedAt, acceptedAt, award, accountCredit,
+      input, configuration, context, rankingAdmission
+  }
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(version: try values.decode(Int.self, forKey: .version),
+      userID: try values.decode(UUID.self, forKey: .userID),
+      resultID: try values.decode(UUID.self, forKey: .resultID),
+      finishedAt: try values.decode(Date.self, forKey: .finishedAt),
+      acceptedAt: try values.decodeIfPresent(Date.self, forKey: .acceptedAt),
+      award: try values.decode(ExperienceCalculationAward.self, forKey: .award),
+      accountCredit: try values.decode(Int.self, forKey: .accountCredit),
+      input: try values.decodeIfPresent(ExperienceCalculationInput.self, forKey: .input),
+      configuration: try values.decodeIfPresent(ExperienceCalculationConfiguration.self, forKey: .configuration),
+      context: try values.decodeIfPresent(ExperienceCalculationContext.self, forKey: .context))
+    rankingAdmission = values.contains(.rankingAdmission)
+      ? try values.decode(RankingAdmission.self, forKey: .rankingAdmission) : nil
   }
 }

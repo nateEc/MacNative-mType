@@ -30,6 +30,7 @@ final class AccountPracticeLifecycleTests: XCTestCase {
   func testHistoryDeletionRetainsCountersActivityStreakAndWeeklyEligibility() async throws {
     let store = try AuthStore(fileURL: nil, bcryptCost: 4, minimumLeaderboardTypingSeconds: 10)
     let owner = try await account(store), input = request(restarts: 1)
+    _ = try await store.submitResult(request(), accessToken: owner.accessToken, now: now)
     _ = try await store.submitResult(input, accessToken: owner.accessToken, now: now)
     let before = try await store.publicProfile(id: owner.user.id, now: now)
     _ = try await store.deleteResults(.init(currentPassword: password), accessToken: owner.accessToken, now: now)

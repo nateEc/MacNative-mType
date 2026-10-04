@@ -13,6 +13,9 @@ if (( $# != 1 )); then
   fail "usage: $0 /absolute/path/to/monkeytype-reference"
 fi
 
+command -v rg >/dev/null 2>&1 || fail \
+  "rg is required for complete process-conflict scans; preserve its directory in PATH"
+
 reference_root="$1"
 [[ "$reference_root" = /* ]] || fail "reference checkout path must be absolute"
 git -C "$reference_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail \
@@ -105,6 +108,10 @@ run_check "checking reference behavior evidence" \
   zsh "$project_root/Scripts/check-reference-behavior-audit.sh" "$reference_root"
 run_check "checking manual acceptance inventory" \
   ruby "$project_root/Scripts/check-manual-acceptance-audit.rb"
+
+run_logged_check "executing actual pinned ranking admission branches" "$temporary_directory/ranking-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-ranking-admission.mjs" "$reference_root"
 
 practice_source_dependencies="${TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES:-$temporary_directory/practice-source-runtime}"
 if [[ ! -f "$practice_source_dependencies/node_modules/date-fns/package.json" ]]; then

@@ -91,7 +91,7 @@ final class ExperienceAwardLifecycleTests: XCTestCase {
     XCTAssertEqual(receipt.experienceGained, 52.5); XCTAssertEqual(receipt.totalExperience, 70)
     XCTAssertEqual(receipt.dailyXpBonus, true); XCTAssertEqual(receipt.xpBreakdown?["daily"], 0.5)
     let page = try await store.experienceLeaderboard(now: now)
-    XCTAssertEqual(page.entries.first?.totalExperience, 70.5)
+    XCTAssertEqual(page.entries.first?.totalExperience, 52.5, "First production award was not yet weekly-qualified")
     let reloaded = try AuthStore(fileURL: file, bcryptCost: 4, experienceConfiguration: config(gain: 100))
     let repeated = try await reloaded.submitResult(input, accessToken: owner.accessToken, now: now)
     XCTAssertEqual(repeated, receipt, "New configuration must never reprice an accepted reward")
@@ -293,7 +293,7 @@ final class ExperienceAwardLifecycleTests: XCTestCase {
     XCTAssertEqual(receipt.experienceGained, 4_294_967_297.75)
     XCTAssertEqual(receipt.totalExperience, 19)
     let page = try await store.experienceLeaderboard(now: now)
-    XCTAssertEqual(page.entries.first?.totalExperience, 4_294_967_315.75)
+    XCTAssertEqual(page.entries.first?.totalExperience, 4_294_967_297.75)
   }
 
   func testDeletionReloadPreservesStreakButClearsPreviousResultDailyContext() async throws {

@@ -5,7 +5,16 @@ enum ExperienceModifierCatalog {
   struct Entry: Equatable {
     let sourceName: String?
     let difficulty: Double
+    var allowsPersonalBest: Bool {
+      sourceName.map { ExperienceModifierCatalog.personalBestSourceNames.contains($0) } ?? false
+    }
   }
+  private static let personalBestSourceNames: Set<String> = [
+    "mirror", "upside_down", "nausea", "round_round_baby", "simon_says", "tts", "choo_choo",
+    "layout_mirror", "layoutfluid", "earthquake", "space_balls", "plus_zero", "plus_one",
+    "plus_two", "plus_three", "read_ahead_easy", "read_ahead", "read_ahead_hard", "memory",
+    "crt", "backwards", "ddoouubblleedd", "asl", "rot13", "no_quit",
+  ]
   static let entries: [String: Entry] = [
     "accountingStream": .init(sourceName: "58008", difficulty: 1),
     "mirrorVisual": .init(sourceName: "mirror", difficulty: 3),

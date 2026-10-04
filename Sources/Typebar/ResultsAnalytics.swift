@@ -2080,10 +2080,10 @@ enum CurrentPersonalBestPolicy {
 
   static func isResultEligible(configuration: TestConfiguration, accuracy: Double) -> Bool {
     isConfigurationEligible(configuration)
-      && (!configuration.rules.stopOnError || accuracy == 100)
+      && (!configuration.rules.stopsOnLetterForRanking || accuracy == 100)
   }
 
-  private static func modifierAllowsPersonalBest(_ modifier: TestModifier) -> Bool {
+  static func modifierAllowsPersonalBest(_ modifier: TestModifier) -> Bool {
     switch modifier {
     case .noSpaces, .underscoreSeparators, .uppercase, .titleCase, .alternatingCase, .randomCase,
       .messagingStyle, .binaryStream, .accountingStream, .hexadecimalStream, .symbolStream,

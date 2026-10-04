@@ -5,8 +5,9 @@ import XCTest
 final class BailoutSubmissionTests: XCTestCase {
   private let now = Date(timeIntervalSince1970: 41_000)
 
-  private func account(file: URL? = nil) async throws -> (AuthStore, AuthSessionResponse) {
-    let store = try AuthStore(fileURL: file, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0)
+  private func account(file: URL? = nil, environment: RankingEnvironment = .production) async throws -> (AuthStore, AuthSessionResponse) {
+    let store = try AuthStore(fileURL: file, bcryptCost: 4, minimumLeaderboardTypingSeconds: 0,
+      rankingEnvironment: environment)
     let user = try await store.register(.init(email: "bailout@example.com",
       password: "a secure password", displayName: "Bailout Tests"), now: now)
     return (store, user)
@@ -40,7 +41,7 @@ final class BailoutSubmissionTests: XCTestCase {
   }
 
   func testTimeBailoutKeepsPracticeAndXPButCannotBecomePBOrSpeedRank() async throws {
-    let (store, user) = try await account()
+    let (store, user) = try await account(environment: .development)
     let receipt = try await store.submitResult(request(), accessToken: user.accessToken, now: now)
     XCTAssertTrue(receipt.accepted)
     XCTAssertFalse(receipt.leaderboardEligible)

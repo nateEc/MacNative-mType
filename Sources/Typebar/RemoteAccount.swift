@@ -387,6 +387,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
     let incompletePractice: ResultIncompletePractice?
     let restartCount: Int?
     let experienceEvidence: RemoteExperienceEvidence?
+    let rankingEvidence: RemoteRankingEvidence?
     let terminalTiming: ResultTerminalTiming?
     let elapsedTime: ResultElapsedTime?
     let bailedOut: Bool?
@@ -399,7 +400,7 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, mode, language, durationSeconds, wordLimit, wpm, rawWpm, accuracy, consistency,
-            errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
+            errorCount, eventCount, tags, practiceTiming, incompletePractice, restartCount, experienceEvidence, rankingEvidence, preciseAccuracy, keyConsistency, terminalTiming, elapsedTime,
             bailedOut, customLimit, startedAt, finishedAt, startedAtReferenceTime, finishedAtReferenceTime
     }
 
@@ -427,6 +428,17 @@ struct RemoteAccountResult: Codable, Equatable, Identifiable, Sendable {
         restartCount = try values.decodeIfPresent(Int.self, forKey: .restartCount)
         experienceEvidence = values.contains(.experienceEvidence)
             ? try values.decode(RemoteExperienceEvidence.self, forKey: .experienceEvidence) : nil
+        rankingEvidence = values.contains(.rankingEvidence)
+            ? try values.decode(RemoteRankingEvidence.self, forKey: .rankingEvidence) : nil
+        if let rankingEvidence, rankingEvidence.modifiers.contains("polyglot") != (language == "mixedLanguages") {
+            throw DecodingError.dataCorruptedError(forKey: .rankingEvidence, in: values,
+                debugDescription: "Ranking modifier and language identities must agree")
+        }
+        if let rankingEvidence, let experienceEvidence,
+            Set(rankingEvidence.modifiers) != Set(experienceEvidence.modifiers) {
+            throw DecodingError.dataCorruptedError(forKey: .rankingEvidence, in: values,
+                debugDescription: "Ranking and XP modifier identities must agree")
+        }
         incompletePractice = values.contains(.incompletePractice)
             ? try values.decode(ResultIncompletePractice.self, forKey: .incompletePractice) : nil
         if let incompletePractice, !RemoteIncompletePracticePolicy.isValid(
@@ -856,6 +868,7 @@ struct RemoteResultSubmission: Codable, Sendable {
     let tags: [String]
     let incompletePractice: ResultIncompletePractice?
     let experienceEvidence: RemoteExperienceEvidence?
+    let rankingEvidence: RemoteRankingEvidence?
     let timingEvidence: RemoteResultTimingEvidence?
     let practiceTiming: RemoteResultPracticeTiming?
     let inputMetrics: ResultInputMetrics?
@@ -872,7 +885,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         result: CompletedTestResult, includesTimingEvidence: Bool = false,
         includesPracticeTiming: Bool = false, includesInputMetrics: Bool = false,
         includesInputMetricsV2: Bool = false, resultConsistency: RemoteResultConsistency? = nil,
-        experienceEvidence: RemoteExperienceEvidence? = nil
+        experienceEvidence: RemoteExperienceEvidence? = nil, rankingEvidence: RemoteRankingEvidence? = nil
     ) {
         id = result.id
         self.resultConsistency = resultConsistency
@@ -895,6 +908,7 @@ struct RemoteResultSubmission: Codable, Sendable {
         practiceTiming = includesPracticeTiming ? RemoteResultPracticeTiming(result: result) : nil
         incompletePractice = result.incompletePractice
         self.experienceEvidence = experienceEvidence
+        self.rankingEvidence = rankingEvidence
         switch result.inputMetrics?.publicationVersion(nativeCharacterCount: result.typedCharacterCount) {
         case 1:
             inputMetrics = includesInputMetrics ? result.inputMetrics
@@ -959,6 +973,11 @@ struct RemoteServiceCapabilities: Codable, Equatable, Sendable {
     var supportsResultExperienceEvidence: Bool {
         apiVersion == "v1" && service == "typebar"
             && capabilities["resultExperienceEvidence"] == "available"
+    }
+
+    var supportsResultRankingEvidence: Bool {
+        apiVersion == "v1" && service == "typebar"
+            && capabilities["resultRankingEvidence"] == "available"
     }
 
     var supportsResultBailout: Bool {

@@ -1280,11 +1280,13 @@ public actor AuthStore {
   private let fileURL: URL?
   private let bcryptCost: Int
   private let minimumLeaderboardTypingSeconds: Int
+  private let rankingEnvironment: RankingEnvironment
   private let experienceConfiguration: ExperienceCalculationConfiguration?
 
   public init(
     fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0,
-    experienceConfiguration: ExperienceCalculationConfiguration? = .typebarDefault
+    experienceConfiguration: ExperienceCalculationConfiguration? = .typebarDefault,
+    rankingEnvironment: RankingEnvironment = .production
   ) throws {
     guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
       minimumLeaderboardTypingSeconds)
@@ -1292,6 +1294,7 @@ public actor AuthStore {
     self.fileURL = fileURL
     self.bcryptCost = bcryptCost
     self.minimumLeaderboardTypingSeconds = minimumLeaderboardTypingSeconds
+    self.rankingEnvironment = rankingEnvironment
     try experienceConfiguration?.validateForProduction()
     self.experienceConfiguration = experienceConfiguration
     guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -1410,6 +1413,10 @@ public actor AuthStore {
         }
         if let input = entry.input,
           try ExperienceEvidenceAdapter.input(for: Self.resultRequest(from: result)) != input {
+          throw ExperienceCalculationError.invalidInput
+        }
+        if let admission = entry.rankingAdmission,
+          try RankingAdmissionInput.make(Self.resultRequest(from: result), evidence: admission.input.evidence) != admission.input {
           throw ExperienceCalculationError.invalidInput
         }
       }
@@ -3116,7 +3123,11 @@ public actor AuthStore {
   }
 
   private func personalBestResults(for userID: UUID, from results: [StoredResult]) -> [StoredResult] {
-    let completed = results.filter { $0.bailedOut != true }
+    let admissions = Dictionary(uniqueKeysWithValues: state.experienceAwards!
+      .filter { $0.userID == userID }.compactMap { entry in
+        entry.rankingAdmission.map { (entry.resultID, $0) }
+      })
+    let completed = results.filter { $0.bailedOut != true && admissions[$0.id]?.decision.personalBestEligible != false }
     guard let resetAt = state.personalBestResetDates[userID] else { return completed }
     return completed.filter { result in
       guard let acceptedAt = result.acceptedAt else { return false }
@@ -3236,7 +3247,7 @@ public actor AuthStore {
     let completedSeconds = max(0, Int(total.rounded(.down)))
     return .init(
       isEligible: !user.accountSuspended && !user.leaderboardRestricted && !user.displayNameChangeRequired
-        && total > Double(minimumLeaderboardTypingSeconds),
+        && (rankingEnvironment == .development || total > Double(minimumLeaderboardTypingSeconds)),
       completedPracticeSeconds: completedSeconds,
       minimumPracticeSeconds: minimumLeaderboardTypingSeconds,
       isLeaderboardRestricted: user.leaderboardRestricted,
@@ -3297,6 +3308,7 @@ public actor AuthStore {
     state.experienceAwards!
       .filter {
         $0.userID == userID
+          && $0.rankingAdmission?.decision.weeklyExperienceEligible != false
           && (since == nil || $0.finishedAt >= since!)
           && (before == nil || $0.finishedAt < before!)
           && (rollingLeaderboardResumedAt == nil
@@ -3309,7 +3321,7 @@ public actor AuthStore {
 
   private func prepareExperienceAward(for request: ResultSubmissionRequest, userID: UUID,
     now: Date, streakDays: Int) throws -> ExperienceAwardRecord {
-    let record: ExperienceAwardRecord
+    var record: ExperienceAwardRecord
     if let configuration = experienceConfiguration, request.experienceEvidence != nil {
       let input = try ExperienceEvidenceAdapter.input(for: request)
       let milliseconds = (now.timeIntervalSince1970.rounded(.down)) * 1_000
@@ -3328,6 +3340,15 @@ public actor AuthStore {
       // An absent complete report stays legacy; never infer missing counters.
       record = .legacy(userID: userID, request: request, acceptedAt: now)
     }
+    let user = state.users.first { $0.id == userID }!
+    let rankingInput = try RankingAdmissionInput.make(request)
+    let rankingContext = RankingAdmissionContext(
+      previousTypingSeconds: state.accountPractice![userID]?.typingSeconds ?? 0,
+      minimumTypingSeconds: minimumLeaderboardTypingSeconds, environment: rankingEnvironment,
+      accountExcluded: user.leaderboardOptedOut || user.leaderboardRestricted
+        || user.displayNameChangeRequired || user.accountSuspended)
+    record.rankingAdmission = .init(version: 1, input: rankingInput, context: rankingContext,
+      decision: RankingAdmission.evaluate(rankingInput, context: rankingContext))
     try record.validate()
     let allAwards = state.experienceAwards!.filter { $0.userID == userID }.reduce(0.0) { $0 + $1.award.xp }
     guard Double(experience(for: userID)) + Double(record.accountCredit) <= 9_007_199_254_740_991,
@@ -3365,7 +3386,8 @@ public actor AuthStore {
       && leaderboardEligibility(for: user).isEligible
     let weeklyEntries = experienceLeaderboardEntries(now: now)
     let isToday = request.finishedAt >= Calendar.current.startOfDay(for: now)
-    let isSpeedEligible = isLeaderboardEligible && request.bailedOut != true
+    let isSpeedEligible = isLeaderboardEligible
+      && (reward.rankingAdmission?.decision.speedEligible ?? (request.bailedOut != true))
     let dailyRank = isSpeedEligible && isToday
       ? try leaderboardEntries(
         .init(
@@ -3383,7 +3405,8 @@ public actor AuthStore {
       dailyLeaderboardRank: dailyRank,
       experienceGained: reward.award.xp,
       totalExperience: experience(for: userID),
-      weeklyExperienceRank: isLeaderboardEligible
+      weeklyExperienceRank: isLeaderboardEligible && reward.award.xp > 0
+        && reward.rankingAdmission?.decision.weeklyExperienceEligible != false
         ? weeklyEntries.first(where: { $0.userID == userID })?.rank
         : nil,
       dailyXpBonus: reward.input == nil ? nil : reward.award.dailyBonus ?? false,
@@ -3481,6 +3504,7 @@ public actor AuthStore {
       throw AuthStoreError.displayNameChangeRequired
     }
     try validate(result: request, leaderboardOptedOut: user.leaderboardOptedOut, now: now)
+    _ = try RankingAdmissionInput.make(request)
     let tags = try validatedResultTags(request.tags)
     if let existing = state.results.first(where: { $0.userID == user.id && $0.id == request.id }) {
       return try resultSubmissionResponse(
@@ -3647,7 +3671,7 @@ public actor AuthStore {
     }
     state.results[index].tags = tags
     try persist()
-    return state.results[index].response()
+    return resultResponse(for: state.results[index])
   }
 
   public func results(
@@ -3669,8 +3693,14 @@ public actor AuthStore {
           ? $0.id.uuidString > $1.id.uuidString
           : $0.finishedAt > $1.finishedAt
       }
+    let controls = Dictionary(uniqueKeysWithValues: state.experienceAwards!
+      .filter { $0.userID == user.id }.compactMap { entry in
+        entry.rankingAdmission?.input.evidence.map { (entry.resultID, $0) }
+      })
     return .init(
-      results: Array(records.dropFirst(offset).prefix(limit)).map { $0.response() },
+      results: Array(records.dropFirst(offset).prefix(limit)).map {
+        var response = $0.response(); response.rankingEvidence = controls[$0.id]; return response
+      },
       total: records.count)
   }
 
@@ -3681,7 +3711,15 @@ public actor AuthStore {
     guard let record = state.results.first(where: { $0.id == id && $0.userID == user.id }) else {
       throw AuthStoreError.resultNotFound
     }
-    return record.response()
+    return resultResponse(for: record)
+  }
+
+  private func resultResponse(for record: StoredResult) -> AccountResultResponse {
+    var response = record.response()
+    response.rankingEvidence = state.experienceAwards!.first {
+      $0.userID == record.userID && $0.resultID == record.id
+    }?.rankingAdmission?.input.evidence
+    return response
   }
 
   public func leaderboard(_ query: LeaderboardQuery, now: Date = .now) throws -> LeaderboardResponse
@@ -3889,10 +3927,16 @@ public actor AuthStore {
       upperBound = nil
     }
     let users = Dictionary(uniqueKeysWithValues: state.users.map { ($0.id, $0) })
+    let rankingAdmissions = Dictionary(uniqueKeysWithValues: state.experienceAwards!.compactMap { entry in
+      entry.rankingAdmission.map { ("\(entry.userID)/\(entry.resultID)", $0) }
+    })
     let typingSecondsByUser = totalTypingSecondsByUser()
     let records = state.results.filter { result in
       (eligibleUserIDs == nil || eligibleUserIDs!.contains(result.userID))
         && result.bailedOut != true
+        && rankingAdmissions["\(result.userID)/\(result.id)"].map {
+          usesDailyLeaderboardCache ? $0.decision.speedEligible : $0.decision.personalBestEligible
+        } != false
         && users[result.userID]?.leaderboardOptedOut == false
         && users[result.userID].map {
           leaderboardEligibility(for: $0, typingSeconds: typingSecondsByUser[$0.id] ?? 0).isEligible
