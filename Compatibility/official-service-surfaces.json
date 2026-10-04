@@ -69,7 +69,10 @@
     "leaderboards": [
       "Sources/Typebar/CloudSyncView.swift",
       "server/Sources/TypebarServerCore/AuthStore.swift",
-      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift"
+      "server/Tests/TypebarServerCoreTests/HealthRouteTests.swift",
+      "server/Sources/TypebarServerCore/WeeklyExperiencePublicScore.swift",
+      "server/Tests/TypebarServerCoreTests/WeeklyExperienceReadTests.swift",
+      "Sources/Typebar/RemoteAccount.swift"
     ],
     "results": [
       "Sources/Typebar/ResultPersistence.swift",

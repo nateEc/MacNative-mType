@@ -495,6 +495,7 @@ public struct LeaderboardRankResponse: Content, Equatable {
 public struct ExperienceLeaderboardEntry: Content, Equatable, Identifiable {
     public let id: UUID
     public let rank: Int
+    public let friendsRank: Int?
     public let userID: UUID
     public let displayName: String
     public let totalExperience: Double

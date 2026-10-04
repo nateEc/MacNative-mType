@@ -38,7 +38,7 @@
 
 最终完整串行门禁通过：原生 2941 项零失败／零跳过，687.769 秒；服务 265 项零失败／零跳过，3.464 秒。十万词耐力实际执行并通过，148.619 秒；九项隔离磁盘迁移通过，3.603 秒。实际排名源码 12,240 组与 48 个标志、账户源码 507 组、869 条人工场景结构、未开窗应用包与原创性边界均通过。869 条仅表示清单结构完整，不表示人工验收。最终日志 `/tmp/typebar-ranking-release-readiness.log`、`/tmp/typebar-ranking-gate-release-client-tests.log`、`/tmp/typebar-ranking-gate-release-service-tests.log`；日志为本机会话证据，不作为仓库运行依赖。全程没有启动 Typebar 图形实例，未操作真实 Typebar 库或部署。
 
-后续查询核对发现：[原版周 XP 服务](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/services/weekly-xp-leaderboard.ts) 的列表和名次 getter 使用 parseInt 投影公开 totalXp。Typebar 当前仍返回累计 Double，这不是已对齐的公开分数合同；内部小数累计、奖励小数和公开显示须分别验证。本轮资格探针不覆盖这些 getter，也不覆盖缓存保留、更新排名和周界。
+本资格阶段查询核对发现：[原版周 XP 服务](https://github.com/monkeytypegame/monkeytype/blob/91bd24bb8513785c7364cbea29296ff7adafac41/backend/src/services/weekly-xp-leaderboard.ts) 的列表和名次 getter 使用 parseInt 投影公开 totalXp。后续 [周 XP 读取阶段](WEEKLY_XP_READ_CONTRACT.md) 已独立实现公开投影与双重名次，区分内部小数累计、奖励小数和公开显示。本资格探针本身不覆盖这些 getter，后续完整服务／Lua 探针才提供对应证据；缓存保留、更新排名和周界仍开放。
 
 首次门禁因调用者重设 PATH 漏掉 rg，辅助串行扫描缺命令；该次自有 gate／测试已明确终止并保留 interrupted 日志，不计作通过。入口增加 rg 必需检查，缺工具会在任何 Swift 任务前退出；以保留原 PATH 的环境重新执行完整门禁。
 

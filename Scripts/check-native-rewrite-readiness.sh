@@ -113,6 +113,11 @@ run_logged_check "executing actual pinned ranking admission branches" "$temporar
   "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
   "$project_root/Scripts/check-source-ranking-admission.mjs" "$reference_root"
 
+run_logged_check "executing pinned weekly XP service with isolated Redis 6.2.6" \
+  "$temporary_directory/weekly-xp-read-source-check.log" \
+  "${TYPEBAR_RANKING_SOURCE_NODE:-node}" --experimental-vm-modules \
+  "$project_root/Scripts/check-source-weekly-xp-read.mjs" "$reference_root"
+
 practice_source_dependencies="${TYPEBAR_PRACTICE_SOURCE_DEPENDENCIES:-$temporary_directory/practice-source-runtime}"
 if [[ ! -f "$practice_source_dependencies/node_modules/date-fns/package.json" ]]; then
   run_logged_check "preparing pinned read-only account date dependencies" "$temporary_directory/practice-source-runtime.log" \

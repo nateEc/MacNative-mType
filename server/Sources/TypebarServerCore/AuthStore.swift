@@ -3816,7 +3816,7 @@ public actor AuthStore {
     let resolvedPeriod = try experienceLeaderboardPeriod(period)
     return .init(
       entry: experienceLeaderboardEntries(
-        eligibleUserIDs: acceptedFriendIDs(for: current.id), period: resolvedPeriod, now: now
+        eligibleUserIDs: acceptedFriendIDs(for: current.id), period: resolvedPeriod, friendsList: false, now: now
       ).first(where: { $0.userID == current.id }),
       period: resolvedPeriod.rawValue, eligibility: leaderboardEligibility(for: current.id))
   }
@@ -3841,7 +3841,8 @@ public actor AuthStore {
   }
 
   private func experienceLeaderboardEntries(
-    eligibleUserIDs: Set<UUID>? = nil, period: ExperienceLeaderboardPeriod = .week, now: Date
+    eligibleUserIDs: Set<UUID>? = nil, period: ExperienceLeaderboardPeriod = .week,
+    friendsList: Bool = true, now: Date
   ) -> [ExperienceLeaderboardEntry] {
     let calendar = Calendar(identifier: .iso8601)
     let currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
@@ -3857,10 +3858,9 @@ public actor AuthStore {
       upperBound = currentWeekStart
     }
     let typingSecondsByUser = totalTypingSecondsByUser()
-    return state.users.compactMap { user -> (StoredUser, Double)? in
+    let globallyRanked = state.users.compactMap { user -> (StoredUser, Double)? in
       guard !user.leaderboardOptedOut,
-        leaderboardEligibility(for: user, typingSeconds: typingSecondsByUser[user.id] ?? 0).isEligible,
-        eligibleUserIDs == nil || eligibleUserIDs!.contains(user.id)
+        leaderboardEligibility(for: user, typingSeconds: typingSecondsByUser[user.id] ?? 0).isEligible
       else { return nil }
       let weeklyPoints = weeklyExperience(
         for: user.id, since: lowerBound, before: upperBound,
@@ -3869,13 +3869,19 @@ public actor AuthStore {
     }
     .sorted {
       if $0.1 != $1.1 { return $0.1 > $1.1 }
-      return $0.0.displayName.localizedCaseInsensitiveCompare($1.0.displayName) == .orderedAscending
+      return $0.0.id.uuidString > $1.0.id.uuidString
     }
-    .enumerated()
-    .map { offset, value in
-      ExperienceLeaderboardEntry(
-        id: value.0.id, rank: offset + 1, userID: value.0.id, displayName: value.0.displayName,
-        totalExperience: value.1, selectedBadge: selectedPublicBadge(for: value.0),
+    let visible = globallyRanked.enumerated().filter {
+      eligibleUserIDs == nil || eligibleUserIDs!.contains($0.element.0.id)
+    }
+    return visible.enumerated().map { friendOffset, ranked in
+      let value = ranked.element
+      return ExperienceLeaderboardEntry(
+        id: value.0.id, rank: ranked.offset + 1,
+        friendsRank: eligibleUserIDs == nil ? nil : friendOffset + 1,
+        userID: value.0.id, displayName: value.0.displayName,
+        totalExperience: WeeklyExperiencePublicScore.project(value.1,
+          friendsList: eligibleUserIDs != nil && friendsList), selectedBadge: selectedPublicBadge(for: value.0),
         discordAvatar: publicDiscordAvatar(for: value.0))
     }
   }

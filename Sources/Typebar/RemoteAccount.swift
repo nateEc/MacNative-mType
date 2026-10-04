@@ -1229,6 +1229,7 @@ private struct RemoteLeaderboardRankMemoryResponse: Codable, Sendable {
 struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
     let id: UUID
     let rank: Int
+    let friendsRank: Int?
     let userID: UUID
     let displayName: String
     let totalExperience: Double
@@ -1236,12 +1237,17 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
     let discordAvatar: RemoteDiscordAvatar?
 
     private enum CodingKeys: String, CodingKey {
-        case id, rank, userID, displayName, totalExperience, selectedBadge, discordAvatar
+        case id, rank, friendsRank, userID, displayName, totalExperience, selectedBadge, discordAvatar
     }
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
         rank = try values.decode(Int.self, forKey: .rank)
+        friendsRank = try values.decodeIfPresent(Int.self, forKey: .friendsRank)
+        guard rank > 0, friendsRank.map({ $0 > 0 }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .rank, in: values,
+                debugDescription: "Leaderboard ranks are one-based")
+        }
         userID = try values.decode(UUID.self, forKey: .userID)
         displayName = try values.decode(String.self, forKey: .displayName)
         totalExperience = try values.decode(Double.self, forKey: .totalExperience)
@@ -1251,6 +1257,18 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
             throw DecodingError.dataCorruptedError(forKey: .totalExperience, in: values,
                 debugDescription: "Weekly rewards require a finite nonnegative value")
         }
+    }
+
+    /// Older Typebar friend responses put their local ordinal in rank.
+    func rank(in scope: RemoteLeaderboardScope) -> Int {
+        scope == .friends ? friendsRank ?? rank : rank
+    }
+
+    func rankLabel(in scope: RemoteLeaderboardScope) -> String {
+        if scope == .friends, let friendsRank {
+            return "好友 #\(friendsRank) · 全局 #\(rank)"
+        }
+        return "#\(rank)"
     }
 }
 

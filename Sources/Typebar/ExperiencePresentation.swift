@@ -5,7 +5,7 @@ enum ExperiencePresentation {
     compact(Double(experience))
   }
 
-  /// Fractional receipt/weekly values remain distinct from integral lifetime credit.
+  /// Fractional receipts and legacy weekly values remain distinct from lifetime credit.
   static func compact(_ experience: Double) -> String {
     guard experience.isFinite else { return "—" }
     let magnitude = abs(experience)

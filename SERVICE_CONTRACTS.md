@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-05 最新 [周 XP 读取合同](WEEKLY_XP_READ_CONTRACT.md)：公开 totalExperience 保留既有 JSON 数字与 Double DTO，但使用整数前缀投影，不能当作奖励小数或累计信用。好友 rank 是全局名次、friendsRank 是新增可选好友内名次，列表与名次的格式化路径分别对应固定源行为；先升级原生端再升级服务，旧原生端不理解双名次。只读投影不迁移文件／重算奖励；缓存、周界和旧二进制仍未验。
+
 2026-10-05 最新扩展见 [榜单准入合同](RANKING_ADMISSION_CONTRACT.md)：resultRankingEvidence=available 协商匿名 version=1、stopOnLetter／modifiers；私有历史保留首次信息，XP 修饰器与语言必须一致。奖励墓碑增加可选准入快照，生产使用提交前严格时长资格；TYPEBAR_RANKING_ENVIRONMENT 默认 production，只显式 development 豁免时间。旧缺快照为未知，不回补周 XP、不重算奖励；完整榜单／PB 缓存、反作弊、混写／降级及部署未验，本机格式不变。
 
 2026-10-05 账户生命周期最新约束见 [累计练习合同](ACCOUNT_PRACTICE_LIFETIME_CONTRACT.md)。公开资料 counts／seconds／streak 来自独立累计状态，活动数组允许 null、最多 372 天且固定 UTC；新增可选 practiceHistoryComplete，缺失不推测。showActivity 仅隐藏日历。删除历史保留统计与资格时长；明确账户重置／删除才清除。旧缺失文件保守只读迁移，显式坏状态拒绝，禁止旧 writer 回写。完整榜单准入、全站计数与私有账户显示尚未对齐；下方为历史阶段。

@@ -3,7 +3,7 @@ import XCTest
 @testable import Typebar
 
 final class ExperienceAwardResponseTests: XCTestCase {
-  func testFractionalRewardReceiptAndWeeklyLeaderboardDecodeWithoutTruncation() throws {
+  func testFractionalReceiptAndOlderWeeklyResponseDecodeWithoutTruncation() throws {
     let id = UUID().uuidString
     let receipt = Data("""
       {"id":"\(id)","accepted":true,"leaderboardEligible":true,

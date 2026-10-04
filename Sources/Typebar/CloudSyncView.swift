@@ -313,10 +313,10 @@ struct CloudSyncView: View {
                                 .foregroundStyle(.secondary)
                         } else if let experienceRank {
                             let standing = LeaderboardRankStanding(
-                                rank: experienceRank.rank, total: experienceLeaderboardPage?.total)
+                                rank: experienceRank.rank(in: experienceScope), total: experienceLeaderboardPage?.total)
                             VStack(alignment: .leading, spacing: 3) {
                                 Label(
-                                    "你的\(experiencePeriod.displayName) XP 排名 #\(experienceRank.rank) · \(ExperiencePresentation.compact(experienceRank.totalExperience)) XP\(standing.map { " · \($0.displayName)" } ?? "")",
+                                    "你的\(experiencePeriod.displayName) XP 排名 \(experienceRank.rankLabel(in: experienceScope)) · \(ExperiencePresentation.compact(experienceRank.totalExperience)) XP\(standing.map { " · \($0.displayName)" } ?? "")",
                                     systemImage: "person.fill")
                                     .font(.caption.weight(.medium))
                                 if let experienceRankChange {
@@ -342,14 +342,14 @@ struct CloudSyncView: View {
                             isLoading: isLoadingExperience,
                             myPageIndex: experienceRank.flatMap {
                                 LeaderboardPaginationPolicy.pageIndex(
-                                    containingRank: $0.rank, total: experienceLeaderboardPage.total,
+                                    containingRank: $0.rank(in: experienceScope), total: experienceLeaderboardPage.total,
                                     pageSize: experienceLeaderboardPage.pageSize)
                             },
                             onLoadPage: { loadExperienceLeaderboard(pageIndex: $0) })
                     }
                     ForEach(experienceLeaderboard) { entry in
                         HStack {
-                            Text("#\(entry.rank)").monospacedDigit().foregroundStyle(.secondary)
+                            Text(entry.rankLabel(in: experienceScope)).monospacedDigit().foregroundStyle(.secondary)
                             LeaderboardAvatar(avatar: entry.discordAvatar)
                             if let badge = entry.selectedBadge {
                                 Image(systemName: badge.systemImage)
@@ -366,7 +366,7 @@ struct CloudSyncView: View {
                                 .accessibilityLabel("\(entry.totalExperience) XP")
                         }
                     }
-                    Text(experienceScope == .friends ? "好友 XP 榜仅包含你和已接受好友，并按当前 ISO 周的服务端验证成绩累计。" : "XP 由服务端根据完成成绩的时长、准确率和模式重算；禅模式不奖励 XP。")
+                    Text(experienceScope == .friends ? "好友 XP 榜包含你和已接受好友，分别显示好友与全局名次。公开分数不参与排序。" : "XP 按首次接受的服务端奖励累计；公开分数与奖励小数分开，旧奖励不重算。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -690,7 +690,7 @@ struct CloudSyncView: View {
                         loadedExperienceRank = true
                         if let rank = rankStatus.entry, page.rankMemorySupported == true {
                             experienceRankChange = try? await account.recordExperienceLeaderboardRankMemory(
-                                rank: rank.rank, period: period, scope: scope)
+                                rank: rank.rank(in: scope), period: period, scope: scope)
                             guard requestGeneration == experienceRequestGeneration,
                                 account.resultPublicationScope == accountScope
                             else { return }
