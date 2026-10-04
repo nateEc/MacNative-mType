@@ -273,7 +273,7 @@ struct PromptCaretOverlay: View {
   let isRightToLeft: Bool
   let accent: Color
   let motion: SmoothCaretMotion
-  var paceFrame: ((Date) -> PromptPaceCaretInterpolation?)? = nil
+  var paceFrame: (() -> PromptPaceCaretInterpolation?)? = nil
   var reducesPaceMotion = false
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.typebarAnimationFrameRate) private var animationFrameRate
@@ -282,8 +282,8 @@ struct PromptCaretOverlay: View {
     GeometryReader { proxy in
       if let paceFrame {
         TimelineView(.animation(minimumInterval: reducesPaceMotion || systemReduceMotion
-          ? 0.1 : AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))) { timeline in
-          markerLayer(in: proxy.size, interpolation: paceFrame(timeline.date), dynamicPace: true)
+          ? 0.1 : AnimationFrameRatePolicy.minimumInterval(for: animationFrameRate))) { _ in
+          markerLayer(in: proxy.size, interpolation: paceFrame(), dynamicPace: true)
         }
       } else { markerLayer(in: proxy.size, interpolation: nil, dynamicPace: false) }
     }

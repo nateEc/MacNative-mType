@@ -4580,17 +4580,17 @@ struct TypingSession {
       asciiSeparatorCount: promptSeparatorUnitCount)
   }
 
-  mutating func configurePace(wpm: Double?) {
+  mutating func configurePace(wpm: Double?, clock: PaceCaretClock = .system) {
     guard configuration.mode != .zen, let wpm,
       !TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) || hasNoSpaceWordSegmentation
     else { paceCaretProgress = nil; return }
     paceCaretProgress = .init(wpm: wpm, catalog: .init(prompt: prompt,
-      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil))
+      noSpaceWords: TestModifierPolicy.usesNoSpaceInput(configuration.modifiers) ? noSpaceTargetWords : nil), clock: clock)
   }
 
-  func paceCaretFrame(at date: Date) -> PaceCaretFrame? {
+  func paceCaretFrame() -> PaceCaretFrame? {
     guard !isFinished else { return nil }
-    return paceCaretProgress?.frame(at: date, blind: configuration.rules.blindMode)
+    return paceCaretProgress?.frame(blind: configuration.rules.blindMode)
   }
 
   func paceCaretGlyphIndex(for position: PaceCaretPosition) -> Int? {
@@ -5959,7 +5959,7 @@ struct TypingSession {
 
   mutating func tick(at date: Date = .now) {
     guard !isFinished else { return }
-    paceCaretProgress?.advance(to: date, blind: configuration.rules.blindMode)
+    paceCaretProgress?.advance(blind: configuration.rules.blindMode)
     guard !isFinished, let duration = configuration.duration, let startedAt else { return }
     guard duration > 0 else { return }
     if date.timeIntervalSince(startedAt) >= duration { complete(at: date) }
@@ -6025,7 +6025,7 @@ struct TypingSession {
   private mutating func beginIfNeeded(at date: Date) {
     if startedAt == nil {
       startedAt = date
-      paceCaretProgress?.start(at: date, blind: configuration.rules.blindMode)
+      paceCaretProgress?.start(blind: configuration.rules.blindMode)
     }
   }
 
@@ -6657,7 +6657,7 @@ struct TypingSession {
     if kind == .insert, inputStopped { discardTerminalElementIfNeeded() }
     let field = replayInputField(kind: kind, inputStopped: inputStopped)
     if paceCaretProgress != nil, kind == .insert, !inputStopped, lastInputCommitsWord, let field {
-      paceCaretProgress?.advance(to: date, blind: configuration.rules.blindMode)
+      paceCaretProgress?.advance(blind: configuration.rules.blindMode)
       let correct = paceCommittedFieldIsCorrect(field)
       paceCaretProgress?.handleCommit(word: field.index, correct: correct,
         blind: configuration.rules.blindMode)

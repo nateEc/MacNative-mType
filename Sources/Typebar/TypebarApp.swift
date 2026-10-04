@@ -2969,8 +2969,8 @@ private struct ContentView: View {
       || session.configuration.usesRightToLeftPrompt
   }
 
-  private func paceCaretInterpolation(in rendering: PromptRendering, at date: Date) -> PromptPaceCaretInterpolation? {
-    guard let frame = session.paceCaretFrame(at: date) else { return nil }
+  private func paceCaretInterpolation(in rendering: PromptRendering) -> PromptPaceCaretInterpolation? {
+    guard let frame = session.paceCaretFrame() else { return nil }
     let from = session.paceCaretGlyphAnchor(for: frame.from)
     let target = session.paceCaretGlyphAnchor(for: frame.target)
     return .init(fromCharacterOffset: rendering.characterOffset(forGlyphAt: from?.glyphIndex),
@@ -2978,9 +2978,9 @@ private struct ContentView: View {
       fromAfter: from?.after ?? false, targetAfter: target?.after ?? false, fraction: frame.fraction)
   }
 
-  private func paceCaretFrameProvider(in rendering: PromptRendering) -> ((Date) -> PromptPaceCaretInterpolation?)? {
-    guard settings.paceCaretStyle.drawsMarker, session.paceCaretFrame(at: .now) != nil else { return nil }
-    return { date in paceCaretInterpolation(in: rendering, at: date) }
+  private func paceCaretFrameProvider(in rendering: PromptRendering) -> (() -> PromptPaceCaretInterpolation?)? {
+    guard settings.paceCaretStyle.drawsMarker, session.paceCaretFrame() != nil else { return nil }
+    return { paceCaretInterpolation(in: rendering) }
   }
 
   private var renderedPrompt: PromptRendering {
@@ -4153,7 +4153,7 @@ private struct ContentView: View {
   }
 
   private var paceGuideIndex: Int? {
-    guard let frame = session.paceCaretFrame(at: .now) else { return nil }
+    guard let frame = session.paceCaretFrame() else { return nil }
     return session.paceCaretGlyphIndex(for: frame.target)
   }
 

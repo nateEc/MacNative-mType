@@ -3,28 +3,34 @@ import XCTest
 
 final class PaceCaretProgressionTests: XCTestCase {
   private let start = Date(timeIntervalSince1970: 1_800_000_000)
+  private let clock = PaceCaretTestClock()
+
+  private func frame(_ session: TypingSession, at date: Date) -> PaceCaretFrame? {
+    clock.set(at: date)
+    return session.paceCaretFrame()
+  }
 
   func testFirstAnimationTargetsNextLetterImmediately() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "ab cd efg")
-    session.configurePace(wpm: 60)
+    session.configurePace(wpm: 60, clock: clock.source)
     session.beginComposition(at: start)
-    XCTAssertEqual(session.paceCaretFrame(at: start)?.target, .init(word: 0, letter: 1))
-    XCTAssertEqual(session.paceCaretFrame(at: start)?.from, .init(word: 0, letter: 0))
-    XCTAssertEqual(session.paceCaretFrame(at: start)?.fraction, 0)
+    XCTAssertEqual(frame(session, at: start)?.target, .init(word: 0, letter: 1))
+    XCTAssertEqual(frame(session, at: start)?.from, .init(word: 0, letter: 0))
+    XCTAssertEqual(frame(session, at: start)?.fraction, 0)
   }
 
   func testExhaustedPaceDoesNotStayPinnedToLastGlyph() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "ab")
-    session.configurePace(wpm: 60)
+    session.configurePace(wpm: 60, clock: clock.source)
     session.beginComposition(at: start)
-    XCTAssertNil(session.paceCaretFrame(at: start.addingTimeInterval(3)))
+    XCTAssertNil(frame(session, at: start.addingTimeInterval(3)))
   }
 
   func testWrongCommitMovesPaceByTheFullTargetIncludingCommit() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "ab cd efg")
-    session.configurePace(wpm: 60)
+    session.configurePace(wpm: 60, clock: clock.source)
     session.insertBatch("ax ", at: start)
-    let frame = session.paceCaretFrame(at: start.addingTimeInterval(0.2))
+    let frame = frame(session, at: start.addingTimeInterval(0.2))
     XCTAssertEqual(frame?.target, .init(word: 1, letter: 2))
     XCTAssertEqual(frame.flatMap { session.paceCaretGlyphIndex(for: $0.target) }, 5)
   }
@@ -56,14 +62,17 @@ final class PaceCaretProgressionTests: XCTestCase {
 
   func testActualBackspaceAndCorrectResubmissionUndoWrongWordOnce() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "ab cd efg")
-    session.configurePace(wpm: 60)
+    session.configurePace(wpm: 60, clock: clock.source)
     session.insertBatch("ax ", at: start)
+    clock.set(at: start.addingTimeInterval(0.2))
     session.tick(at: start.addingTimeInterval(0.2))
+    clock.set(at: start.addingTimeInterval(0.25))
     session.deleteBackward(at: start.addingTimeInterval(0.25))
     session.deleteBackward(at: start.addingTimeInterval(0.25))
+    clock.set(at: start.addingTimeInterval(0.3))
     session.insertBatch("b ", at: start.addingTimeInterval(0.3))
     XCTAssertEqual(session.typed, "ab ")
-    XCTAssertEqual(session.paceCaretFrame(at: start.addingTimeInterval(0.4))?.target, .init(word: 1, letter: 0))
+    XCTAssertEqual(frame(session, at: start.addingTimeInterval(0.4))?.target, .init(word: 1, letter: 0))
   }
 
   func testBlindDefersPendingCorrectionAndDoesNotRecordBlindCommits() {
@@ -103,35 +112,37 @@ final class PaceCaretProgressionTests: XCTestCase {
 
   func testChangingModeMidAttemptReinitializesWithoutRestartingOrRevivingOldSteps() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "ab cd efg")
-    session.configurePace(wpm: 60)
+    session.configurePace(wpm: 60, clock: clock.source)
     session.insertBatch("a", at: start)
-    XCTAssertNotNil(session.paceCaretFrame(at: start))
-    session.configurePace(wpm: 120)
+    XCTAssertNotNil(frame(session, at: start))
+    session.configurePace(wpm: 120, clock: clock.source)
     session.insertBatch("b", at: start.addingTimeInterval(0.1))
     session.tick(at: start.addingTimeInterval(0.2))
     XCTAssertEqual(session.typed, "ab")
     XCTAssertEqual(session.startedAt, start)
-    XCTAssertNil(session.paceCaretFrame(at: start.addingTimeInterval(0.2)))
+    XCTAssertNil(frame(session, at: start.addingTimeInterval(0.2)))
     var repeated = session.repeatedAttempt()
-    repeated.configurePace(wpm: 120)
+    repeated.configurePace(wpm: 120, clock: clock.source)
+    clock.set(at: start.addingTimeInterval(1))
     repeated.insertBatch("a", at: start.addingTimeInterval(1))
-    XCTAssertEqual(repeated.paceCaretFrame(at: start.addingTimeInterval(1))?.target, .init(word: 0, letter: 1))
+    XCTAssertEqual(frame(repeated, at: start.addingTimeInterval(1))?.target, .init(word: 0, letter: 1))
   }
 
   func testRejectedLeadingSpaceAndCompletedOrAbandonedAttemptsHaveNoFrame() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "ab cd")
-    session.configurePace(wpm: 60)
+    session.configurePace(wpm: 60, clock: clock.source)
     session.insertBatch(" ", at: start)
-    XCTAssertNil(session.paceCaretFrame(at: start))
+    XCTAssertNil(frame(session, at: start))
     session.insertBatch("a", at: start)
     session.abandon(at: start.addingTimeInterval(1))
-    XCTAssertNil(session.paceCaretFrame(at: start.addingTimeInterval(1)))
+    XCTAssertNil(frame(session, at: start.addingTimeInterval(1)))
+    clock.set(at: start)
     var completed = TypingSession(configuration: .timed(seconds: 1), prompt: "ab cd")
-    completed.configurePace(wpm: 60)
+    completed.configurePace(wpm: 60, clock: clock.source)
     completed.insertBatch("a", at: start)
     completed.tick(at: start.addingTimeInterval(1))
     XCTAssertTrue(completed.isFinished)
-    XCTAssertNil(completed.paceCaretFrame(at: start.addingTimeInterval(1)))
+    XCTAssertNil(frame(completed, at: start.addingTimeInterval(1)))
   }
 
   func testCatalogGrowthRetainsExistingStepsAndLargeTargetsFastForwardBoundedly() {
@@ -159,29 +170,31 @@ final class PaceCaretProgressionTests: XCTestCase {
     var noSpace = TestSessionFactory.make(configuration: .init(mode: .custom, duration: nil,
       wordLimit: nil, difficulty: .normal, rules: .init(), modifiers: [.noSpaces]),
       customText: "ab cd efg")
-    noSpace.configurePace(wpm: 60)
+    noSpace.configurePace(wpm: 60, clock: clock.source)
     noSpace.insertBatch("ax", at: start)
     XCTAssertEqual(noSpace.completedWordCount, 1)
-    XCTAssertEqual(noSpace.paceCaretFrame(at: start.addingTimeInterval(0.2))?.target, .init(word: 1, letter: 1))
+    XCTAssertEqual(frame(noSpace, at: start.addingTimeInterval(0.2))?.target, .init(word: 1, letter: 1))
+    clock.set(at: start)
     var newline = TypingSession(configuration: .timed(seconds: 30), prompt: "ab\ncd efg")
-    newline.configurePace(wpm: 60)
+    newline.configurePace(wpm: 60, clock: clock.source)
     newline.insertBatch("ax\n", at: start)
-    XCTAssertEqual(newline.paceCaretFrame(at: start.addingTimeInterval(0.2))?.target, .init(word: 1, letter: 2))
+    XCTAssertEqual(frame(newline, at: start.addingTimeInterval(0.2))?.target, .init(word: 1, letter: 2))
   }
 
   func testStoppedAndAutomaticallyDeletedCommitDoesNotAdjustPace() {
     for rules in [InputRules(stopOnErrorMode: .word), InputRules(deleteOnErrorMode: .letter)] {
+      clock.set(at: start)
       var session = TypingSession(configuration: .timed(seconds: 30, rules: rules), prompt: "ab cd efg")
-      session.configurePace(wpm: 60)
+      session.configurePace(wpm: 60, clock: clock.source)
       session.insertBatch("ax ", at: start)
-      XCTAssertEqual(session.paceCaretFrame(at: start.addingTimeInterval(0.2))?.target, .init(word: 0, letter: 2))
+      XCTAssertEqual(frame(session, at: start.addingTimeInterval(0.2))?.target, .init(word: 0, letter: 2))
     }
   }
 
   func testPaceDoesNotAlterSavedResultOrReplayFields() throws {
     var ordinary = TypingSession(configuration: .timed(seconds: 30), prompt: "ab cd efg")
     var paced = ordinary
-    paced.configurePace(wpm: 60)
+    paced.configurePace(wpm: 60, clock: clock.source)
     for text in ["ax ", "cd ", "ef"] {
       ordinary.insertBatch(text, at: start)
       paced.insertBatch(text, at: start)
@@ -193,7 +206,7 @@ final class PaceCaretProgressionTests: XCTestCase {
     XCTAssertEqual(new.characterStats, old.characterStats)
     XCTAssertEqual(new.preciseWpm, old.preciseWpm)
     XCTAssertEqual(new.preciseAccuracy, old.preciseAccuracy)
-    XCTAssertNil(paced.paceCaretFrame(at: start.addingTimeInterval(15)))
+    XCTAssertNil(frame(paced, at: start.addingTimeInterval(15)))
   }
 
   func testGlyphEndAnchorsDoNotJumpToTheNextLineOrDisappearOnTheFinalWord() {
@@ -227,8 +240,8 @@ final class PaceCaretProgressionTests: XCTestCase {
 
   func testForcedCorrectTextDoesNotBecomeAnUnqualifiedCorrectCommit() {
     var session = TypingSession(configuration: .timed(seconds: 30), prompt: "ab cd efg")
-    session.configurePace(wpm: 60)
+    session.configurePace(wpm: 60, clock: clock.source)
     session.insertBatch("ab ", forceError: true, at: start)
-    XCTAssertEqual(session.paceCaretFrame(at: start.addingTimeInterval(0.2))?.target, .init(word: 1, letter: 2))
+    XCTAssertEqual(frame(session, at: start.addingTimeInterval(0.2))?.target, .init(word: 1, letter: 2))
   }
 }

@@ -16,7 +16,7 @@ const local = id => path.join(root, 'frontend/src/ts', id);
 const resolve = (id, importer) => id.startsWith('.') ? path.resolve(path.dirname(importer), id) : id;
 const unexpected = label => () => { throw Error('Outside pace selection probe: ' + label); };
 let rows = [], activeTags = [], authenticated = true, repeat = false, observed, calls = [];
-const now = 1_800_000_000_000;
+let now = 1_800_000_000_000;
 const config = {mode: 'time', time: 30, words: 50, punctuation: false, numbers: false,
   language: 'english', difficulty: 'normal', lazyMode: false, funbox: [],
   paceCaret: 'last', paceCaretStyle: 'default', paceCaretCustomSpeed: 100};
@@ -266,6 +266,13 @@ await prepare(); active = false; const beforeInactive = moves.length;
 await deliver(1200); assert.equal(moves.length, beforeInactive); animationFixtures++;
 await prepare(); config.paceCaretCustomSpeed = 120;
 await deliver(1200); position(0, 2, 200); animationFixtures++;
+const wallBeforeJump = now;
+await prepare(); now += 3_600_000;
+await deliver(1250); position(0, 2, 150); animationFixtures++;
+now = wallBeforeJump;
+await prepare(); now -= 3_600_000;
+await deliver(1400); position(1, 0, 200); animationFixtures++;
+now = wallBeforeJump;
 pace.reset();
 assert.equal(execFileSync('git', ['-C', root, 'status', '--porcelain'], {encoding: 'utf8'}).trim(), '');
 console.log('pace source probe passed: ' + fixtures + ' selection and ' + animationFixtures

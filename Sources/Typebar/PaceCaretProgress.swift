@@ -1,5 +1,19 @@
 import Foundation
 
+/// A process-local time source, never a persisted or user-visible date.
+struct PaceCaretClock {
+  let now: () -> TimeInterval
+
+  static var system: Self {
+    let clock = SuspendingClock()
+    let origin = clock.now
+    return .init {
+      let duration = origin.duration(to: clock.now).components
+      return Double(duration.seconds) + Double(duration.attoseconds) / 1e18
+    }
+  }
+}
+
 struct PaceCaretPosition: Equatable {
   let word: Int
   let letter: Int
@@ -112,8 +126,9 @@ struct PaceCaretProgress {
   private(set) var catalog: PaceCaretCatalog
   let wpm: Double
   private let interval: TimeInterval
-  private var startedAt: Date?
-  private var observedAt: Date?
+  private let clock: PaceCaretClock
+  private var startedAt: TimeInterval?
+  private var observedAt: TimeInterval?
   private var processedSteps = 0.0
   private var currentStep = 0
   private var fromStep = 0
@@ -121,20 +136,22 @@ struct PaceCaretProgress {
   private var wrongWords = Set<Int>()
   private var exhausted = false
 
-  init?(wpm: Double, catalog: PaceCaretCatalog) {
+  init?(wpm: Double, catalog: PaceCaretCatalog, clock: PaceCaretClock = .system) {
     guard PaceGuidePolicy.validTarget(wpm) != nil, !catalog.words.isEmpty else { return nil }
     self.wpm = wpm
     interval = 12 / wpm
     self.catalog = catalog
+    self.clock = clock
   }
 
   mutating func append(_ text: String) { catalog.append(text) }
   mutating func appendWords(_ words: [String]) { catalog.appendWords(words) }
 
-  mutating func start(at date: Date, blind: Bool) {
-    guard startedAt == nil else { return }
-    startedAt = date
-    advance(to: date, blind: blind)
+  mutating func start(at time: TimeInterval? = nil, blind: Bool) {
+    let time = time ?? clock.now()
+    guard startedAt == nil, time.isFinite else { return }
+    startedAt = time
+    advance(to: time, blind: blind)
   }
 
   mutating func handleCommit(word: Int, correct: Bool, blind: Bool) {
@@ -145,14 +162,15 @@ struct PaceCaretProgress {
     } else if wrongWords.insert(word).inserted { correction += length }
   }
 
-  mutating func advance(to date: Date, blind: Bool) {
-    guard !exhausted, let startedAt, date.timeIntervalSince(startedAt).isFinite else { return }
-    let now = max(date, observedAt ?? startedAt)
+  mutating func advance(to time: TimeInterval? = nil, blind: Bool) {
+    let time = time ?? clock.now()
+    guard !exhausted, let startedAt, time.isFinite, (time - startedAt).isFinite else { return }
+    let now = max(time, observedAt ?? startedAt)
     observedAt = now
-    let elapsed = max(0, now.timeIntervalSince(startedAt))
+    let elapsed = max(0, now - startedAt)
     var due = floor(elapsed / interval) + 1
-    // Date rounds absolute deadlines to its representable clock precision.
-    if due.isFinite, now >= startedAt.addingTimeInterval(interval * due) { due += 1 }
+    // Compare absolute deadlines at the source clock's representable precision.
+    if due.isFinite, now >= startedAt + interval * due { due += 1 }
     guard due > processedSteps else { return }
     let total = catalog.steps.last!
     let delta = min(Double(total) + 2, due - processedSteps)
@@ -168,14 +186,14 @@ struct PaceCaretProgress {
     processedSteps = due
   }
 
-  func frame(at date: Date, blind: Bool) -> PaceCaretFrame? {
+  func frame(at time: TimeInterval? = nil, blind: Bool) -> PaceCaretFrame? {
     var projection = self
-    projection.advance(to: date, blind: blind)
+    projection.advance(to: time, blind: blind)
     guard !projection.exhausted, let startedAt, let observedAt = projection.observedAt else { return nil }
-    let stepStart = startedAt.addingTimeInterval(interval * (projection.processedSteps - 1))
-    let stepEnd = startedAt.addingTimeInterval(interval * projection.processedSteps)
-    let duration = stepEnd.timeIntervalSince(stepStart)
-    let fraction = duration > 0 ? min(1, max(0, observedAt.timeIntervalSince(stepStart) / duration)) : 1
+    let stepStart = startedAt + interval * (projection.processedSteps - 1)
+    let stepEnd = startedAt + interval * projection.processedSteps
+    let duration = stepEnd - stepStart
+    let fraction = duration > 0 ? min(1, max(0, (observedAt - stepStart) / duration)) : 1
     return .init(from: projection.catalog.position(at: projection.fromStep),
       target: projection.catalog.position(at: projection.currentStep), fraction: fraction)
   }
