@@ -166,9 +166,20 @@ public struct ResultSubmissionResponse: Content, Equatable {
     public let accepted: Bool
     public let leaderboardEligible: Bool
     public let dailyLeaderboardRank: Int?
-    public let experienceGained: Int
+    public let experienceGained: Double
     public let totalExperience: Int
     public let weeklyExperienceRank: Int?
+    public let dailyXpBonus: Bool?
+    public let xpBreakdown: [String: Double]?
+
+    public init(id: UUID, accepted: Bool, leaderboardEligible: Bool, dailyLeaderboardRank: Int?,
+        experienceGained: Double, totalExperience: Int, weeklyExperienceRank: Int?,
+        dailyXpBonus: Bool? = nil, xpBreakdown: [String: Double]? = nil) {
+        self.id = id; self.accepted = accepted; self.leaderboardEligible = leaderboardEligible
+        self.dailyLeaderboardRank = dailyLeaderboardRank; self.experienceGained = experienceGained
+        self.totalExperience = totalExperience; self.weeklyExperienceRank = weeklyExperienceRank
+        self.dailyXpBonus = dailyXpBonus; self.xpBreakdown = xpBreakdown
+    }
 }
 
 /// A compact, account-scoped view of a submitted result. It deliberately
@@ -464,7 +475,7 @@ public struct ExperienceLeaderboardEntry: Content, Equatable, Identifiable {
     public let rank: Int
     public let userID: UUID
     public let displayName: String
-    public let totalExperience: Int
+    public let totalExperience: Double
     public let selectedBadge: PublicProfileBadge?
     public let discordAvatar: PublicDiscordAvatarResponse?
 }

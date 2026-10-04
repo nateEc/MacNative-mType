@@ -5570,8 +5570,8 @@ final class HealthRouteTests: XCTestCase {
     let aliceResponse = try await store.submitResult(
       aliceRequest, accessToken: alice.accessToken, now: now)
     XCTAssertEqual(
-      aliceResponse.experienceGained, TypebarExperiencePolicy.points(for: aliceRequest))
-    XCTAssertEqual(aliceResponse.totalExperience, aliceResponse.experienceGained)
+      aliceResponse.experienceGained, Double(TypebarExperiencePolicy.points(for: aliceRequest)))
+    XCTAssertEqual(Double(aliceResponse.totalExperience), aliceResponse.experienceGained)
     XCTAssertEqual(aliceResponse.weeklyExperienceRank, 1)
 
     let duplicate = try await store.submitResult(
@@ -5585,7 +5585,7 @@ final class HealthRouteTests: XCTestCase {
     XCTAssertEqual(weekly.entries.map(\.displayName), ["XP Alice", "XP Bob"])
     XCTAssertEqual(
       weekly.entries.map(\.totalExperience),
-      [aliceResponse.totalExperience, TypebarExperiencePolicy.points(for: bobRequest)])
+      [Double(aliceResponse.totalExperience), Double(TypebarExperiencePolicy.points(for: bobRequest))])
     let bobRank = try await store.experienceLeaderboardRank(accessToken: bob.accessToken, now: now)
     XCTAssertEqual(bobRank.entry?.rank, 2)
 

@@ -1048,13 +1048,15 @@ struct RemoteResultSubmissionResponse: Codable, Sendable {
     let accepted: Bool
     let leaderboardEligible: Bool
     let dailyLeaderboardRank: Int?
-    let experienceGained: Int
+    let experienceGained: Double
     let totalExperience: Int
     let weeklyExperienceRank: Int?
+    let dailyXpBonus: Bool?
+    let xpBreakdown: [String: Double]?
 
     private enum CodingKeys: String, CodingKey {
         case id, accepted, leaderboardEligible, dailyLeaderboardRank
-        case experienceGained, totalExperience, weeklyExperienceRank
+        case experienceGained, totalExperience, weeklyExperienceRank, dailyXpBonus, xpBreakdown
     }
 
     init(from decoder: Decoder) throws {
@@ -1063,9 +1065,17 @@ struct RemoteResultSubmissionResponse: Codable, Sendable {
         accepted = try values.decode(Bool.self, forKey: .accepted)
         leaderboardEligible = try values.decode(Bool.self, forKey: .leaderboardEligible)
         dailyLeaderboardRank = try values.decodeIfPresent(Int.self, forKey: .dailyLeaderboardRank)
-        experienceGained = try values.decodeIfPresent(Int.self, forKey: .experienceGained) ?? 0
+        experienceGained = try values.decodeIfPresent(Double.self, forKey: .experienceGained) ?? 0
         totalExperience = try values.decodeIfPresent(Int.self, forKey: .totalExperience) ?? 0
         weeklyExperienceRank = try values.decodeIfPresent(Int.self, forKey: .weeklyExperienceRank)
+        dailyXpBonus = try values.decodeIfPresent(Bool.self, forKey: .dailyXpBonus)
+        xpBreakdown = try values.decodeIfPresent([String: Double].self, forKey: .xpBreakdown)
+        guard experienceGained.isFinite, (0...9_007_199_254_740_991).contains(experienceGained),
+            totalExperience >= 0,
+            xpBreakdown?.values.allSatisfy(\.isFinite) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .experienceGained, in: values,
+                debugDescription: "Reward values must be finite and nonnegative")
+        }
     }
 }
 
@@ -1202,9 +1212,27 @@ struct RemoteExperienceLeaderboardEntry: Codable, Identifiable, Sendable {
     let rank: Int
     let userID: UUID
     let displayName: String
-    let totalExperience: Int
+    let totalExperience: Double
     let selectedBadge: RemotePublicProfileBadge?
     let discordAvatar: RemoteDiscordAvatar?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, rank, userID, displayName, totalExperience, selectedBadge, discordAvatar
+    }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        rank = try values.decode(Int.self, forKey: .rank)
+        userID = try values.decode(UUID.self, forKey: .userID)
+        displayName = try values.decode(String.self, forKey: .displayName)
+        totalExperience = try values.decode(Double.self, forKey: .totalExperience)
+        selectedBadge = try values.decodeIfPresent(RemotePublicProfileBadge.self, forKey: .selectedBadge)
+        discordAvatar = try values.decodeIfPresent(RemoteDiscordAvatar.self, forKey: .discordAvatar)
+        guard totalExperience.isFinite, (0...9_007_199_254_740_991).contains(totalExperience) else {
+            throw DecodingError.dataCorruptedError(forKey: .totalExperience, in: values,
+                debugDescription: "Weekly rewards require a finite nonnegative value")
+        }
+    }
 }
 
 struct RemoteExperienceLeaderboardPage: Codable, Sendable {

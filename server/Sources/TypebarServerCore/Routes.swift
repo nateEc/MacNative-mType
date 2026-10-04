@@ -41,7 +41,8 @@ public func configure(
             from: Environment.get("TYPEBAR_LEADERBOARD_MIN_PRACTICE_SECONDS"))
         resolvedAuthStore = try AuthStore(
             fileURL: TypebarServerStorage.defaultUserStoreURL(for: app),
-            minimumLeaderboardTypingSeconds: minimumPracticeSeconds)
+            minimumLeaderboardTypingSeconds: minimumPracticeSeconds,
+            experienceConfiguration: try .fromJSON(Environment.get("TYPEBAR_XP_CONFIGURATION")))
     }
     let authStore = resolvedAuthStore
     app.middleware.use(TypebarMaintenanceMiddleware(isEnabled: maintenanceMode))
@@ -72,6 +73,7 @@ public func configure(
                 "resultPracticeTiming": .available,
                 "resultIncompletePractice": .available,
                 "resultExperienceEvidence": .available,
+                "resultExperienceAwards": .available,
                 "resultInputMetrics": .available,
                 "resultInputMetricsV2": .available,
                 "resultTerminalTiming": .available,

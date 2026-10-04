@@ -33,7 +33,9 @@ final class ExperienceEvidenceSubmissionTests: XCTestCase {
     XCTAssertThrowsError(try decode(json))
   }
   func testAcceptedHistoryRetainsAnonymousTerminalEvidenceWithoutChangingXP() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    // Preserve the pre-cutover transport contract explicitly; production XP
+    // is tested separately by ExperienceAwardLifecycleTests.
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, experienceConfiguration: nil)
     let owner = try await store.register(.init(email: "xp-evidence@example.com",
       password: "a secure password", displayName: "XP Evidence"), now: now)
     let json = try payload(), request = try decode(json)
@@ -164,7 +166,7 @@ final class ExperienceEvidenceSubmissionTests: XCTestCase {
   func testDiskReloadFirstSnapshotAndGenuineLegacyArePreserved() async throws {
     let file = FileManager.default.temporaryDirectory.appendingPathComponent("typebar-xp-evidence-\(UUID()).json")
     defer { try? FileManager.default.removeItem(at: file) }
-    let store = try AuthStore(fileURL: file, bcryptCost: 4)
+    let store = try AuthStore(fileURL: file, bcryptCost: 4, experienceConfiguration: nil)
     let owner = try await store.register(.init(email: "xp-evidence-disk@example.com",
       password: "a secure password", displayName: "Disk"), now: now)
     let json = try payload(), request = try decode(json)
@@ -174,7 +176,7 @@ final class ExperienceEvidenceSubmissionTests: XCTestCase {
     _ = try await store.submitResult(decode(duplicate), accessToken: owner.accessToken, now: now)
     var old = try payload(); old.removeValue(forKey: "experienceEvidence")
     _ = try await store.submitResult(decode(old), accessToken: owner.accessToken, now: now)
-    let reloaded = try AuthStore(fileURL: file, bcryptCost: 4)
+    let reloaded = try AuthStore(fileURL: file, bcryptCost: 4, experienceConfiguration: nil)
     let page = try await reloaded.results(.init(), credential: .accessToken(owner.accessToken), now: now)
     XCTAssertEqual(page.total, 2)
     XCTAssertEqual(page.results.first { $0.id == request.id }?.experienceEvidence, request.experienceEvidence)
@@ -240,7 +242,7 @@ final class ExperienceEvidenceSubmissionTests: XCTestCase {
   }
 
   func testPrivateOwnerIsolationAndConcurrentDuplicatesKeepOneSnapshot() async throws {
-    let store = try AuthStore(fileURL: nil, bcryptCost: 4)
+    let store = try AuthStore(fileURL: nil, bcryptCost: 4, experienceConfiguration: nil)
     let owner = try await store.register(.init(email: "xp-evidence-owner@example.com",
       password: "a secure password", displayName: "Owner"), now: now)
     let request = try decode(payload()), instant = now

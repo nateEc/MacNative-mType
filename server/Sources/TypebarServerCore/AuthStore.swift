@@ -663,6 +663,8 @@ public actor AuthStore {
     var reauthenticationTokens: [StoredReauthenticationToken] = []
     var syncRecords: [StoredSyncRecord] = []
     var results: [StoredResult] = []
+    // Missing means a pre-ledger file; explicit null is corruption, not a migration.
+    var experienceAwards: [ExperienceAwardRecord]? = []
     var leaderboardRankMemories: [StoredLeaderboardRankMemory] = []
     var connections: [StoredConnection] = []
     var blockedUserIDs: [UUID: [UUID]] = [:]
@@ -678,7 +680,7 @@ public actor AuthStore {
     var nextSyncCursor = 0
 
     private enum CodingKeys: String, CodingKey {
-      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
+      case users, sessions, developerAccessKeys, passwordResetTokens, emailVerificationTokens, oauthIdentities, oauthTransactions, reauthenticationTokens, syncRecords, results, experienceAwards, leaderboardRankMemories, connections, blockedUserIDs, streakDayBoundaryOffsets, personalBestResetDates, quoteSubmissions,
         quoteRatings, notifications, profileReports, quoteReports, directMessages, announcements,
         nextSyncCursor
     }
@@ -703,6 +705,8 @@ public actor AuthStore {
         try values.decodeIfPresent([StoredReauthenticationToken].self, forKey: .reauthenticationTokens) ?? []
       syncRecords = try values.decodeIfPresent([StoredSyncRecord].self, forKey: .syncRecords) ?? []
       results = try values.decodeIfPresent([StoredResult].self, forKey: .results) ?? []
+      experienceAwards = values.contains(.experienceAwards)
+        ? try values.decode([ExperienceAwardRecord].self, forKey: .experienceAwards) : nil
       leaderboardRankMemories = try values.decodeIfPresent(
         [StoredLeaderboardRankMemory].self, forKey: .leaderboardRankMemories) ?? []
       connections = try values.decodeIfPresent([StoredConnection].self, forKey: .connections) ?? []
@@ -1034,6 +1038,14 @@ public actor AuthStore {
       }
       errorCount = try values.decode(Int.self, forKey: .errorCount)
       eventCount = try values.decode(Int.self, forKey: .eventCount)
+      guard (0...500).contains(rawWpm), (0...420).contains(wpm), (0...100).contains(accuracy),
+        (0...1_800_000).contains(eventCount), (0...eventCount).contains(errorCount),
+        // BailOut supports zero (infinite) and safe large configuration limits;
+        // the measured duration is bounded separately, not the requested limit.
+        durationSeconds.map({ (0...9_007_199_254_740_991).contains($0) }) ?? true else {
+        throw DecodingError.dataCorruptedError(forKey: .rawWpm, in: values,
+          debugDescription: "Stored legacy scoring inputs must retain bounded arithmetic")
+      }
       tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
       practiceTiming = try values.decodeIfPresent(ResultPracticeTiming.self, forKey: .practiceTiming)
       incompletePractice = values.contains(.incompletePractice)
@@ -1254,9 +1266,11 @@ public actor AuthStore {
   private let fileURL: URL?
   private let bcryptCost: Int
   private let minimumLeaderboardTypingSeconds: Int
+  private let experienceConfiguration: ExperienceCalculationConfiguration?
 
   public init(
-    fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0
+    fileURL: URL?, bcryptCost: Int = 12, minimumLeaderboardTypingSeconds: Int = 0,
+    experienceConfiguration: ExperienceCalculationConfiguration? = .typebarDefault
   ) throws {
     guard (0...TypebarLeaderboardEligibilityPolicy.maximumMinimumPracticeSeconds).contains(
       minimumLeaderboardTypingSeconds)
@@ -1264,6 +1278,8 @@ public actor AuthStore {
     self.fileURL = fileURL
     self.bcryptCost = bcryptCost
     self.minimumLeaderboardTypingSeconds = minimumLeaderboardTypingSeconds
+    try experienceConfiguration?.validateForProduction()
+    self.experienceConfiguration = experienceConfiguration
     guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
       state = .init()
       committedState = state
@@ -1272,6 +1288,50 @@ public actor AuthStore {
     state = try JSONDecoder.server.decode(PersistedState.self, from: Data(contentsOf: fileURL))
     state.notifications = Self.cappedNotifications(state.notifications)
     committedState = state
+    try Self.initializeExperienceAwards(state: &state)
+    committedState = state
+  }
+
+  private static func initializeExperienceAwards(state: inout PersistedState) throws {
+    if state.experienceAwards == nil {
+      // Snapshot the historical formula only. Never apply today's configuration
+      // to old reports, infer deleted records, or write on a read-only load.
+      state.experienceAwards = state.results.map {
+        .legacy(userID: $0.userID, request: Self.resultRequest(from: $0), acceptedAt: $0.acceptedAt)
+      }
+    }
+    let users = Set(state.users.map(\.id))
+    var keys = Set<String>(), credits: [UUID: Double] = [:], rewards: [UUID: Double] = [:]
+    do {
+      for entry in state.experienceAwards! {
+        try entry.validate()
+        guard users.contains(entry.userID), keys.insert("\(entry.userID)/\(entry.resultID)").inserted else {
+          throw ExperienceCalculationError.invalidInput
+        }
+        credits[entry.userID, default: 0] += Double(entry.accountCredit)
+        rewards[entry.userID, default: 0] += entry.award.xp
+        guard credits[entry.userID]! <= 9_007_199_254_740_991,
+          rewards[entry.userID]! <= 9_007_199_254_740_991 else {
+          throw ExperienceCalculationError.unsafeArithmetic
+        }
+      }
+      let entriesByKey = Dictionary(uniqueKeysWithValues: state.experienceAwards!.map {
+        ("\($0.userID)/\($0.resultID)", $0)
+      })
+      for result in state.results {
+        guard let entry = entriesByKey["\(result.userID)/\(result.id)"] else {
+          throw ExperienceCalculationError.invalidInput
+        }
+        if let input = entry.input,
+          try ExperienceEvidenceAdapter.input(for: Self.resultRequest(from: result)) != input {
+          throw ExperienceCalculationError.invalidInput
+        }
+      }
+    } catch {
+      throw DecodingError.dataCorrupted(.init(codingPath: [],
+        debugDescription: "Experience award ledger is inconsistent; original file is not modified",
+        underlyingError: error))
+    }
   }
 
   private static func cappedNotifications(_ notifications: [StoredNotification])
@@ -2097,6 +2157,7 @@ public actor AuthStore {
       filtered[pair.key] = pair.value.filter { $0 != userID }
     }
     state.streakDayBoundaryOffsets.removeValue(forKey: userID)
+    state.experienceAwards?.removeAll { $0.userID == userID }
     state.personalBestResetDates.removeValue(forKey: userID)
     try persist()
   }
@@ -2135,6 +2196,7 @@ public actor AuthStore {
     state.developerAccessKeys.removeAll { $0.userID == user.id }
     state.syncRecords.removeAll { $0.userID == user.id }
     state.results.removeAll { $0.userID == user.id }
+    state.experienceAwards?.removeAll { $0.userID == user.id }
     state.leaderboardRankMemories.removeAll { $0.userID == user.id }
     state.notifications.removeAll { $0.recipientID == user.id }
     state.personalBestResetDates.removeValue(forKey: user.id)
@@ -3203,11 +3265,15 @@ public actor AuthStore {
     }
   }
 
-  private func experience(
+  private func experience(for userID: UUID) -> Int {
+    state.experienceAwards!.filter { $0.userID == userID }.reduce(0) { $0 + $1.accountCredit }
+  }
+
+  private func weeklyExperience(
     for userID: UUID, since: Date? = nil, before: Date? = nil,
     acceptedOnOrAfter rollingLeaderboardResumedAt: Date? = nil
-  ) -> Int {
-    state.results
+  ) -> Double {
+    state.experienceAwards!
       .filter {
         $0.userID == userID
           && (since == nil || $0.finishedAt >= since!)
@@ -3216,11 +3282,51 @@ public actor AuthStore {
             || $0.acceptedAt.map { $0 >= rollingLeaderboardResumedAt! } == true)
       }
       .reduce(0) { total, record in
-        total + TypebarExperiencePolicy.points(for: resultRequest(from: record))
+        total + record.award.xp
       }
   }
 
-  private func resultRequest(from record: StoredResult) -> ResultSubmissionRequest {
+  private func prepareExperienceAward(for request: ResultSubmissionRequest, userID: UUID,
+    now: Date) throws -> ExperienceAwardRecord {
+    let record: ExperienceAwardRecord
+    if let configuration = experienceConfiguration, request.experienceEvidence != nil {
+      let input = try ExperienceEvidenceAdapter.input(for: request)
+      let milliseconds = (now.timeIntervalSince1970.rounded(.down)) * 1_000
+      let previous = state.results.filter { $0.userID == userID }.map {
+        ($0.acceptedAt ?? $0.finishedAt).timeIntervalSince1970.rounded(.down) * 1_000
+      }.max()
+      let offset = (state.streakDayBoundaryOffsets[userID] ?? 0) * 3_600_000
+      func day(_ value: Double) -> Double {
+        value - (value - offset).truncatingRemainder(dividingBy: 86_400_000)
+      }
+      var days = Set(state.experienceAwards!.filter { $0.userID == userID }.map {
+        day(($0.acceptedAt ?? $0.finishedAt).timeIntervalSince1970 * 1_000)
+      })
+      days.insert(day(milliseconds))
+      var cursor = day(milliseconds), streak = 0.0
+      while days.contains(cursor) { streak += 1; cursor -= 86_400_000 }
+      let context = ExperienceCalculationContext(previousResultMilliseconds: previous,
+        nowMilliseconds: milliseconds, currentTotalXP: Double(experience(for: userID)), streakDays: streak)
+      let award = try SourceStyleExperienceCalculator.calculate(input,
+        configuration: configuration, context: context)
+      record = .init(version: 1, userID: userID, resultID: request.id,
+        finishedAt: Date(timeIntervalSince1970: milliseconds / 1_000), acceptedAt: now,
+        award: award, accountCredit: try ExperienceAwardRecord.sourceAccountCredit(award.xp),
+        input: input, configuration: configuration, context: context)
+    } else {
+      // An absent complete report stays legacy; never infer missing counters.
+      record = .legacy(userID: userID, request: request, acceptedAt: now)
+    }
+    try record.validate()
+    let allAwards = state.experienceAwards!.filter { $0.userID == userID }.reduce(0.0) { $0 + $1.award.xp }
+    guard Double(experience(for: userID)) + Double(record.accountCredit) <= 9_007_199_254_740_991,
+      allAwards + record.award.xp <= 9_007_199_254_740_991 else {
+      throw ExperienceCalculationError.unsafeArithmetic
+    }
+    return record
+  }
+
+  private static func resultRequest(from record: StoredResult) -> ResultSubmissionRequest {
     .init(
       id: record.id, mode: record.mode, language: record.language,
       durationSeconds: record.durationSeconds, wordLimit: record.wordLimit, wpm: record.wpm,
@@ -3241,6 +3347,9 @@ public actor AuthStore {
     for request: ResultSubmissionRequest, userID: UUID, now: Date
   ) throws -> ResultSubmissionResponse {
     let user = state.users.first(where: { $0.id == userID })!
+    guard let reward = state.experienceAwards!.first(where: { $0.userID == userID && $0.resultID == request.id }) else {
+      throw ResultStoreError.invalidResult
+    }
     let isLeaderboardEligible = !user.leaderboardOptedOut
       && leaderboardEligibility(for: user).isEligible
     let weeklyEntries = experienceLeaderboardEntries(now: now)
@@ -3261,11 +3370,13 @@ public actor AuthStore {
       accepted: true,
       leaderboardEligible: isSpeedEligible,
       dailyLeaderboardRank: dailyRank,
-      experienceGained: TypebarExperiencePolicy.points(for: request),
+      experienceGained: reward.award.xp,
       totalExperience: experience(for: userID),
       weeklyExperienceRank: isLeaderboardEligible
         ? weeklyEntries.first(where: { $0.userID == userID })?.rank
-        : nil
+        : nil,
+      dailyXpBonus: reward.input == nil ? nil : reward.award.dailyBonus ?? false,
+      xpBreakdown: reward.input == nil ? nil : reward.award.breakdown ?? [:]
     )
   }
 
@@ -3362,8 +3473,12 @@ public actor AuthStore {
     let tags = try validatedResultTags(request.tags)
     if let existing = state.results.first(where: { $0.userID == user.id && $0.id == request.id }) {
       return try resultSubmissionResponse(
-        for: resultRequest(from: existing), userID: user.id, now: now)
+        for: Self.resultRequest(from: existing), userID: user.id, now: now)
     }
+    if state.experienceAwards!.contains(where: { $0.userID == user.id && $0.resultID == request.id }) {
+      return try resultSubmissionResponse(for: request, userID: user.id, now: now)
+    }
+    let reward = try prepareExperienceAward(for: request, userID: user.id, now: now)
     let existingBadgeIDs = Set(availablePublicBadges(for: user.id).map(\.id))
     state.results.append(
       .init(
@@ -3386,6 +3501,7 @@ public actor AuthStore {
       throw AuthStoreError.invalidAccessToken
     }
     state.users[userIndex].startedTestCount += request.restartCount + 1
+    state.experienceAwards!.append(reward)
     for badge in availablePublicBadges(for: user.id) where !existingBadgeIDs.contains(badge.id) {
       appendNotification(
         .init(
@@ -3675,12 +3791,12 @@ public actor AuthStore {
       upperBound = currentWeekStart
     }
     let typingSecondsByUser = totalTypingSecondsByUser()
-    return state.users.compactMap { user -> (StoredUser, Int)? in
+    return state.users.compactMap { user -> (StoredUser, Double)? in
       guard !user.leaderboardOptedOut,
         leaderboardEligibility(for: user, typingSeconds: typingSecondsByUser[user.id] ?? 0).isEligible,
         eligibleUserIDs == nil || eligibleUserIDs!.contains(user.id)
       else { return nil }
-      let weeklyPoints = experience(
+      let weeklyPoints = weeklyExperience(
         for: user.id, since: lowerBound, before: upperBound,
         acceptedOnOrAfter: user.rollingLeaderboardResumedAt)
       return weeklyPoints > 0 ? (user, weeklyPoints) : nil

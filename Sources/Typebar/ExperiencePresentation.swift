@@ -1,10 +1,20 @@
 import Foundation
 
 enum ExperiencePresentation {
-  /// Keeps leaderboard values compact while preserving the stored XP integer unchanged.
   static func compact(_ experience: Int) -> String {
-    let magnitude = abs(Double(experience))
-    guard magnitude >= 1_000 else { return "\(experience)" }
+    compact(Double(experience))
+  }
+
+  /// Fractional receipt/weekly values remain distinct from integral lifetime credit.
+  static func compact(_ experience: Double) -> String {
+    guard experience.isFinite else { return "—" }
+    let magnitude = abs(experience)
+    guard magnitude >= 1_000 else {
+      if experience.rounded(.towardZero) == experience {
+        return String(format: "%.0f", locale: Locale(identifier: "en_US_POSIX"), experience)
+      }
+      return String(experience)
+    }
 
     let suffixes = ["", "k", "m", "b", "t", "q", "Q"]
     var scaled = magnitude

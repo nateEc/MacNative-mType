@@ -1,8 +1,7 @@
 import Foundation
 
-// An isolated calculation contract, not a replacement for existing account XP.
-// Inputs contain counts and seconds only; catalog resolution and authoritative
-// account context must happen before a future service adapter calls this module.
+// Version-one reward arithmetic. Production resolves the catalog and account
+// context before calling this module; historical rewards keep their snapshots.
 struct ExperienceIncompleteAttempt: Codable, Equatable, Sendable {
   let accuracy: Double
   let seconds: Double
@@ -21,7 +20,7 @@ struct ExperienceCalculationInput: Codable, Equatable, Sendable {
   let incompleteAttempts: [ExperienceIncompleteAttempt]?
 }
 
-struct ExperienceCalculationConfiguration: Codable, Equatable, Sendable {
+public struct ExperienceCalculationConfiguration: Codable, Equatable, Sendable {
   let enabled: Bool
   let gainMultiplier: Double
   let funboxBonus: Double
@@ -30,6 +29,34 @@ struct ExperienceCalculationConfiguration: Codable, Equatable, Sendable {
   let streakEnabled: Bool
   let maximumStreakDays: Double
   let maximumStreakMultiplier: Double
+
+  public init(enabled: Bool, gainMultiplier: Double, funboxBonus: Double,
+    minimumDailyBonus: Double, maximumDailyBonus: Double, streakEnabled: Bool,
+    maximumStreakDays: Double, maximumStreakMultiplier: Double) {
+    self.enabled = enabled; self.gainMultiplier = gainMultiplier; self.funboxBonus = funboxBonus
+    self.minimumDailyBonus = minimumDailyBonus; self.maximumDailyBonus = maximumDailyBonus
+    self.streakEnabled = streakEnabled; self.maximumStreakDays = maximumStreakDays
+    self.maximumStreakMultiplier = maximumStreakMultiplier
+  }
+
+  /// An explicit Typebar deployment choice, NOT Monkeytype's live configuration.
+  public static let typebarDefault = Self(enabled: true, gainMultiplier: 1, funboxBonus: 0,
+    minimumDailyBonus: 0, maximumDailyBonus: 0, streakEnabled: false,
+    maximumStreakDays: 0, maximumStreakMultiplier: 0)
+
+  public static func fromJSON(_ json: String?) throws -> Self {
+    let configuration = try json.map { try JSONDecoder().decode(Self.self, from: Data($0.utf8)) }
+      ?? .typebarDefault
+    try configuration.validateForProduction()
+    return configuration
+  }
+
+  func validateForProduction() throws {
+    guard [gainMultiplier, funboxBonus, minimumDailyBonus, maximumDailyBonus,
+      maximumStreakDays, maximumStreakMultiplier].allSatisfy({ $0.isFinite && $0 >= 0
+        && $0 <= 9_007_199_254_740_991 }), minimumDailyBonus <= maximumDailyBonus
+    else { throw ExperienceCalculationError.invalidConfiguration }
+  }
 }
 
 struct ExperienceCalculationContext: Codable, Equatable, Sendable {
