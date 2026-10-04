@@ -7,8 +7,11 @@ public enum WeeklyExperienceCacheError: Error, Equatable {
 public struct WeeklyExperienceLeaderboardConfiguration: Codable, Equatable, Sendable {
   public let enabled: Bool
   public let expirationTimeInDays: Double
-  public init(enabled: Bool, expirationTimeInDays: Double) {
+  public let xpRewardBrackets: [WeeklyExperienceRewardBracket]
+  public init(enabled: Bool, expirationTimeInDays: Double,
+    xpRewardBrackets: [WeeklyExperienceRewardBracket] = []) {
     self.enabled = enabled; self.expirationTimeInDays = expirationTimeInDays
+    self.xpRewardBrackets = xpRewardBrackets
   }
   /// A Typebar deployment default, not Monkeytype's live configuration.
   public static let typebarDefault = Self(enabled:true,expirationTimeInDays:15)
@@ -17,6 +20,7 @@ public struct WeeklyExperienceLeaderboardConfiguration: Codable, Equatable, Send
     try value.validate(); return value
   }
   func validate() throws {
+    for bracket in xpRewardBrackets { try bracket.validate() }
     guard expirationTimeInDays.isFinite, expirationTimeInDays >= 0,
       expirationTimeInDays <= 9_007_199_254_740_991 / Double(WeeklyExperiencePartition.day)
     else { throw WeeklyExperienceCacheError.invalidConfiguration }
@@ -28,6 +32,17 @@ public struct WeeklyExperienceLeaderboardConfiguration: Codable, Equatable, Send
       throw WeeklyExperienceCacheError.invalidConfiguration
     }
     return Int(floor(milliseconds / 1_000)) * 1_000
+  }
+}
+
+extension WeeklyExperienceLeaderboardConfiguration {
+  private enum CodingKeys: String, CodingKey { case enabled, expirationTimeInDays, xpRewardBrackets }
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy:CodingKeys.self)
+    self.init(enabled:try values.decode(Bool.self,forKey:.enabled),
+      expirationTimeInDays:try values.decode(Double.self,forKey:.expirationTimeInDays),
+      xpRewardBrackets:values.contains(.xpRewardBrackets)
+        ? try values.decode([WeeklyExperienceRewardBracket].self,forKey:.xpRewardBrackets) : [])
   }
 }
 

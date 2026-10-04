@@ -1,5 +1,7 @@
 # 服务端契约 v1（草案）
 
+2026-10-05 最新 [周 XP 结算准备合同](WEEKLY_XP_SETTLEMENT_CONTRACT.md)：TYPEBAR_WEEKLY_XP_CONFIGURATION 新增可选 xpRewardBrackets；旧缺字段为空，新首次配置快照保留档位，不重算旧奖励。仅有调度描述和候选计算，没有新 HTTP 路由、运行任务、邮件持久化或领取，能力不冒报；未来结算须采用当时配置而非投稿快照。原生格式不改，旧 writer 禁止混写；完整功能仍未完成。下方为历史阶段。
+
 2026-10-05 最新 [周 XP metadata 合同](WEEKLY_XP_METADATA_CONTRACT.md)：四个列表／名次响应添加可选 timeTypedSeconds 与 lastActivityTimestamp，缺失表示未知；新缓存投稿保存 version=1 资料快照。读榜不刷新徽章／头像，当前头像隐私及解除绑定仍立即隐藏；混合旧来源不发布部分全周时长。旧 writer 禁止混写，完整备份恢复；premium、真实渲染与整体等价仍开放。下方为历史阶段。
 
 2026-10-05 最新 [周 XP 缓存合同](WEEKLY_XP_CACHE_CONTRACT.md)：服务内部新增可选 version=1 缓存与首次回执，托管奖励不再从终身账本补入榜单；TYPEBAR_WEEKLY_XP_CONFIGURATION 控制启用及保留。禁用时四个周 XP 列表／名次端点为明确 404，成绩接受和账户 XP 不停；重设 TTL 与 purge 按固定源码，旧缺来源不回填。原生协议／归档不改，单 writer／完整备份，metadata、队列和严格隐私差异仍开放；下方为历史阶段。
