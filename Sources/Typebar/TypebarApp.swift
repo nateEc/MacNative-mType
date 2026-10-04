@@ -1400,6 +1400,11 @@ private struct ContentView: View {
           }
           publicationState = .notice((updatedLongTextProgress ? "长文本进度已保存；" : "")
             + "本次已中止：\(reason)，不会同步或发布；当前练习时间仍会显示。")
+        } else if let reason = eligibility.invalidReason {
+          publicationResultID = nil
+          publicationState = .notice(reason == .inactivity
+            ? "检测到结束前持续闲置；本次结果只在当前窗口显示，不会保存、本机统计、同步或发布。"
+            : "本次结果无效（\(reason.resultSummary)）；结果只在当前窗口显示，不会写入本机历史、同步或发布。")
         } else if result.outcome == .invalidAFK {
           publicationResultID = nil
           publicationState = .notice(
@@ -1408,10 +1413,6 @@ private struct ContentView: View {
           publicationResultID = nil
           publicationState = .notice(
             (failureReason?.resultSummary ?? "本次测试失败") + "；结果只在当前窗口显示，不会保存、本机统计、同步或发布。")
-        } else if case .ineligible(let reason) = eligibility {
-          publicationResultID = nil
-          publicationState = .notice(
-            "本次结果无效（\(reason.resultSummary)）；结果只在当前窗口显示，不会写入本机历史、同步或发布。")
         } else {
           publicationResultID = nil
           publicationState = .notice("练习模式：本次成绩不会保存、本机统计、同步或发布。")
@@ -3338,7 +3339,7 @@ private struct ContentView: View {
     HStack {
       Text(
         session.isFinished
-          ? session.outcome.statusText(saveState: localResultSaveState)
+          ? session.outcome.statusText(saveState: localResultSaveState, eligibility: completedResult?.eligibility)
           : restartInstruction
       )
         .foregroundStyle(.secondary)
@@ -5547,8 +5548,13 @@ private extension TestFailureReason {
 }
 
 extension TestOutcome {
-  func statusText(saveState: LocalResultSaveState) -> String {
-    switch self {
+  func statusText(saveState: LocalResultSaveState, eligibility: ResultEligibility? = nil) -> String {
+    if self != .bailedOut, ResultPresentationPolicy.shouldPresent(outcome: self),
+      let reason = eligibility?.invalidReason {
+      return reason == .inactivity ? "本次因闲置无效 · 未保存为完成成绩"
+        : "本次结果无效（\(reason.resultSummary)） · 未保存为完成成绩"
+    }
+    return switch self {
     case .active: "按任意键开始，Esc 可重新开始"
     case .completed:
       saveState.isSaved ? "本次完成 · 已保存到本机" : "本次完成 · 未保存为完成成绩"
@@ -6362,7 +6368,10 @@ private struct CompletedResultView: View {
   }
 
   private var resultOutcomeTitle: String {
-    switch result.outcome {
+    if result.outcome != .bailedOut, let reason = eligibility.invalidReason {
+      return reason == .inactivity ? "闲置无效" : "结果无效"
+    }
+    return switch result.outcome {
     case .bailedOut: "已中止"
     case .invalidAFK: "闲置无效"
     case .failed: "本次测试失败"
@@ -6371,6 +6380,11 @@ private struct CompletedResultView: View {
   }
 
   private var resultOutcomeSubtitle: String {
+    if result.outcome != .bailedOut, let reason = eligibility.invalidReason {
+      return reason == .inactivity
+        ? "结束前连续约 5 秒没有文本输入；结果只在当前窗口显示，不保存成绩"
+        : "本次结果无效（\(reason.resultSummary)）；结果只在当前窗口显示，不保存成绩"
+    }
     switch result.outcome {
     case .bailedOut:
       if case .ineligible(let reason) = eligibility {

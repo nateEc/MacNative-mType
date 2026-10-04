@@ -160,8 +160,8 @@ function input(ms, value = 'a', text = 'a', extra = {}) {
   data.logTestEvent('input', ms, {inputType: 'insertText', wordIndex: 0, inputValue: value,
     data: text, correct: true, ...extra});
 }
-async function finish(ms) {
-  now = ms; await logic.namespace.finish();
+async function finish(ms, difficultyFailed = false) {
+  now = ms; await logic.namespace.finish(difficultyFailed);
   // Finish publishes raw pace speed even if validation rejects saving.
   assert.equal(state.paceWpm, state.lastResult.wpm);
   return state.lastResult;
@@ -372,6 +372,35 @@ for (const [ms, duration, inconsistent] of [[120004, 120, true], [120005, 120.01
   assert.equal(stats.getDateBasedTestDurationMs(state.eventLog),-3_600_000);
   assert.equal(state.notices.includes('Test invalid - inconsistent test duration'),inconsistent);
   // Do not claim unrelated AFK/qualification branches succeeded.
+  count++;
+}
+// Primary qualification uses the full finish function, not an extracted
+// condition. Keep independent repeat/failure accounting even when an earlier
+// invalidity wins the notice. Inputs, identity and result rendering are owned.
+for (const scenario of [
+  {mode:'time',time:10,ms:10000,endDate:-3600000,failed:true,repeated:true,notice:'inconsistent test duration',invalid:true,carried:1},
+  {mode:'time',time:15,ms:15000,endDate:-3600000,repeated:true,notice:'inconsistent test duration',invalid:true,carried:1},
+  {mode:'time',time:10,ms:500,failed:true,repeated:true,notice:'Test failed - ',invalid:false,carried:1},
+  {mode:'words',words:9,ms:500,failed:true,repeated:true,notice:'Test failed - ',invalid:false,carried:1},
+  {mode:'time',time:10,ms:10000,repeated:true,notice:'too short',invalid:true,carried:1},
+  {mode:'words',words:9,ms:10000,repeated:true,notice:'too short',invalid:true,carried:1},
+  {mode:'time',time:15,ms:15000,repeated:true,notice:'AFK detected',invalid:true,carried:1},
+  {mode:'time',time:15,ms:15000,notice:'AFK detected',invalid:true,carried:0},
+  {mode:'time',time:150,ms:150000,endDate:-3600000,failed:true,notice:'Test failed - ',invalid:false,carried:1},
+  {mode:'words',words:10,ms:15000,endDate:-3600000,failed:true,notice:'Test failed - ',invalid:false,carried:1},
+  {mode:'time',time:120,ms:120004,endDate:-3600000,failed:true,notice:'inconsistent test duration',invalid:true,carried:1},
+  {mode:'time',time:120,ms:120005,endDate:-3600000,failed:true,notice:'Test failed - ',invalid:false,carried:1},
+  {mode:'time',time:10,ms:10000,bailedOut:true,repeated:true,endDate:-3600000,notice:'too short',invalid:true,carried:1},
+  {mode:'quote',ms:15000,repeated:true,notice:'AFK detected',invalid:true,carried:0},
+]) {
+  reset({...scenario,targets:['a'],signedIn:true}); press(0); input(0);
+  await finish(scenario.ms,scenario.failed ?? false);
+  assert.equal(state.notices.length,1,JSON.stringify(scenario));
+  assert.ok(state.notices[0].includes(scenario.notice),JSON.stringify(scenario));
+  assert.equal(state.invalid,scenario.invalid,JSON.stringify(scenario));
+  assert.equal(state.requests.length,0,'Rejected results cannot reach synthetic transport');
+  assert.equal(state.incompleteAttempts.length,scenario.carried,JSON.stringify(scenario));
+  assert.equal(state.visible,true); assert.equal(state.active,false);
   count++;
 }
 console.log(`${count} owned terminal timing/finish fixtures passed (${actualFiles.size} complete actual modules; real event storage/cleanup/key handling/stats/finish/backend length check and authenticated save prefix, synthetic 503 transport/hash/identity/UI/timer-end, no success-save/browser/IME/native parity claim).`);

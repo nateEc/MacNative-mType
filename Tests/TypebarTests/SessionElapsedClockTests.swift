@@ -325,14 +325,20 @@ final class SessionElapsedClockTests: XCTestCase {
   @MainActor func testProducedResultFlowsThroughMemoryStoreArchiveAndNegotiatedPublication() async throws {
     let clock = Clock()
     var session = TypingSession(configuration: .init(mode: .quote, duration: nil, wordLimit: nil,
-      difficulty: .normal, rules: .init()), prompt: "ab").withElapsedClock(clock.source)
+      difficulty: .normal, rules: .init()), prompt: "abc").withElapsedClock(clock.source)
     session.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: true, isRepeat: false, at: start)
     session.insert("a", at: start); clock.seconds = 0.1
     session.recordPhysicalKeyEvent(keyCode: 0, isKeyDown: false, isRepeat: false, at: start)
-    clock.seconds = 16.125
+    clock.seconds = 15
     session.recordPhysicalKeyEvent(keyCode: 11, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(-3_600))
     session.insert("b", at: start.addingTimeInterval(-3_600))
+    clock.seconds = 15.1
+    session.recordPhysicalKeyEvent(keyCode: 11, isKeyDown: false, isRepeat: false, at: start.addingTimeInterval(-3_600))
+    clock.seconds = 16.125
+    session.recordPhysicalKeyEvent(keyCode: 8, isKeyDown: true, isRepeat: false, at: start.addingTimeInterval(-3_600))
+    session.insert("c", at: start.addingTimeInterval(-3_600))
     let value = try XCTUnwrap(session.result())
+    XCTAssertEqual(value.outcome, .completed, "Activity in the retained final intervals is required before saving")
     XCTAssertEqual(ResultEligibilityPolicy.assessment(for: value, samePromptRepeat: false), .eligible)
     let container = try ModelContainer(for: TestResultRecord.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true))

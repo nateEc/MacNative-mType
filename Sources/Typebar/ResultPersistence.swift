@@ -13,11 +13,20 @@ enum ResultEligibility: Equatable {
     if case .eligible = self { return true }
     return false
   }
+
+  /// Failure suppresses saving without marking the result invalid. Earlier
+  /// qualification failures may still override a failed/idle outcome's UI.
+  var invalidReason: ResultIneligibilityReason? {
+    guard case .ineligible(let reason) = self, reason != .testFailed else { return nil }
+    return reason
+  }
 }
 
 enum ResultIneligibilityReason: Equatable {
   case inconsistentDuration
+  case testFailed
   case tooShort
+  case inactivity
   case samePromptRepeat
   case typingSpeed
   case rawTypingSpeed
@@ -26,7 +35,9 @@ enum ResultIneligibilityReason: Equatable {
   var resultSummary: String {
     switch self {
     case .inconsistentDuration: "测试时长与日期不一致"
+    case .testFailed: "本次测试失败"
     case .tooShort: "测试时长或题量过短"
+    case .inactivity: "结束前持续闲置"
     case .samePromptRepeat: "使用同一提示词重测"
     case .typingSpeed: "速度超出可保存范围"
     case .rawTypingSpeed: "原始速度超出可保存范围"
@@ -53,8 +64,9 @@ enum ResultEligibilityPolicy {
     for result: CompletedTestResult, samePromptRepeat: Bool,
     allowsReducedAccuracyThreshold: Bool = false
   ) -> ResultEligibility {
-    // Terminal failures have their own result presentation and saving rules.
-    guard result.outcome == .completed || result.outcome == .bailedOut else { return .eligible }
+    // Preserve the finish chain's priority, independently of the engine's
+    // captured outcome. Active/abandoned attempts do not enter this chain.
+    guard ResultPresentationPolicy.shouldPresent(outcome: result.outcome) else { return .eligible }
     if result.elapsedTime != nil, result.outcome != .bailedOut,
       result.configuration.mode == .time, result.elapsedDuration <= 120 {
       let calendarSeconds = result.finishedAt.timeIntervalSince(result.startedAt)
@@ -62,7 +74,9 @@ enum ResultEligibilityPolicy {
         return .ineligible(.inconsistentDuration)
       }
     }
+    if result.outcome == .failed { return .ineligible(.testFailed) }
     guard !isTooShort(result) else { return .ineligible(.tooShort) }
+    if result.outcome == .invalidAFK { return .ineligible(.inactivity) }
     if samePromptRepeat, result.configuration.mode != .quote {
       return .ineligible(.samePromptRepeat)
     }
@@ -189,7 +203,7 @@ struct PriorAttemptLedger: Equatable {
     outcome: TestOutcome, eligibility: ResultEligibility, samePromptRepeat: Bool
   ) -> Bool {
     if outcome == .failed { return true }
-    if samePromptRepeat { return outcome == .completed || outcome == .bailedOut }
+    if samePromptRepeat { return outcome == .completed || outcome == .bailedOut || outcome == .invalidAFK }
     guard case .ineligible(.samePromptRepeat) = eligibility else { return false }
     return outcome == .completed || outcome == .bailedOut
   }
